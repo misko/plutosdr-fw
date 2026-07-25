@@ -25,24 +25,20 @@ int main(void)
 {
 	static const uint8_t capabilities_golden[32] = {
 		0x53, 0x47, 0x43, 0x50, 0x20, 0x00, 0x01, 0x00,
-		0x01, 0x00, 0x00, 0x00, 0x07, 0x00, 0x00, 0x00,
+		0x02, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00,
 		0xff, 0xff, 0xff, 0x1f, 0x10, 0x00, 0x00, 0x00,
-		0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 	const cmd_usb_capabilities_v1_t capabilities = {
 		.magic = SPF_GADGET_CAPS_MAGIC,
 		.response_bytes = sizeof(cmd_usb_capabilities_v1_t),
 		.protocol_min = SPF_GADGET_PROTOCOL_V1,
-		.protocol_max = SPF_GADGET_PROTOCOL_V1,
-		.supported_features =
-			SPF_META_FEATURE_GAIN_ENDPOINT_SNAPSHOTS |
-			SPF_META_FEATURE_HEADER_CRC32 |
-			SPF_META_FEATURE_SAMPLE_SEQUENCE,
+		.protocol_max = SPF_GADGET_PROTOCOL_V2,
+		.supported_features = SPF_META_REQUIRED_FEATURES_V2,
 		.max_samples_per_channel = SPF_GADGET_MAX_SAMPLES_PER_CHANNEL,
 		.max_finite_frames = SPF_GADGET_MAX_FINITE_FRAMES,
 		.capability_flags =
-			SPF_GADGET_CAP_FINITE_RX |
-			SPF_GADGET_CAP_DUMMY_GAINS,
+			SPF_GADGET_CAP_FINITE_RX,
 	};
 
 	static const uint8_t start_golden[32] = {
@@ -63,6 +59,21 @@ int main(void)
 		.samples_per_channel = 524288,
 		.frame_count = 1,
 	};
+	static const uint8_t start_v2_golden[32] = {
+		0x53, 0x47, 0x53, 0x32, 0x02, 0x00, 0x20, 0x00,
+		0x37, 0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x08, 0x00, 0x01, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	};
+	const cmd_usb_start_rx_v1_t start_v2 = {
+		.magic = SPF_GADGET_START_V2_MAGIC,
+		.protocol_version = SPF_GADGET_PROTOCOL_V2,
+		.request_bytes = sizeof(cmd_usb_start_rx_v1_t),
+		.requested_features = SPF_META_REQUIRED_FEATURES_V2,
+		.enabled_scan_mask = 0x0F,
+		.samples_per_channel = 524288,
+		.frame_count = 1,
+	};
 
 	return
 		check_bytes(
@@ -70,5 +81,6 @@ int main(void)
 			&capabilities,
 			capabilities_golden,
 			sizeof(capabilities)) ||
-		check_bytes("start", &start, start_golden, sizeof(start));
+		check_bytes("start", &start, start_golden, sizeof(start)) ||
+		check_bytes("start v2", &start_v2, start_v2_golden, sizeof(start_v2));
 }
