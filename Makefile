@@ -1,8 +1,9 @@
 
 VIVADO_VERSION ?= 2022.2
 
-# Use Buildroot External Linaro GCC 7.3-2018.05 arm-linux-gnueabihf Toolchain
-CROSS_COMPILE = arm-linux-gnueabihf-
+# Buildroot's pinned Arm GNU 2021.07 toolchain uses the arm-none-linux-gnueabihf
+# tuple. Keep this overridable for older cached Linaro toolchains.
+CROSS_COMPILE ?= arm-none-linux-gnueabihf-
 TOOLS_PATH = PATH="$(CURDIR)/buildroot/output/host/bin:$(CURDIR)/buildroot/output/host/sbin:$(PATH)"
 TOOLCHAIN = $(CURDIR)/buildroot/output/host/bin/$(CROSS_COMPILE)gcc
 
@@ -14,7 +15,7 @@ VERSION=$(shell git describe --abbrev=4 --dirty --always --tags)
 LATEST_TAG=$(shell git describe --abbrev=0 --tags)
 UBOOT_VERSION=$(shell echo -n "PlutoSDR " && cd u-boot-xlnx && git describe --abbrev=0 --dirty --always --tags)
 HAVE_VIVADO= $(shell bash -c "source $(VIVADO_SETTINGS) > /dev/null 2>&1 && vivado -version > /dev/null 2>&1 && echo 1 || echo 0")
-XSA_URL ?= http://github.com/analogdevicesinc/plutosdr-fw/releases/download/${LATEST_TAG}/system_top.xsa
+XSA_URL ?= https://github.com/pgreenland/plutosdr-fw/releases/download/${LATEST_TAG}/system_top.xsa
 
 ifeq (1, ${HAVE_VIVADO})
 	VIVADO_INSTALL= $(shell bash -c "source $(VIVADO_SETTINGS) > /dev/null 2>&1 && vivado -version | head -1 | awk '{print $2}'")
