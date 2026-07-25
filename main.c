@@ -72,7 +72,7 @@ static void signal_handler(int signum);
 static void print_usage(const char *program_name, FILE *dest);
 static const char* event_to_string(struct usb_functionfs_event *event);
 static uint64_t next_stream_id(void);
-static bool validate_start_rx_v1(const cmd_usb_start_rx_v1_t *request);
+static bool validate_start_rx_versioned(const cmd_usb_start_rx_v1_t *request);
 
 /* Private variables */
 static volatile sig_atomic_t keep_running = 1;
@@ -282,12 +282,14 @@ static int handle_ep0(state_t *state)
 						.magic = SPF_GADGET_CAPS_MAGIC,
 						.response_bytes = sizeof(cmd_usb_capabilities_v1_t),
 						.protocol_min = SPF_GADGET_PROTOCOL_V1,
-						.protocol_max = SPF_GADGET_PROTOCOL_V1,
+						.protocol_max = SPF_GADGET_PROTOCOL_V2,
 						.reserved0 = 0,
 						.supported_features =
 							SPF_META_FEATURE_GAIN_ENDPOINT_SNAPSHOTS |
 							SPF_META_FEATURE_HEADER_CRC32 |
-							SPF_META_FEATURE_SAMPLE_SEQUENCE,
+							SPF_META_FEATURE_SAMPLE_SEQUENCE |
+							SPF_META_FEATURE_GAIN_DB_ENDPOINTS |
+							SPF_META_FEATURE_RSSI_ENDPOINT_SNAPSHOTS,
 						.max_samples_per_channel =
 							SPF_GADGET_MAX_SAMPLES_PER_CHANNEL,
 						.max_finite_frames = SPF_GADGET_MAX_FINITE_FRAMES,
@@ -376,7 +378,7 @@ static int handle_ep0(state_t *state)
 							fprintf(stderr, "Bad RX v1 start request size: %zd\n", read_count);
 							break;
 						}
-						if (!validate_start_rx_v1(cmd_start_rx_v1))
+						if (!validate_start_rx_versioned(cmd_start_rx_v1))
 							break;
 
 						stop_thread(state, false);
@@ -454,51 +456,59 @@ static uint64_t next_stream_id(void)
 	return id == 0 ? 1 : id;
 }
 
-static bool validate_start_rx_v1(const cmd_usb_start_rx_v1_t *request)
+static bool validate_start_rx_versioned(const cmd_usb_start_rx_v1_t *request)
 {
-	const uint32_t required_features =
-		SPF_META_FEATURE_GAIN_ENDPOINT_SNAPSHOTS |
-		SPF_META_FEATURE_HEADER_CRC32 |
-		SPF_META_FEATURE_SAMPLE_SEQUENCE;
+	const uint32_t required_v1_features =
+		SPF_META_REQUIRED_FEATURES_V1;
+	const uint32_t required_v2_features =
+		SPF_META_REQUIRED_FEATURES_V2;
+	const bool is_v1 =
+		request->magic == SPF_GADGET_START_V1_MAGIC &&
+		request->protocol_version == SPF_GADGET_PROTOCOL_V1;
+	const bool is_v2 =
+		request->magic == SPF_GADGET_START_V2_MAGIC &&
+		request->protocol_version == SPF_GADGET_PROTOCOL_V2;
 
-	if (request->magic != SPF_GADGET_START_V1_MAGIC ||
-		request->protocol_version != SPF_GADGET_PROTOCOL_V1 ||
+	if ((!is_v1 && !is_v2) ||
 		request->request_bytes != sizeof(*request))
 	{
-		fprintf(stderr, "Bad RX v1 protocol identity\n");
+		fprintf(stderr, "Bad versioned RX protocol identity\n");
 		return false;
 	}
+	const uint32_t required_features =
+		is_v1 ? required_v1_features : required_v2_features;
 	if (request->requested_features != required_features)
 	{
-		fprintf(stderr, "Unsupported RX v1 feature mask: 0x%08x\n",
+		fprintf(stderr, "Unsupported RX v%u feature mask: 0x%08x\n",
+			request->protocol_version,
 			request->requested_features);
 		return false;
 	}
 	if (request->enabled_scan_mask != UINT32_C(0x0F))
 	{
-		fprintf(stderr, "RX v1 requires scan mask 0x0f\n");
+		fprintf(stderr, "Versioned RX requires scan mask 0x0f\n");
 		return false;
 	}
 	if (request->samples_per_channel == 0)
 	{
-		fprintf(stderr, "RX v1 sample count must be nonzero\n");
+		fprintf(stderr, "Versioned RX sample count must be nonzero\n");
 		return false;
 	}
 	if (request->samples_per_channel > SPF_GADGET_MAX_SAMPLES_PER_CHANNEL)
 	{
-		fprintf(stderr, "RX v1 sample count exceeds payload size field\n");
+		fprintf(stderr, "Versioned RX sample count exceeds payload size field\n");
 		return false;
 	}
 	if (request->frame_count == 0 ||
 		request->frame_count > SPF_GADGET_MAX_FINITE_FRAMES)
 	{
-		fprintf(stderr, "RX v1 frame count must be in [1, %u]\n",
+		fprintf(stderr, "Versioned RX frame count must be in [1, %u]\n",
 			SPF_GADGET_MAX_FINITE_FRAMES);
 		return false;
 	}
 	if (request->reserved0 != 0 || request->reserved1 != 0)
 	{
-		fprintf(stderr, "RX v1 reserved fields must be zero\n");
+		fprintf(stderr, "Versioned RX reserved fields must be zero\n");
 		return false;
 	}
 	return true;

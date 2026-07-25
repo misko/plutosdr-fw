@@ -31,6 +31,7 @@
 #include "utils.h"
 #include "spf_gain_metadata.h"
 #include "spf_gain_read.h"
+#include "spf_rssi_read.h"
 
 /* Set the following to periodically report statistics */
 #ifndef GENERATE_STATS
@@ -64,8 +65,12 @@ typedef struct
 	/* Local AD936x PHY used for endpoint gain snapshots. */
 	struct iio_device *iio_dev_phy;
 	bool full_gain_table_mode;
+	bool digital_gain_disabled;
+	spf_gain_table_t gain_table;
 	spf_gain_pair_t previous_gain;
+	spf_rssi_pair_t previous_rssi;
 	uint64_t gain_read_failures;
+	uint64_t rssi_read_failures;
 
 	/* Size of USB buffer (bytes) */
 	size_t usb_buffer_size;
@@ -80,6 +85,8 @@ typedef struct
 
 	/* Versioned finite-stream state. */
 	bool metadata_enabled;
+	bool metadata_v2;
+	size_t metadata_header_size;
 	uint32_t frames_remaining;
 	uint64_t buffer_sequence;
 	bool overflow_seen;
@@ -255,12 +262,17 @@ void *THREAD_READ_Entrypoint(void *args)
 	/* Calculate IQ and USB transfer sizes. */
 	state.iq_payload_size = sample_size * thread_args->iio_buffer_size;
 	state.metadata_enabled =
-		(thread_args->protocol_version == SPF_GAIN_META_VERSION);
+		(thread_args->protocol_version == SPF_GAIN_META_VERSION_V1 ||
+		 thread_args->protocol_version == SPF_GAIN_META_VERSION_V2);
+	state.metadata_v2 =
+		(thread_args->protocol_version == SPF_GAIN_META_VERSION_V2);
+	state.metadata_header_size = state.metadata_v2
+		? sizeof(spf_radio_meta_v2_t)
+		: (state.metadata_enabled ? sizeof(spf_gain_meta_v1_t) : 0);
 	state.frames_remaining = thread_args->frame_count;
 	state.buffer_sequence = 0;
 	state.usb_buffer_size =
-		state.iq_payload_size +
-		(state.metadata_enabled ? sizeof(spf_gain_meta_v1_t) : 0);
+		state.iq_payload_size + state.metadata_header_size;
 
 	if (state.metadata_enabled &&
 		(sample_size != 8 ||
@@ -268,7 +280,7 @@ void *THREAD_READ_Entrypoint(void *args)
 		 state.frames_remaining == 0))
 	{
 		fprintf(stderr,
-			"Invalid v1 RX layout: step=%zu mask=0x%08x frames=%u\n",
+			"Invalid versioned RX layout: step=%zu mask=0x%08x frames=%u\n",
 			sample_size,
 			thread_args->iio_channels,
 			state.frames_remaining);
@@ -279,24 +291,65 @@ void *THREAD_READ_Entrypoint(void *args)
 	{
 		state.full_gain_table_mode =
 			spf_gain_is_full_table_mode(state.iio_dev_phy);
-		state.previous_gain = spf_gain_read_pair(state.iio_dev_phy);
-		if (!state.full_gain_table_mode)
+		state.digital_gain_disabled =
+			spf_gain_is_digital_gain_disabled(state.iio_dev_phy);
+		if (state.metadata_v2)
+		{
+			if (!state.full_gain_table_mode ||
+				!state.digital_gain_disabled ||
+				!spf_gain_table_load(
+					state.iio_dev_phy,
+					&state.gain_table))
+			{
+				fprintf(stderr,
+					"Direct RX v2 requires a valid full gain table and disabled digital gain\n");
+				return NULL;
+			}
+			state.previous_gain = spf_gain_read_db_pair(
+				state.iio_dev_phy,
+				&state.gain_table);
+			state.previous_rssi =
+				spf_rssi_read_pair(state.iio_dev_phy);
+			if (!state.previous_rssi.valid)
+				state.rssi_read_failures++;
+		}
+		else
+		{
+			state.previous_gain =
+				spf_gain_read_pair(state.iio_dev_phy);
+		}
+		if (!state.full_gain_table_mode ||
+			(state.metadata_v2 && !state.digital_gain_disabled))
 		{
 			fprintf(stderr,
-				"Direct RX gain metadata requires full gain-table mode\n");
+				"Direct RX gain metadata requires full-table mode with digital gain disabled for v2\n");
 			state.previous_gain.valid = false;
 			state.previous_gain.rx1 = SPF_GAIN_INDEX_INVALID;
 			state.previous_gain.rx2 = SPF_GAIN_INDEX_INVALID;
+			state.previous_gain.rx1_db = SPF_GAIN_DB_INVALID;
+			state.previous_gain.rx2_db = SPF_GAIN_DB_INVALID;
 		}
 		if (!state.previous_gain.valid)
 			state.gain_read_failures++;
 		DEBUG_PRINT(
-			"Initial gains RX1=%u RX2=%u valid=%d full-table=%d duration=%u ns\n",
+			"Initial gains RX1=%u/%d dB RX2=%u/%d dB valid=%d full-table=%d duration=%u ns\n",
 			state.previous_gain.rx1,
+			state.previous_gain.rx1_db,
 			state.previous_gain.rx2,
+			state.previous_gain.rx2_db,
 			state.previous_gain.valid,
 			state.full_gain_table_mode,
 			state.previous_gain.duration_ns);
+		if (state.metadata_v2)
+		{
+			DEBUG_PRINT(
+				"Initial RSSI RX1=%u qdB RX2=%u qdB valid=%d duration=%u ns table-hash=%08x\n",
+				state.previous_rssi.rx1_qdb,
+				state.previous_rssi.rx2_qdb,
+				state.previous_rssi.valid,
+				state.previous_rssi.duration_ns,
+				state.gain_table.fnv1a32);
+		}
 	}
 
 	/* Summarize info */
@@ -426,6 +479,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	}
 	DEBUG_PRINT("Exit read loop..\n");
 	DEBUG_PRINT("Gain read failures: %" PRIu64 "\n", state.gain_read_failures);
+	DEBUG_PRINT("RSSI read failures: %" PRIu64 "\n", state.rssi_read_failures);
 
 	/* Destroy IO context (cancelling any pending transfers) */
 	io_destroy(state.io_ctx);
@@ -534,13 +588,25 @@ static int handle_iio_buffer(state_t *state)
 	spf_gain_pair_t current_gain = {
 		.rx1 = SPF_GAIN_INDEX_INVALID,
 		.rx2 = SPF_GAIN_INDEX_INVALID,
+		.rx1_db = SPF_GAIN_DB_INVALID,
+		.rx2_db = SPF_GAIN_DB_INVALID,
+		.valid = false,
+		.duration_ns = 0,
+	};
+	spf_rssi_pair_t current_rssi = {
+		.rx1_qdb = SPF_RSSI_QDB_INVALID,
+		.rx2_qdb = SPF_RSSI_QDB_INVALID,
 		.valid = false,
 		.duration_ns = 0,
 	};
 	uint64_t this_buffer_sequence = state->buffer_sequence;
 	if (state->metadata_enabled)
 	{
-		current_gain = spf_gain_read_pair(state->iio_dev_phy);
+		current_gain = state->metadata_v2
+			? spf_gain_read_db_pair(
+				state->iio_dev_phy,
+				&state->gain_table)
+			: spf_gain_read_pair(state->iio_dev_phy);
 		if (!state->full_gain_table_mode)
 		{
 			current_gain.valid = false;
@@ -549,6 +615,12 @@ static int handle_iio_buffer(state_t *state)
 		}
 		if (!current_gain.valid)
 			state->gain_read_failures++;
+		if (state->metadata_v2)
+		{
+			current_rssi = spf_rssi_read_pair(state->iio_dev_phy);
+			if (!current_rssi.valid)
+				state->rssi_read_failures++;
+		}
 		this_buffer_sequence = state->buffer_sequence++;
 	}
 
@@ -573,57 +645,126 @@ static int handle_iio_buffer(state_t *state)
 		uint8_t *iq_destination = buf->data;
 		if (state->metadata_enabled)
 		{
-			spf_gain_meta_v1_t *header = (spf_gain_meta_v1_t *)buf->data;
-			memset(header, 0, sizeof(*header));
-			header->magic = SPF_GAIN_META_MAGIC;
-			header->version = SPF_GAIN_META_VERSION;
-			header->header_bytes = SPF_GAIN_META_HEADER_BYTES;
-			header->features = state->thread_args->metadata_features;
-			header->flags = SPF_META_SAMPLE_SEQUENCE_VALID;
+			uint32_t common_flags = SPF_META_SAMPLE_SEQUENCE_VALID;
 			if (state->previous_gain.valid)
-				header->flags |= SPF_META_START_VALID;
+				common_flags |= SPF_META_START_VALID;
 			if (current_gain.valid)
-				header->flags |= SPF_META_END_VALID;
+				common_flags |= SPF_META_END_VALID;
 			if (!state->previous_gain.valid || !current_gain.valid)
-				header->flags |= SPF_META_GAIN_READ_FAILED;
+				common_flags |= SPF_META_GAIN_READ_FAILED;
 			if (state->full_gain_table_mode)
-				header->flags |= SPF_META_GAIN_FULL_TABLE_MODE;
+				common_flags |= SPF_META_GAIN_FULL_TABLE_MODE;
 			if (state->previous_gain.valid && current_gain.valid)
 			{
 				if (state->previous_gain.rx1 != current_gain.rx1)
-					header->flags |= SPF_META_RX1_ENDPOINT_CHANGED;
+					common_flags |= SPF_META_RX1_ENDPOINT_CHANGED;
 				if (state->previous_gain.rx2 != current_gain.rx2)
-					header->flags |= SPF_META_RX2_ENDPOINT_CHANGED;
+					common_flags |= SPF_META_RX2_ENDPOINT_CHANGED;
 			}
 			if (state->overflow_seen)
-				header->flags |= SPF_META_DEVICE_IIO_OVERFLOW;
-			header->stream_id = state->thread_args->stream_id;
-			header->buffer_sequence = this_buffer_sequence;
-			header->first_sample_sequence =
-				this_buffer_sequence * state->thread_args->iio_buffer_size;
-			header->samples_per_channel =
-				(uint32_t)state->thread_args->iio_buffer_size;
-			header->iq_payload_bytes = (uint32_t)state->iq_payload_size;
-			header->enabled_scan_mask = state->thread_args->iio_channels;
-			header->sample_format =
-				SPF_SAMPLE_FORMAT_CS16_LE_TIME_INTERLEAVED;
-			header->channel_count = 2;
-			header->rx1_gain_start = state->previous_gain.rx1;
-			header->rx2_gain_start = state->previous_gain.rx2;
-			header->rx1_gain_end = current_gain.rx1;
-			header->rx2_gain_end = current_gain.rx2;
-			header->gain_start_read_duration_ns =
-				state->previous_gain.duration_ns;
-			header->gain_end_read_duration_ns =
-				current_gain.duration_ns;
-			header->rx1_first_change_sample =
-				SPF_FIRST_CHANGE_UNAVAILABLE;
-			header->rx2_first_change_sample =
-				SPF_FIRST_CHANGE_UNAVAILABLE;
-			header->header_crc32 = 0;
-			header->header_crc32 =
-				spf_gain_meta_crc32(header, sizeof(*header));
-			iq_destination += sizeof(*header);
+				common_flags |= SPF_META_DEVICE_IIO_OVERFLOW;
+
+			if (state->metadata_v2)
+			{
+				spf_radio_meta_v2_t *header =
+					(spf_radio_meta_v2_t *)buf->data;
+				memset(header, 0, sizeof(*header));
+				header->magic = SPF_GAIN_META_MAGIC;
+				header->version = SPF_GAIN_META_VERSION_V2;
+				header->header_bytes = SPF_GAIN_META_HEADER_BYTES_V2;
+				header->features = state->thread_args->metadata_features;
+				header->flags =
+					common_flags | SPF_META_GAIN_DB_VALUES;
+				if (state->previous_rssi.valid)
+					header->flags |= SPF_META_RSSI_START_VALID;
+				if (current_rssi.valid)
+					header->flags |= SPF_META_RSSI_END_VALID;
+				if (!state->previous_rssi.valid || !current_rssi.valid)
+					header->flags |= SPF_META_RSSI_READ_FAILED;
+				header->stream_id = state->thread_args->stream_id;
+				header->buffer_sequence = this_buffer_sequence;
+				header->first_sample_sequence =
+					this_buffer_sequence * state->thread_args->iio_buffer_size;
+				header->samples_per_channel =
+					(uint32_t)state->thread_args->iio_buffer_size;
+				header->iq_payload_bytes =
+					(uint32_t)state->iq_payload_size;
+				header->enabled_scan_mask =
+					state->thread_args->iio_channels;
+				header->sample_format =
+					SPF_SAMPLE_FORMAT_CS16_LE_TIME_INTERLEAVED;
+				header->channel_count = 2;
+				header->rx1_gain_db_start =
+					state->previous_gain.rx1_db;
+				header->rx2_gain_db_start =
+					state->previous_gain.rx2_db;
+				header->rx1_gain_db_end = current_gain.rx1_db;
+				header->rx2_gain_db_end = current_gain.rx2_db;
+				header->gain_start_read_duration_ns =
+					state->previous_gain.duration_ns;
+				header->gain_end_read_duration_ns =
+					current_gain.duration_ns;
+				header->rx1_first_change_sample =
+					SPF_FIRST_CHANGE_UNAVAILABLE;
+				header->rx2_first_change_sample =
+					SPF_FIRST_CHANGE_UNAVAILABLE;
+				header->rx1_rssi_start_qdb =
+					state->previous_rssi.rx1_qdb;
+				header->rx2_rssi_start_qdb =
+					state->previous_rssi.rx2_qdb;
+				header->rx1_rssi_end_qdb =
+					current_rssi.rx1_qdb;
+				header->rx2_rssi_end_qdb =
+					current_rssi.rx2_qdb;
+				header->rssi_start_read_duration_ns =
+					state->previous_rssi.duration_ns;
+				header->rssi_end_read_duration_ns =
+					current_rssi.duration_ns;
+				header->header_crc32 = 0;
+				header->header_crc32 =
+					spf_gain_meta_crc32(header, sizeof(*header));
+				iq_destination += sizeof(*header);
+			}
+			else
+			{
+				spf_gain_meta_v1_t *header =
+					(spf_gain_meta_v1_t *)buf->data;
+				memset(header, 0, sizeof(*header));
+				header->magic = SPF_GAIN_META_MAGIC;
+				header->version = SPF_GAIN_META_VERSION_V1;
+				header->header_bytes = SPF_GAIN_META_HEADER_BYTES_V1;
+				header->features = state->thread_args->metadata_features;
+				header->flags = common_flags;
+				header->stream_id = state->thread_args->stream_id;
+				header->buffer_sequence = this_buffer_sequence;
+				header->first_sample_sequence =
+					this_buffer_sequence * state->thread_args->iio_buffer_size;
+				header->samples_per_channel =
+					(uint32_t)state->thread_args->iio_buffer_size;
+				header->iq_payload_bytes =
+					(uint32_t)state->iq_payload_size;
+				header->enabled_scan_mask =
+					state->thread_args->iio_channels;
+				header->sample_format =
+					SPF_SAMPLE_FORMAT_CS16_LE_TIME_INTERLEAVED;
+				header->channel_count = 2;
+				header->rx1_gain_start = state->previous_gain.rx1;
+				header->rx2_gain_start = state->previous_gain.rx2;
+				header->rx1_gain_end = current_gain.rx1;
+				header->rx2_gain_end = current_gain.rx2;
+				header->gain_start_read_duration_ns =
+					state->previous_gain.duration_ns;
+				header->gain_end_read_duration_ns =
+					current_gain.duration_ns;
+				header->rx1_first_change_sample =
+					SPF_FIRST_CHANGE_UNAVAILABLE;
+				header->rx2_first_change_sample =
+					SPF_FIRST_CHANGE_UNAVAILABLE;
+				header->header_crc32 = 0;
+				header->header_crc32 =
+					spf_gain_meta_crc32(header, sizeof(*header));
+				iq_destination += sizeof(*header);
+			}
 			state->overflow_seen = false;
 		}
 
@@ -673,7 +814,11 @@ static int handle_iio_buffer(state_t *state)
 	}
 
 	if (state->metadata_enabled)
+	{
 		state->previous_gain = current_gain;
+		if (state->metadata_v2)
+			state->previous_rssi = current_rssi;
+	}
 
 	return 0;
 }
