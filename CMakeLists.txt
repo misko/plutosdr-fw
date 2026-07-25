@@ -35,6 +35,7 @@ add_executable(sdr_usb_gadget
     ring_buffer.c
     thread_read.c
     thread_write.c
+    spf_gain_read.c
     utils.c
 )
 target_link_libraries(sdr_usb_gadget

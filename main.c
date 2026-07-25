@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <time.h>
 #include <unistd.h>
 
 /* libIIO */
@@ -22,6 +23,7 @@
 #include "thread_write.h"
 #include "usb_descriptors.h"
 #include "sdr_usb_gadget_types.h"
+#include "spf_gain_metadata.h"
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -69,6 +71,8 @@ static void close_endpoints(state_t *state);
 static void signal_handler(int signum);
 static void print_usage(const char *program_name, FILE *dest);
 static const char* event_to_string(struct usb_functionfs_event *event);
+static uint64_t next_stream_id(void);
+static bool validate_start_rx_v1(const cmd_usb_start_rx_v1_t *request);
 
 /* Private variables */
 static volatile sig_atomic_t keep_running = 1;
@@ -272,10 +276,37 @@ static int handle_ep0(state_t *state)
 
 			if (event.u.setup.bRequestType & USB_DIR_IN)
 			{
-				/* Write null response */
-				if (write(state->ep[0], NULL, 0) < 0)
+				if (event.u.setup.bRequest == SDR_USB_GADGET_COMMAND_GET_CAPABILITIES)
 				{
-					perror("Failed to write packet to host");
+					const cmd_usb_capabilities_v1_t capabilities = {
+						.magic = SPF_GADGET_CAPS_MAGIC,
+						.response_bytes = sizeof(cmd_usb_capabilities_v1_t),
+						.protocol_min = SPF_GADGET_PROTOCOL_V1,
+						.protocol_max = SPF_GADGET_PROTOCOL_V1,
+						.reserved0 = 0,
+						.supported_features =
+							SPF_META_FEATURE_GAIN_ENDPOINT_SNAPSHOTS |
+							SPF_META_FEATURE_HEADER_CRC32 |
+							SPF_META_FEATURE_SAMPLE_SEQUENCE,
+						.max_samples_per_channel =
+							SPF_GADGET_MAX_SAMPLES_PER_CHANNEL,
+						.max_finite_frames = SPF_GADGET_MAX_FINITE_FRAMES,
+						.capability_flags =
+							SPF_GADGET_CAP_FINITE_RX,
+						.reserved1 = 0,
+					};
+					size_t response_bytes = sizeof(capabilities);
+					if (event.u.setup.wLength < response_bytes)
+						response_bytes = event.u.setup.wLength;
+					if (write(state->ep[0], &capabilities, response_bytes) < 0)
+					{
+						perror("Failed to write capabilities to host");
+						return -1;
+					}
+				}
+				else if (write(state->ep[0], NULL, 0) < 0)
+				{
+					perror("Failed to write empty packet to host");
 					return -1;
 				}
 			}
@@ -283,6 +314,7 @@ static int handle_ep0(state_t *state)
 			{
 				uint8_t control_in_data[64];
 				const cmd_usb_start_request_t *cmd_start_req = (const cmd_usb_start_request_t*)control_in_data;
+				const cmd_usb_start_rx_v1_t *cmd_start_rx_v1 = (const cmd_usb_start_rx_v1_t*)control_in_data;
 
 				/* Read request */
 				ssize_t read_count = read(state->ep[0], control_in_data, sizeof(control_in_data));
@@ -322,10 +354,39 @@ static int handle_ep0(state_t *state)
 							/* RX thread, store args */
 							state->read_args.iio_channels = cmd_start_req->enabled_channels;
 							state->read_args.iio_buffer_size = cmd_start_req->buffer_size;
+							state->read_args.protocol_version = 0;
+							state->read_args.metadata_features = 0;
+							state->read_args.frame_count = 0;
+							state->read_args.stream_id = 0;
 						}
 
 						/* Start thread */
 						start_thread(state, tx);
+						break;
+					}
+					case SDR_USB_GADGET_COMMAND_START_RX_V1:
+					{
+						if (event.u.setup.wValue != SDR_USB_GADGET_COMMAND_TARGET_RX)
+						{
+							fprintf(stderr, "Versioned START is RX-only\n");
+							break;
+						}
+						if (read_count != sizeof(*cmd_start_rx_v1))
+						{
+							fprintf(stderr, "Bad RX v1 start request size: %zd\n", read_count);
+							break;
+						}
+						if (!validate_start_rx_v1(cmd_start_rx_v1))
+							break;
+
+						stop_thread(state, false);
+						state->read_args.iio_channels = cmd_start_rx_v1->enabled_scan_mask;
+						state->read_args.iio_buffer_size = cmd_start_rx_v1->samples_per_channel;
+						state->read_args.protocol_version = cmd_start_rx_v1->protocol_version;
+						state->read_args.metadata_features = cmd_start_rx_v1->requested_features;
+						state->read_args.frame_count = cmd_start_rx_v1->frame_count;
+						state->read_args.stream_id = next_stream_id();
+						start_thread(state, false);
 						break;
 					}
 					case SDR_USB_GADGET_COMMAND_STOP:
@@ -379,6 +440,68 @@ static int handle_ep0(state_t *state)
 	}
 
 	return 0;
+}
+
+static uint64_t next_stream_id(void)
+{
+	static uint64_t start_counter;
+	struct timespec now = {0, 0};
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	uint64_t id =
+		((uint64_t)now.tv_sec * UINT64_C(1000000000)) +
+		(uint64_t)now.tv_nsec +
+		++start_counter;
+	return id == 0 ? 1 : id;
+}
+
+static bool validate_start_rx_v1(const cmd_usb_start_rx_v1_t *request)
+{
+	const uint32_t required_features =
+		SPF_META_FEATURE_GAIN_ENDPOINT_SNAPSHOTS |
+		SPF_META_FEATURE_HEADER_CRC32 |
+		SPF_META_FEATURE_SAMPLE_SEQUENCE;
+
+	if (request->magic != SPF_GADGET_START_V1_MAGIC ||
+		request->protocol_version != SPF_GADGET_PROTOCOL_V1 ||
+		request->request_bytes != sizeof(*request))
+	{
+		fprintf(stderr, "Bad RX v1 protocol identity\n");
+		return false;
+	}
+	if (request->requested_features != required_features)
+	{
+		fprintf(stderr, "Unsupported RX v1 feature mask: 0x%08x\n",
+			request->requested_features);
+		return false;
+	}
+	if (request->enabled_scan_mask != UINT32_C(0x0F))
+	{
+		fprintf(stderr, "RX v1 requires scan mask 0x0f\n");
+		return false;
+	}
+	if (request->samples_per_channel == 0)
+	{
+		fprintf(stderr, "RX v1 sample count must be nonzero\n");
+		return false;
+	}
+	if (request->samples_per_channel > SPF_GADGET_MAX_SAMPLES_PER_CHANNEL)
+	{
+		fprintf(stderr, "RX v1 sample count exceeds payload size field\n");
+		return false;
+	}
+	if (request->frame_count == 0 ||
+		request->frame_count > SPF_GADGET_MAX_FINITE_FRAMES)
+	{
+		fprintf(stderr, "RX v1 frame count must be in [1, %u]\n",
+			SPF_GADGET_MAX_FINITE_FRAMES);
+		return false;
+	}
+	if (request->reserved0 != 0 || request->reserved1 != 0)
+	{
+		fprintf(stderr, "RX v1 reserved fields must be zero\n");
+		return false;
+	}
+	return true;
 }
 
 static bool start_thread(state_t *state, bool tx)

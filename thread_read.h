@@ -20,6 +20,18 @@ typedef struct
 	/* Sample buffer size (in samples) */
 	size_t iio_buffer_size;
 
+	/* Zero for the legacy unbounded IQ-only transport. */
+	uint16_t protocol_version;
+
+	/* Negotiated metadata feature mask. */
+	uint32_t metadata_features;
+
+	/* Zero for unbounded legacy streaming, otherwise a finite frame count. */
+	uint32_t frame_count;
+
+	/* Nonzero ID generated for every versioned START. */
+	uint64_t stream_id;
+
 } THREAD_READ_Args_t;
 
 /* Public functions - Thread entrypoint */
