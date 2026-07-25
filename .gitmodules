@@ -4,7 +4,7 @@
 	branch = pluto
 [submodule "buildroot"]
 	path = buildroot
-	url = ../plutosdr-buildroot.git
+	url = https://github.com/misko/plutosdr-fw.git
 [submodule "linux"]
 	path = linux
 	url = ../plutosdr-linux.git
