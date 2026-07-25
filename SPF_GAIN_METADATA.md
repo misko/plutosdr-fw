@@ -3,6 +3,17 @@
 This firmware branch adds an 80-byte, versioned gain-metadata header before
 each finite dual-RX IQ payload sent by the custom USB gadget.
 
+The complete gadget source used by this firmware is also vendored directly in
+the firmware tree:
+
+```text
+third_party/pluto-sdr-usb-gadget/
+```
+
+The gain-register reads are in `spf_gain_read.c`. The packed metadata protocol
+is in `spf_gain_metadata.h`, and `thread_read.c` constructs the header and
+copies the IQ payload immediately after it.
+
 The source is published in this repository using separate branches because the
 upstream firmware uses independent Git repositories for its Buildroot and USB
 gadget:
