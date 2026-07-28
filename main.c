@@ -24,7 +24,6 @@
 #include "usb_descriptors.h"
 #include "sdr_usb_gadget_types.h"
 #include "spf_gain_metadata.h"
-#include "spf_hardware_identity.h"
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -322,12 +321,6 @@ static int handle_ep0(state_t *state)
 						.fpga_device_dna = 0,
 						.gadget_build_id = {0},
 					};
-					if (spf_read_fpga_device_dna(
-						&identity.fpga_device_dna))
-					{
-						identity.flags |=
-							SPF_HARDWARE_IDENTITY_FLAG_DNA_VALID;
-					}
 					if (copy_build_id(identity.gadget_build_id))
 					{
 						identity.flags |=
