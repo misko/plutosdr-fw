@@ -24,6 +24,7 @@
 #include "usb_descriptors.h"
 #include "sdr_usb_gadget_types.h"
 #include "spf_gain_metadata.h"
+#include "spf_hardware_identity.h"
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -73,6 +74,7 @@ static void print_usage(const char *program_name, FILE *dest);
 static const char* event_to_string(struct usb_functionfs_event *event);
 static uint64_t next_stream_id(void);
 static bool validate_start_rx_versioned(const cmd_usb_start_rx_v1_t *request);
+static bool copy_build_id(char destination[40]);
 
 /* Private variables */
 static volatile sig_atomic_t keep_running = 1;
@@ -294,7 +296,8 @@ static int handle_ep0(state_t *state)
 							SPF_GADGET_MAX_SAMPLES_PER_CHANNEL,
 						.max_finite_frames = SPF_GADGET_MAX_FINITE_FRAMES,
 						.capability_flags =
-							SPF_GADGET_CAP_FINITE_RX,
+							SPF_GADGET_CAP_FINITE_RX |
+							SPF_GADGET_CAP_HARDWARE_IDENTITY,
 						.reserved1 = 0,
 					};
 					size_t response_bytes = sizeof(capabilities);
@@ -303,6 +306,39 @@ static int handle_ep0(state_t *state)
 					if (write(state->ep[0], &capabilities, response_bytes) < 0)
 					{
 						perror("Failed to write capabilities to host");
+						return -1;
+					}
+				}
+				else if (event.u.setup.bRequest ==
+					SDR_USB_GADGET_COMMAND_GET_HARDWARE_IDENTITY)
+				{
+					cmd_usb_hardware_identity_v1_t identity = {
+						.magic = SPF_HARDWARE_IDENTITY_MAGIC,
+						.response_bytes =
+							sizeof(cmd_usb_hardware_identity_v1_t),
+						.version = SPF_HARDWARE_IDENTITY_VERSION,
+						.flags = 0,
+						.reserved0 = 0,
+						.fpga_device_dna = 0,
+						.gadget_build_id = {0},
+					};
+					if (spf_read_fpga_device_dna(
+						&identity.fpga_device_dna))
+					{
+						identity.flags |=
+							SPF_HARDWARE_IDENTITY_FLAG_DNA_VALID;
+					}
+					if (copy_build_id(identity.gadget_build_id))
+					{
+						identity.flags |=
+							SPF_HARDWARE_IDENTITY_FLAG_BUILD_ID_VALID;
+					}
+					size_t response_bytes = sizeof(identity);
+					if (event.u.setup.wLength < response_bytes)
+						response_bytes = event.u.setup.wLength;
+					if (write(state->ep[0], &identity, response_bytes) < 0)
+					{
+						perror("Failed to write hardware identity to host");
 						return -1;
 					}
 				}
@@ -442,6 +478,25 @@ static int handle_ep0(state_t *state)
 	}
 
 	return 0;
+}
+
+static bool copy_build_id(char destination[40])
+{
+	const char *source = PROGRAM_VERSION;
+	if (strlen(source) != 40)
+		return false;
+	for (size_t index = 0; index < 40; ++index)
+	{
+		const char value = source[index];
+		if (!((value >= '0' && value <= '9') ||
+			(value >= 'a' && value <= 'f')))
+		{
+			memset(destination, 0, 40);
+			return false;
+		}
+		destination[index] = value;
+	}
+	return true;
 }
 
 static uint64_t next_stream_id(void)

@@ -38,6 +38,7 @@ add_executable(sdr_usb_gadget
     thread_write.c
     spf_gain_read.c
     spf_rssi_read.c
+    spf_hardware_identity.c
     utils.c
 )
 target_link_libraries(sdr_usb_gadget
