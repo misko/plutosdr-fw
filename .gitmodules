@@ -12,8 +12,8 @@
 	branch = 2018_R1
 [submodule "hdl"]
 	path = hdl
-	url = https://github.com/misko/plutosdr-fw.git
-	branch = hdl-hardware-fingerprint-v1
+	url = https://github.com/pgreenland/plutosdr-hdl.git
+	branch = v0.38_plutoplus_timestamp
 [submodule "hdl-quantulum"]
 	path = hdl-quantulum
 	url = ../plutosdr-hdl-quantulum
