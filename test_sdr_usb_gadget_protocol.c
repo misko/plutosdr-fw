@@ -27,7 +27,7 @@ int main(void)
 		0x53, 0x47, 0x43, 0x50, 0x20, 0x00, 0x01, 0x00,
 		0x02, 0x00, 0x00, 0x00, 0x37, 0x00, 0x00, 0x00,
 		0xff, 0xff, 0xff, 0x1f, 0x10, 0x00, 0x00, 0x00,
-		0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	};
 	const cmd_usb_capabilities_v1_t capabilities = {
 		.magic = SPF_GADGET_CAPS_MAGIC,
@@ -38,7 +38,35 @@ int main(void)
 		.max_samples_per_channel = SPF_GADGET_MAX_SAMPLES_PER_CHANNEL,
 		.max_finite_frames = SPF_GADGET_MAX_FINITE_FRAMES,
 		.capability_flags =
-			SPF_GADGET_CAP_FINITE_RX,
+			SPF_GADGET_CAP_FINITE_RX |
+			SPF_GADGET_CAP_HARDWARE_IDENTITY,
+	};
+
+	static const uint8_t identity_golden[64] = {
+		0x53, 0x48, 0x46, 0x31, 0x40, 0x00, 0x01, 0x00,
+		0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+		0xcd, 0xab, 0x89, 0x67, 0x45, 0x23, 0x01, 0x00,
+		0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63,
+		0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63,
+		0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63,
+		0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63,
+		0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63, 0x63,
+	};
+	const cmd_usb_hardware_identity_v1_t identity = {
+		.magic = SPF_HARDWARE_IDENTITY_MAGIC,
+		.response_bytes = sizeof(cmd_usb_hardware_identity_v1_t),
+		.version = SPF_HARDWARE_IDENTITY_VERSION,
+		.flags =
+			SPF_HARDWARE_IDENTITY_FLAG_DNA_VALID |
+			SPF_HARDWARE_IDENTITY_FLAG_BUILD_ID_VALID,
+		.fpga_device_dna = UINT64_C(0x0123456789abcd),
+		.gadget_build_id = {
+			'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c',
+			'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c',
+			'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c',
+			'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c',
+			'c', 'c', 'c', 'c', 'c', 'c', 'c', 'c',
+		},
 	};
 
 	static const uint8_t start_golden[32] = {
@@ -81,6 +109,11 @@ int main(void)
 			&capabilities,
 			capabilities_golden,
 			sizeof(capabilities)) ||
+		check_bytes(
+			"hardware identity",
+			&identity,
+			identity_golden,
+			sizeof(identity)) ||
 		check_bytes("start", &start, start_golden, sizeof(start)) ||
 		check_bytes("start v2", &start_v2, start_v2_golden, sizeof(start_v2));
 }

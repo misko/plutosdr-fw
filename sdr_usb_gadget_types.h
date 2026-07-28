@@ -9,6 +9,7 @@
 #define SDR_USB_GADGET_COMMAND_STOP (0x11)
 #define SDR_USB_GADGET_COMMAND_GET_CAPABILITIES (0x12)
 #define SDR_USB_GADGET_COMMAND_START_RX_V1 (0x13)
+#define SDR_USB_GADGET_COMMAND_GET_HARDWARE_IDENTITY (0x14)
 #define SDR_USB_GADGET_COMMAND_TARGET_RX (0x00)
 #define SDR_USB_GADGET_COMMAND_TARGET_TX (0x01)
 
@@ -22,6 +23,12 @@
 
 #define SPF_GADGET_CAP_FINITE_RX (UINT32_C(1) << 0)
 #define SPF_GADGET_CAP_DUMMY_GAINS (UINT32_C(1) << 1)
+#define SPF_GADGET_CAP_HARDWARE_IDENTITY (UINT32_C(1) << 2)
+
+#define SPF_HARDWARE_IDENTITY_MAGIC UINT32_C(0x31464853) /* "SHF1" */
+#define SPF_HARDWARE_IDENTITY_VERSION UINT16_C(1)
+#define SPF_HARDWARE_IDENTITY_FLAG_DNA_VALID (UINT32_C(1) << 0)
+#define SPF_HARDWARE_IDENTITY_FLAG_BUILD_ID_VALID (UINT32_C(1) << 1)
 
 /* Type definitions */
 #pragma pack(push,1)
@@ -70,6 +77,17 @@ typedef struct
 	uint32_t reserved0;
 	uint32_t reserved1;
 } cmd_usb_start_rx_v1_t;
+
+typedef struct
+{
+	uint32_t magic;
+	uint16_t response_bytes;
+	uint16_t version;
+	uint32_t flags;
+	uint32_t reserved0;
+	uint64_t fpga_device_dna;
+	char gadget_build_id[40];
+} cmd_usb_hardware_identity_v1_t;
 #pragma pack(pop)
 
 _Static_assert(sizeof(cmd_usb_start_request_t) == 8,
@@ -78,5 +96,7 @@ _Static_assert(sizeof(cmd_usb_capabilities_v1_t) == 32,
 	"SPF capability response must be 32 bytes");
 _Static_assert(sizeof(cmd_usb_start_rx_v1_t) == 32,
 	"SPF RX v1 start request must be 32 bytes");
+_Static_assert(sizeof(cmd_usb_hardware_identity_v1_t) == 64,
+	"SPF hardware identity response must be 64 bytes");
 
 #endif
