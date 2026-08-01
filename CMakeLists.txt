@@ -78,4 +78,7 @@ if (BUILD_HOST_TESTS)
     add_executable(test_sdr_usb_gadget_protocol
         test_sdr_usb_gadget_protocol.c)
     add_test(NAME sdr_usb_gadget_protocol COMMAND test_sdr_usb_gadget_protocol)
+
+    add_executable(test_spf_buffer_policy test_spf_buffer_policy.c)
+    add_test(NAME spf_buffer_policy COMMAND test_spf_buffer_policy)
 endif()

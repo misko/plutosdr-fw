@@ -32,6 +32,7 @@
 #include "spf_gain_metadata.h"
 #include "spf_gain_read.h"
 #include "spf_rssi_read.h"
+#include "spf_buffer_policy.h"
 
 /* Set the following to periodically report statistics */
 #ifndef GENERATE_STATS
@@ -42,9 +43,6 @@
 #ifndef STATS_PERIOD_SECS
 #define STATS_PERIOD_SECS (5)
 #endif
-
-/* Define number of write buffers to queue up */
-#define NUM_BUFS (16)
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -98,11 +96,12 @@ typedef struct
 	int aio_eventfd;
 
 	/* List of buffers */
-	usb_buf_t* buffers[NUM_BUFS];
+	usb_buf_t* buffers[SPF_USB_BUFFER_LIMIT];
+	uint32_t buffer_count;
 
 	/* Ring buffer of unused AIO requests */
 	RING_BUFFER_Ctx_t ring_buf_ctx;
-	usb_buf_t* ring_buf_data[NUM_BUFS];
+	usb_buf_t* ring_buf_data[SPF_USB_BUFFER_LIMIT];
 
 	#if GENERATE_STATS
 	/* Stats reporting timer */
@@ -273,6 +272,9 @@ void *THREAD_READ_Entrypoint(void *args)
 	state.buffer_sequence = 0;
 	state.usb_buffer_size =
 		state.iq_payload_size + state.metadata_header_size;
+	state.buffer_count = spf_usb_buffer_count(
+		state.metadata_enabled,
+		state.frames_remaining);
 
 	if (state.metadata_enabled &&
 		(sample_size != 8 ||
@@ -353,18 +355,19 @@ void *THREAD_READ_Entrypoint(void *args)
 	}
 
 	/* Summarize info */
-	DEBUG_PRINT("RX sample count: %zu, iio sample size: %zu, IQ bytes: %zu, USB bytes: %zu, frames: %u\n",
+	DEBUG_PRINT("RX sample count: %zu, iio sample size: %zu, IQ bytes: %zu, USB bytes: %zu, frames: %u, USB buffers: %u\n",
 				thread_args->iio_buffer_size,
 				sample_size,
 				state.iq_payload_size,
 				state.usb_buffer_size,
-				state.frames_remaining);
+				state.frames_remaining,
+				state.buffer_count);
 
 	/* Reset AIO context */
 	memset(&state.io_ctx, 0x00, sizeof(state.io_ctx));
 
 	/* Setup AIO context */
-	if (io_setup(ARRAY_SIZE(state.buffers), &state.io_ctx) < 0)
+	if (io_setup(state.buffer_count, &state.io_ctx) < 0)
 	{
 		perror("Failed to setup AIO");
 		return NULL;
@@ -401,10 +404,10 @@ void *THREAD_READ_Entrypoint(void *args)
 	}
 
 	/* Init ring buffer */
-	RING_BUFFER_Init(&state.ring_buf_ctx, ARRAY_SIZE(state.ring_buf_data));
+	RING_BUFFER_Init(&state.ring_buf_ctx, state.buffer_count);
 
 	/* Allocate buffers */
-	for (unsigned int i = 0; i < ARRAY_SIZE(state.buffers); i++)
+	for (uint32_t i = 0; i < state.buffer_count; i++)
 	{
 		/* Allocate buffer */
 		usb_buf_t *buf = alloc_usb_buffer(state.usb_buffer_size, thread_args->output_fd, state.aio_eventfd);
@@ -485,7 +488,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	io_destroy(state.io_ctx);
 
 	/* Free buffers after destroying context now kernel won't be using them */
-	for (unsigned int i = 0; i < ARRAY_SIZE(state.buffers); i++)
+	for (uint32_t i = 0; i < state.buffer_count; i++)
 	{
 		/* Free buffer */
 		free(state.buffers[i]);
