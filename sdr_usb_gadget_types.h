@@ -19,7 +19,18 @@
 #define SPF_GADGET_PROTOCOL_V1 UINT16_C(1)
 #define SPF_GADGET_PROTOCOL_V2 UINT16_C(2)
 #define SPF_GADGET_MAX_FINITE_FRAMES UINT32_C(16)
-#define SPF_GADGET_MAX_SAMPLES_PER_CHANNEL (UINT32_MAX / UINT32_C(8))
+
+/*
+ * Largest finite dual-RX frame this firmware supports and advertises.
+ *
+ * This is an operational transport limit, not merely the largest sample
+ * count whose byte-size arithmetic fits in uint32_t.  Hosts use this value to
+ * size receive and stale-frame drain transfers.  Advertising UINT32_MAX / 8
+ * caused two simultaneous receivers to each reserve an 8 MiB drain transfer,
+ * exhausting the Raspberry Pi's default 16 MiB usbfs transfer-memory pool.
+ * Rover production frames are 524288 samples/channel (4 MiB of CS16 IQ).
+ */
+#define SPF_GADGET_MAX_SAMPLES_PER_CHANNEL UINT32_C(524288)
 
 #define SPF_GADGET_CAP_FINITE_RX (UINT32_C(1) << 0)
 #define SPF_GADGET_CAP_DUMMY_GAINS (UINT32_C(1) << 1)
