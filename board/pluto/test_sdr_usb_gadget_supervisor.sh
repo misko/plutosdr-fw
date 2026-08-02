@@ -3,7 +3,15 @@ set -eu
 
 TEST_DIR=$(mktemp -d)
 SUPERVISOR=$(dirname "$0")/sdr_usb_gadget_supervisor.sh
+S23UDC=$(dirname "$0")/S23udc
 trap 'rm -rf "$TEST_DIR"' EXIT
+
+# The direct FunctionFS mount must remain registered when its userspace daemon
+# exits. Otherwise the kernel unregisters the entire composite gadget before
+# the supervisor can start a replacement process.
+grep -Fq \
+	'mount -t functionfs -o no_disconnect=1 sdr_gadget_ffs /dev/sdr_gadget_ffs' \
+	"$S23UDC"
 
 cat > "$TEST_DIR/fake_gadget" <<'EOF'
 #!/bin/sh
@@ -38,10 +46,10 @@ set -e
 [ "$STATUS" -eq 7 ]
 [ "$(wc -l < "$TEST_DIR/events")" -eq 3 ]
 [ "$(sed -n '1p' "$TEST_DIR/events")" = start:test_udc ]
-[ "$(sed -n '2p' "$TEST_DIR/events")" = start: ]
-[ "$(sed -n '3p' "$TEST_DIR/events")" = start: ]
+[ "$(sed -n '2p' "$TEST_DIR/events")" = start:test_udc ]
+[ "$(sed -n '3p' "$TEST_DIR/events")" = start:test_udc ]
 [ "$(cat "$TEST_DIR/udc")" = test_udc ]
-[ "$(grep -c 'rebound composite USB gadget' "$TEST_DIR/log")" -eq 2 ]
+[ "$(grep -c 'recovered direct-USB gadget process' "$TEST_DIR/log")" -eq 2 ]
 
 cat > "$TEST_DIR/fake_gadget" <<'EOF'
 #!/bin/sh
