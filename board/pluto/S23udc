@@ -125,7 +125,9 @@ case "$1" in
 	mount iio_ffs -t functionfs /dev/iio_ffs 2> /dev/null
 
 	mkdir -p /dev/sdr_gadget_ffs
-	mount sdr_gadget_ffs -t functionfs /dev/sdr_gadget_ffs 2> /dev/null
+	# Keep the composite gadget registered if the direct-USB userspace daemon
+	# exits. The supervisor can then reopen ep0 without disrupting USB-IIO.
+	mount -t functionfs -o no_disconnect=1 sdr_gadget_ffs /dev/sdr_gadget_ffs 2> /dev/null
 
 	start-stop-daemon -S -b -q -m -p /var/run/iiod.pid -x  /usr/sbin/iiod  -- $IIOD_OPTS
 	if [ "$SDR_USB_GADGET_DEBUG" == "1" ]
@@ -190,6 +192,4 @@ case "$1" in
 esac
 
 exit $?
-
-
 
