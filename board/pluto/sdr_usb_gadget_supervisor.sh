@@ -11,6 +11,10 @@ LOGGER=${SPF_GADGET_LOGGER:-logger}
 UDC_PATH=${SPF_GADGET_UDC_PATH:-/sys/kernel/config/usb_gadget/composite_gadget/UDC}
 UDC_NAME=${SPF_GADGET_UDC_NAME:-ci_hdrc.0}
 REBIND_DELAY=${SPF_GADGET_REBIND_DELAY_SECONDS:-0.2}
+BIND_ATTEMPTS=${SPF_GADGET_BIND_ATTEMPTS:-20}
+READY_ATTEMPTS=${SPF_GADGET_READY_ATTEMPTS:-50}
+READY_DELAY=${SPF_GADGET_READY_DELAY_SECONDS:-0.1}
+CHILD_LOG=${SPF_GADGET_CHILD_LOG:-}
 DEBUG=0
 CHILD_PID=
 STOPPING=0
@@ -26,6 +30,14 @@ if [ "$#" -ne 1 ]; then
 	exit 64
 fi
 
+if [ -z "$CHILD_LOG" ]; then
+	if [ "$DEBUG" -eq 1 ]; then
+		CHILD_LOG=/var/log/sdr_usb_gadget.log
+	else
+		CHILD_LOG=/tmp/sdr_usb_gadget_supervisor_child.log
+	fi
+fi
+
 stop_child() {
 	STOPPING=1
 	if [ -n "$CHILD_PID" ]; then
@@ -37,10 +49,11 @@ stop_child() {
 
 trap stop_child INT TERM
 
-rebind_udc() {
+unbind_udc() {
 	# Closing the last FunctionFS descriptor disconnects the whole composite
-	# gadget. Starting a new daemon republishes descriptors, but the host will
-	# not see them until the UDC is explicitly rebound.
+	# gadget. Unbind before opening the replacement FunctionFS daemon: opening
+	# ep0 while the dead function is still attached can make the replacement
+	# daemon exit before it publishes its descriptors.
 	if [ ! -w "$UDC_PATH" ]; then
 		"$LOGGER" -t sdr_usb_gadget \
 			"cannot rebind direct-USB gadget: UDC path is not writable: $UDC_PATH"
@@ -51,26 +64,74 @@ rebind_udc() {
 			"cannot unbind direct-USB gadget from UDC: $UDC_PATH"
 		return 1
 	fi
-	sleep "$REBIND_DELAY"
-	if ! printf '%s\n' "$UDC_NAME" > "$UDC_PATH"; then
-		"$LOGGER" -t sdr_usb_gadget \
-			"cannot bind direct-USB gadget to UDC: $UDC_NAME"
-		return 1
-	fi
+}
+
+bind_udc() {
+	ATTEMPT=1
+	while [ "$ATTEMPT" -le "$BIND_ATTEMPTS" ]; do
+		if printf '%s\n' "$UDC_NAME" > "$UDC_PATH"; then
+			"$LOGGER" -t sdr_usb_gadget \
+				"rebound composite USB gadget after direct-USB daemon restart=$RESTART_COUNT attempt=$ATTEMPT"
+			return 0
+		fi
+		sleep "$REBIND_DELAY"
+		ATTEMPT=$((ATTEMPT + 1))
+	done
 	"$LOGGER" -t sdr_usb_gadget \
-		"rebound composite USB gadget after direct-USB daemon restart=$RESTART_COUNT"
+		"cannot bind direct-USB gadget to UDC after $BIND_ATTEMPTS attempts: $UDC_NAME"
+	return 1
+}
+
+wait_for_child_ready() {
+	ATTEMPT=1
+	while [ "$ATTEMPT" -le "$READY_ATTEMPTS" ]; do
+		if grep -q '^Ready :-)$' "$CHILD_LOG" 2>/dev/null; then
+			return 0
+		fi
+		if ! kill -0 "$CHILD_PID" 2>/dev/null; then
+			return 1
+		fi
+		sleep "$READY_DELAY"
+		ATTEMPT=$((ATTEMPT + 1))
+	done
+	return 1
 }
 
 while [ "$STOPPING" -eq 0 ]; do
+	if [ "$RESTART_COUNT" -gt 0 ]; then
+		if ! unbind_udc; then
+			RESTART_COUNT=$((RESTART_COUNT + 1))
+			if [ "$MAX_RESTARTS" -gt 0 ] && [ "$RESTART_COUNT" -ge "$MAX_RESTARTS" ]; then
+				exit 1
+			fi
+			sleep "$RESTART_DELAY"
+			continue
+		fi
+		sleep "$REBIND_DELAY"
+	fi
+	: > "$CHILD_LOG"
 	if [ "$DEBUG" -eq 1 ]; then
-		"$GADGET_BIN" -d "$1" > /var/log/sdr_usb_gadget.log 2>&1 &
+		"$GADGET_BIN" -d "$1" > "$CHILD_LOG" 2>&1 &
 	else
-		"$GADGET_BIN" "$1" > /dev/null 2>&1 &
+		"$GADGET_BIN" "$1" > "$CHILD_LOG" 2>&1 &
 	fi
 	CHILD_PID=$!
+	if ! wait_for_child_ready; then
+		"$LOGGER" -t sdr_usb_gadget \
+			"direct-USB gadget failed readiness restart=$RESTART_COUNT log=$CHILD_LOG"
+		kill "$CHILD_PID" 2>/dev/null
+		wait "$CHILD_PID" 2>/dev/null
+		CHILD_PID=
+		RESTART_COUNT=$((RESTART_COUNT + 1))
+		if [ "$MAX_RESTARTS" -gt 0 ] && [ "$RESTART_COUNT" -ge "$MAX_RESTARTS" ]; then
+			exit 1
+		fi
+		sleep "$RESTART_DELAY"
+		continue
+	fi
 	if [ "$RESTART_COUNT" -gt 0 ]; then
 		sleep "$REBIND_DELAY"
-		if ! rebind_udc; then
+		if ! bind_udc; then
 			kill "$CHILD_PID" 2>/dev/null
 			wait "$CHILD_PID" 2>/dev/null
 			CHILD_PID=
