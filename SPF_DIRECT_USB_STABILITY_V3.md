@@ -136,9 +136,24 @@ Hardware evidence for SHA-256 `86f2115e...` on Rover 1 radio
 - supervisor logged both composite recovery and process recovery each time;
 - Raspberry Pi reported `throttled=0x0` after the run.
 
-The second Rover 1 radio had been made unreachable by the rejected candidate
-before this image was loaded. The final simultaneous two-radio crash gate is
-therefore pending a physical power reset of that externally powered radio.
+Final dual-radio evidence after physically resetting Rover 1 and RAM-loading
+SHA-256 `86f2115e...` on both radios:
+
+- both serials enumerated at their stable paths `1-1.1` and `1-1.2`;
+- 20 production-size lifecycle cycles completed on each radio;
+- simultaneous capture completed on both radios;
+- simultaneous rolling streams returned sequences `0..7` on both radios;
+- deliberate SIGKILL recovery passed 3/3 times on each radio;
+- all six recoveries retained serial, physical path, and boot ID;
+- all six recoveries produced fresh process nonces and valid IQ afterward;
+- a final simultaneous post-recovery gate passed 2 tests;
+- both standard USB-IIO contexts were present after the final recovery;
+- the Raspberry Pi reported `throttled=0x0` with 3.6 GiB available memory;
+- pre-load state records confirm QSPI still contains the approved v2 image.
+
+The RAM candidate satisfies the hardware promotion gate. Publishing a release
+asset or changing Rover boot firmware remains a separate, explicit deployment
+step; the acceptance run itself did not write persistent Pluto storage.
 
 ## Release and field-deployment gate
 
