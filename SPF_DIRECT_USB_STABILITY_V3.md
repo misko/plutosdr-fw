@@ -121,8 +121,24 @@ Hardware evidence for SHA-256 `de5264...` rejected that candidate: normal
 simultaneous dual-radio capture passed, but killing the first direct-USB child
 removed that radio from the host indefinitely. A controlled experiment on the
 second radio proved that unbind, restart-to-readiness, and rebind returns the
-same serial and path with both interfaces. A replacement image using that
-sequence is being rebuilt and remains RAM-test-only.
+same serial and path with both interfaces. The current candidate uses that
+sequence and remains RAM-test-only.
+
+Hardware evidence for SHA-256 `86f2115e...` on Rover 1 radio
+`10400090fd950014020005008faf192e5a`, physical path `1-1.2`:
+
+- production-size normal-capture gate: 4 passed, 2 dual-radio tests skipped;
+- deliberate SIGKILL recovery gate: 3/3 consecutive runs passed;
+- USB addresses changed from 12 through 15, as expected after re-enumeration;
+- serial, physical path, and boot ID remained unchanged;
+- every recovery produced a fresh process nonce and three valid IQ frames;
+- standard USB-IIO returned after every recovery;
+- supervisor logged both composite recovery and process recovery each time;
+- Raspberry Pi reported `throttled=0x0` after the run.
+
+The second Rover 1 radio had been made unreachable by the rejected candidate
+before this image was loaded. The final simultaneous two-radio crash gate is
+therefore pending a physical power reset of that externally powered radio.
 
 ## Release and field-deployment gate
 
