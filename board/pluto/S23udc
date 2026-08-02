@@ -130,12 +130,15 @@ case "$1" in
 	start-stop-daemon -S -b -q -m -p /var/run/iiod.pid -x  /usr/sbin/iiod  -- $IIOD_OPTS
 	if [ "$SDR_USB_GADGET_DEBUG" == "1" ]
 	then
-		# Launch SDR USB gadget, logging to file
-		start-stop-daemon -S -b -q -m -p /var/run/sdr_usb_gadget.pid --startas /bin/sh -- -c "exec /usr/sbin/sdr_usb_gadget -d $SDR_USB_GADGET_OPTS > /var/log/sdr_usb_gadget.log 2>&1"
+		SDR_USB_GADGET_SUPERVISOR_OPTS="-d"
 	else
-		# Launch SDR USB gadget, without logging
-		start-stop-daemon -S -b -q -m -p /var/run/sdr_usb_gadget.pid -x  /usr/sbin/sdr_usb_gadget -- $SDR_USB_GADGET_OPTS
+		SDR_USB_GADGET_SUPERVISOR_OPTS=""
 	fi
+	# A stuck worker exits the gadget process. Restart only this FunctionFS
+	# daemon; standard iiod remains online for configuration and attestation.
+	start-stop-daemon -S -b -q -m -p /var/run/sdr_usb_gadget.pid \
+		-x /usr/sbin/sdr_usb_gadget_supervisor.sh -- \
+		$SDR_USB_GADGET_SUPERVISOR_OPTS $SDR_USB_GADGET_OPTS
 	sleep 0.2
 
 	echo ci_hdrc.0 > $GADGET/UDC
@@ -187,7 +190,6 @@ case "$1" in
 esac
 
 exit $?
-
 
 
 
