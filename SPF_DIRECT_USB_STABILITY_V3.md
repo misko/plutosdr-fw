@@ -1,8 +1,9 @@
 # SPF direct-USB stability v3
 
 This document records the source graph, failure evidence, build procedure, and
-promotion gate for the supervised direct-USB firmware. `master` remains the
-rollback baseline until every hardware condition below passes.
+release gate for the supervised direct-USB firmware. The source is published on
+`master`, while the generated image remains RAM-test-only until every hardware
+condition below passes.
 
 ## Pinned source graph
 
@@ -100,9 +101,10 @@ Hardware evidence before the final design:
 Hardware evidence for SHA-256 `de5264...` is pending a physical power cycle of
 the externally powered test radios.
 
-## Promotion gate
+## Release and field-deployment gate
 
-The candidate may be proposed for `master` only after all of the following pass:
+The candidate must not become a release asset or Rover boot image until all of
+the following pass:
 
 - both expected radios enumerate by serial and physical path;
 - standard USB-IIO and direct USB coexist on both radios;
