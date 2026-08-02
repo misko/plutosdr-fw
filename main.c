@@ -230,6 +230,7 @@ int main(int argc, char *argv[])
 
 	/* Here we go */
 	printf("Ready :-)\n");
+	fflush(stdout);
 
 	/* Enter main loop */
 	DEBUG_PRINT("Enter main loop..\n");
