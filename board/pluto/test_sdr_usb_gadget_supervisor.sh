@@ -46,9 +46,10 @@ set -e
 [ "$STATUS" -eq 7 ]
 [ "$(wc -l < "$TEST_DIR/events")" -eq 3 ]
 [ "$(sed -n '1p' "$TEST_DIR/events")" = start:test_udc ]
-[ "$(sed -n '2p' "$TEST_DIR/events")" = start:test_udc ]
-[ "$(sed -n '3p' "$TEST_DIR/events")" = start:test_udc ]
+[ "$(sed -n '2p' "$TEST_DIR/events")" = start: ]
+[ "$(sed -n '3p' "$TEST_DIR/events")" = start: ]
 [ "$(cat "$TEST_DIR/udc")" = test_udc ]
+[ "$(grep -c 'recovered composite USB gadget' "$TEST_DIR/log")" -eq 2 ]
 [ "$(grep -c 'recovered direct-USB gadget process' "$TEST_DIR/log")" -eq 2 ]
 
 cat > "$TEST_DIR/fake_gadget" <<'EOF'
