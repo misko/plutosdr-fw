@@ -33,6 +33,7 @@
 #include "spf_gain_read.h"
 #include "spf_rssi_read.h"
 #include "spf_buffer_policy.h"
+#include "spf_cleanup_plan.h"
 
 /* Set the following to periodically report statistics */
 #ifndef GENERATE_STATS
@@ -53,9 +54,13 @@ typedef struct
 {
 	/* Thread args */
 	THREAD_READ_Args_t *thread_args;
+	uint32_t acquired_resources;
+	uint32_t buffers_allocated;
+	struct iio_context *iio_ctx;
 
 	/* Keep running */
 	bool keep_running;
+	bool worker_ready;
 
 	/* IIO sample buffer */
 	struct iio_buffer *iio_rx_buffer;
@@ -87,6 +92,7 @@ typedef struct
 	size_t metadata_header_size;
 	uint32_t frames_remaining;
 	uint64_t buffer_sequence;
+	uint32_t frames_completed_in_stream;
 	bool overflow_seen;
 
 	/* AIO context */
@@ -133,6 +139,11 @@ static int handle_iio_buffer(state_t *state);
 static int handle_stats_timer(state_t *state);
 #endif
 static usb_buf_t *alloc_usb_buffer(size_t size, int usb_fd, int event_fd);
+static void cleanup_state(state_t *state);
+static void record_fatal_error(
+	state_t *state,
+	spf_error_subsystem_t subsystem,
+	int error_number);
 
 /* Public functions */
 void *THREAD_READ_Entrypoint(void *args)
@@ -150,22 +161,30 @@ void *THREAD_READ_Entrypoint(void *args)
 	/* Reset state */
 	state_t state;
 	memset(&state, 0x00, sizeof(state));
+	state.epoll_fd = -1;
+	state.iio_poll_fd = -1;
+	state.aio_eventfd = -1;
+	#if GENERATE_STATS
+	state.stats_timerfd = -1;
+	#endif
 
 	/* Store args */
 	state.thread_args = thread_args;
+	spf_runtime_status_heartbeat(thread_args->runtime_status);
 
 	/* Create epoll instance */
 	int epoll_fd = epoll_create1(0);
 	if (epoll_fd < 0)
 	{
 		perror("Failed to create epoll instance");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
 		DEBUG_PRINT("Opened epoll :-)\n");
 	}
 	state.epoll_fd = epoll_fd;
+	state.acquired_resources |= SPF_RX_RESOURCE_EPOLL;
 
 	struct epoll_event epoll_event;
 
@@ -175,7 +194,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, thread_args->quit_event_fd, &epoll_event) < 0)
 	{
 		perror("Failed to register thread quit eventfd with epoll");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
@@ -183,26 +202,27 @@ void *THREAD_READ_Entrypoint(void *args)
 	}
 
 	/* Create IIO context */
-	struct iio_context *iio_ctx = iio_create_local_context();
-	if (!iio_ctx)
+	state.iio_ctx = iio_create_local_context();
+	if (!state.iio_ctx)
 	{
 		fprintf(stderr, "Failed to open iio\n");
-		return NULL;
+		goto cleanup;
 	}
+	state.acquired_resources |= SPF_RX_RESOURCE_IIO_CONTEXT;
 
 	/* Retrieve RX streaming device */
-	struct iio_device *iio_dev_rx = iio_context_find_device(iio_ctx, "cf-ad9361-lpc");
+	struct iio_device *iio_dev_rx = iio_context_find_device(state.iio_ctx, "cf-ad9361-lpc");
 	if (!iio_dev_rx)
 	{
 		fprintf(stderr, "Failed to open iio rx dev\n");
-		return NULL;
+		goto cleanup;
 	}
 
-	state.iio_dev_phy = iio_context_find_device(iio_ctx, "ad9361-phy");
+	state.iio_dev_phy = iio_context_find_device(state.iio_ctx, "ad9361-phy");
 	if (!state.iio_dev_phy)
 	{
 		fprintf(stderr, "Failed to open ad9361-phy\n");
-		return NULL;
+		goto cleanup;
 	}
 
 	/* Disable all channels */
@@ -223,7 +243,7 @@ void *THREAD_READ_Entrypoint(void *args)
 			if (!channel)
 			{
 				fprintf(stderr, "Failed to find iio rx chan %u\n", i);
-				return false;
+				goto cleanup;
 			}
 
 			/* Enable channels */
@@ -236,8 +256,9 @@ void *THREAD_READ_Entrypoint(void *args)
 	if (!state.iio_rx_buffer)
 	{
 		fprintf(stderr, "Failed to create rx buffer for %zu samples\n", thread_args->iio_buffer_size);
-		return NULL;
+		goto cleanup;
 	}
+	state.acquired_resources |= SPF_RX_RESOURCE_IIO_BUFFER;
 
 	/* Register buffer with epoll */
 	epoll_event.events = EPOLLIN;
@@ -247,7 +268,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	{
 		/* Failed to register IIO buffer with epoll */
 		perror("Failed to register IIO buffer with epoll");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
@@ -286,7 +307,7 @@ void *THREAD_READ_Entrypoint(void *args)
 			sample_size,
 			thread_args->iio_channels,
 			state.frames_remaining);
-		return NULL;
+		goto cleanup;
 	}
 
 	if (state.metadata_enabled)
@@ -305,7 +326,7 @@ void *THREAD_READ_Entrypoint(void *args)
 			{
 				fprintf(stderr,
 					"Direct RX v2 requires a valid full gain table and disabled digital gain\n");
-				return NULL;
+				goto cleanup;
 			}
 			state.previous_gain = spf_gain_read_db_pair(
 				state.iio_dev_phy,
@@ -313,7 +334,12 @@ void *THREAD_READ_Entrypoint(void *args)
 			state.previous_rssi =
 				spf_rssi_read_pair(state.iio_dev_phy);
 			if (!state.previous_rssi.valid)
+			{
 				state.rssi_read_failures++;
+				spf_runtime_status_increment(
+					thread_args->runtime_status,
+					SPF_STATUS_COUNTER_RSSI_READ_FAILURE);
+			}
 		}
 		else
 		{
@@ -332,7 +358,12 @@ void *THREAD_READ_Entrypoint(void *args)
 			state.previous_gain.rx2_db = SPF_GAIN_DB_INVALID;
 		}
 		if (!state.previous_gain.valid)
+		{
 			state.gain_read_failures++;
+			spf_runtime_status_increment(
+				thread_args->runtime_status,
+				SPF_STATUS_COUNTER_GAIN_READ_FAILURE);
+		}
 		DEBUG_PRINT(
 			"Initial gains RX1=%u/%d dB RX2=%u/%d dB valid=%d full-table=%d duration=%u ns\n",
 			state.previous_gain.rx1,
@@ -370,24 +401,26 @@ void *THREAD_READ_Entrypoint(void *args)
 	if (io_setup(state.buffer_count, &state.io_ctx) < 0)
 	{
 		perror("Failed to setup AIO");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
 		DEBUG_PRINT("Setup AIO :-)\n");
 	}
+	state.acquired_resources |= SPF_RX_RESOURCE_AIO_CONTEXT;
 
 	/* Prepare eventfd to notify of completed AIO transfers */
 	state.aio_eventfd = eventfd(0, 0);
 	if (state.aio_eventfd < 0)
 	{
 		perror("Failed to open eventfd");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
 		DEBUG_PRINT("Opened eventfd :-)\n");
 	}
+	state.acquired_resources |= SPF_RX_RESOURCE_AIO_EVENTFD;
 
 	/* Register aio eventfd with epoll */
 	epoll_event.events = EPOLLIN;
@@ -396,7 +429,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	{
 		/* Failed to register aio completion eventfd with epoll */
 		perror("Failed to register aio completion eventfd with epoll");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
@@ -413,11 +446,13 @@ void *THREAD_READ_Entrypoint(void *args)
 		usb_buf_t *buf = alloc_usb_buffer(state.usb_buffer_size, thread_args->output_fd, state.aio_eventfd);
 		if (!buf)
 		{
-			return NULL;
+			goto cleanup;
 		}
 
 		/* Store buffer */
 		state.buffers[i] = buf;
+		state.buffers_allocated++;
+		state.acquired_resources |= SPF_RX_RESOURCE_USB_BUFFERS;
 
 		/* Push buffer into unused ring position */
 		state.ring_buf_data[RING_BUFFER_Put(&state.ring_buf_ctx)] = buf;
@@ -429,12 +464,13 @@ void *THREAD_READ_Entrypoint(void *args)
 	if (state.stats_timerfd < 0)
 	{
 		perror("Failed to open timerfd");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
 		DEBUG_PRINT("Opened timerfd :-)\n");
 	}
+	state.acquired_resources |= SPF_RX_RESOURCE_STATS_TIMER;
 	struct itimerspec timer_period =
 	{
 		.it_value = { .tv_sec = STATS_PERIOD_SECS, .tv_nsec = 0 },
@@ -443,7 +479,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	if (timerfd_settime(state.stats_timerfd, 0, &timer_period, NULL) < 0)
 	{
 		perror("Failed to set timerfd");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
@@ -457,7 +493,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	{
 		/* Failed to register timer with epoll */
 		perror("Failed to register timer eventfd with epoll");
-		return NULL;
+		goto cleanup;
 	}
 	else
 	{
@@ -470,6 +506,12 @@ void *THREAD_READ_Entrypoint(void *args)
 	#endif
 
 	/* Enter main loop */
+	state.worker_ready = true;
+	spf_runtime_status_set_state(
+		thread_args->runtime_status,
+		SPF_RUNTIME_STATE_STREAMING,
+		true);
+	spf_runtime_status_heartbeat(thread_args->runtime_status);
 	DEBUG_PRINT("Enter read loop..\n");
 	state.keep_running = true;
 	while (state.keep_running)
@@ -484,35 +526,86 @@ void *THREAD_READ_Entrypoint(void *args)
 	DEBUG_PRINT("Gain read failures: %" PRIu64 "\n", state.gain_read_failures);
 	DEBUG_PRINT("RSSI read failures: %" PRIu64 "\n", state.rssi_read_failures);
 
-	/* Destroy IO context (cancelling any pending transfers) */
-	io_destroy(state.io_ctx);
-
-	/* Free buffers after destroying context now kernel won't be using them */
-	for (uint32_t i = 0; i < state.buffer_count; i++)
-	{
-		/* Free buffer */
-		free(state.buffers[i]);
-		state.buffers[i] = NULL;
-	}
-
-	/* Close / destroy everything */
-	#if GENERATE_STATS
-	close(state.stats_timerfd);
-	#endif
-	close(state.aio_eventfd);
-	iio_buffer_destroy(state.iio_rx_buffer);
-	iio_context_destroy(iio_ctx);
-	close(epoll_fd);
-
-	/* Exit */
+cleanup:
+	if (!state.worker_ready)
+		record_fatal_error(&state, SPF_ERROR_SUBSYSTEM_RX_INIT, errno);
+	cleanup_state(&state);
 	DEBUG_PRINT("Read thread exit\n");
 
 	return NULL;
 }
 
+static void record_fatal_error(
+	state_t *state,
+	spf_error_subsystem_t subsystem,
+	int error_number)
+{
+	spf_runtime_status_record_error(
+		state->thread_args->runtime_status,
+		subsystem,
+		error_number != 0 ? error_number : EIO);
+}
+
+static void cleanup_state(state_t *state)
+{
+	spf_rx_resource_t resource;
+	while ((resource = spf_rx_cleanup_next(state->acquired_resources)) !=
+		SPF_RX_RESOURCE_NONE)
+	{
+		switch (resource)
+		{
+			case SPF_RX_RESOURCE_STATS_TIMER:
+				#if GENERATE_STATS
+				if (state->stats_timerfd >= 0)
+					close(state->stats_timerfd);
+				state->stats_timerfd = -1;
+				#endif
+				break;
+			case SPF_RX_RESOURCE_AIO_CONTEXT:
+				/* Cancel pending writes before freeing their backing buffers. */
+				io_destroy(state->io_ctx);
+				memset(&state->io_ctx, 0, sizeof(state->io_ctx));
+				break;
+			case SPF_RX_RESOURCE_USB_BUFFERS:
+				for (uint32_t index = 0;
+					index < state->buffers_allocated;
+					++index)
+				{
+					free(state->buffers[index]);
+					state->buffers[index] = NULL;
+				}
+				state->buffers_allocated = 0;
+				break;
+			case SPF_RX_RESOURCE_AIO_EVENTFD:
+				if (state->aio_eventfd >= 0)
+					close(state->aio_eventfd);
+				state->aio_eventfd = -1;
+				break;
+			case SPF_RX_RESOURCE_IIO_BUFFER:
+				iio_buffer_destroy(state->iio_rx_buffer);
+				state->iio_rx_buffer = NULL;
+				break;
+			case SPF_RX_RESOURCE_IIO_CONTEXT:
+				iio_context_destroy(state->iio_ctx);
+				state->iio_ctx = NULL;
+				state->iio_dev_phy = NULL;
+				break;
+			case SPF_RX_RESOURCE_EPOLL:
+				if (state->epoll_fd >= 0)
+					close(state->epoll_fd);
+				state->epoll_fd = -1;
+				break;
+			case SPF_RX_RESOURCE_NONE:
+				break;
+		}
+		state->acquired_resources &= ~(uint32_t)resource;
+	}
+}
+
 /* Private functions */
 static int handle_eventfd_thread(state_t *state)
 {
+	spf_runtime_status_heartbeat(state->thread_args->runtime_status);
 	/* Quit having detected write on eventfd */
 	DEBUG_PRINT("Stop request received\n");
 	state->keep_running = false;
@@ -522,6 +615,7 @@ static int handle_eventfd_thread(state_t *state)
 
 static int handle_eventfd_aio(state_t *state)
 {
+	spf_runtime_status_heartbeat(state->thread_args->runtime_status);
 	struct io_event events[ARRAY_SIZE(state->buffers)];
 
 	/* Read eventfd to reset it */
@@ -542,36 +636,67 @@ static int handle_eventfd_aio(state_t *state)
 	}
 
 	/* Iterate over events */
+	bool completion_failed = false;
 	for (int i = 0; i < ret; i++)
 	{
 		/* Shorthand ptr */
 		struct io_event *event = &events[i];
+		const long completion_result = (long)event->res;
+		const bool completion_ok =
+			completion_result >= 0 &&
+			state->usb_buffer_size == (size_t)completion_result;
 
 		/* Check for success */
 		if (state->usb_buffer_size != (size_t)event->res)
 		{
 			/* Not all data was written, or write failed, check if failure was down to configuration being disabled */
-			if (-ESHUTDOWN != (long)event->res)
+			if (-ESHUTDOWN != completion_result)
 			{
 				fprintf(stderr, "USB write completed with error, res: %ld, res2: %ld\n", event->res, event->res2);
+				spf_runtime_status_increment(
+					state->thread_args->runtime_status,
+					SPF_STATUS_COUNTER_SHORT_WRITE);
+				record_fatal_error(
+					state,
+					SPF_ERROR_SUBSYSTEM_USB_COMPLETION,
+					completion_result < 0 ? (int)-completion_result : EIO);
+				completion_failed = true;
 			}
 		}
 
 		/* Retrieve buffer */
 		usb_buf_t *buf = (usb_buf_t*)event->data;
+		if (completion_ok && buf->sequence_valid)
+		{
+			spf_runtime_status_complete_frame(
+				state->thread_args->runtime_status,
+				buf->sequence);
+			state->frames_completed_in_stream++;
+			if (state->metadata_enabled &&
+				state->frames_completed_in_stream ==
+				state->thread_args->frame_count)
+			{
+				spf_runtime_status_set_state(
+					state->thread_args->runtime_status,
+					SPF_RUNTIME_STATE_COMPLETE,
+					true);
+			}
+		}
 
 		/* Mark as unused */
 		buf->in_use = false;
+		buf->sequence_valid = false;
 
 		/* Return to ring buffer */
 		state->ring_buf_data[RING_BUFFER_Put(&state->ring_buf_ctx)] = buf;
 	}
 
-	return 0;
+	return completion_failed ? -1 : 0;
 }
 
 static int handle_iio_buffer(state_t *state)
 {
+	spf_runtime_status_heartbeat(state->thread_args->runtime_status);
 	#if GENERATE_STATS
 	/* Capture read period */
 	UTILS_UpdateTimeStats(&state->read_period);
@@ -585,6 +710,13 @@ static int handle_iio_buffer(state_t *state)
 	if (nbytes != (ssize_t)state->iq_payload_size)
 	{
 		fprintf(stderr, "RX buffer read failed, expected %zu, read %zd bytes\n", state->iq_payload_size, nbytes);
+		spf_runtime_status_increment(
+			state->thread_args->runtime_status,
+			SPF_STATUS_COUNTER_IIO_REFILL_ERROR);
+		record_fatal_error(
+			state,
+			SPF_ERROR_SUBSYSTEM_IIO_REFILL,
+			nbytes < 0 ? (int)-nbytes : EIO);
 		return -1;
 	}
 
@@ -617,12 +749,22 @@ static int handle_iio_buffer(state_t *state)
 			current_gain.rx2 = SPF_GAIN_INDEX_INVALID;
 		}
 		if (!current_gain.valid)
+		{
 			state->gain_read_failures++;
+			spf_runtime_status_increment(
+				state->thread_args->runtime_status,
+				SPF_STATUS_COUNTER_GAIN_READ_FAILURE);
+		}
 		if (state->metadata_v2)
 		{
 			current_rssi = spf_rssi_read_pair(state->iio_dev_phy);
 			if (!current_rssi.valid)
+			{
 				state->rssi_read_failures++;
+				spf_runtime_status_increment(
+					state->thread_args->runtime_status,
+					SPF_STATUS_COUNTER_RSSI_READ_FAILURE);
+			}
 		}
 		this_buffer_sequence = state->buffer_sequence++;
 	}
@@ -777,6 +919,8 @@ static int handle_iio_buffer(state_t *state)
 			state->iq_payload_size);
 
 		/* Submit request */
+		buf->sequence = this_buffer_sequence;
+		buf->sequence_valid = state->metadata_enabled;
 		struct iocb *iocb = &buf->iocb;
 		int res = io_submit(state->io_ctx, 1, &iocb);
 		if (1 != res)
@@ -784,6 +928,14 @@ static int handle_iio_buffer(state_t *state)
 			/* Failed to submit context */
 			perror("Failed to submit usb write");
 			buf->in_use = false;
+			buf->sequence_valid = false;
+			spf_runtime_status_increment(
+				state->thread_args->runtime_status,
+				SPF_STATUS_COUNTER_USB_SUBMIT_ERROR);
+			record_fatal_error(
+				state,
+				SPF_ERROR_SUBSYSTEM_USB_SUBMIT,
+				errno);
 			return -1;
 		}
 
@@ -810,6 +962,12 @@ static int handle_iio_buffer(state_t *state)
 	{
 		if (state->metadata_enabled)
 			state->overflow_seen = true;
+		spf_runtime_status_increment(
+			state->thread_args->runtime_status,
+			SPF_STATUS_COUNTER_BUFFER_STARVATION);
+		spf_runtime_status_increment(
+			state->thread_args->runtime_status,
+			SPF_STATUS_COUNTER_DROPPED_FRAME);
 		#if GENERATE_STATS
 		/* Count overflow */
 		state->overflows++;

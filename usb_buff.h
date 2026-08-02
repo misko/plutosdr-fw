@@ -15,6 +15,8 @@ typedef struct
 
 	/* Buffer in use - command queued */
 	bool in_use;
+	bool sequence_valid;
+	uint64_t sequence;
 
 	/* Data buffer follows */
 	uint8_t data[];

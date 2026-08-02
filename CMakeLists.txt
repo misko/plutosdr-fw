@@ -38,6 +38,9 @@ add_executable(sdr_usb_gadget
     thread_write.c
     spf_gain_read.c
     spf_rssi_read.c
+    spf_control_policy.c
+    spf_runtime_status.c
+    spf_thread_join.c
     utils.c
 )
 target_link_libraries(sdr_usb_gadget
@@ -81,4 +84,24 @@ if (BUILD_HOST_TESTS)
 
     add_executable(test_spf_buffer_policy test_spf_buffer_policy.c)
     add_test(NAME spf_buffer_policy COMMAND test_spf_buffer_policy)
+
+    add_executable(test_spf_cleanup_plan test_spf_cleanup_plan.c)
+    add_test(NAME spf_cleanup_plan COMMAND test_spf_cleanup_plan)
+
+    add_executable(test_spf_runtime_status
+        test_spf_runtime_status.c
+        spf_runtime_status.c)
+    target_link_libraries(test_spf_runtime_status pthread)
+    add_test(NAME spf_runtime_status COMMAND test_spf_runtime_status)
+
+    add_executable(test_spf_thread_join
+        test_spf_thread_join.c
+        spf_thread_join.c)
+    target_link_libraries(test_spf_thread_join pthread)
+    add_test(NAME spf_thread_join COMMAND test_spf_thread_join)
+
+    add_executable(test_spf_control_policy
+        test_spf_control_policy.c
+        spf_control_policy.c)
+    add_test(NAME spf_control_policy COMMAND test_spf_control_policy)
 endif()

@@ -5,6 +5,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#include "spf_runtime_status.h"
+
 /* Type definitions - thread args */
 typedef struct
 {
@@ -31,6 +33,9 @@ typedef struct
 
 	/* Nonzero ID generated for every versioned START. */
 	uint64_t stream_id;
+
+	/* Process-wide status shared with the USB control thread. */
+	spf_runtime_status_t *runtime_status;
 
 } THREAD_READ_Args_t;
 

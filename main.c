@@ -24,10 +24,14 @@
 #include "usb_descriptors.h"
 #include "sdr_usb_gadget_types.h"
 #include "spf_gain_metadata.h"
+#include "spf_runtime_status.h"
+#include "spf_thread_join.h"
+#include "spf_control_policy.h"
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define DEBUG_PRINT(...) if (debug) printf("Main: "__VA_ARGS__)
+#define SPF_STOP_TIMEOUT_MS UINT32_C(3000)
 
 /* Type definitions */
 typedef struct
@@ -54,6 +58,10 @@ typedef struct
 	pthread_t thread_read;
 	pthread_t thread_write;
 
+	/* Read-only status exposed through the control endpoint. */
+	spf_runtime_status_t runtime_status;
+	bool fatal_stop_failure;
+
 } state_t;
 
 /* Epoll event handler */
@@ -72,8 +80,8 @@ static void signal_handler(int signum);
 static void print_usage(const char *program_name, FILE *dest);
 static const char* event_to_string(struct usb_functionfs_event *event);
 static uint64_t next_stream_id(void);
-static bool validate_start_rx_versioned(const cmd_usb_start_rx_v1_t *request);
 static bool copy_build_id(char destination[40]);
+static void note_control_error(state_t *state, const char *message);
 
 /* Private variables */
 static volatile sig_atomic_t keep_running = 1;
@@ -85,6 +93,11 @@ int main(int argc, char *argv[])
 
 	/* Reset state */
 	memset(&state, 0x00, sizeof(state));
+	if (!spf_runtime_status_init_auto(&state.runtime_status))
+	{
+		fprintf(stderr, "Failed to initialize runtime status\n");
+		return 1;
+	}
 
 	/* Ensure stdout is line buffered */
 	setlinebuf(stdout);
@@ -181,6 +194,7 @@ int main(int argc, char *argv[])
 	/* Prepare read args */
 	state.read_args.quit_event_fd = state.read_thread_event_fd;
 	state.read_args.output_fd = state.ep[1];
+	state.read_args.runtime_status = &state.runtime_status;
 
 	/* Prepare write args */
 	state.write_args.quit_event_fd = state.write_thread_event_fd;
@@ -230,15 +244,26 @@ int main(int argc, char *argv[])
 	}
 	DEBUG_PRINT("Exit main loop :-(\n");
 
-	/* Stop threads */
-	stop_thread(&state, false);
-	stop_thread(&state, true);
+	/* Stop threads unless a timed-out worker still owns their resources. */
+	if (!state.fatal_stop_failure)
+	{
+		stop_thread(&state, false);
+		stop_thread(&state, true);
+	}
+	if (state.fatal_stop_failure)
+	{
+		fprintf(stderr,
+			"Fatal worker-stop failure; exiting for supervised recovery\n");
+		fflush(NULL);
+		_exit(2);
+	}
 
 	/* Close files */
 	close(epoll_fd);
 	close(state.read_thread_event_fd);
 	close(state.write_thread_event_fd);
 	close_endpoints(&state);
+	spf_runtime_status_destroy(&state.runtime_status);
 
 	/* Goodbye */
 	printf("Bye!\n");
@@ -296,7 +321,8 @@ static int handle_ep0(state_t *state)
 						.max_finite_frames = SPF_GADGET_MAX_FINITE_FRAMES,
 						.capability_flags =
 							SPF_GADGET_CAP_FINITE_RX |
-							SPF_GADGET_CAP_HARDWARE_IDENTITY,
+							SPF_GADGET_CAP_HARDWARE_IDENTITY |
+							SPF_GADGET_CAP_STATUS,
 						.reserved1 = 0,
 					};
 					size_t response_bytes = sizeof(capabilities);
@@ -335,6 +361,22 @@ static int handle_ep0(state_t *state)
 						return -1;
 					}
 				}
+				else if (event.u.setup.bRequest ==
+					SDR_USB_GADGET_COMMAND_GET_STATUS)
+				{
+					cmd_usb_runtime_status_v1_t status;
+					spf_runtime_status_snapshot(
+						&state->runtime_status,
+						&status);
+					size_t response_bytes = sizeof(status);
+					if (event.u.setup.wLength < response_bytes)
+						response_bytes = event.u.setup.wLength;
+					if (write(state->ep[0], &status, response_bytes) < 0)
+					{
+						perror("Failed to write runtime status to host");
+						return -1;
+					}
+				}
 				else if (write(state->ep[0], NULL, 0) < 0)
 				{
 					perror("Failed to write empty packet to host");
@@ -363,7 +405,19 @@ static int handle_ep0(state_t *state)
 						/* Check request size */
 						if (read_count != sizeof(*cmd_start_req))
 						{
-							printf("Bad start request, incorrect data size\n");
+							note_control_error(
+								state,
+								"legacy START has incorrect data size");
+							break;
+						}
+						if (event.u.setup.wValue !=
+							SDR_USB_GADGET_COMMAND_TARGET_RX &&
+							event.u.setup.wValue !=
+							SDR_USB_GADGET_COMMAND_TARGET_TX)
+						{
+							note_control_error(
+								state,
+								"legacy START has invalid target");
 							break;
 						}
 
@@ -371,7 +425,8 @@ static int handle_ep0(state_t *state)
 						bool tx = (SDR_USB_GADGET_COMMAND_TARGET_TX == event.u.setup.wValue);
 
 						/* Ensure thread stopped */
-						stop_thread(state, tx);
+						if (!stop_thread(state, tx))
+							return -1;
 
 						/* Act on direction */
 						if (tx)
@@ -392,46 +447,111 @@ static int handle_ep0(state_t *state)
 						}
 
 						/* Start thread */
-						start_thread(state, tx);
+						if (!start_thread(state, tx))
+							return -1;
 						break;
 					}
 					case SDR_USB_GADGET_COMMAND_START_RX_V1:
 					{
 						if (event.u.setup.wValue != SDR_USB_GADGET_COMMAND_TARGET_RX)
 						{
-							fprintf(stderr, "Versioned START is RX-only\n");
+							note_control_error(
+								state,
+								"versioned START is RX-only");
 							break;
 						}
 						if (read_count != sizeof(*cmd_start_rx_v1))
 						{
-							fprintf(stderr, "Bad RX v1 start request size: %zd\n", read_count);
+							note_control_error(
+								state,
+								"versioned START has incorrect data size");
 							break;
 						}
-						if (!validate_start_rx_versioned(cmd_start_rx_v1))
-							break;
+					spf_start_validation_t validation =
+						spf_validate_start_rx_versioned(cmd_start_rx_v1);
+					if (validation != SPF_START_VALID)
+					{
+						fprintf(stderr,
+							"Rejected versioned RX START: %s\n",
+							spf_start_validation_message(validation));
+						spf_runtime_status_increment(
+							&state->runtime_status,
+							SPF_STATUS_COUNTER_CONTROL_ERROR);
+						spf_runtime_status_note_error(
+							&state->runtime_status,
+							SPF_ERROR_SUBSYSTEM_CONTROL,
+							EINVAL);
+						break;
+					}
 
-						stop_thread(state, false);
+						if (!stop_thread(state, false))
+							return -1;
 						state->read_args.iio_channels = cmd_start_rx_v1->enabled_scan_mask;
 						state->read_args.iio_buffer_size = cmd_start_rx_v1->samples_per_channel;
 						state->read_args.protocol_version = cmd_start_rx_v1->protocol_version;
 						state->read_args.metadata_features = cmd_start_rx_v1->requested_features;
 						state->read_args.frame_count = cmd_start_rx_v1->frame_count;
 						state->read_args.stream_id = next_stream_id();
-						start_thread(state, false);
+						spf_runtime_status_set_stream(
+							&state->runtime_status,
+							state->read_args.stream_id);
+						spf_runtime_status_increment(
+							&state->runtime_status,
+							SPF_STATUS_COUNTER_START);
+						spf_runtime_status_set_state(
+							&state->runtime_status,
+							SPF_RUNTIME_STATE_STARTING,
+							false);
+						if (!start_thread(state, false))
+						{
+							spf_runtime_status_record_error(
+								&state->runtime_status,
+								SPF_ERROR_SUBSYSTEM_RX_INIT,
+								errno);
+							return -1;
+						}
 						break;
 					}
 					case SDR_USB_GADGET_COMMAND_STOP:
 					{
 						/* Decide on TX vs RX thread */
 						bool tx = (0 != event.u.setup.wValue);
+						if (event.u.setup.wValue !=
+							SDR_USB_GADGET_COMMAND_TARGET_RX &&
+							event.u.setup.wValue !=
+							SDR_USB_GADGET_COMMAND_TARGET_TX)
+						{
+							note_control_error(
+								state,
+								"STOP has invalid target");
+							break;
+						}
 
 						/* Stop thread */
-						stop_thread(state, tx);
+						if (!tx)
+						{
+							spf_runtime_status_increment(
+								&state->runtime_status,
+								SPF_STATUS_COUNTER_STOP);
+							spf_runtime_status_set_state(
+								&state->runtime_status,
+								SPF_RUNTIME_STATE_STOPPING,
+								state->read_started);
+						}
+						if (!stop_thread(state, tx))
+							return -1;
+						if (!tx)
+							spf_runtime_status_set_state(
+								&state->runtime_status,
+								SPF_RUNTIME_STATE_IDLE,
+								false);
 						break;
 					}
 					default:
 					{
-						/* Ignore unknown requests */
+						note_control_error(
+							state,
+							"unknown vendor control request");
 						break;
 					}
 				}
@@ -492,6 +612,18 @@ static bool copy_build_id(char destination[40])
 	return true;
 }
 
+static void note_control_error(state_t *state, const char *message)
+{
+	fprintf(stderr, "Rejected control request: %s\n", message);
+	spf_runtime_status_increment(
+		&state->runtime_status,
+		SPF_STATUS_COUNTER_CONTROL_ERROR);
+	spf_runtime_status_note_error(
+		&state->runtime_status,
+		SPF_ERROR_SUBSYSTEM_CONTROL,
+		EINVAL);
+}
+
 static uint64_t next_stream_id(void)
 {
 	static uint64_t start_counter;
@@ -502,64 +634,6 @@ static uint64_t next_stream_id(void)
 		(uint64_t)now.tv_nsec +
 		++start_counter;
 	return id == 0 ? 1 : id;
-}
-
-static bool validate_start_rx_versioned(const cmd_usb_start_rx_v1_t *request)
-{
-	const uint32_t required_v1_features =
-		SPF_META_REQUIRED_FEATURES_V1;
-	const uint32_t required_v2_features =
-		SPF_META_REQUIRED_FEATURES_V2;
-	const bool is_v1 =
-		request->magic == SPF_GADGET_START_V1_MAGIC &&
-		request->protocol_version == SPF_GADGET_PROTOCOL_V1;
-	const bool is_v2 =
-		request->magic == SPF_GADGET_START_V2_MAGIC &&
-		request->protocol_version == SPF_GADGET_PROTOCOL_V2;
-
-	if ((!is_v1 && !is_v2) ||
-		request->request_bytes != sizeof(*request))
-	{
-		fprintf(stderr, "Bad versioned RX protocol identity\n");
-		return false;
-	}
-	const uint32_t required_features =
-		is_v1 ? required_v1_features : required_v2_features;
-	if (request->requested_features != required_features)
-	{
-		fprintf(stderr, "Unsupported RX v%u feature mask: 0x%08x\n",
-			request->protocol_version,
-			request->requested_features);
-		return false;
-	}
-	if (request->enabled_scan_mask != UINT32_C(0x0F))
-	{
-		fprintf(stderr, "Versioned RX requires scan mask 0x0f\n");
-		return false;
-	}
-	if (request->samples_per_channel == 0)
-	{
-		fprintf(stderr, "Versioned RX sample count must be nonzero\n");
-		return false;
-	}
-	if (request->samples_per_channel > SPF_GADGET_MAX_SAMPLES_PER_CHANNEL)
-	{
-		fprintf(stderr, "Versioned RX sample count exceeds payload size field\n");
-		return false;
-	}
-	if (request->frame_count == 0 ||
-		request->frame_count > SPF_GADGET_MAX_FINITE_FRAMES)
-	{
-		fprintf(stderr, "Versioned RX frame count must be in [1, %u]\n",
-			SPF_GADGET_MAX_FINITE_FRAMES);
-		return false;
-	}
-	if (request->reserved0 != 0 || request->reserved1 != 0)
-	{
-		fprintf(stderr, "Versioned RX reserved fields must be zero\n");
-		return false;
-	}
-	return true;
 }
 
 static bool start_thread(state_t *state, bool tx)
@@ -573,6 +647,7 @@ static bool start_thread(state_t *state, bool tx)
 		return false;
 	}
 
+	bool started = true;
 	/* Create appropriate thread */
 	if (tx && !state->write_started)
 	{
@@ -581,7 +656,7 @@ static bool start_thread(state_t *state, bool tx)
 		if (!state->write_started)
 		{
 			perror("Failed to start write thread");
-			return false;
+			started = false;
 		}
 	}
 	else if (!tx && !state->read_started)
@@ -591,7 +666,7 @@ static bool start_thread(state_t *state, bool tx)
 		if (!state->read_started)
 		{
 			perror("Failed to start read thread");
-			return false;
+			started = false;
 		}
 	}
 
@@ -602,7 +677,7 @@ static bool start_thread(state_t *state, bool tx)
 		return false;
 	}
 
-	return true;
+	return started;
 }
 
 static bool stop_thread(state_t *state, bool tx)
@@ -617,8 +692,19 @@ static bool stop_thread(state_t *state, bool tx)
 			return false;
 		}
 
-		/* Join with thread */
-		pthread_join(state->thread_write, NULL);
+		/* Join with a bound so ep0 cannot hang forever. */
+		int join_error = 0;
+		spf_thread_join_result_t join_result = spf_thread_join_bounded(
+			state->thread_write,
+			SPF_STOP_TIMEOUT_MS,
+			&join_error);
+		if (join_result != SPF_THREAD_JOIN_OK)
+		{
+			errno = join_error;
+			perror("Timed write-worker join failed");
+			state->fatal_stop_failure = true;
+			return false;
+		}
 
 		/* Read eventfd now thread has stopped to reset it */
 		if (read(state->write_thread_event_fd, &eventfd_val, sizeof(eventfd_val)) < 0)
@@ -640,8 +726,27 @@ static bool stop_thread(state_t *state, bool tx)
 			return false;
 		}
 
-		/* Join with thread */
-		pthread_join(state->thread_read, NULL);
+		/* Join with a bound so ep0 cannot hang forever. */
+		int join_error = 0;
+		spf_thread_join_result_t join_result = spf_thread_join_bounded(
+			state->thread_read,
+			SPF_STOP_TIMEOUT_MS,
+			&join_error);
+		if (join_result != SPF_THREAD_JOIN_OK)
+		{
+			if (join_result == SPF_THREAD_JOIN_TIMEOUT)
+				spf_runtime_status_increment(
+					&state->runtime_status,
+					SPF_STATUS_COUNTER_STOP_TIMEOUT);
+			spf_runtime_status_record_error(
+				&state->runtime_status,
+				SPF_ERROR_SUBSYSTEM_STOP_TIMEOUT,
+				join_error);
+			errno = join_error;
+			perror("Timed read-worker join failed");
+			state->fatal_stop_failure = true;
+			return false;
+		}
 
 		/* Read eventfd now thread has stopped to reset it */
 		if (read(state->read_thread_event_fd, &eventfd_val, sizeof(eventfd_val)) < 0)
