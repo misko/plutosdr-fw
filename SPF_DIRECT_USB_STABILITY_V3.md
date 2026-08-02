@@ -14,8 +14,8 @@ merging the Buildroot or gadget branches into firmware `master`.
 | Layer | Branch | Commit | Relationship |
 |---|---|---|---|
 | USB gadget | `codex/gadget-stability-v3` | `2072e1d0823ef6db3bc141dd733a90d76e23fc33` | Buildroot package SHA |
-| Buildroot | `codex/buildroot-gadget-supervisor-v3` | `d36f2d93` | Firmware `buildroot` gitlink |
-| Firmware | `codex/firmware-stability-v3` | `43354e64` | Candidate source |
+| Buildroot | `codex/buildroot-gadget-supervisor-v3` | `f37fe105` | Firmware `buildroot` gitlink |
+| Firmware | `master` | this document's commit | Candidate source |
 
 The Buildroot pin is verified without `local.mk` or another source override.
 Buildroot fetches the gadget commit directly from this GitHub repository and
@@ -32,18 +32,24 @@ normal FunctionFS mount, closing the last endpoint descriptor resets the
 FunctionFS state and unregisters the configfs gadget. A userspace supervisor
 cannot reliably reconstruct only one function after that kernel teardown.
 
-Linux provides `no_disconnect=1` for this exact composition case. The v3
+Linux provides `no_disconnect=1` to defer teardown after the last FunctionFS
+descriptor closes. Inspection of the pinned Linux 5.15 implementation and a
+hardware crash test exposed an important second step: reopening `ep0` from the
+deactivated state resets and unregisters the FunctionFS configfs item. Doing
+that while the UDC remains bound makes the whole radio disappear. The v3
 candidate therefore:
 
 1. mounts only `sdr_gadget_ffs` with `no_disconnect=1`;
 2. leaves the standard IIO FunctionFS mount unchanged;
-3. restarts only the `sdr_usb_gadget` child;
-4. waits for an explicit, flushed `Ready :-)` line;
-5. never writes the composite gadget's UDC attribute during child recovery.
+3. unbinds the composite UDC only after a child failure;
+4. starts a fresh `sdr_usb_gadget` child while the UDC is unbound;
+5. waits for an explicit, flushed `Ready :-)` line;
+6. rebinds the UDC with bounded retries.
 
-When the direct-USB child closes its descriptors, the function becomes
-deactivated while USB-IIO and the rest of the composite device stay registered.
-Opening `ep0` in the replacement process resets and reactivates the function.
+The host sees a short, explicit re-enumeration after a process crash. The radio
+must return with the same serial and physical USB path, a fresh process nonce,
+working standard USB-IIO, and working direct USB. Normal capture start/stop does
+not invoke this path or re-enumerate the device.
 
 ## Reproducible build
 
@@ -66,7 +72,7 @@ binary because the sparse local U-Boot checkout could not rebuild that host
 tool. Kernel, device-tree, and FPGA inputs were unchanged from the tagged v2
 firmware. The root filesystem and gadget were rebuilt from the published pins.
 
-Current RAM-only candidate:
+Previous rejected RAM-only candidate:
 
 ```text
 build/pluto.dfu
@@ -86,10 +92,8 @@ gadget 2072e1d0823ef6db3bc141dd733a90d76e23fc33
 Source checks:
 
 - USB gadget native tests: 10/10 passed.
-- Buildroot supervisor red test: proved the old UDC-rebind design violated the
-  required no-disconnect contract.
-- Buildroot supervisor green test: passed with the direct FunctionFS isolation
-  mount and no UDC writes.
+- Buildroot supervisor test: enforces `no_disconnect`, UDC unbind before every
+  replacement launch, explicit child readiness, and UDC rebind afterward.
 - ARM cross-build: passed after fetching gadget `2072e1d0` from GitHub.
 
 Hardware evidence before the final design:
@@ -98,8 +102,12 @@ Hardware evidence before the final design:
 - deliberate child crash: failed because the old design lost the composite USB
   device, confirming that candidate must not be promoted.
 
-Hardware evidence for SHA-256 `de5264...` is pending a physical power cycle of
-the externally powered test radios.
+Hardware evidence for SHA-256 `de5264...` rejected that candidate: normal
+simultaneous dual-radio capture passed, but killing the first direct-USB child
+removed that radio from the host indefinitely. A controlled experiment on the
+second radio proved that unbind, restart-to-readiness, and rebind returns the
+same serial and path with both interfaces. A replacement image using that
+sequence is being rebuilt and remains RAM-test-only.
 
 ## Release and field-deployment gate
 
@@ -110,7 +118,7 @@ the following pass:
 - standard USB-IIO and direct USB coexist on both radios;
 - simultaneous production-size finite capture passes without loss;
 - killing each direct-USB child produces a new process nonce;
-- USB-IIO stays present through each recovery;
+- USB-IIO returns after the bounded recovery re-enumeration;
 - three consecutive recovery cycles pass per radio;
 - post-recovery IQ frames have continuous sequences and valid metadata;
 - the Pi reports no undervoltage or throttling;
