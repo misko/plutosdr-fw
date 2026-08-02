@@ -15,7 +15,7 @@ merging the Buildroot or gadget branches into firmware `master`.
 |---|---|---|---|
 | USB gadget | `codex/gadget-stability-v3` | `2072e1d0823ef6db3bc141dd733a90d76e23fc33` | Buildroot package SHA |
 | Buildroot | `codex/buildroot-gadget-supervisor-v3` | `f37fe105` | Firmware `buildroot` gitlink |
-| Firmware | `master` | this document's commit | Candidate source |
+| Firmware | `master` | `f53dd006` | Candidate source |
 
 The Buildroot pin is verified without `local.mk` or another source override.
 Buildroot fetches the gadget commit directly from this GitHub repository and
@@ -84,6 +84,21 @@ Embedded versions:
 ```text
 device-fw v0.38-plutoplus-spf-gain-rssi-fingerprint-v2-5-g4335
 buildroot d36f2d
+gadget 2072e1d0823ef6db3bc141dd733a90d76e23fc33
+```
+
+Current RAM-only candidate:
+
+```text
+build/pluto.dfu
+SHA-256 86f2115eb344efcbd3d59af02caf80d396291cb9e20dcb01651cacf7e0334191
+```
+
+Embedded versions:
+
+```text
+device-fw v0.38-plutoplus-spf-gain-rssi-fingerprint-v2-8-gf53d
+buildroot f37f
 gadget 2072e1d0823ef6db3bc141dd733a90d76e23fc33
 ```
 
