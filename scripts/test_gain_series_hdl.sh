@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HDL_QUANTULUM="${ROOT}/hdl-quantulum"
-EXPECTED="da54b094365c6a59583e27edff0250d91a4dfb3b"
+EXPECTED="e663136ed7f21e1596c38305cd34745019123d05"
 
 command -v iverilog >/dev/null || {
     echo "FAIL: iverilog is required" >&2

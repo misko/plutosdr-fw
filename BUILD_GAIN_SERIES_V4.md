@@ -14,11 +14,11 @@ prerelease procedure on Kalman, follow
 
 ```text
 firmware                  codex/firmware-gain-series-v4
-buildroot      7440b965b  codex/buildroot-gain-series-v4
+buildroot      e57349dce  codex/buildroot-gain-series-v4
 USB gadget     518e35914  codex/gadget-gain-series-v3
 IP gadget      032c830c7  codex/ip-gadget-gain-series-v3
 HDL            4e9d71240  codex/hdl-sample-counter-v3
-HDL Quantulum  da54b0943  codex/hdl-quantulum-gain-series-v3
+HDL Quantulum  e663136ed  codex/hdl-quantulum-gain-series-v3
 ```
 
 The authoritative complete values are in
