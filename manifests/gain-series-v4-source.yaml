@@ -8,7 +8,7 @@ release_state: candidate
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
-gadget_source: 4e37a31f2b5dc534688d7edfdbfa70bf7261b758
+gadget_source: 518e35914195136e20c9f7261b21ee063b41d994
 gadget_repo: https://github.com/misko/plutosdr-fw.git
 gadget_ref: refs/heads/codex/gadget-gain-series-v3
 
@@ -16,7 +16,7 @@ ip_gadget_source: 032c830c76cb291c2ed0a32b455ed81d1dfd2540
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/heads/codex/ip-gadget-gain-series-v3
 
-submodule_buildroot: 0b863fb89b8f6de80c2ced3cda4af5f71f19d50b
+submodule_buildroot: 7440b965bd36c512316902a5b8a91bd0662e3dd3
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
 submodule_buildroot_ref: refs/heads/codex/buildroot-gain-series-v4
 

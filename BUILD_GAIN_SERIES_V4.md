@@ -10,8 +10,8 @@ its monotonic clock without GNSS/PPS wiring.
 
 ```text
 firmware                  codex/firmware-gain-series-v4
-buildroot      0b863fb89  codex/buildroot-gain-series-v4
-USB gadget     4e37a31f2  codex/gadget-gain-series-v3
+buildroot      7440b965b  codex/buildroot-gain-series-v4
+USB gadget     518e35914  codex/gadget-gain-series-v3
 IP gadget      032c830c7  codex/ip-gadget-gain-series-v3
 HDL            4e9d71240  codex/hdl-sample-counter-v3
 HDL Quantulum  da54b0943  codex/hdl-quantulum-gain-series-v3
@@ -19,6 +19,12 @@ HDL Quantulum  da54b0943  codex/hdl-quantulum-gain-series-v3
 
 The authoritative complete values are in
 `manifests/gain-series-v4-source.yaml`.
+
+The USB and IP daemons may start before the host configures the AD9361 RX
+path. Their time-anchor reader therefore requires the counter register to be
+readable at daemon startup, but does not require it to be moving yet.
+Protocol-v3 stream startup independently requires an advancing counter and
+fails closed if the sample-counter HDL is absent or stale.
 
 ## Source and host checks
 
