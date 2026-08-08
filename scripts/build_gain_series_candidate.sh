@@ -92,6 +92,7 @@ fi
 
 (
     source "$VIVADO_SETTINGS"
+    make -C "$ROOT/hdl/projects/pluto" clean
     make -C "$ROOT/hdl/projects/pluto"
 )
 candidate_xsa="$ROOT/hdl/projects/pluto/pluto.sdk/system_top.xsa"
