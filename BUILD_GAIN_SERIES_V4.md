@@ -92,9 +92,10 @@ new release manifest. Do not edit the immutable v3 manifest.
 7. Repeat concurrently on both radios, then run the existing restart soak.
 8. Compare IQ ordering, phase, throughput, sequence gaps, USB failures, and
    observation overflow against protocol v2.
-9. Only after every gate passes, create a release tag/asset, update SPF pins,
-   and run the normal QSPI promotion procedure with the v3 image retained for
-   rollback.
+9. The offline builder may publish an explicitly unpromoted prerelease candidate
+   for this campaign. Only after every hardware gate passes, promote the accepted
+   RC through the normal release and SPF-pinning process, then run the QSPI
+   promotion procedure with the v3 image retained for rollback.
 
 Protocol v3 intentionally rejects frames without an overlapping gain
 observation. Equal observations mean only that no difference was observed at

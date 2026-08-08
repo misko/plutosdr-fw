@@ -58,8 +58,9 @@ done < <(git submodule status --recursive)
     fail "run git submodule sync --recursive && git submodule update --init --recursive, then retry"
 
 required=(
-    awk bash bc bison cmake cpio dfu-suffix dtc flex git gzip make
-    openssl patch perl python3 rsync sed sha256sum tar unzip wget zip
+    awk bash bc bison cmake cpio dfu-suffix dtc dumpimage file flex git gzip
+    iverilog make openssl patch perl python3 rsync sed sha256sum tar unzip vvp
+    wget zip
 )
 missing=()
 for command_name in "${required[@]}"; do

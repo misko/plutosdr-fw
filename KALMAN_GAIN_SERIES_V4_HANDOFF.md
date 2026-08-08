@@ -81,7 +81,7 @@ Install missing open-source build dependencies if preflight reports them:
 sudo apt-get update
 sudo apt-get install -y \
   bc bison build-essential ccache cmake cpio device-tree-compiler dfu-util \
-  fakeroot flex git gzip libaio-dev libiio-dev libncurses-dev libssl-dev \
+  fakeroot flex git gzip iverilog libaio-dev libiio-dev libncurses-dev libssl-dev \
   mtools patch perl python3 rsync u-boot-tools unzip wget zip
 ```
 
@@ -171,21 +171,24 @@ firmware tree:
 ```bash
 export SPF_FW_ARTIFACT_ROOT="$HOME/firmware-artifacts/gain-series-v4-$(date -u +%Y%m%dT%H%M%SZ)"
 mkdir -p "$SPF_FW_ARTIFACT_ROOT"
-set -o pipefail
+set -euo pipefail
 scripts/build_gain_series_candidate.sh source-check \
   2>&1 | tee "$SPF_FW_ARTIFACT_ROOT/source-check.log"
-scripts/test_gain_series_hdl.sh \
-  2>&1 | tee "$SPF_FW_ARTIFACT_ROOT/hdl-simulation.log"
 scripts/build_gain_series_candidate.sh preflight \
   2>&1 | tee "$SPF_FW_ARTIFACT_ROOT/preflight.log"
+TMPDIR="$SPF_FW_ARTIFACT_ROOT" scripts/test_gain_series_hdl.sh \
+  2>&1 | tee "$SPF_FW_ARTIFACT_ROOT/hdl-simulation.log"
 ```
 
 Pass conditions:
 
 - source check ends with `SOURCE GRAPH OK`;
 - the HDL simulation reports `PASS` and at least 20 coherent counter updates;
-- preflight reports the expected manifest and Vivado 2022.2;
+- preflight reports the expected manifest and all host-side dependencies;
 - `git status --porcelain --untracked-files=no` remains empty.
+
+The `image` gate checks Vivado 2022.2 immediately before the FPGA build. The
+plain `preflight` mode deliberately does not invoke Vivado.
 
 Stop on any failure. Do not edit generated IP checksums, source pins, or the
 manifest merely to make a check pass.
@@ -221,6 +224,12 @@ The two XSA paths must contain the same bytes:
 sha256sum \
   hdl/projects/pluto/pluto.sdk/system_top.xsa \
   build/system_top.xsa
+cmp \
+  hdl/projects/pluto/pluto.sdk/system_top.xsa \
+  build/system_top.xsa
+test -s build/system_top.bit
+test -s build/rootfs.cpio.gz
+test -s build/pluto.dfu
 ```
 
 Pass conditions:
@@ -238,7 +247,7 @@ Preserve all Vivado logs. A convenient bundle is:
 ```bash
 tar -C hdl/projects/pluto -czf \
   "$SPF_FW_ARTIFACT_ROOT/vivado-logs.tar.gz" \
-  --ignore-failed-read vivado.log vivado.jou pluto.runs
+  vivado.log vivado.jou pluto.runs
 ```
 
 Warnings must be reviewed in context. Do not suppress CDC, timing, IP-lock, or
@@ -271,7 +280,10 @@ Extract the packaged root filesystem rather than trusting the build directory:
 
 ```bash
 mkdir -p "$SPF_FW_ARTIFACT_ROOT/rootfs-check"
-dumpimage -T flat_dt -p 5 \
+ramdisk_index="$(awk '$1 == "Image" && $3 == "(ramdisk@1)" {print $2}' \
+  "$SPF_FW_ARTIFACT_ROOT/fit-layout.txt")"
+test -n "$ramdisk_index"
+dumpimage -T flat_dt -p "$ramdisk_index" \
   -o "$SPF_FW_ARTIFACT_ROOT/packed-rootfs.cpio.gz" \
   "$SPF_FW_ARTIFACT_ROOT/${SPF_FW_STEM}-pluto.dfu"
 (
@@ -415,15 +427,20 @@ gh release create "$SPF_FW_TAG" \
 ```
 
 Review the draft asset names and hashes. Download into a new directory and
-compare the downloaded DFU to the local candidate before publishing the draft:
+compare every downloaded asset to the local candidate before publishing the
+draft:
 
 ```bash
 VERIFY_DIR="$(mktemp -d)"
 gh release download "$SPF_FW_TAG" --repo misko/plutosdr-fw --dir "$VERIFY_DIR"
+cmp "$SPF_FW_ARTIFACT_ROOT/SHA256SUMS" "$VERIFY_DIR/SHA256SUMS"
 cmp \
-  "$SPF_FW_ARTIFACT_ROOT/${SPF_FW_STEM}-pluto.dfu" \
-  "$VERIFY_DIR/${SPF_FW_STEM}-pluto.dfu"
-sha256sum "$VERIFY_DIR/${SPF_FW_STEM}-pluto.dfu"
+  "$SPF_FW_ARTIFACT_ROOT/${SPF_FW_STEM}-provenance.txt" \
+  "$VERIFY_DIR/${SPF_FW_STEM}-provenance.txt"
+(
+  cd "$VERIFY_DIR"
+  sha256sum -c SHA256SUMS
+)
 ```
 
 Only after this comparison passes, make it a visible prerelease while keeping
