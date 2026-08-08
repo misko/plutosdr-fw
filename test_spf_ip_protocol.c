@@ -41,6 +41,9 @@ static void test_v3_start_and_started(void)
 	start.data_port = 40000;
 	start.max_datagram_bytes = 1472;
 	assert(spf_ip_control_validate(&start));
+	start.gain_observation_interval_samples = start.samples_per_channel + 1;
+	assert(!spf_ip_control_validate(&start));
+	start.gain_observation_interval_samples = 32768;
 	start.message_type = SPF_IP_CONTROL_STARTED;
 	assert(!spf_ip_control_validate(&start));
 	start.stream_id = UINT64_C(0x1122334455667788);

@@ -126,6 +126,8 @@ bool spf_ip_control_validate(const spf_ip_control_v1_t *message)
 				SPF_METADATA_FEATURE_HARDWARE_SAMPLE_COUNTER;
 			if ((message->features & required) != required ||
 				message->gain_observation_interval_samples == 0 ||
+				message->gain_observation_interval_samples >
+					message->samples_per_channel ||
 				message->gain_observation_capacity == 0 ||
 				message->gain_observation_capacity > SPF_IP_MAX_GAIN_OBSERVATIONS ||
 				message->gain_event_capacity > SPF_IP_MAX_GAIN_EVENTS)
