@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.9.4)
 
 project(sdr_ip_gadget LANGUAGES C)
 
+include(CTest)
+
 # Options
 option(GENERATE_STATS "Generate and output runtime stats" OFF)
 
@@ -38,10 +40,12 @@ add_executable(sdr_ip_gadget
     thread_read.c
     thread_write.c
     utils.c
+	spf_ip_protocol.c
 )
 target_link_libraries(sdr_ip_gadget
     pthread
     iio
+	z
 )
 target_compile_definitions(sdr_ip_gadget PRIVATE
     PROGRAM_VERSION="${GIT_VERSION}"
@@ -55,6 +59,15 @@ if(lto_supported)
     set_property(TARGET sdr_ip_gadget PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 else()
     message(STATUS "LTO not supported: <${lto_error}>")
+endif()
+
+if(BUILD_TESTING)
+	add_executable(test_spf_ip_protocol
+		test_spf_ip_protocol.c
+		spf_ip_protocol.c
+	)
+	target_link_libraries(test_spf_ip_protocol z)
+	add_test(NAME spf_ip_protocol COMMAND test_spf_ip_protocol)
 endif()
 
 install(TARGETS sdr_ip_gadget RUNTIME DESTINATION sbin)
