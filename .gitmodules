@@ -31,16 +31,11 @@
 	path = hdl-quantulum
 	url = https://github.com/misko/plutosdr-hdl-quantulum
 	branch = codex/hdl-quantulum-gain-series-v3
-	shallow = true
 
-; NOTE ON `shallow`: only hdl-quantulum carries it, because only its pin is the
-; default-branch tip of its repository. `git submodule update` shallow-clones a
-; submodule's DEFAULT branch and then checks out the recorded gitlink SHA, so
-; for a pin living on any other branch a depth-1 clone cannot contain it and the
-; submodule is silently left on the default branch -- i.e. it builds the WRONG
-; firmware while reporting success. Verified: adding `shallow = true` to linux
-; and u-boot-xlnx left them at misko master (16b5c2ea / f06dec3) instead of the
-; pins d798b0d8 / 1ff0468e.
+; NOTE ON `shallow`: no submodule carries it. `git submodule update`
+; shallow-clones a submodule's DEFAULT branch and then checks out the recorded
+; gitlink SHA, so a pin on another branch can be silently left on the wrong
+; commit. All gain-series component pins live on explicit candidate branches.
 ;
 ; Consequence: `git submodule update --init --recursive` performs full clones and
 ; needs ~3 GB, most of it unused kernel history. On a memory-constrained builder
