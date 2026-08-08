@@ -63,7 +63,8 @@ uint64_t UTILS_CalcAverageTimeStats(UTILS_TimeStats_t *ctx)
 
 int UTILS_SetThreadRealtimePriority(void)
 {
-    int rc;
+	/* Preserve a defined failure result when sched_get_priority_max fails. */
+	int rc = -1;
 
 	int max_prio = sched_get_priority_max(SCHED_RR);
 	if (max_prio >= 0) {
