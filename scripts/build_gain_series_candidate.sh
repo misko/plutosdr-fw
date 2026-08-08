@@ -54,7 +54,7 @@ while IFS= read -r line; do
     fi
 done < <(git submodule status --recursive)
 (( submodule_error == 0 )) ||
-    fail "run git submodule update --init --recursive, then retry"
+    fail "run git submodule sync --recursive && git submodule update --init --recursive, then retry"
 
 required=(
     awk bash bc bison cmake cpio dfu-suffix dtc flex git gzip make
