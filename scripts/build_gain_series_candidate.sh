@@ -3,6 +3,11 @@
 
 set -euo pipefail
 
+# Buildroot's reproducible source archives include permission bits. Normalize
+# the process mask so a secure caller umask (for example 0077) cannot change
+# otherwise identical archive hashes.
+umask 0022
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/gain-series-v4-source.yaml}"
 MODE="${1:-source-check}"
