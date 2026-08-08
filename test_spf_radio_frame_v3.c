@@ -71,6 +71,8 @@ int main(void)
 	assert((header->flags & SPF_META_RX2_ENDPOINT_CHANGED) == 0);
 	assert((header->flags & SPF_META_GAIN_OBSERVATION_OVERFLOW) != 0);
 	const uint32_t stored_crc = *(const uint32_t *)(buffer + header_bytes - 4);
+	/* Golden value emitted by Python RadioMetadataV3.pack for this fixture. */
+	assert(stored_crc == UINT32_C(0x341a79b7));
 	uint8_t copy[sizeof(buffer)];
 	memcpy(copy, buffer, header_bytes);
 	*(uint32_t *)(copy + header_bytes - 4) = 0;
