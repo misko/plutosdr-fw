@@ -76,6 +76,9 @@ echo "2. the release tag labels the commit that actually built the release"
 # The manifest records the true build commit; this check keeps the discrepancy
 # visible instead of letting it rot into folklore.
 fw_repo="$(m firmware_repo)"; fw_pin="$(m firmware_source)"; rel_tag="$(m release_tag)"
+if [[ -z "$rel_tag" ]]; then
+    warn "candidate source manifest has no release tag (expected before promotion)"
+else
 tag_sha="$(git ls-remote "$fw_repo" "refs/tags/${rel_tag}" 2>/dev/null | awk '{print $1}' | head -1)"
 if [[ -z "$tag_sha" ]]; then
     bad "release tag ${rel_tag} not found at ${fw_repo}"
@@ -84,6 +87,7 @@ elif [[ "$tag_sha" == "$fw_pin" ]]; then
 else
     warn "release tag ${rel_tag} -> ${tag_sha:0:12}, but the release was built from ${fw_pin:0:12}"
     warn "  known and recorded for v3; a NEW release must tag its own build commit"
+fi
 fi
 
 echo
@@ -96,6 +100,22 @@ if [[ -f .gitmodules ]]; then
     fi
 else
     warn ".gitmodules not present (not a firmware checkout?)"
+fi
+
+if [[ "$(m release_state)" == "candidate" ]] && \
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    for entry in "buildroot:submodule_buildroot" "hdl:submodule_hdl" \
+        "hdl-quantulum:submodule_hdl_quantulum" \
+        "linux:submodule_linux" "u-boot-xlnx:submodule_u_boot_xlnx"; do
+        IFS=: read -r path pin_key <<<"$entry"
+        expected="$(m "$pin_key")"
+        actual="$(git ls-tree HEAD "$path" | awk '{print $3}')"
+        if [[ -n "$expected" && "$actual" == "$expected" ]]; then
+            ok "gitlink ${path} ${actual:0:12}"
+        else
+            bad "gitlink ${path} is ${actual:0:12}, manifest pins ${expected:0:12}"
+        fi
+    done
 fi
 
 echo

@@ -26,7 +26,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Verify pins, URLs, tags and overrides
-        run: ./scripts/check_source_graph.sh manifests/fingerprint-v3.yaml
+        run: |
+          ./scripts/check_source_graph.sh manifests/fingerprint-v3.yaml
+          ./scripts/check_source_graph.sh manifests/gain-series-v4-source.yaml
 
   gadget-tests:
     name: native gadget unit tests
@@ -36,7 +38,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: misko/plutosdr-fw
-          ref: 2072e1d0823ef6db3bc141dd733a90d76e23fc33
+          ref: 60d6d52e59932e7db9537e044aa47c22b326fb65
           path: gadget
       - name: Build and test natively
         run: |
@@ -57,7 +59,26 @@ jobs:
         run: |
           n=$(ctest --test-dir gadget/build-tests -N | sed -n 's/^Total Tests: //p')
           echo "registered tests: ${n:-0}"
-          [ "${n:-0}" -ge 10 ] || { echo "expected >=10 tests, got ${n:-0}"; exit 1; }
+          [ "${n:-0}" -ge 12 ] || { echo "expected >=12 tests, got ${n:-0}"; exit 1; }
+
+  hdl-counter-tests:
+    name: coherent RX counter CDC
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out timestamp IP
+        uses: actions/checkout@v4
+        with:
+          repository: misko/plutosdr-hdl-quantulum
+          ref: da54b094365c6a59583e27edff0250d91a4dfb3b
+          path: hdl-quantulum
+      - name: Simulate the multi-bit counter crossing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends iverilog
+          cd hdl-quantulum/util_cpack2_timestamp/src
+          iverilog -g2012 -o /tmp/cdc-counter-tb \
+            cdc_sync_bits.v cdc_sync_data_closed.v cdc_sync_data_closed_tb.v
+          vvp /tmp/cdc-counter-tb
 
   build-dfu:
     name: build pluto.dfu (aarch64)

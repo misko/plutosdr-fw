@@ -1,0 +1,34 @@
+# Source-only manifest for the unpromoted gain-series firmware candidate.
+# Image identity, release tag, and hashes are added only after Vivado build,
+# RAM-boot acceptance, and the two-radio promotion gate.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+gadget_source: 60d6d52e59932e7db9537e044aa47c22b326fb65
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/heads/codex/gadget-gain-series-v3
+
+submodule_buildroot: 85f3dbd530c286d3b69401cd1d3932de3c0bfb9e
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/heads/codex/buildroot-gain-series-v4
+
+submodule_hdl: 4e9d712403afda1393873228e2df3834073d663d
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/heads/codex/hdl-sample-counter-v3
+
+submodule_hdl_quantulum: da54b094365c6a59583e27edff0250d91a4dfb3b
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/heads/codex/hdl-quantulum-gain-series-v3
+
+submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/heads/v0.38_plutoplus
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/heads/v0.38_plutoplus
+
