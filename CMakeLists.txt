@@ -7,6 +7,20 @@ include(CTest)
 # Options
 option(GENERATE_STATS "Generate and output runtime stats" OFF)
 
+set(SPF_COMMON_ROOT "" CACHE PATH
+    "Prefix containing the SPF gain-observation and frame libraries")
+find_path(SPF_COMMON_INCLUDE_DIR spf/spf_radio_frame_v3.h
+    HINTS "${SPF_COMMON_ROOT}/include")
+find_library(SPF_RADIO_FRAME_LIBRARY spf_radio_frame_v3
+    HINTS "${SPF_COMMON_ROOT}/lib")
+find_library(SPF_GAIN_OBSERVATION_LIBRARY spf_gain_observation
+    HINTS "${SPF_COMMON_ROOT}/lib")
+if(NOT SPF_COMMON_INCLUDE_DIR OR NOT SPF_RADIO_FRAME_LIBRARY OR
+   NOT SPF_GAIN_OBSERVATION_LIBRARY)
+    message(FATAL_ERROR
+        "SPF common v3 libraries are required; set SPF_COMMON_ROOT")
+endif()
+
 # Check if link time optimisation is supported
 include(CheckIPOSupported)
 check_ipo_supported(RESULT lto_supported OUTPUT lto_error)
@@ -46,7 +60,10 @@ target_link_libraries(sdr_ip_gadget
     pthread
     iio
 	z
+	${SPF_RADIO_FRAME_LIBRARY}
+	${SPF_GAIN_OBSERVATION_LIBRARY}
 )
+target_include_directories(sdr_ip_gadget PRIVATE ${SPF_COMMON_INCLUDE_DIR})
 target_compile_definitions(sdr_ip_gadget PRIVATE
     PROGRAM_VERSION="${GIT_VERSION}"
     STATS_PERIOD_SECS=2)
@@ -68,6 +85,16 @@ if(BUILD_TESTING)
 	)
 	target_link_libraries(test_spf_ip_protocol z)
 	add_test(NAME spf_ip_protocol COMMAND test_spf_ip_protocol)
+
+	add_executable(test_spf_ip_frame_pipeline
+		test_spf_ip_frame_pipeline.c
+		spf_ip_protocol.c)
+	target_include_directories(test_spf_ip_frame_pipeline PRIVATE
+		${SPF_COMMON_INCLUDE_DIR})
+	target_link_libraries(test_spf_ip_frame_pipeline
+		z
+		${SPF_RADIO_FRAME_LIBRARY})
+	add_test(NAME spf_ip_frame_pipeline COMMAND test_spf_ip_frame_pipeline)
 endif()
 
 install(TARGETS sdr_ip_gadget RUNTIME DESTINATION sbin)
