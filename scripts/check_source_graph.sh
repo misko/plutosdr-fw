@@ -48,6 +48,7 @@ COMPONENTS=(
     "linux:submodule_linux:submodule_linux_repo:submodule_linux_ref"
     "u-boot-xlnx:submodule_u_boot_xlnx:submodule_u_boot_xlnx_repo:submodule_u_boot_xlnx_ref"
     "gadget:gadget_source:gadget_repo:gadget_ref"
+    "ip-gadget:ip_gadget_source:ip_gadget_repo:ip_gadget_ref"
 )
 
 for entry in "${COMPONENTS[@]}"; do
