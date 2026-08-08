@@ -14,7 +14,8 @@ target_include_directories(spf_radio_frame_v3 PUBLIC
 add_library(spf_gain_observation STATIC
 	spf_gain_read.c
 	spf_gain_sampler.c
-	spf_rssi_read.c)
+	spf_rssi_read.c
+	spf_time_anchor.c)
 target_include_directories(spf_gain_observation PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
 	$<INSTALL_INTERFACE:include/spf>)
@@ -77,6 +78,7 @@ install(FILES
 	spf_gain_read.h
 	spf_gain_sampler.h
 	spf_rssi_read.h
+	spf_time_anchor.h
 	spf_radio_frame_v3.h
 	DESTINATION include/spf)
 
@@ -115,6 +117,12 @@ if (BUILD_HOST_TESTS)
         spf_rssi_read.c)
     target_link_libraries(test_spf_rssi_read iio)
     add_test(NAME spf_rssi_read COMMAND test_spf_rssi_read)
+
+    add_executable(test_spf_time_anchor
+        test_spf_time_anchor.c
+        spf_time_anchor.c)
+    target_link_libraries(test_spf_time_anchor iio)
+    add_test(NAME spf_time_anchor COMMAND test_spf_time_anchor)
 
     add_executable(test_sdr_usb_gadget_protocol
         test_sdr_usb_gadget_protocol.c)

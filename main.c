@@ -27,6 +27,7 @@
 #include "spf_runtime_status.h"
 #include "spf_thread_join.h"
 #include "spf_control_policy.h"
+#include "spf_time_anchor.h"
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -61,6 +62,8 @@ typedef struct
 	/* Read-only status exposed through the control endpoint. */
 	spf_runtime_status_t runtime_status;
 	bool fatal_stop_failure;
+	spf_time_anchor_reader_t time_anchor_reader;
+	bool time_anchor_available;
 
 } state_t;
 
@@ -98,6 +101,10 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Failed to initialize runtime status\n");
 		return 1;
 	}
+	state.time_anchor_available =
+		spf_time_anchor_reader_init(&state.time_anchor_reader);
+	if (!state.time_anchor_available)
+		fprintf(stderr, "FPGA time-anchor counter is unavailable\n");
 
 	/* Ensure stdout is line buffered */
 	setlinebuf(stdout);
@@ -264,6 +271,7 @@ int main(int argc, char *argv[])
 	close(state.read_thread_event_fd);
 	close(state.write_thread_event_fd);
 	close_endpoints(&state);
+	spf_time_anchor_reader_destroy(&state.time_anchor_reader);
 	spf_runtime_status_destroy(&state.runtime_status);
 
 	/* Goodbye */
@@ -325,7 +333,9 @@ static int handle_ep0(state_t *state)
 						.capability_flags =
 							SPF_GADGET_CAP_FINITE_RX |
 							SPF_GADGET_CAP_HARDWARE_IDENTITY |
-							SPF_GADGET_CAP_STATUS,
+							SPF_GADGET_CAP_STATUS |
+							(state->time_anchor_available ?
+								SPF_GADGET_CAP_TIME_ANCHOR : 0),
 						.reserved1 = 0,
 					};
 					size_t response_bytes = sizeof(capabilities);
@@ -378,6 +388,32 @@ static int handle_ep0(state_t *state)
 					{
 						perror("Failed to write runtime status to host");
 						return -1;
+					}
+				}
+				else if (event.u.setup.bRequest ==
+					SDR_USB_GADGET_COMMAND_GET_TIME_ANCHOR &&
+					state->time_anchor_available)
+				{
+					/* wIndex remains the FunctionFS interface selector. */
+					const uint64_t request_id = event.u.setup.wValue;
+					spf_time_anchor_v1_t anchor;
+					if (request_id == 0 || !spf_time_anchor_capture(
+						&state->time_anchor_reader, request_id, &anchor))
+					{
+						note_control_error(state, "time-anchor capture failed");
+						if (write(state->ep[0], NULL, 0) < 0)
+							return -1;
+					}
+					else
+					{
+						size_t response_bytes = sizeof(anchor);
+						if (event.u.setup.wLength < response_bytes)
+							response_bytes = event.u.setup.wLength;
+						if (write(state->ep[0], &anchor, response_bytes) < 0)
+						{
+							perror("Failed to write time anchor to host");
+							return -1;
+						}
 					}
 				}
 				else if (write(state->ep[0], NULL, 0) < 0)
