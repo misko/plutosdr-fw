@@ -1,6 +1,7 @@
 #include "spf_ip_protocol.h"
 
 #include <assert.h>
+#include <stdlib.h>
 #include <string.h>
 
 static void test_query_golden_vector(void)
@@ -68,10 +69,45 @@ static void test_fragment_and_crc(void)
 	assert(!spf_ip_fragment_validate(&header, sizeof(header) + sizeof(payload) - 1));
 }
 
+static void test_production_frame_fragment_plan(void)
+{
+	const size_t frame_bytes = 4194304 + 1152;
+	uint8_t *frame = malloc(frame_bytes);
+	assert(frame != NULL);
+	for (size_t index = 0; index < frame_bytes; ++index)
+		frame[index] = (uint8_t)(index % 251);
+	const size_t count = spf_ip_fragment_count(frame_bytes, 1472);
+	assert(count > 255);
+	assert(count == 2955);
+	spf_ip_fragment_v1_t *headers = calloc(count, sizeof(*headers));
+	assert(headers != NULL);
+	assert(spf_ip_fragment_plan(headers,
+		count,
+		frame,
+		frame_bytes,
+		UINT64_C(0x1122334455667788),
+		99,
+		1472));
+	assert(headers[0].flags == SPF_IP_FRAGMENT_FLAG_FIRST);
+	assert(headers[0].fragment_offset == 0);
+	assert(headers[0].fragment_bytes == 1420);
+	assert(headers[count - 1].flags == SPF_IP_FRAGMENT_FLAG_LAST);
+	assert(headers[count - 1].fragment_index == count - 1);
+	assert((size_t)headers[count - 1].fragment_offset +
+		headers[count - 1].fragment_bytes == frame_bytes);
+	assert(headers[0].frame_crc32 == headers[count - 1].frame_crc32);
+	headers[count - 1].fragment_offset = (uint32_t)frame_bytes;
+	assert(!spf_ip_fragment_validate(&headers[count - 1],
+		sizeof(headers[count - 1]) + headers[count - 1].fragment_bytes));
+	free(headers);
+	free(frame);
+}
+
 int main(void)
 {
 	test_query_golden_vector();
 	test_v3_start_and_started();
 	test_fragment_and_crc();
+	test_production_frame_fragment_plan();
 	return 0;
 }

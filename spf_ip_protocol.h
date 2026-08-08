@@ -103,5 +103,14 @@ bool spf_ip_control_validate(const spf_ip_control_v1_t *message);
 bool spf_ip_fragment_validate(const spf_ip_fragment_v1_t *header,
 	size_t datagram_bytes);
 uint32_t spf_ip_crc32(const void *data, size_t bytes);
+size_t spf_ip_fragment_count(size_t frame_bytes, size_t max_datagram_bytes);
+bool spf_ip_fragment_plan(
+	spf_ip_fragment_v1_t *headers,
+	size_t header_capacity,
+	const void *frame,
+	size_t frame_bytes,
+	uint64_t stream_id,
+	uint64_t frame_sequence,
+	size_t max_datagram_bytes);
 
 #endif

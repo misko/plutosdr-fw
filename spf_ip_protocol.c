@@ -142,3 +142,62 @@ uint32_t spf_ip_crc32(const void *data, size_t bytes)
 {
 	return (uint32_t)crc32(0, data, bytes);
 }
+
+size_t spf_ip_fragment_count(size_t frame_bytes, size_t max_datagram_bytes)
+{
+	if (frame_bytes == 0 || frame_bytes > SPF_IP_MAX_FRAME_BYTES ||
+		max_datagram_bytes <= sizeof(spf_ip_fragment_v1_t) ||
+		max_datagram_bytes > SPF_IP_MAX_DATAGRAM_BYTES)
+		return 0;
+	const size_t payload_bytes =
+		max_datagram_bytes - sizeof(spf_ip_fragment_v1_t);
+	const size_t count = (frame_bytes + payload_bytes - 1) / payload_bytes;
+	return count <= SPF_IP_MAX_FRAGMENT_COUNT ? count : 0;
+}
+
+bool spf_ip_fragment_plan(
+	spf_ip_fragment_v1_t *headers,
+	size_t header_capacity,
+	const void *frame,
+	size_t frame_bytes,
+	uint64_t stream_id,
+	uint64_t frame_sequence,
+	size_t max_datagram_bytes)
+{
+	const size_t count = spf_ip_fragment_count(
+		frame_bytes, max_datagram_bytes);
+	if (headers == NULL || frame == NULL || stream_id == 0 || count == 0 ||
+		header_capacity < count)
+		return false;
+	const size_t payload_capacity =
+		max_datagram_bytes - sizeof(spf_ip_fragment_v1_t);
+	const uint32_t frame_crc32 = spf_ip_crc32(frame, frame_bytes);
+	for (size_t index = 0; index < count; ++index)
+	{
+		const size_t offset = index * payload_capacity;
+		const size_t remaining = frame_bytes - offset;
+		const size_t fragment_bytes = remaining < payload_capacity
+			? remaining : payload_capacity;
+		spf_ip_fragment_v1_t *header = &headers[index];
+		memset(header, 0, sizeof(*header));
+		header->magic = SPF_IP_FRAGMENT_MAGIC;
+		header->version = SPF_IP_FRAGMENT_VERSION;
+		header->header_bytes = sizeof(*header);
+		if (index == 0)
+			header->flags |= SPF_IP_FRAGMENT_FLAG_FIRST;
+		if (index == count - 1)
+			header->flags |= SPF_IP_FRAGMENT_FLAG_LAST;
+		header->stream_id = stream_id;
+		header->frame_sequence = frame_sequence;
+		header->frame_bytes = (uint32_t)frame_bytes;
+		header->frame_crc32 = frame_crc32;
+		header->fragment_index = (uint32_t)index;
+		header->fragment_count = (uint32_t)count;
+		header->fragment_offset = (uint32_t)offset;
+		header->fragment_bytes = (uint32_t)fragment_bytes;
+		if (!spf_ip_fragment_validate(
+			header, sizeof(*header) + fragment_bytes))
+			return false;
+	}
+	return true;
+}
