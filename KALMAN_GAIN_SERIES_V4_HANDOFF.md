@@ -88,10 +88,45 @@ sudo apt-get install -y \
 Use at least 40 GiB of free local disk. Build in a local filesystem rather
 than directly in a network-mounted artifact directory.
 
-## 2. Make a fresh checkout
+## 2. Create an isolated candidate checkout
 
-Do not reuse a checkout that contains a prior XSA, Buildroot output, or
-`local.mk` source override.
+Do not build in Kalman's existing `main` checkout. It may contain a prior XSA,
+Buildroot output, or `local.mk` source override, and switching it would disturb
+other work. Keep `main` where it is and create a separate Git worktree.
+
+### Preferred path when the repository already exists on Kalman
+
+From the existing clone, first confirm that its current work is left alone:
+
+```bash
+cd /path/to/the/existing/plutosdr-fw
+git status --short --branch
+git remote -v
+```
+
+Do not clean, reset, stash, or switch that checkout. Fetch the candidate into a
+dedicated remote-tracking reference and create a detached worktree:
+
+```bash
+git fetch https://github.com/misko/plutosdr-fw.git \
+  codex/firmware-gain-series-v4:refs/remotes/misko/codex/firmware-gain-series-v4
+
+mkdir -p "$HOME/gits"
+git worktree add --detach "$HOME/gits/plutosdr-fw-gain-series-v4" \
+  refs/remotes/misko/codex/firmware-gain-series-v4
+
+cd "$HOME/gits/plutosdr-fw-gain-series-v4"
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+Detached HEAD is intentional for a build workspace. It prevents the build
+agent from accidentally advancing or pushing a local branch. The later release
+tag is created explicitly at the recorded source commit.
+
+### Alternative when no checkout exists
+
+Only use a fresh clone if Kalman does not already have the repository:
 
 ```bash
 mkdir -p "$HOME/gits"
@@ -113,10 +148,18 @@ git submodule status --recursive
 
 Pass conditions:
 
-- the branch is `codex/firmware-gain-series-v4`;
+- `HEAD` equals the remote `codex/firmware-gain-series-v4` commit;
 - the tracked worktree is clean;
 - no submodule status line starts with `-`, `+`, or `U`;
 - the component hashes match the table above and the source manifest.
+
+Verify the first condition without relying on a local branch name:
+
+```bash
+test "$(git rev-parse HEAD)" = "$(git ls-remote \
+  https://github.com/misko/plutosdr-fw.git \
+  refs/heads/codex/firmware-gain-series-v4 | awk '{print $1}')"
+```
 
 Never use `git submodule update --remote`; it changes the pinned source graph.
 
@@ -303,6 +346,8 @@ Authenticate without placing a token in the repository or logs:
 
 ```bash
 gh auth status
+gh auth setup-git
+export SPF_FW_PUBLISH_REPO="https://github.com/misko/plutosdr-fw.git"
 ```
 
 Use a new RC number if `rc1` already exists. Never overwrite or delete an RC
@@ -310,7 +355,7 @@ whose bytes were handed to hardware testing.
 
 ```bash
 export SPF_FW_TAG="v0.38-plutoplus-spf-gain-series-v4-${SPF_FW_RC}"
-if git ls-remote --exit-code --tags origin \
+if git ls-remote --exit-code --tags "$SPF_FW_PUBLISH_REPO" \
   "refs/tags/${SPF_FW_TAG}" >/dev/null 2>&1; then
   echo "Tag already exists; choose a new RC number" >&2
   exit 1
@@ -352,7 +397,7 @@ prerelease:
 ```bash
 git tag -a "$SPF_FW_TAG" "$(git rev-parse HEAD)" \
   -m "Gain-series v4 ${SPF_FW_RC} hardware-test candidate"
-git push origin "$SPF_FW_TAG"
+git push "$SPF_FW_PUBLISH_REPO" "$SPF_FW_TAG"
 
 gh release create "$SPF_FW_TAG" \
   --repo misko/plutosdr-fw \
