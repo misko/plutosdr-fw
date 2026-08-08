@@ -920,8 +920,18 @@ static int handle_iio_buffer(state_t *state)
 					.gain_event_capacity =
 						state->thread_args->gain_event_capacity,
 					.gain_event_overflow_count = 0,
-					.rssi_start = state->previous_rssi,
-					.rssi_end = current_rssi,
+					.rssi_start = {
+						.rx1_qdb = state->previous_rssi.rx1_qdb,
+						.rx2_qdb = state->previous_rssi.rx2_qdb,
+						.valid = state->previous_rssi.valid,
+						.duration_ns = state->previous_rssi.duration_ns,
+					},
+					.rssi_end = {
+						.rx1_qdb = current_rssi.rx1_qdb,
+						.rx2_qdb = current_rssi.rx2_qdb,
+						.valid = current_rssi.valid,
+						.duration_ns = current_rssi.duration_ns,
+					},
 					.device_iio_overflow = state->overflow_seen,
 				};
 				if (!spf_radio_frame_v3_build(

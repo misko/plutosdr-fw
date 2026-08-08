@@ -2,11 +2,18 @@
 #define SPF_RADIO_FRAME_V3_H
 
 #include "spf_gain_metadata.h"
-#include "spf_rssi_read.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+typedef struct
+{
+	uint16_t rx1_qdb;
+	uint16_t rx2_qdb;
+	bool valid;
+	uint32_t duration_ns;
+} spf_radio_rssi_v3_t;
 
 typedef struct
 {
@@ -26,8 +33,8 @@ typedef struct
 	uint16_t gain_event_count;
 	uint16_t gain_event_capacity;
 	uint32_t gain_event_overflow_count;
-	spf_rssi_pair_t rssi_start;
-	spf_rssi_pair_t rssi_end;
+	spf_radio_rssi_v3_t rssi_start;
+	spf_radio_rssi_v3_t rssi_end;
 	bool device_iio_overflow;
 } spf_radio_frame_v3_args_t;
 
