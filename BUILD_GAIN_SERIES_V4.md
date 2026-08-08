@@ -8,8 +8,9 @@ that timestamps each IQ frame.
 
 ```text
 firmware                  codex/firmware-gain-series-v4
-buildroot      85f3dbd53  codex/buildroot-gain-series-v4
-USB gadget     60d6d52e5  codex/gadget-gain-series-v3
+buildroot      d748b5643  codex/buildroot-gain-series-v4
+USB gadget     0df6c86f8  codex/gadget-gain-series-v3
+IP gadget      4cf0df925  codex/ip-gadget-gain-series-v3
 HDL            4e9d71240  codex/hdl-sample-counter-v3
 HDL Quantulum  da54b0943  codex/hdl-quantulum-gain-series-v3
 ```
@@ -23,12 +24,8 @@ The authoritative complete values are in
 git clone --branch codex/firmware-gain-series-v4 --recurse-submodules \
   https://github.com/misko/plutosdr-fw.git plutosdr-fw-gain-series-v4
 cd plutosdr-fw-gain-series-v4
-scripts/check_source_graph.sh manifests/gain-series-v4-source.yaml
-
-cd hdl-quantulum/util_cpack2_timestamp/src
-iverilog -g2012 -o /tmp/cdc-counter-tb \
-  cdc_sync_bits.v cdc_sync_data_closed.v cdc_sync_data_closed_tb.v
-vvp /tmp/cdc-counter-tb
+scripts/build_gain_series_candidate.sh source-check
+scripts/test_gain_series_hdl.sh
 ```
 
 Expected result: `SOURCE GRAPH OK` and at least 20 coherent CDC updates.
@@ -43,6 +40,7 @@ cd plutosdr-fw-gain-series-v4
 source /opt/Xilinx/Vivado/2022.2/settings64.sh
 make -C hdl/projects/pluto
 cp hdl/projects/pluto/pluto.sdk/system_top.xsa build/system_top.xsa
+scripts/build_gain_series_candidate.sh image
 ```
 
 Before packaging firmware, Vivado must report:
@@ -59,12 +57,10 @@ do not suppress an IP-lock or port-mismatch error.
 
 ## Firmware package
 
-Use the toolchain and reproducibility workflow in `BUILD.md`. Build a candidate
-DFU only after the new XSA exists:
-
-```bash
-make CROSS_COMPILE=arm-none-linux-gnueabihf- build/pluto.dfu
-```
+Use the toolchain and reproducibility workflow in `BUILD.md`. The candidate
+entry point performs the source, architecture, dependency, clean-tree and
+Vivado-version checks before building the DFU. It must be run only after the
+new XSA exists; it does not flash a radio.
 
 Record SHA-256, `/opt/VERSIONS`, FPGA bitstream hash, and gadget build ID in a
 new release manifest. Do not edit the immutable v3 manifest.
