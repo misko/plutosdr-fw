@@ -6,6 +6,10 @@ that timestamps each IQ frame. The USB and IP control planes expose the same
 CRC-protected time-anchor record so a host can map exact frame counters onto
 its monotonic clock without GNSS/PPS wiring.
 
+For the exact no-hardware build, validation, artifact-attestation, and GitHub
+prerelease procedure on Kalman, follow
+[`KALMAN_GAIN_SERIES_V4_HANDOFF.md`](KALMAN_GAIN_SERIES_V4_HANDOFF.md).
+
 ## Pinned source
 
 ```text
