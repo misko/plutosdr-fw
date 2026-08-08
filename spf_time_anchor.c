@@ -92,17 +92,20 @@ bool spf_time_anchor_reader_init(spf_time_anchor_reader_t *reader)
 	}
 	uint32_t first = 0;
 	uint32_t second = 0;
-	const struct timespec settle = {.tv_sec = 0, .tv_nsec = 1000000};
 	if (iio_device_reg_read(
 			reader->rx, SPF_ADC_SAMPLE_COUNTER_LOW_REG, &first) != 0 ||
-		nanosleep(&settle, NULL) != 0 ||
 		iio_device_reg_read(
-			reader->rx, SPF_ADC_SAMPLE_COUNTER_LOW_REG, &second) != 0 ||
-		first == second)
+			reader->rx, SPF_ADC_SAMPLE_COUNTER_LOW_REG, &second) != 0)
 	{
 		spf_time_anchor_reader_destroy(reader);
 		return false;
 	}
+	/*
+	 * The daemon starts before host-side radio configuration on some images.
+	 * A readable but stationary counter is therefore valid at boot. Protocol-v3
+	 * RX startup independently proves that the same counter advances before it
+	 * accepts a stream, so this does not weaken the stale-HDL capture gate.
+	 */
 	return true;
 }
 

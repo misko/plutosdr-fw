@@ -46,6 +46,11 @@ int main(void)
 		0x00, 0x00, 0x00, 0x00, 0x40, 0xdf, 0x4b, 0x9e,
 	};
 	assert(memcmp(&anchor, anchor_golden, sizeof(anchor)) == 0);
+	anchor.flags &= ~SPF_TIME_ANCHOR_COUNTER_ADVANCED;
+	anchor.sample_counter_after = anchor.sample_counter_before;
+	anchor.crc32 = 0;
+	anchor.crc32 = spf_gain_meta_crc32(&anchor, sizeof(anchor));
+	assert(spf_time_anchor_validate(&anchor));
 	anchor.sample_counter_before |= UINT64_C(1) << 32;
 	assert(!spf_time_anchor_validate(&anchor));
 	return 0;
