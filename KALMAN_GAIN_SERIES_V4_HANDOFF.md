@@ -46,7 +46,7 @@ The complete hashes live in
 | USB/common gadget | `518e35914195136e20c9f7261b21ee063b41d994` |
 | IP gadget | `032c830c76cb291c2ed0a32b455ed81d1dfd2540` |
 | ADI HDL | `4e9d712403afda1393873228e2df3834073d663d` |
-| Quantulum timestamp HDL | `e663136ed7f21e1596c38305cd34745019123d05` |
+| Quantulum timestamp HDL | `26eae2affcd563e1e1845106243a44557083e6be` |
 | Linux | `d798b0d821b85ebd51ecffbfa68d8e4d69b77132` |
 | U-Boot | `1ff0468e9bea29b0a768a7bf52db8d025c521b9a` |
 

@@ -24,7 +24,7 @@ submodule_hdl: 4e9d712403afda1393873228e2df3834073d663d
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
 submodule_hdl_ref: refs/heads/codex/hdl-sample-counter-v3
 
-submodule_hdl_quantulum: e663136ed7f21e1596c38305cd34745019123d05
+submodule_hdl_quantulum: 26eae2affcd563e1e1845106243a44557083e6be
 submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
 submodule_hdl_quantulum_ref: refs/heads/codex/hdl-quantulum-gain-series-v3
 
