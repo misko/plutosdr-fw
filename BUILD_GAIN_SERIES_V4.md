@@ -37,11 +37,12 @@ the ARM-visible counter connection and protocol v3 will correctly fail closed.
 
 ```bash
 cd plutosdr-fw-gain-series-v4
-source /opt/Xilinx/Vivado/2022.2/settings64.sh
-make -C hdl/projects/pluto
-cp hdl/projects/pluto/pluto.sdk/system_top.xsa build/system_top.xsa
 scripts/build_gain_series_candidate.sh image
 ```
+
+The image command always rebuilds the pinned HDL and replaces
+`build/system_top.xsa` before packaging. It will not silently reuse an XSA left
+by another checkout or firmware version.
 
 Before packaging firmware, Vivado must report:
 

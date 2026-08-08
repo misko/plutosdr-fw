@@ -16,7 +16,8 @@ Modes:
   source-check  Verify the pinned source graph; works on any architecture.
   preflight     Verify an x86-64 checkout and all build prerequisites.
   rootfs        Run preflight, then build build/rootfs.cpio.gz.
-  image         Run preflight, then build build/pluto.dfu.
+  image         Run preflight, rebuild the pinned FPGA XSA, then build
+                build/pluto.dfu.
 
 The script never flashes a radio. RAM boot and promotion are separate,
 explicit hardware gates.
@@ -58,7 +59,7 @@ done < <(git submodule status --recursive)
 
 required=(
     awk bash bc bison cmake cpio dfu-suffix dtc flex git gzip make
-    openssl patch perl python3 rsync sed tar unzip wget zip
+    openssl patch perl python3 rsync sed sha256sum tar unzip wget zip
 )
 missing=()
 for command_name in "${required[@]}"; do
@@ -88,5 +89,17 @@ printf 'Preflight passed: mode=%s manifest=%s\n' "$MODE" "$MANIFEST"
 if [[ "$MODE" == rootfs ]]; then
     exec make SKIP_LEGAL=1 build/rootfs.cpio.gz
 fi
+
+(
+    source "$VIVADO_SETTINGS"
+    make -C "$ROOT/hdl/projects/pluto"
+)
+candidate_xsa="$ROOT/hdl/projects/pluto/pluto.sdk/system_top.xsa"
+[[ -r "$candidate_xsa" ]] ||
+    fail "candidate HDL build did not produce ${candidate_xsa}"
+mkdir -p "$ROOT/build"
+cp "$candidate_xsa" "$ROOT/build/system_top.xsa"
+printf 'Candidate FPGA XSA: '
+sha256sum "$ROOT/build/system_top.xsa"
 
 exec make SKIP_LEGAL=1 VIVADO_SETTINGS="$VIVADO_SETTINGS" build/pluto.dfu
