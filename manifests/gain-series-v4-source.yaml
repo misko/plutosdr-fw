@@ -16,7 +16,7 @@ ip_gadget_source: 032c830c76cb291c2ed0a32b455ed81d1dfd2540
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/heads/codex/ip-gadget-gain-series-v3
 
-submodule_buildroot: ef9d75eef01dac698a82d158bf9b2e197ae439b3
+submodule_buildroot: e57349dce9d67e0dc4b7a9f9dd23bbc0fad082d1
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
 submodule_buildroot_ref: refs/heads/codex/buildroot-gain-series-v4
 

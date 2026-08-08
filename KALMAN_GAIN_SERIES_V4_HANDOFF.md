@@ -42,7 +42,7 @@ The complete hashes live in
 
 | Component | Commit |
 |---|---|
-| Buildroot | `ef9d75eef01dac698a82d158bf9b2e197ae439b3` |
+| Buildroot | `e57349dce9d67e0dc4b7a9f9dd23bbc0fad082d1` |
 | USB/common gadget | `518e35914195136e20c9f7261b21ee063b41d994` |
 | IP gadget | `032c830c76cb291c2ed0a32b455ed81d1dfd2540` |
 | ADI HDL | `4e9d712403afda1393873228e2df3834073d663d` |
