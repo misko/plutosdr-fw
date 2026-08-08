@@ -27,6 +27,47 @@ void spf_ip_control_init_query(spf_ip_control_v1_t *message,
 	message->request_id = request_id;
 }
 
+void spf_ip_control_init_capabilities(spf_ip_control_v1_t *message,
+	uint64_t request_id)
+{
+	memset(message, 0, sizeof(*message));
+	message->magic = SPF_IP_CONTROL_MAGIC;
+	message->version = SPF_IP_CONTROL_VERSION;
+	message->message_type = SPF_IP_CONTROL_CAPABILITIES;
+	message->message_bytes = sizeof(*message);
+	message->request_id = request_id;
+	message->flags = SPF_IP_CONTROL_FLAG_FINITE_RX |
+		SPF_IP_CONTROL_FLAG_IDEMPOTENT_REQUESTS;
+	message->protocol_min = 3;
+	message->protocol_max = 3;
+	message->features = SPF_METADATA_KNOWN_FEATURES;
+	message->max_samples_per_channel = SPF_IP_MAX_SAMPLES_PER_CHANNEL;
+	message->max_finite_frames = SPF_IP_MAX_FINITE_FRAMES;
+}
+
+void spf_ip_control_init_error(spf_ip_control_v1_t *message,
+	uint64_t request_id,
+	int32_t status)
+{
+	memset(message, 0, sizeof(*message));
+	message->magic = SPF_IP_CONTROL_MAGIC;
+	message->version = SPF_IP_CONTROL_VERSION;
+	message->message_type = SPF_IP_CONTROL_ERROR;
+	message->message_bytes = sizeof(*message);
+	message->request_id = request_id;
+	message->status = status == 0 ? -1 : status;
+}
+
+void spf_ip_control_init_reply(spf_ip_control_v1_t *reply,
+	const spf_ip_control_v1_t *request,
+	spf_ip_control_type_t reply_type,
+	uint64_t stream_id)
+{
+	*reply = *request;
+	reply->message_type = reply_type;
+	reply->stream_id = stream_id;
+}
+
 bool spf_ip_control_validate(const spf_ip_control_v1_t *message)
 {
 	if (message == NULL || message->magic != SPF_IP_CONTROL_MAGIC ||

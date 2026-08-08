@@ -6,6 +6,7 @@
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -14,6 +15,7 @@
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 /* libIIO */
@@ -23,7 +25,9 @@
 #include "sdr_ip_gadget_types.h"
 #include "epoll_loop.h"
 #include "thread_read.h"
+#include "thread_read_v3.h"
 #include "thread_write.h"
+#include "spf_ip_protocol.h"
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -42,19 +46,31 @@ typedef struct
 
 	/* Eventfds to signal threads */
 	int read_thread_event_fd;
+	int read_v3_startup_event_fd;
+	int read_v3_run_event_fd;
 	int write_thread_event_fd;
 
 	/* Thread status */
 	bool read_started;
+	bool read_v3_started;
 	bool write_started;
 
 	/* Thread arguments */
 	THREAD_READ_Args_t read_args;
+	THREAD_READ_V3_Args_t read_v3_args;
 	THREAD_WRITE_Args_t write_args;
 
 	/* Threads */
 	pthread_t thread_read;
+	pthread_t thread_read_v3;
 	pthread_t thread_write;
+
+	uint64_t next_stream_id;
+	uint64_t active_v3_stream_id;
+	bool control_cache_valid;
+	struct sockaddr_in control_cache_peer;
+	spf_ip_control_v1_t control_cache_request;
+	spf_ip_control_v1_t control_cache_reply;
 
 } state_t;
 
@@ -66,8 +82,16 @@ bool debug;
 
 /* Private function */
 static int handle_control(state_t *state);
+static int handle_v3_control(state_t *state,
+	const spf_ip_control_v1_t *request,
+	const struct sockaddr_in *peer);
+static bool send_v3_control(state_t *state,
+	const spf_ip_control_v1_t *response,
+	const struct sockaddr_in *peer);
 static bool start_thread(state_t *state, bool tx);
 static bool stop_thread(state_t *state, bool tx);
+static bool start_v3_thread(state_t *state);
+static bool stop_v3_thread(state_t *state);
 static void signal_handler(int signum);
 static void print_usage(const char *program_name, FILE *dest);
 static const char* cmd_name(uint32_t cmd);
@@ -83,6 +107,10 @@ int main(int argc, char *argv[])
 
 	/* Reset state */
 	memset(&state, 0x00, sizeof(state));
+	state.next_stream_id = ((uint64_t)time(NULL) << 32) |
+		(uint32_t)getpid();
+	if (state.next_stream_id == 0)
+		state.next_stream_id = 1;
 
 	/* Ensure stdout is line buffered */
 	setlinebuf(stdout);
@@ -262,6 +290,18 @@ int main(int argc, char *argv[])
 		perror("Failed to open read eventfd");
 		return 1;
 	}
+	state.read_v3_startup_event_fd = eventfd(0, EFD_NONBLOCK);
+	if (state.read_v3_startup_event_fd < 0)
+	{
+		perror("Failed to open v3 startup eventfd");
+		return 1;
+	}
+	state.read_v3_run_event_fd = eventfd(0, 0);
+	if (state.read_v3_run_event_fd < 0)
+	{
+		perror("Failed to open v3 run eventfd");
+		return 1;
+	}
 	else
 	{
 		DEBUG_PRINT("Opened read eventfd :-)\n");
@@ -280,6 +320,10 @@ int main(int argc, char *argv[])
 	/* Prepare read args */
 	state.read_args.quit_event_fd = state.read_thread_event_fd;
 	state.read_args.output_fd = state.sock_data;
+	state.read_v3_args.quit_event_fd = state.read_thread_event_fd;
+	state.read_v3_args.startup_event_fd = state.read_v3_startup_event_fd;
+	state.read_v3_args.run_event_fd = state.read_v3_run_event_fd;
+	state.read_v3_args.output_fd = state.sock_data;
 
 	/* Prepare write args */
 	state.write_args.quit_event_fd = state.write_thread_event_fd;
@@ -331,11 +375,14 @@ int main(int argc, char *argv[])
 
 	/* Stop threads */
 	stop_thread(&state, false);
+	stop_v3_thread(&state);
 	stop_thread(&state, true);
 
 	/* Close files */
 	close(epoll_fd);
 	close(state.read_thread_event_fd);
+	close(state.read_v3_startup_event_fd);
+	close(state.read_v3_run_event_fd);
 	close(state.write_thread_event_fd);
 	close(state.sock_control);
 	close(state.sock_data);
@@ -351,13 +398,37 @@ static int handle_control(state_t *state)
 {
 	socklen_t len;
 	struct sockaddr_in addr;
-	cmd_ip_t cmd;
+	union
+	{
+		cmd_ip_t legacy;
+		spf_ip_control_v1_t v3;
+	} command;
 	int ret;
 
 	/* Read datagram from socket */
     len = sizeof(addr);
-    ret = recvfrom(state->sock_control, &cmd, sizeof(cmd), 0, (struct sockaddr*)&addr, &len);
-	if (ret < sizeof(cmd_ip_header_t))
+    ret = recvfrom(state->sock_control,
+		&command,
+		sizeof(command),
+		0,
+		(struct sockaddr*)&addr,
+		&len);
+	if (ret >= (int)sizeof(uint32_t) &&
+		command.v3.magic == SPF_IP_CONTROL_MAGIC)
+	{
+		if (ret != (int)sizeof(command.v3))
+		{
+			spf_ip_control_v1_t error;
+			const uint64_t request_id = ret >= 20
+				? command.v3.request_id : 0;
+			spf_ip_control_init_error(&error, request_id, -EMSGSIZE);
+			(void)send_v3_control(state, &error, &addr);
+			return 0;
+		}
+		return handle_v3_control(state, &command.v3, &addr);
+	}
+	cmd_ip_t cmd = command.legacy;
+	if (ret < 0 || (size_t)ret < sizeof(cmd_ip_header_t))
 	{
 		perror("Failed to read cmd from control socket");
 		return -1;
@@ -389,10 +460,10 @@ static int handle_control(state_t *state)
 			stop_thread(state, true);
 
 			/* Prepare args */
-			DEBUG_PRINT("Start TX with chans: %08X, timestamp: %S, buffsize: %zu\n",
+			DEBUG_PRINT("Start TX with chans: %08X, timestamp: %s, buffsize: %u\n",
 						cmd.start_tx.enabled_channels,
 						cmd.start_tx.timestamping_enabled ? "enabled" : "disabled",
-						cmd.start_tx.buffer_size);
+						(unsigned int)cmd.start_tx.buffer_size);
 			state->write_args.iio_channels = cmd.start_tx.enabled_channels;
 			state->write_args.timestamping_enabled = cmd.start_tx.timestamping_enabled;
 			state->write_args.iio_buffer_size = cmd.start_tx.buffer_size;
@@ -411,6 +482,7 @@ static int handle_control(state_t *state)
 			}
 
 			/* Ensure thread stopped */
+			stop_v3_thread(state);
 			stop_thread(state, false);
 
 			/* Prepare args */
@@ -419,11 +491,11 @@ static int handle_control(state_t *state)
 				perror("Error converting address to string");
 				addr_str[0] = '\0';
 			}
-			DEBUG_PRINT("Start RX with chans: %08X, timestamp: %s, buffsize: %zu, pktsize: %zu, dest: %s:%u\n",
+			DEBUG_PRINT("Start RX with chans: %08X, timestamp: %s, buffsize: %u, pktsize: %u, dest: %s:%u\n",
 						cmd.start_rx.enabled_channels,
 						cmd.start_rx.timestamping_enabled ? "enabled" : "disabled",
-						cmd.start_rx.buffer_size,
-						cmd.start_rx.packet_size,
+						(unsigned int)cmd.start_rx.buffer_size,
+						(unsigned int)cmd.start_rx.packet_size,
 						addr_str, ntohs(cmd.start_rx.data_port));
 			state->read_args.addr.sin_family = AF_INET;
 			state->read_args.addr.sin_addr = addr.sin_addr;
@@ -457,6 +529,148 @@ static int handle_control(state_t *state)
 	}
 
 	return 0;
+}
+
+static bool same_control_peer(
+	const struct sockaddr_in *left,
+	const struct sockaddr_in *right)
+{
+	return left->sin_family == right->sin_family &&
+		left->sin_port == right->sin_port &&
+		left->sin_addr.s_addr == right->sin_addr.s_addr;
+}
+
+static int handle_v3_control(state_t *state,
+	const spf_ip_control_v1_t *request,
+	const struct sockaddr_in *peer)
+{
+	spf_ip_control_v1_t response;
+	if (state->control_cache_valid &&
+		same_control_peer(peer, &state->control_cache_peer) &&
+		request->request_id == state->control_cache_request.request_id)
+	{
+		if (memcmp(request,
+			&state->control_cache_request,
+			sizeof(*request)) == 0)
+			(void)send_v3_control(state, &state->control_cache_reply, peer);
+		else
+		{
+			spf_ip_control_init_error(
+				&response, request->request_id, -EALREADY);
+			(void)send_v3_control(state, &response, peer);
+		}
+		return 0;
+	}
+
+	if (!spf_ip_control_validate(request))
+		spf_ip_control_init_error(&response, request->request_id, -EINVAL);
+	else if (request->message_type == SPF_IP_CONTROL_QUERY_CAPABILITIES)
+		spf_ip_control_init_capabilities(&response, request->request_id);
+	else if (request->message_type == SPF_IP_CONTROL_START_RX)
+	{
+		if (request->protocol_min != 3)
+			spf_ip_control_init_error(
+				&response, request->request_id, -EPROTONOSUPPORT);
+		else
+		{
+			(void)stop_thread(state, false);
+			(void)stop_v3_thread(state);
+			uint64_t stream_id = state->next_stream_id++;
+			if (stream_id == 0)
+				stream_id = state->next_stream_id++;
+			memset(&state->read_v3_args, 0, sizeof(state->read_v3_args));
+			state->read_v3_args.quit_event_fd = state->read_thread_event_fd;
+			state->read_v3_args.startup_event_fd =
+				state->read_v3_startup_event_fd;
+			state->read_v3_args.run_event_fd = state->read_v3_run_event_fd;
+			state->read_v3_args.output_fd = state->sock_data;
+			state->read_v3_args.addr.sin_family = AF_INET;
+			state->read_v3_args.addr.sin_addr = peer->sin_addr;
+			state->read_v3_args.addr.sin_port = htons(request->data_port);
+			state->read_v3_args.iio_channels = request->enabled_scan_mask;
+			state->read_v3_args.samples_per_channel =
+				request->samples_per_channel;
+			state->read_v3_args.udp_datagram_bytes =
+				request->max_datagram_bytes;
+			state->read_v3_args.frame_count = request->frame_count;
+			state->read_v3_args.stream_id = stream_id;
+			state->read_v3_args.metadata_features =
+				(uint32_t)request->features;
+			state->read_v3_args.gain_observation_interval_samples =
+				request->gain_observation_interval_samples;
+			state->read_v3_args.gain_observation_capacity =
+				request->gain_observation_capacity;
+			state->read_v3_args.gain_event_capacity =
+				request->gain_event_capacity;
+			if (!start_v3_thread(state))
+				spf_ip_control_init_error(
+					&response, request->request_id, -EIO);
+			else
+			{
+				state->active_v3_stream_id = stream_id;
+				spf_ip_control_init_reply(&response,
+					request,
+					SPF_IP_CONTROL_STARTED,
+					stream_id);
+			}
+		}
+	}
+	else if (request->message_type == SPF_IP_CONTROL_STOP_RX)
+	{
+		if (request->stream_id != state->active_v3_stream_id)
+			spf_ip_control_init_error(
+				&response, request->request_id, -ENOENT);
+		else if (!stop_v3_thread(state))
+			spf_ip_control_init_error(&response, request->request_id, -EIO);
+		else
+		{
+			state->active_v3_stream_id = 0;
+			spf_ip_control_init_reply(&response,
+				request,
+				SPF_IP_CONTROL_STOPPED,
+				request->stream_id);
+		}
+	}
+	else
+		spf_ip_control_init_error(&response, request->request_id, -EINVAL);
+
+	state->control_cache_valid = true;
+	state->control_cache_peer = *peer;
+	state->control_cache_request = *request;
+	state->control_cache_reply = response;
+	const bool sent = send_v3_control(state, &response, peer);
+	if (sent && response.message_type == SPF_IP_CONTROL_STARTED)
+	{
+		uint64_t release = 1;
+		if (write(state->read_v3_run_event_fd,
+			&release,
+			sizeof(release)) != (ssize_t)sizeof(release))
+		{
+			(void)stop_v3_thread(state);
+			state->active_v3_stream_id = 0;
+			state->control_cache_valid = false;
+		}
+	}
+	else if (!sent && response.message_type == SPF_IP_CONTROL_STARTED)
+	{
+		(void)stop_v3_thread(state);
+		state->active_v3_stream_id = 0;
+		state->control_cache_valid = false;
+	}
+	return 0;
+}
+
+static bool send_v3_control(state_t *state,
+	const spf_ip_control_v1_t *response,
+	const struct sockaddr_in *peer)
+{
+	const ssize_t sent = sendto(state->sock_control,
+		response,
+		sizeof(*response),
+		0,
+		(const struct sockaddr *)peer,
+		sizeof(*peer));
+	return sent == (ssize_t)sizeof(*response);
 }
 
 static bool start_thread(state_t *state, bool tx)
@@ -551,6 +765,62 @@ static bool stop_thread(state_t *state, bool tx)
 		state->read_started = false;
 	}
 
+	return true;
+}
+
+static bool start_v3_thread(state_t *state)
+{
+	if (state->read_v3_started)
+		return false;
+	sigset_t new_mask;
+	sigset_t old_mask;
+	sigfillset(&new_mask);
+	if (sigprocmask(SIG_SETMASK, &new_mask, &old_mask) < 0)
+		return false;
+	state->read_v3_started = pthread_create(&state->thread_read_v3,
+		NULL,
+		&THREAD_READ_V3_Entrypoint,
+		&state->read_v3_args) == 0;
+	const bool mask_restored =
+		sigprocmask(SIG_SETMASK, &old_mask, NULL) == 0;
+	if (!state->read_v3_started || !mask_restored)
+		return false;
+	struct pollfd ready = {
+		.fd = state->read_v3_startup_event_fd,
+		.events = POLLIN,
+	};
+	if (poll(&ready, 1, 10000) != 1)
+	{
+		(void)stop_v3_thread(state);
+		return false;
+	}
+	uint64_t result = 0;
+	if (read(state->read_v3_startup_event_fd,
+		&result,
+		sizeof(result)) != (ssize_t)sizeof(result) || result != 1)
+	{
+		pthread_join(state->thread_read_v3, NULL);
+		state->read_v3_started = false;
+		return false;
+	}
+	return true;
+}
+
+static bool stop_v3_thread(state_t *state)
+{
+	if (!state->read_v3_started)
+		return true;
+	uint64_t value = 1;
+	if (write(state->read_thread_event_fd,
+		&value,
+		sizeof(value)) != (ssize_t)sizeof(value))
+		return false;
+	pthread_join(state->thread_read_v3, NULL);
+	if (read(state->read_thread_event_fd,
+		&value,
+		sizeof(value)) != (ssize_t)sizeof(value))
+		return false;
+	state->read_v3_started = false;
 	return true;
 }
 

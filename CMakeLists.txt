@@ -52,6 +52,7 @@ add_executable(sdr_ip_gadget
     main.c
     epoll_loop.c
     thread_read.c
+	thread_read_v3.c
     thread_write.c
     utils.c
 	spf_ip_protocol.c

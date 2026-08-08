@@ -99,6 +99,15 @@ _Static_assert(sizeof(spf_ip_fragment_v1_t) == 52,
 
 void spf_ip_control_init_query(spf_ip_control_v1_t *message,
 	uint64_t request_id);
+void spf_ip_control_init_capabilities(spf_ip_control_v1_t *message,
+	uint64_t request_id);
+void spf_ip_control_init_error(spf_ip_control_v1_t *message,
+	uint64_t request_id,
+	int32_t status);
+void spf_ip_control_init_reply(spf_ip_control_v1_t *reply,
+	const spf_ip_control_v1_t *request,
+	spf_ip_control_type_t reply_type,
+	uint64_t stream_id);
 bool spf_ip_control_validate(const spf_ip_control_v1_t *message);
 bool spf_ip_fragment_validate(const spf_ip_fragment_v1_t *header,
 	size_t datagram_bytes);

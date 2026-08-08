@@ -49,6 +49,25 @@ static void test_v3_start_and_started(void)
 	assert(!spf_ip_control_validate(&start));
 }
 
+static void test_control_replies(void)
+{
+	spf_ip_control_v1_t capabilities;
+	spf_ip_control_init_capabilities(&capabilities, 77);
+	assert(spf_ip_control_validate(&capabilities));
+	assert(capabilities.request_id == 77);
+	assert(capabilities.protocol_min == 3);
+	assert(capabilities.protocol_max == 3);
+	assert(capabilities.max_samples_per_channel == 524288);
+	assert((capabilities.features &
+		SPF_METADATA_FEATURE_GAIN_OBSERVATIONS) != 0);
+
+	spf_ip_control_v1_t error;
+	spf_ip_control_init_error(&error, 88, -5);
+	assert(spf_ip_control_validate(&error));
+	assert(error.request_id == 88);
+	assert(error.status == -5);
+}
+
 static void test_fragment_and_crc(void)
 {
 	static const uint8_t payload[] = "complete inner frame";
@@ -107,6 +126,7 @@ int main(void)
 {
 	test_query_golden_vector();
 	test_v3_start_and_started();
+	test_control_replies();
 	test_fragment_and_crc();
 	test_production_frame_fragment_plan();
 	return 0;

@@ -422,10 +422,11 @@ static int handle_iio_buffer(state_t *state)
 	}
 
 	/* Send all datagrams with single system call :-) */
-	if (state->packets_per_buffer != sendmmsg(state->thread_args->output_fd,
-											  state->arr_mmsg_hdrs,
-											  state->packets_per_buffer,
-											  0))
+	const int sent = sendmmsg(state->thread_args->output_fd,
+		state->arr_mmsg_hdrs,
+		(unsigned int)state->packets_per_buffer,
+		0);
+	if (sent < 0 || (size_t)sent != state->packets_per_buffer)
 	{
 		/* Send failed */
 		#if GENERATE_STATS
