@@ -38,6 +38,7 @@ add_executable(sdr_usb_gadget
     thread_write.c
     spf_gain_read.c
     spf_gain_sampler.c
+	spf_radio_frame_v3.c
     spf_rssi_read.c
     spf_control_policy.c
     spf_runtime_status.c
@@ -69,6 +70,11 @@ if (BUILD_HOST_TESTS)
 
     add_executable(test_spf_radio_metadata_v3 test_spf_radio_metadata_v3.c)
     add_test(NAME spf_radio_metadata_v3 COMMAND test_spf_radio_metadata_v3)
+
+	add_executable(test_spf_radio_frame_v3
+		test_spf_radio_frame_v3.c
+		spf_radio_frame_v3.c)
+	add_test(NAME spf_radio_frame_v3 COMMAND test_spf_radio_frame_v3)
 
     add_executable(test_spf_gain_read
         test_spf_gain_read.c

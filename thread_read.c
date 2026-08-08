@@ -35,6 +35,7 @@
 #include "spf_buffer_policy.h"
 #include "spf_cleanup_plan.h"
 #include "spf_gain_sampler.h"
+#include "spf_radio_frame_v3.h"
 
 /* Set the following to periodically report statistics */
 #ifndef GENERATE_STATS
@@ -102,6 +103,7 @@ typedef struct
 	bool overflow_seen;
 	spf_gain_sampler_t gain_sampler;
 	bool gain_sampler_started;
+	spf_gain_observation_v3_t frame_observations[SPF_MAX_GAIN_OBSERVATIONS];
 
 	/* AIO context */
 	io_context_t io_ctx;
@@ -329,13 +331,14 @@ void *THREAD_READ_Entrypoint(void *args)
 		 thread_args->protocol_version == SPF_GAIN_META_VERSION_V3);
 	if (state.metadata_v3)
 	{
-		state.metadata_header_size =
-			sizeof(spf_radio_meta_v3_prefix_t) +
-			(size_t)thread_args->gain_observation_capacity *
-				sizeof(spf_gain_observation_v3_t) +
-			(size_t)thread_args->gain_event_capacity *
-				sizeof(spf_gain_event_v3_t) +
-			sizeof(uint32_t);
+		state.metadata_header_size = spf_radio_frame_v3_header_bytes(
+			thread_args->gain_observation_capacity,
+			thread_args->gain_event_capacity);
+		if (state.metadata_header_size == 0)
+		{
+			fprintf(stderr, "Invalid protocol-v3 metadata capacities\n");
+			goto cleanup;
+		}
 	}
 	else
 	{
@@ -887,114 +890,50 @@ static int handle_iio_buffer(state_t *state)
 		{
 			if (state->metadata_v3)
 			{
-				memset(buf->data, 0, state->metadata_header_size);
-				spf_radio_meta_v3_prefix_t *header =
-					(spf_radio_meta_v3_prefix_t *)buf->data;
-				spf_gain_observation_v3_t *observations =
-					(spf_gain_observation_v3_t *)(buf->data +
-						sizeof(*header));
 				uint32_t observation_overflow_count = 0;
 				const uint16_t observation_count = spf_gain_sampler_collect(
 					&state->gain_sampler,
 					first_sample_sequence,
 					(uint32_t)state->thread_args->iio_buffer_size,
-					observations,
+					state->frame_observations,
 					state->thread_args->gain_observation_capacity,
 					&observation_overflow_count);
-				if (observation_count == 0)
+				const spf_radio_frame_v3_args_t frame_args = {
+					.metadata_features = state->thread_args->metadata_features,
+					.stream_id = state->thread_args->stream_id,
+					.buffer_sequence = this_buffer_sequence,
+					.first_sample_sequence = first_sample_sequence,
+					.samples_per_channel =
+						(uint32_t)state->thread_args->iio_buffer_size,
+					.iq_payload_bytes = (uint32_t)state->iq_payload_size,
+					.enabled_scan_mask = state->thread_args->iio_channels,
+					.gain_observation_interval_samples =
+						state->thread_args->gain_observation_interval_samples,
+					.gain_observations = state->frame_observations,
+					.gain_observation_count = observation_count,
+					.gain_observation_capacity =
+						state->thread_args->gain_observation_capacity,
+					.gain_observation_overflow_count =
+						observation_overflow_count,
+					.gain_events = NULL,
+					.gain_event_count = 0,
+					.gain_event_capacity =
+						state->thread_args->gain_event_capacity,
+					.gain_event_overflow_count = 0,
+					.rssi_start = state->previous_rssi,
+					.rssi_end = current_rssi,
+					.device_iio_overflow = state->overflow_seen,
+				};
+				if (!spf_radio_frame_v3_build(
+					buf->data,
+					state->metadata_header_size,
+					&frame_args))
 				{
 					fprintf(stderr,
-						"No sample-aligned gain observations overlap RX frame\n");
+						"Failed to serialize protocol-v3 radio frame metadata\n");
 					buf->in_use = false;
 					return -1;
 				}
-				const spf_gain_observation_v3_t *first = &observations[0];
-				const spf_gain_observation_v3_t *last =
-					&observations[observation_count - 1];
-				uint32_t flags =
-					SPF_META_SAMPLE_SEQUENCE_VALID |
-					SPF_META_HARDWARE_SAMPLE_COUNTER_VALID |
-					SPF_META_GAIN_OBSERVATIONS_VALID |
-					SPF_META_GAIN_DB_VALUES |
-					SPF_META_GAIN_FULL_TABLE_MODE;
-				const bool first_valid =
-					(first->flags & SPF_GAIN_OBSERVATION_VALID) != 0;
-				const bool last_valid =
-					(last->flags & SPF_GAIN_OBSERVATION_VALID) != 0;
-				if (first_valid)
-					flags |= SPF_META_START_VALID;
-				if (last_valid)
-					flags |= SPF_META_END_VALID;
-				if (!first_valid || !last_valid)
-					flags |= SPF_META_GAIN_READ_FAILED;
-				if (first_valid && last_valid)
-				{
-					if (first->rx1_gain_index != last->rx1_gain_index)
-						flags |= SPF_META_RX1_ENDPOINT_CHANGED;
-					if (first->rx2_gain_index != last->rx2_gain_index)
-						flags |= SPF_META_RX2_ENDPOINT_CHANGED;
-				}
-				if (state->previous_rssi.valid)
-					flags |= SPF_META_RSSI_START_VALID;
-				if (current_rssi.valid)
-					flags |= SPF_META_RSSI_END_VALID;
-				if (!state->previous_rssi.valid || !current_rssi.valid)
-					flags |= SPF_META_RSSI_READ_FAILED;
-				if (observation_overflow_count)
-					flags |= SPF_META_GAIN_OBSERVATION_OVERFLOW;
-				if (state->overflow_seen)
-					flags |= SPF_META_DEVICE_IIO_OVERFLOW;
-
-				header->magic = SPF_GAIN_META_MAGIC;
-				header->version = SPF_GAIN_META_VERSION_V3;
-				header->header_bytes = (uint16_t)state->metadata_header_size;
-				header->features = state->thread_args->metadata_features;
-				header->flags = flags;
-				header->stream_id = state->thread_args->stream_id;
-				header->buffer_sequence = this_buffer_sequence;
-				header->first_sample_sequence = first_sample_sequence;
-				header->samples_per_channel =
-					(uint32_t)state->thread_args->iio_buffer_size;
-				header->iq_payload_bytes = (uint32_t)state->iq_payload_size;
-				header->enabled_scan_mask = state->thread_args->iio_channels;
-				header->sample_format =
-					SPF_SAMPLE_FORMAT_CS16_LE_TIME_INTERLEAVED;
-				header->channel_count = 2;
-				header->rx1_gain_db_start = first->rx1_gain_db;
-				header->rx2_gain_db_start = first->rx2_gain_db;
-				header->rx1_gain_db_end = last->rx1_gain_db;
-				header->rx2_gain_db_end = last->rx2_gain_db;
-				header->gain_start_read_duration_ns = first->read_duration_ns;
-				header->gain_end_read_duration_ns = last->read_duration_ns;
-				header->rx1_first_change_sample =
-					SPF_FIRST_CHANGE_UNAVAILABLE;
-				header->rx2_first_change_sample =
-					SPF_FIRST_CHANGE_UNAVAILABLE;
-				header->rx1_rssi_start_qdb = state->previous_rssi.rx1_qdb;
-				header->rx2_rssi_start_qdb = state->previous_rssi.rx2_qdb;
-				header->rx1_rssi_end_qdb = current_rssi.rx1_qdb;
-				header->rx2_rssi_end_qdb = current_rssi.rx2_qdb;
-				header->rssi_start_read_duration_ns =
-					state->previous_rssi.duration_ns;
-				header->rssi_end_read_duration_ns = current_rssi.duration_ns;
-				header->gain_observation_interval_samples =
-					state->thread_args->gain_observation_interval_samples;
-				header->gain_observation_count = observation_count;
-				header->gain_observation_capacity =
-					state->thread_args->gain_observation_capacity;
-				header->gain_observation_bytes =
-					SPF_GAIN_OBSERVATION_BYTES;
-				header->gain_event_count = 0;
-				header->gain_event_capacity =
-					state->thread_args->gain_event_capacity;
-				header->gain_event_bytes = SPF_GAIN_EVENT_BYTES;
-				header->gain_observation_overflow_count =
-					observation_overflow_count;
-				header->gain_event_overflow_count = 0;
-				uint32_t *crc = (uint32_t *)(buf->data +
-					state->metadata_header_size - sizeof(uint32_t));
-				*crc = spf_gain_meta_crc32(
-					buf->data, state->metadata_header_size);
 				iq_destination += state->metadata_header_size;
 			}
 			else
