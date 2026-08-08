@@ -1,9 +1,9 @@
 
 VIVADO_VERSION ?= 2022.2
 
-# Buildroot's pinned Arm GNU 2021.07 toolchain uses the arm-none-linux-gnueabihf
-# tuple. Keep this overridable for older cached Linaro toolchains.
-CROSS_COMPILE ?= arm-none-linux-gnueabihf-
+# The x86-64 Buildroot configuration selects the pinned Linaro 2018.05
+# toolchain, whose binaries use the arm-linux-gnueabihf tuple.
+CROSS_COMPILE ?= arm-linux-gnueabihf-
 TOOLS_PATH = PATH="$(CURDIR)/buildroot/output/host/bin:$(CURDIR)/buildroot/output/host/sbin:$(PATH)"
 TOOLCHAIN = $(CURDIR)/buildroot/output/host/bin/$(CROSS_COMPILE)gcc
 
