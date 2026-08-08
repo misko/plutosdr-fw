@@ -1,0 +1,115 @@
+name: firmware
+
+# Layered deliberately by cost. Every historical failure in this repository was
+# a source-graph failure, not a compile failure -- unreachable submodule URLs,
+# `branch =` keys that did not contain their pin, an uncommitted toolchain
+# selection, a local.mk pointing at /tmp. Those are all caught by a job that
+# runs in seconds and needs no toolchain, so it runs first and on every push.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      firmware_ref:
+        description: Firmware commit/tag/branch to build
+        default: f53dd006c26677a256520b86b7c864100ccd62d2
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-graph:
+    name: source graph (no toolchain)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pins, URLs, tags and overrides
+        run: ./scripts/check_source_graph.sh manifests/fingerprint-v3.yaml
+
+  gadget-tests:
+    name: native gadget unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the pinned gadget source
+        uses: actions/checkout@v4
+        with:
+          repository: misko/plutosdr-fw
+          ref: 2072e1d0823ef6db3bc141dd733a90d76e23fc33
+          path: gadget
+      - name: Build and test natively
+        run: |
+          sudo apt-get update
+          # libaio and libiio are needed by the sdr_usb_gadget target itself.
+          # `cmake --build` builds every target, not just the test binaries, so
+          # omitting them fails the job on a missing libaio.h.
+          sudo apt-get install -y --no-install-recommends \
+            cmake build-essential libaio-dev libiio-dev
+          # BUILD_HOST_TESTS, not the conventional BUILD_TESTING: the tests are
+          # guarded by `if (BUILD_HOST_TESTS)`, so the usual flag configures and
+          # builds cleanly while registering zero tests -- a green job proving
+          # nothing. Verified locally: 10/10 tests run and pass.
+          cmake -S gadget -B gadget/build-tests -DBUILD_HOST_TESTS=ON
+          cmake --build gadget/build-tests -j"$(nproc)"
+          ctest --test-dir gadget/build-tests --output-on-failure
+      - name: Fail if no tests actually ran
+        run: |
+          n=$(ctest --test-dir gadget/build-tests -N | sed -n 's/^Total Tests: //p')
+          echo "registered tests: ${n:-0}"
+          [ "${n:-0}" -ge 10 ] || { echo "expected >=10 tests, got ${n:-0}"; exit 1; }
+
+  build-dfu:
+    name: build pluto.dfu (aarch64)
+    # aarch64 is CANONICAL and this is not a preference. The committed
+    # zynq_pluto_defconfig still selects BR2_TOOLCHAIN_EXTERNAL_LINARO_ARM. On
+    # aarch64 that option is unselectable, so kconfig falls back to
+    # BR2_TOOLCHAIN_EXTERNAL_ARM_ARM (ARM GNU 10.3-2021.07) -- the toolchain
+    # that actually built the deployed release. On x86_64 the Linaro option IS
+    # selectable and wins, so the same source silently builds with gcc 7.3.1.
+    # docker/build_firmware.sh asserts the resolved toolchain and fails loudly
+    # rather than shipping a differently-compiled image.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the builder image
+        run: docker build -t plutosdr-fw-builder:ci docker/
+
+      - name: Verify the source graph can be pulled from scratch
+        run: |
+          docker run --rm -e DRY_RUN=1 \
+            -e FW_REF=${{ github.event.inputs.firmware_ref || 'f53dd006c26677a256520b86b7c864100ccd62d2' }} \
+            plutosdr-fw-builder:ci
+
+      - name: Compile the firmware
+        run: |
+          # The image runs as uid 1000 ("builder", because Buildroot refuses to
+          # run as root) while the GitHub runner checkout is owned by a
+          # different uid. Bind-mounting host directories overrides the
+          # image's ownership, so without this the build fails writing /out.
+          mkdir -p out cache && chmod 777 out cache
+          docker run --rm \
+            -e FW_REF=${{ github.event.inputs.firmware_ref || 'f53dd006c26677a256520b86b7c864100ccd62d2' }} \
+            -v "$PWD/out:/out" -v "$PWD/cache:/cache" \
+            plutosdr-fw-builder:ci
+
+      - name: Verify the rebuilt image reproduces the deployed identity
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends u-boot-tools cpio dfu-util
+          dfu=$(ls out/*.dfu | head -1)
+          # --identity-only, NOT the default mode: the deployed image was built
+          # without BR2_REPRODUCIBLE, so a rebuild can never match its sha256.
+          # What must match is device-fw, the four /opt/VERSIONS strings, the
+          # FPGA bitstream and the gadget build ID read out of the shipped binary.
+          ./scripts/verify_release.sh manifests/fingerprint-v3.yaml \
+            --image "$dfu" --identity-only
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware-dfu
+          path: |
+            out/*.dfu
+            out/*.json
