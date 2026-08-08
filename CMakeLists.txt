@@ -11,6 +11,15 @@ target_include_directories(spf_radio_frame_v3 PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include/spf>)
 
+add_library(spf_gain_observation STATIC
+	spf_gain_read.c
+	spf_gain_sampler.c
+	spf_rssi_read.c)
+target_include_directories(spf_gain_observation PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+	$<INSTALL_INTERFACE:include/spf>)
+target_link_libraries(spf_gain_observation PUBLIC iio pthread)
+
 # From: https://www.mattkeeter.com/blog/2018-01-06-versioning/
 execute_process(COMMAND git log --pretty=format:'%h' -n 1
                 OUTPUT_VARIABLE GIT_REV
@@ -41,9 +50,6 @@ add_executable(sdr_usb_gadget
     ring_buffer.c
     thread_read.c
     thread_write.c
-    spf_gain_read.c
-    spf_gain_sampler.c
-    spf_rssi_read.c
     spf_control_policy.c
     spf_runtime_status.c
     spf_thread_join.c
@@ -54,6 +60,7 @@ target_link_libraries(sdr_usb_gadget
     aio
     iio
 	spf_radio_frame_v3
+	spf_gain_observation
 )
 target_compile_definitions(sdr_usb_gadget PRIVATE
     PROGRAM_VERSION="${GIT_VERSION}"
@@ -64,8 +71,12 @@ endif(GENERATE_STATS)
 
 install(TARGETS sdr_usb_gadget RUNTIME DESTINATION sbin)
 install(TARGETS spf_radio_frame_v3 ARCHIVE DESTINATION lib)
+install(TARGETS spf_gain_observation ARCHIVE DESTINATION lib)
 install(FILES
 	spf_gain_metadata.h
+	spf_gain_read.h
+	spf_gain_sampler.h
+	spf_rssi_read.h
 	spf_radio_frame_v3.h
 	DESTINATION include/spf)
 
