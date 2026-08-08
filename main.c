@@ -28,6 +28,7 @@
 #include "thread_read_v3.h"
 #include "thread_write.h"
 #include "spf_ip_protocol.h"
+#include <spf/spf_time_anchor.h>
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -72,6 +73,12 @@ typedef struct
 	spf_ip_control_v1_t control_cache_request;
 	spf_ip_control_v1_t control_cache_reply;
 
+	spf_time_anchor_reader_t time_anchor_reader;
+	bool time_anchor_cache_valid;
+	struct sockaddr_in time_anchor_cache_peer;
+	spf_time_anchor_query_v1_t time_anchor_cache_query;
+	spf_time_anchor_v1_t time_anchor_cache_reply;
+
 } state_t;
 
 /* Epoll event handler */
@@ -88,6 +95,9 @@ static int handle_v3_control(state_t *state,
 static bool send_v3_control(state_t *state,
 	const spf_ip_control_v1_t *response,
 	const struct sockaddr_in *peer);
+static bool same_control_peer(
+	const struct sockaddr_in *left,
+	const struct sockaddr_in *right);
 static bool start_thread(state_t *state, bool tx);
 static bool stop_thread(state_t *state, bool tx);
 static bool start_v3_thread(state_t *state);
@@ -111,6 +121,11 @@ int main(int argc, char *argv[])
 		(uint32_t)getpid();
 	if (state.next_stream_id == 0)
 		state.next_stream_id = 1;
+	if (!spf_time_anchor_reader_init(&state.time_anchor_reader))
+	{
+		fprintf(stderr, "Required FPGA time-anchor counter is unavailable\n");
+		return 1;
+	}
 
 	/* Ensure stdout is line buffered */
 	setlinebuf(stdout);
@@ -386,6 +401,7 @@ int main(int argc, char *argv[])
 	close(state.write_thread_event_fd);
 	close(state.sock_control);
 	close(state.sock_data);
+	spf_time_anchor_reader_destroy(&state.time_anchor_reader);
 
 	/* Goodbye */
 	printf("Bye!\n");
@@ -402,6 +418,7 @@ static int handle_control(state_t *state)
 	{
 		cmd_ip_t legacy;
 		spf_ip_control_v1_t v3;
+		spf_time_anchor_query_v1_t time_anchor;
 	} command;
 	int ret;
 
@@ -413,6 +430,54 @@ static int handle_control(state_t *state)
 		0,
 		(struct sockaddr*)&addr,
 		&len);
+	if (ret >= (int)sizeof(uint32_t) &&
+		command.time_anchor.magic == SPF_TIME_ANCHOR_QUERY_MAGIC)
+	{
+		const uint64_t request_id =
+			ret >= 16 ? command.time_anchor.request_id : 0;
+		if (ret != (int)sizeof(command.time_anchor) ||
+			!spf_time_anchor_query_validate(&command.time_anchor))
+		{
+			spf_ip_control_v1_t error;
+			spf_ip_control_init_error(&error, request_id, -EINVAL);
+			(void)send_v3_control(state, &error, &addr);
+			return 0;
+		}
+		if (state->time_anchor_cache_valid &&
+			same_control_peer(&addr, &state->time_anchor_cache_peer) &&
+			memcmp(&command.time_anchor,
+				&state->time_anchor_cache_query,
+				sizeof(command.time_anchor)) == 0)
+		{
+			(void)sendto(state->sock_control,
+				&state->time_anchor_cache_reply,
+				sizeof(state->time_anchor_cache_reply),
+				0,
+				(const struct sockaddr *)&addr,
+				sizeof(addr));
+			return 0;
+		}
+		spf_time_anchor_v1_t anchor;
+		if (!spf_time_anchor_capture(
+			&state->time_anchor_reader, request_id, &anchor))
+		{
+			spf_ip_control_v1_t error;
+			spf_ip_control_init_error(&error, request_id, -EIO);
+			(void)send_v3_control(state, &error, &addr);
+			return 0;
+		}
+		state->time_anchor_cache_valid = true;
+		state->time_anchor_cache_peer = addr;
+		state->time_anchor_cache_query = command.time_anchor;
+		state->time_anchor_cache_reply = anchor;
+		(void)sendto(state->sock_control,
+			&anchor,
+			sizeof(anchor),
+			0,
+			(const struct sockaddr *)&addr,
+			sizeof(addr));
+		return 0;
+	}
 	if (ret >= (int)sizeof(uint32_t) &&
 		command.v3.magic == SPF_IP_CONTROL_MAGIC)
 	{

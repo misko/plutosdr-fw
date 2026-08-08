@@ -61,6 +61,7 @@ static void test_control_replies(void)
 	assert(capabilities.protocol_min == 3);
 	assert(capabilities.protocol_max == 3);
 	assert(capabilities.max_samples_per_channel == 524288);
+	assert((capabilities.flags & SPF_IP_CONTROL_FLAG_TIME_ANCHOR) != 0);
 	assert((capabilities.features &
 		SPF_METADATA_FEATURE_GAIN_OBSERVATIONS) != 0);
 

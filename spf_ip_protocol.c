@@ -37,7 +37,8 @@ void spf_ip_control_init_capabilities(spf_ip_control_v1_t *message,
 	message->message_bytes = sizeof(*message);
 	message->request_id = request_id;
 	message->flags = SPF_IP_CONTROL_FLAG_FINITE_RX |
-		SPF_IP_CONTROL_FLAG_IDEMPOTENT_REQUESTS;
+		SPF_IP_CONTROL_FLAG_IDEMPOTENT_REQUESTS |
+		SPF_IP_CONTROL_FLAG_TIME_ANCHOR;
 	message->protocol_min = 3;
 	message->protocol_max = 3;
 	message->features = SPF_METADATA_KNOWN_FEATURES;
