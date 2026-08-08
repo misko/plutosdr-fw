@@ -72,7 +72,7 @@ sub_clone() {
 log "fetch submodules at the depths the deployed image used"
 sub_clone buildroot     "${SUB_BUILDROOT_URL:-https://github.com/misko/plutosdr-fw.git}" \
     codex/buildroot-gadget-supervisor-v3 f37fe105ff4df531311b0cf85584461fb03e0e4e 1
-sub_clone hdl           "${SUB_HDL_URL:-https://github.com/pgreenland/plutosdr-hdl.git}" \
+sub_clone hdl           "${SUB_HDL_URL:-https://github.com/misko/plutosdr-hdl.git}" \
     v0.38_plutoplus_timestamp be89a77d3fd0b344419377fac6fab8cfc7a66ad8 full
 sub_clone hdl-quantulum "${SUB_HDLQ_URL:-https://github.com/misko/plutosdr-hdl-quantulum}" \
     main d70102267713f5bbc99805be5f4f08b0a07766cb 1

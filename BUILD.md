@@ -97,6 +97,22 @@ Only `hdl-quantulum` carries `shallow = true`, because its pin genuinely is its
 default-branch tip. The real fix would be repointing each mirror's default
 branch at the pin's branch.
 
+### Do not re-home hdl into misko/plutosdr-fw
+
+The hdl pin is archived at `misko/plutosdr-fw`
+`refs/heads/hdl-v0.38-plutoplus-timestamp` so the objects survive independently
+of pgreenland. **That archive must not become the submodule source.**
+
+`/opt/VERSIONS` records `git describe --abbrev=4`, and `--abbrev=4` is a
+*minimum* — git lengthens the hash until it is unique **within that repository**.
+`plutosdr-fw` also carries the firmware, buildroot and gadget histories, so the
+identical commit describes there as `dev_prj_2018_r1-1859-gbe89a7` (6 hex)
+instead of `dev_prj_2018_r1-1859-gbe89` (5 hex). Re-homing hdl would silently
+change the recorded firmware identity while every commit stayed the same.
+
+The correct fix is a dedicated `misko/plutosdr-hdl` mirror, which needs repo
+creation rights the build token does not have.
+
 Consequently a plain `git submodule update --init --recursive` does full clones
 and needs ~3 GB. On a memory-constrained builder use `docker/build_firmware.sh`,
 which clones each submodule explicitly at the right depth and asserts every
