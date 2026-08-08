@@ -93,7 +93,7 @@ printf 'Preflight passed: mode=%s manifest=%s\n' "$MODE" "$MANIFEST"
 [[ "$MODE" == preflight ]] && exit 0
 
 if [[ "$MODE" == rootfs ]]; then
-    exec make SKIP_LEGAL=1 build/rootfs.cpio.gz
+    exec make build/rootfs.cpio.gz
 fi
 
 (
@@ -109,4 +109,4 @@ cp "$candidate_xsa" "$ROOT/build/system_top.xsa"
 printf 'Candidate FPGA XSA: '
 sha256sum "$ROOT/build/system_top.xsa"
 
-exec make SKIP_LEGAL=1 VIVADO_SETTINGS="$VIVADO_SETTINGS" build/pluto.dfu
+exec make VIVADO_SETTINGS="$VIVADO_SETTINGS" build/pluto.dfu
