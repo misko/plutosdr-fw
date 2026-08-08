@@ -34,6 +34,7 @@
 #include "spf_rssi_read.h"
 #include "spf_buffer_policy.h"
 #include "spf_cleanup_plan.h"
+#include "spf_gain_sampler.h"
 
 /* Set the following to periodically report statistics */
 #ifndef GENERATE_STATS
@@ -64,6 +65,10 @@ typedef struct
 
 	/* IIO sample buffer */
 	struct iio_buffer *iio_rx_buffer;
+	struct iio_device *iio_dev_rx;
+	size_t iio_refill_size;
+	uint32_t timestamp_control_previous;
+	bool timestamp_control_configured;
 
 	/* Local AD936x PHY used for endpoint gain snapshots. */
 	struct iio_device *iio_dev_phy;
@@ -89,11 +94,14 @@ typedef struct
 	/* Versioned finite-stream state. */
 	bool metadata_enabled;
 	bool metadata_v2;
+	bool metadata_v3;
 	size_t metadata_header_size;
 	uint32_t frames_remaining;
 	uint64_t buffer_sequence;
 	uint32_t frames_completed_in_stream;
 	bool overflow_seen;
+	spf_gain_sampler_t gain_sampler;
+	bool gain_sampler_started;
 
 	/* AIO context */
 	io_context_t io_ctx;
@@ -211,8 +219,8 @@ void *THREAD_READ_Entrypoint(void *args)
 	state.acquired_resources |= SPF_RX_RESOURCE_IIO_CONTEXT;
 
 	/* Retrieve RX streaming device */
-	struct iio_device *iio_dev_rx = iio_context_find_device(state.iio_ctx, "cf-ad9361-lpc");
-	if (!iio_dev_rx)
+	state.iio_dev_rx = iio_context_find_device(state.iio_ctx, "cf-ad9361-lpc");
+	if (!state.iio_dev_rx)
 	{
 		fprintf(stderr, "Failed to open iio rx dev\n");
 		goto cleanup;
@@ -226,10 +234,10 @@ void *THREAD_READ_Entrypoint(void *args)
 	}
 
 	/* Disable all channels */
-	unsigned int nb_channels = iio_device_get_channels_count(iio_dev_rx);
+	unsigned int nb_channels = iio_device_get_channels_count(state.iio_dev_rx);
 	for (unsigned int i = 0; i < nb_channels; i++)
 	{
-		iio_channel_disable(iio_device_get_channel(iio_dev_rx, i));
+		iio_channel_disable(iio_device_get_channel(state.iio_dev_rx, i));
 	}
 
 	/* Enable required channels */
@@ -239,7 +247,7 @@ void *THREAD_READ_Entrypoint(void *args)
 		if (thread_args->iio_channels & (1U << i))
 		{
 			/* Retrieve channel */
-			struct iio_channel *channel = iio_device_get_channel(iio_dev_rx, i);
+			struct iio_channel *channel = iio_device_get_channel(state.iio_dev_rx, i);
 			if (!channel)
 			{
 				fprintf(stderr, "Failed to find iio rx chan %u\n", i);
@@ -251,8 +259,38 @@ void *THREAD_READ_Entrypoint(void *args)
 		}
 	}
 
+	state.metadata_v3 =
+		(thread_args->protocol_version == SPF_GAIN_META_VERSION_V3);
+	size_t iio_capture_samples = thread_args->iio_buffer_size;
+	if (state.metadata_v3)
+	{
+		if (iio_device_reg_read(
+			state.iio_dev_rx,
+			SPF_ADC_TIMESTAMP_CONTROL_REG,
+			&state.timestamp_control_previous) != 0)
+		{
+			fprintf(stderr, "Failed to read ADC timestamp control\n");
+			goto cleanup;
+		}
+		const uint32_t timestamp_control =
+			((uint32_t)thread_args->iio_buffer_size << 1) |
+			(state.timestamp_control_previous & UINT32_C(1));
+		if (iio_device_reg_write(
+			state.iio_dev_rx,
+			SPF_ADC_TIMESTAMP_CONTROL_REG,
+			timestamp_control) != 0)
+		{
+			fprintf(stderr, "Failed to enable ADC frame timestamp\n");
+			goto cleanup;
+		}
+		state.timestamp_control_configured = true;
+		/* Dual complex RX uses one 64-bit scan sample for the timestamp. */
+		iio_capture_samples++;
+	}
+
 	/* Create non-cyclic buffer */
-	state.iio_rx_buffer = iio_device_create_buffer(iio_dev_rx, thread_args->iio_buffer_size, false);
+	state.iio_rx_buffer = iio_device_create_buffer(
+		state.iio_dev_rx, iio_capture_samples, false);
 	if (!state.iio_rx_buffer)
 	{
 		fprintf(stderr, "Failed to create rx buffer for %zu samples\n", thread_args->iio_buffer_size);
@@ -281,14 +319,30 @@ void *THREAD_READ_Entrypoint(void *args)
 
 	/* Calculate IQ and USB transfer sizes. */
 	state.iq_payload_size = sample_size * thread_args->iio_buffer_size;
+	state.iio_refill_size = sample_size * iio_capture_samples;
 	state.metadata_enabled =
 		(thread_args->protocol_version == SPF_GAIN_META_VERSION_V1 ||
-		 thread_args->protocol_version == SPF_GAIN_META_VERSION_V2);
+		 thread_args->protocol_version == SPF_GAIN_META_VERSION_V2 ||
+		 thread_args->protocol_version == SPF_GAIN_META_VERSION_V3);
 	state.metadata_v2 =
-		(thread_args->protocol_version == SPF_GAIN_META_VERSION_V2);
-	state.metadata_header_size = state.metadata_v2
-		? sizeof(spf_radio_meta_v2_t)
-		: (state.metadata_enabled ? sizeof(spf_gain_meta_v1_t) : 0);
+		(thread_args->protocol_version == SPF_GAIN_META_VERSION_V2 ||
+		 thread_args->protocol_version == SPF_GAIN_META_VERSION_V3);
+	if (state.metadata_v3)
+	{
+		state.metadata_header_size =
+			sizeof(spf_radio_meta_v3_prefix_t) +
+			(size_t)thread_args->gain_observation_capacity *
+				sizeof(spf_gain_observation_v3_t) +
+			(size_t)thread_args->gain_event_capacity *
+				sizeof(spf_gain_event_v3_t) +
+			sizeof(uint32_t);
+	}
+	else
+	{
+		state.metadata_header_size = state.metadata_v2
+			? sizeof(spf_radio_meta_v2_t)
+			: (state.metadata_enabled ? sizeof(spf_gain_meta_v1_t) : 0);
+	}
 	state.frames_remaining = thread_args->frame_count;
 	state.buffer_sequence = 0;
 	state.usb_buffer_size =
@@ -383,6 +437,18 @@ void *THREAD_READ_Entrypoint(void *args)
 				state.previous_rssi.duration_ns,
 				state.gain_table.fnv1a32);
 		}
+	}
+	if (state.metadata_v3)
+	{
+		if (!spf_gain_sampler_start(
+			&state.gain_sampler,
+			thread_args->gain_observation_interval_samples))
+		{
+			fprintf(stderr,
+				"Protocol v3 requires an advancing synchronized ADC sample counter\n");
+			goto cleanup;
+		}
+		state.gain_sampler_started = true;
 	}
 
 	/* Summarize info */
@@ -548,6 +614,22 @@ static void record_fatal_error(
 
 static void cleanup_state(state_t *state)
 {
+	if (state->gain_sampler_started)
+	{
+		spf_gain_sampler_stop(&state->gain_sampler);
+		state->gain_sampler_started = false;
+	}
+	if (state->timestamp_control_configured && state->iio_dev_rx)
+	{
+		if (iio_device_reg_write(
+			state->iio_dev_rx,
+			SPF_ADC_TIMESTAMP_CONTROL_REG,
+			state->timestamp_control_previous) != 0)
+		{
+			fprintf(stderr, "Failed to restore ADC timestamp control\n");
+		}
+		state->timestamp_control_configured = false;
+	}
 	spf_rx_resource_t resource;
 	while ((resource = spf_rx_cleanup_next(state->acquired_resources)) !=
 		SPF_RX_RESOURCE_NONE)
@@ -588,6 +670,7 @@ static void cleanup_state(state_t *state)
 			case SPF_RX_RESOURCE_IIO_CONTEXT:
 				iio_context_destroy(state->iio_ctx);
 				state->iio_ctx = NULL;
+				state->iio_dev_rx = NULL;
 				state->iio_dev_phy = NULL;
 				break;
 			case SPF_RX_RESOURCE_EPOLL:
@@ -707,9 +790,9 @@ static int handle_iio_buffer(state_t *state)
 
 	/* Refill buffer */
 	ssize_t nbytes = iio_buffer_refill(state->iio_rx_buffer);
-	if (nbytes != (ssize_t)state->iq_payload_size)
+	if (nbytes != (ssize_t)state->iio_refill_size)
 	{
-		fprintf(stderr, "RX buffer read failed, expected %zu, read %zd bytes\n", state->iq_payload_size, nbytes);
+		fprintf(stderr, "RX buffer read failed, expected %zu, read %zd bytes\n", state->iio_refill_size, nbytes);
 		spf_runtime_status_increment(
 			state->thread_args->runtime_status,
 			SPF_STATUS_COUNTER_IIO_REFILL_ERROR);
@@ -718,6 +801,15 @@ static int handle_iio_buffer(state_t *state)
 			SPF_ERROR_SUBSYSTEM_IIO_REFILL,
 			nbytes < 0 ? (int)-nbytes : EIO);
 		return -1;
+	}
+	const uint8_t *iio_data = iio_buffer_start(state->iio_rx_buffer);
+	uint64_t first_sample_sequence =
+		state->buffer_sequence * state->thread_args->iio_buffer_size;
+	if (state->metadata_v3)
+	{
+		/* The HDL inserts one little-endian 64-bit timestamp scan sample. */
+		memcpy(&first_sample_sequence, iio_data, sizeof(first_sample_sequence));
+		iio_data += sizeof(first_sample_sequence);
 	}
 
 	spf_gain_pair_t current_gain = {
@@ -737,6 +829,8 @@ static int handle_iio_buffer(state_t *state)
 	uint64_t this_buffer_sequence = state->buffer_sequence;
 	if (state->metadata_enabled)
 	{
+		if (!state->metadata_v3)
+		{
 		current_gain = state->metadata_v2
 			? spf_gain_read_db_pair(
 				state->iio_dev_phy,
@@ -754,6 +848,7 @@ static int handle_iio_buffer(state_t *state)
 			spf_runtime_status_increment(
 				state->thread_args->runtime_status,
 				SPF_STATUS_COUNTER_GAIN_READ_FAILURE);
+		}
 		}
 		if (state->metadata_v2)
 		{
@@ -790,6 +885,120 @@ static int handle_iio_buffer(state_t *state)
 		uint8_t *iq_destination = buf->data;
 		if (state->metadata_enabled)
 		{
+			if (state->metadata_v3)
+			{
+				memset(buf->data, 0, state->metadata_header_size);
+				spf_radio_meta_v3_prefix_t *header =
+					(spf_radio_meta_v3_prefix_t *)buf->data;
+				spf_gain_observation_v3_t *observations =
+					(spf_gain_observation_v3_t *)(buf->data +
+						sizeof(*header));
+				uint32_t observation_overflow_count = 0;
+				const uint16_t observation_count = spf_gain_sampler_collect(
+					&state->gain_sampler,
+					first_sample_sequence,
+					(uint32_t)state->thread_args->iio_buffer_size,
+					observations,
+					state->thread_args->gain_observation_capacity,
+					&observation_overflow_count);
+				if (observation_count == 0)
+				{
+					fprintf(stderr,
+						"No sample-aligned gain observations overlap RX frame\n");
+					buf->in_use = false;
+					return -1;
+				}
+				const spf_gain_observation_v3_t *first = &observations[0];
+				const spf_gain_observation_v3_t *last =
+					&observations[observation_count - 1];
+				uint32_t flags =
+					SPF_META_SAMPLE_SEQUENCE_VALID |
+					SPF_META_HARDWARE_SAMPLE_COUNTER_VALID |
+					SPF_META_GAIN_OBSERVATIONS_VALID |
+					SPF_META_GAIN_DB_VALUES |
+					SPF_META_GAIN_FULL_TABLE_MODE;
+				const bool first_valid =
+					(first->flags & SPF_GAIN_OBSERVATION_VALID) != 0;
+				const bool last_valid =
+					(last->flags & SPF_GAIN_OBSERVATION_VALID) != 0;
+				if (first_valid)
+					flags |= SPF_META_START_VALID;
+				if (last_valid)
+					flags |= SPF_META_END_VALID;
+				if (!first_valid || !last_valid)
+					flags |= SPF_META_GAIN_READ_FAILED;
+				if (first_valid && last_valid)
+				{
+					if (first->rx1_gain_index != last->rx1_gain_index)
+						flags |= SPF_META_RX1_ENDPOINT_CHANGED;
+					if (first->rx2_gain_index != last->rx2_gain_index)
+						flags |= SPF_META_RX2_ENDPOINT_CHANGED;
+				}
+				if (state->previous_rssi.valid)
+					flags |= SPF_META_RSSI_START_VALID;
+				if (current_rssi.valid)
+					flags |= SPF_META_RSSI_END_VALID;
+				if (!state->previous_rssi.valid || !current_rssi.valid)
+					flags |= SPF_META_RSSI_READ_FAILED;
+				if (observation_overflow_count)
+					flags |= SPF_META_GAIN_OBSERVATION_OVERFLOW;
+				if (state->overflow_seen)
+					flags |= SPF_META_DEVICE_IIO_OVERFLOW;
+
+				header->magic = SPF_GAIN_META_MAGIC;
+				header->version = SPF_GAIN_META_VERSION_V3;
+				header->header_bytes = (uint16_t)state->metadata_header_size;
+				header->features = state->thread_args->metadata_features;
+				header->flags = flags;
+				header->stream_id = state->thread_args->stream_id;
+				header->buffer_sequence = this_buffer_sequence;
+				header->first_sample_sequence = first_sample_sequence;
+				header->samples_per_channel =
+					(uint32_t)state->thread_args->iio_buffer_size;
+				header->iq_payload_bytes = (uint32_t)state->iq_payload_size;
+				header->enabled_scan_mask = state->thread_args->iio_channels;
+				header->sample_format =
+					SPF_SAMPLE_FORMAT_CS16_LE_TIME_INTERLEAVED;
+				header->channel_count = 2;
+				header->rx1_gain_db_start = first->rx1_gain_db;
+				header->rx2_gain_db_start = first->rx2_gain_db;
+				header->rx1_gain_db_end = last->rx1_gain_db;
+				header->rx2_gain_db_end = last->rx2_gain_db;
+				header->gain_start_read_duration_ns = first->read_duration_ns;
+				header->gain_end_read_duration_ns = last->read_duration_ns;
+				header->rx1_first_change_sample =
+					SPF_FIRST_CHANGE_UNAVAILABLE;
+				header->rx2_first_change_sample =
+					SPF_FIRST_CHANGE_UNAVAILABLE;
+				header->rx1_rssi_start_qdb = state->previous_rssi.rx1_qdb;
+				header->rx2_rssi_start_qdb = state->previous_rssi.rx2_qdb;
+				header->rx1_rssi_end_qdb = current_rssi.rx1_qdb;
+				header->rx2_rssi_end_qdb = current_rssi.rx2_qdb;
+				header->rssi_start_read_duration_ns =
+					state->previous_rssi.duration_ns;
+				header->rssi_end_read_duration_ns = current_rssi.duration_ns;
+				header->gain_observation_interval_samples =
+					state->thread_args->gain_observation_interval_samples;
+				header->gain_observation_count = observation_count;
+				header->gain_observation_capacity =
+					state->thread_args->gain_observation_capacity;
+				header->gain_observation_bytes =
+					SPF_GAIN_OBSERVATION_BYTES;
+				header->gain_event_count = 0;
+				header->gain_event_capacity =
+					state->thread_args->gain_event_capacity;
+				header->gain_event_bytes = SPF_GAIN_EVENT_BYTES;
+				header->gain_observation_overflow_count =
+					observation_overflow_count;
+				header->gain_event_overflow_count = 0;
+				uint32_t *crc = (uint32_t *)(buf->data +
+					state->metadata_header_size - sizeof(uint32_t));
+				*crc = spf_gain_meta_crc32(
+					buf->data, state->metadata_header_size);
+				iq_destination += state->metadata_header_size;
+			}
+			else
+			{
 			uint32_t common_flags = SPF_META_SAMPLE_SEQUENCE_VALID;
 			if (state->previous_gain.valid)
 				common_flags |= SPF_META_START_VALID;
@@ -910,13 +1119,12 @@ static int handle_iio_buffer(state_t *state)
 					spf_gain_meta_crc32(header, sizeof(*header));
 				iq_destination += sizeof(*header);
 			}
+			}
 			state->overflow_seen = false;
 		}
 
 		/* Copy IQ immediately after the optional metadata header. */
-		memcpy(iq_destination,
-			iio_buffer_start(state->iio_rx_buffer),
-			state->iq_payload_size);
+		memcpy(iq_destination, iio_data, state->iq_payload_size);
 
 		/* Submit request */
 		buf->sequence = this_buffer_sequence;

@@ -28,6 +28,11 @@ typedef struct
 	/* Negotiated metadata feature mask. */
 	uint32_t metadata_features;
 
+	/* Protocol v3 bounded gain-series shape; zero for v1/v2. */
+	uint32_t gain_observation_interval_samples;
+	uint16_t gain_observation_capacity;
+	uint16_t gain_event_capacity;
+
 	/* Zero for unbounded legacy streaming, otherwise a finite frame count. */
 	uint32_t frame_count;
 

@@ -1,0 +1,232 @@
+#define _GNU_SOURCE
+
+#include "spf_gain_sampler.h"
+
+#include "spf_gain_read.h"
+
+#include <iio.h>
+#include <sched.h>
+#include <string.h>
+#include <time.h>
+
+static uint64_t extend_counter_near(uint64_t reference, uint32_t low)
+{
+	uint64_t candidate = (reference & UINT64_C(0xFFFFFFFF00000000)) | low;
+	if (candidate < reference && reference - candidate > UINT64_C(0x80000000))
+		candidate += UINT64_C(0x100000000);
+	else if (candidate > reference &&
+		candidate - reference > UINT64_C(0x80000000) &&
+		candidate >= UINT64_C(0x100000000))
+		candidate -= UINT64_C(0x100000000);
+	return candidate;
+}
+
+static bool read_counter(struct iio_device *rx, uint32_t *value)
+{
+	return iio_device_reg_read(rx, SPF_ADC_SAMPLE_COUNTER_LOW_REG, value) == 0;
+}
+
+static void append_record(
+	spf_gain_sampler_t *sampler,
+	const spf_gain_observation_v3_t *record)
+{
+	pthread_mutex_lock(&sampler->mutex);
+	if (sampler->count == SPF_GAIN_SAMPLER_RING_CAPACITY)
+	{
+		memmove(
+			&sampler->records[0],
+			&sampler->records[1],
+			(SPF_GAIN_SAMPLER_RING_CAPACITY - 1) * sizeof(sampler->records[0]));
+		sampler->count--;
+		sampler->overflow_count++;
+	}
+	sampler->records[sampler->count++] = *record;
+	pthread_mutex_unlock(&sampler->mutex);
+}
+
+static void *sampler_thread(void *opaque)
+{
+	spf_gain_sampler_t *sampler = opaque;
+	/* Do not inherit the USB worker's real-time priority or CPU-0 affinity. */
+	pthread_setname_np(pthread_self(), "SPF_GAIN_SAMPLE");
+	struct sched_param normal_priority = {.sched_priority = 0};
+	(void)pthread_setschedparam(pthread_self(), SCHED_OTHER, &normal_priority);
+	cpu_set_t affinity;
+	CPU_ZERO(&affinity);
+	CPU_SET(1, &affinity);
+	(void)pthread_setaffinity_np(pthread_self(), sizeof(affinity), &affinity);
+	struct iio_context *context = iio_create_local_context();
+	if (!context)
+	{
+		atomic_store(&sampler->failed, true);
+		return NULL;
+	}
+	struct iio_device *rx = iio_context_find_device(context, "cf-ad9361-lpc");
+	struct iio_device *phy = iio_context_find_device(context, "ad9361-phy");
+	spf_gain_table_t table;
+	memset(&table, 0, sizeof(table));
+	if (!rx || !phy || !spf_gain_table_load(phy, &table))
+	{
+		atomic_store(&sampler->failed, true);
+		iio_context_destroy(context);
+		return NULL;
+	}
+
+	uint32_t first = 0;
+	uint32_t second = 0;
+	struct timespec settle = {.tv_sec = 0, .tv_nsec = 1000000};
+	if (!read_counter(rx, &first))
+	{
+		atomic_store(&sampler->failed, true);
+		iio_context_destroy(context);
+		return NULL;
+	}
+	nanosleep(&settle, NULL);
+	if (!read_counter(rx, &second) || second == first)
+	{
+		/* The required synchronized FPGA counter is absent or not advancing. */
+		atomic_store(&sampler->failed, true);
+		iio_context_destroy(context);
+		return NULL;
+	}
+	atomic_store(&sampler->ready, true);
+	uint32_t last_sampled = second - sampler->interval_samples;
+	const struct timespec poll_delay = {.tv_sec = 0, .tv_nsec = 100000};
+
+	while (!atomic_load_explicit(&sampler->stop_requested, memory_order_relaxed))
+	{
+		uint32_t current = 0;
+		if (!read_counter(rx, &current))
+		{
+			atomic_store(&sampler->failed, true);
+			break;
+		}
+		if ((uint32_t)(current - last_sampled) < sampler->interval_samples)
+		{
+			nanosleep(&poll_delay, NULL);
+			continue;
+		}
+
+		spf_gain_observation_v3_t record;
+		memset(&record, 0, sizeof(record));
+		uint32_t before = 0;
+		uint32_t after = 0;
+		const bool before_valid = read_counter(rx, &before);
+		spf_gain_pair_t gain = spf_gain_read_db_pair(phy, &table);
+		const bool after_valid = read_counter(rx, &after);
+		record.read_duration_ns = gain.duration_ns;
+		record.rx1_gain_index = gain.valid ? gain.rx1 : SPF_GAIN_INDEX_INVALID;
+		record.rx2_gain_index = gain.valid ? gain.rx2 : SPF_GAIN_INDEX_INVALID;
+		record.rx1_gain_db = gain.valid ? gain.rx1_db : SPF_GAIN_DB_INVALID;
+		record.rx2_gain_db = gain.valid ? gain.rx2_db : SPF_GAIN_DB_INVALID;
+		if (gain.valid)
+			record.flags |= SPF_GAIN_OBSERVATION_VALID;
+		if (before_valid && after_valid)
+		{
+			record.sample_sequence_before = before;
+			record.sample_sequence_after = after;
+			record.flags |= SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID;
+		}
+		append_record(sampler, &record);
+		last_sampled = before_valid ? before : current;
+	}
+
+	iio_context_destroy(context);
+	return NULL;
+}
+
+bool spf_gain_sampler_start(
+	spf_gain_sampler_t *sampler,
+	uint32_t interval_samples)
+{
+	memset(sampler, 0, sizeof(*sampler));
+	sampler->interval_samples = interval_samples;
+	atomic_init(&sampler->stop_requested, false);
+	atomic_init(&sampler->ready, false);
+	atomic_init(&sampler->failed, false);
+	if (pthread_mutex_init(&sampler->mutex, NULL) != 0)
+		return false;
+	sampler->mutex_initialized = true;
+	if (pthread_create(&sampler->thread, NULL, sampler_thread, sampler) != 0)
+	{
+		pthread_mutex_destroy(&sampler->mutex);
+		sampler->mutex_initialized = false;
+		return false;
+	}
+	sampler->thread_started = true;
+
+	/* Bound startup: the counter must prove it advances within 100 ms. */
+	const struct timespec wait = {.tv_sec = 0, .tv_nsec = 1000000};
+	for (unsigned int attempt = 0; attempt < 100; ++attempt)
+	{
+		if (atomic_load(&sampler->ready))
+			return true;
+		if (atomic_load(&sampler->failed))
+			break;
+		nanosleep(&wait, NULL);
+	}
+	spf_gain_sampler_stop(sampler);
+	return false;
+}
+
+void spf_gain_sampler_stop(spf_gain_sampler_t *sampler)
+{
+	if (sampler->thread_started)
+	{
+		atomic_store_explicit(
+			&sampler->stop_requested, true, memory_order_relaxed);
+		pthread_join(sampler->thread, NULL);
+		sampler->thread_started = false;
+	}
+	if (sampler->mutex_initialized)
+	{
+		pthread_mutex_destroy(&sampler->mutex);
+		sampler->mutex_initialized = false;
+	}
+}
+
+uint16_t spf_gain_sampler_collect(
+	spf_gain_sampler_t *sampler,
+	uint64_t frame_start,
+	uint32_t samples,
+	spf_gain_observation_v3_t *destination,
+	uint16_t capacity,
+	uint32_t *overflow_count)
+{
+	const uint64_t frame_end = frame_start + samples;
+	uint16_t copied = 0;
+	uint32_t retained = 0;
+	pthread_mutex_lock(&sampler->mutex);
+	for (uint32_t index = 0; index < sampler->count; ++index)
+	{
+		spf_gain_observation_v3_t record = sampler->records[index];
+		if (record.flags & SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID)
+		{
+			record.sample_sequence_before = extend_counter_near(
+				frame_start, (uint32_t)record.sample_sequence_before);
+			record.sample_sequence_after = extend_counter_near(
+				frame_start, (uint32_t)record.sample_sequence_after);
+		}
+		const bool overlaps =
+			(record.flags & SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID) &&
+			record.sample_sequence_after >= frame_start &&
+			record.sample_sequence_before < frame_end;
+		if (overlaps)
+		{
+			if (copied < capacity)
+				destination[copied++] = record;
+			else
+				sampler->overflow_count++;
+		}
+		if (!(record.flags & SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID) ||
+			record.sample_sequence_after >= frame_end)
+		{
+			sampler->records[retained++] = sampler->records[index];
+		}
+	}
+	sampler->count = retained;
+	*overflow_count = sampler->overflow_count;
+	sampler->overflow_count = 0;
+	pthread_mutex_unlock(&sampler->mutex);
+	return copied;
+}

@@ -12,6 +12,8 @@ typedef enum
 	SPF_START_INVALID_SAMPLE_COUNT,
 	SPF_START_INVALID_FRAME_COUNT,
 	SPF_START_INVALID_RESERVED,
+	SPF_START_INVALID_OBSERVATION_INTERVAL,
+	SPF_START_INVALID_SERIES_CAPACITY,
 } spf_start_validation_t;
 
 spf_start_validation_t spf_validate_start_rx_versioned(

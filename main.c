@@ -309,14 +309,16 @@ static int handle_ep0(state_t *state)
 						.magic = SPF_GADGET_CAPS_MAGIC,
 						.response_bytes = sizeof(cmd_usb_capabilities_v1_t),
 						.protocol_min = SPF_GADGET_PROTOCOL_V1,
-						.protocol_max = SPF_GADGET_PROTOCOL_V2,
+						.protocol_max = SPF_GADGET_PROTOCOL_V3,
 						.reserved0 = 0,
 						.supported_features =
 							SPF_META_FEATURE_GAIN_ENDPOINT_SNAPSHOTS |
 							SPF_META_FEATURE_HEADER_CRC32 |
 							SPF_META_FEATURE_SAMPLE_SEQUENCE |
 							SPF_META_FEATURE_GAIN_DB_ENDPOINTS |
-							SPF_META_FEATURE_RSSI_ENDPOINT_SNAPSHOTS,
+							SPF_META_FEATURE_RSSI_ENDPOINT_SNAPSHOTS |
+							SPF_META_FEATURE_GAIN_OBSERVATION_SERIES |
+							SPF_META_FEATURE_HARDWARE_SAMPLE_COUNTER,
 						.max_samples_per_channel =
 							SPF_GADGET_MAX_SAMPLES_PER_CHANNEL,
 						.max_finite_frames = SPF_GADGET_MAX_FINITE_FRAMES,
@@ -443,6 +445,9 @@ static int handle_ep0(state_t *state)
 							state->read_args.iio_buffer_size = cmd_start_req->buffer_size;
 							state->read_args.protocol_version = 0;
 							state->read_args.metadata_features = 0;
+							state->read_args.gain_observation_interval_samples = 0;
+							state->read_args.gain_observation_capacity = 0;
+							state->read_args.gain_event_capacity = 0;
 							state->read_args.frame_count = 0;
 							state->read_args.stream_id = 0;
 						}
@@ -491,6 +496,23 @@ static int handle_ep0(state_t *state)
 						state->read_args.iio_buffer_size = cmd_start_rx_v1->samples_per_channel;
 						state->read_args.protocol_version = cmd_start_rx_v1->protocol_version;
 						state->read_args.metadata_features = cmd_start_rx_v1->requested_features;
+						if (cmd_start_rx_v1->protocol_version ==
+							SPF_GADGET_PROTOCOL_V3)
+						{
+							state->read_args.gain_observation_interval_samples =
+								cmd_start_rx_v1->reserved0;
+							state->read_args.gain_observation_capacity =
+								(uint16_t)(cmd_start_rx_v1->reserved1 &
+									UINT32_C(0xFFFF));
+							state->read_args.gain_event_capacity =
+								(uint16_t)(cmd_start_rx_v1->reserved1 >> 16);
+						}
+						else
+						{
+							state->read_args.gain_observation_interval_samples = 0;
+							state->read_args.gain_observation_capacity = 0;
+							state->read_args.gain_event_capacity = 0;
+						}
 						state->read_args.frame_count = cmd_start_rx_v1->frame_count;
 						state->read_args.stream_id = next_stream_id();
 						spf_runtime_status_set_stream(

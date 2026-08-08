@@ -13,11 +13,16 @@ spf_start_validation_t spf_validate_start_rx_versioned(
 	const bool is_v2 =
 		request->magic == SPF_GADGET_START_V2_MAGIC &&
 		request->protocol_version == SPF_GADGET_PROTOCOL_V2;
-	if ((!is_v1 && !is_v2) || request->request_bytes != sizeof(*request))
+	const bool is_v3 =
+		request->magic == SPF_GADGET_START_V3_MAGIC &&
+		request->protocol_version == SPF_GADGET_PROTOCOL_V3;
+	if ((!is_v1 && !is_v2 && !is_v3) ||
+		request->request_bytes != sizeof(*request))
 		return SPF_START_INVALID_PROTOCOL;
 	const uint32_t required_features = is_v1
 		? SPF_META_REQUIRED_FEATURES_V1
-		: SPF_META_REQUIRED_FEATURES_V2;
+		: (is_v2 ? SPF_META_REQUIRED_FEATURES_V2 :
+			SPF_META_REQUIRED_FEATURES_V3);
 	if (request->requested_features != required_features)
 		return SPF_START_INVALID_FEATURES;
 	if (request->enabled_scan_mask != UINT32_C(0x0F))
@@ -28,7 +33,21 @@ spf_start_validation_t spf_validate_start_rx_versioned(
 	if (request->frame_count == 0 ||
 		request->frame_count > SPF_GADGET_MAX_FINITE_FRAMES)
 		return SPF_START_INVALID_FRAME_COUNT;
-	if (request->reserved0 != 0 || request->reserved1 != 0)
+	if (is_v3)
+	{
+		const uint16_t observation_capacity =
+			(uint16_t)(request->reserved1 & UINT32_C(0xFFFF));
+		const uint16_t event_capacity =
+			(uint16_t)(request->reserved1 >> 16);
+		if (request->reserved0 == 0 ||
+			request->reserved0 > request->samples_per_channel)
+			return SPF_START_INVALID_OBSERVATION_INTERVAL;
+		if (observation_capacity == 0 ||
+			observation_capacity > SPF_MAX_GAIN_OBSERVATIONS ||
+			event_capacity > SPF_MAX_GAIN_EVENTS)
+			return SPF_START_INVALID_SERIES_CAPACITY;
+	}
+	else if (request->reserved0 != 0 || request->reserved1 != 0)
 		return SPF_START_INVALID_RESERVED;
 	return SPF_START_VALID;
 }
@@ -44,6 +63,10 @@ const char *spf_start_validation_message(spf_start_validation_t result)
 		case SPF_START_INVALID_SAMPLE_COUNT: return "invalid sample count";
 		case SPF_START_INVALID_FRAME_COUNT: return "invalid frame count";
 		case SPF_START_INVALID_RESERVED: return "reserved fields must be zero";
+		case SPF_START_INVALID_OBSERVATION_INTERVAL:
+			return "invalid gain observation interval";
+		case SPF_START_INVALID_SERIES_CAPACITY:
+			return "invalid gain observation/event capacity";
 	}
 	return "unknown validation result";
 }
