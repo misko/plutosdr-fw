@@ -16,7 +16,7 @@
 [submodule "buildroot"]
 	path = buildroot
 	url = https://github.com/misko/plutosdr-fw.git
-	branch = codex/buildroot-gadget-supervisor-v3
+	branch = codex/buildroot-gain-series-v4
 
 [submodule "linux"]
 	path = linux
@@ -26,11 +26,11 @@
 [submodule "hdl"]
 	path = hdl
 	url = https://github.com/misko/plutosdr-hdl.git
-	branch = v0.38_plutoplus_timestamp
+	branch = codex/hdl-sample-counter-v3
 [submodule "hdl-quantulum"]
 	path = hdl-quantulum
 	url = https://github.com/misko/plutosdr-hdl-quantulum
-	branch = main
+	branch = codex/hdl-quantulum-gain-series-v3
 	shallow = true
 
 ; NOTE ON `shallow`: only hdl-quantulum carries it, because only its pin is the
