@@ -34,14 +34,14 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: 518e35914195136e20c9f7261b21ee063b41d994
+          ref: c7431bb2addf955eb622c685b14d87c6eae7506e
           path: usb-gadget
           persist-credentials: false
       - name: Check out pinned IP gadget source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: 032c830c76cb291c2ed0a32b455ed81d1dfd2540
+          ref: 11d0cbb4c5d39e572f1b6f01e949840d1120d97f
           path: ip-gadget
           persist-credentials: false
       - name: Install native test dependencies

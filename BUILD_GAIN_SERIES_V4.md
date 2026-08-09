@@ -14,9 +14,9 @@ prerelease procedure on Kalman, follow
 
 ```text
 firmware                  codex/firmware-gain-series-v4
-buildroot      e57349dce  codex/buildroot-gain-series-v4
-USB gadget     518e35914  codex/gadget-gain-series-v3
-IP gadget      032c830c7  codex/ip-gadget-gain-series-v3
+buildroot      f30cea63c  codex/buildroot-gain-series-v4
+USB gadget     c7431bb2a  codex/gadget-gain-series-v3
+IP gadget      11d0cbb4c  codex/gain-series-v3
 HDL            4e9d71240  codex/hdl-sample-counter-v3
 HDL Quantulum  26eae2aff  codex/hdl-quantulum-gain-series-v3
 ```
@@ -100,3 +100,14 @@ new release manifest. Do not edit the immutable v3 manifest.
 Protocol v3 intentionally rejects frames without an overlapping gain
 observation. Equal observations mean only that no difference was observed at
 those reads; they do not rule out a change-and-return between reads.
+
+## RC1 hardware finding carried into RC2
+
+RC1 proved the FPGA counter and time-anchor path on two radios, but its first
+protocol-v3 DMA block could predate the first ARM gain observation. The USB and
+IP workers now discard the startup-prefetched block after the sampler is ready
+and permit a bounded sequence-zero retry; they still fail closed if any emitted
+frame lacks an overlapping observation. Direct IP also paces UDP batches below
+the PlutoPlus 100-Mbit/s link rate instead of overflowing a host receive queue.
+These changes were hardware-checked from RAM on two radios before requesting
+RC2, but the rebuilt RC2 bytes remain untested until the full campaign passes.
