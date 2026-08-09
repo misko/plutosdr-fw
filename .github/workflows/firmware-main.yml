@@ -1,0 +1,110 @@
+name: Kalman main firmware build
+
+# Security boundary: this workflow never runs for pull requests. A manual run
+# is also restricted to refs/heads/main at the job level.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kalman-main-firmware
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build and package on Kalman
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
+    timeout-minutes: 240
+    outputs:
+      artifact-name: ${{ steps.names.outputs.artifact_name }}
+      bundle-name: ${{ steps.build.outputs.bundle_name }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+          clean: true
+          persist-credentials: false
+
+      - name: Reset persistent nested worktrees
+        run: |
+          git submodule foreach --recursive \
+            'git reset --hard && git clean -ffdx'
+          git submodule sync --recursive
+          git submodule update --init --recursive --force
+          test -z "$(git status --porcelain --untracked-files=no)"
+
+      - name: Choose immutable artifact names
+        id: names
+        run: |
+          echo "artifact_name=plutoplus-main-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Build, validate, and package
+        id: build
+        env:
+          VIVADO_SETTINGS: /opt/Xilinx/Vivado/2022.2/settings64.sh
+        run: |
+          artifact_root=$(mktemp -d "$RUNNER_TEMP/plutosdr-fw-main.XXXXXX")
+          scripts/ci/build_main_firmware.sh "$artifact_root"
+          bundle=$(find "$artifact_root" -maxdepth 1 -type f \
+            -name 'plutoplus-spf-main-*.tar.gz' -print -quit)
+          test -n "$bundle"
+          {
+            echo "artifact_root=$artifact_root"
+            echo "bundle_path=$bundle"
+            echo "bundle_name=$(basename "$bundle")"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload deployment bundle and verification sidecars
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ steps.names.outputs.artifact_name }}
+          path: |
+            ${{ steps.build.outputs.bundle_path }}
+            ${{ steps.build.outputs.bundle_path }}.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 90
+
+      - name: Record build result
+        run: |
+          {
+            echo '## Kalman firmware bundle'
+            echo
+            echo "- Commit: \`${GITHUB_SHA}\`"
+            echo "- Bundle: \`${{ steps.build.outputs.bundle_name }}\`"
+            echo "- Artifact: [${{ steps.names.outputs.artifact_name }}](${{ steps.upload.outputs.artifact-url }})"
+            echo '- Status: offline validated; hardware untested'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  attest:
+    name: verify and attest deployment bundle
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - name: Download the exact Kalman artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: downloaded
+      - name: Verify the downloaded bundle
+        run: |
+          cd downloaded
+          checksum=$(find . -maxdepth 1 -type f -name '*.tar.gz.sha256' -print -quit)
+          test -n "$checksum"
+          sha256sum -c "$checksum"
+      - name: Attest build provenance
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
+        with:
+          subject-path: downloaded/${{ needs.build.outputs.bundle-name }}
