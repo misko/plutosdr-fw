@@ -50,3 +50,5 @@ iverilog -g2012 -Wall -o "${work}/tx_pipeline_debug_tb" \
     "${upack_src}/tx_pipeline_debug.v" \
     "${upack_src}/tx_pipeline_debug_tb.v"
 vvp "${work}/tx_pipeline_debug_tb"
+
+"${HDL_QUANTULUM}/util_upack2_timestamp/test/run_discard_disabled.sh"

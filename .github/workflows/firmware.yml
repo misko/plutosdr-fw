@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-hdl-quantulum
-          ref: a8100f8c360cc4484d5b78a558a5c764867fd028
+          ref: 8897cfaaa7c6d923d3509738dc5a7552fd857d35
           path: hdl-quantulum
           persist-credentials: false
       - name: Simulate the closed-loop counter crossing
@@ -99,3 +99,5 @@ jobs:
           iverilog -g2012 -Wall -o "$RUNNER_TEMP/tx-pipeline-debug-tb" \
             cdc_sync_bits.v tx_pipeline_debug.v tx_pipeline_debug_tb.v
           vvp "$RUNNER_TEMP/tx-pipeline-debug-tb"
+          cd ../test
+          ./run_discard_disabled.sh
