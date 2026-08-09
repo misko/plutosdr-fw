@@ -1,7 +1,6 @@
 /* Standard / system libraries */
 #include <arpa/inet.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <netinet/in.h>
@@ -14,6 +13,7 @@
 #include <string.h>
 #include <sys/epoll.h>
 #include <sys/eventfd.h>
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <time.h>
 #include <unistd.h>
@@ -206,12 +206,13 @@ int main(int argc, char *argv[])
 	}
 
 	/* Place sockets in non-blocking mode */
-	if (fcntl(state.sock_control, F_SETFL, fcntl(state.sock_control, F_GETFL, 0) | O_NONBLOCK))
+	int nonblocking = 1;
+	if (ioctl(state.sock_control, FIONBIO, &nonblocking) != 0)
 	{
 		perror("Failed to set control socket mode to non-blocking");
 		return 1;
 	}
-	if (fcntl(state.sock_data, F_SETFL, fcntl(state.sock_data, F_GETFL, 0) | O_NONBLOCK))
+	if (ioctl(state.sock_data, FIONBIO, &nonblocking) != 0)
 	{
 		perror("Failed to set data socket mode to non-blocking");
 		return 1;

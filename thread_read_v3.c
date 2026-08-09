@@ -24,7 +24,15 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-#define SPF_SENDMMSG_BATCH 1024U
+/*
+ * PlutoPlus Ethernet and USB-network links are 100-Mbit/s-class transports.
+ * An unpaced multi-thousand-datagram sendmmsg burst can fill the host's
+ * capped UDP receive queue before Python begins draining it.  Eight 1472-byte
+ * datagrams per millisecond stays just below line rate after headers while
+ * retaining the syscall batching benefit.
+ */
+#define SPF_SENDMMSG_BATCH 8U
+#define SPF_SENDMMSG_PACING_US 1000U
 #define DEBUG_PRINT(...) if (debug) printf("ReadV3: "__VA_ARGS__)
 
 typedef struct
@@ -53,6 +61,7 @@ typedef struct
 	struct iovec *iovs;
 	size_t fragment_count;
 	uint64_t buffer_sequence;
+	uint32_t startup_frames_discarded;
 } state_v3_t;
 
 extern bool debug;
@@ -173,6 +182,16 @@ static bool initialize(state_v3_t *state)
 		return false;
 	state->sampler_started = true;
 
+	/*
+	 * iio_device_create_buffer() starts DMA before the sampler has loaded the
+	 * gain table.  Discard that one startup-prefetched block after the sampler
+	 * is ready; otherwise its inline timestamp can predate every available gain
+	 * observation and the first protocol-v3 frame must fail closed.
+	 */
+	const ssize_t discarded = iio_buffer_refill(state->iio_buffer);
+	if (discarded != (ssize_t)state->iio_bytes)
+		return false;
+
 	state->fragment_count = spf_ip_fragment_count(
 		state->frame_bytes, args->udp_datagram_bytes);
 	if (state->fragment_count == 0)
@@ -262,6 +281,20 @@ static int handle_iio(state_v3_t *state)
 		state->observations,
 		state->args->gain_observation_capacity,
 		&observation_overflow);
+	const spf_gain_frame_decision_t frame_decision = spf_gain_frame_decide(
+		state->buffer_sequence,
+		observation_count,
+		state->startup_frames_discarded);
+	if (frame_decision == SPF_GAIN_FRAME_DISCARD_STARTUP)
+	{
+		/* Never send startup IQ that predates the first gain observation. */
+		state->startup_frames_discarded++;
+		DEBUG_PRINT(
+			"discarded startup frame without a gain observation (%u/%u)\n",
+			state->startup_frames_discarded,
+			SPF_GAIN_STARTUP_DISCARD_LIMIT);
+		return 0;
+	}
 	const spf_radio_frame_v3_args_t frame_args = {
 		.metadata_features = state->args->metadata_features,
 		.stream_id = state->args->stream_id,
@@ -331,6 +364,8 @@ static bool send_frame(state_v3_t *state)
 		if (sent > 0)
 		{
 			offset += (size_t)sent;
+			if (offset < state->fragment_count)
+				usleep(SPF_SENDMMSG_PACING_US);
 			continue;
 		}
 		if (sent < 0 && errno == EINTR)
