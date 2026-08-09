@@ -65,7 +65,8 @@ Before merging the runner workflow:
 - require pull requests and the three GitHub-hosted checks;
 - require conversation resolution;
 - require code-owner review when another eligible maintainer is available;
-- prohibit force pushes and branch deletion; and
+- prohibit force pushes and branch deletion;
+- preserve the immutable RC tag's exact commit ancestry with a merge commit;
 - protect `v*` tags from rewriting.
 
 The post-merge Kalman build is deliberately not a pre-merge required check.
