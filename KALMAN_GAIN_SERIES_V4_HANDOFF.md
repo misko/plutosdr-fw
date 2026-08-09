@@ -42,9 +42,9 @@ The complete hashes live in
 
 | Component | Commit |
 |---|---|
-| Buildroot | `e57349dce9d67e0dc4b7a9f9dd23bbc0fad082d1` |
-| USB/common gadget | `518e35914195136e20c9f7261b21ee063b41d994` |
-| IP gadget | `032c830c76cb291c2ed0a32b455ed81d1dfd2540` |
+| Buildroot | `f30cea63c568d37e64f3e2b60c3ed0913097b8eb` |
+| USB/common gadget | `c7431bb2addf955eb622c685b14d87c6eae7506e` |
+| IP gadget | `11d0cbb4c5d39e572f1b6f01e949840d1120d97f` |
 | ADI HDL | `4e9d712403afda1393873228e2df3834073d663d` |
 | Quantulum timestamp HDL | `26eae2affcd563e1e1845106243a44557083e6be` |
 | Linux | `d798b0d821b85ebd51ecffbfa68d8e4d69b77132` |
@@ -258,7 +258,7 @@ unconnected-port warnings involving the timestamp block.
 Copy artifacts under candidate-specific names:
 
 ```bash
-export SPF_FW_RC=rc1
+export SPF_FW_RC=rc2
 export SPF_FW_STEM="plutoplus-spf-gain-series-v4-${SPF_FW_RC}"
 cp build/pluto.dfu "$SPF_FW_ARTIFACT_ROOT/${SPF_FW_STEM}-pluto.dfu"
 cp build/system_top.xsa "$SPF_FW_ARTIFACT_ROOT/${SPF_FW_STEM}-system_top.xsa"
@@ -476,7 +476,7 @@ repository:
 
 ```bash
 tests/radio_hardware/run_gain_series_v3_candidate.sh \
-  /absolute/path/to/plutoplus-spf-gain-series-v4-rc1-pluto.dfu \
+  /absolute/path/to/plutoplus-spf-gain-series-v4-rc2-pluto.dfu \
   DIRECT_IP_HOST
 ```
 
