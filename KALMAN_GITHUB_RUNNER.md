@@ -61,10 +61,11 @@ The workflow never flashes a radio and never connects to the QNAP.
 
 `manifests/gain-series-v4-source.yaml` pins every component twice: by the exact
 40-character commit used by the build and by a matching
-`gain-series-v4-source/<component>` tag. GitHub rulesets prevent those tags
-from being updated or deleted in all five component repositories. The source
-check requires exact tag-to-commit equality; moving development branches are
-not build inputs.
+`gain-series-v4-rc2-source/<component>` tag. GitHub rulesets prevent those
+tags from being updated or deleted in all five component repositories. The
+rejected RC1 locks remain protected under `gain-series-v4-source/*` for
+provenance. The source check requires exact tag-to-commit equality; moving
+development branches are not build inputs.
 
 For a later candidate, create a new source-lock namespace, protect it, and
 update the new manifest in the same reviewed change. Never reuse or repoint an
