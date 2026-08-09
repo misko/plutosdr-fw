@@ -1,6 +1,9 @@
 # Source-only manifest for the unpromoted gain-series firmware candidate.
 # Image identity, release tag, and hashes are added only after Vivado build,
 # RAM-boot acceptance, and the two-radio promotion gate.
+# Every component ref below is a protected source-lock tag that resolves
+# exactly to its adjacent 40-character commit. Development branches may move;
+# these source locks must never be updated or deleted.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1
@@ -10,28 +13,28 @@ firmware_repo: https://github.com/misko/plutosdr-fw.git
 
 gadget_source: 518e35914195136e20c9f7261b21ee063b41d994
 gadget_repo: https://github.com/misko/plutosdr-fw.git
-gadget_ref: refs/heads/codex/gadget-gain-series-v3
+gadget_ref: refs/tags/gain-series-v4-source/gadget
 
 ip_gadget_source: 032c830c76cb291c2ed0a32b455ed81d1dfd2540
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
-ip_gadget_ref: refs/heads/codex/ip-gadget-gain-series-v3
+ip_gadget_ref: refs/tags/gain-series-v4-source/ip-gadget
 
 submodule_buildroot: e57349dce9d67e0dc4b7a9f9dd23bbc0fad082d1
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/heads/codex/buildroot-gain-series-v4
+submodule_buildroot_ref: refs/tags/gain-series-v4-source/buildroot
 
 submodule_hdl: 4e9d712403afda1393873228e2df3834073d663d
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
-submodule_hdl_ref: refs/heads/codex/hdl-sample-counter-v3
+submodule_hdl_ref: refs/tags/gain-series-v4-source/hdl
 
 submodule_hdl_quantulum: 26eae2affcd563e1e1845106243a44557083e6be
 submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
-submodule_hdl_quantulum_ref: refs/heads/codex/hdl-quantulum-gain-series-v3
+submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-source/hdl-quantulum
 
 submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
 submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
-submodule_linux_ref: refs/heads/v0.38_plutoplus
+submodule_linux_ref: refs/tags/gain-series-v4-source/linux
 
 submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
 submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
-submodule_u_boot_xlnx_ref: refs/heads/v0.38_plutoplus
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-source/u-boot-xlnx

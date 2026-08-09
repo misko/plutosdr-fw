@@ -57,6 +57,20 @@ dispatch whose selected ref is exactly `main`. It:
 
 The workflow never flashes a radio and never connects to the QNAP.
 
+## Immutable source locks
+
+`manifests/gain-series-v4-source.yaml` pins every component twice: by the exact
+40-character commit used by the build and by a matching
+`gain-series-v4-source/<component>` tag. GitHub rulesets prevent those tags
+from being updated or deleted in all five component repositories. The source
+check requires exact tag-to-commit equality; moving development branches are
+not build inputs.
+
+For a later candidate, create a new source-lock namespace, protect it, and
+update the new manifest in the same reviewed change. Never reuse or repoint an
+existing source-lock tag. The firmware release tag remains separate and is
+created only after the hardware promotion gate.
+
 ## Main-branch policy
 
 Before merging the runner workflow:

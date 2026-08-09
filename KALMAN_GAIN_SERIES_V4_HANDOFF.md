@@ -38,17 +38,23 @@ gate described at the end of this document.
 ## Authoritative source graph
 
 The complete hashes live in
-`manifests/gain-series-v4-source.yaml`. The expected component heads are:
+`manifests/gain-series-v4-source.yaml`. Each hash has a protected, immutable
+source-lock tag. Development branches may advance; builds and source checks
+use only these exact commits and tags.
 
-| Component | Commit |
-|---|---|
-| Buildroot | `e57349dce9d67e0dc4b7a9f9dd23bbc0fad082d1` |
-| USB/common gadget | `518e35914195136e20c9f7261b21ee063b41d994` |
-| IP gadget | `032c830c76cb291c2ed0a32b455ed81d1dfd2540` |
-| ADI HDL | `4e9d712403afda1393873228e2df3834073d663d` |
-| Quantulum timestamp HDL | `26eae2affcd563e1e1845106243a44557083e6be` |
-| Linux | `d798b0d821b85ebd51ecffbfa68d8e4d69b77132` |
-| U-Boot | `1ff0468e9bea29b0a768a7bf52db8d025c521b9a` |
+| Component | Commit | Source-lock tag |
+|---|---|---|
+| Buildroot | `e57349dce9d67e0dc4b7a9f9dd23bbc0fad082d1` | `gain-series-v4-source/buildroot` |
+| USB/common gadget | `518e35914195136e20c9f7261b21ee063b41d994` | `gain-series-v4-source/gadget` |
+| IP gadget | `032c830c76cb291c2ed0a32b455ed81d1dfd2540` | `gain-series-v4-source/ip-gadget` |
+| ADI HDL | `4e9d712403afda1393873228e2df3834073d663d` | `gain-series-v4-source/hdl` |
+| Quantulum timestamp HDL | `26eae2affcd563e1e1845106243a44557083e6be` | `gain-series-v4-source/hdl-quantulum` |
+| Linux | `d798b0d821b85ebd51ecffbfa68d8e4d69b77132` | `gain-series-v4-source/linux` |
+| U-Boot | `1ff0468e9bea29b0a768a7bf52db8d025c521b9a` | `gain-series-v4-source/u-boot-xlnx` |
+
+The `gain-series-v4-source/*` tag namespace is protected against updates and
+deletions in every component repository. Do not repoint an existing source
+lock. A later candidate must use a new namespace and a new manifest.
 
 Build the head of `codex/firmware-gain-series-v4`. Record its full commit in
 the provenance file; do not substitute `master`, the old timestamp branch, or

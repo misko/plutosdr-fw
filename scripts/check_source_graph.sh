@@ -12,9 +12,10 @@
 #     simply impossible, and nobody noticed because every existing checkout had
 #     `origin` pointing at pgreenland.
 #
-#   * three `branch =` keys named a branch that does NOT contain the pinned
+#   * three `branch =` keys named a branch that did NOT match the pinned
 #     commit, so `git submodule update --remote` silently retrieved different
-#     firmware and reported success.
+#     firmware and reported success. New candidate manifests use protected
+#     source-lock tags; strict ref-to-pin equality keeps those locks auditable.
 #
 # Both are invisible to a compile test on a machine that already has the source.
 #
@@ -38,7 +39,7 @@ m() {
 
 echo "Source graph check: ${MANIFEST}"
 echo
-echo "1. every pinned commit is reachable on its declared remote"
+echo "1. every pinned commit exactly matches its declared source ref"
 
 # name:pin_key:repo_key:ref_key
 COMPONENTS=(
@@ -57,13 +58,14 @@ for entry in "${COMPONENTS[@]}"; do
     if [[ -z "$pin" || -z "$repo" || -z "$ref" ]]; then
         bad "${name}: manifest incomplete (pin/repo/ref)"; continue
     fi
-    # ls-remote, not `--contains`: containment needs objects we deliberately do
-    # not fetch here, and a narrow refspec makes `--contains` silently blind.
+    # Exact equality is intentional. Candidate manifests use protected tags,
+    # not moving development branches, so accepting a descendant would weaken
+    # the source lock. ls-remote verifies the advertised ref without cloning.
     actual="$(git ls-remote "$repo" "$ref" 2>/dev/null | awk '{print $1}' | head -1)"
     if [[ -z "$actual" ]]; then
         bad "${name}: ref ${ref} not found at ${repo}"
     elif [[ "$actual" != "$pin" ]]; then
-        bad "${name}: ${ref} is at ${actual:0:12}, manifest pins ${pin:0:12} (ref has moved)"
+        bad "${name}: ${ref} is at ${actual:0:12}, manifest pins ${pin:0:12} (source lock mismatch)"
     else
         ok "${name} ${pin:0:12} == ${ref}"
     fi
