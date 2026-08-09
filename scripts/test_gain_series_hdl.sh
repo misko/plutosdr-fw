@@ -29,7 +29,7 @@ actual="$(git -C "$HDL_QUANTULUM" rev-parse HEAD 2>/dev/null || true)"
 }
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/spf-gain-series-cdc.XXXXXX")"
-trap 'test ! -f "$work/cdc_tb" || unlink "$work/cdc_tb"; rmdir "$work" 2>/dev/null || true' EXIT
+trap 'test ! -f "$work/cdc_tb" || unlink "$work/cdc_tb"; test ! -f "$work/fifo_reset_tb" || unlink "$work/fifo_reset_tb"; rmdir "$work" 2>/dev/null || true' EXIT
 
 src="${HDL_QUANTULUM}/util_cpack2_timestamp/src"
 iverilog -g2012 -Wall -o "${work}/cdc_tb" \
@@ -37,3 +37,10 @@ iverilog -g2012 -Wall -o "${work}/cdc_tb" \
     "${src}/cdc_sync_data_closed.v" \
     "${src}/cdc_sync_data_closed_tb.v"
 vvp "${work}/cdc_tb"
+
+upack_src="${HDL_QUANTULUM}/util_upack2_timestamp/src"
+iverilog -g2012 -Wall -o "${work}/fifo_reset_tb" \
+    "${upack_src}/cdc_sync_bits.v" \
+    "${upack_src}/fifo_reset_sync.v" \
+    "${upack_src}/fifo_reset_sync_tb.v"
+vvp "${work}/fifo_reset_tb"
