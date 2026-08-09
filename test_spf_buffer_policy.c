@@ -6,6 +6,7 @@
 
 int main(void)
 {
+	assert(SPF_IIO_KERNEL_BUFFER_COUNT == 8U);
 	assert(spf_usb_buffer_count(false, 0) == SPF_USB_BUFFER_LIMIT);
 	assert(spf_usb_buffer_count(false, 1) == SPF_USB_BUFFER_LIMIT);
 	assert(spf_usb_buffer_count(true, 0) == 0);

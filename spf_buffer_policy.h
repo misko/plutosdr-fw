@@ -5,6 +5,7 @@
 #include <stdint.h>
 
 #define SPF_USB_BUFFER_LIMIT UINT32_C(16)
+#define SPF_IIO_KERNEL_BUFFER_COUNT 8U
 
 /*
  * Legacy unbounded streaming retains the historical queue depth. A finite

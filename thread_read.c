@@ -291,34 +291,21 @@ void *THREAD_READ_Entrypoint(void *args)
 		iio_capture_samples++;
 	}
 
-	/* Create non-cyclic buffer */
-	state.iio_rx_buffer = iio_device_create_buffer(
-		state.iio_dev_rx, iio_capture_samples, false);
-	if (!state.iio_rx_buffer)
+	/*
+	 * Derive the scan size before enabling DMA.  USB/AIO resources are prepared
+	 * first so the initial kernel blocks cannot fill and overflow while this
+	 * thread is still allocating its transport buffers.
+	 */
+	const ssize_t sample_size_result =
+		iio_device_get_sample_size(state.iio_dev_rx);
+	if (sample_size_result <= 0)
 	{
-		fprintf(stderr, "Failed to create rx buffer for %zu samples\n", thread_args->iio_buffer_size);
+		fprintf(stderr,
+			"Failed to determine IIO sample size: %zd\n",
+			sample_size_result);
 		goto cleanup;
 	}
-	state.acquired_resources |= SPF_RX_RESOURCE_IIO_BUFFER;
-
-	/* Register buffer with epoll */
-	epoll_event.events = EPOLLIN;
-	epoll_event.data.ptr = handle_iio_buffer;
-	state.iio_poll_fd = iio_buffer_get_poll_fd(state.iio_rx_buffer);
-	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, state.iio_poll_fd, &epoll_event) < 0)
-	{
-		/* Failed to register IIO buffer with epoll */
-		perror("Failed to register IIO buffer with epoll");
-		goto cleanup;
-	}
-	else
-	{
-		state.iio_poll_registered = true;
-		DEBUG_PRINT("Registered IIO buffer with with epoll :-)\n");
-	}
-
-	/* Retrieve number of bytes between two samples of the same channel (aka size of one sample of all enabled channels) */
-	size_t sample_size = iio_buffer_step(state.iio_rx_buffer);
+	const size_t sample_size = (size_t)sample_size_result;
 
 	/* Calculate IQ and USB transfer sizes. */
 	state.iq_payload_size = sample_size * thread_args->iio_buffer_size;
@@ -453,32 +440,6 @@ void *THREAD_READ_Entrypoint(void *args)
 			goto cleanup;
 		}
 		state.gain_sampler_started = true;
-
-		/*
-		 * Creating a local IIO buffer starts DMA before the gain sampler has
-		 * loaded the gain table and proved the synchronized FPGA counter.  The
-		 * first completed DMA block can therefore predate every observation.
-		 * Consume that startup-prefetched block only after the sampler is ready,
-		 * so every frame exposed to the host has a chance to contain a genuinely
-		 * sample-bracketed observation.  The timestamp cadence matches the IIO
-		 * block size, so the following refill starts on the next timestamp.
-		 */
-		const ssize_t discarded = iio_buffer_refill(state.iio_rx_buffer);
-		if (discarded != (ssize_t)state.iio_refill_size)
-		{
-			fprintf(stderr,
-				"Protocol-v3 startup prefill discard failed, expected %zu, read %zd bytes\n",
-				state.iio_refill_size,
-				discarded);
-			spf_runtime_status_increment(
-				thread_args->runtime_status,
-				SPF_STATUS_COUNTER_IIO_REFILL_ERROR);
-			goto cleanup;
-		}
-		spf_runtime_status_heartbeat(thread_args->runtime_status);
-		DEBUG_PRINT(
-			"Discarded %zd-byte protocol-v3 startup-prefetched IIO block\n",
-			discarded);
 	}
 
 	/* Summarize info */
@@ -600,6 +561,76 @@ void *THREAD_READ_Entrypoint(void *args)
 	UTILS_ResetTimeStats(&state.read_period);
 	UTILS_ResetTimeStats(&state.read_dur);
 	#endif
+
+	/*
+	 * Start the RX DMA only after every USB/AIO resource is ready.  Four default
+	 * libiio blocks were insufficient to absorb occasional startup scheduling
+	 * delays at 32,768 samples; eight blocks remain bounded (32 MiB at the
+	 * maximum supported dual-CS16 frame) while doubling the scheduling margin.
+	 */
+	const int kernel_buffer_result = iio_device_set_kernel_buffers_count(
+		state.iio_dev_rx,
+		SPF_IIO_KERNEL_BUFFER_COUNT);
+	if (kernel_buffer_result != 0)
+	{
+		fprintf(stderr,
+			"Failed to configure %u IIO kernel buffers: %d\n",
+			SPF_IIO_KERNEL_BUFFER_COUNT,
+			kernel_buffer_result);
+		goto cleanup;
+	}
+	state.iio_rx_buffer = iio_device_create_buffer(
+		state.iio_dev_rx, iio_capture_samples, false);
+	if (!state.iio_rx_buffer)
+	{
+		fprintf(stderr,
+			"Failed to create rx buffer for %zu samples\n",
+			thread_args->iio_buffer_size);
+		goto cleanup;
+	}
+	state.acquired_resources |= SPF_RX_RESOURCE_IIO_BUFFER;
+	if (iio_buffer_step(state.iio_rx_buffer) != sample_size)
+	{
+		fprintf(stderr, "IIO sample size changed while enabling DMA\n");
+		goto cleanup;
+	}
+
+	/* Register the now-live buffer only when the event loop is ready to run. */
+	epoll_event.events = EPOLLIN;
+	epoll_event.data.ptr = handle_iio_buffer;
+	state.iio_poll_fd = iio_buffer_get_poll_fd(state.iio_rx_buffer);
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, state.iio_poll_fd, &epoll_event) < 0)
+	{
+		perror("Failed to register IIO buffer with epoll");
+		goto cleanup;
+	}
+	state.iio_poll_registered = true;
+	DEBUG_PRINT("Registered IIO buffer with with epoll :-)\n");
+
+	if (state.metadata_v3)
+	{
+		/*
+		 * Consume exactly the first timestamp-aligned DMA block after the gain
+		 * sampler is ready.  No transport allocation follows this discard, so the
+		 * next block enters the event loop without a startup backlog.
+		 */
+		const ssize_t discarded = iio_buffer_refill(state.iio_rx_buffer);
+		if (discarded != (ssize_t)state.iio_refill_size)
+		{
+			fprintf(stderr,
+				"Protocol-v3 startup prefill discard failed, expected %zu, read %zd bytes\n",
+				state.iio_refill_size,
+				discarded);
+			spf_runtime_status_increment(
+				thread_args->runtime_status,
+				SPF_STATUS_COUNTER_IIO_REFILL_ERROR);
+			goto cleanup;
+		}
+		spf_runtime_status_heartbeat(thread_args->runtime_status);
+		DEBUG_PRINT(
+			"Discarded %zd-byte protocol-v3 startup-prefetched IIO block\n",
+			discarded);
+	}
 
 	/* Enter main loop */
 	state.worker_ready = true;
