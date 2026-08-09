@@ -12,6 +12,22 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/gain-series-v4-source.yaml}"
 MODE="${1:-source-check}"
 VIVADO_SETTINGS="${VIVADO_SETTINGS:-/opt/Xilinx/Vivado/2022.2/settings64.sh}"
+BUILDROOT_PRIMARY_SITE="${BR2_PRIMARY_SITE:-https://sources.buildroot.net}"
+BUILDROOT_GNU_MIRROR="${BR2_GNU_MIRROR:-https://ftpmirror.gnu.org}"
+BUILDROOT_BACKUP_SITE="${BR2_BACKUP_SITE:-https://sources.buildroot.net}"
+
+buildroot_make_args=(
+    "BR2_PRIMARY_SITE=${BUILDROOT_PRIMARY_SITE}"
+    "BR2_GNU_MIRROR=${BUILDROOT_GNU_MIRROR}"
+    "BR2_BACKUP_SITE=${BUILDROOT_BACKUP_SITE}"
+)
+if [[ -n "${BR2_DL_DIR:-}" ]]; then
+    [[ "$BR2_DL_DIR" == /* ]] || {
+        printf 'FAIL: BR2_DL_DIR must be absolute: %s\n' "$BR2_DL_DIR" >&2
+        exit 1
+    }
+    buildroot_make_args+=("BR2_DL_DIR=${BR2_DL_DIR}")
+fi
 
 usage() {
     cat <<'EOF'
@@ -90,11 +106,22 @@ if [[ "$MODE" == image ]]; then
 fi
 
 printf 'Preflight passed: mode=%s manifest=%s\n' "$MODE" "$MANIFEST"
+printf 'Buildroot sources: cache=%s primary=%s gnu=%s backup=%s\n' \
+    "${BR2_DL_DIR:-${ROOT}/buildroot/dl}" \
+    "$BUILDROOT_PRIMARY_SITE" "$BUILDROOT_GNU_MIRROR" \
+    "$BUILDROOT_BACKUP_SITE"
 [[ "$MODE" == preflight ]] && exit 0
 
 if [[ "$MODE" == rootfs ]]; then
-    exec make build/rootfs.cpio.gz
+    exec make "${buildroot_make_args[@]}" build/rootfs.cpio.gz
 fi
+
+# Fetch and hash-check the selected Buildroot sources before spending time in
+# Vivado. The subsequent firmware make receives the same command-line values,
+# which override this older Buildroot tree's plain-HTTP Kconfig defaults.
+make -C "$ROOT/buildroot" ARCH=arm "${buildroot_make_args[@]}" \
+    zynq_pluto_defconfig
+make -C "$ROOT/buildroot" "${buildroot_make_args[@]}" source
 
 (
     source "$VIVADO_SETTINGS"
@@ -109,4 +136,5 @@ cp "$candidate_xsa" "$ROOT/build/system_top.xsa"
 printf 'Candidate FPGA XSA: '
 sha256sum "$ROOT/build/system_top.xsa"
 
-exec make VIVADO_SETTINGS="$VIVADO_SETTINGS" build/pluto.dfu
+exec make "${buildroot_make_args[@]}" \
+    VIVADO_SETTINGS="$VIVADO_SETTINGS" build/pluto.dfu

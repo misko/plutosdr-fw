@@ -5,10 +5,13 @@
 set -euo pipefail
 umask 0022
 
+REPOSITORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 RUNNER_USER="github-fw"
 RUNNER_NAME="kalman-firmware"
 RUNNER_DIR="/opt/actions-runner-plutosdr-fw"
 RUNNER_HOME="${RUNNER_DIR}/home"
+RUNNER_CACHE="${RUNNER_DIR}/cache"
+BUILDROOT_CACHE="${RUNNER_CACHE}/buildroot-dl"
 REPOSITORY_URL="https://github.com/misko/plutosdr-fw"
 RUNNER_VERSION="2.336.0"
 RUNNER_ARCHIVE="actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
@@ -41,7 +44,41 @@ else
 fi
 
 install -d -m 0755 -o "$RUNNER_USER" -g "$RUNNER_USER" \
-    "$RUNNER_DIR" "$RUNNER_HOME"
+    "$RUNNER_DIR" "$RUNNER_HOME" "$RUNNER_CACHE" "$BUILDROOT_CACHE"
+
+# Seed the persistent runner cache from an existing, already downloaded
+# Buildroot tree. Do not copy transient lock files and do not replace anything
+# already in the shared cache. Buildroot verifies package hashes before use.
+seed_source="${REPOSITORY_ROOT}/buildroot/dl"
+seeded_count=0
+cached_count=0
+if [[ -d "$seed_source" ]]; then
+    while IFS= read -r -d '' source_file; do
+        relative_path="${source_file#"${seed_source}/"}"
+        target_file="${BUILDROOT_CACHE}/${relative_path}"
+        target_dir="$(dirname "$target_file")"
+        install -d -m 0755 -o "$RUNNER_USER" -g "$RUNNER_USER" "$target_dir"
+        if [[ -e "$target_file" ]]; then
+            cached_count=$((cached_count + 1))
+            continue
+        fi
+
+        temporary_file="$(mktemp --tmpdir="$target_dir" .seed.XXXXXX)"
+        cp --reflink=auto "$source_file" "$temporary_file"
+        chown "$RUNNER_USER:$RUNNER_USER" "$temporary_file"
+        chmod 0644 "$temporary_file"
+        if [[ -e "$target_file" ]]; then
+            rm -f "$temporary_file"
+            cached_count=$((cached_count + 1))
+        else
+            mv "$temporary_file" "$target_file"
+            seeded_count=$((seeded_count + 1))
+        fi
+    done < <(find "$seed_source" -type f ! -name .lock -print0)
+fi
+chown -R "$RUNNER_USER:$RUNNER_USER" "$BUILDROOT_CACHE"
+printf 'Buildroot cache: %s (%d seeded, %d already present)\n' \
+    "$BUILDROOT_CACHE" "$seeded_count" "$cached_count"
 
 runner_configured=false
 if [[ -e "$RUNNER_DIR/.runner" ]]; then
