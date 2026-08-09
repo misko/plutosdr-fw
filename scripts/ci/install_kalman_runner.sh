@@ -44,27 +44,40 @@ install -d -m 0755 -o "$RUNNER_USER" -g "$RUNNER_USER" \
 [[ ! -e "$RUNNER_DIR/.runner" ]] ||
     fail "a runner is already configured in $RUNNER_DIR"
 
-download_dir="$(mktemp -d /tmp/kalman-actions-runner.XXXXXX)"
-trap 'rm -rf "$download_dir"' EXIT
-curl --fail --location --proto '=https' --tlsv1.2 \
-    --output "$download_dir/$RUNNER_ARCHIVE" "$RUNNER_URL"
-printf '%s  %s\n' "$RUNNER_SHA256" "$download_dir/$RUNNER_ARCHIVE" |
-    sha256sum -c -
-tar -xzf "$download_dir/$RUNNER_ARCHIVE" -C "$RUNNER_DIR"
-chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR"
+if [[ -x "$RUNNER_DIR/bin/Runner.Listener" ]]; then
+    installed_version="$(runuser -u "$RUNNER_USER" -- \
+        env HOME="$RUNNER_HOME" bash -c \
+        "cd '$RUNNER_DIR' && ./bin/Runner.Listener --version")"
+    [[ "$installed_version" == "$RUNNER_VERSION" ]] ||
+        fail "runner $installed_version is already unpacked; expected $RUNNER_VERSION"
+    printf 'Reusing verified GitHub Actions Runner %s in %s\n' \
+        "$installed_version" "$RUNNER_DIR"
+else
+    download_dir="$(mktemp -d /tmp/kalman-actions-runner.XXXXXX)"
+    trap 'rm -rf "$download_dir"' EXIT
+    curl --fail --location --proto '=https' --tlsv1.2 \
+        --output "$download_dir/$RUNNER_ARCHIVE" "$RUNNER_URL"
+    printf '%s  %s\n' "$RUNNER_SHA256" "$download_dir/$RUNNER_ARCHIVE" |
+        sha256sum -c -
+    tar -xzf "$download_dir/$RUNNER_ARCHIVE" -C "$RUNNER_DIR"
+    chown -R "$RUNNER_USER:$RUNNER_USER" "$RUNNER_DIR"
+fi
 
 runuser -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" bash -c '
     source /opt/Xilinx/Vivado/2022.2/settings64.sh
     vivado -version | grep -F "Vivado v2022.2"
 '
 
-printf 'Paste the one-hour repository runner registration token: ' >&2
+printf 'Paste only the temporary value after --token (not the SHA or command): ' >&2
 IFS= read -r -s runner_token
 printf '\n' >&2
+runner_token="${runner_token//$'\r'/}"
 [[ -n "$runner_token" ]] || fail "registration token was empty"
+[[ "$runner_token" =~ ^[A-Za-z0-9_-]{20,50}$ ]] ||
+    fail "registration token format is invalid; paste only the value after --token"
 
-runuser -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" \
-    "$RUNNER_DIR/config.sh" \
+runuser -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" bash -c \
+    "cd '$RUNNER_DIR' && exec ./config.sh \"\$@\"" runner-config \
     --unattended \
     --url "$REPOSITORY_URL" \
     --token "$runner_token" \
