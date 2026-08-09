@@ -72,6 +72,46 @@ static void test_control_replies(void)
 	assert(error.status == -5);
 }
 
+static void test_control_datagram_classification(void)
+{
+	static const uint32_t legacy_magic = UINT32_C(0x4f544c50);
+	static const uint32_t time_anchor_magic = UINT32_C(0x31415453);
+	uint8_t datagram[80] = {0};
+
+	for (size_t bytes = 0; bytes < sizeof(uint32_t); ++bytes)
+		assert(spf_ip_control_datagram_classify(datagram,
+			bytes, legacy_magic, 8, time_anchor_magic) ==
+			SPF_IP_CONTROL_DATAGRAM_DROP);
+	assert(spf_ip_control_datagram_classify(NULL,
+		sizeof(datagram), legacy_magic, 8, time_anchor_magic) ==
+		SPF_IP_CONTROL_DATAGRAM_DROP);
+
+	memcpy(datagram, &legacy_magic, sizeof(legacy_magic));
+	assert(spf_ip_control_datagram_classify(datagram,
+		4, legacy_magic, 8, time_anchor_magic) ==
+		SPF_IP_CONTROL_DATAGRAM_DROP);
+	assert(spf_ip_control_datagram_classify(datagram,
+		8, legacy_magic, 8, time_anchor_magic) ==
+		SPF_IP_CONTROL_DATAGRAM_LEGACY);
+
+	const uint32_t v3_magic = SPF_IP_CONTROL_MAGIC;
+	memcpy(datagram, &v3_magic, sizeof(v3_magic));
+	assert(spf_ip_control_datagram_classify(datagram,
+		4, legacy_magic, 8, time_anchor_magic) ==
+		SPF_IP_CONTROL_DATAGRAM_V3);
+
+	memcpy(datagram, &time_anchor_magic, sizeof(time_anchor_magic));
+	assert(spf_ip_control_datagram_classify(datagram,
+		4, legacy_magic, 8, time_anchor_magic) ==
+		SPF_IP_CONTROL_DATAGRAM_TIME_ANCHOR);
+
+	const uint32_t unknown_magic = UINT32_C(0xdeadbeef);
+	memcpy(datagram, &unknown_magic, sizeof(unknown_magic));
+	assert(spf_ip_control_datagram_classify(datagram,
+		sizeof(datagram), legacy_magic, 8, time_anchor_magic) ==
+		SPF_IP_CONTROL_DATAGRAM_DROP);
+}
+
 static void test_fragment_and_crc(void)
 {
 	static const uint8_t payload[] = "complete inner frame";
@@ -131,6 +171,7 @@ int main(void)
 	test_query_golden_vector();
 	test_v3_start_and_started();
 	test_control_replies();
+	test_control_datagram_classification();
 	test_fragment_and_crc();
 	test_production_frame_fragment_plan();
 	return 0;

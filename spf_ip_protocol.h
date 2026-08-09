@@ -51,6 +51,14 @@ typedef enum
 	SPF_IP_CONTROL_ERROR = 7,
 } spf_ip_control_type_t;
 
+typedef enum
+{
+	SPF_IP_CONTROL_DATAGRAM_DROP = 0,
+	SPF_IP_CONTROL_DATAGRAM_LEGACY,
+	SPF_IP_CONTROL_DATAGRAM_V3,
+	SPF_IP_CONTROL_DATAGRAM_TIME_ANCHOR,
+} spf_ip_control_datagram_kind_t;
+
 #pragma pack(push, 1)
 typedef struct
 {
@@ -111,6 +119,12 @@ void spf_ip_control_init_reply(spf_ip_control_v1_t *reply,
 	spf_ip_control_type_t reply_type,
 	uint64_t stream_id);
 bool spf_ip_control_validate(const spf_ip_control_v1_t *message);
+spf_ip_control_datagram_kind_t spf_ip_control_datagram_classify(
+	const void *datagram,
+	size_t datagram_bytes,
+	uint32_t legacy_magic,
+	size_t legacy_header_bytes,
+	uint32_t time_anchor_magic);
 bool spf_ip_fragment_validate(const spf_ip_fragment_v1_t *header,
 	size_t datagram_bytes);
 uint32_t spf_ip_crc32(const void *data, size_t bytes);

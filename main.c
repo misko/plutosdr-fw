@@ -431,8 +431,24 @@ static int handle_control(state_t *state)
 		0,
 		(struct sockaddr*)&addr,
 		&len);
-	if (ret >= (int)sizeof(uint32_t) &&
-		command.time_anchor.magic == SPF_TIME_ANCHOR_QUERY_MAGIC)
+	if (ret < 0)
+	{
+		perror("Failed to read cmd from control socket");
+		return -1;
+	}
+	const spf_ip_control_datagram_kind_t command_kind =
+		spf_ip_control_datagram_classify(
+			&command,
+			(size_t)ret,
+			SDR_IP_GADGET_MAGIC,
+			sizeof(cmd_ip_header_t),
+			SPF_TIME_ANCHOR_QUERY_MAGIC);
+	if (command_kind == SPF_IP_CONTROL_DATAGRAM_DROP)
+	{
+		DEBUG_PRINT("Ignore malformed control datagram (%d bytes)\n", ret);
+		return 0;
+	}
+	if (command_kind == SPF_IP_CONTROL_DATAGRAM_TIME_ANCHOR)
 	{
 		const uint64_t request_id =
 			ret >= 16 ? command.time_anchor.request_id : 0;
@@ -479,8 +495,7 @@ static int handle_control(state_t *state)
 			sizeof(addr));
 		return 0;
 	}
-	if (ret >= (int)sizeof(uint32_t) &&
-		command.v3.magic == SPF_IP_CONTROL_MAGIC)
+	if (command_kind == SPF_IP_CONTROL_DATAGRAM_V3)
 	{
 		if (ret != (int)sizeof(command.v3))
 		{
@@ -494,18 +509,6 @@ static int handle_control(state_t *state)
 		return handle_v3_control(state, &command.v3, &addr);
 	}
 	cmd_ip_t cmd = command.legacy;
-	if (ret < 0 || (size_t)ret < sizeof(cmd_ip_header_t))
-	{
-		perror("Failed to read cmd from control socket");
-		return -1;
-	}
-
-	/* Check magic */
-	if (SDR_IP_GADGET_MAGIC != cmd.hdr.magic)
-	{
-		perror("Bad command magic");
-		return -1;
-	}
 
 	/* Print event summary */
 	DEBUG_PRINT("Handle control socket command: %s\n", cmd_name(cmd.hdr.cmd));

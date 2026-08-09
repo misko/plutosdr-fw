@@ -16,6 +16,26 @@ static bool fields_zero_for_query(const spf_ip_control_v1_t *message)
 		message->max_datagram_bytes == 0 && message->stream_id == 0;
 }
 
+spf_ip_control_datagram_kind_t spf_ip_control_datagram_classify(
+	const void *datagram,
+	size_t datagram_bytes,
+	uint32_t legacy_magic,
+	size_t legacy_header_bytes,
+	uint32_t time_anchor_magic)
+{
+	uint32_t magic = 0;
+	if (datagram == NULL || datagram_bytes < sizeof(magic))
+		return SPF_IP_CONTROL_DATAGRAM_DROP;
+	memcpy(&magic, datagram, sizeof(magic));
+	if (magic == SPF_IP_CONTROL_MAGIC)
+		return SPF_IP_CONTROL_DATAGRAM_V3;
+	if (magic == time_anchor_magic)
+		return SPF_IP_CONTROL_DATAGRAM_TIME_ANCHOR;
+	if (magic == legacy_magic && datagram_bytes >= legacy_header_bytes)
+		return SPF_IP_CONTROL_DATAGRAM_LEGACY;
+	return SPF_IP_CONTROL_DATAGRAM_DROP;
+}
+
 void spf_ip_control_init_query(spf_ip_control_v1_t *message,
 	uint64_t request_id)
 {
