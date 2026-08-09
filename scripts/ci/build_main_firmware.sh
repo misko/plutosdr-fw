@@ -26,6 +26,31 @@ mkdir -p "$artifact_real"
     fail "artifact directory is not empty: $artifact_real"
 
 cd "$ROOT"
+
+# Vivado's make wrapper writes only a one-line pointer to pluto_vivado.log on
+# failure. Preserve the underlying logs before the Actions workspace can be
+# cleaned; otherwise the uploaded outer transcript cannot explain the build.
+collect_failure_diagnostics() {
+    local status=$?
+    local file_list="$artifact_real/build-diagnostics-files.bin"
+    local archive="$artifact_real/vivado-build-diagnostics.tar.gz"
+
+    trap - EXIT
+    if (( status != 0 )); then
+        find hdl/projects/pluto build \
+            -type f \
+            \( -name '*.log' -o -name '*.jou' -o -name '*.rpt' \
+               -o -name '*.str' -o -name '*.pb' -o -name '*.tcl' \) \
+            -print0 2>/dev/null > "$file_list" || true
+        if [[ -s "$file_list" ]]; then
+            tar --null --files-from="$file_list" -czf "$archive" || true
+        fi
+        unlink "$file_list" 2>/dev/null || true
+    fi
+    exit "$status"
+}
+trap collect_failure_diagnostics EXIT
+
 start_epoch="$(date +%s)"
 export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git show -s --format=%ct HEAD)}"
 export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@${SOURCE_DATE_EPOCH}")}"
