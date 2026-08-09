@@ -72,6 +72,7 @@ jobs:
           test "${count:-0}" -eq 2
 
   hdl-counter-tests:
+    # Keep this public name stable: main branch protection requires it.
     name: coherent RX counter CDC simulation
     runs-on: ubuntu-latest
     steps:
@@ -79,7 +80,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-hdl-quantulum
-          ref: daabb0a694d283ba3c9b8ba442bf457e486e72f2
+          ref: 772d1d2f84571d5539f7f20db77d97c2d6a4a465
           path: hdl-quantulum
           persist-credentials: false
       - name: Simulate the closed-loop counter crossing
@@ -95,3 +96,6 @@ jobs:
           iverilog -g2012 -Wall -o "$RUNNER_TEMP/tx-fifo-reset-tb" \
             cdc_sync_bits.v fifo_reset_sync.v fifo_reset_sync_tb.v
           vvp "$RUNNER_TEMP/tx-fifo-reset-tb"
+          iverilog -g2012 -Wall -o "$RUNNER_TEMP/tx-pipeline-debug-tb" \
+            cdc_sync_bits.v tx_pipeline_debug.v tx_pipeline_debug_tb.v
+          vvp "$RUNNER_TEMP/tx-pipeline-debug-tb"
