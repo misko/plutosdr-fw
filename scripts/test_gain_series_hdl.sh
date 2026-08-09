@@ -5,7 +5,13 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HDL_QUANTULUM="${ROOT}/hdl-quantulum"
-EXPECTED="26eae2affcd563e1e1845106243a44557083e6be"
+MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/gain-series-v4-source.yaml}"
+
+EXPECTED="$(awk '$1 == "submodule_hdl_quantulum:" { print $2 }' "$MANIFEST")"
+[[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || {
+    echo "FAIL: manifest has no valid submodule_hdl_quantulum pin: ${MANIFEST}" >&2
+    exit 1
+}
 
 command -v iverilog >/dev/null || {
     echo "FAIL: iverilog is required" >&2
