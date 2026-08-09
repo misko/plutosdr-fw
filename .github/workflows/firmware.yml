@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-hdl-quantulum
-          ref: 990cdfd957abb8220dda13c150868801d43130af
+          ref: 94f681210c136547bbb610b254d6b827c6e45367
           path: hdl-quantulum
           persist-credentials: false
       - name: Simulate the closed-loop counter crossing
@@ -91,3 +91,7 @@ jobs:
             cdc_sync_bits.v cdc_sync_data_closed.v \
             cdc_sync_data_closed_tb.v
           vvp "$RUNNER_TEMP/cdc-counter-tb"
+          cd ../../util_upack2_timestamp/src
+          iverilog -g2012 -Wall -o "$RUNNER_TEMP/tx-fifo-reset-tb" \
+            cdc_sync_bits.v fifo_reset_sync.v fifo_reset_sync_tb.v
+          vvp "$RUNNER_TEMP/tx-fifo-reset-tb"
