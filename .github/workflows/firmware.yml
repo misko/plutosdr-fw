@@ -79,7 +79,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-hdl-quantulum
-          ref: 26eae2affcd563e1e1845106243a44557083e6be
+          ref: 990cdfd957abb8220dda13c150868801d43130af
           path: hdl-quantulum
           persist-credentials: false
       - name: Simulate the closed-loop counter crossing
