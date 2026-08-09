@@ -1,4 +1,10 @@
-# Gain-series v4 RC5 registered-reset CDC candidate
+# Gain-series v4 RC5 registered-reset CDC candidate — rejected
+
+RC5 was rejected by the two-radio hardware promotion gate on 2026-08-09. The
+first volatile boot passed TX2 loopback on both radios; the second volatile
+boot put radio `104000bac4950008230026001b440a003a` at the RX noise floor. The
+candidate reproduced the boot-dependent TX starvation and must not be
+promoted or written to QSPI.
 
 RC5 is an unpromoted, RAM-boot-only candidate. It retains the RC2 protocol-v3
 RX gain-series metadata, coherent RX sample counter, direct USB, and direct IP
