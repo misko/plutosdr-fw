@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Lightweight simulation of the coherent RX sample-counter clock crossing.
+# Lightweight simulation of gain-series RX CDC and TX support logic.
 
 set -euo pipefail
 
@@ -29,7 +29,7 @@ actual="$(git -C "$HDL_QUANTULUM" rev-parse HEAD 2>/dev/null || true)"
 }
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/spf-gain-series-cdc.XXXXXX")"
-trap 'test ! -f "$work/cdc_tb" || unlink "$work/cdc_tb"; test ! -f "$work/fifo_reset_tb" || unlink "$work/fifo_reset_tb"; rmdir "$work" 2>/dev/null || true' EXIT
+trap 'test ! -f "$work/cdc_tb" || unlink "$work/cdc_tb"; test ! -f "$work/fifo_reset_tb" || unlink "$work/fifo_reset_tb"; test ! -f "$work/tx_pipeline_debug_tb" || unlink "$work/tx_pipeline_debug_tb"; rmdir "$work" 2>/dev/null || true' EXIT
 
 src="${HDL_QUANTULUM}/util_cpack2_timestamp/src"
 iverilog -g2012 -Wall -o "${work}/cdc_tb" \
@@ -44,3 +44,9 @@ iverilog -g2012 -Wall -o "${work}/fifo_reset_tb" \
     "${upack_src}/fifo_reset_sync.v" \
     "${upack_src}/fifo_reset_sync_tb.v"
 vvp "${work}/fifo_reset_tb"
+
+iverilog -g2012 -Wall -o "${work}/tx_pipeline_debug_tb" \
+    "${upack_src}/cdc_sync_bits.v" \
+    "${upack_src}/tx_pipeline_debug.v" \
+    "${upack_src}/tx_pipeline_debug_tb.v"
+vvp "${work}/tx_pipeline_debug_tb"
