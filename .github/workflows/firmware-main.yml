@@ -54,6 +54,7 @@ jobs:
           BR2_BACKUP_SITE: https://sources.buildroot.net
         run: |
           artifact_root=$(mktemp -d "$RUNNER_TEMP/plutosdr-fw-main.XXXXXX")
+          echo "artifact_root=$artifact_root" >> "$GITHUB_OUTPUT"
           scripts/ci/build_main_firmware.sh "$artifact_root"
           bundle=$(find "$artifact_root" -maxdepth 1 -type f \
             -name 'plutoplus-spf-main-*.tar.gz' -print -quit)
@@ -63,6 +64,19 @@ jobs:
             echo "bundle_path=$bundle"
             echo "bundle_name=$(basename "$bundle")"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Upload failed-build diagnostics
+        if: failure() && steps.build.outputs.artifact_root != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: diagnostics-${{ steps.names.outputs.artifact_name }}
+          path: |
+            ${{ steps.build.outputs.artifact_root }}/*.log
+            ${{ steps.build.outputs.artifact_root }}/*.rpt
+            ${{ steps.build.outputs.artifact_root }}/*.jou
+            ${{ steps.build.outputs.artifact_root }}/*.tcl
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Upload deployment bundle and verification sidecars
         id: upload
