@@ -72,7 +72,8 @@ jobs:
           test "${count:-0}" -eq 2
 
   hdl-counter-tests:
-    name: coherent RX counter and TX diagnostics simulation
+    # Keep this public name stable: main branch protection requires it.
+    name: coherent RX counter CDC simulation
     runs-on: ubuntu-latest
     steps:
       - name: Check out pinned timestamp IP
