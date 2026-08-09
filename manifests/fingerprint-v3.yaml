@@ -1,0 +1,110 @@
+# Immutable build manifest for the deployed PlutoPlus SPF firmware release v3.
+#
+# Every value below was verified on 2026-08-07 against the deployed binary
+# itself -- not against repository state -- by extracting the rootfs from the
+# shipped DFU and reading /opt/VERSIONS and the gadget build ID out of it.
+#
+# THIS FILE IS IMMUTABLE. A new firmware release gets a NEW manifest file.
+# Never edit these values to make a build pass.
+#
+# Deliberately a flat key: value subset of YAML so that scripts/verify_release.sh
+# can parse it with coreutils alone, with no PyYAML dependency in CI containers.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+
+# ---------------------------------------------------------------- release ---
+release_tag: v0.38-plutoplus-spf-gain-rssi-fingerprint-v3
+asset_name: plutoplus-spf-direct-usb-gain-rssi-fingerprint-v3-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.38-plutoplus-spf-gain-rssi-fingerprint-v3/plutoplus-spf-direct-usb-gain-rssi-fingerprint-v3-pluto.dfu
+image_sha256: 86f2115eb344efcbd3d59af02caf80d396291cb9e20dcb01651cacf7e0334191
+
+# The embedded device string reads "v2-8" because `git describe --tags` ran
+# before the v3 tag existed: eight commits past the v2 tag, at f53d. Fixed for
+# future releases by tagging (annotated) before building. Do not "correct" it.
+device_fw: v0.38-plutoplus-spf-gain-rssi-fingerprint-v2-8-gf53d
+
+# ------------------------------------------------------------ source graph ---
+# All seven commits are remotely reachable, and every one now resolves from a
+# misko-owned repository: plutosdr-fw carries the firmware, buildroot and gadget
+# branches, and plutosdr-{hdl,hdl-quantulum,linux,u-boot-xlnx} mirror the rest.
+#
+# They are still BRANCH TIPS, which are mutable. Annotated tags on each would
+# make them immutable; until then, `scripts/check_source_graph.sh` fails the
+# moment any ref moves off its pin.
+firmware_source: f53dd006c26677a256520b86b7c864100ccd62d2
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+gadget_source: 2072e1d0823ef6db3bc141dd733a90d76e23fc33
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/heads/codex/gadget-stability-v3
+
+submodule_buildroot: f37fe105ff4df531311b0cf85584461fb03e0e4e
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/heads/codex/buildroot-gadget-supervisor-v3
+
+submodule_hdl: be89a77d3fd0b344419377fac6fab8cfc7a66ad8
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/heads/v0.38_plutoplus_timestamp
+# hdl MUST come from a dedicated repository (misko/plutosdr-hdl, a fork of
+# pgreenland/plutosdr-hdl), never from the archive branch inside plutosdr-fw.
+#
+# /opt/VERSIONS records `git describe --abbrev=4`, and --abbrev=4 is a MINIMUM:
+# git lengthens the hash until it is unique WITHIN THAT REPOSITORY. plutosdr-fw
+# also holds the firmware, buildroot and gadget histories, so the identical
+# commit describes there as dev_prj_2018_r1-1859-gbe89a7 (6 hex) instead of
+# dev_prj_2018_r1-1859-gbe89 (5 hex), silently changing the recorded identity.
+# A fork carries the parent's object set, so it abbreviates identically --
+# verified by cloning misko/plutosdr-hdl and re-running describe.
+submodule_hdl_archive: https://github.com/misko/plutosdr-fw.git
+submodule_hdl_archive_ref: refs/heads/hdl-v0.38-plutoplus-timestamp
+submodule_hdl_archive_usable_as_source: false
+
+submodule_hdl_quantulum: d70102267713f5bbc99805be5f4f08b0a07766cb
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/heads/main
+
+submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/heads/v0.38_plutoplus
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/heads/v0.38_plutoplus
+
+# --------------------------------------------- /opt/VERSIONS inside the image ---
+# `git describe --abbrev=4` output recorded at build time, per Makefile:113-114.
+versions_hdl: dev_prj_2018_r1-1859-gbe89
+versions_buildroot: f37f
+versions_linux: d798b
+versions_u_boot_xlnx: 1ff04
+
+# ------------------------------------------------------- FIT component hashes ---
+fpga_bitstream_md5: e312e1a2ac35f5a7dcaf3279909a9a3f
+ramdisk_md5: 56463cfc55b97f30c9eee4abe0bea925
+fit_description: Configuration to load fpga before Kernel
+
+# ----------------------------------------------------------------- FPGA input ---
+xsa_url: https://github.com/pgreenland/plutosdr-fw/releases/download/v0.38_plutoplus_with_timestamping/system_top.xsa
+xsa_sha256: e07af4a31973e332f1c7b19a20b8d9527df6ccf91d3b805db417e0164981be3a
+
+# ------------------------------------------------------------- build inputs ---
+# Two DIFFERENT toolchains are in play. The Makefile resolves CROSS_COMPILE
+# against buildroot/output/host/bin, so it must be the Buildroot tuple. The
+# other appears only in upstream setup_env.sh (Xilinx SDK) and is NOT used here.
+cross_compile: arm-none-linux-gnueabihf-
+buildroot_toolchain: BR2_TOOLCHAIN_EXTERNAL_ARM_ARM
+buildroot_toolchain_version: ARM GNU 10.3-2021.07
+xilinx_sdk_tuple_unused: arm-linux-gnueabihf-
+
+# The deployed image was built WITHOUT reproducible-build support, so it cannot
+# be rebuilt byte-for-byte. Verification is by possession + identity, never by
+# rebuild. Reproducibility is a property of v4 onward.
+br2_reproducible: false
+built_on_host_arch: aarch64
+# Use this as SOURCE_DATE_EPOCH if ever attempting a timestamp-matched rebuild.
+# dumpimage renders it in the reader's local zone; 17:38:15 BST = 16:38:15 UTC.
+fit_created_unix: 1785688695
+fit_created_utc: 2026-08-02T16:38:15Z
+boot_mode: qspi
+qspi_partition: mtd3

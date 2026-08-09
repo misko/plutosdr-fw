@@ -1,19 +1,43 @@
+; Absolute URLs only. Relative URLs (../plutosdr-linux.git) resolve against
+; whichever remote is named `origin`, so a clone from misko/ resolved them to
+; misko/plutosdr-linux.git etc., which do not exist. That was the fresh-clone
+; failure.
+;
+; Every `branch` below is the branch that ACTUALLY contains the pinned commit,
+; verified against ls-remote. Three of these previously named a branch that did
+; not contain the pin, so `git submodule update --remote` silently built
+; different firmware while reporting success.
+
 [submodule "u-boot-xlnx"]
 	path = u-boot-xlnx
-	url = ../plutosdr-u-boot-xlnx.git
-	branch = pluto
+	url = https://github.com/misko/plutosdr-u-boot-xlnx.git
+	branch = v0.38_plutoplus
+
 [submodule "buildroot"]
 	path = buildroot
 	url = https://github.com/misko/plutosdr-fw.git
-	branch = buildroot-hardware-fingerprint-v2
+	branch = codex/buildroot-gain-series-v4
+
 [submodule "linux"]
 	path = linux
-	url = ../plutosdr-linux.git
-	branch = 2018_R1
+	url = https://github.com/misko/plutosdr-linux.git
+	branch = v0.38_plutoplus
+
 [submodule "hdl"]
 	path = hdl
-	url = https://github.com/pgreenland/plutosdr-hdl.git
-	branch = v0.38_plutoplus_timestamp
+	url = https://github.com/misko/plutosdr-hdl.git
+	branch = codex/hdl-sample-counter-v3
 [submodule "hdl-quantulum"]
 	path = hdl-quantulum
-	url = ../plutosdr-hdl-quantulum
+	url = https://github.com/misko/plutosdr-hdl-quantulum
+	branch = codex/hdl-quantulum-gain-series-v3
+
+; NOTE ON `shallow`: no submodule carries it. `git submodule update`
+; shallow-clones a submodule's DEFAULT branch and then checks out the recorded
+; gitlink SHA, so a pin on another branch can be silently left on the wrong
+; commit. All gain-series component pins live on explicit candidate branches.
+;
+; Consequence: `git submodule update --init --recursive` performs full clones and
+; needs ~3 GB, most of it unused kernel history. On a memory-constrained builder
+; use docker/build_firmware.sh, which clones each submodule explicitly at the
+; depth the deployed image actually used and asserts every resulting SHA.

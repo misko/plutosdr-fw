@@ -1,0 +1,93 @@
+name: firmware pull-request checks
+
+# This workflow must remain GitHub-hosted. The repository is public, so no
+# pull-request-controlled job may ever target the Kalman self-hosted runner.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  source-graph:
+    name: source graph
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify pins, URLs, refs, and overrides
+        run: |
+          ./scripts/check_source_graph.sh manifests/gain-series-v4-source.yaml
+
+  gadget-tests:
+    name: USB and IP gadget unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pinned USB gadget source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: misko/plutosdr-fw
+          ref: 518e35914195136e20c9f7261b21ee063b41d994
+          path: usb-gadget
+          persist-credentials: false
+      - name: Check out pinned IP gadget source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: misko/plutosdr-fw
+          ref: 032c830c76cb291c2ed0a32b455ed81d1dfd2540
+          path: ip-gadget
+          persist-credentials: false
+      - name: Install native test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential cmake libaio-dev libiio-dev zlib1g-dev
+      - name: Build and test the common USB implementation
+        run: |
+          cmake -S usb-gadget -B usb-gadget/build-tests \
+            -DBUILD_HOST_TESTS=ON \
+            -DCMAKE_INSTALL_PREFIX="$PWD/common"
+          cmake --build usb-gadget/build-tests -j"$(nproc)"
+          ctest --test-dir usb-gadget/build-tests --output-on-failure
+          count=$(ctest --test-dir usb-gadget/build-tests -N |
+            sed -n 's/^Total Tests: //p')
+          test "${count:-0}" -eq 14
+          cmake --install usb-gadget/build-tests
+      - name: Build and test the direct-IP implementation
+        run: |
+          cmake -S ip-gadget -B ip-gadget/build-tests \
+            -DBUILD_TESTING=ON \
+            -DSPF_COMMON_ROOT="$PWD/common"
+          cmake --build ip-gadget/build-tests -j"$(nproc)"
+          ctest --test-dir ip-gadget/build-tests --output-on-failure
+          count=$(ctest --test-dir ip-gadget/build-tests -N |
+            sed -n 's/^Total Tests: //p')
+          test "${count:-0}" -eq 2
+
+  hdl-counter-tests:
+    name: coherent RX counter CDC simulation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pinned timestamp IP
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: misko/plutosdr-hdl-quantulum
+          ref: 26eae2affcd563e1e1845106243a44557083e6be
+          path: hdl-quantulum
+          persist-credentials: false
+      - name: Simulate the closed-loop counter crossing
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends iverilog
+          cd hdl-quantulum/util_cpack2_timestamp/src
+          iverilog -g2012 -Wall -o "$RUNNER_TEMP/cdc-counter-tb" \
+            cdc_sync_bits.v cdc_sync_data_closed.v \
+            cdc_sync_data_closed_tb.v
+          vvp "$RUNNER_TEMP/cdc-counter-tb"

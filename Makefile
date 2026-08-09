@@ -1,9 +1,9 @@
 
 VIVADO_VERSION ?= 2022.2
 
-# Buildroot's pinned Arm GNU 2021.07 toolchain uses the arm-none-linux-gnueabihf
-# tuple. Keep this overridable for older cached Linaro toolchains.
-CROSS_COMPILE ?= arm-none-linux-gnueabihf-
+# The x86-64 Buildroot configuration selects the pinned Linaro 2018.05
+# toolchain, whose binaries use the arm-linux-gnueabihf tuple.
+CROSS_COMPILE ?= arm-linux-gnueabihf-
 TOOLS_PATH = PATH="$(CURDIR)/buildroot/output/host/bin:$(CURDIR)/buildroot/output/host/sbin:$(PATH)"
 TOOLCHAIN = $(CURDIR)/buildroot/output/host/bin/$(CROSS_COMPILE)gcc
 
@@ -142,12 +142,16 @@ endif
 
 ### TODO: Build system_top.xsa from src if dl fails ...
 
-build/sdk/fsbl/Release/fsbl.elf build/system_top.bit : build/system_top.xsa
+build/system_top.bit: build/system_top.xsa
+	unzip -o $< system_top.bit -d build
+
+build/sdk/fsbl/Release/fsbl.elf: build/system_top.xsa
 	rm -Rf build/sdk
 ifeq (1, ${HAVE_VIVADO})
-	bash -c "source $(VIVADO_SETTINGS) && xsct scripts/create_fsbl_project.tcl"
+	bash -c "source $(VIVADO_SETTINGS) && command -v xsct >/dev/null && xsct scripts/create_fsbl_project.tcl"
 else
-	unzip -o build/system_top.xsa system_top.bit -d build
+	@echo "FSBL generation requires Vivado/Vitis xsct; pluto.dfu does not require this target" >&2
+	@false
 endif
 
 build/boot.bin: build/sdk/fsbl/Release/fsbl.elf build/u-boot.elf

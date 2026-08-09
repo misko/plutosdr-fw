@@ -1,0 +1,14 @@
+# Changes that can alter what the trusted Kalman runner executes or packages.
+/.github/workflows/ @misko
+/scripts/ci/ @misko
+/scripts/build_gain_series_candidate.sh @misko
+/scripts/check_source_graph.sh @misko
+/scripts/test_gain_series_hdl.sh @misko
+/manifests/ @misko
+/.gitmodules @misko
+/Makefile @misko
+/buildroot @misko
+/hdl @misko
+/hdl-quantulum @misko
+/linux @misko
+/u-boot-xlnx @misko
