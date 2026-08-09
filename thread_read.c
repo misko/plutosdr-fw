@@ -100,6 +100,7 @@ typedef struct
 	uint32_t frames_remaining;
 	uint64_t buffer_sequence;
 	uint32_t frames_completed_in_stream;
+	uint32_t startup_frames_discarded;
 	bool overflow_seen;
 	spf_gain_sampler_t gain_sampler;
 	bool gain_sampler_started;
@@ -452,6 +453,32 @@ void *THREAD_READ_Entrypoint(void *args)
 			goto cleanup;
 		}
 		state.gain_sampler_started = true;
+
+		/*
+		 * Creating a local IIO buffer starts DMA before the gain sampler has
+		 * loaded the gain table and proved the synchronized FPGA counter.  The
+		 * first completed DMA block can therefore predate every observation.
+		 * Consume that startup-prefetched block only after the sampler is ready,
+		 * so every frame exposed to the host has a chance to contain a genuinely
+		 * sample-bracketed observation.  The timestamp cadence matches the IIO
+		 * block size, so the following refill starts on the next timestamp.
+		 */
+		const ssize_t discarded = iio_buffer_refill(state.iio_rx_buffer);
+		if (discarded != (ssize_t)state.iio_refill_size)
+		{
+			fprintf(stderr,
+				"Protocol-v3 startup prefill discard failed, expected %zu, read %zd bytes\n",
+				state.iio_refill_size,
+				discarded);
+			spf_runtime_status_increment(
+				thread_args->runtime_status,
+				SPF_STATUS_COUNTER_IIO_REFILL_ERROR);
+			goto cleanup;
+		}
+		spf_runtime_status_heartbeat(thread_args->runtime_status);
+		DEBUG_PRINT(
+			"Discarded %zd-byte protocol-v3 startup-prefetched IIO block\n",
+			discarded);
 	}
 
 	/* Summarize info */
@@ -898,6 +925,32 @@ static int handle_iio_buffer(state_t *state)
 					state->frame_observations,
 					state->thread_args->gain_observation_capacity,
 					&observation_overflow_count);
+				const spf_gain_frame_decision_t frame_decision =
+					spf_gain_frame_decide(
+						this_buffer_sequence,
+						observation_count,
+						state->startup_frames_discarded);
+				if (frame_decision == SPF_GAIN_FRAME_DISCARD_STARTUP)
+				{
+					/*
+					 * A short frame can finish while the sampler is still
+					 * completing its first local SPI-backed gain read.  Do not
+					 * expose IQ without its required observation; recycle the USB
+					 * buffer and try the next timestamp-aligned DMA block.  This
+					 * is allowed only before sequence zero is emitted and is
+					 * bounded so a failed sampler cannot hang a capture forever.
+					 */
+					state->startup_frames_discarded++;
+					state->buffer_sequence--;
+					buf->in_use = false;
+					state->ring_buf_data[RING_BUFFER_Put(
+						&state->ring_buf_ctx)] = buf;
+					DEBUG_PRINT(
+						"Discarded protocol-v3 startup frame without a gain observation (%u/%u)\n",
+						state->startup_frames_discarded,
+						SPF_GAIN_STARTUP_DISCARD_LIMIT);
+					return 0;
+				}
 				const spf_radio_frame_v3_args_t frame_args = {
 					.metadata_features = state->thread_args->metadata_features,
 					.stream_id = state->thread_args->stream_id,

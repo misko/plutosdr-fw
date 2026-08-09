@@ -5,7 +5,9 @@
 #include "spf_gain_read.h"
 
 #include <iio.h>
+#include <inttypes.h>
 #include <sched.h>
+#include <stdio.h>
 #include <string.h>
 #include <time.h>
 
@@ -197,6 +199,10 @@ uint16_t spf_gain_sampler_collect(
 	uint16_t copied = 0;
 	uint32_t retained = 0;
 	pthread_mutex_lock(&sampler->mutex);
+	const uint32_t queued_before = sampler->count;
+	uint32_t interval_records = 0;
+	uint64_t earliest_before = UINT64_MAX;
+	uint64_t latest_after = 0;
 	for (uint32_t index = 0; index < sampler->count; ++index)
 	{
 		spf_gain_observation_v3_t record = sampler->records[index];
@@ -206,6 +212,11 @@ uint16_t spf_gain_sampler_collect(
 				frame_start, (uint32_t)record.sample_sequence_before);
 			record.sample_sequence_after = extend_counter_near(
 				frame_start, (uint32_t)record.sample_sequence_after);
+			interval_records++;
+			if (record.sample_sequence_before < earliest_before)
+				earliest_before = record.sample_sequence_before;
+			if (record.sample_sequence_after > latest_after)
+				latest_after = record.sample_sequence_after;
 		}
 		const bool overlaps =
 			(record.flags & SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID) &&
@@ -225,8 +236,37 @@ uint16_t spf_gain_sampler_collect(
 		}
 	}
 	sampler->count = retained;
+	if (copied == 0)
+	{
+		fprintf(stderr,
+			"Protocol-v3 gain sampler found no overlap: "
+			"frame=[%" PRIu64 ",%" PRIu64 ") queued=%u "
+			"interval_records=%u earliest_before=%" PRIu64 " "
+			"latest_after=%" PRIu64 " retained=%u failed=%u\n",
+			frame_start,
+			frame_end,
+			queued_before,
+			interval_records,
+			earliest_before,
+			latest_after,
+			retained,
+			atomic_load(&sampler->failed) ? 1U : 0U);
+	}
 	*overflow_count = sampler->overflow_count;
 	sampler->overflow_count = 0;
 	pthread_mutex_unlock(&sampler->mutex);
 	return copied;
+}
+
+spf_gain_frame_decision_t spf_gain_frame_decide(
+	uint64_t buffer_sequence,
+	uint16_t observation_count,
+	uint32_t startup_frames_discarded)
+{
+	if (observation_count != 0)
+		return SPF_GAIN_FRAME_ACCEPT;
+	if (buffer_sequence == 0 &&
+		startup_frames_discarded < SPF_GAIN_STARTUP_DISCARD_LIMIT)
+		return SPF_GAIN_FRAME_DISCARD_STARTUP;
+	return SPF_GAIN_FRAME_REJECT;
 }

@@ -5,6 +5,17 @@
 
 int main(void)
 {
+	assert(spf_gain_frame_decide(0, 1, 0) == SPF_GAIN_FRAME_ACCEPT);
+	assert(spf_gain_frame_decide(27, 1, 0) == SPF_GAIN_FRAME_ACCEPT);
+	assert(spf_gain_frame_decide(0, 0, 0) ==
+		SPF_GAIN_FRAME_DISCARD_STARTUP);
+	assert(spf_gain_frame_decide(
+		0, 0, SPF_GAIN_STARTUP_DISCARD_LIMIT - 1) ==
+		SPF_GAIN_FRAME_DISCARD_STARTUP);
+	assert(spf_gain_frame_decide(
+		0, 0, SPF_GAIN_STARTUP_DISCARD_LIMIT) == SPF_GAIN_FRAME_REJECT);
+	assert(spf_gain_frame_decide(1, 0, 0) == SPF_GAIN_FRAME_REJECT);
+
 	spf_gain_sampler_t sampler;
 	memset(&sampler, 0, sizeof(sampler));
 	assert(pthread_mutex_init(&sampler.mutex, NULL) == 0);
