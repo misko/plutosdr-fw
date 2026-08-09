@@ -14,6 +14,7 @@ RUNNER_VERSION="2.336.0"
 RUNNER_ARCHIVE="actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
 RUNNER_URL="https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/${RUNNER_ARCHIVE}"
 RUNNER_SHA256="04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d"
+SERVICE_NAME="actions.runner.misko-plutosdr-fw.kalman-firmware.service"
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -41,8 +42,14 @@ fi
 
 install -d -m 0755 -o "$RUNNER_USER" -g "$RUNNER_USER" \
     "$RUNNER_DIR" "$RUNNER_HOME"
-[[ ! -e "$RUNNER_DIR/.runner" ]] ||
-    fail "a runner is already configured in $RUNNER_DIR"
+
+runner_configured=false
+if [[ -e "$RUNNER_DIR/.runner" ]]; then
+    [[ -f "$RUNNER_DIR/.runner" && -f "$RUNNER_DIR/.credentials" &&
+        -f "$RUNNER_DIR/.credentials_rsaparams" ]] ||
+        fail "incomplete runner registration found in $RUNNER_DIR"
+    runner_configured=true
+fi
 
 if [[ -x "$RUNNER_DIR/bin/Runner.Listener" ]]; then
     installed_version="$(runuser -u "$RUNNER_USER" -- \
@@ -68,30 +75,35 @@ runuser -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" bash -c '
     vivado -version | grep -F "Vivado v2022.2"
 '
 
-printf 'Paste only the temporary value after --token (not the SHA or command): ' >&2
-IFS= read -r -s runner_token
-printf '\n' >&2
-runner_token="${runner_token//$'\r'/}"
-[[ -n "$runner_token" ]] || fail "registration token was empty"
-[[ "$runner_token" =~ ^[A-Za-z0-9_-]{20,50}$ ]] ||
-    fail "registration token format is invalid; paste only the value after --token"
+if [[ "$runner_configured" == true ]]; then
+    printf 'Resuming service installation for configured runner %s\n' \
+        "$RUNNER_NAME"
+else
+    printf 'Paste only the temporary value after --token (not the SHA or command): ' >&2
+    IFS= read -r -s runner_token
+    printf '\n' >&2
+    runner_token="${runner_token//$'\r'/}"
+    [[ -n "$runner_token" ]] || fail "registration token was empty"
+    [[ "$runner_token" =~ ^[A-Za-z0-9_-]{20,50}$ ]] ||
+        fail "registration token format is invalid; paste only the value after --token"
 
-runuser -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" bash -c \
-    "cd '$RUNNER_DIR' && exec ./config.sh \"\$@\"" runner-config \
-    --unattended \
-    --url "$REPOSITORY_URL" \
-    --token "$runner_token" \
-    --name "$RUNNER_NAME" \
-    --labels kalman,vivado-2022.2,plutosdr-fw \
-    --work _work
-unset runner_token
+    runuser -u "$RUNNER_USER" -- env HOME="$RUNNER_HOME" bash -c \
+        "cd '$RUNNER_DIR' && exec ./config.sh \"\$@\"" runner-config \
+        --unattended \
+        --url "$REPOSITORY_URL" \
+        --token "$runner_token" \
+        --name "$RUNNER_NAME" \
+        --labels kalman,vivado-2022.2,plutosdr-fw \
+        --work _work
+    unset runner_token
+fi
 
-"$RUNNER_DIR/svc.sh" install "$RUNNER_USER"
-service_file="$(find /etc/systemd/system -maxdepth 1 -type f \
-    -name 'actions.runner.misko-plutosdr-fw.kalman-firmware.service' \
-    -print -quit)"
-[[ -n "$service_file" ]] || fail "could not locate the installed runner service"
-service_name="$(basename "$service_file")"
+service_file="/etc/systemd/system/$SERVICE_NAME"
+if [[ ! -e "$service_file" ]]; then
+    (cd "$RUNNER_DIR" && ./svc.sh install "$RUNNER_USER")
+fi
+[[ -f "$service_file" ]] || fail "could not locate the installed runner service"
+service_name="$SERVICE_NAME"
 dropin_dir="/etc/systemd/system/${service_name}.d"
 install -d -m 0755 "$dropin_dir"
 cat > "$dropin_dir/hardening.conf" <<EOF
