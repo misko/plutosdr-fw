@@ -48,6 +48,10 @@ jobs:
         id: build
         env:
           VIVADO_SETTINGS: /opt/Xilinx/Vivado/2022.2/settings64.sh
+          BR2_DL_DIR: /opt/actions-runner-plutosdr-fw/cache/buildroot-dl
+          BR2_PRIMARY_SITE: https://sources.buildroot.net
+          BR2_GNU_MIRROR: https://ftpmirror.gnu.org
+          BR2_BACKUP_SITE: https://sources.buildroot.net
         run: |
           artifact_root=$(mktemp -d "$RUNNER_TEMP/plutosdr-fw-main.XXXXXX")
           scripts/ci/build_main_firmware.sh "$artifact_root"

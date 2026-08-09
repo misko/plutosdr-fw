@@ -31,6 +31,16 @@ export SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git show -s --format=%ct HEAD)}
 export KBUILD_BUILD_TIMESTAMP="${KBUILD_BUILD_TIMESTAMP:-$(date -u -d "@${SOURCE_DATE_EPOCH}")}"
 export KBUILD_BUILD_USER="${KBUILD_BUILD_USER:-github-actions}"
 export KBUILD_BUILD_HOST="${KBUILD_BUILD_HOST:-kalman}"
+export BR2_DL_DIR="${BR2_DL_DIR:-/opt/actions-runner-plutosdr-fw/cache/buildroot-dl}"
+export BR2_PRIMARY_SITE="${BR2_PRIMARY_SITE:-https://sources.buildroot.net}"
+export BR2_GNU_MIRROR="${BR2_GNU_MIRROR:-https://ftpmirror.gnu.org}"
+export BR2_BACKUP_SITE="${BR2_BACKUP_SITE:-https://sources.buildroot.net}"
+
+[[ "$BR2_DL_DIR" == /* ]] || fail "BR2_DL_DIR must be absolute"
+install -d -m 0755 "$BR2_DL_DIR"
+[[ -r "$BR2_DL_DIR" && -w "$BR2_DL_DIR" && -x "$BR2_DL_DIR" ]] ||
+    fail "Buildroot cache is not accessible: $BR2_DL_DIR"
+printf 'Persistent Buildroot cache: %s\n' "$BR2_DL_DIR"
 
 scripts/build_gain_series_candidate.sh source-check \
     2>&1 | tee "$artifact_real/source-check.log"
