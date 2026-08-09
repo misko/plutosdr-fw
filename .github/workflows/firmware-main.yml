@@ -75,6 +75,7 @@ jobs:
             ${{ steps.build.outputs.artifact_root }}/*.rpt
             ${{ steps.build.outputs.artifact_root }}/*.jou
             ${{ steps.build.outputs.artifact_root }}/*.tcl
+            ${{ steps.build.outputs.artifact_root }}/*diagnostics*.tar.gz
           if-no-files-found: warn
           retention-days: 30
 
