@@ -27,9 +27,9 @@ submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
 submodule_hdl_ref: refs/tags/gain-series-v4-rc7-source/hdl
 
-submodule_hdl_quantulum: 772d1d2f84571d5539f7f20db77d97c2d6a4a465
+submodule_hdl_quantulum: a8100f8c360cc4484d5b78a558a5c764867fd028
 submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
-submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc7a-source/hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc7b-source/hdl-quantulum
 
 submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
 submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
