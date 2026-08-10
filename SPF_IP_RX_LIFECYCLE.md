@@ -61,6 +61,8 @@ host process that restarts while reusing the same source port.
 ## Ownership invariants
 
 - At most one protocol-v3 RX worker owns `cf-ad9361-lpc`.
+- A legacy RX START is refused while protocol-v3 RX owns or releases DMA; it
+  cannot cancel the v3 worker or steal ownership.
 - A new START returns `-EBUSY` until the prior worker has reported cleanup.
 - Capability and time-anchor queries remain serviceable during setup/cleanup.
 - Worker eventfds are distinct: startup, run, quit, and done cannot consume one
