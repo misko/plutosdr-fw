@@ -41,7 +41,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: e44821f6d2737e3cdf452a017787f11c451fe04e
+          ref: be3824b6d755f566c9cafb01cf1e8daef4342114
           path: ip-gadget
           persist-credentials: false
       - name: Install native test dependencies
@@ -69,7 +69,7 @@ jobs:
           ctest --test-dir ip-gadget/build-tests --output-on-failure
           count=$(ctest --test-dir ip-gadget/build-tests -N |
             sed -n 's/^Total Tests: //p')
-          test "${count:-0}" -eq 2
+          test "${count:-0}" -eq 3
 
   hdl-counter-tests:
     # Keep this public name stable: main branch protection requires it.
