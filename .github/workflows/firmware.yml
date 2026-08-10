@@ -34,14 +34,14 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: e14eae63ac6b7fe51828e85de34a8d4e1c50d49e
+          ref: 2e8e40ade5dcf3c7880a5ebb58419ad7c37ed552
           path: usb-gadget
           persist-credentials: false
       - name: Check out pinned IP gadget source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: be3824b6d755f566c9cafb01cf1e8daef4342114
+          ref: 8814aec26c6920afd79e198227d4f192adf16518
           path: ip-gadget
           persist-credentials: false
       - name: Install native test dependencies
@@ -69,7 +69,7 @@ jobs:
           ctest --test-dir ip-gadget/build-tests --output-on-failure
           count=$(ctest --test-dir ip-gadget/build-tests -N |
             sed -n 's/^Total Tests: //p')
-          test "${count:-0}" -eq 3
+          test "${count:-0}" -eq 4
 
   hdl-counter-tests:
     # Keep this public name stable: main branch protection requires it.
