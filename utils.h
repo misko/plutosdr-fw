@@ -39,6 +39,9 @@ uint64_t UTILS_CalcAverageTimeStats(UTILS_TimeStats_t *ctx);
 /* Set thread priority to realtime */
 int UTILS_SetThreadRealtimePriority(void);
 
+/* Reset a worker to normal time-sharing priority. */
+int UTILS_SetThreadNormalPriority(void);
+
 /* Set CPU affinity to single CPU */
 int UTILS_SetThreadAffinity(int cpu_id);
 

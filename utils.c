@@ -63,7 +63,7 @@ uint64_t UTILS_CalcAverageTimeStats(UTILS_TimeStats_t *ctx)
 
 int UTILS_SetThreadRealtimePriority(void)
 {
-    int rc;
+    int rc = -1;
 
 	int max_prio = sched_get_priority_max(SCHED_RR);
 	if (max_prio >= 0) {
@@ -78,6 +78,18 @@ int UTILS_SetThreadRealtimePriority(void)
 		perror("Failed to query thread schedular priorities");
 	}
 
+    return rc;
+}
+
+int UTILS_SetThreadNormalPriority(void)
+{
+    const struct sched_param normal_priority = {.sched_priority = 0};
+    const int rc = pthread_setschedparam(
+        pthread_self(), SCHED_OTHER, &normal_priority);
+    if (rc) {
+        errno = rc;
+        perror("Failed to reset thread priority");
+    }
     return rc;
 }
 

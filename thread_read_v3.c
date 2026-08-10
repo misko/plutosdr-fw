@@ -14,8 +14,10 @@
 #include <spf/spf_rssi_read.h>
 
 #include <errno.h>
+#include <netinet/udp.h>
 #include <pthread.h>
 #include <poll.h>
+#include <sched.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,9 +26,13 @@
 #include <sys/eventfd.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
+#include <time.h>
 #include <unistd.h>
 
 #define DEBUG_PRINT(...) if (debug) printf("ReadV3: "__VA_ARGS__)
+
+/* Match the bounded DMA headroom proven by the direct-USB RX path. */
+#define SPF_IP_IIO_KERNEL_BUFFER_COUNT 8U
 
 typedef struct
 {
@@ -75,6 +81,7 @@ typedef struct
 	spf_ip_fragment_v1_t *fragment_headers;
 	struct mmsghdr *messages;
 	struct iovec *iovs;
+	uint32_t gso_segments_per_send;
 	size_t fragment_count;
 	uint32_t send_batch;
 	uint32_t pacing_interval_us;
@@ -92,10 +99,24 @@ static void cleanup(state_v3_t *state);
 static bool send_frame(state_v3_t *state,
 	const uint8_t *frame,
 	uint64_t sequence);
+static bool send_frame_gso(state_v3_t *state,
+	const uint8_t *frame,
+	uint64_t sequence);
 static void *sender_entrypoint(void *opaque);
 static void signal_sender_result(state_v3_t *state, uint64_t result);
 static void report_startup(const state_v3_t *state, uint64_t result);
 static bool wait_for_run(const state_v3_t *state);
+static bool set_thread_affinity(pthread_t thread, int cpu_id);
+static bool sleep_until_ns(uint64_t deadline_ns);
+
+static uint64_t monotonic_ns(void)
+{
+	struct timespec now;
+	if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+		return 0;
+	return (uint64_t)now.tv_sec * UINT64_C(1000000000) +
+		(uint64_t)now.tv_nsec;
+}
 
 void *THREAD_READ_V3_Entrypoint(void *opaque)
 {
@@ -106,6 +127,7 @@ void *THREAD_READ_V3_Entrypoint(void *opaque)
 	state.sender_event_fd = -1;
 	state.iio_poll_fd = -1;
 	pthread_setname_np(pthread_self(), "IP_SDR_V3_RX");
+	/* DMA ownership must win over packetization to preserve IQ continuity. */
 	UTILS_SetThreadRealtimePriority();
 	UTILS_SetThreadAffinity(1);
 	if (!initialize(&state))
@@ -204,6 +226,16 @@ static bool initialize(state_v3_t *state)
 		timestamp_control) != 0)
 		return false;
 	state->timestamp_control_configured = true;
+	const int kernel_buffer_result = iio_device_set_kernel_buffers_count(
+		state->iio_rx, SPF_IP_IIO_KERNEL_BUFFER_COUNT);
+	if (kernel_buffer_result != 0)
+	{
+		fprintf(stderr,
+			"Failed to configure %u IIO kernel buffers: %d\n",
+			SPF_IP_IIO_KERNEL_BUFFER_COUNT,
+			kernel_buffer_result);
+		return false;
+	}
 	state->iio_buffer = iio_device_create_buffer(
 		state->iio_rx, args->samples_per_channel + 1, false);
 	if (state->iio_buffer == NULL || iio_buffer_step(state->iio_buffer) != 8)
@@ -237,6 +269,13 @@ static bool initialize(state_v3_t *state)
 		&state->sampler, args->gain_observation_interval_samples))
 		return false;
 	state->sampler_started = true;
+	/*
+	 * The RX worker is continuously runnable at 30 MS/s.  Move the normal-
+	 * priority sampler off its real-time CPU before DMA starts; otherwise it
+	 * is starved and frames fail closed with no gain observations.
+	 */
+	if (!set_thread_affinity(state->sampler.thread, 0))
+		return false;
 
 	/*
 	 * iio_device_create_buffer() starts DMA before the sampler has loaded the
@@ -259,6 +298,18 @@ static bool initialize(state_v3_t *state)
 	if (state->fragment_headers == NULL || state->messages == NULL ||
 		state->iovs == NULL)
 		return false;
+	/*
+	 * UDP GSO lets the 5.15 network stack route one batch before segmenting it
+	 * into MTU-safe datagrams.  This removes the Zynq packet-per-second ceiling
+	 * without IP fragmentation or a wire-format change.
+	 */
+	if (args->udp_datagram_bytes <= UINT16_C(1472))
+	{
+		state->gso_segments_per_send = spf_ip_gso_segments_per_send(
+			args->udp_datagram_bytes);
+		if (state->gso_segments_per_send == 0)
+			return false;
+	}
 	for (size_t index = 0; index < state->fragment_count; ++index)
 	{
 		state->messages[index].msg_hdr.msg_name = &args->addr;
@@ -307,6 +358,41 @@ static void report_startup(const state_v3_t *state, uint64_t result)
 		(void)write(state->args->startup_event_fd, &result, sizeof(result));
 }
 
+static bool set_thread_affinity(pthread_t thread, int cpu_id)
+{
+	cpu_set_t affinity;
+	CPU_ZERO(&affinity);
+	CPU_SET(cpu_id, &affinity);
+	const int rc = pthread_setaffinity_np(thread, sizeof(affinity), &affinity);
+	if (rc != 0)
+	{
+		errno = rc;
+		perror("Failed to set helper thread affinity");
+		return false;
+	}
+	return true;
+}
+
+static bool sleep_until_ns(uint64_t deadline_ns)
+{
+	const struct timespec deadline = {
+		.tv_sec = (time_t)(deadline_ns / UINT64_C(1000000000)),
+		.tv_nsec = (long)(deadline_ns % UINT64_C(1000000000)),
+	};
+	int rc;
+	do
+	{
+		rc = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, NULL);
+	} while (rc == EINTR);
+	if (rc != 0)
+	{
+		errno = rc;
+		perror("Failed to pace direct-IP sender");
+		return false;
+	}
+	return true;
+}
+
 static bool wait_for_run(const state_v3_t *state)
 {
 	struct pollfd events[2] = {
@@ -349,6 +435,7 @@ static int handle_sender_event(state_v3_t *state)
 
 static int handle_iio(state_v3_t *state)
 {
+	const uint64_t handler_started_ns = debug ? monotonic_ns() : 0;
 	if (state->frames_captured >= state->frame_slot_count)
 		return -1;
 	const ssize_t received = iio_buffer_refill(state->iio_buffer);
@@ -440,6 +527,13 @@ static int handle_iio(state_v3_t *state)
 			return -1;
 		state->iio_poll_registered = false;
 	}
+	DEBUG_PRINT(
+		"captured=%zu sequence=%llu observations=%u rssi_ns=%u handler_ns=%llu\n",
+		state->frames_captured,
+		(unsigned long long)first_sample_sequence,
+		observation_count,
+		current_rssi.duration_ns,
+		(unsigned long long)(monotonic_ns() - handler_started_ns));
 	return 0;
 }
 
@@ -447,12 +541,18 @@ static void *sender_entrypoint(void *opaque)
 {
 	state_v3_t *state = opaque;
 	pthread_setname_np(pthread_self(), "IP_SDR_V3_TX");
+	/*
+	 * The finite queue is intentionally capture-first.  Once DMA is stopped,
+	 * reuse CPU 1 for packetization and leave CPU 0 to the gain sampler and
+	 * Ethernet IRQ while the buffered frames drain.
+	 */
+	UTILS_SetThreadNormalPriority();
+	UTILS_SetThreadAffinity(1);
 	for (;;)
 	{
 		if (pthread_mutex_lock(&state->queue_mutex) != 0)
 			break;
-		while (state->ready_queue.count == 0 && !state->sender_stop &&
-			!state->capture_complete)
+		while (!state->capture_complete && !state->sender_stop)
 			pthread_cond_wait(&state->queue_condition, &state->queue_mutex);
 		if (state->sender_stop)
 		{
@@ -469,8 +569,14 @@ static void *sender_entrypoint(void *opaque)
 		if (!have_frame)
 			continue;
 		frame_slot_v3_t *slot = &state->frame_slots[slot_index];
+		const uint64_t send_started_ns = debug ? monotonic_ns() : 0;
 		if (!send_frame(state, slot->frame, slot->sequence))
 			break;
+		DEBUG_PRINT(
+			"sent=%zu sequence=%llu sender_ns=%llu\n",
+			state->frames_sent + 1,
+			(unsigned long long)slot->sequence,
+			(unsigned long long)(monotonic_ns() - send_started_ns));
 		state->frames_sent++;
 		if (state->frames_sent == state->frame_slot_count)
 		{
@@ -508,6 +614,10 @@ static bool send_frame(state_v3_t *state,
 			state->fragment_headers[index].fragment_bytes;
 		state->messages[index].msg_len = 0;
 	}
+	if (state->gso_segments_per_send != 0)
+		return send_frame_gso(state, frame, sequence);
+	const uint64_t pacing_started_ns = monotonic_ns();
+	uint64_t payload_bytes_sent = 0;
 	for (size_t offset = 0; offset < state->fragment_count;)
 	{
 		const size_t remaining = state->fragment_count - offset;
@@ -517,9 +627,19 @@ static bool send_frame(state_v3_t *state,
 			state->args->output_fd, &state->messages[offset], batch, 0);
 		if (sent > 0)
 		{
+			for (int index = 0; index < sent; ++index)
+				payload_bytes_sent += state->fragment_headers[
+					offset + (size_t)index].fragment_bytes;
 			offset += (size_t)sent;
 			if (offset < state->fragment_count)
-				usleep(state->pacing_interval_us);
+			{
+				const uint64_t deadline_ns = spf_ip_tx_deadline_ns(
+					pacing_started_ns,
+					payload_bytes_sent,
+					state->args->target_payload_bytes_per_second);
+				if (deadline_ns == 0 || !sleep_until_ns(deadline_ns))
+					return false;
+			}
 			continue;
 		}
 		if (sent < 0 && errno == EINTR)
@@ -534,6 +654,89 @@ static bool send_frame(state_v3_t *state,
 				continue;
 		}
 		return false;
+	}
+	return true;
+}
+
+static bool send_frame_gso(state_v3_t *state,
+	const uint8_t *frame,
+	uint64_t sequence)
+{
+	(void)frame;
+	(void)sequence;
+	const uint64_t pacing_started_ns = monotonic_ns();
+	uint64_t payload_bytes_sent = 0;
+	for (size_t offset = 0; offset < state->fragment_count;)
+	{
+		const size_t remaining = state->fragment_count - offset;
+		const size_t segment_count = remaining < state->gso_segments_per_send
+			? remaining
+			: state->gso_segments_per_send;
+		size_t gso_bytes = 0;
+		uint64_t group_payload_bytes = 0;
+		for (size_t index = 0; index < segment_count; ++index)
+		{
+			const spf_ip_fragment_v1_t *header =
+				&state->fragment_headers[offset + index];
+			gso_bytes += sizeof(*header) + header->fragment_bytes;
+			group_payload_bytes += header->fragment_bytes;
+		}
+
+		union
+		{
+			struct cmsghdr alignment;
+			uint8_t bytes[CMSG_SPACE(sizeof(uint16_t))];
+		} control;
+		memset(&control, 0, sizeof(control));
+		struct msghdr message = {
+			.msg_name = &state->args->addr,
+			.msg_namelen = sizeof(state->args->addr),
+			.msg_iov = &state->iovs[offset * 2],
+			.msg_iovlen = segment_count * 2,
+			.msg_control = control.bytes,
+			.msg_controllen = sizeof(control.bytes),
+		};
+		struct cmsghdr *cmsg = CMSG_FIRSTHDR(&message);
+		if (cmsg == NULL)
+			return false;
+		cmsg->cmsg_level = SOL_UDP;
+		cmsg->cmsg_type = UDP_SEGMENT;
+		cmsg->cmsg_len = CMSG_LEN(sizeof(uint16_t));
+		const uint16_t segment_bytes =
+			(uint16_t)state->args->udp_datagram_bytes;
+		memcpy(CMSG_DATA(cmsg), &segment_bytes, sizeof(segment_bytes));
+
+		ssize_t sent;
+		do
+		{
+			sent = sendmsg(state->args->output_fd, &message, 0);
+		} while (sent < 0 && errno == EINTR);
+		if (sent < 0 && (errno == EAGAIN || errno == EWOULDBLOCK))
+		{
+			struct pollfd writable = {
+				.fd = state->args->output_fd,
+				.events = POLLOUT,
+			};
+			if (poll(&writable, 1, 1000) > 0)
+				continue;
+		}
+		if (sent != (ssize_t)gso_bytes)
+		{
+			if (sent < 0)
+				perror("UDP GSO send failed");
+			return false;
+		}
+		offset += segment_count;
+		payload_bytes_sent += group_payload_bytes;
+		if (offset < state->fragment_count)
+		{
+			const uint64_t deadline_ns = spf_ip_tx_deadline_ns(
+				pacing_started_ns,
+				payload_bytes_sent,
+				state->args->target_payload_bytes_per_second);
+			if (deadline_ns == 0 || !sleep_until_ns(deadline_ns))
+				return false;
+		}
 	}
 	return true;
 }

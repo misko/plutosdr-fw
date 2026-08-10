@@ -107,6 +107,9 @@ static void test_transport_capability_negotiation(void)
 	start.data_port = 30433;
 	start.max_datagram_bytes = 1472;
 	assert(spf_ip_control_validate(&start));
+	start.max_datagram_bytes = 1473;
+	assert(!spf_ip_control_validate(&start));
+	start.max_datagram_bytes = 1472;
 	start.flags &= ~SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX;
 	assert(!spf_ip_control_validate(&start));
 }

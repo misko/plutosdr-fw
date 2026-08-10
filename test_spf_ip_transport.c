@@ -39,9 +39,33 @@ static void test_rate_to_batch_policy(void)
 	assert(spf_ip_tx_batch_size(0, 40000000, 1000) == 0);
 }
 
+static void test_absolute_rate_deadline_policy(void)
+{
+	const uint64_t start = UINT64_C(123000000000);
+	assert(spf_ip_tx_deadline_ns(start, 40000000, 40000000) ==
+		start + UINT64_C(1000000000));
+	assert(spf_ip_tx_deadline_ns(start, 20000000, 40000000) ==
+		start + UINT64_C(500000000));
+	assert(spf_ip_tx_deadline_ns(start, 80000001, 40000000) ==
+		start + UINT64_C(2000000025));
+	assert(spf_ip_tx_deadline_ns(start, 1, 0) == 0);
+}
+
+static void test_udp_gso_group_policy(void)
+{
+	assert(spf_ip_gso_segments_per_send(1472) == 44);
+	assert(spf_ip_gso_segments_per_send(1024) == 63);
+	assert(spf_ip_gso_segments_per_send(256) == 64);
+	assert(spf_ip_gso_segments_per_send(65507) == 1);
+	assert(spf_ip_gso_segments_per_send(0) == 0);
+	assert(spf_ip_gso_segments_per_send(65508) == 0);
+}
+
 int main(void)
 {
 	test_finite_frame_queue();
 	test_rate_to_batch_policy();
+	test_absolute_rate_deadline_policy();
+	test_udp_gso_group_policy();
 	return 0;
 }

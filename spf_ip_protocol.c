@@ -139,7 +139,8 @@ bool spf_ip_control_validate(const spf_ip_control_v1_t *message)
 			SPF_IP_CONTROL_FLAG_USB_CLASS_PACING;
 		if ((message->flags & ~transport_flags) != 0 ||
 			((message->flags & SPF_IP_CONTROL_FLAG_USB_CLASS_PACING) != 0 &&
-			 (message->flags & SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX) == 0) ||
+			 ((message->flags & SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX) == 0 ||
+			  message->max_datagram_bytes > UINT16_C(1472))) ||
 			message->protocol_min != message->protocol_max ||
 			message->protocol_min < 1 || message->protocol_min > 3 ||
 			message->max_samples_per_channel != 0 ||
