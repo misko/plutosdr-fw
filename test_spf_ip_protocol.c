@@ -72,6 +72,45 @@ static void test_control_replies(void)
 	assert(error.status == -5);
 }
 
+static void test_transport_capability_negotiation(void)
+{
+	spf_ip_control_v1_t query;
+	spf_ip_control_init_query(&query, 99);
+	query.flags = SPF_IP_CONTROL_FLAG_QUERY_TRANSPORT_CAPABILITIES;
+	assert(spf_ip_control_validate(&query));
+
+	spf_ip_control_v1_t capabilities;
+	spf_ip_control_init_capabilities(&capabilities, 99);
+	capabilities.flags |= SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX |
+		SPF_IP_CONTROL_FLAG_USB_CLASS_PACING;
+	assert(spf_ip_control_validate(&capabilities));
+	capabilities.flags &= ~SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX;
+	assert(!spf_ip_control_validate(&capabilities));
+
+	spf_ip_control_v1_t start = {0};
+	start.magic = SPF_IP_CONTROL_MAGIC;
+	start.version = SPF_IP_CONTROL_VERSION;
+	start.message_type = SPF_IP_CONTROL_START_RX;
+	start.message_bytes = sizeof(start);
+	start.request_id = 100;
+	start.flags = SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX |
+		SPF_IP_CONTROL_FLAG_USB_CLASS_PACING;
+	start.protocol_min = 3;
+	start.protocol_max = 3;
+	start.features = SPF_METADATA_FEATURE_GAIN_OBSERVATIONS |
+		SPF_METADATA_FEATURE_HARDWARE_SAMPLE_COUNTER;
+	start.enabled_scan_mask = 0x0f;
+	start.samples_per_channel = 16384;
+	start.frame_count = 4;
+	start.gain_observation_interval_samples = 2048;
+	start.gain_observation_capacity = 8;
+	start.data_port = 30433;
+	start.max_datagram_bytes = 1472;
+	assert(spf_ip_control_validate(&start));
+	start.flags &= ~SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX;
+	assert(!spf_ip_control_validate(&start));
+}
+
 static void test_control_datagram_classification(void)
 {
 	static const uint32_t legacy_magic = UINT32_C(0x4f544c50);
@@ -171,6 +210,7 @@ int main(void)
 	test_query_golden_vector();
 	test_v3_start_and_started();
 	test_control_replies();
+	test_transport_capability_negotiation();
 	test_control_datagram_classification();
 	test_fragment_and_crc();
 	test_production_frame_fragment_plan();

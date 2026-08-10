@@ -5,8 +5,7 @@
 
 static bool fields_zero_for_query(const spf_ip_control_v1_t *message)
 {
-	return message->flags == 0 &&
-		message->protocol_min == 0 && message->protocol_max == 0 &&
+	return message->protocol_min == 0 && message->protocol_max == 0 &&
 		message->features == 0 && message->max_samples_per_channel == 0 &&
 		message->max_finite_frames == 0 && message->enabled_scan_mask == 0 &&
 		message->samples_per_channel == 0 && message->frame_count == 0 &&
@@ -104,11 +103,18 @@ bool spf_ip_control_validate(const spf_ip_control_v1_t *message)
 		return message->status != 0;
 
 	if (message->message_type == SPF_IP_CONTROL_QUERY_CAPABILITIES)
-		return fields_zero_for_query(message);
+		return (message->flags == 0 ||
+			message->flags ==
+				SPF_IP_CONTROL_FLAG_QUERY_TRANSPORT_CAPABILITIES) &&
+			fields_zero_for_query(message);
 
 	if (message->message_type == SPF_IP_CONTROL_CAPABILITIES)
 	{
 		if ((message->flags & SPF_IP_CONTROL_FLAG_FINITE_RX) == 0 ||
+			(message->flags &
+				SPF_IP_CONTROL_FLAG_QUERY_TRANSPORT_CAPABILITIES) != 0 ||
+			((message->flags & SPF_IP_CONTROL_FLAG_USB_CLASS_PACING) != 0 &&
+			 (message->flags & SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX) == 0) ||
 			message->protocol_min < 1 ||
 			message->protocol_min > message->protocol_max ||
 			message->protocol_max > 3 ||
@@ -128,7 +134,13 @@ bool spf_ip_control_validate(const spf_ip_control_v1_t *message)
 	if (message->message_type == SPF_IP_CONTROL_START_RX ||
 		message->message_type == SPF_IP_CONTROL_STARTED)
 	{
-		if (message->protocol_min != message->protocol_max ||
+		const uint32_t transport_flags =
+			SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX |
+			SPF_IP_CONTROL_FLAG_USB_CLASS_PACING;
+		if ((message->flags & ~transport_flags) != 0 ||
+			((message->flags & SPF_IP_CONTROL_FLAG_USB_CLASS_PACING) != 0 &&
+			 (message->flags & SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX) == 0) ||
+			message->protocol_min != message->protocol_max ||
 			message->protocol_min < 1 || message->protocol_min > 3 ||
 			message->max_samples_per_channel != 0 ||
 			message->max_finite_frames != 0 ||
@@ -166,7 +178,7 @@ bool spf_ip_control_validate(const spf_ip_control_v1_t *message)
 	if (message->message_type == SPF_IP_CONTROL_STOP_RX ||
 		message->message_type == SPF_IP_CONTROL_STOPPED)
 	{
-		if (message->stream_id == 0)
+		if (message->stream_id == 0 || message->flags != 0)
 			return false;
 		spf_ip_control_v1_t copy = *message;
 		copy.stream_id = 0;

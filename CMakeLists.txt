@@ -56,6 +56,8 @@ add_executable(sdr_ip_gadget
     thread_write.c
     utils.c
 	spf_ip_protocol.c
+	spf_ip_frame_queue.c
+	spf_ip_tx_policy.c
 )
 target_link_libraries(sdr_ip_gadget
     pthread
@@ -96,6 +98,20 @@ if(BUILD_TESTING)
 		z
 		${SPF_RADIO_FRAME_LIBRARY})
 	add_test(NAME spf_ip_frame_pipeline COMMAND test_spf_ip_frame_pipeline)
+
+	add_executable(test_spf_ip_transport
+		test_spf_ip_transport.c
+		spf_ip_frame_queue.c
+		spf_ip_tx_policy.c)
+	add_test(NAME spf_ip_transport COMMAND test_spf_ip_transport)
+	# The tests use assert() as their compact fail-fast harness. Keep those
+	# checks active even when a release-style CMake build defines NDEBUG.
+	foreach(test_target
+		test_spf_ip_protocol
+		test_spf_ip_frame_pipeline
+		test_spf_ip_transport)
+		target_compile_options(${test_target} PRIVATE -UNDEBUG)
+	endforeach()
 endif()
 
 install(TARGETS sdr_ip_gadget RUNTIME DESTINATION sbin)

@@ -28,6 +28,7 @@
 #include "thread_read_v3.h"
 #include "thread_write.h"
 #include "spf_ip_protocol.h"
+#include "spf_ip_tx_policy.h"
 #include <spf/spf_time_anchor.h>
 
 /* Macros */
@@ -634,7 +635,13 @@ static int handle_v3_control(state_t *state,
 	if (!spf_ip_control_validate(request))
 		spf_ip_control_init_error(&response, request->request_id, -EINVAL);
 	else if (request->message_type == SPF_IP_CONTROL_QUERY_CAPABILITIES)
+	{
 		spf_ip_control_init_capabilities(&response, request->request_id);
+		if ((request->flags &
+			SPF_IP_CONTROL_FLAG_QUERY_TRANSPORT_CAPABILITIES) != 0)
+			response.flags |= SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX |
+				SPF_IP_CONTROL_FLAG_USB_CLASS_PACING;
+	}
 	else if (request->message_type == SPF_IP_CONTROL_START_RX)
 	{
 		if (request->protocol_min != 3)
@@ -671,6 +678,12 @@ static int handle_v3_control(state_t *state,
 				request->gain_observation_capacity;
 			state->read_v3_args.gain_event_capacity =
 				request->gain_event_capacity;
+			state->read_v3_args.target_payload_bytes_per_second =
+				(request->flags & SPF_IP_CONTROL_FLAG_USB_CLASS_PACING) != 0
+				? SPF_IP_DEFAULT_TX_PAYLOAD_BYTES_PER_SECOND
+				: SPF_IP_LEGACY_TX_PAYLOAD_BYTES_PER_SECOND;
+			state->read_v3_args.pacing_interval_us =
+				SPF_IP_DEFAULT_PACING_INTERVAL_US;
 			if (!start_v3_thread(state))
 				spf_ip_control_init_error(
 					&response, request->request_id, -EIO);

@@ -3,7 +3,9 @@
 #include "thread_read_v3.h"
 
 #include "epoll_loop.h"
+#include "spf_ip_frame_queue.h"
 #include "spf_ip_protocol.h"
+#include "spf_ip_tx_policy.h"
 #include "utils.h"
 
 #include <spf/spf_gain_read.h>
@@ -24,22 +26,22 @@
 #include <sys/uio.h>
 #include <unistd.h>
 
-/*
- * PlutoPlus Ethernet and USB-network links are 100-Mbit/s-class transports.
- * An unpaced multi-thousand-datagram sendmmsg burst can fill the host's
- * capped UDP receive queue before Python begins draining it.  Eight 1472-byte
- * datagrams per millisecond stays just below line rate after headers while
- * retaining the syscall batching benefit.
- */
-#define SPF_SENDMMSG_BATCH 8U
-#define SPF_SENDMMSG_PACING_US 1000U
 #define DEBUG_PRINT(...) if (debug) printf("ReadV3: "__VA_ARGS__)
+
+typedef struct
+{
+	uint8_t *frame;
+	uint64_t sequence;
+} frame_slot_v3_t;
 
 typedef struct
 {
 	THREAD_READ_V3_Args_t *args;
 	bool keep_running;
 	int epoll_fd;
+	int sender_event_fd;
+	int iio_poll_fd;
+	bool iio_poll_registered;
 	struct iio_context *iio_ctx;
 	struct iio_device *iio_rx;
 	struct iio_device *phy;
@@ -54,12 +56,28 @@ typedef struct
 	size_t iq_bytes;
 	size_t header_bytes;
 	size_t frame_bytes;
-	uint8_t *frame;
+	frame_slot_v3_t *frame_slots;
+	size_t frame_slot_count;
+	size_t frames_captured;
+	size_t frames_sent;
+	spf_ip_frame_queue_t ready_queue;
+	size_t *ready_queue_storage;
+	pthread_mutex_t queue_mutex;
+	pthread_cond_t queue_condition;
+	bool queue_mutex_initialized;
+	bool queue_condition_initialized;
+	pthread_t sender_thread;
+	bool sender_started;
+	bool sender_stop;
+	bool capture_complete;
+	bool sender_failed;
 	spf_gain_observation_v3_t observations[SPF_MAX_GAIN_OBSERVATIONS];
 	spf_ip_fragment_v1_t *fragment_headers;
 	struct mmsghdr *messages;
 	struct iovec *iovs;
 	size_t fragment_count;
+	uint32_t send_batch;
+	uint32_t pacing_interval_us;
 	uint64_t buffer_sequence;
 	uint32_t startup_frames_discarded;
 } state_v3_t;
@@ -68,9 +86,14 @@ extern bool debug;
 
 static int handle_quit(state_v3_t *state);
 static int handle_iio(state_v3_t *state);
+static int handle_sender_event(state_v3_t *state);
 static bool initialize(state_v3_t *state);
 static void cleanup(state_v3_t *state);
-static bool send_frame(state_v3_t *state);
+static bool send_frame(state_v3_t *state,
+	const uint8_t *frame,
+	uint64_t sequence);
+static void *sender_entrypoint(void *opaque);
+static void signal_sender_result(state_v3_t *state, uint64_t result);
 static void report_startup(const state_v3_t *state, uint64_t result);
 static bool wait_for_run(const state_v3_t *state);
 
@@ -80,6 +103,8 @@ void *THREAD_READ_V3_Entrypoint(void *opaque)
 	memset(&state, 0, sizeof(state));
 	state.args = (THREAD_READ_V3_Args_t *)opaque;
 	state.epoll_fd = -1;
+	state.sender_event_fd = -1;
+	state.iio_poll_fd = -1;
 	pthread_setname_np(pthread_self(), "IP_SDR_V3_RX");
 	UTILS_SetThreadRealtimePriority();
 	UTILS_SetThreadAffinity(1);
@@ -112,8 +137,16 @@ static bool initialize(state_v3_t *state)
 		args->startup_event_fd < 0 || args->run_event_fd < 0 ||
 		args->stream_id == 0 || args->frame_count == 0 ||
 		args->samples_per_channel == 0 || args->iio_channels != 0x0f ||
-		args->gain_observation_capacity == 0)
+		args->gain_observation_capacity == 0 ||
+		args->target_payload_bytes_per_second == 0 ||
+		args->pacing_interval_us == 0)
 		return false;
+	if (pthread_mutex_init(&state->queue_mutex, NULL) != 0)
+		return false;
+	state->queue_mutex_initialized = true;
+	if (pthread_cond_init(&state->queue_condition, NULL) != 0)
+		return false;
+	state->queue_condition_initialized = true;
 	state->header_bytes = spf_radio_frame_v3_header_bytes(
 		args->gain_observation_capacity, args->gain_event_capacity);
 	if (state->header_bytes == 0)
@@ -126,6 +159,16 @@ static bool initialize(state_v3_t *state)
 	if (epoll_ctl(state->epoll_fd,
 		EPOLL_CTL_ADD,
 		args->quit_event_fd,
+		&event) < 0)
+		return false;
+	state->sender_event_fd = eventfd(0, EFD_NONBLOCK);
+	if (state->sender_event_fd < 0)
+		return false;
+	event.events = EPOLLIN;
+	event.data.ptr = handle_sender_event;
+	if (epoll_ctl(state->epoll_fd,
+		EPOLL_CTL_ADD,
+		state->sender_event_fd,
 		&event) < 0)
 		return false;
 
@@ -168,9 +211,22 @@ static bool initialize(state_v3_t *state)
 	state->iio_bytes = (args->samples_per_channel + 1) * 8;
 	state->iq_bytes = args->samples_per_channel * 8;
 	state->frame_bytes = state->header_bytes + state->iq_bytes;
-	state->frame = malloc(state->frame_bytes);
-	if (state->frame == NULL)
+	state->frame_slot_count = args->frame_count;
+	state->frame_slots = calloc(
+		state->frame_slot_count, sizeof(*state->frame_slots));
+	state->ready_queue_storage = calloc(
+		state->frame_slot_count, sizeof(*state->ready_queue_storage));
+	if (state->frame_slots == NULL || state->ready_queue_storage == NULL ||
+		!spf_ip_frame_queue_init(&state->ready_queue,
+			state->ready_queue_storage,
+			state->frame_slot_count))
 		return false;
+	for (size_t index = 0; index < state->frame_slot_count; ++index)
+	{
+		state->frame_slots[index].frame = malloc(state->frame_bytes);
+		if (state->frame_slots[index].frame == NULL)
+			return false;
+	}
 
 	if (!spf_gain_is_full_table_mode(state->phy) ||
 		!spf_gain_is_digital_gain_disabled(state->phy) ||
@@ -212,17 +268,35 @@ static bool initialize(state_v3_t *state)
 		state->iovs[index * 2].iov_base = &state->fragment_headers[index];
 		state->iovs[index * 2].iov_len = sizeof(state->fragment_headers[index]);
 	}
+	const size_t payload_bytes_per_datagram =
+		args->udp_datagram_bytes - sizeof(spf_ip_fragment_v1_t);
+	state->pacing_interval_us = args->pacing_interval_us;
+	state->send_batch = spf_ip_tx_batch_size(
+		payload_bytes_per_datagram,
+		args->target_payload_bytes_per_second,
+		state->pacing_interval_us);
+	if (state->send_batch == 0)
+		return false;
 	event.events = EPOLLIN;
 	event.data.ptr = handle_iio;
+	state->iio_poll_fd = iio_buffer_get_poll_fd(state->iio_buffer);
 	if (epoll_ctl(state->epoll_fd,
 		EPOLL_CTL_ADD,
-		iio_buffer_get_poll_fd(state->iio_buffer),
+		state->iio_poll_fd,
 		&event) < 0)
 		return false;
-	DEBUG_PRINT("ready: samples=%zu frame=%zu fragments=%zu stream=%llu\n",
+	state->iio_poll_registered = true;
+	if (pthread_create(
+		&state->sender_thread, NULL, sender_entrypoint, state) != 0)
+		return false;
+	state->sender_started = true;
+	DEBUG_PRINT("ready: samples=%zu frame=%zu slots=%zu fragments=%zu batch=%u/%uus stream=%llu\n",
 		args->samples_per_channel,
 		state->frame_bytes,
+		state->frame_slot_count,
 		state->fragment_count,
+		state->send_batch,
+		state->pacing_interval_us,
 		(unsigned long long)args->stream_id);
 	return true;
 }
@@ -263,8 +337,20 @@ static int handle_quit(state_v3_t *state)
 	return 0;
 }
 
+static int handle_sender_event(state_v3_t *state)
+{
+	uint64_t result = 0;
+	if (read(state->sender_event_fd, &result, sizeof(result)) !=
+		(ssize_t)sizeof(result))
+		return -1;
+	state->keep_running = false;
+	return result == 1 ? 0 : -1;
+}
+
 static int handle_iio(state_v3_t *state)
 {
+	if (state->frames_captured >= state->frame_slot_count)
+		return -1;
 	const ssize_t received = iio_buffer_refill(state->iio_buffer);
 	if (received != (ssize_t)state->iio_bytes)
 		return -1;
@@ -323,33 +409,101 @@ static int handle_iio(state_v3_t *state)
 			.duration_ns = current_rssi.duration_ns,
 		},
 	};
+	frame_slot_v3_t *slot = &state->frame_slots[state->frames_captured];
+	slot->sequence = state->buffer_sequence;
 	if (!spf_radio_frame_v3_build(
-		state->frame, state->header_bytes, &frame_args))
+		slot->frame, state->header_bytes, &frame_args))
 		return -1;
-	memcpy(state->frame + state->header_bytes, iio, state->iq_bytes);
-	if (!send_frame(state))
+	memcpy(slot->frame + state->header_bytes, iio, state->iq_bytes);
+	if (pthread_mutex_lock(&state->queue_mutex) != 0)
+		return -1;
+	const bool queued = spf_ip_frame_queue_push(
+		&state->ready_queue, state->frames_captured);
+	if (queued)
+	{
+		state->frames_captured++;
+		state->capture_complete =
+			state->frames_captured == state->frame_slot_count;
+		pthread_cond_signal(&state->queue_condition);
+	}
+	pthread_mutex_unlock(&state->queue_mutex);
+	if (!queued)
 		return -1;
 	state->previous_rssi = current_rssi;
 	state->buffer_sequence++;
-	if (state->buffer_sequence >= state->args->frame_count)
-		state->keep_running = false;
+	if (state->capture_complete && state->iio_poll_registered)
+	{
+		if (epoll_ctl(state->epoll_fd,
+			EPOLL_CTL_DEL,
+			state->iio_poll_fd,
+			NULL) < 0)
+			return -1;
+		state->iio_poll_registered = false;
+	}
 	return 0;
 }
 
-static bool send_frame(state_v3_t *state)
+static void *sender_entrypoint(void *opaque)
+{
+	state_v3_t *state = opaque;
+	pthread_setname_np(pthread_self(), "IP_SDR_V3_TX");
+	for (;;)
+	{
+		if (pthread_mutex_lock(&state->queue_mutex) != 0)
+			break;
+		while (state->ready_queue.count == 0 && !state->sender_stop &&
+			!state->capture_complete)
+			pthread_cond_wait(&state->queue_condition, &state->queue_mutex);
+		if (state->sender_stop)
+		{
+			pthread_mutex_unlock(&state->queue_mutex);
+			return NULL;
+		}
+		size_t slot_index = 0;
+		const bool have_frame = spf_ip_frame_queue_pop(
+			&state->ready_queue, &slot_index);
+		const bool impossible_empty = !have_frame && state->capture_complete;
+		pthread_mutex_unlock(&state->queue_mutex);
+		if (impossible_empty)
+			break;
+		if (!have_frame)
+			continue;
+		frame_slot_v3_t *slot = &state->frame_slots[slot_index];
+		if (!send_frame(state, slot->frame, slot->sequence))
+			break;
+		state->frames_sent++;
+		if (state->frames_sent == state->frame_slot_count)
+		{
+			signal_sender_result(state, 1);
+			return NULL;
+		}
+	}
+	state->sender_failed = true;
+	signal_sender_result(state, 2);
+	return NULL;
+}
+
+static void signal_sender_result(state_v3_t *state, uint64_t result)
+{
+	(void)write(state->sender_event_fd, &result, sizeof(result));
+}
+
+static bool send_frame(state_v3_t *state,
+	const uint8_t *frame,
+	uint64_t sequence)
 {
 	if (!spf_ip_fragment_plan(state->fragment_headers,
 		state->fragment_count,
-		state->frame,
+		frame,
 		state->frame_bytes,
 		state->args->stream_id,
-		state->buffer_sequence,
+		sequence,
 		state->args->udp_datagram_bytes))
 		return false;
 	for (size_t index = 0; index < state->fragment_count; ++index)
 	{
 		state->iovs[index * 2 + 1].iov_base =
-			state->frame + state->fragment_headers[index].fragment_offset;
+			(void *)(frame + state->fragment_headers[index].fragment_offset);
 		state->iovs[index * 2 + 1].iov_len =
 			state->fragment_headers[index].fragment_bytes;
 		state->messages[index].msg_len = 0;
@@ -357,15 +511,15 @@ static bool send_frame(state_v3_t *state)
 	for (size_t offset = 0; offset < state->fragment_count;)
 	{
 		const size_t remaining = state->fragment_count - offset;
-		const unsigned int batch = (unsigned int)(remaining < SPF_SENDMMSG_BATCH
-			? remaining : SPF_SENDMMSG_BATCH);
+		const unsigned int batch = (unsigned int)(remaining < state->send_batch
+			? remaining : state->send_batch);
 		const int sent = sendmmsg(
 			state->args->output_fd, &state->messages[offset], batch, 0);
 		if (sent > 0)
 		{
 			offset += (size_t)sent;
 			if (offset < state->fragment_count)
-				usleep(SPF_SENDMMSG_PACING_US);
+				usleep(state->pacing_interval_us);
 			continue;
 		}
 		if (sent < 0 && errno == EINTR)
@@ -386,6 +540,18 @@ static bool send_frame(state_v3_t *state)
 
 static void cleanup(state_v3_t *state)
 {
+	if (state->sender_started)
+	{
+		if (state->queue_mutex_initialized)
+		{
+			pthread_mutex_lock(&state->queue_mutex);
+			state->sender_stop = true;
+			pthread_cond_broadcast(&state->queue_condition);
+			pthread_mutex_unlock(&state->queue_mutex);
+		}
+		pthread_join(state->sender_thread, NULL);
+		state->sender_started = false;
+	}
 	if (state->sampler_started)
 		spf_gain_sampler_stop(&state->sampler);
 	if (state->timestamp_control_configured && state->iio_rx != NULL)
@@ -398,8 +564,20 @@ static void cleanup(state_v3_t *state)
 		iio_context_destroy(state->iio_ctx);
 	if (state->epoll_fd >= 0)
 		close(state->epoll_fd);
+	if (state->sender_event_fd >= 0)
+		close(state->sender_event_fd);
 	free(state->fragment_headers);
 	free(state->messages);
 	free(state->iovs);
-	free(state->frame);
+	if (state->frame_slots != NULL)
+	{
+		for (size_t index = 0; index < state->frame_slot_count; ++index)
+			free(state->frame_slots[index].frame);
+	}
+	free(state->frame_slots);
+	free(state->ready_queue_storage);
+	if (state->queue_condition_initialized)
+		pthread_cond_destroy(&state->queue_condition);
+	if (state->queue_mutex_initialized)
+		pthread_mutex_destroy(&state->queue_mutex);
 }

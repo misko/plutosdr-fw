@@ -23,6 +23,8 @@ typedef struct
 	uint32_t gain_observation_interval_samples;
 	uint16_t gain_observation_capacity;
 	uint16_t gain_event_capacity;
+	uint32_t target_payload_bytes_per_second;
+	uint32_t pacing_interval_us;
 } THREAD_READ_V3_Args_t;
 
 void *THREAD_READ_V3_Entrypoint(void *args);
