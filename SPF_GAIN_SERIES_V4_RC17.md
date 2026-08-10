@@ -13,8 +13,8 @@ could then queue duplicate requests and stale responses.
 | Component | Commit | Protected source tag |
 | --- | --- | --- |
 | Firmware parent | assigned by the RC17 parent commit | eventual RC tag |
-| Buildroot | `4a6d1248e6a1bc7e610cec1b9465f77381983361` | `gain-series-v4-rc17-source/buildroot-final` |
-| Direct IP gadget | `988090243117e47e4c07ba881b067f0e7caf6831` | `gain-series-v4-rc17-source/ip-gadget-final` |
+| Buildroot | `56b7bc54d47a16c55e9cb71ed519544892ac63db` | `gain-series-v4-rc17-source/buildroot-final-v2` |
+| Direct IP gadget | `b066059e54817ad9a140c3549fcee0bf39dadc81` | `gain-series-v4-rc17-source/ip-gadget-final-v2` |
 | Common USB gadget | `2e8e40ade5dcf3c7880a5ebb58419ad7c37ed552` | `gain-series-v4-rc14-source/gadget` |
 
 All other FPGA, kernel, and bootloader pins are unchanged from RC16. The

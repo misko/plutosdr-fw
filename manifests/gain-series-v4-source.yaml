@@ -15,13 +15,13 @@ gadget_source: 2e8e40ade5dcf3c7880a5ebb58419ad7c37ed552
 gadget_repo: https://github.com/misko/plutosdr-fw.git
 gadget_ref: refs/tags/gain-series-v4-rc14-source/gadget
 
-ip_gadget_source: 988090243117e47e4c07ba881b067f0e7caf6831
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
-ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 4a6d1248e6a1bc7e610cec1b9465f77381983361
+submodule_buildroot: 56b7bc54d47a16c55e9cb71ed519544892ac63db
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/gain-series-v4-rc17-source/buildroot-final
+submodule_buildroot_ref: refs/tags/gain-series-v4-rc17-source/buildroot-final-v2
 
 submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
