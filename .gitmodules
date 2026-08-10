@@ -16,7 +16,7 @@
 [submodule "buildroot"]
 	path = buildroot
 	url = https://github.com/misko/plutosdr-fw.git
-	branch = codex/buildroot-ip-performance-rc13
+	branch = codex/buildroot-gain-series-v4-rc14-dma-handoff
 
 [submodule "linux"]
 	path = linux
