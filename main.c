@@ -695,8 +695,8 @@ static int handle_control(state_t *state)
 			}
 
 			/* Legacy RX may never cancel or steal protocol-v3 DMA ownership. */
-			if (state->read_v3_started ||
-				spf_ip_rx_lifecycle_busy(&state->rx_lifecycle))
+			if (!spf_ip_rx_lifecycle_allows_legacy_start(
+				&state->rx_lifecycle, state->read_v3_started))
 			{
 				fprintf(stderr,
 					"Reject legacy RX START while protocol-v3 RX is %s\n",

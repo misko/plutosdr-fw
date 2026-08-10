@@ -16,6 +16,14 @@ bool spf_ip_rx_lifecycle_busy(const spf_ip_rx_lifecycle_t *lifecycle)
 	return lifecycle == NULL || lifecycle->state != SPF_IP_RX_IDLE;
 }
 
+bool spf_ip_rx_lifecycle_allows_legacy_start(
+	const spf_ip_rx_lifecycle_t *lifecycle,
+	bool v3_worker_started)
+{
+	return !v3_worker_started && lifecycle != NULL &&
+		lifecycle->state == SPF_IP_RX_IDLE;
+}
+
 bool spf_ip_rx_lifecycle_begin(spf_ip_rx_lifecycle_t *lifecycle,
 	uint64_t stream_id)
 {

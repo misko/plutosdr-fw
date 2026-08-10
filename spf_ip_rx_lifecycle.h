@@ -29,6 +29,9 @@ typedef struct
 
 void spf_ip_rx_lifecycle_init(spf_ip_rx_lifecycle_t *lifecycle);
 bool spf_ip_rx_lifecycle_busy(const spf_ip_rx_lifecycle_t *lifecycle);
+bool spf_ip_rx_lifecycle_allows_legacy_start(
+	const spf_ip_rx_lifecycle_t *lifecycle,
+	bool v3_worker_started);
 bool spf_ip_rx_lifecycle_begin(spf_ip_rx_lifecycle_t *lifecycle,
 	uint64_t stream_id);
 bool spf_ip_rx_lifecycle_ready(spf_ip_rx_lifecycle_t *lifecycle);

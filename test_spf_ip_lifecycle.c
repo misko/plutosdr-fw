@@ -37,8 +37,11 @@ static void test_clean_lifecycle(void)
 	spf_ip_rx_lifecycle_init(&lifecycle);
 	assert(lifecycle.state == SPF_IP_RX_IDLE);
 	assert(!spf_ip_rx_lifecycle_busy(&lifecycle));
+	assert(spf_ip_rx_lifecycle_allows_legacy_start(&lifecycle, false));
+	assert(!spf_ip_rx_lifecycle_allows_legacy_start(&lifecycle, true));
 
 	assert(spf_ip_rx_lifecycle_begin(&lifecycle, 41));
+	assert(!spf_ip_rx_lifecycle_allows_legacy_start(&lifecycle, false));
 	assert(lifecycle.state == SPF_IP_RX_STARTING);
 	assert(lifecycle.generation == 1);
 	assert(lifecycle.stream_id == 41);
@@ -59,6 +62,7 @@ static void test_clean_lifecycle(void)
 	assert(lifecycle.state == SPF_IP_RX_IDLE);
 	assert(lifecycle.generation == 1);
 	assert(lifecycle.stream_id == 0);
+	assert(spf_ip_rx_lifecycle_allows_legacy_start(&lifecycle, false));
 }
 
 static void test_natural_completion_and_stale_event(void)
