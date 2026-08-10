@@ -31,8 +31,8 @@ is bit-for-bit what RC17 does today.
 | D-4 | Event sequence width | **32 bits**, wrap handled by serial-number comparison | Same technique RC17 uses for request-ID wrap. Fits the 6 free bytes of the existing wire record. |
 | D-5 | Ownership epoch width | **8 bits**, never zero, skips zero on wrap | Transposed from RC17's `generation`. Lives in the FIFO record and the frame header, **not** in the 16-byte wire record — there is no room, and stale-epoch events are dropped at drain so the wire never sees them. |
 | D-6 | Gain step size | **1 index = 1 dB**, both directions | Must be programmed explicitly: the shipped configuration currently moves **2** indices per edge. One index per pulse makes the FPGA model trivially auditable. |
-| D-7 | Minimum index clamp default | **30** | The audited tables change the LNA word only at indices 8, 20 and 30. Clamping at ≥30 makes the L6 LNA-bypass phase inversion structurally unreachable, and independently keeps operation inside one frozen `(LNA, MIXER, TIA)` state, which measurement associates with a 3.3× smaller high-band phase residual. Free given the 27–73 dB range in use. |
-| D-8 | Maximum index clamp default | read from the device | `Maximum Full Table/LMT Table Index`, chip default 76. Never hard-code. |
+| D-7 | Default index window | **`[40, 54]`** | Derived from `gain_tables_audited.json`, not assumed. See §6.1 — this is the widest index window that holds `(LNA, MIXER, TIA)` constant in **all three** bands simultaneously, so it survives a band change and avoids every LNA transition. Costs dynamic range; see the tradeoff in §6.1 before accepting the default. |
+| D-8 | Absolute clamp bound | read from the device | `Maximum Full Table/LMT Table Index`, chip default 76. The D-7 window is configured on top of it; never hard-code either. |
 | D-9 | Event FIFO geometry | **256 deep × 128 bits** | 32,768 bits = exactly one BRAM36. Depth is ~15× the worst-case per-frame event count (see §7.3). Matches `SPF_MAX_GAIN_EVENTS`. |
 | D-10 | Cooldown timebase | **power-measurement periods**, not clock cycles | The low-power flag only updates once per decimated power-measurement period (256–410 µs at every supported rate). A cooldown in microseconds is meaningless against it. |
 
@@ -132,7 +132,9 @@ must both hold to these.
 | Item | Value |
 |---|---|
 | `CTRL_IN0` / `1` / `2` / `3` | RX1 increase / RX1 decrease / RX2 increase / RX2 decrease |
-| Pin mapping | identity: `gpio_ctl[0..3]` → `CTRL_IN0..3`, verified at net level against the Pluto+ schematic |
+| Pin mapping | identity: `gpio_ctl[0..3]` → `CTRL_IN0..3`. **Measured on the part** — E-AGC1 session 1, 40/40 trials across two radios, other channel never moved once |
+| ENSM dependence | **`CTRL_IN` edges are ignored outside RX.** Honoured in `fdd`; null in `alert` and `sleep` over 3 edges each on both radios, with return-to-`fdd` rechecks confirming responsiveness. `wait` is advertised but unreachable — writing it lands in `alert` |
+| Gain ownership while armed | **arming takes gain away from software, silently.** With `0x0FB[1:0] = 3` a `hardwaregain` write is dropped: index unchanged, **return code 0**, and the readback reports the pin-controlled index. Disarmed, the identical write moves the index; armed, a pin edge still does. Measured on both radios |
 | EMIO bits | `gpio_ctl` → `[11:8]`, `gpio_status` → `[7:0]` |
 | Linux GPIO | `CTRL_IN` = `<&gpio0 62..65>` = global 968..971 (discover the base at runtime) |
 | Pulse rule | asynchronous, edge-detected; high and low each ≥ 2 ClkRF cycles; no setup/hold to any clock |
@@ -265,6 +267,44 @@ nanoseconds, recovery is paced in milliseconds.
 
 ## 6. Index model and synchronisation
 
+### 6.1 Index window, derived from the audited tables
+
+An earlier revision of this document set the minimum clamp to 30, justified by "the
+audited tables change the LNA word only at indices 8, 20 and 30". **That was wrong** —
+8 and 20 are frozen-word *dB* values, not indices, and the real LNA transitions are
+band-dependent. Recomputed directly from `gain_tables_audited.json`:
+
+| Band | LNA transitions at index | Widest frozen `(LNA, MIXER, TIA)` window |
+|---|---|---|
+| low ≤1300 MHz | 34, 36, 55 | 36…54 (33…51 dB), 19 indices |
+| middle 1301–4000 MHz | 35, 37, 55 | 37…54 (32…49 dB), 18 indices |
+| high >4000 MHz | 37, 40, 55 | 40…54 (26…40 dB), 15 indices |
+
+The **band-common** frozen window is therefore **indices 40…54** — 15 indices, mapping
+to 37…51 dB in the low band, 35…49 dB in the middle, and 26…40 dB in the high. Inside
+it, `(LNA, MIXER, TIA)` is constant in every band, so no tandem step can cross an LNA
+transition and the window survives a band change without re-derivation.
+
+Two things follow that must be decided rather than inherited:
+
+- **This costs dynamic range.** Fifteen dB is a narrow operating range for an AGC. The
+  alternative is a wider window that crosses LNA transitions, where measurement puts
+  the per-step phase disturbance at 7.983° median and one clean step at 16.775°,
+  against a 0.180–0.368° floor for LPF-only steps. That is the whole tradeoff: range
+  against phase disturbance. The default takes the conservative side because this is a
+  phase-sensitive array; a deployment that needs more range must accept the transitions
+  and say so explicitly.
+- **The band-common window is not the widest available per band.** A design that is
+  willing to re-derive the window on a band change can use 36…54 in the low band and
+  37…54 in the middle. That is a runtime-complexity-versus-range trade, and the band
+  change is already an interlocked event (§6.3), so it is available if wanted.
+
+Also corrected: the usable range is **−1…62 dB band-common**, not the "27–73 dB" an
+earlier revision asserted. 73 dB is unreachable above 4 GHz and would hard-fail the
+capture path's own gain validation.
+
+### 6.2 Expected index
+
 The FPGA holds `expected_index`, updated by exactly one step per accepted
 transition, saturating at the clamps.
 
@@ -283,10 +323,18 @@ That read races the pulses, so the comparison is governed by a **quiescence rule
 A confirmed mismatch is a hard synchronisation fault: stop issuing pulses, set the
 sticky fault, preserve diagnostic state, require explicit re-synchronisation.
 
-Conflicting operations, which must be refused while tandem owns or is releasing the
-pins, or must disarm tandem first:
+### 6.3 Conflicting operations
 
-- direct per-channel gain writes;
+These must be refused while tandem owns or is releasing the pins, or must disarm
+tandem first:
+
+- **Direct per-channel gain writes — and the runtime must reject these actively, not
+  rely on the device.** Measurement shows the AD9361 already ignores them while pin
+  control is armed, but it does so *silently*: the write returns success and the
+  readback reports the pin-controlled index rather than the requested one. Silent
+  success is worse than an error, because a caller that does not verify readback will
+  believe it set the gain. Any host-side `set_gains()` during tandem operation is a
+  no-op that looks like a success.
 - gain-table changes, and any switch to split-table mode;
 - **RX FIR decimation changes** — these swing the required pulse width 4×. Key the
   interlock on `rx_fir_dec`, not on sample rate: the `l_clk`/`ClkRF` ratio is
@@ -466,17 +514,30 @@ starts the transition, and returns — RC17's central lesson.
 
 1. controller disabled, all four FPGA outputs low
 2. verify full gain table mode; read the programmed maximum index
-3. place both receivers in manual gain mode
-4. program the same initial index on RX1 and RX2 over SPI
-5. read back both; require equality
-6. configure `CTRL_OUT` page `0x03` and the output enables
-7. program limits, thresholds, pulse width, dwell, cooldown, epoch, event settings
-8. clear the event FIFO and sticky faults; confirm the consumer is running and
+3. **verify the ENSM is in an RX-active state, and refuse to arm otherwise.**
+   `CTRL_IN` edges are ignored in `alert` and `sleep` — measured on both radios — so
+   arming outside RX produces a controller that silently does nothing while believing
+   it owns gain. Note `wait` is advertised but unreachable; do not treat it as a state
+4. place both receivers in manual gain mode
+5. program the same initial index on RX1 and RX2 over SPI — **this is the last point at
+   which software can set gain**; after step 11 every such write is a silent no-op
+6. read back both; require equality
+7. configure `CTRL_OUT` page `0x03` and the output enables
+8. program limits, thresholds, pulse width, dwell, cooldown, epoch, event settings
+9. clear the event FIFO and sticky faults; confirm the consumer is running and
    accepting the current epoch
-9. transfer pin ownership — value **and** tri-state — with outputs held low
-10. **only now** arm `0x0FB[1:0]`, read-modify-write, `value | 0x03`
-11. require an armed acknowledgement carrying the current epoch; report success only
+10. transfer pin ownership — value **and** tri-state — with outputs held low
+11. **only now** arm `0x0FB[1:0]`, read-modify-write, `value | 0x03`
+12. require an armed acknowledgement carrying the current epoch; report success only
     after that response is accepted; then open the policy gate
+
+**While armed, the ENSM must be monitored.** An ENSM transition out of RX does not
+fault the AD9361 or the controller — the pins simply stop having any effect, so the
+FPGA would continue issuing pulses against a deaf part and its `expected_index` would
+diverge from hardware with nothing to detect it locally. The runtime must either
+prevent such a transition while armed, or treat it as a synchronisation fault that
+disarms and re-synchronises. Decide which at implementation; do not leave it
+unhandled.
 
 **Disable.**
 
@@ -499,20 +560,29 @@ Any failure returns to a known-safe legacy state and reports a precise error.
 
 ## 12. Open items — must be closed before RTL is frozen
 
-| # | Item | Owner |
+| # | Item | Status |
 |---|---|---|
-| O-1 | Are `CTRL_IN` edges honoured while the ENSM is outside the RX state? | bench |
-| O-2 | Hold-band width between low-power de-assert and small-ADC assert. The `z` → dBFS mapping is undocumented and ADI publishes no recommended values — it brute-forces 980 combinations and disables the low-power path entirely | bench (E-GSC6 session) |
-| O-3 | Measured `BLANK_GUARD` margin over Peak Overload Wait Time across the supported rate set | bench |
-| O-4 | Decision-to-effect offset — constant, or a table keyed by index and direction? | Campaign C |
-| O-5 | Confirm `gpio_ctl` bit order against the board constraints once more at integration, as a second witness to the schematic extraction | integration |
+| O-1 | Are `CTRL_IN` edges honoured while the ENSM is outside the RX state? | ✅ **CLOSED** — E-AGC1 session 1, both radios: **no**. Contract updated at §3 and §11 |
+| O-2 | Hold-band width between low-power de-assert and small-ADC assert. The `z` → dBFS mapping is undocumented and ADI publishes no recommended values — it brute-forces 980 combinations and disables the low-power path entirely | open — E-AGC1 step 5 (session 2) |
+| O-3 | Measured `BLANK_GUARD` margin over Peak Overload Wait Time across the supported rate set | open — E-AGC1 step 5, and **may not be closeable from userspace at all**: sysfs GPIO resolution is far coarser than the blanking window. May need the FPGA stage regardless |
+| O-4 | Decision-to-effect offset — constant, or a table keyed by index and direction? | open — Campaign C, and see O-7 |
+| O-5 | Second witness on the `gpio_ctl` bit order | ✅ **CLOSED** — E-AGC1 session 1: identity confirmed on the part, 40/40 across two radios, other channel never moved. Stronger than the integration check originally planned |
+| O-6 | ENSM transition while armed: prevent, or fault and re-synchronise? | open — implementation decision, §11 |
+| O-7 | The phase acceptance threshold is not derivable from the published per-band `A`. Every dual-RX phase campaign to date ran on a bare SMA tee with ~0 dB port-to-port isolation, which can manufacture cross-arm phase of the same magnitude as `A` itself. E-GSC6 must not be run on that harness — the interaction term it measures is exactly what a tee produces | open — blocked on a Wilkinson divider and a same-session A/B |
 
-None of O-1 through O-5 blocks writing the standalone controller and its testbench,
-because all five are parameters rather than structure. All five block the candidate
-freeze.
+O-1 and O-5 are closed by measurement. None of the remainder blocks writing the
+standalone controller and its testbench, because all are parameters or downstream
+gates rather than structure. O-2, O-3, O-4 and O-7 block the candidate freeze; O-6
+blocks the runtime.
+
+Note that O-7 does not affect anything in this document. The tandem control path,
+the pin mapping, the lifecycle and the event ABI are all independent of the phase
+numbers — those govern only whether the feature delivers the phase benefit it was
+motivated by, and how Campaign C is graded.
 
 ## 13. Revision history
 
 | Rev | Date | Change |
 |---|---|---|
 | 1 | 2026-08-10 | Initial draft for review. Clock domain fixed to `l_clk` per D-1. |
+| 2 | 2026-08-10 | Reconciled against E-AGC1 session 1 (both radios) and a bench/code audit. **Corrections:** D-7's index clamp was justified by LNA transitions "at indices 8, 20 and 30", which matched nothing in the audited tables — 8 and 20 are frozen-word dB values. Recomputed from `gain_tables_audited.json` to a band-common frozen window of `[40, 54]`, with the range/disturbance tradeoff stated (§6.1). The usable range is −1…62 dB band-common, not the asserted 27–73. **Closed:** O-1 and O-5, both by measurement. **Added:** ENSM-active precondition to the enable sequence, ENSM-while-armed handling, active rejection of host gain writes (the device accepts and ignores them with a success return), and O-6/O-7. |
