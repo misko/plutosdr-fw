@@ -13,8 +13,8 @@ could then queue duplicate requests and stale responses.
 | Component | Commit | Protected source tag |
 | --- | --- | --- |
 | Firmware parent | assigned by the RC17 parent commit | eventual RC tag |
-| Buildroot | `564013d1dd32a0d64b4ab81d5e22d03757146bdf` | `gain-series-v4-rc17-source/buildroot-commit` |
-| Direct IP gadget | `8814aec26c6920afd79e198227d4f192adf16518` | `gain-series-v4-rc17-source/ip-gadget-commit` |
+| Buildroot | `4a6d1248e6a1bc7e610cec1b9465f77381983361` | `gain-series-v4-rc17-source/buildroot-final` |
+| Direct IP gadget | `988090243117e47e4c07ba881b067f0e7caf6831` | `gain-series-v4-rc17-source/ip-gadget-final` |
 | Common USB gadget | `2e8e40ade5dcf3c7880a5ebb58419ad7c37ed552` | `gain-series-v4-rc14-source/gadget` |
 
 All other FPGA, kernel, and bootloader pins are unchanged from RC16. The
@@ -34,6 +34,8 @@ canonical source graph is `manifests/gain-series-v4-source.yaml`.
 - Peer-scoped request high-water marks reject evicted stale requests.
 - Stream generations and completed-stream tombstones prevent old worker and
   STOP events from affecting a newer stream.
+- Legacy direct-IP RX cannot cancel or steal DMA ownership from an active or
+  cleaning protocol-v3 worker.
 - The host drains stale control responses within one receive window rather
   than consuming a new transmit attempt.
 
