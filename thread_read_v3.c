@@ -29,6 +29,15 @@
 #include <time.h>
 #include <unistd.h>
 
+/*
+ * UDP GSO reached Linux before every supported Buildroot userspace header
+ * exposed its socket-option number. The Pluto runtime kernel supports the
+ * option, but its pinned headers need the stable UAPI value supplied here.
+ */
+#ifndef UDP_SEGMENT
+#define UDP_SEGMENT 103
+#endif
+
 #define DEBUG_PRINT(...) if (debug) printf("ReadV3: "__VA_ARGS__)
 
 /* Match the bounded DMA headroom proven by the direct-USB RX path. */
@@ -355,7 +364,12 @@ static bool initialize(state_v3_t *state)
 static void report_startup(const state_v3_t *state, uint64_t result)
 {
 	if (state->args != NULL && state->args->startup_event_fd >= 0)
-		(void)write(state->args->startup_event_fd, &result, sizeof(result));
+	{
+		const ssize_t written = write(
+			state->args->startup_event_fd, &result, sizeof(result));
+		if (written != (ssize_t)sizeof(result))
+			perror("Failed to report RX startup result");
+	}
 }
 
 static bool set_thread_affinity(pthread_t thread, int cpu_id)
@@ -591,7 +605,10 @@ static void *sender_entrypoint(void *opaque)
 
 static void signal_sender_result(state_v3_t *state, uint64_t result)
 {
-	(void)write(state->sender_event_fd, &result, sizeof(result));
+	const ssize_t written = write(
+		state->sender_event_fd, &result, sizeof(result));
+	if (written != (ssize_t)sizeof(result))
+		perror("Failed to report sender result");
 }
 
 static bool send_frame(state_v3_t *state,
