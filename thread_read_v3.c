@@ -53,6 +53,7 @@ typedef struct
 {
 	THREAD_READ_V3_Args_t *args;
 	bool keep_running;
+	bool quit_requested;
 	int epoll_fd;
 	int sender_event_fd;
 	int iio_poll_fd;
@@ -114,6 +115,7 @@ static bool send_frame_gso(state_v3_t *state,
 static void *sender_entrypoint(void *opaque);
 static void signal_sender_result(state_v3_t *state, uint64_t result);
 static void report_startup(const state_v3_t *state, uint64_t result);
+static void report_done(const state_v3_t *state, uint64_t result);
 static bool wait_for_run(const state_v3_t *state);
 static bool set_thread_affinity(pthread_t thread, int cpu_id);
 static bool sleep_until_ns(uint64_t deadline_ns);
@@ -143,12 +145,14 @@ void *THREAD_READ_V3_Entrypoint(void *opaque)
 	{
 		report_startup(&state, 2);
 		cleanup(&state);
+		report_done(&state, 2);
 		return NULL;
 	}
 	report_startup(&state, 1);
 	if (!wait_for_run(&state))
 	{
 		cleanup(&state);
+		report_done(&state, 3);
 		return NULL;
 	}
 	state.keep_running = true;
@@ -157,7 +161,11 @@ void *THREAD_READ_V3_Entrypoint(void *opaque)
 		if (EPOLL_LOOP_Run(state.epoll_fd, 30000, &state) < 0)
 			break;
 	}
+	const uint64_t result = state.quit_requested ? 3 :
+		(state.sender_failed || !state.capture_complete ||
+		 state.frames_sent != state.frame_slot_count ? 2 : 1);
 	cleanup(&state);
+	report_done(&state, result);
 	return NULL;
 }
 
@@ -166,6 +174,7 @@ static bool initialize(state_v3_t *state)
 	THREAD_READ_V3_Args_t *args = state->args;
 	if (args == NULL || args->quit_event_fd < 0 || args->output_fd < 0 ||
 		args->startup_event_fd < 0 || args->run_event_fd < 0 ||
+		args->done_event_fd < 0 ||
 		args->stream_id == 0 || args->frame_count == 0 ||
 		args->samples_per_channel == 0 || args->iio_channels != 0x0f ||
 		args->gain_observation_capacity == 0 ||
@@ -372,6 +381,17 @@ static void report_startup(const state_v3_t *state, uint64_t result)
 	}
 }
 
+static void report_done(const state_v3_t *state, uint64_t result)
+{
+	if (state->args != NULL && state->args->done_event_fd >= 0)
+	{
+		const ssize_t written = write(
+			state->args->done_event_fd, &result, sizeof(result));
+		if (written != (ssize_t)sizeof(result))
+			perror("Failed to report RX completion");
+	}
+}
+
 static bool set_thread_affinity(pthread_t thread, int cpu_id)
 {
 	cpu_set_t affinity;
@@ -433,6 +453,7 @@ static bool wait_for_run(const state_v3_t *state)
 static int handle_quit(state_v3_t *state)
 {
 	/* Main owns and resets this eventfd after joining the worker. */
+	state->quit_requested = true;
 	state->keep_running = false;
 	return 0;
 }

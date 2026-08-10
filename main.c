@@ -5,7 +5,6 @@
 #include <inttypes.h>
 #include <netinet/in.h>
 #include <pthread.h>
-#include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -29,6 +28,8 @@
 #include "thread_write.h"
 #include "spf_ip_protocol.h"
 #include "spf_ip_tx_policy.h"
+#include "spf_ip_control_replay.h"
+#include "spf_ip_rx_lifecycle.h"
 #include <spf/spf_time_anchor.h>
 
 /* Macros */
@@ -51,6 +52,8 @@ typedef struct
 	int read_thread_event_fd;
 	int read_v3_startup_event_fd;
 	int read_v3_run_event_fd;
+	int read_v3_quit_event_fd;
+	int read_v3_done_event_fd;
 	int write_thread_event_fd;
 
 	/* Thread status */
@@ -70,10 +73,16 @@ typedef struct
 
 	uint64_t next_stream_id;
 	uint64_t active_v3_stream_id;
-	bool control_cache_valid;
-	struct sockaddr_in control_cache_peer;
-	spf_ip_control_v1_t control_cache_request;
-	spf_ip_control_v1_t control_cache_reply;
+	spf_ip_rx_lifecycle_t rx_lifecycle;
+	spf_ip_control_replay_t control_replay;
+	int pending_start_slot;
+	int pending_stop_slot;
+	struct sockaddr_in pending_start_peer;
+	struct sockaddr_in pending_stop_peer;
+	bool read_v3_quit_signaled;
+	uint64_t v3_start_count;
+	uint64_t v3_stop_count;
+	uint64_t v3_worker_done_count;
 
 	spf_time_anchor_reader_t time_anchor_reader;
 	bool time_anchor_cache_valid;
@@ -91,6 +100,8 @@ bool debug;
 
 /* Private function */
 static int handle_control(state_t *state);
+static int handle_v3_startup_event(state_t *state);
+static int handle_v3_done_event(state_t *state);
 static int handle_v3_control(state_t *state,
 	const spf_ip_control_v1_t *request,
 	const struct sockaddr_in *peer);
@@ -102,8 +113,19 @@ static bool same_control_peer(
 	const struct sockaddr_in *right);
 static bool start_thread(state_t *state, bool tx);
 static bool stop_thread(state_t *state, bool tx);
-static bool start_v3_thread(state_t *state);
+static bool launch_v3_thread(state_t *state);
+static bool request_v3_stop(state_t *state);
 static bool stop_v3_thread(state_t *state);
+static bool prepare_and_send_control(state_t *state,
+	int slot,
+	const spf_ip_control_v1_t *response,
+	const struct sockaddr_in *peer);
+static void on_control_response_sent(state_t *state, int slot);
+static bool cache_immediate_control(state_t *state,
+	const spf_ip_control_v1_t *request,
+	const spf_ip_control_v1_t *response,
+	const struct sockaddr_in *peer);
+static void reset_v3_eventfds(state_t *state);
 static void signal_handler(int signum);
 static void print_usage(const char *program_name, FILE *dest);
 static const char* cmd_name(uint32_t cmd);
@@ -119,6 +141,10 @@ int main(int argc, char *argv[])
 
 	/* Reset state */
 	memset(&state, 0x00, sizeof(state));
+	state.pending_start_slot = -1;
+	state.pending_stop_slot = -1;
+	spf_ip_rx_lifecycle_init(&state.rx_lifecycle);
+	spf_ip_control_replay_init(&state.control_replay);
 	state.next_stream_id = ((uint64_t)time(NULL) << 32) |
 		(uint32_t)getpid();
 	if (state.next_stream_id == 0)
@@ -314,7 +340,7 @@ int main(int argc, char *argv[])
 		perror("Failed to open v3 startup eventfd");
 		return 1;
 	}
-	state.read_v3_run_event_fd = eventfd(0, 0);
+	state.read_v3_run_event_fd = eventfd(0, EFD_NONBLOCK);
 	if (state.read_v3_run_event_fd < 0)
 	{
 		perror("Failed to open v3 run eventfd");
@@ -323,6 +349,18 @@ int main(int argc, char *argv[])
 	else
 	{
 		DEBUG_PRINT("Opened read eventfd :-)\n");
+	}
+	state.read_v3_quit_event_fd = eventfd(0, EFD_NONBLOCK);
+	if (state.read_v3_quit_event_fd < 0)
+	{
+		perror("Failed to open v3 quit eventfd");
+		return 1;
+	}
+	state.read_v3_done_event_fd = eventfd(0, EFD_NONBLOCK);
+	if (state.read_v3_done_event_fd < 0)
+	{
+		perror("Failed to open v3 done eventfd");
+		return 1;
 	}
 	state.write_thread_event_fd = eventfd(0, 0);
 	if (state.write_thread_event_fd < 0)
@@ -338,9 +376,10 @@ int main(int argc, char *argv[])
 	/* Prepare read args */
 	state.read_args.quit_event_fd = state.read_thread_event_fd;
 	state.read_args.output_fd = state.sock_data;
-	state.read_v3_args.quit_event_fd = state.read_thread_event_fd;
+	state.read_v3_args.quit_event_fd = state.read_v3_quit_event_fd;
 	state.read_v3_args.startup_event_fd = state.read_v3_startup_event_fd;
 	state.read_v3_args.run_event_fd = state.read_v3_run_event_fd;
+	state.read_v3_args.done_event_fd = state.read_v3_done_event_fd;
 	state.read_v3_args.output_fd = state.sock_data;
 
 	/* Prepare write args */
@@ -375,6 +414,23 @@ int main(int argc, char *argv[])
 		DEBUG_PRINT("Registered control socket with epoll :-)\n");
 	}
 
+	/* Worker lifecycle events keep slow IIO setup/teardown off control epoll. */
+	epoll_event.events = EPOLLIN;
+	epoll_event.data.ptr = handle_v3_startup_event;
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD,
+		state.read_v3_startup_event_fd, &epoll_event) < 0)
+	{
+		perror("Failed to register v3 startup eventfd");
+		return 1;
+	}
+	epoll_event.data.ptr = handle_v3_done_event;
+	if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD,
+		state.read_v3_done_event_fd, &epoll_event) < 0)
+	{
+		perror("Failed to register v3 done eventfd");
+		return 1;
+	}
+
 	/* Here we go */
 	printf("Ready :-)\n");
 
@@ -401,6 +457,8 @@ int main(int argc, char *argv[])
 	close(state.read_thread_event_fd);
 	close(state.read_v3_startup_event_fd);
 	close(state.read_v3_run_event_fd);
+	close(state.read_v3_quit_event_fd);
+	close(state.read_v3_done_event_fd);
 	close(state.write_thread_event_fd);
 	close(state.sock_control);
 	close(state.sock_data);
@@ -409,6 +467,90 @@ int main(int argc, char *argv[])
 	/* Goodbye */
 	printf("Bye!\n");
 
+	return 0;
+}
+
+static int handle_v3_startup_event(state_t *state)
+{
+	uint64_t result = 0;
+	if (read(state->read_v3_startup_event_fd, &result, sizeof(result)) !=
+		(ssize_t)sizeof(result))
+		return errno == EAGAIN ? 0 : -1;
+	if (!state->read_v3_started || result != 1 ||
+		state->rx_lifecycle.state != SPF_IP_RX_STARTING)
+	{
+		state->rx_lifecycle.stale_event_count++;
+		return 0;
+	}
+	if (!spf_ip_rx_lifecycle_ready(&state->rx_lifecycle) ||
+		state->pending_start_slot < 0)
+		return -1;
+	DEBUG_PRINT("RX generation %llu stream %llu armed\n",
+		(unsigned long long)state->rx_lifecycle.generation,
+		(unsigned long long)state->rx_lifecycle.stream_id);
+	const spf_ip_control_v1_t *request =
+		&state->control_replay.entries[state->pending_start_slot].request;
+	spf_ip_control_v1_t response;
+	spf_ip_control_init_reply(&response, request,
+		SPF_IP_CONTROL_STARTED, state->rx_lifecycle.stream_id);
+	(void)prepare_and_send_control(state, state->pending_start_slot,
+		&response, &state->pending_start_peer);
+	return 0;
+}
+
+static int handle_v3_done_event(state_t *state)
+{
+	uint64_t result = 0;
+	if (read(state->read_v3_done_event_fd, &result, sizeof(result)) !=
+		(ssize_t)sizeof(result))
+		return errno == EAGAIN ? 0 : -1;
+	if (!state->read_v3_started)
+	{
+		state->rx_lifecycle.stale_event_count++;
+		return 0;
+	}
+	const uint64_t stream_id = state->rx_lifecycle.stream_id;
+	if (pthread_join(state->thread_read_v3, NULL) != 0)
+		return -1;
+	state->read_v3_started = false;
+	state->read_v3_quit_signaled = false;
+	state->v3_worker_done_count++;
+	DEBUG_PRINT("RX generation %llu stream %llu worker done result=%llu\n",
+		(unsigned long long)state->rx_lifecycle.generation,
+		(unsigned long long)stream_id,
+		(unsigned long long)result);
+	if (!spf_ip_rx_lifecycle_worker_done(
+		&state->rx_lifecycle, stream_id, result))
+		return 0;
+	(void)spf_ip_rx_lifecycle_reap(&state->rx_lifecycle);
+	state->active_v3_stream_id = 0;
+
+	if (state->pending_start_slot >= 0)
+	{
+		const int slot = state->pending_start_slot;
+		const spf_ip_control_v1_t *request =
+			&state->control_replay.entries[slot].request;
+		spf_ip_control_v1_t response;
+		spf_ip_control_init_error(&response, request->request_id,
+			result == 3 ? -ECANCELED : -EIO);
+		(void)prepare_and_send_control(
+			state, slot, &response, &state->pending_start_peer);
+	}
+	if (state->pending_stop_slot >= 0)
+	{
+		const int slot = state->pending_stop_slot;
+		const spf_ip_control_v1_t *request =
+			&state->control_replay.entries[slot].request;
+		spf_ip_control_v1_t response;
+		if (result == 1 || result == 3)
+			spf_ip_control_init_reply(&response, request,
+				SPF_IP_CONTROL_STOPPED, stream_id);
+		else
+			spf_ip_control_init_error(
+				&response, request->request_id, -EIO);
+		(void)prepare_and_send_control(
+			state, slot, &response, &state->pending_stop_peer);
+	}
 	return 0;
 }
 
@@ -616,131 +758,236 @@ static int handle_v3_control(state_t *state,
 	const struct sockaddr_in *peer)
 {
 	spf_ip_control_v1_t response;
-	if (state->control_cache_valid &&
-		same_control_peer(peer, &state->control_cache_peer) &&
-		request->request_id == state->control_cache_request.request_id)
+	int replay_slot = -1;
+	const spf_ip_control_v1_t *cached = NULL;
+	const spf_ip_replay_lookup_t replay_result =
+		spf_ip_control_replay_lookup(&state->control_replay,
+			peer, request, &replay_slot, &cached);
+	if (replay_result == SPF_IP_REPLAY_COLLISION)
 	{
-		if (memcmp(request,
-			&state->control_cache_request,
-			sizeof(*request)) == 0)
-			(void)send_v3_control(state, &state->control_cache_reply, peer);
-		else
-		{
-			spf_ip_control_init_error(
-				&response, request->request_id, -EALREADY);
-			(void)send_v3_control(state, &response, peer);
-		}
+		spf_ip_control_init_error(&response, request->request_id, -EALREADY);
+		(void)send_v3_control(state, &response, peer);
+		return 0;
+	}
+	if (replay_result == SPF_IP_REPLAY_STALE)
+	{
+		spf_ip_control_init_error(&response, request->request_id, -ESTALE);
+		(void)send_v3_control(state, &response, peer);
+		return 0;
+	}
+	if (replay_result == SPF_IP_REPLAY_PENDING)
+		return 0;
+	if (replay_result == SPF_IP_REPLAY_PREPARED)
+	{
+		if (send_v3_control(state, cached, peer) &&
+			spf_ip_control_replay_mark_responded(
+				&state->control_replay, replay_slot))
+			on_control_response_sent(state, replay_slot);
+		return 0;
+	}
+	if (replay_result == SPF_IP_REPLAY_RESPONDED)
+	{
+		(void)send_v3_control(state, cached, peer);
 		return 0;
 	}
 
 	if (!spf_ip_control_validate(request))
+	{
 		spf_ip_control_init_error(&response, request->request_id, -EINVAL);
-	else if (request->message_type == SPF_IP_CONTROL_QUERY_CAPABILITIES)
+		(void)cache_immediate_control(state, request, &response, peer);
+		return 0;
+	}
+	if (request->message_type == SPF_IP_CONTROL_QUERY_CAPABILITIES)
 	{
 		spf_ip_control_init_capabilities(&response, request->request_id);
 		if ((request->flags &
 			SPF_IP_CONTROL_FLAG_QUERY_TRANSPORT_CAPABILITIES) != 0)
 			response.flags |= SPF_IP_CONTROL_FLAG_BUFFERED_FINITE_RX |
 				SPF_IP_CONTROL_FLAG_USB_CLASS_PACING;
+		(void)cache_immediate_control(state, request, &response, peer);
+		return 0;
 	}
-	else if (request->message_type == SPF_IP_CONTROL_START_RX)
+	if (request->message_type == SPF_IP_CONTROL_START_RX)
 	{
 		if (request->protocol_min != 3)
+		{
 			spf_ip_control_init_error(
 				&response, request->request_id, -EPROTONOSUPPORT);
-		else
+			(void)cache_immediate_control(state, request, &response, peer);
+			return 0;
+		}
+		if (state->read_started ||
+			spf_ip_rx_lifecycle_busy(&state->rx_lifecycle))
 		{
-			(void)stop_thread(state, false);
-			(void)stop_v3_thread(state);
-			uint64_t stream_id = state->next_stream_id++;
-			if (stream_id == 0)
-				stream_id = state->next_stream_id++;
-			memset(&state->read_v3_args, 0, sizeof(state->read_v3_args));
-			state->read_v3_args.quit_event_fd = state->read_thread_event_fd;
-			state->read_v3_args.startup_event_fd =
-				state->read_v3_startup_event_fd;
-			state->read_v3_args.run_event_fd = state->read_v3_run_event_fd;
-			state->read_v3_args.output_fd = state->sock_data;
-			state->read_v3_args.addr.sin_family = AF_INET;
-			state->read_v3_args.addr.sin_addr = peer->sin_addr;
-			state->read_v3_args.addr.sin_port = htons(request->data_port);
-			state->read_v3_args.iio_channels = request->enabled_scan_mask;
-			state->read_v3_args.samples_per_channel =
-				request->samples_per_channel;
-			state->read_v3_args.udp_datagram_bytes =
-				request->max_datagram_bytes;
-			state->read_v3_args.frame_count = request->frame_count;
-			state->read_v3_args.stream_id = stream_id;
-			state->read_v3_args.metadata_features =
-				(uint32_t)request->features;
-			state->read_v3_args.gain_observation_interval_samples =
-				request->gain_observation_interval_samples;
-			state->read_v3_args.gain_observation_capacity =
-				request->gain_observation_capacity;
-			state->read_v3_args.gain_event_capacity =
-				request->gain_event_capacity;
-			state->read_v3_args.target_payload_bytes_per_second =
-				(request->flags & SPF_IP_CONTROL_FLAG_USB_CLASS_PACING) != 0
-				? SPF_IP_DEFAULT_TX_PAYLOAD_BYTES_PER_SECOND
-				: SPF_IP_LEGACY_TX_PAYLOAD_BYTES_PER_SECOND;
-			state->read_v3_args.pacing_interval_us =
-				SPF_IP_DEFAULT_PACING_INTERVAL_US;
-			if (!start_v3_thread(state))
-				spf_ip_control_init_error(
-					&response, request->request_id, -EIO);
+			spf_ip_control_init_error(&response, request->request_id, -EBUSY);
+			(void)cache_immediate_control(state, request, &response, peer);
+			return 0;
+		}
+		if (!spf_ip_control_replay_begin(&state->control_replay,
+			peer, request, &replay_slot))
+		{
+			spf_ip_control_init_error(&response, request->request_id, -ENOSPC);
+			(void)send_v3_control(state, &response, peer);
+			return 0;
+		}
+		uint64_t stream_id = state->next_stream_id++;
+		if (stream_id == 0)
+			stream_id = state->next_stream_id++;
+		if (!spf_ip_rx_lifecycle_begin(&state->rx_lifecycle, stream_id))
+		{
+			spf_ip_control_init_error(&response, request->request_id, -EBUSY);
+			(void)prepare_and_send_control(
+				state, replay_slot, &response, peer);
+			return 0;
+		}
+		state->pending_start_slot = replay_slot;
+		state->pending_start_peer = *peer;
+		reset_v3_eventfds(state);
+		memset(&state->read_v3_args, 0, sizeof(state->read_v3_args));
+		state->read_v3_args.quit_event_fd = state->read_v3_quit_event_fd;
+		state->read_v3_args.startup_event_fd =
+			state->read_v3_startup_event_fd;
+		state->read_v3_args.run_event_fd = state->read_v3_run_event_fd;
+		state->read_v3_args.done_event_fd = state->read_v3_done_event_fd;
+		state->read_v3_args.output_fd = state->sock_data;
+		state->read_v3_args.addr.sin_family = AF_INET;
+		state->read_v3_args.addr.sin_addr = peer->sin_addr;
+		state->read_v3_args.addr.sin_port = htons(request->data_port);
+		state->read_v3_args.iio_channels = request->enabled_scan_mask;
+		state->read_v3_args.samples_per_channel = request->samples_per_channel;
+		state->read_v3_args.udp_datagram_bytes = request->max_datagram_bytes;
+		state->read_v3_args.frame_count = request->frame_count;
+		state->read_v3_args.stream_id = stream_id;
+		state->read_v3_args.generation = state->rx_lifecycle.generation;
+		state->read_v3_args.metadata_features = (uint32_t)request->features;
+		state->read_v3_args.gain_observation_interval_samples =
+			request->gain_observation_interval_samples;
+		state->read_v3_args.gain_observation_capacity =
+			request->gain_observation_capacity;
+		state->read_v3_args.gain_event_capacity =
+			request->gain_event_capacity;
+		state->read_v3_args.target_payload_bytes_per_second =
+			(request->flags & SPF_IP_CONTROL_FLAG_USB_CLASS_PACING) != 0
+			? SPF_IP_DEFAULT_TX_PAYLOAD_BYTES_PER_SECOND
+			: SPF_IP_LEGACY_TX_PAYLOAD_BYTES_PER_SECOND;
+		state->read_v3_args.pacing_interval_us =
+			SPF_IP_DEFAULT_PACING_INTERVAL_US;
+		if (!launch_v3_thread(state))
+		{
+			(void)spf_ip_rx_lifecycle_worker_done(
+				&state->rx_lifecycle, stream_id, 2);
+			(void)spf_ip_rx_lifecycle_reap(&state->rx_lifecycle);
+			spf_ip_control_init_error(&response, request->request_id, -EIO);
+			(void)prepare_and_send_control(
+				state, replay_slot, &response, peer);
+			state->pending_start_slot = -1;
+		}
+		return 0;
+	}
+	if (request->message_type == SPF_IP_CONTROL_STOP_RX)
+	{
+		if (state->rx_lifecycle.state == SPF_IP_RX_IDLE &&
+			request->stream_id == state->rx_lifecycle.completed_stream_id)
+		{
+			spf_ip_control_init_reply(&response,
+				request, SPF_IP_CONTROL_STOPPED, request->stream_id);
+			(void)cache_immediate_control(state, request, &response, peer);
+			return 0;
+		}
+		if (request->stream_id != state->rx_lifecycle.stream_id)
+		{
+			spf_ip_control_init_error(&response, request->request_id, -ENOENT);
+			(void)cache_immediate_control(state, request, &response, peer);
+			return 0;
+		}
+		if (state->pending_stop_slot >= 0 ||
+			state->rx_lifecycle.state == SPF_IP_RX_STOPPING)
+		{
+			spf_ip_control_init_error(&response, request->request_id, -EBUSY);
+			(void)cache_immediate_control(state, request, &response, peer);
+			return 0;
+		}
+		if (!spf_ip_control_replay_begin(&state->control_replay,
+			peer, request, &replay_slot))
+		{
+			spf_ip_control_init_error(&response, request->request_id, -ENOSPC);
+			(void)send_v3_control(state, &response, peer);
+			return 0;
+		}
+		state->pending_stop_slot = replay_slot;
+		state->pending_stop_peer = *peer;
+		if (!request_v3_stop(state))
+		{
+			spf_ip_control_init_error(&response, request->request_id, -EIO);
+			(void)prepare_and_send_control(
+				state, replay_slot, &response, peer);
+			state->pending_stop_slot = -1;
+		}
+		return 0;
+	}
+	spf_ip_control_init_error(&response, request->request_id, -EINVAL);
+	(void)cache_immediate_control(state, request, &response, peer);
+	return 0;
+}
+
+static bool prepare_and_send_control(state_t *state,
+	int slot,
+	const spf_ip_control_v1_t *response,
+	const struct sockaddr_in *peer)
+{
+	if (!spf_ip_control_replay_prepare(
+		&state->control_replay, slot, response))
+		return false;
+	if (!send_v3_control(state, response, peer))
+		return false;
+	if (!spf_ip_control_replay_mark_responded(
+		&state->control_replay, slot))
+		return false;
+	on_control_response_sent(state, slot);
+	return true;
+}
+
+static void on_control_response_sent(state_t *state, int slot)
+{
+	const spf_ip_control_v1_t *response =
+		&state->control_replay.entries[slot].response;
+	if (slot == state->pending_start_slot)
+	{
+		if (response->message_type == SPF_IP_CONTROL_STARTED &&
+			state->rx_lifecycle.state == SPF_IP_RX_ARMED)
+		{
+			uint64_t release = 1;
+			if (write(state->read_v3_run_event_fd,
+				&release, sizeof(release)) == (ssize_t)sizeof(release) &&
+				spf_ip_rx_lifecycle_started(&state->rx_lifecycle))
+			{
+				state->active_v3_stream_id = response->stream_id;
+				state->v3_start_count++;
+			}
 			else
 			{
-				state->active_v3_stream_id = stream_id;
-				spf_ip_control_init_reply(&response,
-					request,
-					SPF_IP_CONTROL_STARTED,
-					stream_id);
+				(void)request_v3_stop(state);
 			}
 		}
+		state->pending_start_slot = -1;
 	}
-	else if (request->message_type == SPF_IP_CONTROL_STOP_RX)
+	if (slot == state->pending_stop_slot)
 	{
-		if (request->stream_id != state->active_v3_stream_id)
-			spf_ip_control_init_error(
-				&response, request->request_id, -ENOENT);
-		else if (!stop_v3_thread(state))
-			spf_ip_control_init_error(&response, request->request_id, -EIO);
-		else
-		{
-			state->active_v3_stream_id = 0;
-			spf_ip_control_init_reply(&response,
-				request,
-				SPF_IP_CONTROL_STOPPED,
-				request->stream_id);
-		}
+		state->pending_stop_slot = -1;
+		state->v3_stop_count++;
 	}
-	else
-		spf_ip_control_init_error(&response, request->request_id, -EINVAL);
+}
 
-	state->control_cache_valid = true;
-	state->control_cache_peer = *peer;
-	state->control_cache_request = *request;
-	state->control_cache_reply = response;
-	const bool sent = send_v3_control(state, &response, peer);
-	if (sent && response.message_type == SPF_IP_CONTROL_STARTED)
-	{
-		uint64_t release = 1;
-		if (write(state->read_v3_run_event_fd,
-			&release,
-			sizeof(release)) != (ssize_t)sizeof(release))
-		{
-			(void)stop_v3_thread(state);
-			state->active_v3_stream_id = 0;
-			state->control_cache_valid = false;
-		}
-	}
-	else if (!sent && response.message_type == SPF_IP_CONTROL_STARTED)
-	{
-		(void)stop_v3_thread(state);
-		state->active_v3_stream_id = 0;
-		state->control_cache_valid = false;
-	}
-	return 0;
+static bool cache_immediate_control(state_t *state,
+	const spf_ip_control_v1_t *request,
+	const spf_ip_control_v1_t *response,
+	const struct sockaddr_in *peer)
+{
+	int slot = -1;
+	if (!spf_ip_control_replay_begin(
+		&state->control_replay, peer, request, &slot))
+		return send_v3_control(state, response, peer);
+	return prepare_and_send_control(state, slot, response, peer);
 }
 
 static bool send_v3_control(state_t *state,
@@ -851,7 +1098,7 @@ static bool stop_thread(state_t *state, bool tx)
 	return true;
 }
 
-static bool start_v3_thread(state_t *state)
+static bool launch_v3_thread(state_t *state)
 {
 	if (state->read_v3_started)
 		return false;
@@ -868,24 +1115,23 @@ static bool start_v3_thread(state_t *state)
 		sigprocmask(SIG_SETMASK, &old_mask, NULL) == 0;
 	if (!state->read_v3_started || !mask_restored)
 		return false;
-	struct pollfd ready = {
-		.fd = state->read_v3_startup_event_fd,
-		.events = POLLIN,
-	};
-	if (poll(&ready, 1, 10000) != 1)
-	{
-		(void)stop_v3_thread(state);
+	return true;
+}
+
+static bool request_v3_stop(state_t *state)
+{
+	if (!state->read_v3_started)
 		return false;
-	}
-	uint64_t result = 0;
-	if (read(state->read_v3_startup_event_fd,
-		&result,
-		sizeof(result)) != (ssize_t)sizeof(result) || result != 1)
-	{
-		pthread_join(state->thread_read_v3, NULL);
-		state->read_v3_started = false;
+	if (state->rx_lifecycle.state != SPF_IP_RX_STOPPING &&
+		!spf_ip_rx_lifecycle_request_stop(&state->rx_lifecycle))
 		return false;
-	}
+	if (state->read_v3_quit_signaled)
+		return true;
+	const uint64_t value = 1;
+	if (write(state->read_v3_quit_event_fd, &value, sizeof(value)) !=
+		(ssize_t)sizeof(value))
+		return false;
+	state->read_v3_quit_signaled = true;
 	return true;
 }
 
@@ -893,18 +1139,37 @@ static bool stop_v3_thread(state_t *state)
 {
 	if (!state->read_v3_started)
 		return true;
-	uint64_t value = 1;
-	if (write(state->read_thread_event_fd,
-		&value,
-		sizeof(value)) != (ssize_t)sizeof(value))
+	if (!request_v3_stop(state))
 		return false;
-	pthread_join(state->thread_read_v3, NULL);
-	if (read(state->read_thread_event_fd,
-		&value,
-		sizeof(value)) != (ssize_t)sizeof(value))
+	if (pthread_join(state->thread_read_v3, NULL) != 0)
 		return false;
 	state->read_v3_started = false;
+	state->read_v3_quit_signaled = false;
+	const uint64_t stream_id = state->rx_lifecycle.stream_id;
+	(void)spf_ip_rx_lifecycle_worker_done(
+		&state->rx_lifecycle, stream_id, 3);
+	(void)spf_ip_rx_lifecycle_reap(&state->rx_lifecycle);
+	state->active_v3_stream_id = 0;
+	reset_v3_eventfds(state);
 	return true;
+}
+
+static void reset_v3_eventfds(state_t *state)
+{
+	const int fds[] = {
+		state->read_v3_startup_event_fd,
+		state->read_v3_run_event_fd,
+		state->read_v3_quit_event_fd,
+		state->read_v3_done_event_fd,
+	};
+	for (size_t index = 0; index < ARRAY_SIZE(fds); ++index)
+	{
+		uint64_t value = 0;
+		while (read(fds[index], &value, sizeof(value)) ==
+			(ssize_t)sizeof(value))
+			;
+	}
+	state->read_v3_quit_signaled = false;
 }
 
 static void signal_handler(int signum)

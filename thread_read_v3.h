@@ -12,6 +12,8 @@ typedef struct
 	int startup_event_fd;
 	/* Main releases the initialized worker only after STARTED is sent. */
 	int run_event_fd;
+	/* Reports 1 success, 2 failure, or 3 cancellation after cleanup. */
+	int done_event_fd;
 	int output_fd;
 	struct sockaddr_in addr;
 	uint32_t iio_channels;
@@ -19,6 +21,7 @@ typedef struct
 	size_t udp_datagram_bytes;
 	uint32_t frame_count;
 	uint64_t stream_id;
+	uint64_t generation;
 	uint32_t metadata_features;
 	uint32_t gain_observation_interval_samples;
 	uint16_t gain_observation_capacity;
