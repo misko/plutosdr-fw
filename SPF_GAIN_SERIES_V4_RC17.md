@@ -43,7 +43,7 @@ test plan.
 
 ## Promotion gates
 
-1. Source-graph verification and all 14 common USB plus four direct-IP native
+1. Source-graph verification and all 15 common USB plus four direct-IP native
    tests pass in CI.
 2. Build artifact hashes and attestation verify after a fresh download.
 3. RAM boot succeeds on two independently identified Pluto+ radios.

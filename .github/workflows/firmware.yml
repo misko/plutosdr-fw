@@ -58,7 +58,7 @@ jobs:
           ctest --test-dir usb-gadget/build-tests --output-on-failure
           count=$(ctest --test-dir usb-gadget/build-tests -N |
             sed -n 's/^Total Tests: //p')
-          test "${count:-0}" -eq 14
+          test "${count:-0}" -eq 15
           cmake --install usb-gadget/build-tests
       - name: Build and test the direct-IP implementation
         run: |
