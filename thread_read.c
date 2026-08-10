@@ -35,6 +35,7 @@
 #include "spf_buffer_policy.h"
 #include "spf_cleanup_plan.h"
 #include "spf_gain_sampler.h"
+#include "spf_iio_handoff_policy.h"
 #include "spf_radio_frame_v3.h"
 
 /* Set the following to periodically report statistics */
@@ -155,6 +156,9 @@ static void record_fatal_error(
 	state_t *state,
 	spf_error_subsystem_t subsystem,
 	int error_number);
+static struct iio_buffer *create_rx_buffer_after_iio_handoff(
+	struct iio_device *device,
+	size_t sample_count);
 
 /* Public functions */
 void *THREAD_READ_Entrypoint(void *args)
@@ -579,8 +583,8 @@ void *THREAD_READ_Entrypoint(void *args)
 			kernel_buffer_result);
 		goto cleanup;
 	}
-	state.iio_rx_buffer = iio_device_create_buffer(
-		state.iio_dev_rx, iio_capture_samples, false);
+	state.iio_rx_buffer = create_rx_buffer_after_iio_handoff(
+		state.iio_dev_rx, iio_capture_samples);
 	if (!state.iio_rx_buffer)
 	{
 		fprintf(stderr,
@@ -589,7 +593,7 @@ void *THREAD_READ_Entrypoint(void *args)
 		goto cleanup;
 	}
 	state.acquired_resources |= SPF_RX_RESOURCE_IIO_BUFFER;
-	if (iio_buffer_step(state.iio_rx_buffer) != sample_size)
+	if ((size_t)iio_buffer_step(state.iio_rx_buffer) != sample_size)
 	{
 		fprintf(stderr, "IIO sample size changed while enabling DMA\n");
 		goto cleanup;
@@ -671,6 +675,37 @@ static void record_fatal_error(
 		state->thread_args->runtime_status,
 		subsystem,
 		error_number != 0 ? error_number : EIO);
+}
+
+static struct iio_buffer *create_rx_buffer_after_iio_handoff(
+	struct iio_device *device,
+	size_t sample_count)
+{
+	uint32_t retries_used = 0;
+	for (;;)
+	{
+		errno = 0;
+		struct iio_buffer *buffer =
+			iio_device_create_buffer(device, sample_count, false);
+		if (buffer)
+			return buffer;
+
+		const int create_errno = errno != 0 ? errno : EIO;
+		if (!spf_iio_handoff_should_retry(create_errno, retries_used))
+		{
+			errno = create_errno;
+			return NULL;
+		}
+		if (retries_used == 0)
+		{
+			fprintf(stderr,
+				"RX DMA is busy; waiting up to %u ms for IIO ownership handoff\n",
+				(SPF_IIO_HANDOFF_RETRY_LIMIT *
+				 SPF_IIO_HANDOFF_RETRY_DELAY_US) / UINT32_C(1000));
+		}
+		retries_used++;
+		usleep(SPF_IIO_HANDOFF_RETRY_DELAY_US);
+	}
 }
 
 static void cleanup_state(state_t *state)

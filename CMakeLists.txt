@@ -150,4 +150,8 @@ if (BUILD_HOST_TESTS)
         test_spf_control_policy.c
         spf_control_policy.c)
     add_test(NAME spf_control_policy COMMAND test_spf_control_policy)
+
+    add_executable(test_spf_iio_handoff_policy
+        test_spf_iio_handoff_policy.c)
+    add_test(NAME spf_iio_handoff_policy COMMAND test_spf_iio_handoff_policy)
 endif()
