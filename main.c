@@ -38,6 +38,7 @@
 /* Definitions - UDP port numbers */
 #define DIRECT_IP_PORT_CONTROL (30432) // IIOD + 1
 #define DIRECT_IP_PORT_DATA (30433) // IIOD + 2
+#define SPF_IP_SOCKET_BUFFER_BYTES (8 * 1024 * 1024)
 
 /* Type definitions */
 typedef struct
@@ -241,7 +242,7 @@ int main(int argc, char *argv[])
     DEBUG_PRINT("Current socket send = %d receive = %d\n", send_size, recv_size);
 
 	// Set the send buffer size
-	send_size = 524288;
+	send_size = SPF_IP_SOCKET_BUFFER_BYTES;
     if (setsockopt(state.sock_data, SOL_SOCKET, SO_SNDBUF, &send_size, sizeof(send_size)) == -1)
 	{
         perror("setsockopt for send buffer size");
@@ -249,7 +250,7 @@ int main(int argc, char *argv[])
     }
 
 	// Set the receive buffer size
-	recv_size = 524288;
+	recv_size = SPF_IP_SOCKET_BUFFER_BYTES;
     if (setsockopt(state.sock_data, SOL_SOCKET, SO_RCVBUF, &recv_size, sizeof(send_size)) == -1)
 	{
         perror("setsockopt for receive buffer size");
