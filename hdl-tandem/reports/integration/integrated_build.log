@@ -1,0 +1,28 @@
+=== INTEGRATED build #5 started Tue Aug 11 02:27:53 AM UTC 2026 ===
+make: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/projects/pluto'
+make[1]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/axi_ad9361'
+make[1]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/axi_ad9361'
+make[1]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/axi_dmac'
+make[2]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_axis_fifo'
+make[3]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_cdc'
+make[3]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_cdc'
+make[2]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_axis_fifo'
+make[2]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_cdc'
+make[2]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_cdc'
+make[1]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/axi_dmac'
+make[1]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/axi_tdd'
+make[1]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/axi_tdd'
+make[1]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_pack/util_cpack2'
+make[1]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_pack/util_cpack2'
+make[1]: Entering directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_pack/util_upack2'
+make[1]: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/library/util_pack/util_upack2'
+Building pluto project [/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/projects/pluto/pluto_vivado.log] ... FAILED
+For details see /home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/projects/pluto/pluto_vivado.log
+
+make: *** [../scripts/project-xilinx.mk:102: pluto.sdk/system_top.xsa] Error 1
+make: Leaving directory '/home/mouse9911/gits/plutosdr-fw-tandem-agc-v1/hdl/projects/pluto'
+
+real	10m46.732s
+user	11m22.595s
+sys	0m48.992s
+=== INTEGRATED exit=2 Tue Aug 11 02:38:40 AM UTC 2026 ===

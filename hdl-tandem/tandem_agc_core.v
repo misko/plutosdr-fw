@@ -18,8 +18,8 @@
 `timescale 1ns/1ps
 
 module tandem_agc_core #(
-  parameter integer EVT_AW = 8,      // 256 entries, D-9
-  parameter integer EVT_DW = 128     // record layout, §7.1
+  parameter integer EVT_AW = 6,      // 64 entries; §7.3 worst case is ~18/frame
+  parameter integer EVT_DW = 104    // record layout, §7.1, exact width
 ) (
   input  wire             l_clk,
   input  wire             l_resetn,
@@ -39,7 +39,7 @@ module tandem_agc_core #(
   input  wire [7:0]       cfg_pulse_hi,
   input  wire [7:0]       cfg_pulse_lo,
   input  wire [15:0]      cfg_blank_guard,
-  input  wire [31:0]      cfg_pwr_period,
+  input  wire [19:0]      cfg_pwr_period,
   input  wire [7:0]       cfg_cooldown,    // in power-measurement periods, D-10
   input  wire [7:0]       cfg_dwell,       // in power-measurement periods
   input  wire [7:0]       cfg_debounce,
@@ -70,10 +70,10 @@ module tandem_agc_core #(
   output wire             fpga_owns_o,
   output wire [7:0]       fault_o,
   output wire [7:0]       detect_o,
-  output wire [31:0]      cnt_trans_o,
-  output wire [31:0]      cnt_inhib_o,
-  output wire [31:0]      cnt_clamp_o,
-  output wire [31:0]      cnt_stale_o,
+  output wire [7:0]       cnt_trans_o,
+  output wire [7:0]       cnt_inhib_o,
+  output wire [7:0]       cnt_clamp_o,
+  output wire [7:0]       cnt_stale_o,
 
   // ---- event FIFO. The read side may be in another clock domain (§9); tie
   //      evt_rd_clk to l_clk for a single-clock instantiation.
@@ -122,24 +122,25 @@ module tandem_agc_core #(
   // detector conditioning, §5.1: source register, 2-flop sync, debounce
   // ---------------------------------------------------------------------------
   reg [7:0] det_src, det_s1, det_s2, det_stable;
-  reg [7:0] det_cnt [0:7];
+  reg [7:0] det_h1, det_h2;      // agreement history, one shared control set
+  reg [7:0] deb_div;
+  wire      deb_tick = (deb_div >= cfg_debounce);
 
-  integer di;
   always @(posedge l_clk) begin
     if (!l_resetn) begin
       det_src <= 8'd0; det_s1 <= 8'd0; det_s2 <= 8'd0; det_stable <= 8'd0;
-      for (di = 0; di < 8; di = di + 1) det_cnt[di] <= 8'd0;
+      det_h1 <= 8'd0; det_h2 <= 8'd0; deb_div <= 8'd0;
     end else begin
-      det_src <= detect_async;
+      det_src <= detect_async;     // source-registered before the synchroniser
       det_s1  <= det_src;
       det_s2  <= det_s1;
-      for (di = 0; di < 8; di = di + 1) begin
-        if (det_s2[di] != det_stable[di]) begin
-          if (det_cnt[di] >= cfg_debounce) begin
-            det_stable[di] <= det_s2[di];
-            det_cnt[di]    <= 8'd0;
-          end else det_cnt[di] <= det_cnt[di] + 8'd1;
-        end else det_cnt[di] <= 8'd0;
+      deb_div <= deb_tick ? 8'd0 : deb_div + 8'd1;
+      if (deb_tick) begin
+        det_h1 <= det_s2;
+        det_h2 <= det_h1;
+        // a bit only moves after three consecutive agreeing samples
+        det_stable <= (det_s2 & det_h1 & det_h2)
+                    | (det_stable & ~(~det_s2 & ~det_h1 & ~det_h2));
       end
     end
   end
@@ -157,15 +158,15 @@ module tandem_agc_core #(
   // ---------------------------------------------------------------------------
   // power-measurement tick, D-10
   // ---------------------------------------------------------------------------
-  reg [31:0] pwr_div;
+  reg [19:0] pwr_div;
   reg        pwr_tick;
   always @(posedge l_clk) begin
     if (!l_resetn) begin
-      pwr_div <= 32'd0; pwr_tick <= 1'b0;
+      pwr_div <= 20'd0; pwr_tick <= 1'b0;
     end else if (pwr_div >= cfg_pwr_period) begin
-      pwr_div <= 32'd0; pwr_tick <= 1'b1;
+      pwr_div <= 20'd0; pwr_tick <= 1'b1;
     end else begin
-      pwr_div <= pwr_div + 32'd1; pwr_tick <= 1'b0;
+      pwr_div <= pwr_div + 20'd1; pwr_tick <= 1'b0;
     end
   end
 
@@ -234,8 +235,10 @@ module tandem_agc_core #(
   wire at_min = (expected_index <= cfg_idx_min);
   wire at_max = (expected_index >= cfg_idx_max);
 
-  reg [31:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
-  reg [31:0] evt_seq;
+  // 16 bits is ample for diagnostics and halves the flip-flops these cost
+  // both here and in the status crossing.
+  reg [7:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
+  reg [15:0] evt_seq;
   reg [3:0]  evt_reason;
   reg        evt_push;
 
@@ -245,8 +248,8 @@ module tandem_agc_core #(
   always @(posedge l_clk) begin
     if (!l_resetn) begin
       expected_index <= 8'd0; cooldown_cnt <= 8'd0; dwell_cnt <= 8'd0;
-      cnt_trans <= 32'd0; cnt_inhib <= 32'd0; cnt_clamp <= 32'd0;
-      evt_seq <= 32'd0; evt_reason <= 4'd0; evt_push <= 1'b0;
+      cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
+      evt_seq <= 16'd0; evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else begin
       evt_push <= 1'b0;
@@ -271,36 +274,36 @@ module tandem_agc_core #(
       if (may_decide) begin
         if (want_decrease) begin
           if (at_min) begin
-            cnt_clamp <= cnt_clamp + 32'd1;      // report, never spin
+            cnt_clamp <= (cnt_clamp == 8'hFF) ? cnt_clamp : cnt_clamp + 8'd1;      // report, never spin
           end else begin
             req_dir        <= 2'd2;
             fire_req       <= 1'b1;
             expected_index <= expected_index - 8'd1;
             evt_reason     <= (ch1_lglmt | ch2_lglmt) ? R_LG_LMT : R_LG_ADC;
             evt_push       <= 1'b1;
-            evt_seq        <= evt_seq + 32'd1;
+            evt_seq        <= evt_seq + 16'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
           end
         end else if (inhibit) begin
-          if (both_lp) cnt_inhib <= cnt_inhib + 32'd1;
+          if (both_lp) cnt_inhib <= (cnt_inhib == 8'hFF) ? cnt_inhib : cnt_inhib + 8'd1;
         end else if (both_lp && (dwell_cnt >= cfg_dwell)) begin
           if (at_max) begin
-            cnt_clamp <= cnt_clamp + 32'd1;
+            cnt_clamp <= (cnt_clamp == 8'hFF) ? cnt_clamp : cnt_clamp + 8'd1;
           end else begin
             req_dir        <= 2'd1;
             fire_req       <= 1'b1;
             expected_index <= expected_index + 8'd1;
             evt_reason     <= R_BOTH_LP;
             evt_push       <= 1'b1;
-            evt_seq        <= evt_seq + 32'd1;
+            evt_seq        <= evt_seq + 16'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
           end
         end else if (one_lp) begin
-          cnt_inhib <= cnt_inhib + 32'd1;        // starvation case, §5.4
+          cnt_inhib <= (cnt_inhib == 8'hFF) ? cnt_inhib : cnt_inhib + 8'd1;        // starvation case, §5.4
         end
       end
     end
@@ -313,7 +316,7 @@ module tandem_agc_core #(
   wire quiescent = !pulse_busy && !cooldown_active;
   always @(posedge l_clk) begin
     if (!l_resetn) begin
-      mismatch_seen <= 1'b0; cnt_stale <= 32'd0;
+      mismatch_seen <= 1'b0; cnt_stale <= 8'd0;
     end else if (sw_idx_strobe) begin
       if (state == ST_ACTIVE || state == ST_OWNED_IDLE) begin
         if (quiescent &&
@@ -332,7 +335,7 @@ module tandem_agc_core #(
   // write side stays in l_clk while software reads from the processor domain.
   // ---------------------------------------------------------------------------
   wire [EVT_DW-1:0] evt_wdata = {
-      8'd0, evt_seq, epoch, 2'd0, req_dir, evt_reason, expected_index, sample_counter };
+      evt_seq, epoch, 2'd0, req_dir, evt_reason, expected_index, sample_counter };
 
   wire fifo_full;
   tandem_async_fifo #(.W(EVT_DW), .AW(EVT_AW)) u_evt_fifo (

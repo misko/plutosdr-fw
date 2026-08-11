@@ -31,7 +31,7 @@ module tandem_agc_regs (
   output wire [7:0]  cfg_pulse_hi,
   output wire [7:0]  cfg_pulse_lo,
   output wire [15:0] cfg_blank_guard,
-  output wire [31:0] cfg_pwr_period,
+  output wire [19:0] cfg_pwr_period,
   output wire [7:0]  cfg_cooldown,
   output wire [7:0]  cfg_dwell,
   output wire [7:0]  cfg_debounce,
@@ -48,13 +48,13 @@ module tandem_agc_regs (
   input  wire        fpga_owns,
   input  wire [7:0]  fault,
   input  wire [7:0]  detect,
-  input  wire [31:0] cnt_trans,
-  input  wire [31:0] cnt_inhib,
-  input  wire [31:0] cnt_clamp,
-  input  wire [31:0] cnt_stale,
-  input  wire [127:0] evt_rdata,
+  input  wire [7:0]  cnt_trans,
+  input  wire [7:0]  cnt_inhib,
+  input  wire [7:0]  cnt_clamp,
+  input  wire [7:0]  cnt_stale,
+  input  wire [103:0] evt_rdata,
   input  wire        evt_valid,
-  input  wire [8:0]  evt_level,
+  input  wire [6:0]  evt_level,
   input  wire [31:0] evt_ovf,
   output wire        evt_pop
 );
@@ -65,7 +65,7 @@ module tandem_agc_regs (
   reg        r_fault_clear;
   reg [7:0]  r_pulse_hi, r_pulse_lo;
   reg [15:0] r_blank_guard;
-  reg [31:0] r_pwr_period;
+  reg [19:0] r_pwr_period;
   reg [7:0]  r_cooldown, r_dwell, r_debounce;
   reg [7:0]  r_idx_min, r_idx_max, r_idx_init;
 
@@ -80,7 +80,7 @@ module tandem_agc_regs (
       r_pulse_hi    <= 8'd16;         // D-2
       r_pulse_lo    <= 8'd16;
       r_blank_guard <= 16'd64;
-      r_pwr_period  <= 32'd10000;
+      r_pwr_period  <= 20'd10000;
       r_cooldown    <= 8'd2;          // §5.5, in power-measurement periods
       r_dwell       <= 8'd4;
       r_debounce    <= 8'd8;
@@ -96,7 +96,7 @@ module tandem_agc_regs (
                        r_idx_init <= reg_wdata[23:16]; end
           8'h1C: begin r_pulse_hi <= reg_wdata[7:0]; r_pulse_lo <= reg_wdata[15:8];
                        r_blank_guard <= reg_wdata[31:16]; end
-          8'h20: r_pwr_period <= reg_wdata;
+          8'h20: r_pwr_period <= reg_wdata[19:0];
           8'h24: begin r_cooldown <= reg_wdata[7:0]; r_dwell <= reg_wdata[15:8];
                        r_debounce <= reg_wdata[23:16]; end
           default: ;
@@ -108,7 +108,7 @@ module tandem_agc_regs (
   always @(*) begin
     case (reg_addr)
       8'h00: reg_rdata = ID_MAGIC;
-      8'h04: reg_rdata = {16'd0, 8'd128, 8'd8};       // record width, depth log2
+      8'h04: reg_rdata = {16'd0, 8'd104, 8'd6};       // record width, depth log2
       8'h08: reg_rdata = {23'd0, 1'b0, 6'd0, r_mode};
       8'h0C: reg_rdata = {24'd0, cooldown_active, pulse_busy,
                           1'b0, fpga_owns, 1'b0, state};
@@ -116,19 +116,19 @@ module tandem_agc_regs (
       8'h14: reg_rdata = {8'd0, r_idx_init, r_idx_max, r_idx_min};
       8'h18: reg_rdata = {24'd0, expected_index};
       8'h1C: reg_rdata = {r_blank_guard, r_pulse_lo, r_pulse_hi};
-      8'h20: reg_rdata = r_pwr_period;
+      8'h20: reg_rdata = {12'd0, r_pwr_period};
       8'h24: reg_rdata = {8'd0, r_debounce, r_dwell, r_cooldown};
       8'h2C: reg_rdata = {24'd0, fault};
       8'h30: reg_rdata = evt_rdata[31:0];
       8'h34: reg_rdata = evt_rdata[63:32];
       8'h38: reg_rdata = evt_rdata[95:64];
-      8'h3C: reg_rdata = evt_rdata[127:96];
-      8'h40: reg_rdata = {23'd0, evt_level};
+      8'h3C: reg_rdata = {24'd0, evt_rdata[103:96]};
+      8'h40: reg_rdata = {25'd0, evt_level};
       8'h44: reg_rdata = evt_ovf;
-      8'h48: reg_rdata = cnt_trans;
-      8'h4C: reg_rdata = cnt_stale;
-      8'h50: reg_rdata = cnt_inhib;
-      8'h54: reg_rdata = cnt_clamp;
+      8'h48: reg_rdata = {24'd0, cnt_trans};
+      8'h4C: reg_rdata = {24'd0, cnt_stale};
+      8'h50: reg_rdata = {24'd0, cnt_inhib};
+      8'h54: reg_rdata = {24'd0, cnt_clamp};
       8'h5C: reg_rdata = {24'd0, detect};
       default: reg_rdata = 32'd0;
     endcase

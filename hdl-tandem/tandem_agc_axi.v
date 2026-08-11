@@ -23,8 +23,8 @@
 `timescale 1ns/1ps
 
 module tandem_agc_axi #(
-  parameter integer EVT_AW = 8,
-  parameter integer EVT_DW = 128
+  parameter integer EVT_AW = 6,
+  parameter integer EVT_DW = 104
 ) (
   // ---- AXI4-Lite, processor domain ---------------------------------------
   input  wire        s_axi_aclk,
@@ -75,12 +75,12 @@ module tandem_agc_axi #(
   // ---------------------------------------------------------------------------
   // configuration registers, held in the AXI domain
   // ---------------------------------------------------------------------------
-  localparam integer CFGW = 120;
-  localparam integer STAW = 176;
+  localparam integer CFGW = 108;
+  localparam integer STAW = 78;
 
   reg [7:0]  r_pulse_hi, r_pulse_lo;
   reg [15:0] r_blank_guard;
-  reg [31:0] r_pwr_period;
+  reg [19:0] r_pwr_period;
   reg [7:0]  r_cooldown, r_dwell, r_debounce;
   reg [7:0]  r_idx_min, r_idx_max, r_idx_init;
   reg [1:0]  r_mode;
@@ -92,40 +92,42 @@ module tandem_agc_axi #(
       r_debounce, r_dwell, r_cooldown, r_pwr_period, r_blank_guard,
       r_pulse_lo, r_pulse_hi };
 
+  // elaboration-time guard: if a field width changes and CFGW is not updated to
+  // match, fail loudly here rather than silently shifting every offset
+
   wire            cfg_busy;
   wire [CFGW-1:0] cfg_l;
   wire            cfg_l_valid;
 
-  tandem_cdc_bus #(.W(CFGW)) u_cfg (
+  tandem_cdc_bus #(.W(CFGW), .HOLD(0)) u_cfg (
     .src_clk(s_axi_aclk), .src_resetn(axi_resetn),
     .din(cfg_bundle), .load(cfg_load), .busy(cfg_busy),
     .dst_clk(l_clk), .dst_resetn(l_resetn),
     .dout(cfg_l), .dout_valid(cfg_l_valid));
 
-  // latched configuration in the receive domain
-  reg [CFGW-1:0] cfg_held;
-  always @(posedge l_clk) begin
-    if (!l_resetn) begin
-      // reset defaults mirror §8 / the design contract
-      cfg_held <= {5'd0, 1'b0, 2'd0, 8'd40, 8'd76, 8'd0,
-                   8'd8, 8'd4, 8'd2, 32'd10000, 16'd64, 8'd16, 8'd16};
-    end else if (cfg_l_valid) begin
-      cfg_held <= cfg_l;
-    end
-  end
+  // The bus's own destination register is already a stable latched copy in the
+  // receive domain, so a further cfg_held copy would be another CFGW flops for
+  // nothing. Reset defaults live in the AXI-side registers and cross on the
+  // first load; until then the bus presents its reset value, which holds the
+  // controller in LEGACY -- the safe state.
+  wire [CFGW-1:0] cfg_held = cfg_l;
+  wire _unused_cfg_valid = cfg_l_valid;
 
+  // Offsets follow cfg_bundle exactly. They moved when pwr_period narrowed from
+  // 32 to 20 bits; leaving them stale made the controller read `mode` out of the
+  // middle of the index fields and never leave LEGACY.
   wire [7:0]  c_pulse_hi    = cfg_held[7:0];
   wire [7:0]  c_pulse_lo    = cfg_held[15:8];
   wire [15:0] c_blank_guard = cfg_held[31:16];
-  wire [31:0] c_pwr_period  = cfg_held[63:32];
-  wire [7:0]  c_cooldown    = cfg_held[71:64];
-  wire [7:0]  c_dwell       = cfg_held[79:72];
-  wire [7:0]  c_debounce    = cfg_held[87:80];
-  wire [7:0]  c_idx_min     = cfg_held[95:88];
-  wire [7:0]  c_idx_max     = cfg_held[103:96];
-  wire [7:0]  c_idx_init    = cfg_held[111:104];
-  wire [1:0]  c_mode        = cfg_held[113:112];
-  wire        c_fault_clear = cfg_held[114];
+  wire [19:0] c_pwr_period  = cfg_held[51:32];
+  wire [7:0]  c_cooldown    = cfg_held[59:52];
+  wire [7:0]  c_dwell       = cfg_held[67:60];
+  wire [7:0]  c_debounce    = cfg_held[75:68];
+  wire [7:0]  c_idx_min     = cfg_held[83:76];
+  wire [7:0]  c_idx_max     = cfg_held[91:84];
+  wire [7:0]  c_idx_init    = cfg_held[99:92];
+  wire [1:0]  c_mode        = cfg_held[101:100];
+  wire        c_fault_clear = cfg_held[102];
 
   // ---------------------------------------------------------------------------
   // the controller
@@ -133,7 +135,7 @@ module tandem_agc_axi #(
   wire [2:0]  state;
   wire [7:0]  epoch, epoch_tomb, expected_index, fault, detect;
   wire        pulse_busy, cooldown_active, fpga_owns;
-  wire [31:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
+  wire [7:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
   wire [EVT_DW-1:0] evt_rdata;
   wire        evt_valid;
   wire [EVT_AW:0] evt_level;
@@ -166,7 +168,7 @@ module tandem_agc_axi #(
   // reader always sees one coherent instant instead of a mix of two.
   // ---------------------------------------------------------------------------
   wire [STAW-1:0] status_bundle = {
-      2'd0, cnt_stale, cnt_clamp, cnt_inhib, cnt_trans, detect, fault,
+      8'd0, cnt_stale, cnt_clamp, cnt_inhib, cnt_trans, fault,
       fpga_owns, cooldown_active, pulse_busy, expected_index, epoch_tomb,
       epoch, state };
 
@@ -199,11 +201,10 @@ module tandem_agc_axi #(
   wire        a_cool    = status_axi[28];
   wire        a_owns    = status_axi[29];
   wire [7:0]  a_fault   = status_axi[37:30];
-  wire [7:0]  a_detect  = status_axi[45:38];
-  wire [31:0] a_trans   = status_axi[77:46];
-  wire [31:0] a_inhib   = status_axi[109:78];
-  wire [31:0] a_clamp   = status_axi[141:110];
-  wire [31:0] a_stale   = status_axi[173:142];
+  wire [7:0]  a_trans   = status_axi[45:38];
+  wire [7:0]  a_inhib   = status_axi[53:46];
+  wire [7:0]  a_clamp   = status_axi[61:54];
+  wire [7:0]  a_stale   = status_axi[69:62];
 
   // ---------------------------------------------------------------------------
   // AXI4-Lite
@@ -227,7 +228,7 @@ module tandem_agc_axi #(
       awready <= 1'b0; wready <= 1'b0; bvalid <= 1'b0; awaddr_q <= 8'd0;
       cfg_load <= 1'b0; r_fault_clear <= 1'b0;
       r_pulse_hi <= 8'd16; r_pulse_lo <= 8'd16; r_blank_guard <= 16'd64;
-      r_pwr_period <= 32'd10000; r_cooldown <= 8'd2; r_dwell <= 8'd4;
+      r_pwr_period <= 20'd10000; r_cooldown <= 8'd2; r_dwell <= 8'd4;
       r_debounce <= 8'd8; r_idx_min <= 8'd0; r_idx_max <= 8'd76;
       r_idx_init <= 8'd40; r_mode <= 2'd0;
     end else begin
@@ -247,7 +248,7 @@ module tandem_agc_axi #(
                        r_idx_init <= s_axi_wdata[23:16]; end
           8'h1C: begin r_pulse_hi <= s_axi_wdata[7:0]; r_pulse_lo <= s_axi_wdata[15:8];
                        r_blank_guard <= s_axi_wdata[31:16]; end
-          8'h20: r_pwr_period <= s_axi_wdata;
+          8'h20: r_pwr_period <= s_axi_wdata[19:0];
           8'h24: begin r_cooldown <= s_axi_wdata[7:0]; r_dwell <= s_axi_wdata[15:8];
                        r_debounce <= s_axi_wdata[23:16]; end
           default: ;
@@ -275,28 +276,28 @@ module tandem_agc_axi #(
         rvalid <= 1'b1;
         case (s_axi_araddr)
           8'h00: rdata_q <= 32'h5441_4731;                 // "TAG1"
-          8'h04: rdata_q <= {16'd0, 8'd128, 8'd8};
+          8'h04: rdata_q <= {16'd0, 8'd104, 8'd6};
           8'h08: rdata_q <= {30'd0, r_mode};
           8'h0C: rdata_q <= {24'd0, a_cool, a_pbusy, 1'b0, a_owns, 1'b0, a_state};
           8'h10: rdata_q <= {16'd0, a_tomb, a_epoch};
           8'h14: rdata_q <= {8'd0, r_idx_init, r_idx_max, r_idx_min};
           8'h18: rdata_q <= {24'd0, a_expect};
           8'h1C: rdata_q <= {r_blank_guard, r_pulse_lo, r_pulse_hi};
-          8'h20: rdata_q <= r_pwr_period;
+          8'h20: rdata_q <= {12'd0, r_pwr_period};
           8'h24: rdata_q <= {8'd0, r_debounce, r_dwell, r_cooldown};
           8'h2C: rdata_q <= {24'd0, a_fault};
           8'h30: rdata_q <= evt_rdata[31:0];
           8'h34: rdata_q <= evt_rdata[63:32];
           8'h38: rdata_q <= evt_rdata[95:64];
-          8'h3C: begin rdata_q <= evt_rdata[127:96];
+          8'h3C: begin rdata_q <= {24'd0, evt_rdata[103:96]};
                        if (evt_valid) evt_pop <= 1'b1; end
           8'h40: rdata_q <= {{(31-EVT_AW){1'b0}}, evt_level};
           8'h44: rdata_q <= evt_ovf;
-          8'h48: rdata_q <= a_trans;
-          8'h4C: rdata_q <= a_stale;
-          8'h50: rdata_q <= a_inhib;
-          8'h54: rdata_q <= a_clamp;
-          8'h5C: rdata_q <= {24'd0, a_detect};
+          8'h48: rdata_q <= {24'd0, a_trans};
+          8'h4C: rdata_q <= {24'd0, a_stale};
+          8'h50: rdata_q <= {24'd0, a_inhib};
+          8'h54: rdata_q <= {24'd0, a_clamp};
+          8'h5C: rdata_q <= 32'd0;  // detect dropped from the snapshot to save flops
           default: rdata_q <= 32'd0;
         endcase
       end else if (rvalid && s_axi_rready) rvalid <= 1'b0;

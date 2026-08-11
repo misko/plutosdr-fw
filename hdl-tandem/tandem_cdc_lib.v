@@ -71,7 +71,11 @@ endmodule
 // The source must not issue a new `load` until `busy` is low.
 // -----------------------------------------------------------------------------
 module tandem_cdc_bus #(
-  parameter integer W = 32
+  parameter integer W = 32,
+  // HOLD=0 when the source guarantees `din` is stable from `load` until `busy`
+  // clears. Saves W flip-flops. Use it wherever the caller already has the data
+  // in a register that does not move -- configuration is the obvious case.
+  parameter integer HOLD = 1
 ) (
   input  wire         src_clk,
   input  wire         src_resetn,
@@ -84,16 +88,18 @@ module tandem_cdc_bus #(
   output reg  [W-1:0] dout,
   output reg          dout_valid
 );
-  reg [W-1:0] hold;
-  reg         tog;
+  wire [W-1:0] hold;
+  reg  [W-1:0] hold_r;
+  reg          tog;
   always @(posedge src_clk) begin
     if (!src_resetn) begin
-      hold <= {W{1'b0}}; tog <= 1'b0;
+      hold_r <= {W{1'b0}}; tog <= 1'b0;
     end else if (load && !busy) begin
-      hold <= din;                 // registered in the SOURCE domain
-      tog  <= ~tog;
+      if (HOLD) hold_r <= din;     // registered in the SOURCE domain
+      tog <= ~tog;
     end
   end
+  assign hold = HOLD ? hold_r : din;
 
   wire tog_dst;
   tandem_sync_bit #(.STAGES(3)) u_tog (
