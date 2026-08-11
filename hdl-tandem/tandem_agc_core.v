@@ -19,7 +19,12 @@
 
 module tandem_agc_core #(
   parameter integer EVT_AW = 6,      // 64 entries; §7.3 worst case is ~18/frame
-  parameter integer EVT_DW = 104    // record layout, §7.1, exact width
+  parameter integer EVT_DW = 104,   // record layout, §7.1, exact width
+  // EVENTS=0 compiles out the whole event-capture path: FIFO, sequence counter,
+  // record registers and overflow tracking. Tandem gain control itself does not
+  // depend on any of it, so this is the lever that trades the exact per-sample
+  // gain series for area when the device cannot hold both.
+  parameter integer EVENTS = 1
 ) (
   input  wire             l_clk,
   input  wire             l_resetn,
@@ -338,11 +343,19 @@ module tandem_agc_core #(
       evt_seq, epoch, 2'd0, req_dir, evt_reason, expected_index, sample_counter };
 
   wire fifo_full;
-  tandem_async_fifo #(.W(EVT_DW), .AW(EVT_AW)) u_evt_fifo (
-    .wr_clk(l_clk), .wr_resetn(l_resetn), .wr_en(evt_push), .wr_data(evt_wdata),
-    .wr_full(fifo_full), .wr_ovf(evt_ovf_o),
-    .rd_clk(evt_rd_clk), .rd_resetn(evt_rd_resetn), .rd_en(evt_pop),
-    .rd_data(evt_rdata_o), .rd_valid(evt_valid_o), .rd_level(evt_level_o));
+  generate if (EVENTS) begin : g_events
+    tandem_async_fifo #(.W(EVT_DW), .AW(EVT_AW)) u_evt_fifo (
+      .wr_clk(l_clk), .wr_resetn(l_resetn), .wr_en(evt_push), .wr_data(evt_wdata),
+      .wr_full(fifo_full), .wr_ovf(evt_ovf_o),
+      .rd_clk(evt_rd_clk), .rd_resetn(evt_rd_resetn), .rd_en(evt_pop),
+      .rd_data(evt_rdata_o), .rd_valid(evt_valid_o), .rd_level(evt_level_o));
+  end else begin : g_no_events
+    assign fifo_full    = 1'b0;
+    assign evt_ovf_o    = 32'd0;
+    assign evt_rdata_o  = {EVT_DW{1'b0}};
+    assign evt_valid_o  = 1'b0;
+    assign evt_level_o  = {(EVT_AW+1){1'b0}};
+  end endgenerate
 
   assign evt_push_o  = evt_push;
   assign evt_wdata_o = evt_wdata;
