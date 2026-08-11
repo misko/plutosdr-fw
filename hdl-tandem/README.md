@@ -29,3 +29,43 @@ Out-of-context, so no placement pressure and no routing congestion. The
 integrated place-and-route against the RC17 baseline is the real answer.
 The canary also omits the AXI4-Lite slave (a standard component, roughly
 100–200 LUT and 150 FF) and simplifies the policy truth table.
+
+
+---
+
+# Tandem AGC controller — implementation
+
+`tandem_agc_core.v` is the controller, `tandem_agc_regs.v` the §8 control
+surface, `tandem_agc_wrap.v` the unit that integrates into the block design.
+`ad9361_gain_model.v` is a behavioural model of the part; every behaviour in it
+is either cited to UG-570 or measured by experiment E-AGC1.
+
+## Tests
+
+    ./run_tests.sh
+
+Four suites, all under Icarus Verilog:
+
+| Suite | Covers |
+|---|---|
+| `tb_ad9361_model` | 27 checks that the model itself is faithful, including that a 1-ClkRF pulse is rejected and a 2-cycle one accepted |
+| `tb_tandem_agc` (ratio 1.0) | closed loop at `rx_fir_dec = 2`, SPF production |
+| `tb_tandem_agc` (ratio 2.0) | closed loop at `rx_fir_dec = 1`, the device-tree boot default |
+| `tb_tandem_agc_regs` | the control surface, driven exactly as software will |
+
+The twelve §10 assertions run continuously as procedural checkers
+(`tandem_agc_checkers.v`) — Icarus has no SVA and this repository uses none.
+
+## Out-of-context synthesis, xc7z010clg400-1, l_clk @ 61.44 MHz
+
+| Resource | Core + regs | Device | % | Plan §6 estimate |
+|---|---:|---:|---:|---|
+| LUT | 516 | 17,600 | 2.93% | 500–1,000 |
+| FF | 478 | 35,200 | 1.36% | 600–1,400 |
+| BRAM36 | 2 | 60 | 3.33% | ~1 |
+| DSP | 0 | 80 | 0% | 0 |
+
+Against the measured RC17 baseline of 13,088 LUT this projects to **13,604 LUT
+= 77.3%**, inside the ~82% guardrail, with DSP unchanged at 72/80.
+
+Reproduce: `vivado -mode batch -source core_ooc.tcl`
