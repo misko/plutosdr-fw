@@ -31,7 +31,7 @@ is bit-for-bit what RC17 does today.
 | D-4 | Event sequence width | **32 bits**, wrap handled by serial-number comparison | Same technique RC17 uses for request-ID wrap. Fits the 6 free bytes of the existing wire record. |
 | D-5 | Ownership epoch width | **8 bits**, never zero, skips zero on wrap | Transposed from RC17's `generation`. Lives in the FIFO record and the frame header, **not** in the 16-byte wire record — there is no room, and stale-epoch events are dropped at drain so the wire never sees them. |
 | D-6 | Gain step size | **1 index = 1 dB**, both directions | Must be programmed explicitly: the shipped configuration currently moves **2** indices per edge. One index per pulse makes the FPGA model trivially auditable. |
-| D-7 | Default index window | **`[40, 54]`** | Derived from `gain_tables_audited.json`, not assumed. See §6.1 — this is the widest index window that holds `(LNA, MIXER, TIA)` constant in **all three** bands simultaneously, so it survives a band change and avoids every LNA transition. Costs dynamic range; see the tradeoff in §6.1 before accepting the default. |
+| D-7 | Index window | **configurable; default = full usable range** | The clamp mechanism is mandatory — the index model must not run off the end of a 77-row table — but the narrow phase-optimal window is **optional and off by default**. `[40, 54]` is documented in §6.1 as the setting to use when inter-channel phase matters more than dynamic range; it is not imposed. Tandem's cancellation does not depend on it (§6.1). |
 | D-8 | Absolute clamp bound | read from the device | `Maximum Full Table/LMT Table Index`, chip default 76. The D-7 window is configured on top of it; never hard-code either. |
 | D-9 | Event FIFO geometry | **256 deep × 128 bits** | 32,768 bits = exactly one BRAM36. Depth is ~15× the worst-case per-frame event count (see §7.3). Matches `SPF_MAX_GAIN_EVENTS`. |
 | D-10 | Cooldown timebase | **power-measurement periods**, not clock cycles | The low-power flag only updates once per decimated power-measurement period (256–410 µs at every supported rate). A cooldown in microseconds is meaningless against it. |
@@ -284,6 +284,16 @@ The **band-common** frozen window is therefore **indices 40…54** — 15 indice
 to 37…51 dB in the low band, 35…49 dB in the middle, and 26…40 dB in the high. Inside
 it, `(LNA, MIXER, TIA)` is constant in every band, so no tandem step can cross an LNA
 transition and the window survives a band change without re-derivation.
+
+**This window is optional and is not the default.** Per D-7 the clamp registers
+default to the full usable range; `[40, 54]` is an available configuration for
+deployments where inter-channel phase matters more than 15 dB of dynamic range.
+The reason it is safe to leave wide is that **tandem's cancellation does not depend
+on it**: tandem steps both channels together, so both arms' LNA words change
+simultaneously and `H(g1) − H(g2)` remains zero whichever block the table switches.
+The window narrows the arm-specific residual's worst case and variance, not the
+mechanism. Note also that the L6 LNA-bypass phase inversion was fixed in software in
+January 2024, so the window is not carrying a safety function either.
 
 Two things follow that must be decided rather than inherited:
 
@@ -585,4 +595,5 @@ motivated by, and how Campaign C is graded.
 | Rev | Date | Change |
 |---|---|---|
 | 1 | 2026-08-10 | Initial draft for review. Clock domain fixed to `l_clk` per D-1. |
+| 3 | 2026-08-11 | D-7 changed to optional: the clamp mechanism stays mandatory, the narrow `[40,54]` window becomes a documented configuration rather than the default, per the project decision to keep the focus on tandem itself. Rationale recorded in §6.1 — tandem's cancellation does not depend on the window. RC17 baseline measured and archived: every retained RC16 figure reproduces exactly. |
 | 2 | 2026-08-10 | Reconciled against E-AGC1 session 1 (both radios) and a bench/code audit. **Corrections:** D-7's index clamp was justified by LNA transitions "at indices 8, 20 and 30", which matched nothing in the audited tables — 8 and 20 are frozen-word dB values. Recomputed from `gain_tables_audited.json` to a band-common frozen window of `[40, 54]`, with the range/disturbance tradeoff stated (§6.1). The usable range is −1…62 dB band-common, not the asserted 27–73. **Closed:** O-1 and O-5, both by measurement. **Added:** ENSM-active precondition to the enable sequence, ENSM-while-armed handling, active rejection of host gain writes (the device accepts and ignores them with a success return), and O-6/O-7. |
