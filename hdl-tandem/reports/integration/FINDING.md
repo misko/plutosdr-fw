@@ -145,3 +145,82 @@ on this device to accept an additional AXI peripheral.**
 This is a Stage 3 result. It does not block Stage 1's design review, Stage 4's
 runtime work, or Stage 5's metadata and host work, none of which depend on a
 bitstream that fits. Those proceed independently.
+
+
+---
+
+# CORRECTION: the blocker was a missing constraint, not device capacity
+
+Everything above this line diagnosed a capacity problem. **That diagnosis was
+wrong.** With one constraint added, the same EVENTS=0 design closes timing at
+**+0.780 ns with zero failing endpoints** — better than the RC17 baseline's
++0.504 ns.
+
+| | WNS | Failing endpoints |
+|---|---:|---:|
+| RC17 baseline | +0.504 | 0 |
+| tandem, five placement + four timing attempts | **-2.391** best of nine | 230–394 |
+| tandem, one constraint added | **+0.780** | **0 of 53,382** |
+
+## What was actually wrong
+
+`clk_fpga_0` (100 MHz, PS PLL) and `rx_clk` (61.44 MHz, sourced from the
+AD9361) have no phase relationship whatsoever. Nothing in the project declared
+that. The baseline never needed it: it has only **8** endpoints between the two
+domains and they pass with +14.9 ns, so the omission was invisible.
+
+The tandem block adds **170** more. Every one of them was being timed as a
+single-cycle synchronous transfer between unrelated clocks — something no
+placer or router can ever achieve. Hence the signature the earlier analysis
+misread: zero logic levels, ~96% routing delay, and *nearly every* cross-domain
+endpoint failing (57 of 65 one way, 105 of 113 the other).
+
+The block's own out-of-context runs closed with +10.7 ns because
+`hdl-tandem/tandem_agc_axi.xdc` declares exactly this:
+
+    set_clock_groups -asynchronous -group [get_clocks s_axi_aclk] \
+                                   -group [get_clocks l_clk]
+
+That file is **never added to the integrated project**. The block is
+instantiated with `create_bd_cell -type module -reference`, and a plain module
+reference carries no constraints — only packaged IP does. So the design was
+correct, the constraint existed, and it simply never reached the build.
+
+## Why nine attempts all made it worse
+
+Because they were being asked to fix a constraint bug with placement. Four
+successive interventions each *regressed* the reported slack:
+
+| Attempt | WNS |
+|---|---:|
+| default flow | -2.391 |
+| `AltSpreadLogic_medium` | -3.649 |
+| `phys_opt AggressiveExplore` + `route Explore` | -3.895 |
+| pblock to `CLOCKREGION_X1Y1` | -3.740 |
+
+A consistent regression across four independent techniques should have been
+read as evidence that the target was not congestion. It was recorded above as
+"a consistent result, not a tuning accident" — correct observation, wrong
+conclusion drawn from it.
+
+The five *placement* failures earlier in this document are a separate matter
+and were real: at EVENTS=1 with the original datapath widths the block genuinely
+did not place. Whether it places now, with the placer no longer distorted by
+170 impossible paths, is being retested rather than assumed.
+
+## The constraint
+
+In `system_constr.xdc`, `set_max_delay -datapath_only` rather than
+`set_clock_groups -asynchronous`. Every crossing in `tandem_cdc_lib.v` is a
+handshake or gray-coded transfer whose data is stable for many source cycles
+before the destination samples it, so the setup relationship is meaningless —
+but the skew between the bits of a bus is not. Declaring a false path would
+drop that check too and permit a bus to be sampled mid-transition.
+
+## What this invalidates
+
+The "fork" above — drop the event-capture half, floorplan, or reduce the
+design — was a choice forced by a bug. `EVENTS=0` was adopted on that basis and
+is now being re-examined. Nothing else in the document's measurements is wrong;
+the LUT, FF and BRAM figures all stand. Only the conclusion drawn from them
+does not.
