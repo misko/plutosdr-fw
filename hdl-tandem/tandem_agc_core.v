@@ -75,12 +75,17 @@ module tandem_agc_core #(
   output wire [31:0]      cnt_clamp_o,
   output wire [31:0]      cnt_stale_o,
 
-  // ---- event FIFO ---------------------------------------------------------
+  // ---- event FIFO. The read side may be in another clock domain (§9); tie
+  //      evt_rd_clk to l_clk for a single-clock instantiation.
+  input  wire              evt_rd_clk,
+  input  wire              evt_rd_resetn,
   output wire [EVT_DW-1:0] evt_rdata_o,
   output wire              evt_valid_o,
   input  wire              evt_pop,
   output wire [EVT_AW:0]   evt_level_o,
-  output wire [31:0]       evt_ovf_o
+  output wire [31:0]       evt_ovf_o,
+  output wire              evt_push_o,
+  output wire [EVT_DW-1:0] evt_wdata_o
 );
 
   // ---------------------------------------------------------------------------
@@ -323,44 +328,21 @@ module tandem_agc_core #(
   end
 
   // ---------------------------------------------------------------------------
-  // event FIFO, D-9
+  // event FIFO, D-9. Uses the CDC library's gray-coded asynchronous FIFO so the
+  // write side stays in l_clk while software reads from the processor domain.
   // ---------------------------------------------------------------------------
-  reg [EVT_DW-1:0] evt_mem [0:(1<<EVT_AW)-1];
-  reg [EVT_AW:0]   wptr, rptr;
-  reg [31:0]       evt_ovf;
-
-  wire full  = (wptr[EVT_AW-1:0] == rptr[EVT_AW-1:0]) && (wptr[EVT_AW] != rptr[EVT_AW]);
-  wire empty = (wptr == rptr);
-
   wire [EVT_DW-1:0] evt_wdata = {
       8'd0, evt_seq, epoch, 2'd0, req_dir, evt_reason, expected_index, sample_counter };
 
-  always @(posedge l_clk) begin
-    if (!l_resetn) begin
-      wptr <= 0; rptr <= 0; evt_ovf <= 32'd0;
-    end else begin
-      if (evt_push) begin
-        if (full) evt_ovf <= evt_ovf + 32'd1;   // never silent, §7.5
-        else begin
-          evt_mem[wptr[EVT_AW-1:0]] <= evt_wdata;
-          wptr <= wptr + 1'b1;
-        end
-      end
-      if (evt_pop && !empty) rptr <= rptr + 1'b1;
-    end
-  end
+  wire fifo_full;
+  tandem_async_fifo #(.W(EVT_DW), .AW(EVT_AW)) u_evt_fifo (
+    .wr_clk(l_clk), .wr_resetn(l_resetn), .wr_en(evt_push), .wr_data(evt_wdata),
+    .wr_full(fifo_full), .wr_ovf(evt_ovf_o),
+    .rd_clk(evt_rd_clk), .rd_resetn(evt_rd_resetn), .rd_en(evt_pop),
+    .rd_data(evt_rdata_o), .rd_valid(evt_valid_o), .rd_level(evt_level_o));
 
-  // Synchronous read. An asynchronous `assign evt_rdata_o = evt_mem[...]`
-  // cannot map to block RAM and infers distributed LUT-RAM instead, which cost
-  // ~850 extra LUT and lost both BRAM tiles when first measured. The register
-  // file reads the four words while the entry is stable, and pops on the last,
-  // so a one-cycle read latency is invisible to it.
-  reg [EVT_DW-1:0] evt_rdata_r;
-  always @(posedge l_clk) evt_rdata_r <= evt_mem[rptr[EVT_AW-1:0]];
-  assign evt_rdata_o = evt_rdata_r;
-  assign evt_valid_o = !empty;
-  assign evt_level_o = wptr - rptr;
-  assign evt_ovf_o   = evt_ovf;
+  assign evt_push_o  = evt_push;
+  assign evt_wdata_o = evt_wdata;
 
   // ---------------------------------------------------------------------------
   // faults, sticky
@@ -369,7 +351,7 @@ module tandem_agc_core #(
     if (!l_resetn) fault <= 8'd0;
     else begin
       if (fault_clear && state == ST_FAULTED) fault <= 8'd0;
-      if (evt_push && full)                   fault[F_FIFO_OVF]    <= 1'b1;
+      if (evt_push && fifo_full)              fault[F_FIFO_OVF]    <= 1'b1;
       if (mismatch_seen && sw_idx_strobe && quiescent &&
           ((sw_idx_rx1 != expected_index) || (sw_idx_rx2 != expected_index)))
                                               fault[F_IDX_MISMTCH] <= 1'b1;
