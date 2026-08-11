@@ -19,7 +19,7 @@ module tb_tandem_agc_stress;
 
   reg [7:0]  cfg_pulse_hi = 8'd4, cfg_pulse_lo = 8'd4;
   reg [15:0] cfg_blank_guard = 16'd8;
-  reg [31:0] cfg_pwr_period = 32'd12;
+  reg [19:0] cfg_pwr_period = 20'd12;
   reg [7:0]  cfg_cooldown = 8'd2, cfg_dwell = 8'd2, cfg_debounce = 8'd1;
   reg [7:0]  cfg_idx_min = 8'd0, cfg_idx_max = 8'd76, cfg_idx_init = 8'd40;
 
@@ -40,10 +40,10 @@ module tb_tandem_agc_stress;
   wire [2:0] state;
   wire [7:0] epoch, epoch_tomb, expected_index, fault, det_stable;
   wire       pulse_busy, cooldown_active, fpga_owns;
-  wire [31:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
-  wire [127:0] evt_rdata;
+  wire [7:0]  cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
+  wire [103:0] evt_rdata;
   wire       evt_valid;
-  wire [8:0] evt_level;
+  wire [6:0] evt_level;
   wire [31:0] evt_ovf;
   wire [7:0] m_rx1, m_rx2;
   wire [31:0] m_acc, m_rej, m_ign;
@@ -151,7 +151,7 @@ module tb_tandem_agc_stress;
         tick(3);                                     // far faster than a period
       end
       check(a_err == ae0, "chattering inputs raise no assertion");
-      check(cnt_trans - t0 < 32'd80,
+      check(cnt_trans - t0 < 8'd80,
             "dwell and cooldown bound the transition rate under chatter");
       stop;
     end
@@ -212,7 +212,7 @@ module tb_tandem_agc_stress;
 
     // -- 6. FIFO overflow must be sticky and reported, never silent ---------
     begin : overflow
-      cfg_pwr_period = 32'd4; cfg_cooldown = 8'd1; cfg_dwell = 8'd1;
+      cfg_pwr_period = 20'd4; cfg_cooldown = 8'd1; cfg_dwell = 8'd1;
       go(2'd2);
       evt_pop = 1'b0;                       // never drain
       for (k = 0; k < 2000; k = k + 1) begin
@@ -223,11 +223,12 @@ module tb_tandem_agc_stress;
       end
       check(evt_ovf > 32'd0,      "FIFO overflow is counted");
       check(fault[0] == 1'b1,     "FIFO overflow sets a sticky fault");
-      check(evt_level == 9'd256,  "the FIFO is full at its configured depth");
+      check(evt_level == (1 << core.EVT_AW),
+            "the FIFO is full at its configured depth");
       stop;
       fault_clear = 1'b1; tick(4); fault_clear = 1'b0; tick(10);
       check(fault == 8'd0, "fault_clear clears the sticky fault");
-      cfg_pwr_period = 32'd12; cfg_cooldown = 8'd2; cfg_dwell = 8'd2;
+      cfg_pwr_period = 20'd12; cfg_cooldown = 8'd2; cfg_dwell = 8'd2;
       // drain it out so later cases start clean
       while (evt_valid) begin
         @(posedge l_clk); evt_pop = 1'b1; @(posedge l_clk); evt_pop = 1'b0;
@@ -236,13 +237,13 @@ module tb_tandem_agc_stress;
 
     // -- 7. event sequence rollover ----------------------------------------
     begin : seq_rollover
-      reg [31:0] s_before;
+      reg [15:0] s_before;
       ae0 = a_err;
       go(2'd2);
       // Teleport the counter close to the wrap. This is an artificial jump, not
       // a wrap, so the checker's history is void across it -- re-baseline, or it
       // would (correctly) flag the jump itself as non-monotonic.
-      core.evt_seq = 32'hFFFF_FFFE;
+      core.evt_seq = 16'hFFFE;
       chk.seq_seen = 1'b0;
       s_before = core.evt_seq;
       rx1_level = -16'sd25; rx2_level = -16'sd25;

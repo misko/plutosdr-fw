@@ -27,9 +27,9 @@ module tb_tandem_agc_regs;
   wire [7:0]  epoch, epoch_tomb, expected_index, fault, detect;
   wire        pulse_busy, cooldown_active, fpga_owns;
   wire [31:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
-  wire [127:0] evt_rdata;
+  wire [103:0] evt_rdata;
   wire        evt_valid, evt_pop;
-  wire [8:0]  evt_level;
+  wire [6:0]  evt_level;
   wire [31:0] evt_ovf;
 
   wire [3:0]  ctl_o, ctl_t;

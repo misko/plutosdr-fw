@@ -1,0 +1,91 @@
+diff --git a/projects/pluto/system_bd.tcl b/projects/pluto/system_bd.tcl
+index 78e3ef30..d7763517 100644
+--- a/projects/pluto/system_bd.tcl
++++ b/projects/pluto/system_bd.tcl
+@@ -443,6 +443,36 @@ ad_cpu_interconnect 0x7C420000 axi_ad9361_dac_dma
+ ad_cpu_interconnect 0x7C430000 axi_spi
+ ad_cpu_interconnect 0x7C440000 axi_tdd_0
+ 
++# ---------------------------------------------------------------------------
++# tandem AGC: owns the four AD9361 CTRL_IN pins and steps RX1/RX2 gain together.
++# Lives in the l_clk (receive) domain; the AXI side is the processor domain and
++# every crossing between them is inside the block (TANDEM_AGC_V1_DESIGN.md §9).
++# ---------------------------------------------------------------------------
++create_bd_port -dir I -from 7 -to 0 tandem_detect
++create_bd_port -dir I -from 3 -to 0 tandem_ps_ctl_o
++create_bd_port -dir I -from 3 -to 0 tandem_ps_ctl_t
++create_bd_port -dir O -from 3 -to 0 tandem_ctl_o
++create_bd_port -dir O -from 3 -to 0 tandem_ctl_t
++
++set tandem_dir [file normalize [file join [file dirname [info script]] "../../../hdl-tandem"]]
++add_files -norecurse -fileset sources_1 [list \
++  "$tandem_dir/tandem_cdc_lib.v" \
++  "$tandem_dir/tandem_agc_core.v" \
++  "$tandem_dir/tandem_agc_axi.v"]
++update_compile_order -fileset sources_1
++
++create_bd_cell -type module -reference tandem_agc_axi i_tandem_agc
++ad_connect axi_ad9361/l_clk        i_tandem_agc/l_clk
++ad_connect sys_cpu_resetn          i_tandem_agc/l_aresetn
++ad_connect counter_timestamp/Q     i_tandem_agc/sample_counter
++ad_connect tandem_detect           i_tandem_agc/detect_async
++ad_connect tandem_ps_ctl_o         i_tandem_agc/ps_ctl_o
++ad_connect tandem_ps_ctl_t         i_tandem_agc/ps_ctl_t
++ad_connect i_tandem_agc/ctl_o      tandem_ctl_o
++ad_connect i_tandem_agc/ctl_t      tandem_ctl_t
++ad_connect VCC                     i_tandem_agc/consumer_ready
++ad_cpu_interconnect 0x7C450000 i_tandem_agc
++
+ ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP1 {1}
+ ad_connect sys_cpu_clk sys_ps7/S_AXI_HP1_ACLK
+ ad_connect axi_ad9361_adc_dma/m_dest_axi sys_ps7/S_AXI_HP1
+diff --git a/projects/pluto/system_project.tcl b/projects/pluto/system_project.tcl
+index ddb6672b..fa623c7f 100644
+--- a/projects/pluto/system_project.tcl
++++ b/projects/pluto/system_project.tcl
+@@ -10,6 +10,7 @@ adi_project_files pluto [list \
+   "$ad_hdl_dir/library/common/ad_iobuf.v"]
+ 
+ set_property is_enabled false [get_files  *system_sys_ps7_0.xdc]
++
+ adi_project_run pluto
+ source $ad_hdl_dir/library/axi_ad9361/axi_ad9361_delay.tcl
+ 
+diff --git a/projects/pluto/system_top.v b/projects/pluto/system_top.v
+index e491027f..c8c37856 100644
+--- a/projects/pluto/system_top.v
++++ b/projects/pluto/system_top.v
+@@ -106,11 +106,19 @@ module system_top (
+ 
+   // instantiations
+ 
++  // Tandem AGC ownership mux. Bits [11:8] are gpio_ctl = AD9361 CTRL_IN[3:0];
++  // the tandem block drives BOTH the value and the tri-state for those four
++  // lines, and passes the PS through untouched when it does not own them.
++  // Everything else reaches the iobuf exactly as before.
++  wire [3:0] tandem_ctl_o;
++  wire [3:0] tandem_ctl_t;
++  wire [7:0] tandem_detect = gpio_i[7:0];   // CTRL_OUT page 0x03 readback
++
+   ad_iobuf #(
+     .DATA_WIDTH(14)
+   ) i_iobuf (
+-    .dio_t (gpio_t[13:0]),
+-    .dio_i (gpio_o[13:0]),
++    .dio_t ({gpio_t[13:12], tandem_ctl_t, gpio_t[7:0]}),
++    .dio_i ({gpio_o[13:12], tandem_ctl_o, gpio_o[7:0]}),
+     .dio_o (gpio_i[13:0]),
+     .dio_p ({ gpio_resetb,        // 13:13
+               gpio_en_agc,        // 12:12
+@@ -168,6 +176,11 @@ module system_top (
+     .gpio_t (gpio_t),
+     .iic_main_scl_io (iic_scl),
+     .iic_main_sda_io (iic_sda),
++    .tandem_detect (tandem_detect),
++    .tandem_ps_ctl_o (gpio_o[11:8]),
++    .tandem_ps_ctl_t (gpio_t[11:8]),
++    .tandem_ctl_o (tandem_ctl_o),
++    .tandem_ctl_t (tandem_ctl_t),
+     .rx_clk_in (rx_clk_in),
+     .rx_data_in (rx_data_in),
+     .rx_frame_in (rx_frame_in),

@@ -13,7 +13,7 @@
 `timescale 1ns/1ps
 
 module tandem_agc_checkers #(
-  parameter integer EVT_DW = 128
+  parameter integer EVT_DW = 104
 ) (
   input  wire              l_clk,
   input  wire              l_resetn,
@@ -49,7 +49,7 @@ module tandem_agc_checkers #(
   reg       was_high;
   reg [7:0] exp_idx_d;
   reg       evt_push_d;
-  reg [31:0] last_seq;
+  reg [15:0] last_seq;
   reg [7:0]  last_epoch;
   reg        seq_seen;
   reg [3:0]  ps_o_d;
@@ -68,7 +68,7 @@ module tandem_agc_checkers #(
   initial begin
     a_err = 0; hi_run = 0; lo_run = 0; was_high = 0;
     cd_d = 0; blank_d = 0; fault_d = 0;
-    last_seq = 0; last_epoch = 0; seq_seen = 0;
+    last_seq = 16'd0; last_epoch = 0; seq_seen = 0;
   end
 
   always @(posedge l_clk) begin
@@ -84,7 +84,7 @@ module tandem_agc_checkers #(
 
     if (!l_resetn) begin
       seq_seen   <= 1'b0;          // history is void across a reset
-      last_seq   <= 32'd0;
+      last_seq   <= 16'd0;
       last_epoch <= 8'd0;
     end else begin
 
@@ -147,10 +147,10 @@ module tandem_agc_checkers #(
         if (seq_seen && (evt_wdata[87:80] == last_epoch)) begin
           // serial-number comparison (D-4): "after" means the signed difference
           // is positive, so a wrap at 2^32 is ordered correctly.
-          if ($signed(evt_wdata[119:88] - last_seq) <= 0)
+          if ($signed(evt_wdata[103:88] - last_seq) <= 0)
             fail("A-10 event sequence not monotonic within the epoch");
         end
-        last_seq   <= evt_wdata[119:88];
+        last_seq   <= evt_wdata[103:88];
         last_epoch <= evt_wdata[87:80];
         seq_seen   <= 1'b1;
       end
