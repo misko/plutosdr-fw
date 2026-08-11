@@ -32,25 +32,32 @@ run tb_ad9361_model "${here}/ad9361_gain_model.v" "${here}/tb_ad9361_model.v"
 
 # 2. closed loop at ratio 1.0 (rx_fir_dec = 2, SPF production at 30 MS/s)
 EXTRA_ARGS="" run tb_tandem_agc \
-    "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
+    "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
     "${here}/tandem_agc_checkers.v" "${here}/tb_tandem_agc.v"
 
 # 3. closed loop at ratio 2.0 (rx_fir_dec = 1, the device-tree boot default and
 #    the case where a naive two-cycle pulse would be illegal)
 EXTRA_ARGS="-Ptb_tandem_agc.CLKRF_DIV=2" run tb_tandem_agc \
-    "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
+    "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
     "${here}/tandem_agc_checkers.v" "${here}/tb_tandem_agc.v"
 
 # 4. §8.2 edge cases: randomised traffic, reset in every state, disable at every
 #    pulse phase, chatter, long idle, FIFO overflow, rollover, index mismatch
 run tb_tandem_agc_stress \
-    "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
+    "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
     "${here}/tandem_agc_checkers.v" "${here}/tb_tandem_agc_stress.v"
 
 # 5. the control surface, driven exactly as software will drive it
 run tb_tandem_agc_regs \
-    "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
+    "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
     "${here}/tandem_agc_regs.v" "${here}/tb_tandem_agc_regs.v"
+
+# 6. the AXI4-Lite slave with the processor and receive domains genuinely
+#    asynchronous -- the configuration this actually ships in
+run tb_tandem_agc_axi \
+    "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" \
+    "${here}/tandem_agc_core.v" "${here}/tandem_agc_axi.v" \
+    "${here}/tb_tandem_agc_axi.v"
 
 echo
 echo "ALL TANDEM AGC TESTS PASSED"

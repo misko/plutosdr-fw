@@ -79,6 +79,7 @@ module tb_tandem_agc_regs;
     .fault_o(fault), .detect_o(detect),
     .cnt_trans_o(cnt_trans), .cnt_inhib_o(cnt_inhib),
     .cnt_clamp_o(cnt_clamp), .cnt_stale_o(cnt_stale),
+    .evt_rd_clk(l_clk), .evt_rd_resetn(l_resetn),
     .evt_rdata_o(evt_rdata), .evt_valid_o(evt_valid), .evt_pop(evt_pop),
     .evt_level_o(evt_level), .evt_ovf_o(evt_ovf));
 
