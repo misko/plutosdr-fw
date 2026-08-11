@@ -1,3 +1,25 @@
+> **STALE — do not read this tree as the current gadget.**
+>
+> This vendored copy predates protocol v3. It has no `spf_radio_frame_v3.c`, no
+> `spf_ip_*` transport, and no `thread_read_v3.c`; its `spf_gain_metadata.h` is
+> a v2-era header that happens to define some v3 constants, which makes the
+> staleness easy to miss.
+>
+> The gadget actually built and shipped lives in tags on this repository:
+>
+> | What | Where |
+> | --- | --- |
+> | current (RC17, IP transport) | `gain-series-v4-rc17-source/ip-gadget-final-v2` |
+> | last USB-transport gadget | `gain-series-v4-rc14-source/gadget` |
+> | frame builder + metadata ABI | `gain-series-v4-rc14-source/gadget` |
+>
+> Extract one with `git archive <tag> | tar -x -C <dir>`. Patches against them
+> live in `runtime/integration/`.
+>
+> Left in place rather than deleted because the build system still references
+> this path; correcting that is tracked as a Stage 0 item in
+> `tandem_agc_plan.md`.
+
 # SDR USB Gadget
 
 This repository implements a simple(ish) daemon which provides a Linux USB Gadget, attempting to perform a high performance interface to transfer IIO buffers.
