@@ -23,6 +23,10 @@ run() {
     vvp "${work}/${top}"
 }
 
+# 0. the CDC primitives: RC3/RC4 died on CDC-10, RC5/RC6 on clock and reset
+#    ordering, so these are tested before anything that uses them
+run tb_tandem_cdc "${here}/tandem_cdc_lib.v" "${here}/tb_tandem_cdc.v"
+
 # 1. the model must be right before anything is tested against it
 run tb_ad9361_model "${here}/ad9361_gain_model.v" "${here}/tb_ad9361_model.v"
 
