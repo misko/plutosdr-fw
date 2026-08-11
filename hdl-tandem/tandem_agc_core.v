@@ -88,7 +88,7 @@ module tandem_agc_core #(
   output wire              evt_valid_o,
   input  wire              evt_pop,
   output wire [EVT_AW:0]   evt_level_o,
-  output wire [31:0]       evt_ovf_o,
+  output wire [7:0]        evt_ovf_o,
   output wire              evt_push_o,
   output wire [EVT_DW-1:0] evt_wdata_o
 );
@@ -351,7 +351,7 @@ module tandem_agc_core #(
       .rd_data(evt_rdata_o), .rd_valid(evt_valid_o), .rd_level(evt_level_o));
   end else begin : g_no_events
     assign fifo_full    = 1'b0;
-    assign evt_ovf_o    = 32'd0;
+    assign evt_ovf_o    = 8'd0;
     assign evt_rdata_o  = {EVT_DW{1'b0}};
     assign evt_valid_o  = 1'b0;
     assign evt_level_o  = {(EVT_AW+1){1'b0}};

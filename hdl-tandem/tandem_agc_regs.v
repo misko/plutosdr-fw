@@ -55,7 +55,7 @@ module tandem_agc_regs (
   input  wire [103:0] evt_rdata,
   input  wire        evt_valid,
   input  wire [6:0]  evt_level,
-  input  wire [31:0] evt_ovf,
+  input  wire [7:0]  evt_ovf,
   output wire        evt_pop
 );
 
@@ -124,7 +124,7 @@ module tandem_agc_regs (
       8'h38: reg_rdata = evt_rdata[95:64];
       8'h3C: reg_rdata = {24'd0, evt_rdata[103:96]};
       8'h40: reg_rdata = {25'd0, evt_level};
-      8'h44: reg_rdata = evt_ovf;
+      8'h44: reg_rdata = {24'd0, evt_ovf};
       8'h48: reg_rdata = {24'd0, cnt_trans};
       8'h4C: reg_rdata = {24'd0, cnt_stale};
       8'h50: reg_rdata = {24'd0, cnt_inhib};

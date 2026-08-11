@@ -224,3 +224,44 @@ design — was a choice forced by a bug. `EVENTS=0` was adopted on that basis an
 is now being re-examined. Nothing else in the document's measurements is wrong;
 the LUT, FF and BRAM figures all stand. Only the conclusion drawn from them
 does not.
+
+
+---
+
+# RESOLVED: EVENTS=1 fits, with timing met
+
+With the constraint in place, `EVENTS=1` -- the full design, event capture
+included -- places, routes and **meets timing**.
+
+| Variant | WNS | Failing | LUT | BRAM | Bitstream |
+|---|---:|---:|---:|---:|:--:|
+| RC17 baseline | +0.504 | 0 | 13,088 | 6 | — |
+| EVENTS=0 + constraint | +0.780 | 0 | 13,394 (76.10%) | 6 | yes |
+| **EVENTS=1 + constraint** | **+0.606** | **0 of 53,718** | **13,463 (76.49%)** | 7.5 | **yes** |
+
+One further change was needed. The first `EVENTS=1` attempt missed placement by
+**five slices** (2,343 required against 2,338 available), with the placer
+reporting 486 control sets and noting that flip-flops therefore could not pack
+to fill every slice. LUTs were not the constraint -- 14,791 of 17,600.
+
+The event FIFO's overflow counter was still 32 bits, the last survivor of a
+narrowing pass that had already taken every sibling counter (`cnt_trans`,
+`cnt_inhib`, `cnt_clamp`, `cnt_stale`) to 8. Narrowing it, in the counter and
+in its domain crossing, recovered the margin.
+
+It also now **saturates** rather than wrapping. An 8-bit counter that wraps
+reports "almost none" after 256 drops, which is worse than reporting nothing:
+the frame would look healthy. Saturating at 255 keeps "we lost count" and
+"we lost none" distinguishable, which is the same principle as the
+producer-armed validity flag on the host side.
+
+## Result
+
+Stage 3 is unblocked with **no functional reduction**. The event-capture path
+that Stage 5's metadata work depends on is present in a bitstream that meets
+timing with more margin than the baseline it was thought not to fit into.
+
+Slice occupancy is 100% (4,400 of 4,400) in both closing variants. That is
+expected at 76% LUT -- a slice counts as occupied if anything is in it -- but
+it does mean there is no headroom for a further addition without another
+reduction somewhere.

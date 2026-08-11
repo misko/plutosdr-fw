@@ -140,7 +140,7 @@ module tandem_agc_axi #(
   wire [EVT_DW-1:0] evt_rdata;
   wire        evt_valid;
   wire [EVT_AW:0] evt_level;
-  wire [31:0] evt_ovf;
+  wire [7:0]  evt_ovf;
   reg         evt_pop;
 
   tandem_agc_core #(.EVT_AW(EVT_AW), .EVT_DW(EVT_DW), .EVENTS(EVENTS)) u_core (
@@ -293,7 +293,7 @@ module tandem_agc_axi #(
           8'h3C: begin rdata_q <= {24'd0, evt_rdata[103:96]};
                        if (evt_valid) evt_pop <= 1'b1; end
           8'h40: rdata_q <= {{(31-EVT_AW){1'b0}}, evt_level};
-          8'h44: rdata_q <= evt_ovf;
+          8'h44: rdata_q <= {24'd0, evt_ovf};
           8'h48: rdata_q <= {24'd0, a_trans};
           8'h4C: rdata_q <= {24'd0, a_stale};
           8'h50: rdata_q <= {24'd0, a_inhib};
