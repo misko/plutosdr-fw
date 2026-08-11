@@ -1,12 +1,18 @@
 # Source-only manifest for the gain-series v5 candidate: v4's source graph with
 # the tandem AGC HDL integration.
 #
-# Two pins differ from manifests/gain-series-v4-source.yaml: hdl carries the
-# tandem block, and linux carries the driver and device-tree node that make the
-# block reachable from a host. Everything else -- gadget, ip-gadget, buildroot,
+# Three pins differ from manifests/gain-series-v4-source.yaml: hdl carries the
+# tandem block, linux carries the driver and device-tree node that make it
+# reachable from a host, and buildroot carries the package that puts the
+# operator tool in the rootfs. Everything else -- gadget, ip-gadget,
 # hdl-quantulum, u-boot-xlnx -- is the tree that shipped as
 # v0.38-plutoplus-spf-gain-series-v4, so anything that changes between v4 and
-# v5 RC1 is attributable to tandem alone.
+# v5 is attributable to tandem alone.
+#
+# The runtime source itself is pinned by the buildroot package, not here:
+# package/spf_gainctl fetches runtime/ from plutosdr-fw at
+# refs/tags/gain-series-v5-rc3-source/runtime, the same way sdr_ip_gadget pins
+# its own tree.
 #
 # Original header follows.
 #
@@ -31,9 +37,9 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 56b7bc54d47a16c55e9cb71ed519544892ac63db
+submodule_buildroot: 1a2a00298e9155ce384736dcd6be6a0e674b74bd
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/gain-series-v4-rc17-source/buildroot-final-v2
+submodule_buildroot_ref: refs/tags/gain-series-v5-rc3-source/buildroot
 
 submodule_hdl: 3475a1bb293272f858b4c9cfd14bd1cd4ef0022f
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
