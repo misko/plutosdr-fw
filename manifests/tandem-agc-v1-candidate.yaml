@@ -1,0 +1,73 @@
+# Candidate freeze record for tandem AGC v1.
+#
+# This is NOT a release manifest. It records what was built and verified so a
+# release manifest can be written against it once a DFU exists and hardware
+# acceptance has run. The existing manifests in this directory are immutable
+# records of *deployed* firmware; this one describes a candidate that has never
+# been on a radio.
+#
+# Same flat key: value subset of YAML the other manifests use, so
+# scripts/verify_release.sh can read it with coreutils alone.
+
+schema: plutosdr-fw.candidate-record
+schema_version: 1
+
+candidate: tandem-agc-v1
+status: not-released
+released: false
+
+# ------------------------------------------------------------ source graph ---
+plutosdr_fw_commit: 163a9c661c49a0bc7c6a7cca88db6b5d57f59d87
+plutosdr_fw_branch: main
+hdl_base_commit: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
+# The hdl submodule is modified in-tree; the changes are captured as
+# hdl-tandem/integration/pluto_integration.patch and are NOT committed to the
+# submodule. A release must land that patch on a real branch first.
+hdl_patch: hdl-tandem/integration/pluto_integration.patch
+hdl_patch_state: uncommitted-working-tree
+
+# ---------------------------------------------------------------- artifact ---
+# The bitstream is the only binary this candidate has produced. There is no
+# DFU, no rootfs and no kernel: the gadget's event-producer patch is not yet
+# compiled, so a full image would not exercise the feature anyway.
+bitstream_sha256: 0fabcd43c942151857b02eba2e3b102637bc95a07dd08cd81e82ea4d49ba4e24
+bitstream_path: hdl/projects/pluto/pluto.runs/impl_1/system_top.bit
+vivado_version: 2022.2
+device: xc7z010clg400-1
+
+# ------------------------------------------------------------------ timing ---
+# Better than the RC17 baseline it was previously thought not to fit into.
+wns_ns: 0.606
+tns_ns: 0.000
+failing_endpoints: 0
+total_endpoints: 53718
+baseline_wns_ns: 0.504
+timing_met: true
+
+# ------------------------------------------------------------- utilisation ---
+lut: 13463
+lut_percent: 76.49
+registers: 23111
+bram_tiles: 7.5
+dsp: 72
+slice_percent: 100.00
+events_capture_enabled: true
+
+# ------------------------------------------------------------------- tests ---
+hdl_suites: 7
+hdl_result: pass
+runtime_ctest_suites: 5
+runtime_tests: 39
+runtime_result: pass
+runtime_flags: -Wall -Wextra -Werror
+
+# ------------------------------------------------- what is NOT verified yet ---
+# Everything below must be closed before this becomes a release manifest.
+# Listed explicitly because a candidate record that only lists successes is
+# how an unverified build gets shipped.
+open_no_hardware_run: true          # campaigns A-F need authorisation and a radio
+open_gadget_patch_uncompiled: true  # needs the Buildroot sysroot
+open_zarr_patch_untested: true      # needs numpy/zarr
+open_no_dfu_built: true
+open_hdl_patch_uncommitted: true
+open_bare_tee_unresolved: true      # dual-RX phase work needs a Wilkinson divider
