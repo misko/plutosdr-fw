@@ -1,5 +1,28 @@
 # Release notes
 
+## Version history at a glance
+
+| Release | Date | Status | What it added |
+|---|---|---|---|
+| `gain-rssi-v2` | 2026-07-26 | superseded | first direct-USB v2 metadata frame: per-buffer RX1/RX2 gain + RSSI |
+| `fingerprint-v1` | 2026-07-28 | superseded | passive gadget build-identity query |
+| `fingerprint-v2` | 2026-08-02 | superseded | dual-Pluto simultaneous startup fix on 16 MiB usbfs hosts |
+| `fingerprint-v3` | 2026-08-02 | last stable | supervised recovery of a crashed direct-USB gadget |
+| `gain-series-v4-rc1` | 2026-08-09 | **rejected** | protocol-v3 gain series; failed on hardware |
+| `gain-series-v4-rc2` | 2026-08-09 | offline only | startup-prefetch fix + bounded direct-IP pacing |
+| `gain-series-v4-rc11` | 2026-08-09 | qualified | first protocol-v3 candidate to pass on hardware |
+| `gain-series-v4-rc12` | 2026-08-10 | qualified | direct-IP frame/timing parity, verified TX mute |
+| RC13 – RC15 | — | never released | source tags only |
+| `gain-series-v4-rc16` | 2026-08-10 | qualified | 320-frame / 1.25 GiB direct-IP burst at 21.33 MiB/s |
+| `gain-series-v4-rc17` | 2026-08-10 | qualified | direct-IP control lifecycle rewritten around worker ownership |
+| **`gain-series-v4`** | 2026-08-11 | **current** | RC17's source with the version label corrected |
+
+**A note on the numbering.** The trailing number does not mean the same thing
+across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
+2. `fingerprint-v1..v3` is a separate series tracking the passive-fingerprint
+work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
+series. Read the family name, not the digit.
+
 ## v0.38-plutoplus-spf-gain-series-v4
 
 Hardware-qualified on two PlutoPlus units on 2026-08-11, both RAM-booted and
@@ -107,3 +130,139 @@ thing:
 2. `/opt/VERSIONS` is not proof of a successful flash. A RAM-booted radio reports
    the new string regardless of what is in `mtd3`. Only a power cycle followed by
    a re-read proves persistence.
+
+---
+
+## Version history in detail
+
+### `v0.38-plutoplus-spf-gain-rssi-v2` — 2026-07-26
+
+The first direct-USB capture firmware. Adds the versioned v2 metadata frame
+carrying per-buffer RX1/RX2 gain and RSSI endpoint snapshots, while retaining
+standard USB-IIO for radio configuration. Tested with a single PlutoPlus.
+
+Firmware `dd6b1f4d`, buildroot `6d5b0298`, gadget `54610e01`.
+DFU sha256 `f3cd4d68…`.
+
+Its release notes carry a provenance caveat worth remembering: the binary was
+built and tested *before* the source-publication commit existed, so a clean
+rebuild yields a different checksum because the version text embeds Git state.
+
+### `v0.38-plutoplus-spf-gain-rssi-fingerprint-v1` — 2026-07-28
+
+Adds a passive gadget build-identity query, so a host can bind a hardware
+compatibility fingerprint at boot. The query starts no RX/TX DMA and does not
+modify RF state. First release on the Quantulum PlutoPlus timestamp HDL.
+
+### `v0.38-plutoplus-spf-gain-rssi-fingerprint-v2` — 2026-08-02
+
+Fixes simultaneous dual-Pluto startup on Raspberry Pi hosts running the default
+16 MiB usbfs memory pool — the gadget had been advertising the uint32 arithmetic
+ceiling rather than the frame size it actually supports.
+
+- advertises the supported 524,288-sample dual-RX limit
+- rejects oversized versioned RX requests in the gadget
+- bounded finite-stream buffer allocation
+
+Validated on Rover 3 with two radios: 5/5 on the original simultaneous-open
+regression, 4/4 focused, and a pass on the exact release artifact.
+
+Firmware `7b7fb140`, gadget `27a7eed7`. DFU sha256 `5f8220bc…`.
+
+### `v0.38-plutoplus-spf-gain-rssi-fingerprint-v3` — 2026-08-02
+
+Supervised recovery of a crashed direct-USB gadget: bounded UDC unbind,
+readiness-checked restart, rebind — while keeping standard USB-IIO available for
+control. Recovery preserves serial, physical path and boot ID while producing a
+fresh process nonce.
+
+Qualified on Rover 1 with two radios: simultaneous production-size capture, 20
+lifecycle cycles per radio, rolling streams, 3/3 SIGKILL recovery per radio.
+
+Firmware source `dac99758`, **built from candidate `f53dd006`**, buildroot
+`f37fe105`, gadget `2072e1d0`. DFU sha256 `86f2115e…`.
+
+> The v3 tag points at `dac99758`, but the shipped binary was built from
+> `f53dd006`, three commits earlier — so `git checkout <tag>` gives source that
+> did not build that release. This is also why the image reports
+> `…-fingerprint-v2-8-gf53d`: `git describe` ran before the v3 tag existed.
+> Tagging before building prevents both.
+
+### `v0.38-plutoplus-spf-gain-series-v4-rc1` — 2026-08-09 — **hardware rejected**
+
+First protocol-v3 gain-series candidate. Retained for provenance, never promoted.
+
+Protocol-v3 RX failed on **both** radios before the first bulk frame: DMA began
+filling before the ARM gain sampler finished starting up, leaving the first IQ
+frame with zero overlapping gain observations. The gadget failed closed, which is
+the correct behaviour.
+
+Firmware `d0e29715`. DFU sha256 `53a24a19…`.
+
+### `v0.38-plutoplus-spf-gain-series-v4-rc2` — 2026-08-09 — offline only
+
+Carries RC1's fixes: bounded startup-frame alignment in USB and IP, plus paced
+direct-IP UDP batches. Offline validation passed with WNS 0.076 ns, WHS 0.008 ns.
+Never completed a hardware campaign.
+
+Firmware `aed638ff`. DFU sha256 `8aa50f09…`.
+
+Its notes record a measurement that still holds: a steady 524,288-sample frame
+carries roughly **18–20** CPU gain observations, not one every 2,048 samples,
+because local register-read speed is the limiting factor.
+
+### `v0.38-plutoplus-spf-gain-series-v4-rc11` — 2026-08-09 — qualified
+
+First protocol-v3 candidate to pass on hardware. Production protocol-v2 baseline,
+persistent 2R2T verification, and eight independent two-radio volatile loads
+without shared-hub failure.
+
+Firmware `8fd497c3`, gadget `e14eae63`. DFU sha256 `4caca323…`.
+
+### `v0.38-plutoplus-spf-gain-series-v4-rc12` — 2026-08-10 — qualified
+
+Adds direct-IP frame/timing parity and verified TX mute after every transition.
+Campaign: three independent shared-hub RAM boot epochs, physical TX2 loopback
+after every boot, protocol-v2 compatibility, 100 fresh protocol-v3 STARTs per
+radio, simultaneous direct USB, 100 production-sized V7 records per radio,
+malformed direct-IP datagram survival. Both radios were restored to the preserved
+QSPI image and passed 6/6 post-rollback tests.
+
+Firmware `fa5f95f0`, gadget `e14eae63`, direct-IP gadget `e44821f6`.
+DFU sha256 `2209e23c…`.
+
+### RC13 – RC15 — never released
+
+Source tags exist (`gain-series-v4-rc13-source/…` through `rc15`) covering
+direct-IP performance and UDP GSO work, but no release was published and no
+hardware campaign completed against them.
+
+### `v0.38-plutoplus-spf-gain-series-v4-rc16` — 2026-08-10 — qualified
+
+Direct-IP throughput work. Campaign added a **320-frame / 1.25 GiB maximum finite
+direct-IP burst at 21.33 MiB/s with zero loss or reassembly errors**, on top of
+RC12's gates. Both radios restored to the preserved QSPI image, 6/6 post-rollback.
+
+Firmware `867e1854`, gadget `2e8e40ad`, direct-IP gadget `7cae12eb`.
+DFU sha256 `27aca409…`.
+
+RC16 was later found to have a **control-rearm failure** under sustained
+low-rate simultaneous sessions, which RC17 fixes.
+
+### `v0.38-plutoplus-spf-gain-series-v4-rc17` — 2026-08-10 — qualified
+
+Replaces the blocking direct-IP control lifecycle with explicit worker ownership,
+readiness and cleanup handshakes, bounded request replay, stale-request
+rejection, and safe legacy/v3 DMA exclusion.
+
+Campaign: three independent two-radio RAM boot epochs, physical TX2 loopback on
+both radios after every boot, protocol-v2 compatibility, 100 fresh protocol-v3
+USB starts per radio, simultaneous direct USB, 100 production V7 records per
+radio, malformed direct-IP recovery, and a 20-cycle buffered direct-IP burst.
+A separate low-rate regression ran **120 simultaneous radio sessions from 1–3
+MS/s without the RC16 control-rearm failure**, and a 1–30 MS/s ladder completed
+66 more finite sessions with no integrity or lifecycle failures.
+
+Firmware `1f3fe0cb`, gadget `2e8e40ad`, direct-IP gadget `b066059e`, buildroot
+`56b7bc54`. DFU sha256 `88a606f1…`.
+
