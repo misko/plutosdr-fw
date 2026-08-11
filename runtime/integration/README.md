@@ -10,6 +10,7 @@ because neither tree is checked out here: the gadget lives in a source tag, and
 | `gadget_events_valid.patch` | `gain-series-v4-rc14-source/gadget` | producer-armed validity flag, exact in-buffer change bits, a rejection for self-inconsistent frames, and the regression test |
 | `spf_host_tandem_events.patch` | `misko/spf` @ main | decodes the two formerly-reserved words, adds `tandem_gain_series.py`, adds its test |
 | `spf_zarr_gain_events.patch` | `misko/spf` @ main | stores the decoded fields, bumps the gain-series schema to 2, fixes an exact-version reader check |
+| `gadget_event_producer.patch` | `gain-series-v4-rc17-source/ip-gadget-final-v2` | drains the block's FIFO per frame and passes the events to the builder |
 
 Both were dry-run applied against pristine checkouts. The gadget patch was
 built and run against RC14's own `test_spf_radio_frame_v3.c`, which passes
@@ -79,12 +80,20 @@ An exact-equality check on a version number means every future schema reads as
 *absent*: a schema-2 store would have been recovered as though it had no gain
 series at all, silently and with no error. Changed to `>= 1`.
 
-## What is NOT in these patches
+## Test status, stated plainly
 
-The gadget's `thread_read_v3.c` call site — passing `gain_events`,
-`gain_event_count`, `gain_event_overflow_count` and `gain_events_valid` from
-`spf_tandem_drain_frame()` — is not patched here, because it needs the FPGA
-FIFO reader, which needs the AXI block, which is Stage 3's blocked timing
-closure. The drain and its result struct are shaped to drop straight into that
-call site when it unblocks: every field the builder wants is already a field of
-`spf_tandem_drain_result_t`.
+| Patch | Built | Tested |
+| --- | --- | --- |
+| `gadget_events_valid.patch` | yes | RC14's own suite, before and after |
+| `spf_host_tandem_events.patch` | yes | round-trip + 200-case cross-check vs C |
+| `spf_zarr_gain_events.patch` | no | needs numpy/zarr, absent on this host |
+| `gadget_event_producer.patch` | **no** | see below |
+
+The producer patch is **not compile-tested here.** `thread_read_v3.c` includes
+`<spf/...>` headers that are installed by the Buildroot package, and that
+sysroot is not present on this machine. What *is* tested is everything the
+patch calls: `spf_tandem_fifo_drain`, `spf_tandem_drain_frame` and
+`spf_tandem_reconstruct` are exercised end-to-end, from four register windows
+through to a per-sample series, in `test_spf_tandem_fifo.c`. The patch itself
+is 40 lines of wiring between tested pieces, but it is wiring that has not been
+through a compiler, and it should be treated that way at integration.

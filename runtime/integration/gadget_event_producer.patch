@@ -1,0 +1,77 @@
+--- a/thread_read_v3.c
++++ b/thread_read_v3.c
+@@ -11,6 +11,8 @@
+ #include <spf/spf_gain_read.h>
+ #include <spf/spf_gain_sampler.h>
+ #include <spf/spf_radio_frame_v3.h>
++#include <spf/spf_tandem_drain.h>
++#include <spf/spf_tandem_fifo.h>
+ #include <spf/spf_rssi_read.h>
+ 
+ #include <errno.h>
+@@ -88,6 +90,15 @@
+ 	bool capture_complete;
+ 	bool sender_failed;
+ 	spf_gain_observation_v3_t observations[SPF_MAX_GAIN_OBSERVATIONS];
++	/*
++	 * FPGA gain events. The v3 wire record and the header fields for these have
++	 * existed since RC14; what has never existed is a producer. These three make
++	 * one.
++	 */
++	spf_tandem_drain_t gain_drain;
++	spf_tandem_record_t gain_records[SPF_TANDEM_DRAIN_CAPACITY];
++	uint8_t gain_event_wire[SPF_IP_MAX_GAIN_EVENTS * SPF_GAIN_EVENT_BYTES];
++	void *tandem_regs;   /* NULL when the bitstream has no tandem block */
+ 	spf_ip_fragment_v1_t *fragment_headers;
+ 	struct mmsghdr *messages;
+ 	struct iovec *iovs;
+@@ -503,6 +514,38 @@
+ 			SPF_GAIN_STARTUP_DISCARD_LIMIT);
+ 		return 0;
+ 	}
++	/*
++	 * Drain the block's event FIFO for this frame. The drain is what filters
++	 * stale ownership epochs and carries events belonging to the next frame
++	 * forward -- see spf_tandem_drain.h. When no producer is armed it reports
++	 * events_valid = false, which is what makes a quiet frame distinguishable
++	 * from a frame captured without the feature.
++	 */
++	spf_tandem_drain_result_t gain_drain_result;
++	{
++		uint32_t hw_overflow = 0;
++		int record_count = 0;
++
++		if (state->args->gain_event_capacity != 0 && state->gain_drain.armed) {
++			record_count = spf_tandem_fifo_drain(
++				spf_tandem_reg_read, state->tandem_regs,
++				state->gain_records, SPF_TANDEM_DRAIN_CAPACITY, &hw_overflow);
++			if (record_count < 0) {
++				/* A register-read failure is not a reason to drop the frame --
++				 * the IQ is good. Report it as an overflow so the consumer
++				 * refuses to reconstruct rather than trusting a partial set. */
++				record_count = 0;
++				hw_overflow = UINT32_MAX;
++			}
++		}
++		spf_tandem_drain_frame(&state->gain_drain,
++			state->gain_records, (unsigned)record_count, hw_overflow,
++			first_sample_sequence,
++			(uint32_t)state->args->samples_per_channel,
++			state->gain_event_wire, state->args->gain_event_capacity,
++			&gain_drain_result);
++	}
++
+ 	const spf_radio_frame_v3_args_t frame_args = {
+ 		.metadata_features = state->args->metadata_features,
+ 		.stream_id = state->args->stream_id,
+@@ -518,6 +561,10 @@
+ 		.gain_observation_capacity = state->args->gain_observation_capacity,
+ 		.gain_observation_overflow_count = observation_overflow,
+ 		.gain_event_capacity = state->args->gain_event_capacity,
++		.gain_events = (const spf_gain_event_v3_t *)state->gain_event_wire,
++		.gain_event_count = gain_drain_result.count,
++		.gain_event_overflow_count = gain_drain_result.overflow_count,
++		.gain_events_valid = gain_drain_result.events_valid,
+ 		.rssi_start = {
+ 			.rx1_qdb = state->previous_rssi.rx1_qdb,
+ 			.rx2_qdb = state->previous_rssi.rx2_qdb,

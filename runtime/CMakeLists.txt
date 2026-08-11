@@ -15,7 +15,7 @@ target_include_directories(spf_tandem_lifecycle PUBLIC ${CMAKE_CURRENT_SOURCE_DI
 # record, draining the FIFO into a frame, and reconstructing the per-sample gain
 # series. Separate from the lifecycle library because the gadget links this and
 # not the control layer.
-add_library(spf_tandem_meta STATIC spf_tandem_event.c spf_tandem_drain.c)
+add_library(spf_tandem_meta STATIC spf_tandem_event.c spf_tandem_drain.c spf_tandem_fifo.c)
 target_include_directories(spf_tandem_meta PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 # the CLI links the iio backend only where libiio exists; the library and its
@@ -51,4 +51,8 @@ if(BUILD_TESTING)
   add_executable(test_spf_tandem_drain test_spf_tandem_drain.c)
   target_link_libraries(test_spf_tandem_drain spf_tandem_meta)
   add_test(NAME spf_tandem_drain COMMAND test_spf_tandem_drain)
+
+  add_executable(test_spf_tandem_fifo test_spf_tandem_fifo.c)
+  target_link_libraries(test_spf_tandem_fifo spf_tandem_meta)
+  add_test(NAME spf_tandem_fifo COMMAND test_spf_tandem_fifo)
 endif()
