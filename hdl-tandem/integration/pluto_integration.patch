@@ -43,31 +43,42 @@ index 78e3ef30..8729b8e7 100644
  ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP1 {1}
  ad_connect sys_cpu_clk sys_ps7/S_AXI_HP1_ACLK
  ad_connect axi_ad9361_adc_dma/m_dest_axi sys_ps7/S_AXI_HP1
+diff --git a/projects/pluto/system_constr.xdc b/projects/pluto/system_constr.xdc
+index 37b1cf39..1f6f784d 100644
+--- a/projects/pluto/system_constr.xdc
++++ b/projects/pluto/system_constr.xdc
+@@ -216,3 +216,17 @@ set_property PACKAGE_PIN F2 [get_ports ddr_dqs_n[1]]
+ set_false_path -from [get_pins {i_system_wrapper/system_i/axi_ad9361/inst/i_rx/i_up_adc_common/up_adc_gpio_out_int_reg[0]/C}]
+ set_false_path -from [get_pins {i_system_wrapper/system_i/axi_ad9361/inst/i_tx/i_up_dac_common/up_dac_gpio_out_int_reg[0]/C}]
+ 
++
++# -----------------------------------------------------------------------------
++# Tandem AGC floorplan: TRIED AND REVERTED.
++#
++# Confining the block to CLOCKREGION_X1Y1 gave -3.740 ns against the default
++# flow's -2.391 ns. Every intervention tried made timing worse than doing
++# nothing -- see reports/integration/FINDING.md for all five. The constraint is
++# left here commented out so the next person does not repeat it.
++#
++# create_pblock pblock_tandem
++# add_cells_to_pblock [get_pblocks pblock_tandem] \
++#   [get_cells -quiet i_system_wrapper/system_i/i_tandem_agc]
++# resize_pblock [get_pblocks pblock_tandem] -add {CLOCKREGION_X1Y1:CLOCKREGION_X1Y1}
++# -----------------------------------------------------------------------------
 diff --git a/projects/pluto/system_project.tcl b/projects/pluto/system_project.tcl
-index ddb6672b..8860fb23 100644
+index ddb6672b..46a4e3df 100644
 --- a/projects/pluto/system_project.tcl
 +++ b/projects/pluto/system_project.tcl
-@@ -10,6 +10,23 @@ adi_project_files pluto [list \
+@@ -10,6 +10,12 @@ adi_project_files pluto [list \
    "$ad_hdl_dir/library/common/ad_iobuf.v"]
  
  set_property is_enabled false [get_files  *system_sys_ps7_0.xdc]
 +
-+# The tandem block fits (76.06% LUT against a 74.36% baseline) but adding a
-+# sixth AXI slave congests the existing interconnect: the worst path is
-+# entirely inside axi_ad9361, zero logic levels, 96% routing delay. That is a
-+# congestion problem, so give the tools the standard remedies -- physical
-+# optimisation can replicate drivers to shorten routes, and spreading placement
-+# relieves the congestion that caused the detour.
-+# Spreading logic made it worse (-3.649 against -2.391): on a device this full
-+# it lengthens routes rather than relieving them. The failing paths have zero
-+# logic levels and 96% route delay, which is the signature of a high-fanout net
-+# taking a detour -- that wants driver replication, which is what phys_opt does.
-+set_property STEPS.PHYS_OPT_DESIGN.IS_ENABLED true [get_runs impl_1]
-+set_property STEPS.PHYS_OPT_DESIGN.ARGS.DIRECTIVE AggressiveExplore [get_runs impl_1]
-+set_property STEPS.ROUTE_DESIGN.ARGS.DIRECTIVE Explore [get_runs impl_1]
-+set_property STEPS.POST_ROUTE_PHYS_OPT_DESIGN.IS_ENABLED true [get_runs impl_1]
-+set_property STEPS.POST_ROUTE_PHYS_OPT_DESIGN.ARGS.DIRECTIVE AggressiveExplore [get_runs impl_1]
-+
++# Three directive experiments all made timing worse than the default flow
++# (-2.391 default, -3.649 AltSpreadLogic_medium, -3.895 phys_opt
++# AggressiveExplore + route Explore + post-route). On a device this full the
++# extra optimisation passes churn placement and lengthen routes. Default flow
++# it is; the remedy is floorplanning, in system_constr.xdc.
  adi_project_run pluto
  source $ad_hdl_dir/library/axi_ad9361/axi_ad9361_delay.tcl
  

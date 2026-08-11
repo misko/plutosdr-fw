@@ -96,3 +96,52 @@ signature -- driver replication via `phys_opt_design AggressiveExplore`, plus
 If directives cannot close it, the evidence now supports floorplanning under
 §6: the failing paths are localised to one IP, so a pblock keeping the tandem
 block away from `axi_ad9361` is a targeted remedy rather than a guess.
+
+
+---
+
+## Timing closure: five attempts, and doing nothing wins
+
+With EVENTS=0 the design places and routes every time. It never meets timing.
+
+| Attempt | WNS | TNS | Failing |
+|---|---:|---:|---:|
+| **default flow** | **-2.391** | | **best** |
+| `AltSpreadLogic_medium` placer | -3.649 | -435 | 235 |
+| `phys_opt AggressiveExplore` + `route Explore` + post-route | -3.895 | -587 | 326 |
+| pblock to `CLOCKREGION_X1Y1` | -3.740 | -630 | 394 |
+
+Four interventions, four regressions. On a device at 76% LUT with a baseline
+that closes at +0.504 ns, every extra optimisation or constraint churns
+placement and lengthens routes rather than relieving them. That is a
+consistent result across independent techniques, not a tuning accident.
+
+## What the failure actually is
+
+Every failing path is inside `axi_ad9361`, on the 100 MHz AXI clock, from
+`i_up_axi/up_wdata_int_reg[*]` to that IP's own register banks. Zero logic
+levels; ~96% of the delay is routing. The tandem block is not on any failing
+path -- out of context it closes with +10.7 ns of slack.
+
+The mechanism is capacity, not logic: adding a sixth AXI peripheral scatters
+`axi_ad9361`'s internal register banks, and its internal write-data fanout
+then cannot be routed short enough. **RC17 does not have the timing headroom
+on this device to accept an additional AXI peripheral.**
+
+## Options that remain, none of them tuning
+
+1. **Attach without an AXI slave.** The interconnect port is the cause. The
+   existing `up_adc_gpio_out`/`up_adc_gpio_in` pair is fully consumed --
+   bit 0 to the decimator, bits 31:1 to `timestamp_every` -- but
+   `timestamp_every` almost certainly does not need 31 bits, so narrowing it
+   would free a window. That changes a shipped register ABI and needs its own
+   review.
+2. **Accept a larger device.** Not available for existing hardware.
+3. **Reduce the existing design.** §6 forbids removing safety or metadata
+   functions to force a fit.
+
+## What is not blocked
+
+This is a Stage 3 result. It does not block Stage 1's design review, Stage 4's
+runtime work, or Stage 5's metadata and host work, none of which depend on a
+bitstream that fits. Those proceed independently.
