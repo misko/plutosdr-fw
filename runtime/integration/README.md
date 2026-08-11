@@ -11,6 +11,7 @@ because neither tree is checked out here: the gadget lives in a source tag, and
 | `spf_host_tandem_events.patch` | `misko/spf` @ main | decodes the two formerly-reserved words, adds `tandem_gain_series.py`, adds its test |
 | `spf_zarr_gain_events.patch` | `misko/spf` @ main | stores the decoded fields, bumps the gain-series schema to 2, fixes an exact-version reader check |
 | `gadget_event_producer.patch` | `gain-series-v4-rc17-source/ip-gadget-final-v2` | drains the block's FIFO per frame and passes the events to the builder |
+| `spf_host_tandem_control.patch` | `misko/spf` @ main | host-side enable/disable over libiio, plus 17 tests |
 
 Both were dry-run applied against pristine checkouts. The gadget patch was
 built and run against RC14's own `test_spf_radio_frame_v3.c`, which passes
@@ -87,6 +88,7 @@ series at all, silently and with no error. Changed to `>= 1`.
 | `gadget_events_valid.patch` | yes | RC14's own suite, before and after |
 | `spf_host_tandem_events.patch` | yes | round-trip + 200-case cross-check vs C |
 | `spf_zarr_gain_events.patch` | no | needs numpy/zarr, absent on this host |
+| `spf_host_tandem_control.patch` | yes | **17 tests pass**, including a C/Python register-map drift check proven to fail on a planted mismatch |
 | `gadget_event_producer.patch` | **no** | see below |
 
 The producer patch is **not compile-tested here.** `thread_read_v3.c` includes
