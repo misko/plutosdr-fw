@@ -24,7 +24,8 @@
 
 module tandem_agc_axi #(
   parameter integer EVT_AW = 6,
-  parameter integer EVT_DW = 104
+  parameter integer EVT_DW = 104,
+  parameter integer EVENTS = 1
 ) (
   // ---- AXI4-Lite, processor domain ---------------------------------------
   input  wire        s_axi_aclk,
@@ -142,7 +143,7 @@ module tandem_agc_axi #(
   wire [31:0] evt_ovf;
   reg         evt_pop;
 
-  tandem_agc_core #(.EVT_AW(EVT_AW), .EVT_DW(EVT_DW)) u_core (
+  tandem_agc_core #(.EVT_AW(EVT_AW), .EVT_DW(EVT_DW), .EVENTS(EVENTS)) u_core (
     .l_clk(l_clk), .l_resetn(l_resetn),
     .detect_async(detect_async), .sample_counter(sample_counter),
     .mode_req(c_mode), .fault_clear(c_fault_clear), .consumer_ready(consumer_ready),

@@ -53,3 +53,46 @@ The remaining options are architectural, not tuning:
 
 Option 1 is measurable and reversible. Nothing here is wasted either way:
 the controller, the CDC layer, the AXI slave and seven test suites all stand.
+
+
+---
+
+## Resolution: EVENTS=0 fits
+
+The fork was measured rather than argued. An `EVENTS` parameter compiles out
+the whole event-capture path -- FIFO, sequence counter, record registers and
+overflow tracking -- which tandem gain control itself does not depend on.
+
+| Variant | LUT | FF | BRAM |
+|---|---:|---:|---:|
+| EVENTS=1 | 432 | 688 | 1.5 |
+| EVENTS=0 | 331 | 579 | 0 |
+
+Integrated, EVENTS=0 **places and routes**: 13,386 LUT against a 13,088
+baseline, 76.06% against a ~82% guardrail, BRAM back to 6, DSP untouched at
+72. The +298 LUT cost is modest.
+
+## What remains is timing, and it is not the tandem block's fault
+
+The routed design misses timing, and every failing path is inside the
+existing `axi_ad9361` IP on the 100 MHz AXI clock:
+
+    source  axi_ad9361/i_up_axi/up_wdata_int_reg[*]
+    dest    axi_ad9361/i_tdd or i_tx register
+    delay   12.02 ns, of which 11.57 ns (96%) is routing
+    logic levels 0
+
+Zero logic levels and 96% route delay is a congestion signature, not a slow
+path. Adding a sixth AXI slave pushed an already-full device past the point
+where the router can keep `axi_ad9361`'s internal nets short. The baseline
+closes at **+0.504 ns**, so there was almost no margin to give away.
+
+Attempts so far: default directives -2.391 ns; `AltSpreadLogic_medium` made
+it **worse** at -3.649 ns with 235 failing endpoints, because spreading logic
+lengthens routes on a full device. The current attempt targets the actual
+signature -- driver replication via `phys_opt_design AggressiveExplore`, plus
+`route Explore` and post-route physical optimisation.
+
+If directives cannot close it, the evidence now supports floorplanning under
+§6: the failing paths are localised to one IP, so a pblock keeping the tandem
+block away from `axi_ad9361` is a targeted remedy rather than a guess.
