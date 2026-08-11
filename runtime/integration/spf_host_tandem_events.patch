@@ -1,0 +1,358 @@
+--- a/spf/sdrpluto/direct_usb_protocol.py
++++ b/spf/sdrpluto/direct_usb_protocol.py
+@@ -1169,6 +1169,10 @@
+ 
+     sample_sequence: int
+     flags: GainEventFlags
++    gain_index: int = 0
++    reason: int = 0
++    direction: int = 0
++    event_sequence: int = 0
+ 
+     def pack(self) -> bytes:
+         _validate_uint("event sample_sequence", self.sample_sequence, 64)
+@@ -1182,7 +1186,18 @@
+             raise ProtocolError(f"unknown gain-event flags: 0x{unknown:04x}")
+         if not self.flags & (GainEventFlags.RX1_CHANGED | GainEventFlags.RX2_CHANGED):
+             raise ProtocolError("gain event must identify a changed receiver")
+-        return _GAIN_EVENT_STRUCT.pack(self.sample_sequence, int(self.flags), 0, 0)
++        _validate_uint("event gain_index", self.gain_index, 8)
++        if not 0 <= self.reason <= 0x0F:
++            raise ProtocolError(f"gain-event reason out of range: {self.reason}")
++        if not 0 <= self.direction <= 0x03:
++            raise ProtocolError(f"gain-event direction out of range: {self.direction}")
++        _validate_uint("event event_sequence", self.event_sequence, 32)
++        reserved0 = self.gain_index | (
++            ((self.reason & 0x0F) | ((self.direction & 0x03) << 4)) << 8
++        )
++        return _GAIN_EVENT_STRUCT.pack(
++            self.sample_sequence, int(self.flags), reserved0, self.event_sequence
++        )
+ 
+     @classmethod
+     def unpack(cls, payload: bytes | bytearray | memoryview) -> "GainEventV3":
+@@ -1191,9 +1206,20 @@
+         sample_sequence, flags, reserved0, reserved1 = _GAIN_EVENT_STRUCT.unpack(
+             payload
+         )
+-        if reserved0 or reserved1:
+-            raise ProtocolError("gain event reserved fields must be zero")
+-        event = cls(sample_sequence=sample_sequence, flags=GainEventFlags(flags))
++        # Both formerly-reserved words now carry the tandem controller's decision:
++        # the gain index it moved to, why, which way, and a sequence number that
++        # makes a dropped event detectable. Older firmware leaves them zero, which
++        # decodes to index 0 / reason 0 / sequence 0 and is distinguishable from a
++        # real record by the frame's own FPGA_EVENTS_VALID flag.
++        detail = (reserved0 >> 8) & 0xFF
++        event = cls(
++            sample_sequence=sample_sequence,
++            flags=GainEventFlags(flags),
++            gain_index=reserved0 & 0xFF,
++            reason=detail & 0x0F,
++            direction=(detail >> 4) & 0x03,
++            event_sequence=reserved1,
++        )
+         event.pack()
+         return event
+ 
+--- a/spf/sdrpluto/tandem_gain_series.py
++++ b/spf/sdrpluto/tandem_gain_series.py
+@@ -0,0 +1,148 @@
++"""Reconstruct the per-sample gain index from a frame's FPGA gain events.
++
++This is the host half of the tandem AGC metadata path. The firmware records a
++64-bit hardware sample counter at every gain decision; this turns a frame's
++worth of those records back into the gain that was in force at each sample, so
++a calibration can divide out the gain-dependent phase term it already knows.
++
++Faults are explicit. A frame whose producer overflowed, whose events arrive out
++of order, or whose sequence numbers have a hole cannot be reconstructed, and a
++plausible-but-wrong series is worse than an annotated gap -- so those raise
++rather than interpolate.
++
++Kept byte-identical to the C implementation in plutosdr-fw's
++runtime/spf_tandem_event.c; the two are cross-checked in the test suite.
++"""
++
++from __future__ import annotations
++
++import dataclasses
++from typing import Iterable, Sequence
++
++import numpy as np
++
++from spf.sdrpluto.direct_usb_protocol import GainEventFlags, GainEventV3
++
++__all__ = [
++    "GainSeriesError",
++    "GainSeriesOverflow",
++    "GainSeriesGap",
++    "GainSeriesOutOfOrder",
++    "GainSeriesUnavailable",
++    "reconstruct_gain_series",
++]
++
++
++class GainSeriesError(Exception):
++    """Base class: this frame's gain series cannot be trusted."""
++
++
++class GainSeriesOverflow(GainSeriesError):
++    """The producer dropped events; transitions are missing."""
++
++
++class GainSeriesGap(GainSeriesError):
++    """A sequence number is missing, so an event was lost in transport."""
++
++
++class GainSeriesOutOfOrder(GainSeriesError):
++    """Counters or sequence numbers are not monotonic."""
++
++
++class GainSeriesUnavailable(GainSeriesError):
++    """No event producer was armed for this frame, so nothing is known.
++
++    Distinct from a frame with zero events, which means the gain genuinely
++    never moved and is a complete answer.
++    """
++
++
++@dataclasses.dataclass(frozen=True)
++class _Event:
++    sample_sequence: int
++    gain_index: int
++    event_sequence: int
++
++
++def reconstruct_gain_series(
++    events: Iterable[GainEventV3] | Sequence[GainEventV3],
++    *,
++    first_sample_sequence: int,
++    samples_per_channel: int,
++    index_at_frame_start: int,
++    events_valid: bool,
++    overflow_count: int = 0,
++    effect_offset_samples: int = 0,
++    expect_first_sequence: int | None = None,
++) -> np.ndarray:
++    """Return a uint8 array of length ``samples_per_channel``.
++
++    ``events_valid`` is the frame's FPGA_EVENTS_VALID flag, which the firmware
++    now sets from producer-armed state rather than from a non-zero count.
++
++    ``effect_offset_samples`` shifts each transition from the instant it was
++    decided to the instant it becomes visible in the IQ -- analog settling plus
++    filter group delay. Campaign C measures it; 0 means "unmeasured", which is
++    honest but not correct.
++    """
++    if samples_per_channel <= 0:
++        raise ValueError("samples_per_channel must be positive")
++    if not events_valid:
++        raise GainSeriesUnavailable(
++            "no FPGA gain-event producer was armed for this frame"
++        )
++    if overflow_count:
++        raise GainSeriesOverflow(
++            f"producer dropped {overflow_count} event(s); "
++            "the series after the first drop is unknowable"
++        )
++
++    series = np.full(samples_per_channel, index_at_frame_start, dtype=np.uint8)
++
++    previous: _Event | None = None
++    for event in events:
++        if not event.flags & (GainEventFlags.RX1_CHANGED | GainEventFlags.RX2_CHANGED):
++            raise GainSeriesOutOfOrder("event does not identify a changed receiver")
++        # Under tandem both receivers move together, always. One-sided evidence
++        # means something other than the tandem controller wrote the gain.
++        if not (
++            event.flags & GainEventFlags.RX1_CHANGED
++            and event.flags & GainEventFlags.RX2_CHANGED
++        ):
++            raise GainSeriesOutOfOrder(
++                "tandem events must report both receivers as changed"
++            )
++
++        current = _Event(
++            event.sample_sequence, event.gain_index, event.event_sequence
++        )
++        if previous is not None:
++            if current.sample_sequence < previous.sample_sequence:
++                raise GainSeriesOutOfOrder("sample counters are not monotonic")
++            # serial-number comparison, so a 32-bit wrap still orders correctly
++            delta = (current.event_sequence - previous.event_sequence) & 0xFFFFFFFF
++            if delta == 0 or delta > 0x7FFFFFFF:
++                raise GainSeriesOutOfOrder("event sequence numbers are not increasing")
++            if expect_first_sequence is not None and delta != 1:
++                raise GainSeriesGap(
++                    f"event {previous.event_sequence} -> "
++                    f"{current.event_sequence} skips {delta - 1} event(s)"
++                )
++        elif (
++            expect_first_sequence is not None
++            and current.event_sequence != expect_first_sequence
++        ):
++            raise GainSeriesGap(
++                f"frame starts at event {current.event_sequence}, "
++                f"expected {expect_first_sequence}"
++            )
++        previous = current
++
++        offset = (
++            current.sample_sequence + effect_offset_samples - first_sample_sequence
++        )
++        if offset >= samples_per_channel:
++            continue
++        series[max(offset, 0) :] = current.gain_index
++
++    return series
+--- a/tests/test_tandem_gain_series.py
++++ b/tests/test_tandem_gain_series.py
+@@ -0,0 +1,147 @@
++"""Host-side reconstruction of the tandem AGC gain series.
++
++Cross-checked against the C implementation in plutosdr-fw
++(runtime/spf_tandem_event.c) over randomized frames; the two must agree
++bit-for-bit, because the firmware writes the records and this reads them.
++"""
++
++import numpy as np
++import pytest
++
++from spf.sdrpluto.direct_usb_protocol import GainEventFlags, GainEventV3
++from spf.sdrpluto.tandem_gain_series import (
++    GainSeriesGap,
++    GainSeriesOutOfOrder,
++    GainSeriesOverflow,
++    GainSeriesUnavailable,
++    reconstruct_gain_series,
++)
++
++BOTH = GainEventFlags.RX1_CHANGED | GainEventFlags.RX2_CHANGED
++
++
++def event(sample, index, sequence):
++    return GainEventV3(
++        sample_sequence=sample,
++        flags=BOTH,
++        gain_index=index,
++        event_sequence=sequence,
++    )
++
++
++def test_wire_record_carries_the_controller_decision():
++    original = GainEventV3(
++        sample_sequence=0x0123456789ABCDEF,
++        flags=BOTH,
++        gain_index=43,
++        reason=3,
++        direction=2,
++        event_sequence=0xDEADBEEF,
++    )
++    packed = original.pack()
++    assert len(packed) == 16
++    assert GainEventV3.unpack(packed) == original
++
++
++def test_records_from_firmware_without_a_producer_still_decode():
++    """Older firmware leaves both words zero; that must not be an error."""
++    legacy = GainEventV3(sample_sequence=99, flags=BOTH).pack()
++    decoded = GainEventV3.unpack(legacy)
++    assert decoded.gain_index == 0
++    assert decoded.event_sequence == 0
++
++
++def test_transitions_land_on_the_exact_sample():
++    series = reconstruct_gain_series(
++        [event(1000, 43, 1), event(2000, 42, 2), event(3000, 43, 3)],
++        first_sample_sequence=0,
++        samples_per_channel=4096,
++        index_at_frame_start=44,
++        events_valid=True,
++        expect_first_sequence=1,
++    )
++    assert series[999] == 44 and series[1000] == 43
++    assert series[1999] == 43 and series[2000] == 42
++    assert series[2999] == 42 and series[3000] == 43
++
++
++def test_a_quiet_frame_is_a_complete_answer():
++    """Zero events with an armed producer means the gain genuinely held.
++
++    This is the case the firmware could not previously express: it derived
++    FPGA_EVENTS_VALID from a non-zero count, so a quiet frame was
++    indistinguishable from a frame captured with no producer at all.
++    """
++    series = reconstruct_gain_series(
++        [],
++        first_sample_sequence=0,
++        samples_per_channel=1024,
++        index_at_frame_start=41,
++        events_valid=True,
++    )
++    assert np.all(series == 41)
++
++
++def test_no_producer_is_not_a_quiet_frame():
++    with pytest.raises(GainSeriesUnavailable):
++        reconstruct_gain_series(
++            [],
++            first_sample_sequence=0,
++            samples_per_channel=1024,
++            index_at_frame_start=41,
++            events_valid=False,
++        )
++
++
++def test_the_published_effect_offset_moves_the_edge():
++    """The recorded counter is the decision; the IQ changes later."""
++    series = reconstruct_gain_series(
++        [event(1000, 43, 1)],
++        first_sample_sequence=0,
++        samples_per_channel=4096,
++        index_at_frame_start=44,
++        events_valid=True,
++        effect_offset_samples=250,
++    )
++    assert series[1249] == 44 and series[1250] == 43
++
++
++@pytest.mark.parametrize(
++    "kwargs,events,expected",
++    [
++        (dict(events_valid=True, overflow_count=3), [], GainSeriesOverflow),
++        (
++            dict(events_valid=True, expect_first_sequence=1),
++            [event(1000, 43, 1), event(2000, 42, 3)],
++            GainSeriesGap,
++        ),
++        (
++            dict(events_valid=True),
++            [event(2000, 42, 2), event(1000, 43, 1)],
++            GainSeriesOutOfOrder,
++        ),
++        (
++            dict(events_valid=True),
++            [
++                GainEventV3(
++                    sample_sequence=10,
++                    flags=GainEventFlags.RX1_CHANGED,
++                    gain_index=40,
++                    event_sequence=1,
++                )
++            ],
++            GainSeriesOutOfOrder,
++        ),
++    ],
++    ids=["overflow", "sequence-gap", "out-of-order", "one-sided"],
++)
++def test_faults_are_explicit_never_interpolated(kwargs, events, expected):
++    """A plausible-but-wrong series is worse than an annotated gap."""
++    with pytest.raises(expected):
++        reconstruct_gain_series(
++            events,
++            first_sample_sequence=0,
++            samples_per_channel=4096,
++            index_at_frame_start=44,
++            **kwargs,
++        )

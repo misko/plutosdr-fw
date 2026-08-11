@@ -1,0 +1,136 @@
+--- a/spf_radio_frame_v3.c
++++ b/spf_radio_frame_v3.c
+@@ -34,7 +34,10 @@
+ 		args->gain_observation_count > args->gain_observation_capacity ||
+ 		args->gain_observations == NULL ||
+ 		args->gain_event_count > args->gain_event_capacity ||
+-		(args->gain_event_count != 0 && args->gain_events == NULL))
++		(args->gain_event_count != 0 && args->gain_events == NULL) ||
++		/* events without an armed producer would ship a count the validity
++		 * flag contradicts; reject rather than emit a self-inconsistent frame */
++		(args->gain_event_count != 0 && !args->gain_events_valid))
+ 		return false;
+ 
+ 	const size_t header_bytes = spf_radio_frame_v3_header_bytes(
+@@ -76,8 +79,24 @@
+ 		flags |= SPF_META_RSSI_READ_FAILED;
+ 	if (args->gain_observation_overflow_count != 0)
+ 		flags |= SPF_META_GAIN_OBSERVATION_OVERFLOW;
+-	if (args->gain_event_count != 0)
++	if (args->gain_events_valid)
++	{
++		/* Producer-armed, not count-derived. See gain_events_valid. */
+ 		flags |= SPF_META_FPGA_EVENTS_VALID;
++		/*
++		 * With events in hand the in-buffer change bits are exact. The endpoint
++		 * comparison above cannot see a gain that moved and came back within
++		 * the frame; the event stream can.
++		 */
++		for (uint16_t i = 0; i < args->gain_event_count; i++)
++		{
++			const uint16_t event_flags = args->gain_events[i].flags;
++			if (event_flags & SPF_GAIN_EVENT_RX1_CHANGED)
++				flags |= SPF_META_RX1_CHANGED_IN_BUFFER;
++			if (event_flags & SPF_GAIN_EVENT_RX2_CHANGED)
++				flags |= SPF_META_RX2_CHANGED_IN_BUFFER;
++		}
++	}
+ 	if (args->gain_event_overflow_count != 0)
+ 		flags |= SPF_META_FPGA_EVENT_OVERFLOW;
+ 	if (args->device_iio_overflow)
+--- a/spf_radio_frame_v3.h
++++ b/spf_radio_frame_v3.h
+@@ -33,6 +33,18 @@
+ 	uint16_t gain_event_count;
+ 	uint16_t gain_event_capacity;
+ 	uint32_t gain_event_overflow_count;
++	/*
++	 * True when an FPGA event producer was armed for this frame AND its queue
++	 * was drained into gain_events. This is NOT derivable from the count: a
++	 * frame in which the gain genuinely never moved has zero events and is a
++	 * complete answer, while a frame captured with no producer also has zero
++	 * events and means nothing is known. Deriving the validity flag from the
++	 * count conflated the two and made "gain held constant" unrepresentable.
++	 *
++	 * Callers that do not set it get false, which is the honest answer for
++	 * every producer that predates the tandem controller.
++	 */
++	bool gain_events_valid;
+ 	spf_radio_rssi_v3_t rssi_start;
+ 	spf_radio_rssi_v3_t rssi_end;
+ 	bool device_iio_overflow;
+--- a/test_spf_radio_frame_v3.c
++++ b/test_spf_radio_frame_v3.c
+@@ -83,5 +83,72 @@
+ 	args.stream_id = 7;
+ 	args.gain_observation_count = 0;
+ 	assert(!spf_radio_frame_v3_build(buffer, sizeof(buffer), &args));
++	args.gain_observation_count = 2;
++
++	/*
++	 * FPGA event validity is producer-armed, not count-derived.
++	 *
++	 * The two zero-event cases below are physically different and used to be
++	 * indistinguishable on the wire: a frame in which the gain genuinely never
++	 * moved reported exactly what a frame captured with no event producer at
++	 * all reported. A consumer could not tell "held constant" from "unknown",
++	 * so it had to treat every quiet frame as unusable.
++	 */
++	uint8_t event_buffer[1024];
++	spf_gain_event_v3_t events[2] = {
++		{
++			.sample_sequence = 1234,
++			.flags = SPF_GAIN_EVENT_RX1_CHANGED | SPF_GAIN_EVENT_RX2_CHANGED,
++		},
++		{
++			.sample_sequence = 1500,
++			.flags = SPF_GAIN_EVENT_RX1_CHANGED | SPF_GAIN_EVENT_RX2_CHANGED,
++		},
++	};
++	const size_t event_header_bytes = spf_radio_frame_v3_header_bytes(4, 8);
++	assert(event_header_bytes != 0 && event_header_bytes <= sizeof(event_buffer));
++	args.gain_event_capacity = 8;
++	const spf_radio_meta_v3_prefix_t *event_header =
++		(const spf_radio_meta_v3_prefix_t *)event_buffer;
++
++	/* no producer, no events: nothing is known */
++	args.gain_events = NULL;
++	args.gain_event_count = 0;
++	args.gain_events_valid = false;
++	assert(spf_radio_frame_v3_build(
++		event_buffer, sizeof(event_buffer), &args));
++	assert((event_header->flags & SPF_META_FPGA_EVENTS_VALID) == 0);
++
++	/* armed, no events: the gain held, and that is a complete answer */
++	args.gain_events_valid = true;
++	assert(spf_radio_frame_v3_build(
++		event_buffer, sizeof(event_buffer), &args));
++	assert((event_header->flags & SPF_META_FPGA_EVENTS_VALID) != 0);
++	assert((event_header->flags & SPF_META_RX1_CHANGED_IN_BUFFER) == 0);
++	assert((event_header->flags & SPF_META_RX2_CHANGED_IN_BUFFER) == 0);
++
++	/* armed with events: the in-buffer change bits become exact */
++	args.gain_events = events;
++	args.gain_event_count = 2;
++	assert(spf_radio_frame_v3_build(
++		event_buffer, sizeof(event_buffer), &args));
++	assert((event_header->flags & SPF_META_FPGA_EVENTS_VALID) != 0);
++	assert((event_header->flags & SPF_META_RX1_CHANGED_IN_BUFFER) != 0);
++	assert((event_header->flags & SPF_META_RX2_CHANGED_IN_BUFFER) != 0);
++	assert(event_header->gain_event_count == 2);
++	assert(event_header->gain_event_bytes == SPF_GAIN_EVENT_BYTES);
++	{
++		const spf_gain_event_v3_t *wire = (const spf_gain_event_v3_t *)
++			(event_buffer + sizeof(spf_radio_meta_v3_prefix_t) +
++			 (size_t)args.gain_observation_capacity *
++				sizeof(spf_gain_observation_v3_t));
++		assert(wire[0].sample_sequence == 1234);
++		assert(wire[1].sample_sequence == 1500);
++	}
++
++	/* events without an armed producer is self-inconsistent, not merely odd */
++	args.gain_events_valid = false;
++	assert(!spf_radio_frame_v3_build(
++		event_buffer, sizeof(event_buffer), &args));
+ 	return 0;
+ }

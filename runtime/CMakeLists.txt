@@ -11,6 +11,13 @@ add_compile_options(-Wall -Wextra -Werror)
 add_library(spf_tandem_lifecycle STATIC spf_tandem_lifecycle.c spf_tandem_ctl.c)
 target_include_directories(spf_tandem_lifecycle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+# The metadata path: encoding a controller record into the protocol-v3 wire
+# record, draining the FIFO into a frame, and reconstructing the per-sample gain
+# series. Separate from the lifecycle library because the gadget links this and
+# not the control layer.
+add_library(spf_tandem_meta STATIC spf_tandem_event.c spf_tandem_drain.c)
+target_include_directories(spf_tandem_meta PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
 # the CLI links the iio backend only where libiio exists; the library and its
 # tests never do, which is what keeps the transaction logic host-testable
 find_library(IIO_LIBRARY iio)
@@ -36,4 +43,12 @@ if(BUILD_TESTING)
   add_executable(test_spf_tandem_ctl test_spf_tandem_ctl.c)
   target_link_libraries(test_spf_tandem_ctl spf_tandem_lifecycle)
   add_test(NAME spf_tandem_ctl COMMAND test_spf_tandem_ctl)
+
+  add_executable(test_spf_tandem_event test_spf_tandem_event.c)
+  target_link_libraries(test_spf_tandem_event spf_tandem_meta)
+  add_test(NAME spf_tandem_event COMMAND test_spf_tandem_event)
+
+  add_executable(test_spf_tandem_drain test_spf_tandem_drain.c)
+  target_link_libraries(test_spf_tandem_drain spf_tandem_meta)
+  add_test(NAME spf_tandem_drain COMMAND test_spf_tandem_drain)
 endif()
