@@ -46,16 +46,26 @@ static void usage(FILE *f)
 		"  mode tandem-auto [--initial-gain N]\n"
 		"  check-sync                   compare the FPGA model against the part\n"
 		"\n"
+		"  --harness-baseline REF       this unit's measured D(g,g) reference\n"
+		"\n"
 		"Enabling requires the ENSM to be RX-active: CTRL_IN edges are ignored\n"
 		"otherwise, so a controller armed outside RX silently does nothing.\n"
 		"While tandem is armed the AD9361 accepts host gain writes and drops\n"
-		"them with a success return, so this tool refuses them itself.\n");
+		"them with a success return, so this tool refuses them itself.\n"
+		"\n"
+		"Tandem's phase benefit depends on harness health, not just on the\n"
+		"radio. E-GSC6 measured two units whose interaction terms matched to\n"
+		"0.05 degrees but whose D(g,g) differed 5-7x by band; on the unit with\n"
+		"a damaged connector the high band came in at 0.3x, meaning tandem made\n"
+		"phase WORSE than leaving it off. Pass --harness-baseline with this\n"
+		"unit's own measured reference, re-measured after any connector work.\n");
 }
 
 int main(int argc, char **argv)
 {
 	const char *uri = NULL;
 	const char *restore = "slow_attack";
+	const char *harness_baseline = NULL;
 	long initial_gain = 40;
 	const spf_tandem_backend_t *be;
 	spf_tandem_ctl_t ctl;
@@ -70,6 +80,8 @@ int main(int argc, char **argv)
 			restore = argv[++i];
 		} else if (strcmp(argv[i], "--initial-gain") == 0 && i + 1 < argc) {
 			initial_gain = strtol(argv[++i], NULL, 0);
+		} else if (strcmp(argv[i], "--harness-baseline") == 0 && i + 1 < argc) {
+			harness_baseline = argv[++i];
 		} else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
 			usage(stdout);
 			return 0;
@@ -114,10 +126,26 @@ int main(int argc, char **argv)
 		const char *m = argv[first + 1];
 		if (strcmp(m, "legacy") == 0)
 			rc = spf_tandem_ctl_disable(&ctl, restore);
-		else if (strcmp(m, "tandem-hold") == 0)
-			rc = spf_tandem_ctl_enable(&ctl, false);
-		else if (strcmp(m, "tandem-auto") == 0)
-			rc = spf_tandem_ctl_enable(&ctl, true);
+		else if (strcmp(m, "tandem-hold") == 0 || strcmp(m, "tandem-auto") == 0) {
+			/*
+			 * Warn rather than refuse. Firmware cannot measure harness health,
+			 * so a hard block would be enforcing a condition it cannot check --
+			 * and tandem is still the right answer for dynamic range on a unit
+			 * whose phase is not being used. But arming silently on an
+			 * uncharacterised harness is how a unit ends up 0.3x on the band
+			 * that matters most, so this is loud and on stderr.
+			 */
+			if (harness_baseline == NULL)
+				fprintf(stderr,
+					"warning: arming tandem with no harness baseline.\n"
+					"  Phase benefit is per-unit and per-harness: E-GSC6 measured\n"
+					"  0.3x (worse than off) in the high band on a unit with a\n"
+					"  damaged connector, against >=7.2x on the control unit.\n"
+					"  Pass --harness-baseline with this unit's measured D(g,g).\n");
+			else
+				fprintf(stderr, "harness baseline: %s\n", harness_baseline);
+			rc = spf_tandem_ctl_enable(&ctl, strcmp(m, "tandem-auto") == 0);
+		}
 		else {
 			fprintf(stderr, "unknown mode '%s'\n", m);
 			spf_tandem_iio_release();
