@@ -1,6 +1,9 @@
 # Tandem AGC v1 — design contract
 
-Status: **draft for review**. This document must be reviewed and frozen before any
+Status: **reviewed, revision 4**. Every decision below has been checked against the
+implementation; the review found one unimplemented decision (D-8) and two drifts
+(D-4, D-9), all recorded in revision 4. Further changes go
+through a revision entry at the bottom. Original note: this document must be reviewed and frozen before any
 RTL is written. Nothing here may be changed silently once RTL exists; changes go
 through a revision entry at the bottom.
 
@@ -28,12 +31,12 @@ is bit-for-bit what RC17 does today.
 | D-1 | Controller clock domain | **`l_clk`** (the AD9361 `DATA_CLK`, RX datapath clock) | Keeps decisions and timestamps in the same domain as the sample counter, removing a CDC from the timestamp path. Also gives the narrowest pulse-width register. |
 | D-2 | Pulse width register | **8 bits**, default **16**, RTL floor **4** | `N_min = 4 / rx_fir_dec` on `l_clk`; worst case is `rx_fir_dec = 1`, which is the device-tree boot default. Default 16 is 4× margin. 8 bits also covers a hypothetical LVDS switch (`N_min = 8`). |
 | D-3 | Event sample counter width | **64-bit**, full width, in the FIFO and on the wire | The wire record already carries `uint64_t sample_sequence`. Carrying 64 bits internally makes counter rollover a simulation-only concern (~9,500 years at 61.44 MS/s) instead of a live 70-second hazard. |
-| D-4 | Event sequence width | **32 bits**, wrap handled by serial-number comparison | Same technique RC17 uses for request-ID wrap. Fits the 6 free bytes of the existing wire record. |
+| D-4 | Event sequence width | **16 bits in the FPGA**, zero-extended into the wire record's 32-bit field; wrap handled by serial-number comparison | Same technique RC17 uses for request-ID wrap. Narrowed from 32 during Stage 3 as part of the area reduction that let the block place; the wire field keeps its 32-bit width, so nothing downstream changed. Serial-number comparison is done at the counter's own width -- comparing magnitudes, or zero-extending before the comparison, both break at the wrap. |
 | D-5 | Ownership epoch width | **8 bits**, never zero, skips zero on wrap | Transposed from RC17's `generation`. Lives in the FIFO record and the frame header, **not** in the 16-byte wire record — there is no room, and stale-epoch events are dropped at drain so the wire never sees them. |
 | D-6 | Gain step size | **1 index = 1 dB**, both directions | Must be programmed explicitly: the shipped configuration currently moves **2** indices per edge. One index per pulse makes the FPGA model trivially auditable. |
 | D-7 | Index window | **configurable; default = full usable range** | The clamp mechanism is mandatory — the index model must not run off the end of a 77-row table — but the narrow phase-optimal window is **optional and off by default**. `[40, 54]` is documented in §6.1 as the setting to use when inter-channel phase matters more than dynamic range; it is not imposed. Tandem's cancellation does not depend on it (§6.1). |
 | D-8 | Absolute clamp bound | read from the device | `Maximum Full Table/LMT Table Index`, chip default 76. The D-7 window is configured on top of it; never hard-code either. |
-| D-9 | Event FIFO geometry | **256 deep × 128 bits** | 32,768 bits = exactly one BRAM36. Depth is ~15× the worst-case per-frame event count (see §7.3). Matches `SPF_MAX_GAIN_EVENTS`. |
+| D-9 | Event FIFO geometry | **64 deep × 104 bits** | Narrowed from 256×128 during Stage 3. 104 bits is the record's exact width, and 64 is still ~3.5× the worst-case per-frame event count (§7.3). The original geometry was chosen to fill exactly one BRAM36 and to match `SPF_MAX_GAIN_EVENTS`; neither survived contact with the 7010's capacity, and neither was load-bearing. Note the FIFO must be read **synchronously** -- an asynchronous indexed read infers distributed LUT-RAM instead of block RAM, which cost ~850 LUT and both BRAM tiles when first measured. |
 | D-10 | Cooldown timebase | **power-measurement periods**, not clock cycles | The low-power flag only updates once per decimated power-measurement period (256–410 µs at every supported rate). A cooldown in microseconds is meaningless against it. |
 
 ## 2. Modes and lifecycle
@@ -595,5 +598,6 @@ motivated by, and how Campaign C is graded.
 | Rev | Date | Change |
 |---|---|---|
 | 1 | 2026-08-10 | Initial draft for review. Clock domain fixed to `l_clk` per D-1. |
+| 4 | 2026-08-11 | **Design review against the implementation.** D-8 was never implemented: the clamp bound was the constant 76 in the CLI, in the RTL reset default, and read from the part nowhere. Enable now reads `Max Full/LMT Gain Table Index` (0x0FF[6:0]), refuses a zero-length table and an out-of-range initial index, and writes the measured bound into the block's index window. Walking failure injection across the FPGA register writes then exposed a missing rollback at step 12 (entering tandem-auto), which left the part armed with the block owning the pins after a failure the caller saw as an aborted enable; fixed. D-4 and D-9 updated to match the Stage 3 area reductions -- both were deliberate, neither was written back. |
 | 3 | 2026-08-11 | D-7 changed to optional: the clamp mechanism stays mandatory, the narrow `[40,54]` window becomes a documented configuration rather than the default, per the project decision to keep the focus on tandem itself. Rationale recorded in §6.1 — tandem's cancellation does not depend on the window. RC17 baseline measured and archived: every retained RC16 figure reproduces exactly. |
 | 2 | 2026-08-10 | Reconciled against E-AGC1 session 1 (both radios) and a bench/code audit. **Corrections:** D-7's index clamp was justified by LNA transitions "at indices 8, 20 and 30", which matched nothing in the audited tables — 8 and 20 are frozen-word dB values. Recomputed from `gain_tables_audited.json` to a band-common frozen window of `[40, 54]`, with the range/disturbance tradeoff stated (§6.1). The usable range is −1…62 dB band-common, not the asserted 27–73. **Closed:** O-1 and O-5, both by measurement. **Added:** ENSM-active precondition to the enable sequence, ENSM-while-armed handling, active rejection of host gain writes (the device accepts and ignores them with a success return), and O-6/O-7. |
