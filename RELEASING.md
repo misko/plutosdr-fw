@@ -49,9 +49,19 @@ mislabelling.
    `gain-rssi-fingerprint-v1/v2/v3` → `gain-series-v4`. Drop the `-rcNN`; keep
    the `v0.38` upstream base.
 
-2. **Dispatch the build** from `main` with `release_version` set to the exact
-   name. Do not tag first — if the build or its testing fails you would have to
-   move a version tag, and tagging is not what makes the string correct.
+2. **Dispatch the build** with `release_version` set to the exact name. Do not
+   tag first — if the build or its testing fails you would have to move a
+   version tag, and tagging is not what makes the string correct.
+
+   A manual dispatch may target **any branch**, so a release candidate can be
+   built and hardware-tested before it is merged. Prefer that order: RC17 was
+   merged to main and qualified afterwards, which is how main came to carry a
+   candidate that had never been on a radio.
+
+   ```sh
+   gh workflow run firmware-main.yml --ref <branch> \
+     -f release_version=v0.38-plutoplus-spf-gain-series-v5-rc1
+   ```
 
 3. **Verify the stamp.** The job summary shows `device-fw`. To confirm from the
    artifact itself:

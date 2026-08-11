@@ -1,7 +1,21 @@
 name: Kalman main firmware build
 
-# Security boundary: this workflow never runs for pull requests. A manual run
-# is also restricted to refs/heads/main at the job level.
+# Security boundary: this workflow never runs for pull requests. Automatic
+# builds are main-only; a MANUAL build may target any branch.
+#
+# What that boundary actually rests on is `on:` -- the only triggers are a push
+# to main and workflow_dispatch, and workflow_dispatch requires write access to
+# this repository. Anyone who can dispatch can already push to main, so the
+# former refs/heads/main job guard did not add a privilege boundary; it
+# prevented dispatching the wrong ref by accident.
+#
+# It was traded for something worth more: building and hardware-testing a
+# release candidate BEFORE merging it. RC17 merged to main and was qualified
+# afterwards, which is how main came to carry a candidate that had never been
+# on a radio. Testing first inverts that.
+#
+# The cost is real and should be named: a manual dispatch runs unreviewed
+# branch code on a self-hosted runner. Only dispatch branches you would merge.
 on:
   push:
     branches: [main]
@@ -30,7 +44,9 @@ concurrency:
 jobs:
   build:
     name: build and package on Kalman
-    if: github.ref == 'refs/heads/main'
+    # Automatic builds stay main-only; a deliberate manual run may target any
+    # branch. See the security-boundary note at the top of this file.
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     outputs:
