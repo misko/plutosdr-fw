@@ -1,3 +1,14 @@
+# LANDED -- this patch is now a record, not a carrier.
+#
+# These changes are committed upstream as misko/plutosdr-hdl commit 3475a1bb on
+# branch `tandem-agc-v1`, pinned by the annotated source-lock tag
+# `gain-series-v5-rc1-source/hdl`, and the submodule pointer in this repository
+# resolves to it. Do NOT apply this by hand: doing so on top of the pinned
+# submodule produces a dirty tree that fails the CI worktree-reset check.
+#
+# Kept because it is the readable form of the delta against the v4 hdl lock
+# (5360aeac), which is what a reviewer wants when asking what tandem changed.
+#
 diff --git a/projects/pluto/system_bd.tcl b/projects/pluto/system_bd.tcl
 index 78e3ef30..0cf3376f 100644
 --- a/projects/pluto/system_bd.tcl

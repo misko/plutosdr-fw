@@ -20,11 +20,13 @@ released: false
 plutosdr_fw_commit: 163a9c661c49a0bc7c6a7cca88db6b5d57f59d87
 plutosdr_fw_branch: main
 hdl_base_commit: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
-# The hdl submodule is modified in-tree; the changes are captured as
-# hdl-tandem/integration/pluto_integration.patch and are NOT committed to the
-# submodule. A release must land that patch on a real branch first.
-hdl_patch: hdl-tandem/integration/pluto_integration.patch
-hdl_patch_state: uncommitted-working-tree
+# Landed. The integration is committed upstream and pinned by an annotated
+# source-lock tag, so the submodule pointer alone reproduces the tree.
+hdl_commit: 3475a1bb293272f858b4c9cfd14bd1cd4ef0022f
+hdl_repo: https://github.com/misko/plutosdr-hdl.git
+hdl_ref: refs/tags/gain-series-v5-rc1-source/hdl
+hdl_branch: tandem-agc-v1
+hdl_patch_state: committed
 
 # ---------------------------------------------------------------- artifact ---
 # The bitstream is the only binary this candidate has produced. There is no
@@ -69,5 +71,5 @@ open_no_hardware_run: true          # campaigns A-F need authorisation and a rad
 open_gadget_patch_uncompiled: true  # needs the Buildroot sysroot
 open_zarr_patch_untested: true      # needs numpy/zarr
 open_no_dfu_built: true
-open_hdl_patch_uncommitted: true
+open_hdl_patch_uncommitted: false   # closed 2026-08-11
 open_bare_tee_unresolved: true      # dual-RX phase work needs a Wilkinson divider
