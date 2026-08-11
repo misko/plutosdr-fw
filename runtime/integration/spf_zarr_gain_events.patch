@@ -1,0 +1,93 @@
+--- a/spf/dataset/v7_data.py
++++ b/spf/dataset/v7_data.py
+@@ -71,6 +71,9 @@
+         "gain_observation_read_duration_ns",
+         "gain_event_sample_sequence",
+         "gain_event_flags",
++        "gain_event_index",
++        "gain_event_detail",
++        "gain_event_sequence",
+     ]
+ 
+ 
+@@ -124,7 +127,11 @@
+     # The bounded observation/event arrays are an independently versioned,
+     # backward-compatible extension.
+     z.attrs["radio_metadata_schema_version"] = 2
+-    z.attrs["gain_series_schema_version"] = 1
++    # 2 adds gain_event_index / _detail / _sequence. Readers must accept any
++    # version they know how to read, not one exact value -- see
++    # recover_interrupted_v7.py, which tested for equality and would have
++    # silently treated a schema-2 store as having no gain series at all.
++    z.attrs["gain_series_schema_version"] = 2
+     z.attrs["sample_time_schema_version"] = 1
+     z.attrs["sample_counter_end_semantics"] = "exclusive"
+     z.attrs[
+@@ -221,4 +228,32 @@
+             chunks=(row_chunk, V7_GAIN_EVENT_CAPACITY),
+             compressor=compressor,
+         )
++        # Schema 2. Without these three the stored events say only "the gain
++        # moved here", which cannot be turned back into a gain series -- the
++        # index it moved to lives in what protocol v3 calls the record's
++        # reserved words, and dropping them at the Zarr boundary discards the
++        # only thing that makes the events usable for calibration.
++        receiver_z.create_dataset(
++            "gain_event_index",
++            shape=(timesteps, V7_GAIN_EVENT_CAPACITY),
++            dtype=np.uint8,
++            chunks=(row_chunk, V7_GAIN_EVENT_CAPACITY),
++            compressor=compressor,
++        )
++        # reason in [3:0], direction in [5:4], as on the wire
++        receiver_z.create_dataset(
++            "gain_event_detail",
++            shape=(timesteps, V7_GAIN_EVENT_CAPACITY),
++            dtype=np.uint8,
++            chunks=(row_chunk, V7_GAIN_EVENT_CAPACITY),
++            compressor=compressor,
++        )
++        # monotonic within an ownership epoch; a hole means an event was lost
++        receiver_z.create_dataset(
++            "gain_event_sequence",
++            shape=(timesteps, V7_GAIN_EVENT_CAPACITY),
++            dtype=np.uint32,
++            chunks=(row_chunk, V7_GAIN_EVENT_CAPACITY),
++            compressor=compressor,
++        )
+     return z
+--- a/spf/scripts/recover_interrupted_v7.py
++++ b/spf/scripts/recover_interrupted_v7.py
+@@ -205,7 +205,9 @@
+             f"r{index}" for index in range(len(receiver_names))
+         ]:
+             raise ValueError(f"receiver groups are not contiguous: {receiver_names}")
+-        include_gain_series = source.attrs.get("gain_series_schema_version") == 1
++        include_gain_series = (
++            source.attrs.get("gain_series_schema_version", 0) >= 1
++        )
+         include_sample_time = source.attrs.get("sample_time_schema_version") == 1
+         detected = []
+         stopping_reasons = []
+--- a/tests/test_dataset.py
++++ b/tests/test_dataset.py
+@@ -287,7 +287,7 @@
+             receiver[key][1] = expected_sample_time[key]
+ 
+         assert z.attrs["radio_metadata_schema_version"] == 2
+-        assert z.attrs["gain_series_schema_version"] == 1
++        assert z.attrs["gain_series_schema_version"] == 2
+         assert z.attrs["sample_time_schema_version"] == 1
+         assert "gain_observation_index" not in v7rx_keys()
+         assert "gain_observation_index" in v7rx_keys(include_gain_series=True)
+--- a/tests/radio_hardware/test_gain_series_v3_hardware.py
++++ b/tests/radio_hardware/test_gain_series_v3_hardware.py
+@@ -831,7 +831,7 @@
+     reopened = zarr_open_from_lmdb_store(str(path), mode="r")
+     try:
+         assert reopened.attrs["radio_metadata_schema_version"] == 2
+-        assert reopened.attrs["gain_series_schema_version"] == 1
++        assert reopened.attrs["gain_series_schema_version"] == 2
+         assert reopened.attrs["sample_time_schema_version"] == 1
+         assert reopened.attrs["capture_status"] == "complete"
+         assert reopened.attrs["rx_transport"] == "direct_usb"
