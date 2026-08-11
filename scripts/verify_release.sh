@@ -221,18 +221,49 @@ expect "versions_buildroot"  "$(m versions_buildroot)"  "$(field buildroot)"
 expect "versions_linux"      "$(m versions_linux)"      "$(field linux)"
 expect "versions_u_boot_xlnx" "$(m versions_u_boot_xlnx)" "$(field u-boot-xlnx)"
 
-# The recorded buildroot/linux/u-boot strings are `git describe --abbrev=4`
-# prefixes; assert they are genuine prefixes of the full pinned SHAs so a
-# manifest cannot pin one commit while claiming another.
-prefix_of() {
-    local what="$1" short="$2" full="$3"
-    [[ "$full" == "$short"* ]] ||
-        die "${what}: /opt/VERSIONS says '${short}' which is not a prefix of pinned ${full}"
-    note "${what} prefix of pinned ${full:0:12}..."
+# Assert the strings recorded in /opt/VERSIONS identify the pinned commits, so
+# a manifest cannot pin one commit while claiming another.
+#
+# `git describe --abbrev=4 --tags` returns one of two shapes, and this check
+# originally understood only the first:
+#
+#   <tag>-<n>-g<hash>   when the commit is n commits past a tag
+#   <tag>               when the commit IS the tag
+#
+# fingerprint-v3's submodules sat on branch tips, so every recorded string
+# ended in a hash prefix. As this project moved its submodules onto immutable
+# source-lock tags they began describing as bare tag names, which the prefix
+# rule reads as a mismatch -- failing the better-pinned build and passing the
+# looser one. Resolve a tag rather than rejecting it.
+pin_matches() {
+    local what="$1" recorded="$2" full="$3" repo="$4" resolved=""
+
+    if [[ "$full" == "$recorded"* ]]; then
+        note "${what} prefix of pinned ${full:0:12}..."
+        return
+    fi
+
+    # Local first: buildroot's source-lock tags live in this repository, so this
+    # resolves offline. ls-remote is the fallback for the mirrored submodules.
+    resolved="$(git rev-parse -q --verify "refs/tags/${recorded}^{commit}" 2>/dev/null || true)"
+    if [[ -z "$resolved" && -n "$repo" ]]; then
+        # Both refs are asked for so annotated and lightweight tags behave the
+        # same: an annotated tag also returns `^{}`, which dereferences to the
+        # commit and sorts last.
+        resolved="$(git ls-remote "$repo" \
+                        "refs/tags/${recorded}" "refs/tags/${recorded}^{}" 2>/dev/null |
+                    awk '{print $1}' | tail -1)"
+    fi
+
+    [[ -n "$resolved" ]] ||
+        die "${what}: /opt/VERSIONS says '${recorded}', which is neither a prefix of pinned ${full} nor a tag this checker could resolve"
+    [[ "$resolved" == "$full" ]] ||
+        die "${what}: '${recorded}' resolves to ${resolved}, not the pinned ${full}"
+    note "${what} tag ${recorded} resolves to pinned ${full:0:12}..."
 }
-prefix_of "buildroot pin"   "$(m versions_buildroot)"   "$(m submodule_buildroot)"
-prefix_of "linux pin"       "$(m versions_linux)"       "$(m submodule_linux)"
-prefix_of "u-boot-xlnx pin" "$(m versions_u_boot_xlnx)" "$(m submodule_u_boot_xlnx)"
+pin_matches "buildroot pin"   "$(m versions_buildroot)"   "$(m submodule_buildroot)"   "$(m submodule_buildroot_repo)"
+pin_matches "linux pin"       "$(m versions_linux)"       "$(m submodule_linux)"       "$(m submodule_linux_repo)"
+pin_matches "u-boot-xlnx pin" "$(m versions_u_boot_xlnx)" "$(m submodule_u_boot_xlnx)" "$(m submodule_u_boot_xlnx_repo)"
 
 # ---------------------------------------------------- 5. gadget build ident ---
 GADGET="${WORK}/rootfs/usr/sbin/sdr_usb_gadget"
