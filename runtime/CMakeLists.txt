@@ -34,6 +34,13 @@ else()
   message(STATUS "spf-gainctl: no libiio, building without a backend")
 endif()
 
+# Install the operator tool. Without this the Buildroot package builds
+# spf-gainctl and ships nothing -- which is exactly the state v5 RC2 went out
+# in, with the block in the fabric, the driver in the kernel, and no way on the
+# device to drive either.
+include(GNUInstallDirs)
+install(TARGETS spf-gainctl RUNTIME DESTINATION ${CMAKE_INSTALL_SBINDIR})
+
 if(BUILD_TESTING)
   enable_testing()
   add_executable(test_spf_tandem_lifecycle test_spf_tandem_lifecycle.c)
