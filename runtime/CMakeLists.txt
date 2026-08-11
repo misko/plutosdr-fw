@@ -8,7 +8,7 @@ project(spf_tandem_runtime C)
 set(CMAKE_C_STANDARD 99)
 add_compile_options(-Wall -Wextra -Werror)
 
-add_library(spf_tandem_lifecycle STATIC spf_tandem_lifecycle.c)
+add_library(spf_tandem_lifecycle STATIC spf_tandem_lifecycle.c spf_tandem_ctl.c)
 target_include_directories(spf_tandem_lifecycle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(BUILD_TESTING)
@@ -16,4 +16,8 @@ if(BUILD_TESTING)
   add_executable(test_spf_tandem_lifecycle test_spf_tandem_lifecycle.c)
   target_link_libraries(test_spf_tandem_lifecycle spf_tandem_lifecycle)
   add_test(NAME spf_tandem_lifecycle COMMAND test_spf_tandem_lifecycle)
+
+  add_executable(test_spf_tandem_ctl test_spf_tandem_ctl.c)
+  target_link_libraries(test_spf_tandem_ctl spf_tandem_lifecycle)
+  add_test(NAME spf_tandem_ctl COMMAND test_spf_tandem_ctl)
 endif()
