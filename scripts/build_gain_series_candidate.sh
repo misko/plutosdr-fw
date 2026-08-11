@@ -136,5 +136,10 @@ cp "$candidate_xsa" "$ROOT/build/system_top.xsa"
 printf 'Candidate FPGA XSA: '
 sha256sum "$ROOT/build/system_top.xsa"
 
+# Pass the version pin on the command line rather than relying on the
+# environment, so it wins over the Makefile's default unconditionally. Empty
+# means "derive it from git describe", which is what every development build
+# wants; a release build sets it. See the RELEASE_VERSION comment in Makefile.
 exec make "${buildroot_make_args[@]}" \
+    RELEASE_VERSION="${RELEASE_VERSION:-}" \
     VIVADO_SETTINGS="$VIVADO_SETTINGS" build/pluto.dfu
