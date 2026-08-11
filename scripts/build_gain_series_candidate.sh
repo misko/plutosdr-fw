@@ -9,7 +9,7 @@ set -euo pipefail
 umask 0022
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/gain-series-v4-source.yaml}"
+MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/gain-series-v5-source.yaml}"
 MODE="${1:-source-check}"
 VIVADO_SETTINGS="${VIVADO_SETTINGS:-/opt/Xilinx/Vivado/2022.2/settings64.sh}"
 BUILDROOT_PRIMARY_SITE="${BR2_PRIMARY_SITE:-https://sources.buildroot.net}"

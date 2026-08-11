@@ -24,7 +24,12 @@ jobs:
           persist-credentials: false
       - name: Verify pins, URLs, refs, and overrides
         run: |
-          ./scripts/check_source_graph.sh manifests/gain-series-v4-source.yaml
+          # The manifest describes THIS tree's source graph, so it moves with the
+          # tree. v4's manifest stays in the repository as the immutable record
+          # of what v4 was, and is still what verify_release.sh checks the
+          # shipped v4 image against; it is simply no longer a description of
+          # main once the hdl pin moves to the tandem integration.
+          ./scripts/check_source_graph.sh manifests/gain-series-v5-source.yaml
 
   gadget-tests:
     name: USB and IP gadget unit tests
