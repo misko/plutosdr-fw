@@ -61,7 +61,20 @@ for entry in "${COMPONENTS[@]}"; do
     # Exact equality is intentional. Candidate manifests use protected tags,
     # not moving development branches, so accepting a descendant would weaken
     # the source lock. ls-remote verifies the advertised ref without cloning.
-    actual="$(git ls-remote "$repo" "$ref" 2>/dev/null | awk '{print $1}' | head -1)"
+    #
+    # Ask for the dereferenced form too. Every source lock written so far has
+    # been a LIGHTWEIGHT tag, whose ref is the commit, so reading the first
+    # line was correct by accident. An ANNOTATED tag's ref is the tag object,
+    # and ls-remote then advertises both `<ref>` (the tag) and `<ref>^{}` (the
+    # commit it points at) -- so the naive read compares a tag-object hash
+    # against a commit hash and reports a lock mismatch for a perfectly
+    # correct pin. Annotated is the better form for an immutable lock, and the
+    # check should not push callers away from it.
+    #
+    # `tail -1` picks the deref when present because ls-remote sorts `^{}`
+    # after its own ref, and falls through to the only line for a lightweight
+    # tag. A tag that resolves to the wrong commit still fails below.
+    actual="$(git ls-remote "$repo" "$ref" "${ref}^{}" 2>/dev/null | awk '{print $1}' | tail -1)"
     if [[ -z "$actual" ]]; then
         bad "${name}: ref ${ref} not found at ${repo}"
     elif [[ "$actual" != "$pin" ]]; then
