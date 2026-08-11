@@ -82,7 +82,11 @@ module tandem_agc_checkers #(
     blank_d    <= blanked;
     fault_d    <= fault;
 
-    if (l_resetn) begin
+    if (!l_resetn) begin
+      seq_seen   <= 1'b0;          // history is void across a reset
+      last_seq   <= 32'd0;
+      last_epoch <= 8'd0;
+    end else begin
 
       // A-1: increment and decrement never asserted together on a channel
       if (ctl_o[0] && ctl_o[1]) fail("A-1 RX1 inc and dec asserted together");
@@ -141,7 +145,9 @@ module tandem_agc_checkers #(
       if (evt_push) begin
         if (evt_wdata[87:80] !== epoch) fail("A-9 event carries a stale epoch");
         if (seq_seen && (evt_wdata[87:80] == last_epoch)) begin
-          if (evt_wdata[119:88] <= last_seq)
+          // serial-number comparison (D-4): "after" means the signed difference
+          // is positive, so a wrap at 2^32 is ordered correctly.
+          if ($signed(evt_wdata[119:88] - last_seq) <= 0)
             fail("A-10 event sequence not monotonic within the epoch");
         end
         last_seq   <= evt_wdata[119:88];

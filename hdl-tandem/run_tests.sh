@@ -37,7 +37,13 @@ EXTRA_ARGS="-Ptb_tandem_agc.CLKRF_DIV=2" run tb_tandem_agc \
     "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
     "${here}/tandem_agc_checkers.v" "${here}/tb_tandem_agc.v"
 
-# 4. the control surface, driven exactly as software will drive it
+# 4. §8.2 edge cases: randomised traffic, reset in every state, disable at every
+#    pulse phase, chatter, long idle, FIFO overflow, rollover, index mismatch
+run tb_tandem_agc_stress \
+    "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
+    "${here}/tandem_agc_checkers.v" "${here}/tb_tandem_agc_stress.v"
+
+# 5. the control surface, driven exactly as software will drive it
 run tb_tandem_agc_regs \
     "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
     "${here}/tandem_agc_regs.v" "${here}/tb_tandem_agc_regs.v"
