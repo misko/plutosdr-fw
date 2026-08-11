@@ -11,6 +11,22 @@ add_compile_options(-Wall -Wextra -Werror)
 add_library(spf_tandem_lifecycle STATIC spf_tandem_lifecycle.c spf_tandem_ctl.c)
 target_include_directories(spf_tandem_lifecycle PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
+# the CLI links the iio backend only where libiio exists; the library and its
+# tests never do, which is what keeps the transaction logic host-testable
+find_library(IIO_LIBRARY iio)
+find_path(IIO_INCLUDE_DIR iio.h)
+add_executable(spf-gainctl spf_gainctl.c)
+target_link_libraries(spf-gainctl spf_tandem_lifecycle)
+if(IIO_LIBRARY AND IIO_INCLUDE_DIR)
+  target_sources(spf-gainctl PRIVATE spf_tandem_iio.c)
+  target_compile_definitions(spf-gainctl PRIVATE SPF_TANDEM_HAVE_IIO)
+  target_include_directories(spf-gainctl PRIVATE ${IIO_INCLUDE_DIR})
+  target_link_libraries(spf-gainctl ${IIO_LIBRARY})
+  message(STATUS "spf-gainctl: libiio found, real backend enabled")
+else()
+  message(STATUS "spf-gainctl: no libiio, building without a backend")
+endif()
+
 if(BUILD_TESTING)
   enable_testing()
   add_executable(test_spf_tandem_lifecycle test_spf_tandem_lifecycle.c)
