@@ -1,10 +1,12 @@
 # Source-only manifest for the gain-series v5 candidate: v4's source graph with
 # the tandem AGC HDL integration.
 #
-# Only the hdl pin differs from manifests/gain-series-v4-source.yaml. Everything
-# else -- gadget, ip-gadget, buildroot, hdl-quantulum, linux, u-boot-xlnx -- is
-# the tree that shipped as v0.38-plutoplus-spf-gain-series-v4, so anything that
-# changes between v4 and v5 RC1 in the FPGA is attributable to tandem alone.
+# Two pins differ from manifests/gain-series-v4-source.yaml: hdl carries the
+# tandem block, and linux carries the driver and device-tree node that make the
+# block reachable from a host. Everything else -- gadget, ip-gadget, buildroot,
+# hdl-quantulum, u-boot-xlnx -- is the tree that shipped as
+# v0.38-plutoplus-spf-gain-series-v4, so anything that changes between v4 and
+# v5 RC1 is attributable to tandem alone.
 #
 # Original header follows.
 #
@@ -41,9 +43,9 @@ submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
 submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
 submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc10-source/hdl-quantulum
 
-submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
+submodule_linux: 293274c47f5ae5d15b603124e9768184a3da51b0
 submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
-submodule_linux_ref: refs/tags/gain-series-v4-rc2-source/linux
+submodule_linux_ref: refs/tags/gain-series-v5-rc1-source/linux
 
 submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
 submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
