@@ -1,0 +1,10 @@
+config BR2_PACKAGE_SPF_GAINCTL
+	bool "spf_gainctl"
+	select BR2_PACKAGE_LIBIIO
+	help
+	  Operator control for the tandem AGC: arms and disarms
+	  FPGA-driven gain control that steps RX1 and RX2 together.
+
+	  Only useful on a bitstream carrying the tandem AGC block.
+	  Without one the tool reports that the block is absent
+	  rather than acting.

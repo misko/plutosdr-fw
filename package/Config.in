@@ -2759,6 +2759,7 @@ menu "Applications and Tools for PlutoSDR, M2k & SidekiqZ2"
 	source "package/ad936x_ref_cal/Config.in"
 	source "package/sdr_usb_gadget/Config.in"
 	source "package/sdr_ip_gadget/Config.in"
+	source "package/spf_gainctl/Config.in"
 endmenu
 
 menu "Applications and Tools for the JESD204B Interface Framework"
