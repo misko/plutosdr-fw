@@ -81,8 +81,13 @@ int main(int argc, char **argv)
 		usage(stderr);
 		return 2;
 	}
-	if (initial_gain < 0 || initial_gain > 76) {
-		fprintf(stderr, "initial gain %ld is outside the 0..76 table range\n",
+	/* Range-check only what cannot depend on the part: an index is a 7-bit
+	 * field. The real bound is the part's Max Full/LMT Gain Table Index, which
+	 * enable reads and enforces (D-8) -- checking against a compiled-in 76
+	 * here would reject a valid index on a radio with a longer table and
+	 * accept an invalid one on a radio with a shorter table. */
+	if (initial_gain < 0 || initial_gain > 127) {
+		fprintf(stderr, "initial gain %ld is not a 7-bit gain-table index\n",
 		        initial_gain);
 		return 2;
 	}

@@ -29,6 +29,12 @@
 #define SPF_AD9361_REG_CTRL_OUT_EN    0x036u
 #define SPF_AD9361_REG_GAIN_RX1       0x2B0u
 #define SPF_AD9361_REG_GAIN_RX2       0x2B5u
+/* Max Full/LMT Gain Table Index, [6:0]. Chip default 0x4C = 76, but D-8 is
+ * explicit that neither this nor the D-7 window may be hard-coded: a gain
+ * table loaded by the driver can be shorter, and clamping to a stale 76 would
+ * walk the index model off the end of the table it is modelling. */
+#define SPF_AD9361_REG_MAX_GAIN_INDEX 0x0FFu
+#define SPF_AD9361_MAX_GAIN_INDEX_MASK 0x7Fu
 
 #define SPF_AD9361_PIN_CTRL_MASK      0x03u
 #define SPF_CTRL_OUT_PAGE_DETECTORS   0x03u
@@ -77,6 +83,8 @@ typedef struct {
 	uint8_t initial_index;
 	uint8_t last_rx1;
 	uint8_t last_rx2;
+	/* read from the part at enable, never assumed (D-8); 0 until then */
+	uint8_t device_max_index;
 
 	/* bounded retry, RC13/RC14's lesson made explicit */
 	unsigned retry_limit;
@@ -99,6 +107,11 @@ spf_tandem_rc_t spf_tandem_ctl_disable(spf_tandem_ctl_t *c, const char *restore_
 /* the §6.2 quiescence rule: only compare when no pulse is in flight and the
  * cooldown has expired, and require two consecutive disagreements */
 spf_tandem_rc_t spf_tandem_ctl_check_sync(spf_tandem_ctl_t *c);
+
+/* Read the part's Max Full/LMT Gain Table Index. Exposed separately so an
+ * operator tool can validate a requested gain against the actual table rather
+ * than a compiled-in constant. Returns <0 on a backend failure. */
+int spf_tandem_ctl_max_index(spf_tandem_ctl_t *c, uint8_t *out);
 
 /* machine-readable status, §5.7 */
 int spf_tandem_ctl_status(spf_tandem_ctl_t *c, char *buf, size_t len);

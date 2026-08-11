@@ -108,6 +108,7 @@ static void mock_init(mock_t *m, spf_tandem_backend_t *be)
 	m->ad9361[SPF_AD9361_REG_AGC_CONFIG_2] = 0x08; /* bit 3 live, as measured */
 	m->ad9361[SPF_AD9361_REG_PEAK_WAIT_TIME] = 0x23; /* step 2, PWOT 3 */
 	m->ad9361[SPF_AD9361_REG_AGC_CONFIG_3] = 0x23;
+	m->ad9361[SPF_AD9361_REG_MAX_GAIN_INDEX] = 76; /* chip default; D-8 says read it */
 	m->full_table = true;
 	snprintf(m->ensm, sizeof(m->ensm), "fdd");
 
@@ -225,6 +226,27 @@ static int test_spi_failure_at_every_step(void)
 		CHECK(c.lc.state != SPF_TANDEM_ACTIVE,
 		      "and never reaches tandem-auto");
 	}
+	/*
+	 * The same walk over the FPGA register writes. This covers the index
+	 * window write (step 4c) and the ownership request (step 10); a failure at
+	 * either must leave the part in legacy mode with the pins unclaimed,
+	 * because a block that half-owns the pins is worse than one that never
+	 * tried.
+	 */
+	for (step = 1; step <= 4; step++) {
+		mock_t m; spf_tandem_backend_t be; spf_tandem_ctl_t c;
+		mock_init(&m, &be);
+		m.fail_fpga_write_at = step;
+		spf_tandem_ctl_init(&c, &be, 40);
+		if (spf_tandem_ctl_enable(&c, true) == SPF_TANDEM_OK)
+			continue;   /* past the last write; the enable correctly succeeds */
+		CHECK((m.ad9361[SPF_AD9361_REG_AGC_CONFIG_2] & 0x03) == 0,
+		      "an FPGA write failure never leaves pin control armed");
+		CHECK(!spf_tandem_owns_pins(&c.lc),
+		      "and never leaves the block owning the pins");
+		CHECK(c.lc.state != SPF_TANDEM_ACTIVE, "and never reaches tandem-auto");
+	}
+
 	/* the enable path calls gain_set exactly twice, one per channel */
 	for (step = 1; step <= 2; step++) {
 		mock_t m; spf_tandem_backend_t be; spf_tandem_ctl_t c;
@@ -282,9 +304,59 @@ static int test_sync_quiescence_rule(void)
 	return 0;
 }
 
+/*
+ * D-8: the clamp bound is read from the part, never assumed.
+ *
+ * The chip default is 76 and the RTL's reset default is also 76, so a
+ * hard-coded bound looks correct on every radio anyone has tested. It stops
+ * being correct the moment a driver loads a shorter gain table -- and then the
+ * index model walks off the end of the table it exists to model, silently.
+ */
+static int test_max_index_is_read_from_the_part(void)
+{
+	mock_t m; spf_tandem_backend_t be; spf_tandem_ctl_t c;
+	uint8_t max = 0;
+
+	mock_init(&m, &be);
+	m.ad9361[SPF_AD9361_REG_MAX_GAIN_INDEX] = 0xC3; /* [7] set, must be masked */
+	spf_tandem_ctl_init(&c, &be, 40);
+	CHECK(spf_tandem_ctl_max_index(&c, &max) == 0, "the bound is readable");
+	CHECK(max == 0x43, "and only the 7-bit field is used");
+
+	mock_init(&m, &be);
+	m.ad9361[SPF_AD9361_REG_MAX_GAIN_INDEX] = 60;
+	spf_tandem_ctl_init(&c, &be, 40);
+	CHECK(spf_tandem_ctl_enable(&c, true) == SPF_TANDEM_OK, "a short table enables");
+	CHECK(c.device_max_index == 60, "and the measured bound is what was read");
+	CHECK((m.fpga[SPF_TANDEM_REG_INDEX >> 2] >> 8 & 0xFF) == 60,
+	      "and it reaches the block's index window, overwriting the RTL's 76");
+	return 0;
+}
+
+static int test_enable_refuses_an_index_past_the_table(void)
+{
+	mock_t m; spf_tandem_backend_t be; spf_tandem_ctl_t c;
+
+	mock_init(&m, &be);
+	m.ad9361[SPF_AD9361_REG_MAX_GAIN_INDEX] = 40;
+	spf_tandem_ctl_init(&c, &be, 50);   /* legal against 76, not against 40 */
+	CHECK(spf_tandem_ctl_enable(&c, true) != SPF_TANDEM_OK,
+	      "an index past the part's table is refused, not clamped silently");
+	CHECK(!spf_tandem_owns_pins(&c.lc), "and the pins were never handed over");
+
+	mock_init(&m, &be);
+	m.ad9361[SPF_AD9361_REG_MAX_GAIN_INDEX] = 0;
+	spf_tandem_ctl_init(&c, &be, 40);
+	CHECK(spf_tandem_ctl_enable(&c, true) != SPF_TANDEM_OK,
+	      "a zero-length table is refused rather than treated as 'no limit'");
+	return 0;
+}
+
 int main(void)
 {
 	struct { const char *name; int (*fn)(void); } tests[] = {
+		{ "max_index_is_read_from_the_part", test_max_index_is_read_from_the_part },
+		{ "enable_refuses_index_past_table", test_enable_refuses_an_index_past_the_table },
 		{ "enable_disable_happy",           test_enable_disable_happy },
 		{ "preconditions_refused",          test_preconditions_refused },
 		{ "unequal_readback",               test_unequal_readback },

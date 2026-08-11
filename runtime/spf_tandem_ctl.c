@@ -30,6 +30,18 @@ void spf_tandem_ctl_init(spf_tandem_ctl_t *c, const spf_tandem_backend_t *be,
 	c->retry_limit = 8;
 }
 
+int spf_tandem_ctl_max_index(spf_tandem_ctl_t *c, uint8_t *out)
+{
+	uint8_t raw;
+
+	if (c == NULL || out == NULL || c->be == NULL || c->be->ad9361_read == NULL)
+		return -1;
+	if (c->be->ad9361_read(c->be->ctx, SPF_AD9361_REG_MAX_GAIN_INDEX, &raw) != 0)
+		return -1;
+	*out = (uint8_t)(raw & SPF_AD9361_MAX_GAIN_INDEX_MASK);
+	return 0;
+}
+
 /* Read-modify-write is mandatory: direct_reg_access writes the whole byte, and
  * 0x0FB carries live bits besides [1:0] on the shipped builds -- E-AGC1 found
  * bit 3 set, so a bare 0x03 would have cleared it. */
@@ -99,6 +111,39 @@ spf_tandem_rc_t spf_tandem_ctl_enable(spf_tandem_ctl_t *c, bool auto_mode)
 	    be->mode_set(be->ctx, 1, "manual") != 0) {
 		spf_tandem_fault(&c->lc, SPF_TANDEM_EINVAL);
 		FAIL(c, SPF_TANDEM_EINVAL, "step 4: could not set manual gain mode");
+	}
+
+	/* step 4b: the clamp bound comes from the part, never from a constant
+	 * (D-8). A driver-loaded gain table can be shorter than the chip default
+	 * of 76, and clamping the index model to a stale bound would walk it off
+	 * the end of the table it exists to model. */
+	if (spf_tandem_ctl_max_index(c, &c->device_max_index) != 0) {
+		spf_tandem_fault(&c->lc, SPF_TANDEM_EINVAL);
+		FAIL(c, SPF_TANDEM_EINVAL, "step 4b: max gain index unreadable");
+	}
+	if (c->device_max_index == 0) {
+		spf_tandem_fault(&c->lc, SPF_TANDEM_EINVAL);
+		FAIL(c, SPF_TANDEM_EINVAL, "step 4b: part reports a zero-length gain table");
+	}
+	if (c->initial_index > c->device_max_index) {
+		spf_tandem_fault(&c->lc, SPF_TANDEM_EINVAL);
+		FAIL(c, SPF_TANDEM_EINVAL,
+		     "step 4b: initial index %u exceeds the part's maximum %u",
+		     c->initial_index, c->device_max_index);
+	}
+
+	/* step 4c: push the measured bound into the block's index window. The
+	 * RTL's reset default is 76, which is the chip default and therefore the
+	 * same hard-coded constant D-8 rejects -- it is a safe starting value, not
+	 * an authority. Overwriting it from the part is what makes the clamp
+	 * correct on a radio whose driver loaded a shorter table. idx_min stays 0;
+	 * the narrow D-7 window is an operator choice, not something enable
+	 * imposes. */
+	if (be->fpga_write(be->ctx, SPF_TANDEM_REG_INDEX,
+	                   ((uint32_t)c->initial_index << 16) |
+	                   ((uint32_t)c->device_max_index << 8)) != 0) {
+		spf_tandem_fault(&c->lc, SPF_TANDEM_EINVAL);
+		FAIL(c, SPF_TANDEM_EINVAL, "step 4c: could not program the index window");
 	}
 
 	/* step 5: program the common index. This is the LAST point at which
@@ -184,6 +229,17 @@ spf_tandem_rc_t spf_tandem_ctl_enable(spf_tandem_ctl_t *c, bool auto_mode)
 	/* step 12: open the policy gate only after success is established */
 	if (auto_mode) {
 		if (be->fpga_write(be->ctx, SPF_TANDEM_REG_CTRL, 2u) != 0) {
+			/*
+			 * Roll back in the reverse of the order that built it up. Without
+			 * this the caller sees a failed enable while the part is armed for
+			 * pin control and the block owns the pins -- the gain is then
+			 * frozen wherever step 5 left it, host gain writes are accepted
+			 * and silently dropped (E-AGC1), and nothing anywhere reports why.
+			 * A half-applied enable is worse than one that never started.
+			 */
+			(void)ad9361_rmw(be, SPF_AD9361_REG_AGC_CONFIG_2,
+			                 SPF_AD9361_PIN_CTRL_MASK, 0x00);
+			(void)be->fpga_write(be->ctx, SPF_TANDEM_REG_CTRL, 0u);
 			spf_tandem_fault(&c->lc, SPF_TANDEM_EINVAL);
 			FAIL(c, SPF_TANDEM_EINVAL, "step 12: could not enter tandem-auto");
 		}
@@ -297,7 +353,8 @@ int spf_tandem_ctl_status(spf_tandem_ctl_t *c, char *buf, size_t len)
 		"\"owns_pins\":%s,\"pin_control_armed\":%s,\"gain_writable\":%s,"
 		"\"expected_index\":%u,\"rx1_index\":%u,\"rx2_index\":%u,"
 		"\"fault\":%u,\"transitions\":%u,\"stale_epoch\":%u,"
-		"\"duplicate_stop\":%u,\"retries_used\":%u,\"last_error\":\"%s\"}",
+		"\"duplicate_stop\":%u,\"retries_used\":%u,"
+		"\"device_max_index\":%u,\"last_error\":\"%s\"}",
 		spf_tandem_state_name(c->lc.state),
 		c->lc.epoch, c->lc.epoch_tomb,
 		spf_tandem_owns_pins(&c->lc) ? "true" : "false",
@@ -305,6 +362,6 @@ int spf_tandem_ctl_status(spf_tandem_ctl_t *c, char *buf, size_t len)
 		spf_tandem_gain_writable(&c->lc) ? "true" : "false",
 		(unsigned)(uint8_t)expect, c->last_rx1, c->last_rx2,
 		fault, c->lc.transition_count, c->lc.stale_epoch_count,
-		c->lc.duplicate_stop_count, c->retries_used,
+		c->lc.duplicate_stop_count, c->retries_used, c->device_max_index,
 		c->last_error_detail);
 }
