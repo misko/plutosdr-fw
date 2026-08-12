@@ -1,8 +1,11 @@
 name: Kalman libiio metadata v4 candidate
 
-# This is a manual-only trusted build. It never runs pull-request-controlled
-# source on the self-hosted Kalman/Vivado runner.
+# This trusted candidate build runs only for its exact maintainer-controlled
+# branch (or a manual dispatch of that ref). It never runs pull-request-
+# controlled source on the self-hosted Kalman/Vivado runner.
 on:
+  push:
+    branches: [codex/firmware-libiio-frame-metadata-v4]
   workflow_dispatch:
 
 permissions:
