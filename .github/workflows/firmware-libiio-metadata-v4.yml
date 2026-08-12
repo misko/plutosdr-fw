@@ -1,33 +1,34 @@
-name: Kalman libiio metadata v4 candidate
+name: Kalman libiio metadata v5 release
 
-# This trusted candidate build runs only for its exact maintainer-controlled
+# This trusted release build runs only for its exact maintainer-controlled
 # branch (or a manual dispatch of that ref). It never runs pull-request-
 # controlled source on the self-hosted Kalman/Vivado runner.
 on:
   push:
-    branches: [codex/firmware-libiio-frame-metadata-v4]
+    branches: [codex/firmware-libiio-frame-metadata-v5-release]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: kalman-libiio-metadata-v4-candidate
+  group: kalman-libiio-metadata-v5-release
   cancel-in-progress: false
 
 jobs:
   build:
-    name: build and package v4 candidate on Kalman
-    if: github.ref == 'refs/heads/codex/firmware-libiio-frame-metadata-v4'
+    name: build and package v5 release on Kalman
+    if: github.ref == 'refs/heads/codex/firmware-libiio-frame-metadata-v5-release'
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     outputs:
       artifact-name: ${{ steps.names.outputs.artifact_name }}
       bundle-name: ${{ steps.build.outputs.bundle_name }}
     env:
-      SPF_GAIN_SERIES_MANIFEST: ${{ github.workspace }}/manifests/libiio-frame-metadata-v4-source.yaml
-      SPF_PACKAGE_STEM_PREFIX: plutoplus-spf-libiio-metadata-v4
-      SPF_RELEASE_STATE: candidate-offline-ci
+      SPF_GAIN_SERIES_MANIFEST: ${{ github.workspace }}/manifests/libiio-frame-metadata-v5-source.yaml
+      SPF_PACKAGE_STEM_PREFIX: plutoplus-spf-libiio-metadata-v5
+      SPF_RELEASE_STATE: release-offline-ci
+      RELEASE_VERSION: v0.38-plutoplus-spf-libiio-metadata-v5
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -47,7 +48,7 @@ jobs:
       - name: Choose immutable artifact names
         id: names
         run: |
-          echo "artifact_name=plutoplus-libiio-metadata-v4-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=plutoplus-libiio-metadata-v5-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
       - name: Build, validate, and package
         id: build
@@ -58,11 +59,11 @@ jobs:
           BR2_GNU_MIRROR: https://ftpmirror.gnu.org
           BR2_BACKUP_SITE: https://sources.buildroot.net
         run: |
-          artifact_root=$(mktemp -d "$RUNNER_TEMP/plutosdr-fw-libiio-metadata-v4.XXXXXX")
+          artifact_root=$(mktemp -d "$RUNNER_TEMP/plutosdr-fw-libiio-metadata-v5.XXXXXX")
           echo "artifact_root=$artifact_root" >> "$GITHUB_OUTPUT"
           scripts/ci/build_main_firmware.sh "$artifact_root"
           bundle=$(find "$artifact_root" -maxdepth 1 -type f \
-            -name 'plutoplus-spf-libiio-metadata-v4-*.tar.gz' -print -quit)
+            -name 'plutoplus-spf-libiio-metadata-v5-*.tar.gz' -print -quit)
           test -n "$bundle"
           {
             echo "artifact_root=$artifact_root"
@@ -99,17 +100,18 @@ jobs:
       - name: Record build result
         run: |
           {
-            echo '## Kalman libiio metadata v4 candidate'
+            echo '## Kalman libiio metadata v5 release build'
             echo
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Bundle: \`${{ steps.build.outputs.bundle_name }}\`"
             echo "- Artifact: [${{ steps.names.outputs.artifact_name }}](${{ steps.upload.outputs.artifact-url }})"
-            echo '- Status: offline validated; RAM-boot hardware testing required'
+            echo '- device-fw: `v0.38-plutoplus-spf-libiio-metadata-v5`'
+            echo '- Status: offline validated; exact bytes require hardware confirmation before publication'
             echo '- Compatibility: radio 0.25; hosts 0.25 and 0.26 only'
           } >> "$GITHUB_STEP_SUMMARY"
 
   attest:
-    name: verify and attest candidate bundle
+    name: verify and attest release bundle
     needs: build
     runs-on: ubuntu-latest
     permissions:
