@@ -151,6 +151,10 @@ static void *sampler_thread(void *opaque)
 		uint32_t before = 0;
 		uint32_t after = 0;
 		const bool before_valid = read_counter(rx, &before);
+		pthread_mutex_lock(&sampler->mutex);
+		sampler->observations_started++;
+		pthread_cond_broadcast(&sampler->credit_cond);
+		pthread_mutex_unlock(&sampler->mutex);
 		spf_gain_pair_t gain = spf_gain_read_db_pair(phy, &table);
 		spf_rssi_pair_t rssi = spf_rssi_read_pair(phy);
 		const bool after_valid = read_counter(rx, &after);
@@ -307,6 +311,46 @@ void spf_gain_sampler_limit(spf_gain_sampler_t *sampler, uint64_t samples)
 	sampler->sample_credit = samples;
 	pthread_cond_broadcast(&sampler->credit_cond);
 	pthread_mutex_unlock(&sampler->mutex);
+}
+
+bool spf_gain_sampler_limit_and_wait_started(
+	spf_gain_sampler_t *sampler,
+	uint64_t samples,
+	uint32_t timeout_ms)
+{
+	if (!sampler || !sampler->mutex_initialized || samples == 0 ||
+		timeout_ms == 0)
+		return false;
+	struct timespec deadline;
+	if (clock_gettime(CLOCK_REALTIME, &deadline) != 0)
+		return false;
+	deadline.tv_sec += timeout_ms / 1000U;
+	deadline.tv_nsec += (long)(timeout_ms % 1000U) * 1000000L;
+	if (deadline.tv_nsec >= 1000000000L)
+	{
+		deadline.tv_sec++;
+		deadline.tv_nsec -= 1000000000L;
+	}
+
+	pthread_mutex_lock(&sampler->mutex);
+	const uint64_t started_before = sampler->observations_started;
+	sampler->bounded = true;
+	sampler->sample_credit = samples;
+	pthread_cond_broadcast(&sampler->credit_cond);
+	int wait_result = 0;
+	while (sampler->observations_started == started_before &&
+		!atomic_load_explicit(&sampler->failed, memory_order_relaxed) &&
+		!atomic_load_explicit(
+			&sampler->stop_requested, memory_order_relaxed))
+	{
+		wait_result = pthread_cond_timedwait(
+			&sampler->credit_cond, &sampler->mutex, &deadline);
+		if (wait_result != 0)
+			break;
+	}
+	const bool started = sampler->observations_started != started_before;
+	pthread_mutex_unlock(&sampler->mutex);
+	return started;
 }
 
 void spf_gain_sampler_add_credit(spf_gain_sampler_t *sampler, uint64_t samples)

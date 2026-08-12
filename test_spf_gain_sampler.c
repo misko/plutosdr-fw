@@ -2,6 +2,19 @@
 
 #include <assert.h>
 #include <string.h>
+#include <time.h>
+
+static void *announce_observation(void *opaque)
+{
+	spf_gain_sampler_t *sampler = opaque;
+	const struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000000};
+	nanosleep(&delay, NULL);
+	pthread_mutex_lock(&sampler->mutex);
+	sampler->observations_started++;
+	pthread_cond_broadcast(&sampler->credit_cond);
+	pthread_mutex_unlock(&sampler->mutex);
+	return NULL;
+}
 
 int main(void)
 {
@@ -23,11 +36,21 @@ int main(void)
 	assert(pthread_cond_init(&sampler.credit_cond, NULL) == 0);
 	sampler.credit_cond_initialized = true;
 	atomic_init(&sampler.idle, false);
+	atomic_init(&sampler.failed, false);
+	atomic_init(&sampler.stop_requested, false);
 	spf_gain_sampler_limit(&sampler, UINT64_C(4096));
 	assert(sampler.bounded);
 	assert(sampler.sample_credit == UINT64_C(4096));
 	spf_gain_sampler_add_credit(&sampler, UINT64_C(2048));
 	assert(sampler.sample_credit == UINT64_C(6144));
+	pthread_t announcer;
+	assert(pthread_create(&announcer, NULL, announce_observation, &sampler) == 0);
+	assert(spf_gain_sampler_limit_and_wait_started(
+		&sampler, UINT64_C(2048), UINT32_C(100)));
+	assert(pthread_join(announcer, NULL) == 0);
+	assert(sampler.sample_credit == UINT64_C(2048));
+	assert(!spf_gain_sampler_limit_and_wait_started(
+		&sampler, UINT64_C(2048), UINT32_C(1)));
 	assert(!spf_gain_sampler_is_idle(&sampler));
 	sampler.count = 2;
 	sampler.records[0] = (spf_gain_observation_v3_t){

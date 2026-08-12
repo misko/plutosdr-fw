@@ -42,6 +42,7 @@ typedef struct
 	atomic_bool idle;
 	bool bounded;
 	uint64_t sample_credit;
+	uint64_t observations_started;
 	uint32_t interval_samples;
 	uint32_t count;
 	uint32_t overflow_count;
@@ -65,6 +66,17 @@ void spf_gain_sampler_stop(spf_gain_sampler_t *sampler);
 void spf_gain_sampler_limit(
 	spf_gain_sampler_t *sampler,
 	uint64_t samples);
+
+/*
+ * Replace the current credit and wait until the sampler has started a fresh
+ * observation.  Request-driven IIO uses this immediately before re-enqueuing
+ * a delivered DMA block, ensuring capture begins while gain/RSSI reads are
+ * already in flight instead of racing the sampler's scheduler wakeup.
+ */
+bool spf_gain_sampler_limit_and_wait_started(
+	spf_gain_sampler_t *sampler,
+	uint64_t samples,
+	uint32_t timeout_ms);
 
 /* Grant polling coverage for newly re-enqueued DMA capture work. */
 void spf_gain_sampler_add_credit(
