@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-SPF_METADATA_SOURCE_VERSION = 31aebc3f40907e1bef52945601f4c3fe37c5f7dc
+SPF_METADATA_SOURCE_VERSION = 86c0c78d8a4f70f81243a1ee4ff3b4f945ff5c40
 SPF_METADATA_SOURCE_SITE = https://github.com/misko/plutosdr-fw.git
 SPF_METADATA_SOURCE_SITE_METHOD = git
 SPF_METADATA_SOURCE_INSTALL_STAGING = YES

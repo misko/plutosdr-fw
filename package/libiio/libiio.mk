@@ -8,7 +8,7 @@
 #LIBIIO_VERSION = 0.25
 #LIBIIO_SITE = $(call github,analogdevicesinc,libiio,v$(LIBIIO_VERSION))
 
-LIBIIO_VERSION = 11a1291eeaeb552e4647eb79d7a941a8ec2bab0c
+LIBIIO_VERSION = d189917de2311b9922032cd5afe935e435d2a920
 LIBIIO_SITE = https://github.com/misko/libiio.git
 LIBIIO_SITE_METHOD = git
 

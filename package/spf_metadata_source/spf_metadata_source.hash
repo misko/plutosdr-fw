@@ -1,5 +1,6 @@
 # Buildroot deterministic git archive
 sha256 2a1c26489c65a3b975741d5f70f38531660d1abcc0999332b361af18e930e962  spf_metadata_source-31aebc3f40907e1bef52945601f4c3fe37c5f7dc-br1.tar.gz
+sha256 ed5d47c13dd0f314d20c1c0097c4110799f5161468056c795b7581386691db99  spf_metadata_source-86c0c78d8a4f70f81243a1ee4ff3b4f945ff5c40-br1.tar.gz
 
 # Locally calculated
 sha256 f5c87cbdfe837209750b16fdca27b6c135b4447ac371abd4bfacc4d75467967e  LICENSE
