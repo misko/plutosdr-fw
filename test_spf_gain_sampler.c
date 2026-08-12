@@ -20,6 +20,15 @@ int main(void)
 	memset(&sampler, 0, sizeof(sampler));
 	assert(pthread_mutex_init(&sampler.mutex, NULL) == 0);
 	sampler.mutex_initialized = true;
+	assert(pthread_cond_init(&sampler.credit_cond, NULL) == 0);
+	sampler.credit_cond_initialized = true;
+	atomic_init(&sampler.idle, false);
+	spf_gain_sampler_limit(&sampler, UINT64_C(4096));
+	assert(sampler.bounded);
+	assert(sampler.sample_credit == UINT64_C(4096));
+	spf_gain_sampler_add_credit(&sampler, UINT64_C(2048));
+	assert(sampler.sample_credit == UINT64_C(6144));
+	assert(!spf_gain_sampler_is_idle(&sampler));
 	sampler.count = 2;
 	sampler.records[0] = (spf_gain_observation_v3_t){
 		.sample_sequence_before = UINT32_C(0xFFFFFF00),
@@ -68,6 +77,7 @@ int main(void)
 	assert(rssi_start.rx1_qdb == 400);
 	assert(rssi_end.rx1_qdb == 408);
 	assert(overflow == 0);
+	pthread_cond_destroy(&sampler.credit_cond);
 	pthread_mutex_destroy(&sampler.mutex);
 	return 0;
 }

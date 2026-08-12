@@ -32,11 +32,16 @@ typedef struct
 {
 	pthread_t thread;
 	pthread_mutex_t mutex;
+	pthread_cond_t credit_cond;
 	atomic_bool stop_requested;
 	bool mutex_initialized;
+	bool credit_cond_initialized;
 	bool thread_started;
 	atomic_bool ready;
 	atomic_bool failed;
+	atomic_bool idle;
+	bool bounded;
+	uint64_t sample_credit;
 	uint32_t interval_samples;
 	uint32_t count;
 	uint32_t overflow_count;
@@ -50,6 +55,24 @@ bool spf_gain_sampler_start(
 	spf_gain_sampler_t *sampler,
 	uint32_t interval_samples);
 void spf_gain_sampler_stop(spf_gain_sampler_t *sampler);
+
+/*
+ * Convert a running sampler to bounded operation.  The sampler polls for at
+ * most samples more ADC samples and then sleeps without touching IIO until
+ * more capture credit is granted.  This is used by request-driven transports
+ * after their initial kernel DMA queue has been armed.
+ */
+void spf_gain_sampler_limit(
+	spf_gain_sampler_t *sampler,
+	uint64_t samples);
+
+/* Grant polling coverage for newly re-enqueued DMA capture work. */
+void spf_gain_sampler_add_credit(
+	spf_gain_sampler_t *sampler,
+	uint64_t samples);
+
+/* True while a bounded sampler is asleep with no capture credit. */
+bool spf_gain_sampler_is_idle(const spf_gain_sampler_t *sampler);
 
 /*
  * Copy ordered observations overlapping [frame_start, frame_start+samples).

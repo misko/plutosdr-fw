@@ -11,6 +11,16 @@
 #include <string.h>
 #include <time.h>
 
+static void consume_credit_locked(spf_gain_sampler_t *sampler)
+{
+	if (!sampler->bounded)
+		return;
+	if (sampler->sample_credit <= sampler->interval_samples)
+		sampler->sample_credit = 0;
+	else
+		sampler->sample_credit -= sampler->interval_samples;
+}
+
 static uint64_t extend_counter_near(uint64_t reference, uint32_t low)
 {
 	uint64_t candidate = (reference & UINT64_C(0xFFFFFFFF00000000)) | low;
@@ -55,6 +65,7 @@ static void append_records(
 		sampler->rssi_overflow_count++;
 	}
 	sampler->rssi_records[sampler->rssi_count++] = *rssi_record;
+	consume_credit_locked(sampler);
 	pthread_mutex_unlock(&sampler->mutex);
 }
 
@@ -108,6 +119,21 @@ static void *sampler_thread(void *opaque)
 
 	while (!atomic_load_explicit(&sampler->stop_requested, memory_order_relaxed))
 	{
+		pthread_mutex_lock(&sampler->mutex);
+		while (sampler->bounded && sampler->sample_credit == 0 &&
+			!atomic_load_explicit(
+				&sampler->stop_requested, memory_order_relaxed))
+		{
+			atomic_store_explicit(&sampler->idle, true, memory_order_release);
+			pthread_cond_wait(&sampler->credit_cond, &sampler->mutex);
+		}
+		atomic_store_explicit(&sampler->idle, false, memory_order_release);
+		const bool stop = atomic_load_explicit(
+			&sampler->stop_requested, memory_order_relaxed);
+		pthread_mutex_unlock(&sampler->mutex);
+		if (stop)
+			break;
+
 		uint32_t current = 0;
 		if (!read_counter(rx, &current))
 		{
@@ -213,11 +239,21 @@ bool spf_gain_sampler_start(
 	atomic_init(&sampler->stop_requested, false);
 	atomic_init(&sampler->ready, false);
 	atomic_init(&sampler->failed, false);
+	atomic_init(&sampler->idle, false);
 	if (pthread_mutex_init(&sampler->mutex, NULL) != 0)
 		return false;
 	sampler->mutex_initialized = true;
+	if (pthread_cond_init(&sampler->credit_cond, NULL) != 0)
+	{
+		pthread_mutex_destroy(&sampler->mutex);
+		sampler->mutex_initialized = false;
+		return false;
+	}
+	sampler->credit_cond_initialized = true;
 	if (pthread_create(&sampler->thread, NULL, sampler_thread, sampler) != 0)
 	{
+		pthread_cond_destroy(&sampler->credit_cond);
+		sampler->credit_cond_initialized = false;
 		pthread_mutex_destroy(&sampler->mutex);
 		sampler->mutex_initialized = false;
 		return false;
@@ -244,14 +280,52 @@ void spf_gain_sampler_stop(spf_gain_sampler_t *sampler)
 	{
 		atomic_store_explicit(
 			&sampler->stop_requested, true, memory_order_relaxed);
+		pthread_mutex_lock(&sampler->mutex);
+		pthread_cond_broadcast(&sampler->credit_cond);
+		pthread_mutex_unlock(&sampler->mutex);
 		pthread_join(sampler->thread, NULL);
 		sampler->thread_started = false;
+	}
+	if (sampler->credit_cond_initialized)
+	{
+		pthread_cond_destroy(&sampler->credit_cond);
+		sampler->credit_cond_initialized = false;
 	}
 	if (sampler->mutex_initialized)
 	{
 		pthread_mutex_destroy(&sampler->mutex);
 		sampler->mutex_initialized = false;
 	}
+}
+
+void spf_gain_sampler_limit(spf_gain_sampler_t *sampler, uint64_t samples)
+{
+	if (!sampler || !sampler->mutex_initialized)
+		return;
+	pthread_mutex_lock(&sampler->mutex);
+	sampler->bounded = true;
+	sampler->sample_credit = samples;
+	pthread_cond_broadcast(&sampler->credit_cond);
+	pthread_mutex_unlock(&sampler->mutex);
+}
+
+void spf_gain_sampler_add_credit(spf_gain_sampler_t *sampler, uint64_t samples)
+{
+	if (!sampler || !sampler->mutex_initialized || samples == 0)
+		return;
+	pthread_mutex_lock(&sampler->mutex);
+	if (UINT64_MAX - sampler->sample_credit < samples)
+		sampler->sample_credit = UINT64_MAX;
+	else
+		sampler->sample_credit += samples;
+	pthread_cond_broadcast(&sampler->credit_cond);
+	pthread_mutex_unlock(&sampler->mutex);
+}
+
+bool spf_gain_sampler_is_idle(const spf_gain_sampler_t *sampler)
+{
+	return sampler && atomic_load_explicit(
+		&sampler->idle, memory_order_acquire);
 }
 
 uint16_t spf_gain_sampler_collect(
