@@ -8,9 +8,8 @@
 #LIBIIO_VERSION = 0.25
 #LIBIIO_SITE = $(call github,analogdevicesinc,libiio,v$(LIBIIO_VERSION))
 
-LIBIIO_VERSION = ce48c63f8d06e876405cd082380ac9f083ed4618
-LIBIIO_SITE = https://github.com/misko/libiio.git
-LIBIIO_SITE_METHOD = git
+LIBIIO_VERSION = ab6b63b5b4477c151a2c7b554e6442817937f8d4
+LIBIIO_SITE = $(call github,misko,libiio,$(LIBIIO_VERSION))
 
 LIBIIO_INSTALL_STAGING = YES
 LIBIIO_LICENSE = LGPL-2.1+
