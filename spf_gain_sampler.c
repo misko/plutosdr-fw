@@ -152,11 +152,27 @@ static void *sampler_thread(void *opaque)
 		uint32_t after = 0;
 		const bool before_valid = read_counter(rx, &before);
 		pthread_mutex_lock(&sampler->mutex);
-		sampler->observations_started++;
+		uint64_t capture_generation = 0;
+		if (sampler->capture_started < sampler->capture_requested)
+		{
+			capture_generation = sampler->capture_requested;
+			sampler->capture_started = capture_generation;
+		}
 		pthread_cond_broadcast(&sampler->credit_cond);
 		pthread_mutex_unlock(&sampler->mutex);
 		spf_gain_pair_t gain = spf_gain_read_db_pair(phy, &table);
 		spf_rssi_pair_t rssi = spf_rssi_read_pair(phy);
+		if (capture_generation != 0)
+		{
+			pthread_mutex_lock(&sampler->mutex);
+			while (sampler->capture_finished < capture_generation &&
+				!atomic_load_explicit(
+					&sampler->stop_requested, memory_order_relaxed))
+			{
+				pthread_cond_wait(&sampler->credit_cond, &sampler->mutex);
+			}
+			pthread_mutex_unlock(&sampler->mutex);
+		}
 		const bool after_valid = read_counter(rx, &after);
 		record.read_duration_ns = gain.duration_ns;
 		record.rx1_gain_index = gain.valid ? gain.rx1 : SPF_GAIN_INDEX_INVALID;
@@ -179,6 +195,14 @@ static void *sampler_thread(void *opaque)
 		if (!before_valid || !after_valid)
 			rssi_record.value.valid = false;
 		append_records(sampler, &record, &rssi_record);
+		if (capture_generation != 0)
+		{
+			pthread_mutex_lock(&sampler->mutex);
+			if (sampler->capture_observed < capture_generation)
+				sampler->capture_observed = capture_generation;
+			pthread_cond_broadcast(&sampler->credit_cond);
+			pthread_mutex_unlock(&sampler->mutex);
+		}
 		atomic_store(&sampler->ready, true);
 		last_sampled = before_valid ? before : current;
 	}
@@ -333,12 +357,12 @@ bool spf_gain_sampler_limit_and_wait_started(
 	}
 
 	pthread_mutex_lock(&sampler->mutex);
-	const uint64_t started_before = sampler->observations_started;
+	const uint64_t target = ++sampler->capture_requested;
 	sampler->bounded = true;
 	sampler->sample_credit = samples;
 	pthread_cond_broadcast(&sampler->credit_cond);
 	int wait_result = 0;
-	while (sampler->observations_started == started_before &&
+	while (sampler->capture_started < target &&
 		!atomic_load_explicit(&sampler->failed, memory_order_relaxed) &&
 		!atomic_load_explicit(
 			&sampler->stop_requested, memory_order_relaxed))
@@ -348,9 +372,56 @@ bool spf_gain_sampler_limit_and_wait_started(
 		if (wait_result != 0)
 			break;
 	}
-	const bool started = sampler->observations_started != started_before;
+	const bool started = sampler->capture_started >= target;
+	if (!started)
+	{
+		sampler->capture_finished = target;
+		pthread_cond_broadcast(&sampler->credit_cond);
+	}
 	pthread_mutex_unlock(&sampler->mutex);
 	return started;
+}
+
+bool spf_gain_sampler_finish_capture(
+	spf_gain_sampler_t *sampler,
+	uint32_t timeout_ms)
+{
+	if (!sampler || !sampler->mutex_initialized || timeout_ms == 0)
+		return false;
+	struct timespec deadline;
+	if (clock_gettime(CLOCK_REALTIME, &deadline) != 0)
+		return false;
+	deadline.tv_sec += timeout_ms / 1000U;
+	deadline.tv_nsec += (long)(timeout_ms % 1000U) * 1000000L;
+	if (deadline.tv_nsec >= 1000000000L)
+	{
+		deadline.tv_sec++;
+		deadline.tv_nsec -= 1000000000L;
+	}
+
+	pthread_mutex_lock(&sampler->mutex);
+	const uint64_t target = sampler->capture_requested;
+	if (target == 0 || sampler->capture_started < target)
+	{
+		pthread_mutex_unlock(&sampler->mutex);
+		return false;
+	}
+	sampler->capture_finished = target;
+	pthread_cond_broadcast(&sampler->credit_cond);
+	int wait_result = 0;
+	while (sampler->capture_observed < target &&
+		!atomic_load_explicit(&sampler->failed, memory_order_relaxed) &&
+		!atomic_load_explicit(
+			&sampler->stop_requested, memory_order_relaxed))
+	{
+		wait_result = pthread_cond_timedwait(
+			&sampler->credit_cond, &sampler->mutex, &deadline);
+		if (wait_result != 0)
+			break;
+	}
+	const bool observed = sampler->capture_observed >= target;
+	pthread_mutex_unlock(&sampler->mutex);
+	return observed;
 }
 
 void spf_gain_sampler_add_credit(spf_gain_sampler_t *sampler, uint64_t samples)

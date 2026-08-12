@@ -10,7 +10,11 @@ static void *announce_observation(void *opaque)
 	const struct timespec delay = {.tv_sec = 0, .tv_nsec = 1000000};
 	nanosleep(&delay, NULL);
 	pthread_mutex_lock(&sampler->mutex);
-	sampler->observations_started++;
+	sampler->capture_started = sampler->capture_requested;
+	pthread_cond_broadcast(&sampler->credit_cond);
+	while (sampler->capture_finished < sampler->capture_started)
+		pthread_cond_wait(&sampler->credit_cond, &sampler->mutex);
+	sampler->capture_observed = sampler->capture_started;
 	pthread_cond_broadcast(&sampler->credit_cond);
 	pthread_mutex_unlock(&sampler->mutex);
 	return NULL;
@@ -47,6 +51,7 @@ int main(void)
 	assert(pthread_create(&announcer, NULL, announce_observation, &sampler) == 0);
 	assert(spf_gain_sampler_limit_and_wait_started(
 		&sampler, UINT64_C(2048), UINT32_C(100)));
+	assert(spf_gain_sampler_finish_capture(&sampler, UINT32_C(100)));
 	assert(pthread_join(announcer, NULL) == 0);
 	assert(sampler.sample_credit == UINT64_C(2048));
 	assert(!spf_gain_sampler_limit_and_wait_started(

@@ -42,7 +42,10 @@ typedef struct
 	atomic_bool idle;
 	bool bounded;
 	uint64_t sample_credit;
-	uint64_t observations_started;
+	uint64_t capture_requested;
+	uint64_t capture_started;
+	uint64_t capture_finished;
+	uint64_t capture_observed;
 	uint32_t interval_samples;
 	uint32_t count;
 	uint32_t overflow_count;
@@ -76,6 +79,11 @@ void spf_gain_sampler_limit(
 bool spf_gain_sampler_limit_and_wait_started(
 	spf_gain_sampler_t *sampler,
 	uint64_t samples,
+	uint32_t timeout_ms);
+
+/* Finish the active capture fence and wait for its counter-after record. */
+bool spf_gain_sampler_finish_capture(
+	spf_gain_sampler_t *sampler,
 	uint32_t timeout_ms);
 
 /* Grant polling coverage for newly re-enqueued DMA capture work. */
