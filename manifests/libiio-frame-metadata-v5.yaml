@@ -1,0 +1,54 @@
+# Immutable build manifest for the deployed PlutoPlus SPF libiio frame-metadata
+# v5 release. Values below were read from the published, hardware-qualified
+# image. A later release gets a new file; do not revise this one in place.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+
+release_tag: v0.38-plutoplus-spf-libiio-metadata-v5
+asset_name: plutoplus-spf-libiio-metadata-v5-d7c87a9a2809-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.38-plutoplus-spf-libiio-metadata-v5/plutoplus-spf-libiio-metadata-v5-d7c87a9a2809-pluto.dfu
+image_sha256: 948b46506febacb087f3955be86015e074f8c0e3370a9dfc6a942e735d97f882
+device_fw: v0.38-plutoplus-spf-libiio-metadata-v5
+
+bundle_sha256: 013f6174bd989e0e9f5cfc36179141f38fe905f730561899f2361b7f834f4007
+ci_run_id: 31618487933
+
+firmware_source: d7c87a9a28094ee6f0b23cb47df9ff737b5a69d8
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: c26258bfa33098c2b215e19cf85d448e89499b1a
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_26_source: d5695c3eaa9cec99cc6f7b2c91565555044b907a
+libiio_0_26_repo: https://github.com/misko/libiio.git
+
+gadget_source: ab270f9e3128187372f27de887be65353f9e195d
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+submodule_buildroot: 684ecbcbe44bc82043caae7091f12c02cbd02d8b
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+
+versions_hdl: gain-series-v4-rc7-source/hdl
+versions_buildroot: libiio-metadata-v4-source/buildroot-final-v5
+versions_linux: gain-series-v4-rc2-source/linux
+versions_u_boot_xlnx: gain-series-v4-source/u-boot-xlnx
+
+fpga_bitstream_md5: 3e4eeae54cc394cc621abdf6f4c2bc6a
+ramdisk_md5: bcaf963f96c52e6d315defb21fc37b5b
+fit_description: Configuration to load fpga before Kernel
+
+hardware_qualified: true
+hardware_qualified_date: 2026-08-12
+hardware_units: 2
+radio_libiio: 0.25
+supported_host_libiio: 0.25,0.26
+continuous_metadata_usb_sps: 2000000
+continuous_metadata_tcp_sps: 3000000
+qualification_evidence_repo: https://github.com/misko/spf.git
+qualification_evidence_commit: 9308757
