@@ -365,7 +365,14 @@ void *THREAD_READ_Entrypoint(void *args)
 			spf_gain_is_full_table_mode(state.iio_dev_phy);
 		state.digital_gain_disabled =
 			spf_gain_is_digital_gain_disabled(state.iio_dev_phy);
-		if (state.metadata_v2)
+		if (state.metadata_v3 &&
+			(!state.full_gain_table_mode || !state.digital_gain_disabled))
+		{
+			fprintf(stderr,
+				"Direct RX v3 requires full-table mode with digital gain disabled\n");
+			goto cleanup;
+		}
+		if (state.metadata_v2 && !state.metadata_v3)
 		{
 			if (!state.full_gain_table_mode ||
 				!state.digital_gain_disabled ||
@@ -390,13 +397,14 @@ void *THREAD_READ_Entrypoint(void *args)
 					SPF_STATUS_COUNTER_RSSI_READ_FAILURE);
 			}
 		}
-		else
+		else if (!state.metadata_v3)
 		{
 			state.previous_gain =
 				spf_gain_read_pair(state.iio_dev_phy);
 		}
-		if (!state.full_gain_table_mode ||
+		if (!state.metadata_v3 && (!state.full_gain_table_mode ||
 			(state.metadata_v2 && !state.digital_gain_disabled))
+		)
 		{
 			fprintf(stderr,
 				"Direct RX gain metadata requires full-table mode with digital gain disabled for v2\n");
@@ -406,14 +414,15 @@ void *THREAD_READ_Entrypoint(void *args)
 			state.previous_gain.rx1_db = SPF_GAIN_DB_INVALID;
 			state.previous_gain.rx2_db = SPF_GAIN_DB_INVALID;
 		}
-		if (!state.previous_gain.valid)
+		if (!state.metadata_v3 && !state.previous_gain.valid)
 		{
 			state.gain_read_failures++;
 			spf_runtime_status_increment(
 				thread_args->runtime_status,
 				SPF_STATUS_COUNTER_GAIN_READ_FAILURE);
 		}
-		DEBUG_PRINT(
+		if (!state.metadata_v3)
+			DEBUG_PRINT(
 			"Initial gains RX1=%u/%d dB RX2=%u/%d dB valid=%d full-table=%d duration=%u ns\n",
 			state.previous_gain.rx1,
 			state.previous_gain.rx1_db,
@@ -422,7 +431,7 @@ void *THREAD_READ_Entrypoint(void *args)
 			state.previous_gain.valid,
 			state.full_gain_table_mode,
 			state.previous_gain.duration_ns);
-		if (state.metadata_v2)
+		if (state.metadata_v2 && !state.metadata_v3)
 		{
 			DEBUG_PRINT(
 				"Initial RSSI RX1=%u qdB RX2=%u qdB valid=%d duration=%u ns table-hash=%08x\n",
@@ -946,7 +955,7 @@ static int handle_iio_buffer(state_t *state)
 				SPF_STATUS_COUNTER_GAIN_READ_FAILURE);
 		}
 		}
-		if (state->metadata_v2)
+		if (state->metadata_v2 && !state->metadata_v3)
 		{
 			current_rssi = spf_rssi_read_pair(state->iio_dev_phy);
 			if (!current_rssi.valid)
@@ -984,6 +993,9 @@ static int handle_iio_buffer(state_t *state)
 			if (state->metadata_v3)
 			{
 				uint32_t observation_overflow_count = 0;
+				uint32_t rssi_overflow_count = 0;
+				spf_rssi_pair_t frame_rssi_start;
+				spf_rssi_pair_t frame_rssi_end;
 				const uint16_t observation_count = spf_gain_sampler_collect(
 					&state->gain_sampler,
 					first_sample_sequence,
@@ -991,12 +1003,22 @@ static int handle_iio_buffer(state_t *state)
 					state->frame_observations,
 					state->thread_args->gain_observation_capacity,
 					&observation_overflow_count);
+				const bool rssi_valid = spf_gain_sampler_collect_rssi(
+					&state->gain_sampler,
+					first_sample_sequence,
+					(uint32_t)state->thread_args->iio_buffer_size,
+					&frame_rssi_start,
+					&frame_rssi_end,
+					&rssi_overflow_count);
 				const spf_gain_frame_decision_t frame_decision =
 					spf_gain_frame_decide(
 						this_buffer_sequence,
 						observation_count,
 						state->startup_frames_discarded);
-				if (frame_decision == SPF_GAIN_FRAME_DISCARD_STARTUP)
+				if (frame_decision == SPF_GAIN_FRAME_DISCARD_STARTUP ||
+					(!rssi_valid && this_buffer_sequence == 0 &&
+					 state->startup_frames_discarded <
+						SPF_GAIN_STARTUP_DISCARD_LIMIT))
 				{
 					/*
 					 * A short frame can finish while the sampler is still
@@ -1016,6 +1038,14 @@ static int handle_iio_buffer(state_t *state)
 						state->startup_frames_discarded,
 						SPF_GAIN_STARTUP_DISCARD_LIMIT);
 					return 0;
+				}
+				if (frame_decision != SPF_GAIN_FRAME_ACCEPT ||
+					!rssi_valid || rssi_overflow_count != 0)
+				{
+					fprintf(stderr,
+						"Protocol-v3 frame lacks bounded capture-associated metadata\n");
+					buf->in_use = false;
+					return -1;
 				}
 				const spf_radio_frame_v3_args_t frame_args = {
 					.metadata_features = state->thread_args->metadata_features,
@@ -1040,16 +1070,16 @@ static int handle_iio_buffer(state_t *state)
 						state->thread_args->gain_event_capacity,
 					.gain_event_overflow_count = 0,
 					.rssi_start = {
-						.rx1_qdb = state->previous_rssi.rx1_qdb,
-						.rx2_qdb = state->previous_rssi.rx2_qdb,
-						.valid = state->previous_rssi.valid,
-						.duration_ns = state->previous_rssi.duration_ns,
+						.rx1_qdb = frame_rssi_start.rx1_qdb,
+						.rx2_qdb = frame_rssi_start.rx2_qdb,
+						.valid = frame_rssi_start.valid,
+						.duration_ns = frame_rssi_start.duration_ns,
 					},
 					.rssi_end = {
-						.rx1_qdb = current_rssi.rx1_qdb,
-						.rx2_qdb = current_rssi.rx2_qdb,
-						.valid = current_rssi.valid,
-						.duration_ns = current_rssi.duration_ns,
+						.rx1_qdb = frame_rssi_end.rx1_qdb,
+						.rx2_qdb = frame_rssi_end.rx2_qdb,
+						.valid = frame_rssi_end.valid,
+						.duration_ns = frame_rssi_end.duration_ns,
 					},
 					.device_iio_overflow = state->overflow_seen,
 				};
@@ -1253,7 +1283,7 @@ static int handle_iio_buffer(state_t *state)
 	if (state->metadata_enabled)
 	{
 		state->previous_gain = current_gain;
-		if (state->metadata_v2)
+		if (state->metadata_v2 && !state->metadata_v3)
 			state->previous_rssi = current_rssi;
 	}
 

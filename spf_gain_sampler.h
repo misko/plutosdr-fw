@@ -2,6 +2,7 @@
 #define SPF_GAIN_SAMPLER_H
 
 #include "spf_gain_metadata.h"
+#include "spf_rssi_read.h"
 
 #include <pthread.h>
 #include <stdatomic.h>
@@ -22,6 +23,13 @@ typedef enum
 
 typedef struct
 {
+	uint64_t sample_sequence_before;
+	uint64_t sample_sequence_after;
+	spf_rssi_pair_t value;
+} spf_rssi_observation_t;
+
+typedef struct
+{
 	pthread_t thread;
 	pthread_mutex_t mutex;
 	atomic_bool stop_requested;
@@ -33,6 +41,9 @@ typedef struct
 	uint32_t count;
 	uint32_t overflow_count;
 	spf_gain_observation_v3_t records[SPF_GAIN_SAMPLER_RING_CAPACITY];
+	uint32_t rssi_count;
+	uint32_t rssi_overflow_count;
+	spf_rssi_observation_t rssi_records[SPF_GAIN_SAMPLER_RING_CAPACITY];
 } spf_gain_sampler_t;
 
 bool spf_gain_sampler_start(
@@ -51,6 +62,19 @@ uint16_t spf_gain_sampler_collect(
 	uint32_t samples,
 	spf_gain_observation_v3_t *destination,
 	uint16_t capacity,
+	uint32_t *overflow_count);
+
+/*
+ * Select the first and last valid RSSI observations whose counter brackets
+ * overlap the exact frame sample range. Old observations are retired with the
+ * same bounded-ledger rule as gain observations.
+ */
+bool spf_gain_sampler_collect_rssi(
+	spf_gain_sampler_t *sampler,
+	uint64_t frame_start,
+	uint32_t samples,
+	spf_rssi_pair_t *rssi_start,
+	spf_rssi_pair_t *rssi_end,
 	uint32_t *overflow_count);
 
 /*

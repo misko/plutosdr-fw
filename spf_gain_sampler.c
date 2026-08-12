@@ -28,9 +28,10 @@ static bool read_counter(struct iio_device *rx, uint32_t *value)
 	return iio_device_reg_read(rx, SPF_ADC_SAMPLE_COUNTER_LOW_REG, value) == 0;
 }
 
-static void append_record(
+static void append_records(
 	spf_gain_sampler_t *sampler,
-	const spf_gain_observation_v3_t *record)
+	const spf_gain_observation_v3_t *gain_record,
+	const spf_rssi_observation_t *rssi_record)
 {
 	pthread_mutex_lock(&sampler->mutex);
 	if (sampler->count == SPF_GAIN_SAMPLER_RING_CAPACITY)
@@ -42,7 +43,18 @@ static void append_record(
 		sampler->count--;
 		sampler->overflow_count++;
 	}
-	sampler->records[sampler->count++] = *record;
+	sampler->records[sampler->count++] = *gain_record;
+	if (sampler->rssi_count == SPF_GAIN_SAMPLER_RING_CAPACITY)
+	{
+		memmove(
+			&sampler->rssi_records[0],
+			&sampler->rssi_records[1],
+			(SPF_GAIN_SAMPLER_RING_CAPACITY - 1) *
+				sizeof(sampler->rssi_records[0]));
+		sampler->rssi_count--;
+		sampler->rssi_overflow_count++;
+	}
+	sampler->rssi_records[sampler->rssi_count++] = *rssi_record;
 	pthread_mutex_unlock(&sampler->mutex);
 }
 
@@ -91,7 +103,6 @@ static void *sampler_thread(void *opaque)
 		iio_context_destroy(context);
 		return NULL;
 	}
-	atomic_store(&sampler->ready, true);
 	uint32_t last_sampled = second - sampler->interval_samples;
 	const struct timespec poll_delay = {.tv_sec = 0, .tv_nsec = 100000};
 
@@ -115,6 +126,7 @@ static void *sampler_thread(void *opaque)
 		uint32_t after = 0;
 		const bool before_valid = read_counter(rx, &before);
 		spf_gain_pair_t gain = spf_gain_read_db_pair(phy, &table);
+		spf_rssi_pair_t rssi = spf_rssi_read_pair(phy);
 		const bool after_valid = read_counter(rx, &after);
 		record.read_duration_ns = gain.duration_ns;
 		record.rx1_gain_index = gain.valid ? gain.rx1 : SPF_GAIN_INDEX_INVALID;
@@ -129,12 +141,67 @@ static void *sampler_thread(void *opaque)
 			record.sample_sequence_after = after;
 			record.flags |= SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID;
 		}
-		append_record(sampler, &record);
+		spf_rssi_observation_t rssi_record = {
+			.sample_sequence_before = before,
+			.sample_sequence_after = after,
+			.value = rssi,
+		};
+		if (!before_valid || !after_valid)
+			rssi_record.value.valid = false;
+		append_records(sampler, &record, &rssi_record);
+		atomic_store(&sampler->ready, true);
 		last_sampled = before_valid ? before : current;
 	}
 
 	iio_context_destroy(context);
 	return NULL;
+}
+
+bool spf_gain_sampler_collect_rssi(
+	spf_gain_sampler_t *sampler,
+	uint64_t frame_start,
+	uint32_t samples,
+	spf_rssi_pair_t *rssi_start,
+	spf_rssi_pair_t *rssi_end,
+	uint32_t *overflow_count)
+{
+	if (!sampler || !rssi_start || !rssi_end || !overflow_count)
+		return false;
+	const uint64_t frame_end = frame_start + samples;
+	uint32_t retained = 0;
+	bool found = false;
+	memset(rssi_start, 0, sizeof(*rssi_start));
+	memset(rssi_end, 0, sizeof(*rssi_end));
+	rssi_start->rx1_qdb = SPF_RSSI_QDB_INVALID;
+	rssi_start->rx2_qdb = SPF_RSSI_QDB_INVALID;
+	*rssi_end = *rssi_start;
+
+	pthread_mutex_lock(&sampler->mutex);
+	for (uint32_t index = 0; index < sampler->rssi_count; ++index)
+	{
+		spf_rssi_observation_t record = sampler->rssi_records[index];
+		record.sample_sequence_before = extend_counter_near(
+			frame_start, (uint32_t)record.sample_sequence_before);
+		record.sample_sequence_after = extend_counter_near(
+			frame_start, (uint32_t)record.sample_sequence_after);
+		const bool overlaps = record.value.valid &&
+			record.sample_sequence_after >= frame_start &&
+			record.sample_sequence_before < frame_end;
+		if (overlaps)
+		{
+			if (!found)
+				*rssi_start = record.value;
+			*rssi_end = record.value;
+			found = true;
+		}
+		if (record.sample_sequence_after >= frame_end)
+			sampler->rssi_records[retained++] = sampler->rssi_records[index];
+	}
+	sampler->rssi_count = retained;
+	*overflow_count = sampler->rssi_overflow_count;
+	sampler->rssi_overflow_count = 0;
+	pthread_mutex_unlock(&sampler->mutex);
+	return found;
 }
 
 bool spf_gain_sampler_start(

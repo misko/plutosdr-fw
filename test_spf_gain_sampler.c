@@ -44,6 +44,30 @@ int main(void)
 	assert(output[0].sample_sequence_before == UINT64_C(0x1FFFFFF00));
 	assert(output[1].sample_sequence_before == UINT64_C(0x200000010));
 	assert(overflow == 0);
+
+	sampler.rssi_count = 2;
+	sampler.rssi_records[0] = (spf_rssi_observation_t){
+		.sample_sequence_before = UINT32_C(0xFFFFFF80),
+		.sample_sequence_after = UINT32_C(0xFFFFFF90),
+		.value = {.rx1_qdb = 400, .rx2_qdb = 404, .valid = true},
+	};
+	sampler.rssi_records[1] = (spf_rssi_observation_t){
+		.sample_sequence_before = UINT32_C(0x00000100),
+		.sample_sequence_after = UINT32_C(0x00000110),
+		.value = {.rx1_qdb = 408, .rx2_qdb = 412, .valid = true},
+	};
+	spf_rssi_pair_t rssi_start;
+	spf_rssi_pair_t rssi_end;
+	assert(spf_gain_sampler_collect_rssi(
+		&sampler,
+		UINT64_C(0x1FFFFFF80),
+		UINT32_C(0x400),
+		&rssi_start,
+		&rssi_end,
+		&overflow));
+	assert(rssi_start.rx1_qdb == 400);
+	assert(rssi_end.rx1_qdb == 408);
+	assert(overflow == 0);
 	pthread_mutex_destroy(&sampler.mutex);
 	return 0;
 }
