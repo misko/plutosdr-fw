@@ -11,7 +11,21 @@ NCORES = $(shell grep -c ^processor /proc/cpuinfo)
 VIVADO_SETTINGS ?= /opt/Xilinx/Vivado/$(VIVADO_VERSION)/settings64.sh
 VSUBDIRS = hdl buildroot linux u-boot-xlnx
 
-VERSION=$(shell git describe --abbrev=4 --dirty --always --tags)
+# The string stamped into /opt/VERSIONS as `device-fw`, which is what a radio
+# reports about itself and what scripts/verify_release.sh checks.
+#
+# Deriving it from `git describe` is right for development builds and wrong for
+# release builds, because the release tag does not exist yet while the build is
+# running. That has now shipped twice: fingerprint-v3 stamped
+# `...-gain-rssi-fingerprint-v2-8-gf53d`, and gain-series-v4-rc17 stamped
+# `...-gain-series-v4-rc16-7-g1f3fe` because its tag was created thirteen
+# minutes AFTER the build finished. The second is the worse of the two -- it
+# names RC16, the release RC17 exists to supersede.
+#
+# Set RELEASE_VERSION to state the name instead of deriving it. Development
+# builds leave it empty and keep the describe behaviour unchanged.
+RELEASE_VERSION ?=
+VERSION=$(if $(RELEASE_VERSION),$(RELEASE_VERSION),$(shell git describe --abbrev=4 --dirty --always --tags))
 LATEST_TAG=$(shell git describe --abbrev=0 --tags)
 UBOOT_VERSION=$(shell echo -n "PlutoSDR " && cd u-boot-xlnx && git describe --abbrev=0 --dirty --always --tags)
 HAVE_VIVADO= $(shell bash -c "source $(VIVADO_SETTINGS) > /dev/null 2>&1 && vivado -version > /dev/null 2>&1 && echo 1 || echo 0")

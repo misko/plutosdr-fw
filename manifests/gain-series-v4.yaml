@@ -1,0 +1,80 @@
+# Immutable build manifest for the deployed PlutoPlus SPF firmware release
+# gain-series v4.
+#
+# Every value below was verified on 2026-08-11 against the shipped binary
+# itself -- not against repository state -- by extracting the rootfs from the
+# release DFU and reading /opt/VERSIONS out of it. device_fw in particular was
+# read from the image, never assumed from the tag: assuming it is precisely how
+# the two preceding releases shipped mislabelled.
+#
+# THIS FILE IS IMMUTABLE. A new firmware release gets a NEW manifest file.
+# Never edit these values to make a build pass.
+#
+# Deliberately a flat key: value subset of YAML so that scripts/verify_release.sh
+# can parse it with coreutils alone, with no PyYAML dependency in CI containers.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+
+# ---------------------------------------------------------------- release ---
+release_tag: v0.38-plutoplus-spf-gain-series-v4
+asset_name: plutoplus-spf-main-95e952326e6a-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.38-plutoplus-spf-gain-series-v4/plutoplus-spf-main-95e952326e6a-pluto.dfu
+image_sha256: 6920c58bedcdeafabd083efa7e961834b01b3c78e1eb30acbdd0f4e0b24b14d7
+
+# The first release in this line whose embedded string is the release name.
+# fingerprint-v3 shipped `...-fingerprint-v2-8-gf53d` and gain-series-v4-rc17
+# shipped `...-gain-series-v4-rc16-7-g1f3fe`, both because `git describe` ran
+# before the tag existed. RELEASE_VERSION now pins it and
+# scripts/ci/package_main_firmware.sh fails the build on a mismatch, so this
+# field and release_tag agreeing is enforced rather than hoped for.
+device_fw: v0.38-plutoplus-spf-gain-series-v4
+
+# The bundle the release was cut from, and the CI run that produced it. The
+# artifacts were published exactly as built; nothing was rebuilt between
+# hardware qualification and publication.
+bundle_sha256: 0ef5024424c5d7c0e708be2dfa0499bfb1785712fdec16a3c8573b80d3b08968
+ci_run_id: 31513472001
+
+# ------------------------------------------------------------ source graph ---
+# Identical to gain-series-v4-rc17 in every component. The release commit
+# differs from RC17's 1f3fe0cbe because it carries the release tooling that
+# pins the version string; no firmware source, submodule pointer, or build
+# configuration differs. See manifests/gain-series-v4-source.yaml for the
+# protected source-lock refs each commit resolves from.
+firmware_source: 95e952326e6a1b0547897a67ec041df7ff783a28
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+gadget_source: 2e8e40ade5dcf3c7880a5ebb58419ad7c37ed552
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+submodule_buildroot: 56b7bc54d47a16c55e9cb71ed519544892ac63db
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+
+# --------------------------------------- embedded identities, read from the image ---
+# The `git describe` strings the build recorded in /opt/VERSIONS, and the FIT
+# hashes read out of the shipped DFU. verify_release.sh re-derives all of these
+# from the downloaded asset and fails on any mismatch, which is what makes the
+# manifest a check on the binary rather than a description of it.
+versions_hdl: gain-series-v4-rc7-source/hdl
+versions_buildroot: gain-series-v4-rc17-source/buildroot-final-v2
+versions_linux: gain-series-v4-source/linux
+versions_u_boot_xlnx: gain-series-v4-source/u-boot-xlnx
+
+fpga_bitstream_md5: 1b2bd4bd89d83231c82ef3778afdc094
+ramdisk_md5: 440aa4bef4b5bbb5e81098b481a23db9
+fit_description: Configuration to load fpga before Kernel
+
+# --------------------------------------------------- hardware qualification ---
+# Two PlutoPlus units, 2026-08-11. RAM-booted 16/16, persistently flashed to
+# QSPI 16/16, and 9/9 after a host reboot, with persistence confirmed across a
+# wall power cycle rather than only the flasher's own reset.
+hardware_qualified: true
+hardware_qualified_date: 2026-08-11
+hardware_units: 2

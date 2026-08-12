@@ -98,6 +98,37 @@ mkdir -p "$rootfs_check"
         usr/sbin/sdr_usb_gadget usr/sbin/sdr_ip_gadget
 )
 cp "$rootfs_check/opt/VERSIONS" "$ARTIFACT_ROOT/packed-VERSIONS.txt"
+
+# The version a radio will report about itself. This file has always been
+# extracted and printed here; what was missing was anyone comparing it to the
+# name the build was supposed to produce. Both fingerprint-v3 and
+# gain-series-v4-rc17 shipped stamped with the PREVIOUS release's name, and in
+# both cases the wrong string was sitting in this artifact the whole time.
+#
+# verify_release.sh cannot catch this: it compares the DFU against a manifest
+# written afterwards from whatever the DFU happens to say, so it detects
+# tampering, not mislabelling. The check has to happen here, at build time.
+packed_version="$(awk '$1 == "device-fw" {print $2; exit}' \
+    "$ARTIFACT_ROOT/packed-VERSIONS.txt")"
+[[ -n "$packed_version" ]] ||
+    fail "packaged /opt/VERSIONS has no device-fw line"
+printf 'Packaged device-fw: %s\n' "$packed_version"
+if [[ -n "${RELEASE_VERSION:-}" ]]; then
+    [[ "$packed_version" == "$RELEASE_VERSION" ]] ||
+        fail "packaged device-fw is '${packed_version}' but RELEASE_VERSION requested '${RELEASE_VERSION}'"
+    printf 'Version pin satisfied: %s\n' "$RELEASE_VERSION"
+else
+    # Not a failure -- development builds legitimately describe as N commits
+    # past a tag -- but it must be visible, because a release built without the
+    # pin is exactly how the last two mislabelled images were produced.
+    case "$packed_version" in
+    *-dirty)
+        fail "packaged device-fw '${packed_version}' was built from a dirty tree" ;;
+    *-g*)
+        printf 'NOTE: device-fw is not an exact tag (%s).\n' "$packed_version"
+        printf '      Set RELEASE_VERSION for any build intended for release.\n' ;;
+    esac
+fi
 file "$rootfs_check/usr/sbin/sdr_usb_gadget" \
      "$rootfs_check/usr/sbin/sdr_ip_gadget" |
     tee "$ARTIFACT_ROOT/gadget-binaries.txt"

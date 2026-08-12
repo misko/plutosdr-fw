@@ -6,6 +6,19 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      release_version:
+        description: >-
+          Exact device-fw string to stamp into /opt/VERSIONS, e.g.
+          v0.38-plutoplus-spf-gain-series-v4. Leave empty for an ordinary build,
+          which derives the string from `git describe`. Set it for anything
+          intended for release: the release tag does not exist while the build
+          runs, so a derived string names the PREVIOUS release. RC17 shipped
+          stamped rc16-7 for exactly this reason. The build fails if the
+          packaged string does not match what is entered here.
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -47,6 +60,8 @@ jobs:
       - name: Build, validate, and package
         id: build
         env:
+          # Empty on push builds, which keeps the `git describe` default.
+          RELEASE_VERSION: ${{ inputs.release_version || '' }}
           VIVADO_SETTINGS: /opt/Xilinx/Vivado/2022.2/settings64.sh
           BR2_DL_DIR: /opt/actions-runner-plutosdr-fw/cache/buildroot-dl
           BR2_PRIMARY_SITE: https://sources.buildroot.net
@@ -56,6 +71,11 @@ jobs:
           artifact_root=$(mktemp -d "$RUNNER_TEMP/plutosdr-fw-main.XXXXXX")
           echo "artifact_root=$artifact_root" >> "$GITHUB_OUTPUT"
           scripts/ci/build_main_firmware.sh "$artifact_root"
+          # Reporting only -- must never be what fails an otherwise good build,
+          # so tolerate a missing file here. package_main_firmware.sh is what
+          # actually enforces the version, and it has already run by this point.
+          awk '$1 == "device-fw" {print "packed_version=" $2; exit}' \
+            "$artifact_root/packed-VERSIONS.txt" >> "$GITHUB_OUTPUT" || true
           bundle=$(find "$artifact_root" -maxdepth 1 -type f \
             -name 'plutoplus-spf-main-*.tar.gz' -print -quit)
           test -n "$bundle"
@@ -92,6 +112,8 @@ jobs:
           retention-days: 90
 
       - name: Record build result
+        env:
+          PACKED_VERSION: ${{ steps.build.outputs.packed_version }}
         run: |
           {
             echo '## Kalman firmware bundle'
@@ -99,6 +121,7 @@ jobs:
             echo "- Commit: \`${GITHUB_SHA}\`"
             echo "- Bundle: \`${{ steps.build.outputs.bundle_name }}\`"
             echo "- Artifact: [${{ steps.names.outputs.artifact_name }}](${{ steps.upload.outputs.artifact-url }})"
+            echo "- device-fw: \`${PACKED_VERSION:-unknown}\`"
             echo '- Status: offline validated; hardware untested'
           } >> "$GITHUB_STEP_SUMMARY"
 
