@@ -8,8 +8,8 @@
 #LIBIIO_VERSION = 0.25
 #LIBIIO_SITE = $(call github,analogdevicesinc,libiio,v$(LIBIIO_VERSION))
 
-LIBIIO_VERSION = 38483f31be391af66b35542f733e569febe13d3a
-LIBIIO_SITE = https://github.com/analogdevicesinc/libiio.git
+LIBIIO_VERSION = 11a1291eeaeb552e4647eb79d7a941a8ec2bab0c
+LIBIIO_SITE = https://github.com/misko/libiio.git
 LIBIIO_SITE_METHOD = git
 
 LIBIIO_INSTALL_STAGING = YES
@@ -58,8 +58,13 @@ LIBIIO_CONF_OPTS += -DWITH_HWMON=OFF
 endif
 
 ifeq ($(BR2_PACKAGE_LIBIIO_IIOD),y)
-LIBIIO_DEPENDENCIES += host-flex host-bison libaio
-LIBIIO_CONF_OPTS += -DWITH_IIOD=ON -DWITH_AIO=ON
+LIBIIO_DEPENDENCIES += host-flex host-bison libaio spf_metadata_source
+LIBIIO_CONF_OPTS += \
+	-DWITH_IIOD=ON \
+	-DWITH_AIO=ON \
+	-DIIOD_BUFFER_METADATA_PROVIDER=$(@D)/iiod/spf-buffer-metadata.c \
+	-DIIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES="$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_sampler.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_rssi_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_radio_frame_v3.c" \
+	-DIIOD_BUFFER_METADATA_INCLUDE_DIRS=$(STAGING_DIR)/usr/include/spf
 else
 LIBIIO_CONF_OPTS += -DWITH_IIOD=OFF
 endif
