@@ -9,25 +9,25 @@ release_state: candidate
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
-libiio_0_25_source: ce48c63f8d06e876405cd082380ac9f083ed4618
+libiio_0_25_source: ab6b63b5b4477c151a2c7b554e6442817937f8d4
 libiio_0_25_repo: https://github.com/misko/libiio.git
-libiio_0_25_ref: refs/tags/spf-frame-metadata-source/v0.25-final
+libiio_0_25_ref: refs/tags/spf-frame-metadata-source/v0.25-final-v2
 
-libiio_0_26_source: 3f7568044643bfa9c3b04f070d4340e9c1fa45ec
+libiio_0_26_source: 4510a45877c0e0e8dc5cf53574273a6ded4319fb
 libiio_0_26_repo: https://github.com/misko/libiio.git
-libiio_0_26_ref: refs/tags/spf-frame-metadata-source/v0.26-final
+libiio_0_26_ref: refs/tags/spf-frame-metadata-source/v0.26-final-v2
 
-gadget_source: 86c0c78d8a4f70f81243a1ee4ff3b4f945ff5c40
+gadget_source: c11d5715cb89408c25bed14a5ae8d7848f96c293
 gadget_repo: https://github.com/misko/plutosdr-fw.git
-gadget_ref: refs/tags/libiio-metadata-v4-source/gadget-final
+gadget_ref: refs/tags/libiio-metadata-v4-source/gadget-final-v2
 
 ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 59e0ea97127df85226854f24355e79f9c46a4820
+submodule_buildroot: 6b46a4e39569ffc023a83240bbb710a5c7582180
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/libiio-metadata-v4-source/buildroot-final-v3
+submodule_buildroot_ref: refs/tags/libiio-metadata-v4-source/buildroot-final-v4
 
 submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
