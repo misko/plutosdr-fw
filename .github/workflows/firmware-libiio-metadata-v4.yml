@@ -1,5 +1,7 @@
 name: Kalman libiio metadata v5 release
 
+# The fixed release identity is deliberately part of the reviewed workflow;
+# publication uses the exact artifact produced by this branch and commit.
 # This trusted release build runs only for its exact maintainer-controlled
 # branch (or a manual dispatch of that ref). It never runs pull-request-
 # controlled source on the self-hosted Kalman/Vivado runner.
