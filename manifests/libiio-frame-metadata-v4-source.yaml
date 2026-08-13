@@ -1,0 +1,46 @@
+# Source-only manifest for the unpromoted v4 libiio frame-metadata candidate.
+# The radio is pinned to libiio 0.25. Host compatibility is intentionally
+# limited to 0.25 and 0.26. Every ref is an immutable source-lock tag whose
+# advertised commit must exactly equal its adjacent pin.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: c26258bfa33098c2b215e19cf85d448e89499b1a
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/spf-frame-metadata-source/v0.25-final-v3
+
+libiio_0_26_source: d5695c3eaa9cec99cc6f7b2c91565555044b907a
+libiio_0_26_repo: https://github.com/misko/libiio.git
+libiio_0_26_ref: refs/tags/spf-frame-metadata-source/v0.26-final-v3
+
+gadget_source: ab270f9e3128187372f27de887be65353f9e195d
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v4-source/gadget-final-v3
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: 684ecbcbe44bc82043caae7091f12c02cbd02d8b
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/libiio-metadata-v4-source/buildroot-final-v5
+
+submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/gain-series-v4-rc7-source/hdl
+
+submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc10-source/hdl-quantulum
+
+submodule_linux: d798b0d821b85ebd51ecffbfa68d8e4d69b77132
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/gain-series-v4-rc2-source/linux
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx

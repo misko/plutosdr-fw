@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
       - name: Verify pins, URLs, refs, and overrides
         run: |
-          ./scripts/check_source_graph.sh manifests/gain-series-v4-source.yaml
+          ./scripts/check_source_graph.sh manifests/libiio-frame-metadata-v5-source.yaml
 
   gadget-tests:
     name: USB and IP gadget unit tests
@@ -34,14 +34,14 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: 2e8e40ade5dcf3c7880a5ebb58419ad7c37ed552
+          ref: ab270f9e3128187372f27de887be65353f9e195d
           path: usb-gadget
           persist-credentials: false
       - name: Check out pinned IP gadget source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: 8814aec26c6920afd79e198227d4f192adf16518
+          ref: b066059e54817ad9a140c3549fcee0bf39dadc81
           path: ip-gadget
           persist-credentials: false
       - name: Install native test dependencies

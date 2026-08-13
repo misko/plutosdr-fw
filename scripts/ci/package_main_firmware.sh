@@ -7,6 +7,9 @@ umask 0022
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ARTIFACT_ROOT="${1:-}"
 VIVADO_SETTINGS="${VIVADO_SETTINGS:-/opt/Xilinx/Vivado/2022.2/settings64.sh}"
+MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/libiio-frame-metadata-v5-source.yaml}"
+PACKAGE_STEM_PREFIX="${SPF_PACKAGE_STEM_PREFIX:-plutoplus-spf-main}"
+RELEASE_STATE="${SPF_RELEASE_STATE:-main-ci}"
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -20,10 +23,11 @@ ARTIFACT_ROOT="$(realpath -m "$ARTIFACT_ROOT")"
 mkdir -p "$ARTIFACT_ROOT"
 
 cd "$ROOT"
+[[ -f "$MANIFEST" ]] || fail "manifest not found: $MANIFEST"
 initial_tracked_status="$(git status --porcelain --untracked-files=no)"
 commit="$(git rev-parse HEAD)"
 short_commit="$(git rev-parse --short=12 HEAD)"
-stem="plutoplus-spf-main-${short_commit}"
+stem="${PACKAGE_STEM_PREFIX}-${short_commit}"
 dfu="${ARTIFACT_ROOT}/${stem}-pluto.dfu"
 xsa="${ARTIFACT_ROOT}/${stem}-system_top.xsa"
 rootfs="${ARTIFACT_ROOT}/${stem}-rootfs.cpio.gz"
@@ -49,8 +53,7 @@ cmp hdl/projects/pluto/pluto.sdk/system_top.xsa build/system_top.xsa
 cp build/pluto.dfu "$dfu"
 cp build/system_top.xsa "$xsa"
 cp build/rootfs.cpio.gz "$rootfs"
-cp manifests/gain-series-v4-source.yaml \
-    "$ARTIFACT_ROOT/gain-series-v4-source.yaml"
+cp "$MANIFEST" "$ARTIFACT_ROOT/$(basename "$MANIFEST")"
 
 dfu-suffix -c "$dfu" 2>&1 | tee "$ARTIFACT_ROOT/dfu-suffix-check.txt"
 grep -Eq 'Vendor ID:[[:space:]]+0x0456' "$ARTIFACT_ROOT/dfu-suffix-check.txt" ||
@@ -201,7 +204,7 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
 )
 
 {
-    echo 'release_state=main-ci'
+    echo "release_state=$RELEASE_STATE"
     echo 'hardware_tested=false'
     echo 'hardware_accessed=false'
     echo 'intended_boot_mode=RAM-only-until-hardware-promotion'

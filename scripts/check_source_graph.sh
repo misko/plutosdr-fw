@@ -52,6 +52,18 @@ COMPONENTS=(
     "ip-gadget:ip_gadget_source:ip_gadget_repo:ip_gadget_ref"
 )
 
+# Host compatibility sources are optional because historical firmware
+# manifests predate the frame-metadata extension.  When a candidate declares
+# either supported libiio line, require the complete immutable source lock.
+for entry in \
+    "libiio-0.25:libiio_0_25_source:libiio_0_25_repo:libiio_0_25_ref" \
+    "libiio-0.26:libiio_0_26_source:libiio_0_26_repo:libiio_0_26_ref"; do
+    IFS=: read -r name pin_key repo_key ref_key <<<"$entry"
+    if [[ -n "$(m "$pin_key")$(m "$repo_key")$(m "$ref_key")" ]]; then
+        COMPONENTS+=("$entry")
+    fi
+done
+
 for entry in "${COMPONENTS[@]}"; do
     IFS=: read -r name pin_key repo_key ref_key <<<"$entry"
     pin="$(m "$pin_key")"; repo="$(m "$repo_key")"; ref="$(m "$ref_key")"

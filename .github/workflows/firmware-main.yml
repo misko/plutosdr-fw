@@ -33,6 +33,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
+    env:
+      # libiio frame-metadata v5 is the hardware-qualified main baseline.
+      SPF_GAIN_SERIES_MANIFEST: ${{ github.workspace }}/manifests/libiio-frame-metadata-v5-source.yaml
     outputs:
       artifact-name: ${{ steps.names.outputs.artifact_name }}
       bundle-name: ${{ steps.build.outputs.bundle_name }}
