@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 HDL_QUANTULUM="${ROOT}/hdl-quantulum"
-MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/gain-series-v4-source.yaml}"
+MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/libiio-frame-metadata-v5-source.yaml}"
 
 EXPECTED="$(awk '$1 == "submodule_hdl_quantulum:" { print $2 }' "$MANIFEST")"
 [[ "$EXPECTED" =~ ^[0-9a-f]{40}$ ]] || {
