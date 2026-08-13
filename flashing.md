@@ -129,6 +129,168 @@ The expected v5 DFU SHA-256 is:
 948b46506febacb087f3955be86015e074f8c0e3370a9dfc6a942e735d97f882
 ```
 
+## Install the host-side libiio extension
+
+Flashing v5 installs the radio-side libiio/iiOD 0.25 implementation as part of
+the firmware. It does **not** install anything on the computer that controls
+the radio.
+
+The normal libiio buffer API and IQ byte layout remain compatible with an
+unmodified host. Reading v5's capture index, sample sequence/time, gain
+history, gain endpoints, and RSSI endpoints requires both parts of the matching
+SPF host extension:
+
+1. the patched native `libiio` C library; and
+2. the patched Python `pylibiio` binding containing `iio.MetadataBuffer`.
+
+Installing only `pylibiio` from PyPI is insufficient because it does not
+contain the modified C protocol implementation.
+
+### Supported host versions
+
+Use 0.25 unless an existing application specifically requires 0.26.
+
+| Host line | Immutable source tag | Commit | Use |
+|---|---|---|---|
+| 0.25 | `spf-frame-metadata-source/v0.25-final-v3` | `c26258bfa33098c2b215e19cf85d448e89499b1a` | Recommended; matches the radio's libiio line |
+| 0.26 | `spf-frame-metadata-source/v0.26-final-v3` | `d5695c3eaa9cec99cc6f7b2c91565555044b907a` | Supported host alternative |
+
+Both lines were hardware-qualified with v5 over USB and standard libiio
+`ip:`/TCP. Do not install an arbitrary development branch.
+
+### Recommended package installation
+
+SPF's package workflow produces a native Debian 12 package and a Python wheel:
+
+- `arm64` supports Pi 4 and Pi 5 running 64-bit Debian 12 or Raspberry Pi OS
+  12;
+- `amd64` supports standard x86-64 Debian 12 hosts; and
+- the `py3-none-any` wheel is shared by both architectures.
+
+First check whether an immutable `libiio-artifacts-*` release has been
+published in `misko/spf`:
+
+```bash
+gh release list --repo misko/spf --limit 50
+```
+
+If a release for the desired line exists, download the two native packages,
+wheel, and checksum file from that one release. The installer chooses the
+local architecture, while `SHA256SUMS` verifies the complete release set:
+
+```bash
+host_release=libiio-artifacts-v0.25-spfmeta3.1  # replace with listed tag
+host_bundle="$(mktemp -d /tmp/spf-libiio.XXXXXX)"
+
+gh release download "$host_release" \
+  --repo misko/spf \
+  --pattern 'spf-libiio_*.deb' \
+  --pattern 'pylibiio-*.whl' \
+  --pattern 'SHA256SUMS' \
+  --dir "$host_bundle"
+
+git clone https://github.com/misko/spf.git
+cd spf
+python3 -m venv ~/spf-virtualenv
+~/spf-virtualenv/bin/python -m pip install --upgrade pip
+~/spf-virtualenv/bin/python -m pip install -e .
+
+./install_spf_libiio_artifacts.sh \
+  --bundle "$host_bundle" \
+  --python ~/spf-virtualenv/bin/python
+```
+
+Do not combine a `.deb`, wheel, and checksum file from different releases. If
+no matching `libiio-artifacts-*` release is listed, use the source-build method
+below; a successful CI build artifact is not automatically a published host
+release.
+
+### Source-build installation
+
+The SPF installer clones and verifies the immutable source tag, builds the
+local, USB, and network backends, installs the native library and tools under
+`/usr/local`, runs `ldconfig`, and installs the generated Python binding into
+the selected environment.
+
+Install build dependencies:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y --no-install-recommends \
+  git cmake make pkg-config flex bison python3-dev python3-venv \
+  libxml2-dev libaio-dev libusb-1.0-0-dev
+```
+
+Install SPF first, then install the patched binding last so a later installation
+of unmodified PyPI `pylibiio` cannot replace it:
+
+```bash
+git clone https://github.com/misko/spf.git
+cd spf
+python3 -m venv ~/spf-virtualenv
+~/spf-virtualenv/bin/python -m pip install --upgrade pip
+~/spf-virtualenv/bin/python -m pip install -e .
+
+./install_spf_libiio.sh \
+  --series 0.25 \
+  --python ~/spf-virtualenv/bin/python
+```
+
+For the supported 0.26 host line, change only the series:
+
+```bash
+./install_spf_libiio.sh \
+  --series 0.26 \
+  --python ~/spf-virtualenv/bin/python
+```
+
+Only one series should be installed in `/usr/local` at a time. Advanced
+side-by-side testing can use `--prefix /opt/libiio-spf-0.25`, but every process
+then needs that prefix's `lib` or `lib64` directory in `LD_LIBRARY_PATH`.
+
+The authoritative host installation guide and packaging details live in
+[`misko/spf`](https://github.com/misko/spf/blob/main/docs/libiio_frame_metadata_install.md).
+
+### Verify the host and radio together
+
+For the recommended 0.25 line:
+
+```bash
+~/spf-virtualenv/bin/python - <<'PY'
+import iio
+
+print("binding:", iio.__file__)
+print("version:", iio.version)
+print("MetadataBuffer:", hasattr(iio, "MetadataBuffer"))
+assert iio.version == (0, 25, "c26258b")
+assert hasattr(iio, "MetadataBuffer")
+PY
+
+/usr/local/bin/iio_info --version
+/usr/local/bin/iio_info -S
+```
+
+For 0.26, the expected tuple is `(0, 26, "d5695c3")`.
+
+Finally, select the intended radio URI and verify that v5 advertises the
+metadata capability. Examples:
+
+```bash
+# Direct USB: obtain the exact URI from iio_info -S.
+/usr/local/bin/iio_attr -T 2000 \
+  -u 'usb:BUS.DEVICE.5' -C iio,buffer-metadata
+
+# Standard libiio network/TCP transport.
+/usr/local/bin/iio_attr -T 2000 \
+  -u 'ip:RADIO_ADDRESS' -C iio,buffer-metadata
+```
+
+The value must be `1`. An older or upstream radio can still use ordinary
+buffers, but it cannot provide v5 `MetadataBuffer` records. Run host commands
+from the selected virtual environment, and avoid a global `PYTHONPATH` pointing
+at a libiio build directory; that can silently mix the Python binding with a
+different native library.
+
 ## Method 1: persistent update through USB mass storage
 
 This is the preferred normal Pluto+ method. It uses `pluto.frm`, which the
