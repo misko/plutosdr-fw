@@ -1,7 +1,11 @@
 # plutosdr-fw
 PlutoSDR Firmware for the [ADALM-PLUTO](https://wiki.analog.com/university/tools/pluto "PlutoSDR Wiki Page") Active Learning Module
 
-Latest binary Release : [![GitHub Release](https://img.shields.io/github/release/analogdevicesinc/plutosdr-fw.svg)](https://github.com/analogdevicesinc/plutosdr-fw/releases/latest)  [![Github Releases](https://img.shields.io/github/downloads/analogdevicesinc/plutosdr-fw/total.svg)](https://github.com/analogdevicesinc/plutosdr-fw/releases/latest)
+For release discovery and safe persistent or RAM-only installation on Pluto
+and Pluto+, see **[Flashing firmware](flashing.md)**. Pluto+ users should read
+its bootloader safety warning before copying any image to a radio.
+
+Latest binary release: [![GitHub Release](https://img.shields.io/github/v/release/misko/plutosdr-fw)](https://github.com/misko/plutosdr-fw/releases/latest) [![GitHub release downloads](https://img.shields.io/github/downloads/misko/plutosdr-fw/total.svg)](https://github.com/misko/plutosdr-fw/releases)
 
 Firmware License : [![Many Licenses](https://img.shields.io/badge/license-LGPL2+-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md)  [![Many License](https://img.shields.io/badge/license-GPL2+-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md)  [![Many License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md)  [![Many License](https://img.shields.io/badge/license-apache-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md) and many others.
 
@@ -120,4 +124,3 @@ This problem seems to affect Ubuntu 16.04LTS only.
      | zynq-pluto-sdr-revb.dtb | Device Tree Blob for Rev.B|     
      | zynq-pluto-sdr-revc.dtb | Device Tree Blob for Rev.C|
  
-
