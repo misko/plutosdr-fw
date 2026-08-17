@@ -58,12 +58,12 @@ are maintained in [`SPF_LIBIIO_METADATA_V6_RC4.md`](SPF_LIBIIO_METADATA_V6_RC4.m
 Four-board receive stress reproduced the front-port radio's USB disappearance
 without a radio reboot: Ethernet `.14` and the boot ID stayed live, but the
 finite direct-USB worker retained 32 MiB CMA and direct-IP START failed with
-`-EIO`. RC4 now releases DMA ownership immediately after a successful finite
-request and uses a five-second finite-write watchdog to invoke the existing
-supervised UDC rebind after a host link loss. The same investigation found and
-fixed a provenance error where the manifest named gadget `907978b0` while
-Buildroot compiled `ab270f9e`; the corrected graph consistently pins gadget
-`ce671c61`.
+`-EIO`. RC4 now arms a ten-second finite-write watchdog after the final DMA
+submission and keeps it armed until the host explicitly sends STOP. A short or
+failed write, or a missing STOP after host link loss, invokes normal cleanup
+and the existing supervised UDC rebind. The same investigation found and fixed
+a provenance error where the manifest named gadget `907978b0` while Buildroot
+compiled `ab270f9e`; the corrected graph consistently pins gadget `1bbe9f0e`.
 
 ## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
 

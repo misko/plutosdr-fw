@@ -75,11 +75,13 @@ alive. Because FunctionFS did not deliver `DISABLE`, the direct-USB worker kept
 returned `-EIO`. Killing the USB worker released CMA and the existing
 supervisor restored the same serial and physical path without rebooting.
 
-The corrected RC4 gadget releases IIO/CMA immediately after every completed
-finite request. It also arms a five-second watchdog after the last finite DMA
-block is submitted. A short/error completion (including `-ESHUTDOWN`) or an
-uncompleted write requests the existing supervised UDC unbind/rebind, so a
-host-side link loss cannot strand DMA ownership or poison direct-IP recovery.
+The corrected RC4 gadget arms a ten-second watchdog after the last finite DMA
+block is submitted and keeps recovery armed until the host explicitly sends
+STOP. A short/error completion (including `-ESHUTDOWN`) or a missing STOP
+requests the existing supervised UDC unbind/rebind; normal process cleanup
+then releases IIO/CMA ownership. This means a host-side link loss cannot strand
+DMA ownership or poison direct-IP recovery, including when device-side AIO
+completed just before the physical disconnect.
 Buildroot now pins the manifest-declared gadget source; the previous RC4 build
 configuration incorrectly compiled `ab270f9e` while its source manifest named
 `907978b0`.
@@ -97,7 +99,7 @@ configuration incorrectly compiled `ab270f9e` while its source manifest named
 | #32 stress | Repeated metadata teardown could reset a board | No boot-ID change; supervised iiOD recovery is bounded |
 | 4 MiB RX DMA | Boot has `CmaTotal: 0 kB`; direct USB receive times out in `__alloc_pages` | Boot reserves 64 MiB CMA; repeated 4 MiB USB/IP receives complete without allocation warnings |
 | USB link loss | Host disconnect leaves 32 MiB CMA owned and IP START returns `-EIO` | Finite-write watchdog releases DMA and supervised re-enumeration restores the same path/serial |
-| Gadget provenance | Manifest names `907978b0`, Buildroot compiles `ab270f9e` | Manifest, immutable source tag, Buildroot pin, and embedded build ID all name `ce671c61` |
+| Gadget provenance | Manifest names `907978b0`, Buildroot compiles `ab270f9e` | Manifest, immutable source tag, Buildroot pin, and embedded build ID all name `1bbe9f0e` |
 | Reset evidence | Cause was lost across reset | Previous console/pmsg survives a forced watchdog reset |
 
 ## Four-board promotion matrix
