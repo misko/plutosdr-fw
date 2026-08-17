@@ -133,10 +133,31 @@ Hardware green so far:
   absent. Removing the injection restored the real serial and a green 4 MiB
   direct-USB capture without rebooting Linux.
 
-Promotion remains blocked, without a radio failure, by two host limits that
-require sudo: `usbfs_memory_mb=16` blocks simultaneous four-radio 4 MiB USB
-capture, and `net.core.rmem_max=4194304` limits the effective direct-IP receive
-buffer to 8 MiB instead of the required 256 MiB for a 16-frame burst.
+The final host-capacity gates passed after transiently setting
+`usbfs_memory_mb=128` and `net.core.rmem_max=134217728`:
+
+- five consecutive back-to-back runs of the simultaneous four-radio one-frame
+  and three-frame rolling USB tests passed (40 radio-test cells total); all
+  four USB device numbers remained unchanged through a 15-second watchdog
+  window;
+- the `.14` Winbond radio passed a 16-frame, 64 MiB buffered direct-IP burst at
+  20 MS/s and 21.90 MiB/s payload throughput. The effective receive buffer was
+  256 MiB, and duplicate, expired, rejected, and socket-overflow counts were
+  all zero.
+
+The first back-to-back attempt exposed a host STOP/GET_STATUS race in SPF, not
+a radio boot or identity failure. FunctionFS can complete the zero-length host
+STOP transfer before device userspace finishes handling it; an immediate
+status request was rejected by the UDC with `LIBUSB_ERROR_PIPE` or
+`LIBUSB_ERROR_IO`, after which the supervisor correctly re-enumerated the
+gadget under the same boot and physical path. SPF
+[commit `f109c204`](https://github.com/misko/spf/commit/f109c204) makes open
+state-aware, skips redundant STOP for an already-idle worker, and retains an
+IDLE status fence after a real STOP. Its 51 unit/recovery tests and the
+four-board stress above passed.
+
+The complete RAM-only promotion matrix is now green. Persistent serial-flash
+installation remains a separate, explicitly authorized release step.
 
 ## Red/green evidence
 

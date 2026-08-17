@@ -18,7 +18,7 @@
 | `gain-series-v4` | 2026-08-11 | superseded | RC17's source with the version label corrected |
 | **`libiio-metadata-v5`** | 2026-08-12 | **current hardware-qualified** | frame metadata through the standard libiio USB and IP/TCP transports |
 | `libiio-metadata-v6-rc3` | 2026-08-17 | **RAM-only candidate** | bounded teardown/reset diagnostics and Winbond identity support for #32/#33 |
-| `libiio-metadata-v6-rc4` | 2026-08-17 | **unreleased, RAM-only** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
+| `libiio-metadata-v6-rc4` | 2026-08-17 | **hardware-qualified, RAM-only** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -79,12 +79,29 @@ all-four gadget crash/recovery, the 1/3/10/30 MS/s standard-libiio TCP matrix,
 protocol-v3/Zarr, direct-IP malformed/one-frame gates, and the physical TX2
 loopback suite. A deliberately missing host STOP reproduced the formerly fatal
 condition and automatically re-enumerated the same front-port serial/path in
-12 seconds without a Linux reboot or 32 MiB CMA leak. The candidate remains
-RAM-only: simultaneous four-radio 4 MiB USB and the 256 MiB direct-IP burst
-buffer still require transient host sudo tuning. Injected identity failure
-also passed on the Winbond board: recovery exposed only labelled
-network/ACM/storage interfaces with RF services withheld, then restored the
-real serial and RF interfaces after removing the RAM-only injection.
+12 seconds without a Linux reboot or 32 MiB CMA leak.
+
+After applying the documented transient host tuning (`usbfs_memory_mb=128`,
+`net.core.rmem_max=134217728`), five consecutive back-to-back four-radio USB
+runs passed both one-frame and three-frame rolling captures. All four USB
+device numbers remained unchanged through the post-test watchdog window. The
+front-port `.14` radio then passed the maximum 16-frame direct-IP burst: 64 MiB
+at 21.90 MiB/s with a 256 MiB effective receive buffer and zero duplicate,
+expired, rejected, or overflowed frames.
+
+That stress exposed a host lifecycle defect rather than a new RC4 firmware
+failure: an immediate STOP-followed-by-GET_STATUS could collide in the
+FunctionFS ep0 hand-off window, causing `LIBUSB_ERROR_PIPE`/`EIO` and a clean
+supervised gadget restart. SPF
+[commit `f109c204`](https://github.com/misko/spf/commit/f109c204) now checks
+status first, avoids redundant STOP on an already-idle worker, and fences a
+real STOP with an explicit IDLE assertion. The corrected sequence passed 51
+unit/recovery tests and the five-run four-board hardware stress above.
+
+Injected identity failure also passed on the Winbond board: recovery exposed
+only labelled network/ACM/storage interfaces with RF services withheld, then
+restored the real serial and RF interfaces after removing the RAM-only
+injection.
 
 ## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
 
