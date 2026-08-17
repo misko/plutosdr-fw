@@ -95,7 +95,8 @@ mkdir -p "$rootfs_check"
     cd "$rootfs_check"
     gzip -dc "$rootfs" | cpio --quiet -idm \
         opt/VERSIONS opt/vfat.img \
-        usr/sbin/sdr_usb_gadget usr/sbin/sdr_ip_gadget
+        usr/sbin/sdr_usb_gadget usr/sbin/sdr_ip_gadget \
+        usr/sbin/pluto-mute-tx etc/init.d/S23udc
 )
 cp "$rootfs_check/opt/VERSIONS" "$ARTIFACT_ROOT/packed-VERSIONS.txt"
 
@@ -134,6 +135,16 @@ file "$rootfs_check/usr/sbin/sdr_usb_gadget" \
     tee "$ARTIFACT_ROOT/gadget-binaries.txt"
 [[ "$(grep -c 'ELF 32-bit.*ARM.*EABI5' "$ARTIFACT_ROOT/gadget-binaries.txt")" == 2 ]] ||
     fail "packaged gadget binaries are not both ARM EABI5 executables"
+[[ -x "$rootfs_check/usr/sbin/pluto-mute-tx" ]] ||
+    fail "packaged TX mute helper is missing or not executable"
+grep -Fq "printf '%s\\n' '-80'" "$rootfs_check/usr/sbin/pluto-mute-tx" ||
+    fail "packaged TX mute helper does not request exactly -80 dB"
+mute_line="$(grep -n -m1 '/usr/sbin/pluto-mute-tx' \
+    "$rootfs_check/etc/init.d/S23udc" | cut -d: -f1)"
+bind_line="$(grep -n -m1 'echo ci_hdrc.0 > $GADGET/UDC' \
+    "$rootfs_check/etc/init.d/S23udc" | cut -d: -f1)"
+[[ -n "$mute_line" && -n "$bind_line" && "$mute_line" -lt "$bind_line" ]] ||
+    fail "packaged startup does not mute TX before binding USB"
 buildroot/output/host/bin/mdir -i "$rootfs_check/opt/vfat.img@@512" :: |
     tee "$ARTIFACT_ROOT/packed-vfat-listing.txt"
 grep -qi 'index.html' "$ARTIFACT_ROOT/packed-vfat-listing.txt" ||

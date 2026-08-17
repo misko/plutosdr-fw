@@ -15,13 +15,217 @@
 | RC13 – RC15 | — | never released | source tags only |
 | `gain-series-v4-rc16` | 2026-08-10 | qualified | 320-frame / 1.25 GiB direct-IP burst at 21.33 MiB/s |
 | `gain-series-v4-rc17` | 2026-08-10 | qualified | direct-IP control lifecycle rewritten around worker ownership |
-| **`gain-series-v4`** | 2026-08-11 | **current** | RC17's source with the version label corrected |
+| `gain-series-v4` | 2026-08-11 | superseded | RC17's source with the version label corrected |
+| **`libiio-metadata-v5`** | 2026-08-12 | **current hardware-qualified** | frame metadata through the standard libiio USB and IP/TCP transports |
+| `libiio-metadata-v6-rc3` | 2026-08-17 | **RAM-only candidate** | bounded teardown/reset diagnostics and Winbond identity support for #32/#33 |
+| `libiio-metadata-v6-rc4` | 2026-08-17 | **hardware-qualified, persistent prerelease** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 2. `fingerprint-v1..v3` is a separate series tracking the passive-fingerprint
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
-series. Read the family name, not the digit.
+series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
+standard libiio transports. Read the family name, not the digit.
+
+## v0.39-plutoplus-spf-libiio-metadata-v6-rc4 — 2026-08-17 — **hardware-qualified persistent prerelease**
+
+RC4 completed four-board RAM and persistent qualification for
+[issue #32](https://github.com/misko/plutosdr-fw/issues/32),
+[issue #33](https://github.com/misko/plutosdr-fw/issues/33), and
+[issue #34](https://github.com/misko/plutosdr-fw/issues/34).
+
+RC4 initializes every active AD9361 TX path at exactly `-80 dB`, then an
+independent startup gate zeros and verifies every DDS control and writes and
+verifies every TX gain before exposing USB services. A mute failure returns to
+RAM DFU. An identity failure exposes a clearly labelled, per-boot Ethernet/ACM
+diagnostic gadget while withholding USB-IIO and direct-SDR functions.
+
+The attached blank-serial W25Q256 hardware exposed a second RC4 red: Zynq QSPI
+skips SFDP parsing, so a UID reader installed only by the BFPT callback never
+appears in sysfs. The corrected candidate installs the common FV/JV opcode
+`4Bh` UID reader in the unconditional post-SFDP fixup and retains the BFPT hook
+only for addressing-mode discrimination. A source regression test now guards
+that controller-specific path.
+
+The Winbond board's 2023 U-Boot also contains a malformed legacy `attr_val`
+test that rewrites `mode=1r1t`. Removing the redundant `attr_name`/`attr_val`
+pair while retaining `compatible=ad9361` was red/green tested across a real
+U-Boot/RC4 RAM reboot: `mode=2r2t` persisted, both TX gains read `-80 dB`, and
+all eight DDS values read zero. Detailed acceptance criteria and live evidence
+are maintained in [`SPF_LIBIIO_METADATA_V6_RC4.md`](SPF_LIBIIO_METADATA_V6_RC4.md).
+
+Four-board receive stress reproduced the front-port radio's USB disappearance
+without a radio reboot: Ethernet `.14` and the boot ID stayed live, but the
+finite direct-USB worker retained 32 MiB CMA and direct-IP START failed with
+`-EIO`. RC4 now arms a ten-second finite-write watchdog after the final DMA
+submission and keeps it armed until the host explicitly sends STOP. A short or
+failed write, or a missing STOP after host link loss, invokes normal cleanup
+and the existing supervised UDC rebind. The same investigation found and fixed
+a provenance error where the manifest named gadget `907978b0` while Buildroot
+compiled `ab270f9e`; the corrected graph consistently pins gadget `1bbe9f0e`.
+
+The corrected RAM-only candidate at commit `e9e675e6d` was built and attested
+by [run `32002024507`](https://github.com/misko/plutosdr-fw/actions/runs/32002024507)
+(DFU SHA-256
+`a92aa9c02cba8292a7f8bb034db455f164cb5428c61ecd14941f70ee45c5763f`).
+It completed two exact-image RAM boot epochs on three Micron boards and the
+Winbond board. Every boot exposed 2R2T and 64 MiB CMA with TX1/TX2 at `-80 dB`
+and all DDS controls zero; the Winbond identity and static `.14` address
+survived both boots.
+
+Receive qualification passed 60 production-size 4 MiB lifecycle captures,
+all-four gadget crash/recovery, the 1/3/10/30 MS/s standard-libiio TCP matrix,
+protocol-v3/Zarr, direct-IP malformed/one-frame gates, and the physical TX2
+loopback suite. A deliberately missing host STOP reproduced the formerly fatal
+condition and automatically re-enumerated the same front-port serial/path in
+12 seconds without a Linux reboot or 32 MiB CMA leak.
+
+After applying the documented transient host tuning (`usbfs_memory_mb=128`,
+`net.core.rmem_max=134217728`), five consecutive back-to-back four-radio USB
+runs passed both one-frame and three-frame rolling captures. All four USB
+device numbers remained unchanged through the post-test watchdog window. The
+front-port `.14` radio then passed the maximum 16-frame direct-IP burst: 64 MiB
+at 21.90 MiB/s with a 256 MiB effective receive buffer and zero duplicate,
+expired, rejected, or overflowed frames.
+
+That stress exposed a host lifecycle defect rather than a new RC4 firmware
+failure: an immediate STOP-followed-by-GET_STATUS could collide in the
+FunctionFS ep0 hand-off window, causing `LIBUSB_ERROR_PIPE`/`EIO` and a clean
+supervised gadget restart. SPF
+[commit `f109c204`](https://github.com/misko/spf/commit/f109c204) now checks
+status first, avoids redundant STOP on an already-idle worker, and fences a
+real STOP with an explicit IDLE assertion. The corrected sequence passed 51
+unit/recovery tests and the five-run four-board hardware stress above.
+
+Injected identity failure also passed on the Winbond board: recovery exposed
+only labelled network/ACM/storage interfaces with RF services withheld, then
+restored the real serial and RF interfaces after removing the RAM-only
+injection.
+
+The explicitly labelled release image was rebuilt from firmware commit
+`28643c5f185a894a36ac0f37c2271f23acfd9f0e` and attested by
+[run `32040690713`](https://github.com/misko/plutosdr-fw/actions/runs/32040690713).
+Its embedded `device-fw` is
+`v0.39-plutoplus-spf-libiio-metadata-v6-rc4`; DFU SHA-256 is
+`dda63fae2fbc969cbb980eb188c621b14fcb55c9d849c36f28e8e4294186d27a`.
+All four exact USB paths then RAM-booted that formal image with their expected
+serials, 2R2T, 64 MiB CMA, TX1/TX2 at `-80 dB`, and all eight DDS controls at
+zero. The complete direct-USB hardware file passed 6/6, including ten
+production lifecycle captures per board and both simultaneous tests. The
+formal image also repeated the `.14` 16-frame direct-IP burst at 21.88 MiB/s
+with zero loss/reassembly/socket-overflow counters. Device numbers remained
+unchanged through the final watchdog window. No QSPI writes were performed.
+
+Persistent qualification then wrote only the `qspi-linux` FIT partition on
+all four attached PlutoPlus radios. The Winbond `.14` and Micron `.15` radios
+were updated over their LAN addresses; the Micron `.17` and `.18` radios were
+updated through USB serial-flash DFU. Every board booted the formal RC4 FIT,
+retained its expected serial, LAN identity, 2R2T mode, 64 MiB CMA, and exact
+`fit_size=c2be37`, then survived a second independent reboot with the same
+identity and firmware version.
+
+The post-persistence matrix passed the complete direct-USB hardware file
+(6/6), 64 standard-libiio USB/TCP cells across ordinary and metadata modes at
+1/3/10/30 MS/s, repeated and simultaneous four-radio protocol-v3 streaming,
+the V7 Zarr round trip, the `.14` 16-frame/64 MiB direct-IP burst, and both
+physical TX2 loopback tests on every board. Final cleanup and a 15-second idle
+window left TX1/TX2 at `-80 dB` and all eight DDS raw controls at zero on all
+four radios; the fragile front-port `.14` device retained USB path `3-10.2`
+and remained reachable at its static LAN address.
+
+One host-side timing assertion was not stable at its strict 5 ms uncertainty
+limit: individual USB control round trips reached 7.96 ms while frame
+continuity, fitted sample clocks, and all data-path tests remained valid. A
+diagnostic run with a 10 ms reporting ceiling measured 1.01–6.69 ms total
+uncertainty across the four radios. This is recorded as host scheduling/USB
+latency and does not change the RC4 firmware result.
+
+## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
+
+Published as a prerelease on 2026-08-17. This is a **hardware-untested,
+RAM-boot-only candidate** for [issue #32](https://github.com/misko/plutosdr-fw/issues/32)
+and [issue #33](https://github.com/misko/plutosdr-fw/issues/33). Do not install
+it persistently until the hardware promotion gates below pass on both Micron
+and Winbond boards.
+
+### Identity and downloads
+
+| | |
+|---|---|
+| release | [`v0.39-plutoplus-spf-libiio-metadata-v6-rc3`](https://github.com/misko/plutosdr-fw/releases/tag/v0.39-plutoplus-spf-libiio-metadata-v6-rc3) |
+| firmware source | [`ff999e906018966557e275f8ec96e3c490869de8`](https://github.com/misko/plutosdr-fw/commit/ff999e906018966557e275f8ec96e3c490869de8) |
+| `device-fw` | `v0.39-plutoplus-spf-libiio-metadata-v6-rc3` |
+| DFU | [`plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018-pluto.dfu`](https://github.com/misko/plutosdr-fw/releases/download/v0.39-plutoplus-spf-libiio-metadata-v6-rc3/plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018-pluto.dfu) |
+| DFU sha256 | `091ec7ded71f84057927dbf4c0a155ee61a1ceb4166e8fa2aca352685ef4aa23` |
+| source bundle | [`plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018.tar.gz`](https://github.com/misko/plutosdr-fw/releases/download/v0.39-plutoplus-spf-libiio-metadata-v6-rc3/plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018.tar.gz) |
+| bundle sha256 | `5242b95ae6903d8246c9afa6079681c62b22efa42568ff87e91a326ea14b5a34` |
+| build | [CI run `31987898232`](https://github.com/misko/plutosdr-fw/actions/runs/31987898232) |
+| detailed plan | [`SPF_LIBIIO_METADATA_V6_RC3.md`](https://github.com/misko/plutosdr-fw/blob/ff999e906018966557e275f8ec96e3c490869de8/SPF_LIBIIO_METADATA_V6_RC3.md) |
+| source manifest | [`libiio-frame-metadata-v6-rc3-source.yaml`](https://github.com/misko/plutosdr-fw/blob/ff999e906018966557e275f8ec96e3c490869de8/manifests/libiio-frame-metadata-v6-rc3-source.yaml) |
+
+### What RC3 changes
+
+For #32, RC3 fixes a confirmed unbounded `pthread_join()` in metadata-sampler
+teardown by imposing a 500 ms deadline and exiting only the owning daemon if
+the worker cannot be safely reclaimed. iiOD is supervised and can restart
+without rebooting Linux. RC3 also records boot and iiOD generations and retains
+kernel-console and userspace pmsg evidence in ramoops across a watchdog reset.
+The reported whole-board reset is real, but the existing evidence does **not**
+prove that the teardown defect caused it; the new diagnostics are intended to
+distinguish a daemon failure, kernel stall, watchdog reset, and power event.
+
+For #33, the kernel exposes the factory eight-byte UID of a confirmed
+W25Q256JV through `spi-nor/unique_id`. Userspace preserves the historical
+Micron serial byte-for-byte and encodes a Winbond UID as
+`winbond-<16 lowercase hex>`. Missing, malformed, all-zero, and all-ones IDs
+fail closed before gadget bind, preventing the former empty-serial and repeated
+empty-hash MAC behavior.
+
+### Validation and promotion blockers
+
+The source graph, native identity fixtures, bounded-teardown unit test, iiOD
+supervisor tests, ARM kernel objects, Pluto DTB, FPGA build, packaged firmware,
+and artifact attestations pass offline. Routed timing is WNS 0.504 ns and WHS
+0.014 ns, with zero failing endpoints.
+
+Promotion still requires RAM-only hardware validation:
+
+1. On one Micron and one W25Q256JV board, verify nonempty, stable, distinct
+   USB/IIO serials; agreement across `/etc/serial`, configfs, and libiio; and
+   distinct locally administered MAC addresses.
+2. Run the exact #32 two-radio, 936-slot repeated retune/capture/close soak with
+   no boot-ID change, unexplained iiOD-generation change, metadata failure, or
+   resource growth.
+3. Force iiOD termination and prove supervised recovery without a boot-ID
+   change and with the iiOD generation advancing.
+4. Force a watchdog reset and prove that the previous kernel console and pmsg
+   records are present in `/sys/fs/pstore`.
+
+RC4 qualification additionally found that the prior 256 MiB default CMA pool
+cannot be placed around Pluto's fixed ramoops region. The resulting zero-CMA
+boot makes 4 MiB IIO receive blocks fail as high-order page allocations. RC4
+uses a 64 MiB CMA pool and requires successful repeated USB and local-IP 4 MiB
+captures, with no allocator warnings, before promotion.
+
+## v0.38-plutoplus-spf-libiio-metadata-v5
+
+Hardware-qualified on two PlutoPlus units and persistently flashed on
+2026-08-12. This is the current stable baseline while v6 RC3 remains a
+RAM-only candidate. It adds capture index, hardware sample sequence/time
+anchor, start/end gain and RSSI, and in-frame gain observations to ordinary
+libiio buffers over USB and IP/TCP without changing the IQ byte layout.
+
+| | |
+|---|---|
+| release | [`v0.38-plutoplus-spf-libiio-metadata-v5`](https://github.com/misko/plutosdr-fw/releases/tag/v0.38-plutoplus-spf-libiio-metadata-v5) |
+| firmware source | `d7c87a9a28094ee6f0b23cb47df9ff737b5a69d8` |
+| DFU sha256 | `948b46506febacb087f3955be86015e074f8c0e3370a9dfc6a942e735d97f882` |
+
+The qualified continuous metadata limits were 2 MS/s over USB and 3 MS/s over
+IP/TCP on the tested hardware and network. Both radios passed the complete host
+libiio 0.25 and 0.26 matrices, rebooted from QSPI, retained the exact v5
+identity, and passed the post-reboot USB/TCP metadata smoke. Its later field
+reports are tracked in #32 and #33; v6 RC3 is the candidate corrective release.
 
 ## v0.38-plutoplus-spf-gain-series-v4
 
@@ -265,4 +469,3 @@ MS/s without the RC16 control-rearm failure**, and a 1–30 MS/s ladder complete
 
 Firmware `1f3fe0cb`, gadget `2e8e40ad`, direct-IP gadget `b066059e`, buildroot
 `56b7bc54`. DFU sha256 `88a606f1…`.
-

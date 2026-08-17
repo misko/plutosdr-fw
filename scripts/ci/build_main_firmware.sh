@@ -67,6 +67,18 @@ install -d -m 0755 "$BR2_DL_DIR"
     fail "Buildroot cache is not accessible: $BR2_DL_DIR"
 printf 'Persistent Buildroot cache: %s\n' "$BR2_DL_DIR"
 
+scripts/test_pluto_pstore_layout.sh \
+	2>&1 | tee "$artifact_real/pstore-layout.log"
+scripts/test_pluto_cma_layout.sh \
+	2>&1 | tee "$artifact_real/cma-layout.log"
+scripts/test_winbond_uid_fixup.sh \
+    2>&1 | tee "$artifact_real/winbond-uid-fixup.log"
+buildroot/board/pluto/test_pluto_mute_tx.sh \
+    2>&1 | tee "$artifact_real/boot-tx-mute.log"
+buildroot/board/pluto/test_pluto_boot_safety.sh \
+    2>&1 | tee "$artifact_real/boot-safety.log"
+buildroot/board/pluto/test_pluto_read_identity.sh \
+    2>&1 | tee "$artifact_real/identity-reader.log"
 scripts/build_gain_series_candidate.sh source-check \
     2>&1 | tee "$artifact_real/source-check.log"
 scripts/build_gain_series_candidate.sh preflight \
