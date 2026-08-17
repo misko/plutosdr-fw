@@ -19,7 +19,7 @@ USB gadget is exposed, a second independent startup gate:
 - locates the AD9361 PHY and DDS IIO devices;
 - writes zero to every DDS raw control and verifies the readback;
 - writes `-80` to every exposed TX hardware-gain control and verifies it;
-- returns the radio to RAM-DFU recovery if any check fails.
+- returns the radio to RAM-DFU recovery if TX mute cannot be verified.
 
 This is a firmware-controlled default, not a permanent lock. An authorized
 application may deliberately set another gain after boot.
@@ -35,8 +35,10 @@ RAM-booted radio appear to disappear.
 RC4 enables factory UID opcode `4Bh` for both FV and JV variants. FV global
 4-byte-address mode uses the required fifth dummy byte; JV keeps four dummy
 bytes with dedicated 4-byte opcodes. Invalid identities remain rejected, but a
-startup identity failure now returns to visible RAM-DFU recovery instead of
-leaving the unit unreachable.
+startup identity failure now exposes only an explicitly labelled, per-boot
+network/ACM recovery gadget. USB-IIO and direct-SDR functions remain withheld,
+so the unit is reachable for diagnosis without presenting an unsafe radio
+identity.
 
 ### #32: reset containment and evidence
 
@@ -49,7 +51,7 @@ boot correlation, and ramoops reset evidence unchanged.
 |---|---|---|
 | Boot attenuation | Active TX gain reads `-10 dB` | Every active TX reads exactly `-80 dB` before host services |
 | DDS state | DDS disable was assumed | Every exposed DDS raw control reads zero |
-| Startup failure | Missing identity leaves no runtime USB interfaces | Unit reappears in RAM-DFU recovery |
+| Startup failure | Missing identity leaves no runtime USB interfaces | Labelled network/ACM recovery; RF data functions absent |
 | Winbond identity | W25Q256FV has blank USB/IIO serial | Stable nonempty `winbond-<16 hex>` serial and unique MAC |
 | Micron regression | Three boards have stable historical serials | Serial remains byte-for-byte unchanged |
 | 2R2T topology | Recovered Winbond board reverted to `1r1t` | Two RX scan paths and two TX gain controls on every board |
@@ -65,7 +67,7 @@ Each board is loaded to RAM only and must pass:
 3. 2R2T channel enumeration and TX2-to-tee-to-attenuator-to-RX1/RX2 loopback;
 4. receive, recovery, standard libiio, direct USB/IP, TX loopback, and stress
    suites without a boot-ID change;
-5. recovery to RAM DFU on an injected identity failure.
+5. labelled network/ACM-only recovery on an injected identity failure.
 
 Any red result blocks promotion and is fixed and retested in RC4. Serial-flash
 installation remains explicitly out of scope until the entire matrix is green.
