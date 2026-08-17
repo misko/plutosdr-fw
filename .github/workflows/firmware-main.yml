@@ -1,7 +1,7 @@
 name: Kalman main firmware build
 
-# Security boundary: this workflow never runs for pull requests. A manual run
-# is also restricted to refs/heads/main at the job level.
+# Security boundary: this workflow never runs for pull requests. Manual runs
+# are restricted to main and the reviewed v6 RC1 source-lock branch.
 on:
   push:
     branches: [main]
@@ -30,12 +30,26 @@ concurrency:
 jobs:
   build:
     name: build and package on Kalman
-    if: github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/codex/firmware-v6-rc1-stability-identity')
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
-      # libiio frame-metadata v5 is the hardware-qualified main baseline.
-      SPF_GAIN_SERIES_MANIFEST: ${{ github.workspace }}/manifests/libiio-frame-metadata-v5-source.yaml
+      # main retains the hardware-qualified v5 graph; the named RC branch uses
+      # its independently locked candidate graph.
+      SPF_GAIN_SERIES_MANIFEST: >-
+        ${{ format('{0}/manifests/{1}', github.workspace,
+          github.ref == 'refs/heads/main' &&
+          'libiio-frame-metadata-v5-source.yaml' ||
+          'libiio-frame-metadata-v6-rc1-source.yaml') }}
+      SPF_PACKAGE_STEM_PREFIX: >-
+        ${{ github.ref == 'refs/heads/main' &&
+          'plutoplus-spf-main' ||
+          'plutoplus-spf-libiio-metadata-v6-rc1' }}
+      SPF_RELEASE_STATE: >-
+        ${{ github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
     outputs:
       artifact-name: ${{ steps.names.outputs.artifact_name }}
       bundle-name: ${{ steps.build.outputs.bundle_name }}
