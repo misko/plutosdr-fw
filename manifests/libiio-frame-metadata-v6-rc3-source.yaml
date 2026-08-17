@@ -1,5 +1,5 @@
-# Immutable source graph for the libiio frame-metadata v6 RC2 build.
-# RC2 addresses #32 (bounded metadata teardown plus reset evidence) and #33
+# Immutable source graph for the libiio frame-metadata v6 RC3 build.
+# RC3 addresses #32 (bounded metadata teardown plus reset evidence) and #33
 # (stable identity on Winbond W25Q256JV flashes).
 
 schema: plutosdr-fw.source-manifest
@@ -18,7 +18,7 @@ libiio_0_26_ref: refs/tags/spf-frame-metadata-source/v0.26-final-v3
 
 gadget_source: 907978b0f770add6f97693c5afcb8c1a0b762882
 gadget_repo: https://github.com/misko/plutosdr-fw.git
-gadget_ref: refs/tags/libiio-metadata-v6-rc2-source/gadget
+gadget_ref: refs/tags/libiio-metadata-v6-rc3-source/gadget
 
 ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
@@ -26,7 +26,7 @@ ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
 submodule_buildroot: f100bc8c2442608ef6c02a6191f9ceac803207e8
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/libiio-metadata-v6-rc2-source/buildroot
+submodule_buildroot_ref: refs/tags/libiio-metadata-v6-rc3-source/buildroot
 
 submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
@@ -38,7 +38,7 @@ submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc10-source/hdl-quantulum
 
 submodule_linux: b14dfbd6374db7df2dfac62f3f6a4413d0749dd2
 submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
-submodule_linux_ref: refs/tags/libiio-metadata-v6-rc2-source/linux
+submodule_linux_ref: refs/tags/libiio-metadata-v6-rc3-source/linux
 
 submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
 submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
