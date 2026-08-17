@@ -57,6 +57,16 @@ gain controls then initialize to `-80 dB` and all eight DDS controls to zero.
 RC4 retains RC3's bounded metadata teardown, iiOD supervision, generation and
 boot correlation, and ramoops reset evidence unchanged.
 
+Hardware qualification also exposed an independent receive-path failure. The
+Pluto kernel requested a 256 MiB contiguous-memory (CMA) pool, but the fixed
+ramoops region at 239 MiB splits the DMA-addressable placement window. Boot
+therefore reported `cma: Failed to reserve 256 MiB` and `CmaTotal: 0 kB`.
+Direct receive then attempted fragile order-10 allocations for each 4 MiB IIO
+buffer, producing `__alloc_pages` warnings and libusb timeouts. RC4 reduces the
+default pool to a 64 MiB hardware-validation candidate, which leaves ample
+capacity for concurrent IIO blocks while fitting below the reserved pstore
+region.
+
 ## Red/green evidence
 
 | Gate | RC3 red | RC4 green acceptance |
@@ -68,6 +78,7 @@ boot correlation, and ramoops reset evidence unchanged.
 | Micron regression | Three boards have stable historical serials | Serial remains byte-for-byte unchanged |
 | 2R2T topology | Recovered Winbond board reverted to `1r1t` | Two RX scan paths and two TX gain controls on every board |
 | #32 stress | Repeated metadata teardown could reset a board | No boot-ID change; supervised iiOD recovery is bounded |
+| 4 MiB RX DMA | Boot has `CmaTotal: 0 kB`; direct USB receive times out in `__alloc_pages` | Boot reserves 64 MiB CMA; repeated 4 MiB USB/IP receives complete without allocation warnings |
 | Reset evidence | Cause was lost across reset | Previous console/pmsg survives a forced watchdog reset |
 
 ## Four-board promotion matrix

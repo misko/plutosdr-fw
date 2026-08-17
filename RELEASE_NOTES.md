@@ -116,6 +116,12 @@ Promotion still requires RAM-only hardware validation:
 4. Force a watchdog reset and prove that the previous kernel console and pmsg
    records are present in `/sys/fs/pstore`.
 
+RC4 qualification additionally found that the prior 256 MiB default CMA pool
+cannot be placed around Pluto's fixed ramoops region. The resulting zero-CMA
+boot makes 4 MiB IIO receive blocks fail as high-order page allocations. RC4
+uses a 64 MiB CMA pool and requires successful repeated USB and local-IP 4 MiB
+captures, with no allocator warnings, before promotion.
+
 ## v0.38-plutoplus-spf-libiio-metadata-v5
 
 Hardware-qualified on two PlutoPlus units and persistently flashed on
