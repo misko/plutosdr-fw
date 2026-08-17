@@ -16,9 +16,10 @@
 | `gain-series-v4-rc16` | 2026-08-10 | qualified | 320-frame / 1.25 GiB direct-IP burst at 21.33 MiB/s |
 | `gain-series-v4-rc17` | 2026-08-10 | qualified | direct-IP control lifecycle rewritten around worker ownership |
 | `gain-series-v4` | 2026-08-11 | superseded | RC17's source with the version label corrected |
-| **`libiio-metadata-v5`** | 2026-08-12 | **current hardware-qualified** | frame metadata through the standard libiio USB and IP/TCP transports |
+| `libiio-metadata-v5` | 2026-08-12 | superseded | frame metadata through the standard libiio USB and IP/TCP transports |
 | `libiio-metadata-v6-rc3` | 2026-08-17 | **RAM-only candidate** | bounded teardown/reset diagnostics and Winbond identity support for #32/#33 |
 | `libiio-metadata-v6-rc4` | 2026-08-17 | **hardware-qualified, persistent prerelease** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
+| **`libiio-metadata-v6`** | 2026-08-17 | **current hardware-qualified** | final RC4 graph, exact release identity, four-board persistent qualification |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -26,6 +27,49 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.39-plutoplus-spf-libiio-metadata-v6 — 2026-08-17 — **hardware-qualified release**
+
+v6 promotes RC4's exact component graph with the final embedded identity
+`v0.39-plutoplus-spf-libiio-metadata-v6`. Source commit
+[`e3700cc7268132eb6baa4bc88d8f3320dc7148b9`](https://github.com/misko/plutosdr-fw/commit/e3700cc7268132eb6baa4bc88d8f3320dc7148b9)
+was built and attested by
+[run `32045625826`](https://github.com/misko/plutosdr-fw/actions/runs/32045625826).
+The DFU SHA-256 is
+`8ffbb0bf0912285636ddbcf0b00e12deaca0f55612faf7d29efa067b22e61352`;
+the deployment-bundle SHA-256 is
+`c4845f769962eff1dadd7639b5cefbaf63b29c06f97678b60624eaf9960c7267`.
+Routed timing closed at WNS `0.504 ns` and WHS `0.014 ns`, with zero failing
+endpoints.
+
+The exact final artifact was RAM-booted on three Micron PlutoPlus boards and
+the front-port Winbond board. All four returned on their expected USB paths and
+serials with 2R2T, 64 MiB CMA, TX1/TX2 at `-80 dB`, and all eight DDS controls
+zero. The complete direct-USB hardware file passed 6/6 and both physical
+TX2-to-tee-to-attenuator-to-RX1/RX2 tests passed across all four boards before
+persistent installation.
+
+Only the `qspi-linux` FIT partition was then written: `.14` and `.15` over
+Ethernet using verified `pluto.frm`, and `.17` and `.18` through path-pinned
+SPI-flash DFU using only `firmware.dfu`. Every radio retained its identity and
+LAN address, booted v6 from QSPI with `fit_size=C2BE33`, and survived a second
+independent reboot.
+
+Post-persistence qualification passed the direct-USB hardware file (6/6), 64
+standard-libiio USB/TCP ordinary/metadata cells at 1/3/10/30 MS/s, repeated and
+simultaneous protocol-v3 capture, V7 Zarr round-trip, the `.14` 16-frame/64 MiB
+direct-IP burst, and both physical TX2 loopback tests. Final readback on every
+board showed TX1/TX2 at `-80 dB`, eight zero DDS controls, unchanged boot IDs,
+and healthy CMA.
+
+During the final persistent run, the front-port `.14` host link dropped once.
+Firmware recovered exactly as designed: Ethernet and the Linux boot ID stayed
+live, CMA was released, and the supervised gadget returned on path `3-10.2`
+with the same serial. The host's five-second rediscovery budget was shorter
+than the firmware's ten-second missing-STOP watchdog plus USB re-enumeration.
+SPF [commit `f1c297da`](https://github.com/misko/spf/commit/f1c297da)
+extends that bounded host budget to 15 seconds; its receiver unit file passed
+27/27 and the formerly failing four-radio hardware file then passed 6/6.
 
 ## v0.39-plutoplus-spf-libiio-metadata-v6-rc4 — 2026-08-17 — **hardware-qualified persistent prerelease**
 
