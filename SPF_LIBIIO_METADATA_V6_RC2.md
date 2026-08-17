@@ -1,6 +1,6 @@
-# LibIIO frame-metadata v6 RC1
+# LibIIO frame-metadata v6 RC2
 
-v6 RC1 is a RAM-boot-only candidate for issues #32 and #33. It is not eligible
+v6 RC2 is a RAM-boot-only candidate for issues #32 and #33. It is not eligible
 for flash installation until the hardware gates below pass on both Micron and
 Winbond boards.
 
@@ -14,13 +14,15 @@ also used an unbounded `pthread_join()` during stream close. That is a confirmed
 hang defect, but the evidence available in #32 does not prove whether the final
 board reset was caused by this path, a wider kernel stall, or power integrity.
 
-RC1 therefore fixes the known hang and makes the remaining reset diagnosable:
+RC2 therefore fixes the known hang and makes the remaining reset diagnosable:
 
 - metadata sampler teardown is bounded to 500 ms;
 - an unsafe timeout exits only the owning daemon before state is freed;
 - iiOD is supervised and restarted without rebooting Linux;
 - one MiB of reserved ramoops memory retains kernel-console and userspace pmsg
   records across watchdog resets;
+- the reserved region is below the FPGA load address and outside U-Boot's
+  high-memory relocation arena;
 - each boot and iiOD generation is recorded for correlation.
 
 ### #33: blank serial on Winbond W25Q256
@@ -30,7 +32,7 @@ line only for the Micron/ST implementation, so Winbond boards received an empty
 serial. Hashing that empty line also produced the repeated `00:e0:22:ad:c8:3b`
 host MAC.
 
-RC1 exposes the W25Q256JV factory UID through the SPI-NOR sysfs group after the
+RC2 exposes the W25Q256JV factory UID through the SPI-NOR sysfs group after the
 existing SFDP discriminator proves the part is JV rather than FV. Userspace
 keeps the historical Micron serial unchanged, otherwise encodes the eight-byte
 Winbond UID as `winbond-<16 lowercase hex>`. Missing, malformed, all-zero, and

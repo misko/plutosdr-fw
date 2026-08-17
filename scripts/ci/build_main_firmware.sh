@@ -67,6 +67,8 @@ install -d -m 0755 "$BR2_DL_DIR"
     fail "Buildroot cache is not accessible: $BR2_DL_DIR"
 printf 'Persistent Buildroot cache: %s\n' "$BR2_DL_DIR"
 
+scripts/test_pluto_pstore_layout.sh \
+	2>&1 | tee "$artifact_real/pstore-layout.log"
 scripts/build_gain_series_candidate.sh source-check \
     2>&1 | tee "$artifact_real/source-check.log"
 scripts/build_gain_series_candidate.sh preflight \
