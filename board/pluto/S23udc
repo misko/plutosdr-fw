@@ -65,6 +65,7 @@ create_iiod_context_attributes() {
 case "$1" in
   start)
 	echo -n "Starting UDC Gadgets: "
+	RECOVERY_MODE=0
 	if ! /usr/sbin/pluto-mute-tx
 	then
 		logger -t S23udc "TX mute failed; returning to RAM DFU recovery"
@@ -72,13 +73,16 @@ case "$1" in
 		/usr/sbin/device_reboot ram
 		exit 1
 	fi
-	if ! serial=$(/usr/sbin/pluto-read-identity)
+	if ! serial=$(/usr/sbin/pluto-read-identity 2>/tmp/pluto-identity-error)
 	then
-		logger -t S23udc "identity unavailable; returning to RAM DFU recovery"
-		echo "FAIL (missing board identity; entering RAM DFU recovery)"
-		/usr/sbin/device_reboot ram
-		exit 1
+		RECOVERY_MODE=1
+		boot_id=`cat /proc/sys/kernel/random/boot_id | tr -d -`
+		serial="identity-recovery-${boot_id}"
+		identity_error=`cat /tmp/pluto-identity-error 2>/dev/null`
+		logger -t S23udc "identity unavailable; exposing network/ACM recovery only: ${identity_error}"
+		printf '%s\n' "$identity_error" > /run/pluto-identity-recovery
 	fi
+	rm -f /tmp/pluto-identity-error
 
 	mount configfs -t configfs /sys/kernel/config 2> /dev/null
 
@@ -87,7 +91,9 @@ case "$1" in
 	model=`cat /sys/firmware/devicetree/base/model | tr / -`
 	model_variant=`dmesg | grep m25p80 | grep Kbytes | cut -d ' ' -f 3`
 
-	create_iiod_context_attributes "$model" "$serial" "$model_variant"
+	if [ "$RECOVERY_MODE" == "0" ]; then
+		create_iiod_context_attributes "$model" "$serial" "$model_variant"
+	fi
 
 	printf '%s\n' "$serial" > /etc/serial
 	sha1=$(printf '%s\n' "$serial" | sha1sum)
@@ -97,11 +103,17 @@ case "$1" in
 
 	mkdir -p $GADGET/strings/0x409
 	echo "Analog Devices Inc." > $GADGET/strings/0x409/manufacturer
-	echo $PRODUCT > $GADGET/strings/0x409/product
+	if [ "$RECOVERY_MODE" == "1" ]; then
+		echo "$PRODUCT (IDENTITY RECOVERY)" > $GADGET/strings/0x409/product
+	else
+		echo $PRODUCT > $GADGET/strings/0x409/product
+	fi
 	printf '%s\n' "$serial" > $GADGET/strings/0x409/serialnumber
 
-	mkdir -p $GADGET/functions/ffs.iio_ffs
-	mkdir -p $GADGET/functions/ffs.sdr_gadget_ffs
+	if [ "$RECOVERY_MODE" == "0" ]; then
+		mkdir -p $GADGET/functions/ffs.iio_ffs
+		mkdir -p $GADGET/functions/ffs.sdr_gadget_ffs
+	fi
 	mkdir -p $GADGET/functions/acm.usb0
 	mkdir -p $GADGET/functions/$USB_NET_FUNCTION
 	mkdir -p $GADGET/functions/mass_storage.0
@@ -117,7 +129,11 @@ case "$1" in
 
 	mkdir -p $GADGET/configs/c.1
 	mkdir -p $GADGET/configs/c.1/strings/0x409
-	echo "RNDIS/MSD/ACM/IIOUSBD/SDRGADGET" > $GADGET/configs/c.1/strings/0x409/configuration
+	if [ "$RECOVERY_MODE" == "1" ]; then
+		echo "IDENTITY-RECOVERY/RNDIS/MSD/ACM" > $GADGET/configs/c.1/strings/0x409/configuration
+	else
+		echo "RNDIS/MSD/ACM/IIOUSBD/SDRGADGET" > $GADGET/configs/c.1/strings/0x409/configuration
+	fi
 
 	# In case the M2k is powered via the Power USB, advertise low power on the DATA USB
 	if [ "$TARGET" == "m2k" ]; then
@@ -130,35 +146,41 @@ case "$1" in
 	ln -s $GADGET/functions/$USB_NET_FUNCTION $GADGET/configs/c.1
 	ln -s $GADGET/functions/mass_storage.0 $GADGET/configs/c.1
 	ln -s $GADGET/functions/acm.usb0 $GADGET/configs/c.1
-	ln -s $GADGET/functions/ffs.iio_ffs $GADGET/configs/c.1/ffs.iio_ffs
-	ln -s $GADGET/functions/ffs.sdr_gadget_ffs $GADGET/configs/c.1/ffs.sdr_gadget_ffs
+	if [ "$RECOVERY_MODE" == "0" ]; then
+		ln -s $GADGET/functions/ffs.iio_ffs $GADGET/configs/c.1/ffs.iio_ffs
+		ln -s $GADGET/functions/ffs.sdr_gadget_ffs $GADGET/configs/c.1/ffs.sdr_gadget_ffs
 
-	mkdir -p /dev/iio_ffs
-	mount -t functionfs -o no_disconnect=1 iio_ffs /dev/iio_ffs 2> /dev/null
+		mkdir -p /dev/iio_ffs
+		mount -t functionfs -o no_disconnect=1 iio_ffs /dev/iio_ffs 2> /dev/null
 
-	mkdir -p /dev/sdr_gadget_ffs
-	# Keep the composite gadget registered if the direct-USB userspace daemon
-	# exits. The supervisor can then reopen ep0 without disrupting USB-IIO.
-	mount -t functionfs -o no_disconnect=1 sdr_gadget_ffs /dev/sdr_gadget_ffs 2> /dev/null
+		mkdir -p /dev/sdr_gadget_ffs
+		# Keep the composite gadget registered if the direct-USB userspace daemon
+		# exits. The supervisor can then reopen ep0 without disrupting USB-IIO.
+		mount -t functionfs -o no_disconnect=1 sdr_gadget_ffs /dev/sdr_gadget_ffs 2> /dev/null
 
-	start-stop-daemon -S -b -q -m -p /var/run/iiod-supervisor.pid \
-		-x /usr/sbin/iiod_supervisor.sh -- $IIOD_OPTS
-	if [ "$SDR_USB_GADGET_DEBUG" == "1" ]
-	then
-		SDR_USB_GADGET_SUPERVISOR_OPTS="-d"
-	else
-		SDR_USB_GADGET_SUPERVISOR_OPTS=""
+		start-stop-daemon -S -b -q -m -p /var/run/iiod-supervisor.pid \
+			-x /usr/sbin/iiod_supervisor.sh -- $IIOD_OPTS
+		if [ "$SDR_USB_GADGET_DEBUG" == "1" ]
+		then
+			SDR_USB_GADGET_SUPERVISOR_OPTS="-d"
+		else
+			SDR_USB_GADGET_SUPERVISOR_OPTS=""
+		fi
+		# A stuck worker exits the gadget process. Restart only this FunctionFS
+		# daemon; standard iiod remains online for configuration and attestation.
+		start-stop-daemon -S -b -q -m -p /var/run/sdr_usb_gadget.pid \
+			-x /usr/sbin/sdr_usb_gadget_supervisor.sh -- \
+			$SDR_USB_GADGET_SUPERVISOR_OPTS $SDR_USB_GADGET_OPTS
+		sleep 0.2
 	fi
-	# A stuck worker exits the gadget process. Restart only this FunctionFS
-	# daemon; standard iiod remains online for configuration and attestation.
-	start-stop-daemon -S -b -q -m -p /var/run/sdr_usb_gadget.pid \
-		-x /usr/sbin/sdr_usb_gadget_supervisor.sh -- \
-		$SDR_USB_GADGET_SUPERVISOR_OPTS $SDR_USB_GADGET_OPTS
-	sleep 0.2
 
 	echo ci_hdrc.0 > $GADGET/UDC
 
-	[ $? = 0 ] && echo "OK" || echo "FAIL"
+	if [ "$RECOVERY_MODE" == "1" ]; then
+		echo "RECOVERY (identity unavailable; RF services withheld)"
+	else
+		echo "OK"
+	fi
 
 	if [ "$UDC_HANDLE_SUSPEND" == "1" ]; then
 		start-stop-daemon -S -b -q -m -p /var/run/udc_handle_suspend.pid -x  /sbin/udc_handle_suspend.sh
@@ -176,18 +198,18 @@ case "$1" in
 	start-stop-daemon -K -q -p /var/run/iiod-supervisor.pid 2>/dev/null
 	start-stop-daemon -K -q -p /var/run/sdr_usb_gadget.pid 2>/dev/null
 
-	rm $GADGET/configs/c.1/$USB_NET_FUNCTION
-	rm $GADGET/configs/c.1/mass_storage.0
-	rm $GADGET/configs/c.1/acm.usb0
-	rm $GADGET/configs/c.1/ffs.iio_ffs
-	rm $GADGET/configs/c.1/ffs.sdr_gadget_ffs
+	rm -f $GADGET/configs/c.1/$USB_NET_FUNCTION
+	rm -f $GADGET/configs/c.1/mass_storage.0
+	rm -f $GADGET/configs/c.1/acm.usb0
+	rm -f $GADGET/configs/c.1/ffs.iio_ffs
+	rm -f $GADGET/configs/c.1/ffs.sdr_gadget_ffs
 
 	rmdir $GADGET/strings/0x409
 	rmdir $GADGET/configs/c.1/strings/0x409
 	rmdir $GADGET/configs/c.1
 
-	rmdir $GADGET/functions/ffs.sdr_gadget_ffs
-	rmdir $GADGET/functions/ffs.iio_ffs
+	rmdir $GADGET/functions/ffs.sdr_gadget_ffs 2> /dev/null
+	rmdir $GADGET/functions/ffs.iio_ffs 2> /dev/null
 	#rmdir $GADGET/functions/acm.usb0
 	rmdir $GADGET/functions/$USB_NET_FUNCTION
 	rmdir $GADGET/functions/mass_storage.0
