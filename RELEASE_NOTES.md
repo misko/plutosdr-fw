@@ -15,13 +15,97 @@
 | RC13 – RC15 | — | never released | source tags only |
 | `gain-series-v4-rc16` | 2026-08-10 | qualified | 320-frame / 1.25 GiB direct-IP burst at 21.33 MiB/s |
 | `gain-series-v4-rc17` | 2026-08-10 | qualified | direct-IP control lifecycle rewritten around worker ownership |
-| **`gain-series-v4`** | 2026-08-11 | **current** | RC17's source with the version label corrected |
+| `gain-series-v4` | 2026-08-11 | superseded | RC17's source with the version label corrected |
+| **`libiio-metadata-v5`** | 2026-08-12 | **current hardware-qualified** | frame metadata through the standard libiio USB and IP/TCP transports |
+| `libiio-metadata-v6-rc3` | 2026-08-17 | **RAM-only candidate** | bounded teardown/reset diagnostics and Winbond identity support for #32/#33 |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 2. `fingerprint-v1..v3` is a separate series tracking the passive-fingerprint
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
-series. Read the family name, not the digit.
+series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
+standard libiio transports. Read the family name, not the digit.
+
+## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
+
+Published as a prerelease on 2026-08-17. This is a **hardware-untested,
+RAM-boot-only candidate** for [issue #32](https://github.com/misko/plutosdr-fw/issues/32)
+and [issue #33](https://github.com/misko/plutosdr-fw/issues/33). Do not install
+it persistently until the hardware promotion gates below pass on both Micron
+and Winbond boards.
+
+### Identity and downloads
+
+| | |
+|---|---|
+| release | [`v0.39-plutoplus-spf-libiio-metadata-v6-rc3`](https://github.com/misko/plutosdr-fw/releases/tag/v0.39-plutoplus-spf-libiio-metadata-v6-rc3) |
+| firmware source | [`ff999e906018966557e275f8ec96e3c490869de8`](https://github.com/misko/plutosdr-fw/commit/ff999e906018966557e275f8ec96e3c490869de8) |
+| `device-fw` | `v0.39-plutoplus-spf-libiio-metadata-v6-rc3` |
+| DFU | [`plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018-pluto.dfu`](https://github.com/misko/plutosdr-fw/releases/download/v0.39-plutoplus-spf-libiio-metadata-v6-rc3/plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018-pluto.dfu) |
+| DFU sha256 | `091ec7ded71f84057927dbf4c0a155ee61a1ceb4166e8fa2aca352685ef4aa23` |
+| source bundle | [`plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018.tar.gz`](https://github.com/misko/plutosdr-fw/releases/download/v0.39-plutoplus-spf-libiio-metadata-v6-rc3/plutoplus-spf-libiio-metadata-v6-rc3-ff999e906018.tar.gz) |
+| bundle sha256 | `5242b95ae6903d8246c9afa6079681c62b22efa42568ff87e91a326ea14b5a34` |
+| build | [CI run `31987898232`](https://github.com/misko/plutosdr-fw/actions/runs/31987898232) |
+| detailed plan | [`SPF_LIBIIO_METADATA_V6_RC3.md`](https://github.com/misko/plutosdr-fw/blob/ff999e906018966557e275f8ec96e3c490869de8/SPF_LIBIIO_METADATA_V6_RC3.md) |
+| source manifest | [`libiio-frame-metadata-v6-rc3-source.yaml`](https://github.com/misko/plutosdr-fw/blob/ff999e906018966557e275f8ec96e3c490869de8/manifests/libiio-frame-metadata-v6-rc3-source.yaml) |
+
+### What RC3 changes
+
+For #32, RC3 fixes a confirmed unbounded `pthread_join()` in metadata-sampler
+teardown by imposing a 500 ms deadline and exiting only the owning daemon if
+the worker cannot be safely reclaimed. iiOD is supervised and can restart
+without rebooting Linux. RC3 also records boot and iiOD generations and retains
+kernel-console and userspace pmsg evidence in ramoops across a watchdog reset.
+The reported whole-board reset is real, but the existing evidence does **not**
+prove that the teardown defect caused it; the new diagnostics are intended to
+distinguish a daemon failure, kernel stall, watchdog reset, and power event.
+
+For #33, the kernel exposes the factory eight-byte UID of a confirmed
+W25Q256JV through `spi-nor/unique_id`. Userspace preserves the historical
+Micron serial byte-for-byte and encodes a Winbond UID as
+`winbond-<16 lowercase hex>`. Missing, malformed, all-zero, and all-ones IDs
+fail closed before gadget bind, preventing the former empty-serial and repeated
+empty-hash MAC behavior.
+
+### Validation and promotion blockers
+
+The source graph, native identity fixtures, bounded-teardown unit test, iiOD
+supervisor tests, ARM kernel objects, Pluto DTB, FPGA build, packaged firmware,
+and artifact attestations pass offline. Routed timing is WNS 0.504 ns and WHS
+0.014 ns, with zero failing endpoints.
+
+Promotion still requires RAM-only hardware validation:
+
+1. On one Micron and one W25Q256JV board, verify nonempty, stable, distinct
+   USB/IIO serials; agreement across `/etc/serial`, configfs, and libiio; and
+   distinct locally administered MAC addresses.
+2. Run the exact #32 two-radio, 936-slot repeated retune/capture/close soak with
+   no boot-ID change, unexplained iiOD-generation change, metadata failure, or
+   resource growth.
+3. Force iiOD termination and prove supervised recovery without a boot-ID
+   change and with the iiOD generation advancing.
+4. Force a watchdog reset and prove that the previous kernel console and pmsg
+   records are present in `/sys/fs/pstore`.
+
+## v0.38-plutoplus-spf-libiio-metadata-v5
+
+Hardware-qualified on two PlutoPlus units and persistently flashed on
+2026-08-12. This is the current stable baseline while v6 RC3 remains a
+RAM-only candidate. It adds capture index, hardware sample sequence/time
+anchor, start/end gain and RSSI, and in-frame gain observations to ordinary
+libiio buffers over USB and IP/TCP without changing the IQ byte layout.
+
+| | |
+|---|---|
+| release | [`v0.38-plutoplus-spf-libiio-metadata-v5`](https://github.com/misko/plutosdr-fw/releases/tag/v0.38-plutoplus-spf-libiio-metadata-v5) |
+| firmware source | `d7c87a9a28094ee6f0b23cb47df9ff737b5a69d8` |
+| DFU sha256 | `948b46506febacb087f3955be86015e074f8c0e3370a9dfc6a942e735d97f882` |
+
+The qualified continuous metadata limits were 2 MS/s over USB and 3 MS/s over
+IP/TCP on the tested hardware and network. Both radios passed the complete host
+libiio 0.25 and 0.26 matrices, rebooted from QSPI, retained the exact v5
+identity, and passed the post-reboot USB/TCP metadata smoke. Its later field
+reports are tracked in #32 and #33; v6 RC3 is the candidate corrective release.
 
 ## v0.38-plutoplus-spf-gain-series-v4
 
@@ -265,4 +349,3 @@ MS/s without the RC16 control-rearm failure**, and a 1–30 MS/s ladder complete
 
 Firmware `1f3fe0cb`, gadget `2e8e40ad`, direct-IP gadget `b066059e`, buildroot
 `56b7bc54`. DFU sha256 `88a606f1…`.
-
