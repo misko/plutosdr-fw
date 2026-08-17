@@ -37,16 +37,16 @@ jobs:
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
-      # main retains the hardware-qualified v5 graph; the named RC branch uses
-      # its independently locked candidate graph.
+      # Main carries the promoted v6 graph; the named RC branch remains usable
+      # only for reproducing the independently locked RC4 candidate graph.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'libiio-frame-metadata-v5-source.yaml' ||
+          'libiio-frame-metadata-v6-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-main' ||
+          'plutoplus-spf-libiio-metadata-v6' ||
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
       SPF_RELEASE_STATE: >-
         ${{ github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
