@@ -3,6 +3,7 @@
 #include "spf_gain_sampler.h"
 
 #include "spf_gain_read.h"
+#include "spf_thread_join.h"
 
 #include <iio.h>
 #include <inttypes.h>
@@ -10,6 +11,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
+
+#define SPF_GAIN_SAMPLER_STOP_TIMEOUT_MS UINT32_C(500)
+#define SPF_GAIN_SAMPLER_STUCK_EXIT_STATUS 70
 
 static void consume_credit_locked(spf_gain_sampler_t *sampler)
 {
@@ -306,12 +311,28 @@ void spf_gain_sampler_stop(spf_gain_sampler_t *sampler)
 {
 	if (sampler->thread_started)
 	{
+		int join_error = 0;
 		atomic_store_explicit(
 			&sampler->stop_requested, true, memory_order_relaxed);
 		pthread_mutex_lock(&sampler->mutex);
 		pthread_cond_broadcast(&sampler->credit_cond);
 		pthread_mutex_unlock(&sampler->mutex);
-		pthread_join(sampler->thread, NULL);
+		const spf_thread_join_result_t join_result = spf_thread_join_bounded(
+			sampler->thread, SPF_GAIN_SAMPLER_STOP_TIMEOUT_MS, &join_error);
+		if (join_result != SPF_THREAD_JOIN_OK)
+		{
+			fprintf(stderr,
+				"metadata sampler teardown did not complete within %u ms "
+				"(result=%d error=%d); terminating for supervised recovery\n",
+				SPF_GAIN_SAMPLER_STOP_TIMEOUT_MS,
+				(int)join_result,
+				join_error);
+			fflush(NULL);
+			/* The worker may still reference sampler and libiio state. There
+			 * is no memory-safe in-process recovery after a timed-out join.
+			 */
+			_exit(SPF_GAIN_SAMPLER_STUCK_EXIT_STATUS);
+		}
 		sampler->thread_started = false;
 	}
 	if (sampler->credit_cond_initialized)

@@ -15,6 +15,7 @@ add_library(spf_gain_observation STATIC
 	spf_gain_read.c
 	spf_gain_sampler.c
 	spf_rssi_read.c
+	spf_thread_join.c
 	spf_time_anchor.c)
 target_include_directories(spf_gain_observation PUBLIC
 	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
@@ -53,7 +54,6 @@ add_executable(sdr_usb_gadget
     thread_write.c
     spf_control_policy.c
     spf_runtime_status.c
-    spf_thread_join.c
     utils.c
 )
 target_link_libraries(sdr_usb_gadget
