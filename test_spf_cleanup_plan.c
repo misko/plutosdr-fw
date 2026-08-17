@@ -27,6 +27,7 @@ int main(void)
 		SPF_RX_RESOURCE_AIO_EVENTFD,
 		SPF_RX_RESOURCE_USB_BUFFERS,
 		SPF_RX_RESOURCE_STATS_TIMER,
+		SPF_RX_RESOURCE_FINITE_TRANSFER_TIMER,
 	};
 	uint32_t acquired = 0;
 
@@ -40,6 +41,9 @@ int main(void)
 		check_prefix(acquired);
 	}
 
+	assert(spf_rx_cleanup_next(acquired) ==
+		SPF_RX_RESOURCE_FINITE_TRANSFER_TIMER);
+	acquired &= ~(uint32_t)SPF_RX_RESOURCE_FINITE_TRANSFER_TIMER;
 	assert(spf_rx_cleanup_next(acquired) == SPF_RX_RESOURCE_STATS_TIMER);
 	acquired &= ~(uint32_t)SPF_RX_RESOURCE_STATS_TIMER;
 	assert(spf_rx_cleanup_next(acquired) == SPF_RX_RESOURCE_AIO_CONTEXT);

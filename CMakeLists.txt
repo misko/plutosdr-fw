@@ -109,7 +109,8 @@ if (BUILD_HOST_TESTS)
         test_spf_gain_sampler.c
         spf_gain_sampler.c
 		spf_gain_read.c
-		spf_rssi_read.c)
+		spf_rssi_read.c
+		spf_thread_join.c)
     target_link_libraries(test_spf_gain_sampler iio pthread)
     add_test(NAME spf_gain_sampler COMMAND test_spf_gain_sampler)
 
@@ -134,6 +135,11 @@ if (BUILD_HOST_TESTS)
 
     add_executable(test_spf_cleanup_plan test_spf_cleanup_plan.c)
     add_test(NAME spf_cleanup_plan COMMAND test_spf_cleanup_plan)
+
+	add_executable(test_spf_finite_transfer_policy
+		test_spf_finite_transfer_policy.c)
+	add_test(NAME spf_finite_transfer_policy
+		COMMAND test_spf_finite_transfer_policy)
 
     add_executable(test_spf_runtime_status
         test_spf_runtime_status.c

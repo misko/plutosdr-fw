@@ -20,11 +20,13 @@ typedef enum
 	SPF_RX_RESOURCE_AIO_EVENTFD = UINT32_C(1) << 4,
 	SPF_RX_RESOURCE_USB_BUFFERS = UINT32_C(1) << 5,
 	SPF_RX_RESOURCE_STATS_TIMER = UINT32_C(1) << 6,
+	SPF_RX_RESOURCE_FINITE_TRANSFER_TIMER = UINT32_C(1) << 7,
 } spf_rx_resource_t;
 
 static inline spf_rx_resource_t spf_rx_cleanup_next(uint32_t acquired)
 {
 	static const spf_rx_resource_t order[] = {
+		SPF_RX_RESOURCE_FINITE_TRANSFER_TIMER,
 		SPF_RX_RESOURCE_STATS_TIMER,
 		SPF_RX_RESOURCE_AIO_CONTEXT,
 		SPF_RX_RESOURCE_USB_BUFFERS,

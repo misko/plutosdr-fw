@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <pthread.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,6 +35,7 @@
 #include "spf_rssi_read.h"
 #include "spf_buffer_policy.h"
 #include "spf_cleanup_plan.h"
+#include "spf_finite_transfer_policy.h"
 #include "spf_gain_sampler.h"
 #include "spf_iio_handoff_policy.h"
 #include "spf_radio_frame_v3.h"
@@ -47,6 +49,8 @@
 #ifndef STATS_PERIOD_SECS
 #define STATS_PERIOD_SECS (5)
 #endif
+
+#define FINITE_USB_WRITE_TIMEOUT_SECS (5)
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -112,6 +116,10 @@ typedef struct
 
 	/* AIO completion eventfd */
 	int aio_eventfd;
+	uint32_t writes_pending;
+
+	/* Detect a finite write stranded by a host-side link loss. */
+	int finite_transfer_timerfd;
 
 	/* List of buffers */
 	usb_buf_t* buffers[SPF_USB_BUFFER_LIMIT];
@@ -146,6 +154,7 @@ extern bool debug;
 /* Private functions */
 static int handle_eventfd_thread(state_t *state);
 static int handle_eventfd_aio(state_t *state);
+static int handle_finite_transfer_timeout(state_t *state);
 static int handle_iio_buffer(state_t *state);
 #if GENERATE_STATS
 static int handle_stats_timer(state_t *state);
@@ -156,6 +165,10 @@ static void record_fatal_error(
 	state_t *state,
 	spf_error_subsystem_t subsystem,
 	int error_number);
+static void request_gadget_recovery(
+	state_t *state,
+	int error_number,
+	const char *reason);
 static struct iio_buffer *create_rx_buffer_after_iio_handoff(
 	struct iio_device *device,
 	size_t sample_count);
@@ -179,6 +192,7 @@ void *THREAD_READ_Entrypoint(void *args)
 	state.epoll_fd = -1;
 	state.iio_poll_fd = -1;
 	state.aio_eventfd = -1;
+	state.finite_transfer_timerfd = -1;
 	#if GENERATE_STATS
 	state.stats_timerfd = -1;
 	#endif
@@ -506,6 +520,25 @@ void *THREAD_READ_Entrypoint(void *args)
 		DEBUG_PRINT("Registered aio completion eventfd with with epoll :-)\n");
 	}
 
+	if (state.metadata_enabled)
+	{
+		state.finite_transfer_timerfd = timerfd_create(CLOCK_MONOTONIC, 0);
+		if (state.finite_transfer_timerfd < 0)
+		{
+			perror("Failed to open finite-transfer watchdog timerfd");
+			goto cleanup;
+		}
+		state.acquired_resources |= SPF_RX_RESOURCE_FINITE_TRANSFER_TIMER;
+		epoll_event.events = EPOLLIN;
+		epoll_event.data.ptr = handle_finite_transfer_timeout;
+		if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD,
+				state.finite_transfer_timerfd, &epoll_event) < 0)
+		{
+			perror("Failed to register finite-transfer watchdog timerfd");
+			goto cleanup;
+		}
+	}
+
 	/* Init ring buffer */
 	RING_BUFFER_Init(&state.ring_buf_ctx, state.buffer_count);
 
@@ -748,6 +781,11 @@ static void cleanup_state(state_t *state)
 				state->stats_timerfd = -1;
 				#endif
 				break;
+			case SPF_RX_RESOURCE_FINITE_TRANSFER_TIMER:
+				if (state->finite_transfer_timerfd >= 0)
+					close(state->finite_transfer_timerfd);
+				state->finite_transfer_timerfd = -1;
+				break;
 			case SPF_RX_RESOURCE_AIO_CONTEXT:
 				/* Cancel pending writes before freeing their backing buffers. */
 				io_destroy(state->io_ctx);
@@ -830,26 +868,21 @@ static int handle_eventfd_aio(state_t *state)
 		/* Shorthand ptr */
 		struct io_event *event = &events[i];
 		const long completion_result = (long)event->res;
-		const bool completion_ok =
-			completion_result >= 0 &&
-			state->usb_buffer_size == (size_t)completion_result;
+		const bool completion_ok = !spf_usb_completion_requires_recovery(
+			completion_result, state->usb_buffer_size);
 
 		/* Check for success */
-		if (state->usb_buffer_size != (size_t)event->res)
+		if (!completion_ok)
 		{
-			/* Not all data was written, or write failed, check if failure was down to configuration being disabled */
-			if (-ESHUTDOWN != completion_result)
-			{
-				fprintf(stderr, "USB write completed with error, res: %ld, res2: %ld\n", event->res, event->res2);
-				spf_runtime_status_increment(
-					state->thread_args->runtime_status,
-					SPF_STATUS_COUNTER_SHORT_WRITE);
-				record_fatal_error(
-					state,
-					SPF_ERROR_SUBSYSTEM_USB_COMPLETION,
-					completion_result < 0 ? (int)-completion_result : EIO);
-				completion_failed = true;
-			}
+			fprintf(stderr, "USB write completed with error, res: %ld, res2: %ld\n", event->res, event->res2);
+			spf_runtime_status_increment(
+				state->thread_args->runtime_status,
+				SPF_STATUS_COUNTER_SHORT_WRITE);
+			request_gadget_recovery(
+				state,
+				completion_result < 0 ? (int)-completion_result : EIO,
+				"finite USB write failed");
+			completion_failed = true;
 		}
 
 		/* Retrieve buffer */
@@ -877,9 +910,34 @@ static int handle_eventfd_aio(state_t *state)
 
 		/* Return to ring buffer */
 		state->ring_buf_data[RING_BUFFER_Put(&state->ring_buf_ctx)] = buf;
+		if (state->writes_pending > 0)
+			state->writes_pending--;
+	}
+
+	if (spf_finite_transfer_is_complete(
+			state->metadata_enabled,
+			state->frames_remaining,
+			state->writes_pending))
+	{
+		/* Release IIO/CMA as soon as the host owns every requested frame. */
+		state->keep_running = false;
 	}
 
 	return completion_failed ? -1 : 0;
+}
+
+static int handle_finite_transfer_timeout(state_t *state)
+{
+	uint64_t expirations;
+	if (read(state->finite_transfer_timerfd, &expirations,
+			sizeof(expirations)) < 0)
+	{
+		perror("Failed to read finite-transfer watchdog timerfd");
+		return -1;
+	}
+	request_gadget_recovery(
+		state, ETIMEDOUT, "finite USB write timed out");
+	return -1;
 }
 
 static int handle_iio_buffer(state_t *state)
@@ -1244,6 +1302,7 @@ static int handle_iio_buffer(state_t *state)
 				errno);
 			return -1;
 		}
+		state->writes_pending++;
 
 		if (state->metadata_enabled)
 		{
@@ -1260,6 +1319,20 @@ static int handle_iio_buffer(state_t *state)
 					return -1;
 				}
 				state->iio_poll_registered = false;
+				struct itimerspec watchdog = {
+					.it_value = {
+						.tv_sec = FINITE_USB_WRITE_TIMEOUT_SECS,
+					},
+				};
+				if (timerfd_settime(state->finite_transfer_timerfd, 0,
+						&watchdog, NULL) < 0)
+				{
+					perror("Failed to arm finite-transfer watchdog");
+					request_gadget_recovery(
+						state, errno,
+						"finite-transfer watchdog arm failed");
+					return -1;
+				}
 				DEBUG_PRINT("Finite RX capture complete\n");
 			}
 		}
@@ -1288,6 +1361,22 @@ static int handle_iio_buffer(state_t *state)
 	}
 
 	return 0;
+}
+
+static void request_gadget_recovery(
+	state_t *state,
+	int error_number,
+	const char *reason)
+{
+	fprintf(stderr, "%s; requesting supervised gadget recovery\n", reason);
+	record_fatal_error(
+		state, SPF_ERROR_SUBSYSTEM_USB_COMPLETION, error_number);
+	state->keep_running = false;
+	/* Worker threads inherit a fully blocked signal mask, so SIGTERM is handled
+	 * by main and interrupts its epoll wait. Normal process cleanup then runs
+	 * before the supervisor performs the bounded UDC rebind. */
+	if (kill(getpid(), SIGTERM) < 0)
+		perror("Failed to signal gadget recovery");
 }
 
 #if GENERATE_STATS
