@@ -1,7 +1,7 @@
 name: Kalman main firmware build
 
 # Security boundary: this workflow never runs for pull requests. Manual runs
-# are restricted to main and the reviewed v6 RC3 source-lock branch.
+# are restricted to main and the reviewed v6 RC4 source-lock branch.
 on:
   push:
     branches: [main]
@@ -33,7 +33,7 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' ||
       (github.event_name == 'workflow_dispatch' &&
-       github.ref == 'refs/heads/codex/firmware-v6-rc3-stability-identity')
+       github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety')
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
@@ -43,11 +43,11 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'libiio-frame-metadata-v5-source.yaml' ||
-          'libiio-frame-metadata-v6-rc3-source.yaml') }}
+          'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-main' ||
-          'plutoplus-spf-libiio-metadata-v6-rc3' }}
+          'plutoplus-spf-libiio-metadata-v6-rc4' }}
       SPF_RELEASE_STATE: >-
         ${{ github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
     outputs:
