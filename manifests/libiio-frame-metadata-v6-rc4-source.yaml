@@ -16,17 +16,17 @@ libiio_0_26_source: d5695c3eaa9cec99cc6f7b2c91565555044b907a
 libiio_0_26_repo: https://github.com/misko/libiio.git
 libiio_0_26_ref: refs/tags/spf-frame-metadata-source/v0.26-final-v3
 
-gadget_source: 907978b0f770add6f97693c5afcb8c1a0b762882
+gadget_source: ce671c6114a83e619d4d601f4f7a137feb089d32
 gadget_repo: https://github.com/misko/plutosdr-fw.git
-gadget_ref: refs/tags/libiio-metadata-v6-rc3-source/gadget
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v2
 
 ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 6a72ad8e5c9689cc23b6636670e174e84bfab446
+submodule_buildroot: 186aed3aa88c657b5f83ce026774a4624ef64970
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/libiio-metadata-v6-rc4-source/buildroot-v2
+submodule_buildroot_ref: refs/tags/libiio-metadata-v6-rc4-source/buildroot-v3
 
 submodule_hdl: 5360aeac83013e8e3aa0b5d4e0a9b32280fe1677
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
