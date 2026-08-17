@@ -65,6 +65,25 @@ and the existing supervised UDC rebind. The same investigation found and fixed
 a provenance error where the manifest named gadget `907978b0` while Buildroot
 compiled `ab270f9e`; the corrected graph consistently pins gadget `1bbe9f0e`.
 
+The corrected RAM-only candidate at commit `e9e675e6d` was built and attested
+by [run `32002024507`](https://github.com/misko/plutosdr-fw/actions/runs/32002024507)
+(DFU SHA-256
+`a92aa9c02cba8292a7f8bb034db455f164cb5428c61ecd14941f70ee45c5763f`).
+It completed two exact-image RAM boot epochs on three Micron boards and the
+Winbond board. Every boot exposed 2R2T and 64 MiB CMA with TX1/TX2 at `-80 dB`
+and all DDS controls zero; the Winbond identity and static `.14` address
+survived both boots.
+
+Receive qualification passed 60 production-size 4 MiB lifecycle captures,
+all-four gadget crash/recovery, the 1/3/10/30 MS/s standard-libiio TCP matrix,
+protocol-v3/Zarr, direct-IP malformed/one-frame gates, and the physical TX2
+loopback suite. A deliberately missing host STOP reproduced the formerly fatal
+condition and automatically re-enumerated the same front-port serial/path in
+12 seconds without a Linux reboot or 32 MiB CMA leak. The candidate remains
+RAM-only: simultaneous four-radio 4 MiB USB and the 256 MiB direct-IP burst
+buffer still require transient host sudo tuning, and injected identity-failure
+recovery remains to be exercised.
+
 ## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
 
 Published as a prerelease on 2026-08-17. This is a **hardware-untested,

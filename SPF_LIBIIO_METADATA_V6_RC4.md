@@ -86,6 +86,54 @@ Buildroot now pins the manifest-declared gadget source; the previous RC4 build
 configuration incorrectly compiled `ab270f9e` while its source manifest named
 `907978b0`.
 
+## Four-board qualification checkpoint (2026-08-17)
+
+CI run [`32002024507`](https://github.com/misko/plutosdr-fw/actions/runs/32002024507)
+built and attested firmware commit `e9e675e6dd89b525cdae2dc112b36ee6ce190e9b`.
+The RAM-only DFU SHA-256 is
+`a92aa9c02cba8292a7f8bb034db455f164cb5428c61ecd14941f70ee45c5763f`.
+
+The exact image completed two independently identified RAM boots on all four
+attached radios. On both boots every board retained its serial and physical
+USB path, exposed 2R2T, reserved 64 MiB CMA, initialized TX1/TX2 to `-80 dB`,
+and initialized all eight DDS raw controls to zero before a host mute command.
+The Winbond board retained its static Ethernet address `192.168.1.14`.
+
+| USB path | Serial | LAN |
+|---|---|---|
+| `3-4` | `104000bac4950008230026001b440a003a` | `192.168.1.17` |
+| `3-8` | `1040007c4a94000211000b009186843ef2` | `192.168.1.18` |
+| `3-10.2` | `winbond-db620818a328172c` | `192.168.1.14` |
+| `3-11` | `104000b29905000e17000800065934759d` | `192.168.1.15` |
+
+Hardware green so far:
+
+- 60 repeated production-size 4 MiB direct-USB lifecycle captures, including
+  30 consecutive captures on the previously disappearing front-port board;
+- a deliberately omitted host STOP caused automatic watchdog recovery in 12
+  seconds: USB devnum `103` became `104`, while path, serial, Linux boot ID,
+  Ethernet, TX mute, and healthy CMA ownership were preserved;
+- deliberate direct-USB child crashes recovered on all four boards with new
+  process nonces, unchanged boot IDs and paths, standard USB-IIO present, and
+  three ordered 4 MiB frames after each recovery;
+- all 32 ordinary/metadata standard-libiio TCP cells passed at 1, 3, 10, and
+  30 MS/s; direct-IP malformed-control and one-frame protocol-v3 gates passed
+  on all four LAN addresses;
+- protocol-v3 repeated fresh starts and V7 Zarr round-trip passed. One initial
+  host time-anchor observation measured 6.76 ms against a 5 ms bound; three
+  immediate isolated retries measured 0.55--0.68 ms and the all-four rerun
+  passed with a 2.98 ms worst case;
+- TX2 physical loopback passed on all four boards with 20 dB declared minimum
+  attenuation and a strongest TX setting of `-10 dB`. Cyclic DMA-to-DAC,
+  manual-gain tone quality, slow-attack AGC, and final `-80 dB` mute all passed.
+
+Promotion remains blocked, without a radio failure, by two host limits that
+require sudo: `usbfs_memory_mb=16` blocks simultaneous four-radio 4 MiB USB
+capture, and `net.core.rmem_max=4194304` limits the effective direct-IP receive
+buffer to 8 MiB instead of the required 256 MiB for a 16-frame burst. The
+labelled network/ACM-only recovery path must also pass an injected identity
+failure before persistent installation.
+
 ## Red/green evidence
 
 | Gate | RC3 red | RC4 green acceptance |
