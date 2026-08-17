@@ -126,13 +126,17 @@ Hardware green so far:
 - TX2 physical loopback passed on all four boards with 20 dB declared minimum
   attenuation and a strongest TX setting of `-10 dB`. Cyclic DMA-to-DAC,
   manual-gain tone quality, slow-attack AGC, and final `-80 dB` mute all passed.
+- a RAM-only identity-reader fault was injected on the Winbond board. It
+  re-enumerated as `identity-recovery-<boot-id>` with configuration
+  `IDENTITY-RECOVERY/RNDIS/MSD/ACM`; Ethernet `.14`, ACM, storage, and TX mute
+  remained available, while iiOD, direct SDR, and both RF data interfaces were
+  absent. Removing the injection restored the real serial and a green 4 MiB
+  direct-USB capture without rebooting Linux.
 
 Promotion remains blocked, without a radio failure, by two host limits that
 require sudo: `usbfs_memory_mb=16` blocks simultaneous four-radio 4 MiB USB
 capture, and `net.core.rmem_max=4194304` limits the effective direct-IP receive
-buffer to 8 MiB instead of the required 256 MiB for a 16-frame burst. The
-labelled network/ACM-only recovery path must also pass an injected identity
-failure before persistent installation.
+buffer to 8 MiB instead of the required 256 MiB for a 16-frame burst.
 
 ## Red/green evidence
 

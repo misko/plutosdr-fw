@@ -81,8 +81,10 @@ loopback suite. A deliberately missing host STOP reproduced the formerly fatal
 condition and automatically re-enumerated the same front-port serial/path in
 12 seconds without a Linux reboot or 32 MiB CMA leak. The candidate remains
 RAM-only: simultaneous four-radio 4 MiB USB and the 256 MiB direct-IP burst
-buffer still require transient host sudo tuning, and injected identity-failure
-recovery remains to be exercised.
+buffer still require transient host sudo tuning. Injected identity failure
+also passed on the Winbond board: recovery exposed only labelled
+network/ACM/storage interfaces with RF services withheld, then restored the
+real serial and RF interfaces after removing the RAM-only injection.
 
 ## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
 
