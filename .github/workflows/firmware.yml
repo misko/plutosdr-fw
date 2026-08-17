@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
       - name: Verify pins, URLs, refs, and overrides
         run: |
-          ./scripts/check_source_graph.sh manifests/libiio-frame-metadata-v5-source.yaml
+          ./scripts/check_source_graph.sh manifests/libiio-frame-metadata-v6-source.yaml
 
   gadget-tests:
     name: USB and IP gadget unit tests
