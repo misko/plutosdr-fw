@@ -34,11 +34,23 @@ RAM-booted radio appear to disappear.
 
 RC4 enables factory UID opcode `4Bh` for both FV and JV variants. FV global
 4-byte-address mode uses the required fifth dummy byte; JV keeps four dummy
-bytes with dedicated 4-byte opcodes. Invalid identities remain rejected, but a
-startup identity failure now exposes only an explicitly labelled, per-boot
-network/ACM recovery gadget. USB-IIO and direct-SDR functions remain withheld,
-so the unit is reachable for diagnosis without presenting an unsafe radio
-identity.
+bytes with dedicated 4-byte opcodes. A hardware red on the attached Zynq board
+showed that its QSPI controller deliberately bypasses SFDP and therefore never
+runs the part's BFPT hook. RC4 installs the common UID reader from the
+unconditional post-SFDP hook while retaining BFPT only for FV/JV addressing
+discrimination. A source regression test covers that Zynq-specific path.
+
+Invalid identities remain rejected, but a startup identity failure now exposes
+only an explicitly labelled, per-boot network/ACM recovery gadget. USB-IIO and
+direct-SDR functions remain withheld, so the unit is reachable for diagnosis
+without presenting an unsafe radio identity.
+
+The same board carries a newer 2023 U-Boot whose stored `adi_loadvals` has a
+malformed `test -n ${attr_val} = ad9364` condition. With the redundant
+`attr_name`/`attr_val` compatibility override present, every boot rewrites
+`mode=1r1t`. Removing only that redundant pair while retaining
+`compatible=ad9361` makes `mode=2r2t` survive a real U-Boot/RC4 RAM boot; both TX
+gain controls then initialize to `-80 dB` and all eight DDS controls to zero.
 
 ### #32: reset containment and evidence
 
@@ -52,7 +64,7 @@ boot correlation, and ramoops reset evidence unchanged.
 | Boot attenuation | Active TX gain reads `-10 dB` | Every active TX reads exactly `-80 dB` before host services |
 | DDS state | DDS disable was assumed | Every exposed DDS raw control reads zero |
 | Startup failure | Missing identity leaves no runtime USB interfaces | Labelled network/ACM recovery; RF data functions absent |
-| Winbond identity | W25Q256FV has blank USB/IIO serial | Stable nonempty `winbond-<16 hex>` serial and unique MAC |
+| Winbond identity | Zynq SFDP bypass omits `spi-nor/unique_id` | Stable nonempty `winbond-<16 hex>` serial and unique MAC |
 | Micron regression | Three boards have stable historical serials | Serial remains byte-for-byte unchanged |
 | 2R2T topology | Recovered Winbond board reverted to `1r1t` | Two RX scan paths and two TX gain controls on every board |
 | #32 stress | Repeated metadata teardown could reset a board | No boot-ID change; supervised iiOD recovery is bounded |

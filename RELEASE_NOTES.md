@@ -18,6 +18,7 @@
 | `gain-series-v4` | 2026-08-11 | superseded | RC17's source with the version label corrected |
 | **`libiio-metadata-v5`** | 2026-08-12 | **current hardware-qualified** | frame metadata through the standard libiio USB and IP/TCP transports |
 | `libiio-metadata-v6-rc3` | 2026-08-17 | **RAM-only candidate** | bounded teardown/reset diagnostics and Winbond identity support for #32/#33 |
+| `libiio-metadata-v6-rc4` | 2026-08-17 | **unreleased, RAM-only** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -25,6 +26,34 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.39-plutoplus-spf-libiio-metadata-v6-rc4 (unreleased)
+
+RC4 is under four-board RAM-only qualification for
+[issue #32](https://github.com/misko/plutosdr-fw/issues/32),
+[issue #33](https://github.com/misko/plutosdr-fw/issues/33), and
+[issue #34](https://github.com/misko/plutosdr-fw/issues/34). It must not be
+written to serial flash until the complete hardware matrix passes.
+
+RC4 initializes every active AD9361 TX path at exactly `-80 dB`, then an
+independent startup gate zeros and verifies every DDS control and writes and
+verifies every TX gain before exposing USB services. A mute failure returns to
+RAM DFU. An identity failure exposes a clearly labelled, per-boot Ethernet/ACM
+diagnostic gadget while withholding USB-IIO and direct-SDR functions.
+
+The attached blank-serial W25Q256 hardware exposed a second RC4 red: Zynq QSPI
+skips SFDP parsing, so a UID reader installed only by the BFPT callback never
+appears in sysfs. The corrected candidate installs the common FV/JV opcode
+`4Bh` UID reader in the unconditional post-SFDP fixup and retains the BFPT hook
+only for addressing-mode discrimination. A source regression test now guards
+that controller-specific path.
+
+The Winbond board's 2023 U-Boot also contains a malformed legacy `attr_val`
+test that rewrites `mode=1r1t`. Removing the redundant `attr_name`/`attr_val`
+pair while retaining `compatible=ad9361` was red/green tested across a real
+U-Boot/RC4 RAM reboot: `mode=2r2t` persisted, both TX gains read `-80 dB`, and
+all eight DDS values read zero. Detailed acceptance criteria and live evidence
+are maintained in [`SPF_LIBIIO_METADATA_V6_RC4.md`](SPF_LIBIIO_METADATA_V6_RC4.md).
 
 ## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
 

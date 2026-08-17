@@ -69,6 +69,8 @@ printf 'Persistent Buildroot cache: %s\n' "$BR2_DL_DIR"
 
 scripts/test_pluto_pstore_layout.sh \
 	2>&1 | tee "$artifact_real/pstore-layout.log"
+scripts/test_winbond_uid_fixup.sh \
+    2>&1 | tee "$artifact_real/winbond-uid-fixup.log"
 buildroot/board/pluto/test_pluto_mute_tx.sh \
     2>&1 | tee "$artifact_real/boot-tx-mute.log"
 buildroot/board/pluto/test_pluto_boot_safety.sh \
