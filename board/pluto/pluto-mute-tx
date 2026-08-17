@@ -1,0 +1,69 @@
+#!/bin/sh
+
+# Establish a fail-closed RF state before any host-facing service is exposed.
+# Keep the root overridable so the behavior can be tested without hardware.
+
+IIO_ROOT=${PLUTO_IIO_ROOT:-/sys/bus/iio/devices}
+phy=
+dds=
+
+for candidate in "$IIO_ROOT"/*; do
+	[ -r "$candidate/name" ] || continue
+	[ "$(cat "$candidate/name")" = "ad9361-phy" ] || continue
+	phy=$candidate
+	break
+done
+
+if [ -z "$phy" ]; then
+	printf '%s\n' "pluto-mute-tx: ad9361-phy was not found" >&2
+	exit 1
+fi
+
+for candidate in "$IIO_ROOT"/*; do
+	[ -r "$candidate/name" ] || continue
+	[ "$(cat "$candidate/name")" = "cf-ad9361-dds-core-lpc" ] || continue
+	dds=$candidate
+	break
+done
+
+if [ -z "$dds" ]; then
+	printf '%s\n' "pluto-mute-tx: AD9361 DDS core was not found" >&2
+	exit 1
+fi
+
+dds_count=0
+for control in "$dds"/out_altvoltage*_raw; do
+	[ -e "$control" ] || continue
+	printf '0\n' > "$control" || exit 1
+	[ "$(cat "$control")" = "0" ] || {
+		printf 'pluto-mute-tx: DDS control did not mute: %s\n' "$control" >&2
+		exit 1
+	}
+	dds_count=$((dds_count + 1))
+done
+
+if [ "$dds_count" -eq 0 ]; then
+	printf '%s\n' "pluto-mute-tx: no DDS controls were found" >&2
+	exit 1
+fi
+
+gain_count=0
+for control in "$phy"/out_voltage*_hardwaregain; do
+	[ -e "$control" ] || continue
+	printf '%s\n' '-80' > "$control" || exit 1
+	case "$(cat "$control")" in
+		-80|-80.000000*) ;;
+		*)
+			printf 'pluto-mute-tx: TX gain did not mute: %s\n' "$control" >&2
+			exit 1
+			;;
+	esac
+	gain_count=$((gain_count + 1))
+done
+
+if [ "$gain_count" -eq 0 ]; then
+	printf '%s\n' "pluto-mute-tx: no TX gain controls were found" >&2
+	exit 1
+fi
+
+printf 'TX muted: dds_controls=%s tx_channels=%s\n' "$dds_count" "$gain_count"

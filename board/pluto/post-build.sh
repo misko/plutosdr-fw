@@ -59,6 +59,7 @@ ${INSTALL} -D -m 0755 ${BOARD_DIR}/update_frm.sh ${TARGET_DIR}/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/udc_handle_suspend.sh ${TARGET_DIR}/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/sdr_usb_gadget_supervisor.sh ${TARGET_DIR}/usr/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/pluto-read-identity ${TARGET_DIR}/usr/sbin/
+${INSTALL} -D -m 0755 ${BOARD_DIR}/pluto-mute-tx ${TARGET_DIR}/usr/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/iiod_supervisor.sh ${TARGET_DIR}/usr/sbin/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S10mdev ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S14diagnostics ${TARGET_DIR}/etc/init.d/

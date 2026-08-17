@@ -65,10 +65,18 @@ create_iiod_context_attributes() {
 case "$1" in
   start)
 	echo -n "Starting UDC Gadgets: "
+	if ! /usr/sbin/pluto-mute-tx
+	then
+		logger -t S23udc "TX mute failed; returning to RAM DFU recovery"
+		echo "FAIL (TX mute; entering RAM DFU recovery)"
+		/usr/sbin/device_reboot ram
+		exit 1
+	fi
 	if ! serial=$(/usr/sbin/pluto-read-identity)
 	then
-		logger -t S23udc "refusing to bind USB gadget without a trustworthy board identity"
-		echo "FAIL (missing board identity)"
+		logger -t S23udc "identity unavailable; returning to RAM DFU recovery"
+		echo "FAIL (missing board identity; entering RAM DFU recovery)"
+		/usr/sbin/device_reboot ram
 		exit 1
 	fi
 
