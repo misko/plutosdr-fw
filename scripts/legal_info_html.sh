@@ -147,21 +147,25 @@ strstr () {
 package_table_items () {
 	url=$5
 
-	command curl -h > /dev/null 2>&1
-	if [ "$?" = "0" ] ; then
+	# The legal report is built entirely from local Buildroot output.  Checking
+	# project links is optional enrichment and must not make a reproducible
+	# firmware build depend on third-party web sites being responsive.
+	if [ "${LEGAL_INFO_CHECK_URLS:-0}" = "1" ] && command -v curl > /dev/null 2>&1 ; then
 		if $(strstr $url sourceforge) ; then
 			url=$(echo ${url} | sed -e 's/downloads\.//' -e 's/project/projects/')
 		fi
-		while [ 1 ] ; do
+		redirect_count=0
+		while [ "${redirect_count}" -lt 10 ] ; do
 			if $(strstr $url "ftp://") ; then
 				break
 			fi
 			# We should use curl's -L, but then we couldn't track things
-			tmp=$(curl -IsS $url)
+			tmp=$(curl -IsS --connect-timeout 5 --max-time 15 --retry 0 -- "$url")
 			if [ $(echo "$tmp" | head -1 | grep -E "301|302" | wc -l) -gt 0 ] ; then
 				_url=$url
 				url=$(echo "$tmp" | grep -i "Location:" | awk '{print $2}' | sed -e 's/^[ \t]*//;s/[ \t]*$//')
 				url=${url%$'\r'}
+				redirect_count=$((redirect_count + 1))
 				if [[ $url != http* ]] ; then
 					url=$_url
 					break
@@ -177,6 +181,9 @@ package_table_items () {
 				break
 			fi
 		done
+		if [ "${redirect_count}" -eq 10 ] ; then
+			echo "stopped after 10 redirects while trying ${url}"
+		fi
 	fi
 
 	echo "<tr>" >> ${FILE}
