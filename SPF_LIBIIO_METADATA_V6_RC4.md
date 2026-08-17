@@ -159,6 +159,30 @@ four-board stress above passed.
 The complete RAM-only promotion matrix is now green. Persistent serial-flash
 installation remains a separate, explicitly authorized release step.
 
+## Formal RC4-labelled artifact
+
+CI run [`32040690713`](https://github.com/misko/plutosdr-fw/actions/runs/32040690713)
+rebuilt and attested firmware commit
+`28643c5f185a894a36ac0f37c2271f23acfd9f0e` with embedded `device-fw`
+`v0.39-plutoplus-spf-libiio-metadata-v6-rc4`. The formal DFU SHA-256 is
+`dda63fae2fbc969cbb980eb188c621b14fcb55c9d849c36f28e8e4294186d27a`.
+
+That exact DFU was RAM-booted one path at a time on all four boards. Every
+board returned on its expected path and serial with a new boot ID, 2R2T,
+64 MiB CMA, gadget build `1bbe9f0e`, TX1/TX2 at `-80 dB`, and eight zeroed DDS
+controls. The full direct-USB hardware file passed 6/6, including ten 4 MiB
+lifecycle captures per board, contiguous multi-frame checks, and both
+simultaneous tests. The formal image repeated the 16-frame/64 MiB direct-IP
+burst on `.14` at 21.88 MiB/s with zero duplicate, expired, rejected, or
+socket-overflow counts. All USB device numbers remained unchanged through the
+post-test watchdog window.
+
+The RAM loader must download and then issue DFU detach (`dfu-util -e`). A USB
+reset (`-R`) was red-tested and returned a Micron board to its persistent v5
+image instead of entering the downloaded RAM image; version and TX-gain
+readback detected the mismatch before testing continued. QSPI was never
+written.
+
 ## Red/green evidence
 
 | Gate | RC3 red | RC4 green acceptance |

@@ -371,11 +371,20 @@ dfu-util -l -d 0456:b673,0456:b674
 With exactly one intended radio connected, write only `firmware.dfu` and reset:
 
 ```bash
-sudo dfu-util -R \
+sudo dfu-util \
   -d 0456:b673,0456:b674 \
   -a firmware.dfu \
   -D "$dfu_image"
+sudo dfu-util \
+  -d 0456:b673,0456:b674 \
+  -a firmware.dfu \
+  -e
 ```
+
+Use DFU detach (`-e`) to jump into the downloaded RAM image. Do not use `-R`
+for this step: on the tested Pluto+ bootloader, USB reset restarted the
+processor from the persistently installed QSPI image and discarded the RAM
+download. Always verify `/opt/VERSIONS` and the boot ID after enumeration.
 
 If more than one radio is present, do not run an ambiguous command. Disconnect
 the others or select the intended USB path using `dfu-util -p` after checking

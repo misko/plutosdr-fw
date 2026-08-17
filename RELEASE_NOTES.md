@@ -27,7 +27,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.39-plutoplus-spf-libiio-metadata-v6-rc4 (unreleased)
+## v0.39-plutoplus-spf-libiio-metadata-v6-rc4 — 2026-08-17 — **hardware-qualified RAM prerelease**
 
 RC4 is under four-board RAM-only qualification for
 [issue #32](https://github.com/misko/plutosdr-fw/issues/32),
@@ -102,6 +102,20 @@ Injected identity failure also passed on the Winbond board: recovery exposed
 only labelled network/ACM/storage interfaces with RF services withheld, then
 restored the real serial and RF interfaces after removing the RAM-only
 injection.
+
+The explicitly labelled release image was rebuilt from firmware commit
+`28643c5f185a894a36ac0f37c2271f23acfd9f0e` and attested by
+[run `32040690713`](https://github.com/misko/plutosdr-fw/actions/runs/32040690713).
+Its embedded `device-fw` is
+`v0.39-plutoplus-spf-libiio-metadata-v6-rc4`; DFU SHA-256 is
+`dda63fae2fbc969cbb980eb188c621b14fcb55c9d849c36f28e8e4294186d27a`.
+All four exact USB paths then RAM-booted that formal image with their expected
+serials, 2R2T, 64 MiB CMA, TX1/TX2 at `-80 dB`, and all eight DDS controls at
+zero. The complete direct-USB hardware file passed 6/6, including ten
+production lifecycle captures per board and both simultaneous tests. The
+formal image also repeated the `.14` 16-frame direct-IP burst at 21.88 MiB/s
+with zero loss/reassembly/socket-overflow counters. Device numbers remained
+unchanged through the final watchdog window. No QSPI writes were performed.
 
 ## v0.39-plutoplus-spf-libiio-metadata-v6-rc3
 
