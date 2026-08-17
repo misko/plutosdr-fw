@@ -65,6 +65,13 @@ create_iiod_context_attributes() {
 case "$1" in
   start)
 	echo -n "Starting UDC Gadgets: "
+	if ! serial=$(/usr/sbin/pluto-read-identity)
+	then
+		logger -t S23udc "refusing to bind USB gadget without a trustworthy board identity"
+		echo "FAIL (missing board identity)"
+		exit 1
+	fi
+
 	mount configfs -t configfs /sys/kernel/config 2> /dev/null
 
 	mkdir -p $GADGET
@@ -72,13 +79,10 @@ case "$1" in
 	model=`cat /sys/firmware/devicetree/base/model | tr / -`
 	model_variant=`dmesg | grep m25p80 | grep Kbytes | cut -d ' ' -f 3`
 
-	serial=`dmesg | grep SPI-NOR-UniqueID`
-	serial=${serial#*SPI-NOR-UniqueID }
-
 	create_iiod_context_attributes "$model" "$serial" "$model_variant"
 
-	echo $serial > /etc/serial
-	sha1=`echo $serial | sha1sum`
+	printf '%s\n' "$serial" > /etc/serial
+	sha1=$(printf '%s\n' "$serial" | sha1sum)
 
 	echo 0x0456 > $GADGET/idVendor
 	echo $USBPID > $GADGET/idProduct
@@ -86,7 +90,7 @@ case "$1" in
 	mkdir -p $GADGET/strings/0x409
 	echo "Analog Devices Inc." > $GADGET/strings/0x409/manufacturer
 	echo $PRODUCT > $GADGET/strings/0x409/product
-	echo $serial > $GADGET/strings/0x409/serialnumber
+	printf '%s\n' "$serial" > $GADGET/strings/0x409/serialnumber
 
 	mkdir -p $GADGET/functions/ffs.iio_ffs
 	mkdir -p $GADGET/functions/ffs.sdr_gadget_ffs
@@ -122,14 +126,15 @@ case "$1" in
 	ln -s $GADGET/functions/ffs.sdr_gadget_ffs $GADGET/configs/c.1/ffs.sdr_gadget_ffs
 
 	mkdir -p /dev/iio_ffs
-	mount iio_ffs -t functionfs /dev/iio_ffs 2> /dev/null
+	mount -t functionfs -o no_disconnect=1 iio_ffs /dev/iio_ffs 2> /dev/null
 
 	mkdir -p /dev/sdr_gadget_ffs
 	# Keep the composite gadget registered if the direct-USB userspace daemon
 	# exits. The supervisor can then reopen ep0 without disrupting USB-IIO.
 	mount -t functionfs -o no_disconnect=1 sdr_gadget_ffs /dev/sdr_gadget_ffs 2> /dev/null
 
-	start-stop-daemon -S -b -q -m -p /var/run/iiod.pid -x  /usr/sbin/iiod  -- $IIOD_OPTS
+	start-stop-daemon -S -b -q -m -p /var/run/iiod-supervisor.pid \
+		-x /usr/sbin/iiod_supervisor.sh -- $IIOD_OPTS
 	if [ "$SDR_USB_GADGET_DEBUG" == "1" ]
 	then
 		SDR_USB_GADGET_SUPERVISOR_OPTS="-d"
@@ -160,7 +165,7 @@ case "$1" in
 	fi
 
 	echo "" > $GADGET/UDC
-	start-stop-daemon -K -q -p /var/run/iiod.pid 2>/dev/null
+	start-stop-daemon -K -q -p /var/run/iiod-supervisor.pid 2>/dev/null
 	start-stop-daemon -K -q -p /var/run/sdr_usb_gadget.pid 2>/dev/null
 
 	rm $GADGET/configs/c.1/$USB_NET_FUNCTION
@@ -192,4 +197,3 @@ case "$1" in
 esac
 
 exit $?
-

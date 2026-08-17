@@ -1,0 +1,21 @@
+#!/bin/sh
+
+case "$1" in
+  start)
+	mkdir -p /sys/fs/pstore
+	mount -t pstore pstore /sys/fs/pstore 2>/dev/null || true
+	BOOT_ID=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || echo unknown)
+	logger -t boot-diagnostics "boot_id=$BOOT_ID pstore=/sys/fs/pstore"
+	if [ -w /dev/pmsg0 ]; then
+		printf 'boot-diagnostics: boot_id=%s\n' "$BOOT_ID" > /dev/pmsg0 2>/dev/null || true
+	fi
+	;;
+  stop)
+	;;
+  *)
+	echo "Usage: $0 {start|stop}" >&2
+	exit 1
+	;;
+esac
+
+exit 0

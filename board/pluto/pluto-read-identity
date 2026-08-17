@@ -1,0 +1,47 @@
+#!/bin/sh
+
+# Return a stable, hardware-backed board identity. Micron/ST flashes keep the
+# historical value so existing USB serials and MAC addresses do not change.
+
+identity_is_trustworthy()
+{
+	value=$1
+	case "$value" in
+		""|*[!0-9A-Fa-f]*) return 1 ;;
+	esac
+	[ "${#value}" -ge 16 ] || return 1
+	[ -n "$(printf '%s' "$value" | tr -d '0')" ] || return 1
+	[ -n "$(printf '%s' "$value" | tr -d 'fF')" ] || return 1
+	return 0
+}
+
+if [ -n "${PLUTO_IDENTITY_DMESG_FILE:-}" ]; then
+	dmesg_output=$(cat "$PLUTO_IDENTITY_DMESG_FILE" 2>/dev/null || true)
+else
+	dmesg_output=$(dmesg 2>/dev/null || true)
+fi
+
+serial=$(printf '%s\n' "$dmesg_output" |
+	sed -n 's/^.*SPI-NOR-UniqueID[[:space:]]*//p' | tail -n 1)
+if identity_is_trustworthy "$serial"; then
+	printf '%s\n' "$serial"
+	exit 0
+fi
+
+if [ -n "${PLUTO_IDENTITY_UID_FILE:-}" ]; then
+	uid_files=$PLUTO_IDENTITY_UID_FILE
+else
+	uid_files=/sys/bus/spi/devices/*/spi-nor/unique_id
+fi
+
+for uid_file in $uid_files; do
+	[ -r "$uid_file" ] || continue
+	uid=$(od -An -v -tx1 "$uid_file" 2>/dev/null | tr -d '[:space:]')
+	[ "${#uid}" -eq 16 ] || continue
+	identity_is_trustworthy "$uid" || continue
+	printf 'winbond-%s\n' "$uid"
+	exit 0
+done
+
+printf '%s\n' "No trustworthy SPI-NOR identity is available" >&2
+exit 1

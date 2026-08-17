@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-SPF_METADATA_SOURCE_VERSION = ab270f9e3128187372f27de887be65353f9e195d
+SPF_METADATA_SOURCE_VERSION = 907978b0f770add6f97693c5afcb8c1a0b762882
 SPF_METADATA_SOURCE_SITE = $(call github,misko,plutosdr-fw,$(SPF_METADATA_SOURCE_VERSION))
 SPF_METADATA_SOURCE_INSTALL_STAGING = YES
 SPF_METADATA_SOURCE_LICENSE = MIT
@@ -19,7 +19,9 @@ SPF_METADATA_SOURCE_FILES = \
 	spf_radio_frame_v3.c \
 	spf_radio_frame_v3.h \
 	spf_rssi_read.c \
-	spf_rssi_read.h
+	spf_rssi_read.h \
+	spf_thread_join.c \
+	spf_thread_join.h
 
 define SPF_METADATA_SOURCE_INSTALL_STAGING_CMDS
 	mkdir -p $(STAGING_DIR)/usr/include/spf
