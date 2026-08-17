@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include <stdint.h>
 
 /* Keep the disconnect policy host-testable and independent of FunctionFS.
  * Every short/error completion is fatal, including -ESHUTDOWN: on affected
@@ -15,14 +14,6 @@ static inline bool spf_usb_completion_requires_recovery(
 {
 	return completion_result < 0 ||
 		(size_t)completion_result != expected_bytes;
-}
-
-static inline bool spf_finite_transfer_is_complete(
-	bool finite,
-	uint32_t frames_remaining,
-	uint32_t writes_pending)
-{
-	return finite && frames_remaining == 0 && writes_pending == 0;
 }
 
 #endif

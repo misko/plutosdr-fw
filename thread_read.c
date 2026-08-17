@@ -50,7 +50,7 @@
 #define STATS_PERIOD_SECS (5)
 #endif
 
-#define FINITE_USB_WRITE_TIMEOUT_SECS (5)
+#define FINITE_USB_WRITE_TIMEOUT_SECS (10)
 
 /* Macros */
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -116,7 +116,6 @@ typedef struct
 
 	/* AIO completion eventfd */
 	int aio_eventfd;
-	uint32_t writes_pending;
 
 	/* Detect a finite write stranded by a host-side link loss. */
 	int finite_transfer_timerfd;
@@ -910,17 +909,6 @@ static int handle_eventfd_aio(state_t *state)
 
 		/* Return to ring buffer */
 		state->ring_buf_data[RING_BUFFER_Put(&state->ring_buf_ctx)] = buf;
-		if (state->writes_pending > 0)
-			state->writes_pending--;
-	}
-
-	if (spf_finite_transfer_is_complete(
-			state->metadata_enabled,
-			state->frames_remaining,
-			state->writes_pending))
-	{
-		/* Release IIO/CMA as soon as the host owns every requested frame. */
-		state->keep_running = false;
 	}
 
 	return completion_failed ? -1 : 0;
@@ -1302,8 +1290,6 @@ static int handle_iio_buffer(state_t *state)
 				errno);
 			return -1;
 		}
-		state->writes_pending++;
-
 		if (state->metadata_enabled)
 		{
 			state->frames_remaining--;
