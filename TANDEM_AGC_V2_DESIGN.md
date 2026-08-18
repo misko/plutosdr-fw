@@ -216,11 +216,11 @@ consumer readiness, synchronized modeled/hardware indices, and room in the
 event FIFO. Limits clamp both channels as a pair. One accepted transition emits
 exactly one event.
 
-The complete AXI configuration bundle crosses clock domains through a retained
-snapshot handshake. AXI writes received while a prior snapshot is in flight
-remain pending and the newest complete bundle is delivered after acknowledgement;
-no accepted register write may be silently lost. Sticky-fault clear is a level
-held until Linux observes the fault register clear, then explicitly deasserted.
+The complete AXI configuration bundle crosses clock domains through a snapshot
+handshake. The AXI write channels apply backpressure while a prior snapshot is
+in flight, keeping the source bundle stable until acknowledgement; no accepted
+register write may be silently lost. Sticky-fault clear is a level held until
+Linux observes the fault register clear, then explicitly deasserted.
 
 ## 8. Metadata contract
 
