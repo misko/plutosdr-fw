@@ -22,6 +22,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      - name: Check out the pinned Buildroot recipe
+        run: git submodule update --init --depth 1 buildroot
       - name: Verify pins, URLs, refs, and overrides
         run: |
           ./scripts/check_source_graph.sh manifests/tandem-agc-v2-source.yaml
