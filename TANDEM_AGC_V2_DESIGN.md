@@ -198,6 +198,12 @@ epoch, and restores the complete snapshot. No caller supplies a guessed
 
 For each completed power-measurement period:
 
+The period counter advances only when the receive decimator asserts output
+sample-valid, using the same enable that advances the 64-bit IQ sample counter.
+Consequently `power_measurement_samples` is measured in delivered RX samples,
+not fabric-clock cycles, and retains the same meaning across sample rates and
+decimation settings.
+
 | Condition | Decision |
 | --- | --- |
 | Either channel reports large overload | Decrease both gains by one index |
@@ -209,6 +215,12 @@ An accepted change requires auto mode, completed cooldown, no active fault,
 consumer readiness, synchronized modeled/hardware indices, and room in the
 event FIFO. Limits clamp both channels as a pair. One accepted transition emits
 exactly one event.
+
+The complete AXI configuration bundle crosses clock domains through a retained
+snapshot handshake. AXI writes received while a prior snapshot is in flight
+remain pending and the newest complete bundle is delivered after acknowledgement;
+no accepted register write may be silently lost. Sticky-fault clear is a level
+held until Linux observes the fault register clear, then explicitly deasserted.
 
 ## 8. Metadata contract
 

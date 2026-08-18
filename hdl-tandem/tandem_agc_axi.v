@@ -53,6 +53,7 @@ module tandem_agc_axi #(
   input  wire        l_aresetn,        // asynchronous; bridged internally
   input  wire [7:0]  detect_async,     // CTRL_OUT page 0x03
   input  wire [63:0] sample_counter,
+  input  wire        sample_valid,
   input  wire        consumer_ready,
 
   // ---- legacy PS path and pins -------------------------------------------
@@ -88,6 +89,7 @@ module tandem_agc_axi #(
   reg [1:0]  r_mode;
   reg        r_fault_clear;
   reg        cfg_load;
+  reg        cfg_pending;
 
   wire [CFGW-1:0] cfg_bundle = {
       r_epoch, 5'd0, r_fault_clear, r_mode,
@@ -102,7 +104,9 @@ module tandem_agc_axi #(
   wire [CFGW-1:0] cfg_l;
   wire            cfg_l_valid;
 
-  tandem_cdc_bus #(.W(CFGW), .HOLD(0)) u_cfg (
+  // AXI may update the source registers again while a prior transfer is in
+  // flight, so the CDC must retain each launched snapshot until acknowledged.
+  tandem_cdc_bus #(.W(CFGW), .HOLD(1)) u_cfg (
     .src_clk(s_axi_aclk), .src_resetn(axi_resetn),
     .din(cfg_bundle), .load(cfg_load), .busy(cfg_busy),
     .dst_clk(l_clk), .dst_resetn(l_resetn),
@@ -150,6 +154,7 @@ module tandem_agc_axi #(
   tandem_agc_core #(.EVT_AW(EVT_AW), .EVT_DW(EVT_DW), .EVENTS(EVENTS)) u_core (
     .l_clk(l_clk), .l_resetn(l_resetn),
     .detect_async(detect_async), .sample_counter(sample_counter),
+    .sample_valid(sample_valid),
     .mode_req(c_mode), .cfg_epoch(c_epoch),
     .fault_clear(c_fault_clear), .consumer_ready(consumer_ready),
     .cfg_pulse_hi(c_pulse_hi), .cfg_pulse_lo(c_pulse_lo),
@@ -238,15 +243,22 @@ module tandem_agc_axi #(
     if (!axi_resetn) begin
       aw_pending <= 1'b0; w_pending <= 1'b0; bvalid <= 1'b0;
       awaddr_q <= 8'd0; wdata_q <= 32'd0;
-      cfg_load <= 1'b0; r_fault_clear <= 1'b0;
+      cfg_load <= 1'b0; cfg_pending <= 1'b0; r_fault_clear <= 1'b0;
       r_pulse_hi <= 8'd16; r_pulse_lo <= 8'd16; r_blank_guard <= 16'd64;
       r_pwr_period <= 20'd10000; r_cooldown <= 8'd2; r_dwell <= 8'd4;
       r_debounce <= 8'd8; r_idx_min <= 8'd0; r_idx_max <= 8'd76;
       r_idx_init <= 8'd40; r_mode <= 2'd0; r_epoch <= 32'd0;
       r_thresholds <= 32'd0;
     end else begin
-      cfg_load      <= 1'b0;
-      r_fault_clear <= 1'b0;
+      cfg_load <= 1'b0;
+
+      // AXI writes may arrive while the multi-cycle CDC transfer is busy.
+      // Retain a dirty indication and send the newest complete bundle as soon
+      // as the previous transfer completes; never silently lose a write.
+      if (cfg_pending && !cfg_busy) begin
+        cfg_load <= 1'b1;
+        cfg_pending <= 1'b0;
+      end
 
       if (s_axi_awready && s_axi_awvalid) begin
         aw_pending <= 1'b1;
@@ -276,7 +288,7 @@ module tandem_agc_axi #(
           8'h30: r_thresholds <= wdata_q;
           default: ;
         endcase
-        if (!cfg_busy) cfg_load <= 1'b1;   // push the whole bundle across
+        cfg_pending <= 1'b1;
         aw_pending <= 1'b0;
         w_pending <= 1'b0;
         bvalid <= 1'b1;

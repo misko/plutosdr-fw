@@ -55,7 +55,7 @@ module tb_tandem_agc_stress;
 
   tandem_agc_core core (
     .l_clk(l_clk), .l_resetn(l_resetn),
-    .detect_async(detect), .sample_counter(sample_counter),
+    .detect_async(detect), .sample_counter(sample_counter), .sample_valid(1'b1),
     .mode_req(mode_req), .cfg_epoch(cfg_epoch),
     .fault_clear(fault_clear), .consumer_ready(consumer_ready),
     .cfg_pulse_hi(cfg_pulse_hi), .cfg_pulse_lo(cfg_pulse_lo),

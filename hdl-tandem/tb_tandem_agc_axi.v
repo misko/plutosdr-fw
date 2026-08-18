@@ -24,7 +24,9 @@ module tb_tandem_agc_axi;
   wire [31:0] rdata;          wire [1:0] rresp;    wire rvalid;  reg rready = 1'b0;
 
   reg  [63:0] sample_counter = 64'd0;
-  always @(posedge l_clk) sample_counter <= sample_counter + 64'd1;
+  reg         sample_valid = 1'b1;
+  always @(posedge l_clk)
+    if (sample_valid) sample_counter <= sample_counter + 64'd1;
 
   wire [3:0] ctl_o, ctl_t;
   wire [7:0] detect_pins;
@@ -44,6 +46,7 @@ module tb_tandem_agc_axi;
     .s_axi_rdata(rdata), .s_axi_rresp(rresp), .s_axi_rvalid(rvalid), .s_axi_rready(rready),
     .l_clk(l_clk), .l_aresetn(l_aresetn),
     .detect_async(detect_pins), .sample_counter(sample_counter),
+    .sample_valid(sample_valid),
     .consumer_ready(1'b1),
     .ps_ctl_o(4'd0), .ps_ctl_t(4'hF), .ctl_o(ctl_o), .ctl_t(ctl_t));
 
@@ -72,6 +75,15 @@ module tb_tandem_agc_axi;
       awvalid <= 1'b0; wvalid <= 1'b0;
       @(posedge s_axi_aclk); bready <= 1'b0;
       tick(2);
+    end
+  endtask
+
+  task axi_write_fast(input [7:0] a, input [31:0] d);
+    begin
+      @(posedge s_axi_aclk);
+      awaddr <= a; awvalid <= 1'b1; wdata <= d; wvalid <= 1'b1; bready <= 1'b1;
+      wait (bvalid); @(posedge s_axi_aclk);
+      awvalid <= 1'b0; wvalid <= 1'b0; bready <= 1'b0;
     end
   endtask
 
@@ -146,6 +158,23 @@ module tb_tandem_agc_axi;
     axi_write_w_first(8'h30, 32'h5aa5_2468);
     axi_read(8'h30, v);
     check(v == 32'h5aa5_2468, "W-before-AW data and address remain paired");
+
+    // A second AXI write while the first configuration CDC is busy must be
+    // retained and delivered after the in-flight snapshot, never discarded.
+    axi_write_fast(8'h20, 32'd111);
+    wait (dut.cfg_busy);
+    axi_write_fast(8'h24, {8'd7, 8'd6, 8'd5});
+    tick(100);
+    check(dut.c_pwr_period == 20'd111 && dut.c_debounce == 8'd7 &&
+          dut.c_cooldown == 8'd6 && dut.c_dwell == 8'd5,
+          "back-to-back configuration writes survive CDC busy");
+
+    v = dut.u_core.pwr_div;
+    sample_valid = 1'b0;
+    tick(100);
+    check(dut.u_core.pwr_div == v[19:0],
+          "power-measurement time stops without a valid output sample");
+    sample_valid = 1'b1;
 
     // configure for a fast simulation profile, entirely over AXI
     axi_write(8'h28, {16'd0, 8'd4, 8'd4});

@@ -34,6 +34,7 @@ module tandem_agc_core #(
 
   // ---- receive-domain sample counter, §7.1 [63:0] -------------------------
   input  wire [63:0]      sample_counter,
+  input  wire             sample_valid,
 
   // ---- control ------------------------------------------------------------
   input  wire [1:0]       mode_req,        // 0 legacy, 1 hold, 2 auto
@@ -169,10 +170,15 @@ module tandem_agc_core #(
   always @(posedge l_clk) begin
     if (!l_resetn) begin
       pwr_div <= 20'd0; pwr_tick <= 1'b0;
-    end else if (pwr_div >= cfg_pwr_period) begin
-      pwr_div <= 20'd0; pwr_tick <= 1'b1;
     end else begin
-      pwr_div <= pwr_div + 20'd1; pwr_tick <= 1'b0;
+      pwr_tick <= 1'b0;
+      if (sample_valid) begin
+        if (pwr_div >= cfg_pwr_period) begin
+          pwr_div <= 20'd0; pwr_tick <= 1'b1;
+        end else begin
+          pwr_div <= pwr_div + 20'd1;
+        end
+      end
     end
   end
 
