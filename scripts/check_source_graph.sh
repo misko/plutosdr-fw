@@ -131,6 +131,22 @@ if [[ "$(m release_state)" == "candidate" ]] && \
             bad "gitlink ${path} is ${actual:0:12}, manifest pins ${expected:0:12}"
         fi
     done
+
+    # The libiio source lock is also the daemon compiled into the firmware.
+    # Checking only the externally consumable source pin can pass while the
+    # Buildroot recipe silently embeds an older iiod.
+    expected_libiio="$(m libiio_0_25_source)"
+    recipe="buildroot/package/libiio/libiio.mk"
+    if [[ -n "$expected_libiio" && -f "$recipe" ]]; then
+        recipe_libiio="$(sed -n 's/^LIBIIO_VERSION[[:space:]]*=[[:space:]]*//p' "$recipe" | head -1)"
+        if [[ "$recipe_libiio" == "$expected_libiio" ]]; then
+            ok "Buildroot libiio recipe ${recipe_libiio:0:12}"
+        else
+            bad "Buildroot libiio recipe is ${recipe_libiio:0:12}, manifest pins ${expected_libiio:0:12}"
+        fi
+    elif [[ -n "$expected_libiio" ]]; then
+        bad "Buildroot libiio recipe not found: ${recipe}"
+    fi
 fi
 
 echo
