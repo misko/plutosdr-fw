@@ -53,3 +53,11 @@ vvp "${work}/tx_pipeline_debug_tb"
 
 "${HDL_QUANTULUM}/util_upack2_timestamp/test/run_discard_disabled.sh"
 "${HDL_QUANTULUM}/util_upack2_timestamp/test/run_timestamp_check_pipeline.sh"
+
+# The tandem candidate adds root-repository RTL that is not part of the
+# hdl-quantulum source lock above.  Run its complete directed, randomized, CDC,
+# and AXI suite in the packaged build so the deployment evidence covers the
+# exact tandem implementation that Vivado consumes.
+if [[ "$(basename "$MANIFEST")" == "tandem-agc-v2-source.yaml" ]]; then
+    "${ROOT}/hdl-tandem/run_tests.sh"
+fi

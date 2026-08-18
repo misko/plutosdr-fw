@@ -71,6 +71,10 @@ scripts/test_pluto_pstore_layout.sh \
 	2>&1 | tee "$artifact_real/pstore-layout.log"
 scripts/test_pluto_cma_layout.sh \
 	2>&1 | tee "$artifact_real/cma-layout.log"
+scripts/test_tandem_acquire_sequence.sh \
+    2>&1 | tee "$artifact_real/tandem-acquire-sequence.log"
+scripts/test_tandem_detector_latch_clear.sh \
+    2>&1 | tee "$artifact_real/tandem-detector-latch-clear.log"
 scripts/test_winbond_uid_fixup.sh \
     2>&1 | tee "$artifact_real/winbond-uid-fixup.log"
 buildroot/board/pluto/test_pluto_mute_tx.sh \

@@ -1,7 +1,7 @@
 name: Kalman main firmware build
 
 # Security boundary: this workflow never runs for pull requests. Manual runs
-# are restricted to main and the reviewed v6 RC4 source-lock branch.
+# are restricted to main and explicitly named maintainer source-lock branches.
 on:
   push:
     branches: [main]
@@ -33,7 +33,8 @@ jobs:
     if: >-
       github.ref == 'refs/heads/main' ||
       (github.event_name == 'workflow_dispatch' &&
-       github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety')
+       (github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+        github.ref == 'refs/heads/feature/tandem-agc-v2'))
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
@@ -43,10 +44,14 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'libiio-frame-metadata-v6-source.yaml' ||
+          github.ref == 'refs/heads/feature/tandem-agc-v2' &&
+          'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-libiio-metadata-v6' ||
+          github.ref == 'refs/heads/feature/tandem-agc-v2' &&
+          'plutoplus-spf-tandem-agc-v2' ||
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
       SPF_RELEASE_STATE: >-
         ${{ github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
