@@ -24,7 +24,7 @@ jobs:
           persist-credentials: false
       - name: Verify pins, URLs, refs, and overrides
         run: |
-          ./scripts/check_source_graph.sh manifests/libiio-frame-metadata-v6-source.yaml
+          ./scripts/check_source_graph.sh manifests/tandem-agc-v2-source.yaml
           ./scripts/test_legal_info_network.sh
 
   gadget-tests:
