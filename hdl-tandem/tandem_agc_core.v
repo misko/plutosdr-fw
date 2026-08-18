@@ -5,8 +5,8 @@
 // together, keeping both receivers at one common index, deciding from the
 // AD9361's own detectors on CTRL_OUT page 0x03.
 //
-// Implements TANDEM_AGC_V1_DESIGN.md revision 3. Section references below are
-// to that document. Clock domain is l_clk per D-1.
+// Implements the forward-only Tandem AGC v2 contract. Historical section
+// references identify the measured invariants retained from the v1 prototype.
 //
 // One deliberate refinement of §11: the FPGA takes pin ownership on entry to
 // ARMING and immediately drives all four low, rather than at a later step. The
@@ -19,7 +19,7 @@
 
 module tandem_agc_core #(
   parameter integer EVT_AW = 6,      // 64 entries; §7.3 worst case is ~18/frame
-  parameter integer EVT_DW = 104,   // record layout, §7.1, exact width
+  parameter integer EVT_DW = 128,   // fixed v2 event record
   // EVENTS=0 compiles out the whole event-capture path: FIFO, sequence counter,
   // record registers and overflow tracking. Tandem gain control itself does not
   // depend on any of it, so this is the lever that trades the exact per-sample
@@ -37,6 +37,7 @@ module tandem_agc_core #(
 
   // ---- control ------------------------------------------------------------
   input  wire [1:0]       mode_req,        // 0 legacy, 1 hold, 2 auto
+  input  wire [31:0]      cfg_epoch,
   input  wire             fault_clear,
   input  wire             consumer_ready,  // §2.3 readiness before release
 
@@ -67,8 +68,8 @@ module tandem_agc_core #(
 
   // ---- status -------------------------------------------------------------
   output wire [2:0]       state_o,
-  output wire [7:0]       epoch_o,
-  output wire [7:0]       epoch_tomb_o,
+  output wire [31:0]      epoch_o,
+  output wire [31:0]      epoch_tomb_o,
   output wire [7:0]       expected_index_o,
   output wire             pulse_busy_o,
   output wire             cooldown_active_o,
@@ -88,7 +89,7 @@ module tandem_agc_core #(
   output wire              evt_valid_o,
   input  wire              evt_pop,
   output wire [EVT_AW:0]   evt_level_o,
-  output wire [31:0]       evt_ovf_o,
+  output wire [7:0]        evt_ovf_o,
   output wire              evt_push_o,
   output wire [EVT_DW-1:0] evt_wdata_o
 );
@@ -120,7 +121,7 @@ module tandem_agc_core #(
   localparam R_INIT     = 4'd6;
 
   reg [2:0] state;
-  reg [7:0] epoch, epoch_tomb;
+  reg [31:0] epoch, epoch_tomb;
   reg [7:0] fault;
 
   // ---------------------------------------------------------------------------
@@ -243,7 +244,8 @@ module tandem_agc_core #(
   // 16 bits is ample for diagnostics and halves the flip-flops these cost
   // both here and in the status crossing.
   reg [7:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
-  reg [15:0] evt_seq;
+  reg [31:0] evt_seq;
+  reg [7:0]  event_index;
   reg [3:0]  evt_reason;
   reg        evt_push;
 
@@ -254,7 +256,15 @@ module tandem_agc_core #(
     if (!l_resetn) begin
       expected_index <= 8'd0; cooldown_cnt <= 8'd0; dwell_cnt <= 8'd0;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
-      evt_seq <= 16'd0; evt_reason <= 4'd0; evt_push <= 1'b0;
+      evt_seq <= 32'd0; event_index <= 8'd0;
+      evt_reason <= 4'd0; evt_push <= 1'b0;
+      fire_req <= 1'b0; req_dir <= 2'd0;
+    end else if (fault_clear && state != ST_ACTIVE) begin
+      expected_index <= cfg_idx_init;
+      cooldown_cnt <= 8'd0; dwell_cnt <= 8'd0;
+      cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
+      evt_seq <= 32'd0; event_index <= cfg_idx_init;
+      evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else begin
       evt_push <= 1'b0;
@@ -284,9 +294,10 @@ module tandem_agc_core #(
             req_dir        <= 2'd2;
             fire_req       <= 1'b1;
             expected_index <= expected_index - 8'd1;
+            event_index     <= expected_index - 8'd1;
             evt_reason     <= (ch1_lglmt | ch2_lglmt) ? R_LG_LMT : R_LG_ADC;
             evt_push       <= 1'b1;
-            evt_seq        <= evt_seq + 16'd1;
+            evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
@@ -300,9 +311,10 @@ module tandem_agc_core #(
             req_dir        <= 2'd1;
             fire_req       <= 1'b1;
             expected_index <= expected_index + 8'd1;
+            event_index     <= expected_index + 8'd1;
             evt_reason     <= R_BOTH_LP;
             evt_push       <= 1'b1;
-            evt_seq        <= evt_seq + 16'd1;
+            evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
@@ -322,6 +334,8 @@ module tandem_agc_core #(
   always @(posedge l_clk) begin
     if (!l_resetn) begin
       mismatch_seen <= 1'b0; cnt_stale <= 8'd0;
+    end else if (fault_clear && state != ST_ACTIVE) begin
+      mismatch_seen <= 1'b0; cnt_stale <= 8'd0;
     end else if (sw_idx_strobe) begin
       if (state == ST_ACTIVE || state == ST_OWNED_IDLE) begin
         if (quiescent &&
@@ -339,19 +353,21 @@ module tandem_agc_core #(
   // event FIFO, D-9. Uses the CDC library's gray-coded asynchronous FIFO so the
   // write side stays in l_clk while software reads from the processor domain.
   // ---------------------------------------------------------------------------
+  wire [15:0] evt_flags = {8'd0, 2'd0, req_dir, evt_reason};
   wire [EVT_DW-1:0] evt_wdata = {
-      evt_seq, epoch, 2'd0, req_dir, evt_reason, expected_index, sample_counter };
+      event_index, event_index, evt_flags, evt_seq, sample_counter };
 
   wire fifo_full;
   generate if (EVENTS) begin : g_events
     tandem_async_fifo #(.W(EVT_DW), .AW(EVT_AW)) u_evt_fifo (
-      .wr_clk(l_clk), .wr_resetn(l_resetn), .wr_en(evt_push), .wr_data(evt_wdata),
+      .wr_clk(l_clk), .wr_resetn(l_resetn & ~fault_clear),
+      .wr_en(evt_push), .wr_data(evt_wdata),
       .wr_full(fifo_full), .wr_ovf(evt_ovf_o),
       .rd_clk(evt_rd_clk), .rd_resetn(evt_rd_resetn), .rd_en(evt_pop),
       .rd_data(evt_rdata_o), .rd_valid(evt_valid_o), .rd_level(evt_level_o));
   end else begin : g_no_events
     assign fifo_full    = 1'b0;
-    assign evt_ovf_o    = 32'd0;
+    assign evt_ovf_o    = 8'd0;
     assign evt_rdata_o  = {EVT_DW{1'b0}};
     assign evt_valid_o  = 1'b0;
     assign evt_level_o  = {(EVT_AW+1){1'b0}};
@@ -366,7 +382,7 @@ module tandem_agc_core #(
   always @(posedge l_clk) begin
     if (!l_resetn) fault <= 8'd0;
     else begin
-      if (fault_clear && state == ST_FAULTED) fault <= 8'd0;
+      if (fault_clear && state != ST_ACTIVE)  fault <= 8'd0;
       if (evt_push && fifo_full)              fault[F_FIFO_OVF]    <= 1'b1;
       if (mismatch_seen && sw_idx_strobe && quiescent &&
           ((sw_idx_rx1 != expected_index) || (sw_idx_rx2 != expected_index)))
@@ -380,13 +396,13 @@ module tandem_agc_core #(
   // ---------------------------------------------------------------------------
   always @(posedge l_clk) begin
     if (!l_resetn) begin
-      state <= ST_LEGACY; epoch <= 8'd1; epoch_tomb <= 8'd0;
+      state <= ST_LEGACY; epoch <= 32'd0; epoch_tomb <= 32'd0;
     end else begin
       case (state)
         ST_LEGACY:
           if (mode_req != 2'd0) begin
             state <= ST_ARMING;
-            epoch <= (epoch == 8'hFF) ? 8'd1 : epoch + 8'd1;   // never zero
+            epoch <= cfg_epoch;
           end
         ST_ARMING:
           if (fault != 8'd0)            state <= ST_DISARMING;
@@ -397,9 +413,13 @@ module tandem_agc_core #(
           else if (mode_req == 2'd2)    state <= ST_ACTIVE;
         ST_ACTIVE:
           if (fault != 8'd0)            state <= ST_DISARMING;
-          else if (mode_req != 2'd2)    state <= ST_DISARMING;
+          else if (mode_req == 2'd0)    state <= ST_DISARMING;
+          else if (mode_req == 2'd1 && !pulse_busy)
+                                            state <= ST_OWNED_IDLE;
         ST_DISARMING:
-          if (!pulse_busy)              state <= ST_RELEASABLE;
+          if (!pulse_busy && mode_req != 2'd0 && fault == 8'd0)
+                                            state <= ST_OWNED_IDLE;
+          else if (!pulse_busy)         state <= ST_RELEASABLE;
         ST_RELEASABLE: begin
           epoch_tomb <= epoch;
           state <= (fault != 8'd0) ? ST_FAULTED : ST_LEGACY;
@@ -414,8 +434,13 @@ module tandem_agc_core #(
   // ---------------------------------------------------------------------------
   // ownership mux, §4: owns BOTH value and tri-state, registered, reset=legacy
   // ---------------------------------------------------------------------------
+  // A fault must keep actively driving all CTRL_IN pins low until Linux has
+  // disabled AD9361 pin control. Returning a still-armed part to PS high-Z is
+  // unsafe, so mode_req=0 is the explicit final mux release.
   wire fpga_owns = (state == ST_ARMING) || (state == ST_OWNED_IDLE) ||
-                   (state == ST_ACTIVE) || (state == ST_DISARMING);
+                   (state == ST_ACTIVE) || (state == ST_DISARMING) ||
+                   (state == ST_RELEASABLE) ||
+                   ((state == ST_FAULTED) && (mode_req != 2'd0));
 
   reg [3:0] ctl_o_r, ctl_t_r;
   always @(posedge l_clk) begin

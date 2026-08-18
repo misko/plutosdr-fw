@@ -70,7 +70,7 @@ module tb_tandem_cdc;
   reg  fw_en = 1'b0;
   reg  [127:0] fw_data = 128'd0;
   wire fw_full;
-  wire [31:0] fw_ovf;
+  wire [7:0] fw_ovf;
   reg  fr_en = 1'b0;
   wire [127:0] fr_data;
   wire fr_valid;
@@ -173,7 +173,7 @@ module tb_tandem_cdc;
     repeat (50) @(posedge fr_clk);
     check(n_read == 200,  "every FIFO entry crossed exactly once, none lost");
     check(read_ok == 1,   "FIFO preserved exact order across the domains");
-    check(fw_ovf == 32'd0,"no spurious overflow while the reader kept up");
+    check(fw_ovf == 8'd0,"no spurious overflow while the reader kept up");
 
     $display("MARK fifo-rw done @%0t", $time);
     // ---- deliberate overflow ---------------------------------------------
@@ -187,7 +187,7 @@ module tb_tandem_cdc;
     end
     repeat (20) @(posedge fw_clk);
     check(fw_full == 1'b1,  "the FIFO reports full when the reader stops");
-    check(fw_ovf > 32'd0,   "overflow is counted, never silent");
+    check(fw_ovf > 8'd0,    "overflow is counted, never silent");
 
     $display("---- scenario failures : %0d ----", errors);
     if (errors != 0) $fatal(1, "CDC TESTS FAILED");

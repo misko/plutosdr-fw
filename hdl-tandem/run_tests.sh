@@ -14,13 +14,21 @@ here="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 work="$(mktemp -d "${TMPDIR:-/tmp}/tandem-agc.XXXXXX")"
 trap 'rm -rf "${work}"' EXIT
 
+iverilog_bin="${IVERILOG:-iverilog}"
+vvp_bin="${VVP:-vvp}"
+iverilog_base_args=()
+if [[ -n "${IVERILOG_BASE:-}" ]]; then
+    iverilog_base_args=(-B "${IVERILOG_BASE}")
+fi
+
 run() {
     local top="$1"; shift
     local extra="${EXTRA_ARGS:-}"
     echo "--- ${top} ${extra} ---"
     # shellcheck disable=SC2086
-    iverilog -g2012 -Wall ${extra} -s "${top}" -o "${work}/${top}" "$@"
-    vvp "${work}/${top}"
+    "${iverilog_bin}" "${iverilog_base_args[@]}" -g2012 -Wall ${extra} \
+        -s "${top}" -o "${work}/${top}" "$@"
+    "${vvp_bin}" "${work}/${top}"
 }
 
 # 0. the CDC primitives: RC3/RC4 died on CDC-10, RC5/RC6 on clock and reset
@@ -47,12 +55,7 @@ run tb_tandem_agc_stress \
     "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
     "${here}/tandem_agc_checkers.v" "${here}/tb_tandem_agc_stress.v"
 
-# 5. the control surface, driven exactly as software will drive it
-run tb_tandem_agc_regs \
-    "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" "${here}/tandem_agc_core.v" \
-    "${here}/tandem_agc_regs.v" "${here}/tb_tandem_agc_regs.v"
-
-# 6. the AXI4-Lite slave with the processor and receive domains genuinely
+# 5. the v2 AXI4-Lite surface with processor and receive domains genuinely
 #    asynchronous -- the configuration this actually ships in
 run tb_tandem_agc_axi \
     "${here}/tandem_cdc_lib.v" "${here}/ad9361_gain_model.v" \

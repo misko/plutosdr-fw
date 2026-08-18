@@ -1,4 +1,4 @@
-# Tandem AGC — resource canary
+# Tandem AGC v2 RTL
 
 Answers the project's single unbounded risk before the real controller exists:
 does a block of this size and shape fit and close timing on a Zynq-7010 already
@@ -33,10 +33,12 @@ The canary also omits the AXI4-Lite slave (a standard component, roughly
 
 ---
 
-# Tandem AGC controller — implementation
+## Implementation
 
-`tandem_agc_core.v` is the controller, `tandem_agc_regs.v` the §8 control
-surface, `tandem_agc_wrap.v` the unit that integrates into the block design.
+`tandem_agc_core.v` is the receive-clock controller and `tandem_agc_axi.v` is
+the only control surface. It implements the forward-only `TAG2` register ABI
+used by the Linux ownership driver; the v1 standalone register wrapper has
+been removed so it cannot become a second control path.
 `ad9361_gain_model.v` is a behavioural model of the part; every behaviour in it
 is either cited to UG-570 or measured by experiment E-AGC1.
 
@@ -44,15 +46,16 @@ is either cited to UG-570 or measured by experiment E-AGC1.
 
     ./run_tests.sh
 
-Four suites, all under Icarus Verilog:
+Six runs across five suites, all under Icarus Verilog:
 
 | Suite | Covers |
 |---|---|
+| `tb_tandem_cdc` | reset bridges, coherent bus crossings, FIFO ordering, and explicit overflow |
 | `tb_ad9361_model` | 27 checks that the model itself is faithful, including that a 1-ClkRF pulse is rejected and a 2-cycle one accepted |
 | `tb_tandem_agc` (ratio 1.0) | closed loop at `rx_fir_dec = 2`, SPF production |
 | `tb_tandem_agc` (ratio 2.0) | closed loop at `rx_fir_dec = 1`, the device-tree boot default |
 | `tb_tandem_agc_stress` | §8.2 edge cases: randomised traffic, reset in every lifecycle state, disable at every pulse phase, chatter, long idle, FIFO overflow, sequence and 64-bit counter rollover, index-mismatch fault |
-| `tb_tandem_agc_regs` | the control surface, driven exactly as software will |
+| `tb_tandem_agc_axi` | exact `TAG2` ABI, 32-bit kernel epoch, 16-byte post-change events, asynchronous AXI/RX clocks, and HOLD-low teardown ordering |
 
 The twelve §10 assertions run continuously as procedural checkers
 (`tandem_agc_checkers.v`) — Icarus has no SVA and this repository uses none.

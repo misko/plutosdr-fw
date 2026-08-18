@@ -94,60 +94,72 @@ module tb_tandem_agc_axi;
     s_axi_aresetn = 1'b1; l_aresetn = 1'b1;
     tick(20);
 
-    axi_read(8'h00, v); check(v == 32'h5441_4731, "AXI read of ID returns the magic");
-    axi_read(8'h0C, v); check(v[2:0] == 3'd0,     "STATUS crosses back: LEGACY at reset");
-    axi_read(8'h14, v);
+    axi_read(8'h00, v); check(v == 32'h5441_4732, "TAG2 identity matches the kernel ABI");
+    axi_read(8'h04, v); check(v == 32'd1, "FPGA ABI version is one");
+    axi_read(8'h08, v); check(v[15:0] == 16'd64, "capabilities report FIFO depth");
+    axi_read(8'h10, v); check(v[2:0] == 3'd0, "public state is IDLE after reset");
+    axi_read(8'h18, v);
     check(v[7:0] == 8'd0 && v[15:8] == 8'd76,
           "index window default is the full range (D-7 optional)");
 
     // configure for a fast simulation profile, entirely over AXI
-    axi_write(8'h1C, {16'd8, 8'd4, 8'd4});
+    axi_write(8'h28, {16'd0, 8'd4, 8'd4});
+    axi_write(8'h2C, 32'd8);
     axi_write(8'h20, 32'd20);
-    axi_write(8'h24, {8'd0, 8'd2, 8'd3, 8'd2});
-    axi_write(8'h14, {8'd0, 8'd40, 8'd76, 8'd0});
+    axi_write(8'h24, {8'd2, 8'd2, 8'd3});
+    axi_write(8'h18, {8'd40, 8'd76, 8'd0});
+    axi_write(8'h14, 32'h1234_5678);
+    axi_write(8'h30, 32'h313a2f30);
+    axi_write(8'h0C, 32'h0000_0100); // clear FIFO, counters, and sticky faults
     tick(50);
-    axi_read(8'h1C, v); check(v[7:0] == 8'd4, "config write reads back over AXI");
+    axi_read(8'h28, v); check(v[7:0] == 8'd4, "pulse configuration reads back");
+    axi_read(8'h30, v); check(v == 32'h313a2f30, "threshold provenance reads back");
 
     // §11 enable, driven over the bus
     model.rx1_index = 8'd40; model.rx2_index = 8'd40;
-    axi_write(8'h08, 32'd1);
+    axi_write(8'h0C, 32'd1);
     tick(600);                                   // let the snapshot cross
-    axi_read(8'h0C, v);
-    check(v[2:0] == 3'd2, "mode 1 reaches OWNED_IDLE, observed across the CDC");
-    check(v[4]   == 1'b1, "ownership is reported across the CDC");
+    axi_read(8'h10, v);
+    check(v[2:0] == 3'd2, "HOLD reaches public ARMED_HOLD state");
     armed = 1'b1; tick(20);
-    axi_read(8'h10, v); check(v[7:0] == 8'd2, "EPOCH crossed back correctly");
+    axi_read(8'h14, v); check(v == 32'h1234_5678, "kernel epoch reads back exactly");
 
-    axi_write(8'h08, 32'd2); tick(600);
-    axi_read(8'h0C, v); check(v[2:0] == 3'd3, "mode 2 reaches ACTIVE");
+    axi_write(8'h0C, 32'd3); tick(600);
+    axi_read(8'h10, v); check(v[2:0] == 3'd3, "AUTO reaches public ARMED_AUTO state");
 
     // run the loop and confirm events cross domains
     rx1_level = -16'sd35; rx2_level = -16'sd35;
     tick(4000);
-    axi_read(8'h48, v); check(v > 32'd0, "CNT_TRANS crossed back non-zero");
-    axi_read(8'h40, v); check(v > 32'd0, "EVT_LEVEL shows events in the async FIFO");
+    axi_read(8'h40, v); check(v > 32'd0, "transition count crossed back non-zero");
+    axi_read(8'h38, v); check(v > 32'd0, "event level shows captured records");
 
     // drain one event through the four-read sequence across the CDC
     begin : drain
       reg [31:0] w0,w1,w2,w3,l0,l1;
-      axi_read(8'h40, l0);
-      axi_read(8'h30, w0); axi_read(8'h34, w1);
-      axi_read(8'h38, w2); axi_read(8'h3C, w3);
+      axi_read(8'h38, l0);
+      axi_read(8'h44, w0); axi_read(8'h48, w1);
+      axi_read(8'h4C, w2); axi_read(8'h50, w3);
       tick(10);
-      axi_read(8'h40, l1);
-      check(l1 == l0 - 1, "reading EVT_HI3 over AXI pops exactly one entry");
-      check(w2[23:16] == 32'd2, "the event carries the epoch across the CDC");
+      axi_read(8'h38, l1);
+      check(l1 == l0 - 1, "reading event word three pops exactly one entry");
+      check(w3[23:16] == w3[31:24], "event carries paired gain indices");
+      check(w2 != 32'd0, "event sequence and flags are populated");
       check(w0 != 32'd0 || w1 != 32'd0, "the 64-bit sample counter crossed intact");
     end
 
     // tandem invariant still holds with the domains truly asynchronous
     check(m_rx1 == m_rx2, "RX1 == RX2 with processor and receive clocks async");
 
-    // §11 disable over the bus
-    axi_write(8'h08, 32'd0); tick(20); armed = 1'b0; tick(600);
-    axi_read(8'h0C, v);
-    check(v[2:0] == 3'd0, "mode 0 returns to LEGACY");
-    check(v[4]   == 1'b0, "ownership returned to the PS");
+    // Kernel teardown: AUTO -> HOLD-low -> AD9361 disarm -> mux release.
+    axi_write(8'h0C, 32'd1); tick(600);
+    axi_read(8'h10, v);
+    check(v[2:0] == 3'd2, "teardown first reaches ARMED_HOLD");
+    check(ctl_t == 4'd0 && ctl_o == 4'd0,
+          "HOLD retains ownership and actively drives every CTRL_IN low");
+    armed = 1'b0;
+    axi_write(8'h0C, 32'd0); tick(600);
+    axi_read(8'h10, v);
+    check(v[2:0] == 3'd0, "release returns to public IDLE");
     check(ctl_t  == 4'hF, "pins tri-stated back to the legacy path");
 
     $display("---- scenario failures : %0d ----", errors);

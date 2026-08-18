@@ -38,6 +38,7 @@ module tb_tandem_agc;
   reg [7:0]  cfg_idx_init  = 8'd40;
 
   reg [1:0] mode_req = 2'd0;
+  reg [31:0] cfg_epoch = 32'd1;
   reg       fault_clear = 1'b0;
   reg       consumer_ready = 1'b1;
   reg [3:0] ps_ctl_o = 4'd0;
@@ -63,13 +64,14 @@ module tb_tandem_agc;
   wire [3:0]   ctl_o, ctl_t;
   wire [7:0]   detect;
   wire [2:0]   state;
-  wire [7:0]   epoch, epoch_tomb, expected_index, fault, det_stable;
+  wire [31:0]  epoch, epoch_tomb;
+  wire [7:0]   expected_index, fault, det_stable;
   wire         pulse_busy, cooldown_active, fpga_owns;
   wire [7:0]   cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
-  wire [103:0] evt_rdata;
+  wire [127:0] evt_rdata;
   wire         evt_valid;
-  wire [8:0]   evt_level;
-  wire [31:0]  evt_ovf;
+  wire [6:0]   evt_level;
+  wire [7:0]   evt_ovf;
   wire [7:0]   m_rx1, m_rx2;
   wire [31:0]  m_acc, m_rej, m_ign;
 
@@ -78,7 +80,8 @@ module tb_tandem_agc;
   tandem_agc_core core (
     .l_clk(l_clk), .l_resetn(l_resetn),
     .detect_async(detect), .sample_counter(sample_counter),
-    .mode_req(mode_req), .fault_clear(fault_clear), .consumer_ready(consumer_ready),
+    .mode_req(mode_req), .cfg_epoch(cfg_epoch),
+    .fault_clear(fault_clear), .consumer_ready(consumer_ready),
     .cfg_pulse_hi(cfg_pulse_hi), .cfg_pulse_lo(cfg_pulse_lo),
     .cfg_blank_guard(cfg_blank_guard), .cfg_pwr_period(cfg_pwr_period),
     .cfg_cooldown(cfg_cooldown), .cfg_dwell(cfg_dwell), .cfg_debounce(cfg_debounce),
@@ -138,6 +141,7 @@ module tb_tandem_agc;
     begin
       model.rx1_index = cfg_idx_init;      // step 5: SPI programs both indices
       model.rx2_index = cfg_idx_init;
+      cfg_epoch = cfg_epoch + 32'd1;
       mode_req = mode;
       tick(4);
       wait (fpga_owns == 1'b1);
@@ -182,7 +186,7 @@ module tb_tandem_agc;
     check(fpga_owns == 1'b1,    "FPGA owns the pins");
     check(ctl_t == 4'd0,        "FPGA drives the pins");
     check(ctl_o == 4'd0,        "outputs held low in tandem-hold");
-    check(epoch == 8'd2,        "epoch incremented on arming");
+    check(epoch == 32'd2,       "requested epoch accepted on arming");
     settle(4);
     check(cnt_trans == 32'd0,   "no transitions occur in tandem-hold");
 
@@ -253,15 +257,15 @@ module tb_tandem_agc;
       n0 = cnt_trans;
       rx1_level = -16'sd95; rx2_level = -16'sd95;
       settle(12);
-      check(evt_level > 9'd0,  "events were captured");
-      // drain and verify epoch and monotonic sequence
+      check(evt_level > 7'd0,  "events were captured");
+      // Drain and verify the fixed v2 post-change paired-gain record.
       ok = 1'b1; popped = 0;
       while (evt_valid && popped < 64) begin
-        if (evt_rdata[87:80] !== epoch) ok = 1'b0;
+        if (evt_rdata[119:112] !== evt_rdata[127:120]) ok = 1'b0;
         @(posedge l_clk); evt_pop = 1'b1; @(posedge l_clk); evt_pop = 1'b0;
         popped = popped + 1;
       end
-      check(ok, "every drained event carries the current epoch");
+      check(ok, "every drained event carries paired post-change indices");
       check(popped > 0, "the FIFO drained");
     end
 
@@ -270,11 +274,11 @@ module tb_tandem_agc;
     check(state == 3'd0,     "disable returns to LEGACY");
     check(fpga_owns == 1'b0, "ownership returned to the PS");
     check(ctl_t == 4'hF,     "pins tri-stated again");
-    check(epoch_tomb == 8'd2,"the retired epoch is tombstoned");
+    check(epoch_tomb == 32'd2,"the retired epoch is tombstoned");
 
     // -- 11. re-enable takes a NEW epoch ------------------------------------
     enable_tandem(2'd2);
-    check(epoch == 8'd3,     "re-arming takes a new, never-reused epoch");
+    check(epoch == 32'd3,    "re-arming takes the requested new epoch");
     disable_tandem;
 
     // -- 12. consumer not ready must fault rather than arm ------------------

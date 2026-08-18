@@ -4,7 +4,7 @@
 // AXI4-Lite slave for the tandem AGC block. This is the unit that goes into the
 // Pluto block design: it owns the processor-domain register interface and every
 // crossing into and out of the receive domain, per TANDEM_AGC_V1_DESIGN.md §8
-// and §9.
+// and the v2 ownership contract.
 //
 // Three domains meet here and each crossing uses a primitive from
 // tandem_cdc_lib.v, never an ad-hoc synchroniser:
@@ -24,7 +24,7 @@
 
 module tandem_agc_axi #(
   parameter integer EVT_AW = 6,
-  parameter integer EVT_DW = 104,
+  parameter integer EVT_DW = 128,
   parameter integer EVENTS = 1
 ) (
   // ---- AXI4-Lite, processor domain ---------------------------------------
@@ -76,20 +76,22 @@ module tandem_agc_axi #(
   // ---------------------------------------------------------------------------
   // configuration registers, held in the AXI domain
   // ---------------------------------------------------------------------------
-  localparam integer CFGW = 108;
-  localparam integer STAW = 78;
+  localparam integer CFGW = 140;
+  localparam integer STAW = 126;
 
   reg [7:0]  r_pulse_hi, r_pulse_lo;
   reg [15:0] r_blank_guard;
   reg [19:0] r_pwr_period;
   reg [7:0]  r_cooldown, r_dwell, r_debounce;
   reg [7:0]  r_idx_min, r_idx_max, r_idx_init;
+  reg [31:0] r_epoch, r_thresholds;
   reg [1:0]  r_mode;
   reg        r_fault_clear;
   reg        cfg_load;
 
   wire [CFGW-1:0] cfg_bundle = {
-      5'd0, r_fault_clear, r_mode, r_idx_init, r_idx_max, r_idx_min,
+      r_epoch, 5'd0, r_fault_clear, r_mode,
+      r_idx_init, r_idx_max, r_idx_min,
       r_debounce, r_dwell, r_cooldown, r_pwr_period, r_blank_guard,
       r_pulse_lo, r_pulse_hi };
 
@@ -129,24 +131,27 @@ module tandem_agc_axi #(
   wire [7:0]  c_idx_init    = cfg_held[99:92];
   wire [1:0]  c_mode        = cfg_held[101:100];
   wire        c_fault_clear = cfg_held[102];
+  wire [31:0] c_epoch       = cfg_held[139:108];
 
   // ---------------------------------------------------------------------------
   // the controller
   // ---------------------------------------------------------------------------
   wire [2:0]  state;
-  wire [7:0]  epoch, epoch_tomb, expected_index, fault, detect;
+  wire [31:0] epoch, epoch_tomb;
+  wire [7:0]  expected_index, fault, detect;
   wire        pulse_busy, cooldown_active, fpga_owns;
   wire [7:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
   wire [EVT_DW-1:0] evt_rdata;
   wire        evt_valid;
   wire [EVT_AW:0] evt_level;
-  wire [31:0] evt_ovf;
+  wire [7:0]  evt_ovf;
   reg         evt_pop;
 
   tandem_agc_core #(.EVT_AW(EVT_AW), .EVT_DW(EVT_DW), .EVENTS(EVENTS)) u_core (
     .l_clk(l_clk), .l_resetn(l_resetn),
     .detect_async(detect_async), .sample_counter(sample_counter),
-    .mode_req(c_mode), .fault_clear(c_fault_clear), .consumer_ready(consumer_ready),
+    .mode_req(c_mode), .cfg_epoch(c_epoch),
+    .fault_clear(c_fault_clear), .consumer_ready(consumer_ready),
     .cfg_pulse_hi(c_pulse_hi), .cfg_pulse_lo(c_pulse_lo),
     .cfg_blank_guard(c_blank_guard), .cfg_pwr_period(c_pwr_period),
     .cfg_cooldown(c_cooldown), .cfg_dwell(c_dwell), .cfg_debounce(c_debounce),
@@ -159,7 +164,7 @@ module tandem_agc_axi #(
     .fault_o(fault), .detect_o(detect),
     .cnt_trans_o(cnt_trans), .cnt_inhib_o(cnt_inhib),
     .cnt_clamp_o(cnt_clamp), .cnt_stale_o(cnt_stale),
-    .evt_rd_clk(s_axi_aclk), .evt_rd_resetn(axi_resetn),
+    .evt_rd_clk(s_axi_aclk), .evt_rd_resetn(axi_resetn & ~r_fault_clear),
     .evt_rdata_o(evt_rdata), .evt_valid_o(evt_valid), .evt_pop(evt_pop),
     .evt_level_o(evt_level), .evt_ovf_o(evt_ovf),
     .evt_push_o(), .evt_wdata_o());
@@ -195,17 +200,21 @@ module tandem_agc_axi #(
     .dout(status_axi), .dout_valid(status_axi_valid));
 
   wire [2:0]  a_state   = status_axi[2:0];
-  wire [7:0]  a_epoch   = status_axi[10:3];
-  wire [7:0]  a_tomb    = status_axi[18:11];
-  wire [7:0]  a_expect  = status_axi[26:19];
-  wire        a_pbusy   = status_axi[27];
-  wire        a_cool    = status_axi[28];
-  wire        a_owns    = status_axi[29];
-  wire [7:0]  a_fault   = status_axi[37:30];
-  wire [7:0]  a_trans   = status_axi[45:38];
-  wire [7:0]  a_inhib   = status_axi[53:46];
-  wire [7:0]  a_clamp   = status_axi[61:54];
-  wire [7:0]  a_stale   = status_axi[69:62];
+  wire [31:0] a_epoch   = status_axi[34:3];
+  wire [31:0] a_tomb    = status_axi[66:35];
+  wire [7:0]  a_expect  = status_axi[74:67];
+  wire        a_pbusy   = status_axi[75];
+  wire        a_cool    = status_axi[76];
+  wire        a_owns    = status_axi[77];
+  wire [7:0]  a_fault   = status_axi[85:78];
+  wire [7:0]  a_trans   = status_axi[93:86];
+  wire [7:0]  a_inhib   = status_axi[101:94];
+  wire [7:0]  a_clamp   = status_axi[109:102];
+  wire [7:0]  a_stale   = status_axi[117:110];
+
+  wire [2:0] a_public_state =
+      (a_state == 3'd6) ? 3'd4 :
+      ((a_state == 3'd4) || (a_state == 3'd5)) ? 3'd5 : a_state;
 
   // ---------------------------------------------------------------------------
   // AXI4-Lite
@@ -231,7 +240,8 @@ module tandem_agc_axi #(
       r_pulse_hi <= 8'd16; r_pulse_lo <= 8'd16; r_blank_guard <= 16'd64;
       r_pwr_period <= 20'd10000; r_cooldown <= 8'd2; r_dwell <= 8'd4;
       r_debounce <= 8'd8; r_idx_min <= 8'd0; r_idx_max <= 8'd76;
-      r_idx_init <= 8'd40; r_mode <= 2'd0;
+      r_idx_init <= 8'd40; r_mode <= 2'd0; r_epoch <= 32'd0;
+      r_thresholds <= 32'd0;
     end else begin
       cfg_load      <= 1'b0;
       r_fault_clear <= 1'b0;
@@ -244,14 +254,21 @@ module tandem_agc_axi #(
 
       if (wready && s_axi_wvalid) begin
         case (awaddr_q)
-          8'h08: begin r_mode <= s_axi_wdata[1:0]; r_fault_clear <= s_axi_wdata[8]; end
-          8'h14: begin r_idx_min <= s_axi_wdata[7:0]; r_idx_max <= s_axi_wdata[15:8];
+          8'h0C: begin
+            r_mode <= !s_axi_wdata[0] ? 2'd0 :
+                      s_axi_wdata[1] ? 2'd2 : 2'd1;
+            r_fault_clear <= s_axi_wdata[8];
+          end
+          8'h14: r_epoch <= s_axi_wdata;
+          8'h18: begin r_idx_min <= s_axi_wdata[7:0]; r_idx_max <= s_axi_wdata[15:8];
                        r_idx_init <= s_axi_wdata[23:16]; end
-          8'h1C: begin r_pulse_hi <= s_axi_wdata[7:0]; r_pulse_lo <= s_axi_wdata[15:8];
-                       r_blank_guard <= s_axi_wdata[31:16]; end
           8'h20: r_pwr_period <= s_axi_wdata[19:0];
-          8'h24: begin r_cooldown <= s_axi_wdata[7:0]; r_dwell <= s_axi_wdata[15:8];
+          8'h24: begin r_dwell <= s_axi_wdata[7:0]; r_cooldown <= s_axi_wdata[15:8];
                        r_debounce <= s_axi_wdata[23:16]; end
+          8'h28: begin r_pulse_hi <= s_axi_wdata[7:0];
+                       r_pulse_lo <= s_axi_wdata[15:8]; end
+          8'h2C: r_blank_guard <= s_axi_wdata[15:0];
+          8'h30: r_thresholds <= s_axi_wdata;
           default: ;
         endcase
         if (!cfg_busy) cfg_load <= 1'b1;   // push the whole bundle across
@@ -276,29 +293,31 @@ module tandem_agc_axi #(
       if (arready && s_axi_arvalid && !rvalid) begin
         rvalid <= 1'b1;
         case (s_axi_araddr)
-          8'h00: rdata_q <= 32'h5441_4731;                 // "TAG1"
-          8'h04: rdata_q <= {16'd0, 8'd104, 8'd6};
-          8'h08: rdata_q <= {30'd0, r_mode};
-          8'h0C: rdata_q <= {24'd0, a_cool, a_pbusy, 1'b0, a_owns, 1'b0, a_state};
-          8'h10: rdata_q <= {16'd0, a_tomb, a_epoch};
-          8'h14: rdata_q <= {8'd0, r_idx_init, r_idx_max, r_idx_min};
-          8'h18: rdata_q <= {24'd0, a_expect};
-          8'h1C: rdata_q <= {r_blank_guard, r_pulse_lo, r_pulse_hi};
+          8'h00: rdata_q <= 32'h5441_4732;                 // "TAG2"
+          8'h04: rdata_q <= 32'd1;
+          8'h08: rdata_q <= {16'h0007, 16'd64};
+          8'h0C: rdata_q <= {23'd0, r_fault_clear, 6'd0, r_mode[1], |r_mode};
+          8'h10: rdata_q <= {23'd0, |a_fault, 5'd0, a_public_state};
+          8'h14: rdata_q <= r_epoch;
+          8'h18: rdata_q <= {8'd0, r_idx_init, r_idx_max, r_idx_min};
+          8'h1C: rdata_q <= {16'd0, a_expect, a_expect};
           8'h20: rdata_q <= {12'd0, r_pwr_period};
-          8'h24: rdata_q <= {8'd0, r_debounce, r_dwell, r_cooldown};
-          8'h2C: rdata_q <= {24'd0, a_fault};
-          8'h30: rdata_q <= evt_rdata[31:0];
-          8'h34: rdata_q <= evt_rdata[63:32];
-          8'h38: rdata_q <= evt_rdata[95:64];
-          8'h3C: begin rdata_q <= {24'd0, evt_rdata[103:96]};
+          8'h24: rdata_q <= {8'd0, r_debounce, r_cooldown, r_dwell};
+          8'h28: rdata_q <= {16'd0, r_pulse_lo, r_pulse_hi};
+          8'h2C: rdata_q <= {16'd0, r_blank_guard};
+          8'h30: rdata_q <= r_thresholds;
+          8'h34: rdata_q <= {24'd0, a_fault};
+          8'h38: rdata_q <= {{(31-EVT_AW){1'b0}}, evt_level};
+          8'h3C: rdata_q <= {24'd0, evt_ovf};
+          8'h40: rdata_q <= {24'd0, a_trans};
+          8'h44: rdata_q <= evt_rdata[31:0];
+          8'h48: rdata_q <= evt_rdata[63:32];
+          8'h4C: rdata_q <= evt_rdata[95:64];
+          8'h50: begin rdata_q <= evt_rdata[127:96];
                        if (evt_valid) evt_pop <= 1'b1; end
-          8'h40: rdata_q <= {{(31-EVT_AW){1'b0}}, evt_level};
-          8'h44: rdata_q <= evt_ovf;
-          8'h48: rdata_q <= {24'd0, a_trans};
-          8'h4C: rdata_q <= {24'd0, a_stale};
-          8'h50: rdata_q <= {24'd0, a_inhib};
-          8'h54: rdata_q <= {24'd0, a_clamp};
-          8'h5C: rdata_q <= 32'd0;  // detect dropped from the snapshot to save flops
+          8'h54: rdata_q <= {24'd0, a_stale};
+          8'h58: rdata_q <= {24'd0, a_inhib};
+          8'h5C: rdata_q <= {24'd0, a_clamp};
           default: rdata_q <= 32'd0;
         endcase
       end else if (rvalid && s_axi_rready) rvalid <= 1'b0;

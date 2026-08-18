@@ -24,6 +24,7 @@ module tb_tandem_agc_stress;
   reg [7:0]  cfg_idx_min = 8'd0, cfg_idx_max = 8'd76, cfg_idx_init = 8'd40;
 
   reg [1:0]  mode_req = 2'd0;
+  reg [31:0] cfg_epoch = 32'h1234;
   reg        fault_clear = 1'b0, consumer_ready = 1'b1;
   reg [3:0]  ps_ctl_o = 4'd0, ps_ctl_t = 4'hF;
   reg [7:0]  sw_idx_rx1 = 8'd0, sw_idx_rx2 = 8'd0;
@@ -38,13 +39,14 @@ module tb_tandem_agc_stress;
   wire [3:0] ctl_o, ctl_t;
   wire [7:0] detect;
   wire [2:0] state;
-  wire [7:0] epoch, epoch_tomb, expected_index, fault, det_stable;
+  wire [31:0] epoch, epoch_tomb;
+  wire [7:0] expected_index, fault, det_stable;
   wire       pulse_busy, cooldown_active, fpga_owns;
   wire [7:0]  cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
-  wire [103:0] evt_rdata;
+  wire [127:0] evt_rdata;
   wire       evt_valid;
   wire [6:0] evt_level;
-  wire [31:0] evt_ovf;
+  wire [7:0] evt_ovf;
   wire [7:0] m_rx1, m_rx2;
   wire [31:0] m_acc, m_rej, m_ign;
 
@@ -54,7 +56,8 @@ module tb_tandem_agc_stress;
   tandem_agc_core core (
     .l_clk(l_clk), .l_resetn(l_resetn),
     .detect_async(detect), .sample_counter(sample_counter),
-    .mode_req(mode_req), .fault_clear(fault_clear), .consumer_ready(consumer_ready),
+    .mode_req(mode_req), .cfg_epoch(cfg_epoch),
+    .fault_clear(fault_clear), .consumer_ready(consumer_ready),
     .cfg_pulse_hi(cfg_pulse_hi), .cfg_pulse_lo(cfg_pulse_lo),
     .cfg_blank_guard(cfg_blank_guard), .cfg_pwr_period(cfg_pwr_period),
     .cfg_cooldown(cfg_cooldown), .cfg_dwell(cfg_dwell), .cfg_debounce(cfg_debounce),
@@ -103,6 +106,7 @@ module tb_tandem_agc_stress;
   task go(input [1:0] m);
     begin
       model.rx1_index = cfg_idx_init; model.rx2_index = cfg_idx_init;
+      cfg_epoch = cfg_epoch + 32'd1;
       mode_req = m; tick(4); wait (fpga_owns); tick(2); armed = 1'b1; tick(4);
     end
   endtask
@@ -237,13 +241,13 @@ module tb_tandem_agc_stress;
 
     // -- 7. event sequence rollover ----------------------------------------
     begin : seq_rollover
-      reg [15:0] s_before;
+      reg [31:0] s_before;
       ae0 = a_err;
       go(2'd2);
       // Teleport the counter close to the wrap. This is an artificial jump, not
       // a wrap, so the checker's history is void across it -- re-baseline, or it
       // would (correctly) flag the jump itself as non-monotonic.
-      core.evt_seq = 16'hFFFE;
+      core.evt_seq = 32'hFFFF_FFFE;
       chk.seq_seen = 1'b0;
       s_before = core.evt_seq;
       rx1_level = -16'sd25; rx2_level = -16'sd25;

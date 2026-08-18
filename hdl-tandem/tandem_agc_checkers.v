@@ -13,7 +13,7 @@
 `timescale 1ns/1ps
 
 module tandem_agc_checkers #(
-  parameter integer EVT_DW = 104
+  parameter integer EVT_DW = 128
 ) (
   input  wire              l_clk,
   input  wire              l_resetn,
@@ -38,7 +38,7 @@ module tandem_agc_checkers #(
 
   input  wire              evt_push,
   input  wire [EVT_DW-1:0] evt_wdata,
-  input  wire [7:0]        epoch,
+  input  wire [31:0]       epoch,
 
   output reg  [31:0]       a_err
 );
@@ -49,14 +49,15 @@ module tandem_agc_checkers #(
   reg       was_high;
   reg [7:0] exp_idx_d;
   reg       evt_push_d;
-  reg [15:0] last_seq;
-  reg [7:0]  last_epoch;
+  reg [31:0] last_seq;
+  reg [31:0] last_epoch;
   reg        seq_seen;
   reg [3:0]  ps_o_d;
   reg [3:0]  ps_t_d;
   reg        owns_d;
   reg        cd_d, blank_d;
   reg [7:0]  fault_d;
+  wire [31:0] event_seq_delta = evt_wdata[95:64] - last_seq;
 
   task fail(input [511:0] which);
     begin
@@ -68,7 +69,7 @@ module tandem_agc_checkers #(
   initial begin
     a_err = 0; hi_run = 0; lo_run = 0; was_high = 0;
     cd_d = 0; blank_d = 0; fault_d = 0;
-    last_seq = 16'd0; last_epoch = 0; seq_seen = 0;
+    last_seq = 32'd0; last_epoch = 32'd0; seq_seen = 0;
   end
 
   always @(posedge l_clk) begin
@@ -84,8 +85,8 @@ module tandem_agc_checkers #(
 
     if (!l_resetn) begin
       seq_seen   <= 1'b0;          // history is void across a reset
-      last_seq   <= 16'd0;
-      last_epoch <= 8'd0;
+      last_seq   <= 32'd0;
+      last_epoch <= 32'd0;
     end else begin
 
       // A-1: increment and decrement never asserted together on a channel
@@ -141,17 +142,20 @@ module tandem_agc_checkers #(
         if (ctl_t !== ps_t_d) fail("A-8 legacy tri-state not passed through");
       end
 
-      // A-9/A-10: epoch is current, sequence is monotonic within an epoch
+      // A-9/A-10: event is post-change, paired, and sequence is monotonic.
       if (evt_push) begin
-        if (evt_wdata[87:80] !== epoch) fail("A-9 event carries a stale epoch");
-        if (seq_seen && (evt_wdata[87:80] == last_epoch)) begin
-          // serial-number comparison (D-4): "after" means the signed difference
-          // is positive, so a wrap at 2^32 is ordered correctly.
-          if ($signed(evt_wdata[103:88] - last_seq) <= 0)
-            fail("A-10 event sequence not monotonic within the epoch");
+        if (evt_wdata[119:112] !== evt_wdata[127:120])
+          fail("A-9 event RX indices differ");
+        if (evt_wdata[119:112] !== expected_index)
+          fail("A-9 event does not carry the accepted post-change index");
+        if (seq_seen && epoch == last_epoch &&
+            (event_seq_delta == 32'd0 || event_seq_delta[31])) begin
+          $display("event sequence current=%h previous=%h delta=%h",
+                   evt_wdata[95:64], last_seq, event_seq_delta);
+          fail("A-10 event sequence not monotonic");
         end
-        last_seq   <= evt_wdata[103:88];
-        last_epoch <= evt_wdata[87:80];
+        last_seq   <= evt_wdata[95:64];
+        last_epoch <= epoch;
         seq_seen   <= 1'b1;
       end
 

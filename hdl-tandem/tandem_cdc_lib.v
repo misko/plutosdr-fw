@@ -136,7 +136,7 @@ module tandem_async_fifo #(
   input  wire          wr_en,
   input  wire [W-1:0]  wr_data,
   output wire          wr_full,
-  output reg  [31:0]   wr_ovf,
+  output reg  [7:0]    wr_ovf,
 
   input  wire          rd_clk,
   input  wire          rd_resetn,
@@ -168,13 +168,14 @@ module tandem_async_fifo #(
 
   always @(posedge wr_clk) begin
     if (!wr_resetn) begin
-      wbin <= 0; wgray <= 0; wr_ovf <= 32'd0; full_r <= 1'b0;
+      wbin <= 0; wgray <= 0; wr_ovf <= 8'd0; full_r <= 1'b0;
       rgray_s1 <= 0; rgray_s2 <= 0;
     end else begin
       rgray_s1 <= rgray;
       rgray_s2 <= rgray_s1;
       if (wr_en) begin
-        if (full_r) wr_ovf <= wr_ovf + 32'd1;       // never silent, §7.5
+        if (full_r && wr_ovf != 8'hFF)
+          wr_ovf <= wr_ovf + 8'd1;
         else        mem[wbin[AW-1:0]] <= wr_data;
       end
       wbin   <= wbin_nxt;
