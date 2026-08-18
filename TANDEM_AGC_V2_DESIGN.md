@@ -60,7 +60,9 @@ While a lease is active, conflicting AD9361 writes return `-EBUSY`. This
 includes RX hardware gain, gain-control mode, gain-table selection or reload,
 RX LO/band changes, sample-rate changes that invalidate controller timing,
 ENSM changes, initialize/reset, driver unbind, and direct debug-register
-writes. Unexpected hardware state is a fault and triggers rollback.
+writes. TX hardware gain remains writable because the lease neither owns nor
+snapshots the TX attenuators; this permits a separately safety-gated loopback
+stimulus. Unexpected hardware state is a fault and triggers rollback.
 
 Closing the session file descriptor releases the lease. This is mandatory
 process-death cleanup, not an optional userspace convention.

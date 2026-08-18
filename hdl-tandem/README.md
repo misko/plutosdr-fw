@@ -37,6 +37,10 @@ The canary also omits the AXI4-Lite slave (a standard component, roughly
 
 `tandem_agc_core.v` is the receive-clock controller and `tandem_agc_axi.v` is
 the only control surface. It implements the forward-only `TAG2` register ABI
+with a coherent 30-bit return crossing containing only software-observable
+state. Epoch configuration is already AXI-local; retired-epoch and policy
+diagnostic counters remain core-local for simulation and do not consume a
+second pair of wide CDC register banks.
 used by the Linux ownership driver; the v1 standalone register wrapper has
 been removed so it cannot become a second control path.
 `ad9361_gain_model.v` is a behavioural model of the part; every behaviour in it

@@ -77,7 +77,7 @@ module tandem_agc_axi #(
   // configuration registers, held in the AXI domain
   // ---------------------------------------------------------------------------
   localparam integer CFGW = 140;
-  localparam integer STAW = 126;
+  localparam integer STAW = 30;
 
   reg [7:0]  r_pulse_hi, r_pulse_lo;
   reg [15:0] r_blank_guard;
@@ -170,13 +170,16 @@ module tandem_agc_axi #(
     .evt_push_o(), .evt_wdata_o());
 
   // ---------------------------------------------------------------------------
-  // status snapshot, l_clk -> AXI. Periodic, over the same handshake, so a
-  // reader always sees one coherent instant instead of a mix of two.
+  // Status snapshot, l_clk -> AXI. Periodic, over the same handshake, so a
+  // reader always sees one coherent instant instead of a mix of two. Keep only
+  // fields observable through the forward ABI: r_epoch already lives in the
+  // AXI domain, while the retired epoch and policy-debug counters have no
+  // software consumer. Crossing them duplicated 96 bits in both the source
+  // hold and destination registers on an already full XC7Z010.
   // ---------------------------------------------------------------------------
   wire [STAW-1:0] status_bundle = {
-      8'd0, cnt_stale, cnt_clamp, cnt_inhib, cnt_trans, fault,
-      fpga_owns, cooldown_active, pulse_busy, expected_index, epoch_tomb,
-      epoch, state };
+      cnt_trans, fault, fpga_owns, cooldown_active, pulse_busy,
+      expected_index, state };
 
   reg  [7:0] snap_div;
   reg        snap_load;
@@ -200,17 +203,12 @@ module tandem_agc_axi #(
     .dout(status_axi), .dout_valid(status_axi_valid));
 
   wire [2:0]  a_state   = status_axi[2:0];
-  wire [31:0] a_epoch   = status_axi[34:3];
-  wire [31:0] a_tomb    = status_axi[66:35];
-  wire [7:0]  a_expect  = status_axi[74:67];
-  wire        a_pbusy   = status_axi[75];
-  wire        a_cool    = status_axi[76];
-  wire        a_owns    = status_axi[77];
-  wire [7:0]  a_fault   = status_axi[85:78];
-  wire [7:0]  a_trans   = status_axi[93:86];
-  wire [7:0]  a_inhib   = status_axi[101:94];
-  wire [7:0]  a_clamp   = status_axi[109:102];
-  wire [7:0]  a_stale   = status_axi[117:110];
+  wire [7:0]  a_expect  = status_axi[10:3];
+  wire        a_pbusy   = status_axi[11];
+  wire        a_cool    = status_axi[12];
+  wire        a_owns    = status_axi[13];
+  wire [7:0]  a_fault   = status_axi[21:14];
+  wire [7:0]  a_trans   = status_axi[29:22];
 
   wire [2:0] a_public_state =
       (a_state == 3'd6) ? 3'd4 :
@@ -315,9 +313,9 @@ module tandem_agc_axi #(
           8'h4C: rdata_q <= evt_rdata[95:64];
           8'h50: begin rdata_q <= evt_rdata[127:96];
                        if (evt_valid) evt_pop <= 1'b1; end
-          8'h54: rdata_q <= {24'd0, a_stale};
-          8'h58: rdata_q <= {24'd0, a_inhib};
-          8'h5C: rdata_q <= {24'd0, a_clamp};
+          8'h54: rdata_q <= 32'd0;
+          8'h58: rdata_q <= 32'd0;
+          8'h5C: rdata_q <= 32'd0;
           default: rdata_q <= 32'd0;
         endcase
       end else if (rvalid && s_axi_rready) rvalid <= 1'b0;
