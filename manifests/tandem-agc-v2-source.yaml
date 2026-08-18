@@ -6,9 +6,9 @@ release_state: candidate
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
-libiio_0_25_source: 457bda348ad70906a7ef8005189dae4ed312cf0b
+libiio_0_25_source: cfddbf29148fb254f95e50a8667b8a0ba3b49732
 libiio_0_25_repo: https://github.com/misko/libiio.git
-libiio_0_25_ref: refs/tags/tandem-agc-v2-source/libiio-v3
+libiio_0_25_ref: refs/tags/tandem-agc-v2-source/libiio-v4
 
 gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
 gadget_repo: https://github.com/misko/plutosdr-fw.git
