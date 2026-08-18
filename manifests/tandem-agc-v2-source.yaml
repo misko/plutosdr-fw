@@ -30,9 +30,9 @@ submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
 submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
 submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc10-source/hdl-quantulum
 
-submodule_linux: a00c4d2ebda51dbfa57a85d3b4299a79f28035cf
+submodule_linux: 85430d6efec2f77d500f7a2b5565e4ca0bd59ab0
 submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
-submodule_linux_ref: refs/tags/tandem-agc-v2-source/linux-v9
+submodule_linux_ref: refs/tags/tandem-agc-v2-source/linux-v10
 
 submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
 submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
