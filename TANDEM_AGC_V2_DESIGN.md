@@ -67,6 +67,12 @@ stimulus. Unexpected hardware state is a fault and triggers rollback.
 Closing the session file descriptor releases the lease. This is mandatory
 process-death cleanup, not an optional userspace convention.
 
+The provider refreshes a kernel lease heartbeat on every completed frame. If
+the descriptor remains open but frame/status progress stops for five seconds,
+the kernel forces HOLD, restores the AD9361 snapshot, and reports a typed
+watchdog fault. A wedged owner therefore cannot leave autonomous gain pulses
+running indefinitely.
+
 ### libiio and iiOD
 
 libiio transports opaque, provider-owned session requests and returns opaque
@@ -289,7 +295,9 @@ re-arm is forbidden.
 - synthetic FPGA records round-trip through the kernel drain, iiOD metadata
   provider, libiio C/Python bindings, SPF decoder, and Zarr store;
 - event reconstruction agrees with endpoint observations;
-- USB-IIO, network-IIO, direct USB, and direct IP use the same metadata schema.
+- USB-IIO and network-IIO return the same metadata schema. Direct gadget
+  transports reject tandem requests in v2; they cannot bypass the exclusive
+  iiOD-owned lease or silently return legacy metadata.
 
 ### C5: hardware
 
