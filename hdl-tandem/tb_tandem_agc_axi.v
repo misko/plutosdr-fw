@@ -30,6 +30,9 @@ module tb_tandem_agc_axi;
 
   wire [3:0] ctl_o, ctl_t;
   wire [7:0] detect_pins;
+  reg        use_forced_detect = 1'b0;
+  reg  [7:0] forced_detect = 8'd0;
+  wire [7:0] tandem_detect = use_forced_detect ? forced_detect : detect_pins;
   wire [7:0] m_rx1, m_rx2;
   wire [31:0] m_acc, m_rej, m_ign;
 
@@ -45,7 +48,7 @@ module tb_tandem_agc_axi;
     .s_axi_araddr(araddr), .s_axi_arvalid(arvalid), .s_axi_arready(arready),
     .s_axi_rdata(rdata), .s_axi_rresp(rresp), .s_axi_rvalid(rvalid), .s_axi_rready(rready),
     .l_clk(l_clk), .l_aresetn(l_aresetn),
-    .detect_async(detect_pins), .sample_counter(sample_counter),
+    .detect_async(tandem_detect), .sample_counter(sample_counter),
     .sample_valid(sample_valid),
     .consumer_ready(1'b1),
     .ps_ctl_o(4'd0), .ps_ctl_t(4'hF), .ctl_o(ctl_o), .ctl_t(ctl_t));
@@ -235,6 +238,33 @@ module tb_tandem_agc_axi;
     axi_read(8'h10, v);
     check(v[2:0] == 3'd0, "release returns to public IDLE");
     check(ctl_t  == 4'hF, "pins tri-stated back to the legacy path");
+
+    // Reproduce the hardware recovery path end-to-end: fill the asynchronous
+    // event FIFO, observe fail-closed, then hold CLEAR across the configuration
+    // CDC until the receive-domain sticky fault and FIFO are reset.
+    axi_write(8'h0C, 32'h0000_0100); tick(300);
+    axi_write(8'h0C, 32'd0); tick(300);
+    model.rx1_index = 8'd40; model.rx2_index = 8'd40;
+    axi_write(8'h0C, 32'd1); tick(600);
+    armed = 1'b1;
+    axi_write(8'h0C, 32'd3); tick(600);
+    use_forced_detect = 1'b1;
+    forced_detect = 8'h88; tick(15000); // both channels low-power
+    forced_detect = 8'h44; tick(30000); // large overload on both channels
+    axi_read(8'h34, v);
+    check(v[0] == 1'b1, "undrained event FIFO raises the sticky overflow fault");
+    axi_read(8'h10, v);
+    check(v[2:0] == 3'd4, "FIFO overflow enters public FAULTED state");
+    armed = 1'b0;
+    axi_write(8'h0C, 32'h0000_0100); tick(600);
+    axi_read(8'h34, v);
+    check(v == 32'd0, "level-held AXI clear reaches the receive-domain fault");
+    axi_read(8'h38, v);
+    check(v == 32'd0, "level-held AXI clear resets the event FIFO");
+    axi_write(8'h0C, 32'd0); tick(600);
+    use_forced_detect = 1'b0;
+    axi_read(8'h10, v);
+    check(v[2:0] == 3'd0, "fault recovery returns to public IDLE");
 
     $display("---- scenario failures : %0d ----", errors);
     if (errors != 0) $fatal(1, "AXI TESTS FAILED");
