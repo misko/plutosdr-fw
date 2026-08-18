@@ -217,12 +217,15 @@ module tandem_agc_axi #(
   // ---------------------------------------------------------------------------
   // AXI4-Lite
   // ---------------------------------------------------------------------------
-  reg        awready, wready, bvalid, arready, rvalid;
+  reg        aw_pending, w_pending, bvalid, arready, rvalid;
   reg [7:0]  awaddr_q, araddr_q;
-  reg [31:0] rdata_q;
+  reg [31:0] wdata_q, rdata_q;
 
-  assign s_axi_awready = awready;
-  assign s_axi_wready  = wready;
+  // AW and W are independent AXI channels.  Hold either one until its peer
+  // arrives; requiring AWVALID and WVALID in the same cycle can deadlock a
+  // conforming interconnect that completes the address transaction first.
+  assign s_axi_awready = axi_resetn && !aw_pending && !bvalid;
+  assign s_axi_wready  = axi_resetn && !w_pending && !bvalid;
   assign s_axi_bvalid  = bvalid;
   assign s_axi_bresp   = 2'b00;
   assign s_axi_arready  = arready;
@@ -233,7 +236,8 @@ module tandem_agc_axi #(
   // write channel
   always @(posedge s_axi_aclk) begin
     if (!axi_resetn) begin
-      awready <= 1'b0; wready <= 1'b0; bvalid <= 1'b0; awaddr_q <= 8'd0;
+      aw_pending <= 1'b0; w_pending <= 1'b0; bvalid <= 1'b0;
+      awaddr_q <= 8'd0; wdata_q <= 32'd0;
       cfg_load <= 1'b0; r_fault_clear <= 1'b0;
       r_pulse_hi <= 8'd16; r_pulse_lo <= 8'd16; r_blank_guard <= 16'd64;
       r_pwr_period <= 20'd10000; r_cooldown <= 8'd2; r_dwell <= 8'd4;
@@ -244,34 +248,41 @@ module tandem_agc_axi #(
       cfg_load      <= 1'b0;
       r_fault_clear <= 1'b0;
 
-      if (!awready && s_axi_awvalid) begin awready <= 1'b1; awaddr_q <= s_axi_awaddr; end
-      else awready <= 1'b0;
+      if (s_axi_awready && s_axi_awvalid) begin
+        aw_pending <= 1'b1;
+        awaddr_q <= s_axi_awaddr;
+      end
+      if (s_axi_wready && s_axi_wvalid) begin
+        w_pending <= 1'b1;
+        wdata_q <= s_axi_wdata;
+      end
 
-      if (!wready && s_axi_wvalid && s_axi_awvalid) wready <= 1'b1;
-      else wready <= 1'b0;
-
-      if (wready && s_axi_wvalid) begin
+      if (aw_pending && w_pending && !bvalid) begin
         case (awaddr_q)
           8'h0C: begin
-            r_mode <= !s_axi_wdata[0] ? 2'd0 :
-                      s_axi_wdata[1] ? 2'd2 : 2'd1;
-            r_fault_clear <= s_axi_wdata[8];
+            r_mode <= !wdata_q[0] ? 2'd0 :
+                      wdata_q[1] ? 2'd2 : 2'd1;
+            r_fault_clear <= wdata_q[8];
           end
-          8'h14: r_epoch <= s_axi_wdata;
-          8'h18: begin r_idx_min <= s_axi_wdata[7:0]; r_idx_max <= s_axi_wdata[15:8];
-                       r_idx_init <= s_axi_wdata[23:16]; end
-          8'h20: r_pwr_period <= s_axi_wdata[19:0];
-          8'h24: begin r_dwell <= s_axi_wdata[7:0]; r_cooldown <= s_axi_wdata[15:8];
-                       r_debounce <= s_axi_wdata[23:16]; end
-          8'h28: begin r_pulse_hi <= s_axi_wdata[7:0];
-                       r_pulse_lo <= s_axi_wdata[15:8]; end
-          8'h2C: r_blank_guard <= s_axi_wdata[15:0];
-          8'h30: r_thresholds <= s_axi_wdata;
+          8'h14: r_epoch <= wdata_q;
+          8'h18: begin r_idx_min <= wdata_q[7:0]; r_idx_max <= wdata_q[15:8];
+                       r_idx_init <= wdata_q[23:16]; end
+          8'h20: r_pwr_period <= wdata_q[19:0];
+          8'h24: begin r_dwell <= wdata_q[7:0]; r_cooldown <= wdata_q[15:8];
+                       r_debounce <= wdata_q[23:16]; end
+          8'h28: begin r_pulse_hi <= wdata_q[7:0];
+                       r_pulse_lo <= wdata_q[15:8]; end
+          8'h2C: r_blank_guard <= wdata_q[15:0];
+          8'h30: r_thresholds <= wdata_q;
           default: ;
         endcase
         if (!cfg_busy) cfg_load <= 1'b1;   // push the whole bundle across
+        aw_pending <= 1'b0;
+        w_pending <= 1'b0;
         bvalid <= 1'b1;
-      end else if (bvalid && s_axi_bready) bvalid <= 1'b0;
+      end else if (bvalid && s_axi_bready) begin
+        bvalid <= 1'b0;
+      end
     end
   end
 

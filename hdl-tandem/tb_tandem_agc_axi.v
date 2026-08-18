@@ -75,6 +75,44 @@ module tb_tandem_agc_axi;
     end
   endtask
 
+  // AXI4-Lite explicitly permits AW and W to arrive independently.  Exercise
+  // both legal orderings because a CPU/interconnect is not required to keep
+  // AWVALID asserted while it waits to present WVALID (or vice versa).
+  task axi_write_aw_first(input [7:0] a, input [31:0] d);
+    integer guard;
+    begin
+      @(posedge s_axi_aclk);
+      awaddr <= a; awvalid <= 1'b1; bready <= 1'b1;
+      wait (awready); @(posedge s_axi_aclk); awvalid <= 1'b0;
+      tick(3);
+      wdata <= d; wvalid <= 1'b1;
+      guard = 0;
+      while (!bvalid && guard < 32) begin tick(1); guard = guard + 1; end
+      check(bvalid, "AW-before-W write completes");
+      wvalid <= 1'b0;
+      if (bvalid) @(posedge s_axi_aclk);
+      bready <= 1'b0;
+      tick(2);
+    end
+  endtask
+
+  task axi_write_w_first(input [7:0] a, input [31:0] d);
+    integer guard;
+    begin
+      @(posedge s_axi_aclk);
+      wdata <= d; wvalid <= 1'b1; bready <= 1'b1;
+      tick(3);
+      awaddr <= a; awvalid <= 1'b1;
+      guard = 0;
+      while (!bvalid && guard < 32) begin tick(1); guard = guard + 1; end
+      check(bvalid, "W-before-AW write completes");
+      awvalid <= 1'b0; wvalid <= 1'b0;
+      if (bvalid) @(posedge s_axi_aclk);
+      bready <= 1'b0;
+      tick(2);
+    end
+  endtask
+
   task axi_read(input [7:0] a, output [31:0] d);
     begin
       @(posedge s_axi_aclk);
@@ -101,6 +139,13 @@ module tb_tandem_agc_axi;
     axi_read(8'h18, v);
     check(v[7:0] == 8'd0 && v[15:8] == 8'd76,
           "index window default is the full range (D-7 optional)");
+
+    axi_write_aw_first(8'h30, 32'ha55a_1357);
+    axi_read(8'h30, v);
+    check(v == 32'ha55a_1357, "AW-before-W data and address remain paired");
+    axi_write_w_first(8'h30, 32'h5aa5_2468);
+    axi_read(8'h30, v);
+    check(v == 32'h5aa5_2468, "W-before-AW data and address remain paired");
 
     // configure for a fast simulation profile, entirely over AXI
     axi_write(8'h28, {16'd0, 8'd4, 8'd4});
