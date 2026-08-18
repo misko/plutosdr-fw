@@ -8,7 +8,7 @@
 #LIBIIO_VERSION = 0.25
 #LIBIIO_SITE = $(call github,analogdevicesinc,libiio,v$(LIBIIO_VERSION))
 
-LIBIIO_VERSION = c26258bfa33098c2b215e19cf85d448e89499b1a
+LIBIIO_VERSION = 7037e718a3a7342883a84076c2e903971b4f7376
 LIBIIO_SITE = $(call github,misko,libiio,$(LIBIIO_VERSION))
 
 LIBIIO_INSTALL_STAGING = YES
@@ -58,11 +58,17 @@ endif
 
 ifeq ($(BR2_PACKAGE_LIBIIO_IIOD),y)
 LIBIIO_DEPENDENCIES += host-flex host-bison libaio spf_metadata_source
+define LIBIIO_INSTALL_TANDEM_AGC_UAPI
+	$(INSTALL) -D -m 0644 \
+		$(TOPDIR)/../linux/include/uapi/linux/adi_tandem_agc.h \
+		$(STAGING_DIR)/usr/include/linux/adi_tandem_agc.h
+endef
+LIBIIO_PRE_CONFIGURE_HOOKS += LIBIIO_INSTALL_TANDEM_AGC_UAPI
 LIBIIO_CONF_OPTS += \
 	-DWITH_IIOD=ON \
 	-DWITH_AIO=ON \
 	-DIIOD_BUFFER_METADATA_PROVIDER=$(@D)/iiod/spf-buffer-metadata.c \
-	-DIIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES="$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_sampler.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_rssi_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_radio_frame_v3.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_thread_join.c" \
+	-DIIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES="$(@D)/iiod/spf-tandem-session.c;$(@D)/iiod/spf-tandem-metadata.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_sampler.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_rssi_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_radio_frame_v3.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_thread_join.c" \
 	-DIIOD_BUFFER_METADATA_INCLUDE_DIRS=$(STAGING_DIR)/usr/include/spf
 else
 LIBIIO_CONF_OPTS += -DWITH_IIOD=OFF
