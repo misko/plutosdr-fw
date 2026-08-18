@@ -174,7 +174,8 @@ module tandem_agc_axi #(
     .evt_push_o(), .evt_wdata_o());
 
   // ---------------------------------------------------------------------------
-  // Status snapshot, l_clk -> AXI. Periodic, over the same handshake, so a
+  // Status snapshot, l_clk -> AXI. Re-issued as soon as the preceding
+  // handshake completes, so a
   // reader always sees one coherent instant instead of a mix of two. Keep only
   // fields observable through the forward ABI: r_epoch already lives in the
   // AXI domain, while the retired epoch and policy-debug counters have no
@@ -185,18 +186,13 @@ module tandem_agc_axi #(
       cnt_trans, fault, fpga_owns, cooldown_active, pulse_busy,
       expected_index, state };
 
-  reg  [7:0] snap_div;
-  reg        snap_load;
   wire       snap_busy;
-  always @(posedge l_clk) begin
-    if (!l_resetn) begin snap_div <= 8'd0; snap_load <= 1'b0; end
-    else begin
-      snap_load <= 1'b0;
-      if (snap_div == 8'hFF) begin
-        if (!snap_busy) begin snap_load <= 1'b1; snap_div <= 8'd0; end
-      end else snap_div <= snap_div + 8'd1;
-    end
-  end
+  // tandem_cdc_bus captures status_bundle in its source holding register on
+  // this pulse.  busy rises with that same source edge and remains asserted
+  // until the destination has acknowledged the snapshot, naturally turning
+  // this level into one load pulse per completed round trip.  This is both
+  // fresher and smaller than an arbitrary eight-bit polling divider.
+  wire       snap_load = l_resetn && !snap_busy;
 
   wire [STAW-1:0] status_axi;
   wire            status_axi_valid;
