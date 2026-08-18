@@ -6,9 +6,9 @@ release_state: candidate
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
-libiio_0_25_source: 09e5922cc5707eca5aad32814557f39fbef70a8a
+libiio_0_25_source: 457bda348ad70906a7ef8005189dae4ed312cf0b
 libiio_0_25_repo: https://github.com/misko/libiio.git
-libiio_0_25_ref: refs/tags/tandem-agc-v2-source/libiio-v2
+libiio_0_25_ref: refs/tags/tandem-agc-v2-source/libiio-v3
 
 gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
 gadget_repo: https://github.com/misko/plutosdr-fw.git
@@ -18,9 +18,9 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 648f13f47381fde74702c9e48091d09fc9154507
+submodule_buildroot: 8ddad4783d8dfdd8277cb7fac6838f20849d1358
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/tandem-agc-v2-source/buildroot-v2
+submodule_buildroot_ref: refs/tags/tandem-agc-v2-source/buildroot-v3
 
 submodule_hdl: 5c691681b821ce49491db11ef8952b1f488e6b84
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
