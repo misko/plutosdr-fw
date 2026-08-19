@@ -19,7 +19,8 @@
 | `libiio-metadata-v5` | 2026-08-12 | superseded | frame metadata through the standard libiio USB and IP/TCP transports |
 | `libiio-metadata-v6-rc3` | 2026-08-17 | **RAM-only candidate** | bounded teardown/reset diagnostics and Winbond identity support for #32/#33 |
 | `libiio-metadata-v6-rc4` | 2026-08-17 | **hardware-qualified, persistent prerelease** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
-| **`libiio-metadata-v6`** | 2026-08-17 | **current hardware-qualified** | final RC4 graph, exact release identity, four-board persistent qualification |
+| `libiio-metadata-v6` | 2026-08-17 | superseded | final RC4 graph, exact release identity, four-board persistent qualification |
+| **`tandem-agc-v7`** | 2026-08-19 | **current hardware-qualified** | paired RX1/RX2 AGC, ABI-2 metadata control, synchronous close, and four-board persistent qualification |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -27,6 +28,57 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.40-plutoplus-spf-tandem-agc-v7 — 2026-08-19 — **hardware-qualified release**
+
+Tandem AGC v7 controls RX1 and RX2 as one coherent gain pair. Standard-libiio
+ABI-2 metadata sessions select HOLD or AUTO, report one ownership epoch and
+matched endpoint gains, and expose bounded events, faults, overflow state, and
+the active gain-table region. A stalled owner rolls back through the watchdog;
+boot and every test exit leave TX1/TX2 at `-80 dB` with DDS disabled.
+
+The exact release is firmware commit
+[`e0049c2d0077770eeb1f6850b957878a373623d9`](https://github.com/misko/plutosdr-fw/commit/e0049c2d0077770eeb1f6850b957878a373623d9),
+built and attested by
+[run `32214045747`](https://github.com/misko/plutosdr-fw/actions/runs/32214045747).
+Its embedded identity is `v0.40-plutoplus-spf-tandem-agc-v7`; DFU SHA-256 is
+`4fe286f9756e3c721d5322ba9c18831f43ab4678c34bb9ef7f238cbb1236debe`,
+FIT-body SHA-256 is
+`4c19876d09082adfdbd255726e84be397eb4e18a4c0d96b9722d7d543c2ebae7`,
+and bundle SHA-256 is
+`5468827aa7eca6badd69a518df6bf70ef4220e3f39cdca66b7ba8e3fb452fbb4`.
+Routed timing closed at WNS `0.770 ns` and WHS `0.027 ns` with zero failing
+endpoints.
+
+The intermittent pre-slot `EBUSY` release blocker was traced to network CLOSE
+ordering in iiOD: an acknowledgement could precede destruction of the
+exclusive kernel buffer by its separate worker. libiio commit
+[`015e4924113d4996667f80b880c34cbf7d1147de`](https://github.com/misko/libiio/commit/015e4924113d4996667f80b880c34cbf7d1147de)
+makes CLOSE synchronous with the real teardown. No retry was added.
+
+The byte-identical artifact was RAM-booted, then persistently written to QSPI
+on all four local Pluto+ radios. Each board survived the flash boot plus two
+additional guarded reboot epochs with the same serial, USB topology, static LAN
+address, tandem ABI, and safe TX state. The final hardware gates passed at
+915 MHz, 2.45 GHz, and 5.8 GHz on both RX channels: 12/12 persistent band checks,
+the expected gain-table IDs 1/2/3, bidirectional AUTO events, watchdog rollback,
+zero clipping, and minimum cross-channel coherence above 0.9979.
+
+Across RAM and persistent modes, the four boards completed 72/72 no-retry
+metadata lifecycle cells, 576 retunes, and 1,344 frames without `EBUSY`,
+`EPIPE`, a reboot, an iiOD-generation change, or a leaked buffer. Persistent
+close latency stayed below 51 ms. Every final readback was tandem IDLE with
+zero fault/overflow and TX1/TX2 at `-80 dB`.
+
+This release resolves
+[#40](https://github.com/misko/plutosdr-fw/issues/40) and the tandem release
+gates tracked in pluto-plus-utils
+[#13](https://github.com/misko/pluto-plus-utils/issues/13) and
+[#21](https://github.com/misko/pluto-plus-utils/issues/21). The older
+[#32](https://github.com/misko/plutosdr-fw/issues/32) 936-slot, three-power-epoch
+endurance and reset-diagnostic campaign remains an explicit non-blocking
+follow-up. No segmentation code, calibration history, or core SPF production
+code changed for this release.
 
 ## v0.39-plutoplus-spf-libiio-metadata-v6 — 2026-08-17 — **hardware-qualified release**
 
