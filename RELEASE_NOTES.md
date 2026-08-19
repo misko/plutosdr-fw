@@ -62,7 +62,7 @@ additional guarded reboot epochs with the same serial, USB topology, static LAN
 address, tandem ABI, and safe TX state. The final hardware gates passed at
 915 MHz, 2.45 GHz, and 5.8 GHz on both RX channels: 12/12 persistent band checks,
 the expected gain-table IDs 1/2/3, bidirectional AUTO events, watchdog rollback,
-zero clipping, and minimum cross-channel coherence above 0.9979.
+zero clipping, and minimum cross-channel coherence above 0.9978.
 
 Across RAM and persistent modes, the four boards completed 72/72 no-retry
 metadata lifecycle cells, 576 retunes, and 1,344 frames without `EBUSY`,
