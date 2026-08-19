@@ -38,18 +38,19 @@ jobs:
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
-      # Main carries the promoted v6 graph; the named RC branch remains usable
-      # only for reproducing the independently locked RC4 candidate graph.
+      # Main carries the forward-only tandem graph. The named legacy branch
+      # remains usable only for reproducing the independently locked v6 RC4
+      # candidate graph.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'libiio-frame-metadata-v6-source.yaml' ||
+          'tandem-agc-v2-source.yaml' ||
           github.ref == 'refs/heads/feature/tandem-agc-v2' &&
           'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-libiio-metadata-v6' ||
+          'plutoplus-spf-tandem-agc-v2' ||
           github.ref == 'refs/heads/feature/tandem-agc-v2' &&
           'plutoplus-spf-tandem-agc-v2' ||
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
