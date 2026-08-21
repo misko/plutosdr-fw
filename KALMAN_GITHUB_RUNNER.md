@@ -12,6 +12,7 @@ so pull-request-controlled work must never target Kalman.
   radios and USB devices.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
+- Self-hosted jobs require the triggering GitHub actor to be `misko`.
 - Artifact attestation occurs in a separate GitHub-hosted job.
 - Successful CI means offline validated and deployment-ready; it does not mean
   hardware-tested, QSPI-approved, or production-promoted.
@@ -43,8 +44,9 @@ in the repository.
 `.github/workflows/firmware.yml` performs source-graph, USB/IP gadget, and HDL
 simulation checks on GitHub-hosted runners for pull requests targeting `main`.
 
-`.github/workflows/firmware-main.yml` runs only for `main` pushes or a manual
-dispatch whose selected ref is exactly `main`. It:
+`.github/workflows/firmware-main.yml` runs only for pushes to `main` initiated
+by `misko`, or a manual dispatch initiated by `misko` from an explicitly
+allowed maintainer source-lock branch. It:
 
 1. checks out the full pinned source graph;
 2. cleans persistent generated files from all nested worktrees;

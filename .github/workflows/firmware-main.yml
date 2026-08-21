@@ -1,7 +1,8 @@
 name: Kalman main firmware build
 
-# Security boundary: this workflow never runs for pull requests. Manual runs
-# are restricted to main and explicitly named maintainer source-lock branches.
+# Security boundary: this workflow never runs for pull requests. Self-hosted
+# work is restricted to pushes and manual runs initiated by the repository
+# owner; manual runs also require an explicitly allowed source-lock branch.
 on:
   push:
     branches: [main]
@@ -31,10 +32,13 @@ jobs:
   build:
     name: build and package on Kalman
     if: >-
-      github.ref == 'refs/heads/main' ||
-      (github.event_name == 'workflow_dispatch' &&
-       (github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
-        github.ref == 'refs/heads/feature/tandem-agc-v2'))
+      github.actor == 'misko' &&
+      ((github.event_name == 'push' &&
+        github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/feature/tandem-agc-v2')))
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
