@@ -21,6 +21,7 @@
 | `libiio-metadata-v6-rc4` | 2026-08-17 | **hardware-qualified, persistent prerelease** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
 | `libiio-metadata-v6` | 2026-08-17 | superseded | final RC4 graph, exact release identity, four-board persistent qualification |
 | **`tandem-agc-v7`** | 2026-08-19 | **current hardware-qualified** | paired RX1/RX2 AGC, ABI-2 metadata control, synchronous close, and four-board persistent qualification |
+| `tandem-agc-v8-rc1` | 2026-08-21 | **hardware-qualified persistent prerelease** | device-side cached AD9361 temperature in each fresh metadata frame |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -28,6 +29,48 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc1 — 2026-08-21 — **hardware-qualified persistent prerelease**
+
+RC1 adds AD9361 temperature to standard-libiio ABI-2 frame metadata without
+changing the 56-byte extension or adding another USB/TCP transaction. A
+device-side iiOD worker samples `ad9361-phy/temp0/input` at most once per
+second. Each frame copies the cached millidegree-Celsius value when its last
+successful sample is no more than ten seconds old; otherwise the one field is
+omitted/invalid. Frame capture never performs a temperature IIO read.
+
+The exact release is firmware commit
+[`62a5c228a992a286869266ba884979656df82b5d`](https://github.com/misko/plutosdr-fw/commit/62a5c228a992a286869266ba884979656df82b5d),
+built and attested by
+[run `32533280971`](https://github.com/misko/plutosdr-fw/actions/runs/32533280971).
+Its DFU SHA-256 is
+`9e88b2bcf28416528bfcf4c92bf10aa59dd01ddab6a6741dc6d78ae7325d9cd3`,
+FIT-body SHA-256 is
+`ca4cf900d9c52d8da89681d311267c6f114425144369cea522c42487da2b88d1`,
+and bundle SHA-256 is
+`8918ef4422a897dd32b4778db1c8086c8c7ed3663345227748248117f3bbd96b`.
+Routed timing closed at WNS `0.770 ns` and WHS `0.027 ns` with zero failing
+endpoints.
+
+The byte-identical artifact was RAM-booted and then persistently installed on
+both attached Winbond Pluto+ radios. USB and TCP tandem-HOLD captures reported
+temperature on both units. In the 64-frame RAM lifecycle test, 62 frames had a
+valid temperature; the first frame from each cold worker correctly omitted it.
+Mean metadata capture time was 33.0 and 33.2 ms, synchronous close was 19.2 and
+11.1 ms, and ordinary receive handoff was 132.7 and 120.7 ms. A focused cache
+trace produced one initial invalid frame followed by five frames with the same
+cached value, as designed.
+
+Guarded persistent promotion verified the staged image hash, QSPI FIT bytes,
+reboot return identity, exact firmware version, and safe TX state on both
+radios. The final command-line readings were 35.965 C and 40.351 C. A host-side
+USB return-attestation compatibility bug found during the first RAM run was
+fixed in pluto-plus-utils commit `c89fb7a`; the device itself remained on the
+expected v8 image and TX-safe state.
+
+This remains an RC prerelease because only the two attached Winbond units were
+available. The prior release's four-board, attenuated physical-loopback,
+three-band AUTO/event matrix was not repeated for this temperature-only change.
 
 ## v0.40-plutoplus-spf-tandem-agc-v7 — 2026-08-19 — **hardware-qualified release**
 

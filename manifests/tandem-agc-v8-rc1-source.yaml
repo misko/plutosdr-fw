@@ -1,9 +1,11 @@
-# Immutable source graph for the forward-only tandem AGC v8 RC1 candidate.
+# Immutable source graph for the forward-only tandem AGC v8 RC1 prerelease.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1
-release_state: candidate
+release_state: hardware-qualified-prerelease
+release_tag: v0.41-plutoplus-spf-tandem-agc-v8-rc1
 
+firmware_source: 62a5c228a992a286869266ba884979656df82b5d
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
 libiio_0_25_source: 405811d162550747c063c7c9b1787763be81da36

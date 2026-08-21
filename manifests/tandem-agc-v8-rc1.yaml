@@ -1,0 +1,59 @@
+# Immutable build manifest for the hardware-qualified PlutoPlus tandem AGC v8
+# RC1 prerelease. Values were read from the exact CI artifact deployed to two
+# attached Winbond radios. A later release gets a new file.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+
+release_tag: v0.41-plutoplus-spf-tandem-agc-v8-rc1
+asset_name: plutoplus-spf-tandem-agc-v8-rc1-62a5c228a992-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.41-plutoplus-spf-tandem-agc-v8-rc1/plutoplus-spf-tandem-agc-v8-rc1-62a5c228a992-pluto.dfu
+image_sha256: 9e88b2bcf28416528bfcf4c92bf10aa59dd01ddab6a6741dc6d78ae7325d9cd3
+fit_body_sha256: ca4cf900d9c52d8da89681d311267c6f114425144369cea522c42487da2b88d1
+fit_body_size: 12780591
+device_fw: v0.41-plutoplus-spf-tandem-agc-v8-rc1
+
+bundle_sha256: 8918ef4422a897dd32b4778db1c8086c8c7ed3663345227748248117f3bbd96b
+ci_run_id: 32533280971
+
+firmware_source: 62a5c228a992a286869266ba884979656df82b5d
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: 405811d162550747c063c7c9b1787763be81da36
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/tandem-agc-v8-rc1-source/libiio-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+submodule_buildroot: dbf093512ca6fde11dd5a04ff592253eaddd55cd
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_hdl: dec1dba5b9563c4c58c39fb76df904e462819ad5
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+submodule_linux: 85430d6efec2f77d500f7a2b5565e4ca0bd59ab0
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+
+versions_hdl: tandem-agc-v2-source/hdl-v2
+versions_buildroot: tandem-agc-v8-rc1-source/buildroot-v1
+versions_linux: tandem-agc-v2-source/linux-v10
+versions_u_boot_xlnx: gain-series-v4-source/u-boot-xlnx
+
+fpga_bitstream_md5: c3eb3eac9f4cc0450b4fd6de5f2e91e7
+fpga_bitstream_sha256: f49742b4ae80f66b852b45db1990ccdb20bf81a502f0bafbc2ebd682d7749ae3
+ramdisk_md5: a63b6f419bcadcbb6ed3b1a66839f1a9
+rootfs_sha256: 639a14c46eb1b6e384658b1bcc3a7807d5423140163e255d91a6c644a6700319
+fit_description: Configuration to load fpga before Kernel
+
+hardware_qualified: true
+hardware_qualified_date: 2026-08-21
+hardware_units: 2
+radio_libiio: 0.25
+metadata_abi: 2
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_commit: 42db0ce198b5b802ab56f64c469260a1de7389bb
+qualification_transports: usb,tcp
+qualification_ram_lifecycle_frames: 64
+qualification_temperature_startup_omissions: 2
+qualification_persistent_boots: 2
