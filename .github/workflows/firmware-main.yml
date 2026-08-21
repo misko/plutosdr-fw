@@ -38,6 +38,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/codex/tandem-agc-v8-rc1' ||
          github.ref == 'refs/heads/feature/tandem-agc-v2')))
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
@@ -49,12 +50,16 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'tandem-agc-v2-source.yaml' ||
+          github.ref == 'refs/heads/codex/tandem-agc-v8-rc1' &&
+          'tandem-agc-v8-rc1-source.yaml' ||
           github.ref == 'refs/heads/feature/tandem-agc-v2' &&
           'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-tandem-agc-v2' ||
+          github.ref == 'refs/heads/codex/tandem-agc-v8-rc1' &&
+          'plutoplus-spf-tandem-agc-v8-rc1' ||
           github.ref == 'refs/heads/feature/tandem-agc-v2' &&
           'plutoplus-spf-tandem-agc-v2' ||
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
