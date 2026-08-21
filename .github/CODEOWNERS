@@ -1,4 +1,5 @@
 # Changes that can alter what the trusted Kalman runner executes or packages.
+/.github/CODEOWNERS @misko
 /.github/workflows/ @misko
 /scripts/ci/ @misko
 /scripts/build_gain_series_candidate.sh @misko
