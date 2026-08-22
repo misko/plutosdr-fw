@@ -18,7 +18,7 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 0428772505614ff42659d230488088f3a99a07bf
+submodule_buildroot: 7ae15ad982c7f6cae55fc12d8e064aa7bfa3cc0d
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
 submodule_buildroot_ref: refs/tags/tandem-agc-v8-rc2-source/buildroot-v1
 
