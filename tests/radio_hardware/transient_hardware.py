@@ -338,7 +338,8 @@ def _validate_tandem_metadata(
         raise EvidenceInvalid("tandem metadata does not describe dual complex RX")
     if metadata.flags & TANDEM_UNSAFE_FLAGS:
         raise EvidenceInvalid(
-            f"tandem metadata reports unsafe flags 0x{metadata.flags & TANDEM_UNSAFE_FLAGS:08x}"
+            "tandem metadata reports unsafe flags "
+            f"0x{metadata.flags & TANDEM_UNSAFE_FLAGS:08x}"
         )
     if metadata.observation_overflow_count or metadata.event_overflow_count:
         raise EvidenceInvalid("tandem transient metadata capacity overflowed")
@@ -767,7 +768,8 @@ def _check_effective_attenuation(
     effective = quality.physical_attenuation_db - command.applied_level_db
     if effective < 30.0:
         raise EvidenceInvalid(
-            f"TX2 readback for {command.command_id!r} violates the 30 dB safety boundary"
+            f"TX2 readback for {command.command_id!r} violates the "
+            "30 dB safety boundary"
         )
     return effective
 
@@ -1326,7 +1328,8 @@ def run_transient_hardware(
     def check_deadline() -> None:
         if monotonic() - started >= quality.max_seconds:
             raise TimeoutError(
-                f"transient hardware campaign exceeded {quality.max_seconds:.1f} seconds"
+                "transient hardware campaign exceeded "
+                f"{quality.max_seconds:.1f} seconds"
             )
 
     quality_configuration = asdict(quality)
@@ -1363,7 +1366,9 @@ def run_transient_hardware(
         "safety": {
             "physical_attenuation_db": quality.physical_attenuation_db,
             "strongest_tx_gain_db": quality.strongest_tx_gain_db,
-            "minimum_effective_attenuation_db": quality.minimum_effective_attenuation_db,
+            "minimum_effective_attenuation_db": (
+                quality.minimum_effective_attenuation_db
+            ),
             "required_effective_attenuation_db": 30.0,
             "tx1_policy": "muted below -80 dB for the entire campaign",
         },

@@ -95,7 +95,9 @@ def pn_transition(
 
 def agree_dual_rx(transitions: Sequence[PnTransition]) -> PnTransition:
     if len(transitions) != 2:
-        raise ContinuityError("the TX2 tee fixture must supply exactly two RX witnesses")
+        raise ContinuityError(
+            "the TX2 tee fixture must supply exactly two RX witnesses"
+        )
     first, second = transitions
     if first.period != second.period:
         raise ContinuityError("RX witnesses used different PN periods")
@@ -152,7 +154,9 @@ def evaluate_boundary(
 
     if capacity_safe:
         return BoundaryVerdict(
-            "red", "gap_inside_safe_bound", "RF samples were omitted inside queue capacity"
+            "red",
+            "gap_inside_safe_bound",
+            "RF samples were omitted inside queue capacity",
         )
     if api == "ordinary":
         return BoundaryVerdict(
@@ -169,5 +173,7 @@ def evaluate_boundary(
             "metadata counted omitted samples but did not mark device overflow",
         )
     return BoundaryVerdict(
-        "green", "explicit_segmented_gap", "metadata explicitly segmented the RF-time gap"
+        "green",
+        "explicit_segmented_gap",
+        "metadata explicitly segmented the RF-time gap",
     )

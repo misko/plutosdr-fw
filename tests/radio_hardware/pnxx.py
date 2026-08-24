@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import re
-from functools import lru_cache
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -119,20 +119,18 @@ def pn_samples(
 @lru_cache(maxsize=1)
 def p15_period() -> tuple[int, ...]:
     canonical_state = pn_step(0xFFFFFF, P15_TAPS)
-    return tuple(
-        pn_samples(P15_TAPS, P15_SAMPLE_PERIOD, initial_state=canonical_state)
-    )
+    return tuple(pn_samples(P15_TAPS, P15_SAMPLE_PERIOD, initial_state=canonical_state))
 
 
 @lru_cache(maxsize=1)
 def p20_period() -> tuple[int, ...]:
     canonical_state = pn_step(0xFFFFFF, P20_TAPS)
-    return tuple(
-        pn_samples(P20_TAPS, P20_SAMPLE_PERIOD, initial_state=canonical_state)
-    )
+    return tuple(pn_samples(P20_TAPS, P20_SAMPLE_PERIOD, initial_state=canonical_state))
 
 
-def _extract_rtl_taps(source: str, label: str, next_label: str) -> tuple[tuple[int, ...], ...]:
+def _extract_rtl_taps(
+    source: str, label: str, next_label: str
+) -> tuple[tuple[int, ...], ...]:
     pattern = rf"{label}:\s*begin(?P<body>.*?)(?=\n\s*{next_label}:|\n\s*endcase)"
     match = re.search(pattern, source, flags=re.DOTALL)
     if match is None:
@@ -141,7 +139,9 @@ def _extract_rtl_taps(source: str, label: str, next_label: str) -> tuple[tuple[i
     for output_bit, expression in re.findall(
         r"dout\[\s*(\d+)\]\s*=\s*([^;]+);", match.group("body")
     ):
-        inputs = tuple(int(value) for value in re.findall(r"din\[\s*(\d+)\]", expression))
+        inputs = tuple(
+            int(value) for value in re.findall(r"din\[\s*(\d+)\]", expression)
+        )
         assignments[int(output_bit)] = inputs
     if set(assignments) != set(range(24)):
         raise ValueError(f"{label} does not assign all 24 output bits")
@@ -225,8 +225,7 @@ def estimate_p15_phase(
     convolution_length = len(doubled) + count - 1
     fft_length = 1 << (convolution_length - 1).bit_length()
     convolution = np.fft.ifft(
-        np.fft.fft(doubled.conj(), fft_length)
-        * np.fft.fft(observed[::-1], fft_length)
+        np.fft.fft(doubled.conj(), fft_length) * np.fft.fft(observed[::-1], fft_length)
     )
     correlation = convolution[count - 1 : count - 1 + P15_SAMPLE_PERIOD]
     cumulative_energy = np.concatenate(

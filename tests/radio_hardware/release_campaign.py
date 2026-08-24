@@ -207,9 +207,7 @@ def default_policy_cases(base: TandemQualityOptions) -> tuple[PolicyCase, ...]:
         )
 
     cases: list[PolicyCase] = [PolicyCase("baseline", "baseline")]
-    for value in bounded_alternates(
-        base.tandem_low_power_threshold, 4, 0, 127
-    ):
+    for value in bounded_alternates(base.tandem_low_power_threshold, 4, 0, 127):
         cases.append(
             PolicyCase(
                 f"low-power-{value}",
@@ -217,9 +215,7 @@ def default_policy_cases(base: TandemQualityOptions) -> tuple[PolicyCase, ...]:
                 (("tandem_low_power_threshold", value),),
             )
         )
-    for value in bounded_alternates(
-        base.tandem_large_lmt_overload_threshold, 4, 0, 63
-    ):
+    for value in bounded_alternates(base.tandem_large_lmt_overload_threshold, 4, 0, 63):
         cases.append(
             PolicyCase(
                 f"large-lmt-{value}",
@@ -241,9 +237,7 @@ def default_policy_cases(base: TandemQualityOptions) -> tuple[PolicyCase, ...]:
                     ),
                 )
             )
-    for value in bounded_alternates(
-        base.tandem_low_power_dwell_periods, 2, 1, 255
-    ):
+    for value in bounded_alternates(base.tandem_low_power_dwell_periods, 2, 1, 255):
         cases.append(
             PolicyCase(
                 f"dwell-{value}",
@@ -259,9 +253,7 @@ def default_policy_cases(base: TandemQualityOptions) -> tuple[PolicyCase, ...]:
                 (("tandem_cooldown_periods", value),),
             )
         )
-    return (
-        *cases,
-    )
+    return (*cases,)
 
 
 def _validate_config(config: ReleaseCampaignConfig) -> None:
@@ -619,7 +611,9 @@ def _validate_matrix_report(
         cells = record.get("cells") if isinstance(record, Mapping) else None
         if not isinstance(cells, list) or len(cells) != len(trajectory):
             raise ValueError("matrix mode does not contain the full planned trajectory")
-        for index, (cell, expected_gain) in enumerate(zip(cells, trajectory)):
+        for index, (cell, expected_gain) in enumerate(
+            zip(cells, trajectory, strict=True)
+        ):
             if not isinstance(cell, Mapping):
                 raise ValueError("matrix trajectory cell is malformed")
             if (
