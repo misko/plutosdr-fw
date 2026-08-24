@@ -930,8 +930,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     ]
     anchor_command = StimulusCommand(
         "weak_conditioning_anchor",
-        quality.weakest_tx_gain_db,
-        quality.weakest_tx_gain_db,
+        capture_options.weak_stimulus_tx_gain_db,
+        capture_options.weak_stimulus_tx_gain_db,
         1_000,
         1_100,
         (attack_start - 1) * frame_samples,
@@ -939,8 +939,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     )
     attack_command = StimulusCommand(
         "strong_attack",
-        quality.strongest_tx_gain_db,
-        quality.strongest_tx_gain_db,
+        capture_options.strong_stimulus_tx_gain_db,
+        capture_options.strong_stimulus_tx_gain_db,
         1_200,
         1_300,
         attack_start * frame_samples,
@@ -948,8 +948,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     )
     release_command = StimulusCommand(
         "weak_release",
-        quality.weakest_tx_gain_db,
-        quality.weakest_tx_gain_db,
+        capture_options.weak_stimulus_tx_gain_db,
+        capture_options.weak_stimulus_tx_gain_db,
         1_400,
         1_500,
         release_start * frame_samples,
@@ -1130,8 +1130,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         ]
         initial = StimulusCommand(
             "weak_initial",
-            quality.weakest_tx_gain_db,
-            quality.weakest_tx_gain_db,
+            capture_options.weak_stimulus_tx_gain_db,
+            capture_options.weak_stimulus_tx_gain_db,
             1_000,
             1_100,
             None,
@@ -1139,8 +1139,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         )
         anchor = StimulusCommand(
             "weak_conditioning_anchor",
-            quality.weakest_tx_gain_db,
-            quality.weakest_tx_gain_db,
+            capture_options.weak_stimulus_tx_gain_db,
+            capture_options.weak_stimulus_tx_gain_db,
             1_000,
             1_100,
             int(baseline[0]["first_sample_sequence"]),
@@ -1148,8 +1148,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         )
         attack_command = StimulusCommand(
             "strong_attack",
-            quality.strongest_tx_gain_db,
-            quality.strongest_tx_gain_db,
+            capture_options.strong_stimulus_tx_gain_db,
+            capture_options.strong_stimulus_tx_gain_db,
             1_200,
             1_300,
             int(baseline[-1]["sample_end_exclusive"]),
@@ -1157,8 +1157,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         )
         release_command = StimulusCommand(
             "weak_release",
-            quality.weakest_tx_gain_db,
-            quality.weakest_tx_gain_db,
+            capture_options.weak_stimulus_tx_gain_db,
+            capture_options.weak_stimulus_tx_gain_db,
             1_400,
             1_500,
             int(ordinary_attack[-1]["sample_end_exclusive"]),
@@ -1379,6 +1379,21 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
             "kernel_buffers": 1,
         },
         "evidence_policy": transient_evidence_policy(capture_options),
+        "trajectory_db": [
+            capture_options.weak_stimulus_tx_gain_db,
+            capture_options.strong_stimulus_tx_gain_db,
+            capture_options.weak_stimulus_tx_gain_db,
+        ],
+        "safety": {
+            "physical_attenuation_db": quality.physical_attenuation_db,
+            "strongest_tx_gain_db": capture_options.strong_stimulus_tx_gain_db,
+            "minimum_effective_attenuation_db": (
+                quality.physical_attenuation_db
+                - capture_options.strong_stimulus_tx_gain_db
+            ),
+            "required_effective_attenuation_db": 30.0,
+            "tx1_policy": "muted below -80 dB for the entire campaign",
+        },
         "rf": {
             "center_frequency_hz_requested": 915_000_000,
             "center_frequency_hz_readback": {
@@ -1463,8 +1478,8 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
                         {
                             **StimulusCommand(
                                 "weak_initial",
-                                quality.weakest_tx_gain_db,
-                                quality.weakest_tx_gain_db,
+                                capture_options.weak_stimulus_tx_gain_db,
+                                capture_options.weak_stimulus_tx_gain_db,
                                 1_000,
                                 1_100,
                                 None,
@@ -1472,7 +1487,7 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
                             ).as_dict(),
                             "effective_attenuation_db": (
                                 quality.physical_attenuation_db
-                                - quality.weakest_tx_gain_db
+                                - capture_options.weak_stimulus_tx_gain_db
                             ),
                             "rx_state_before": None,
                             "rx_state_after": None,
@@ -1504,6 +1519,12 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     report_path.parent.mkdir(parents=True)
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     assert production_validator(options)(spec, report_path, work_dir).verdict == "pass"
+    assert report["trajectory_db"] == [-45.0, -30.0, -45.0]
+    assert all(
+        [command["requested_level_db"] for command in mode["commands"]]
+        == [-45.0, -30.0, -45.0]
+        for mode in report["modes"]
+    )
 
     valid_report = json.loads(json.dumps(report))
 
@@ -1799,6 +1820,24 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     report["evidence_policy"]["tandem_provider_gaps"] = "accept planted gaps"
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="evidence policy differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["trajectory_db"][0] = -55.0
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="stimulus trajectory differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["safety"]["strongest_tx_gain_db"] = -29.9
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="safety policy differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["configuration"]["transient_capture"]["weak_stimulus_tx_gain_db"] = -55.0
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="configuration differs"):
         production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))

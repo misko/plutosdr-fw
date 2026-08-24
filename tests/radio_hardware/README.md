@@ -182,6 +182,17 @@ writes execute. IQ analysis, hashing, and optional artifact writes are deferred
 until the buffer is closed; the default worst-case retained IQ is about 6 MiB
 and every configuration is capped at 64 MiB.
 
+The release transient stimulus is explicitly `-45,-30,-45` dB; it does not
+inherit the full steady trajectory's `-61` dB endpoint. Across 22
+release-equivalent RC2 reports on four radios (DDS scale 1 and manual gain 40
+dB), the worst individual manual-RX tone SNR at the `-45` dB rung was 24.47
+dB; R18 measured at least 24.85 dB there. On R18 the same `-45` to `-30` dB
+step retained native gain movement of at least 11 dB across the attack channels
+and tandem moved from paired gain index 65 to 61, then returned to 65. Each
+release band must first qualify these exact rungs in its steady phase. The
+transient gate remains 10 dB; changing the stimulus does not relax
+signal-quality acceptance.
+
 - `timestamp_stimulus_command()` brackets every write in monotonic host time.
   Ordinary IIO only positions the write on an ordinal axis over returned IQ;
   refill/readback intervals are unobserved, so its settling spans are not

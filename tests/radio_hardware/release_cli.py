@@ -1824,9 +1824,9 @@ def _transient_ordinary_errors(
             errors.append(f"{context} command order differs from policy")
             command_records_valid = False
         expected_levels = (
-            quality.weakest_tx_gain_db,
-            quality.strongest_tx_gain_db,
-            quality.weakest_tx_gain_db,
+            capture.weak_stimulus_tx_gain_db,
+            capture.strong_stimulus_tx_gain_db,
+            capture.weak_stimulus_tx_gain_db,
         )
         for command, expected_level in zip(commands, expected_levels, strict=True):
             before = command.get("host_before_ns")
@@ -2233,9 +2233,9 @@ def _transient_continuity_errors(
     for command, expected_level in zip(
         commands,
         (
-            quality.weakest_tx_gain_db,
-            quality.strongest_tx_gain_db,
-            quality.weakest_tx_gain_db,
+            capture.weak_stimulus_tx_gain_db,
+            capture.strong_stimulus_tx_gain_db,
+            capture.weak_stimulus_tx_gain_db,
         ),
         strict=True,
     ):
@@ -3145,6 +3145,25 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             assert isinstance(expected_quality, dict)
             expected_quality["output_dir"] = str(work_dir)
             expected_capture = TransientCaptureOptions()
+            expected_trajectory = [
+                expected_capture.weak_stimulus_tx_gain_db,
+                expected_capture.strong_stimulus_tx_gain_db,
+                expected_capture.weak_stimulus_tx_gain_db,
+            ]
+            if disk.get("trajectory_db") != expected_trajectory:
+                errors.append("transient stimulus trajectory differs from plan")
+            expected_safety = {
+                "physical_attenuation_db": transient_quality.physical_attenuation_db,
+                "strongest_tx_gain_db": (expected_capture.strong_stimulus_tx_gain_db),
+                "minimum_effective_attenuation_db": (
+                    transient_quality.physical_attenuation_db
+                    - expected_capture.strong_stimulus_tx_gain_db
+                ),
+                "required_effective_attenuation_db": 30.0,
+                "tx1_policy": "muted below -80 dB for the entire campaign",
+            }
+            if disk.get("safety") != expected_safety:
+                errors.append("transient safety policy differs from plan")
             expected_configuration = {
                 "quality": expected_quality,
                 "transient_capture": _json_safe(asdict(expected_capture)),

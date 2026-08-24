@@ -381,6 +381,8 @@ def _quality(output_dir: Path) -> TandemQualityOptions:
 
 def _capture_options(**overrides: Any) -> TransientCaptureOptions:
     values = {
+        "weak_stimulus_tx_gain_db": -60.0,
+        "strong_stimulus_tx_gain_db": -30.0,
         "frame_samples": 1_024,
         "window_samples": 256,
         "response_frames": 2,
@@ -432,6 +434,19 @@ def test_fake_transport_executes_every_mode_and_writes_atomic_report(
     )
     assert "native_hybrid" not in TRANSIENT_MODES
     assert report["trajectory_db"] == [-60.0, -30.0, -60.0]
+    assert (
+        report["configuration"]["transient_capture"]["weak_stimulus_tx_gain_db"]
+        == -60.0
+    )
+    assert report["evidence_policy"]["stimulus"] == {
+        "weak_tx_gain_db": -60.0,
+        "strong_tx_gain_db": -30.0,
+        "step_db": 30.0,
+        "quality_policy": (
+            "explicit trajectory rungs require prior same-band steady "
+            "qualification; retain the 10 dB returned-IQ tone-SNR gate"
+        ),
+    }
     assert report["cleanup"] == {
         "verified": False,
         "status": "pending_radio_lifecycle_close",
@@ -1022,11 +1037,14 @@ def test_iio_buffer_close_failure_cannot_mask_body_failure() -> None:
         iio=SimpleNamespace(Buffer=lambda *_args: ClosingBuffer()),
     )
 
-    with pytest.raises(BaseExceptionGroup) as raised, Issue46Radio.buffer(
-        fake_radio,
-        "ordinary",
-        1,
-        1_024,
+    with (
+        pytest.raises(BaseExceptionGroup) as raised,
+        Issue46Radio.buffer(
+            fake_radio,
+            "ordinary",
+            1,
+            1_024,
+        ),
     ):
         raise EvidenceInvalid("planted buffer body failure")
 
@@ -1072,3 +1090,24 @@ def test_capture_options_prove_enough_pre_and_post_windows(tmp_path: Path) -> No
             quality,
             _capture_options(max_precondition_frames=10_000),
         )
+
+
+def test_transient_stimulus_requires_distinct_configured_rungs(tmp_path: Path) -> None:
+    quality = _quality(tmp_path)
+    with pytest.raises(ValueError, match="configured quality-trajectory rungs"):
+        validate_transient_options(
+            quality,
+            _capture_options(weak_stimulus_tx_gain_db=-55.0),
+        )
+    with pytest.raises(ValueError, match="weak stimulus must be below"):
+        validate_transient_options(
+            quality,
+            _capture_options(weak_stimulus_tx_gain_db=-30.0),
+        )
+
+
+def test_release_default_uses_the_characterized_minus_45_db_weak_rung() -> None:
+    capture = TransientCaptureOptions()
+    assert capture.weak_stimulus_tx_gain_db == -45.0
+    assert capture.strong_stimulus_tx_gain_db == -30.0
+    assert capture.strong_stimulus_tx_gain_db - capture.weak_stimulus_tx_gain_db == 15.0

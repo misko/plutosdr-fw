@@ -128,6 +128,8 @@ class TransientRadioTransport(Protocol):
 class TransientCaptureOptions:
     """Bounded acquisition and oracle settings for one transient campaign."""
 
+    weak_stimulus_tx_gain_db: float = -45.0
+    strong_stimulus_tx_gain_db: float = -30.0
     frame_samples: int = 8_192
     window_samples: int = 1_024
     response_frames: int = 8
@@ -194,6 +196,17 @@ def transient_evidence_policy(
             "pre-session weak write remains sample-unbounded; retained stable IQ "
             "is an explicitly labelled conditioning anchor"
         ),
+        "stimulus": {
+            "weak_tx_gain_db": capture.weak_stimulus_tx_gain_db,
+            "strong_tx_gain_db": capture.strong_stimulus_tx_gain_db,
+            "step_db": (
+                capture.strong_stimulus_tx_gain_db - capture.weak_stimulus_tx_gain_db
+            ),
+            "quality_policy": (
+                "explicit trajectory rungs require prior same-band steady "
+                "qualification; retain the 10 dB returned-IQ tone-SNR gate"
+            ),
+        },
         "tandem_acquisition": (
             "one kernel buffer; one bounded acquisition-only thread continuously "
             "refills and copies IQ while commands execute; FFT, hashing, and IQ "
@@ -287,6 +300,30 @@ def validate_transient_options(
         )
     if capture.max_event_latency_samples < 0:
         raise ValueError("maximum event latency must be a nonnegative integer")
+    stimulus_levels = {
+        "weak_stimulus_tx_gain_db": capture.weak_stimulus_tx_gain_db,
+        "strong_stimulus_tx_gain_db": capture.strong_stimulus_tx_gain_db,
+    }
+    if any(
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        for value in stimulus_levels.values()
+    ):
+        raise ValueError("transient stimulus levels must be finite numbers")
+    weak_level = float(capture.weak_stimulus_tx_gain_db)
+    strong_level = float(capture.strong_stimulus_tx_gain_db)
+    configured_rungs = {float(value) for value in quality.tx_gain_trajectory_db}
+    if weak_level not in configured_rungs or strong_level not in configured_rungs:
+        raise ValueError(
+            "transient stimulus levels must be configured quality-trajectory rungs"
+        )
+    if weak_level >= strong_level:
+        raise ValueError("transient weak stimulus must be below its strong stimulus")
+    if strong_level != quality.strongest_tx_gain_db:
+        raise ValueError(
+            "transient strong stimulus must equal the authorized quality ceiling"
+        )
     finite_nonnegative = {
         "settling_tolerance_db": capture.settling_tolerance_db,
         "ringing_deadband_db": capture.ringing_deadband_db,
@@ -301,8 +338,6 @@ def validate_transient_options(
         for value in finite_nonnegative.values()
     ):
         raise ValueError("transient tolerances must be finite and nonnegative")
-    if quality.weakest_tx_gain_db == quality.strongest_tx_gain_db:
-        raise ValueError("transient campaign needs distinct weak and strong TX levels")
 
 
 def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
@@ -1567,7 +1602,7 @@ def _run_mode_body(
     )
     initial_unanchored = timestamp_stimulus_command(
         "weak_initial",
-        quality.weakest_tx_gain_db,
+        capture.weak_stimulus_tx_gain_db,
         apply=radio.set_tx2_gain,
         clock_ns=clock_ns,
         max_host_jitter_ns=capture.max_host_jitter_ns,
@@ -1692,7 +1727,7 @@ def _run_mode_body(
                     attack, attack_counter_bracket = _timestamp_tandem_command(
                         radio,
                         "strong_attack",
-                        quality.strongest_tx_gain_db,
+                        capture.strong_stimulus_tx_gain_db,
                         last_observed_frame_end=attack_boundary,
                         clock_ns=clock_ns,
                         max_host_jitter_ns=capture.max_host_jitter_ns,
@@ -1702,7 +1737,7 @@ def _run_mode_body(
                 else:
                     attack = timestamp_stimulus_command(
                         "strong_attack",
-                        quality.strongest_tx_gain_db,
+                        capture.strong_stimulus_tx_gain_db,
                         apply=radio.set_tx2_gain,
                         clock_ns=clock_ns,
                         max_host_jitter_ns=capture.max_host_jitter_ns,
@@ -1760,7 +1795,7 @@ def _run_mode_body(
                     release, release_counter_bracket = _timestamp_tandem_command(
                         radio,
                         "weak_release",
-                        quality.weakest_tx_gain_db,
+                        capture.weak_stimulus_tx_gain_db,
                         last_observed_frame_end=release_boundary,
                         clock_ns=clock_ns,
                         max_host_jitter_ns=capture.max_host_jitter_ns,
@@ -1770,7 +1805,7 @@ def _run_mode_body(
                 else:
                     release = timestamp_stimulus_command(
                         "weak_release",
-                        quality.weakest_tx_gain_db,
+                        capture.weak_stimulus_tx_gain_db,
                         apply=radio.set_tx2_gain,
                         clock_ns=clock_ns,
                         max_host_jitter_ns=capture.max_host_jitter_ns,
@@ -2136,7 +2171,7 @@ def run_transient_hardware(
     validate_transient_options(quality, capture)
     if radio.options.sample_rate_hz != quality.sample_rate_hz:
         raise ValueError("radio and transient sample rates differ")
-    if abs(float(radio.options.tx_gain_db) - quality.strongest_tx_gain_db) > 0.01:
+    if abs(float(radio.options.tx_gain_db) - capture.strong_stimulus_tx_gain_db) > 0.01:
         raise ValueError("radio TX authorization differs from the transient ceiling")
     if radio.options.center_frequency_hz != quality.center_frequency_hz:
         raise ValueError("radio and transient center frequencies differ")
@@ -2178,9 +2213,9 @@ def run_transient_hardware(
             ],
         },
         "trajectory_db": [
-            quality.weakest_tx_gain_db,
-            quality.strongest_tx_gain_db,
-            quality.weakest_tx_gain_db,
+            capture.weak_stimulus_tx_gain_db,
+            capture.strong_stimulus_tx_gain_db,
+            capture.weak_stimulus_tx_gain_db,
         ],
         "required_modes": list(TRANSIENT_MODES),
         "rf": {
@@ -2196,9 +2231,9 @@ def run_transient_hardware(
         },
         "safety": {
             "physical_attenuation_db": quality.physical_attenuation_db,
-            "strongest_tx_gain_db": quality.strongest_tx_gain_db,
+            "strongest_tx_gain_db": capture.strong_stimulus_tx_gain_db,
             "minimum_effective_attenuation_db": (
-                quality.minimum_effective_attenuation_db
+                quality.physical_attenuation_db - capture.strong_stimulus_tx_gain_db
             ),
             "required_effective_attenuation_db": 30.0,
             "tx1_policy": "muted below -80 dB for the entire campaign",
