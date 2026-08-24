@@ -27,6 +27,7 @@ from typing import Any
 from . import release_campaign as steady_campaign
 from .experiment import Issue46Options, Issue46Radio
 from .modulated_hardware import (
+    MODE_TANDEM,
     MODULATED_MODES,
     ModulatedHardwareOptions,
     evaluate_modulated_hardware_report,
@@ -911,6 +912,223 @@ def _cleanup_errors(report: Mapping[str, Any]) -> list[str]:
     return errors
 
 
+def _modulated_dma_cleanup_errors(waveforms: Any) -> list[str]:
+    if not isinstance(waveforms, list):
+        return ["modulated waveforms are missing"]
+    errors: list[str] = []
+    for index, waveform in enumerate(waveforms):
+        if not isinstance(waveform, Mapping):
+            errors.append(f"modulated waveform {index} is malformed")
+            continue
+        case_id = waveform.get("case_id", index)
+        cleanup = waveform.get("dma_cleanup")
+        if not isinstance(cleanup, Mapping):
+            errors.append(f"modulated {case_id} cyclic-DMA cleanup is missing")
+            continue
+        if cleanup.get("buffer_closed") is not True:
+            errors.append(f"modulated {case_id} cyclic-DMA buffer was not closed")
+        if cleanup.get("buffer_release_method") not in (
+            "explicit_close",
+            "reference_release_gc",
+        ):
+            errors.append(
+                f"modulated {case_id} cyclic-DMA release method is invalid"
+            )
+        if cleanup.get("failures") != []:
+            errors.append(f"modulated {case_id} cyclic-DMA cleanup has failures")
+        errors.extend(
+            f"modulated {case_id} cyclic-DMA {error}"
+            for error in _cleanup_errors({"cleanup": cleanup.get("mute")})
+        )
+    return errors
+
+
+def _modulated_iq_convention_errors(runs: Any) -> list[str]:
+    if not isinstance(runs, list):
+        return ["modulated runs are missing"]
+    errors: list[str] = []
+    conventions: set[str] = set()
+    for index, run in enumerate(runs):
+        if not isinstance(run, Mapping):
+            errors.append(f"modulated run {index} is malformed")
+            continue
+        summary = run.get("summary")
+        convention = summary.get("iq_convention") if isinstance(summary, Mapping) else None
+        if convention not in ("direct", "conjugated"):
+            errors.append(
+                f"modulated {run.get('mode')}/{run.get('case_id')} IQ convention "
+                "is invalid"
+            )
+        else:
+            conventions.add(convention)
+    if len(conventions) > 1:
+        errors.append("modulated IQ convention changed inside one hardware campaign")
+    return errors
+
+
+def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:
+    """Recompute tandem gap evidence from the persisted metadata counters."""
+
+    if not isinstance(runs, list):
+        return ["modulated runs are missing"]
+    errors: list[str] = []
+    uint32_modulus = 1 << 32
+
+    def exact_integer(value: Any, *, minimum: int = 0) -> bool:
+        return type(value) is int and value >= minimum
+
+    for run_index, run in enumerate(runs):
+        if not isinstance(run, Mapping) or run.get("mode") != MODE_TANDEM:
+            continue
+        context = f"modulated tandem run {run.get('case_id', run_index)}"
+        settling = run.get("settling")
+        trace = settling.get("trace") if isinstance(settling, Mapping) else None
+        measurements = run.get("measurements")
+        if not isinstance(trace, list) or not isinstance(measurements, list):
+            errors.append(f"{context} lacks frame evidence")
+            continue
+        if not trace or not measurements:
+            errors.append(f"{context} has empty frame evidence")
+            continue
+        if settling.get("frames") != len(trace):
+            errors.append(f"{context} settling frame count is inconsistent")
+
+        previous_metadata: Mapping[str, Any] | None = None
+        cumulative_missing = 0
+        cumulative_hidden = 0
+        event_hole_count = 0
+        last_event_sequence: int | None = None
+        unrepresented_since_event = 0
+        for frame_index, frame in enumerate((*trace, *measurements)):
+            frame_context = f"{context} frame {frame_index}"
+            if not isinstance(frame, Mapping):
+                errors.append(f"{frame_context} is malformed")
+                break
+            metadata = frame.get("metadata")
+            continuity = frame.get("continuity")
+            if not isinstance(metadata, Mapping) or not isinstance(
+                continuity, Mapping
+            ):
+                errors.append(f"{frame_context} lacks metadata gap evidence")
+                break
+            buffer_sequence = metadata.get("buffer_sequence")
+            sample_sequence = metadata.get("first_sample_sequence")
+            samples_per_channel = metadata.get("samples_per_channel")
+            transition_count = metadata.get("tandem_transition_count")
+            events = metadata.get("gain_events")
+            if (
+                not exact_integer(buffer_sequence)
+                or not exact_integer(sample_sequence)
+                or samples_per_channel != capture_samples
+                or not exact_integer(transition_count)
+                or transition_count >= uint32_modulus
+                or not isinstance(events, list)
+            ):
+                errors.append(f"{frame_context} metadata counters are malformed")
+                break
+            event_sequences: list[int] = []
+            if any(
+                not isinstance(event, Mapping)
+                or not exact_integer(event.get("event_sequence"))
+                or event["event_sequence"] >= uint32_modulus
+                for event in events
+            ):
+                errors.append(f"{frame_context} event sequences are malformed")
+                break
+            event_sequences.extend(int(event["event_sequence"]) for event in events)
+            visible = len(event_sequences)
+
+            if previous_metadata is None:
+                buffer_delta: int | None = None
+                sample_delta: int | None = None
+                transition_delta: int | None = None
+                missing = 0
+                hidden = 0
+                initial_unrepresented = transition_count - visible
+                if initial_unrepresented < 0:
+                    errors.append(
+                        f"{frame_context} has more events than transitions"
+                    )
+                    break
+            else:
+                buffer_delta = buffer_sequence - int(
+                    previous_metadata["buffer_sequence"]
+                )
+                sample_delta = sample_sequence - int(
+                    previous_metadata["first_sample_sequence"]
+                )
+                if buffer_delta <= 0 or sample_delta != buffer_delta * capture_samples:
+                    errors.append(f"{frame_context} frame counters disagree")
+                    break
+                transition_delta = (
+                    transition_count
+                    - int(previous_metadata["tandem_transition_count"])
+                ) % uint32_modulus
+                if transition_delta >= uint32_modulus // 2:
+                    errors.append(f"{frame_context} transition counter regressed")
+                    break
+                missing = buffer_delta - 1
+                hidden = transition_delta - visible
+                initial_unrepresented = 0
+                if hidden < 0 or (missing == 0 and hidden != 0):
+                    errors.append(f"{frame_context} hidden transitions are invalid")
+                    break
+                cumulative_missing += missing
+                cumulative_hidden += hidden
+                unrepresented_since_event += hidden
+
+            expected_values: dict[str, int | None] = {
+                "buffer_delta": buffer_delta,
+                "sample_delta": sample_delta,
+                "missing_frame_count": missing,
+                "transition_count_delta": transition_delta,
+                "visible_event_count": visible,
+                "hidden_transition_count": hidden,
+                "initial_unrepresented_transition_count": initial_unrepresented,
+                "cumulative_missing_frame_count": cumulative_missing,
+                "cumulative_hidden_transition_count": cumulative_hidden,
+            }
+            if any(
+                (
+                    continuity.get(name) is not None
+                    if expected is None
+                    else type(continuity.get(name)) is not int
+                    or continuity.get(name) != expected
+                )
+                for name, expected in expected_values.items()
+            ):
+                errors.append(f"{frame_context} gap evidence differs from metadata")
+                break
+
+            event_error = False
+            for event_sequence in event_sequences:
+                if last_event_sequence is not None:
+                    delta = (event_sequence - last_event_sequence) % uint32_modulus
+                    if delta == 0 or delta >= uint32_modulus // 2:
+                        event_error = True
+                        break
+                    hole = delta - 1
+                    if hole != unrepresented_since_event:
+                        event_error = True
+                        break
+                    if hole:
+                        event_hole_count += 1
+                unrepresented_since_event = 0
+                last_event_sequence = event_sequence
+            if event_error:
+                errors.append(f"{frame_context} event holes do not reconcile")
+                break
+            if (
+                type(continuity.get("cumulative_event_sequence_hole_count")) is not int
+                or continuity.get("cumulative_event_sequence_hole_count")
+                != event_hole_count
+            ):
+                errors.append(f"{frame_context} event-hole evidence is inconsistent")
+                break
+            previous_metadata = metadata
+    return errors
+
+
 def _identity_errors(
     report: Mapping[str, Any], options: ReleaseHardwareOptions
 ) -> list[str]:
@@ -1111,15 +1329,13 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                 ]
             ):
                 errors.append("modulated waveform cases differ from plan")
-            elif any(
-                not isinstance(item.get("dma_cleanup"), Mapping)
-                or item["dma_cleanup"].get("buffer_closed") is not True
-                or item["dma_cleanup"].get("failures") != []
-                for item in waveforms
-            ):
-                errors.append("modulated cyclic-DMA cleanup evidence is invalid")
+            errors.extend(_modulated_dma_cleanup_errors(waveforms))
+            runs = disk.get("runs")
+            run_records = runs if isinstance(runs, list) else []
             observed = [
-                (item.get("case_id"), item.get("mode")) for item in disk.get("runs", [])
+                (item.get("case_id"), item.get("mode"))
+                for item in run_records
+                if isinstance(item, Mapping)
             ]
             expected = [
                 (case_id, mode)
@@ -1128,6 +1344,10 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             ]
             if observed != expected:
                 errors.append("modulated mode/blocker coverage differs from plan")
+            errors.extend(_modulated_iq_convention_errors(runs))
+            errors.extend(
+                _modulated_continuity_errors(runs, expected_options.capture_samples)
+            )
             evaluation = disk.get("evaluation")
             if (
                 not isinstance(evaluation, Mapping)

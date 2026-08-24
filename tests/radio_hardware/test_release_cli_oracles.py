@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from .modulated_hardware import (
+    MODE_TANDEM,
     MODULATED_MODES,
     ModulatedHardwareOptions,
     evaluate_modulated_hardware_report,
@@ -323,6 +324,7 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
         return {
             "schema": "plutosdr-fw.modulated-quality.v1",
             "reference_id": "reference-46",
+            "iq_convention": "direct",
             "quality_valid": True,
             "quality_reasons": [],
             "evm_percent": [2.0, 2.0],
@@ -345,6 +347,31 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
             for index in range(8)
         },
     }
+
+    def tandem_frame(sequence: int) -> dict[str, object]:
+        first = sequence == 0
+        return {
+            "metadata": {
+                "buffer_sequence": sequence,
+                "first_sample_sequence": sequence * modulated.capture_samples,
+                "samples_per_channel": modulated.capture_samples,
+                "tandem_transition_count": 0,
+                "gain_events": [],
+            },
+            "continuity": {
+                "buffer_delta": None if first else 1,
+                "sample_delta": None if first else modulated.capture_samples,
+                "missing_frame_count": 0,
+                "transition_count_delta": None if first else 0,
+                "visible_event_count": 0,
+                "hidden_transition_count": 0,
+                "initial_unrepresented_transition_count": 0,
+                "cumulative_missing_frame_count": 0,
+                "cumulative_hidden_transition_count": 0,
+                "cumulative_event_sequence_hole_count": 0,
+            },
+        }
+
     report = {
         "schema": "plutosdr-fw.modulated-hardware.v1",
         "verdict": "pass",
@@ -363,7 +390,12 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
                 "kind": (
                     "desired_only" if case_id == "desired_only" else "composite_blocker"
                 ),
-                "dma_cleanup": {"buffer_closed": True, "failures": []},
+                "dma_cleanup": {
+                    "mute": cleanup,
+                    "buffer_closed": True,
+                    "buffer_release_method": "explicit_close",
+                    "failures": [],
+                },
             }
             for case_id in case_ids
         ],
@@ -372,6 +404,14 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
                 "case_id": case_id,
                 "mode": mode,
                 "summary": quality_summary(case_id),
+                **(
+                    {
+                        "settling": {"frames": 1, "trace": [tandem_frame(0)]},
+                        "measurements": [tandem_frame(1)],
+                    }
+                    if mode == MODE_TANDEM
+                    else {}
+                ),
             }
             for case_id in case_ids
             for mode in MODULATED_MODES
@@ -388,9 +428,29 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
     assert validated.verdict == "pass"
     assert validated.cleanup_verified is True
 
+    valid_report = json.loads(json.dumps(report))
     report["evaluation"]["degradation_valid"] = False
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="differs from recomputation"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["runs"][-1]["summary"]["iq_convention"] = "conjugated"
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="IQ convention changed"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    tandem_run = next(run for run in report["runs"] if run["mode"] == MODE_TANDEM)
+    tandem_run["measurements"][0]["continuity"]["sample_delta"] += 1
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="gap evidence differs from metadata"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["waveforms"][0]["dma_cleanup"]["mute"]["verified"] = False
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="cyclic-DMA cleanup was not verified"):
         production_validator(options)(spec, report_path, work_dir)
 
 
