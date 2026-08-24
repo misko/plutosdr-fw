@@ -86,7 +86,35 @@ for entry in "${COMPONENTS[@]}"; do
 done
 
 echo
-echo "2. the release tag labels the commit that actually built the release"
+echo "2. packed component identities exactly match their source-lock tags"
+
+# Make writes these strings with `git describe --tags`.  Every final source
+# lock points at the exact component commit, so the deterministic describe
+# form is the complete tag name with only the refs/tags/ prefix removed.
+# Checking this here prevents a typo or stale alias from wasting a full FPGA
+# and rootfs build before package_main_firmware.sh detects the mismatch.
+IDENTITIES=(
+    "hdl:versions_hdl:submodule_hdl_ref"
+    "buildroot:versions_buildroot:submodule_buildroot_ref"
+    "linux:versions_linux:submodule_linux_ref"
+    "u-boot-xlnx:versions_u_boot_xlnx:submodule_u_boot_xlnx_ref"
+)
+for entry in "${IDENTITIES[@]}"; do
+    IFS=: read -r name identity_key ref_key <<<"$entry"
+    identity="$(m "$identity_key")"
+    [[ -n "$identity" ]] || continue
+    ref="$(m "$ref_key")"
+    if ! tag_identity="$(source_manifest_tag_identity "$ref")"; then
+        bad "${name}: ${ref_key} must name a refs/tags source lock"
+    elif [[ "$identity" != "$tag_identity" ]]; then
+        bad "${name}: ${identity_key} is '${identity}', but ${ref_key} describes as '${tag_identity}'"
+    else
+        ok "${name} packed identity ${identity}"
+    fi
+done
+
+echo
+echo "3. the release tag labels the commit that actually built the release"
 # The v3 tag was created AFTER three further commits landed, so it points at
 # dac99758 while the shipped binary was built from f53dd006. `git checkout
 # <release tag>` therefore hands you source that did not build that release.
@@ -108,7 +136,7 @@ fi
 fi
 
 echo
-echo "3. .gitmodules hygiene"
+echo "4. .gitmodules hygiene"
 if [[ -f .gitmodules ]]; then
     if grep -qE '^\s*url\s*=\s*\.\.' .gitmodules; then
         bad "relative submodule url present (resolves against \`origin\`, breaks fresh clones)"
@@ -152,7 +180,7 @@ if [[ "$(m release_state)" == "candidate" ]] && \
 fi
 
 echo
-echo "4. no local source overrides"
+echo "5. no local source overrides"
 # A Buildroot <PKG>_OVERRIDE_SRCDIR still passes -DGIT_VERSION_OVERRIDE from the
 # pinned .mk, so an overridden build yields a binary that REPORTS the pinned
 # gadget SHA while containing entirely different code.

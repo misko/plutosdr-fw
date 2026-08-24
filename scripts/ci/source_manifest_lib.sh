@@ -21,3 +21,10 @@ source_manifest_ref_commit() {
     peeled="$(awk -v ref="${ref}^{}" '$2 == ref {print $1; exit}' <<<"$advertised")"
     printf '%s\n' "${peeled:-$direct}"
 }
+
+source_manifest_tag_identity() {
+    local ref=$1
+
+    [[ "$ref" == refs/tags/* ]] || return 1
+    printf '%s\n' "${ref#refs/tags/}"
+}

@@ -45,4 +45,4 @@ submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
 versions_hdl: tandem-agc-v2-source/hdl-v2
 versions_buildroot: tandem-agc-v8-rc2-source/buildroot-v1
 versions_linux: tandem-agc-v2-source/linux-v10
-versions_u_boot_xlnx: gain-series-v4-source/u-boot-xlnx
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

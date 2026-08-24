@@ -52,3 +52,26 @@ for entry in "${components[@]}"; do
         fail "$path local $ref is $local_commit after synchronization"
     printf 'source lock %-15s %s == %s\n' "$path" "${pin:0:12}" "$ref"
 done
+
+# A persistent runner may retain another tag at the same commit.  Git permits
+# that, and `git describe --tags` then chooses one alias according to its own
+# ordering rather than the tag we just fetched.  /opt/VERSIONS is generated
+# from that exact command, so prove the live worktree will emit the manifest's
+# expected identity before starting any expensive build work.
+packed_identities=(
+    "hdl:versions_hdl"
+    "buildroot:versions_buildroot"
+    "linux:versions_linux"
+    "u-boot-xlnx:versions_u_boot_xlnx"
+)
+for entry in "${packed_identities[@]}"; do
+    IFS=: read -r path identity_key <<<"$entry"
+    expected_identity="$(source_manifest_value "$MANIFEST" "$identity_key")"
+    [[ -n "$expected_identity" ]] || continue
+    actual_identity="$(
+        git -C "$ROOT/$path" describe --abbrev=4 --dirty --always --tags
+    )"
+    [[ "$actual_identity" == "$expected_identity" ]] ||
+        fail "$path git describe is '$actual_identity'; manifest requires '$expected_identity'"
+    printf 'packed identity %-12s %s\n' "$path" "$actual_identity"
+done
