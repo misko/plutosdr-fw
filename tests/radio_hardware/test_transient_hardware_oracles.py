@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from builtins import BaseExceptionGroup
 from contextlib import contextmanager
 from dataclasses import replace
@@ -12,6 +13,7 @@ from typing import Any
 
 import pytest
 
+from . import transient_hardware as transient_hardware_module
 from .experiment import EvidenceInvalid
 from .metadata_abi import (
     TandemEventDirection,
@@ -91,6 +93,7 @@ class _FakeRadio:
         self.rx_gain_db = 40.0
         self.tx_gain_db = -89.75
         self.metadata_open = False
+        self.buffer_open = False
         self.metadata_by_token: dict[bytes, Any] = {}
         self.metadata_capture_count = 0
         self.metadata_sample = 100_000
@@ -99,6 +102,16 @@ class _FakeRadio:
         self.metadata_event_sequence = 70
         self.metadata_gain_index = 40
         self.metadata_previous_level = -60.0
+        self.sample_counter_low32 = self.metadata_sample
+        self.sample_counter_step = 128
+        self.freeze_sample_counter = False
+        self.scripted_counter_reads: list[int] = []
+        self.counter_reads: list[tuple[str, int]] = []
+        self.capture_thread_names: list[str] = []
+        self.metadata_capture_thread_names: list[str] = []
+        self.coordinate_attack_capture = False
+        self.attack_capture_waiting = threading.Event()
+        self.attack_command_applied = threading.Event()
         self.sample_gap_capture_index: int | None = None
         self.sample_gap_frames = 1
         self.buffer_gap_frames_override: int | None = None
@@ -121,6 +134,12 @@ class _FakeRadio:
 
     def set_tx2_gain(self, gain_db: float) -> float:
         self.tx_gain_db = float(gain_db)
+        if (
+            self.coordinate_attack_capture
+            and self.metadata_open
+            and self.tx_gain_db > -45.0
+        ):
+            self.attack_command_applied.set()
         if not self.metadata_open and self.mode != "manual":
             self.rx_gain_db = 20.0 if self.tx_gain_db > -45.0 else 40.0
         self.operations.append(("set_tx2_gain", self.tx_gain_db))
@@ -167,12 +186,14 @@ class _FakeRadio:
                 )
             )
             self.metadata_open = api == "metadata"
+            self.buffer_open = True
             if self.metadata_open:
                 self.metadata_previous_level = self.tx_gain_db
             try:
                 yield object(), 2 if self.metadata_open else None
             finally:
                 self.metadata_open = False
+                self.buffer_open = False
                 self.operations.append(("buffer_exit", api))
 
         return opened()
@@ -252,6 +273,17 @@ class _FakeRadio:
     def capture_iq(
         self, _buffer: Any, *, metadata: bool, samples_per_channel: int
     ) -> tuple[bytes, bytes | None, int]:
+        self.capture_thread_names.append(threading.current_thread().name)
+        if metadata:
+            self.metadata_capture_thread_names.append(threading.current_thread().name)
+        if (
+            metadata
+            and self.coordinate_attack_capture
+            and self.metadata_capture_count == 3
+        ):
+            self.attack_capture_waiting.set()
+            if not self.attack_command_applied.wait(timeout=2.0):
+                raise EvidenceInvalid("planted concurrent command never arrived")
         if self.fail_next_capture_with_mute_error:
             self.fail_next_capture_with_mute_error = False
             self.mute_failures_remaining = 1
@@ -269,6 +301,21 @@ class _FakeRadio:
         token = f"metadata-{self.metadata_capture_count}".encode()
         self.metadata_by_token[token] = parsed
         return raw, token, 1_000 + len(self.operations)
+
+    def read_rx_sample_counter_low32(self) -> int:
+        if self.scripted_counter_reads:
+            value = self.scripted_counter_reads.pop(0)
+            self.counter_reads.append((threading.current_thread().name, value))
+            return value
+        if self.freeze_sample_counter:
+            value = self.sample_counter_low32 % (1 << 32)
+            self.counter_reads.append((threading.current_thread().name, value))
+            return value
+        current = max(self.sample_counter_low32, self.metadata_sample)
+        value = current % (1 << 32)
+        self.counter_reads.append((threading.current_thread().name, value))
+        self.sample_counter_low32 = current + self.sample_counter_step
+        return value
 
     def parse_metadata(self, token: bytes) -> Any:
         return self.metadata_by_token[token]
@@ -501,7 +548,7 @@ def test_report_retains_immediate_iq_gain_and_tandem_event_evidence(
     assert report["comparison"][0]["attack"]["maximum_post_clipping_fraction"] == 0.0
 
 
-def test_host_writes_have_frame_sized_bounds_and_initial_write_is_unanchored(
+def test_host_writes_have_bounded_sample_intervals_and_initial_is_unanchored(
     tmp_path: Path,
 ) -> None:
     report, _path = _run_fake(_FakeRadio(tmp_path), _quality(tmp_path))
@@ -519,60 +566,38 @@ def test_host_writes_have_frame_sized_bounds_and_initial_write_is_unanchored(
 
         for command_id in ("strong_attack", "weak_release"):
             command = commands[command_id]
-            assert command["sample_uncertainty"] == 1_024
             assert command["sample_uncertainty"] > 0
-            assert command["timing_role"] == "host_write_bracketed_by_observed_iq"
+            if mode["mode"] == "tandem_auto":
+                assert command["sample_uncertainty"] == 256
+                assert (
+                    command["timing_role"]
+                    == "host_write_bracketed_by_coherent_fpga_counter"
+                )
+                assert command["sample_counter_bracket"]["post_write_read_count"] == 2
+            else:
+                assert command["sample_uncertainty"] == 1_024
+                assert command["timing_role"] == "host_write_bracketed_by_observed_iq"
         if mode["mode"] != "tandem_auto":
             assert mode["timing_basis"].startswith("ordinary_session_local_")
 
 
-def test_tandem_command_bracket_includes_a_metadata_gap(tmp_path: Path) -> None:
+def test_tandem_command_bracket_rejects_even_a_matched_metadata_gap(
+    tmp_path: Path,
+) -> None:
     radio = _FakeRadio(tmp_path)
     radio.sample_gap_capture_index = 3
-    report, _path = _run_fake(radio, _quality(tmp_path))
-
-    tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
-    attack = next(
-        command
-        for command in tandem["commands"]
-        if command["command_id"] == "strong_attack"
-    )
-    first_post = tandem["attack_frames"][0]
-    assert first_post["sample_gap_before"] == 1_024
-    assert first_post["continuity"] == {
-        "buffer_delta": 2,
-        "sample_delta": 2_048,
-        "missing_frame_count": 1,
-        "sample_gap_before": 1_024,
-        "provider_gap_accepted": True,
-        "gap_context": "command_bracket",
-        "command_boundary_gap_allowed": True,
-        "transition_count_delta": 1,
-        "visible_event_count": 1,
-        "hidden_transition_count": 0,
-        "initial_unrepresented_transition_count": 0,
-        "cumulative_missing_frame_count": 1,
-        "cumulative_hidden_transition_count": 0,
-        "cumulative_event_sequence_hole_count": 0,
-    }
-    assert (
-        attack["sample_sequence_before"]
-        == tandem["baseline_frames"][-1]["sample_end_exclusive"]
-    )
-    assert attack["sample_sequence_after"] == first_post["sample_end_exclusive"]
-    assert attack["sample_uncertainty"] == 2_048
-    assert tandem["responses"]["attack"]["command_bracket_gap_samples"] == 1_024
-    assert all(
-        transition["latency_upper_samples"] <= 65_536
-        for transition in tandem["gain_evidence"]["transitions"]
-    )
+    with pytest.raises(EvidenceInvalid, match="provider gap is forbidden") as raised:
+        _run_fake(radio, _quality(tmp_path))
+    assert "buffer 42->44" in str(raised.value)
+    assert "sample 102048->104096" in str(raised.value)
+    assert "hidden transitions 0" in str(raised.value)
 
 
 def test_runner_rejects_excessive_command_sample_uncertainty_and_checkpoints(
     tmp_path: Path,
 ) -> None:
     radio = _FakeRadio(tmp_path)
-    radio.sample_gap_capture_index = 3
+    radio.sample_counter_step = 1_024
     with pytest.raises(EvidenceInvalid, match=r"uncertainty 2048 exceeds 1024"):
         _run_fake(
             radio,
@@ -592,23 +617,19 @@ def test_tandem_sample_gap_outside_a_command_boundary_remains_fatal(
 ) -> None:
     radio = _FakeRadio(tmp_path)
     radio.sample_gap_capture_index = 4
-    with pytest.raises(EvidenceInvalid, match="gap lies inside a continuous response"):
+    with pytest.raises(EvidenceInvalid, match="provider gap is forbidden"):
         _run_fake(radio, _quality(tmp_path))
 
 
-def test_zero_transition_precondition_gap_is_a_discontinuous_observation(
+def test_zero_transition_precondition_gap_is_fatal_under_continuous_acquisition(
     tmp_path: Path,
 ) -> None:
     radio = _FakeRadio(tmp_path)
     radio.sample_gap_capture_index = 1
-    report, _path = _run_fake(radio, _quality(tmp_path))
-
-    tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
-    gap = tandem["preconditioning"]["trace"][1]
-    assert gap["gap_context"] == "precondition_observation"
-    assert gap["continuity"]["provider_gap_accepted"] is True
-    assert gap["continuity"]["hidden_transition_count"] == 0
-    assert gap["precondition_stable_run"] == 1
+    with pytest.raises(EvidenceInvalid, match="provider gap is forbidden") as raised:
+        _run_fake(radio, _quality(tmp_path))
+    assert "transition delta 0" in str(raised.value)
+    assert "hidden transitions 0" in str(raised.value)
 
 
 def test_tandem_provider_gap_requires_matching_buffer_and_sample_deltas(
@@ -635,8 +656,11 @@ def test_tandem_provider_gap_cannot_hide_transient_event_timing(
     radio = _FakeRadio(tmp_path)
     radio.sample_gap_capture_index = 3
     radio.hidden_transition_capture_index = 3
-    with pytest.raises(EvidenceInvalid, match="hides gain-event timing evidence"):
+    with pytest.raises(EvidenceInvalid, match="provider gap is forbidden") as raised:
         _run_fake(radio, _quality(tmp_path))
+    assert "transition delta 2" in str(raised.value)
+    assert "visible events 1" in str(raised.value)
+    assert "hidden transitions 1" in str(raised.value)
 
 
 def test_runner_fails_closed_when_tandem_release_event_is_missing(
@@ -653,6 +677,114 @@ def test_runner_fails_closed_when_tandem_release_event_is_missing(
         ).read_text(encoding="utf-8")
     )
     assert persisted["verdict"] == "invalid"
+
+
+def test_tandem_refills_run_continuously_while_counter_timed_command_executes(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.coordinate_attack_capture = True
+
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
+    attack = next(
+        command
+        for command in tandem["commands"]
+        if command["command_id"] == "strong_attack"
+    )
+
+    assert radio.attack_capture_waiting.is_set()
+    assert radio.attack_command_applied.is_set()
+    assert set(radio.metadata_capture_thread_names) == {"tandem-transient-acquisition"}
+    assert {thread for thread, _value in radio.counter_reads} == {"MainThread"}
+    assert tandem["acquisition"]["threaded"] is True
+    assert tandem["acquisition"]["kernel_buffers"] == 1
+    assert tandem["acquisition"]["consumed_frames"] == (
+        len(tandem["preconditioning"]["trace"])
+        + len(tandem["attack_frames"])
+        + len(tandem["release_frames"])
+    )
+    assert (
+        attack["sample_counter_bracket"]["raw_post_write_advanced"]
+        != (attack["sample_counter_bracket"]["raw_post_write_initial"])
+    )
+    assert all(
+        frame["continuity"]["buffer_delta"] in (None, 1)
+        and frame["continuity"]["provider_gap_accepted"] is False
+        for frame in (
+            tandem["preconditioning"]["trace"]
+            + tandem["attack_frames"]
+            + tandem["release_frames"]
+        )
+    )
+
+
+def test_iq_analysis_hashing_and_artifact_writes_wait_for_buffer_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    analyzed = 0
+    written = 0
+    real_analyze = transient_hardware_module.analyze_immediate_dual_rx
+    real_write = transient_hardware_module._atomic_bytes
+
+    def checked_analyze(*args: Any, **kwargs: Any) -> Any:
+        nonlocal analyzed
+        assert not radio.buffer_open
+        analyzed += 1
+        return real_analyze(*args, **kwargs)
+
+    def checked_write(path: Path, value: bytes) -> None:
+        nonlocal written
+        assert not radio.buffer_open
+        written += 1
+        real_write(path, value)
+
+    monkeypatch.setattr(
+        transient_hardware_module, "analyze_immediate_dual_rx", checked_analyze
+    )
+    monkeypatch.setattr(transient_hardware_module, "_atomic_bytes", checked_write)
+    report, _path = _run_fake(
+        radio,
+        replace(_quality(tmp_path), save_iq=True),
+    )
+
+    unique_frames = [
+        frame
+        for mode in report["modes"]
+        for frame in (
+            mode["preconditioning"]["trace"]
+            + mode["attack_frames"]
+            + mode["release_frames"]
+        )
+    ]
+    assert analyzed == len(unique_frames)
+    assert written == len(unique_frames)
+    assert all(
+        len(frame["sha256"]) == 64
+        and frame["analysis"]["samples_per_channel"] == 1_024
+        and Path(frame["iq_path"]).is_file()
+        for frame in unique_frames
+    )
+
+
+def test_tandem_counter_bracket_requires_post_write_cdc_advance(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.freeze_sample_counter = True
+    with pytest.raises(EvidenceInvalid, match="post-write FPGA counter advance"):
+        _run_fake(radio, _quality(tmp_path))
+
+
+def test_low32_extension_accepts_wrap_and_rejects_half_range_ambiguity() -> None:
+    modulus = 1 << 32
+    assert (
+        transient_hardware_module._extend_low32_near(0x20, reference=modulus - 0x10)
+        == modulus + 0x20
+    )
+    with pytest.raises(EvidenceInvalid, match="extension is ambiguous"):
+        transient_hardware_module._extend_low32_near(0x80000000, reference=0)
 
 
 def test_runner_rejects_host_write_jitter_and_still_requests_mute(
@@ -721,4 +853,9 @@ def test_capture_options_prove_enough_pre_and_post_windows(tmp_path: Path) -> No
         validate_transient_options(
             quality,
             _capture_options(max_event_latency_samples=None),
+        )
+    with pytest.raises(ValueError, match="deferred IQ bytes"):
+        validate_transient_options(
+            quality,
+            _capture_options(max_precondition_frames=10_000),
         )

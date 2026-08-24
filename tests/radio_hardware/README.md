@@ -176,13 +176,18 @@ the same absolute envelope.
 manual, native slow-attack, native fast-attack, and tandem-auto modes. Native
 hybrid is intentionally absent from the release transient matrix under the
 mode policy above. The runner uses one kernel buffer and retains the first
-frame after each level write instead of draining away the transition.
+frame around each level write instead of draining away the transition. A
+bounded acquisition-only thread keeps metadata refills active while tandem TX
+writes execute. IQ analysis, hashing, and optional artifact writes are deferred
+until the buffer is closed; the default worst-case retained IQ is about 6 MiB
+and every configuration is capped at 64 MiB.
 
-- `timestamp_stimulus_command()` brackets the write in monotonic host time. The
-  hardware runner closes its sample-time bracket only after IQ arrives: from
-  the last observed pre-write frame end through the first observed post-write
-  frame end. Ordinary-IIO sample positions are explicitly session-local;
-  tandem positions come from the FPGA metadata counter.
+- `timestamp_stimulus_command()` brackets every write in monotonic host time.
+  Ordinary-IIO closes its sample-time bracket with observed IQ on an explicitly
+  session-local axis. Tandem reads the coherent low 32 bits of the same FPGA
+  counter used by metadata immediately before and after the TX write. The upper
+  bound is accepted only after a second post-write read proves that the CDC
+  value advanced; low words are extended around nearby 64-bit frame metadata.
 - `analyze_immediate_dual_rx()` analyzes fixed windows beginning at sample zero
   of each returned frame. It does not discard the transition and reports
   dual-RX tone level, SNR, clipping, differential phase, and phase stability.
@@ -196,12 +201,11 @@ frame after each level write instead of draining away the transition.
   phase excursion.
 
 The metadata provider derives `buffer_sequence` from the same FPGA sample
-counter carried in `first_sample_sequence`. The transient runner therefore
-accepts a provider-skipped frame only when both deltas identify the same whole
-frames and the cumulative transition counter proves that no gain event was
-hidden. Such a gap may separate preconditioning observations or lie inside the
-conservative first-post-write command bracket. A gap in the subsequent response
-trace remains fatal because it could hide overshoot or settling behavior.
+counter carried in `first_sample_sequence`, but it does not return exact events
+or IQ for omitted frames. Transient qualification therefore rejects every
+provider gap, including a matched whole-frame gap with zero transitions: it
+could still hide signal overshoot or settling. Any transition-count increment
+not represented by an exact in-frame event is also fatal.
 
 The layer fails closed on missing sample brackets, host-write jitter over the
 configured limit, excessive sample uncertainty, event-sequence holes, torn or

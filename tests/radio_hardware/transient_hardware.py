@@ -17,7 +17,9 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import queue
 import statistics
+import threading
 import time
 from builtins import BaseExceptionGroup
 from collections.abc import Callable, Mapping, Sequence
@@ -56,6 +58,11 @@ from .transient_quality import (
 
 _UINT32_MODULUS = 1 << 32
 _UINT64_MODULUS = 1 << 64
+_TRANSIENT_KERNEL_BUFFERS = 1
+_TANDEM_CAPTURE_QUEUE_FRAMES = 4
+_TANDEM_CAPTURE_TAIL_FRAMES = _TANDEM_CAPTURE_QUEUE_FRAMES + 1
+_MAX_DEFERRED_CAPTURE_BYTES = 64 * 1024 * 1024
+_CAPTURE_THREAD_WAIT_SECONDS = 6.0
 TRANSIENT_MODES = (
     MODE_MANUAL,
     *(native_mode_name(mode) for mode in AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES),
@@ -64,10 +71,14 @@ TRANSIENT_MODES = (
 _GAP_CONTEXT_CONTINUOUS_RESPONSE = "continuous_response"
 _GAP_CONTEXT_PRECONDITION = "precondition_observation"
 _GAP_CONTEXT_COMMAND = "command_bracket"
+_GAP_CONTEXT_PREFETCH = "precommand_prefetch"
+_GAP_CONTEXT_ACQUISITION = "continuous_acquisition_unclassified"
 _GAP_CONTEXTS = {
     _GAP_CONTEXT_CONTINUOUS_RESPONSE,
     _GAP_CONTEXT_PRECONDITION,
     _GAP_CONTEXT_COMMAND,
+    _GAP_CONTEXT_PREFETCH,
+    _GAP_CONTEXT_ACQUISITION,
 }
 
 
@@ -107,6 +118,8 @@ class TransientRadioTransport(Protocol):
         self, buffer: Any, *, metadata: bool, samples_per_channel: int
     ) -> tuple[bytes, bytes | None, int]: ...
 
+    def read_rx_sample_counter_low32(self) -> int: ...
+
 
 @dataclass(frozen=True)
 class TransientCaptureOptions:
@@ -131,6 +144,68 @@ class TransientCaptureOptions:
 
 
 _DEFAULT_TRANSIENT_CAPTURE_OPTIONS = TransientCaptureOptions()
+
+
+@dataclass
+class _DeferredFrame:
+    """One copied frame whose expensive processing waits for buffer close."""
+
+    record: dict[str, Any]
+    raw: bytes
+    metadata: TandemFrameMetadata | None
+    iq_dir: Path | None = None
+
+
+def _maximum_deferred_capture_bytes(capture: TransientCaptureOptions) -> int:
+    # Tandem may have a bounded producer tail around each command.  Ordinary
+    # modes use no producer tail, but this worst case applies uniformly.
+    maximum_frames = (
+        capture.max_precondition_frames
+        + 2 * (capture.response_frames + _TANDEM_CAPTURE_TAIL_FRAMES)
+        + _TANDEM_CAPTURE_QUEUE_FRAMES
+        + 1
+    )
+    return maximum_frames * capture.frame_samples * 8
+
+
+def transient_evidence_policy(
+    capture: TransientCaptureOptions,
+) -> dict[str, Any]:
+    """Return the exact durable policy independently checked for release use."""
+
+    return {
+        "ordinary_timing": (
+            "session-local contiguous refill axis reset for each mode; never "
+            "compared across sessions and not a hardware timestamp"
+        ),
+        "tandem_timing": "metadata-v5 FPGA sample counter",
+        "command_latency": (
+            "tandem uses coherent FPGA low32 reads around the TX write and "
+            "requires a counter update observed after an initial post-write read; "
+            "ordinary modes retain closed observed-IQ bounds; never point estimates"
+        ),
+        "initial_condition": (
+            "pre-session weak write remains sample-unbounded; retained stable IQ "
+            "is an explicitly labelled conditioning anchor"
+        ),
+        "tandem_acquisition": (
+            "one kernel buffer; one bounded acquisition-only thread continuously "
+            "refills and copies IQ while commands execute; FFT, hashing, and IQ "
+            "artifact writes begin only after buffer close"
+        ),
+        "tandem_provider_gaps": (
+            "reject every buffer/sample gap and every hidden transition; the "
+            "provider does not retain exact events or signal response for omitted "
+            "frames"
+        ),
+        "tandem_capture_queue_frames": _TANDEM_CAPTURE_QUEUE_FRAMES,
+        "tandem_response_tail_frames": _TANDEM_CAPTURE_TAIL_FRAMES,
+        "maximum_deferred_capture_bytes": _MAX_DEFERRED_CAPTURE_BYTES,
+        "configured_worst_case_deferred_capture_bytes": (
+            _maximum_deferred_capture_bytes(capture)
+        ),
+        "tandem_event_latency_limit_samples": capture.max_event_latency_samples,
+    }
 
 
 def validate_transient_options(
@@ -180,6 +255,13 @@ def validate_transient_options(
         raise ValueError("preconditioning must retain every requested baseline frame")
     if capture.max_precondition_frames < capture.precondition_stable_frames + 1:
         raise ValueError("preconditioning bound cannot drain and prove stability")
+    deferred_bytes = _maximum_deferred_capture_bytes(capture)
+    if deferred_bytes > _MAX_DEFERRED_CAPTURE_BYTES:
+        raise ValueError(
+            "transient acquisition-first capture can retain at most "
+            f"{_MAX_DEFERRED_CAPTURE_BYTES} deferred IQ bytes; requested bounds "
+            f"permit {deferred_bytes} bytes"
+        )
     windows_per_frame = capture.frame_samples // capture.window_samples
     if capture.baseline_frames * windows_per_frame < capture.baseline_windows:
         raise ValueError("baseline captures do not contain enough analysis windows")
@@ -474,28 +556,23 @@ def _validate_tandem_metadata(
                 "omitted frames can hold "
                 f"({hidden_transitions} > {maximum_hidden})"
             )
-        if missing_frames and gap_context == _GAP_CONTEXT_CONTINUOUS_RESPONSE:
+        if missing_frames:
+            # The provider consumes events older than the returned IQ frame.
+            # Even a zero-transition gap can hide signal settling or overshoot,
+            # and a nonzero transition delta loses exact event placement.  The
+            # acquisition-first transport is therefore qualification evidence
+            # only when every hardware frame is returned.
             raise EvidenceInvalid(
-                "tandem transient provider gap lies inside a continuous response "
-                f"(buffer {previous.buffer_sequence}->{metadata.buffer_sequence}, "
-                f"sample {previous.first_sample_sequence}->"
+                "tandem transient provider gap is forbidden by continuous "
+                "acquisition policy "
+                f"(context {gap_context}, buffer "
+                f"{previous.buffer_sequence}->{metadata.buffer_sequence}, sample "
+                f"{previous.first_sample_sequence}->"
                 f"{metadata.first_sample_sequence}, missing frames "
-                f"{missing_frames})"
-            )
-        if hidden_transitions:
-            # Buffer/sample counters and the cumulative transition counter prove
-            # that these are real omitted frames, not torn metadata.  They do
-            # not retain the exact sample timestamps required by a transient
-            # latency claim, however, so this stricter oracle cannot credit
-            # them as attack/release evidence.
-            raise EvidenceInvalid(
-                "tandem transient provider gap hides gain-event timing evidence "
-                f"(missing frames {missing_frames}, transition delta "
-                f"{transition_delta}, visible events "
-                f"{len(metadata.gain_events)}, hidden transitions "
+                f"{missing_frames}, transition delta {transition_delta}, visible "
+                f"events {len(metadata.gain_events)}, hidden transitions "
                 f"{hidden_transitions})"
             )
-        state.missing_frame_count += missing_frames
     elif metadata.tandem_transition_count < len(metadata.gain_events):
         raise EvidenceInvalid(
             "first tandem transient frame has more events than transitions"
@@ -576,9 +653,9 @@ def _validate_tandem_metadata(
         "sample_delta": sample_delta,
         "missing_frame_count": missing_frames,
         "sample_gap_before": sample_gap_before,
-        "provider_gap_accepted": bool(missing_frames),
+        "provider_gap_accepted": False,
         "gap_context": gap_context,
-        "command_boundary_gap_allowed": gap_context == _GAP_CONTEXT_COMMAND,
+        "command_boundary_gap_allowed": False,
         "transition_count_delta": transition_delta,
         "visible_event_count": len(metadata.gain_events),
         "hidden_transition_count": hidden_transitions,
@@ -602,9 +679,8 @@ def _capture_frame(
     capture: TransientCaptureOptions,
     state: _CaptureState,
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
-    iq_dir: Path,
     gap_context: str = _GAP_CONTEXT_CONTINUOUS_RESPONSE,
-) -> tuple[dict[str, Any], TandemFrameMetadata | None]:
+) -> _DeferredFrame:
     metadata_mode = mode == MODE_TANDEM
     before = (
         None if metadata_mode else _rx_state(radio, expected_mode=expected_iio_mode)
@@ -644,21 +720,8 @@ def _capture_frame(
         first_sample = state.next_nominal_sample
         timing_basis = "ordinary_session_local_contiguous_refill_axis"
 
-    analysis = dict(
-        analyze_immediate_dual_rx(
-            raw,
-            first_sample_sequence=first_sample,
-            sample_rate_hz=quality.sample_rate_hz,
-            expected_tone_hz=quality.tone_hz,
-            window_samples=capture.window_samples,
-            min_tone_snr_db=quality.thresholds.min_tone_snr_db,
-            max_clipping_fraction=quality.thresholds.max_clipping_fraction,
-            max_phase_std_deg=quality.thresholds.max_phase_std_deg,
-        )
-    )
     record: dict[str, Any] = {
         "frame_index": state.frame_index,
-        "sha256": hashlib.sha256(raw).hexdigest(),
         "iq_bytes": len(raw),
         "refill_monotonic_ns": int(refill_ns),
         "timing_basis": timing_basis,
@@ -666,22 +729,278 @@ def _capture_frame(
         "sample_end_exclusive": first_sample + capture.frame_samples,
         "sample_gap_before": sample_gap_before,
         "gap_context": gap_context,
-        "command_boundary_gap_allowed": gap_context == _GAP_CONTEXT_COMMAND,
-        "analysis": analysis,
+        "command_boundary_gap_allowed": False,
     }
     if before is not None and after is not None:
         record["rx_state_before"] = before
         record["rx_state_after"] = after
     if parsed is not None:
-        record["metadata"] = _metadata_dict(parsed)
         record["continuity"] = dict(continuity or {})
-    if quality.save_iq:
-        iq_path = iq_dir / f"frame-{state.frame_index:04d}.cs16"
-        _atomic_bytes(iq_path, raw)
-        record["iq_path"] = str(iq_path)
     state.frame_index += 1
     state.next_nominal_sample = first_sample + capture.frame_samples
-    return record, parsed
+    return _DeferredFrame(record=record, raw=raw, metadata=parsed)
+
+
+def _classify_deferred_frame(
+    frame: _DeferredFrame, *, iq_dir: Path, gap_context: str
+) -> tuple[dict[str, Any], TandemFrameMetadata | None]:
+    """Assign one acquired frame to a durable phase after command timing is known."""
+
+    if gap_context not in _GAP_CONTEXTS:
+        raise ValueError(f"unknown transient gap context {gap_context!r}")
+    frame.iq_dir = iq_dir
+    frame.record["gap_context"] = gap_context
+    frame.record["command_boundary_gap_allowed"] = False
+    continuity = frame.record.get("continuity")
+    if isinstance(continuity, dict):
+        continuity["gap_context"] = gap_context
+        continuity["command_boundary_gap_allowed"] = False
+    return frame.record, frame.metadata
+
+
+def _materialize_deferred_frames(
+    frames: Sequence[_DeferredFrame],
+    *,
+    quality: TandemQualityOptions,
+    capture: TransientCaptureOptions,
+    check_deadline: Callable[[], None],
+) -> None:
+    """Analyze, hash, and optionally persist IQ only after the IIO buffer closes."""
+
+    for frame in frames:
+        check_deadline()
+        record = frame.record
+        record["sha256"] = hashlib.sha256(frame.raw).hexdigest()
+        record["analysis"] = dict(
+            analyze_immediate_dual_rx(
+                frame.raw,
+                first_sample_sequence=int(record["first_sample_sequence"]),
+                sample_rate_hz=quality.sample_rate_hz,
+                expected_tone_hz=quality.tone_hz,
+                window_samples=capture.window_samples,
+                min_tone_snr_db=quality.thresholds.min_tone_snr_db,
+                max_clipping_fraction=quality.thresholds.max_clipping_fraction,
+                max_phase_std_deg=quality.thresholds.max_phase_std_deg,
+            )
+        )
+        if frame.metadata is not None:
+            record["metadata"] = _metadata_dict(frame.metadata)
+        if quality.save_iq:
+            if frame.iq_dir is None:
+                raise EvidenceInvalid("transient frame lacks its IQ artifact phase")
+            iq_path = frame.iq_dir / f"frame-{record['frame_index']:04d}.cs16"
+            _atomic_bytes(iq_path, frame.raw)
+            record["iq_path"] = str(iq_path)
+
+
+class _TandemCapturePump:
+    """Continuously refill tandem IQ on one bounded acquisition-only thread."""
+
+    def __init__(
+        self, acquire: Callable[[], _DeferredFrame], *, maximum_frames: int
+    ) -> None:
+        self._acquire = acquire
+        self._maximum_frames = maximum_frames
+        self._queue: queue.Queue[_DeferredFrame | BaseException] = queue.Queue(
+            maxsize=_TANDEM_CAPTURE_QUEUE_FRAMES
+        )
+        self._stop = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="tandem-transient-acquisition",
+            daemon=True,
+        )
+        self.produced_frames = 0
+        self.consumed_frames = 0
+        self.discarded_tail_frames = 0
+        self._terminal_error: BaseException | None = None
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def _offer(self, item: _DeferredFrame | BaseException) -> bool:
+        while not self._stop.is_set():
+            try:
+                self._queue.put(item, timeout=0.05)
+                return True
+            except queue.Full:
+                continue
+        return False
+
+    def _run(self) -> None:
+        try:
+            while not self._stop.is_set():
+                if self.produced_frames >= self._maximum_frames:
+                    raise EvidenceInvalid(
+                        "tandem acquisition exceeded its bounded frame budget"
+                    )
+                frame = self._acquire()
+                self.produced_frames += 1
+                if not self._offer(frame):
+                    self.discarded_tail_frames += 1
+                    return
+        except BaseException as error:  # noqa: BLE001 - cross-thread propagation
+            self._terminal_error = error
+            self._offer(error)
+
+    def take(self) -> _DeferredFrame:
+        try:
+            item = self._queue.get(timeout=_CAPTURE_THREAD_WAIT_SECONDS)
+        except queue.Empty as exc:
+            raise EvidenceInvalid(
+                "tandem acquisition thread returned no frame before timeout"
+            ) from exc
+        if isinstance(item, BaseException):
+            self._terminal_error = None
+            raise item.with_traceback(item.__traceback__)
+        self.consumed_frames += 1
+        return item
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=_CAPTURE_THREAD_WAIT_SECONDS)
+        if self._thread.is_alive():
+            raise EvidenceInvalid("tandem acquisition thread did not stop")
+        while True:
+            try:
+                item = self._queue.get_nowait()
+            except queue.Empty:
+                break
+            if isinstance(item, BaseException):
+                self._terminal_error = None
+                raise item.with_traceback(item.__traceback__)
+            self.discarded_tail_frames += 1
+        if self._terminal_error is not None:
+            error = self._terminal_error
+            self._terminal_error = None
+            raise error.with_traceback(error.__traceback__)
+
+
+def _strict_low32_counter(value: Any) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise EvidenceInvalid("RX sample-counter readback is not an integer")
+    if not 0 <= value < _UINT32_MODULUS:
+        raise EvidenceInvalid("RX sample-counter readback lies outside uint32")
+    return value
+
+
+def _extend_low32_near(raw: int, *, reference: int) -> int:
+    """Extend a coherent low word to the unique uint64 value nearest a frame."""
+
+    if not 0 <= reference < _UINT64_MODULUS:
+        raise EvidenceInvalid("sample-counter extension reference exceeds uint64")
+    base = reference & ~(_UINT32_MODULUS - 1)
+    candidates = [base | raw]
+    if candidates[0] >= _UINT32_MODULUS:
+        candidates.append(candidates[0] - _UINT32_MODULUS)
+    if candidates[0] + _UINT32_MODULUS < _UINT64_MODULUS:
+        candidates.append(candidates[0] + _UINT32_MODULUS)
+    distances = [abs(value - reference) for value in candidates]
+    minimum = min(distances)
+    if minimum >= _UINT32_MODULUS // 2 or distances.count(minimum) != 1:
+        raise EvidenceInvalid("RX sample-counter low32 extension is ambiguous")
+    return candidates[distances.index(minimum)]
+
+
+def _timestamp_tandem_command(
+    radio: TransientRadioTransport,
+    command_id: str,
+    requested_level_db: float,
+    *,
+    last_observed_frame_end: int,
+    clock_ns: Callable[[], int],
+    max_host_jitter_ns: int,
+    max_sample_uncertainty: int,
+    readback_tolerance_db: float,
+) -> tuple[StimulusCommand, dict[str, Any]]:
+    """Bracket a TX write with coherent FPGA-counter reads while refill runs."""
+
+    raw_before = _strict_low32_counter(radio.read_rx_sample_counter_low32())
+    extended_before = _extend_low32_near(raw_before, reference=last_observed_frame_end)
+    command = timestamp_stimulus_command(
+        command_id,
+        requested_level_db,
+        apply=radio.set_tx2_gain,
+        clock_ns=clock_ns,
+        max_host_jitter_ns=max_host_jitter_ns,
+        readback_tolerance_db=readback_tolerance_db,
+    )
+
+    raw_post_write_initial = _strict_low32_counter(radio.read_rx_sample_counter_low32())
+    raw_post_write_advanced = raw_post_write_initial
+    post_write_read_count = 1
+    for _ in range(8):
+        raw_post_write_advanced = _strict_low32_counter(
+            radio.read_rx_sample_counter_low32()
+        )
+        post_write_read_count += 1
+        if raw_post_write_advanced != raw_post_write_initial:
+            break
+    else:
+        raise EvidenceInvalid(
+            f"command {command_id!r} did not observe a post-write FPGA counter advance"
+        )
+
+    initial_delta = (raw_post_write_initial - raw_before) % _UINT32_MODULUS
+    advanced_delta = (
+        raw_post_write_advanced - raw_post_write_initial
+    ) % _UINT32_MODULUS
+    if initial_delta >= _UINT32_MODULUS // 2 or not (
+        0 < advanced_delta < _UINT32_MODULUS // 2
+    ):
+        raise EvidenceInvalid(
+            f"command {command_id!r} FPGA counter bracket is ambiguous"
+        )
+    extended_post_write_initial = extended_before + initial_delta
+    extended_after = extended_post_write_initial + advanced_delta
+    if extended_after >= _UINT64_MODULUS:
+        raise EvidenceInvalid(
+            f"command {command_id!r} FPGA counter bracket exceeds uint64"
+        )
+    lower = max(last_observed_frame_end, extended_before)
+    uncertainty = extended_after - lower
+    if uncertainty < 0:
+        raise EvidenceInvalid(
+            f"command {command_id!r} FPGA counter bracket predates observed IQ"
+        )
+    if uncertainty > max_sample_uncertainty:
+        raise EvidenceInvalid(
+            f"command {command_id!r} sample uncertainty {uncertainty} exceeds "
+            f"{max_sample_uncertainty} samples"
+        )
+    bracketed = replace(
+        command,
+        sample_sequence_before=lower,
+        sample_sequence_after=extended_after,
+    )
+    return bracketed, {
+        "register_address": "0x800000b8",
+        "counter_width_bits": 32,
+        "counter_source": "coherent FPGA RX sample counter low word",
+        "extension_reference_sample": last_observed_frame_end,
+        "raw_before": raw_before,
+        "raw_post_write_initial": raw_post_write_initial,
+        "raw_post_write_advanced": raw_post_write_advanced,
+        "extended_before": extended_before,
+        "extended_post_write_initial": extended_post_write_initial,
+        "extended_after": extended_after,
+        "post_write_read_count": post_write_read_count,
+        "lower_clamped_to_last_observed_frame_end": lower != extended_before,
+        "sample_sequence_lower": lower,
+        "sample_sequence_upper": extended_after,
+    }
+
+
+def _response_gap_context(frame: Mapping[str, Any], command: StimulusCommand) -> str:
+    assert command.sample_sequence_before is not None
+    assert command.sample_sequence_after is not None
+    start = int(frame["first_sample_sequence"])
+    end = int(frame["sample_end_exclusive"])
+    if end <= command.sample_sequence_before:
+        return _GAP_CONTEXT_PREFETCH
+    if start < command.sample_sequence_after:
+        return _GAP_CONTEXT_COMMAND
+    return _GAP_CONTEXT_CONTINUOUS_RESPONSE
 
 
 def _ordinary_stable_run(
@@ -697,15 +1016,10 @@ def _ordinary_stable_run(
 
 
 def _precondition(
-    radio: TransientRadioTransport,
-    buffer: Any,
     *,
     mode: str,
-    expected_iio_mode: str,
-    quality: TandemQualityOptions,
     capture: TransientCaptureOptions,
-    state: _CaptureState,
-    metadata_parser: Callable[[bytes], TandemFrameMetadata],
+    capture_next: Callable[[], _DeferredFrame],
     iq_dir: Path,
     check_deadline: Callable[[], None],
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -714,15 +1028,8 @@ def _precondition(
     previous_metadata: TandemFrameMetadata | None = None
     for attempt in range(1, capture.max_precondition_frames + 1):
         check_deadline()
-        frame, metadata = _capture_frame(
-            radio,
-            buffer,
-            mode=mode,
-            expected_iio_mode=expected_iio_mode,
-            quality=quality,
-            capture=capture,
-            state=state,
-            metadata_parser=metadata_parser,
+        frame, metadata = _classify_deferred_frame(
+            capture_next(),
             iq_dir=iq_dir / "precondition",
             gap_context=_GAP_CONTEXT_PRECONDITION,
         )
@@ -1028,18 +1335,31 @@ def _command_record(
     timing_basis: str,
     rx_state_before: Mapping[str, Any] | None,
     rx_state_after: Mapping[str, Any] | None,
+    sample_counter_bracket: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    counter_timed = sample_counter_bracket is not None
+    record = {
         **command.as_dict(),
         "effective_attenuation_db": effective_attenuation_db,
         "rx_state_before": rx_state_before,
         "rx_state_after": rx_state_after,
-        "timing_role": "host_write_bracketed_by_observed_iq",
+        "timing_role": (
+            "host_write_bracketed_by_coherent_fpga_counter"
+            if counter_timed
+            else "host_write_bracketed_by_observed_iq"
+        ),
         "sample_timing_basis": timing_basis,
         "sample_anchor_policy": (
-            "last observed pre-frame end through first observed post-write frame end"
+            "max(last observed frame end, coherent low32 pre-read) through the "
+            "first coherent low32 advance observed after a post-write read"
+            if counter_timed
+            else "last observed pre-frame end through first observed post-write "
+            "frame end"
         ),
     }
+    if sample_counter_bracket is not None:
+        record["sample_counter_bracket"] = dict(sample_counter_bracket)
+    return record
 
 
 def _run_mode_body(
@@ -1108,11 +1428,24 @@ def _run_mode_body(
     state = _CaptureState()
     iq_dir = output_dir / mode
     metadata_abi = None
+    deferred_frames: list[_DeferredFrame] = []
+    attack_counter_bracket: Mapping[str, Any] | None = None
+    release_counter_bracket: Mapping[str, Any] | None = None
+    acquisition_stats: dict[str, Any] = {
+        "threaded": mode == MODE_TANDEM,
+        "kernel_buffers": _TRANSIENT_KERNEL_BUFFERS,
+        "queue_capacity_frames": (
+            _TANDEM_CAPTURE_QUEUE_FRAMES if mode == MODE_TANDEM else 0
+        ),
+        "response_tail_frames": (
+            _TANDEM_CAPTURE_TAIL_FRAMES if mode == MODE_TANDEM else 0
+        ),
+    }
     mode_body_error: BaseException | None = None
     try:
         with radio.buffer(
             "metadata" if mode == MODE_TANDEM else "ordinary",
-            1,
+            _TRANSIENT_KERNEL_BUFFERS,
             capture.frame_samples,
             tandem_request=request,
         ) as (buffer, metadata_abi):
@@ -1120,258 +1453,333 @@ def _run_mode_body(
                 raise EvidenceInvalid(
                     f"tandem transient requires metadata ABI 2, got {metadata_abi!r}"
                 )
-            trace, baseline = _precondition(
-                radio,
-                buffer,
-                mode=mode,
-                expected_iio_mode=expected_iio_mode,
-                quality=quality,
-                capture=capture,
-                state=state,
-                metadata_parser=metadata_parser,
-                iq_dir=iq_dir,
-                check_deadline=check_deadline,
-            )
-            initial = _conditioning_anchor(
-                initial_unanchored,
-                baseline,
-                max_sample_uncertainty=capture.max_sample_uncertainty,
-            )
-            record["preconditioning"] = {
-                "frame_count": len(trace),
-                "trace": trace,
-                "retained_baseline_frame_indices": [
-                    int(frame["frame_index"]) for frame in baseline
-                ],
-            }
-            record["baseline_frames"] = baseline
-            record["commands"].append(
-                {
-                    **initial_unanchored.as_dict(),
-                    "effective_attenuation_db": initial_effective,
-                    "rx_state_before": initial_gain_state_before,
-                    "rx_state_after": initial_gain_state_after,
-                    "timing_role": "pre_session_conditioning_write",
-                    "sample_timing_basis": None,
-                    "sample_anchor_policy": (
-                        "unbounded in sample time; the write predates the open "
-                        "capture session"
+
+            def acquire_one() -> _DeferredFrame:
+                return _capture_frame(
+                    radio,
+                    buffer,
+                    mode=mode,
+                    expected_iio_mode=expected_iio_mode,
+                    quality=quality,
+                    capture=capture,
+                    state=state,
+                    metadata_parser=metadata_parser,
+                    gap_context=(
+                        _GAP_CONTEXT_ACQUISITION
+                        if mode == MODE_TANDEM
+                        else _GAP_CONTEXT_CONTINUOUS_RESPONSE
                     ),
-                }
-            )
-            record["conditioning_anchor"] = {
-                **initial.as_dict(),
-                "timing_role": "observed_stable_conditioning_interval",
-                "sample_timing_basis": timing_basis,
-                "sample_anchor_policy": (
-                    "retained stable baseline interval; not the initial write time"
-                ),
-            }
-
-            attack_boundary = int(baseline[-1]["sample_end_exclusive"])
-            attack_gain_before = (
-                None
-                if mode == MODE_TANDEM
-                else _rx_state(radio, expected_mode=expected_iio_mode)
-            )
-            attack = timestamp_stimulus_command(
-                "strong_attack",
-                quality.strongest_tx_gain_db,
-                apply=radio.set_tx2_gain,
-                clock_ns=clock_ns,
-                max_host_jitter_ns=capture.max_host_jitter_ns,
-                readback_tolerance_db=capture.readback_tolerance_db,
-            )
-            attack_effective = _check_effective_attenuation(quality, attack)
-            attack_gain_after = (
-                None
-                if mode == MODE_TANDEM
-                else _rx_state(radio, expected_mode=expected_iio_mode)
-            )
-            attack_frames: list[dict[str, Any]] = []
-            check_deadline()
-            first_attack_frame, _metadata = _capture_frame(
-                radio,
-                buffer,
-                mode=mode,
-                expected_iio_mode=expected_iio_mode,
-                quality=quality,
-                capture=capture,
-                state=state,
-                metadata_parser=metadata_parser,
-                iq_dir=iq_dir / "attack",
-                gap_context=(
-                    _GAP_CONTEXT_COMMAND
-                    if mode == MODE_TANDEM
-                    else _GAP_CONTEXT_CONTINUOUS_RESPONSE
-                ),
-            )
-            attack_frames.append(first_attack_frame)
-            attack = _bracket_host_write(
-                attack,
-                last_pre_frame_end=attack_boundary,
-                first_post_frame=first_attack_frame,
-                max_sample_uncertainty=capture.max_sample_uncertainty,
-            )
-            for _ in range(capture.response_frames - 1):
-                check_deadline()
-                frame, _metadata = _capture_frame(
-                    radio,
-                    buffer,
-                    mode=mode,
-                    expected_iio_mode=expected_iio_mode,
-                    quality=quality,
-                    capture=capture,
-                    state=state,
-                    metadata_parser=metadata_parser,
-                    iq_dir=iq_dir / "attack",
                 )
-                attack_frames.append(frame)
 
-            release_boundary = int(attack_frames[-1]["sample_end_exclusive"])
-            release_gain_before = (
-                None
-                if mode == MODE_TANDEM
-                else _rx_state(radio, expected_mode=expected_iio_mode)
-            )
-            release = timestamp_stimulus_command(
-                "weak_release",
-                quality.weakest_tx_gain_db,
-                apply=radio.set_tx2_gain,
-                clock_ns=clock_ns,
-                max_host_jitter_ns=capture.max_host_jitter_ns,
-                readback_tolerance_db=capture.readback_tolerance_db,
-            )
-            release_effective = _check_effective_attenuation(quality, release)
-            release_gain_after = (
-                None
-                if mode == MODE_TANDEM
-                else _rx_state(radio, expected_mode=expected_iio_mode)
-            )
-            release_frames: list[dict[str, Any]] = []
-            check_deadline()
-            first_release_frame, _metadata = _capture_frame(
-                radio,
-                buffer,
-                mode=mode,
-                expected_iio_mode=expected_iio_mode,
-                quality=quality,
-                capture=capture,
-                state=state,
-                metadata_parser=metadata_parser,
-                iq_dir=iq_dir / "release",
-                gap_context=(
-                    _GAP_CONTEXT_COMMAND
-                    if mode == MODE_TANDEM
-                    else _GAP_CONTEXT_CONTINUOUS_RESPONSE
-                ),
-            )
-            release_frames.append(first_release_frame)
-            release = _bracket_host_write(
-                release,
-                last_pre_frame_end=release_boundary,
-                first_post_frame=first_release_frame,
-                max_sample_uncertainty=capture.max_sample_uncertainty,
-            )
-            for _ in range(capture.response_frames - 1):
-                check_deadline()
-                frame, _metadata = _capture_frame(
-                    radio,
-                    buffer,
-                    mode=mode,
-                    expected_iio_mode=expected_iio_mode,
-                    quality=quality,
-                    capture=capture,
-                    state=state,
-                    metadata_parser=metadata_parser,
-                    iq_dir=iq_dir / "release",
+            pump: _TandemCapturePump | None = None
+            raw_next: Callable[[], _DeferredFrame] = acquire_one
+            if mode == MODE_TANDEM:
+                maximum_pump_frames = (
+                    capture.max_precondition_frames
+                    + 2 * (capture.response_frames + _TANDEM_CAPTURE_TAIL_FRAMES)
+                    + _TANDEM_CAPTURE_QUEUE_FRAMES
+                    + 1
                 )
-                release_frames.append(frame)
+                pump = _TandemCapturePump(
+                    acquire_one, maximum_frames=maximum_pump_frames
+                )
+                pump.start()
+                raw_next = pump.take
 
-            record["commands"].extend(
-                (
-                    _command_record(
+            def capture_next() -> _DeferredFrame:
+                frame = raw_next()
+                deferred_frames.append(frame)
+                retained_bytes = sum(len(item.raw) for item in deferred_frames)
+                if retained_bytes > _MAX_DEFERRED_CAPTURE_BYTES:
+                    raise EvidenceInvalid(
+                        "transient deferred IQ exceeded its static memory bound"
+                    )
+                return frame
+
+            acquisition_error: BaseException | None = None
+            try:
+                trace, baseline = _precondition(
+                    mode=mode,
+                    capture=capture,
+                    capture_next=capture_next,
+                    iq_dir=iq_dir,
+                    check_deadline=check_deadline,
+                )
+
+                attack_boundary = int(baseline[-1]["sample_end_exclusive"])
+                attack_gain_before = (
+                    None
+                    if mode == MODE_TANDEM
+                    else _rx_state(radio, expected_mode=expected_iio_mode)
+                )
+                if mode == MODE_TANDEM:
+                    attack, attack_counter_bracket = _timestamp_tandem_command(
+                        radio,
+                        "strong_attack",
+                        quality.strongest_tx_gain_db,
+                        last_observed_frame_end=attack_boundary,
+                        clock_ns=clock_ns,
+                        max_host_jitter_ns=capture.max_host_jitter_ns,
+                        max_sample_uncertainty=capture.max_sample_uncertainty,
+                        readback_tolerance_db=capture.readback_tolerance_db,
+                    )
+                else:
+                    attack = timestamp_stimulus_command(
+                        "strong_attack",
+                        quality.strongest_tx_gain_db,
+                        apply=radio.set_tx2_gain,
+                        clock_ns=clock_ns,
+                        max_host_jitter_ns=capture.max_host_jitter_ns,
+                        readback_tolerance_db=capture.readback_tolerance_db,
+                    )
+                attack_effective = _check_effective_attenuation(quality, attack)
+                attack_gain_after = (
+                    None
+                    if mode == MODE_TANDEM
+                    else _rx_state(radio, expected_mode=expected_iio_mode)
+                )
+                attack_frames: list[dict[str, Any]] = []
+                response_capture_frames = capture.response_frames + (
+                    _TANDEM_CAPTURE_TAIL_FRAMES if mode == MODE_TANDEM else 0
+                )
+                for frame_index in range(response_capture_frames):
+                    check_deadline()
+                    pending = capture_next()
+                    gap_context = (
+                        _response_gap_context(pending.record, attack)
+                        if mode == MODE_TANDEM
+                        else (
+                            _GAP_CONTEXT_COMMAND
+                            if frame_index == 0
+                            else _GAP_CONTEXT_CONTINUOUS_RESPONSE
+                        )
+                    )
+                    frame, _metadata = _classify_deferred_frame(
+                        pending,
+                        iq_dir=iq_dir / "attack",
+                        gap_context=gap_context,
+                    )
+                    attack_frames.append(frame)
+                if mode != MODE_TANDEM:
+                    attack = _bracket_host_write(
                         attack,
-                        effective_attenuation_db=attack_effective,
-                        timing_basis=timing_basis,
-                        rx_state_before=attack_gain_before,
-                        rx_state_after=attack_gain_after,
-                    ),
-                    _command_record(
-                        release,
-                        effective_attenuation_db=release_effective,
-                        timing_basis=timing_basis,
-                        rx_state_before=release_gain_before,
-                        rx_state_after=release_gain_after,
-                    ),
-                )
-            )
-            record["attack_frames"] = attack_frames
-            record["release_frames"] = release_frames
+                        last_pre_frame_end=attack_boundary,
+                        first_post_frame=attack_frames[0],
+                        max_sample_uncertainty=capture.max_sample_uncertainty,
+                    )
 
-            response_kwargs = {
-                "sample_rate_hz": quality.sample_rate_hz,
-                "baseline_windows": capture.baseline_windows,
-                "steady_windows": capture.steady_windows,
-                "stable_windows": capture.stable_windows,
-                "settling_tolerance_db": capture.settling_tolerance_db,
-                "ringing_deadband_db": capture.ringing_deadband_db,
-                "max_host_jitter_ns": capture.max_host_jitter_ns,
-                "max_sample_uncertainty": capture.max_sample_uncertainty,
+                release_boundary = int(attack_frames[-1]["sample_end_exclusive"])
+                release_gain_before = (
+                    None
+                    if mode == MODE_TANDEM
+                    else _rx_state(radio, expected_mode=expected_iio_mode)
+                )
+                if mode == MODE_TANDEM:
+                    release, release_counter_bracket = _timestamp_tandem_command(
+                        radio,
+                        "weak_release",
+                        quality.weakest_tx_gain_db,
+                        last_observed_frame_end=release_boundary,
+                        clock_ns=clock_ns,
+                        max_host_jitter_ns=capture.max_host_jitter_ns,
+                        max_sample_uncertainty=capture.max_sample_uncertainty,
+                        readback_tolerance_db=capture.readback_tolerance_db,
+                    )
+                else:
+                    release = timestamp_stimulus_command(
+                        "weak_release",
+                        quality.weakest_tx_gain_db,
+                        apply=radio.set_tx2_gain,
+                        clock_ns=clock_ns,
+                        max_host_jitter_ns=capture.max_host_jitter_ns,
+                        readback_tolerance_db=capture.readback_tolerance_db,
+                    )
+                release_effective = _check_effective_attenuation(quality, release)
+                release_gain_after = (
+                    None
+                    if mode == MODE_TANDEM
+                    else _rx_state(radio, expected_mode=expected_iio_mode)
+                )
+                release_frames: list[dict[str, Any]] = []
+                for frame_index in range(response_capture_frames):
+                    check_deadline()
+                    pending = capture_next()
+                    gap_context = (
+                        _response_gap_context(pending.record, release)
+                        if mode == MODE_TANDEM
+                        else (
+                            _GAP_CONTEXT_COMMAND
+                            if frame_index == 0
+                            else _GAP_CONTEXT_CONTINUOUS_RESPONSE
+                        )
+                    )
+                    frame, _metadata = _classify_deferred_frame(
+                        pending,
+                        iq_dir=iq_dir / "release",
+                        gap_context=gap_context,
+                    )
+                    release_frames.append(frame)
+                if mode != MODE_TANDEM:
+                    release = _bracket_host_write(
+                        release,
+                        last_pre_frame_end=release_boundary,
+                        first_post_frame=release_frames[0],
+                        max_sample_uncertainty=capture.max_sample_uncertainty,
+                    )
+            except BaseException as error:  # noqa: BLE001 - preserve interrupts
+                acquisition_error = error
+            pump_stop_error: BaseException | None = None
+            if pump is not None:
+                try:
+                    pump.stop()
+                except BaseException as error:  # noqa: BLE001
+                    pump_stop_error = error
+                acquisition_stats.update(
+                    {
+                        "produced_frames": pump.produced_frames,
+                        "consumed_frames": pump.consumed_frames,
+                        "discarded_tail_frames": pump.discarded_tail_frames,
+                    }
+                )
+            if acquisition_error is not None and pump_stop_error is not None:
+                raise BaseExceptionGroup(
+                    "transient acquisition and capture-thread shutdown failed",
+                    [acquisition_error, pump_stop_error],
+                )
+            if acquisition_error is not None:
+                raise acquisition_error.with_traceback(acquisition_error.__traceback__)
+            if pump_stop_error is not None:
+                raise pump_stop_error.with_traceback(pump_stop_error.__traceback__)
+
+        # Release tandem ownership and mute RF before any FFT, hashing, or disk IO.
+        radio.mute_all()
+        _materialize_deferred_frames(
+            deferred_frames,
+            quality=quality,
+            capture=capture,
+            check_deadline=check_deadline,
+        )
+
+        initial = _conditioning_anchor(
+            initial_unanchored,
+            baseline,
+            max_sample_uncertainty=capture.max_sample_uncertainty,
+        )
+        record["acquisition"] = acquisition_stats
+        record["preconditioning"] = {
+            "frame_count": len(trace),
+            "trace": trace,
+            "retained_baseline_frame_indices": [
+                int(frame["frame_index"]) for frame in baseline
+            ],
+        }
+        record["baseline_frames"] = baseline
+        record["commands"].append(
+            {
+                **initial_unanchored.as_dict(),
+                "effective_attenuation_db": initial_effective,
+                "rx_state_before": initial_gain_state_before,
+                "rx_state_after": initial_gain_state_after,
+                "timing_role": "pre_session_conditioning_write",
+                "sample_timing_basis": None,
+                "sample_anchor_policy": (
+                    "unbounded in sample time; the write predates the open "
+                    "capture session"
+                ),
             }
-            attack_response = dict(
+        )
+        record["conditioning_anchor"] = {
+            **initial.as_dict(),
+            "timing_role": "observed_stable_conditioning_interval",
+            "sample_timing_basis": timing_basis,
+            "sample_anchor_policy": (
+                "retained stable baseline interval; not the initial write time"
+            ),
+        }
+        record["commands"].extend(
+            (
+                _command_record(
+                    attack,
+                    effective_attenuation_db=attack_effective,
+                    timing_basis=timing_basis,
+                    rx_state_before=attack_gain_before,
+                    rx_state_after=attack_gain_after,
+                    sample_counter_bracket=attack_counter_bracket,
+                ),
+                _command_record(
+                    release,
+                    effective_attenuation_db=release_effective,
+                    timing_basis=timing_basis,
+                    rx_state_before=release_gain_before,
+                    rx_state_after=release_gain_after,
+                    sample_counter_bracket=release_counter_bracket,
+                ),
+            )
+        )
+        record["attack_frames"] = attack_frames
+        record["release_frames"] = release_frames
+
+        response_kwargs = {
+            "sample_rate_hz": quality.sample_rate_hz,
+            "baseline_windows": capture.baseline_windows,
+            "steady_windows": capture.steady_windows,
+            "stable_windows": capture.stable_windows,
+            "settling_tolerance_db": capture.settling_tolerance_db,
+            "ringing_deadband_db": capture.ringing_deadband_db,
+            "max_host_jitter_ns": capture.max_host_jitter_ns,
+            "max_sample_uncertainty": capture.max_sample_uncertainty,
+        }
+        record["responses"] = {
+            "attack": dict(
                 calculate_transient_response(
                     _flatten_windows([*baseline, *attack_frames]),
                     previous_command=initial,
                     command=attack,
                     **response_kwargs,
                 )
-            )
-            release_response = dict(
+            ),
+            "release": dict(
                 calculate_transient_response(
                     _flatten_windows([*attack_frames, *release_frames]),
                     previous_command=attack,
                     command=release,
                     **response_kwargs,
                 )
-            )
-            record["responses"] = {
-                "attack": attack_response,
-                "release": release_response,
-            }
+            ),
+        }
 
-            if native_iio_mode is not None:
-                record["gain_evidence"] = _native_gain_evidence(
-                    baseline,
-                    attack_frames,
-                    release_frames,
-                    attack_command=attack,
-                    release_command=release,
+        if native_iio_mode is not None:
+            record["gain_evidence"] = _native_gain_evidence(
+                baseline,
+                attack_frames,
+                release_frames,
+                attack_command=attack,
+                release_command=release,
+                sample_rate_hz=quality.sample_rate_hz,
+                minimum_change_db=capture.minimum_native_gain_change_db,
+            )
+        elif mode == MODE_MANUAL:
+            record["gain_evidence"] = _manual_gain_evidence(
+                [*baseline, *attack_frames, *release_frames],
+                expected_gain_db=quality.manual_gain_db,
+            )
+        else:
+            tandem_frames = [*attack_frames, *release_frames]
+            events = [
+                event
+                for frame in tandem_frames
+                for event in frame["metadata"]["gain_events"]
+            ]
+            record["gain_evidence"] = dict(
+                reconcile_tandem_events(
+                    (initial, attack, release),
+                    events,
                     sample_rate_hz=quality.sample_rate_hz,
-                    minimum_change_db=capture.minimum_native_gain_change_db,
+                    max_host_jitter_ns=capture.max_host_jitter_ns,
+                    max_sample_uncertainty=capture.max_sample_uncertainty,
+                    max_latency_samples=capture.max_event_latency_samples,
                 )
-            elif mode == MODE_MANUAL:
-                record["gain_evidence"] = _manual_gain_evidence(
-                    [*baseline, *attack_frames, *release_frames],
-                    expected_gain_db=quality.manual_gain_db,
-                )
-            else:
-                tandem_frames = [*attack_frames, *release_frames]
-                events = [
-                    event
-                    for frame in tandem_frames
-                    for event in frame["metadata"]["gain_events"]
-                ]
-                record["gain_evidence"] = dict(
-                    reconcile_tandem_events(
-                        (initial, attack, release),
-                        events,
-                        sample_rate_hz=quality.sample_rate_hz,
-                        max_host_jitter_ns=capture.max_host_jitter_ns,
-                        max_sample_uncertainty=capture.max_sample_uncertainty,
-                        max_latency_samples=capture.max_event_latency_samples,
-                    )
-                )
+            )
     except BaseException as error:  # noqa: BLE001 - preserve shutdown interrupts
         mode_body_error = error
     mute_error: BaseException | None = None
@@ -1538,7 +1946,7 @@ def run_transient_hardware(
         "configuration": {
             "quality": quality_configuration,
             "transient_capture": asdict(capture),
-            "kernel_buffers": 1,
+            "kernel_buffers": _TRANSIENT_KERNEL_BUFFERS,
         },
         "safety": {
             "physical_attenuation_db": quality.physical_attenuation_db,
@@ -1549,29 +1957,7 @@ def run_transient_hardware(
             "required_effective_attenuation_db": 30.0,
             "tx1_policy": "muted below -80 dB for the entire campaign",
         },
-        "evidence_policy": {
-            "ordinary_timing": (
-                "session-local contiguous refill axis reset for each mode; "
-                "never compared across sessions and not a hardware timestamp"
-            ),
-            "tandem_timing": "metadata-v5 FPGA sample counter",
-            "command_latency": (
-                "closed lower/upper bound from the last observed pre-frame end "
-                "through the first observed post-write frame end; never a point "
-                "estimate"
-            ),
-            "initial_condition": (
-                "pre-session weak write remains sample-unbounded; retained stable "
-                "IQ is an explicitly labelled conditioning anchor"
-            ),
-            "tandem_provider_gaps": (
-                "accept only matching whole-frame buffer/sample deltas with zero "
-                "hidden transitions during preconditioning observations or the "
-                "first command-bracketing frame; reject response gaps because "
-                "they can hide settling or overshoot"
-            ),
-            "tandem_event_latency_limit_samples": (capture.max_event_latency_samples),
-        },
+        "evidence_policy": transient_evidence_policy(capture),
         "modes": [],
         "cleanup": {
             "verified": False,

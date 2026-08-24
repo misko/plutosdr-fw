@@ -35,7 +35,11 @@ from .release_cli import (
     run_aggregate,
 )
 from .tandem_quality import AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
-from .transient_hardware import TRANSIENT_MODES, TransientCaptureOptions
+from .transient_hardware import (
+    TRANSIENT_MODES,
+    TransientCaptureOptions,
+    transient_evidence_policy,
+)
 from .transient_quality import StimulusCommand, reconcile_tandem_events
 
 COMMIT = "6" * 40
@@ -666,9 +670,14 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         "attack": {"evidence_valid": True},
         "release": {"evidence_valid": True},
     }
-    frame_samples = TransientCaptureOptions().frame_samples
+    capture_options = TransientCaptureOptions()
+    frame_samples = capture_options.frame_samples
+    response_tail = int(
+        transient_evidence_policy(capture_options)["tandem_response_tail_frames"]
+    )
+    response_frame_count = capture_options.response_frames + response_tail
     attack_event = {
-        "sample_sequence": 2 * frame_samples + 128,
+        "sample_sequence": frame_samples + 128,
         "event_sequence": 100,
         "flags": 0x20,
         "direction": 2,
@@ -679,7 +688,7 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         "rx2_gain_index": 39,
     }
     release_event = {
-        "sample_sequence": 3 * frame_samples + 128,
+        "sample_sequence": (response_frame_count + 1) * frame_samples + 128,
         "event_sequence": 101,
         "flags": 0x10,
         "direction": 1,
@@ -697,6 +706,7 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         buffer_delta: int | None,
         cumulative_missing: int,
         transition_count: int,
+        transition_delta: int | None,
         endpoint: int,
         events: list[dict[str, object]],
         gap_context: str,
@@ -728,24 +738,23 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
             "gain_event_count": len(events),
             "gain_events": events,
         }
-        command_boundary = gap_context == "command_bracket"
         return {
             "frame_index": frame_index,
             "first_sample_sequence": sequence * frame_samples,
             "sample_end_exclusive": (sequence + 1) * frame_samples,
             "sample_gap_before": missing * frame_samples,
             "gap_context": gap_context,
-            "command_boundary_gap_allowed": command_boundary,
+            "command_boundary_gap_allowed": False,
             "metadata": metadata,
             "continuity": {
                 "buffer_delta": buffer_delta,
                 "sample_delta": (None if first else buffer_delta * frame_samples),
                 "missing_frame_count": missing,
                 "sample_gap_before": missing * frame_samples,
-                "provider_gap_accepted": bool(missing),
+                "provider_gap_accepted": False,
                 "gap_context": gap_context,
-                "command_boundary_gap_allowed": command_boundary,
-                "transition_count_delta": None if first else 1,
+                "command_boundary_gap_allowed": False,
+                "transition_count_delta": transition_delta,
                 "visible_event_count": len(events),
                 "hidden_transition_count": 0,
                 "initial_unrepresented_transition_count": 0,
@@ -761,30 +770,46 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         buffer_delta=None,
         cumulative_missing=0,
         transition_count=0,
+        transition_delta=None,
         endpoint=40,
         events=[],
         gap_context="precondition_observation",
     )
-    attack_frame = tandem_frame(
-        1,
-        2,
-        buffer_delta=2,
-        cumulative_missing=1,
-        transition_count=1,
-        endpoint=39,
-        events=[attack_event],
-        gap_context="command_bracket",
-    )
-    release_frame = tandem_frame(
-        2,
-        3,
-        buffer_delta=1,
-        cumulative_missing=1,
-        transition_count=2,
-        endpoint=40,
-        events=[release_event],
-        gap_context="command_bracket",
-    )
+    attack_frames = [
+        tandem_frame(
+            frame_index,
+            frame_index,
+            buffer_delta=1,
+            cumulative_missing=0,
+            transition_count=1,
+            transition_delta=1 if frame_index == 1 else 0,
+            endpoint=39,
+            events=[attack_event] if frame_index == 1 else [],
+            gap_context=(
+                "command_bracket" if frame_index == 1 else "continuous_response"
+            ),
+        )
+        for frame_index in range(1, response_frame_count + 1)
+    ]
+    release_start = response_frame_count + 1
+    release_frames = [
+        tandem_frame(
+            frame_index,
+            frame_index,
+            buffer_delta=1,
+            cumulative_missing=0,
+            transition_count=2,
+            transition_delta=1 if frame_index == release_start else 0,
+            endpoint=40,
+            events=[release_event] if frame_index == release_start else [],
+            gap_context=(
+                "command_bracket"
+                if frame_index == release_start
+                else "continuous_response"
+            ),
+        )
+        for frame_index in range(release_start, release_start + response_frame_count)
+    ]
     anchor_command = StimulusCommand(
         "weak_conditioning_anchor", -61.0, -61.0, 1_000, 1_100, 0, frame_samples
     )
@@ -795,7 +820,7 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         1_200,
         1_300,
         frame_samples,
-        3 * frame_samples,
+        frame_samples + 256,
     )
     release_command = StimulusCommand(
         "weak_release",
@@ -803,9 +828,43 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         -61.0,
         1_400,
         1_500,
-        3 * frame_samples,
-        4 * frame_samples,
+        release_start * frame_samples,
+        release_start * frame_samples + 256,
     )
+
+    def counter_timed_record(
+        command: StimulusCommand, *, reference: int
+    ) -> dict[str, object]:
+        assert command.sample_sequence_before is not None
+        assert command.sample_sequence_after is not None
+        initial = reference + 128
+        advanced = command.sample_sequence_after
+        return {
+            **command.as_dict(),
+            "timing_role": "host_write_bracketed_by_coherent_fpga_counter",
+            "sample_timing_basis": "hardware_sample_counter",
+            "sample_anchor_policy": (
+                "max(last observed frame end, coherent low32 pre-read) through "
+                "the first coherent low32 advance observed after a post-write read"
+            ),
+            "sample_counter_bracket": {
+                "register_address": "0x800000b8",
+                "counter_width_bits": 32,
+                "counter_source": "coherent FPGA RX sample counter low word",
+                "extension_reference_sample": reference,
+                "raw_before": reference,
+                "raw_post_write_initial": initial,
+                "raw_post_write_advanced": advanced,
+                "extended_before": reference,
+                "extended_post_write_initial": initial,
+                "extended_after": advanced,
+                "post_write_read_count": 2,
+                "lower_clamped_to_last_observed_frame_end": False,
+                "sample_sequence_lower": reference,
+                "sample_sequence_upper": advanced,
+            },
+        }
+
     tandem_gain = _json_safe(
         dict(
             reconcile_tandem_events(
@@ -844,9 +903,10 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         },
         "configuration": {
             "quality": quality_configuration,
-            "transient_capture": _json_safe(asdict(TransientCaptureOptions())),
+            "transient_capture": _json_safe(asdict(capture_options)),
             "kernel_buffers": 1,
         },
+        "evidence_policy": transient_evidence_policy(capture_options),
         "rf": {"center_frequency_hz_requested": 915_000_000},
         "cleanup": cleanup,
         "required_modes": list(TRANSIENT_MODES),
@@ -859,7 +919,7 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
                     "responses": {
                         "attack": {
                             "evidence_valid": True,
-                            "command_bracket_gap_samples": frame_samples,
+                            "command_bracket_gap_samples": 0,
                         },
                         "release": {
                             "evidence_valid": True,
@@ -872,12 +932,24 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
                         "retained_baseline_frame_indices": [0],
                     },
                     "baseline_frames": [baseline_frame],
-                    "attack_frames": [attack_frame],
-                    "release_frames": [release_frame],
+                    "attack_frames": attack_frames,
+                    "release_frames": release_frames,
+                    "acquisition": {
+                        "threaded": True,
+                        "kernel_buffers": 1,
+                        "queue_capacity_frames": 4,
+                        "response_tail_frames": response_tail,
+                        "produced_frames": 1 + 2 * response_frame_count,
+                        "consumed_frames": 1 + 2 * response_frame_count,
+                        "discarded_tail_frames": 0,
+                    },
                     "conditioning_anchor": dict(anchor_command.as_dict()),
                     "commands": [
-                        dict(attack_command.as_dict()),
-                        dict(release_command.as_dict()),
+                        counter_timed_record(attack_command, reference=frame_samples),
+                        counter_timed_record(
+                            release_command,
+                            reference=release_start * frame_samples,
+                        ),
                     ],
                 }
                 if mode == MODE_TANDEM
@@ -903,6 +975,32 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     assert production_validator(options)(spec, report_path, work_dir).verdict == "pass"
 
     valid_report = json.loads(json.dumps(report))
+
+    report = json.loads(json.dumps(valid_report))
+    report["evidence_policy"]["tandem_provider_gaps"] = "accept planted gaps"
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="evidence policy differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    tandem["acquisition"]["consumed_frames"] -= 1
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="acquisition ledger is inconsistent"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    attack_counter = next(
+        command
+        for command in tandem["commands"]
+        if command["command_id"] == "strong_attack"
+    )["sample_counter_bracket"]
+    attack_counter["raw_post_write_advanced"] += 1
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="command bracket is inconsistent"):
+        production_validator(options)(spec, report_path, work_dir)
+
     report = json.loads(json.dumps(valid_report))
     tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
     tandem["attack_frames"][0]["metadata"]["first_sample_sequence"] += 1
@@ -922,7 +1020,7 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
     tandem["attack_frames"][0]["metadata"]["tandem_transition_count"] = 2
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
-    with pytest.raises(ReleaseCliError, match="hides transition timing evidence"):
+    with pytest.raises(ReleaseCliError, match="lost adjacent-frame event evidence"):
         production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))

@@ -49,6 +49,7 @@ DAC_SELECT_DDS = 0x0
 DAC_SELECT_DMA = 0x2
 DAC_SELECT_ZERO = 0x3
 DAC_SELECT_PNXX = 0x9
+RX_SAMPLE_COUNTER_LOW_REGISTER = 0x800000B8
 MIN_COMMON_CENTER_FREQUENCY_HZ = 70_000_000
 MAX_COMMON_CENTER_FREQUENCY_HZ = 6_000_000_000
 
@@ -964,6 +965,16 @@ class Issue46Radio:
                 f"IQ payload has {len(raw)} bytes, expected {expected_bytes}"
             )
         return raw, raw_metadata, refill_monotonic_ns
+
+    def read_rx_sample_counter_low32(self) -> int:
+        """Read the coherent CPU-visible low word of the FPGA RX sample counter."""
+
+        value = int(self.rx.reg_read(RX_SAMPLE_COUNTER_LOW_REGISTER))
+        if not 0 <= value < 1 << 32:
+            raise EvidenceInvalid(
+                f"RX sample-counter register returned non-uint32 value {value}"
+            )
+        return value
 
     @staticmethod
     def _refill(buffer: Any, *, metadata: bool) -> Optional[bytes]:

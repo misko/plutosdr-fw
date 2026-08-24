@@ -57,6 +57,7 @@ from .transient_hardware import (
     TRANSIENT_MODES,
     TransientCaptureOptions,
     run_transient_hardware,
+    transient_evidence_policy,
     validate_transient_options,
 )
 from .transient_quality import StimulusCommand, reconcile_tandem_events
@@ -1408,6 +1409,53 @@ def _transient_continuity_errors(
             "transient tandem retained baseline indices differ from preconditioning"
         )
 
+    commands = mode.get("commands")
+    conditioning_anchor = mode.get("conditioning_anchor")
+    if not isinstance(commands, list) or not isinstance(conditioning_anchor, Mapping):
+        errors.append("transient tandem commands or conditioning anchor are missing")
+        return errors
+    by_id = {
+        command.get("command_id"): command
+        for command in commands
+        if isinstance(command, Mapping)
+    }
+    attack_command = by_id.get("strong_attack")
+    release_command = by_id.get("weak_release")
+    if not isinstance(attack_command, Mapping) or not isinstance(
+        release_command, Mapping
+    ):
+        errors.append("transient tandem attack/release commands are missing")
+        return errors
+
+    response_tail = int(
+        transient_evidence_policy(capture)["tandem_response_tail_frames"]
+    )
+    expected_response_frames = capture.response_frames + response_tail
+    if len(attack) != expected_response_frames or len(release) != (
+        expected_response_frames
+    ):
+        errors.append("transient tandem response capture count differs from policy")
+
+    acquisition = mode.get("acquisition")
+    queue_frames = int(
+        transient_evidence_policy(capture)["tandem_capture_queue_frames"]
+    )
+    consumed_frames = len(trace) + len(attack) + len(release)
+    if (
+        not isinstance(acquisition, Mapping)
+        or acquisition.get("threaded") is not True
+        or acquisition.get("kernel_buffers") != 1
+        or acquisition.get("queue_capacity_frames") != queue_frames
+        or acquisition.get("response_tail_frames") != response_tail
+        or acquisition.get("consumed_frames") != consumed_frames
+        or type(acquisition.get("produced_frames")) is not int
+        or acquisition.get("produced_frames") < consumed_frames
+        or acquisition.get("produced_frames") > consumed_frames + queue_frames + 1
+        or acquisition.get("discarded_tail_frames")
+        != acquisition.get("produced_frames") - consumed_frames
+    ):
+        errors.append("transient tandem acquisition ledger is inconsistent")
+
     sections = (
         ("precondition", trace),
         ("attack", attack),
@@ -1432,21 +1480,31 @@ def _transient_continuity_errors(
             if not isinstance(frame, Mapping):
                 errors.append(f"{context} is malformed")
                 return errors
-            expected_gap_context = (
-                "precondition_observation"
-                if section == "precondition"
-                else (
-                    "command_bracket" if section_index == 0 else "continuous_response"
+            if section == "precondition":
+                expected_gap_context = "precondition_observation"
+            else:
+                section_command = (
+                    attack_command if section == "attack" else release_command
                 )
-            )
+                start = frame.get("first_sample_sequence")
+                end = frame.get("sample_end_exclusive")
+                lower = section_command.get("sample_sequence_before")
+                upper = section_command.get("sample_sequence_after")
+                if not all(type(value) is int for value in (start, end, lower, upper)):
+                    errors.append(f"{context} cannot be classified in sample time")
+                    return errors
+                if end <= lower:
+                    expected_gap_context = "precommand_prefetch"
+                elif start < upper:
+                    expected_gap_context = "command_bracket"
+                else:
+                    expected_gap_context = "continuous_response"
             if frame.get("frame_index") != frame_number:
                 errors.append(f"{context} frame index is not contiguous")
             frame_number += 1
             if frame.get("gap_context") != expected_gap_context:
                 errors.append(f"{context} gap context differs from its phase")
-            if frame.get("command_boundary_gap_allowed") is not (
-                expected_gap_context == "command_bracket"
-            ):
+            if frame.get("command_boundary_gap_allowed") is not False:
                 errors.append(f"{context} command-boundary policy is inconsistent")
 
             metadata = frame.get("metadata")
@@ -1546,12 +1604,12 @@ def _transient_continuity_errors(
                 if hidden < 0:
                     errors.append(f"{context} has more events than transitions")
                     return errors
-                if hidden:
+                if missing:
                     errors.append(
-                        f"{context} hides transition timing evidence in a provider gap"
+                        f"{context} has a provider gap under continuous acquisition"
                     )
-                if missing and expected_gap_context == "continuous_response":
-                    errors.append(f"{context} has a gap inside a continuous response")
+                elif hidden:
+                    errors.append(f"{context} lost adjacent-frame event evidence")
                 cumulative_missing += missing
 
             sample_gap = missing * capture.frame_samples
@@ -1560,11 +1618,9 @@ def _transient_continuity_errors(
                 "sample_delta": sample_delta,
                 "missing_frame_count": missing,
                 "sample_gap_before": sample_gap,
-                "provider_gap_accepted": bool(missing),
+                "provider_gap_accepted": False,
                 "gap_context": expected_gap_context,
-                "command_boundary_gap_allowed": (
-                    expected_gap_context == "command_bracket"
-                ),
+                "command_boundary_gap_allowed": False,
                 "transition_count_delta": transition_delta,
                 "visible_event_count": len(events),
                 "hidden_transition_count": hidden,
@@ -1636,11 +1692,6 @@ def _transient_continuity_errors(
                 errors.append(f"{context} endpoint changed without an event")
             previous_metadata = metadata
 
-    commands = mode.get("commands")
-    conditioning_anchor = mode.get("conditioning_anchor")
-    if not isinstance(commands, list) or not isinstance(conditioning_anchor, Mapping):
-        errors.append("transient tandem commands or conditioning anchor are missing")
-        return errors
     anchor_lower = baseline[0].get("first_sample_sequence")
     anchor_upper = baseline[-1].get("sample_end_exclusive")
     if (
@@ -1657,49 +1708,86 @@ def _transient_continuity_errors(
             "transient tandem conditioning anchor differs from the exact retained "
             "baseline interval"
         )
-    by_id = {
-        command.get("command_id"): command
-        for command in commands
-        if isinstance(command, Mapping)
-    }
-    attack_command = by_id.get("strong_attack")
-    release_command = by_id.get("weak_release")
-    if not isinstance(attack_command, Mapping) or not isinstance(
-        release_command, Mapping
-    ):
-        errors.append("transient tandem attack/release commands are missing")
-        return errors
     bracket_plan = (
         (
             "attack",
             attack_command,
             baseline[-1],
-            attack[0],
         ),
         (
             "release",
             release_command,
             attack[-1],
-            release[0],
         ),
     )
     responses = mode.get("responses")
-    for name, command, previous_frame, first_post in bracket_plan:
-        lower = previous_frame.get("sample_end_exclusive")
-        upper = first_post.get("sample_end_exclusive")
+    for name, command, previous_frame in bracket_plan:
+        reference = previous_frame.get("sample_end_exclusive")
+        bracket = command.get("sample_counter_bracket")
+        raw_fields: list[Any] = []
+        extended_fields: list[Any] = []
+        if isinstance(bracket, Mapping):
+            raw_fields = [
+                bracket.get("raw_before"),
+                bracket.get("raw_post_write_initial"),
+                bracket.get("raw_post_write_advanced"),
+            ]
+            extended_fields = [
+                bracket.get("extended_before"),
+                bracket.get("extended_post_write_initial"),
+                bracket.get("extended_after"),
+            ]
         if (
-            not exact_integer(lower)
-            or not exact_integer(upper)
-            or command.get("sample_sequence_before") != lower
-            or command.get("sample_sequence_after") != upper
-            or command.get("sample_uncertainty") != upper - lower
-            or upper - lower > capture.max_sample_uncertainty
+            not exact_integer(reference)
+            or not isinstance(bracket, Mapping)
+            or bracket.get("register_address") != "0x800000b8"
+            or bracket.get("counter_width_bits") != 32
+            or bracket.get("counter_source")
+            != "coherent FPGA RX sample counter low word"
+            or bracket.get("extension_reference_sample") != reference
+            or any(
+                type(value) is not int or not 0 <= value < uint32_modulus
+                for value in raw_fields
+            )
+            or any(not exact_integer(value) for value in extended_fields)
+            or any(value >= 1 << 64 for value in extended_fields)
+            or any(
+                extended & (uint32_modulus - 1) != raw
+                for extended, raw in zip(extended_fields, raw_fields, strict=True)
+            )
+            or not 0 <= extended_fields[1] - extended_fields[0] < uint32_modulus // 2
+            or extended_fields[1] - extended_fields[0]
+            != (raw_fields[1] - raw_fields[0]) % uint32_modulus
+            or not 0 < extended_fields[2] - extended_fields[1] < uint32_modulus // 2
+            or extended_fields[2] - extended_fields[1]
+            != (raw_fields[2] - raw_fields[1]) % uint32_modulus
+            or abs(extended_fields[0] - reference) >= uint32_modulus // 2
+            or type(bracket.get("post_write_read_count")) is not int
+            or bracket.get("post_write_read_count") not in range(2, 10)
+            or bracket.get("lower_clamped_to_last_observed_frame_end")
+            is not (reference > extended_fields[0])
+            or bracket.get("sample_sequence_lower")
+            != max(reference, extended_fields[0])
+            or bracket.get("sample_sequence_upper") != extended_fields[2]
+            or command.get("sample_sequence_before")
+            != bracket.get("sample_sequence_lower")
+            or command.get("sample_sequence_after")
+            != bracket.get("sample_sequence_upper")
+            or command.get("sample_uncertainty")
+            != command.get("sample_sequence_after")
+            - command.get("sample_sequence_before")
+            or not exact_integer(command.get("sample_uncertainty"))
+            or command.get("sample_uncertainty") > capture.max_sample_uncertainty
+            or command.get("timing_role")
+            != "host_write_bracketed_by_coherent_fpga_counter"
+            or command.get("sample_timing_basis") != "hardware_sample_counter"
         ):
             errors.append(f"transient tandem {name} command bracket is inconsistent")
         response = responses.get(name) if isinstance(responses, Mapping) else None
-        if not isinstance(response, Mapping) or response.get(
-            "command_bracket_gap_samples"
-        ) != first_post.get("sample_gap_before"):
+        if (
+            not isinstance(response, Mapping)
+            or response.get("command_bracket_gap_samples") != 0
+        ):
             errors.append(f"transient tandem {name} response gap is inconsistent")
 
     def command_from_report(record: Mapping[str, Any]) -> StimulusCommand:
@@ -1863,6 +1951,10 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             }
             if disk.get("configuration") != expected_configuration:
                 errors.append("transient configuration differs from plan")
+            if disk.get("evidence_policy") != transient_evidence_policy(
+                expected_capture
+            ):
+                errors.append("transient evidence policy differs from plan")
             if disk.get("required_modes") != list(TRANSIENT_MODES) or [
                 item.get("mode") for item in disk.get("modes", [])
             ] != list(TRANSIENT_MODES):
