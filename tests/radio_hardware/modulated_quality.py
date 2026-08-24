@@ -26,7 +26,7 @@ def _numpy() -> Any:
 
 def _finite_number(name: str, value: Any) -> float:
     if isinstance(value, bool):
-        raise ValueError(f"{name} must be a finite number")
+        raise TypeError(f"{name} must be a finite number")
     try:
         converted = float(value)
     except (TypeError, ValueError) as exc:
@@ -108,6 +108,9 @@ class ModulatedQualityThresholds:
     min_cross_channel_coherence: float = 0.98
     max_timing_disagreement_samples: int = 0
     max_abs_cfo_hz: float = 5_000.0
+    min_blocker_correlation: float = 0.50
+    max_blocker_offset_error_hz: float = 1.0
+    max_blocker_power_error_db: float = 2.0
 
 
 DEFAULT_MODULATED_THRESHOLDS = ModulatedQualityThresholds()
@@ -296,7 +299,7 @@ def build_composite_blocker(
 
     np = _numpy()
     if not isinstance(desired, QpskReference):
-        raise ValueError("desired must be a QpskReference")
+        raise TypeError("desired must be a QpskReference")
     offset_hz = _finite_number("blocker_offset_hz", blocker_offset_hz)
     power_db = _finite_number("blocker_power_db", blocker_power_db)
     peak_fraction = _finite_number("peak_fraction", peak_fraction)
@@ -351,7 +354,7 @@ def scale_reference_for_tx(
 
     np = _numpy()
     if not isinstance(desired, QpskReference):
-        raise ValueError("desired must be a QpskReference")
+        raise TypeError("desired must be a QpskReference")
     peak_fraction = _finite_number("peak_fraction", peak_fraction)
     if not 0.0 < peak_fraction <= 1.0:
         raise ValueError("peak_fraction must be in (0, 1]")
@@ -490,7 +493,7 @@ def _estimate_cfo_and_timing(
     first_cycle = matrix[:, :cycle]
     reference_fft_conjugate = np.conj(np.fft.fft(reference.samples))
     grid_step = sample_rate / (cycle * cfo_grid_oversample)
-    grid_count = int(math.ceil(max_cfo_hz / grid_step))
+    grid_count = math.ceil(max_cfo_hz / grid_step)
     candidates = np.arange(-grid_count, grid_count + 1, dtype=np.float64) * grid_step
     indexes = np.arange(cycle, dtype=np.float64)
     best_score = -1.0
@@ -572,7 +575,7 @@ def _estimate_cfo_and_timing(
 
 def _validate_thresholds(thresholds: ModulatedQualityThresholds) -> None:
     if not isinstance(thresholds, ModulatedQualityThresholds):
-        raise ValueError("thresholds must be ModulatedQualityThresholds")
+        raise TypeError("thresholds must be ModulatedQualityThresholds")
     for name in (
         "max_evm_percent",
         "min_mer_db",
@@ -581,6 +584,9 @@ def _validate_thresholds(thresholds: ModulatedQualityThresholds) -> None:
         "max_clipping_fraction",
         "min_cross_channel_coherence",
         "max_abs_cfo_hz",
+        "min_blocker_correlation",
+        "max_blocker_offset_error_hz",
+        "max_blocker_power_error_db",
     ):
         value = _finite_number(name, getattr(thresholds, name))
         if value < 0.0:
@@ -592,12 +598,119 @@ def _validate_thresholds(thresholds: ModulatedQualityThresholds) -> None:
             raise ValueError(f"{name} must be at most one")
     if not 0.0 <= thresholds.min_cross_channel_coherence <= 1.0:
         raise ValueError("min_cross_channel_coherence must be in [0, 1]")
+    if not 0.0 <= thresholds.min_blocker_correlation <= 1.0:
+        raise ValueError("min_blocker_correlation must be in [0, 1]")
+    if thresholds.max_blocker_offset_error_hz < 0.0:
+        raise ValueError("max_blocker_offset_error_hz must be nonnegative")
+    if thresholds.max_blocker_power_error_db < 0.0:
+        raise ValueError("max_blocker_power_error_db must be nonnegative")
     if (
         isinstance(thresholds.max_timing_disagreement_samples, bool)
         or not isinstance(thresholds.max_timing_disagreement_samples, int)
         or thresholds.max_timing_disagreement_samples < 0
     ):
         raise ValueError("max_timing_disagreement_samples must be nonnegative")
+
+
+def _measure_known_blocker(
+    corrected: Any,
+    *,
+    desired_reference: QpskReference,
+    blocker_reference: QpskReference,
+    timing: int,
+    commanded_offset_hz: float,
+    commanded_power_db: float,
+) -> dict[str, Any]:
+    """Measure signed blocker offset and relative power from the IQ itself."""
+
+    np = _numpy()
+    cycle = desired_reference.cycle_samples
+    used_samples = int(corrected.shape[1])
+    if used_samples % cycle:
+        raise AssertionError("blocker measurement requires whole reference cycles")
+    cycle_indexes = np.arange(cycle, dtype=np.int64)
+    aligned_indexes = (cycle_indexes + timing) % cycle
+    desired_cycle = desired_reference.samples[aligned_indexes]
+    blocker_cycle = blocker_reference.samples[aligned_indexes]
+    folded = corrected.reshape((2, used_samples // cycle, cycle)).mean(axis=1)
+    desired_power = float(np.vdot(desired_cycle, desired_cycle).real)
+    desired_coefficients = np.asarray(
+        [
+            np.vdot(desired_cycle, folded[channel]) / desired_power
+            for channel in range(2)
+        ]
+    )
+    residual = folded - desired_coefficients[:, None] * desired_cycle[None, :]
+    spectra = np.stack(
+        [np.fft.fft(residual[channel] * np.conj(blocker_cycle)) for channel in range(2)]
+    )
+    frequencies = np.fft.fftfreq(cycle, d=1.0 / desired_reference.sample_rate_hz)
+    occupied_half_bandwidth = (
+        0.5 * blocker_reference.symbol_rate_hz * (1.0 + blocker_reference.rolloff)
+    )
+    valid = (frequencies != 0.0) & (
+        np.abs(frequencies) + occupied_half_bandwidth
+        < desired_reference.sample_rate_hz / 2.0
+    )
+    if not bool(np.any(valid)):
+        raise ValueError("no valid signed blocker-offset bins remain")
+    score = np.sum(np.abs(spectra) ** 2, axis=0)
+    score[~valid] = -1.0
+    peak_index = int(np.argmax(score))
+    measured_offset_hz = float(frequencies[peak_index])
+
+    indexes = np.arange(used_samples, dtype=np.float64)
+    desired_template = desired_reference.samples[
+        (indexes.astype(np.int64) + timing) % cycle
+    ]
+    blocker_template = blocker_reference.samples[
+        (indexes.astype(np.int64) + timing) % cycle
+    ] * np.exp(
+        2j
+        * np.pi
+        * measured_offset_hz
+        * (indexes + float(timing))
+        / desired_reference.sample_rate_hz
+    )
+    design = np.column_stack((desired_template, blocker_template))
+    relative_power_db: list[float] = []
+    correlations: list[float] = []
+    for channel in range(2):
+        coefficients, _residuals, rank, _singular = np.linalg.lstsq(
+            design, corrected[channel], rcond=None
+        )
+        if int(rank) != 2 or abs(coefficients[0]) < 1e-12:
+            raise ValueError("desired/blocker joint fit is singular")
+        relative_power_db.append(
+            float(
+                20.0 * math.log10(max(abs(coefficients[1] / coefficients[0]), 1e-300))
+            )
+        )
+        blocker_residual = corrected[channel] - coefficients[0] * desired_template
+        numerator = abs(np.vdot(blocker_template, blocker_residual)) ** 2
+        denominator = float(
+            np.vdot(blocker_template, blocker_template).real
+            * np.vdot(blocker_residual, blocker_residual).real
+        )
+        correlations.append(
+            float(np.clip(numerator / denominator, 0.0, 1.0))
+            if denominator > 0.0
+            else 0.0
+        )
+    measured_power_db = float(np.median(np.asarray(relative_power_db)))
+    frequency_resolution_hz = desired_reference.sample_rate_hz / cycle
+    return {
+        "measured_signed_offset_hz": measured_offset_hz,
+        "commanded_signed_offset_hz": commanded_offset_hz,
+        "offset_error_hz": measured_offset_hz - commanded_offset_hz,
+        "frequency_resolution_hz": float(frequency_resolution_hz),
+        "measured_relative_power_db": measured_power_db,
+        "measured_relative_power_db_per_rx": relative_power_db,
+        "commanded_relative_power_db": commanded_power_db,
+        "relative_power_error_db": measured_power_db - commanded_power_db,
+        "correlation_per_rx": correlations,
+        "minimum_correlation": min(correlations),
+    }
 
 
 def analyze_modulated_capture(
@@ -610,12 +723,13 @@ def analyze_modulated_capture(
     thresholds: ModulatedQualityThresholds = DEFAULT_MODULATED_THRESHOLDS,
     blocker_offset_hz: float | None = None,
     blocker_power_db: float | None = None,
+    blocker_reference: QpskReference | None = None,
 ) -> dict[str, Any]:
     """Synchronize and measure a dual-RX capture against known QPSK samples."""
 
     np = _numpy()
     if not isinstance(reference, QpskReference):
-        raise ValueError("reference must be a QpskReference")
+        raise TypeError("reference must be a QpskReference")
     matrix = _dual_signal(signal_or_raw)
     if not np.isfinite(matrix).all():
         raise ValueError("dual-RX signal contains non-finite values")
@@ -629,11 +743,26 @@ def analyze_modulated_capture(
     if adc_full_scale <= 1.0:
         raise ValueError("adc_full_scale must be greater than one")
     _validate_thresholds(thresholds)
-    if (blocker_offset_hz is None) != (blocker_power_db is None):
-        raise ValueError("blocker offset and power must be supplied together")
+    blocker_values = (
+        blocker_offset_hz is not None,
+        blocker_power_db is not None,
+        blocker_reference is not None,
+    )
+    if len(set(blocker_values)) != 1:
+        raise ValueError(
+            "blocker offset, power, and known reference must be supplied together"
+        )
     if blocker_offset_hz is not None:
         blocker_offset_hz = _finite_number("blocker_offset_hz", blocker_offset_hz)
         blocker_power_db = _finite_number("blocker_power_db", blocker_power_db)
+        if not isinstance(blocker_reference, QpskReference):
+            raise ValueError("blocker_reference must be a QpskReference")
+        if (
+            blocker_reference.sample_rate_hz != reference.sample_rate_hz
+            or blocker_reference.cycle_samples != reference.cycle_samples
+            or blocker_reference.samples_per_symbol != reference.samples_per_symbol
+        ):
+            raise ValueError("blocker reference is incompatible with desired reference")
 
     cycle = reference.cycle_samples
     if matrix.shape[1] < 2 * cycle:
@@ -663,6 +792,20 @@ def analyze_modulated_capture(
         * np.exp(-2j * np.pi * cfo_hz * indexes / reference.sample_rate_hz)[None, :]
     )
     expected = reference.samples[(indexes.astype(np.int64) + timing) % cycle]
+    blocker_measurement = (
+        _measure_known_blocker(
+            corrected,
+            desired_reference=reference,
+            blocker_reference=blocker_reference,
+            timing=timing,
+            commanded_offset_hz=blocker_offset_hz,
+            commanded_power_db=blocker_power_db,
+        )
+        if blocker_reference is not None
+        and blocker_offset_hz is not None
+        and blocker_power_db is not None
+        else None
+    )
     reference_power = float(np.vdot(expected, expected).real)
     gains = np.asarray(
         [
@@ -765,6 +908,33 @@ def analyze_modulated_capture(
     )
     if abs(cfo_hz) >= max_cfo_hz - cfo_grid_step_hz:
         reasons.append("cfo_at_search_edge")
+    if blocker_measurement is not None:
+        blocker_detected = bool(
+            blocker_measurement["minimum_correlation"]
+            >= thresholds.min_blocker_correlation
+        )
+        offset_valid = bool(
+            abs(blocker_measurement["offset_error_hz"])
+            <= thresholds.max_blocker_offset_error_hz
+        )
+        power_valid = bool(
+            abs(blocker_measurement["relative_power_error_db"])
+            <= thresholds.max_blocker_power_error_db
+        )
+        blocker_measurement.update(
+            {
+                "detected": blocker_detected,
+                "offset_valid": offset_valid,
+                "relative_power_valid": power_valid,
+                "valid": blocker_detected and offset_valid and power_valid,
+            }
+        )
+        if not blocker_detected:
+            reasons.append("blocker_not_detected")
+        if not offset_valid:
+            reasons.append("blocker_signed_offset_mismatch")
+        if not power_valid:
+            reasons.append("blocker_relative_power_mismatch")
 
     return {
         "schema": "plutosdr-fw.modulated-quality.v1",
@@ -797,6 +967,35 @@ def analyze_modulated_capture(
         "cross_channel_coherence": coherence,
         "blocker_offset_hz": blocker_offset_hz,
         "blocker_power_db": blocker_power_db,
+        "blocker_measurement": blocker_measurement,
+        "blocker_detected": (
+            None if blocker_measurement is None else blocker_measurement["detected"]
+        ),
+        "measured_blocker_offset_hz": (
+            None
+            if blocker_measurement is None
+            else blocker_measurement["measured_signed_offset_hz"]
+        ),
+        "measured_blocker_power_db": (
+            None
+            if blocker_measurement is None
+            else blocker_measurement["measured_relative_power_db"]
+        ),
+        "blocker_offset_error_hz": (
+            None
+            if blocker_measurement is None
+            else blocker_measurement["offset_error_hz"]
+        ),
+        "blocker_power_error_db": (
+            None
+            if blocker_measurement is None
+            else blocker_measurement["relative_power_error_db"]
+        ),
+        "blocker_correlation": (
+            None
+            if blocker_measurement is None
+            else blocker_measurement["correlation_per_rx"]
+        ),
         "quality_valid": not reasons,
         "quality_reasons": reasons,
     }
@@ -808,7 +1007,7 @@ def quantify_blocker_degradation(
     """Compare one blocker capture with its desired-only baseline."""
 
     if not isinstance(baseline, dict) or not isinstance(blocked, dict):
-        raise ValueError("baseline and blocked results must be dictionaries")
+        raise TypeError("baseline and blocked results must be dictionaries")
     required = (
         "schema",
         "reference_id",

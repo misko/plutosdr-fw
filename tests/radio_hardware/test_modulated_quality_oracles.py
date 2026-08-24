@@ -273,6 +273,7 @@ def test_composite_blocker_power_offset_and_degradation_are_quantified(
         max_cfo_hz=2_000.0,
         blocker_offset_hz=near_waveform.blocker_offset_hz,
         blocker_power_db=near_waveform.blocker_power_db,
+        blocker_reference=near_waveform.blocker_reference,
     )
     far = analyze_modulated_capture(
         _capture(far_waveform.tx_samples, gains=(1_000.0, 850.0), noise_sigma=1.0),
@@ -280,6 +281,7 @@ def test_composite_blocker_power_offset_and_degradation_are_quantified(
         max_cfo_hz=2_000.0,
         blocker_offset_hz=far_waveform.blocker_offset_hz,
         blocker_power_db=far_waveform.blocker_power_db,
+        blocker_reference=far_waveform.blocker_reference,
     )
 
     near_degradation = quantify_blocker_degradation(baseline, near)
@@ -292,6 +294,12 @@ def test_composite_blocker_power_offset_and_degradation_are_quantified(
         near_degradation["worst_evm_increase_percentage_points"]
         > (far_degradation["worst_evm_increase_percentage_points"])
     )
+    assert near["blocker_detected"]
+    assert near["measured_blocker_offset_hz"] == pytest.approx(64_000.0)
+    assert near["measured_blocker_power_db"] == pytest.approx(-3.0, abs=0.1)
+    assert min(near["blocker_correlation"]) > 0.99
+    assert far["blocker_detected"]
+    assert far["measured_blocker_offset_hz"] == pytest.approx(320_000.0)
     sweep = summarize_blocker_sweep(baseline, [far, near])
     assert sweep["point_count"] == 2
     assert [point["blocker_offset_hz"] for point in sweep["points"]] == [
@@ -299,6 +307,77 @@ def test_composite_blocker_power_offset_and_degradation_are_quantified(
         320_000.0,
     ]
     json.dumps(sweep, allow_nan=False)
+
+
+def test_commanded_but_absent_blocker_is_not_accepted(reference) -> None:
+    commanded = build_composite_blocker(
+        reference,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-10.0,
+        blocker_seed=72,
+    )
+    desired_only = scale_reference_for_tx(reference)
+    result = analyze_modulated_capture(
+        _capture(desired_only.tx_samples, noise_sigma=0.5),
+        reference=reference,
+        max_cfo_hz=2_000.0,
+        blocker_offset_hz=commanded.blocker_offset_hz,
+        blocker_power_db=commanded.blocker_power_db,
+        blocker_reference=commanded.blocker_reference,
+    )
+    assert not result["quality_valid"]
+    assert not result["blocker_detected"]
+    assert "blocker_not_detected" in result["quality_reasons"]
+    assert result["blocker_measurement"]["minimum_correlation"] < 0.1
+
+
+def test_mirrored_blocker_fails_signed_offset_provenance(reference) -> None:
+    commanded = build_composite_blocker(
+        reference,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-10.0,
+        blocker_seed=73,
+    )
+    mirrored = build_composite_blocker(
+        reference,
+        blocker_offset_hz=-320_000.0,
+        blocker_power_db=-10.0,
+        blocker_seed=73,
+    )
+    result = analyze_modulated_capture(
+        _capture(mirrored.tx_samples, noise_sigma=0.5),
+        reference=reference,
+        max_cfo_hz=2_000.0,
+        blocker_offset_hz=commanded.blocker_offset_hz,
+        blocker_power_db=commanded.blocker_power_db,
+        blocker_reference=commanded.blocker_reference,
+    )
+    assert result["blocker_detected"]
+    assert result["measured_blocker_offset_hz"] == pytest.approx(-320_000.0)
+    assert result["measured_blocker_power_db"] == pytest.approx(-10.0, abs=0.1)
+    assert not result["quality_valid"]
+    assert "blocker_signed_offset_mismatch" in result["quality_reasons"]
+
+
+def test_wrong_blocker_power_fails_commanded_relative_power_gate(reference) -> None:
+    actual = build_composite_blocker(
+        reference,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-20.0,
+        blocker_seed=74,
+    )
+    result = analyze_modulated_capture(
+        _capture(actual.tx_samples, noise_sigma=0.5),
+        reference=reference,
+        max_cfo_hz=2_000.0,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-10.0,
+        blocker_reference=actual.blocker_reference,
+    )
+    assert result["blocker_detected"]
+    assert result["measured_blocker_power_db"] == pytest.approx(-20.0, abs=0.1)
+    assert not result["quality_valid"]
+    assert "blocker_relative_power_mismatch" in result["quality_reasons"]
 
 
 @pytest.mark.parametrize(
@@ -409,6 +488,7 @@ def test_degradation_rejects_mismatched_or_duplicate_evidence(reference) -> None
         max_cfo_hz=2_000.0,
         blocker_offset_hz=64_000.0,
         blocker_power_db=-10.0,
+        blocker_reference=blocked_waveform.blocker_reference,
     )
     different = generate_cyclic_qpsk(
         sample_rate_hz=SAMPLE_RATE_HZ,

@@ -12,6 +12,7 @@ import os
 import random
 import re
 import time
+from builtins import BaseExceptionGroup
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -45,6 +46,7 @@ PHY_DEVICE = "ad9361-phy"
 TX_MUTE_DB = -89.75
 DAC_SYNC_REGISTER = 0x0044
 DAC_SELECT_DDS = 0x0
+DAC_SELECT_DMA = 0x2
 DAC_SELECT_ZERO = 0x3
 DAC_SELECT_PNXX = 0x9
 MIN_COMMON_CENTER_FREQUENCY_HZ = 70_000_000
@@ -634,6 +636,238 @@ class Issue46Radio:
         self._write_selector(3, DAC_SELECT_DDS)
         self._configure_tone_dds(tone_hz, scale)
         self._pulse_sync()
+
+    @contextmanager
+    def cyclic_tx2_waveform(
+        self,
+        tx2_cs16: bytes | bytearray | memoryview,
+        *,
+        sample_count: int,
+    ) -> Iterator[dict[str, Any]]:
+        """Route one verified cyclic-DMA waveform to TX2 and zeros to TX1.
+
+        The caller receives control while both hardware attenuators remain
+        muted.  It may then use :meth:`set_tx2_gain`, whose existing fixture
+        authorization bounds still apply.  Every exit path attempts the three
+        independent mute barriers before synchronously closing the DMA buffer.
+        """
+
+        # A malformed caller must not be able to leave a previously active RF
+        # path transmitting merely because validation returns early.
+        self.mute_all()
+        if isinstance(sample_count, bool) or not isinstance(sample_count, int):
+            raise FixtureSafetyError("cyclic TX sample_count must be an integer")
+        if sample_count <= 0:
+            raise FixtureSafetyError("cyclic TX sample_count must be positive")
+        try:
+            tx2_payload = bytes(tx2_cs16)
+        except (TypeError, ValueError) as exc:
+            raise FixtureSafetyError("TX2 cyclic payload must be bytes-like") from exc
+        expected_tx2_bytes = sample_count * 4
+        if len(tx2_payload) != expected_tx2_bytes:
+            raise FixtureSafetyError(
+                f"TX2 cyclic payload has {len(tx2_payload)} bytes, expected "
+                f"{expected_tx2_bytes}"
+            )
+
+        buffer: Any = None
+        buffer_closed = False
+        buffer_release_method = "not_created"
+        body_error: BaseException | None = None
+        channel_states: list[tuple[Any, bool]] = []
+        evidence: dict[str, Any] = {
+            "sample_count": sample_count,
+            "tx2_payload_bytes": len(tx2_payload),
+            "tx2_payload_sha256": hashlib.sha256(tx2_payload).hexdigest(),
+            "cyclic": True,
+            "tx1_source": "zero samples and ZERO selector",
+            "tx2_source": "cyclic DMA",
+        }
+        try:
+            enabled_ids = {"voltage0", "voltage1", "voltage2", "voltage3"}
+            scan_channels: dict[str, Any] = {}
+            for channel in self.tx.channels:
+                if channel.scan_element:
+                    channel_states.append((channel, bool(channel.enabled)))
+                    if channel.id in enabled_ids:
+                        if channel.id in scan_channels:
+                            raise FixtureSafetyError(
+                                f"duplicate TX scan channel {channel.id!r}"
+                            )
+                        scan_channels[channel.id] = channel
+                    channel.enabled = channel.id in enabled_ids
+            if set(scan_channels) != enabled_ids:
+                missing = sorted(enabled_ids - set(scan_channels))
+                raise FixtureSafetyError(f"TX scan layout lacks channels {missing}")
+            scan_layout: list[dict[str, Any]] = []
+            for expected_index, channel_id in enumerate(
+                ("voltage0", "voltage1", "voltage2", "voltage3")
+            ):
+                channel = scan_channels[channel_id]
+                observed_index = int(channel.index)
+                if observed_index != expected_index:
+                    raise FixtureSafetyError(
+                        f"TX {channel_id} scan index {observed_index}, expected "
+                        f"{expected_index}"
+                    )
+                data_format = channel.data_format
+                observed_format = {
+                    "length": int(data_format.length),
+                    "bits": int(data_format.bits),
+                    "shift": int(data_format.shift),
+                    "is_signed": bool(data_format.is_signed),
+                    "is_be": bool(data_format.is_be),
+                    "repeat": int(data_format.repeat),
+                }
+                expected_format = {
+                    "length": 16,
+                    "bits": 16,
+                    "shift": 0,
+                    "is_signed": True,
+                    "is_be": False,
+                    "repeat": 1,
+                }
+                if observed_format != expected_format:
+                    raise FixtureSafetyError(
+                        f"TX {channel_id} scan format {observed_format}, expected "
+                        f"{expected_format}"
+                    )
+                scan_layout.append(
+                    {"id": channel_id, "index": observed_index, **observed_format}
+                )
+            sample_size = int(self.tx.sample_size)
+            if sample_size != 8:
+                raise FixtureSafetyError(
+                    f"dual-TX scan size is {sample_size}, expected 8 bytes/sample"
+                )
+
+            interleaved = bytearray(sample_count * sample_size)
+            for index in range(sample_count):
+                tx2_start = index * 4
+                frame_start = index * sample_size
+                interleaved[frame_start + 4 : frame_start + 8] = tx2_payload[
+                    tx2_start : tx2_start + 4
+                ]
+            expected_buffer_bytes = sample_count * sample_size
+            buffer = self.iio.Buffer(self.tx, sample_count, True)
+            if len(buffer) != expected_buffer_bytes:
+                raise FixtureSafetyError(
+                    f"cyclic DMA buffer has {len(buffer)} bytes, expected "
+                    f"{expected_buffer_bytes}"
+                )
+            written = int(buffer.write(interleaved))
+            if written != expected_buffer_bytes:
+                raise FixtureSafetyError(
+                    f"cyclic DMA write accepted {written} bytes, expected "
+                    f"{expected_buffer_bytes}"
+                )
+            read_buffer = getattr(buffer, "read", None)
+            if not callable(read_buffer):
+                raise FixtureSafetyError(
+                    "cyclic DMA output buffer cannot provide payload readback"
+                )
+            try:
+                readback = bytes(read_buffer())
+            except BaseException as error:  # noqa: BLE001 - fail closed on any ABI error
+                raise FixtureSafetyError(
+                    "cyclic DMA output buffer readback failed"
+                ) from error
+            if readback != bytes(interleaved):
+                raise FixtureSafetyError(
+                    "cyclic DMA buffer readback differs from payload"
+                )
+            buffer.push()
+
+            self._write_selector(0, DAC_SELECT_ZERO)
+            self._write_selector(1, DAC_SELECT_ZERO)
+            self._write_selector(2, DAC_SELECT_DMA)
+            self._write_selector(3, DAC_SELECT_DMA)
+            tx_gains = [
+                _first_number(
+                    self._read_attr(
+                        self._phy_channel(f"voltage{index}", True), "hardwaregain"
+                    )
+                )
+                for index in (0, 1)
+            ]
+            if any(gain > -80.0 for gain in tx_gains):
+                raise FixtureSafetyError(
+                    f"TX gain readbacks {tx_gains} dB are above the mute limit"
+                )
+            evidence.update(
+                {
+                    "scan_sample_size": sample_size,
+                    "scan_layout": scan_layout,
+                    "buffer_bytes": expected_buffer_bytes,
+                    "write_bytes": written,
+                    "interleaved_sha256": hashlib.sha256(interleaved).hexdigest(),
+                    "tx1_gain_db": tx_gains[0],
+                    "tx2_gain_db": tx_gains[1],
+                    "selectors": [
+                        DAC_SELECT_ZERO,
+                        DAC_SELECT_ZERO,
+                        DAC_SELECT_DMA,
+                        DAC_SELECT_DMA,
+                    ],
+                }
+            )
+            yield evidence
+        except BaseException as error:  # noqa: BLE001 - preserve every body exit
+            body_error = error
+            raise
+        finally:
+            cleanup_failures: list[str] = []
+            try:
+                cleanup, mute_failures = self._best_effort_mute()
+                cleanup_failures.extend(mute_failures)
+            except BaseException as error:  # noqa: BLE001 - mute is unconditional
+                cleanup = {"verified": False, "failures": []}
+                cleanup_failures.append(
+                    f"cyclic DMA mute routine: {_exception_text(error)}"
+                )
+            try:
+                buffer_value = buffer
+                buffer = None
+                buffer_release_method = (
+                    "not_created"
+                    if buffer_value is None
+                    else (
+                        "explicit_close"
+                        if callable(getattr(buffer_value, "close", None))
+                        else "reference_release_gc"
+                    )
+                )
+                try:
+                    close_iio_object(buffer_value)
+                finally:
+                    buffer_value = None
+                    gc.collect()
+                buffer_closed = True
+            except BaseException as error:  # noqa: BLE001 - report close failures
+                cleanup_failures.append(
+                    f"cyclic DMA buffer close: {_exception_text(error)}"
+                )
+            for channel, was_enabled in channel_states:
+                try:
+                    channel.enabled = was_enabled
+                except BaseException as error:  # noqa: BLE001 - restore every channel
+                    cleanup_failures.append(
+                        f"cyclic DMA scan restore: {_exception_text(error)}"
+                    )
+            self._last_cyclic_dma_cleanup = {
+                "mute": cleanup,
+                "buffer_closed": buffer_closed,
+                "buffer_release_method": buffer_release_method,
+                "failures": cleanup_failures,
+            }
+            if cleanup_failures:
+                cleanup_error = FixtureSafetyError("; ".join(cleanup_failures))
+                if body_error is None:
+                    raise cleanup_error
+                raise BaseExceptionGroup(
+                    "cyclic DMA body and cleanup both failed",
+                    [body_error, cleanup_error],
+                ) from None
 
     def set_tx2_gain(self, gain_db: float) -> float:
         """Set TX2 only, bounded by the strongest gain attested at construction."""
