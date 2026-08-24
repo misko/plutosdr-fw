@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, replace
 from pathlib import Path
@@ -9,6 +10,7 @@ from pathlib import Path
 import pytest
 
 from .modulated_hardware import (
+    DEFAULT_MODULATED_TX2_GAIN_DB,
     MODE_TANDEM,
     MODULATED_MODES,
     ModulatedHardwareOptions,
@@ -82,7 +84,9 @@ def test_parser_anchors_literal_firmware_and_scopes_output_by_serial(
         "modulated_hardware.py",
     }
     assert all(len(digest) == 64 for _name, digest in options.harness_sources)
-    assert plan_document(options)["deployment_performed"] is False
+    plan = plan_document(options)
+    assert plan["deployment_performed"] is False
+    assert plan["configuration"]["modulated_tx2_gain_db"] == -42.0
 
 
 def test_plan_fingerprint_binds_release_harness_source_manifest(
@@ -298,7 +302,7 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
     modulated = ModulatedHardwareOptions(
         physical_attenuation_db=0.0,
         center_frequency_hz=915_000_000,
-        tx2_gain_db=-30.0,
+        tx2_gain_db=DEFAULT_MODULATED_TX2_GAIN_DB,
         max_seconds=options.phase_max_seconds,
         output_dir=work_dir,
     )
@@ -318,6 +322,24 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
         "desired_only",
         *(f"blocker_{index:02d}" for index in range(len(modulated.blocker_points))),
     ]
+    raw_payload = (bytes(range(256)) * 256)[: modulated.capture_samples * 8]
+    raw_sha256 = hashlib.sha256(raw_payload).hexdigest()
+    raw_relative_path = (
+        Path(options.serial)
+        / "diagnostic-iq"
+        / "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le"
+    )
+    raw_path = work_dir / raw_relative_path
+    raw_path.parent.mkdir(parents=True)
+    raw_path.write_bytes(raw_payload)
+    raw_provenance = {
+        "path": raw_relative_path.as_posix(),
+        "sha256": raw_sha256,
+        "bytes": len(raw_payload),
+        "encoding": "signed-16-bit-little-endian",
+        "channel_layout": ["rx0_i", "rx0_q", "rx1_i", "rx1_q"],
+        "samples_per_channel": modulated.capture_samples,
+    }
 
     def quality_summary(case_id: str) -> dict[str, object]:
         blocked = case_id != "desired_only"
@@ -403,6 +425,11 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
             {
                 "case_id": case_id,
                 "mode": mode,
+                "tx2_gain_requested_db": DEFAULT_MODULATED_TX2_GAIN_DB,
+                "tx2_gain_readback_db": DEFAULT_MODULATED_TX2_GAIN_DB,
+                "effective_attenuation_db": (
+                    modulated.minimum_effective_attenuation_db
+                ),
                 "summary": quality_summary(case_id),
                 **(
                     {
@@ -410,7 +437,19 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
                         "measurements": [tandem_frame(1)],
                     }
                     if mode == MODE_TANDEM
-                    else {}
+                    else (
+                        {
+                            "measurements": [
+                                {
+                                    "sha256": raw_sha256,
+                                    "iq_bytes": len(raw_payload),
+                                    "raw_iq_provenance": raw_provenance,
+                                }
+                            ]
+                        }
+                        if case_id == "desired_only" and mode == "manual_fixed"
+                        else {}
+                    )
                 ),
             }
             for case_id in case_ids
@@ -420,13 +459,14 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
     report["evaluation"] = evaluate_modulated_hardware_report(
         report, modulated.degradation_thresholds
     )
-    report_path.parent.mkdir(parents=True)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
 
     validated = production_validator(options)(spec, report_path, work_dir)
 
     assert validated.verdict == "pass"
     assert validated.cleanup_verified is True
+    assert validated.summary["raw_iq_provenance"] == raw_provenance
 
     valid_report = json.loads(json.dumps(report))
     report["evaluation"]["degradation_valid"] = False
@@ -451,6 +491,40 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
     report["waveforms"][0]["dma_cleanup"]["mute"]["verified"] = False
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="cyclic-DMA cleanup was not verified"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["runs"][0]["tx2_gain_readback_db"] = -41.75
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="TX2 gain readback differs from plan"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    target_frame = report["runs"][0]["measurements"][0]
+    target_frame["raw_iq_provenance"]["path"] = "../../escaped.cs16le"
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="escapes the phase work directory"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["runs"][1]["measurements"] = [
+        {
+            "sha256": raw_sha256,
+            "iq_bytes": len(raw_payload),
+            "raw_iq_provenance": raw_provenance,
+        }
+    ]
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="exactly one raw-IQ provenance"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report_path.write_text(json.dumps(valid_report) + "\n", encoding="utf-8")
+    raw_path.write_bytes(raw_payload[:-1])
+    with pytest.raises(ReleaseCliError, match="on-disk byte count differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    raw_path.write_bytes(raw_payload[:-1] + b"X")
+    with pytest.raises(ReleaseCliError, match="on-disk SHA-256 differs"):
         production_validator(options)(spec, report_path, work_dir)
 
 

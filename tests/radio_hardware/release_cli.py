@@ -27,6 +27,7 @@ from typing import Any
 from . import release_campaign as steady_campaign
 from .experiment import Issue46Options, Issue46Radio
 from .modulated_hardware import (
+    DEFAULT_MODULATED_TX2_GAIN_DB,
     MODE_TANDEM,
     MODULATED_MODES,
     ModulatedHardwareOptions,
@@ -404,7 +405,7 @@ def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
                 ModulatedHardwareOptions(
                     physical_attenuation_db=options.physical_attenuation_db,
                     center_frequency_hz=band.center_frequency_hz,
-                    tx2_gain_db=quality.strongest_tx_gain_db,
+                    tx2_gain_db=DEFAULT_MODULATED_TX2_GAIN_DB,
                     max_seconds=options.phase_max_seconds,
                     output_dir=options.output_dir / "preflight-modulated",
                 )
@@ -454,6 +455,7 @@ def _configuration(options: ReleaseHardwareOptions) -> dict[str, Any]:
         "soak_deadline_seconds": options.soak_deadline_seconds,
         "sample_rate_hz": options.sample_rate_hz,
         "samples_per_channel": options.samples_per_channel,
+        "modulated_tx2_gain_db": DEFAULT_MODULATED_TX2_GAIN_DB,
         "phase_max_seconds": options.phase_max_seconds,
     }
 
@@ -756,6 +758,7 @@ def _issue_options(
     quality: TandemQualityOptions,
     *,
     namespace: str,
+    tx_gain_db: float | None = None,
 ) -> Issue46Options:
     return Issue46Options(
         serial=options.serial,
@@ -764,7 +767,7 @@ def _issue_options(
         firmware_pattern=options.firmware_pattern,
         libiio_source_commit=options.libiio_source_commit,
         attenuation_db=options.physical_attenuation_db,
-        tx_gain_db=quality.strongest_tx_gain_db,
+        tx_gain_db=(quality.strongest_tx_gain_db if tx_gain_db is None else tx_gain_db),
         sample_rate_hz=quality.sample_rate_hz,
         samples_per_channel=quality.samples_per_channel,
         profile="repro",
@@ -850,7 +853,7 @@ def production_executor(
             modulated = ModulatedHardwareOptions(
                 physical_attenuation_db=options.physical_attenuation_db,
                 center_frequency_hz=spec.band.center_frequency_hz,
-                tx2_gain_db=-30.0,
+                tx2_gain_db=DEFAULT_MODULATED_TX2_GAIN_DB,
                 max_seconds=options.phase_max_seconds,
                 output_dir=work_dir,
             )
@@ -864,7 +867,10 @@ def production_executor(
             with _radio_lifecycle(
                 iio_module,
                 _issue_options(
-                    options, radio_quality, namespace="tandem-agc-release-modulated"
+                    options,
+                    radio_quality,
+                    namespace="tandem-agc-release-modulated",
+                    tx_gain_db=modulated.tx2_gain_db,
                 ),
                 radio_factory,
             ) as radio:
@@ -931,9 +937,7 @@ def _modulated_dma_cleanup_errors(waveforms: Any) -> list[str]:
             "explicit_close",
             "reference_release_gc",
         ):
-            errors.append(
-                f"modulated {case_id} cyclic-DMA release method is invalid"
-            )
+            errors.append(f"modulated {case_id} cyclic-DMA release method is invalid")
         if cleanup.get("failures") != []:
             errors.append(f"modulated {case_id} cyclic-DMA cleanup has failures")
         errors.extend(
@@ -953,7 +957,9 @@ def _modulated_iq_convention_errors(runs: Any) -> list[str]:
             errors.append(f"modulated run {index} is malformed")
             continue
         summary = run.get("summary")
-        convention = summary.get("iq_convention") if isinstance(summary, Mapping) else None
+        convention = (
+            summary.get("iq_convention") if isinstance(summary, Mapping) else None
+        )
         if convention not in ("direct", "conjugated"):
             errors.append(
                 f"modulated {run.get('mode')}/{run.get('case_id')} IQ convention "
@@ -964,6 +970,124 @@ def _modulated_iq_convention_errors(runs: Any) -> list[str]:
     if len(conventions) > 1:
         errors.append("modulated IQ convention changed inside one hardware campaign")
     return errors
+
+
+def _modulated_gain_errors(runs: Any, expected: ModulatedHardwareOptions) -> list[str]:
+    if not isinstance(runs, list):
+        return ["modulated runs are missing"]
+    errors: list[str] = []
+    expected_effective_attenuation = (
+        expected.physical_attenuation_db - expected.tx2_gain_db
+    )
+    for index, run in enumerate(runs):
+        if not isinstance(run, Mapping):
+            errors.append(f"modulated run {index} is malformed")
+            continue
+        context = f"modulated {run.get('mode')}/{run.get('case_id')}"
+        if run.get("tx2_gain_requested_db") != expected.tx2_gain_db:
+            errors.append(f"{context} requested TX2 gain differs from plan")
+        if run.get("tx2_gain_readback_db") != expected.tx2_gain_db:
+            errors.append(f"{context} TX2 gain readback differs from plan")
+        if run.get("effective_attenuation_db") != expected_effective_attenuation:
+            errors.append(f"{context} effective attenuation differs from plan")
+    return errors
+
+
+def _modulated_raw_iq_evidence(
+    runs: Any,
+    *,
+    work_dir: Path,
+    serial: str,
+    capture_samples: int,
+) -> tuple[list[str], dict[str, Any] | None]:
+    """Verify the single bounded diagnostic capture against its durable bytes."""
+
+    if not isinstance(runs, list):
+        return ["modulated runs are missing"], None
+    errors: list[str] = []
+    candidates: list[tuple[Mapping[str, Any], int, Mapping[str, Any]]] = []
+    target_run: Mapping[str, Any] | None = None
+    for run in runs:
+        if not isinstance(run, Mapping):
+            continue
+        measurements = run.get("measurements")
+        is_target = (
+            run.get("case_id") == "desired_only" and run.get("mode") == "manual_fixed"
+        )
+        if is_target:
+            target_run = run
+            if not isinstance(measurements, list) or not measurements:
+                errors.append("desired/manual run lacks its first IQ measurement")
+        if not isinstance(measurements, list):
+            continue
+        for frame_index, frame in enumerate(measurements):
+            if isinstance(frame, Mapping) and "raw_iq_provenance" in frame:
+                candidates.append((run, frame_index, frame))
+
+    if target_run is None:
+        errors.append("desired/manual run is missing")
+    if len(candidates) != 1:
+        errors.append(
+            "modulated report must contain exactly one raw-IQ provenance record"
+        )
+        return errors, None
+
+    run, frame_index, frame = candidates[0]
+    if run is not target_run or frame_index != 0:
+        errors.append("raw-IQ provenance is not on the first desired/manual frame")
+    provenance = frame.get("raw_iq_provenance")
+    if not isinstance(provenance, Mapping):
+        errors.append("raw-IQ provenance is malformed")
+        return errors, None
+
+    expected_relative_path = (
+        Path(serial)
+        / "diagnostic-iq"
+        / "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le"
+    ).as_posix()
+    expected_bytes = capture_samples * 8
+    if provenance.get("path") != expected_relative_path:
+        errors.append("raw-IQ artifact path differs from plan")
+    if (
+        type(provenance.get("bytes")) is not int
+        or provenance.get("bytes") != expected_bytes
+    ):
+        errors.append("raw-IQ artifact byte count differs from plan")
+    digest = provenance.get("sha256")
+    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        errors.append("raw-IQ artifact SHA-256 is malformed")
+    if provenance.get("encoding") != "signed-16-bit-little-endian":
+        errors.append("raw-IQ artifact encoding differs from plan")
+    if provenance.get("channel_layout") != ["rx0_i", "rx0_q", "rx1_i", "rx1_q"]:
+        errors.append("raw-IQ artifact channel layout differs from plan")
+    if provenance.get("samples_per_channel") != capture_samples:
+        errors.append("raw-IQ artifact sample count differs from plan")
+    if frame.get("sha256") != digest or frame.get("iq_bytes") != expected_bytes:
+        errors.append("raw-IQ provenance differs from its measurement frame")
+
+    path_value = provenance.get("path")
+    if isinstance(path_value, str):
+        root = work_dir.resolve()
+        artifact = (work_dir / path_value).resolve()
+        if artifact != root and root not in artifact.parents:
+            errors.append("raw-IQ artifact escapes the phase work directory")
+        elif not artifact.is_file():
+            errors.append("raw-IQ artifact is missing")
+        else:
+            if artifact.stat().st_size != expected_bytes:
+                errors.append("raw-IQ artifact on-disk byte count differs")
+            else:
+                payload = artifact.read_bytes()
+                if (
+                    isinstance(digest, str)
+                    and hashlib.sha256(payload).hexdigest() != digest
+                ):
+                    errors.append("raw-IQ artifact on-disk SHA-256 differs")
+            temporary = artifact.with_suffix(artifact.suffix + ".tmp")
+            if temporary.exists():
+                errors.append("raw-IQ atomic-write temporary file remains")
+
+    return errors, dict(provenance) if not errors else None
 
 
 def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:
@@ -1006,9 +1130,7 @@ def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:
                 break
             metadata = frame.get("metadata")
             continuity = frame.get("continuity")
-            if not isinstance(metadata, Mapping) or not isinstance(
-                continuity, Mapping
-            ):
+            if not isinstance(metadata, Mapping) or not isinstance(continuity, Mapping):
                 errors.append(f"{frame_context} lacks metadata gap evidence")
                 break
             buffer_sequence = metadata.get("buffer_sequence")
@@ -1046,9 +1168,7 @@ def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:
                 hidden = 0
                 initial_unrepresented = transition_count - visible
                 if initial_unrepresented < 0:
-                    errors.append(
-                        f"{frame_context} has more events than transitions"
-                    )
+                    errors.append(f"{frame_context} has more events than transitions")
                     break
             else:
                 buffer_delta = buffer_sequence - int(
@@ -1061,8 +1181,7 @@ def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:
                     errors.append(f"{frame_context} frame counters disagree")
                     break
                 transition_delta = (
-                    transition_count
-                    - int(previous_metadata["tandem_transition_count"])
+                    transition_count - int(previous_metadata["tandem_transition_count"])
                 ) % uint32_modulus
                 if transition_delta >= uint32_modulus // 2:
                     errors.append(f"{frame_context} transition counter regressed")
@@ -1296,7 +1415,7 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             expected_options = ModulatedHardwareOptions(
                 physical_attenuation_db=options.physical_attenuation_db,
                 center_frequency_hz=spec.band.center_frequency_hz,
-                tx2_gain_db=-30.0,
+                tx2_gain_db=DEFAULT_MODULATED_TX2_GAIN_DB,
                 max_seconds=options.phase_max_seconds,
                 output_dir=work_dir,
             )
@@ -1344,10 +1463,18 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             ]
             if observed != expected:
                 errors.append("modulated mode/blocker coverage differs from plan")
+            errors.extend(_modulated_gain_errors(runs, expected_options))
             errors.extend(_modulated_iq_convention_errors(runs))
             errors.extend(
                 _modulated_continuity_errors(runs, expected_options.capture_samples)
             )
+            raw_iq_errors, raw_iq_provenance = _modulated_raw_iq_evidence(
+                runs,
+                work_dir=work_dir,
+                serial=options.serial,
+                capture_samples=expected_options.capture_samples,
+            )
+            errors.extend(raw_iq_errors)
             evaluation = disk.get("evaluation")
             if (
                 not isinstance(evaluation, Mapping)
@@ -1364,7 +1491,11 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                     errors.append(
                         "modulated quality evaluation differs from recomputation"
                     )
-            summary = {"run_count": len(observed), "evaluation": evaluation}
+            summary = {
+                "run_count": len(observed),
+                "evaluation": evaluation,
+                "raw_iq_provenance": raw_iq_provenance,
+            }
         if errors:
             raise ReleaseCliError("; ".join(errors))
         return ValidatedPhase("pass", True, summary)
