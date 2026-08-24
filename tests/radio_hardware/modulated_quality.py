@@ -573,6 +573,59 @@ def _estimate_cfo_and_timing(
     return estimated_cfo, timing, individual, normalized_peak
 
 
+def _canonicalize_iq_convention(
+    matrix: Any,
+    reference: QpskReference,
+    *,
+    max_cfo_hz: float,
+    cfo_grid_oversample: int,
+) -> tuple[str, Any, float, int, list[int], float, dict[str, float]]:
+    """Choose the decoded-RX spectral orientation that matches the TX reference.
+
+    A Pluto TX-to-RX RF loopback can invert the complex spectrum even though the
+    DMA and IIO scan lanes are both ordered I, Q.  In that transport convention
+    the decoded receive vector is a complex conjugate of the transmitted
+    baseband, up to ordinary timing, carrier, and complex-gain terms.  A random
+    QPSK sequence is intentionally not conjugate symmetric, so correlating only
+    the direct orientation makes a clean capture look like roughly 50% BER.
+
+    Synchronize both physically valid global orientations and retain the one
+    with the stronger normalized known-reference correlation.  Conjugating both
+    receive channels preserves clipping and cross-channel coherence while
+    returning timing, CFO, blocker offset, EVM, and decisions to the commanded
+    TX-reference convention.
+    """
+
+    np = _numpy()
+    candidates: list[tuple[str, Any, float, int, list[int], float]] = []
+    for convention, canonical in (
+        ("direct", matrix),
+        ("conjugated", np.conj(matrix)),
+    ):
+        cfo_hz, timing, individual_timing, correlation_peak = _estimate_cfo_and_timing(
+            canonical,
+            reference,
+            max_cfo_hz=max_cfo_hz,
+            cfo_grid_oversample=cfo_grid_oversample,
+        )
+        candidates.append(
+            (
+                convention,
+                canonical,
+                cfo_hz,
+                timing,
+                individual_timing,
+                correlation_peak,
+            )
+        )
+    # The stable ordering deliberately resolves an exact tie as direct.  A
+    # low-SNR ambiguous choice still fails the independent absolute quality
+    # gates; it is never promoted merely because one orientation won.
+    selected = max(candidates, key=lambda item: item[5])
+    peaks = {item[0]: float(item[5]) for item in candidates}
+    return (*selected, peaks)
+
+
 def _validate_thresholds(thresholds: ModulatedQualityThresholds) -> None:
     if not isinstance(thresholds, ModulatedQualityThresholds):
         raise TypeError("thresholds must be ModulatedQualityThresholds")
@@ -777,7 +830,15 @@ def analyze_modulated_capture(
         axis=1,
     )
 
-    cfo_hz, timing, individual_timing, correlation_peak = _estimate_cfo_and_timing(
+    (
+        iq_convention,
+        matrix,
+        cfo_hz,
+        timing,
+        individual_timing,
+        correlation_peak,
+        convention_peaks,
+    ) = _canonicalize_iq_convention(
         matrix,
         reference,
         max_cfo_hz=max_cfo_hz,
@@ -946,6 +1007,11 @@ def analyze_modulated_capture(
         "sample_rate_hz": reference.sample_rate_hz,
         "symbol_rate_hz": reference.symbol_rate_hz,
         "samples_per_symbol": reference.samples_per_symbol,
+        "iq_convention": iq_convention,
+        "iq_canonicalization": (
+            "identity" if iq_convention == "direct" else "complex_conjugate"
+        ),
+        "iq_convention_correlation_peaks": convention_peaks,
         "estimated_cfo_hz": float(cfo_hz),
         "timing_offset_samples": int(timing),
         "rx_timing_offsets_samples": individual_timing,

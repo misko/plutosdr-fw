@@ -75,6 +75,49 @@ def _encode_dual_rx(matrix) -> bytes:
     return words.tobytes()
 
 
+def _real_pluto_loopback_capture(
+    encoded,
+    *,
+    cycles: int = 8,
+    timing_offset: int = 547,
+    cfo_hz: float = 375.0,
+    gains: tuple[complex, complex] = (
+        900.0 * complex(math.cos(0.55), math.sin(0.55)),
+        720.0 * complex(math.cos(-0.35), math.sin(-0.35)),
+    ),
+    noise_sigma: float = 0.5,
+    seed: int = 92,
+) -> bytes:
+    """Model the observed TX-DMA -> RF loopback -> RX-IIO convention.
+
+    The four DMA scan words are TX1 I/Q followed by TX2 I/Q.  The Pluto RF
+    loopback preserves those lane assignments but presents the transmitted
+    complex baseband with an inverted spectrum at the decoded RX I/Q boundary,
+    which is equivalent to a global complex conjugation.  Complex channel gain
+    still absorbs fixed phase rotations such as an I/Q swap.
+    """
+
+    np = pytest.importorskip("numpy")
+    tx2_words = np.frombuffer(encoded.payload, dtype="<i2").reshape((-1, 2))
+    dma_words = np.zeros((encoded.sample_count, 4), dtype="<i2")
+    dma_words[:, 2:] = tx2_words
+    tx2 = (
+        dma_words[:, 2].astype(np.float64) + 1j * dma_words[:, 3].astype(np.float64)
+    ) / encoded.applied_scale
+    indexes = np.arange(cycles * encoded.sample_count, dtype=np.float64)
+    aligned = tx2[(indexes.astype(np.int64) + timing_offset) % encoded.sample_count]
+    carrier = np.exp(2j * np.pi * cfo_hz * indexes / SAMPLE_RATE_HZ)
+    transported = np.conj(aligned * carrier)
+    rng = np.random.default_rng(seed)
+    channels = []
+    for gain in gains:
+        noise = noise_sigma * (
+            rng.normal(size=indexes.size) + 1j * rng.normal(size=indexes.size)
+        )
+        channels.append(gain * transported + noise)
+    return _encode_dual_rx(np.asarray(channels))
+
+
 def test_qpsk_generation_is_deterministic_balanced_and_cyclic(reference) -> None:
     np = pytest.importorskip("numpy")
     repeated = generate_cyclic_qpsk(
@@ -146,6 +189,12 @@ def test_sync_recovers_planted_timing_cfo_phase_gain_and_metrics(reference) -> N
     )
 
     assert result["quality_valid"], result["quality_reasons"]
+    assert result["iq_convention"] == "direct"
+    assert result["iq_canonicalization"] == "identity"
+    assert (
+        result["iq_convention_correlation_peaks"]["direct"]
+        > result["iq_convention_correlation_peaks"]["conjugated"]
+    )
     assert result["timing_offset_samples"] == 137
     assert result["rx_timing_offsets_samples"] == [137, 137]
     assert result["timing_disagreement_samples"] == 0
@@ -162,6 +211,58 @@ def test_sync_recovers_planted_timing_cfo_phase_gain_and_metrics(reference) -> N
     assert result["cross_channel_coherence"] > 0.9999
     assert result["clipping_fraction"] == [0.0, 0.0]
     json.dumps(result, allow_nan=False)
+
+
+def test_real_pluto_conjugated_transport_recovers_clean_qpsk(reference) -> None:
+    """Plant the convention that produced the first R18 hardware failure."""
+
+    waveform = scale_reference_for_tx(reference, peak_fraction=0.8)
+    encoded = encode_tx2_cs16(waveform.tx_samples, headroom_db=1.0)
+    raw = _real_pluto_loopback_capture(encoded)
+    result = analyze_modulated_capture(
+        raw,
+        reference=reference,
+        max_cfo_hz=2_000.0,
+        adc_full_scale=2_048.0,
+    )
+
+    assert result["quality_valid"], result["quality_reasons"]
+    assert result["iq_convention"] == "conjugated"
+    assert result["iq_canonicalization"] == "complex_conjugate"
+    assert result["timing_offset_samples"] == 547
+    assert result["rx_timing_offsets_samples"] == [547, 547]
+    assert result["estimated_cfo_hz"] == pytest.approx(375.0, abs=0.5)
+    assert result["iq_convention_correlation_peaks"]["conjugated"] > 0.999
+    assert result["iq_convention_correlation_peaks"]["direct"] < 0.1
+    assert max(result["evm_percent"]) < 0.5
+    assert result["ser"] == [0.0, 0.0]
+    assert result["ber"] == [0.0, 0.0]
+    assert result["cross_channel_coherence"] > 0.999
+
+
+def test_real_pluto_conjugated_transport_preserves_blocker_sign(reference) -> None:
+    waveform = build_composite_blocker(
+        reference,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-20.0,
+        blocker_seed=47,
+        peak_fraction=0.8,
+    )
+    encoded = encode_tx2_cs16(waveform.tx_samples, headroom_db=1.0)
+    result = analyze_modulated_capture(
+        _real_pluto_loopback_capture(encoded, noise_sigma=0.2),
+        reference=reference,
+        max_cfo_hz=2_000.0,
+        blocker_offset_hz=waveform.blocker_offset_hz,
+        blocker_power_db=waveform.blocker_power_db,
+        blocker_reference=waveform.blocker_reference,
+    )
+
+    assert result["iq_convention"] == "conjugated"
+    assert result["blocker_detected"]
+    assert result["measured_blocker_offset_hz"] == pytest.approx(320_000.0)
+    assert result["measured_blocker_power_db"] == pytest.approx(-20.0, abs=0.1)
+    assert result["blocker_measurement"]["valid"]
 
 
 def test_phase_and_gain_do_not_inflate_evm_after_reference_equalization(
