@@ -32,6 +32,7 @@ from .metadata_abi import (
     TandemState,
 )
 from .modulated_hardware import (
+    MODE_MANUAL,
     MODE_NATIVE_FAST,
     MODE_TANDEM,
     MODULATED_MODES,
@@ -920,6 +921,47 @@ def test_planted_clipping_returns_fail_report_not_false_green(tmp_path: Path) ->
         for reason in report["evaluation"]["failure_reasons"]
     )
     assert radio.mute_count >= 2
+
+
+def test_invalid_manual_reference_fails_closed_before_adaptive_tx(
+    tmp_path: Path,
+) -> None:
+    options = _campaign_options(tmp_path)
+    radio = _FakeCampaignRadio(options, clip=("desired_only", MODE_MANUAL))
+
+    with pytest.raises(
+        EvidenceInvalid, match="desired-only manual reference preflight failed"
+    ):
+        run_modulated_hardware_campaign(radio, options)
+
+    # The manual cell muted TX2 before returning its invalid result.  No native
+    # AGC, tandem, or blocker cell was subsequently allowed to energize TX2.
+    assert radio.tx_gain_log.count(options.tx2_gain_db) == 1
+    assert radio.tx_mutes_inside_buffer == [True]
+    assert radio.waveform_entries == 1
+
+    report_path = (
+        options.output_dir / radio.options.serial / "modulated-hardware-report.json"
+    )
+    durable = json.loads(report_path.read_text(encoding="utf-8"))
+    assert durable["verdict"] == "invalid"
+    assert "desired-only manual reference preflight failed" in durable["error"]
+    assert [(run["case_id"], run["mode"]) for run in durable["runs"]] == [
+        ("desired_only", MODE_MANUAL)
+    ]
+    manual = durable["runs"][0]
+    assert manual["summary"]["quality_valid"] is False
+
+    provenance = manual["measurements"][0]["raw_iq_provenance"]
+    artifact = options.output_dir / provenance["path"]
+    payload = artifact.read_bytes()
+    assert provenance["bytes"] == len(payload) == options.capture_samples * 8
+    assert provenance["sha256"] == hashlib.sha256(payload).hexdigest()
+
+    dma_cleanup = durable["waveforms"][0]["dma_cleanup"]
+    assert dma_cleanup["buffer_closed"] is True
+    assert dma_cleanup["failures"] == []
+    assert durable["final_mute"]["verified"] is True
 
 
 def test_planted_blocker_degradation_fails_relative_gate(tmp_path: Path) -> None:

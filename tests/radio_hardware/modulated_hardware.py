@@ -1508,6 +1508,22 @@ def run_modulated_hardware_campaign(
                         )
                         report["runs"].append(run)
                         _atomic_json(report_path, report)
+                        if case.case_id == "desired_only" and mode == MODE_MANUAL:
+                            summary = run.get("summary")
+                            if (
+                                not isinstance(summary, Mapping)
+                                or summary.get("quality_valid") is not True
+                            ):
+                                reasons = (
+                                    summary.get("quality_reasons", ())
+                                    if isinstance(summary, Mapping)
+                                    else ()
+                                )
+                                reason_text = ",".join(str(item) for item in reasons)
+                                raise EvidenceInvalid(
+                                    "desired-only manual reference preflight failed"
+                                    + (f": {reason_text}" if reason_text else "")
+                                )
             finally:
                 # The cyclic context records this only after its unconditional
                 # mute and buffer close.  Persist it even when a mode fails so
