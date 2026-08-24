@@ -67,6 +67,13 @@ install -d -m 0755 "$BR2_DL_DIR"
     fail "Buildroot cache is not accessible: $BR2_DL_DIR"
 printf 'Persistent Buildroot cache: %s\n' "$BR2_DL_DIR"
 
+# Persistent self-hosted runners retain local tag objects.  Synchronize only
+# the source locks named by the manifest before any git-describe value is
+# embedded into /opt/VERSIONS.
+source_manifest="${SPF_GAIN_SERIES_MANIFEST:-$ROOT/manifests/libiio-frame-metadata-v5-source.yaml}"
+scripts/ci/sync_source_locks.sh "$source_manifest" \
+    2>&1 | tee "$artifact_real/source-lock-sync.log"
+
 scripts/test_pluto_pstore_layout.sh \
 	2>&1 | tee "$artifact_real/pstore-layout.log"
 scripts/test_pluto_cma_layout.sh \

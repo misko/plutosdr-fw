@@ -78,11 +78,19 @@ mislabelling.
 6. **Publish the exact artifacts** from step 2 as a non-prerelease. Never
    rebuild between qualification and publication.
 
-7. **Write the release manifest**, `manifests/<name>.yaml`, with the five fields
-   `verify_release.sh` requires: `release_tag`, `asset_name`, `image_url`,
-   `image_sha256`, `device_fw`. Take `device_fw` from the extracted rootfs, not
-   from what you expect it to say. These manifests are immutable — a new release
-   gets a new file.
+7. **Write the release manifest**, `manifests/<name>.yaml`, from the exact
+   published asset. The current verifier requires the release identity
+   (`release_tag`, `asset_name`, `image_url`, `image_sha256`, `device_fw`), the
+   firmware and component source pins (`firmware_source`, `firmware_repo`,
+   `submodule_buildroot`, `submodule_buildroot_repo`, `submodule_hdl`,
+   `submodule_hdl_repo`, `submodule_hdl_quantulum`, `submodule_linux`,
+   `submodule_linux_repo`, `submodule_u_boot_xlnx`,
+   `submodule_u_boot_xlnx_repo`), and the four packed component identities
+   (`versions_hdl`, `versions_buildroot`, `versions_linux`,
+   `versions_u_boot_xlnx`). Record additional bundle, FIT, rootfs, host-libiio,
+   and hardware-qualification fields used by current release manifests. Take
+   `device_fw` and every hash from the built/published bytes, not from expected
+   values. These manifests are immutable — a new release gets a new file.
 
 8. **Verify against the published asset**, not the local build:
 

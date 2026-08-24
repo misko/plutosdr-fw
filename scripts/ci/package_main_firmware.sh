@@ -100,6 +100,30 @@ mkdir -p "$rootfs_check"
 )
 cp "$rootfs_check/opt/VERSIONS" "$ARTIFACT_ROOT/packed-VERSIONS.txt"
 
+# A source manifest may pin the human-readable component identities expected
+# in /opt/VERSIONS in addition to their commit graph.  This catches stale or
+# ambiguous persistent-runner tags before an artifact can be qualified.
+manifest_value() {
+    local key=$1 value
+    value="$(sed -n "s/^${key}:[[:space:]]*//p" "$MANIFEST" | head -1)"
+    printf '%s' "${value%"${value##*[![:space:]]}"}"
+}
+for identity in \
+    "hdl:versions_hdl" \
+    "buildroot:versions_buildroot" \
+    "linux:versions_linux" \
+    "u-boot-xlnx:versions_u_boot_xlnx"; do
+    IFS=: read -r field key <<<"$identity"
+    expected_identity="$(manifest_value "$key")"
+    [[ -n "$expected_identity" ]] || continue
+    packed_identity="$(awk -v field="$field" '$1 == field {print $2; exit}' \
+        "$ARTIFACT_ROOT/packed-VERSIONS.txt")"
+    [[ "$packed_identity" == "$expected_identity" ]] ||
+        fail "packed $field identity is '$packed_identity'; manifest requires '$expected_identity'"
+    printf 'Component identity pin satisfied: %s %s\n' \
+        "$field" "$expected_identity"
+done
+
 # The version a radio will report about itself. This file has always been
 # extracted and printed here; what was missing was anyone comparing it to the
 # name the build was supposed to produce. Both fingerprint-v3 and

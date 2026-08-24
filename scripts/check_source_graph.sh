@@ -26,15 +26,17 @@ set -uo pipefail
 MANIFEST="${1:-manifests/fingerprint-v3.yaml}"
 [[ -f "$MANIFEST" ]] || { echo "FAIL: manifest not found: $MANIFEST" >&2; exit 1; }
 
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=scripts/ci/source_manifest_lib.sh
+source "$ROOT/scripts/ci/source_manifest_lib.sh"
+
 RC=0
 ok()   { printf '  ok    %s\n' "$*"; }
 bad()  { printf '  FAIL  %s\n' "$*"; RC=1; }
 warn() { printf '  warn  %s\n' "$*"; }
 
 m() {
-    local v
-    v="$(sed -n "s/^$1:[[:space:]]*//p" "$MANIFEST" | head -1)"
-    printf '%s' "${v%"${v##*[![:space:]]}"}"
+    source_manifest_value "$MANIFEST" "$1"
 }
 
 echo "Source graph check: ${MANIFEST}"
@@ -73,7 +75,7 @@ for entry in "${COMPONENTS[@]}"; do
     # Exact equality is intentional. Candidate manifests use protected tags,
     # not moving development branches, so accepting a descendant would weaken
     # the source lock. ls-remote verifies the advertised ref without cloning.
-    actual="$(git ls-remote "$repo" "$ref" 2>/dev/null | awk '{print $1}' | head -1)"
+    actual="$(source_manifest_ref_commit "$repo" "$ref" 2>/dev/null)"
     if [[ -z "$actual" ]]; then
         bad "${name}: ref ${ref} not found at ${repo}"
     elif [[ "$actual" != "$pin" ]]; then
@@ -94,7 +96,7 @@ fw_repo="$(m firmware_repo)"; fw_pin="$(m firmware_source)"; rel_tag="$(m releas
 if [[ -z "$rel_tag" ]]; then
     warn "candidate source manifest has no release tag (expected before promotion)"
 else
-tag_sha="$(git ls-remote "$fw_repo" "refs/tags/${rel_tag}" 2>/dev/null | awk '{print $1}' | head -1)"
+tag_sha="$(source_manifest_ref_commit "$fw_repo" "refs/tags/${rel_tag}" 2>/dev/null)"
 if [[ -z "$tag_sha" ]]; then
     bad "release tag ${rel_tag} not found at ${fw_repo}"
 elif [[ "$tag_sha" == "$fw_pin" ]]; then
