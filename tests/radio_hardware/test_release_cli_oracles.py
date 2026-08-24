@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from pathlib import Path
 
 import pytest
 
+from .modulated_hardware import MODULATED_MODES, ModulatedHardwareOptions
 from .release_campaign import build_release_plan
 from .release_cli import (
     AGGREGATE_CHECKPOINT,
@@ -17,6 +19,7 @@ from .release_cli import (
     parse_cli_args,
     phase_specs,
     plan_document,
+    production_validator,
     run_aggregate,
 )
 
@@ -250,3 +253,82 @@ def test_cleanup_failure_cannot_produce_aggregate_pass(tmp_path: Path) -> None:
     assert report["verdict"] == "invalid"
     assert report["all_cleanup_verified"] is False
     assert report["phases"]["modulated_low"]["status"] == "failed"
+
+
+def test_production_validator_compares_modulated_configuration_in_json_domain(
+    tmp_path: Path,
+) -> None:
+    options = _parse(tmp_path, "--phase", "modulated", "--band", "low=915000000")
+    spec = phase_specs(options)[0]
+    work_dir = options.output_dir / "work"
+    report_path = work_dir / "radio-a" / "modulated-hardware-report.json"
+    modulated = ModulatedHardwareOptions(
+        physical_attenuation_db=0.0,
+        center_frequency_hz=915_000_000,
+        tx2_gain_db=-30.0,
+        max_seconds=options.phase_max_seconds,
+        output_dir=work_dir,
+    )
+    configuration = json.loads(
+        json.dumps(
+            {
+                **asdict(modulated),
+                "output_dir": str(work_dir),
+                "minimum_effective_attenuation_db": (
+                    modulated.minimum_effective_attenuation_db
+                ),
+            },
+            default=str,
+        )
+    )
+    case_ids = [
+        "desired_only",
+        *(f"blocker_{index:02d}" for index in range(len(modulated.blocker_points))),
+    ]
+    cleanup = {
+        "verified": True,
+        "failures": [],
+        "tx1_gain_db": -89.75,
+        "tx2_gain_db": -89.75,
+        "selectors": [3, 3, 3, 3],
+        "dds": {
+            f"altvoltage{index}": {"present": True, "scale": 0.0, "raw": 0.0}
+            for index in range(8)
+        },
+    }
+    report = {
+        "schema": "plutosdr-fw.modulated-hardware.v1",
+        "verdict": "pass",
+        "identity": {
+            "serial": options.serial,
+            "uri": "usb:1.2.3",
+            "libiio_source_commit": COMMIT,
+            "context_attrs": {"fw_version": options.firmware_version},
+        },
+        "configuration": configuration,
+        "rf": {"center_frequency_hz_requested": 915_000_000},
+        "cleanup": cleanup,
+        "waveforms": [
+            {
+                "case_id": case_id,
+                "kind": (
+                    "desired_only" if case_id == "desired_only" else "composite_blocker"
+                ),
+                "dma_cleanup": {"buffer_closed": True, "failures": []},
+            }
+            for case_id in case_ids
+        ],
+        "runs": [
+            {"case_id": case_id, "mode": mode}
+            for case_id in case_ids
+            for mode in MODULATED_MODES
+        ],
+        "evaluation": {"valid": True},
+    }
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+
+    validated = production_validator(options)(spec, report_path, work_dir)
+
+    assert validated.verdict == "pass"
+    assert validated.cleanup_verified is True

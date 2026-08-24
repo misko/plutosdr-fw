@@ -917,7 +917,7 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             identity_failures: list[str] = []
             cleanup_failures: list[str] = []
             complete = 0
-            for run, record in zip(plan.runs, checkpoint["runs"].values()):
+            for run, record in zip(plan.runs, checkpoint["runs"].values(), strict=True):
                 if record["status"] != "complete":
                     continue
                 complete += 1
@@ -1011,7 +1011,11 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                 max_seconds=options.phase_max_seconds,
                 output_dir=work_dir,
             )
-            expected_configuration = asdict(expected_options)
+            # Durable JSON normalizes dataclass tuples (notably blocker_points)
+            # to arrays.  Compare the same JSON-domain representation rather
+            # than a Python tuple against the decoded list.
+            expected_configuration = _json_safe(asdict(expected_options))
+            assert isinstance(expected_configuration, dict)
             expected_configuration["output_dir"] = str(work_dir)
             expected_configuration["minimum_effective_attenuation_db"] = (
                 expected_options.minimum_effective_attenuation_db
