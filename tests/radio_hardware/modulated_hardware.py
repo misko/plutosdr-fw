@@ -55,13 +55,22 @@ MODE_NATIVE_SLOW = "native_slow_attack"
 MODE_NATIVE_FAST = "native_fast_attack"
 MODE_NATIVE_HYBRID = "native_hybrid"
 MODE_TANDEM = "tandem_auto"
-MODULATED_MODES = (
+SUPPORTED_MODULATED_MODES = (
     MODE_MANUAL,
     MODE_NATIVE_SLOW,
     MODE_NATIVE_FAST,
     MODE_NATIVE_HYBRID,
     MODE_TANDEM,
 )
+RELEASE_MODULATED_MODES = (
+    MODE_MANUAL,
+    MODE_NATIVE_SLOW,
+    MODE_NATIVE_FAST,
+    MODE_TANDEM,
+)
+# Backward-compatible name for callers that explicitly request every supported
+# mode.  Execution and evaluation use ``ModulatedHardwareOptions.modes``.
+MODULATED_MODES = SUPPORTED_MODULATED_MODES
 
 DEFAULT_MODULATED_TX2_GAIN_DB = -42.0
 TX2_GAIN_READBACK_TOLERANCE_DB = 0.01
@@ -83,6 +92,24 @@ _NATIVE_IIO_MODES = {
     MODE_NATIVE_FAST: "fast_attack",
     MODE_NATIVE_HYBRID: "hybrid",
 }
+
+
+def modulated_mode_evidence_policy() -> dict[str, Any]:
+    """Return the durable claim boundary for release and exploratory modes."""
+
+    return {
+        "release_default_modes": list(RELEASE_MODULATED_MODES),
+        "native_hybrid": {
+            "classification": "exploratory_quality_only",
+            "autonomous_agc_claim": False,
+            "release_qualification_claim": False,
+            "ctrl_in2_guarded": False,
+            "reason": (
+                "hybrid re-arms the external CTRL_IN2 path, whose idle level is "
+                "not driven or attested by this fixture"
+            ),
+        },
+    }
 
 
 @dataclass(frozen=True)
@@ -122,6 +149,7 @@ class ModulatedHardwareOptions:
     tx_peak_fraction: float = 0.80
     tx_headroom_db: float = 1.0
     manual_gain_db: float = 40.0
+    modes: tuple[str, ...] = RELEASE_MODULATED_MODES
     blocker_points: tuple[BlockerPoint, ...] = (
         BlockerPoint(offset_hz=320_000.0, power_db=-20.0, seed=47),
     )
@@ -301,6 +329,21 @@ def validate_modulated_hardware_options(options: ModulatedHardwareOptions) -> No
         raise TypeError("options must be ModulatedHardwareOptions")
     if not isinstance(options.output_dir, Path):
         raise TypeError("output_dir must be a pathlib.Path")
+    if isinstance(options.modes, (str, bytes)) or not isinstance(options.modes, tuple):
+        raise TypeError("modes must be a tuple of supported modulated modes")
+    if not options.modes:
+        raise ValueError("modes cannot be empty")
+    if any(not isinstance(mode, str) for mode in options.modes):
+        raise TypeError("modes must contain strings")
+    if len(set(options.modes)) != len(options.modes):
+        raise ValueError("modes cannot contain duplicates")
+    unsupported_modes = tuple(
+        mode for mode in options.modes if mode not in SUPPORTED_MODULATED_MODES
+    )
+    if unsupported_modes:
+        raise ValueError(f"unsupported modulated modes: {unsupported_modes}")
+    if MODE_MANUAL not in options.modes or MODE_TANDEM not in options.modes:
+        raise ValueError("modes must include manual_fixed and tandem_auto anchors")
     _expected_gain_table(options.center_frequency_hz)
     if not isinstance(options.quality_thresholds, ModulatedQualityThresholds):
         raise TypeError("quality_thresholds has the wrong type")
@@ -1338,13 +1381,57 @@ def _run_case_mode(
 def evaluate_modulated_hardware_report(
     report: Mapping[str, Any],
     thresholds: ModulatedDegradationThresholds,
+    *,
+    expected_modes: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Apply absolute frame gates and per-mode blocker-degradation gates."""
 
     _validate_degradation_thresholds(thresholds)
     failures: list[str] = []
+    configuration = report.get("configuration")
+    configured_value = (
+        configuration.get("modes") if isinstance(configuration, Mapping) else None
+    )
+    configured_modes: tuple[str, ...] = ()
+    configured_modes_valid = True
+    if isinstance(configured_value, (str, bytes)) or not isinstance(
+        configured_value, Sequence
+    ):
+        failures.append("modulated configuration has no valid mode sequence")
+        configured_modes_valid = False
+    else:
+        configured_modes = tuple(configured_value)
+        if not configured_modes:
+            failures.append("modulated configuration mode sequence is empty")
+            configured_modes_valid = False
+        elif any(
+            not isinstance(mode, str) or mode not in SUPPORTED_MODULATED_MODES
+            for mode in configured_modes
+        ):
+            failures.append("modulated configuration contains an unsupported mode")
+            configured_modes_valid = False
+        elif len(set(configured_modes)) != len(configured_modes):
+            failures.append("modulated configuration contains duplicate modes")
+            configured_modes_valid = False
+    if expected_modes is None:
+        active_modes = configured_modes if configured_modes_valid else ()
+    else:
+        active_modes = tuple(expected_modes)
+        if (
+            not active_modes
+            or any(
+                not isinstance(mode, str) or mode not in SUPPORTED_MODULATED_MODES
+                for mode in active_modes
+            )
+            or len(set(active_modes)) != len(active_modes)
+        ):
+            raise ValueError("expected_modes must be unique supported modes")
+        if configured_modes != active_modes:
+            failures.append("modulated configuration modes differ from expectation")
+    if report.get("mode_evidence_policy") != modulated_mode_evidence_policy():
+        failures.append("modulated mode evidence policy is missing or invalid")
     indexed: dict[str, dict[str, Mapping[str, Any]]] = {
-        mode: {} for mode in MODULATED_MODES
+        mode: {} for mode in active_modes
     }
     observed_iq_conventions: set[str] = set()
     for run in report.get("runs", []):
@@ -1375,7 +1462,7 @@ def evaluate_modulated_hardware_report(
         if item.get("kind") == "composite_blocker"
     ]
     degradation_rows: list[dict[str, Any]] = []
-    for mode in MODULATED_MODES:
+    for mode in active_modes:
         runs = indexed[mode]
         baseline_run = runs.get("desired_only")
         if baseline_run is None:
@@ -1412,7 +1499,7 @@ def evaluate_modulated_hardware_report(
                 f"{mode}/{case_id}: {reason}" for reason in row["failure_reasons"]
             )
             degradation_rows.append(row)
-    expected_runs = len(MODULATED_MODES) * (1 + len(blocker_ids))
+    expected_runs = len(active_modes) * (1 + len(blocker_ids))
     if len(report.get("runs", [])) != expected_runs:
         failures.append(
             f"report has {len(report.get('runs', []))} runs, expected {expected_runs}"
@@ -1423,7 +1510,7 @@ def evaluate_modulated_hardware_report(
             failure.startswith("absolute quality") for failure in failures
         ),
         "degradation_valid": all(row["valid"] for row in degradation_rows)
-        and len(degradation_rows) == len(MODULATED_MODES) * len(blocker_ids),
+        and len(degradation_rows) == len(active_modes) * len(blocker_ids),
         "failure_reasons": failures,
         "degradation": degradation_rows,
     }
@@ -1432,7 +1519,7 @@ def evaluate_modulated_hardware_report(
 def run_modulated_hardware_campaign(
     radio: Issue46Radio, options: ModulatedHardwareOptions
 ) -> tuple[dict[str, Any], Path]:
-    """Run desired-only and composite QPSK on every manual/AGC mode."""
+    """Run desired-only and composite QPSK on every selected manual/AGC mode."""
 
     validate_modulated_hardware_options(options)
     reference, cases = _prepare_waveforms(options)
@@ -1470,6 +1557,7 @@ def run_modulated_hardware_campaign(
         "started_unix_ns": time.time_ns(),
         "identity": radio.identity,
         "configuration": _configuration_dict(options),
+        "mode_evidence_policy": modulated_mode_evidence_policy(),
         "bench_port_mapping": {
             "stimulus": "bench TX2 = AD9361/IIO TX2",
             "receivers": [
@@ -1519,7 +1607,7 @@ def run_modulated_hardware_campaign(
                 ) as dma_evidence:
                     case_record["dma"] = dict(dma_evidence)
                     _atomic_json(report_path, report)
-                    for mode in MODULATED_MODES:
+                    for mode in options.modes:
                         run = _run_case_mode(
                             radio,
                             mode=mode,
@@ -1562,7 +1650,9 @@ def run_modulated_hardware_campaign(
                 raise FixtureSafetyError("cyclic DMA cleanup reported failures")
             _atomic_json(report_path, report)
         report["evaluation"] = evaluate_modulated_hardware_report(
-            report, options.degradation_thresholds
+            report,
+            options.degradation_thresholds,
+            expected_modes=options.modes,
         )
         report["verdict"] = "pass" if report["evaluation"]["valid"] else "fail"
         report["finished_unix_ns"] = time.time_ns()

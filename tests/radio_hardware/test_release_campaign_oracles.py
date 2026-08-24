@@ -19,7 +19,7 @@ from .release_campaign import (
     run_release_campaign,
 )
 from .tandem_quality import (
-    NATIVE_GAIN_CONTROL_MODES,
+    AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
     TandemQualityOptions,
     expected_tandem_gain_table,
     quality_modes,
@@ -168,7 +168,7 @@ def _write_report(spec, report):
     return report, path
 
 
-def test_default_plan_is_full_all_native_all_band_all_radio_and_deterministic(
+def test_default_plan_is_full_autonomous_native_all_band_all_radio_and_deterministic(
     tmp_path: Path,
 ) -> None:
     config = ReleaseCampaignConfig(
@@ -190,7 +190,7 @@ def test_default_plan_is_full_all_native_all_band_all_radio_and_deterministic(
     }
     assert {run.options.profile for run in first.runs} == {"full"}
     assert {run.options.native_gain_control_modes for run in first.runs} == {
-        NATIVE_GAIN_CONTROL_MODES
+        AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
     }
     assert len({run.options.output_dir for run in first.runs}) == len(first.runs)
 

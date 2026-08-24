@@ -36,9 +36,9 @@ from .metadata_abi import (
     parse_tandem_frame_metadata,
 )
 from .tandem_quality import (
+    AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
     MODE_MANUAL,
     MODE_TANDEM,
-    NATIVE_GAIN_CONTROL_MODES,
     TandemQualityOptions,
     expected_tandem_gain_table,
     native_gain_control_mode,
@@ -57,7 +57,7 @@ _UINT32_MODULUS = 1 << 32
 _UINT64_MODULUS = 1 << 64
 TRANSIENT_MODES = (
     MODE_MANUAL,
-    *(native_mode_name(mode) for mode in NATIVE_GAIN_CONTROL_MODES),
+    *(native_mode_name(mode) for mode in AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES),
     MODE_TANDEM,
 )
 
@@ -130,6 +130,10 @@ def validate_transient_options(
     """Reject unsafe or underdetermined transient settings before radio writes."""
 
     validate_options(quality)
+    if quality.native_gain_control_modes != AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES:
+        raise ValueError(
+            "transient release evidence requires the autonomous native-mode set"
+        )
     integer_fields = {
         "frame_samples": capture.frame_samples,
         "window_samples": capture.window_samples,
@@ -1300,7 +1304,7 @@ def run_transient_hardware(
     ] = parse_tandem_frame_metadata,
     report_writer: Callable[[Path, Mapping[str, Any]], None] = _atomic_json,
 ) -> tuple[dict[str, Any], Path]:
-    """Run five guarded transient cells and atomically preserve all evidence."""
+    """Run four guarded transient cells and atomically preserve all evidence."""
 
     validate_transient_options(quality, capture)
     if radio.options.sample_rate_hz != quality.sample_rate_hz:

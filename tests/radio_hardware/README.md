@@ -68,6 +68,22 @@ absolute quality and bidirectional gain-response gates. The legacy
 fields continue to use `slow_attack` when it is selected, while `*_by_mode`
 fields contain every requested native cell.
 
+Release automation uses a narrower native-mode policy than this generic
+comparison interface. `slow_attack` and `fast_attack` are the autonomous
+release-native modes. The release-default steady-state, transient, and
+modulated matrices therefore contain manual, native slow-attack, native
+fast-attack, and tandem-auto cells; they deliberately exclude native hybrid.
+
+Selecting `hybrid` explicitly remains supported for exploratory comparisons,
+but its result is **quality-only evidence**, not an autonomous AGC or release
+claim. Entering AD9361 hybrid mode can re-arm the external CTRL_IN2 control
+path, and the current bench/HDL ownership path does not guard an inactive
+CTRL_IN2 against a high-impedance state. An explicit hybrid selection does not
+relax any configured absolute-quality or gain-response gate: gain observations
+remain diagnostic, and even a passing cell is not release-eligible evidence of
+autonomous gain control. This same policy applies when hybrid is explicitly
+selected in the generic modulated-signal harness.
+
 The common RX/TX LO defaults to 915 MHz. Set an explicit frequency with
 `--tandem-quality-center-frequency-hz HZ`. Both LO writes are read back, the
 requested and observed values are retained under `rf`, and tandem metadata
@@ -157,9 +173,10 @@ the same absolute envelope.
 
 `transient_quality.py` supplies the transport-independent analyzers and
 `transient_hardware.py` runs a guarded weak/strong/weak TX2 trajectory in
-manual, native slow-attack, native fast-attack, native hybrid, and tandem-auto
-modes. It uses one kernel buffer and retains the first frame after each level
-write instead of draining away the transition.
+manual, native slow-attack, native fast-attack, and tandem-auto modes. Native
+hybrid is intentionally absent from the release transient matrix under the
+mode policy above. The runner uses one kernel buffer and retains the first
+frame after each level write instead of draining away the transition.
 
 - `timestamp_stimulus_command()` brackets the write in monotonic host time. The
   hardware runner closes its sample-time bracket only after IQ arrives: from

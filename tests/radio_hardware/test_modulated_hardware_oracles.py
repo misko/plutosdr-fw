@@ -35,14 +35,17 @@ from .modulated_hardware import (
     MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES,
     MODE_MANUAL,
     MODE_NATIVE_FAST,
+    MODE_NATIVE_HYBRID,
     MODE_TANDEM,
-    MODULATED_MODES,
+    RELEASE_MODULATED_MODES,
+    SUPPORTED_MODULATED_MODES,
     BlockerPoint,
     ModulatedDegradationThresholds,
     ModulatedHardwareOptions,
     _parse_and_validate_metadata,
     _TandemContinuity,
     evaluate_modulated_hardware_report,
+    modulated_mode_evidence_policy,
     run_modulated_hardware_campaign,
     run_serial_modulated_hardware_campaign,
     validate_modulated_hardware_options,
@@ -787,7 +790,7 @@ def test_adjacent_tandem_metadata_rejects_incomplete_transition_proof(
         )
 
 
-def test_fake_radio_runs_all_modes_and_blocker_oracles_atomically(
+def test_fake_radio_runs_release_modes_and_blocker_oracles_atomically(
     tmp_path: Path,
 ) -> None:
     options = _campaign_options(tmp_path)
@@ -797,8 +800,11 @@ def test_fake_radio_runs_all_modes_and_blocker_oracles_atomically(
     assert report["verdict"] == "pass", report.get("evaluation")
     assert path.exists()
     assert not path.with_suffix(path.suffix + ".tmp").exists()
-    assert len(report["runs"]) == 2 * len(MODULATED_MODES)
-    assert {run["mode"] for run in report["runs"]} == set(MODULATED_MODES)
+    assert options.modes == RELEASE_MODULATED_MODES
+    assert MODE_NATIVE_HYBRID not in options.modes
+    assert len(report["runs"]) == 2 * len(options.modes)
+    assert {run["mode"] for run in report["runs"]} == set(options.modes)
+    assert report["mode_evidence_policy"] == modulated_mode_evidence_policy()
     assert all(run["summary"]["quality_valid"] for run in report["runs"])
     assert report["evaluation"]["degradation_valid"]
     assert report["stimulus_topology"]["active_transmitters"] == ["TX2"]
@@ -910,7 +916,9 @@ def test_evaluator_rejects_missing_invalid_or_mixed_iq_conventions(
         else:
             summary["iq_convention"] = value
         evaluation = evaluate_modulated_hardware_report(
-            planted, options.degradation_thresholds
+            planted,
+            options.degradation_thresholds,
+            expected_modes=options.modes,
         )
         assert not evaluation["valid"]
         assert any(
@@ -943,7 +951,24 @@ def test_campaign_accepts_real_issue46_options_contract(tmp_path: Path) -> None:
     )
     report, _path = run_modulated_hardware_campaign(radio, options)
     assert report["verdict"] == "pass"
-    assert len(report["runs"]) == 2 * len(MODULATED_MODES)
+    assert len(report["runs"]) == 2 * len(options.modes)
+
+
+def test_explicit_hybrid_campaign_remains_exploratory_quality_only(
+    tmp_path: Path,
+) -> None:
+    options = replace(_campaign_options(tmp_path), modes=SUPPORTED_MODULATED_MODES)
+    report, _path = run_modulated_hardware_campaign(
+        _FakeCampaignRadio(options), options
+    )
+
+    assert report["verdict"] == "pass"
+    assert any(run["mode"] == MODE_NATIVE_HYBRID for run in report["runs"])
+    policy = report["mode_evidence_policy"]["native_hybrid"]
+    assert policy["classification"] == "exploratory_quality_only"
+    assert policy["autonomous_agc_claim"] is False
+    assert policy["release_qualification_claim"] is False
+    assert policy["ctrl_in2_guarded"] is False
 
 
 def test_tandem_refuses_legacy_metadata_abi_before_unmuting(tmp_path: Path) -> None:
@@ -951,9 +976,9 @@ def test_tandem_refuses_legacy_metadata_abi_before_unmuting(tmp_path: Path) -> N
     radio = _FakeCampaignRadio(options, metadata_abi=1)
     with pytest.raises(EvidenceInvalid, match="requires metadata ABI 2"):
         run_modulated_hardware_campaign(radio, options)
-    # Manual plus three native cells ran, but the tandem cell never unmuted.
-    assert radio.tx_gain_log.count(options.tx2_gain_db) == 4
-    assert radio.tx_mutes_inside_buffer == [True] * 5
+    # Manual plus two autonomous native cells ran; tandem never unmuted.
+    assert radio.tx_gain_log.count(options.tx2_gain_db) == 3
+    assert radio.tx_mutes_inside_buffer == [True] * 4
 
 
 def test_campaign_rejects_tx_gain_readback_that_differs_from_plan(
@@ -1137,6 +1162,18 @@ def test_serial_wrapper_rejects_verified_cleanup_with_failures(tmp_path: Path) -
                 BlockerPoint(320_000.0, -20.0, 47),
                 BlockerPoint(320_000.0, -20.0, 48),
             ),
+        ),
+        ModulatedHardwareOptions(
+            physical_attenuation_db=0.0,
+            modes=(MODE_MANUAL, MODE_NATIVE_FAST, MODE_NATIVE_FAST, MODE_TANDEM),
+        ),
+        ModulatedHardwareOptions(
+            physical_attenuation_db=0.0,
+            modes=(MODE_MANUAL, "native_unknown", MODE_TANDEM),
+        ),
+        ModulatedHardwareOptions(
+            physical_attenuation_db=0.0,
+            modes=(MODE_NATIVE_FAST, MODE_TANDEM),
         ),
     ],
 )

@@ -11,10 +11,12 @@ import pytest
 
 from .modulated_hardware import (
     DEFAULT_MODULATED_TX2_GAIN_DB,
+    MODE_NATIVE_HYBRID,
     MODE_TANDEM,
-    MODULATED_MODES,
+    RELEASE_MODULATED_MODES,
     ModulatedHardwareOptions,
     evaluate_modulated_hardware_report,
+    modulated_mode_evidence_policy,
 )
 from .release_campaign import build_release_plan
 from .release_cli import (
@@ -32,6 +34,7 @@ from .release_cli import (
     production_validator,
     run_aggregate,
 )
+from .tandem_quality import AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
 from .transient_hardware import TRANSIENT_MODES, TransientCaptureOptions
 
 COMMIT = "6" * 40
@@ -87,6 +90,12 @@ def test_parser_anchors_literal_firmware_and_scopes_output_by_serial(
     plan = plan_document(options)
     assert plan["deployment_performed"] is False
     assert plan["configuration"]["modulated_tx2_gain_db"] == -42.0
+    assert plan["configuration"]["autonomous_native_gain_control_modes"] == [
+        "slow_attack",
+        "fast_attack",
+    ]
+    assert plan["configuration"]["modulated_modes"] == list(RELEASE_MODULATED_MODES)
+    assert MODE_NATIVE_HYBRID not in plan["configuration"]["modulated_modes"]
 
 
 def test_plan_fingerprint_binds_release_harness_source_manifest(
@@ -149,6 +158,8 @@ def test_characterization_and_baseline_soak_are_distinct_plans(
         soak_config.policy_cases
     )
     assert soak_config.policy_cases[0].factor == "baseline"
+    assert full_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
+    assert soak_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
 
 
 def _fake_boundaries(calls: list[tuple[str, str]]):
@@ -437,6 +448,7 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
             "context_attrs": {"fw_version": options.firmware_version},
         },
         "configuration": configuration,
+        "mode_evidence_policy": modulated_mode_evidence_policy(),
         "rf": {"center_frequency_hz_requested": 915_000_000},
         "cleanup": cleanup,
         "waveforms": [
@@ -478,11 +490,13 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
                 ),
             }
             for case_id in case_ids
-            for mode in MODULATED_MODES
+            for mode in modulated.modes
         ],
     }
     report["evaluation"] = evaluate_modulated_hardware_report(
-        report, modulated.degradation_thresholds
+        report,
+        modulated.degradation_thresholds,
+        expected_modes=modulated.modes,
     )
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
@@ -509,9 +523,27 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
         return run["measurements"][0]
 
     valid_report = json.loads(json.dumps(report))
+    assert modulated.modes == RELEASE_MODULATED_MODES
+    assert MODE_NATIVE_HYBRID not in {run["mode"] for run in valid_report["runs"]}
     report["evaluation"]["degradation_valid"] = False
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="differs from recomputation"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["mode_evidence_policy"]["native_hybrid"]["release_qualification_claim"] = (
+        True
+    )
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="mode evidence policy differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    planted_hybrid = dict(report["runs"][0])
+    planted_hybrid["mode"] = MODE_NATIVE_HYBRID
+    report["runs"].append(planted_hybrid)
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="mode/blocker coverage differs"):
         production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))

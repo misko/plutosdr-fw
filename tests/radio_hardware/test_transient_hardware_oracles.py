@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from builtins import BaseExceptionGroup
 from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -18,7 +19,11 @@ from .metadata_abi import (
     TandemGainTable,
     TandemState,
 )
-from .tandem_quality import TandemQualityOptions
+from .tandem_quality import (
+    AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
+    TandemQualityOptions,
+    native_mode_name,
+)
 from .transient_hardware import (
     TRANSIENT_MODES,
     TransientCaptureOptions,
@@ -273,7 +278,7 @@ def _quality(output_dir: Path) -> TandemQualityOptions:
         samples_per_channel=8_192,
         tone_hz=100_000,
         manual_gain_db=40.0,
-        native_gain_control_modes=("slow_attack", "fast_attack", "hybrid"),
+        native_gain_control_modes=AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
         stable_frames=2,
         measurement_frames=1,
         max_settle_frames=4,
@@ -328,6 +333,12 @@ def test_fake_transport_executes_every_mode_and_writes_atomic_report(
 
     assert report["verdict"] == "pass"
     assert [mode["mode"] for mode in report["modes"]] == list(TRANSIENT_MODES)
+    assert TRANSIENT_MODES == (
+        "manual_fixed",
+        *(native_mode_name(mode) for mode in AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES),
+        "tandem_auto",
+    )
+    assert "native_hybrid" not in TRANSIENT_MODES
     assert report["trajectory_db"] == [-60.0, -30.0, -60.0]
     assert report["cleanup"] == {
         "verified": False,
@@ -342,7 +353,6 @@ def test_fake_transport_executes_every_mode_and_writes_atomic_report(
 
     buffer_entries = [item for item in radio.operations if item[0] == "buffer_enter"]
     assert [item[1] for item in buffer_entries] == [
-        "ordinary",
         "ordinary",
         "ordinary",
         "ordinary",
@@ -428,6 +438,18 @@ def test_serial_wrapper_validates_before_opening_radio(tmp_path: Path) -> None:
     assert not opened
 
 
+def test_transient_rejects_non_autonomous_native_set_before_radio_io(
+    tmp_path: Path,
+) -> None:
+    quality = replace(
+        _quality(tmp_path),
+        native_gain_control_modes=("slow_attack", "fast_attack", "hybrid"),
+    )
+
+    with pytest.raises(ValueError, match="autonomous native-mode set"):
+        validate_transient_options(quality, _capture_options())
+
+
 def test_report_retains_immediate_iq_gain_and_tandem_event_evidence(
     tmp_path: Path,
 ) -> None:
@@ -442,7 +464,6 @@ def test_report_retains_immediate_iq_gain_and_tandem_event_evidence(
     for native_mode in (
         "native_slow_attack",
         "native_fast_attack",
-        "native_hybrid",
     ):
         gain = modes[native_mode]["gain_evidence"]
         assert all(value < 0 for value in gain["attack_gain_change_db"])

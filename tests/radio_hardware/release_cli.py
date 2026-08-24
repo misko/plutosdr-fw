@@ -31,9 +31,10 @@ from .modulated_hardware import (
     MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES,
     MODE_MANUAL,
     MODE_TANDEM,
-    MODULATED_MODES,
+    RELEASE_MODULATED_MODES,
     ModulatedHardwareOptions,
     evaluate_modulated_hardware_report,
+    modulated_mode_evidence_policy,
     run_modulated_hardware_campaign,
     validate_modulated_hardware_options,
 )
@@ -47,7 +48,7 @@ from .release_campaign import (
     run_release_campaign,
 )
 from .tandem_quality import (
-    NATIVE_GAIN_CONTROL_MODES,
+    AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
     TandemQualityOptions,
     default_tx_trajectory,
     validate_options,
@@ -322,7 +323,7 @@ def _base_quality(
         ),
         sample_rate_hz=options.sample_rate_hz,
         samples_per_channel=options.samples_per_channel,
-        native_gain_control_modes=NATIVE_GAIN_CONTROL_MODES,
+        native_gain_control_modes=AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
         max_seconds=options.phase_max_seconds,
         output_dir=output_dir,
         profile="full",
@@ -408,6 +409,7 @@ def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
                     physical_attenuation_db=options.physical_attenuation_db,
                     center_frequency_hz=band.center_frequency_hz,
                     tx2_gain_db=DEFAULT_MODULATED_TX2_GAIN_DB,
+                    modes=RELEASE_MODULATED_MODES,
                     max_seconds=options.phase_max_seconds,
                     output_dir=options.output_dir / "preflight-modulated",
                 )
@@ -457,6 +459,10 @@ def _configuration(options: ReleaseHardwareOptions) -> dict[str, Any]:
         "soak_deadline_seconds": options.soak_deadline_seconds,
         "sample_rate_hz": options.sample_rate_hz,
         "samples_per_channel": options.samples_per_channel,
+        "autonomous_native_gain_control_modes": list(
+            AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
+        ),
+        "modulated_modes": list(RELEASE_MODULATED_MODES),
         "modulated_tx2_gain_db": DEFAULT_MODULATED_TX2_GAIN_DB,
         "phase_max_seconds": options.phase_max_seconds,
     }
@@ -856,6 +862,7 @@ def production_executor(
                 physical_attenuation_db=options.physical_attenuation_db,
                 center_frequency_hz=spec.band.center_frequency_hz,
                 tx2_gain_db=DEFAULT_MODULATED_TX2_GAIN_DB,
+                modes=RELEASE_MODULATED_MODES,
                 max_seconds=options.phase_max_seconds,
                 output_dir=work_dir,
             )
@@ -1516,6 +1523,7 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                 physical_attenuation_db=options.physical_attenuation_db,
                 center_frequency_hz=spec.band.center_frequency_hz,
                 tx2_gain_db=DEFAULT_MODULATED_TX2_GAIN_DB,
+                modes=RELEASE_MODULATED_MODES,
                 max_seconds=options.phase_max_seconds,
                 output_dir=work_dir,
             )
@@ -1530,6 +1538,8 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             )
             if disk.get("configuration") != expected_configuration:
                 errors.append("modulated configuration differs from plan")
+            if disk.get("mode_evidence_policy") != modulated_mode_evidence_policy():
+                errors.append("modulated mode evidence policy differs from plan")
             expected_case_ids = [
                 "desired_only",
                 *(
@@ -1559,7 +1569,7 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             expected = [
                 (case_id, mode)
                 for case_id in expected_case_ids
-                for mode in MODULATED_MODES
+                for mode in expected_options.modes
             ]
             if observed != expected:
                 errors.append("modulated mode/blocker coverage differs from plan")
@@ -1584,7 +1594,9 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             else:
                 recomputed_evaluation = _json_safe(
                     evaluate_modulated_hardware_report(
-                        disk, expected_options.degradation_thresholds
+                        disk,
+                        expected_options.degradation_thresholds,
+                        expected_modes=expected_options.modes,
                     )
                 )
                 if evaluation != recomputed_evaluation:

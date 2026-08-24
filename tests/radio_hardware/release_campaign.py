@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, ContextManager
 
 from .tandem_quality import (
-    NATIVE_GAIN_CONTROL_MODES,
+    AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
     TandemQualityOptions,
     default_tx_trajectory,
     expected_tandem_gain_table,
@@ -317,14 +317,14 @@ def _options_payload(options: TandemQualityOptions) -> dict[str, Any]:
 def build_release_plan(
     config: ReleaseCampaignConfig, base_options: TandemQualityOptions
 ) -> CampaignPlan:
-    """Build the exact full-profile, all-native campaign without touching hardware."""
+    """Build the exact full-profile autonomous-native campaign without hardware."""
 
     _validate_config(config)
     release_base = replace(
         base_options,
         profile="full",
         tx_gain_trajectory_db=default_tx_trajectory("full"),
-        native_gain_control_modes=NATIVE_GAIN_CONTROL_MODES,
+        native_gain_control_modes=AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
     )
     validate_options(release_base)
     cases = config.policy_cases or default_policy_cases(release_base)
