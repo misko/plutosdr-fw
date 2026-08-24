@@ -15,6 +15,7 @@ import json
 import math
 import os
 import re
+import statistics
 import sys
 import time
 from builtins import BaseExceptionGroup
@@ -26,6 +27,15 @@ from typing import Any
 
 from . import release_campaign as steady_campaign
 from .experiment import Issue46Options, Issue46Radio
+from .metadata_abi import (
+    FLAG_HARDWARE_SAMPLE_COUNTER_VALID,
+    FLAG_SAMPLE_SEQUENCE_VALID,
+    FLAG_TANDEM_METADATA_VALID,
+    TANDEM_UNSAFE_FLAGS,
+    TandemEventDirection,
+    TandemEventReason,
+    TandemState,
+)
 from .modulated_hardware import (
     DEFAULT_MODULATED_TX2_GAIN_DB,
     MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES,
@@ -51,6 +61,7 @@ from .tandem_quality import (
     AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
     TandemQualityOptions,
     default_tx_trajectory,
+    expected_tandem_gain_table,
     validate_options,
 )
 from .transient_hardware import (
@@ -60,7 +71,11 @@ from .transient_hardware import (
     transient_evidence_policy,
     validate_transient_options,
 )
-from .transient_quality import StimulusCommand, reconcile_tandem_events
+from .transient_quality import (
+    StimulusCommand,
+    calculate_transient_response,
+    reconcile_tandem_events,
+)
 
 AGGREGATE_SCHEMA = "plutosdr-fw.tandem-agc-release-hardware.v1"
 AGGREGATE_CHECKPOINT = "release-hardware-checkpoint.json"
@@ -1357,8 +1372,765 @@ def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:
     return errors
 
 
+def _transient_comparison_errors(modes: Any, comparison: Any) -> list[str]:
+    """Reconstruct the shared summary without upgrading ordinal diagnostics."""
+
+    if not isinstance(modes, list) or not isinstance(comparison, list):
+        return ["transient comparison cannot be reconstructed"]
+    if len(modes) != len(comparison):
+        return ["transient comparison count differs from modes"]
+    errors: list[str] = []
+    quality_fields = (
+        "worst_overshoot_db",
+        "ringing_peak_to_peak_db",
+        "minimum_post_tone_snr_db",
+        "maximum_post_clipping_fraction",
+        "maximum_phase_excursion_deg",
+    )
+    for index, (mode, reported) in enumerate(zip(modes, comparison, strict=True)):
+        if not isinstance(mode, Mapping) or not isinstance(reported, Mapping):
+            errors.append(f"transient comparison entry {index} is malformed")
+            continue
+        hardware = mode.get("mode") == MODE_TANDEM
+        responses = mode.get("responses")
+        try:
+            summaries: dict[str, dict[str, Any]] = {}
+            for direction in ("attack", "release"):
+                response = responses[direction]
+                summary = {
+                    "timing_qualification": response["timing_qualification"],
+                    "hardware_latency_qualified": hardware,
+                    "transient_observation_scope": response[
+                        "transient_observation_scope"
+                    ],
+                    **{field: response[field] for field in quality_fields},
+                }
+                if hardware:
+                    summary.update(
+                        {
+                            field: response[field]
+                            for field in (
+                                "signal_settling_latency_lower_samples",
+                                "signal_settling_latency_upper_samples",
+                                "signal_settling_latency_lower_seconds",
+                                "signal_settling_latency_upper_seconds",
+                            )
+                        }
+                    )
+                else:
+                    summary.update(
+                        {
+                            "signal_settling_latency_lower_samples": None,
+                            "signal_settling_latency_upper_samples": None,
+                            "signal_settling_latency_lower_seconds": None,
+                            "signal_settling_latency_upper_seconds": None,
+                            "observed_returned_iq_settling_span_lower_axis_units": (
+                                response[
+                                    "observed_returned_iq_settling_span_lower_axis_units"
+                                ]
+                            ),
+                            "observed_returned_iq_settling_span_upper_axis_units": (
+                                response[
+                                    "observed_returned_iq_settling_span_upper_axis_units"
+                                ]
+                            ),
+                        }
+                    )
+                summaries[direction] = summary
+            expected = {
+                "mode": mode["mode"],
+                "timing_basis": mode["timing_basis"],
+                "attack": summaries["attack"],
+                "release": summaries["release"],
+                "gain_evidence": mode["gain_evidence"],
+            }
+        except (KeyError, TypeError) as error:
+            errors.append(
+                f"transient comparison entry {index} cannot be reconstructed: {error}"
+            )
+        else:
+            if reported != expected:
+                errors.append(
+                    f"transient comparison entry {index} differs from recomputation"
+                )
+    return errors
+
+
+def _transient_mode_boundary_errors(
+    modes: Any, quality: TandemQualityOptions
+) -> list[str]:
+    """Bind the safe controller and RX state on both sides of every mode."""
+
+    if not isinstance(modes, list):
+        return ["transient mode boundary evidence is missing"]
+    errors: list[str] = []
+    for index, mode in enumerate(modes):
+        if not isinstance(mode, Mapping):
+            errors.append(f"transient mode {index} boundary evidence is malformed")
+            continue
+        context = f"transient {mode.get('mode', index)}"
+        for status_name in ("tandem_status_before", "tandem_status_after"):
+            status = mode.get(status_name)
+            if (
+                not isinstance(status, Mapping)
+                or type(status.get("state")) is not int
+                or status.get("state") != int(TandemState.IDLE)
+                or type(status.get("fault_flags")) is not int
+                or status.get("fault_flags") != 0
+                or type(status.get("fifo_level")) is not int
+                or status.get("fifo_level") != 0
+            ):
+                errors.append(f"{context} {status_name} is not safely IDLE")
+        final_state = mode.get("final_rx_state")
+        gains = (
+            final_state.get("gains_db") if isinstance(final_state, Mapping) else None
+        )
+        if (
+            not isinstance(final_state, Mapping)
+            or final_state.get("modes") != ["manual", "manual"]
+            or not isinstance(gains, list)
+            or len(gains) != 2
+            or any(
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or abs(float(value) - quality.manual_gain_db) > 0.1
+                for value in gains
+            )
+        ):
+            errors.append(f"{context} final RX state is not restored to manual")
+    return errors
+
+
+def _transient_ordinary_errors(
+    modes: Any,
+    capture: TransientCaptureOptions,
+    quality: TandemQualityOptions,
+) -> list[str]:
+    """Recompute returned-IQ ordinal evidence for every ordinary mode."""
+
+    if not isinstance(modes, list):
+        return ["transient ordinary modes are missing"]
+    ordinary_basis = "ordinary_returned_iq_ordinal_axis"
+    expected_modes = [mode for mode in TRANSIENT_MODES if mode != MODE_TANDEM]
+    ordinary = [
+        mode
+        for mode in modes
+        if isinstance(mode, Mapping) and mode.get("mode") != MODE_TANDEM
+    ]
+    if [mode.get("mode") for mode in ordinary] != expected_modes:
+        return ["transient ordinary mode coverage differs from policy"]
+    errors: list[str] = []
+
+    def exact_integer(value: Any, *, minimum: int = 0) -> bool:
+        return type(value) is int and value >= minimum
+
+    def finite_number(value: Any) -> bool:
+        return (
+            not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and math.isfinite(float(value))
+        )
+
+    def command_from_report(record: Mapping[str, Any]) -> StimulusCommand:
+        return StimulusCommand(
+            command_id=record["command_id"],
+            requested_level_db=record["requested_level_db"],
+            applied_level_db=record["applied_level_db"],
+            host_before_ns=record["host_before_ns"],
+            host_after_ns=record["host_after_ns"],
+            sample_sequence_before=record["sample_sequence_before"],
+            sample_sequence_after=record["sample_sequence_after"],
+        )
+
+    def ordinal_response(value: Mapping[str, Any]) -> dict[str, Any]:
+        result = dict(value)
+        lower = result.pop("signal_settling_latency_lower_samples")
+        upper = result.pop("signal_settling_latency_upper_samples")
+        result.pop("signal_settling_latency_lower_seconds")
+        result.pop("signal_settling_latency_upper_seconds")
+        result.update(
+            {
+                "timing_qualification": "returned_iq_observation_only",
+                "hardware_latency_qualified": False,
+                "transient_observation_scope": (
+                    "returned_iq_windows_with_unobserved_refill_intervals"
+                ),
+                "observed_returned_iq_settling_span_lower_axis_units": lower,
+                "observed_returned_iq_settling_span_upper_axis_units": upper,
+            }
+        )
+        return result
+
+    for mode in ordinary:
+        mode_name = str(mode.get("mode"))
+        context = f"transient {mode_name}"
+        expected_iio_mode = (
+            "manual" if mode_name == MODE_MANUAL else mode_name.removeprefix("native_")
+        )
+        if mode.get("timing_basis") != ordinary_basis:
+            errors.append(f"{context} timing basis is not returned-IQ ordinal")
+        if mode.get("metadata_abi") is not None:
+            errors.append(f"{context} unexpectedly reports a metadata ABI")
+        preconditioning = mode.get("preconditioning")
+        trace = (
+            preconditioning.get("trace")
+            if isinstance(preconditioning, Mapping)
+            else None
+        )
+        baseline = mode.get("baseline_frames")
+        attack = mode.get("attack_frames")
+        release = mode.get("release_frames")
+        if not all(
+            isinstance(items, list) and items
+            for items in (trace, baseline, attack, release)
+        ):
+            errors.append(f"{context} frame evidence is missing or empty")
+            continue
+        assert isinstance(trace, list)
+        assert isinstance(baseline, list)
+        assert isinstance(attack, list)
+        assert isinstance(release, list)
+        if any(
+            not isinstance(frame, Mapping)
+            for frame in (*trace, *baseline, *attack, *release)
+        ):
+            errors.append(f"{context} frame evidence is malformed")
+            continue
+        if (
+            not isinstance(preconditioning, Mapping)
+            or preconditioning.get("frame_count") != len(trace)
+            or not max(2, capture.precondition_stable_frames)
+            <= len(trace)
+            <= capture.max_precondition_frames
+        ):
+            errors.append(f"{context} precondition frame count is inconsistent")
+        expected_baseline = trace[-capture.baseline_frames :]
+        if baseline != expected_baseline:
+            errors.append(f"{context} baseline is not the retained trace tail")
+        if isinstance(preconditioning, Mapping) and preconditioning.get(
+            "retained_baseline_frame_indices"
+        ) != [frame.get("frame_index") for frame in expected_baseline]:
+            errors.append(f"{context} retained baseline indices are inconsistent")
+        if len(attack) != capture.response_frames or len(release) != (
+            capture.response_frames
+        ):
+            errors.append(f"{context} response frame count differs from policy")
+        if mode.get("acquisition") != {
+            "threaded": False,
+            "kernel_buffers": 1,
+            "queue_capacity_frames": 0,
+            "response_tail_frames": 0,
+        }:
+            errors.append(f"{context} acquisition policy is inconsistent")
+
+        frames_by_section = (
+            ("precondition", trace),
+            ("attack", attack),
+            ("release", release),
+        )
+        frame_number = 0
+        previous_refill_ns: int | None = None
+        frame_records_valid = True
+        for section, frames in frames_by_section:
+            for section_index, frame in enumerate(frames):
+                assert isinstance(frame, Mapping)
+                frame_context = f"{context} {section} frame {section_index}"
+                expected_start = frame_number * capture.frame_samples
+                expected_gap_context = (
+                    "precondition_observation"
+                    if section == "precondition"
+                    else (
+                        "command_bracket"
+                        if section_index == 0
+                        else "continuous_response"
+                    )
+                )
+                if (
+                    frame.get("frame_index") != frame_number
+                    or frame.get("iq_bytes") != capture.frame_samples * 8
+                    or not exact_integer(frame.get("refill_monotonic_ns"))
+                    or frame.get("timing_basis") != ordinary_basis
+                    or frame.get("first_sample_sequence") != expected_start
+                    or frame.get("sample_end_exclusive")
+                    != expected_start + capture.frame_samples
+                    or frame.get("sample_gap_before") is not None
+                    or frame.get("physical_sample_continuity_proven") is not False
+                    or frame.get("gap_context") != expected_gap_context
+                    or frame.get("command_boundary_gap_allowed") is not False
+                    or "metadata" in frame
+                    or "continuity" in frame
+                    or not isinstance(frame.get("sha256"), str)
+                    or re.fullmatch(r"[0-9a-f]{64}", frame["sha256"]) is None
+                ):
+                    errors.append(f"{frame_context} ordinal ledger is inconsistent")
+                    frame_records_valid = False
+                refill_ns = frame.get("refill_monotonic_ns")
+                if (
+                    exact_integer(refill_ns)
+                    and previous_refill_ns is not None
+                    and refill_ns < previous_refill_ns
+                ):
+                    errors.append(f"{frame_context} refill ledger regressed")
+                    frame_records_valid = False
+                if exact_integer(refill_ns):
+                    previous_refill_ns = refill_ns
+                for state_name in ("rx_state_before", "rx_state_after"):
+                    state = frame.get(state_name)
+                    if (
+                        not isinstance(state, Mapping)
+                        or state.get("modes") != [expected_iio_mode, expected_iio_mode]
+                        or not isinstance(state.get("gains_db"), list)
+                        or len(state["gains_db"]) != 2
+                        or any(not finite_number(value) for value in state["gains_db"])
+                    ):
+                        errors.append(f"{frame_context} RX state is inconsistent")
+                        frame_records_valid = False
+                analysis = frame.get("analysis")
+                windows = (
+                    analysis.get("windows") if isinstance(analysis, Mapping) else None
+                )
+                expected_windows = capture.frame_samples // capture.window_samples
+                if (
+                    not isinstance(analysis, Mapping)
+                    or analysis.get("first_sample_sequence") != expected_start
+                    or analysis.get("samples_per_channel") != capture.frame_samples
+                    or analysis.get("sample_rate_hz") != quality.sample_rate_hz
+                    or analysis.get("expected_tone_hz") != quality.tone_hz
+                    or not finite_number(analysis.get("selected_tone_hz"))
+                    or abs(float(analysis.get("selected_tone_hz", 0)))
+                    != abs(quality.tone_hz)
+                    or analysis.get("window_samples") != capture.window_samples
+                    or analysis.get("stride_samples") != capture.window_samples
+                    or analysis.get("window_count") != expected_windows
+                    or analysis.get("uncovered_tail_samples") != 0
+                    or not isinstance(windows, list)
+                    or len(windows) != expected_windows
+                ):
+                    errors.append(f"{frame_context} analysis ledger is inconsistent")
+                    frame_records_valid = False
+                else:
+                    window_quality: list[bool] = []
+                    for window_index, window in enumerate(windows):
+                        if not isinstance(window, Mapping):
+                            errors.append(
+                                f"{frame_context} analysis window is malformed"
+                            )
+                            frame_records_valid = False
+                            break
+                        snr = window.get("tone_snr_db")
+                        clipping = window.get("clipping_fraction")
+                        phase_std = window.get("within_window_phase_std_deg")
+                        if (
+                            not isinstance(snr, list)
+                            or len(snr) != 2
+                            or any(not finite_number(value) for value in snr)
+                            or not isinstance(clipping, list)
+                            or len(clipping) != 2
+                            or any(not finite_number(value) for value in clipping)
+                            or any(not 0 <= float(value) <= 1 for value in clipping)
+                            or not finite_number(phase_std)
+                            or float(phase_std) < 0
+                        ):
+                            errors.append(
+                                f"{frame_context} analysis quality values are malformed"
+                            )
+                            frame_records_valid = False
+                            break
+                        reasons: list[str] = []
+                        for channel in (0, 1):
+                            if snr[channel] < quality.thresholds.min_tone_snr_db:
+                                reasons.append(f"rx{channel}_tone_snr_low")
+                            if (
+                                clipping[channel]
+                                > quality.thresholds.max_clipping_fraction
+                            ):
+                                reasons.append(f"rx{channel}_clipping")
+                        if phase_std > quality.thresholds.max_phase_std_deg:
+                            reasons.append("within_window_phase_unstable")
+                        valid = not reasons
+                        window_quality.append(valid)
+                        if (
+                            window.get("window_index") != window_index
+                            or window.get("offset_start")
+                            != window_index * capture.window_samples
+                            or window.get("offset_end_exclusive")
+                            != (window_index + 1) * capture.window_samples
+                            or window.get("sample_start")
+                            != expected_start + window_index * capture.window_samples
+                            or window.get("sample_end_exclusive")
+                            != expected_start
+                            + (window_index + 1) * capture.window_samples
+                            or window.get("quality_reasons") != reasons
+                            or window.get("quality_valid") is not valid
+                        ):
+                            errors.append(
+                                f"{frame_context} analysis window ledger is inconsistent"
+                            )
+                            frame_records_valid = False
+                    if analysis.get("quality_valid") is not all(window_quality):
+                        errors.append(
+                            f"{frame_context} analysis quality ledger is inconsistent"
+                        )
+                        frame_records_valid = False
+                frame_number += 1
+
+        if frame_records_valid:
+            tolerance = 0.1 if mode_name == MODE_MANUAL else 1.0
+            stable_run: list[Mapping[str, Any]] = []
+            for trace_index, frame in enumerate(trace):
+                assert isinstance(frame, Mapping)
+                candidate = [*stable_run, frame]
+                stable = True
+                for channel in (0, 1):
+                    gains = [
+                        float(item[state]["gains_db"][channel])
+                        for item in candidate
+                        for state in ("rx_state_before", "rx_state_after")
+                    ]
+                    stable &= max(gains) - min(gains) <= tolerance
+                stable_run = candidate if stable else [frame]
+                if frame.get("precondition_stable_run") != len(stable_run):
+                    errors.append(
+                        f"{context} precondition stability ledger is inconsistent"
+                    )
+                    break
+                if (
+                    trace_index < len(trace) - 1
+                    and len(stable_run) >= capture.precondition_stable_frames
+                ):
+                    errors.append(f"{context} precondition continued after stability")
+                    break
+            if len(stable_run) < capture.precondition_stable_frames:
+                errors.append(f"{context} precondition never established stability")
+
+        commands = mode.get("commands")
+        anchor = mode.get("conditioning_anchor")
+        if (
+            not isinstance(commands, list)
+            or len(commands) != 3
+            or any(not isinstance(command, Mapping) for command in commands)
+            or not isinstance(anchor, Mapping)
+        ):
+            errors.append(f"{context} commands are missing or malformed")
+            continue
+        assert all(isinstance(command, Mapping) for command in commands)
+        initial, attack_command_record, release_command_record = commands
+        command_records_valid = True
+        expected_command_ids = ("weak_initial", "strong_attack", "weak_release")
+        if tuple(command.get("command_id") for command in commands) != (
+            expected_command_ids
+        ):
+            errors.append(f"{context} command order differs from policy")
+            command_records_valid = False
+        expected_levels = (
+            quality.weakest_tx_gain_db,
+            quality.strongest_tx_gain_db,
+            quality.weakest_tx_gain_db,
+        )
+        for command, expected_level in zip(commands, expected_levels, strict=True):
+            before = command.get("host_before_ns")
+            after = command.get("host_after_ns")
+            applied = command.get("applied_level_db")
+            effective = (
+                quality.physical_attenuation_db - float(applied)
+                if finite_number(applied)
+                else None
+            )
+            if (
+                not exact_integer(before)
+                or not exact_integer(after)
+                or not before <= after
+                or command.get("host_jitter_ns") != after - before
+                or after - before > capture.max_host_jitter_ns
+                or not finite_number(command.get("requested_level_db"))
+                or float(command["requested_level_db"]) != expected_level
+                or not finite_number(applied)
+                or abs(float(applied) - expected_level) > capture.readback_tolerance_db
+                or command.get("effective_attenuation_db") != effective
+            ):
+                errors.append(f"{context} command write ledger is inconsistent")
+                command_records_valid = False
+            if effective is not None and effective < 30.0:
+                errors.append(
+                    f"{context} command violates the 30 dB effective-attenuation "
+                    "boundary"
+                )
+        attack_lower = baseline[-1].get("sample_end_exclusive")
+        attack_upper = attack[0].get("sample_end_exclusive")
+        release_lower = attack[-1].get("sample_end_exclusive")
+        release_upper = release[0].get("sample_end_exclusive")
+        command_bounds = (
+            (attack_command_record, attack_lower, attack_upper),
+            (release_command_record, release_lower, release_upper),
+        )
+        bounds_valid = all(
+            exact_integer(lower) and exact_integer(upper, minimum=1)
+            for _command, lower, upper in command_bounds
+        )
+        if not bounds_valid or (
+            initial.get("sample_sequence_before") is not None
+            or initial.get("sample_sequence_after") is not None
+            or initial.get("sample_uncertainty") is not None
+            or initial.get("timing_role") != "pre_session_conditioning_write"
+            or initial.get("sample_timing_basis") is not None
+            or initial.get("sample_anchor_policy")
+            != "unbounded in sample time; the write predates the open capture session"
+            or any(
+                command.get("sample_sequence_before") != lower
+                or command.get("sample_sequence_after") != upper
+                or command.get("sample_uncertainty") != upper - lower
+                or not 0 < upper - lower <= capture.max_sample_uncertainty
+                or command.get("timing_role")
+                != "host_write_positioned_on_returned_iq_ordinal_axis"
+                or command.get("sample_timing_basis") != ordinary_basis
+                or command.get("sample_anchor_policy")
+                != "last returned pre-command IQ ordinal through end of first "
+                "returned post-command frame; unobserved hardware intervals excluded"
+                or "sample_counter_bracket" in command
+                for command, lower, upper in command_bounds
+            )
+        ):
+            errors.append(f"{context} command ordinal bracket is inconsistent")
+            command_records_valid = False
+        anchor_lower = baseline[0].get("first_sample_sequence")
+        anchor_upper = baseline[-1].get("sample_end_exclusive")
+        if (
+            not exact_integer(anchor_lower)
+            or not exact_integer(anchor_upper, minimum=1)
+            or anchor.get("command_id") != "weak_conditioning_anchor"
+            or anchor.get("requested_level_db") != initial.get("requested_level_db")
+            or anchor.get("applied_level_db") != initial.get("applied_level_db")
+            or anchor.get("host_before_ns") != initial.get("host_before_ns")
+            or anchor.get("host_after_ns") != initial.get("host_after_ns")
+            or anchor.get("host_jitter_ns") != initial.get("host_jitter_ns")
+            or anchor.get("sample_sequence_before") != anchor_lower
+            or anchor.get("sample_sequence_after") != anchor_upper
+            or anchor.get("sample_uncertainty") != anchor_upper - anchor_lower
+            or anchor.get("timing_role") != "observed_stable_conditioning_interval"
+            or anchor.get("sample_timing_basis") != ordinary_basis
+            or anchor.get("sample_anchor_policy")
+            != "retained stable baseline interval; not the initial write time"
+        ):
+            errors.append(f"{context} conditioning anchor is inconsistent")
+            command_records_valid = False
+
+        if not frame_records_valid or not command_records_valid:
+            continue
+        for frames, command in (
+            (baseline, None),
+            (attack, attack_command_record),
+            (release, release_command_record),
+        ):
+            for frame in frames:
+                for window in frame["analysis"]["windows"]:
+                    lower = (
+                        command.get("sample_sequence_before")
+                        if command is not None
+                        else None
+                    )
+                    upper = (
+                        command.get("sample_sequence_after")
+                        if command is not None
+                        else None
+                    )
+                    intersects = bool(
+                        command is not None
+                        and type(lower) is int
+                        and type(upper) is int
+                        and window["sample_start"] < upper
+                        and window["sample_end_exclusive"] > lower
+                    )
+                    if not intersects and window.get("quality_valid") is not True:
+                        errors.append(
+                            f"{context} has a quality-invalid returned-IQ window "
+                            "outside a command interval"
+                        )
+                        break
+
+        responses = mode.get("responses")
+        try:
+            anchor_command = command_from_report(anchor)
+            attack_command = command_from_report(attack_command_record)
+            release_command = command_from_report(release_command_record)
+            response_kwargs = {
+                "sample_rate_hz": quality.sample_rate_hz,
+                "baseline_windows": capture.baseline_windows,
+                "steady_windows": capture.steady_windows,
+                "stable_windows": capture.stable_windows,
+                "settling_tolerance_db": capture.settling_tolerance_db,
+                "ringing_deadband_db": capture.ringing_deadband_db,
+                "max_host_jitter_ns": capture.max_host_jitter_ns,
+                "max_sample_uncertainty": capture.max_sample_uncertainty,
+            }
+            attack_windows = [
+                window
+                for frame in (*baseline, *attack)
+                for window in frame["analysis"]["windows"]
+            ]
+            release_windows = [
+                window
+                for frame in (*attack, *release)
+                for window in frame["analysis"]["windows"]
+            ]
+            recomputed_responses = {
+                "attack": ordinal_response(
+                    calculate_transient_response(
+                        attack_windows,
+                        previous_command=anchor_command,
+                        command=attack_command,
+                        **response_kwargs,
+                    )
+                ),
+                "release": ordinal_response(
+                    calculate_transient_response(
+                        release_windows,
+                        previous_command=attack_command,
+                        command=release_command,
+                        **response_kwargs,
+                    )
+                ),
+            }
+        except (KeyError, TypeError, ValueError) as error:
+            errors.append(f"{context} responses cannot be recomputed: {error}")
+        else:
+            if responses != _json_safe(recomputed_responses):
+                errors.append(f"{context} responses differ from recomputation")
+
+        gain = mode.get("gain_evidence")
+        if mode_name == MODE_MANUAL:
+            gain_values: list[list[float]] = [[], []]
+            for frame in (*baseline, *attack, *release):
+                for state_name in ("rx_state_before", "rx_state_after"):
+                    for channel in (0, 1):
+                        gain_values[channel].append(
+                            float(frame[state_name]["gains_db"][channel])
+                        )
+            expected_gain = {
+                "evidence_valid": True,
+                "timing_qualification": "not_applicable_fixed_gain",
+                "hardware_latency_qualified": False,
+                "expected_gain_db": quality.manual_gain_db,
+                "gain_span_db": [max(values) - min(values) for values in gain_values],
+                "maximum_readback_error_db": [
+                    max(abs(value - quality.manual_gain_db) for value in values)
+                    for values in gain_values
+                ],
+            }
+            if any(value > 0.1 for value in expected_gain["gain_span_db"]) or any(
+                value > 0.1 for value in expected_gain["maximum_readback_error_db"]
+            ):
+                errors.append(f"{context} manual RX gain moved outside policy")
+        else:
+
+            def gain_at_end(frames: Sequence[Mapping[str, Any]]) -> tuple[float, float]:
+                selected = frames[-min(3, len(frames)) :]
+                return tuple(
+                    float(
+                        statistics.median(
+                            float(frame["rx_state_after"]["gains_db"][channel])
+                            for frame in selected
+                        )
+                    )
+                    for channel in (0, 1)
+                )  # type: ignore[return-value]
+
+            weak = gain_at_end(baseline)
+            strong = gain_at_end(attack)
+            returned = gain_at_end(release)
+
+            def gain_bounds(
+                frames: Sequence[Mapping[str, Any]],
+                *,
+                command: StimulusCommand,
+                reference: tuple[float, float],
+                sign: int,
+            ) -> list[dict[str, Any]]:
+                assert command.sample_sequence_before is not None
+                assert command.sample_sequence_after is not None
+                results = []
+                for channel in (0, 1):
+                    found = None
+                    for frame in frames:
+                        before_gain = float(
+                            frame["rx_state_before"]["gains_db"][channel]
+                        )
+                        after_gain = float(frame["rx_state_after"]["gains_db"][channel])
+                        evidence = None
+                        observed = 0.0
+                        if sign * (before_gain - reference[channel]) >= (
+                            capture.minimum_native_gain_change_db
+                        ):
+                            evidence = "pre_refill_readback"
+                            observed = before_gain
+                        elif sign * (after_gain - reference[channel]) >= (
+                            capture.minimum_native_gain_change_db
+                        ):
+                            evidence = "post_refill_readback"
+                            observed = after_gain
+                        if evidence is not None:
+                            found = {
+                                "rx_channel": channel,
+                                "evidence": evidence,
+                                "observed_gain_db": observed,
+                                "returned_iq_observation_span_lower_axis_units": max(
+                                    0,
+                                    int(frame["first_sample_sequence"])
+                                    - command.sample_sequence_after,
+                                ),
+                                "returned_iq_observation_span_upper_axis_units": max(
+                                    0,
+                                    int(frame["sample_end_exclusive"])
+                                    - command.sample_sequence_before,
+                                ),
+                                "hardware_latency_qualified": False,
+                            }
+                            break
+                    if found is None:
+                        raise ValueError("native gain change is not represented")
+                    results.append(found)
+                return results
+
+            try:
+                attack_bounds = gain_bounds(
+                    attack,
+                    command=attack_command,
+                    reference=weak,
+                    sign=-1,
+                )
+                release_bounds = gain_bounds(
+                    release,
+                    command=release_command,
+                    reference=strong,
+                    sign=1,
+                )
+            except ValueError as error:
+                errors.append(f"{context} gain evidence cannot be recomputed: {error}")
+                continue
+            expected_gain = {
+                "evidence_valid": True,
+                "timing_qualification": "returned_iq_observation_only",
+                "hardware_latency_qualified": False,
+                "minimum_required_change_db": capture.minimum_native_gain_change_db,
+                "weak_gain_db": list(weak),
+                "strong_gain_db": list(strong),
+                "returned_weak_gain_db": list(returned),
+                "attack_gain_change_db": [
+                    strong[index] - weak[index] for index in (0, 1)
+                ],
+                "release_gain_change_db": [
+                    returned[index] - strong[index] for index in (0, 1)
+                ],
+                "attack_returned_iq_observation_bounds": attack_bounds,
+                "release_returned_iq_observation_bounds": release_bounds,
+            }
+        if gain != expected_gain:
+            errors.append(f"{context} gain evidence differs from recomputation")
+    return errors
+
+
 def _transient_continuity_errors(
-    modes: Any, capture: TransientCaptureOptions, sample_rate_hz: int
+    modes: Any, capture: TransientCaptureOptions, quality: TandemQualityOptions
 ) -> list[str]:
     """Recompute transient gap, event, endpoint, and command-bracket evidence."""
 
@@ -1389,9 +2161,29 @@ def _transient_continuity_errors(
     assert isinstance(attack, list)
     assert isinstance(release, list)
     errors: list[str] = []
-    if any(not isinstance(frame, Mapping) for frame in baseline):
-        return ["transient tandem baseline frame evidence is malformed"]
-    if preconditioning.get("frame_count") != len(trace):
+
+    def exact_integer(value: Any, *, minimum: int = 0) -> bool:
+        return type(value) is int and value >= minimum
+
+    def finite_number(value: Any) -> bool:
+        return (
+            not isinstance(value, bool)
+            and isinstance(value, (int, float))
+            and math.isfinite(float(value))
+        )
+
+    if mode.get("timing_basis") != "hardware_sample_counter":
+        errors.append("transient tandem mode timing basis is inconsistent")
+    if mode.get("metadata_abi") != 2:
+        errors.append("transient tandem metadata ABI is inconsistent")
+    if any(not isinstance(frame, Mapping) for frame in (*trace, *baseline)):
+        return ["transient tandem precondition frame evidence is malformed"]
+    if (
+        preconditioning.get("frame_count") != len(trace)
+        or not capture.precondition_stable_frames + 1
+        <= len(trace)
+        <= capture.max_precondition_frames
+    ):
         errors.append("transient tandem precondition frame count is inconsistent")
     expected_baseline = trace[-capture.baseline_frames :]
     if baseline != expected_baseline:
@@ -1411,9 +2203,21 @@ def _transient_continuity_errors(
 
     commands = mode.get("commands")
     conditioning_anchor = mode.get("conditioning_anchor")
-    if not isinstance(commands, list) or not isinstance(conditioning_anchor, Mapping):
+    if (
+        not isinstance(commands, list)
+        or len(commands) != 3
+        or any(not isinstance(command, Mapping) for command in commands)
+        or not isinstance(conditioning_anchor, Mapping)
+    ):
         errors.append("transient tandem commands or conditioning anchor are missing")
         return errors
+    if [command.get("command_id") for command in commands] != [
+        "weak_initial",
+        "strong_attack",
+        "weak_release",
+    ]:
+        errors.append("transient tandem command order differs from policy")
+    initial_command = commands[0]
     by_id = {
         command.get("command_id"): command
         for command in commands
@@ -1426,6 +2230,66 @@ def _transient_continuity_errors(
     ):
         errors.append("transient tandem attack/release commands are missing")
         return errors
+    for command, expected_level in zip(
+        commands,
+        (
+            quality.weakest_tx_gain_db,
+            quality.strongest_tx_gain_db,
+            quality.weakest_tx_gain_db,
+        ),
+        strict=True,
+    ):
+        before = command.get("host_before_ns")
+        after = command.get("host_after_ns")
+        applied = command.get("applied_level_db")
+        effective = (
+            quality.physical_attenuation_db - float(applied)
+            if finite_number(applied)
+            else None
+        )
+        if (
+            not exact_integer(before)
+            or not exact_integer(after)
+            or not before <= after
+            or command.get("host_jitter_ns") != after - before
+            or after - before > capture.max_host_jitter_ns
+            or not finite_number(command.get("requested_level_db"))
+            or float(command["requested_level_db"]) != expected_level
+            or not finite_number(applied)
+            or abs(float(applied) - expected_level) > capture.readback_tolerance_db
+            or command.get("effective_attenuation_db") != effective
+        ):
+            errors.append("transient tandem command write ledger is inconsistent")
+        if effective is not None and effective < 30.0:
+            errors.append(
+                "transient tandem command violates the 30 dB "
+                "effective-attenuation boundary"
+            )
+    if (
+        initial_command.get("sample_sequence_before") is not None
+        or initial_command.get("sample_sequence_after") is not None
+        or initial_command.get("sample_uncertainty") is not None
+        or initial_command.get("timing_role") != "pre_session_conditioning_write"
+        or initial_command.get("sample_timing_basis") is not None
+        or initial_command.get("sample_anchor_policy")
+        != "unbounded in sample time; the write predates the open capture session"
+        or conditioning_anchor.get("requested_level_db")
+        != initial_command.get("requested_level_db")
+        or conditioning_anchor.get("applied_level_db")
+        != initial_command.get("applied_level_db")
+        or conditioning_anchor.get("host_before_ns")
+        != initial_command.get("host_before_ns")
+        or conditioning_anchor.get("host_after_ns")
+        != initial_command.get("host_after_ns")
+        or conditioning_anchor.get("host_jitter_ns")
+        != initial_command.get("host_jitter_ns")
+        or conditioning_anchor.get("timing_role")
+        != "observed_stable_conditioning_interval"
+        or conditioning_anchor.get("sample_timing_basis") != "hardware_sample_counter"
+        or conditioning_anchor.get("sample_anchor_policy")
+        != "retained stable baseline interval; not the initial write time"
+    ):
+        errors.append("transient tandem initial command or anchor is inconsistent")
 
     response_tail = int(
         transient_evidence_policy(capture)["tandem_response_tail_frames"]
@@ -1447,6 +2311,7 @@ def _transient_continuity_errors(
         or acquisition.get("kernel_buffers") != 1
         or acquisition.get("queue_capacity_frames") != queue_frames
         or acquisition.get("response_tail_frames") != response_tail
+        or acquisition.get("buffer_cancelled_before_join") is not True
         or acquisition.get("consumed_frames") != consumed_frames
         or type(acquisition.get("produced_frames")) is not int
         or acquisition.get("produced_frames") < consumed_frames
@@ -1466,13 +2331,21 @@ def _transient_continuity_errors(
     stream_id: int | None = None
     ownership_epoch: int | None = None
     gain_index_range: tuple[int, int] | None = None
+    threshold_provenance: int | None = None
+    previous_refill_ns: int | None = None
     cumulative_missing = 0
     frame_number = 0
     visible_response_events: list[Mapping[str, Any]] = []
     uint32_modulus = 1 << 32
-
-    def exact_integer(value: Any, *, minimum: int = 0) -> bool:
-        return type(value) is int and value >= minimum
+    expected_gain_table_id = int(
+        expected_tandem_gain_table(quality.center_frequency_hz)
+    )
+    required_metadata_flags = (
+        FLAG_SAMPLE_SEQUENCE_VALID
+        | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
+        | FLAG_TANDEM_METADATA_VALID
+    )
+    tandem_stable_run = 0
 
     for section, frames in sections:
         for section_index, frame in enumerate(frames):
@@ -1502,10 +2375,119 @@ def _transient_continuity_errors(
             if frame.get("frame_index") != frame_number:
                 errors.append(f"{context} frame index is not contiguous")
             frame_number += 1
+            refill_ns = frame.get("refill_monotonic_ns")
+            if (
+                frame.get("iq_bytes") != capture.frame_samples * 8
+                or not exact_integer(refill_ns)
+                or (
+                    previous_refill_ns is not None
+                    and exact_integer(refill_ns)
+                    and refill_ns < previous_refill_ns
+                )
+                or frame.get("timing_basis") != "hardware_sample_counter"
+                or frame.get("physical_sample_continuity_proven") is not True
+                or not isinstance(frame.get("sha256"), str)
+                or re.fullmatch(r"[0-9a-f]{64}", frame["sha256"]) is None
+            ):
+                errors.append(f"{context} capture ledger is inconsistent")
+            if exact_integer(refill_ns):
+                previous_refill_ns = refill_ns
             if frame.get("gap_context") != expected_gap_context:
                 errors.append(f"{context} gap context differs from its phase")
             if frame.get("command_boundary_gap_allowed") is not False:
                 errors.append(f"{context} command-boundary policy is inconsistent")
+
+            analysis = frame.get("analysis")
+            windows = analysis.get("windows") if isinstance(analysis, Mapping) else None
+            expected_window_count = capture.frame_samples // capture.window_samples
+            first = frame.get("first_sample_sequence")
+            if (
+                not isinstance(analysis, Mapping)
+                or analysis.get("first_sample_sequence") != first
+                or analysis.get("samples_per_channel") != capture.frame_samples
+                or analysis.get("sample_rate_hz") != quality.sample_rate_hz
+                or analysis.get("expected_tone_hz") != quality.tone_hz
+                or not finite_number(analysis.get("selected_tone_hz"))
+                or abs(float(analysis.get("selected_tone_hz", 0)))
+                != abs(quality.tone_hz)
+                or analysis.get("window_samples") != capture.window_samples
+                or analysis.get("stride_samples") != capture.window_samples
+                or analysis.get("window_count") != expected_window_count
+                or analysis.get("uncovered_tail_samples") != 0
+                or not isinstance(windows, list)
+                or len(windows) != expected_window_count
+            ):
+                errors.append(f"{context} analysis ledger is inconsistent")
+                return errors
+            window_quality: list[bool] = []
+            for window_index, window in enumerate(windows):
+                if not isinstance(window, Mapping) or not exact_integer(first):
+                    errors.append(f"{context} analysis window is malformed")
+                    return errors
+                expected_start = first + window_index * capture.window_samples
+                reasons: list[str] = []
+                snr = window.get("tone_snr_db")
+                clipping = window.get("clipping_fraction")
+                phase_std = window.get("within_window_phase_std_deg")
+                if (
+                    not isinstance(snr, list)
+                    or len(snr) != 2
+                    or any(not finite_number(value) for value in snr)
+                    or not isinstance(clipping, list)
+                    or len(clipping) != 2
+                    or any(not finite_number(value) for value in clipping)
+                    or any(not 0 <= float(value) <= 1 for value in clipping)
+                    or not finite_number(phase_std)
+                    or float(phase_std) < 0
+                ):
+                    errors.append(f"{context} analysis quality values are malformed")
+                    return errors
+                for channel in (0, 1):
+                    if snr[channel] < quality.thresholds.min_tone_snr_db:
+                        reasons.append(f"rx{channel}_tone_snr_low")
+                    if clipping[channel] > quality.thresholds.max_clipping_fraction:
+                        reasons.append(f"rx{channel}_clipping")
+                if phase_std > quality.thresholds.max_phase_std_deg:
+                    reasons.append("within_window_phase_unstable")
+                valid = not reasons
+                window_quality.append(valid)
+                if (
+                    window.get("window_index") != window_index
+                    or window.get("offset_start")
+                    != window_index * capture.window_samples
+                    or window.get("offset_end_exclusive")
+                    != (window_index + 1) * capture.window_samples
+                    or window.get("sample_start") != expected_start
+                    or window.get("sample_end_exclusive")
+                    != expected_start + capture.window_samples
+                    or window.get("quality_reasons") != reasons
+                    or window.get("quality_valid") is not valid
+                ):
+                    errors.append(f"{context} analysis window ledger is inconsistent")
+                command = (
+                    None
+                    if section == "precondition"
+                    else attack_command
+                    if section == "attack"
+                    else release_command
+                )
+                lower = command.get("sample_sequence_before") if command else None
+                upper = command.get("sample_sequence_after") if command else None
+                intersects = bool(
+                    command is not None
+                    and type(lower) is int
+                    and type(upper) is int
+                    and window["sample_start"] < upper
+                    and window["sample_end_exclusive"] > lower
+                )
+                quality_required = section != "precondition" or frame in baseline
+                if quality_required and not intersects and not valid:
+                    errors.append(
+                        f"{context} has a quality-invalid window outside a command "
+                        "interval"
+                    )
+            if analysis.get("quality_valid") is not all(window_quality):
+                errors.append(f"{context} frame quality summary is inconsistent")
 
             metadata = frame.get("metadata")
             continuity = frame.get("continuity")
@@ -1521,14 +2503,15 @@ def _transient_continuity_errors(
             events = metadata.get("gain_events")
             endpoint = metadata.get("bench_gain_indices")
             index_range = metadata.get("gain_index_range")
+            current_provenance = metadata.get("threshold_provenance")
             if (
                 not exact_integer(buffer_sequence)
                 or not exact_integer(first_sample)
                 or samples != capture.frame_samples
                 or not exact_integer(transition_count)
                 or transition_count >= uint32_modulus
-                or not exact_integer(current_stream)
-                or not exact_integer(current_epoch)
+                or not exact_integer(current_stream, minimum=1)
+                or not exact_integer(current_epoch, minimum=1)
                 or not isinstance(events, list)
                 or not isinstance(endpoint, list)
                 or len(endpoint) != 2
@@ -1539,9 +2522,43 @@ def _transient_continuity_errors(
                 or any(not exact_integer(value) for value in index_range)
                 or index_range[0] > index_range[1]
                 or not index_range[0] <= endpoint[0] <= index_range[1]
+                or not exact_integer(metadata.get("flags"))
+                or metadata.get("flags") & TANDEM_UNSAFE_FLAGS
+                or metadata.get("flags") & required_metadata_flags
+                != required_metadata_flags
+                or metadata.get("tandem_state") != int(TandemState.ARMED_AUTO)
+                or metadata.get("tandem_state_name") != "armed_auto"
+                or metadata.get("gain_table_id") != expected_gain_table_id
+                or metadata.get("gain_db_range") != [0, 62]
+                or metadata.get("initial_gain_db") != int(quality.manual_gain_db)
+                or not exact_integer(current_provenance)
             ):
                 errors.append(f"{context} metadata counters or gains are malformed")
                 return errors
+            if threshold_provenance is None:
+                threshold_provenance = int(current_provenance)
+            elif current_provenance != threshold_provenance:
+                errors.append(f"{context} threshold provenance changed")
+            if section == "precondition":
+                stable = bool(
+                    previous_metadata is not None
+                    and not events
+                    and transition_count
+                    == previous_metadata.get("tandem_transition_count")
+                    and endpoint == previous_metadata.get("bench_gain_indices")
+                )
+                tandem_stable_run = tandem_stable_run + 1 if stable else 0
+                if frame.get("precondition_stable_run") != tandem_stable_run:
+                    errors.append(
+                        f"{context} precondition stability ledger is inconsistent"
+                    )
+                if (
+                    section_index < len(trace) - 1
+                    and tandem_stable_run >= capture.precondition_stable_frames
+                ):
+                    errors.append(
+                        "transient tandem precondition continued after stability"
+                    )
             if (
                 not exact_integer(metadata.get("event_count"))
                 or not exact_integer(metadata.get("gain_event_count"))
@@ -1641,15 +2658,35 @@ def _transient_continuity_errors(
                     return errors
                 event_sample = event.get("sample_sequence")
                 event_sequence = event.get("event_sequence")
+                flags = event.get("flags")
                 direction = event.get("direction")
+                reason = event.get("reason")
                 rx1_gain = event.get("rx1_gain_index")
                 rx2_gain = event.get("rx2_gain_index")
+                flags_valid = exact_integer(flags) and flags <= 0x3F
+                expected_direction = (flags >> 4) & 0x3 if flags_valid else None
+                expected_reason = flags & 0xF if flags_valid else None
+                try:
+                    direction_name = TandemEventDirection(
+                        expected_direction
+                    ).name.lower()
+                    reason_name = TandemEventReason(expected_reason).name.lower()
+                except (TypeError, ValueError):
+                    direction_name = None
+                    reason_name = None
                 if (
                     not exact_integer(event_sample)
                     or not exact_integer(event_sequence)
                     or event_sequence >= uint32_modulus
+                    or not flags_valid
+                    or direction_name is None
+                    or reason_name is None
                     or type(direction) is not int
-                    or direction not in (1, 2)
+                    or direction != expected_direction
+                    or event.get("direction_name") != direction_name
+                    or type(reason) is not int
+                    or reason != expected_reason
+                    or event.get("reason_name") != reason_name
                     or not exact_integer(rx1_gain)
                     or not exact_integer(rx2_gain)
                     or rx1_gain != rx2_gain
@@ -1692,6 +2729,76 @@ def _transient_continuity_errors(
                 errors.append(f"{context} endpoint changed without an event")
             previous_metadata = metadata
 
+    if tandem_stable_run < capture.precondition_stable_frames:
+        errors.append("transient tandem precondition never established stability")
+
+    expected_partitions: dict[str, dict[str, int]] = {}
+    phase_order = {
+        "precommand_prefetch": 0,
+        "command_bracket": 1,
+        "continuous_response": 2,
+    }
+    for name, frames, command in (
+        ("attack", attack, attack_command),
+        ("release", release, release_command),
+    ):
+        lower = command.get("sample_sequence_before")
+        upper = command.get("sample_sequence_after")
+        if not exact_integer(lower) or not exact_integer(upper, minimum=1):
+            errors.append(
+                f"transient tandem {name} response partition cannot be recomputed"
+            )
+            continue
+        contexts: list[str] = []
+        fully_post = 0
+        for frame in frames:
+            assert isinstance(frame, Mapping)
+            start = frame.get("first_sample_sequence")
+            end = frame.get("sample_end_exclusive")
+            if not exact_integer(start) or not exact_integer(end, minimum=1):
+                errors.append(
+                    f"transient tandem {name} response partition has malformed "
+                    "sample bounds"
+                )
+                contexts = []
+                break
+            if end <= lower:
+                contexts.append("precommand_prefetch")
+            elif start < upper:
+                contexts.append("command_bracket")
+            else:
+                contexts.append("continuous_response")
+                fully_post += 1
+        if not contexts:
+            continue
+        non_post = len(frames) - fully_post
+        if non_post > response_tail:
+            errors.append(
+                f"transient tandem {name} pre/bracketed prefix exceeds policy"
+            )
+        if fully_post < capture.response_frames:
+            errors.append(
+                f"transient tandem {name} lacks the required fully post-command frames"
+            )
+        if contexts != sorted(contexts, key=phase_order.__getitem__):
+            errors.append(
+                f"transient tandem {name} response phases are not sample ordered"
+            )
+        expected_partitions[name] = {
+            "precommand_prefetch_frames": contexts.count("precommand_prefetch"),
+            "command_bracket_frames": contexts.count("command_bracket"),
+            "fully_post_command_frames": fully_post,
+            "required_fully_post_command_frames": capture.response_frames,
+            "maximum_non_post_command_frames": response_tail,
+        }
+    if (
+        not isinstance(acquisition, Mapping)
+        or acquisition.get("response_partitions") != expected_partitions
+    ):
+        errors.append(
+            "transient tandem response partition ledger differs from recomputation"
+        )
+
     anchor_lower = baseline[0].get("first_sample_sequence")
     anchor_upper = baseline[-1].get("sample_end_exclusive")
     if (
@@ -1730,11 +2837,13 @@ def _transient_continuity_errors(
             raw_fields = [
                 bracket.get("raw_before"),
                 bracket.get("raw_post_write_initial"),
-                bracket.get("raw_post_write_advanced"),
+                bracket.get("raw_post_write_first_advance"),
+                bracket.get("raw_post_write_causal"),
             ]
             extended_fields = [
                 bracket.get("extended_before"),
                 bracket.get("extended_post_write_initial"),
+                bracket.get("extended_post_write_first_advance"),
                 bracket.get("extended_after"),
             ]
         if (
@@ -1761,14 +2870,17 @@ def _transient_continuity_errors(
             or not 0 < extended_fields[2] - extended_fields[1] < uint32_modulus // 2
             or extended_fields[2] - extended_fields[1]
             != (raw_fields[2] - raw_fields[1]) % uint32_modulus
+            or not 0 < extended_fields[3] - extended_fields[2] < uint32_modulus // 2
+            or extended_fields[3] - extended_fields[2]
+            != (raw_fields[3] - raw_fields[2]) % uint32_modulus
             or abs(extended_fields[0] - reference) >= uint32_modulus // 2
             or type(bracket.get("post_write_read_count")) is not int
-            or bracket.get("post_write_read_count") not in range(2, 10)
+            or bracket.get("post_write_read_count") not in range(3, 10)
             or bracket.get("lower_clamped_to_last_observed_frame_end")
             is not (reference > extended_fields[0])
             or bracket.get("sample_sequence_lower")
             != max(reference, extended_fields[0])
-            or bracket.get("sample_sequence_upper") != extended_fields[2]
+            or bracket.get("sample_sequence_upper") != extended_fields[3]
             or command.get("sample_sequence_before")
             != bracket.get("sample_sequence_lower")
             or command.get("sample_sequence_after")
@@ -1776,11 +2888,15 @@ def _transient_continuity_errors(
             or command.get("sample_uncertainty")
             != command.get("sample_sequence_after")
             - command.get("sample_sequence_before")
-            or not exact_integer(command.get("sample_uncertainty"))
+            or not exact_integer(command.get("sample_uncertainty"), minimum=1)
             or command.get("sample_uncertainty") > capture.max_sample_uncertainty
             or command.get("timing_role")
             != "host_write_bracketed_by_coherent_fpga_counter"
             or command.get("sample_timing_basis") != "hardware_sample_counter"
+            or command.get("sample_anchor_policy")
+            != "max(last observed frame end, coherent low32 pre-read) through the "
+            "second distinct coherent low32 advance observed after an initial "
+            "post-write read"
         ):
             errors.append(f"transient tandem {name} command bracket is inconsistent")
         response = responses.get(name) if isinstance(responses, Mapping) else None
@@ -1802,6 +2918,62 @@ def _transient_continuity_errors(
         )
 
     try:
+        anchor_stimulus = command_from_report(conditioning_anchor)
+        attack_stimulus = command_from_report(attack_command)
+        release_stimulus = command_from_report(release_command)
+        response_kwargs = {
+            "sample_rate_hz": quality.sample_rate_hz,
+            "baseline_windows": capture.baseline_windows,
+            "steady_windows": capture.steady_windows,
+            "stable_windows": capture.stable_windows,
+            "settling_tolerance_db": capture.settling_tolerance_db,
+            "ringing_deadband_db": capture.ringing_deadband_db,
+            "max_host_jitter_ns": capture.max_host_jitter_ns,
+            "max_sample_uncertainty": capture.max_sample_uncertainty,
+        }
+        recomputed_responses = {
+            "attack": dict(
+                calculate_transient_response(
+                    [
+                        window
+                        for frame in (*baseline, *attack)
+                        for window in frame["analysis"]["windows"]
+                    ],
+                    previous_command=anchor_stimulus,
+                    command=attack_stimulus,
+                    **response_kwargs,
+                )
+            ),
+            "release": dict(
+                calculate_transient_response(
+                    [
+                        window
+                        for frame in (*attack, *release)
+                        for window in frame["analysis"]["windows"]
+                    ],
+                    previous_command=attack_stimulus,
+                    command=release_stimulus,
+                    **response_kwargs,
+                )
+            ),
+        }
+        for response in recomputed_responses.values():
+            response.update(
+                {
+                    "timing_qualification": "fpga_sample_counter_bounded",
+                    "hardware_latency_qualified": True,
+                    "transient_observation_scope": (
+                        "continuous_hardware_sample_record"
+                    ),
+                }
+            )
+    except (KeyError, TypeError, ValueError) as error:
+        errors.append(f"transient tandem responses cannot be recomputed: {error}")
+    else:
+        if responses != _json_safe(recomputed_responses):
+            errors.append("transient tandem responses differ from recomputation")
+
+    try:
         recomputed_gain = _json_safe(
             dict(
                 reconcile_tandem_events(
@@ -1811,12 +2983,19 @@ def _transient_continuity_errors(
                         command_from_report(release_command),
                     ),
                     visible_response_events,
-                    sample_rate_hz=sample_rate_hz,
+                    sample_rate_hz=quality.sample_rate_hz,
                     max_host_jitter_ns=capture.max_host_jitter_ns,
                     max_sample_uncertainty=capture.max_sample_uncertainty,
                     max_latency_samples=capture.max_event_latency_samples,
                 )
             )
+        )
+        assert isinstance(recomputed_gain, dict)
+        recomputed_gain.update(
+            {
+                "timing_qualification": "fpga_sample_counter_bounded",
+                "hardware_latency_qualified": True,
+            }
         )
     except (KeyError, TypeError, ValueError) as error:
         errors.append(f"transient tandem gain evidence cannot be recomputed: {error}")
@@ -1990,11 +3169,22 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                     and comparison[index].get("gain_evidence") != gain
                 ):
                     errors.append("transient comparison changed gain evidence")
+            errors.extend(_transient_comparison_errors(mode_records, comparison))
+            errors.extend(
+                _transient_mode_boundary_errors(mode_records, transient_quality)
+            )
+            errors.extend(
+                _transient_ordinary_errors(
+                    mode_records,
+                    expected_capture,
+                    transient_quality,
+                )
+            )
             errors.extend(
                 _transient_continuity_errors(
                     mode_records,
                     expected_capture,
-                    transient_quality.sample_rate_hz,
+                    transient_quality,
                 )
             )
             summary = {
