@@ -24,11 +24,13 @@ jobs:
           persist-credentials: false
       - name: Check out the PNXX HDL source
         run: git submodule update --init --depth 1 hdl
-      - name: Run metadata, continuity, tone, matrix, and RTL goldens
+      - name: Run release, metadata, continuity, quality, and RTL oracles
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends python3-numpy python3-pytest
-          python3 -m pytest tests/radio_hardware -m 'not radio_hardware'
+          python3 -m pytest \
+            tests/test_release_oracles.py tests/radio_hardware \
+            -m 'not radio_hardware'
 
   source-graph:
     name: source graph
@@ -99,7 +101,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-hdl-quantulum
-          ref: 8897cfaaa7c6d923d3509738dc5a7552fd857d35
+          ref: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
           path: hdl-quantulum
           persist-credentials: false
       - name: Simulate the closed-loop counter crossing
@@ -120,3 +122,4 @@ jobs:
           vvp "$RUNNER_TEMP/tx-pipeline-debug-tb"
           cd ../test
           ./run_discard_disabled.sh
+          ./run_timestamp_check_pipeline.sh

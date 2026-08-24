@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import re
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE_LIB = ROOT / "scripts" / "ci" / "source_manifest_lib.sh"
 FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
+FIRMWARE_PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
 
 
 def _git(*args: str, cwd: Path) -> str:
@@ -96,3 +98,17 @@ def test_final_packed_identities_match_declared_source_lock_tags() -> None:
 
     for identity_key, ref_key in mappings.items():
         assert values[identity_key] == _tag_identity(values[ref_key])
+
+
+def test_required_hdl_simulation_uses_final_timestamp_source() -> None:
+    values = _manifest_values(FINAL_SOURCE_MANIFEST)
+    workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
+    checkout = re.search(
+        r"repository:\s*misko/plutosdr-hdl-quantulum\s*\n\s*"
+        r"ref:\s*([0-9a-f]{40})",
+        workflow,
+    )
+
+    assert checkout is not None
+    assert checkout.group(1) == values["submodule_hdl_quantulum"]
+    assert "./run_timestamp_check_pipeline.sh" in workflow
