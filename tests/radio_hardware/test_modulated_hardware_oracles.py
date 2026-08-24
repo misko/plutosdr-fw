@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+import hashlib
 import json
 import math
 from builtins import BaseExceptionGroup
@@ -38,6 +40,7 @@ from .modulated_hardware import (
     ModulatedHardwareOptions,
     _parse_and_validate_metadata,
     _TandemContinuity,
+    evaluate_modulated_hardware_report,
     run_modulated_hardware_campaign,
     run_serial_modulated_hardware_campaign,
     validate_modulated_hardware_options,
@@ -276,6 +279,7 @@ class _FakeCampaignRadio:
         metadata_abi: int = 2,
         cleanup_verified_on_close: bool = True,
         cleanup_failures: tuple[str, ...] = (),
+        tx_gain_readback_offset_db: float = 0.0,
     ):
         self.options = SimpleNamespace(
             serial="fake-usb-radio",
@@ -296,6 +300,7 @@ class _FakeCampaignRadio:
         self.metadata_abi = metadata_abi
         self.cleanup_verified_on_close = cleanup_verified_on_close
         self.cleanup_failures = cleanup_failures
+        self.tx_gain_readback_offset_db = tx_gain_readback_offset_db
         self.active: Any = None
         self.active_case = ""
         self.mode = "manual"
@@ -367,7 +372,9 @@ class _FakeCampaignRadio:
         self.tx_gain_log.append(float(gain_db))
         if gain_db == TX_MUTE_DB:
             self.tx_mutes_inside_buffer.append(self.in_buffer)
-        return float(gain_db)
+        if gain_db == TX_MUTE_DB:
+            return float(gain_db)
+        return float(gain_db) + self.tx_gain_readback_offset_db
 
     @contextmanager
     def buffer(
@@ -797,6 +804,60 @@ def test_fake_radio_runs_all_modes_and_blocker_oracles_atomically(
     blocker_runs = [run for run in report["runs"] if run["case_id"] == "blocker_00"]
     assert all(run["summary"]["blocker_measurement"]["valid"] for run in blocker_runs)
 
+    provenance_frames = [
+        (run, measurement)
+        for run in report["runs"]
+        for measurement in run["measurements"]
+        if "raw_iq_provenance" in measurement
+    ]
+    assert len(provenance_frames) == 1
+    raw_run, raw_frame = provenance_frames[0]
+    assert (raw_run["case_id"], raw_run["mode"]) == (
+        "desired_only",
+        "manual_fixed",
+    )
+    provenance = raw_frame["raw_iq_provenance"]
+    artifact = options.output_dir / provenance["path"]
+    payload = artifact.read_bytes()
+    assert provenance["bytes"] == options.capture_samples * 8 == len(payload)
+    assert provenance["sha256"] == raw_frame["sha256"]
+    assert provenance["sha256"] == hashlib.sha256(payload).hexdigest()
+    assert provenance["channel_layout"] == ["rx0_i", "rx0_q", "rx1_i", "rx1_q"]
+    assert not artifact.with_suffix(artifact.suffix + ".tmp").exists()
+
+
+def test_evaluator_rejects_missing_invalid_or_mixed_iq_conventions(
+    tmp_path: Path,
+) -> None:
+    options = _campaign_options(tmp_path)
+    report, _path = run_modulated_hardware_campaign(
+        _FakeCampaignRadio(options), options
+    )
+    original = report["runs"][0]["summary"]["iq_convention"]
+    mutations = (
+        ("missing", None, "invalid IQ convention"),
+        ("invalid", "swapped", "invalid IQ convention"),
+        (
+            "mixed",
+            "conjugated" if original == "direct" else "direct",
+            "mixed IQ conventions",
+        ),
+    )
+    for mutation, value, expected_reason in mutations:
+        planted = copy.deepcopy(report)
+        summary = planted["runs"][0]["summary"]
+        if mutation == "missing":
+            summary.pop("iq_convention")
+        else:
+            summary["iq_convention"] = value
+        evaluation = evaluate_modulated_hardware_report(
+            planted, options.degradation_thresholds
+        )
+        assert not evaluation["valid"]
+        assert any(
+            expected_reason in reason for reason in evaluation["failure_reasons"]
+        )
+
 
 def test_campaign_accepts_real_issue46_options_contract(tmp_path: Path) -> None:
     options = _campaign_options(tmp_path)
@@ -834,6 +895,17 @@ def test_tandem_refuses_legacy_metadata_abi_before_unmuting(tmp_path: Path) -> N
     # Manual plus three native cells ran, but the tandem cell never unmuted.
     assert radio.tx_gain_log.count(options.tx2_gain_db) == 4
     assert radio.tx_mutes_inside_buffer == [True] * 5
+
+
+def test_campaign_rejects_tx_gain_readback_that_differs_from_plan(
+    tmp_path: Path,
+) -> None:
+    options = _campaign_options(tmp_path)
+    radio = _FakeCampaignRadio(options, tx_gain_readback_offset_db=0.25)
+    with pytest.raises(FixtureSafetyError, match="readback differs from the planned"):
+        run_modulated_hardware_campaign(radio, options)
+    assert radio.tx_gain_log[0] == options.tx2_gain_db
+    assert radio.tx_mutes_inside_buffer == [True]
 
 
 def test_planted_clipping_returns_fail_report_not_false_green(tmp_path: Path) -> None:

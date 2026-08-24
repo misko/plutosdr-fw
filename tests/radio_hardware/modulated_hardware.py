@@ -63,6 +63,9 @@ MODULATED_MODES = (
     MODE_TANDEM,
 )
 
+DEFAULT_MODULATED_TX2_GAIN_DB = -42.0
+TX2_GAIN_READBACK_TOLERANCE_DB = 0.01
+
 _NATIVE_IIO_MODES = {
     MODE_NATIVE_SLOW: "slow_attack",
     MODE_NATIVE_FAST: "fast_attack",
@@ -103,7 +106,7 @@ class ModulatedHardwareOptions:
     span_symbols: int = 10
     desired_seed: int = 46
     capture_samples: int = 8_192
-    tx2_gain_db: float = -30.0
+    tx2_gain_db: float = DEFAULT_MODULATED_TX2_GAIN_DB
     tx_peak_fraction: float = 0.80
     tx_headroom_db: float = 1.0
     manual_gain_db: float = 40.0
@@ -455,6 +458,13 @@ def _atomic_json(path: Path, report: Mapping[str, Any]) -> None:
         json.dumps(report, indent=2, sort_keys=True, allow_nan=False) + "\n",
         encoding="utf-8",
     )
+    temporary.replace(path)
+
+
+def _atomic_bytes(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_bytes(payload)
     temporary.replace(path)
 
 
@@ -1085,7 +1095,7 @@ def _measure_ordinary(
     minimum, maximum = (list(settled_band[0]), list(settled_band[1]))
     tolerance = 0.2 if expected_mode == "manual" else 1.0
     measurements: list[dict[str, Any]] = []
-    for _frame_index in range(options.measurement_frames):
+    for frame_index in range(options.measurement_frames):
         check_deadline()
         before = radio.read_rx_state()
         raw, _parsed, frame = _capture(radio, buffer, options=options, metadata=False)
@@ -1099,6 +1109,26 @@ def _measure_ordinary(
             raise EvidenceInvalid("RX gain left its settled measurement window")
         frame["rx_state_before"] = before
         frame["rx_state_after"] = after
+        if (
+            case.case_id == "desired_only"
+            and expected_mode == "manual"
+            and frame_index == 0
+        ):
+            artifact_path = (
+                options.output_dir
+                / radio.options.serial
+                / "diagnostic-iq"
+                / "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le"
+            )
+            _atomic_bytes(artifact_path, raw)
+            frame["raw_iq_provenance"] = {
+                "path": artifact_path.relative_to(options.output_dir).as_posix(),
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "bytes": len(raw),
+                "encoding": "signed-16-bit-little-endian",
+                "channel_layout": ["rx0_i", "rx0_q", "rx1_i", "rx1_q"],
+                "samples_per_channel": options.capture_samples,
+            }
         frame["quality"] = _quality(
             raw, reference=reference, case=case, options=options
         )
@@ -1203,6 +1233,16 @@ def _run_case_mode(
                         f"tandem capture requires metadata ABI 2, got {metadata_abi}"
                     )
                 tx_readback = float(radio.set_tx2_gain(options.tx2_gain_db))
+                if (
+                    not math.isfinite(tx_readback)
+                    or abs(tx_readback - options.tx2_gain_db)
+                    > TX2_GAIN_READBACK_TOLERANCE_DB
+                ):
+                    raise FixtureSafetyError(
+                        "TX2 gain readback differs from the planned campaign value: "
+                        f"requested {options.tx2_gain_db:.2f} dB, "
+                        f"read back {tx_readback!r} dB"
+                    )
                 effective_attenuation = options.physical_attenuation_db - tx_readback
                 if effective_attenuation < 30.0:
                     raise FixtureSafetyError(
@@ -1287,6 +1327,7 @@ def evaluate_modulated_hardware_report(
     indexed: dict[str, dict[str, Mapping[str, Any]]] = {
         mode: {} for mode in MODULATED_MODES
     }
+    observed_iq_conventions: set[str] = set()
     for run in report.get("runs", []):
         mode = str(run.get("mode"))
         case_id = str(run.get("case_id"))
@@ -1298,9 +1339,16 @@ def evaluate_modulated_hardware_report(
             continue
         indexed[mode][case_id] = run
         summary = run.get("summary", {})
+        iq_convention = summary.get("iq_convention")
+        if iq_convention not in ("direct", "conjugated"):
+            failures.append(f"invalid IQ convention for {mode}/{case_id}")
+        else:
+            observed_iq_conventions.add(str(iq_convention))
         if not bool(summary.get("quality_valid", False)):
             reasons = ",".join(summary.get("quality_reasons", ())) or "invalid"
             failures.append(f"absolute quality failed for {mode}/{case_id}: {reasons}")
+    if len(observed_iq_conventions) > 1:
+        failures.append("modulated runs use mixed IQ conventions")
 
     blocker_ids = [
         str(item["case_id"])
