@@ -21,6 +21,7 @@ import math
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 from typing import Any
 
 from .tone_quality import decode_dual_iq
@@ -555,7 +556,7 @@ def reconcile_tandem_events(
             max_sample_uncertainty=sample_limit,
             require_sample_bounds=True,
         )
-    for previous, current in zip(command_list, command_list[1:], strict=False):
+    for previous, current in pairwise(command_list):
         assert previous.sample_sequence_after is not None
         assert current.sample_sequence_before is not None
         if current.host_before_ns < previous.host_after_ns:
@@ -690,9 +691,12 @@ def calculate_transient_response(
 ) -> Mapping[str, Any]:
     """Calculate window-bounded settling, overshoot, and ringing metrics.
 
-    Input windows must be non-overlapping and exactly sample-contiguous.  A
-    window intersecting the uncertain command interval is retained as proof of
-    continuity but excluded from baseline/post-step statistics.
+    Input windows must be non-overlapping and sample-contiguous outside the
+    uncertain command interval.  A missing range wholly covered by that
+    interval is accepted and counted: a host-side write can delay the next
+    refill, and hardware metadata can expose that delay as a sample gap.  A
+    window intersecting the interval is retained but excluded from
+    baseline/post-step statistics.
     """
 
     rate = _strict_int(sample_rate_hz, name="sample_rate_hz", minimum=1)
@@ -724,6 +728,7 @@ def calculate_transient_response(
     assert command.sample_sequence_after is not None
 
     normalized: list[Mapping[str, Any]] = []
+    command_bracket_gap_samples = 0
     for index, window in enumerate(windows):
         if not isinstance(window, Mapping):
             raise TransientEvidenceError(f"window {index} is not a record")
@@ -746,10 +751,23 @@ def calculate_transient_response(
             window.get("phase_difference_deg"),
             name=f"window {index} phase_difference_deg",
         )
-        if normalized and start != int(normalized[-1]["sample_end_exclusive"]):
-            raise TransientEvidenceError(
-                "transient windows have a gap, overlap, or reordered sample range"
-            )
+        if normalized:
+            previous_end = int(normalized[-1]["sample_end_exclusive"])
+            if start < previous_end:
+                raise TransientEvidenceError(
+                    "transient windows overlap or have a reordered sample range"
+                )
+            if start > previous_end:
+                gap_is_command_bracketed = (
+                    previous_end >= command.sample_sequence_before
+                    and start <= command.sample_sequence_after
+                )
+                if not gap_is_command_bracketed:
+                    raise TransientEvidenceError(
+                        "transient windows have a gap, overlap, or reordered "
+                        "sample range outside the command bracket"
+                    )
+                command_bracket_gap_samples += start - previous_end
         normalized.append(
             {
                 "sample_start": start,
@@ -806,7 +824,7 @@ def calculate_transient_response(
         undershoot.append(max(0.0, -min(deviations)))
 
     first_stable_index = None
-    for start in range(0, len(post) - stable_count + 1):
+    for start in range(len(post) - stable_count + 1):
         candidate = post[start : start + stable_count]
         if all(
             all(
@@ -899,4 +917,5 @@ def calculate_transient_response(
         "baseline_window_count": baseline_count,
         "post_window_count": len(post),
         "command_intersecting_window_count": excluded,
+        "command_bracket_gap_samples": command_bracket_gap_samples,
     }

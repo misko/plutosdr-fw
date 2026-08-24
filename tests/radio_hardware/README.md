@@ -155,32 +155,38 @@ the same absolute envelope.
 
 ## Transient attack and release analysis
 
-`transient_quality.py` supplies a transport-independent layer for a future
-attack/release campaign. It is deliberately not wired into the steady-state
-matrix: callers inject the hardware attribute-write and sample-counter
-callbacks, then pass captured IQ and already parsed tandem events to pure
-analysis functions.
+`transient_quality.py` supplies the transport-independent analyzers and
+`transient_hardware.py` runs a guarded weak/strong/weak TX2 trajectory in
+manual, native slow-attack, native fast-attack, native hybrid, and tandem-auto
+modes. It uses one kernel buffer and retains the first frame after each level
+write instead of draining away the transition.
 
-- `timestamp_stimulus_command()` brackets the write in monotonic host time and,
-  when available, hardware sample time. The write callback must return its
-  actual hardware readback.
+- `timestamp_stimulus_command()` brackets the write in monotonic host time. The
+  hardware runner closes its sample-time bracket only after IQ arrives: from
+  the last observed pre-write frame end through the first observed post-write
+  frame end. Ordinary-IIO sample positions are explicitly session-local;
+  tandem positions come from the FPGA metadata counter.
 - `analyze_immediate_dual_rx()` analyzes fixed windows beginning at sample zero
   of each returned frame. It does not discard the transition and reports
   dual-RX tone level, SNR, clipping, differential phase, and phase stability.
 - `reconcile_tandem_events()` assigns the first paired decrease/increase event
   to louder/quieter command intervals and reports conservative lower/upper
   attack and release latency bounds in samples and seconds.
-- `calculate_transient_response()` requires contiguous IQ windows on both sides
-  of a command and reports window-bounded signal settling, overshoot, opposite
+- `calculate_transient_response()` requires contiguous IQ windows outside a
+  command bracket. A metadata gap wholly inside that bracket is counted as
+  uncertainty. It reports window-bounded signal settling, overshoot, opposite
   excursion, ringing crossings, post-settle excursions, SNR, clipping, and
   phase excursion.
 
 The layer fails closed on missing sample brackets, host-write jitter over the
 configured limit, excessive sample uncertainty, event-sequence holes, torn or
-non-unit tandem gain steps, overlapping commands, discontinuous IQ windows, or
-missing baseline/steady-state evidence. Public CI exercises only deterministic
-synthetic and planted-failure oracles; this layer does not open a radio or emit
-RF by itself.
+non-unit tandem gain steps, overlapping commands, IQ gaps outside a command
+bracket, unbounded tandem-event latency, or missing baseline/steady-state
+evidence. The initial weak write remains sample-unbounded because it predates
+streaming; a separately labelled stable-IQ interval is the conditioning
+anchor. `run_serial_transient_hardware()` owns the radio lifecycle, reloads the
+report after close, and requires durable verified-cleanup evidence. Public CI
+exercises only deterministic synthetic and planted-failure oracles.
 
 ## Host setup and first RC2 run
 
