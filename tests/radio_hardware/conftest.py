@@ -12,6 +12,7 @@ from .experiment import Issue46Options, Issue46Radio
 from .tandem_quality import (
     TandemQualityOptions,
     default_tx_trajectory,
+    parse_native_gain_control_modes,
     parse_tx_trajectory,
     validate_options,
 )
@@ -72,12 +73,25 @@ def pytest_addoption(parser: Any) -> None:
     )
     group.addoption("--tandem-quality-sample-rate", type=int, default=2_500_000)
     group.addoption("--tandem-quality-samples", type=int, default=65_536)
+    group.addoption(
+        "--tandem-quality-center-frequency-hz", type=int, default=915_000_000
+    )
     group.addoption("--tandem-quality-dds-scale", type=float, default=1.0)
     group.addoption("--tandem-quality-manual-gain", type=float, default=40.0)
+    group.addoption(
+        "--tandem-quality-native-modes",
+        default="slow_attack",
+        help="ordered comma-separated subset of slow_attack,fast_attack,hybrid",
+    )
     group.addoption("--tandem-quality-low-power-threshold", type=int, default=20)
     group.addoption("--tandem-quality-large-lmt-threshold", type=int, default=58)
     group.addoption("--tandem-quality-large-adc-threshold", type=int, default=35)
     group.addoption("--tandem-quality-small-adc-threshold", type=int, default=34)
+    group.addoption(
+        "--tandem-quality-power-measurement-samples", type=int, default=1_024
+    )
+    group.addoption("--tandem-quality-low-power-dwell-periods", type=int, default=3)
+    group.addoption("--tandem-quality-cooldown-periods", type=int, default=16)
     group.addoption("--tandem-quality-measurements", type=int, default=3)
     group.addoption("--tandem-quality-stable-frames", type=int, default=3)
     group.addoption("--tandem-quality-max-settle-frames", type=int, default=64)
@@ -196,10 +210,16 @@ def tandem_quality_options(pytestconfig: Any) -> TandemQualityOptions:
         options = TandemQualityOptions(
             tx_gain_trajectory_db=levels,
             physical_attenuation_db=attenuation,
+            center_frequency_hz=pytestconfig.getoption(
+                "--tandem-quality-center-frequency-hz"
+            ),
             sample_rate_hz=pytestconfig.getoption("--tandem-quality-sample-rate"),
             samples_per_channel=pytestconfig.getoption("--tandem-quality-samples"),
             dds_scale=pytestconfig.getoption("--tandem-quality-dds-scale"),
             manual_gain_db=pytestconfig.getoption("--tandem-quality-manual-gain"),
+            native_gain_control_modes=parse_native_gain_control_modes(
+                pytestconfig.getoption("--tandem-quality-native-modes")
+            ),
             tandem_low_power_threshold=pytestconfig.getoption(
                 "--tandem-quality-low-power-threshold"
             ),
@@ -211,6 +231,15 @@ def tandem_quality_options(pytestconfig: Any) -> TandemQualityOptions:
             ),
             tandem_small_adc_overload_threshold=pytestconfig.getoption(
                 "--tandem-quality-small-adc-threshold"
+            ),
+            tandem_power_measurement_samples=pytestconfig.getoption(
+                "--tandem-quality-power-measurement-samples"
+            ),
+            tandem_low_power_dwell_periods=pytestconfig.getoption(
+                "--tandem-quality-low-power-dwell-periods"
+            ),
+            tandem_cooldown_periods=pytestconfig.getoption(
+                "--tandem-quality-cooldown-periods"
             ),
             stable_frames=pytestconfig.getoption("--tandem-quality-stable-frames"),
             measurement_frames=pytestconfig.getoption("--tandem-quality-measurements"),
@@ -248,6 +277,7 @@ def tandem_quality_radio(
         libiio_source_commit=pytestconfig.getoption("--libiio-source-commit"),
         attenuation_db=tandem_quality_options.physical_attenuation_db,
         tx_gain_db=tandem_quality_options.strongest_tx_gain_db,
+        center_frequency_hz=tandem_quality_options.center_frequency_hz,
         sample_rate_hz=tandem_quality_options.sample_rate_hz,
         samples_per_channel=tandem_quality_options.samples_per_channel,
         profile="smoke",

@@ -52,12 +52,27 @@ and verifies those readbacks. A cleanup failure fails the pytest session.
 
 ## Manual, native AGC, and tandem AUTO quality matrix
 
-The quality test emits the same 100 kHz TX2 DDS tone at scale 1.0 and the same deterministic
-weak-to-strong-to-weak TX gain trajectory in three fresh receive sessions:
+The quality test emits the same 100 kHz TX2 DDS tone at scale 1.0 and the same
+deterministic weak-to-strong-to-weak TX gain trajectory in fresh receive
+sessions. The compatibility default is the original three-cell matrix:
 
 1. fixed 40 dB manual gain on both receivers through ordinary IIO;
 2. independent AD9361 `slow_attack` AGC through ordinary IIO;
 3. paired tandem `AUTO` through metadata ABI 2.
+
+Select additional independent AD9361 comparison cells with
+`--tandem-quality-native-modes slow_attack,fast_attack,hybrid`. The order is
+retained in the report; every selected native mode must independently pass the
+absolute quality and bidirectional gain-response gates. The legacy
+`native_minus_manual`, `tandem_minus_native`, and `native_gain_evidence` report
+fields continue to use `slow_attack` when it is selected, while `*_by_mode`
+fields contain every requested native cell.
+
+The common RX/TX LO defaults to 915 MHz. Set an explicit frequency with
+`--tandem-quality-center-frequency-hz HZ`. Both LO writes are read back, the
+requested and observed values are retained under `rf`, and tandem metadata
+must report the kernel-selected full gain table: ID 1 through 1.3 GHz, ID 2
+above 1.3 GHz through 4 GHz, and ID 3 above 4 GHz through 6 GHz.
 
 The conservative smoke trajectory is `-61,-45,-30,-45,-61` dB. The full
 trajectory is `-61,-55,-50,-45,-40,-35,-30,-35,-40,-45,-50,-55,-61` dB.
@@ -79,6 +94,15 @@ unchanged in `metadata_abi.py`. Override them for a threshold sweep with
 `--tandem-quality-small-adc-threshold`. The requested settings and firmware
 threshold provenance are retained in the report.
 
+AUTO timing defaults preserve the qualified campaign request: a 1,024-sample
+power window, three low-power dwell periods, and sixteen cooldown periods.
+Controlled studies can override them with
+`--tandem-quality-power-measurement-samples`,
+`--tandem-quality-low-power-dwell-periods`, and
+`--tandem-quality-cooldown-periods`. Invalid wire ranges and timing choices
+whose worst-case event count exceeds the 64-record metadata capacity are
+rejected before any radio write.
+
 Each measured level checks its actual TX gain readback before capture, drains
 queued IQ, and requires three stable frames before measuring three more frames.
 Native AGC stability comes from gain readback before and after each refill. Tandem
@@ -98,6 +122,7 @@ scripts/run_tandem_agc_quality_hardware.sh \
   --radio-uri usb:BUS.DEVICE.INTERFACE \
   --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc2$' \
   --loopback-attenuation-db 0 \
+  --tandem-quality-center-frequency-hz 915000000 \
   --tandem-quality-profile smoke
 ```
 
@@ -127,6 +152,35 @@ by provider-reported frame gaps; native gain must span at least 1 dB. The report
 computes tandem-minus-native/manual deltas, but initially does not claim that
 one adaptive controller must numerically outperform the other: both must pass
 the same absolute envelope.
+
+## Transient attack and release analysis
+
+`transient_quality.py` supplies a transport-independent layer for a future
+attack/release campaign. It is deliberately not wired into the steady-state
+matrix: callers inject the hardware attribute-write and sample-counter
+callbacks, then pass captured IQ and already parsed tandem events to pure
+analysis functions.
+
+- `timestamp_stimulus_command()` brackets the write in monotonic host time and,
+  when available, hardware sample time. The write callback must return its
+  actual hardware readback.
+- `analyze_immediate_dual_rx()` analyzes fixed windows beginning at sample zero
+  of each returned frame. It does not discard the transition and reports
+  dual-RX tone level, SNR, clipping, differential phase, and phase stability.
+- `reconcile_tandem_events()` assigns the first paired decrease/increase event
+  to louder/quieter command intervals and reports conservative lower/upper
+  attack and release latency bounds in samples and seconds.
+- `calculate_transient_response()` requires contiguous IQ windows on both sides
+  of a command and reports window-bounded signal settling, overshoot, opposite
+  excursion, ringing crossings, post-settle excursions, SNR, clipping, and
+  phase excursion.
+
+The layer fails closed on missing sample brackets, host-write jitter over the
+configured limit, excessive sample uncertainty, event-sequence holes, torn or
+non-unit tandem gain steps, overlapping commands, discontinuous IQ windows, or
+missing baseline/steady-state evidence. Public CI exercises only deterministic
+synthetic and planted-failure oracles; this layer does not open a radio or emit
+RF by itself.
 
 ## Host setup and first RC2 run
 

@@ -13,14 +13,22 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any, Optional
 
-from .experiment import TX_MUTE_DB, EvidenceInvalid, Issue46Radio
+from .experiment import (
+    MAX_COMMON_CENTER_FREQUENCY_HZ,
+    MIN_COMMON_CENTER_FREQUENCY_HZ,
+    TX_MUTE_DB,
+    EvidenceInvalid,
+    Issue46Radio,
+)
 from .metadata_abi import (
     TANDEM_UNSAFE_FLAGS,
     TandemEventDirection,
     TandemFrameMetadata,
+    TandemGainTable,
     TandemMode,
     TandemState,
     build_tandem_request,
+    maximum_tandem_events_per_frame,
     parse_tandem_frame_metadata,
 )
 from .tone_quality import ToneQualityThresholds, analyze_common_tone
@@ -29,6 +37,8 @@ MODE_MANUAL = "manual_fixed"
 MODE_NATIVE = "native_slow_attack"
 MODE_TANDEM = "tandem_auto"
 MODES = (MODE_MANUAL, MODE_NATIVE, MODE_TANDEM)
+NATIVE_GAIN_CONTROL_MODES = ("slow_attack", "fast_attack", "hybrid")
+DEFAULT_NATIVE_GAIN_CONTROL_MODES = ("slow_attack",)
 MANUAL_TONE_TRACKING_TOLERANCE_DB = 3.0
 MANUAL_TONE_RETRACE_TOLERANCE_DB = 3.0
 NATIVE_MIN_GAIN_SPAN_DB = 1.0
@@ -40,15 +50,20 @@ class TandemQualityOptions:
 
     tx_gain_trajectory_db: tuple[float, ...]
     physical_attenuation_db: float
+    center_frequency_hz: int = 915_000_000
     sample_rate_hz: int = 2_500_000
     samples_per_channel: int = 65_536
     tone_hz: int = 100_000
     dds_scale: float = 1.0
     manual_gain_db: float = 40.0
+    native_gain_control_modes: tuple[str, ...] = DEFAULT_NATIVE_GAIN_CONTROL_MODES
     tandem_low_power_threshold: int = 20
     tandem_large_lmt_overload_threshold: int = 58
     tandem_large_adc_overload_threshold: int = 35
     tandem_small_adc_overload_threshold: int = 34
+    tandem_power_measurement_samples: int = 1_024
+    tandem_low_power_dwell_periods: int = 3
+    tandem_cooldown_periods: int = 16
     kernel_buffers: int = 2
     stable_frames: int = 3
     measurement_frames: int = 3
@@ -71,6 +86,82 @@ class TandemQualityOptions:
     @property
     def minimum_effective_attenuation_db(self) -> float:
         return self.physical_attenuation_db - self.strongest_tx_gain_db
+
+
+def native_mode_name(gain_control_mode: str) -> str:
+    """Return the stable report-cell name for one native AD9361 mode."""
+
+    if gain_control_mode not in NATIVE_GAIN_CONTROL_MODES:
+        raise ValueError(f"unsupported native gain-control mode {gain_control_mode!r}")
+    return f"native_{gain_control_mode}"
+
+
+def native_gain_control_mode(mode: str) -> str | None:
+    """Map a report-cell name back to its native IIO gain-control value."""
+
+    prefix = "native_"
+    if not mode.startswith(prefix):
+        return None
+    gain_control_mode = mode[len(prefix) :]
+    if gain_control_mode not in NATIVE_GAIN_CONTROL_MODES:
+        raise ValueError(f"unsupported native quality mode {mode!r}")
+    return gain_control_mode
+
+
+def _ordinary_iio_mode(mode: str) -> str:
+    if mode == MODE_MANUAL:
+        return "manual"
+    gain_control_mode = native_gain_control_mode(mode)
+    if gain_control_mode is None:
+        raise ValueError(f"quality mode {mode!r} is not an ordinary-IIO mode")
+    return gain_control_mode
+
+
+def quality_modes(options: TandemQualityOptions) -> tuple[str, ...]:
+    """Return the deterministic mode-cell order for one matrix."""
+
+    return (
+        MODE_MANUAL,
+        *(native_mode_name(mode) for mode in options.native_gain_control_modes),
+        MODE_TANDEM,
+    )
+
+
+def parse_native_gain_control_modes(value: str) -> tuple[str, ...]:
+    """Parse a comma-separated, ordered native-mode selection."""
+
+    modes = tuple(item.strip() for item in value.split(","))
+    if not modes or any(not mode for mode in modes):
+        raise ValueError("native gain-control mode list contains an empty cell")
+    if len(set(modes)) != len(modes):
+        raise ValueError("native gain-control modes cannot contain duplicates")
+    for mode in modes:
+        native_mode_name(mode)
+    return modes
+
+
+def expected_tandem_gain_table(center_frequency_hz: int) -> TandemGainTable:
+    """Derive the kernel's full-gain-table selection for a common RX/TX LO."""
+
+    if isinstance(center_frequency_hz, bool) or not isinstance(
+        center_frequency_hz, int
+    ):
+        raise TypeError("center frequency must be an integer number of Hz")
+    if not (
+        MIN_COMMON_CENTER_FREQUENCY_HZ
+        <= center_frequency_hz
+        <= MAX_COMMON_CENTER_FREQUENCY_HZ
+    ):
+        raise ValueError(
+            "common RX/TX center frequency must be in "
+            f"[{MIN_COMMON_CENTER_FREQUENCY_HZ}, "
+            f"{MAX_COMMON_CENTER_FREQUENCY_HZ}] Hz"
+        )
+    if center_frequency_hz <= 1_300_000_000:
+        return TandemGainTable.MHZ_200_1300
+    if center_frequency_hz <= 4_000_000_000:
+        return TandemGainTable.MHZ_1300_4000
+    return TandemGainTable.MHZ_4000_6000
 
 
 def default_tx_trajectory(profile: str) -> tuple[float, ...]:
@@ -123,6 +214,14 @@ def _select_tandem_priming_gain(
 def validate_options(options: TandemQualityOptions) -> None:
     """Reject an unsafe or non-diagnostic experiment before any radio write."""
 
+    expected_tandem_gain_table(options.center_frequency_hz)
+    native_modes = options.native_gain_control_modes
+    if isinstance(native_modes, (str, bytes)) or not native_modes:
+        raise ValueError("native gain-control mode list cannot be empty")
+    if len(set(native_modes)) != len(native_modes):
+        raise ValueError("native gain-control modes cannot contain duplicates")
+    for native_mode in native_modes:
+        native_mode_name(native_mode)
     levels = options.tx_gain_trajectory_db
     if any(not math.isfinite(level) for level in levels):
         raise ValueError("TX trajectory must contain only finite gains")
@@ -181,6 +280,32 @@ def validate_options(options: TandemQualityOptions) -> None:
     ):
         raise ValueError(
             "tandem ADC thresholds must satisfy 0 <= small <= large <= 255"
+        )
+    timing_values = (
+        options.tandem_power_measurement_samples,
+        options.tandem_low_power_dwell_periods,
+        options.tandem_cooldown_periods,
+    )
+    if any(
+        isinstance(value, bool) or not isinstance(value, int) for value in timing_values
+    ):
+        raise ValueError("tandem power-window, dwell, and cooldown must be integers")
+    if not 1 <= options.tandem_power_measurement_samples <= (1 << 20) - 1:
+        raise ValueError("tandem power-measurement samples must be in [1, 1048575]")
+    if not 1 <= options.tandem_low_power_dwell_periods <= 0xFF:
+        raise ValueError("tandem low-power dwell periods must be in [1, 255]")
+    if not 0 <= options.tandem_cooldown_periods <= 0xFF:
+        raise ValueError("tandem cooldown periods must be in [0, 255]")
+    maximum_events = maximum_tandem_events_per_frame(
+        mode=TandemMode.AUTO,
+        samples_per_channel=options.samples_per_channel,
+        power_measurement_samples=options.tandem_power_measurement_samples,
+        cooldown_periods=options.tandem_cooldown_periods,
+    )
+    if maximum_events > 64:
+        raise ValueError(
+            "tandem timing can produce "
+            f"{maximum_events} events per frame, exceeding metadata capacity 64"
         )
     if options.kernel_buffers <= 0:
         raise ValueError("kernel buffer count must be positive")
@@ -361,9 +486,12 @@ def _capture(
             )
         if parsed.observation_overflow_count or parsed.event_overflow_count:
             raise EvidenceInvalid("tandem metadata record capacity overflowed")
-        if parsed.gain_table_id.value != 1:
+        expected_gain_table = expected_tandem_gain_table(options.center_frequency_hz)
+        if parsed.gain_table_id is not expected_gain_table:
             raise EvidenceInvalid(
-                "915 MHz tandem session selected the wrong gain table"
+                f"{options.center_frequency_hz} Hz tandem session selected gain "
+                f"table {int(parsed.gain_table_id)}, expected "
+                f"{int(expected_gain_table)}"
             )
         if (
             parsed.minimum_gain_db != 0
@@ -392,7 +520,7 @@ def _settle_ordinary(
     mode: str,
     options: TandemQualityOptions,
 ) -> tuple[list[dict[str, Any]], _OrdinaryGainBand]:
-    expected_mode = "manual" if mode == MODE_MANUAL else "slow_attack"
+    expected_mode = _ordinary_iio_mode(mode)
     trace: list[dict[str, Any]] = []
     stable = 0
     stable_band: Optional[_OrdinaryGainBand] = None
@@ -502,7 +630,7 @@ def _measure_ordinary(
     level_index: int,
     settled: _OrdinaryGainBand,
 ) -> list[dict[str, Any]]:
-    expected_mode = "manual" if mode == MODE_MANUAL else "slow_attack"
+    expected_mode = _ordinary_iio_mode(mode)
     measurements: list[dict[str, Any]] = []
     gain_band = settled
     for frame_index in range(options.measurement_frames):
@@ -656,13 +784,16 @@ def _run_mode(
 
     metadata = mode == MODE_TANDEM
     request: Optional[bytes] = None
-    if mode == MODE_NATIVE:
-        radio.configure_rx("slow_attack")
+    native_iio_mode = native_gain_control_mode(mode)
+    if native_iio_mode is not None:
+        radio.configure_rx(native_iio_mode)
     elif mode == MODE_TANDEM:
         request = build_tandem_request(
             mode=TandemMode.AUTO,
             initial_gain_db=int(options.manual_gain_db),
-            cooldown_periods=16,
+            power_measurement_samples=options.tandem_power_measurement_samples,
+            low_power_dwell_periods=options.tandem_low_power_dwell_periods,
+            cooldown_periods=options.tandem_cooldown_periods,
             low_power_threshold=options.tandem_low_power_threshold,
             large_lmt_overload_threshold=(options.tandem_large_lmt_overload_threshold),
             large_adc_overload_threshold=(options.tandem_large_adc_overload_threshold),
@@ -1486,32 +1617,76 @@ def _quality_deltas(
     }
 
 
+def _native_report_modes(report: Mapping[str, Any]) -> tuple[str, ...]:
+    modes: list[str] = []
+    for record in report["modes"]:
+        mode = str(record["mode"])
+        if mode in (MODE_MANUAL, MODE_TANDEM):
+            continue
+        try:
+            gain_control_mode = native_gain_control_mode(mode)
+        except ValueError as exc:
+            raise EvidenceInvalid(str(exc)) from exc
+        if gain_control_mode is None:
+            raise EvidenceInvalid(f"report contains unknown quality mode {mode!r}")
+        modes.append(mode)
+    if not modes:
+        raise EvidenceInvalid("report contains no native AGC mode")
+    if len(set(modes)) != len(modes):
+        raise EvidenceInvalid("report contains duplicate native AGC modes")
+    return tuple(modes)
+
+
 def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
     """Apply absolute gates and report, but do not invent a relative AGC winner."""
 
     manual = _mode_cells(report, MODE_MANUAL)
-    native = _mode_cells(report, MODE_NATIVE)
     tandem = _mode_cells(report, MODE_TANDEM)
-    if not len(manual) == len(native) == len(tandem):
+    native_modes = _native_report_modes(report)
+    native_cells = {mode: _mode_cells(report, mode) for mode in native_modes}
+    trajectory_lengths = {
+        len(manual),
+        len(tandem),
+        *(len(cells) for cells in native_cells.values()),
+    }
+    if len(trajectory_lengths) != 1:
         raise EvidenceInvalid("mode trajectories contain different cell counts")
+    primary_native_mode = (
+        MODE_NATIVE if MODE_NATIVE in native_cells else native_modes[0]
+    )
     comparisons = []
-    for index, (fixed, ordinary_agc, paired_agc) in enumerate(
-        zip(manual, native, tandem, strict=True)
-    ):
+    for index, (fixed, paired_agc) in enumerate(zip(manual, tandem, strict=True)):
+        ordinary_agc_by_mode = {
+            mode: cells[index] for mode, cells in native_cells.items()
+        }
         levels = {
             fixed["tx2_gain_requested_db"],
-            ordinary_agc["tx2_gain_requested_db"],
             paired_agc["tx2_gain_requested_db"],
+            *(
+                ordinary_agc["tx2_gain_requested_db"]
+                for ordinary_agc in ordinary_agc_by_mode.values()
+            ),
         }
         if len(levels) != 1:
             raise EvidenceInvalid("modes did not execute an identical TX trajectory")
+        native_minus_manual_by_mode = {
+            mode: _quality_deltas(fixed, ordinary_agc)
+            for mode, ordinary_agc in ordinary_agc_by_mode.items()
+        }
+        tandem_minus_native_by_mode = {
+            mode: _quality_deltas(ordinary_agc, paired_agc)
+            for mode, ordinary_agc in ordinary_agc_by_mode.items()
+        }
         comparisons.append(
             {
                 "level_index": index,
                 "tx2_gain_db": fixed["tx2_gain_requested_db"],
-                "native_minus_manual": _quality_deltas(fixed, ordinary_agc),
+                "native_reference_mode": primary_native_mode,
+                "native_minus_manual": native_minus_manual_by_mode[primary_native_mode],
                 "tandem_minus_manual": _quality_deltas(fixed, paired_agc),
-                "tandem_minus_native": _quality_deltas(ordinary_agc, paired_agc),
+                "tandem_minus_native": tandem_minus_native_by_mode[primary_native_mode],
+                "native_minus_manual_by_mode": native_minus_manual_by_mode,
+                "tandem_minus_native_by_mode": tandem_minus_native_by_mode,
             }
         )
 
@@ -1521,7 +1696,11 @@ def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
     ]
     manual_tone_evidence = _manual_tone_response(manual)
     tandem_evidence = _observed_tandem_evidence(tandem)
-    native_gain_evidence = _observed_native_gain_response(native)
+    native_gain_evidence_by_mode = {
+        mode: _observed_native_gain_response(cells)
+        for mode, cells in native_cells.items()
+    }
+    native_gain_evidence = native_gain_evidence_by_mode[primary_native_mode]
     failures: list[str] = []
     if not manual_reference or not all(
         cell["summary"]["quality_valid"] for cell in manual_reference
@@ -1532,7 +1711,7 @@ def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
             "manual fixed-gain tone did not track/retrace the TX2 trajectory: "
             + ", ".join(manual_tone_evidence["reasons"])
         )
-    for mode, cells in ((MODE_NATIVE, native), (MODE_TANDEM, tandem)):
+    for mode, cells in (*native_cells.items(), (MODE_TANDEM, tandem)):
         failed = [
             int(cell["level_index"])
             for cell in cells
@@ -1540,30 +1719,32 @@ def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
         ]
         if failed:
             failures.append(f"{mode} failed absolute quality at levels {failed}")
-    narrow_native_channels = [
-        channel
-        for channel, span in enumerate(native_gain_evidence["gain_span_db"])
-        if span < NATIVE_MIN_GAIN_SPAN_DB
-    ]
-    if narrow_native_channels:
-        failures.append(
-            "native slow-attack gain did not span at least 1 dB on RX channels "
-            f"{narrow_native_channels}"
-        )
-    for leg, evidence_name in (
-        ("outbound", "outbound_weak_minus_strong_gain_db"),
-        ("return", "return_weak_minus_strong_gain_db"),
-    ):
-        wrong_native_channels = [
+    for native_mode, evidence in native_gain_evidence_by_mode.items():
+        narrow_native_channels = [
             channel
-            for channel, response in enumerate(native_gain_evidence[evidence_name])
-            if response <= 0.0
+            for channel, span in enumerate(evidence["gain_span_db"])
+            if span < NATIVE_MIN_GAIN_SPAN_DB
         ]
-        if wrong_native_channels:
+        if narrow_native_channels:
             failures.append(
-                f"native slow-attack {leg} leg did not keep weak-TX gain higher "
-                f"than strongest-TX gain on RX channels {wrong_native_channels}"
+                f"{native_mode} gain did not span at least 1 dB on RX channels "
+                f"{narrow_native_channels}"
             )
+        for leg, evidence_name in (
+            ("outbound", "outbound_weak_minus_strong_gain_db"),
+            ("return", "return_weak_minus_strong_gain_db"),
+        ):
+            wrong_native_channels = [
+                channel
+                for channel, response in enumerate(evidence[evidence_name])
+                if response <= 0.0
+            ]
+            if wrong_native_channels:
+                failures.append(
+                    f"{native_mode} {leg} leg did not keep weak-TX gain higher "
+                    "than strongest-TX gain on RX channels "
+                    f"{wrong_native_channels}"
+                )
     required_directions = {
         int(TandemEventDirection.INCREASE),
         int(TandemEventDirection.DECREASE),
@@ -1581,13 +1762,19 @@ def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
         "failures": failures,
         "manual_reference_tx2_gain_db": strongest,
         "manual_tone_evidence": manual_tone_evidence,
+        "native_modes": list(native_modes),
+        "native_reference_mode": primary_native_mode,
         "native_gain_span_db": native_gain_evidence["gain_span_db"],
         "native_gain_evidence": native_gain_evidence,
+        "native_gain_evidence_by_mode": native_gain_evidence_by_mode,
         "tandem_evidence": tandem_evidence,
         "comparisons": comparisons,
         "relative_gate_policy": (
             "report numeric deltas; both adaptive modes must independently pass "
             "the common absolute envelope"
+            if native_modes == (MODE_NATIVE,)
+            else "report numeric deltas; every adaptive mode must independently "
+            "pass the common absolute envelope"
         ),
     }
 
@@ -1595,7 +1782,7 @@ def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
 def run_tandem_quality_matrix(
     radio: Issue46Radio, options: TandemQualityOptions
 ) -> tuple[dict[str, Any], Path]:
-    """Execute all three modes and preserve an atomic evidence report."""
+    """Execute every configured mode and preserve an atomic evidence report."""
 
     validate_options(options)
     if radio.options.sample_rate_hz != options.sample_rate_hz:
@@ -1604,6 +1791,19 @@ def run_tandem_quality_matrix(
         raise ValueError("radio and quality sample counts differ")
     if abs(radio.options.tx_gain_db - options.strongest_tx_gain_db) > 0.01:
         raise ValueError("radio TX authorization differs from the trajectory ceiling")
+    if radio.options.center_frequency_hz != options.center_frequency_hz:
+        raise ValueError("radio and quality center frequencies differ")
+
+    center_frequency_readback = radio.read_center_frequency()
+    if any(
+        abs(int(value) - options.center_frequency_hz) > 2
+        for value in center_frequency_readback.values()
+    ):
+        raise EvidenceInvalid(
+            "live RX/TX LO readback differs from the requested common center "
+            f"frequency: {center_frequency_readback}"
+        )
+    expected_gain_table = expected_tandem_gain_table(options.center_frequency_hz)
 
     report_path = (
         options.output_dir / radio.options.serial / "tandem-agc-quality-report.json"
@@ -1628,6 +1828,12 @@ def run_tandem_quality_matrix(
                 "bench RX1 = AD9361/IIO RX2",
             ],
         },
+        "rf": {
+            "center_frequency_hz_requested": options.center_frequency_hz,
+            "center_frequency_hz_readback": center_frequency_readback,
+            "expected_tandem_gain_table_id": int(expected_gain_table),
+            "expected_tandem_gain_table_name": expected_gain_table.name.lower(),
+        },
         "configuration": {
             **asdict(options),
             "output_dir": str(options.output_dir),
@@ -1651,7 +1857,7 @@ def run_tandem_quality_matrix(
     }
     _atomic_json(report_path, report)
     try:
-        for mode in MODES:
+        for mode in quality_modes(options):
             _run_mode(
                 radio,
                 mode=mode,

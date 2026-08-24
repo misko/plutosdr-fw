@@ -47,6 +47,8 @@ DAC_SYNC_REGISTER = 0x0044
 DAC_SELECT_DDS = 0x0
 DAC_SELECT_ZERO = 0x3
 DAC_SELECT_PNXX = 0x9
+MIN_COMMON_CENTER_FREQUENCY_HZ = 70_000_000
+MAX_COMMON_CENTER_FREQUENCY_HZ = 6_000_000_000
 
 
 def DAC_SELECTOR_REGISTER(channel: int) -> int:
@@ -86,6 +88,7 @@ class Issue46Options:
     pn_min_peak_ratio: float
     seed: int = 46
     lock_namespace: str = "issue46"
+    center_frequency_hz: int = 915_000_000
 
     @property
     def refill_period_seconds(self) -> float:
@@ -473,6 +476,21 @@ class Issue46Radio:
             raise FixtureSafetyError(
                 "issue-46 buffers must contain at least 8192 samples"
             )
+        center_frequency_hz = self.options.center_frequency_hz
+        if isinstance(center_frequency_hz, bool) or not isinstance(
+            center_frequency_hz, int
+        ):
+            raise FixtureSafetyError("center frequency must be an integer number of Hz")
+        if not (
+            MIN_COMMON_CENTER_FREQUENCY_HZ
+            <= center_frequency_hz
+            <= MAX_COMMON_CENTER_FREQUENCY_HZ
+        ):
+            raise FixtureSafetyError(
+                "common RX/TX center frequency must be in "
+                f"[{MIN_COMMON_CENTER_FREQUENCY_HZ}, "
+                f"{MAX_COMMON_CENTER_FREQUENCY_HZ}] Hz"
+            )
 
         rx0 = self._phy_channel("voltage0", False)
         rx1 = self._phy_channel("voltage1", False)
@@ -489,18 +507,7 @@ class Issue46Radio:
         for channel in (rx0, rx1):
             self._write_attr(channel, "gain_control_mode", "manual")
             self._write_numeric(channel, "hardwaregain", 20.0, tolerance=0.1)
-        self._write_numeric(
-            self._phy_channel("altvoltage0", True),
-            "frequency",
-            915_000_000,
-            tolerance=2.0,
-        )
-        self._write_numeric(
-            self._phy_channel("altvoltage1", True),
-            "frequency",
-            915_000_000,
-            tolerance=2.0,
-        )
+        self._configure_center_frequency(center_frequency_hz)
         if "calib_mode" in self.phy.attrs:
             self._write_attr(self.phy, "calib_mode", "tx_quad")
 
@@ -512,6 +519,39 @@ class Issue46Radio:
             raise FixtureSafetyError(
                 f"dual-RX scan size is {self.rx.sample_size}, expected 8 bytes/sample"
             )
+
+    def _configure_center_frequency(self, center_frequency_hz: int) -> dict[str, int]:
+        """Tune the common RX/TX LO and return exact numeric readbacks."""
+
+        self._write_numeric(
+            self._phy_channel("altvoltage0", True),
+            "frequency",
+            center_frequency_hz,
+            tolerance=2.0,
+        )
+        self._write_numeric(
+            self._phy_channel("altvoltage1", True),
+            "frequency",
+            center_frequency_hz,
+            tolerance=2.0,
+        )
+        return self.read_center_frequency()
+
+    def read_center_frequency(self) -> dict[str, int]:
+        """Return live RX/TX LO readbacks without changing radio state."""
+
+        return {
+            "rx_lo_hz": round(
+                _first_number(
+                    self._read_attr(self._phy_channel("altvoltage0", True), "frequency")
+                )
+            ),
+            "tx_lo_hz": round(
+                _first_number(
+                    self._read_attr(self._phy_channel("altvoltage1", True), "frequency")
+                )
+            ),
+        }
 
     def _pulse_sync(self) -> None:
         self.tx.reg_write(DAC_SYNC_REGISTER, 1)
