@@ -182,7 +182,7 @@ def test_default_plan_is_full_all_native_all_band_all_radio_and_deterministic(
 
     assert first.fingerprint == second.fingerprint
     assert [run.run_id for run in first.runs] == [run.run_id for run in second.runs]
-    assert len(first.runs) == 2 * 2 * 3 * 6
+    assert len(first.runs) == 2 * 2 * 3 * 11
     assert {run.band.center_frequency_hz for run in first.runs} == {
         915_000_000,
         2_450_000_000,
@@ -220,6 +220,18 @@ def test_default_policy_cases_change_exactly_one_declared_factor(
         case.factor: {key for key, _value in case.overrides}
         for case in plan.policy_cases
     } == expected
+    assert len(plan.policy_cases) == 11
+    assert {
+        factor: sum(case.factor == factor for case in plan.policy_cases)
+        for factor in expected
+    } == {
+        "baseline": 1,
+        "low_power_threshold": 2,
+        "large_lmt_threshold": 2,
+        "adc_thresholds": 2,
+        "low_power_dwell": 2,
+        "cooldown": 2,
+    }
 
 
 @pytest.mark.parametrize(

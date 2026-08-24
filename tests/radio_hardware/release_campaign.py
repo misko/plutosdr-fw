@@ -195,49 +195,72 @@ def _slug(value: str) -> str:
 
 
 def default_policy_cases(base: TandemQualityOptions) -> tuple[PolicyCase, ...]:
-    """Return baseline plus one deterministic alternate for each policy factor."""
+    """Return a controlled lower/baseline/upper sweep for each policy factor."""
 
-    def shifted(value: int, delta: int, minimum: int, maximum: int) -> int:
-        candidate = value + delta
-        return candidate if candidate <= maximum else max(minimum, value - delta)
+    def bounded_alternates(
+        value: int, delta: int, minimum: int, maximum: int
+    ) -> tuple[int, ...]:
+        return tuple(
+            candidate
+            for candidate in (max(minimum, value - delta), min(maximum, value + delta))
+            if candidate != value
+        )
 
-    low = shifted(base.tandem_low_power_threshold, 4, 0, 127)
-    lmt = shifted(base.tandem_large_lmt_overload_threshold, 4, 0, 63)
-    adc_delta = 2 if base.tandem_large_adc_overload_threshold <= 253 else -2
-    large_adc = base.tandem_large_adc_overload_threshold + adc_delta
-    small_adc = base.tandem_small_adc_overload_threshold + adc_delta
-    dwell = shifted(base.tandem_low_power_dwell_periods, 1, 1, 255)
-    cooldown = shifted(base.tandem_cooldown_periods, 8, 0, 255)
+    cases: list[PolicyCase] = [PolicyCase("baseline", "baseline")]
+    for value in bounded_alternates(
+        base.tandem_low_power_threshold, 4, 0, 127
+    ):
+        cases.append(
+            PolicyCase(
+                f"low-power-{value}",
+                "low_power_threshold",
+                (("tandem_low_power_threshold", value),),
+            )
+        )
+    for value in bounded_alternates(
+        base.tandem_large_lmt_overload_threshold, 4, 0, 63
+    ):
+        cases.append(
+            PolicyCase(
+                f"large-lmt-{value}",
+                "large_lmt_threshold",
+                (("tandem_large_lmt_overload_threshold", value),),
+            )
+        )
+    for delta in (-5, 5):
+        large_adc = base.tandem_large_adc_overload_threshold + delta
+        small_adc = base.tandem_small_adc_overload_threshold + delta
+        if 0 <= small_adc <= large_adc <= 255:
+            cases.append(
+                PolicyCase(
+                    f"adc-{large_adc}-{small_adc}",
+                    "adc_thresholds",
+                    (
+                        ("tandem_large_adc_overload_threshold", large_adc),
+                        ("tandem_small_adc_overload_threshold", small_adc),
+                    ),
+                )
+            )
+    for value in bounded_alternates(
+        base.tandem_low_power_dwell_periods, 2, 1, 255
+    ):
+        cases.append(
+            PolicyCase(
+                f"dwell-{value}",
+                "low_power_dwell",
+                (("tandem_low_power_dwell_periods", value),),
+            )
+        )
+    for value in bounded_alternates(base.tandem_cooldown_periods, 16, 0, 255):
+        cases.append(
+            PolicyCase(
+                f"cooldown-{value}",
+                "cooldown",
+                (("tandem_cooldown_periods", value),),
+            )
+        )
     return (
-        PolicyCase("baseline", "baseline"),
-        PolicyCase(
-            f"low-power-{low}",
-            "low_power_threshold",
-            (("tandem_low_power_threshold", low),),
-        ),
-        PolicyCase(
-            f"large-lmt-{lmt}",
-            "large_lmt_threshold",
-            (("tandem_large_lmt_overload_threshold", lmt),),
-        ),
-        PolicyCase(
-            f"adc-{large_adc}-{small_adc}",
-            "adc_thresholds",
-            (
-                ("tandem_large_adc_overload_threshold", large_adc),
-                ("tandem_small_adc_overload_threshold", small_adc),
-            ),
-        ),
-        PolicyCase(
-            f"dwell-{dwell}",
-            "low_power_dwell",
-            (("tandem_low_power_dwell_periods", dwell),),
-        ),
-        PolicyCase(
-            f"cooldown-{cooldown}",
-            "cooldown",
-            (("tandem_cooldown_periods", cooldown),),
-        ),
+        *cases,
     )
 
 
