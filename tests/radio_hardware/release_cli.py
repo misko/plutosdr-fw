@@ -29,6 +29,7 @@ from .experiment import Issue46Options, Issue46Radio
 from .modulated_hardware import (
     MODULATED_MODES,
     ModulatedHardwareOptions,
+    evaluate_modulated_hardware_report,
     run_modulated_hardware_campaign,
     validate_modulated_hardware_options,
 )
@@ -59,6 +60,18 @@ AGGREGATE_CHECKPOINT = "release-hardware-checkpoint.json"
 AGGREGATE_REPORT = "release-hardware-report.json"
 DEFAULT_PHASES = ("steady", "transient", "modulated")
 BASELINE_POLICY = PolicyCase("baseline", "baseline")
+HARNESS_SOURCE_NAMES = (
+    "experiment.py",
+    "metadata_abi.py",
+    "tone_quality.py",
+    "tandem_quality.py",
+    "release_campaign.py",
+    "transient_quality.py",
+    "transient_hardware.py",
+    "modulated_quality.py",
+    "modulated_hardware.py",
+    "release_cli.py",
+)
 
 
 class ReleaseCliError(RuntimeError):
@@ -71,6 +84,7 @@ class ReleaseHardwareOptions:
     firmware_version: str
     firmware_pattern: str
     libiio_source_commit: str
+    harness_sources: tuple[tuple[str, str], ...]
     physical_attenuation_db: float
     output_dir: Path
     phases: tuple[str, ...]
@@ -136,6 +150,11 @@ def _positive_integer(value: str) -> int:
     if parsed <= 0:
         raise argparse.ArgumentTypeError("value must be a positive integer")
     return parsed
+
+
+def _harness_sources() -> tuple[tuple[str, str], ...]:
+    root = Path(__file__).resolve().parent
+    return tuple((name, _sha256(root / name)) for name in HARNESS_SOURCE_NAMES)
 
 
 def _band(value: str) -> BandCase:
@@ -265,6 +284,7 @@ def parse_cli_args(
         firmware_version=firmware,
         firmware_pattern=r"\A" + re.escape(firmware) + r"\Z",
         libiio_source_commit=commit,
+        harness_sources=_harness_sources(),
         physical_attenuation_db=namespace.physical_attenuation_db,
         # Every invocation owns exactly one immutable serial.  Scope even an
         # explicit base directory so four parallel radios cannot share state.
@@ -340,6 +360,13 @@ def phase_specs(options: ReleaseHardwareOptions) -> tuple[PhaseSpec, ...]:
 def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
     if re.fullmatch(r"[0-9a-f]{40}", options.libiio_source_commit) is None:
         raise ValueError("host libiio commit must be exact 40-hex")
+    if tuple(
+        name for name, _digest in options.harness_sources
+    ) != HARNESS_SOURCE_NAMES or any(
+        re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        for _name, digest in options.harness_sources
+    ):
+        raise ValueError("release harness source manifest is incomplete or malformed")
     if re.fullmatch(options.firmware_pattern, options.firmware_version) is None:
         raise ValueError("anchored firmware regex does not match the exact version")
     if options.firmware_pattern != r"\A" + re.escape(options.firmware_version) + r"\Z":
@@ -383,6 +410,11 @@ def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
             )
 
 
+def _assert_harness_unchanged(options: ReleaseHardwareOptions) -> None:
+    if _harness_sources() != options.harness_sources:
+        raise ReleaseCliError("release harness source changed after plan validation")
+
+
 def _json_safe(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
@@ -405,6 +437,7 @@ def _configuration(options: ReleaseHardwareOptions) -> dict[str, Any]:
         "firmware_version": options.firmware_version,
         "firmware_pattern": options.firmware_pattern,
         "libiio_source_commit": options.libiio_source_commit,
+        "harness_sources": dict(options.harness_sources),
         "physical_attenuation_db": options.physical_attenuation_db,
         "output_dir": str(options.output_dir),
         "requested_phases": list(options.phases),
@@ -775,6 +808,7 @@ def production_executor(
     radio_factory: Callable[[Any, Issue46Options], Issue46Radio] = Issue46Radio,
 ) -> PhaseExecutor:
     def execute(spec: PhaseSpec, work_dir: Path) -> Path:
+        _assert_harness_unchanged(options)
         if spec.kind == "steady":
             config, base = _steady_inputs(options, work_dir)
 
@@ -900,8 +934,29 @@ def _identity_errors(
     return errors
 
 
+def _soak_temperature_errors(
+    options: ReleaseHardwareOptions, records: Mapping[str, Any]
+) -> list[str]:
+    if options.policy_set != "baseline":
+        return []
+    errors = []
+    for run_id, record in records.items():
+        if record.get("status") != "complete":
+            continue
+        temperature = record.get("summary", {}).get("temperature")
+        if (
+            not isinstance(temperature, Mapping)
+            or temperature.get("available") is not True
+            or type(temperature.get("count")) is not int
+            or temperature["count"] <= 0
+        ):
+            errors.append(f"baseline soak run {run_id} lacks temperature evidence")
+    return errors
+
+
 def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
     def validate(spec: PhaseSpec, path: Path, work_dir: Path) -> ValidatedPhase:
+        _assert_harness_unchanged(options)
         disk = json.loads(path.read_text(encoding="utf-8"))
         if spec.kind == "steady":
             config, base = _steady_inputs(options, work_dir)
@@ -933,6 +988,9 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                 raise ReleaseCliError(
                     "; ".join((*identity_failures, *cleanup_failures))
                 )
+            temperature_failures = _soak_temperature_errors(options, checkpoint["runs"])
+            if temperature_failures:
+                raise ReleaseCliError("; ".join(temperature_failures))
             verdict = str(disk.get("verdict"))
             cleanup_verified = verdict == "pass" and complete == len(plan.runs)
             return ValidatedPhase(
@@ -964,6 +1022,19 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
         ):
             errors.append("phase RF band differs from plan")
         if spec.kind == "transient":
+            transient_quality = _base_quality(
+                options, output_dir=work_dir, band=spec.band
+            )
+            expected_quality = _json_safe(asdict(transient_quality))
+            assert isinstance(expected_quality, dict)
+            expected_quality["output_dir"] = str(work_dir)
+            expected_configuration = {
+                "quality": expected_quality,
+                "transient_capture": _json_safe(asdict(TransientCaptureOptions())),
+                "kernel_buffers": 1,
+            }
+            if disk.get("configuration") != expected_configuration:
+                errors.append("transient configuration differs from plan")
             if disk.get("required_modes") != list(TRANSIENT_MODES) or [
                 item.get("mode") for item in disk.get("modes", [])
             ] != list(TRANSIENT_MODES):
@@ -1063,6 +1134,16 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                 or evaluation.get("valid") is not True
             ):
                 errors.append("modulated quality evaluation is invalid")
+            else:
+                recomputed_evaluation = _json_safe(
+                    evaluate_modulated_hardware_report(
+                        disk, expected_options.degradation_thresholds
+                    )
+                )
+                if evaluation != recomputed_evaluation:
+                    errors.append(
+                        "modulated quality evaluation differs from recomputation"
+                    )
             summary = {"run_count": len(observed), "evaluation": evaluation}
         if errors:
             raise ReleaseCliError("; ".join(errors))

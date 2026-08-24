@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from pathlib import Path
 
 import pytest
 
-from .modulated_hardware import MODULATED_MODES, ModulatedHardwareOptions
+from .modulated_hardware import (
+    MODULATED_MODES,
+    ModulatedHardwareOptions,
+    evaluate_modulated_hardware_report,
+)
 from .release_campaign import build_release_plan
 from .release_cli import (
     AGGREGATE_CHECKPOINT,
     PhaseSpec,
     ReleaseCliError,
     ValidatedPhase,
+    _base_quality,
+    _json_safe,
+    _soak_temperature_errors,
     _steady_inputs,
     parse_cli_args,
     phase_specs,
@@ -22,6 +29,7 @@ from .release_cli import (
     production_validator,
     run_aggregate,
 )
+from .transient_hardware import TRANSIENT_MODES, TransientCaptureOptions
 
 COMMIT = "6" * 40
 
@@ -66,7 +74,31 @@ def test_parser_anchors_literal_firmware_and_scopes_output_by_serial(
 
     assert options.firmware_pattern == (r"\Av0\.41\-plutoplus\-spf\-tandem\-agc\-v8\Z")
     assert options.output_dir == (tmp_path / "release" / "radio-a").resolve()
+    assert set(dict(options.harness_sources)) >= {
+        "release_cli.py",
+        "release_campaign.py",
+        "transient_hardware.py",
+        "modulated_hardware.py",
+    }
+    assert all(len(digest) == 64 for _name, digest in options.harness_sources)
     assert plan_document(options)["deployment_performed"] is False
+
+
+def test_plan_fingerprint_binds_release_harness_source_manifest(
+    tmp_path: Path,
+) -> None:
+    options = _parse(tmp_path, "--plan-only")
+    planted_sources = (
+        *options.harness_sources[:-1],
+        (options.harness_sources[-1][0], "0" * 64),
+    )
+
+    assert (
+        plan_document(options)["fingerprint"]
+        != plan_document(replace(options, harness_sources=planted_sources))[
+            "fingerprint"
+        ]
+    )
 
 
 def test_parser_rejects_serial_path_traversal_before_output_join(
@@ -285,6 +317,23 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
         "desired_only",
         *(f"blocker_{index:02d}" for index in range(len(modulated.blocker_points))),
     ]
+
+    def quality_summary(case_id: str) -> dict[str, object]:
+        blocked = case_id != "desired_only"
+        return {
+            "schema": "plutosdr-fw.modulated-quality.v1",
+            "reference_id": "reference-46",
+            "quality_valid": True,
+            "quality_reasons": [],
+            "evm_percent": [2.0, 2.0],
+            "mer_db": [34.0, 34.0],
+            "ser": [0.0, 0.0],
+            "ber": [0.0, 0.0],
+            "desired_gain_linear": [1.0, 1.0],
+            "blocker_offset_hz": 320_000.0 if blocked else None,
+            "blocker_power_db": -20.0 if blocked else None,
+        }
+
     cleanup = {
         "verified": True,
         "failures": [],
@@ -319,12 +368,18 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
             for case_id in case_ids
         ],
         "runs": [
-            {"case_id": case_id, "mode": mode}
+            {
+                "case_id": case_id,
+                "mode": mode,
+                "summary": quality_summary(case_id),
+            }
             for case_id in case_ids
             for mode in MODULATED_MODES
         ],
-        "evaluation": {"valid": True},
     }
+    report["evaluation"] = evaluate_modulated_hardware_report(
+        report, modulated.degradation_thresholds
+    )
     report_path.parent.mkdir(parents=True)
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
 
@@ -332,3 +387,101 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
 
     assert validated.verdict == "pass"
     assert validated.cleanup_verified is True
+
+    report["evaluation"]["degradation_valid"] = False
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="differs from recomputation"):
+        production_validator(options)(spec, report_path, work_dir)
+
+
+def test_production_validator_rejects_transient_configuration_substitution(
+    tmp_path: Path,
+) -> None:
+    options = _parse(tmp_path, "--phase", "transient", "--band", "low=915000000")
+    spec = phase_specs(options)[0]
+    work_dir = options.output_dir / "work"
+    report_path = work_dir / "radio-a" / "tandem-agc-transient-report.json"
+    quality = _base_quality(options, output_dir=work_dir, band=spec.band)
+    quality_configuration = _json_safe(asdict(quality))
+    assert isinstance(quality_configuration, dict)
+    quality_configuration["output_dir"] = str(work_dir)
+    gain = {"evidence_valid": True}
+    responses = {
+        "attack": {"evidence_valid": True},
+        "release": {"evidence_valid": True},
+    }
+    cleanup = {
+        "verified": True,
+        "failures": [],
+        "tx1_gain_db": -89.75,
+        "tx2_gain_db": -89.75,
+        "selectors": [3, 3, 3, 3],
+        "dds": {
+            f"altvoltage{index}": {"present": True, "scale": 0.0, "raw": 0.0}
+            for index in range(8)
+        },
+    }
+    report = {
+        "schema": "plutosdr-fw.tandem-agc-transient.v1",
+        "verdict": "pass",
+        "identity": {
+            "serial": options.serial,
+            "uri": "usb:1.2.3",
+            "libiio_source_commit": COMMIT,
+            "context_attrs": {"fw_version": options.firmware_version},
+        },
+        "configuration": {
+            "quality": quality_configuration,
+            "transient_capture": _json_safe(asdict(TransientCaptureOptions())),
+            "kernel_buffers": 1,
+        },
+        "rf": {"center_frequency_hz_requested": 915_000_000},
+        "cleanup": cleanup,
+        "required_modes": list(TRANSIENT_MODES),
+        "modes": [
+            {
+                "mode": mode,
+                "verdict": "pass",
+                "gain_evidence": gain,
+                "responses": responses,
+            }
+            for mode in TRANSIENT_MODES
+        ],
+        "comparison": [
+            {"mode": mode, "gain_evidence": gain} for mode in TRANSIENT_MODES
+        ],
+    }
+    report_path.parent.mkdir(parents=True)
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    assert production_validator(options)(spec, report_path, work_dir).verdict == "pass"
+
+    report["configuration"]["quality"]["sample_rate_hz"] = 1_000_000
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="configuration differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+
+def test_baseline_soak_requires_temperature_evidence(tmp_path: Path) -> None:
+    soak = _parse(
+        tmp_path,
+        "--phase",
+        "steady",
+        "--policy-set",
+        "baseline",
+    )
+    records = {
+        "run-a": {
+            "status": "complete",
+            "summary": {"temperature": {"available": False, "count": 0}},
+        }
+    }
+
+    assert _soak_temperature_errors(soak, records) == [
+        "baseline soak run run-a lacks temperature evidence"
+    ]
+    records["run-a"]["summary"]["temperature"] = {
+        "available": True,
+        "count": 3,
+        "median_c": 35.0,
+    }
+    assert _soak_temperature_errors(soak, records) == []
