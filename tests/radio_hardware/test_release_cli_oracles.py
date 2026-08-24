@@ -1379,7 +1379,15 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
             "kernel_buffers": 1,
         },
         "evidence_policy": transient_evidence_policy(capture_options),
-        "rf": {"center_frequency_hz_requested": 915_000_000},
+        "rf": {
+            "center_frequency_hz_requested": 915_000_000,
+            "center_frequency_hz_readback": {
+                "rx_lo_hz": 915_000_000,
+                "tx_lo_hz": 915_000_000,
+            },
+            "tone_hz": quality.tone_hz,
+            "dds_scale": quality.dds_scale,
+        },
         "cleanup": cleanup,
         "required_modes": list(TRANSIENT_MODES),
         "modes": [
@@ -1519,6 +1527,30 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
             record["sample_sequence_before"],
             record["sample_sequence_after"],
         )
+
+    report = json.loads(json.dumps(valid_report))
+    report["rf"].pop("center_frequency_hz_readback")
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="transient RF readback differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["rf"]["dds_scale"] = quality.dds_scale / 2
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="transient RF readback differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["rf"]["center_frequency_hz_readback"]["rx_lo_hz"] += 3
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="transient RF readback differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    report["rf"]["tone_hz"] += 1
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="transient RF readback differs"):
+        production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))
     manual = report_mode(report, "manual_fixed")

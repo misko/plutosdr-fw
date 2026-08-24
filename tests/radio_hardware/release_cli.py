@@ -3119,6 +3119,28 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             transient_quality = _base_quality(
                 options, output_dir=work_dir, band=spec.band
             )
+            center_readback = (
+                rf.get("center_frequency_hz_readback")
+                if isinstance(rf, Mapping)
+                else None
+            )
+            if (
+                not isinstance(rf, Mapping)
+                or rf.get("center_frequency_hz_requested")
+                != transient_quality.center_frequency_hz
+                or rf.get("tone_hz") != transient_quality.tone_hz
+                or rf.get("dds_scale") != transient_quality.dds_scale
+                or not isinstance(center_readback, Mapping)
+                or any(
+                    type(center_readback.get(name)) is not int
+                    or abs(
+                        center_readback[name] - transient_quality.center_frequency_hz
+                    )
+                    > 2
+                    for name in ("rx_lo_hz", "tx_lo_hz")
+                )
+            ):
+                errors.append("transient RF readback differs from plan")
             expected_quality = _json_safe(asdict(transient_quality))
             assert isinstance(expected_quality, dict)
             expected_quality["output_dir"] = str(work_dir)
