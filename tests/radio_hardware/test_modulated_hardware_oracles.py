@@ -95,6 +95,8 @@ class _OutputBuffer:
         return len(self.payload)
 
     def write(self, payload: bytes | bytearray) -> int:
+        if not isinstance(payload, bytearray):
+            raise TypeError("underlying buffer is not writable")
         self.payload = bytes(payload)
         return len(self.payload) - int(self.short_write)
 

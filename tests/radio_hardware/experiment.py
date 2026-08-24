@@ -757,7 +757,12 @@ class Issue46Radio:
                     f"cyclic DMA buffer has {len(buffer)} bytes, expected "
                     f"{expected_buffer_bytes}"
                 )
-            written = int(buffer.write(tx2_payload))
+            # pylibiio's Buffer.write() obtains a ctypes view with
+            # ``from_buffer`` and therefore requires writable host storage.
+            # Keep the immutable payload above for hashing/comparison, but
+            # hand the transport an exact mutable copy.
+            writable_payload = bytearray(tx2_payload)
+            written = int(buffer.write(writable_payload))
             if written != expected_buffer_bytes:
                 raise FixtureSafetyError(
                     f"cyclic DMA write accepted {written} bytes, expected "
