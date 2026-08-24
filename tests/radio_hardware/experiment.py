@@ -598,6 +598,7 @@ class Issue46Radio:
         self.rx.set_kernel_buffers_count(kernel_buffers)
         value = None
         metadata_abi: Optional[int] = None
+        body_error: BaseException | None = None
         try:
             if api == "ordinary":
                 value = self.iio.Buffer(self.rx, samples_per_channel, False)
@@ -615,10 +616,25 @@ class Issue46Radio:
             else:
                 raise ValueError(f"unknown capture API {api!r}")
             yield value, metadata_abi
-        finally:
+        except BaseException as error:  # noqa: BLE001 - preserve body and close
+            body_error = error
+        close_error: BaseException | None = None
+        try:
             close_iio_object(value)
+        except BaseException as error:  # noqa: BLE001 - close is mandatory
+            close_error = error
+        finally:
             value = None
             gc.collect()
+        if body_error is not None and close_error is not None:
+            raise BaseExceptionGroup(
+                "IIO buffer body and synchronous close both failed",
+                [body_error, close_error],
+            ) from None
+        if body_error is not None:
+            raise body_error.with_traceback(body_error.__traceback__)
+        if close_error is not None:
+            raise close_error.with_traceback(close_error.__traceback__)
 
     def mute_all(self) -> None:
         """Force the fixture into its verified non-transmitting configuration."""

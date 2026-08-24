@@ -183,11 +183,14 @@ until the buffer is closed; the default worst-case retained IQ is about 6 MiB
 and every configuration is capped at 64 MiB.
 
 - `timestamp_stimulus_command()` brackets every write in monotonic host time.
-  Ordinary-IIO closes its sample-time bracket with observed IQ on an explicitly
-  session-local axis. Tandem reads the coherent low 32 bits of the same FPGA
-  counter used by metadata immediately before and after the TX write. The upper
-  bound is accepted only after a second post-write read proves that the CDC
-  value advanced; low words are extended around nearby 64-bit frame metadata.
+  Ordinary IIO only positions the write on an ordinal axis over returned IQ;
+  refill/readback intervals are unobserved, so its settling spans are not
+  hardware latency and cannot be ranked against tandem timing. Tandem reads the
+  coherent low 32 bits of the same FPGA counter used by metadata immediately
+  before and after the TX write. The upper bound is accepted only after two
+  distinct advances beyond the initial post-write read: a word already in the
+  closed-loop CDC path can explain the first, while the second is causally
+  post-command. Low words are extended around nearby 64-bit frame metadata.
 - `analyze_immediate_dual_rx()` analyzes fixed windows beginning at sample zero
   of each returned frame. It does not discard the transition and reports
   dual-RX tone level, SNR, clipping, differential phase, and phase stability.
@@ -195,10 +198,12 @@ and every configuration is capped at 64 MiB.
   to louder/quieter command intervals and reports conservative lower/upper
   attack and release latency bounds in samples and seconds.
 - `calculate_transient_response()` requires contiguous IQ windows outside a
-  command bracket. A metadata gap wholly inside that bracket is counted as
-  uncertainty. It reports window-bounded signal settling, overshoot, opposite
-  excursion, ringing crossings, post-settle excursions, SNR, clipping, and
-  phase excursion.
+  command bracket. Tandem reports hardware-counter-bounded settling and a
+  continuous hardware-sample observation scope. Ordinary modes report only
+  spans and extrema within returned IQ windows; unobserved refill intervals can
+  hide response behavior. Shared comparisons therefore null ordinary hardware
+  latency fields and retain an explicit returned-IQ-only scope beside their
+  diagnostic overshoot, ringing, SNR, clipping, and phase values.
 
 The metadata provider derives `buffer_sequence` from the same FPGA sample
 counter carried in `first_sample_sequence`, but it does not return exact events

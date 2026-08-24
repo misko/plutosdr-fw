@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import threading
 from builtins import BaseExceptionGroup
@@ -14,7 +15,7 @@ from typing import Any
 import pytest
 
 from . import transient_hardware as transient_hardware_module
-from .experiment import EvidenceInvalid
+from .experiment import EvidenceInvalid, Issue46Radio
 from .metadata_abi import (
     TandemEventDirection,
     TandemGainEvent,
@@ -119,10 +120,19 @@ class _FakeRadio:
         self.omit_release_event = False
         self.fail_next_capture_with_mute_error = False
         self.mute_failures_remaining = 0
+        self.cancel_failures_remaining = 0
+        self.buffer_cancelled = threading.Event()
+        self.block_metadata_refill = False
+        self.block_metadata_refill_at_count: int | None = None
+        self.blocked_refill_waiting = threading.Event()
+        self.buffer_cancel_calls = 0
+        self.mute_while_buffer_open_count = 0
         self.cleanup_verified = False
         self.closed = False
 
     def mute_all(self) -> None:
+        if self.buffer_open:
+            self.mute_while_buffer_open_count += 1
         self.tx_gain_db = -89.75
         self.operations.append(("mute_all",))
         if self.mute_failures_remaining:
@@ -187,16 +197,28 @@ class _FakeRadio:
             )
             self.metadata_open = api == "metadata"
             self.buffer_open = True
+            self.buffer_cancelled.clear()
             if self.metadata_open:
                 self.metadata_previous_level = self.tx_gain_db
             try:
-                yield object(), 2 if self.metadata_open else None
+                yield (
+                    SimpleNamespace(cancel=self.cancel_buffer),
+                    (2 if self.metadata_open else None),
+                )
             finally:
                 self.metadata_open = False
                 self.buffer_open = False
                 self.operations.append(("buffer_exit", api))
 
         return opened()
+
+    def cancel_buffer(self) -> None:
+        self.buffer_cancel_calls += 1
+        self.operations.append(("buffer_cancel",))
+        self.buffer_cancelled.set()
+        if self.cancel_failures_remaining:
+            self.cancel_failures_remaining -= 1
+            raise RuntimeError("planted buffer cancel failure")
 
     def _metadata(self, *, samples: int) -> Any:
         events: tuple[TandemGainEvent, ...] = ()
@@ -276,6 +298,14 @@ class _FakeRadio:
         self.capture_thread_names.append(threading.current_thread().name)
         if metadata:
             self.metadata_capture_thread_names.append(threading.current_thread().name)
+        if metadata and (
+            self.block_metadata_refill
+            or self.block_metadata_refill_at_count == self.metadata_capture_count
+        ):
+            self.blocked_refill_waiting.set()
+            if not self.buffer_cancelled.wait(timeout=2.0):
+                raise EvidenceInvalid("planted refill was not cancelled")
+            raise OSError(errno.EBADF, "planted cancelled refill")
         if (
             metadata
             and self.coordinate_attack_capture
@@ -532,8 +562,9 @@ def test_report_retains_immediate_iq_gain_and_tandem_event_evidence(
         assert all(value > 0 for value in gain["release_gain_change_db"])
         assert all(
             bound["evidence"] == "pre_refill_readback"
-            for bound in gain["attack_latency_bounds"]
+            for bound in gain["attack_returned_iq_observation_bounds"]
         )
+        assert gain["hardware_latency_qualified"] is False
 
     tandem = modes["tandem_auto"]
     assert tandem["timing_basis"] == "hardware_sample_counter"
@@ -568,17 +599,32 @@ def test_host_writes_have_bounded_sample_intervals_and_initial_is_unanchored(
             command = commands[command_id]
             assert command["sample_uncertainty"] > 0
             if mode["mode"] == "tandem_auto":
-                assert command["sample_uncertainty"] == 256
+                assert command["sample_uncertainty"] == 384
                 assert (
                     command["timing_role"]
                     == "host_write_bracketed_by_coherent_fpga_counter"
                 )
-                assert command["sample_counter_bracket"]["post_write_read_count"] == 2
+                assert command["sample_counter_bracket"]["post_write_read_count"] == 3
             else:
                 assert command["sample_uncertainty"] == 1_024
-                assert command["timing_role"] == "host_write_bracketed_by_observed_iq"
+                assert command["timing_role"] == (
+                    "host_write_positioned_on_returned_iq_ordinal_axis"
+                )
         if mode["mode"] != "tandem_auto":
-            assert mode["timing_basis"].startswith("ordinary_session_local_")
+            assert mode["timing_basis"] == "ordinary_returned_iq_ordinal_axis"
+            for response in mode["responses"].values():
+                assert response["hardware_latency_qualified"] is False
+                assert response["timing_qualification"] == (
+                    "returned_iq_observation_only"
+                )
+                assert not any(
+                    key.startswith("signal_settling_latency_") for key in response
+                )
+            comparison = next(
+                item for item in report["comparison"] if item["mode"] == mode["mode"]
+            )
+            assert comparison["attack"]["signal_settling_latency_lower_samples"] is None
+            assert comparison["attack"]["signal_settling_latency_lower_seconds"] is None
 
 
 def test_tandem_command_bracket_rejects_even_a_matched_metadata_gap(
@@ -598,7 +644,7 @@ def test_runner_rejects_excessive_command_sample_uncertainty_and_checkpoints(
 ) -> None:
     radio = _FakeRadio(tmp_path)
     radio.sample_counter_step = 1_024
-    with pytest.raises(EvidenceInvalid, match=r"uncertainty 2048 exceeds 1024"):
+    with pytest.raises(EvidenceInvalid, match=r"uncertainty 3072 exceeds 1024"):
         _run_fake(
             radio,
             _quality(tmp_path),
@@ -608,7 +654,7 @@ def test_runner_rejects_excessive_command_sample_uncertainty_and_checkpoints(
     report_path = tmp_path / radio.options.serial / "tandem-agc-transient-report.json"
     persisted = json.loads(report_path.read_text(encoding="utf-8"))
     assert persisted["verdict"] == "invalid"
-    assert "uncertainty 2048 exceeds 1024" in persisted["fatal_error"]
+    assert "uncertainty 3072 exceeds 1024" in persisted["fatal_error"]
     assert radio.operations[-1] == ("mute_all",)
 
 
@@ -705,8 +751,8 @@ def test_tandem_refills_run_continuously_while_counter_timed_command_executes(
         + len(tandem["release_frames"])
     )
     assert (
-        attack["sample_counter_bracket"]["raw_post_write_advanced"]
-        != (attack["sample_counter_bracket"]["raw_post_write_initial"])
+        attack["sample_counter_bracket"]["raw_post_write_causal"]
+        != (attack["sample_counter_bracket"]["raw_post_write_first_advance"])
     )
     assert all(
         frame["continuity"]["buffer_delta"] in (None, 1)
@@ -773,8 +819,152 @@ def test_tandem_counter_bracket_requires_post_write_cdc_advance(
 ) -> None:
     radio = _FakeRadio(tmp_path)
     radio.freeze_sample_counter = True
-    with pytest.raises(EvidenceInvalid, match="post-write FPGA counter advance"):
+    with pytest.raises(EvidenceInvalid, match="two post-write FPGA counter advances"):
         _run_fake(radio, _quality(tmp_path))
+
+
+def test_tandem_counter_bracket_rejects_an_empty_sample_interval(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.scripted_counter_reads = [900, 950, 975, 1_000]
+    with pytest.raises(EvidenceInvalid, match="bracket is empty"):
+        transient_hardware_module._timestamp_tandem_command(
+            radio,
+            "planted_empty_bracket",
+            -30.0,
+            last_observed_frame_end=1_000,
+            clock_ns=_Clocks().clock_ns,
+            max_host_jitter_ns=1_000,
+            max_sample_uncertainty=16_384,
+            readback_tolerance_db=0.25,
+        )
+
+
+def test_tandem_response_partition_accepts_only_the_bounded_producer_prefix() -> None:
+    frame_samples = 1_024
+    frames = [
+        {
+            "first_sample_sequence": index * frame_samples,
+            "sample_end_exclusive": (index + 1) * frame_samples,
+        }
+        for index in range(7)
+    ]
+    accepted = transient_hardware_module._response_partition(
+        frames,
+        transient_hardware_module.StimulusCommand(
+            "bounded_prefix",
+            -30.0,
+            -30.0,
+            1_000,
+            1_100,
+            2 * frame_samples,
+            5 * frame_samples,
+        ),
+        required_fully_post_frames=2,
+    )
+    assert accepted == {
+        "precommand_prefetch_frames": 2,
+        "command_bracket_frames": 3,
+        "fully_post_command_frames": 2,
+        "required_fully_post_command_frames": 2,
+        "maximum_non_post_command_frames": 5,
+    }
+
+    with pytest.raises(EvidenceInvalid, match="exceeding the 5-frame producer"):
+        transient_hardware_module._response_partition(
+            frames,
+            transient_hardware_module.StimulusCommand(
+                "oversized_prefix",
+                -30.0,
+                -30.0,
+                1_000,
+                1_100,
+                2 * frame_samples,
+                6 * frame_samples,
+            ),
+            required_fully_post_frames=2,
+        )
+
+
+def test_blocked_tandem_refill_is_muted_cancelled_and_joined_before_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(transient_hardware_module, "_CAPTURE_THREAD_WAIT_SECONDS", 0.05)
+    radio = _FakeRadio(tmp_path)
+    radio.block_metadata_refill = True
+
+    with pytest.raises(EvidenceInvalid, match="returned no frame before timeout"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert radio.blocked_refill_waiting.is_set()
+    assert radio.buffer_cancel_calls == 1
+    assert radio.mute_while_buffer_open_count >= 1
+    assert not any(
+        thread.name == "tandem-transient-acquisition"
+        for thread in threading.enumerate()
+    )
+    metadata_enter = max(
+        index
+        for index, operation in enumerate(radio.operations)
+        if operation[:2] == ("buffer_enter", "metadata")
+    )
+    emergency_mute = radio.operations.index(("mute_all",), metadata_enter + 1)
+    cancel = radio.operations.index(("buffer_cancel",), emergency_mute + 1)
+    metadata_exit = radio.operations.index(("buffer_exit", "metadata"), cancel + 1)
+    assert emergency_mute < cancel < metadata_exit
+
+
+def test_successful_tandem_shutdown_cancels_post_evidence_refill_before_close(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    capture = _capture_options()
+    consumed = (
+        capture.precondition_stable_frames + 1 + 2 * (capture.response_frames + 5)
+    )
+    radio.block_metadata_refill_at_count = consumed
+
+    report, _path = _run_fake(radio, _quality(tmp_path), capture=capture)
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
+
+    assert report["verdict"] == "pass"
+    assert radio.blocked_refill_waiting.is_set()
+    assert radio.buffer_cancel_calls == 1
+    assert tandem["acquisition"]["buffer_cancelled_before_join"] is True
+    assert not any(
+        thread.name == "tandem-transient-acquisition"
+        for thread in threading.enumerate()
+    )
+    cancel = radio.operations.index(("buffer_cancel",))
+    metadata_exit = radio.operations.index(("buffer_exit", "metadata"), cancel + 1)
+    assert cancel < metadata_exit
+
+
+def test_tandem_cancel_failure_is_preserved_with_acquisition_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(transient_hardware_module, "_CAPTURE_THREAD_WAIT_SECONDS", 0.05)
+    radio = _FakeRadio(tmp_path)
+    radio.block_metadata_refill = True
+    radio.cancel_failures_remaining = 1
+
+    with pytest.raises(BaseExceptionGroup) as raised:
+        _run_fake(radio, _quality(tmp_path))
+
+    def leaves(error: BaseException) -> list[BaseException]:
+        if isinstance(error, BaseExceptionGroup):
+            return [child for item in error.exceptions for child in leaves(item)]
+        return [error]
+
+    messages = [str(error) for error in leaves(raised.value)]
+    assert any("returned no frame before timeout" in message for message in messages)
+    assert any("planted buffer cancel failure" in message for message in messages)
+    assert radio.mute_while_buffer_open_count >= 1
+    assert not any(
+        thread.name == "tandem-transient-acquisition"
+        for thread in threading.enumerate()
+    )
 
 
 def test_low32_extension_accepts_wrap_and_rejects_half_range_ambiguity() -> None:
@@ -820,6 +1010,29 @@ def test_runner_preserves_body_and_fail_safe_mute_errors(tmp_path: Path) -> None
     )
     assert persisted["verdict"] == "invalid"
     assert "ExceptionGroup" in persisted["fatal_error"]
+
+
+def test_iio_buffer_close_failure_cannot_mask_body_failure() -> None:
+    class ClosingBuffer:
+        def close(self) -> None:
+            raise RuntimeError("planted synchronous close failure")
+
+    fake_radio = SimpleNamespace(
+        rx=SimpleNamespace(set_kernel_buffers_count=lambda _count: None),
+        iio=SimpleNamespace(Buffer=lambda *_args: ClosingBuffer()),
+    )
+
+    with pytest.raises(BaseExceptionGroup) as raised, Issue46Radio.buffer(
+        fake_radio,
+        "ordinary",
+        1,
+        1_024,
+    ):
+        raise EvidenceInvalid("planted buffer body failure")
+
+    messages = [str(error) for error in raised.value.exceptions]
+    assert any("planted buffer body failure" in message for message in messages)
+    assert any("planted synchronous close failure" in message for message in messages)
 
 
 def test_static_capture_validation_happens_before_any_radio_operation(

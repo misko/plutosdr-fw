@@ -4,8 +4,8 @@ This module complements :mod:`transient_quality` with the smallest hardware
 orchestration layer needed by the existing TX2 loopback fixture.  It keeps the
 transport duck typed so deterministic fakes can exercise the complete runner.
 Only tandem metadata is described as hardware sample time.  Ordinary IIO uses
-an explicitly labelled, session-local contiguous refill axis and native gain
-readbacks bracketing every returned frame.
+an explicitly labelled ordinal axis over returned IQ and native gain readbacks
+bracketing every returned frame; unobserved refill intervals are not latency.
 
 The caller owns the :class:`Issue46Radio` lifecycle.  This runner requests a
 mute on every exit and points ``radio._report_path`` at its atomic report, but
@@ -14,6 +14,7 @@ only ``Issue46Radio.close()`` performs and records verified final cleanup.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import math
@@ -80,6 +81,8 @@ _GAP_CONTEXTS = {
     _GAP_CONTEXT_PREFETCH,
     _GAP_CONTEXT_ACQUISITION,
 }
+_ORDINARY_TIMING_BASIS = "ordinary_returned_iq_ordinal_axis"
+_TANDEM_TIMING_BASIS = "hardware_sample_counter"
 
 
 class TransientRadioTransport(Protocol):
@@ -175,14 +178,17 @@ def transient_evidence_policy(
 
     return {
         "ordinary_timing": (
-            "session-local contiguous refill axis reset for each mode; never "
-            "compared across sessions and not a hardware timestamp"
+            "ordinary IIO coordinates are ordinals over returned IQ only; host "
+            "refill/readback intervals are unobserved, so settling fields are "
+            "observation spans, not hardware latency, and must not be ranked "
+            "against FPGA-timed tandem latency"
         ),
         "tandem_timing": "metadata-v5 FPGA sample counter",
         "command_latency": (
             "tandem uses coherent FPGA low32 reads around the TX write and "
-            "requires a counter update observed after an initial post-write read; "
-            "ordinary modes retain closed observed-IQ bounds; never point estimates"
+            "requires two distinct counter advances after an initial post-write "
+            "read so the second is causally post-command; ordinary modes retain "
+            "returned-IQ ordinal positions only; never point estimates"
         ),
         "initial_condition": (
             "pre-session weak write remains sample-unbounded; retained stable IQ "
@@ -711,14 +717,14 @@ def _capture_frame(
         )
         sample_gap_before = int(continuity["sample_gap_before"])
         first_sample = parsed.first_sample_sequence
-        timing_basis = "hardware_sample_counter"
+        timing_basis = _TANDEM_TIMING_BASIS
     else:
         if raw_metadata is not None:
             raise EvidenceInvalid(
                 "ordinary transient capture unexpectedly returned metadata"
             )
         first_sample = state.next_nominal_sample
-        timing_basis = "ordinary_session_local_contiguous_refill_axis"
+        timing_basis = _ORDINARY_TIMING_BASIS
 
     record: dict[str, Any] = {
         "frame_index": state.frame_index,
@@ -727,7 +733,8 @@ def _capture_frame(
         "timing_basis": timing_basis,
         "first_sample_sequence": first_sample,
         "sample_end_exclusive": first_sample + capture.frame_samples,
-        "sample_gap_before": sample_gap_before,
+        "sample_gap_before": sample_gap_before if metadata_mode else None,
+        "physical_sample_continuity_proven": metadata_mode,
         "gap_context": gap_context,
         "command_boundary_gap_allowed": False,
     }
@@ -793,6 +800,41 @@ def _materialize_deferred_frames(
             record["iq_path"] = str(iq_path)
 
 
+def _require_returned_window_quality(
+    baseline: Sequence[Mapping[str, Any]],
+    attack: Sequence[Mapping[str, Any]],
+    release: Sequence[Mapping[str, Any]],
+    *,
+    attack_command: StimulusCommand,
+    release_command: StimulusCommand,
+) -> None:
+    """Reject invalid returned windows outside uncertain command intervals."""
+
+    def command_intersects(window: Mapping[str, Any], command: StimulusCommand) -> bool:
+        assert command.sample_sequence_before is not None
+        assert command.sample_sequence_after is not None
+        return (
+            int(window["sample_start"]) < command.sample_sequence_after
+            and int(window["sample_end_exclusive"]) > command.sample_sequence_before
+        )
+
+    checks = (
+        (baseline, None),
+        (attack, attack_command),
+        (release, release_command),
+    )
+    for frames, command in checks:
+        for frame in frames:
+            for window in frame["analysis"]["windows"]:
+                if command is not None and command_intersects(window, command):
+                    continue
+                if window.get("quality_valid") is not True:
+                    raise EvidenceInvalid(
+                        "transient returned-IQ window outside a command interval "
+                        f"failed quality gates: {window.get('quality_reasons')!r}"
+                    )
+
+
 class _TandemCapturePump:
     """Continuously refill tandem IQ on one bounded acquisition-only thread."""
 
@@ -840,6 +882,14 @@ class _TandemCapturePump:
                     self.discarded_tail_frames += 1
                     return
         except BaseException as error:  # noqa: BLE001 - cross-thread propagation
+            if (
+                self._stop.is_set()
+                and isinstance(error, OSError)
+                and error.errno == errno.EBADF
+            ):
+                # iio_buffer_cancel() makes the pending/future refill return
+                # EBADF by contract.  Suppress only that explicit stop result.
+                return
             self._terminal_error = error
             self._offer(error)
 
@@ -856,8 +906,11 @@ class _TandemCapturePump:
         self.consumed_frames += 1
         return item
 
-    def stop(self) -> None:
+    def request_stop(self) -> None:
         self._stop.set()
+
+    def stop(self) -> None:
+        self.request_stop()
         self._thread.join(timeout=_CAPTURE_THREAD_WAIT_SECONDS)
         if self._thread.is_alive():
             raise EvidenceInvalid("tandem acquisition thread did not stop")
@@ -927,41 +980,55 @@ def _timestamp_tandem_command(
     )
 
     raw_post_write_initial = _strict_low32_counter(radio.read_rx_sample_counter_low32())
-    raw_post_write_advanced = raw_post_write_initial
+    raw_post_write_first_advance: int | None = None
+    raw_post_write_causal: int | None = None
     post_write_read_count = 1
     for _ in range(8):
-        raw_post_write_advanced = _strict_low32_counter(
-            radio.read_rx_sample_counter_low32()
-        )
+        current = _strict_low32_counter(radio.read_rx_sample_counter_low32())
         post_write_read_count += 1
-        if raw_post_write_advanced != raw_post_write_initial:
+        if raw_post_write_first_advance is None:
+            if current != raw_post_write_initial:
+                raw_post_write_first_advance = current
+        elif current != raw_post_write_first_advance:
+            raw_post_write_causal = current
             break
     else:
         raise EvidenceInvalid(
-            f"command {command_id!r} did not observe a post-write FPGA counter advance"
+            f"command {command_id!r} did not observe two post-write FPGA "
+            "counter advances"
         )
+    assert raw_post_write_first_advance is not None
+    assert raw_post_write_causal is not None
 
     initial_delta = (raw_post_write_initial - raw_before) % _UINT32_MODULUS
-    advanced_delta = (
-        raw_post_write_advanced - raw_post_write_initial
+    first_advance_delta = (
+        raw_post_write_first_advance - raw_post_write_initial
     ) % _UINT32_MODULUS
-    if initial_delta >= _UINT32_MODULUS // 2 or not (
-        0 < advanced_delta < _UINT32_MODULUS // 2
+    causal_advance_delta = (
+        raw_post_write_causal - raw_post_write_first_advance
+    ) % _UINT32_MODULUS
+    if initial_delta >= _UINT32_MODULUS // 2 or not all(
+        0 < delta < _UINT32_MODULUS // 2
+        for delta in (first_advance_delta, causal_advance_delta)
     ):
         raise EvidenceInvalid(
             f"command {command_id!r} FPGA counter bracket is ambiguous"
         )
     extended_post_write_initial = extended_before + initial_delta
-    extended_after = extended_post_write_initial + advanced_delta
+    extended_post_write_first_advance = (
+        extended_post_write_initial + first_advance_delta
+    )
+    extended_after = extended_post_write_first_advance + causal_advance_delta
     if extended_after >= _UINT64_MODULUS:
         raise EvidenceInvalid(
             f"command {command_id!r} FPGA counter bracket exceeds uint64"
         )
     lower = max(last_observed_frame_end, extended_before)
     uncertainty = extended_after - lower
-    if uncertainty < 0:
+    if uncertainty <= 0:
         raise EvidenceInvalid(
-            f"command {command_id!r} FPGA counter bracket predates observed IQ"
+            f"command {command_id!r} FPGA counter bracket is empty or predates "
+            "observed IQ"
         )
     if uncertainty > max_sample_uncertainty:
         raise EvidenceInvalid(
@@ -980,9 +1047,11 @@ def _timestamp_tandem_command(
         "extension_reference_sample": last_observed_frame_end,
         "raw_before": raw_before,
         "raw_post_write_initial": raw_post_write_initial,
-        "raw_post_write_advanced": raw_post_write_advanced,
+        "raw_post_write_first_advance": raw_post_write_first_advance,
+        "raw_post_write_causal": raw_post_write_causal,
         "extended_before": extended_before,
         "extended_post_write_initial": extended_post_write_initial,
+        "extended_post_write_first_advance": (extended_post_write_first_advance),
         "extended_after": extended_after,
         "post_write_read_count": post_write_read_count,
         "lower_clamped_to_last_observed_frame_end": lower != extended_before,
@@ -1001,6 +1070,53 @@ def _response_gap_context(frame: Mapping[str, Any], command: StimulusCommand) ->
     if start < command.sample_sequence_after:
         return _GAP_CONTEXT_COMMAND
     return _GAP_CONTEXT_CONTINUOUS_RESPONSE
+
+
+def _response_partition(
+    frames: Sequence[Mapping[str, Any]],
+    command: StimulusCommand,
+    *,
+    required_fully_post_frames: int,
+) -> dict[str, int]:
+    """Prove the bounded producer prefix leaves the full response budget."""
+
+    assert command.sample_sequence_before is not None
+    assert command.sample_sequence_after is not None
+    contexts = [_response_gap_context(frame, command) for frame in frames]
+    non_post = sum(
+        int(frame["first_sample_sequence"]) < command.sample_sequence_after
+        for frame in frames
+    )
+    fully_post = len(frames) - non_post
+    if non_post > _TANDEM_CAPTURE_TAIL_FRAMES:
+        raise EvidenceInvalid(
+            f"command {command.command_id!r} has {non_post} pre/bracketed tandem "
+            f"frames, exceeding the {_TANDEM_CAPTURE_TAIL_FRAMES}-frame producer "
+            "tail bound"
+        )
+    if fully_post < required_fully_post_frames:
+        raise EvidenceInvalid(
+            f"command {command.command_id!r} retained only {fully_post} fully "
+            f"post-command frames, requires {required_fully_post_frames}"
+        )
+    if contexts != sorted(
+        contexts,
+        key={
+            _GAP_CONTEXT_PREFETCH: 0,
+            _GAP_CONTEXT_COMMAND: 1,
+            _GAP_CONTEXT_CONTINUOUS_RESPONSE: 2,
+        }.__getitem__,
+    ):
+        raise EvidenceInvalid(
+            f"command {command.command_id!r} response phases are not sample ordered"
+        )
+    return {
+        "precommand_prefetch_frames": contexts.count(_GAP_CONTEXT_PREFETCH),
+        "command_bracket_frames": contexts.count(_GAP_CONTEXT_COMMAND),
+        "fully_post_command_frames": fully_post,
+        "required_fully_post_command_frames": required_fully_post_frames,
+        "maximum_non_post_command_frames": _TANDEM_CAPTURE_TAIL_FRAMES,
+    }
 
 
 def _ordinary_stable_run(
@@ -1105,10 +1221,10 @@ def _gain_transition_bounds(
                     "rx_channel": channel,
                     "evidence": "pre_refill_readback",
                     "observed_gain_db": before,
-                    "latency_lower_samples": max(
+                    "returned_iq_observation_span_lower_axis_units": max(
                         0, start - command.sample_sequence_after
                     ),
-                    "latency_upper_samples": max(
+                    "returned_iq_observation_span_upper_axis_units": max(
                         0, end - command.sample_sequence_before
                     ),
                 }
@@ -1118,10 +1234,10 @@ def _gain_transition_bounds(
                     "rx_channel": channel,
                     "evidence": "post_refill_readback",
                     "observed_gain_db": after,
-                    "latency_lower_samples": max(
+                    "returned_iq_observation_span_lower_axis_units": max(
                         0, start - command.sample_sequence_after
                     ),
-                    "latency_upper_samples": max(
+                    "returned_iq_observation_span_upper_axis_units": max(
                         0, end - command.sample_sequence_before
                     ),
                 }
@@ -1130,8 +1246,7 @@ def _gain_transition_bounds(
             raise EvidenceInvalid(
                 f"RX{channel} lacks a {minimum_change_db:g} dB native gain response"
             )
-        found["latency_lower_seconds"] = found["latency_lower_samples"] / 1.0
-        found["latency_upper_seconds"] = found["latency_upper_samples"] / 1.0
+        found["hardware_latency_qualified"] = False
         results.append(found)
     return results
 
@@ -1143,7 +1258,6 @@ def _native_gain_evidence(
     *,
     attack_command: StimulusCommand,
     release_command: StimulusCommand,
-    sample_rate_hz: int,
     minimum_change_db: float,
 ) -> dict[str, Any]:
     weak = _gain_at_end(baseline)
@@ -1163,23 +1277,18 @@ def _native_gain_evidence(
         expected_sign=1,
         minimum_change_db=minimum_change_db,
     )
-    for result in (*attack_bounds, *release_bounds):
-        result["latency_lower_seconds"] = (
-            result["latency_lower_samples"] / sample_rate_hz
-        )
-        result["latency_upper_seconds"] = (
-            result["latency_upper_samples"] / sample_rate_hz
-        )
     return {
         "evidence_valid": True,
+        "timing_qualification": "returned_iq_observation_only",
+        "hardware_latency_qualified": False,
         "minimum_required_change_db": minimum_change_db,
         "weak_gain_db": list(weak),
         "strong_gain_db": list(strong),
         "returned_weak_gain_db": list(returned),
         "attack_gain_change_db": [strong[index] - weak[index] for index in (0, 1)],
         "release_gain_change_db": [returned[index] - strong[index] for index in (0, 1)],
-        "attack_latency_bounds": attack_bounds,
-        "release_latency_bounds": release_bounds,
+        "attack_returned_iq_observation_bounds": attack_bounds,
+        "release_returned_iq_observation_bounds": release_bounds,
     }
 
 
@@ -1199,26 +1308,87 @@ def _manual_gain_evidence(
         raise EvidenceInvalid("manual RX gain moved during the transient campaign")
     return {
         "evidence_valid": True,
+        "timing_qualification": "not_applicable_fixed_gain",
+        "hardware_latency_qualified": False,
         "expected_gain_db": expected_gain_db,
         "gain_span_db": spans,
         "maximum_readback_error_db": errors,
     }
 
 
-def _response_summary(response: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "signal_settling_latency_lower_samples": response[
-            "signal_settling_latency_lower_samples"
-        ],
-        "signal_settling_latency_upper_samples": response[
-            "signal_settling_latency_upper_samples"
-        ],
+def _qualify_response_timing(
+    response: Mapping[str, Any], *, hardware_latency_qualified: bool
+) -> dict[str, Any]:
+    qualified = dict(response)
+    if hardware_latency_qualified:
+        qualified["timing_qualification"] = "fpga_sample_counter_bounded"
+        qualified["hardware_latency_qualified"] = True
+        qualified["transient_observation_scope"] = "continuous_hardware_sample_record"
+        return qualified
+    lower = qualified.pop("signal_settling_latency_lower_samples")
+    upper = qualified.pop("signal_settling_latency_upper_samples")
+    qualified.pop("signal_settling_latency_lower_seconds")
+    qualified.pop("signal_settling_latency_upper_seconds")
+    qualified.update(
+        {
+            "timing_qualification": "returned_iq_observation_only",
+            "hardware_latency_qualified": False,
+            "transient_observation_scope": (
+                "returned_iq_windows_with_unobserved_refill_intervals"
+            ),
+            "observed_returned_iq_settling_span_lower_axis_units": lower,
+            "observed_returned_iq_settling_span_upper_axis_units": upper,
+        }
+    )
+    return qualified
+
+
+def _response_summary(
+    response: Mapping[str, Any], *, hardware_latency_qualified: bool
+) -> dict[str, Any]:
+    summary = {
+        "timing_qualification": response["timing_qualification"],
+        "hardware_latency_qualified": hardware_latency_qualified,
+        "transient_observation_scope": response["transient_observation_scope"],
         "worst_overshoot_db": response["worst_overshoot_db"],
         "ringing_peak_to_peak_db": response["ringing_peak_to_peak_db"],
         "minimum_post_tone_snr_db": response["minimum_post_tone_snr_db"],
         "maximum_post_clipping_fraction": response["maximum_post_clipping_fraction"],
         "maximum_phase_excursion_deg": response["maximum_phase_excursion_deg"],
     }
+    if hardware_latency_qualified:
+        summary.update(
+            {
+                "signal_settling_latency_lower_samples": response[
+                    "signal_settling_latency_lower_samples"
+                ],
+                "signal_settling_latency_upper_samples": response[
+                    "signal_settling_latency_upper_samples"
+                ],
+                "signal_settling_latency_lower_seconds": response[
+                    "signal_settling_latency_lower_seconds"
+                ],
+                "signal_settling_latency_upper_seconds": response[
+                    "signal_settling_latency_upper_seconds"
+                ],
+            }
+        )
+    else:
+        summary.update(
+            {
+                "signal_settling_latency_lower_samples": None,
+                "signal_settling_latency_upper_samples": None,
+                "signal_settling_latency_lower_seconds": None,
+                "signal_settling_latency_upper_seconds": None,
+                "observed_returned_iq_settling_span_lower_axis_units": response[
+                    "observed_returned_iq_settling_span_lower_axis_units"
+                ],
+                "observed_returned_iq_settling_span_upper_axis_units": response[
+                    "observed_returned_iq_settling_span_upper_axis_units"
+                ],
+            }
+        )
+    return summary
 
 
 def _build_tandem_request(
@@ -1291,12 +1461,12 @@ def _bracket_host_write(
     first_post_frame: Mapping[str, Any],
     max_sample_uncertainty: int,
 ) -> StimulusCommand:
-    """Close a host write bracket with the first observed post-write frame.
+    """Position a host write on the returned-IQ ordinal axis.
 
-    A host attribute write cannot read the RF sample counter atomically.  Its
-    conservative closed bracket therefore begins at the last observed
-    pre-write frame end and ends at the first observed post-write frame end.
-    Any hardware-metadata gap before that frame is automatically included.
+    Ordinary IIO exposes no RF sample counter or continuity.  These coordinates
+    run from the end of the last returned pre-command frame through the end of
+    the first returned post-command frame.  Unobserved hardware time and sample
+    intervals are excluded, so the result is an observation span, not latency.
     """
 
     lower = int(last_pre_frame_end)
@@ -1346,15 +1516,16 @@ def _command_record(
         "timing_role": (
             "host_write_bracketed_by_coherent_fpga_counter"
             if counter_timed
-            else "host_write_bracketed_by_observed_iq"
+            else "host_write_positioned_on_returned_iq_ordinal_axis"
         ),
         "sample_timing_basis": timing_basis,
         "sample_anchor_policy": (
             "max(last observed frame end, coherent low32 pre-read) through the "
-            "first coherent low32 advance observed after a post-write read"
+            "second distinct coherent low32 advance observed after an initial "
+            "post-write read"
             if counter_timed
-            else "last observed pre-frame end through first observed post-write "
-            "frame end"
+            else "last returned pre-command IQ ordinal through end of first "
+            "returned post-command frame; unobserved hardware intervals excluded"
         ),
     }
     if sample_counter_bracket is not None:
@@ -1411,9 +1582,7 @@ def _run_mode_body(
 
     request = _build_tandem_request(quality, capture) if mode == MODE_TANDEM else None
     timing_basis = (
-        "hardware_sample_counter"
-        if mode == MODE_TANDEM
-        else "ordinary_session_local_contiguous_refill_axis"
+        _TANDEM_TIMING_BASIS if mode == MODE_TANDEM else _ORDINARY_TIMING_BASIS
     )
     record: dict[str, Any] = {
         "mode": mode,
@@ -1431,6 +1600,8 @@ def _run_mode_body(
     deferred_frames: list[_DeferredFrame] = []
     attack_counter_bracket: Mapping[str, Any] | None = None
     release_counter_bracket: Mapping[str, Any] | None = None
+    attack_partition: Mapping[str, int] | None = None
+    release_partition: Mapping[str, int] | None = None
     acquisition_stats: dict[str, Any] = {
         "threaded": mode == MODE_TANDEM,
         "kernel_buffers": _TRANSIENT_KERNEL_BUFFERS,
@@ -1452,6 +1623,11 @@ def _run_mode_body(
             if mode == MODE_TANDEM and metadata_abi != 2:
                 raise EvidenceInvalid(
                     f"tandem transient requires metadata ABI 2, got {metadata_abi!r}"
+                )
+            cancel_capture = getattr(buffer, "cancel", None)
+            if mode == MODE_TANDEM and not callable(cancel_capture):
+                raise EvidenceInvalid(
+                    "tandem transient buffer lacks thread-safe cancellation"
                 )
 
             def acquire_one() -> _DeferredFrame:
@@ -1567,6 +1743,12 @@ def _run_mode_body(
                         first_post_frame=attack_frames[0],
                         max_sample_uncertainty=capture.max_sample_uncertainty,
                     )
+                else:
+                    attack_partition = _response_partition(
+                        attack_frames,
+                        attack,
+                        required_fully_post_frames=capture.response_frames,
+                    )
 
                 release_boundary = int(attack_frames[-1]["sample_end_exclusive"])
                 release_gain_before = (
@@ -1626,8 +1808,38 @@ def _run_mode_body(
                         first_post_frame=release_frames[0],
                         max_sample_uncertainty=capture.max_sample_uncertainty,
                     )
+                else:
+                    release_partition = _response_partition(
+                        release_frames,
+                        release,
+                        required_fully_post_frames=capture.response_frames,
+                    )
+                    assert attack_partition is not None
+                    acquisition_stats["response_partitions"] = {
+                        "attack": dict(attack_partition),
+                        "release": dict(release_partition),
+                    }
             except BaseException as error:  # noqa: BLE001 - preserve interrupts
                 acquisition_error = error
+            prejoin_mute_error: BaseException | None = None
+            if acquisition_error is not None or pump is not None:
+                # A failed acquisition can otherwise leave the strong stimulus
+                # active for the worker join timeout.  A successful tandem run
+                # can also leave its producer blocked in the next refill.  Mute,
+                # cancel, and join deterministically before buffer close.
+                try:
+                    radio.mute_all()
+                except BaseException as error:  # noqa: BLE001 - preserve both
+                    prejoin_mute_error = error
+            cancel_error: BaseException | None = None
+            if pump is not None:
+                pump.request_stop()
+                try:
+                    assert callable(cancel_capture)
+                    cancel_capture()
+                except BaseException as error:  # noqa: BLE001 - preserve all
+                    cancel_error = error
+                acquisition_stats["buffer_cancelled_before_join"] = cancel_error is None
             pump_stop_error: BaseException | None = None
             if pump is not None:
                 try:
@@ -1641,15 +1853,25 @@ def _run_mode_body(
                         "discarded_tail_frames": pump.discarded_tail_frames,
                     }
                 )
-            if acquisition_error is not None and pump_stop_error is not None:
-                raise BaseExceptionGroup(
-                    "transient acquisition and capture-thread shutdown failed",
-                    [acquisition_error, pump_stop_error],
+            acquisition_errors = [
+                error
+                for error in (
+                    acquisition_error,
+                    prejoin_mute_error,
+                    cancel_error,
+                    pump_stop_error,
                 )
-            if acquisition_error is not None:
-                raise acquisition_error.with_traceback(acquisition_error.__traceback__)
-            if pump_stop_error is not None:
-                raise pump_stop_error.with_traceback(pump_stop_error.__traceback__)
+                if error is not None
+            ]
+            if len(acquisition_errors) > 1:
+                raise BaseExceptionGroup(
+                    "transient acquisition, emergency mute, buffer cancel, or "
+                    "capture-thread shutdown failed",
+                    acquisition_errors,
+                )
+            if acquisition_errors:
+                error = acquisition_errors[0]
+                raise error.with_traceback(error.__traceback__)
 
         # Release tandem ownership and mute RF before any FFT, hashing, or disk IO.
         radio.mute_all()
@@ -1658,6 +1880,13 @@ def _run_mode_body(
             quality=quality,
             capture=capture,
             check_deadline=check_deadline,
+        )
+        _require_returned_window_quality(
+            baseline,
+            attack_frames,
+            release_frames,
+            attack_command=attack,
+            release_command=release,
         )
 
         initial = _conditioning_anchor(
@@ -1729,22 +1958,25 @@ def _run_mode_body(
             "max_host_jitter_ns": capture.max_host_jitter_ns,
             "max_sample_uncertainty": capture.max_sample_uncertainty,
         }
+        hardware_latency_qualified = mode == MODE_TANDEM
         record["responses"] = {
-            "attack": dict(
+            "attack": _qualify_response_timing(
                 calculate_transient_response(
                     _flatten_windows([*baseline, *attack_frames]),
                     previous_command=initial,
                     command=attack,
                     **response_kwargs,
-                )
+                ),
+                hardware_latency_qualified=hardware_latency_qualified,
             ),
-            "release": dict(
+            "release": _qualify_response_timing(
                 calculate_transient_response(
                     _flatten_windows([*attack_frames, *release_frames]),
                     previous_command=attack,
                     command=release,
                     **response_kwargs,
-                )
+                ),
+                hardware_latency_qualified=hardware_latency_qualified,
             ),
         }
 
@@ -1755,7 +1987,6 @@ def _run_mode_body(
                 release_frames,
                 attack_command=attack,
                 release_command=release,
-                sample_rate_hz=quality.sample_rate_hz,
                 minimum_change_db=capture.minimum_native_gain_change_db,
             )
         elif mode == MODE_MANUAL:
@@ -1779,6 +2010,12 @@ def _run_mode_body(
                     max_sample_uncertainty=capture.max_sample_uncertainty,
                     max_latency_samples=capture.max_event_latency_samples,
                 )
+            )
+            record["gain_evidence"].update(
+                {
+                    "timing_qualification": "fpga_sample_counter_bounded",
+                    "hardware_latency_qualified": True,
+                }
             )
     except BaseException as error:  # noqa: BLE001 - preserve shutdown interrupts
         mode_body_error = error
@@ -1859,16 +2096,25 @@ def _run_mode(
 
 
 def _comparison(modes: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        {
-            "mode": mode["mode"],
-            "timing_basis": mode["timing_basis"],
-            "attack": _response_summary(mode["responses"]["attack"]),
-            "release": _response_summary(mode["responses"]["release"]),
-            "gain_evidence": mode["gain_evidence"],
-        }
-        for mode in modes
-    ]
+    comparison = []
+    for mode in modes:
+        hardware_latency_qualified = mode["mode"] == MODE_TANDEM
+        comparison.append(
+            {
+                "mode": mode["mode"],
+                "timing_basis": mode["timing_basis"],
+                "attack": _response_summary(
+                    mode["responses"]["attack"],
+                    hardware_latency_qualified=hardware_latency_qualified,
+                ),
+                "release": _response_summary(
+                    mode["responses"]["release"],
+                    hardware_latency_qualified=hardware_latency_qualified,
+                ),
+                "gain_evidence": mode["gain_evidence"],
+            }
+        )
+    return comparison
 
 
 def run_transient_hardware(
