@@ -869,6 +869,7 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
                     "preconditioning": {
                         "frame_count": 1,
                         "trace": [baseline_frame],
+                        "retained_baseline_frame_indices": [0],
                     },
                     "baseline_frames": [baseline_frame],
                     "attack_frames": [attack_frame],
@@ -934,6 +935,67 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
     attack_command_record["sample_sequence_after"] -= 1
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="command bracket is inconsistent"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    tandem["baseline_frames"][-1]["sample_end_exclusive"] += 1
+    attack_command_record = next(
+        command
+        for command in tandem["commands"]
+        if command["command_id"] == "strong_attack"
+    )
+    attack_command_record["sample_sequence_before"] += 1
+    attack_command_record["sample_uncertainty"] -= 1
+
+    def command_from_record(record: dict[str, object]) -> StimulusCommand:
+        return StimulusCommand(
+            record["command_id"],
+            record["requested_level_db"],
+            record["applied_level_db"],
+            record["host_before_ns"],
+            record["host_after_ns"],
+            record["sample_sequence_before"],
+            record["sample_sequence_after"],
+        )
+
+    response_events = [
+        event
+        for phase in ("attack_frames", "release_frames")
+        for frame in tandem[phase]
+        for event in frame["metadata"]["gain_events"]
+    ]
+    release_command_record = next(
+        command
+        for command in tandem["commands"]
+        if command["command_id"] == "weak_release"
+    )
+    forged_gain = _json_safe(
+        dict(
+            reconcile_tandem_events(
+                (
+                    command_from_record(tandem["conditioning_anchor"]),
+                    command_from_record(attack_command_record),
+                    command_from_record(release_command_record),
+                ),
+                response_events,
+                sample_rate_hz=quality.sample_rate_hz,
+                max_host_jitter_ns=(TransientCaptureOptions().max_host_jitter_ns),
+                max_sample_uncertainty=(
+                    TransientCaptureOptions().max_sample_uncertainty
+                ),
+                max_latency_samples=(
+                    TransientCaptureOptions().max_event_latency_samples
+                ),
+            )
+        )
+    )
+    tandem["gain_evidence"] = forged_gain
+    next(item for item in report["comparison"] if item["mode"] == MODE_TANDEM)[
+        "gain_evidence"
+    ] = forged_gain
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="exact retained preconditioning tail"):
         production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))

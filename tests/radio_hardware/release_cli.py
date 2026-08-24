@@ -1392,8 +1392,21 @@ def _transient_continuity_errors(
         return ["transient tandem baseline frame evidence is malformed"]
     if preconditioning.get("frame_count") != len(trace):
         errors.append("transient tandem precondition frame count is inconsistent")
-    if baseline[-1].get("frame_index") != trace[-1].get("frame_index"):
-        errors.append("transient tandem baseline is not retained from preconditioning")
+    expected_baseline = trace[-capture.baseline_frames :]
+    if baseline != expected_baseline:
+        errors.append(
+            "transient tandem baseline is not the exact retained preconditioning tail"
+        )
+    expected_baseline_indices = [
+        frame.get("frame_index") if isinstance(frame, Mapping) else None
+        for frame in expected_baseline
+    ]
+    if preconditioning.get("retained_baseline_frame_indices") != (
+        expected_baseline_indices
+    ):
+        errors.append(
+            "transient tandem retained baseline indices differ from preconditioning"
+        )
 
     sections = (
         ("precondition", trace),
