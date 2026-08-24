@@ -148,14 +148,43 @@ class _WaveformCase:
 
 @dataclass
 class _TandemContinuity:
-    """State needed to prove every adjacent frame and event exactly once."""
+    """State needed to reconcile returned frames and provider-accounted gaps."""
 
     previous: TandemFrameMetadata | None = None
     last_event_sequence: int | None = None
     last_event_sample_sequence: int | None = None
+    last_event_gain_index: int | None = None
+    unrepresented_since_event: int = 0
+    missing_frame_count: int = 0
+    hidden_transition_count: int = 0
+    event_sequence_hole_count: int = 0
+    last_frame_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 _UINT32_MODULUS = 1 << 32
+
+
+def _forward_u32_delta(current: int, previous: int, *, context: str) -> int:
+    delta = (current - previous) % _UINT32_MODULUS
+    if delta >= _UINT32_MODULUS // 2:
+        raise EvidenceInvalid(f"{context} regressed ambiguously")
+    return delta
+
+
+def _gain_endpoint_is_reachable(
+    start: int,
+    end: int,
+    transitions: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> bool:
+    """Return whether exact paired +/-1 steps can join two known endpoints."""
+
+    if not minimum <= start <= maximum or not minimum <= end <= maximum:
+        return False
+    distance = abs(end - start)
+    return distance <= transitions and (transitions - distance) % 2 == 0
 
 
 def _finite(name: str, value: Any) -> float:
@@ -570,36 +599,86 @@ def _parse_and_validate_metadata(
         or metadata.initial_gain_db != int(options.manual_gain_db)
     ):
         raise EvidenceInvalid("tandem metadata differs from the requested gains")
+    if (
+        metadata.minimum_gain_index > metadata.maximum_gain_index
+        or not metadata.minimum_gain_index
+        <= metadata.rx1_gain_index
+        <= metadata.maximum_gain_index
+    ):
+        raise EvidenceInvalid("tandem endpoint lies outside its session gain range")
     temperature = metadata.ad9361_temperature_mdeg_c
     if temperature is not None and not -40_000 <= temperature <= 125_000:
         raise EvidenceInvalid("AD9361 temperature is outside its physical range")
     previous = continuity.previous
+    buffer_delta: int | None = None
+    sample_delta: int | None = None
+    missing_frames = 0
     transition_delta: int | None = None
+    hidden_transitions = 0
+    initial_unrepresented_transitions = 0
     if previous is not None:
         if metadata.stream_id != previous.stream_id:
             raise EvidenceInvalid("tandem stream changed inside one session")
         if metadata.ownership_epoch != previous.ownership_epoch:
             raise EvidenceInvalid("tandem ownership changed inside one session")
-        if metadata.buffer_sequence != previous.buffer_sequence + 1:
-            raise EvidenceInvalid("tandem buffer sequence is not contiguous")
-        expected_sample = previous.first_sample_sequence + previous.samples_per_channel
-        if metadata.first_sample_sequence != expected_sample:
-            raise EvidenceInvalid("tandem sample sequence is not contiguous")
-        transition_delta = (
-            metadata.tandem_transition_count - previous.tandem_transition_count
-        ) % _UINT32_MODULUS
-        if transition_delta >= _UINT32_MODULUS // 2:
-            raise EvidenceInvalid("tandem transition count regressed ambiguously")
-        if transition_delta != len(metadata.gain_events):
+        if (
+            metadata.minimum_gain_index != previous.minimum_gain_index
+            or metadata.maximum_gain_index != previous.maximum_gain_index
+        ):
+            raise EvidenceInvalid("tandem gain-index range changed inside one session")
+        buffer_delta = metadata.buffer_sequence - previous.buffer_sequence
+        sample_delta = metadata.first_sample_sequence - previous.first_sample_sequence
+        if buffer_delta <= 0 or sample_delta <= 0:
+            raise EvidenceInvalid("tandem frame counters did not advance")
+        if sample_delta % previous.samples_per_channel:
+            raise EvidenceInvalid(
+                "tandem sample sequence did not advance by whole frames"
+            )
+        if buffer_delta != sample_delta // previous.samples_per_channel:
+            raise EvidenceInvalid("tandem buffer and sample sequence deltas disagree")
+        missing_frames = buffer_delta - 1
+        transition_delta = _forward_u32_delta(
+            metadata.tandem_transition_count,
+            previous.tandem_transition_count,
+            context="tandem transition count",
+        )
+        if transition_delta < len(metadata.gain_events):
+            raise EvidenceInvalid(
+                "tandem frame has more events than its transition-count delta"
+            )
+        hidden_transitions = transition_delta - len(metadata.gain_events)
+        if not missing_frames and hidden_transitions:
             raise EvidenceInvalid(
                 "adjacent tandem frames lost transition event evidence"
             )
+        maximum_hidden = missing_frames * maximum_tandem_events_per_frame(
+            mode=TandemMode.AUTO,
+            samples_per_channel=options.capture_samples,
+            power_measurement_samples=options.tandem_power_measurement_samples,
+            cooldown_periods=options.tandem_cooldown_periods,
+        )
+        if hidden_transitions > maximum_hidden:
+            raise EvidenceInvalid(
+                "tandem gap contains more hidden transitions than omitted frames "
+                "can hold"
+            )
+        continuity.missing_frame_count += missing_frames
+        continuity.hidden_transition_count += hidden_transitions
+        continuity.unrepresented_since_event += hidden_transitions
     elif metadata.tandem_transition_count < len(metadata.gain_events):
         raise EvidenceInvalid("first tandem frame has more events than transitions")
+    else:
+        # The session may have transitioned before its first returned frame.
+        # This is baseline provenance only and must never become credit for a
+        # later event-sequence hole.
+        initial_unrepresented_transitions = metadata.tandem_transition_count - len(
+            metadata.gain_events
+        )
 
-    prior_gain = previous.rx1_gain_index if previous is not None else None
     last_event_sequence = continuity.last_event_sequence
     last_event_sample = continuity.last_event_sample_sequence
+    last_event_gain = continuity.last_event_gain_index
+    unrepresented_since_event = continuity.unrepresented_since_event
     frame_start = metadata.first_sample_sequence
     frame_end = frame_start + metadata.samples_per_channel
     for event_index, event in enumerate(metadata.gain_events):
@@ -637,34 +716,85 @@ def _parse_and_validate_metadata(
             TandemEventDirection.DECREASE,
         ):
             raise EvidenceInvalid(f"{context} has an invalid direction")
+        step = 1 if direction is TandemEventDirection.INCREASE else -1
         if last_event_sequence is not None:
-            expected_sequence = (last_event_sequence + 1) % _UINT32_MODULUS
-            if event.event_sequence != expected_sequence:
+            sequence_delta = _forward_u32_delta(
+                event.event_sequence,
+                last_event_sequence,
+                context="tandem event sequence",
+            )
+            if sequence_delta == 0:
                 raise EvidenceInvalid("tandem event sequence is not contiguous")
+            sequence_hole = sequence_delta - 1
+            if sequence_hole != unrepresented_since_event:
+                raise EvidenceInvalid(
+                    "tandem event-sequence hole does not match locally hidden "
+                    "transitions"
+                )
+            if sequence_hole:
+                continuity.event_sequence_hole_count += 1
         if last_event_sample is not None and event.sample_sequence < last_event_sample:
             raise EvidenceInvalid("tandem events are not globally sample ordered")
-        if prior_gain is not None:
-            expected_gain = prior_gain + (
-                1 if direction is TandemEventDirection.INCREASE else -1
-            )
-            if event.rx1_gain_index != expected_gain:
-                raise EvidenceInvalid(
-                    "tandem event did not reconcile an exact paired +/-1 endpoint"
+        anchor_gain: int | None = None
+        transitions_to_event = 0
+        if last_event_gain is not None:
+            anchor_gain = last_event_gain
+            transitions_to_event = unrepresented_since_event
+        elif previous is not None:
+            # With no visible event baseline, earlier hidden transitions are
+            # already represented by the immediately previous endpoint.
+            anchor_gain = previous.rx1_gain_index
+            transitions_to_event = hidden_transitions
+        if anchor_gain is not None:
+            gain_before_event = event.rx1_gain_index - step
+            if not _gain_endpoint_is_reachable(
+                anchor_gain,
+                gain_before_event,
+                transitions_to_event,
+                minimum=metadata.minimum_gain_index,
+                maximum=metadata.maximum_gain_index,
+            ):
+                qualifier = (
+                    "exact paired +/-1 endpoint"
+                    if transitions_to_event == 0
+                    else "gap-accounted paired +/-1 endpoint"
                 )
-        prior_gain = event.rx1_gain_index
+                raise EvidenceInvalid(f"tandem event did not reconcile an {qualifier}")
+        unrepresented_since_event = 0
+        last_event_gain = event.rx1_gain_index
         last_event_sequence = event.event_sequence
         last_event_sample = event.sample_sequence
 
     if metadata.gain_events:
-        if metadata.bench_gain_indices != (prior_gain, prior_gain):
+        if metadata.bench_gain_indices != (last_event_gain, last_event_gain):
             raise EvidenceInvalid("tandem endpoint differs from its final event")
     elif previous is not None:
-        assert transition_delta == 0
-        if metadata.bench_gain_indices != previous.bench_gain_indices:
+        assert transition_delta is not None
+        if not _gain_endpoint_is_reachable(
+            previous.rx1_gain_index,
+            metadata.rx1_gain_index,
+            transition_delta,
+            minimum=metadata.minimum_gain_index,
+            maximum=metadata.maximum_gain_index,
+        ):
             raise EvidenceInvalid("tandem endpoint changed without an event")
     continuity.previous = metadata
     continuity.last_event_sequence = last_event_sequence
     continuity.last_event_sample_sequence = last_event_sample
+    continuity.last_event_gain_index = last_event_gain
+    continuity.unrepresented_since_event = unrepresented_since_event
+    continuity.last_frame_evidence = {
+        "buffer_delta": buffer_delta,
+        "sample_delta": sample_delta,
+        "missing_frame_count": missing_frames,
+        "transition_count_delta": transition_delta,
+        "visible_event_count": len(metadata.gain_events),
+        "hidden_transition_count": hidden_transitions,
+        "initial_unrepresented_transition_count": initial_unrepresented_transitions,
+        "cumulative_missing_frame_count": continuity.missing_frame_count,
+        "cumulative_hidden_transition_count": continuity.hidden_transition_count,
+        "cumulative_event_sequence_hole_count": continuity.event_sequence_hole_count,
+    }
     return metadata
 
 
@@ -686,12 +816,13 @@ def _capture(
         raise EvidenceInvalid(
             f"IQ payload has {len(raw)} bytes, expected {expected_bytes}"
         )
+    active_continuity = continuity if continuity is not None else _TandemContinuity()
     parsed = (
         _parse_and_validate_metadata(
             raw_metadata,
             raw_bytes=len(raw),
             options=options,
-            continuity=(continuity if continuity is not None else _TandemContinuity()),
+            continuity=active_continuity,
         )
         if metadata
         else None
@@ -703,6 +834,7 @@ def _capture(
     }
     if parsed is not None:
         frame["metadata"] = _metadata_dict(parsed)
+        frame["continuity"] = dict(active_continuity.last_frame_evidence)
     return raw, parsed, frame
 
 
@@ -842,6 +974,11 @@ def summarize_modulated_measurements(
     first = qualities[0]
     if any(item["reference_id"] != first["reference_id"] for item in qualities):
         raise EvidenceInvalid("measurement reference IDs differ")
+    iq_convention = first.get("iq_convention")
+    if iq_convention not in ("direct", "conjugated"):
+        raise EvidenceInvalid("measurement IQ convention is invalid")
+    if any(item.get("iq_convention") != iq_convention for item in qualities):
+        raise EvidenceInvalid("measurement IQ conventions differ")
     if any(
         item["blocker_offset_hz"] != first["blocker_offset_hz"]
         or item["blocker_power_db"] != first["blocker_power_db"]
@@ -901,6 +1038,7 @@ def summarize_modulated_measurements(
         "schema": first["schema"],
         "reference_id": first["reference_id"],
         "measurement_count": len(qualities),
+        "iq_convention": iq_convention,
         "blocker_offset_hz": first["blocker_offset_hz"],
         "blocker_power_db": first["blocker_power_db"],
         "quality_valid": all(bool(item["quality_valid"]) for item in qualities),
@@ -1305,25 +1443,31 @@ def run_modulated_hardware_campaign(
             case_record = next(
                 item for item in report["waveforms"] if item["case_id"] == case.case_id
             )
-            with radio.cyclic_tx2_waveform(
-                case.encoded.payload, sample_count=case.encoded.sample_count
-            ) as dma_evidence:
-                case_record["dma"] = dict(dma_evidence)
-                _atomic_json(report_path, report)
-                for mode in MODULATED_MODES:
-                    run = _run_case_mode(
-                        radio,
-                        mode=mode,
-                        reference=reference,
-                        case=case,
-                        options=options,
-                        check_deadline=check_deadline,
-                    )
-                    report["runs"].append(run)
+            try:
+                with radio.cyclic_tx2_waveform(
+                    case.encoded.payload, sample_count=case.encoded.sample_count
+                ) as dma_evidence:
+                    case_record["dma"] = dict(dma_evidence)
                     _atomic_json(report_path, report)
-            case_record["dma_cleanup"] = dict(
-                getattr(radio, "_last_cyclic_dma_cleanup", {})
-            )
+                    for mode in MODULATED_MODES:
+                        run = _run_case_mode(
+                            radio,
+                            mode=mode,
+                            reference=reference,
+                            case=case,
+                            options=options,
+                            check_deadline=check_deadline,
+                        )
+                        report["runs"].append(run)
+                        _atomic_json(report_path, report)
+            finally:
+                # The cyclic context records this only after its unconditional
+                # mute and buffer close.  Persist it even when a mode fails so
+                # the invalid report still proves the independent DMA barrier.
+                case_record["dma_cleanup"] = dict(
+                    getattr(radio, "_last_cyclic_dma_cleanup", {})
+                )
+                _atomic_json(report_path, report)
             if not bool(case_record["dma_cleanup"].get("buffer_closed", False)):
                 raise FixtureSafetyError(
                     "cyclic DMA cleanup did not prove buffer close"

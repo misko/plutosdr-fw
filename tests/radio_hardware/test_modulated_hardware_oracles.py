@@ -601,6 +601,112 @@ def test_adjacent_tandem_metadata_reconciles_every_event_and_endpoint(
     assert parsed.bench_gain_indices == (35, 35)
 
 
+def test_provider_skipped_frames_are_gap_accounted_without_losing_events(
+    tmp_path: Path,
+) -> None:
+    """Mirror real MetadataBuffer sequence jumps from device-side USB drops."""
+
+    options = _campaign_options(tmp_path)
+    radio = _FakeCampaignRadio(options)
+    base = radio._fake_metadata(options.capture_samples, options.capture_samples * 8)
+    continuity = _TandemContinuity()
+    _parse_and_validate_metadata(
+        base,
+        raw_bytes=options.capture_samples * 8,
+        options=options,
+        continuity=continuity,
+    )
+    first_visible = _metadata_with_event(
+        base,
+        buffer_sequence=1,
+        transition_count=12,
+        event_sequence=100,
+        direction=TandemEventDirection.INCREASE,
+        gain=36,
+    )
+    _parse_and_validate_metadata(
+        first_visible,
+        raw_bytes=options.capture_samples * 8,
+        options=options,
+        continuity=continuity,
+    )
+    # The provider increments both counters for every device refill.  Frames 2
+    # and 3 were not delivered over USB; their two transitions cancel at the
+    # endpoint and are intentionally absent from frame 4's event array.
+    after_gap = replace(
+        first_visible,
+        buffer_sequence=4,
+        first_sample_sequence=4 * options.capture_samples,
+        tandem_transition_count=14,
+        event_count=0,
+        gain_events=(),
+    )
+    _parse_and_validate_metadata(
+        after_gap,
+        raw_bytes=options.capture_samples * 8,
+        options=options,
+        continuity=continuity,
+    )
+    assert continuity.last_frame_evidence == {
+        "buffer_delta": 3,
+        "sample_delta": 3 * options.capture_samples,
+        "missing_frame_count": 2,
+        "transition_count_delta": 2,
+        "visible_event_count": 0,
+        "hidden_transition_count": 2,
+        "initial_unrepresented_transition_count": 0,
+        "cumulative_missing_frame_count": 2,
+        "cumulative_hidden_transition_count": 2,
+        "cumulative_event_sequence_hole_count": 0,
+    }
+    recovered = _metadata_with_event(
+        base,
+        buffer_sequence=5,
+        transition_count=15,
+        event_sequence=103,
+        direction=TandemEventDirection.INCREASE,
+        gain=37,
+    )
+    parsed = _parse_and_validate_metadata(
+        recovered,
+        raw_bytes=options.capture_samples * 8,
+        options=options,
+        continuity=continuity,
+    )
+    assert parsed.bench_gain_indices == (37, 37)
+    assert continuity.missing_frame_count == 2
+    assert continuity.hidden_transition_count == 2
+    assert continuity.event_sequence_hole_count == 1
+    assert continuity.unrepresented_since_event == 0
+
+
+def test_provider_gap_requires_matching_buffer_and_sample_deltas(
+    tmp_path: Path,
+) -> None:
+    options = _campaign_options(tmp_path)
+    radio = _FakeCampaignRadio(options)
+    base = radio._fake_metadata(options.capture_samples, options.capture_samples * 8)
+    continuity = _TandemContinuity()
+    _parse_and_validate_metadata(
+        base,
+        raw_bytes=options.capture_samples * 8,
+        options=options,
+        continuity=continuity,
+    )
+    mismatched = replace(
+        base,
+        buffer_sequence=3,
+        first_sample_sequence=2 * options.capture_samples,
+    )
+    with pytest.raises(EvidenceInvalid, match="deltas disagree"):
+        _parse_and_validate_metadata(
+            mismatched,
+            raw_bytes=options.capture_samples * 8,
+            options=options,
+            continuity=continuity,
+        )
+
+
 @pytest.mark.parametrize(
     ("mutation", "message"),
     [
@@ -790,7 +896,13 @@ def test_serial_lifecycle_closes_after_invalid_tandem_evidence(tmp_path: Path) -
     assert radio.mute_count >= 2
     report_path = tmp_path / "fake-usb-radio" / "modulated-hardware-report.json"
     assert report_path.exists()
-    assert '"verdict": "invalid"' in report_path.read_text(encoding="utf-8")
+    durable = json.loads(report_path.read_text(encoding="utf-8"))
+    assert durable["verdict"] == "invalid"
+    # The planted mode failure happens inside the cyclic TX scope.  Its report
+    # must still retain the barrier evidence produced during context unwind.
+    dma_cleanup = durable["waveforms"][0]["dma_cleanup"]
+    assert dma_cleanup["buffer_closed"] is True
+    assert dma_cleanup["failures"] == []
 
 
 def test_serial_lifecycle_closes_and_reports_final_mute_failure(tmp_path: Path) -> None:
