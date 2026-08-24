@@ -195,6 +195,14 @@ frame after each level write instead of draining away the transition.
   excursion, ringing crossings, post-settle excursions, SNR, clipping, and
   phase excursion.
 
+The metadata provider derives `buffer_sequence` from the same FPGA sample
+counter carried in `first_sample_sequence`. The transient runner therefore
+accepts a provider-skipped frame only when both deltas identify the same whole
+frames and the cumulative transition counter proves that no gain event was
+hidden. Such a gap may separate preconditioning observations or lie inside the
+conservative first-post-write command bracket. A gap in the subsequent response
+trace remains fatal because it could hide overshoot or settling behavior.
+
 The layer fails closed on missing sample brackets, host-write jitter over the
 configured limit, excessive sample uncertainty, event-sequence holes, torn or
 non-unit tandem gain steps, overlapping commands, IQ gaps outside a command

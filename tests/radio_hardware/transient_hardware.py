@@ -21,7 +21,7 @@ import statistics
 import time
 from builtins import BaseExceptionGroup
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -33,6 +33,7 @@ from .metadata_abi import (
     TandemMode,
     TandemState,
     build_tandem_request,
+    maximum_tandem_events_per_frame,
     parse_tandem_frame_metadata,
 )
 from .tandem_quality import (
@@ -60,6 +61,14 @@ TRANSIENT_MODES = (
     *(native_mode_name(mode) for mode in AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES),
     MODE_TANDEM,
 )
+_GAP_CONTEXT_CONTINUOUS_RESPONSE = "continuous_response"
+_GAP_CONTEXT_PRECONDITION = "precondition_observation"
+_GAP_CONTEXT_COMMAND = "command_bracket"
+_GAP_CONTEXTS = {
+    _GAP_CONTEXT_CONTINUOUS_RESPONSE,
+    _GAP_CONTEXT_PRECONDITION,
+    _GAP_CONTEXT_COMMAND,
+}
 
 
 class TransientRadioTransport(Protocol):
@@ -299,16 +308,26 @@ def _metadata_dict(metadata: TandemFrameMetadata) -> dict[str, Any]:
         "first_sample_sequence": metadata.first_sample_sequence,
         "samples_per_channel": metadata.samples_per_channel,
         "flags": metadata.flags,
+        "observation_count": metadata.observation_count,
         "ownership_epoch": metadata.ownership_epoch,
         "tandem_state": int(metadata.tandem_state),
         "tandem_state_name": metadata.tandem_state.name.lower(),
+        "tandem_fault_flags": metadata.tandem_fault_flags,
         "tandem_transition_count": metadata.tandem_transition_count,
         "gain_table_id": int(metadata.gain_table_id),
         "threshold_provenance": metadata.threshold_provenance,
+        "gain_db_range": [metadata.minimum_gain_db, metadata.maximum_gain_db],
+        "initial_gain_db": metadata.initial_gain_db,
+        "gain_index_range": [
+            metadata.minimum_gain_index,
+            metadata.maximum_gain_index,
+        ],
         "bench_gain_indices": list(metadata.bench_gain_indices),
         "event_count": metadata.event_count,
         "observation_overflow_count": metadata.observation_overflow_count,
         "event_overflow_count": metadata.event_overflow_count,
+        "temperature_mdeg_c": metadata.ad9361_temperature_mdeg_c,
+        "gain_event_count": len(metadata.gain_events),
         "gain_events": [_event_dict(event) for event in metadata.gain_events],
     }
 
@@ -321,6 +340,17 @@ class _CaptureState:
     stream_id: int | None = None
     ownership_epoch: int | None = None
     last_event: Any = None
+    missing_frame_count: int = 0
+    hidden_transition_count: int = 0
+    event_sequence_hole_count: int = 0
+    last_frame_continuity: dict[str, Any] = field(default_factory=dict)
+
+
+def _forward_u32_delta(current: int, previous: int, *, context: str) -> int:
+    delta = (current - previous) % _UINT32_MODULUS
+    if delta >= _UINT32_MODULUS // 2:
+        raise EvidenceInvalid(f"{context} regressed ambiguously")
+    return delta
 
 
 def _validate_tandem_metadata(
@@ -330,8 +360,10 @@ def _validate_tandem_metadata(
     quality: TandemQualityOptions,
     capture: TransientCaptureOptions,
     state: _CaptureState,
-    allow_command_boundary_gap: bool,
-) -> int:
+    gap_context: str,
+) -> Mapping[str, Any]:
+    if gap_context not in _GAP_CONTEXTS:
+        raise ValueError(f"unknown transient gap context {gap_context!r}")
     if metadata.samples_per_channel != capture.frame_samples:
         raise EvidenceInvalid(
             "tandem metadata sample count differs from transient frame"
@@ -373,51 +405,155 @@ def _validate_tandem_metadata(
     ):
         raise EvidenceInvalid("tandem stream or ownership changed inside one session")
 
+    buffer_delta: int | None = None
+    sample_delta: int | None = None
+    missing_frames = 0
     sample_gap_before = 0
+    transition_delta: int | None = None
+    hidden_transitions = 0
+    initial_unrepresented_transitions = 0
     previous = state.previous_metadata
     if previous is not None:
-        if metadata.buffer_sequence != previous.buffer_sequence + 1:
-            raise EvidenceInvalid("tandem transient buffer sequence has a gap")
-        expected_first_sample = (
-            previous.first_sample_sequence + previous.samples_per_channel
-        )
-        if metadata.first_sample_sequence < expected_first_sample:
-            raise EvidenceInvalid("tandem transient sample sequence overlaps")
-        sample_gap_before = metadata.first_sample_sequence - expected_first_sample
-        if sample_gap_before and not allow_command_boundary_gap:
-            raise EvidenceInvalid("tandem transient sample sequence has a gap")
-        transition_delta = (
-            metadata.tandem_transition_count - previous.tandem_transition_count
-        ) % _UINT32_MODULUS
-        if transition_delta != len(metadata.gain_events):
+        if (
+            metadata.minimum_gain_index != previous.minimum_gain_index
+            or metadata.maximum_gain_index != previous.maximum_gain_index
+        ):
             raise EvidenceInvalid(
-                "adjacent tandem transient frames lost gain-event evidence"
+                "tandem transient gain-index range changed inside one session"
             )
-        if metadata.gain_events:
-            first = metadata.gain_events[0]
-            expected = previous.rx1_gain_index + (
-                1 if first.direction is TandemEventDirection.INCREASE else -1
+        buffer_delta = metadata.buffer_sequence - previous.buffer_sequence
+        sample_delta = metadata.first_sample_sequence - previous.first_sample_sequence
+        if buffer_delta <= 0 or sample_delta <= 0:
+            raise EvidenceInvalid(
+                "tandem transient frame counters did not advance "
+                f"(buffer {previous.buffer_sequence}->{metadata.buffer_sequence}, "
+                "sample "
+                f"{previous.first_sample_sequence}->{metadata.first_sample_sequence})"
             )
-            if first.rx1_gain_index != expected:
-                raise EvidenceInvalid(
-                    "first tandem event disagrees with the prior paired endpoint"
-                )
-        elif metadata.bench_gain_indices != previous.bench_gain_indices:
-            raise EvidenceInvalid("tandem endpoint changed without a visible event")
+        if sample_delta % previous.samples_per_channel:
+            raise EvidenceInvalid(
+                "tandem transient sample sequence did not advance by whole frames "
+                f"(delta {sample_delta}, frame {previous.samples_per_channel})"
+            )
+        expected_sample_delta = buffer_delta * previous.samples_per_channel
+        if sample_delta != expected_sample_delta:
+            raise EvidenceInvalid(
+                "tandem transient buffer/sample deltas disagree "
+                f"(buffer delta {buffer_delta}, sample delta {sample_delta}, "
+                f"expected {expected_sample_delta})"
+            )
+        missing_frames = buffer_delta - 1
+        sample_gap_before = missing_frames * previous.samples_per_channel
+        transition_delta = _forward_u32_delta(
+            metadata.tandem_transition_count,
+            previous.tandem_transition_count,
+            context="tandem transient transition count",
+        )
+        if transition_delta < len(metadata.gain_events):
+            raise EvidenceInvalid(
+                "tandem transient frame has more visible events than its "
+                f"transition delta ({len(metadata.gain_events)} > "
+                f"{transition_delta})"
+            )
+        hidden_transitions = transition_delta - len(metadata.gain_events)
+        if not missing_frames and hidden_transitions:
+            raise EvidenceInvalid(
+                "adjacent tandem transient frames lost gain-event evidence "
+                f"(transition delta {transition_delta}, visible "
+                f"{len(metadata.gain_events)})"
+            )
+        maximum_hidden = missing_frames * maximum_tandem_events_per_frame(
+            mode=TandemMode.AUTO,
+            samples_per_channel=capture.frame_samples,
+            power_measurement_samples=quality.tandem_power_measurement_samples,
+            cooldown_periods=quality.tandem_cooldown_periods,
+        )
+        if hidden_transitions > maximum_hidden:
+            raise EvidenceInvalid(
+                "tandem transient gap contains more hidden transitions than "
+                "omitted frames can hold "
+                f"({hidden_transitions} > {maximum_hidden})"
+            )
+        if missing_frames and gap_context == _GAP_CONTEXT_CONTINUOUS_RESPONSE:
+            raise EvidenceInvalid(
+                "tandem transient provider gap lies inside a continuous response "
+                f"(buffer {previous.buffer_sequence}->{metadata.buffer_sequence}, "
+                f"sample {previous.first_sample_sequence}->"
+                f"{metadata.first_sample_sequence}, missing frames "
+                f"{missing_frames})"
+            )
+        if hidden_transitions:
+            # Buffer/sample counters and the cumulative transition counter prove
+            # that these are real omitted frames, not torn metadata.  They do
+            # not retain the exact sample timestamps required by a transient
+            # latency claim, however, so this stricter oracle cannot credit
+            # them as attack/release evidence.
+            raise EvidenceInvalid(
+                "tandem transient provider gap hides gain-event timing evidence "
+                f"(missing frames {missing_frames}, transition delta "
+                f"{transition_delta}, visible events "
+                f"{len(metadata.gain_events)}, hidden transitions "
+                f"{hidden_transitions})"
+            )
+        state.missing_frame_count += missing_frames
+    elif metadata.tandem_transition_count < len(metadata.gain_events):
+        raise EvidenceInvalid(
+            "first tandem transient frame has more events than transitions"
+        )
+    else:
+        initial_unrepresented_transitions = metadata.tandem_transition_count - len(
+            metadata.gain_events
+        )
 
     for event in metadata.gain_events:
+        if event.rx1_gain_index != event.rx2_gain_index:
+            raise EvidenceInvalid("tandem transient event contains a torn gain pair")
+        if not (
+            metadata.first_sample_sequence
+            <= event.sample_sequence
+            < metadata.first_sample_sequence + metadata.samples_per_channel
+        ):
+            raise EvidenceInvalid(
+                "tandem transient event lies outside its returned IQ frame"
+            )
+        if not (
+            metadata.minimum_gain_index
+            <= event.rx1_gain_index
+            <= metadata.maximum_gain_index
+        ):
+            raise EvidenceInvalid(
+                "tandem transient event gain lies outside the session range"
+            )
         if state.last_event is not None:
-            if (
-                event.event_sequence
-                != (state.last_event.event_sequence + 1) % _UINT32_MODULUS
-            ):
-                raise EvidenceInvalid("tandem event sequence has a hole")
+            sequence_delta = _forward_u32_delta(
+                event.event_sequence,
+                state.last_event.event_sequence,
+                context="tandem transient event sequence",
+            )
+            if sequence_delta != 1:
+                raise EvidenceInvalid(
+                    "tandem transient event sequence has an unreconciled hole "
+                    f"(delta {sequence_delta})"
+                )
+            if event.sample_sequence < state.last_event.sample_sequence:
+                raise EvidenceInvalid(
+                    "tandem transient events are not globally sample ordered"
+                )
             expected = state.last_event.rx1_gain_index + (
                 1 if event.direction is TandemEventDirection.INCREASE else -1
             )
             if event.rx1_gain_index != expected:
                 raise EvidenceInvalid(
                     "tandem gain event did not take its exact +/-1 step"
+                )
+        elif previous is not None:
+            expected = previous.rx1_gain_index + (
+                1 if event.direction is TandemEventDirection.INCREASE else -1
+            )
+            if event.rx1_gain_index != expected:
+                raise EvidenceInvalid(
+                    "first tandem transient event disagrees with the prior "
+                    "paired endpoint"
                 )
         state.last_event = event
     if metadata.gain_events and (
@@ -428,8 +564,32 @@ def _validate_tandem_metadata(
         )
     ):
         raise EvidenceInvalid("tandem endpoint differs from its final visible event")
+    if (
+        previous is not None
+        and not metadata.gain_events
+        and metadata.bench_gain_indices != previous.bench_gain_indices
+    ):
+        raise EvidenceInvalid("tandem endpoint changed without a visible event")
+
+    continuity = {
+        "buffer_delta": buffer_delta,
+        "sample_delta": sample_delta,
+        "missing_frame_count": missing_frames,
+        "sample_gap_before": sample_gap_before,
+        "provider_gap_accepted": bool(missing_frames),
+        "gap_context": gap_context,
+        "command_boundary_gap_allowed": gap_context == _GAP_CONTEXT_COMMAND,
+        "transition_count_delta": transition_delta,
+        "visible_event_count": len(metadata.gain_events),
+        "hidden_transition_count": hidden_transitions,
+        "initial_unrepresented_transition_count": initial_unrepresented_transitions,
+        "cumulative_missing_frame_count": state.missing_frame_count,
+        "cumulative_hidden_transition_count": state.hidden_transition_count,
+        "cumulative_event_sequence_hole_count": state.event_sequence_hole_count,
+    }
     state.previous_metadata = metadata
-    return sample_gap_before
+    state.last_frame_continuity = continuity
+    return continuity
 
 
 def _capture_frame(
@@ -443,7 +603,7 @@ def _capture_frame(
     state: _CaptureState,
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
     iq_dir: Path,
-    allow_command_boundary_gap: bool = False,
+    gap_context: str = _GAP_CONTEXT_CONTINUOUS_RESPONSE,
 ) -> tuple[dict[str, Any], TandemFrameMetadata | None]:
     metadata_mode = mode == MODE_TANDEM
     before = (
@@ -460,18 +620,20 @@ def _capture_frame(
 
     parsed = None
     sample_gap_before = 0
+    continuity: Mapping[str, Any] | None = None
     if metadata_mode:
         if raw_metadata is None:
             raise EvidenceInvalid("tandem transient capture returned no metadata")
         parsed = metadata_parser(raw_metadata)
-        sample_gap_before = _validate_tandem_metadata(
+        continuity = _validate_tandem_metadata(
             parsed,
             raw_bytes=len(raw),
             quality=quality,
             capture=capture,
             state=state,
-            allow_command_boundary_gap=allow_command_boundary_gap,
+            gap_context=gap_context,
         )
+        sample_gap_before = int(continuity["sample_gap_before"])
         first_sample = parsed.first_sample_sequence
         timing_basis = "hardware_sample_counter"
     else:
@@ -503,7 +665,8 @@ def _capture_frame(
         "first_sample_sequence": first_sample,
         "sample_end_exclusive": first_sample + capture.frame_samples,
         "sample_gap_before": sample_gap_before,
-        "command_boundary_gap_allowed": bool(allow_command_boundary_gap),
+        "gap_context": gap_context,
+        "command_boundary_gap_allowed": gap_context == _GAP_CONTEXT_COMMAND,
         "analysis": analysis,
     }
     if before is not None and after is not None:
@@ -511,6 +674,7 @@ def _capture_frame(
         record["rx_state_after"] = after
     if parsed is not None:
         record["metadata"] = _metadata_dict(parsed)
+        record["continuity"] = dict(continuity or {})
     if quality.save_iq:
         iq_path = iq_dir / f"frame-{state.frame_index:04d}.cs16"
         _atomic_bytes(iq_path, raw)
@@ -560,6 +724,7 @@ def _precondition(
             state=state,
             metadata_parser=metadata_parser,
             iq_dir=iq_dir / "precondition",
+            gap_context=_GAP_CONTEXT_PRECONDITION,
         )
         if mode == MODE_TANDEM:
             assert metadata is not None
@@ -1035,7 +1200,11 @@ def _run_mode_body(
                 state=state,
                 metadata_parser=metadata_parser,
                 iq_dir=iq_dir / "attack",
-                allow_command_boundary_gap=mode == MODE_TANDEM,
+                gap_context=(
+                    _GAP_CONTEXT_COMMAND
+                    if mode == MODE_TANDEM
+                    else _GAP_CONTEXT_CONTINUOUS_RESPONSE
+                ),
             )
             attack_frames.append(first_attack_frame)
             attack = _bracket_host_write(
@@ -1091,7 +1260,11 @@ def _run_mode_body(
                 state=state,
                 metadata_parser=metadata_parser,
                 iq_dir=iq_dir / "release",
-                allow_command_boundary_gap=mode == MODE_TANDEM,
+                gap_context=(
+                    _GAP_CONTEXT_COMMAND
+                    if mode == MODE_TANDEM
+                    else _GAP_CONTEXT_CONTINUOUS_RESPONSE
+                ),
             )
             release_frames.append(first_release_frame)
             release = _bracket_host_write(
@@ -1390,6 +1563,12 @@ def run_transient_hardware(
             "initial_condition": (
                 "pre-session weak write remains sample-unbounded; retained stable "
                 "IQ is an explicitly labelled conditioning anchor"
+            ),
+            "tandem_provider_gaps": (
+                "accept only matching whole-frame buffer/sample deltas with zero "
+                "hidden transitions during preconditioning observations or the "
+                "first command-bracketing frame; reject response gaps because "
+                "they can hide settling or overshoot"
             ),
             "tandem_event_latency_limit_samples": (capture.max_event_latency_samples),
         },

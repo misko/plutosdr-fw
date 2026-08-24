@@ -36,6 +36,7 @@ from .release_cli import (
 )
 from .tandem_quality import AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
 from .transient_hardware import TRANSIENT_MODES, TransientCaptureOptions
+from .transient_quality import StimulusCommand, reconcile_tandem_events
 
 COMMIT = "6" * 40
 
@@ -649,7 +650,7 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
         production_validator(options)(spec, report_path, work_dir)
 
 
-def test_production_validator_rejects_transient_configuration_substitution(
+def test_production_validator_recomputes_transient_evidence_and_configuration(
     tmp_path: Path,
 ) -> None:
     options = _parse(tmp_path, "--phase", "transient", "--band", "low=915000000")
@@ -665,6 +666,162 @@ def test_production_validator_rejects_transient_configuration_substitution(
         "attack": {"evidence_valid": True},
         "release": {"evidence_valid": True},
     }
+    frame_samples = TransientCaptureOptions().frame_samples
+    attack_event = {
+        "sample_sequence": 2 * frame_samples + 128,
+        "event_sequence": 100,
+        "flags": 0x20,
+        "direction": 2,
+        "direction_name": "decrease",
+        "reason": 1,
+        "reason_name": "large_lmt_overload",
+        "rx1_gain_index": 39,
+        "rx2_gain_index": 39,
+    }
+    release_event = {
+        "sample_sequence": 3 * frame_samples + 128,
+        "event_sequence": 101,
+        "flags": 0x10,
+        "direction": 1,
+        "direction_name": "increase",
+        "reason": 4,
+        "reason_name": "low_power_dwell",
+        "rx1_gain_index": 40,
+        "rx2_gain_index": 40,
+    }
+
+    def tandem_frame(
+        frame_index: int,
+        sequence: int,
+        *,
+        buffer_delta: int | None,
+        cumulative_missing: int,
+        transition_count: int,
+        endpoint: int,
+        events: list[dict[str, object]],
+        gap_context: str,
+    ) -> dict[str, object]:
+        first = frame_index == 0
+        missing = 0 if buffer_delta is None else buffer_delta - 1
+        metadata = {
+            "stream_id": 9,
+            "buffer_sequence": sequence,
+            "first_sample_sequence": sequence * frame_samples,
+            "samples_per_channel": frame_samples,
+            "flags": 0,
+            "observation_count": 4,
+            "ownership_epoch": 5,
+            "tandem_state": 2,
+            "tandem_state_name": "armed_auto",
+            "tandem_fault_flags": 0,
+            "tandem_transition_count": transition_count,
+            "gain_table_id": 1,
+            "threshold_provenance": 123,
+            "gain_db_range": [0, 62],
+            "initial_gain_db": 40,
+            "gain_index_range": [3, 65],
+            "bench_gain_indices": [endpoint, endpoint],
+            "event_count": len(events),
+            "observation_overflow_count": 0,
+            "event_overflow_count": 0,
+            "temperature_mdeg_c": 35_000,
+            "gain_event_count": len(events),
+            "gain_events": events,
+        }
+        command_boundary = gap_context == "command_bracket"
+        return {
+            "frame_index": frame_index,
+            "first_sample_sequence": sequence * frame_samples,
+            "sample_end_exclusive": (sequence + 1) * frame_samples,
+            "sample_gap_before": missing * frame_samples,
+            "gap_context": gap_context,
+            "command_boundary_gap_allowed": command_boundary,
+            "metadata": metadata,
+            "continuity": {
+                "buffer_delta": buffer_delta,
+                "sample_delta": (None if first else buffer_delta * frame_samples),
+                "missing_frame_count": missing,
+                "sample_gap_before": missing * frame_samples,
+                "provider_gap_accepted": bool(missing),
+                "gap_context": gap_context,
+                "command_boundary_gap_allowed": command_boundary,
+                "transition_count_delta": None if first else 1,
+                "visible_event_count": len(events),
+                "hidden_transition_count": 0,
+                "initial_unrepresented_transition_count": 0,
+                "cumulative_missing_frame_count": cumulative_missing,
+                "cumulative_hidden_transition_count": 0,
+                "cumulative_event_sequence_hole_count": 0,
+            },
+        }
+
+    baseline_frame = tandem_frame(
+        0,
+        0,
+        buffer_delta=None,
+        cumulative_missing=0,
+        transition_count=0,
+        endpoint=40,
+        events=[],
+        gap_context="precondition_observation",
+    )
+    attack_frame = tandem_frame(
+        1,
+        2,
+        buffer_delta=2,
+        cumulative_missing=1,
+        transition_count=1,
+        endpoint=39,
+        events=[attack_event],
+        gap_context="command_bracket",
+    )
+    release_frame = tandem_frame(
+        2,
+        3,
+        buffer_delta=1,
+        cumulative_missing=1,
+        transition_count=2,
+        endpoint=40,
+        events=[release_event],
+        gap_context="command_bracket",
+    )
+    anchor_command = StimulusCommand(
+        "weak_conditioning_anchor", -61.0, -61.0, 1_000, 1_100, 0, frame_samples
+    )
+    attack_command = StimulusCommand(
+        "strong_attack",
+        -30.0,
+        -30.0,
+        1_200,
+        1_300,
+        frame_samples,
+        3 * frame_samples,
+    )
+    release_command = StimulusCommand(
+        "weak_release",
+        -61.0,
+        -61.0,
+        1_400,
+        1_500,
+        3 * frame_samples,
+        4 * frame_samples,
+    )
+    tandem_gain = _json_safe(
+        dict(
+            reconcile_tandem_events(
+                (anchor_command, attack_command, release_command),
+                (attack_event, release_event),
+                sample_rate_hz=quality.sample_rate_hz,
+                max_host_jitter_ns=TransientCaptureOptions().max_host_jitter_ns,
+                max_sample_uncertainty=(
+                    TransientCaptureOptions().max_sample_uncertainty
+                ),
+                max_latency_samples=(
+                    TransientCaptureOptions().max_event_latency_samples
+                ),
+            )
+        )
+    )
     cleanup = {
         "verified": True,
         "failures": [],
@@ -694,22 +851,92 @@ def test_production_validator_rejects_transient_configuration_substitution(
         "cleanup": cleanup,
         "required_modes": list(TRANSIENT_MODES),
         "modes": [
-            {
-                "mode": mode,
-                "verdict": "pass",
-                "gain_evidence": gain,
-                "responses": responses,
-            }
+            (
+                {
+                    "mode": mode,
+                    "verdict": "pass",
+                    "gain_evidence": tandem_gain,
+                    "responses": {
+                        "attack": {
+                            "evidence_valid": True,
+                            "command_bracket_gap_samples": frame_samples,
+                        },
+                        "release": {
+                            "evidence_valid": True,
+                            "command_bracket_gap_samples": 0,
+                        },
+                    },
+                    "preconditioning": {
+                        "frame_count": 1,
+                        "trace": [baseline_frame],
+                    },
+                    "baseline_frames": [baseline_frame],
+                    "attack_frames": [attack_frame],
+                    "release_frames": [release_frame],
+                    "conditioning_anchor": dict(anchor_command.as_dict()),
+                    "commands": [
+                        dict(attack_command.as_dict()),
+                        dict(release_command.as_dict()),
+                    ],
+                }
+                if mode == MODE_TANDEM
+                else {
+                    "mode": mode,
+                    "verdict": "pass",
+                    "gain_evidence": gain,
+                    "responses": responses,
+                }
+            )
             for mode in TRANSIENT_MODES
         ],
         "comparison": [
-            {"mode": mode, "gain_evidence": gain} for mode in TRANSIENT_MODES
+            {
+                "mode": mode,
+                "gain_evidence": tandem_gain if mode == MODE_TANDEM else gain,
+            }
+            for mode in TRANSIENT_MODES
         ],
     }
     report_path.parent.mkdir(parents=True)
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     assert production_validator(options)(spec, report_path, work_dir).verdict == "pass"
 
+    valid_report = json.loads(json.dumps(report))
+    report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    tandem["attack_frames"][0]["metadata"]["first_sample_sequence"] += 1
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="buffer/sample deltas disagree"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    tandem["attack_frames"][0]["gap_context"] = "continuous_response"
+    tandem["attack_frames"][0]["continuity"]["gap_context"] = "continuous_response"
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="gap context differs from its phase"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    tandem["attack_frames"][0]["metadata"]["tandem_transition_count"] = 2
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="hides transition timing evidence"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    attack_command_record = next(
+        command
+        for command in tandem["commands"]
+        if command["command_id"] == "strong_attack"
+    )
+    attack_command_record["sample_sequence_after"] -= 1
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="command bracket is inconsistent"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
     report["configuration"]["quality"]["sample_rate_hz"] = 1_000_000
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="configuration differs"):

@@ -101,6 +101,8 @@ class _FakeRadio:
         self.metadata_previous_level = -60.0
         self.sample_gap_capture_index: int | None = None
         self.sample_gap_frames = 1
+        self.buffer_gap_frames_override: int | None = None
+        self.hidden_transition_capture_index: int | None = None
         self.omit_release_event = False
         self.fail_next_capture_with_mute_error = False
         self.mute_failures_remaining = 0
@@ -178,8 +180,18 @@ class _FakeRadio:
     def _metadata(self, *, samples: int) -> Any:
         events: tuple[TandemGainEvent, ...] = ()
         first_sample = self.metadata_sample
+        buffer_sequence = self.metadata_buffer_sequence
         if self.sample_gap_capture_index == self.metadata_capture_count:
             first_sample += samples * self.sample_gap_frames
+            buffer_sequence += (
+                self.sample_gap_frames
+                if self.buffer_gap_frames_override is None
+                else self.buffer_gap_frames_override
+            )
+        if self.hidden_transition_capture_index == self.metadata_capture_count:
+            self.metadata_gain_index -= 1
+            self.metadata_transition_count += 1
+            self.metadata_event_sequence += 1
         louder = self.tx_gain_db > self.metadata_previous_level
         quieter = self.tx_gain_db < self.metadata_previous_level
         emit = louder or (quieter and not self.omit_release_event)
@@ -208,9 +220,11 @@ class _FakeRadio:
             enabled_scan_mask=0x0F,
             channel_count=2,
             flags=0,
+            observation_count=4,
             observation_overflow_count=0,
             event_overflow_count=0,
             tandem_state=TandemState.ARMED_AUTO,
+            tandem_fault_flags=0,
             gain_table_id=TandemGainTable.MHZ_200_1300,
             minimum_gain_db=0,
             maximum_gain_db=62,
@@ -221,16 +235,17 @@ class _FakeRadio:
             rx2_gain_index=self.metadata_gain_index,
             bench_gain_indices=(self.metadata_gain_index, self.metadata_gain_index),
             first_sample_sequence=first_sample,
-            buffer_sequence=self.metadata_buffer_sequence,
+            buffer_sequence=buffer_sequence,
             stream_id=9,
             ownership_epoch=5,
             tandem_transition_count=self.metadata_transition_count,
             threshold_provenance=123,
+            ad9361_temperature_mdeg_c=35_000,
             event_count=len(events),
             gain_events=events,
         )
         self.metadata_sample = first_sample + samples
-        self.metadata_buffer_sequence += 1
+        self.metadata_buffer_sequence = buffer_sequence + 1
         self.metadata_capture_count += 1
         return metadata
 
@@ -524,6 +539,22 @@ def test_tandem_command_bracket_includes_a_metadata_gap(tmp_path: Path) -> None:
     )
     first_post = tandem["attack_frames"][0]
     assert first_post["sample_gap_before"] == 1_024
+    assert first_post["continuity"] == {
+        "buffer_delta": 2,
+        "sample_delta": 2_048,
+        "missing_frame_count": 1,
+        "sample_gap_before": 1_024,
+        "provider_gap_accepted": True,
+        "gap_context": "command_bracket",
+        "command_boundary_gap_allowed": True,
+        "transition_count_delta": 1,
+        "visible_event_count": 1,
+        "hidden_transition_count": 0,
+        "initial_unrepresented_transition_count": 0,
+        "cumulative_missing_frame_count": 1,
+        "cumulative_hidden_transition_count": 0,
+        "cumulative_event_sequence_hole_count": 0,
+    }
     assert (
         attack["sample_sequence_before"]
         == tandem["baseline_frames"][-1]["sample_end_exclusive"]
@@ -561,7 +592,50 @@ def test_tandem_sample_gap_outside_a_command_boundary_remains_fatal(
 ) -> None:
     radio = _FakeRadio(tmp_path)
     radio.sample_gap_capture_index = 4
-    with pytest.raises(EvidenceInvalid, match="sample sequence has a gap"):
+    with pytest.raises(EvidenceInvalid, match="gap lies inside a continuous response"):
+        _run_fake(radio, _quality(tmp_path))
+
+
+def test_zero_transition_precondition_gap_is_a_discontinuous_observation(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.sample_gap_capture_index = 1
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
+    gap = tandem["preconditioning"]["trace"][1]
+    assert gap["gap_context"] == "precondition_observation"
+    assert gap["continuity"]["provider_gap_accepted"] is True
+    assert gap["continuity"]["hidden_transition_count"] == 0
+    assert gap["precondition_stable_run"] == 1
+
+
+def test_tandem_provider_gap_requires_matching_buffer_and_sample_deltas(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.sample_gap_capture_index = 3
+    radio.buffer_gap_frames_override = 0
+    with pytest.raises(EvidenceInvalid, match="buffer/sample deltas disagree"):
+        _run_fake(radio, _quality(tmp_path))
+
+    persisted = json.loads(
+        (
+            tmp_path / radio.options.serial / "tandem-agc-transient-report.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert "buffer delta 1" in persisted["fatal_error"]
+    assert "sample delta 2048" in persisted["fatal_error"]
+
+
+def test_tandem_provider_gap_cannot_hide_transient_event_timing(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.sample_gap_capture_index = 3
+    radio.hidden_transition_capture_index = 3
+    with pytest.raises(EvidenceInvalid, match="hides gain-event timing evidence"):
         _run_fake(radio, _quality(tmp_path))
 
 

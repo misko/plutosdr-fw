@@ -59,6 +59,7 @@ from .transient_hardware import (
     run_transient_hardware,
     validate_transient_options,
 )
+from .transient_quality import StimulusCommand, reconcile_tandem_events
 
 AGGREGATE_SCHEMA = "plutosdr-fw.tandem-agc-release-hardware.v1"
 AGGREGATE_CHECKPOINT = "release-hardware-checkpoint.json"
@@ -1355,6 +1356,359 @@ def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:
     return errors
 
 
+def _transient_continuity_errors(
+    modes: Any, capture: TransientCaptureOptions, sample_rate_hz: int
+) -> list[str]:
+    """Recompute transient gap, event, endpoint, and command-bracket evidence."""
+
+    if not isinstance(modes, list):
+        return ["transient modes are missing"]
+    tandem_modes = [
+        mode
+        for mode in modes
+        if isinstance(mode, Mapping) and mode.get("mode") == MODE_TANDEM
+    ]
+    if len(tandem_modes) != 1:
+        return ["transient tandem mode is missing or duplicated"]
+    mode = tandem_modes[0]
+    preconditioning = mode.get("preconditioning")
+    trace = (
+        preconditioning.get("trace") if isinstance(preconditioning, Mapping) else None
+    )
+    baseline = mode.get("baseline_frames")
+    attack = mode.get("attack_frames")
+    release = mode.get("release_frames")
+    if not all(
+        isinstance(items, list) and items
+        for items in (trace, baseline, attack, release)
+    ):
+        return ["transient tandem frame evidence is missing or empty"]
+    assert isinstance(trace, list)
+    assert isinstance(baseline, list)
+    assert isinstance(attack, list)
+    assert isinstance(release, list)
+    errors: list[str] = []
+    if any(not isinstance(frame, Mapping) for frame in baseline):
+        return ["transient tandem baseline frame evidence is malformed"]
+    if preconditioning.get("frame_count") != len(trace):
+        errors.append("transient tandem precondition frame count is inconsistent")
+    if baseline[-1].get("frame_index") != trace[-1].get("frame_index"):
+        errors.append("transient tandem baseline is not retained from preconditioning")
+
+    sections = (
+        ("precondition", trace),
+        ("attack", attack),
+        ("release", release),
+    )
+    previous_metadata: Mapping[str, Any] | None = None
+    previous_event: Mapping[str, Any] | None = None
+    stream_id: int | None = None
+    ownership_epoch: int | None = None
+    gain_index_range: tuple[int, int] | None = None
+    cumulative_missing = 0
+    frame_number = 0
+    visible_response_events: list[Mapping[str, Any]] = []
+    uint32_modulus = 1 << 32
+
+    def exact_integer(value: Any, *, minimum: int = 0) -> bool:
+        return type(value) is int and value >= minimum
+
+    for section, frames in sections:
+        for section_index, frame in enumerate(frames):
+            context = f"transient tandem {section} frame {section_index}"
+            if not isinstance(frame, Mapping):
+                errors.append(f"{context} is malformed")
+                return errors
+            expected_gap_context = (
+                "precondition_observation"
+                if section == "precondition"
+                else (
+                    "command_bracket" if section_index == 0 else "continuous_response"
+                )
+            )
+            if frame.get("frame_index") != frame_number:
+                errors.append(f"{context} frame index is not contiguous")
+            frame_number += 1
+            if frame.get("gap_context") != expected_gap_context:
+                errors.append(f"{context} gap context differs from its phase")
+            if frame.get("command_boundary_gap_allowed") is not (
+                expected_gap_context == "command_bracket"
+            ):
+                errors.append(f"{context} command-boundary policy is inconsistent")
+
+            metadata = frame.get("metadata")
+            continuity = frame.get("continuity")
+            if not isinstance(metadata, Mapping) or not isinstance(continuity, Mapping):
+                errors.append(f"{context} lacks metadata gap evidence")
+                return errors
+            buffer_sequence = metadata.get("buffer_sequence")
+            first_sample = metadata.get("first_sample_sequence")
+            samples = metadata.get("samples_per_channel")
+            transition_count = metadata.get("tandem_transition_count")
+            current_stream = metadata.get("stream_id")
+            current_epoch = metadata.get("ownership_epoch")
+            events = metadata.get("gain_events")
+            endpoint = metadata.get("bench_gain_indices")
+            index_range = metadata.get("gain_index_range")
+            if (
+                not exact_integer(buffer_sequence)
+                or not exact_integer(first_sample)
+                or samples != capture.frame_samples
+                or not exact_integer(transition_count)
+                or transition_count >= uint32_modulus
+                or not exact_integer(current_stream)
+                or not exact_integer(current_epoch)
+                or not isinstance(events, list)
+                or not isinstance(endpoint, list)
+                or len(endpoint) != 2
+                or any(not exact_integer(value) for value in endpoint)
+                or endpoint[0] != endpoint[1]
+                or not isinstance(index_range, list)
+                or len(index_range) != 2
+                or any(not exact_integer(value) for value in index_range)
+                or index_range[0] > index_range[1]
+                or not index_range[0] <= endpoint[0] <= index_range[1]
+            ):
+                errors.append(f"{context} metadata counters or gains are malformed")
+                return errors
+            if (
+                not exact_integer(metadata.get("event_count"))
+                or not exact_integer(metadata.get("gain_event_count"))
+                or metadata.get("event_count") != len(events)
+                or metadata.get("gain_event_count") != len(events)
+            ):
+                errors.append(f"{context} event count differs from its event array")
+            if (
+                metadata.get("tandem_fault_flags") != 0
+                or metadata.get("observation_overflow_count") != 0
+                or metadata.get("event_overflow_count") != 0
+            ):
+                errors.append(f"{context} reports a fault or metadata overflow")
+            if (
+                frame.get("first_sample_sequence") != first_sample
+                or frame.get("sample_end_exclusive") != first_sample + samples
+            ):
+                errors.append(f"{context} IQ sample range differs from metadata")
+
+            initial_unrepresented = 0
+            if previous_metadata is None:
+                stream_id = int(current_stream)
+                ownership_epoch = int(current_epoch)
+                gain_index_range = (int(index_range[0]), int(index_range[1]))
+                buffer_delta: int | None = None
+                sample_delta: int | None = None
+                transition_delta: int | None = None
+                missing = 0
+                hidden = 0
+                initial_unrepresented = int(transition_count) - len(events)
+                if initial_unrepresented < 0:
+                    errors.append(f"{context} has more events than transitions")
+                    return errors
+            else:
+                if current_stream != stream_id or current_epoch != ownership_epoch:
+                    errors.append(f"{context} stream or ownership changed")
+                if tuple(index_range) != gain_index_range:
+                    errors.append(f"{context} gain-index range changed")
+                buffer_delta = int(buffer_sequence) - int(
+                    previous_metadata["buffer_sequence"]
+                )
+                sample_delta = int(first_sample) - int(
+                    previous_metadata["first_sample_sequence"]
+                )
+                if buffer_delta <= 0 or sample_delta <= 0:
+                    errors.append(f"{context} frame counters did not advance")
+                    return errors
+                if sample_delta != buffer_delta * capture.frame_samples:
+                    errors.append(f"{context} buffer/sample deltas disagree")
+                    return errors
+                missing = buffer_delta - 1
+                transition_delta = (
+                    int(transition_count)
+                    - int(previous_metadata["tandem_transition_count"])
+                ) % uint32_modulus
+                if transition_delta >= uint32_modulus // 2:
+                    errors.append(f"{context} transition counter regressed")
+                    return errors
+                hidden = transition_delta - len(events)
+                if hidden < 0:
+                    errors.append(f"{context} has more events than transitions")
+                    return errors
+                if hidden:
+                    errors.append(
+                        f"{context} hides transition timing evidence in a provider gap"
+                    )
+                if missing and expected_gap_context == "continuous_response":
+                    errors.append(f"{context} has a gap inside a continuous response")
+                cumulative_missing += missing
+
+            sample_gap = missing * capture.frame_samples
+            expected_continuity = {
+                "buffer_delta": buffer_delta,
+                "sample_delta": sample_delta,
+                "missing_frame_count": missing,
+                "sample_gap_before": sample_gap,
+                "provider_gap_accepted": bool(missing),
+                "gap_context": expected_gap_context,
+                "command_boundary_gap_allowed": (
+                    expected_gap_context == "command_bracket"
+                ),
+                "transition_count_delta": transition_delta,
+                "visible_event_count": len(events),
+                "hidden_transition_count": hidden,
+                "initial_unrepresented_transition_count": initial_unrepresented,
+                "cumulative_missing_frame_count": cumulative_missing,
+                "cumulative_hidden_transition_count": 0,
+                "cumulative_event_sequence_hole_count": 0,
+            }
+            if dict(continuity) != expected_continuity:
+                errors.append(f"{context} gap evidence differs from metadata")
+            if frame.get("sample_gap_before") != sample_gap:
+                errors.append(f"{context} sample-gap summary differs from metadata")
+
+            for event_index, event in enumerate(events):
+                event_context = f"{context} event {event_index}"
+                if not isinstance(event, Mapping):
+                    errors.append(f"{event_context} is malformed")
+                    return errors
+                event_sample = event.get("sample_sequence")
+                event_sequence = event.get("event_sequence")
+                direction = event.get("direction")
+                rx1_gain = event.get("rx1_gain_index")
+                rx2_gain = event.get("rx2_gain_index")
+                if (
+                    not exact_integer(event_sample)
+                    or not exact_integer(event_sequence)
+                    or event_sequence >= uint32_modulus
+                    or type(direction) is not int
+                    or direction not in (1, 2)
+                    or not exact_integer(rx1_gain)
+                    or not exact_integer(rx2_gain)
+                    or rx1_gain != rx2_gain
+                    or not first_sample <= event_sample < first_sample + samples
+                    or not index_range[0] <= rx1_gain <= index_range[1]
+                ):
+                    errors.append(f"{event_context} is malformed")
+                    return errors
+                step = 1 if direction == 1 else -1
+                if previous_event is not None:
+                    sequence_delta = (
+                        int(event_sequence) - int(previous_event["event_sequence"])
+                    ) % uint32_modulus
+                    if sequence_delta != 1:
+                        errors.append(f"{event_context} sequence is not contiguous")
+                    if event_sample < int(previous_event["sample_sequence"]):
+                        errors.append(f"{event_context} is not sample ordered")
+                    if rx1_gain != int(previous_event["rx1_gain_index"]) + step:
+                        errors.append(f"{event_context} is not an exact paired step")
+                elif (
+                    previous_metadata is not None
+                    and rx1_gain
+                    != int(previous_metadata["bench_gain_indices"][0]) + step
+                ):
+                    errors.append(
+                        f"{event_context} disagrees with the prior paired endpoint"
+                    )
+                previous_event = event
+                if section in ("attack", "release"):
+                    visible_response_events.append(event)
+            if events:
+                if endpoint != [
+                    events[-1].get("rx1_gain_index"),
+                    events[-1].get("rx2_gain_index"),
+                ]:
+                    errors.append(f"{context} endpoint differs from its final event")
+            elif previous_metadata is not None and endpoint != previous_metadata.get(
+                "bench_gain_indices"
+            ):
+                errors.append(f"{context} endpoint changed without an event")
+            previous_metadata = metadata
+
+    commands = mode.get("commands")
+    conditioning_anchor = mode.get("conditioning_anchor")
+    if not isinstance(commands, list) or not isinstance(conditioning_anchor, Mapping):
+        errors.append("transient tandem commands or conditioning anchor are missing")
+        return errors
+    by_id = {
+        command.get("command_id"): command
+        for command in commands
+        if isinstance(command, Mapping)
+    }
+    attack_command = by_id.get("strong_attack")
+    release_command = by_id.get("weak_release")
+    if not isinstance(attack_command, Mapping) or not isinstance(
+        release_command, Mapping
+    ):
+        errors.append("transient tandem attack/release commands are missing")
+        return errors
+    bracket_plan = (
+        (
+            "attack",
+            attack_command,
+            baseline[-1],
+            attack[0],
+        ),
+        (
+            "release",
+            release_command,
+            attack[-1],
+            release[0],
+        ),
+    )
+    responses = mode.get("responses")
+    for name, command, previous_frame, first_post in bracket_plan:
+        lower = previous_frame.get("sample_end_exclusive")
+        upper = first_post.get("sample_end_exclusive")
+        if (
+            not exact_integer(lower)
+            or not exact_integer(upper)
+            or command.get("sample_sequence_before") != lower
+            or command.get("sample_sequence_after") != upper
+            or command.get("sample_uncertainty") != upper - lower
+            or upper - lower > capture.max_sample_uncertainty
+        ):
+            errors.append(f"transient tandem {name} command bracket is inconsistent")
+        response = responses.get(name) if isinstance(responses, Mapping) else None
+        if not isinstance(response, Mapping) or response.get(
+            "command_bracket_gap_samples"
+        ) != first_post.get("sample_gap_before"):
+            errors.append(f"transient tandem {name} response gap is inconsistent")
+
+    def command_from_report(record: Mapping[str, Any]) -> StimulusCommand:
+        return StimulusCommand(
+            command_id=record["command_id"],
+            requested_level_db=record["requested_level_db"],
+            applied_level_db=record["applied_level_db"],
+            host_before_ns=record["host_before_ns"],
+            host_after_ns=record["host_after_ns"],
+            sample_sequence_before=record["sample_sequence_before"],
+            sample_sequence_after=record["sample_sequence_after"],
+        )
+
+    try:
+        recomputed_gain = _json_safe(
+            dict(
+                reconcile_tandem_events(
+                    (
+                        command_from_report(conditioning_anchor),
+                        command_from_report(attack_command),
+                        command_from_report(release_command),
+                    ),
+                    visible_response_events,
+                    sample_rate_hz=sample_rate_hz,
+                    max_host_jitter_ns=capture.max_host_jitter_ns,
+                    max_sample_uncertainty=capture.max_sample_uncertainty,
+                    max_latency_samples=capture.max_event_latency_samples,
+                )
+            )
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        errors.append(f"transient tandem gain evidence cannot be recomputed: {error}")
+    else:
+        if mode.get("gain_evidence") != recomputed_gain:
+            errors.append("transient tandem gain evidence differs from recomputation")
+    return errors
+
+
 def _identity_errors(
     report: Mapping[str, Any], options: ReleaseHardwareOptions
 ) -> list[str]:
@@ -1472,9 +1826,10 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
             expected_quality = _json_safe(asdict(transient_quality))
             assert isinstance(expected_quality, dict)
             expected_quality["output_dir"] = str(work_dir)
+            expected_capture = TransientCaptureOptions()
             expected_configuration = {
                 "quality": expected_quality,
-                "transient_capture": _json_safe(asdict(TransientCaptureOptions())),
+                "transient_capture": _json_safe(asdict(expected_capture)),
                 "kernel_buffers": 1,
             }
             if disk.get("configuration") != expected_configuration:
@@ -1514,6 +1869,13 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                     and comparison[index].get("gain_evidence") != gain
                 ):
                     errors.append("transient comparison changed gain evidence")
+            errors.extend(
+                _transient_continuity_errors(
+                    mode_records,
+                    expected_capture,
+                    transient_quality.sample_rate_hz,
+                )
+            )
             summary = {
                 "mode_count": len(mode_records),
                 "comparison": comparison,
