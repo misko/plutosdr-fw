@@ -999,6 +999,49 @@ def test_production_validator_recomputes_transient_evidence_and_configuration(
         production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == MODE_TANDEM)
+    anchor_command_record = tandem["conditioning_anchor"]
+    anchor_command_record["sample_sequence_before"] += 1
+    anchor_command_record["sample_uncertainty"] -= 1
+    attack_command_record = next(
+        command
+        for command in tandem["commands"]
+        if command["command_id"] == "strong_attack"
+    )
+    release_command_record = next(
+        command
+        for command in tandem["commands"]
+        if command["command_id"] == "weak_release"
+    )
+    forged_gain = _json_safe(
+        dict(
+            reconcile_tandem_events(
+                (
+                    command_from_record(anchor_command_record),
+                    command_from_record(attack_command_record),
+                    command_from_record(release_command_record),
+                ),
+                response_events,
+                sample_rate_hz=quality.sample_rate_hz,
+                max_host_jitter_ns=(TransientCaptureOptions().max_host_jitter_ns),
+                max_sample_uncertainty=(
+                    TransientCaptureOptions().max_sample_uncertainty
+                ),
+                max_latency_samples=(
+                    TransientCaptureOptions().max_event_latency_samples
+                ),
+            )
+        )
+    )
+    tandem["gain_evidence"] = forged_gain
+    next(item for item in report["comparison"] if item["mode"] == MODE_TANDEM)[
+        "gain_evidence"
+    ] = forged_gain
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="exact retained baseline interval"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
     report["configuration"]["quality"]["sample_rate_hz"] = 1_000_000
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="configuration differs"):

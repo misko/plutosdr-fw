@@ -1641,6 +1641,22 @@ def _transient_continuity_errors(
     if not isinstance(commands, list) or not isinstance(conditioning_anchor, Mapping):
         errors.append("transient tandem commands or conditioning anchor are missing")
         return errors
+    anchor_lower = baseline[0].get("first_sample_sequence")
+    anchor_upper = baseline[-1].get("sample_end_exclusive")
+    if (
+        not exact_integer(anchor_lower)
+        or not exact_integer(anchor_upper)
+        or anchor_upper <= anchor_lower
+        or conditioning_anchor.get("command_id") != "weak_conditioning_anchor"
+        or conditioning_anchor.get("sample_sequence_before") != anchor_lower
+        or conditioning_anchor.get("sample_sequence_after") != anchor_upper
+        or conditioning_anchor.get("sample_uncertainty") != anchor_upper - anchor_lower
+        or anchor_upper - anchor_lower > capture.max_sample_uncertainty
+    ):
+        errors.append(
+            "transient tandem conditioning anchor differs from the exact retained "
+            "baseline interval"
+        )
     by_id = {
         command.get("command_id"): command
         for command in commands
