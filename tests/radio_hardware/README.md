@@ -1,0 +1,232 @@
+# PlutoSDR radio-hardware pytest
+
+This directory owns two independent hardware acceptance tests: the refill
+continuity experiment for
+[plutosdr-fw issue 46](https://github.com/misko/plutosdr-fw/issues/46), and a
+manual/native-AGC/tandem-AUTO dual-RX tone-quality comparison. Neither imports
+SPF. Public pull-request CI runs only offline metadata, continuity, planted
+fault, tone-analysis, matrix-verdict, and pinned-HDL goldens; no workflow
+transmits RF.
+
+## Fixture and safety gate
+
+Wire one authorized radio as:
+
+```text
+TX2 -> attenuation/backoff -> two-way splitter/tee -> RX0 and RX1
+```
+
+The effective attenuation from TX2 to **each** receiver must be at least 30 dB.
+For every emitted level the tests enforce:
+
+```text
+physical path attenuation (dB) - TX hardware gain (dB) >= 30 dB
+```
+
+Thus a conservatively declared 0 dB physical path permits TX gains no stronger
+than -30 dB. A freshly measured 30 dB physical pad permits up to 0 dB TX gain.
+The test uses the AD9361/IIO names TX2, RX1, and RX2 for the physical ports the
+bench calls TX2, RX0, and RX1.
+
+The operator must provide all of the following before the test mutates TX:
+
+- `--issue46-hardware --tx2-loopback`;
+- the exact `--radio-serial` (dynamic USB coordinates are resolved from it);
+- a `--firmware-pattern` matching the opened radio's `fw_version`;
+- the currently justified **physical** `--loopback-attenuation-db`; the test
+  combines it with the strongest requested TX backoff and requires at least
+  30 dB effective attenuation;
+- a manifest-pinned host libiio selected by `scripts/run_issue_46_hardware.sh`.
+
+The runner takes a nonblocking per-serial lock. It first mutes TX1/TX2, disables
+all DDS channels, and selects FPGA ZERO on all four DAC lanes. A bounded DDS
+tone then qualifies both tee branches for level, clipping, and SNR. The tone is
+not a continuity oracle. After that gate passes, TX1 stays muted, logical DAC
+channels 2/3 select PNXX (`0x9`, P15/P20), and one DAC sync seeds the generator.
+There are no later selector, sync, sample-rate, LO, or bandwidth writes during
+the experiment.
+
+Fixture teardown does not restore a possibly transmitting prior state. It
+forces both TX gains below -80 dB, disables DDS, selects ZERO on every lane,
+and verifies those readbacks. A cleanup failure fails the pytest session.
+
+## Manual, native AGC, and tandem AUTO quality matrix
+
+The quality test emits the same 100 kHz TX2 DDS tone at scale 1.0 and the same deterministic
+weak-to-strong-to-weak TX gain trajectory in three fresh receive sessions:
+
+1. fixed 40 dB manual gain on both receivers through ordinary IIO;
+2. independent AD9361 `slow_attack` AGC through ordinary IIO;
+3. paired tandem `AUTO` through metadata ABI 2.
+
+The conservative smoke trajectory is `-61,-45,-30,-45,-61` dB. The full
+trajectory is `-61,-55,-50,-45,-40,-35,-30,-35,-40,-45,-50,-55,-61` dB.
+With 0 dB credited physical loss, the loudest rung remains at the required
+30 dB effective-attenuation boundary. After the tandem metadata buffer opens,
+AUTO is conditioned at the median of the sorted distinct trajectory gains
+(`-45` dB for both profiles). This priming phase uses the normal metadata
+settling proof and records its paired equilibrium, which can be below maximum on
+a hotter fixture. Its TX readback, effective attenuation, convergence trace,
+event summary, and final metadata are recorded under `priming`. Priming has no
+tone-quality gate. The measured trajectory then starts fresh at its weak `-61`
+dB rung.
+
+The AUTO request uses qualification ADC overload thresholds `35/34` (large/
+small). They exercise both decrease and recovery within the safe 30 dB TX
+ceiling across the local fixture range; the production ABI defaults remain
+unchanged in `metadata_abi.py`. Override them for a threshold sweep with
+`--tandem-quality-large-adc-threshold` and
+`--tandem-quality-small-adc-threshold`. The requested settings and firmware
+threshold provenance are retained in the report.
+
+Each measured level checks its actual TX gain readback before capture, drains
+queued IQ, and requires three stable frames before measuring three more frames.
+Native AGC stability comes from gain readback before and after each refill. Tandem
+stability requires strict metadata-v5 provenance, one ownership epoch, paired
+gain indices, an unchanged transition count, and no gain event in each stable
+frame. There is no sleep-based settling decision.
+
+Run one serial-attested local USB radio with the firmware already deployed:
+
+```bash
+PYTHON=/home/mouse9911/gits/spf/.venv/bin/python \
+IIO_SOURCE=../libiio \
+scripts/run_tandem_agc_quality_hardware.sh \
+  --tandem-quality-hardware \
+  --tx2-loopback \
+  --radio-serial SERIAL \
+  --radio-uri usb:BUS.DEVICE.INTERFACE \
+  --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc2$' \
+  --loopback-attenuation-db 0 \
+  --tandem-quality-profile smoke
+```
+
+The runner never flashes or reboots a radio. It builds/loads only the
+manifest-pinned host libiio and treats the exact `fw_version` match on the
+serial-attested opened context as deployment evidence. If a fresh RAM boot is
+needed, perform it separately with the repository's guarded, exact-serial RAM
+deployment workflow; never substitute an unrelated `build/pluto.dfu` or write
+QSPI for this test.
+
+The default report is
+`build/radio-hardware/tandem-agc-quality/SERIAL/tandem-agc-quality-report.json`.
+It is updated atomically after every level and contains identity and safety
+attestation, convergence traces, gain/event evidence, frame hashes, per-frame
+quality, per-level summaries, cross-mode numeric deltas, and final cleanup
+readback. Raw IQ is retained only with `--tandem-quality-save-iq`.
+
+Every native and tandem rung must pass the same absolute envelope: tone SNR at
+least 10 dB, tone level from -70 to -3 dBFS, no clipping, cross-channel
+coherence at least 0.98, within-frame differential-phase deviation at most 5
+degrees, and tone-frequency error at most 250 Hz. The strongest manual rung is
+the fixture/reference gate; weak manual degradation is recorded rather than
+misclassified as an AGC defect. Tandem must also show paired gain indices and
+prove a louder-TX gain decrease and a quieter-TX gain increase. That response
+proof may use explicit events or transition-count/endpoint evidence accounted
+by provider-reported frame gaps; native gain must span at least 1 dB. The report
+computes tandem-minus-native/manual deltas, but initially does not claim that
+one adaptive controller must numerically outperform the other: both must pass
+the same absolute envelope.
+
+## Host setup and first RC2 run
+
+Create a test-only environment; the special libiio itself is selected by the
+runner rather than installed from PyPI:
+
+```bash
+python3 -m venv .venv-radio-hardware
+.venv-radio-hardware/bin/pip install -r tests/radio_hardware/requirements.txt
+```
+
+Use a maintenance-window radio that is physically wired to the fixture. Do not
+borrow a radio owned by a live acquisition process. The smoke command below is
+expected to pass only when it actually observes RED evidence on affected RC2:
+
+```bash
+PYTHON=.venv-radio-hardware/bin/python \
+IIO_SOURCE=../libiio \
+scripts/run_issue_46_hardware.sh \
+  --issue46-hardware \
+  --tx2-loopback \
+  --radio-serial SERIAL \
+  --firmware-pattern 'tandem-agc-v8-rc2' \
+  --loopback-attenuation-db 30 \
+  --issue46-profile smoke \
+  --issue46-expected red
+```
+
+Then run the pinned reproduction matrix:
+
+```bash
+PYTHON=.venv-radio-hardware/bin/python \
+IIO_SOURCE=../libiio \
+scripts/run_issue_46_hardware.sh \
+  --issue46-hardware \
+  --tx2-loopback \
+  --radio-serial SERIAL \
+  --firmware-pattern 'tandem-agc-v8-rc2' \
+  --loopback-attenuation-db 30 \
+  --issue46-profile repro \
+  --issue46-expected red
+```
+
+The reproduction profile randomizes, with seed 46, the ordinary/metadata A/B
+cells across kernel queue counts 1/2/4, pause factors
+0/0.5/1/2/4/8/16 times `N/Fs`, and five repeats. The pinned starting point is
+`Fs=2.5 MS/s`, `N=262144`, so one refill period is 104.8576 ms. Each cell reads
+two frames before the pause and `K+3` after it. The default RAM sink retains IQ
+only for the current cell. `--issue46-sink sync` writes and `fsync()`s every IQ
+frame to expose a stalled synchronous writer; it can consume several gigabytes.
+
+Artifacts are written below `build/radio-hardware/issue-46/`. The JSON report is
+updated atomically after every cell and records the firmware/runtime identity,
+fixture qualification, randomized matrix, per-frame hashes/counters/PN scores,
+per-boundary verdicts, and final mute/selector readback. Use
+`--issue46-save-iq` only for a bounded debugging run.
+
+## RED/GREEN meaning
+
+The two RX branches independently estimate the P15 phase at every returned IQ
+boundary. Metadata additionally supplies the FPGA sample counter. Evidence is
+invalid—not RED—if the two receivers disagree, PN confidence is weak, metadata
+CRC/layout is wrong, or the counter and PN witness disagree.
+
+- **RED:** a PN-proven gap returns through ordinary IIO; a gap occurs inside a
+  conservative queue bound; metadata counts a gap without the device-overflow
+  flag; or refill fails inside that safe bound.
+- **GREEN:** every returned boundary is counter/PN contiguous, or saturation
+  produces an exact counter gap with an explicit overflow flag, or the refill
+  fails visibly outside queue capacity.
+
+For a real regression gate, use `--issue46-expected green` (the default). The
+offline planted-deletion test proves that the oracle goes RED, so a no-gap
+hardware result is not accepted merely because the detector was inert.
+
+## Localization and v0.38 comparison
+
+After the first RED cell, rerun around its threshold, then repeat with
+`--issue46-samples 131072` and `--issue46-samples 524288`. Use
+`--issue46-sink sync` to test synchronous writer backpressure. USB is the
+default safety boundary; an intentional IP comparison requires both an exact
+`--radio-uri` and `--allow-non-usb` while still attesting the serial.
+
+To compare v0.38 metadata-v5 on the **same radio and wiring**, boot its image in
+RAM during an explicit maintenance window—never write QSPI for this test. Use a
+separate libiio worktree at the manifest commit and select its manifest:
+
+```bash
+IIO_MANIFEST=manifests/libiio-frame-metadata-v5-source.yaml \
+IIO_SOURCE=../libiio-metadata-v5 \
+PYTHON=.venv-radio-hardware/bin/python \
+scripts/run_issue_46_hardware.sh \
+  --issue46-hardware --tx2-loopback \
+  --radio-serial SERIAL \
+  --firmware-pattern 'v0.38-plutoplus-spf-libiio-metadata-v5' \
+  --loopback-attenuation-db 30 \
+  --issue46-profile repro --issue46-expected red
+```
+
+The runner detects v0.38's requestless metadata constructor and RC2's required
+104-byte tandem request without an SPF import. Component-level provider fixes
+still need libiio unit tests; this directory remains the firmware/hardware
+acceptance boundary.

@@ -11,6 +11,10 @@
 *.gch
 *.pch
 
+# Python test caches
+__pycache__/
+.pytest_cache/
+
 # Libraries
 *.lib
 *.a
