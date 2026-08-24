@@ -285,6 +285,43 @@ def test_campaign_checkpoint_resume_skips_verified_completed_run(
     json.dumps(complete, allow_nan=False)
 
 
+def test_campaign_resume_is_independent_of_canonical_json_key_order(
+    tmp_path: Path,
+) -> None:
+    config = ReleaseCampaignConfig(
+        output_dir=tmp_path / "campaign",
+        radio_serials=("radio-a",),
+        bands=(
+            BandCase("z-low", 915_000_000),
+            BandCase("a-mid", 2_450_000_000),
+        ),
+        policy_cases=(BASELINE,),
+    )
+    plan = build_release_plan(config, _base(tmp_path))
+    planned_ids = [run.run_id for run in plan.runs]
+    calls: list[str] = []
+
+    def callback(spec, _options):
+        calls.append(spec.run_id)
+        return _write_report(spec, _matrix_report(spec))
+
+    partial, _path = run_release_campaign(
+        config, _base(tmp_path), callback, max_new_runs=1
+    )
+    assert partial["verdict"] == "incomplete"
+    durable = json.loads(
+        (config.output_dir / "campaign-checkpoint.json").read_text(encoding="utf-8")
+    )
+    assert list(durable["runs"]) == sorted(planned_ids)
+    assert list(durable["runs"]) != planned_ids
+
+    complete, _path = run_release_campaign(config, _base(tmp_path), callback)
+
+    assert complete["verdict"] == "pass"
+    assert calls == planned_ids
+    assert list(complete["runs"]) == planned_ids
+
+
 def test_resume_rejects_tampered_completed_artifact(tmp_path: Path) -> None:
     config = _config(tmp_path)
 

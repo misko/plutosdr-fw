@@ -932,10 +932,22 @@ def _load_checkpoint(path: Path, plan: CampaignPlan) -> dict[str, Any]:
         raise CampaignConfigurationError(
             "checkpoint does not match this campaign configuration"
         )
-    if list(checkpoint.get("runs", {})) != [run.run_id for run in plan.runs]:
+    durable_runs = checkpoint.get("runs")
+    planned_ids = [run.run_id for run in plan.runs]
+    if not isinstance(durable_runs, dict) or set(durable_runs) != set(planned_ids):
         raise CampaignConfigurationError(
             "checkpoint run plan differs from deterministic plan"
         )
+    for run in plan.runs:
+        record = durable_runs[run.run_id]
+        if not isinstance(record, dict) or record.get("spec") != run.to_dict():
+            raise CampaignConfigurationError(
+                f"checkpoint run specification differs for {run.run_id}"
+            )
+    # Checkpoints are intentionally written with sorted JSON keys.  Restore the
+    # semantic plan order after loading rather than treating JSON object order as
+    # release evidence or allowing it to affect blocker/report ordering.
+    checkpoint["runs"] = {run_id: durable_runs[run_id] for run_id in planned_ids}
     return checkpoint
 
 
