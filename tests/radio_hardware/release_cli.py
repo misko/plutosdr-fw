@@ -28,6 +28,8 @@ from . import release_campaign as steady_campaign
 from .experiment import Issue46Options, Issue46Radio
 from .modulated_hardware import (
     DEFAULT_MODULATED_TX2_GAIN_DB,
+    MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES,
+    MODE_MANUAL,
     MODE_TANDEM,
     MODULATED_MODES,
     ModulatedHardwareOptions,
@@ -1000,94 +1002,192 @@ def _modulated_raw_iq_evidence(
     serial: str,
     capture_samples: int,
 ) -> tuple[list[str], dict[str, Any] | None]:
-    """Verify the single bounded diagnostic capture against its durable bytes."""
+    """Verify the bounded desired/blocker diagnostic pair against durable bytes."""
 
     if not isinstance(runs, list):
         return ["modulated runs are missing"], None
     errors: list[str] = []
-    candidates: list[tuple[Mapping[str, Any], int, Mapping[str, Any]]] = []
-    target_run: Mapping[str, Any] | None = None
+    expected_bytes = capture_samples * 8
+    if expected_bytes > MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES:
+        errors.append("planned raw-IQ artifact exceeds the 64 KiB bound")
+    targets = (
+        {
+            "purpose": "desired_baseline",
+            "case_id": "desired_only",
+            "mode": MODE_MANUAL,
+            "measurement_index": 0,
+            "filename": "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le",
+        },
+        {
+            "purpose": "first_blocker",
+            "case_id": "blocker_00",
+            "mode": MODE_MANUAL,
+            "measurement_index": 0,
+            "filename": "blocker-00-manual-fixed-frame-0000-rx0-rx1.cs16le",
+        },
+    )
+    target_runs: dict[tuple[str, str], list[Mapping[str, Any]]] = {
+        (target["case_id"], target["mode"]): [] for target in targets
+    }
+    candidates: list[tuple[str, str, int, Mapping[str, Any]]] = []
     for run in runs:
         if not isinstance(run, Mapping):
             continue
+        key = (run.get("case_id"), run.get("mode"))
+        if key in target_runs:
+            target_runs[key].append(run)
         measurements = run.get("measurements")
-        is_target = (
-            run.get("case_id") == "desired_only" and run.get("mode") == "manual_fixed"
-        )
-        if is_target:
-            target_run = run
-            if not isinstance(measurements, list) or not measurements:
-                errors.append("desired/manual run lacks its first IQ measurement")
         if not isinstance(measurements, list):
             continue
         for frame_index, frame in enumerate(measurements):
             if isinstance(frame, Mapping) and "raw_iq_provenance" in frame:
-                candidates.append((run, frame_index, frame))
+                candidates.append(
+                    (
+                        str(run.get("case_id")),
+                        str(run.get("mode")),
+                        frame_index,
+                        frame,
+                    )
+                )
 
-    if target_run is None:
-        errors.append("desired/manual run is missing")
-    if len(candidates) != 1:
+    expected_positions = {
+        (target["case_id"], target["mode"], target["measurement_index"])
+        for target in targets
+    }
+    observed_positions = {
+        (case_id, mode, frame_index)
+        for case_id, mode, frame_index, _frame in candidates
+    }
+    if len(candidates) != 2 or observed_positions != expected_positions:
         errors.append(
-            "modulated report must contain exactly one raw-IQ provenance record"
+            "modulated report must contain exactly two raw-IQ provenance records "
+            "on the planned desired/blocker manual frames"
         )
-        return errors, None
 
-    run, frame_index, frame = candidates[0]
-    if run is not target_run or frame_index != 0:
-        errors.append("raw-IQ provenance is not on the first desired/manual frame")
-    provenance = frame.get("raw_iq_provenance")
-    if not isinstance(provenance, Mapping):
-        errors.append("raw-IQ provenance is malformed")
-        return errors, None
+    evidence: dict[str, Any] = {}
+    digests: list[str] = []
+    expected_paths = {
+        (Path(serial) / "diagnostic-iq" / str(target["filename"])).as_posix()
+        for target in targets
+    }
+    root = work_dir.resolve()
+    for target in targets:
+        purpose = str(target["purpose"])
+        key = (str(target["case_id"]), str(target["mode"]))
+        matching_runs = target_runs[key]
+        if len(matching_runs) != 1:
+            errors.append(f"{purpose} raw-IQ target run is missing or duplicated")
+            continue
+        measurements = matching_runs[0].get("measurements")
+        frame_index = int(target["measurement_index"])
+        if not isinstance(measurements, list) or len(measurements) <= frame_index:
+            errors.append(f"{purpose} raw-IQ target frame is missing")
+            continue
+        frame = measurements[frame_index]
+        if not isinstance(frame, Mapping):
+            errors.append(f"{purpose} raw-IQ target frame is malformed")
+            continue
+        provenance = frame.get("raw_iq_provenance")
+        if not isinstance(provenance, Mapping):
+            errors.append(f"{purpose} raw-IQ provenance is missing or malformed")
+            continue
 
-    expected_relative_path = (
-        Path(serial)
-        / "diagnostic-iq"
-        / "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le"
-    ).as_posix()
-    expected_bytes = capture_samples * 8
-    if provenance.get("path") != expected_relative_path:
-        errors.append("raw-IQ artifact path differs from plan")
-    if (
-        type(provenance.get("bytes")) is not int
-        or provenance.get("bytes") != expected_bytes
-    ):
-        errors.append("raw-IQ artifact byte count differs from plan")
-    digest = provenance.get("sha256")
-    if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
-        errors.append("raw-IQ artifact SHA-256 is malformed")
-    if provenance.get("encoding") != "signed-16-bit-little-endian":
-        errors.append("raw-IQ artifact encoding differs from plan")
-    if provenance.get("channel_layout") != ["rx0_i", "rx0_q", "rx1_i", "rx1_q"]:
-        errors.append("raw-IQ artifact channel layout differs from plan")
-    if provenance.get("samples_per_channel") != capture_samples:
-        errors.append("raw-IQ artifact sample count differs from plan")
-    if frame.get("sha256") != digest or frame.get("iq_bytes") != expected_bytes:
-        errors.append("raw-IQ provenance differs from its measurement frame")
+        if provenance.get("purpose") != purpose:
+            errors.append(f"{purpose} raw-IQ purpose differs from plan")
+        if provenance.get("case_id") != target["case_id"]:
+            errors.append(f"{purpose} raw-IQ case linkage differs from plan")
+        if provenance.get("mode") != target["mode"]:
+            errors.append(f"{purpose} raw-IQ mode linkage differs from plan")
+        if provenance.get("measurement_index") != frame_index:
+            errors.append(f"{purpose} raw-IQ frame linkage differs from plan")
 
-    path_value = provenance.get("path")
-    if isinstance(path_value, str):
-        root = work_dir.resolve()
-        artifact = (work_dir / path_value).resolve()
-        if artifact != root and root not in artifact.parents:
-            errors.append("raw-IQ artifact escapes the phase work directory")
-        elif not artifact.is_file():
-            errors.append("raw-IQ artifact is missing")
+        expected_relative_path = (
+            Path(serial) / "diagnostic-iq" / str(target["filename"])
+        ).as_posix()
+        if provenance.get("path") != expected_relative_path:
+            errors.append(f"{purpose} raw-IQ artifact path differs from plan")
+        byte_count = provenance.get("bytes")
+        if type(byte_count) is not int or byte_count != expected_bytes:
+            errors.append(f"{purpose} raw-IQ artifact byte count differs from plan")
+        if type(byte_count) is int and byte_count > MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES:
+            errors.append(f"{purpose} raw-IQ artifact exceeds the 64 KiB bound")
+        digest = provenance.get("sha256")
+        if not isinstance(digest, str) or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+            errors.append(f"{purpose} raw-IQ artifact SHA-256 is malformed")
         else:
-            if artifact.stat().st_size != expected_bytes:
-                errors.append("raw-IQ artifact on-disk byte count differs")
-            else:
-                payload = artifact.read_bytes()
-                if (
-                    isinstance(digest, str)
-                    and hashlib.sha256(payload).hexdigest() != digest
-                ):
-                    errors.append("raw-IQ artifact on-disk SHA-256 differs")
-            temporary = artifact.with_suffix(artifact.suffix + ".tmp")
-            if temporary.exists():
-                errors.append("raw-IQ atomic-write temporary file remains")
+            digests.append(digest)
+        if provenance.get("encoding") != "signed-16-bit-little-endian":
+            errors.append(f"{purpose} raw-IQ artifact encoding differs from plan")
+        if provenance.get("channel_layout") != [
+            "rx0_i",
+            "rx0_q",
+            "rx1_i",
+            "rx1_q",
+        ]:
+            errors.append(f"{purpose} raw-IQ artifact channel layout differs from plan")
+        if provenance.get("samples_per_channel") != capture_samples:
+            errors.append(f"{purpose} raw-IQ artifact sample count differs from plan")
+        if frame.get("sha256") != digest or frame.get("iq_bytes") != expected_bytes:
+            errors.append(
+                f"{purpose} raw-IQ provenance differs from its measurement frame"
+            )
 
-    return errors, dict(provenance) if not errors else None
+        path_value = provenance.get("path")
+        if isinstance(path_value, str):
+            candidate_path = work_dir / path_value
+            artifact = candidate_path.resolve()
+            if artifact != root and root not in artifact.parents:
+                errors.append(
+                    f"{purpose} raw-IQ artifact escapes the phase work directory"
+                )
+            elif candidate_path.is_symlink():
+                errors.append(f"{purpose} raw-IQ artifact must not be a symlink")
+            elif not artifact.is_file():
+                errors.append(f"{purpose} raw-IQ artifact is missing")
+            else:
+                on_disk_bytes = artifact.stat().st_size
+                if on_disk_bytes != expected_bytes:
+                    errors.append(
+                        f"{purpose} raw-IQ artifact on-disk byte count differs"
+                    )
+                elif on_disk_bytes > MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES:
+                    errors.append(
+                        f"{purpose} raw-IQ artifact exceeds the on-disk 64 KiB bound"
+                    )
+                else:
+                    payload = artifact.read_bytes()
+                    if (
+                        isinstance(digest, str)
+                        and hashlib.sha256(payload).hexdigest() != digest
+                    ):
+                        errors.append(
+                            f"{purpose} raw-IQ artifact on-disk SHA-256 differs"
+                        )
+                temporary = artifact.with_suffix(artifact.suffix + ".tmp")
+                if temporary.exists():
+                    errors.append(
+                        f"{purpose} raw-IQ atomic-write temporary file remains"
+                    )
+        evidence[purpose] = dict(provenance)
+
+    if len(digests) == 2 and len(set(digests)) != 2:
+        errors.append(
+            "desired and blocker raw-IQ artifact SHA-256 values are not distinct"
+        )
+
+    diagnostic_dir = work_dir / serial / "diagnostic-iq"
+    if diagnostic_dir.is_symlink():
+        errors.append("raw-IQ diagnostic directory must not be a symlink")
+    elif diagnostic_dir.is_dir():
+        actual_paths = {
+            path.relative_to(work_dir).as_posix()
+            for path in diagnostic_dir.rglob("*")
+            if path.is_file() or path.is_symlink()
+        }
+        if actual_paths != expected_paths:
+            errors.append("raw-IQ diagnostic directory contents differ from plan")
+
+    return errors, evidence if not errors else None
 
 
 def _modulated_continuity_errors(runs: Any, capture_samples: int) -> list[str]:

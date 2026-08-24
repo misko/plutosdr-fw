@@ -65,6 +65,18 @@ MODULATED_MODES = (
 
 DEFAULT_MODULATED_TX2_GAIN_DB = -42.0
 TX2_GAIN_READBACK_TOLERANCE_DB = 0.01
+MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES = 64 * 1024
+
+_DIAGNOSTIC_IQ_TARGETS = {
+    "desired_only": (
+        "desired_baseline",
+        "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le",
+    ),
+    "blocker_00": (
+        "first_blocker",
+        "blocker-00-manual-fixed-frame-0000-rx0-rx1.cs16le",
+    ),
+}
 
 _NATIVE_IIO_MODES = {
     MODE_NATIVE_SLOW: "slow_attack",
@@ -441,6 +453,8 @@ def validate_modulated_hardware_options(options: ModulatedHardwareOptions) -> No
         raise ValueError("capture_samples must contain at least two waveform cycles")
     if options.capture_samples % reference.cycle_samples:
         raise ValueError("capture_samples must be a whole number of waveform cycles")
+    if options.capture_samples * 8 > MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES:
+        raise ValueError("capture_samples exceeds the 64 KiB diagnostic-IQ bound")
     if any(case.encoded.sample_count != reference.cycle_samples for case in cases):
         raise AssertionError("prepared TX2 waveform has the wrong cycle length")
 
@@ -1109,19 +1123,24 @@ def _measure_ordinary(
             raise EvidenceInvalid("RX gain left its settled measurement window")
         frame["rx_state_before"] = before
         frame["rx_state_after"] = after
+        diagnostic_target = _DIAGNOSTIC_IQ_TARGETS.get(case.case_id)
         if (
-            case.case_id == "desired_only"
+            diagnostic_target is not None
             and expected_mode == "manual"
             and frame_index == 0
         ):
+            purpose, filename = diagnostic_target
+            if len(raw) > MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES:
+                raise EvidenceInvalid("diagnostic IQ artifact exceeds the 64 KiB bound")
             artifact_path = (
-                options.output_dir
-                / radio.options.serial
-                / "diagnostic-iq"
-                / "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le"
+                options.output_dir / radio.options.serial / "diagnostic-iq" / filename
             )
             _atomic_bytes(artifact_path, raw)
             frame["raw_iq_provenance"] = {
+                "purpose": purpose,
+                "case_id": case.case_id,
+                "mode": MODE_MANUAL,
+                "measurement_index": frame_index,
                 "path": artifact_path.relative_to(options.output_dir).as_posix(),
                 "sha256": hashlib.sha256(raw).hexdigest(),
                 "bytes": len(raw),

@@ -322,24 +322,45 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
         "desired_only",
         *(f"blocker_{index:02d}" for index in range(len(modulated.blocker_points))),
     ]
-    raw_payload = (bytes(range(256)) * 256)[: modulated.capture_samples * 8]
-    raw_sha256 = hashlib.sha256(raw_payload).hexdigest()
-    raw_relative_path = (
-        Path(options.serial)
-        / "diagnostic-iq"
-        / "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le"
-    )
-    raw_path = work_dir / raw_relative_path
-    raw_path.parent.mkdir(parents=True)
-    raw_path.write_bytes(raw_payload)
-    raw_provenance = {
-        "path": raw_relative_path.as_posix(),
-        "sha256": raw_sha256,
-        "bytes": len(raw_payload),
-        "encoding": "signed-16-bit-little-endian",
-        "channel_layout": ["rx0_i", "rx0_q", "rx1_i", "rx1_q"],
-        "samples_per_channel": modulated.capture_samples,
-    }
+    desired_payload = (bytes(range(256)) * 256)[: modulated.capture_samples * 8]
+    blocker_payload = bytes(value ^ 0xA5 for value in desired_payload)
+    raw_by_case: dict[str, dict[str, object]] = {}
+    for purpose, case_id, filename, payload in (
+        (
+            "desired_baseline",
+            "desired_only",
+            "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le",
+            desired_payload,
+        ),
+        (
+            "first_blocker",
+            "blocker_00",
+            "blocker-00-manual-fixed-frame-0000-rx0-rx1.cs16le",
+            blocker_payload,
+        ),
+    ):
+        digest = hashlib.sha256(payload).hexdigest()
+        relative_path = Path(options.serial) / "diagnostic-iq" / filename
+        path = work_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(payload)
+        raw_by_case[case_id] = {
+            "payload": payload,
+            "sha256": digest,
+            "path": path,
+            "provenance": {
+                "purpose": purpose,
+                "case_id": case_id,
+                "mode": "manual_fixed",
+                "measurement_index": 0,
+                "path": relative_path.as_posix(),
+                "sha256": digest,
+                "bytes": len(payload),
+                "encoding": "signed-16-bit-little-endian",
+                "channel_layout": ["rx0_i", "rx0_q", "rx1_i", "rx1_q"],
+                "samples_per_channel": modulated.capture_samples,
+            },
+        }
 
     def quality_summary(case_id: str) -> dict[str, object]:
         blocked = case_id != "desired_only"
@@ -394,6 +415,18 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
             },
         }
 
+    def raw_measurements(case_id: str) -> list[dict[str, object]]:
+        artifact = raw_by_case[case_id]
+        payload = artifact["payload"]
+        assert isinstance(payload, bytes)
+        return [
+            {
+                "sha256": artifact["sha256"],
+                "iq_bytes": len(payload),
+                "raw_iq_provenance": artifact["provenance"],
+            }
+        ]
+
     report = {
         "schema": "plutosdr-fw.modulated-hardware.v1",
         "verdict": "pass",
@@ -438,16 +471,8 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
                     }
                     if mode == MODE_TANDEM
                     else (
-                        {
-                            "measurements": [
-                                {
-                                    "sha256": raw_sha256,
-                                    "iq_bytes": len(raw_payload),
-                                    "raw_iq_provenance": raw_provenance,
-                                }
-                            ]
-                        }
-                        if case_id == "desired_only" and mode == "manual_fixed"
+                        {"measurements": raw_measurements(case_id)}
+                        if case_id in raw_by_case and mode == "manual_fixed"
                         else {}
                     )
                 ),
@@ -466,7 +491,22 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
 
     assert validated.verdict == "pass"
     assert validated.cleanup_verified is True
-    assert validated.summary["raw_iq_provenance"] == raw_provenance
+    expected_raw_summary: dict[str, object] = {}
+    for artifact in raw_by_case.values():
+        provenance = artifact["provenance"]
+        assert isinstance(provenance, dict)
+        expected_raw_summary[str(provenance["purpose"])] = provenance
+    assert validated.summary["raw_iq_provenance"] == expected_raw_summary
+
+    def raw_frame(document: dict[str, object], case_id: str) -> dict[str, object]:
+        runs = document["runs"]
+        assert isinstance(runs, list)
+        run = next(
+            item
+            for item in runs
+            if item["case_id"] == case_id and item["mode"] == "manual_fixed"
+        )
+        return run["measurements"][0]
 
     valid_report = json.loads(json.dumps(report))
     report["evaluation"]["degradation_valid"] = False
@@ -500,31 +540,80 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
         production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))
-    target_frame = report["runs"][0]["measurements"][0]
+    target_frame = raw_frame(report, "blocker_00")
     target_frame["raw_iq_provenance"]["path"] = "../../escaped.cs16le"
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="escapes the phase work directory"):
         production_validator(options)(spec, report_path, work_dir)
 
     report = json.loads(json.dumps(valid_report))
-    report["runs"][1]["measurements"] = [
-        {
-            "sha256": raw_sha256,
-            "iq_bytes": len(raw_payload),
-            "raw_iq_provenance": raw_provenance,
-        }
+    report["runs"][1]["measurements"] = [dict(raw_measurements("desired_only")[0])]
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="exactly two raw-IQ provenance"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    raw_frame(report, "blocker_00").pop("raw_iq_provenance")
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="exactly two raw-IQ provenance"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    raw_frame(report, "blocker_00")["raw_iq_provenance"]["channel_layout"] = [
+        "rx1_i",
+        "rx1_q",
+        "rx0_i",
+        "rx0_q",
     ]
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
-    with pytest.raises(ReleaseCliError, match="exactly one raw-IQ provenance"):
+    with pytest.raises(ReleaseCliError, match="channel layout differs from plan"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    report = json.loads(json.dumps(valid_report))
+    raw_frame(report, "blocker_00")["raw_iq_provenance"]["measurement_index"] = 1
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="frame linkage differs from plan"):
         production_validator(options)(spec, report_path, work_dir)
 
     report_path.write_text(json.dumps(valid_report) + "\n", encoding="utf-8")
-    raw_path.write_bytes(raw_payload[:-1])
+    desired_path = raw_by_case["desired_only"]["path"]
+    desired_payload = raw_by_case["desired_only"]["payload"]
+    assert isinstance(desired_path, Path)
+    assert isinstance(desired_payload, bytes)
+    blocker_path = raw_by_case["blocker_00"]["path"]
+    blocker_payload = raw_by_case["blocker_00"]["payload"]
+    assert isinstance(blocker_path, Path)
+    assert isinstance(blocker_payload, bytes)
+
+    report = json.loads(json.dumps(valid_report))
+    desired_digest = hashlib.sha256(desired_payload).hexdigest()
+    blocker_frame = raw_frame(report, "blocker_00")
+    blocker_frame["sha256"] = desired_digest
+    blocker_frame["raw_iq_provenance"]["sha256"] = desired_digest
+    blocker_path.write_bytes(desired_payload)
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="SHA-256 values are not distinct"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    blocker_path.write_bytes(blocker_payload)
+    report_path.write_text(json.dumps(valid_report) + "\n", encoding="utf-8")
+    stale_path = blocker_path.parent / "stale-frame.cs16le"
+    stale_path.write_bytes(b"stale")
+    with pytest.raises(ReleaseCliError, match="directory contents differ from plan"):
+        production_validator(options)(spec, report_path, work_dir)
+    stale_path.unlink()
+
+    desired_path.write_bytes(desired_payload[:-1])
     with pytest.raises(ReleaseCliError, match="on-disk byte count differs"):
         production_validator(options)(spec, report_path, work_dir)
 
-    raw_path.write_bytes(raw_payload[:-1] + b"X")
+    desired_path.write_bytes(desired_payload)
+    blocker_path.write_bytes(blocker_payload[:-1] + b"X")
     with pytest.raises(ReleaseCliError, match="on-disk SHA-256 differs"):
+        production_validator(options)(spec, report_path, work_dir)
+
+    blocker_path.unlink()
+    with pytest.raises(ReleaseCliError, match="raw-IQ artifact is missing"):
         production_validator(options)(spec, report_path, work_dir)
 
 

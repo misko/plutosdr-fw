@@ -32,6 +32,7 @@ from .metadata_abi import (
     TandemState,
 )
 from .modulated_hardware import (
+    MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES,
     MODE_MANUAL,
     MODE_NATIVE_FAST,
     MODE_TANDEM,
@@ -819,20 +820,69 @@ def test_fake_radio_runs_all_modes_and_blocker_oracles_atomically(
         for measurement in run["measurements"]
         if "raw_iq_provenance" in measurement
     ]
-    assert len(provenance_frames) == 1
-    raw_run, raw_frame = provenance_frames[0]
-    assert (raw_run["case_id"], raw_run["mode"]) == (
-        "desired_only",
-        "manual_fixed",
+    assert len(provenance_frames) == 2
+    expected = {
+        "desired_baseline": (
+            "desired_only",
+            "desired-only-manual-fixed-frame-0000-rx0-rx1.cs16le",
+        ),
+        "first_blocker": (
+            "blocker_00",
+            "blocker-00-manual-fixed-frame-0000-rx0-rx1.cs16le",
+        ),
+    }
+    observed_paths: set[str] = set()
+    observed_digests: set[str] = set()
+    for raw_run, raw_frame in provenance_frames:
+        provenance = raw_frame["raw_iq_provenance"]
+        purpose = provenance["purpose"]
+        case_id, filename = expected[purpose]
+        assert (raw_run["case_id"], raw_run["mode"]) == (case_id, MODE_MANUAL)
+        assert provenance["case_id"] == case_id
+        assert provenance["mode"] == MODE_MANUAL
+        assert provenance["measurement_index"] == 0
+        assert Path(provenance["path"]).name == filename
+        artifact = options.output_dir / provenance["path"]
+        payload = artifact.read_bytes()
+        assert provenance["bytes"] == options.capture_samples * 8 == len(payload)
+        assert provenance["bytes"] <= MAX_DIAGNOSTIC_IQ_ARTIFACT_BYTES
+        assert provenance["sha256"] == raw_frame["sha256"]
+        assert provenance["sha256"] == hashlib.sha256(payload).hexdigest()
+        assert provenance["channel_layout"] == [
+            "rx0_i",
+            "rx0_q",
+            "rx1_i",
+            "rx1_q",
+        ]
+        assert not artifact.with_suffix(artifact.suffix + ".tmp").exists()
+        observed_paths.add(provenance["path"])
+        observed_digests.add(provenance["sha256"])
+    assert len(observed_paths) == 2
+    assert len(observed_digests) == 2
+
+
+def test_only_first_blocker_gets_a_bounded_raw_iq_artifact(tmp_path: Path) -> None:
+    options = replace(
+        _campaign_options(tmp_path),
+        blocker_points=(
+            BlockerPoint(320_000.0, -20.0, 47),
+            BlockerPoint(64_000.0, -20.0, 48),
+        ),
     )
-    provenance = raw_frame["raw_iq_provenance"]
-    artifact = options.output_dir / provenance["path"]
-    payload = artifact.read_bytes()
-    assert provenance["bytes"] == options.capture_samples * 8 == len(payload)
-    assert provenance["sha256"] == raw_frame["sha256"]
-    assert provenance["sha256"] == hashlib.sha256(payload).hexdigest()
-    assert provenance["channel_layout"] == ["rx0_i", "rx0_q", "rx1_i", "rx1_q"]
-    assert not artifact.with_suffix(artifact.suffix + ".tmp").exists()
+    report, _path = run_modulated_hardware_campaign(
+        _FakeCampaignRadio(options), options
+    )
+
+    positions = [
+        (run["case_id"], run["mode"], frame_index)
+        for run in report["runs"]
+        for frame_index, measurement in enumerate(run["measurements"])
+        if "raw_iq_provenance" in measurement
+    ]
+    assert positions == [
+        ("desired_only", MODE_MANUAL, 0),
+        ("blocker_00", MODE_MANUAL, 0),
+    ]
 
 
 def test_evaluator_rejects_missing_invalid_or_mixed_iq_conventions(
@@ -1080,6 +1130,7 @@ def test_serial_wrapper_rejects_verified_cleanup_with_failures(tmp_path: Path) -
     [
         ModulatedHardwareOptions(physical_attenuation_db=0.0, tx2_gain_db=-29.0),
         ModulatedHardwareOptions(physical_attenuation_db=0.0, capture_samples=4_097),
+        ModulatedHardwareOptions(physical_attenuation_db=0.0, capture_samples=9_216),
         ModulatedHardwareOptions(
             physical_attenuation_db=0.0,
             blocker_points=(
