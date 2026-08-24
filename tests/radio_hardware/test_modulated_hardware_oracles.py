@@ -79,11 +79,12 @@ class _OutputBuffer:
         self,
         samples: int,
         *,
+        sample_size: int = 4,
         readable: bool = True,
         short_write: bool = False,
         fail_close: bool = False,
     ):
-        self.payload = bytes(samples * 8)
+        self.payload = bytes(samples * sample_size)
         self.readable = readable
         self.short_write = short_write
         self.fail_close = fail_close
@@ -125,13 +126,14 @@ def _dma_context_radio(
             f"voltage{index}",
             enabled=bool(index % 2),
             index=scan_indexes[index],
-            format_overrides=(format_overrides if index == 0 else None),
+            format_overrides=(format_overrides if index == 2 else None),
         )
         for index in range(4)
     ]
-    radio.tx = SimpleNamespace(channels=channels, sample_size=8)
+    radio.tx = SimpleNamespace(channels=channels, sample_size=4)
     output = _OutputBuffer(
         4,
+        sample_size=4,
         readable=readable,
         short_write=short_write,
         fail_close=fail_close,
@@ -161,7 +163,7 @@ def _group_members(error: BaseException) -> list[BaseException]:
     return [member for item in nested for member in _group_members(item)]
 
 
-def test_cyclic_dma_interleaves_zero_tx1_and_verified_tx2() -> None:
+def test_cyclic_dma_packs_only_verified_tx2_iq() -> None:
     radio, output, selectors, channels = _dma_context_radio()
     original_states = [channel.enabled for channel in channels]
     tx2 = bytes.fromhex("01000200 fdff0400 0500faff 07000800")
@@ -173,13 +175,17 @@ def test_cyclic_dma_interleaves_zero_tx1_and_verified_tx2() -> None:
             DAC_SELECT_DMA,
             DAC_SELECT_DMA,
         ]
+        assert evidence["scan_sample_size"] == 4
+        assert evidence["enabled_scan_mask"] == 0x0C
+        assert [item["id"] for item in evidence["scan_layout"]] == [
+            "voltage2",
+            "voltage3",
+        ]
+        assert evidence["buffer_payload_layout"] == ["tx2_i", "tx2_q"]
+        assert evidence["buffer_payload_sha256"] == hashlib.sha256(tx2).hexdigest()
         assert output.pushed
-        for index in range(4):
-            assert output.payload[index * 8 : index * 8 + 4] == bytes(4)
-            assert (
-                output.payload[index * 8 + 4 : index * 8 + 8]
-                == tx2[index * 4 : index * 4 + 4]
-            )
+        assert output.payload == tx2
+        assert [channel.enabled for channel in channels] == [False, False, True, True]
 
     assert selectors == [
         DAC_SELECT_ZERO,
@@ -249,7 +255,7 @@ def test_cyclic_dma_rejects_output_buffer_without_readback() -> None:
 @pytest.mark.parametrize(
     ("radio_kwargs", "message"),
     [
-        ({"scan_indexes": (1, 0, 2, 3)}, "scan index"),
+        ({"scan_indexes": (0, 1, 3, 2)}, "scan index"),
         ({"format_overrides": {"is_be": True}}, "scan format"),
         ({"format_overrides": {"bits": 12}}, "scan format"),
     ],

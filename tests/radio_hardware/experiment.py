@@ -680,11 +680,19 @@ class Issue46Radio:
             "tx2_payload_bytes": len(tx2_payload),
             "tx2_payload_sha256": hashlib.sha256(tx2_payload).hexdigest(),
             "cyclic": True,
-            "tx1_source": "zero samples and ZERO selector",
+            "tx1_source": "excluded from DMA scan and ZERO selector",
             "tx2_source": "cyclic DMA",
         }
         try:
-            enabled_ids = {"voltage0", "voltage1", "voltage2", "voltage3"}
+            # Keep the DMA scan scoped to the physical TX2 I/Q pair.  Enabling
+            # both complex transmitters makes each 64-bit DMA beat one
+            # four-lane scan; on Pluto's time-multiplexed 2T interface the TX2
+            # pair then updates on only one of two physical phases.  The 0x0c
+            # scan instead packs two successive TX2 IQ samples per beat, which
+            # util_upack2 emits on successive DAC read events at the requested
+            # per-channel sample cadence.  TX1 remains independently blocked
+            # by its hardware attenuator and both ZERO selectors.
+            enabled_ids = {"voltage2", "voltage3"}
             scan_channels: dict[str, Any] = {}
             for channel in self.tx.channels:
                 if channel.scan_element:
@@ -700,8 +708,9 @@ class Issue46Radio:
                 missing = sorted(enabled_ids - set(scan_channels))
                 raise FixtureSafetyError(f"TX scan layout lacks channels {missing}")
             scan_layout: list[dict[str, Any]] = []
-            for expected_index, channel_id in enumerate(
-                ("voltage0", "voltage1", "voltage2", "voltage3")
+            for expected_index, channel_id in (
+                (2, "voltage2"),
+                (3, "voltage3"),
             ):
                 channel = scan_channels[channel_id]
                 observed_index = int(channel.index)
@@ -736,18 +745,11 @@ class Issue46Radio:
                     {"id": channel_id, "index": observed_index, **observed_format}
                 )
             sample_size = int(self.tx.sample_size)
-            if sample_size != 8:
+            if sample_size != 4:
                 raise FixtureSafetyError(
-                    f"dual-TX scan size is {sample_size}, expected 8 bytes/sample"
+                    f"TX2-only scan size is {sample_size}, expected 4 bytes/sample"
                 )
 
-            interleaved = bytearray(sample_count * sample_size)
-            for index in range(sample_count):
-                tx2_start = index * 4
-                frame_start = index * sample_size
-                interleaved[frame_start + 4 : frame_start + 8] = tx2_payload[
-                    tx2_start : tx2_start + 4
-                ]
             expected_buffer_bytes = sample_count * sample_size
             buffer = self.iio.Buffer(self.tx, sample_count, True)
             if len(buffer) != expected_buffer_bytes:
@@ -755,7 +757,7 @@ class Issue46Radio:
                     f"cyclic DMA buffer has {len(buffer)} bytes, expected "
                     f"{expected_buffer_bytes}"
                 )
-            written = int(buffer.write(interleaved))
+            written = int(buffer.write(tx2_payload))
             if written != expected_buffer_bytes:
                 raise FixtureSafetyError(
                     f"cyclic DMA write accepted {written} bytes, expected "
@@ -772,7 +774,7 @@ class Issue46Radio:
                 raise FixtureSafetyError(
                     "cyclic DMA output buffer readback failed"
                 ) from error
-            if readback != bytes(interleaved):
+            if readback != tx2_payload:
                 raise FixtureSafetyError(
                     "cyclic DMA buffer readback differs from payload"
                 )
@@ -797,10 +799,12 @@ class Issue46Radio:
             evidence.update(
                 {
                     "scan_sample_size": sample_size,
+                    "enabled_scan_mask": 0x0C,
                     "scan_layout": scan_layout,
                     "buffer_bytes": expected_buffer_bytes,
                     "write_bytes": written,
-                    "interleaved_sha256": hashlib.sha256(interleaved).hexdigest(),
+                    "buffer_payload_layout": ["tx2_i", "tx2_q"],
+                    "buffer_payload_sha256": hashlib.sha256(tx2_payload).hexdigest(),
                     "tx1_gain_db": tx_gains[0],
                     "tx2_gain_db": tx_gains[1],
                     "selectors": [

@@ -1460,7 +1460,10 @@ def run_modulated_hardware_campaign(
         },
         "stimulus_topology": {
             "active_transmitters": ["TX2"],
-            "tx1": "zero CS16 words, ZERO selectors, and hardware attenuation mute",
+            "tx1": (
+                "excluded from the DMA scan, ZERO selectors, and hardware "
+                "attenuation mute"
+            ),
             "tx2": "one cyclic-DMA CS16 waveform",
             "blocker": "digitally summed into the TX2 waveform before encoding",
             "external_generator_required": False,
