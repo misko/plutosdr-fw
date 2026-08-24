@@ -75,7 +75,7 @@ def _encode_dual_rx(matrix) -> bytes:
     return words.tobytes()
 
 
-def _real_pluto_loopback_capture(
+def _planted_conjugated_transport_capture(
     encoded,
     *,
     cycles: int = 8,
@@ -88,21 +88,13 @@ def _real_pluto_loopback_capture(
     noise_sigma: float = 0.5,
     seed: int = 92,
 ) -> bytes:
-    """Model the observed TX-DMA -> RF loopback -> RX-IIO convention.
-
-    The four DMA scan words are TX1 I/Q followed by TX2 I/Q.  The Pluto RF
-    loopback preserves those lane assignments but presents the transmitted
-    complex baseband with an inverted spectrum at the decoded RX I/Q boundary,
-    which is equivalent to a global complex conjugation.  Complex channel gain
-    still absorbs fixed phase rotations such as an I/Q swap.
-    """
+    """Plant spectral inversion to exercise IQ-convention canonicalization."""
 
     np = pytest.importorskip("numpy")
     tx2_words = np.frombuffer(encoded.payload, dtype="<i2").reshape((-1, 2))
-    dma_words = np.zeros((encoded.sample_count, 4), dtype="<i2")
-    dma_words[:, 2:] = tx2_words
     tx2 = (
-        dma_words[:, 2].astype(np.float64) + 1j * dma_words[:, 3].astype(np.float64)
+        tx2_words[:, 0].astype(np.float64)
+        + 1j * tx2_words[:, 1].astype(np.float64)
     ) / encoded.applied_scale
     indexes = np.arange(cycles * encoded.sample_count, dtype=np.float64)
     aligned = tx2[(indexes.astype(np.int64) + timing_offset) % encoded.sample_count]
@@ -213,12 +205,10 @@ def test_sync_recovers_planted_timing_cfo_phase_gain_and_metrics(reference) -> N
     json.dumps(result, allow_nan=False)
 
 
-def test_real_pluto_conjugated_transport_recovers_clean_qpsk(reference) -> None:
-    """Plant the convention that produced the first R18 hardware failure."""
-
+def test_planted_conjugated_transport_recovers_clean_qpsk(reference) -> None:
     waveform = scale_reference_for_tx(reference, peak_fraction=0.8)
     encoded = encode_tx2_cs16(waveform.tx_samples, headroom_db=1.0)
-    raw = _real_pluto_loopback_capture(encoded)
+    raw = _planted_conjugated_transport_capture(encoded)
     result = analyze_modulated_capture(
         raw,
         reference=reference,
@@ -240,7 +230,7 @@ def test_real_pluto_conjugated_transport_recovers_clean_qpsk(reference) -> None:
     assert result["cross_channel_coherence"] > 0.999
 
 
-def test_real_pluto_conjugated_transport_preserves_blocker_sign(reference) -> None:
+def test_planted_conjugated_transport_preserves_blocker_sign(reference) -> None:
     waveform = build_composite_blocker(
         reference,
         blocker_offset_hz=320_000.0,
@@ -250,7 +240,7 @@ def test_real_pluto_conjugated_transport_preserves_blocker_sign(reference) -> No
     )
     encoded = encode_tx2_cs16(waveform.tx_samples, headroom_db=1.0)
     result = analyze_modulated_capture(
-        _real_pluto_loopback_capture(encoded, noise_sigma=0.2),
+        _planted_conjugated_transport_capture(encoded, noise_sigma=0.2),
         reference=reference,
         max_cfo_hz=2_000.0,
         blocker_offset_hz=waveform.blocker_offset_hz,
@@ -430,6 +420,66 @@ def test_commanded_but_absent_blocker_is_not_accepted(reference) -> None:
     assert not result["blocker_detected"]
     assert "blocker_not_detected" in result["quality_reasons"]
     assert result["blocker_measurement"]["minimum_correlation"] < 0.1
+
+
+def test_weak_known_blocker_passes_calibrated_residual_correlation_floor(
+    reference,
+) -> None:
+    waveform = build_composite_blocker(
+        reference,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-20.0,
+        blocker_seed=47,
+    )
+    thresholds = ModulatedQualityThresholds()
+    result = analyze_modulated_capture(
+        _capture(waveform.tx_samples, noise_sigma=35.0),
+        reference=reference,
+        max_cfo_hz=2_000.0,
+        blocker_offset_hz=waveform.blocker_offset_hz,
+        blocker_power_db=waveform.blocker_power_db,
+        blocker_reference=waveform.blocker_reference,
+    )
+
+    minimum_correlation = result["blocker_measurement"]["minimum_correlation"]
+    assert thresholds.min_blocker_correlation == 0.40
+    assert thresholds.min_blocker_correlation < minimum_correlation < 0.50
+    assert result["blocker_detected"]
+    assert result["blocker_measurement"]["offset_valid"]
+    assert result["blocker_measurement"]["relative_power_valid"]
+    assert result["quality_valid"], result["quality_reasons"]
+
+
+def test_exact_rf_energy_with_wrong_blocker_reference_is_not_accepted(
+    reference,
+) -> None:
+    commanded = build_composite_blocker(
+        reference,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-20.0,
+        blocker_seed=75,
+    )
+    wrong_reference = build_composite_blocker(
+        reference,
+        blocker_offset_hz=320_000.0,
+        blocker_power_db=-20.0,
+        blocker_seed=76,
+    )
+    result = analyze_modulated_capture(
+        _capture(wrong_reference.tx_samples, noise_sigma=0.5),
+        reference=reference,
+        max_cfo_hz=2_000.0,
+        blocker_offset_hz=commanded.blocker_offset_hz,
+        blocker_power_db=commanded.blocker_power_db,
+        blocker_reference=commanded.blocker_reference,
+    )
+
+    assert wrong_reference.blocker_offset_hz == commanded.blocker_offset_hz
+    assert wrong_reference.blocker_power_db == commanded.blocker_power_db
+    assert result["blocker_measurement"]["minimum_correlation"] < 0.1
+    assert not result["blocker_detected"]
+    assert not result["quality_valid"]
+    assert "blocker_not_detected" in result["quality_reasons"]
 
 
 def test_mirrored_blocker_fails_signed_offset_provenance(reference) -> None:

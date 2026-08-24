@@ -108,7 +108,11 @@ class ModulatedQualityThresholds:
     min_cross_channel_coherence: float = 0.98
     max_timing_disagreement_samples: int = 0
     max_abs_cfo_hz: float = 5_000.0
-    min_blocker_correlation: float = 0.50
+    # Squared coherent fraction of the post-desired residual.  A -20 dBc
+    # blocker shares that residual with ordinary desired-channel distortion;
+    # 0.40 preserves hardware margin while remaining far above the planted
+    # absent and wrong-reference cases.
+    min_blocker_correlation: float = 0.40
     max_blocker_offset_error_hz: float = 1.0
     max_blocker_power_error_db: float = 2.0
 
