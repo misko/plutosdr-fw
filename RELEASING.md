@@ -45,52 +45,91 @@ mislabelling.
 
 ## Procedure
 
-1. **Decide the name.** The line runs `gain-rssi-v2` →
-   `gain-rssi-fingerprint-v1/v2/v3` → `gain-series-v4`. Drop the `-rcNN`; keep
-   the `v0.38` upstream base.
+1. **Decide the name.** Drop the candidate's `-rcNN`, keep the intended
+   upstream-version prefix, and verify that neither the tag nor release already
+   exists. For the current tandem promotion the exact name is
+   `v0.41-plutoplus-spf-tandem-agc-v8`.
 
 2. **Dispatch the build** from `main` with `release_version` set to the exact
    name. Do not tag first — if the build or its testing fails you would have to
    move a version tag, and tagging is not what makes the string correct.
 
-3. **Verify the stamp.** The job summary shows `device-fw`. To confirm from the
-   artifact itself:
+3. **Download and verify the Actions artifact.** No GitHub release exists yet;
+   qualification must use the artifact from the exact workflow run in step 2,
+   never `gh release download`. Record the intended 40-character `main` commit,
+   the run ID, and the run attempt. Confirm that the run's `headSha` is that
+   commit, then verify the bundle sidecar, internal checksums, attestation, and
+   packed `/opt/VERSIONS`:
 
    ```sh
-   gh release download <tag> -p '*rootfs.cpio.gz' -D /tmp/rf
-   ( cd /tmp/rf && gzip -dc *rootfs.cpio.gz | cpio -idm --quiet && cat opt/VERSIONS )
+   release_run_id=<run-id>
+   release_commit=<40-character-main-commit>
+   release_attempt=<attempt>
+   release_artifact="plutoplus-main-${release_commit}-${release_run_id}-${release_attempt}"
+   release_work=$(mktemp -d)
+
+   test "$(gh run view "$release_run_id" --repo misko/plutosdr-fw \
+     --json headSha --jq .headSha)" = "$release_commit"
+   gh run download "$release_run_id" --repo misko/plutosdr-fw \
+     --name "$release_artifact" --dir "$release_work"
+   (
+     cd "$release_work"
+     sha256sum -c ./*.tar.gz.sha256
+     mkdir extracted
+     tar -xzf ./*.tar.gz -C extracted
+     cd extracted
+     sha256sum -c SHA256SUMS
+     mkdir rootfs
+     cd rootfs
+     gzip -dc ../*-rootfs.cpio.gz | cpio -idm --quiet opt/VERSIONS
+     cat opt/VERSIONS
+   )
+   gh attestation verify "$release_work"/*.tar.gz \
+     --repo misko/plutosdr-fw
    ```
+
+   The printed `device-fw` must equal the requested release name. The four
+   packed component identities must equal the `versions_*` values in the source
+   manifest.
 
 4. **Hardware-qualify these exact bytes.** A rebuild for the name change is
    byte-different from the RC that was qualified, so the RC's campaign does not
    transfer literally. When the only delta is the version string, a confirmation
-   pass — boot, TX2 loopback on both radios, one protocol-v3 stream run — covers
-   the real risk, which is build-environment drift rather than a code change.
+   pass — boot, TX2 loopback on every release-gate radio, and one protocol-v3
+   stream run — covers the real risk, which is build-environment drift rather
+   than a code change.
 
 5. **Tag, annotated, on the built commit.** Annotated, not lightweight: `rc16`
    is lightweight and `rc17` is not, and the inconsistency is worth ending.
 
    ```sh
-   git tag -a v0.38-plutoplus-spf-gain-series-v4 <commit> -m '...'
-   git push origin v0.38-plutoplus-spf-gain-series-v4
+   git tag -a v0.41-plutoplus-spf-tandem-agc-v8 <commit> -m '...'
+   git push origin v0.41-plutoplus-spf-tandem-agc-v8
    ```
 
 6. **Publish the exact artifacts** from step 2 as a non-prerelease. Never
    rebuild between qualification and publication.
 
 7. **Write the release manifest**, `manifests/<name>.yaml`, from the exact
-   published asset. The current verifier requires the release identity
-   (`release_tag`, `asset_name`, `image_url`, `image_sha256`, `device_fw`), the
-   firmware and component source pins (`firmware_source`, `firmware_repo`,
-   `submodule_buildroot`, `submodule_buildroot_repo`, `submodule_hdl`,
-   `submodule_hdl_repo`, `submodule_hdl_quantulum`, `submodule_linux`,
-   `submodule_linux_repo`, `submodule_u_boot_xlnx`,
-   `submodule_u_boot_xlnx_repo`), and the four packed component identities
-   (`versions_hdl`, `versions_buildroot`, `versions_linux`,
-   `versions_u_boot_xlnx`). Record additional bundle, FIT, rootfs, host-libiio,
-   and hardware-qualification fields used by current release manifests. Take
-   `device_fw` and every hash from the built/published bytes, not from expected
-   values. These manifests are immutable — a new release gets a new file.
+   published asset. `scripts/verify_release.sh` currently requires exactly
+   these 17 non-empty fields:
+
+   - release identity: `release_tag`, `asset_name`, `image_url`,
+     `image_sha256`, `device_fw`;
+   - source identity: `firmware_source`, `gadget_source`,
+     `submodule_buildroot`, `submodule_linux`, `submodule_u_boot_xlnx`;
+   - packed identities: `versions_hdl`, `versions_buildroot`,
+     `versions_linux`, `versions_u_boot_xlnx`; and
+   - shipped structure: `fpga_bitstream_md5`, `ramdisk_md5`,
+     `fit_description`.
+
+   Current manifests also record repository URLs and refs, libiio, HDL,
+   timestamp-HDL and IP-gadget pins, bundle/FIT/rootfs SHA-256 values, the CI
+   run, and hardware-qualification evidence. Those additional provenance
+   fields are expected for a new release even though the verifier does not yet
+   consume all of them. Take `device_fw` and every hash from the
+   built/published bytes, not from expected values. These manifests are
+   immutable — a new release gets a new file.
 
 8. **Verify against the published asset**, not the local build:
 

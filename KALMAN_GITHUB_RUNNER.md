@@ -41,8 +41,14 @@ in the repository.
 
 ## CI behavior
 
-`.github/workflows/firmware.yml` performs source-graph, USB/IP gadget, and HDL
-simulation checks on GitHub-hosted runners for pull requests targeting `main`.
+`.github/workflows/firmware.yml` performs four checks on GitHub-hosted runners
+for pull requests targeting `main`:
+
+1. radio-hardware metadata, continuity, quality, campaign, and RTL oracles
+   (offline only; this job never opens a radio);
+2. the immutable source graph and legal-info network boundary;
+3. USB and IP gadget unit tests; and
+4. coherent RX counter CDC, FIFO-reset, TX-diagnostic, and discard simulations.
 
 `.github/workflows/firmware-main.yml` runs only for pushes to `main` initiated
 by `misko`, or a manual dispatch initiated by `misko` from an explicitly
@@ -61,13 +67,19 @@ The workflow never flashes a radio and never connects to the QNAP.
 
 ## Immutable source locks
 
-`manifests/gain-series-v4-source.yaml` pins every component twice: by the exact
-40-character commit used by the build and by a matching
-`gain-series-v4-rc2-source/<component>` tag. GitHub rulesets prevent those
-tags from being updated or deleted in all five component repositories. The
-rejected RC1 locks remain protected under `gain-series-v4-source/*` for
-provenance. The source check requires exact tag-to-commit equality; moving
-development branches are not build inputs.
+`manifests/tandem-agc-v8-source.yaml` is the source graph selected for `main`.
+It pins libiio, Buildroot, HDL, timestamp HDL, Linux, U-Boot, and both gadget
+implementations by exact 40-character commit and protected source-lock tag.
+The final v8 graph deliberately reuses qualified locks from the tandem-v8 RC2,
+tandem-v2, gain-series, and libiio-metadata families instead of minting aliases
+for unchanged components. Active GitHub rulesets prevent every referenced lock
+from being updated or deleted in its owning repository.
+
+The source check requires exact tag-to-commit equality and requires each packed
+`/opt/VERSIONS` identity to equal its declared source-lock tag. The trusted
+runner then synchronizes only those declared tags and checks the live
+`git describe --tags` result before building. Moving development branches and
+ambient persistent-runner tags are not build inputs.
 
 For a later candidate, create a new source-lock namespace, protect it, and
 update the new manifest in the same reviewed change. Never reuse or repoint an
@@ -79,7 +91,9 @@ created only after the hardware promotion gate.
 Before merging the runner workflow:
 
 - make `main` the default branch;
-- require pull requests and the three GitHub-hosted checks;
+- require pull requests and all four GitHub-hosted checks:
+  `radio hardware offline oracles`, `source graph`, `USB and IP gadget unit tests`, and
+  `coherent RX counter CDC simulation`;
 - require conversation resolution;
 - require code-owner review when another eligible maintainer is available;
 - prohibit force pushes and branch deletion;
@@ -94,12 +108,13 @@ rewriting an existing artifact or tag.
 ## Deployment handoff
 
 Download the Actions artifact named
-`plutoplus-main-<commit>-<run>-<attempt>`, verify the adjacent `.sha256` file,
-extract the bundle, and run `sha256sum -c SHA256SUMS` inside it. Then verify the
-GitHub attestation before using the DFU:
+`plutoplus-main-<full-commit>-<run>-<attempt>`, verify the adjacent `.sha256`
+file, extract the bundle, and run `sha256sum -c SHA256SUMS` inside it. Then
+verify the GitHub attestation against the extracted `*.tar.gz` before using the
+DFU:
 
 ```bash
-gh attestation verify plutoplus-spf-main-<commit>.tar.gz \
+gh attestation verify plutoplus-spf-*-<short-commit>.tar.gz \
   --repo misko/plutosdr-fw
 ```
 
