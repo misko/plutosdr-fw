@@ -7,6 +7,7 @@ IIO_SOURCE=${IIO_SOURCE:-$(cd -- "${ROOT}/.." && pwd)/libiio}
 pytest_target=tests/radio_hardware/test_tandem_agc_quality.py
 quality_requested=false
 probe_requested=false
+dual_target_probe_requested=false
 for argument in "$@"; do
   case "${argument}" in
     --tandem-quality-hardware)
@@ -16,11 +17,17 @@ for argument in "$@"; do
       probe_requested=true
       pytest_target=tests/radio_hardware/test_transient_transport_probe.py
       ;;
+    --tandem-transient-dual-target-probe)
+      dual_target_probe_requested=true
+      pytest_target=tests/radio_hardware/test_transient_transport_dual_target_probe.py
+      ;;
   esac
 done
-if [[ "${quality_requested}" == true && "${probe_requested}" == true ]]; then
+if [[ ("${quality_requested}" == true && "${probe_requested}" == true) ||
+      ("${quality_requested}" == true && "${dual_target_probe_requested}" == true) ||
+      ("${probe_requested}" == true && "${dual_target_probe_requested}" == true) ]]; then
   printf '%s\n' \
-    'ERROR: choose either the quality matrix or transport probe, not both' >&2
+    'ERROR: choose exactly one quality matrix or transport probe mode' >&2
   exit 2
 fi
 

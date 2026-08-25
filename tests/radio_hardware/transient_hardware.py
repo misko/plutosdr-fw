@@ -28,6 +28,7 @@ from builtins import BaseExceptionGroup
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from dataclasses import fields as dataclass_fields
+from enum import Enum
 from itertools import pairwise
 from pathlib import Path
 from typing import Any, Protocol
@@ -87,6 +88,13 @@ _TANDEM_METADATA_CAPACITY_BYTES = 64 * 1024
 _TANDEM_INITIAL_GAIN_DB = 62
 _TANDEM_ATTACK_TARGET_FRAMES = 16
 _TANDEM_RELEASE_TARGET_FRAMES = 40
+_TANDEM_WEAK_FIRST_COMMAND_ID = "weak_reassertion_16f"
+_TANDEM_WEAK_SECOND_COMMAND_ID = "weak_reassertion_40f"
+_TANDEM_WEAK_COMMAND_LEVEL_DB = -45.0
+_TANDEM_WEAK_ARTIFACT_DIRECTORY = "weak_dual_target"
+_TANDEM_WEAK_ARTIFACT_POLICY = (
+    "mandatory_exact_weak_dual_target_preflight_sidecars"
+)
 _TANDEM_REQUIRED_PARTITION_FRAMES = 8
 _TANDEM_CONDITIONING_TAIL_SAMPLES = 8_192
 _TANDEM_WINDOW_SAMPLES = 1_024
@@ -153,13 +161,28 @@ _TANDEM_REQUIRED_METADATA_FLAGS = (
     | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
     | FLAG_TANDEM_METADATA_VALID
 )
+# RC2 assigns every metadata flag bit from 0 through 22.  Reject higher bits so
+# a future or corrupted wire record cannot silently acquire safety semantics
+# that this release runner does not understand.
+_TANDEM_KNOWN_METADATA_FLAGS = (1 << 23) - 1
 _TANDEM_REQUIRED_METADATA_FEATURES = (
     FEATURE_AD9361_TEMPERATURE
     | FEATURE_FPGA_GAIN_EVENTS
     | FEATURE_HARDWARE_SAMPLE_COUNTER
     | FEATURE_TANDEM_METADATA
 )
+# RC2 defines feature bits 0 through 9.  Known optional bits remain accepted,
+# including the observed full 0x3ff provider mask, while unknown future bits
+# fail closed for a release qualification.
+_TANDEM_KNOWN_METADATA_FEATURES = (1 << 10) - 1
 _TANDEM_METADATA_HEADER_BYTES = 180 + 64 * 32 + 64 * 16 + 4
+
+
+class _TandemBatchProfile(Enum):
+    """Closed profiles sharing the audited one-session batch transport."""
+
+    PRODUCTION_ATTACK_RELEASE = "production_attack_release"
+    WEAK_DUAL_TARGET_TRANSPORT = "weak_dual_target_transport"
 
 
 class TransientRadioTransport(Protocol):
@@ -659,6 +682,7 @@ def _validate_tandem_metadata(
         or metadata.header_bytes != _TANDEM_METADATA_HEADER_BYTES
         or metadata.features & _TANDEM_REQUIRED_METADATA_FEATURES
         != _TANDEM_REQUIRED_METADATA_FEATURES
+        or metadata.features & ~_TANDEM_KNOWN_METADATA_FEATURES
         or metadata.sample_format != 1
     ):
         raise EvidenceInvalid("tandem metadata v5 wire provenance changed")
@@ -666,6 +690,8 @@ def _validate_tandem_metadata(
         _TANDEM_REQUIRED_METADATA_FLAGS
     ):
         raise EvidenceInvalid("tandem metadata lacks required valid flags")
+    if metadata.flags & ~_TANDEM_KNOWN_METADATA_FLAGS:
+        raise EvidenceInvalid("tandem metadata contains unrecognized flags")
     if metadata.flags & TANDEM_UNSAFE_FLAGS:
         raise EvidenceInvalid(
             "tandem metadata reports unsafe flags "
@@ -2074,6 +2100,14 @@ _TANDEM_PARTITION_PHASES = (
     "fully_post_release",
 )
 
+_TANDEM_WEAK_PARTITION_PHASES = (
+    "fully_pre_first",
+    "first_command_bracket",
+    "fully_between_commands",
+    "second_command_bracket",
+    "fully_post_second",
+)
+
 
 def _partition_tandem_batch(
     frames: Sequence[_DeferredFrame],
@@ -2170,6 +2204,121 @@ def _partition_tandem_batch(
             _TANDEM_REQUIRED_PARTITION_FRAMES
         ),
         "minimum_required_fully_post_release_frames": (
+            _TANDEM_REQUIRED_PARTITION_FRAMES
+        ),
+        "frame_count": len(frames),
+    }
+
+
+def _partition_weak_tandem_batch(
+    frames: Sequence[_DeferredFrame],
+    *,
+    first: StimulusCommand,
+    second: StimulusCommand,
+) -> dict[str, Any]:
+    """Classify the weak preflight without attack/release semantics."""
+
+    first_lower = first.sample_sequence_before
+    first_upper = first.sample_sequence_after
+    second_lower = second.sample_sequence_before
+    second_upper = second.sample_sequence_after
+    if None in (first_lower, first_upper, second_lower, second_upper):
+        raise EvidenceInvalid("weak dual-target commands lack hardware brackets")
+    assert first_lower is not None and first_upper is not None
+    assert second_lower is not None and second_upper is not None
+    if not first_lower < first_upper <= second_lower < second_upper:
+        raise EvidenceInvalid("weak dual-target command brackets overlap or reorder")
+
+    phase_by_frame: list[str] = []
+    groups: dict[str, list[int]] = {
+        name: [] for name in _TANDEM_WEAK_PARTITION_PHASES
+    }
+    for frame in frames:
+        start = int(frame.record["first_sample_sequence"])
+        end = int(frame.record["sample_end_exclusive"])
+        if end <= first_lower:
+            phase = "fully_pre_first"
+        elif start < first_upper and end > first_lower:
+            phase = "first_command_bracket"
+        elif start >= first_upper and end <= second_lower:
+            phase = "fully_between_commands"
+        elif start < second_upper and end > second_lower:
+            phase = "second_command_bracket"
+        elif start >= second_upper:
+            phase = "fully_post_second"
+        else:
+            raise EvidenceInvalid(
+                "weak dual-target frame cannot be assigned to an exact partition"
+            )
+        frame.record["batch_phase"] = phase
+        frame.record["gap_context"] = phase
+        continuity = frame.record.get("continuity")
+        if isinstance(continuity, dict):
+            continuity["gap_context"] = phase
+        phase_by_frame.append(phase)
+        groups[phase].append(int(frame.record["frame_index"]))
+
+    order = {
+        name: index for index, name in enumerate(_TANDEM_WEAK_PARTITION_PHASES)
+    }
+    if phase_by_frame != sorted(phase_by_frame, key=order.__getitem__):
+        raise EvidenceInvalid("weak dual-target five-way partition is not ordered")
+    required = {
+        "fully_pre_first": _TANDEM_REQUIRED_PARTITION_FRAMES,
+        "fully_between_commands": _TANDEM_REQUIRED_PARTITION_FRAMES,
+        "fully_post_second": _TANDEM_REQUIRED_PARTITION_FRAMES,
+    }
+    for phase, minimum in required.items():
+        if len(groups[phase]) < minimum:
+            raise EvidenceInvalid(
+                f"weak dual-target partition {phase!r} has "
+                f"{len(groups[phase])} frames; requires {minimum}"
+            )
+    if not groups["first_command_bracket"] or not groups[
+        "second_command_bracket"
+    ]:
+        raise EvidenceInvalid(
+            "weak dual-target command bracket lacks a retained frame"
+        )
+
+    for index, frame in enumerate(frames):
+        metadata = frame.metadata
+        if metadata is None:
+            raise EvidenceInvalid(
+                f"weak dual-target frame {index} lacks tandem metadata"
+            )
+        if (
+            metadata.tandem_state is not TandemState.ARMED_AUTO
+            or metadata.tandem_fault_flags != 0
+            or metadata.observation_overflow_count != 0
+            or metadata.event_overflow_count != 0
+            or metadata.tandem_transition_count != 0
+            or metadata.event_count != 0
+            or metadata.gain_events
+            or metadata.rx1_gain_index != metadata.maximum_gain_index
+            or metadata.rx2_gain_index != metadata.maximum_gain_index
+            or metadata.bench_gain_indices
+            != (metadata.maximum_gain_index, metadata.maximum_gain_index)
+        ):
+            raise EvidenceInvalid(
+                "weak dual-target batch is not globally transition-free at the "
+                "maximum-gain endpoint"
+            )
+
+    return {
+        "phase_order": list(_TANDEM_WEAK_PARTITION_PHASES),
+        "phase_by_frame": phase_by_frame,
+        "groups": {
+            name: {"count": len(indices), "frame_indices": indices}
+            for name, indices in groups.items()
+        },
+        "minimum_required_fully_pre_first_frames": (
+            _TANDEM_REQUIRED_PARTITION_FRAMES
+        ),
+        "minimum_required_fully_between_commands_frames": (
+            _TANDEM_REQUIRED_PARTITION_FRAMES
+        ),
+        "minimum_required_fully_post_second_frames": (
             _TANDEM_REQUIRED_PARTITION_FRAMES
         ),
         "frame_count": len(frames),
@@ -2353,6 +2502,8 @@ def _prepare_tandem_artifact_inventory(
     *,
     quality: TandemQualityOptions,
     iq_dir: Path,
+    artifact_directory: str = MODE_TANDEM,
+    artifact_policy: str = "mandatory_exact_release_sidecars",
 ) -> None:
     """Predeclare and validate the exact 128 sidecars before the first write."""
 
@@ -2371,7 +2522,7 @@ def _prepare_tandem_artifact_inventory(
     if (
         len(relative_directory.parts) != 4
         or relative_directory.parts[1:]
-        != ("transient-iq", MODE_TANDEM, "batch")
+        != ("transient-iq", artifact_directory, "batch")
     ):
         raise EvidenceInvalid(
             "tandem sidecar directory does not use the exact serial-scoped layout"
@@ -2408,7 +2559,7 @@ def _prepare_tandem_artifact_inventory(
                 "raw_metadata_sha256": hashlib.sha256(
                     frame.raw_metadata
                 ).hexdigest(),
-                "artifact_policy": "mandatory_exact_release_sidecars",
+                "artifact_policy": artifact_policy,
                 "artifact_write_status": {
                     "iq_write_completed": False,
                     "raw_metadata_write_completed": False,
@@ -2666,6 +2817,82 @@ def _stable_tandem_partition_suffix(
         "maximum_frame_median_deviation_limit_db": tolerance_db,
         "maximum_window_deviation_db": maximum_window_deviations,
         "maximum_window_deviation_limit_db": tolerance_db,
+    }
+
+
+def _require_weak_tandem_batch_window_quality(
+    frames: Sequence[_DeferredFrame],
+) -> None:
+    """Require every weak same-level window, including both write brackets."""
+
+    expected_windows = _TANDEM_FRAME_SAMPLES // _TANDEM_WINDOW_SAMPLES
+    for frame in frames:
+        analysis = frame.record.get("analysis")
+        windows = analysis.get("windows") if isinstance(analysis, Mapping) else None
+        if (
+            not isinstance(windows, list)
+            or len(windows) != expected_windows
+            or any(
+                not isinstance(window, Mapping)
+                or window.get("quality_valid") is not True
+                for window in windows
+            )
+        ):
+            raise EvidenceInvalid(
+                "weak dual-target returned-IQ window failed a quality gate"
+            )
+
+
+def _weak_cross_suffix_stability(
+    suffixes: Mapping[str, Mapping[str, Any]], *, tolerance_db: float
+) -> dict[str, Any]:
+    """Bind equal weak RF level across pre, middle, and post suffixes."""
+
+    phase_order = (
+        "fully_pre_first",
+        "fully_between_commands",
+        "fully_post_second",
+    )
+    medians: list[list[float]] = []
+    endpoints: list[list[int]] = []
+    for phase in phase_order:
+        suffix = suffixes.get(phase)
+        if not isinstance(suffix, Mapping):
+            raise EvidenceInvalid(
+                f"weak dual-target {phase} suffix evidence is missing"
+            )
+        raw_medians = suffix.get("suffix_channel_median_tone_dbfs")
+        raw_endpoint = suffix.get("bench_gain_indices")
+        if (
+            not isinstance(raw_medians, list)
+            or len(raw_medians) != 2
+            or not isinstance(raw_endpoint, list)
+            or len(raw_endpoint) != 2
+        ):
+            raise EvidenceInvalid(
+                f"weak dual-target {phase} suffix geometry is invalid"
+            )
+        medians.append([float(value) for value in raw_medians])
+        endpoints.append([int(value) for value in raw_endpoint])
+    spans = [
+        max(row[channel] for row in medians)
+        - min(row[channel] for row in medians)
+        for channel in (0, 1)
+    ]
+    if any(value > tolerance_db for value in spans):
+        raise EvidenceInvalid(
+            "weak dual-target pre/middle/post RF suffixes disagree"
+        )
+    if len({tuple(endpoint) for endpoint in endpoints}) != 1:
+        raise EvidenceInvalid(
+            "weak dual-target pre/middle/post endpoints disagree"
+        )
+    return {
+        "phase_order": list(phase_order),
+        "suffix_channel_median_tone_dbfs": medians,
+        "maximum_cross_suffix_span_db": spans,
+        "maximum_cross_suffix_span_limit_db": tolerance_db,
+        "bench_gain_indices": endpoints[0],
     }
 
 
@@ -3424,14 +3651,16 @@ def _run_tandem_batch_mode_body(
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
     output_dir: Path,
     failure_sink: Callable[[Mapping[str, Any]], None] | None,
-    command_specs: Sequence[tuple[str, float, int]] | None = None,
-    release_eligible: bool = True,
+    profile: _TandemBatchProfile = (
+        _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE
+    ),
 ) -> dict[str, Any]:
-    """Run one reusable two-command batch session for tandem release evidence."""
+    """Run the closed production or weak qualification batch profile."""
 
-    selected_specs = tuple(
-        command_specs
-        or (
+    if type(profile) is not _TandemBatchProfile:
+        raise TypeError("tandem batch profile is not a closed profile member")
+    if profile is _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE:
+        selected_specs = (
             (
                 "strong_attack",
                 capture.strong_stimulus_tx_gain_db,
@@ -3443,31 +3672,35 @@ def _run_tandem_batch_mode_body(
                 _TANDEM_RELEASE_TARGET_FRAMES,
             ),
         )
-    )
-    if type(release_eligible) is not bool:
-        raise TypeError("tandem batch release eligibility must be a boolean")
-    if (
-        len(selected_specs) != 2
-        or [item[2] for item in selected_specs]
-        != [_TANDEM_ATTACK_TARGET_FRAMES, _TANDEM_RELEASE_TARGET_FRAMES]
-        or len({item[0] for item in selected_specs}) != 2
-    ):
-        raise ValueError("tandem batch session requires two frozen ordered targets")
-    for command_id, level_db, target_frames in selected_specs:
-        if type(command_id) is not str or not command_id:
-            raise ValueError("tandem batch command IDs must be nonempty strings")
-        if (
-            isinstance(level_db, bool)
-            or not isinstance(level_db, (int, float))
-            or not math.isfinite(float(level_db))
-            or not TX_MUTE_DB <= float(level_db) <= (
-                capture.strong_stimulus_tx_gain_db
-            )
+        artifact_directory = MODE_TANDEM
+        artifact_policy = "mandatory_exact_release_sidecars"
+    else:
+        if float(capture.weak_stimulus_tx_gain_db) != (
+            _TANDEM_WEAK_COMMAND_LEVEL_DB
         ):
-            raise ValueError("tandem batch command level is not authorized")
-        if type(target_frames) is not int:
-            raise ValueError("tandem batch target frame offset must be an integer")
-    production_specs = (
+            raise ValueError(
+                "weak dual-target profile is hard-capped at -45 dB TX2"
+            )
+        selected_specs = (
+            (
+                _TANDEM_WEAK_FIRST_COMMAND_ID,
+                _TANDEM_WEAK_COMMAND_LEVEL_DB,
+                _TANDEM_ATTACK_TARGET_FRAMES,
+            ),
+            (
+                _TANDEM_WEAK_SECOND_COMMAND_ID,
+                _TANDEM_WEAK_COMMAND_LEVEL_DB,
+                _TANDEM_RELEASE_TARGET_FRAMES,
+            ),
+        )
+        artifact_directory = _TANDEM_WEAK_ARTIFACT_DIRECTORY
+        artifact_policy = _TANDEM_WEAK_ARTIFACT_POLICY
+
+    normalized_specs = tuple(
+        (command_id, float(level_db), target_frames)
+        for command_id, level_db, target_frames in selected_specs
+    )
+    expected_specs = (
         (
             "strong_attack",
             float(capture.strong_stimulus_tx_gain_db),
@@ -3478,15 +3711,21 @@ def _run_tandem_batch_mode_body(
             float(capture.weak_stimulus_tx_gain_db),
             _TANDEM_RELEASE_TARGET_FRAMES,
         ),
+    ) if profile is _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE else (
+        (
+            _TANDEM_WEAK_FIRST_COMMAND_ID,
+            _TANDEM_WEAK_COMMAND_LEVEL_DB,
+            _TANDEM_ATTACK_TARGET_FRAMES,
+        ),
+        (
+            _TANDEM_WEAK_SECOND_COMMAND_ID,
+            _TANDEM_WEAK_COMMAND_LEVEL_DB,
+            _TANDEM_RELEASE_TARGET_FRAMES,
+        ),
     )
-    normalized_specs = tuple(
-        (command_id, float(level_db), target_frames)
-        for command_id, level_db, target_frames in selected_specs
-    )
-    if release_eligible and normalized_specs != production_specs:
+    if normalized_specs != expected_specs:
         raise ValueError(
-            "release-eligible tandem batch commands differ from the exact "
-            "strong/weak production trajectory"
+            "tandem batch commands differ from their closed profile"
         )
 
     memory_ledger = _tandem_memory_ledger()
@@ -3580,6 +3819,27 @@ def _run_tandem_batch_mode_body(
             },
         },
     }
+    if profile is _TandemBatchProfile.WEAK_DUAL_TARGET_TRANSPORT:
+        for release_only_key in (
+            "response_observations",
+            "responses",
+            "gain_evidence",
+        ):
+            record.pop(release_only_key)
+        record.update(
+            {
+                "batch_profile": profile.value,
+                "release_pass_eligible": False,
+                "strong_tx_write_permitted": False,
+                "gain_transient_exercised": False,
+                "qualification_scope": (
+                    "weak-only same-level dual-target transport, ordering, "
+                    "retention, provenance, RF-stability, and cleanup evidence; "
+                    "no gain-transient or latency qualification"
+                ),
+                "transport_stability": None,
+            }
+        )
     acquisition = record["acquisition"]
     frames: list[_DeferredFrame] = []
     initial_unanchored: StimulusCommand | None = None
@@ -3825,21 +4085,60 @@ def _run_tandem_batch_mode_body(
                                 sample_counter_bracket=bracket,
                             )
                         )
-                    attack = bound_commands[selected_specs[0][0]]
-                    release = bound_commands[selected_specs[1][0]]
-                    record["partition"] = _partition_tandem_batch(
-                        frames, attack=attack, release=release
-                    )
+                    first_command = bound_commands[selected_specs[0][0]]
+                    second_command = bound_commands[selected_specs[1][0]]
+                    if profile is _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE:
+                        record["partition"] = _partition_tandem_batch(
+                            frames,
+                            attack=first_command,
+                            release=second_command,
+                        )
+                    else:
+                        record["partition"] = _partition_weak_tandem_batch(
+                            frames,
+                            first=first_command,
+                            second=second_command,
+                        )
                     initiating_completion = acquisition[
                         "initiating_refill_completion_monotonic_ns"
                     ]
-                    if initial_unanchored.host_after_ns > attack.host_before_ns or any(
+                    if initial_unanchored.host_after_ns > (
+                        first_command.host_before_ns
+                    ) or any(
                         command.host_after_ns > initiating_completion
                         for command in bound_commands.values()
                     ):
                         raise EvidenceInvalid(
                             "tandem commands did not complete inside the initiating "
                             "batch refill"
+                        )
+                    first_diagnostics = acquisition["schedule_diagnostics"][
+                        selected_specs[0][0]
+                    ]
+                    second_diagnostics = acquisition["schedule_diagnostics"][
+                        selected_specs[1][0]
+                    ]
+                    first_post = first_diagnostics["tx1_mute_assurance"]["post"]
+                    second_pre = second_diagnostics["tx1_mute_assurance"]["pre"]
+                    first_pre = first_diagnostics["tx1_mute_assurance"]["pre"]
+                    if (
+                        initial_unanchored.host_after_ns
+                        > acquisition["s0_read"]["host_before_ns"]
+                        or acquisition["schedule_plan"][
+                            "worker_start_returned_ns"
+                        ]
+                        > first_pre["host_before_ns"]
+                        or first_command.sample_sequence_after is None
+                        or second_command.sample_sequence_before is None
+                        or first_command.sample_sequence_after
+                        > second_command.sample_sequence_before
+                        or first_command.host_after_ns > second_command.host_before_ns
+                        or first_post["host_after_ns"]
+                        > second_pre["host_before_ns"]
+                    ):
+                        raise EvidenceInvalid(
+                            "tandem first/second command chronology overlaps or "
+                            "reorders"
                         )
                 except BaseException as error:  # noqa: BLE001 - preserve interrupts
                     session_error = error
@@ -4048,15 +4347,37 @@ def _run_tandem_batch_mode_body(
             ],
             "exact_retired_tail_count_claim": None,
             "policy": (
-                "preserve forward modulo-u32 diagnostics across RELEASE without "
-                "claiming an exact retired FIFO tail count"
+                "preserve forward modulo-u32 diagnostics across buffer close "
+                "without claiming an exact retired FIFO tail count"
+                if profile is _TandemBatchProfile.WEAK_DUAL_TARGET_TRANSPORT
+                else "preserve forward modulo-u32 diagnostics across RELEASE "
+                "without claiming an exact retired FIFO tail count"
             ),
         }
+        if profile is _TandemBatchProfile.WEAK_DUAL_TARGET_TRANSPORT:
+            maximum_endpoint = last_frame_metadata.maximum_gain_index
+            if (
+                last_frame_metadata.tandem_transition_count != 0
+                or pre_close_status["transition_count"] != 0
+                or post_close_status["transition_count"] != 0
+                or frame_to_pre_delta != 0
+                or transition_delta != 0
+                or pre_close_status["rx1_gain_index"] != maximum_endpoint
+                or pre_close_status["rx2_gain_index"] != maximum_endpoint
+                or post_close_status["rx1_gain_index"] != maximum_endpoint
+                or post_close_status["rx2_gain_index"] != maximum_endpoint
+            ):
+                raise EvidenceInvalid(
+                    "weak dual-target controller changed transition count or "
+                    "maximum-gain endpoint through close"
+                )
         radio.mute_all()
         _prepare_tandem_artifact_inventory(
             frames,
             quality=quality,
-            iq_dir=output_dir / MODE_TANDEM / "batch",
+            iq_dir=output_dir / artifact_directory / "batch",
+            artifact_directory=artifact_directory,
+            artifact_policy=artifact_policy,
         )
         acquisition["artifact_manifest"] = _tandem_artifact_manifest(frames)
         try:
@@ -4067,14 +4388,85 @@ def _run_tandem_batch_mode_body(
             )
         finally:
             acquisition["artifact_manifest"] = _tandem_artifact_manifest(frames)
-        _require_tandem_batch_window_quality(
-            frames,
-            commands=[
-                bound_commands[selected_specs[0][0]],
-                bound_commands[selected_specs[1][0]],
-            ],
-        )
+        if profile is _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE:
+            _require_tandem_batch_window_quality(
+                frames,
+                commands=[
+                    bound_commands[selected_specs[0][0]],
+                    bound_commands[selected_specs[1][0]],
+                ],
+            )
+        else:
+            _require_weak_tandem_batch_window_quality(frames)
         record["batch_frames"] = [frame.record for frame in frames]
+
+        if profile is _TandemBatchProfile.WEAK_DUAL_TARGET_TRANSPORT:
+            partition = record["partition"]
+            groups = partition["groups"]
+            stable_suffixes = {
+                phase: _stable_tandem_partition_suffix(
+                    frames,
+                    frame_indices=groups[phase]["frame_indices"],
+                    label=phase,
+                    tolerance_db=capture.settling_tolerance_db,
+                )
+                for phase in (
+                    "fully_pre_first",
+                    "fully_between_commands",
+                    "fully_post_second",
+                )
+            }
+            partition["stable_suffixes"] = stable_suffixes
+            cross_suffix = _weak_cross_suffix_stability(
+                stable_suffixes, tolerance_db=capture.settling_tolerance_db
+            )
+            anchor_index = groups["fully_pre_first"]["frame_indices"][-1]
+            anchor = _analyze_tandem_frame_slice(
+                frames[anchor_index],
+                offset_samples=(
+                    _TANDEM_FRAME_SAMPLES - _TANDEM_CONDITIONING_TAIL_SAMPLES
+                ),
+                sample_count=_TANDEM_CONDITIONING_TAIL_SAMPLES,
+                role="weak_pre_first_conditioning_tail",
+                quality=quality,
+            )
+            record["conditioning_anchor"] = {
+                "timing_role": "exact_retained_pre_first_tail",
+                "sample_timing_basis": _TANDEM_TIMING_BASIS,
+                "sample_anchor_policy": (
+                    "exact final 8192 samples of the final fully-pre-first "
+                    "frame; weak conditioning only, not latency evidence"
+                ),
+                "release_latency_evidence": False,
+                "source": anchor,
+            }
+            first_metadata = frames[0].metadata
+            assert first_metadata is not None
+            record["transport_stability"] = {
+                "frame_count": _TANDEM_BATCH_FRAMES,
+                "global_transition_count": 0,
+                "global_gain_event_count": 0,
+                "maximum_gain_index": first_metadata.maximum_gain_index,
+                "bench_gain_indices": [
+                    first_metadata.maximum_gain_index,
+                    first_metadata.maximum_gain_index,
+                ],
+                "all_frames_at_maximum_gain": True,
+                "all_windows_quality_valid": True,
+                "stable_suffixes": stable_suffixes,
+                "cross_suffix_stability": cross_suffix,
+            }
+            record["metadata_abi"] = acquisition["metadata_abi"]
+            record["tandem_status_after"] = acquisition[
+                "post_close_tandem_status"
+            ]
+            radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
+            record["final_rx_state"] = _rx_state(
+                radio, expected_mode="manual"
+            )
+            record["verdict"] = "qualified_transport"
+            _attest_tandem_evidence_reservation(record, frames)
+            return record
 
         attack = bound_commands[selected_specs[0][0]]
         release = bound_commands[selected_specs[1][0]]
@@ -4276,6 +4668,36 @@ def _run_tandem_batch_mode_body(
         if failure_sink is not None:
             failure_sink(record)
         raise
+
+
+def _run_weak_dual_target_batch_preflight_body(
+    radio: TransientRadioTransport,
+    *,
+    quality: TandemQualityOptions,
+    capture: TransientCaptureOptions,
+    check_deadline: Callable[[], None],
+    clock_ns: Callable[[], int],
+    monotonic: Callable[[], float],
+    sleep: Callable[[float], None],
+    metadata_parser: Callable[[bytes], TandemFrameMetadata],
+    output_dir: Path,
+    failure_sink: Callable[[Mapping[str, Any]], None] | None,
+) -> dict[str, Any]:
+    """Enter the weak profile only through the guarded probe-v4 wrapper."""
+
+    return _run_tandem_batch_mode_body(
+        radio,
+        quality=quality,
+        capture=capture,
+        check_deadline=check_deadline,
+        clock_ns=clock_ns,
+        monotonic=monotonic,
+        sleep=sleep,
+        metadata_parser=metadata_parser,
+        output_dir=output_dir,
+        failure_sink=failure_sink,
+        profile=_TandemBatchProfile.WEAK_DUAL_TARGET_TRANSPORT,
+    )
 
 
 def _run_mode_body(

@@ -259,10 +259,10 @@ session or shutdown failure follows mute, cancel, worker join, and close while
 retaining progressive schedule and acquisition diagnostics in the invalid
 atomic report.
 
-Before another loudness-step transient attempt, the dedicated transport probe
-can qualify the continuous larger-frame transport without producing a release
-PASS. It deliberately keeps the exact RC2 device firmware while advancing only
-the host to the protected RC3 libiio transport lock. It opens one AUTO metadata
+The legacy single-target v3 transport probe remains available to qualify the
+continuous larger-frame transport without producing a release PASS. It
+deliberately keeps the exact RC2 device firmware while advancing only the host
+to the protected RC3 libiio transport lock. It opens one AUTO metadata
 session at the already-qualified `-45` dB
 rung with K=8 device buffers and one 64-frame libiio batch. While the initiating
 batch refill remains in flight, it reasserts the same `-45` dB level at the
@@ -309,6 +309,52 @@ The durable artifact is written to
 the radio, verifies mute/selector/DDS cleanup and identity, then atomically
 promotes it to `qualified_transport`. A host loss or close failure therefore
 cannot leave a final qualified artifact.
+
+The additive v4 gate is the release preflight for the same batch transport. It
+uses a separate guarded pytest marker and a fresh, isolated output namespace;
+it does not replace or relax the v3 callable. From one post-open `S0`, it freezes
+both `S0 + 16 * 65,536` and `S0 + 40 * 65,536` before requesting the initiating
+refill. While that one refill remains in flight, it performs exactly two
+same-level `-45` dB TX2 reassertions. Each command uses one hardware write,
+coherent FPGA-counter A-to-initial-to-B-to-C evidence, deferred readback, and
+TX1 pre/post mute assurance. The batch then replays all 64 contiguous frames
+and closes normally without cancellation.
+
+V4 independently rereads 64 exact 524,288-byte IQ sidecars and 64 exact
+3,256-byte raw-metadata sidecars under
+`SERIAL/transient-iq/weak_dual_target/batch/`. All frames must remain in one
+stream and ownership epoch with no gaps, faults, events, or transition-count
+change, and both gain indices must stay at the maximum endpoint through close.
+The five-way first-command/second-command partition must contain at least eight
+fully pre-first, fully between-command, and fully post-second frames. Every
+1,024-sample window in the final eight frames of each stable region must stay
+within 1 dB of its suffix median, and the three suffix medians must agree within
+1 dB per channel. The artifact is always non-authorizing:
+`release_pass_eligible` and `strong_tx_write_permitted` are both false, and it
+contains no attack/release response or latency claim.
+
+Run this distinct preflight through the same pinned-libiio launcher:
+
+```bash
+PYTHON=/home/mouse9911/gits/spf/.venv/bin/python \
+IIO_SOURCE=../libiio \
+scripts/run_tandem_agc_quality_hardware.sh \
+  --tandem-transient-dual-target-probe \
+  --tx2-loopback \
+  --radio-serial SERIAL \
+  --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc2$' \
+  --loopback-attenuation-db 0 \
+  --tandem-quality-center-frequency-hz 915000000 \
+  --tandem-quality-samples 65536 \
+  --tandem-quality-output \
+    build/radio-hardware/tandem-agc-transient-dual-target-preflight
+```
+
+Its durable report is
+`build/radio-hardware/tandem-agc-transient-dual-target-preflight/SERIAL/`
+`tandem-agc-transient-transport-dual-target-preflight.json`. The serial-owning
+wrapper promotes the pending transport verdict only after verified radio close;
+the final verdict still grants no release authority.
 
 ## Host setup and first RC2 run
 

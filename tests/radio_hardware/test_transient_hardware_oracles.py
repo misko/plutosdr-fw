@@ -1106,9 +1106,22 @@ def test_tandem_deleted_sidecar_demotes_durable_pass_to_invalid(
     (
         ("metadata_flags_override", 0, "does not mark the FPGA counter valid"),
         (
+            "metadata_flags_override",
+            (1 << 31)
+            | FLAG_SAMPLE_SEQUENCE_VALID
+            | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
+            | FLAG_TANDEM_METADATA_VALID,
+            "unrecognized flags",
+        ),
+        (
             "metadata_features_override",
             1_023 & ~FEATURE_TANDEM_METADATA,
             "lacks required tandem-v5 features",
+        ),
+        (
+            "metadata_features_override",
+            (1 << 31) | 1_023,
+            "wire provenance changed",
         ),
         (
             "metadata_observation_count_override",

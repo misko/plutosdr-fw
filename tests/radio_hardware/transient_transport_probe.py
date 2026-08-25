@@ -61,10 +61,13 @@ from .transient_hardware import (
     _capture_frame,
     _CaptureState,
     _check_effective_attenuation,
+    _checked_transient_output_relative_path,
     _DeferredFrame,
     _exception_text,
     _extend_low32_near,
+    _run_weak_dual_target_batch_preflight_body,
     _rx_state,
+    _safe_transient_serial_component,
     _strict_low32_counter,
     _wait_for_idle,
 )
@@ -87,6 +90,16 @@ PROBE_EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
 PROBE_EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
 PROBE_EXACT_LIBIIO_REF = f"refs/tags/{PROBE_EXACT_LIBIIO_TAG}"
 
+DUAL_TARGET_PROBE_SCHEMA = (
+    "plutosdr-fw.tandem-agc-transient-transport-probe.v4"
+)
+DUAL_TARGET_PROBE_MODE = "weak_dual_target_transport"
+DUAL_TARGET_PROBE_VERDICT = "qualified_transport"
+DUAL_TARGET_PROBE_PENDING_VERDICT = "qualified_transport_pending_cleanup"
+DUAL_TARGET_PROBE_REPORT_NAME = (
+    "tandem-agc-transient-transport-dual-target-preflight.json"
+)
+
 _PROBE_MANIFEST_PATH = "manifests/tandem-agc-v8-rc3-source.yaml"
 _PROBE_LOCAL_RUNTIME_DEPENDENCIES = (
     "pytest.ini",
@@ -102,9 +115,11 @@ _PROBE_LOCAL_RUNTIME_DEPENDENCIES = (
     "tests/radio_hardware/requirements.txt",
     "tests/radio_hardware/tandem_quality.py",
     "tests/radio_hardware/test_transient_transport_probe.py",
+    "tests/radio_hardware/test_transient_transport_dual_target_probe.py",
     "tests/radio_hardware/tone_quality.py",
     "tests/radio_hardware/transient_hardware.py",
     "tests/radio_hardware/transient_quality.py",
+    "tests/radio_hardware/transient_transport_dual_target_validator.py",
     "tests/radio_hardware/transient_transport_probe.py",
 )
 
@@ -145,6 +160,15 @@ _PROBE_REQUIRED_METADATA_FLAGS = (
     | FLAG_TANDEM_METADATA_VALID
 )
 _PROBE_METADATA_HEADER_BYTES = 180 + 64 * 32 + 64 * 16 + 4
+_DUAL_TARGET_ARTIFACT_DIRECTORY = "weak_dual_target"
+_DUAL_TARGET_ARTIFACT_POLICY = (
+    "mandatory_exact_weak_dual_target_preflight_sidecars"
+)
+_DUAL_TARGET_FIRST_COMMAND_ID = "weak_reassertion_16f"
+_DUAL_TARGET_SECOND_COMMAND_ID = "weak_reassertion_40f"
+_DUAL_TARGET_TARGET_FRAMES = (16, 40)
+_DUAL_TARGET_REQUIRED_PARTITION_FRAMES = 8
+_DUAL_TARGET_MAXIMUM_AGGREGATE_BYTES = 96 * 1024 * 1024
 _PROBE_RAW_SCHEDULE_FIELDS = frozenset(
     {
         "register_address",
@@ -759,6 +783,240 @@ def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def _reject_dual_target_symlink_components(path: Path, *, label: str) -> None:
+    """Reject every existing symlink component without resolving through it."""
+
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current /= part
+        if current.is_symlink():
+            raise EvidenceInvalid(f"{label} contains a symlink component")
+
+
+def _preflight_dual_target_output_paths(
+    output_root: Path,
+    serial: Any,
+    *,
+    sidecar_inventory_policy: str,
+    require_fresh_report: bool,
+) -> Path:
+    """Create/recheck the isolated v4 report and exact sidecar namespace."""
+
+    if sidecar_inventory_policy not in {"empty", "partial", "complete"}:
+        raise ValueError("unknown weak dual-target sidecar inventory policy")
+    selected_serial = _safe_transient_serial_component(serial)
+    _reject_dual_target_symlink_components(
+        output_root, label="weak dual-target output root"
+    )
+    output_root.mkdir(parents=True, exist_ok=True)
+    _reject_dual_target_symlink_components(
+        output_root, label="weak dual-target output root"
+    )
+    if output_root.is_symlink() or not output_root.is_dir():
+        raise EvidenceInvalid("weak dual-target output root is unsafe")
+
+    serial_directory = output_root / selected_serial
+    sidecar_directory = (
+        serial_directory
+        / "transient-iq"
+        / _DUAL_TARGET_ARTIFACT_DIRECTORY
+        / "batch"
+    )
+    current = output_root
+    for component in (
+        selected_serial,
+        "transient-iq",
+        _DUAL_TARGET_ARTIFACT_DIRECTORY,
+        "batch",
+    ):
+        current /= component
+        _checked_transient_output_relative_path(
+            current,
+            output_root=output_root,
+            label="weak dual-target output directory",
+        )
+        current.mkdir(exist_ok=True)
+        _checked_transient_output_relative_path(
+            current,
+            output_root=output_root,
+            label="weak dual-target output directory",
+        )
+        if not current.is_dir():
+            raise EvidenceInvalid(
+                "weak dual-target output component is not a directory"
+            )
+
+    report_path = serial_directory / DUAL_TARGET_PROBE_REPORT_NAME
+    _checked_transient_output_relative_path(
+        report_path,
+        output_root=output_root,
+        label="weak dual-target atomic report",
+    )
+    report_temporary = report_path.with_suffix(report_path.suffix + ".tmp")
+    _checked_transient_output_relative_path(
+        report_temporary,
+        output_root=output_root,
+        label="weak dual-target atomic report temporary",
+    )
+    if require_fresh_report and (report_path.exists() or report_temporary.exists()):
+        raise EvidenceInvalid(
+            "weak dual-target probe refuses to overwrite an existing report"
+        )
+    for candidate in (report_path, report_temporary):
+        if candidate.exists() and (candidate.is_symlink() or not candidate.is_file()):
+            raise EvidenceInvalid("weak dual-target report path is unsafe")
+
+    expected_names = {
+        f"frame-{index:04d}{suffix}"
+        for index in range(_PROBE_BATCH_FRAMES)
+        for suffix in (".cs16", ".metadata.bin")
+    }
+    allowed_partial_names = {
+        *expected_names,
+        *(f"{name}.tmp" for name in expected_names),
+    }
+    observed: set[str] = set()
+    for existing in sidecar_directory.iterdir():
+        observed.add(existing.name)
+        allowed = (
+            allowed_partial_names
+            if sidecar_inventory_policy == "partial"
+            else expected_names
+        )
+        if (
+            existing.name not in allowed
+            or existing.is_symlink()
+            or not existing.is_file()
+        ):
+            raise EvidenceInvalid(
+                "weak dual-target sidecar directory contains an unplanned artifact"
+            )
+    if sidecar_inventory_policy == "empty" and observed:
+        raise EvidenceInvalid(
+            "weak dual-target sidecar directory is not empty before RF"
+        )
+    if sidecar_inventory_policy == "complete" and observed != expected_names:
+        raise EvidenceInvalid(
+            "weak dual-target sidecar directory lacks its exact 128 files"
+        )
+    return report_path
+
+
+def _write_dual_target_report(
+    path: Path,
+    value: Mapping[str, Any],
+    *,
+    quality: TandemQualityOptions,
+    serial: str,
+    inventory_policy: str,
+    report_writer: Callable[[Path, Mapping[str, Any]], None],
+) -> None:
+    expected = _preflight_dual_target_output_paths(
+        quality.output_dir,
+        serial,
+        sidecar_inventory_policy=inventory_policy,
+        require_fresh_report=False,
+    )
+    if expected != path:
+        raise EvidenceInvalid("weak dual-target report path changed")
+    report_writer(path, value)
+    expected = _preflight_dual_target_output_paths(
+        quality.output_dir,
+        serial,
+        sidecar_inventory_policy=inventory_policy,
+        require_fresh_report=False,
+    )
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    if expected != path or not path.is_file() or temporary.exists():
+        raise EvidenceInvalid("weak dual-target report write was not durable")
+
+
+def _demote_dual_target_report(
+    path: Path,
+    value: Mapping[str, Any],
+    *,
+    quality: TandemQualityOptions,
+    serial: str,
+    error: BaseException,
+) -> dict[str, Any]:
+    """Atomically revoke a promoted verdict without trusting sidecar inventory."""
+
+    selected_serial = _safe_transient_serial_component(serial)
+    output_root = quality.output_dir
+    expected = output_root / selected_serial / DUAL_TARGET_PROBE_REPORT_NAME
+    if path != expected:
+        raise EvidenceInvalid("weak dual-target demotion report path changed")
+    for candidate, label in (
+        (output_root, "output root"),
+        (output_root / selected_serial, "serial directory"),
+        (path, "report"),
+        (path.with_suffix(path.suffix + ".tmp"), "report temporary"),
+    ):
+        _reject_dual_target_symlink_components(
+            candidate, label=f"weak dual-target demotion {label}"
+        )
+    if not output_root.is_dir() or not (output_root / selected_serial).is_dir():
+        raise EvidenceInvalid("weak dual-target demotion directories are unsafe")
+    for candidate in (path, path.with_suffix(path.suffix + ".tmp")):
+        if candidate.exists() and (candidate.is_symlink() or not candidate.is_file()):
+            raise EvidenceInvalid("weak dual-target demotion target is unsafe")
+
+    invalid = dict(value)
+    invalid["verdict"] = "invalid"
+    invalid["release_pass_eligible"] = False
+    invalid["strong_tx_write_permitted"] = False
+    invalid["fatal_error"] = _durable_exception_text(error)
+    _atomic_json(path, invalid)
+
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    _reject_dual_target_symlink_components(
+        path, label="weak dual-target demoted report"
+    )
+    if path.is_symlink() or not path.is_file() or temporary.exists():
+        raise EvidenceInvalid("weak dual-target verdict demotion was not durable")
+    payload = path.read_bytes()
+    if not 0 < len(payload) <= 64 * 1024 * 1024:
+        raise EvidenceInvalid("weak dual-target demoted report size is invalid")
+    persisted = json.loads(payload)
+    if (
+        not isinstance(persisted, dict)
+        or persisted.get("verdict") != "invalid"
+        or persisted.get("release_pass_eligible") is not False
+        or persisted.get("strong_tx_write_permitted") is not False
+        or type(persisted.get("fatal_error")) is not str
+    ):
+        raise EvidenceInvalid("weak dual-target verdict demotion changed")
+    return persisted
+
+
+def _read_dual_target_report(
+    path: Path,
+    *,
+    quality: TandemQualityOptions,
+    serial: str,
+    inventory_policy: str,
+) -> dict[str, Any]:
+    expected = _preflight_dual_target_output_paths(
+        quality.output_dir,
+        serial,
+        sidecar_inventory_policy=inventory_policy,
+        require_fresh_report=False,
+    )
+    if expected != path or path.is_symlink() or not path.is_file():
+        raise EvidenceInvalid("weak dual-target durable report path is unsafe")
+    size_before = path.stat().st_size
+    if not 0 < size_before <= 64 * 1024 * 1024:
+        raise EvidenceInvalid("weak dual-target durable report size is invalid")
+    payload = path.read_bytes()
+    if len(payload) != size_before or path.stat().st_size != size_before:
+        raise EvidenceInvalid("weak dual-target durable report changed while read")
+    parsed = json.loads(payload)
+    if not isinstance(parsed, dict):
+        raise EvidenceInvalid("weak dual-target durable report is not an object")
+    return parsed
 
 
 def _quality_configuration(quality: TandemQualityOptions) -> dict[str, Any]:
@@ -2037,6 +2295,125 @@ def _safety_policy(
         "required_effective_attenuation_db": 30.0,
         "strong_tx_write_permitted": False,
         "tx1_policy": "muted below -80 dB throughout",
+    }
+
+
+def _dual_target_qualification_scope() -> str:
+    return (
+        "weak-only tandem AUTO dual-target transport, ordering, retention, "
+        "provenance, RF-stability, and cleanup evidence; no commanded loudness "
+        "step, gain-transient, response, or latency qualification"
+    )
+
+
+def _dual_target_probe_configuration(
+    probe: TransientTransportProbeOptions,
+) -> dict[str, Any]:
+    """Project shared v4 inputs without legacy single-command schedule knobs."""
+
+    return {
+        "weak_stimulus_tx_gain_db": probe.weak_stimulus_tx_gain_db,
+        "auto_initial_gain_db": probe.auto_initial_gain_db,
+        "frame_samples": probe.frame_samples,
+        "kernel_buffers": probe.kernel_buffers,
+        "batch_frames": probe.batch_frames,
+        "anchor_samples": probe.anchor_samples,
+        "window_samples": probe.window_samples,
+        "max_host_jitter_ns": probe.max_host_jitter_ns,
+        "max_target_overshoot_samples": probe.max_target_overshoot_samples,
+        "max_command_sample_uncertainty": probe.max_command_sample_uncertainty,
+        "readback_tolerance_db": probe.readback_tolerance_db,
+        "maximum_retained_raw_bytes": probe.maximum_retained_raw_bytes,
+        "maximum_core_batch_bytes": probe.maximum_core_batch_bytes,
+        "maximum_aggregate_bytes": probe.maximum_aggregate_bytes,
+    }
+
+
+def _dual_target_evidence_policy(
+    probe: TransientTransportProbeOptions,
+) -> dict[str, Any]:
+    return {
+        "transport": "one continuous AUTO metadata batch session",
+        "provider_frame_samples": _PROBE_FRAME_SAMPLES,
+        "kernel_buffers": _PROBE_KERNEL_BUFFERS,
+        "batch_frames": _PROBE_BATCH_FRAMES,
+        "queue_capacity_frames": _PROBE_QUEUE_FRAMES,
+        "targets": [
+            {
+                "command_id": _DUAL_TARGET_FIRST_COMMAND_ID,
+                "requested_level_db": _PROBE_WEAK_GAIN_DB,
+                "offset_frames": _DUAL_TARGET_TARGET_FRAMES[0],
+                "offset_samples": (
+                    _DUAL_TARGET_TARGET_FRAMES[0] * _PROBE_FRAME_SAMPLES
+                ),
+            },
+            {
+                "command_id": _DUAL_TARGET_SECOND_COMMAND_ID,
+                "requested_level_db": _PROBE_WEAK_GAIN_DB,
+                "offset_frames": _DUAL_TARGET_TARGET_FRAMES[1],
+                "offset_samples": (
+                    _DUAL_TARGET_TARGET_FRAMES[1] * _PROBE_FRAME_SAMPLES
+                ),
+            },
+        ],
+        "targets_frozen_before_initiating_refill": True,
+        "command_primitive": (
+            "exact one TX2 write in [A,C), one deferred readback, and TX1 "
+            "pre/post mute assurance while the initiating refill is in flight"
+        ),
+        "maximum_target_overshoot_samples": (
+            probe.max_target_overshoot_samples
+        ),
+        "maximum_a_to_c_uncertainty_samples": (
+            probe.max_command_sample_uncertainty
+        ),
+        "provider_gaps": "forbidden",
+        "hidden_transitions": "forbidden",
+        "all_64_frames": (
+            "transition_count=0, event_count=0, AUTO fault-free, and paired "
+            "maximum-gain endpoint"
+        ),
+        "partition": (
+            "ordered five-way first/second command partition with at least eight "
+            "fully-pre, fully-between, and fully-post frames"
+        ),
+        "stable_suffix_frames_per_phase": (
+            _DUAL_TARGET_REQUIRED_PARTITION_FRAMES
+        ),
+        "whole_window_and_cross_suffix_tolerance_db": 1.0,
+        "sidecars": (
+            "exact 64 IQ plus 64 raw-metadata files, independently reread, "
+            "reparsed, and reanalyzed"
+        ),
+        "success_close": (
+            "full initiating refill plus 63 cached replays; no cancel; normal "
+            "close; transition count remains zero"
+        ),
+        "release_claim": "never eligible",
+    }
+
+
+def _dual_target_safety_policy(
+    quality: TandemQualityOptions, probe: TransientTransportProbeOptions
+) -> dict[str, Any]:
+    return {
+        "physical_attenuation_db": quality.physical_attenuation_db,
+        "authorized_tx2_gain_ceiling_db": _PROBE_WEAK_GAIN_DB,
+        "initial_tx2_gain_db": _PROBE_WEAK_GAIN_DB,
+        "exact_reassertion_levels_db": [
+            _PROBE_WEAK_GAIN_DB,
+            _PROBE_WEAK_GAIN_DB,
+        ],
+        "minimum_effective_attenuation_db": (
+            quality.physical_attenuation_db - _PROBE_WEAK_GAIN_DB
+        ),
+        "required_effective_attenuation_db": 30.0,
+        "strong_tx_write_permitted": False,
+        "tx1_policy": "exact mute assurance before and after each TX2 write",
+        "release_pass_eligible": False,
+        "configured_weak_level_matches_probe": (
+            probe.weak_stimulus_tx_gain_db == _PROBE_WEAK_GAIN_DB
+        ),
     }
 
 
@@ -4958,6 +5335,53 @@ def validate_transient_transport_probe_report(
         ) from error
 
 
+def validate_dual_target_transient_transport_probe_report(
+    report: Mapping[str, Any],
+    quality: TandemQualityOptions,
+    *,
+    probe: TransientTransportProbeOptions = _DEFAULT_PROBE_OPTIONS,
+    require_cleanup: bool = False,
+) -> None:
+    """Independently validate the additive weak dual-target v4 artifact."""
+
+    validate_transient_transport_probe_options(quality, probe)
+    try:
+        value = _json_domain(report)
+        if not isinstance(value, Mapping):
+            raise EvidenceInvalid("weak dual-target report is not an object")
+        runtime_provenance = _validate_runtime_provenance(
+            value.get("runtime_provenance")
+        )
+        _validate_probe_identity(
+            value.get("identity"), runtime_provenance=runtime_provenance
+        )
+        from .transient_transport_dual_target_validator import (
+            validate_dual_target_report,
+        )
+
+        validate_dual_target_report(
+            value,
+            quality,
+            probe,
+            phase_root=quality.output_dir,
+            require_cleanup=require_cleanup,
+        )
+    except (EvidenceInvalid, FixtureSafetyError):
+        raise
+    except (
+        AttributeError,
+        IndexError,
+        KeyError,
+        MemoryError,
+        OverflowError,
+        TypeError,
+        ValueError,
+    ) as error:
+        raise EvidenceInvalid(
+            "weak dual-target report is malformed: " + _exception_text(error)
+        ) from error
+
+
 def run_transient_transport_probe(
     radio: Issue46Radio | TransientRadioTransport,
     quality: TandemQualityOptions,
@@ -5174,6 +5598,242 @@ def run_transient_transport_probe(
     return report, report_path
 
 
+def run_dual_target_transient_transport_probe(
+    radio: Issue46Radio | TransientRadioTransport,
+    quality: TandemQualityOptions,
+    *,
+    probe: TransientTransportProbeOptions = _DEFAULT_PROBE_OPTIONS,
+    clock_ns: Callable[[], int] = time.monotonic_ns,
+    monotonic: Callable[[], float] = time.monotonic,
+    wall_clock_ns: Callable[[], int] = time.time_ns,
+    sleep: Callable[[float], None] = time.sleep,
+    metadata_parser: Callable[
+        [bytes], TandemFrameMetadata
+    ] = parse_tandem_frame_metadata,
+    report_writer: Callable[[Path, Mapping[str, Any]], None] = _atomic_json,
+    runtime_provenance: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], Path]:
+    """Run the guarded weak-only v4 dual-target qualification session."""
+
+    validate_transient_transport_probe_options(quality, probe)
+    serial = _safe_transient_serial_component(
+        getattr(radio.options, "serial", None)
+    )
+    report_path = _preflight_dual_target_output_paths(
+        quality.output_dir,
+        serial,
+        sidecar_inventory_policy="empty",
+        require_fresh_report=True,
+    )
+    if runtime_provenance is None:
+        iio_module = getattr(radio, "iio", None)
+        if iio_module is None:
+            raise EvidenceInvalid(
+                "weak dual-target probe lacks an IIO module for runtime attestation"
+            )
+        runtime_provenance = _attest_runtime_provenance(iio_module)
+    attested_runtime = _validate_runtime_provenance(runtime_provenance)
+    _validate_probe_radio_options(radio.options, quality, probe)
+    _validate_probe_identity(radio.identity, runtime_provenance=attested_runtime)
+
+    center_frequency = {
+        key: int(value) for key, value in radio.read_center_frequency().items()
+    }
+    expected_frequency = quality.center_frequency_hz
+    if set(center_frequency) != {"rx_lo_hz", "tx_lo_hz"} or any(
+        abs(value - expected_frequency) > 2 for value in center_frequency.values()
+    ):
+        raise EvidenceInvalid(
+            "live RX/TX LO differs from weak dual-target configuration"
+        )
+    if str(radio.identity.get("serial", "")) != serial:
+        raise EvidenceInvalid(
+            "weak dual-target radio identity differs from authorization"
+        )
+
+    radio._report_path = report_path
+    started = monotonic()
+
+    def check_deadline() -> None:
+        if monotonic() - started >= quality.max_seconds:
+            raise TimeoutError(
+                "weak dual-target transport probe exceeded "
+                f"{quality.max_seconds:.1f} seconds"
+            )
+
+    report: dict[str, Any] = {
+        "schema": DUAL_TARGET_PROBE_SCHEMA,
+        "probe_mode": DUAL_TARGET_PROBE_MODE,
+        "started_unix_ns": wall_clock_ns(),
+        "identity": dict(radio.identity),
+        "runtime_provenance": attested_runtime,
+        "release_pass_eligible": False,
+        "strong_tx_write_permitted": False,
+        "qualification_scope": _dual_target_qualification_scope(),
+        "rf": {
+            "center_frequency_hz_requested": expected_frequency,
+            "center_frequency_hz_readback": center_frequency,
+            "sample_rate_hz": quality.sample_rate_hz,
+            "tone_hz": quality.tone_hz,
+            "dds_scale": quality.dds_scale,
+            "weak_tx2_gain_db": _PROBE_WEAK_GAIN_DB,
+        },
+        "configuration": {
+            "quality": _quality_configuration(quality),
+            "probe": _dual_target_probe_configuration(probe),
+            "dual_target": {
+                "command_ids": [
+                    _DUAL_TARGET_FIRST_COMMAND_ID,
+                    _DUAL_TARGET_SECOND_COMMAND_ID,
+                ],
+                "target_frames": list(_DUAL_TARGET_TARGET_FRAMES),
+                "requested_levels_db": [
+                    _PROBE_WEAK_GAIN_DB,
+                    _PROBE_WEAK_GAIN_DB,
+                ],
+                "artifact_directory": _DUAL_TARGET_ARTIFACT_DIRECTORY,
+                "artifact_policy": _DUAL_TARGET_ARTIFACT_POLICY,
+            },
+        },
+        "safety": _dual_target_safety_policy(quality, probe),
+        "evidence_policy": _dual_target_evidence_policy(probe),
+        "mode_evidence": None,
+        "cleanup": {
+            "verified": False,
+            "status": "pending_radio_lifecycle_close",
+            "owner": "Issue46Radio.close",
+        },
+        "verdict": "running",
+    }
+
+    initial_report_error: BaseException | None = None
+    try:
+        _write_dual_target_report(
+            report_path,
+            report,
+            quality=quality,
+            serial=serial,
+            inventory_policy="empty",
+            report_writer=report_writer,
+        )
+    except BaseException as error:  # noqa: BLE001
+        initial_report_error = error
+
+    def failure_sink(mode: Mapping[str, Any]) -> None:
+        report["mode_evidence"] = dict(mode)
+        report["verdict"] = "invalid"
+        report["release_pass_eligible"] = False
+        report["strong_tx_write_permitted"] = False
+        report["failure_evidence"] = dict(mode)
+        _write_dual_target_report(
+            report_path,
+            report,
+            quality=quality,
+            serial=serial,
+            inventory_policy="partial",
+            report_writer=report_writer,
+        )
+
+    mode_evidence: dict[str, Any] | None = None
+    campaign_error: BaseException | None = initial_report_error
+    if campaign_error is None:
+        try:
+            mode_evidence = _run_weak_dual_target_batch_preflight_body(
+                radio,
+                quality=quality,
+                capture=_capture_adapter(probe),
+                check_deadline=check_deadline,
+                clock_ns=clock_ns,
+                monotonic=monotonic,
+                sleep=sleep,
+                metadata_parser=metadata_parser,
+                output_dir=(
+                    quality.output_dir / serial / "transient-iq"
+                ),
+                failure_sink=failure_sink,
+            )
+            report["mode_evidence"] = mode_evidence
+        except BaseException as error:  # noqa: BLE001
+            campaign_error = error
+
+    final_mute_error: BaseException | None = None
+    try:
+        radio.mute_all()
+    except BaseException as error:  # noqa: BLE001
+        final_mute_error = error
+
+    pre_report_errors = [
+        error
+        for error in (campaign_error, final_mute_error)
+        if error is not None
+    ]
+    report["elapsed_seconds"] = monotonic() - started
+    report["completed_unix_ns"] = wall_clock_ns()
+    if not pre_report_errors:
+        report["verdict"] = DUAL_TARGET_PROBE_PENDING_VERDICT
+        try:
+            validate_dual_target_transient_transport_probe_report(
+                report,
+                quality,
+                probe=probe,
+                require_cleanup=False,
+            )
+        except BaseException as error:  # noqa: BLE001
+            pre_report_errors.append(error)
+    if pre_report_errors:
+        report["verdict"] = "invalid"
+        report["release_pass_eligible"] = False
+        report["strong_tx_write_permitted"] = False
+        report["fatal_error"] = _durable_exception_text(
+            pre_report_errors[0]
+            if len(pre_report_errors) == 1
+            else BaseExceptionGroup(
+                "weak dual-target probe failures", pre_report_errors
+            )
+        )
+    inventory_policy = "complete" if not pre_report_errors else "partial"
+    report_error: BaseException | None = None
+    try:
+        _write_dual_target_report(
+            report_path,
+            report,
+            quality=quality,
+            serial=serial,
+            inventory_policy=inventory_policy,
+            report_writer=report_writer,
+        )
+    except BaseException as error:  # noqa: BLE001
+        report_error = error
+    if report_error is None and not pre_report_errors:
+        try:
+            persisted = _read_dual_target_report(
+                report_path,
+                quality=quality,
+                serial=serial,
+                inventory_policy="complete",
+            )
+            validate_dual_target_transient_transport_probe_report(
+                persisted,
+                quality,
+                probe=probe,
+                require_cleanup=False,
+            )
+            report = persisted
+        except BaseException as error:  # noqa: BLE001
+            report_error = error
+
+    errors = [*pre_report_errors, *([report_error] if report_error else [])]
+    if len(errors) > 1:
+        raise BaseExceptionGroup(
+            "weak dual-target probe or fail-closed reporting failed", errors
+        )
+    if errors:
+        error = errors[0]
+        raise error.with_traceback(error.__traceback__)
+    assert mode_evidence is not None
+    return report, report_path
+
+
 def run_serial_transient_transport_probe(
     iio_module: Any,
     radio_options: Any,
@@ -5339,13 +5999,232 @@ def run_serial_transient_transport_probe(
     return durable_report, report_path
 
 
+def run_serial_dual_target_transient_transport_probe(
+    iio_module: Any,
+    radio_options: Any,
+    quality: TandemQualityOptions,
+    *,
+    probe: TransientTransportProbeOptions = _DEFAULT_PROBE_OPTIONS,
+    radio_factory: Callable[[Any, Any], Issue46Radio] = Issue46Radio,
+    clock_ns: Callable[[], int] = time.monotonic_ns,
+    monotonic: Callable[[], float] = time.monotonic,
+    wall_clock_ns: Callable[[], int] = time.time_ns,
+    sleep: Callable[[float], None] = time.sleep,
+    metadata_parser: Callable[
+        [bytes], TandemFrameMetadata
+    ] = parse_tandem_frame_metadata,
+    report_writer: Callable[[Path, Mapping[str, Any]], None] = _atomic_json,
+    runtime_provenance: Mapping[str, Any] | None = None,
+) -> tuple[dict[str, Any], Path]:
+    """Own the R18 radio and promote v4 only after verified final cleanup."""
+
+    validate_transient_transport_probe_options(quality, probe)
+    _validate_probe_radio_options(radio_options, quality, probe)
+    serial = _safe_transient_serial_component(
+        getattr(radio_options, "serial", None)
+    )
+    report_path = _preflight_dual_target_output_paths(
+        quality.output_dir,
+        serial,
+        sidecar_inventory_policy="empty",
+        require_fresh_report=True,
+    )
+    if runtime_provenance is None:
+        runtime_provenance = _attest_runtime_provenance(iio_module)
+    attested_runtime = _validate_runtime_provenance(runtime_provenance)
+
+    radio = radio_factory(iio_module, radio_options)
+    body_error: BaseException | None = None
+    result: tuple[dict[str, Any], Path] | None = None
+    try:
+        result = run_dual_target_transient_transport_probe(
+            radio,
+            quality,
+            probe=probe,
+            clock_ns=clock_ns,
+            monotonic=monotonic,
+            wall_clock_ns=wall_clock_ns,
+            sleep=sleep,
+            metadata_parser=metadata_parser,
+            report_writer=report_writer,
+            runtime_provenance=attested_runtime,
+        )
+    except BaseException as error:  # noqa: BLE001
+        body_error = error
+
+    inventory_policy = "complete" if result is not None else "partial"
+    preclose_path_error: BaseException | None = None
+    try:
+        checked = _preflight_dual_target_output_paths(
+            quality.output_dir,
+            serial,
+            sidecar_inventory_policy=inventory_policy,
+            require_fresh_report=False,
+        )
+        if checked != report_path:
+            raise EvidenceInvalid("weak dual-target report path changed before close")
+    except BaseException as error:  # noqa: BLE001
+        preclose_path_error = error
+
+    close_error: BaseException | None = None
+    try:
+        radio.close()
+    except BaseException as error:  # noqa: BLE001
+        close_error = FixtureSafetyError(
+            "radio close failed after weak dual-target probe: "
+            + _exception_text(error)
+        )
+
+    close_invalidation_error: BaseException | None = None
+    if close_error is not None and report_path.is_file():
+        try:
+            parsed_failure = _read_dual_target_report(
+                report_path,
+                quality=quality,
+                serial=serial,
+                inventory_policy=inventory_policy,
+            )
+            parsed_failure["verdict"] = "invalid"
+            parsed_failure["release_pass_eligible"] = False
+            parsed_failure["strong_tx_write_permitted"] = False
+            parsed_failure["fatal_error"] = _durable_exception_text(close_error)
+            prior_cleanup = parsed_failure.get("cleanup")
+            cleanup_failure = (
+                dict(prior_cleanup) if isinstance(prior_cleanup, Mapping) else {}
+            )
+            failures = cleanup_failure.get("failures")
+            cleanup_failure["failures"] = [
+                *(failures if isinstance(failures, list) else []),
+                _exception_text(close_error),
+            ]
+            cleanup_failure["verified"] = False
+            parsed_failure["cleanup"] = cleanup_failure
+            _write_dual_target_report(
+                report_path,
+                parsed_failure,
+                quality=quality,
+                serial=serial,
+                inventory_policy=inventory_policy,
+                report_writer=report_writer,
+            )
+        except BaseException as error:  # noqa: BLE001
+            close_invalidation_error = error
+
+    durable_report: dict[str, Any] | None = None
+    durable_error: BaseException | None = None
+    promotion_candidate: dict[str, Any] | None = None
+    promotion_started = False
+    if (
+        body_error is None
+        and preclose_path_error is None
+        and close_error is None
+    ):
+        try:
+            if not bool(getattr(radio, "cleanup_verified", False)):
+                raise FixtureSafetyError(
+                    "radio close did not verify weak dual-target cleanup"
+                )
+            parsed = _read_dual_target_report(
+                report_path,
+                quality=quality,
+                serial=serial,
+                inventory_policy="complete",
+            )
+            if parsed.get("verdict") != DUAL_TARGET_PROBE_PENDING_VERDICT:
+                raise EvidenceInvalid(
+                    "durable weak dual-target report lacks pending-cleanup verdict"
+                )
+            if (
+                parsed.get("release_pass_eligible") is not False
+                or parsed.get("strong_tx_write_permitted") is not False
+            ):
+                raise EvidenceInvalid(
+                    "durable weak dual-target report gained release authority"
+                )
+            parsed["verdict"] = DUAL_TARGET_PROBE_VERDICT
+            validate_dual_target_transient_transport_probe_report(
+                parsed,
+                quality,
+                probe=probe,
+                require_cleanup=True,
+            )
+            promotion_candidate = parsed
+            promotion_started = True
+            _write_dual_target_report(
+                report_path,
+                parsed,
+                quality=quality,
+                serial=serial,
+                inventory_policy="complete",
+                report_writer=report_writer,
+            )
+            promoted = _read_dual_target_report(
+                report_path,
+                quality=quality,
+                serial=serial,
+                inventory_policy="complete",
+            )
+            validate_dual_target_transient_transport_probe_report(
+                promoted,
+                quality,
+                probe=probe,
+                require_cleanup=True,
+            )
+            durable_report = promoted
+        except BaseException as error:  # noqa: BLE001
+            durable_error = error
+            if promotion_started and promotion_candidate is not None:
+                try:
+                    _demote_dual_target_report(
+                        report_path,
+                        promotion_candidate,
+                        quality=quality,
+                        serial=serial,
+                        error=error,
+                    )
+                except BaseException as demotion_error:  # noqa: BLE001
+                    durable_error = BaseExceptionGroup(
+                        "weak dual-target promotion and verdict demotion failed",
+                        [error, demotion_error],
+                    )
+
+    errors = [
+        error
+        for error in (
+            body_error,
+            preclose_path_error,
+            close_error,
+            close_invalidation_error,
+            durable_error,
+        )
+        if error is not None
+    ]
+    if len(errors) > 1:
+        raise BaseExceptionGroup(
+            "weak dual-target probe, close, or durable promotion failed", errors
+        )
+    if errors:
+        error = errors[0]
+        raise error.with_traceback(error.__traceback__)
+    assert result is not None
+    assert durable_report is not None
+    return durable_report, report_path
+
+
 __all__ = [
+    "DUAL_TARGET_PROBE_MODE",
+    "DUAL_TARGET_PROBE_PENDING_VERDICT",
+    "DUAL_TARGET_PROBE_SCHEMA",
+    "DUAL_TARGET_PROBE_VERDICT",
     "PROBE_PENDING_VERDICT",
     "PROBE_SCHEMA",
     "PROBE_VERDICT",
     "TransientTransportProbeOptions",
+    "run_dual_target_transient_transport_probe",
+    "run_serial_dual_target_transient_transport_probe",
     "run_serial_transient_transport_probe",
     "run_transient_transport_probe",
+    "validate_dual_target_transient_transport_probe_report",
     "validate_transient_transport_probe_options",
     "validate_transient_transport_probe_report",
 ]

@@ -37,6 +37,13 @@ def pytest_addoption(parser: Any) -> None:
         ),
     )
     group.addoption(
+        "--tandem-transient-dual-target-probe",
+        action="store_true",
+        help=(
+            "run only the guarded weak dual-target batch transport preflight"
+        ),
+    )
+    group.addoption(
         "--tx2-loopback", action="store_true", help="authorize attenuated TX2 RF"
     )
     group.addoption("--radio-serial", help="exact immutable radio serial")
@@ -125,6 +132,12 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
             "requires --tandem-transient-transport-probe and explicit TX2 authorization"
         )
     )
+    dual_target_probe_skip = pytest.mark.skip(
+        reason=(
+            "requires --tandem-transient-dual-target-probe and explicit TX2 "
+            "authorization"
+        )
+    )
     for item in items:
         if "issue46" in item.keywords and not config.getoption("--issue46-hardware"):
             item.add_marker(issue46_skip)
@@ -136,6 +149,10 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
             config.getoption("--tandem-transient-transport-probe")
         ):
             item.add_marker(transport_probe_skip)
+        if "tandem_transient_dual_target_probe" in item.keywords and not (
+            config.getoption("--tandem-transient-dual-target-probe")
+        ):
+            item.add_marker(dual_target_probe_skip)
 
 
 @pytest.fixture(scope="session")
@@ -318,6 +335,29 @@ def tandem_transient_transport_probe_quality(
 
 
 @pytest.fixture(scope="session")
+def tandem_transient_dual_target_probe_quality(
+    pytestconfig: Any,
+) -> TandemQualityOptions:
+    attenuation = _require_tandem_authorization(
+        pytestconfig,
+        option="--tandem-transient-dual-target-probe",
+        description="tandem transient weak dual-target transport preflight",
+    )
+    options = _configured_tandem_quality_options(pytestconfig, attenuation)
+    if options.samples_per_channel != 65_536:
+        pytest.fail(
+            "--tandem-quality-samples must equal 65536 for the dual-target probe",
+            pytrace=False,
+        )
+    if -45.0 not in options.tx_gain_trajectory_db:
+        pytest.fail(
+            "--tandem-quality-tx-gains must include the guarded -45 dB probe level",
+            pytrace=False,
+        )
+    return options
+
+
+@pytest.fixture(scope="session")
 def tandem_transient_transport_probe_options() -> Any:
     from .transient_transport_probe import TransientTransportProbeOptions
 
@@ -350,6 +390,35 @@ def tandem_transient_transport_probe_radio_options(
         pn_min_coherence=0.03,
         pn_min_peak_ratio=1.5,
         lock_namespace="tandem-transient-transport-probe",
+    )
+
+
+@pytest.fixture(scope="session")
+def tandem_transient_dual_target_probe_radio_options(
+    pytestconfig: Any,
+    tandem_transient_dual_target_probe_quality: TandemQualityOptions,
+) -> Issue46Options:
+    quality = tandem_transient_dual_target_probe_quality
+    return Issue46Options(
+        serial=pytestconfig.getoption("--radio-serial"),
+        uri=pytestconfig.getoption("--radio-uri"),
+        allow_non_usb=pytestconfig.getoption("--allow-non-usb"),
+        firmware_pattern=pytestconfig.getoption("--firmware-pattern"),
+        libiio_source_commit=pytestconfig.getoption("--libiio-source-commit"),
+        attenuation_db=quality.physical_attenuation_db,
+        tx_gain_db=-45.0,
+        center_frequency_hz=quality.center_frequency_hz,
+        sample_rate_hz=quality.sample_rate_hz,
+        samples_per_channel=65_536,
+        profile="smoke",
+        sink="ram",
+        expected="green",
+        output_dir=quality.output_dir,
+        max_seconds=quality.max_seconds,
+        save_iq=False,
+        pn_min_coherence=0.03,
+        pn_min_peak_ratio=1.5,
+        lock_namespace="tandem-transient-dual-target-probe",
     )
 
 
