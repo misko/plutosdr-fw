@@ -757,7 +757,10 @@ class _FakeProbeRadio:
         elif _buffer.batch_frames == 64:
             self.cached_replays += 1
         parsed = self._metadata(samples_per_channel)
-        token = f"metadata-{self.capture_count}".encode()
+        token_prefix = f"metadata-{self.capture_count}".encode()
+        token = token_prefix.ljust(
+            probe_module._PROBE_METADATA_HEADER_BYTES, b"\0"
+        )
         self.metadata_by_token[token] = parsed
         self.refill_ns += 1_000_000
         return self.raw, token, self.refill_ns
@@ -1679,21 +1682,21 @@ def test_probe_hold_close_failure_is_muted_and_never_arms_tx(tmp_path: Path) -> 
         ),
         (lambda radio: setattr(radio, "stream_change_at", 8), "stream or ownership"),
         (lambda radio: setattr(radio, "zero_epoch_at", 8), "stream or ownership"),
-        (lambda radio: setattr(radio, "missing_feature_at", 8), "required features"),
+        (lambda radio: setattr(radio, "missing_feature_at", 8), "wire provenance"),
         (lambda radio: setattr(radio, "missing_valid_flag_at", 8), "valid flags"),
         (lambda radio: setattr(radio, "unsafe_flag_at", 8), "unsafe"),
         (lambda radio: setattr(radio, "overflow_at", 8), "overflow"),
         (
             lambda radio: setattr(radio, "excess_observations_at", 8),
-            "provider overlap bound",
+            "overlap-safe bound",
         ),
         (
             lambda radio: setattr(radio, "bad_sample_format_at", 8),
-            "wire/request provenance",
+            "wire provenance",
         ),
         (
             lambda radio: setattr(radio, "bad_threshold_provenance_at", 8),
-            "wire/request provenance",
+            "threshold provenance",
         ),
         (
             lambda radio: setattr(radio, "bad_initial_gain_at", 8),

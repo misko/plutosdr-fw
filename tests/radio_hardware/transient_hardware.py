@@ -520,8 +520,11 @@ def _wait_for_idle(
         "rx1_gain_index",
         "rx2_gain_index",
     )
+    expected_names = set(names)
     while True:
         raw = radio.tandem_status()
+        if not isinstance(raw, Mapping) or set(raw) != expected_names:
+            raise EvidenceInvalid("tandem IDLE status fields are incomplete")
         try:
             values = {name: raw[name] for name in names}
         except (KeyError, TypeError) as error:
@@ -530,10 +533,15 @@ def _wait_for_idle(
             raise EvidenceInvalid("tandem IDLE status contains a non-exact integer")
         status = dict(values)
         if (
+            status["rx1_gain_index"] != status["rx2_gain_index"]
+            or not 0 <= status["rx1_gain_index"] <= 127
+        ):
+            raise EvidenceInvalid(
+                "tandem IDLE endpoint is not a paired 7-bit gain index"
+            )
+        if (
             status["fault_flags"]
             or status["overflow_count"]
-            or status["rx1_gain_index"] != status["rx2_gain_index"]
-            or not 0 <= status["rx1_gain_index"] <= 127
         ):
             raise EvidenceInvalid(f"tandem controller status is unsafe: {status}")
         if (
@@ -838,6 +846,10 @@ def _validate_tandem_metadata(
                 "tandem transient event gain lies outside the session range"
             )
         if state.last_event is not None:
+            if event.sample_sequence < state.last_event.sample_sequence:
+                raise EvidenceInvalid(
+                    "tandem transient events are not globally sample ordered"
+                )
             minimum_event_spacing = quality.tandem_power_measurement_samples * (
                 quality.tandem_cooldown_periods + 1
             )
@@ -857,10 +869,6 @@ def _validate_tandem_metadata(
                 raise EvidenceInvalid(
                     "tandem transient event sequence has an unreconciled hole "
                     f"(delta {sequence_delta})"
-                )
-            if event.sample_sequence < state.last_event.sample_sequence:
-                raise EvidenceInvalid(
-                    "tandem transient events are not globally sample ordered"
                 )
             expected = state.last_event.rx1_gain_index + (
                 1 if event.direction is TandemEventDirection.INCREASE else -1
