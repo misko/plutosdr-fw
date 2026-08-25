@@ -245,10 +245,13 @@ def _valid_report():
             "firmware_repo_commit": "f" * 40,
             "python_module_path": "/src/plutosdr-fw/tests/radio_hardware/muted_metadata_batch_lifecycle.py",
             "python_module_sha256": "1" * 64,
+            "python_module_head_blob_sha256": "1" * 64,
             "shell_runner_path": "/src/plutosdr-fw/scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
             "shell_runner_sha256": "2" * 64,
+            "shell_runner_head_blob_sha256": "2" * 64,
             "metadata_abi_path": "/src/plutosdr-fw/tests/radio_hardware/metadata_abi.py",
             "metadata_abi_sha256": "3" * 64,
+            "metadata_abi_head_blob_sha256": "3" * 64,
         },
         "configuration": {
             "serial": serial,
@@ -351,7 +354,9 @@ def test_durable_report_validator_accepts_frame_derived_pass():
     ("path", "value"),
     [
         (("host_libiio", "runner_shared_object_sha256"), "0" * 64),
-        (("runner_provenance", "metadata_abi_sha256"), "not-a-sha256"),
+        (("runner_provenance", "python_module_sha256"), "0" * 64),
+        (("runner_provenance", "shell_runner_sha256"), "0" * 64),
+        (("runner_provenance", "metadata_abi_sha256"), "0" * 64),
         (("runner_provenance", "metadata_abi_path"), "/tmp/metadata_abi.py"),
         (("full_drain", "batch_cache_bound_bytes"), EXPECTED_BATCH_CACHE_BYTES - 1),
         (("full_drain", "frames", 7, "ownership_epoch"), 99),
@@ -415,9 +420,12 @@ def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch
     metadata_abi_sha = hashlib.sha256(metadata_abi_path.read_bytes()).hexdigest()
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", "a" * 40)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_MODULE_SHA256", module_sha)
+    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_MODULE_HEAD_SHA256", module_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_SHELL_SHA256", shell_sha)
+    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_SHELL_HEAD_SHA256", shell_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_SHELL_PATH", str(shell))
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", metadata_abi_sha)
+    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", metadata_abi_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", str(metadata_abi_path))
     evidence = _attest_runner_provenance()
     assert evidence["python_module_sha256"] == module_sha
@@ -436,11 +444,20 @@ def test_runner_rejects_metadata_abi_mutation(tmp_path, monkeypatch):
         hashlib.sha256(module_path.read_bytes()).hexdigest(),
     )
     monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_MODULE_HEAD_SHA256",
+        hashlib.sha256(module_path.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(
         "PLUTOSDR_FW_RUNNER_SHELL_SHA256",
+        hashlib.sha256(shell.read_bytes()).hexdigest(),
+    )
+    monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_SHELL_HEAD_SHA256",
         hashlib.sha256(shell.read_bytes()).hexdigest(),
     )
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_SHELL_PATH", str(shell))
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", "0" * 64)
+    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", "0" * 64)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", str(metadata_abi_path))
     with pytest.raises(QualificationError, match="SHA-256"):
         _attest_runner_provenance()

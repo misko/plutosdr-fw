@@ -207,9 +207,14 @@ def _attest_mapped_libiio() -> dict[str, Any]:
 def _attest_runner_provenance() -> dict[str, str]:
     commit = os.environ.get("PLUTOSDR_FW_RUNNER_COMMIT", "")
     module_sha = os.environ.get("PLUTOSDR_FW_RUNNER_MODULE_SHA256", "")
+    module_head_sha = os.environ.get("PLUTOSDR_FW_RUNNER_MODULE_HEAD_SHA256", "")
     shell_sha = os.environ.get("PLUTOSDR_FW_RUNNER_SHELL_SHA256", "")
+    shell_head_sha = os.environ.get("PLUTOSDR_FW_RUNNER_SHELL_HEAD_SHA256", "")
     shell_text = os.environ.get("PLUTOSDR_FW_RUNNER_SHELL_PATH", "")
     metadata_abi_sha = os.environ.get("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", "")
+    metadata_abi_head_sha = os.environ.get(
+        "PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", ""
+    )
     metadata_abi_text = os.environ.get("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", "")
     module_path = pathlib.Path(__file__).resolve()
     shell_path = pathlib.Path(shell_text).resolve() if shell_text else pathlib.Path()
@@ -236,18 +241,24 @@ def _attest_runner_provenance() -> dict[str, str]:
     calculated_metadata_abi_sha = _sha256_file(metadata_abi_path)
     if (
         calculated_module_sha != module_sha
+        or calculated_module_sha != module_head_sha
         or calculated_shell_sha != shell_sha
+        or calculated_shell_sha != shell_head_sha
         or calculated_metadata_abi_sha != metadata_abi_sha
+        or calculated_metadata_abi_sha != metadata_abi_head_sha
     ):
         raise QualificationError("runner source SHA-256 does not match its process")
     return {
         "firmware_repo_commit": commit,
         "python_module_path": str(module_path),
         "python_module_sha256": calculated_module_sha,
+        "python_module_head_blob_sha256": module_head_sha,
         "shell_runner_path": str(shell_path),
         "shell_runner_sha256": calculated_shell_sha,
+        "shell_runner_head_blob_sha256": shell_head_sha,
         "metadata_abi_path": str(metadata_abi_path),
         "metadata_abi_sha256": calculated_metadata_abi_sha,
+        "metadata_abi_head_blob_sha256": metadata_abi_head_sha,
     }
 
 
@@ -1056,13 +1067,21 @@ def validate_durable_pass_report(value: Any) -> None:
         is None
     ):
         raise QualificationError("durable runner commit is invalid")
-    for name in (
-        "python_module_sha256",
-        "shell_runner_sha256",
-        "metadata_abi_sha256",
+    for observed_name, head_name in (
+        ("python_module_sha256", "python_module_head_blob_sha256"),
+        ("shell_runner_sha256", "shell_runner_head_blob_sha256"),
+        ("metadata_abi_sha256", "metadata_abi_head_blob_sha256"),
     ):
-        if re.fullmatch(r"[0-9a-f]{64}", str(provenance.get(name, ""))) is None:
-            raise QualificationError(f"durable runner {name} is invalid")
+        observed = str(provenance.get(observed_name, ""))
+        head = str(provenance.get(head_name, ""))
+        if (
+            re.fullmatch(r"[0-9a-f]{64}", observed) is None
+            or re.fullmatch(r"[0-9a-f]{64}", head) is None
+            or observed != head
+        ):
+            raise QualificationError(
+                f"durable runner {observed_name} is not its exact HEAD blob"
+            )
     module_path = pathlib.Path(str(provenance.get("python_module_path", "")))
     shell_path = pathlib.Path(str(provenance.get("shell_runner_path", "")))
     metadata_abi_path = pathlib.Path(str(provenance.get("metadata_abi_path", "")))

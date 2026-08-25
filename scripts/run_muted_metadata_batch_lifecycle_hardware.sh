@@ -61,25 +61,38 @@ for runner_path in \
   }
 done
 export PLUTOSDR_FW_RUNNER_COMMIT="$(git -C "${ROOT}" rev-parse HEAD)"
-export PLUTOSDR_FW_RUNNER_MODULE_SHA256="$(sha256sum \
-  "${ROOT}/${runner_module}" | awk '{print $1}')"
-export PLUTOSDR_FW_RUNNER_SHELL_SHA256="$(sha256sum \
-  "${ROOT}/${runner_shell}" | awk '{print $1}')"
+runner_module_sha=$(sha256sum "${ROOT}/${runner_module}" | awk '{print $1}')
+runner_shell_sha=$(sha256sum "${ROOT}/${runner_shell}" | awk '{print $1}')
+runner_metadata_abi_sha=$(sha256sum \
+  "${ROOT}/${runner_metadata_abi}" | awk '{print $1}')
+runner_module_head_sha=$(git -C "${ROOT}" show \
+  "${PLUTOSDR_FW_RUNNER_COMMIT}:${runner_module}" | sha256sum | awk '{print $1}')
+runner_shell_head_sha=$(git -C "${ROOT}" show \
+  "${PLUTOSDR_FW_RUNNER_COMMIT}:${runner_shell}" | sha256sum | awk '{print $1}')
+runner_metadata_abi_head_sha=$(git -C "${ROOT}" show \
+  "${PLUTOSDR_FW_RUNNER_COMMIT}:${runner_metadata_abi}" | sha256sum | awk '{print $1}')
+[[ "${runner_module_sha}" == "${runner_module_head_sha}" ]] || {
+  printf 'ERROR: runner blob does not match commit: %s\n' "${runner_module}" >&2
+  exit 2
+}
+[[ "${runner_shell_sha}" == "${runner_shell_head_sha}" ]] || {
+  printf 'ERROR: runner blob does not match commit: %s\n' "${runner_shell}" >&2
+  exit 2
+}
+[[ "${runner_metadata_abi_sha}" == "${runner_metadata_abi_head_sha}" ]] || {
+  printf 'ERROR: runner blob does not match commit: %s\n' \
+    "${runner_metadata_abi}" >&2
+  exit 2
+}
+export PLUTOSDR_FW_RUNNER_MODULE_SHA256="${runner_module_sha}"
+export PLUTOSDR_FW_RUNNER_MODULE_HEAD_SHA256="${runner_module_head_sha}"
+export PLUTOSDR_FW_RUNNER_SHELL_SHA256="${runner_shell_sha}"
+export PLUTOSDR_FW_RUNNER_SHELL_HEAD_SHA256="${runner_shell_head_sha}"
 export PLUTOSDR_FW_RUNNER_SHELL_PATH="$(realpath -- "${ROOT}/${runner_shell}")"
-export PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256="$(sha256sum \
-  "${ROOT}/${runner_metadata_abi}" | awk '{print $1}')"
+export PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256="${runner_metadata_abi_sha}"
+export PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256="${runner_metadata_abi_head_sha}"
 export PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH="$(realpath -- \
   "${ROOT}/${runner_metadata_abi}")"
-for runner_path in \
-  "${runner_module}" "${runner_shell}" "${runner_metadata_abi}"; do
-  worktree_sha=$(sha256sum "${ROOT}/${runner_path}" | awk '{print $1}')
-  commit_sha=$(git -C "${ROOT}" show \
-    "${PLUTOSDR_FW_RUNNER_COMMIT}:${runner_path}" | sha256sum | awk '{print $1}')
-  [[ "${worktree_sha}" == "${commit_sha}" ]] || {
-    printf 'ERROR: runner blob does not match commit: %s\n' "${runner_path}" >&2
-    exit 2
-  }
-done
 
 "${PYTHON}" - "${IIO_BUILD}" "${library}" <<'PY'
 import pathlib
