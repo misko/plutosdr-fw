@@ -95,7 +95,7 @@ def test_first_measurement_gain_jump_is_compared_with_settled_band(
         physical_attenuation_db=0.0,
         measurement_frames=1,
     )
-    with pytest.raises(EvidenceInvalid, match="left its settled band"):
+    with pytest.raises(EvidenceInvalid, match="left its settled band") as caught:
         _measure_ordinary(
             JumpingRadio(),
             object(),
@@ -105,6 +105,20 @@ def test_first_measurement_gain_jump_is_compared_with_settled_band(
             level_index=0,
             settled=settled,
         )
+    assert caught.value.failure_evidence == {
+        "kind": "ordinary_gain_left_settled_band",
+        "mode": MODE_NATIVE,
+        "expected_iio_mode": "slow_attack",
+        "level_index": 0,
+        "tx2_gain_requested_db": -60.0,
+        "frame_index": 0,
+        "allowed_cumulative_span_db": 1.0,
+        "settled_gain_band": settled.to_dict(),
+        "cumulative_gain_band_before_frame": settled.to_dict(),
+        "rx_state_before": _state("slow_attack", 32.0, 32.0),
+        "rx_state_after": _state("slow_attack", 32.0, 32.0),
+        "captured_frame": {},
+    }
 
 
 @pytest.mark.parametrize(

@@ -45,6 +45,14 @@ MANUAL_TONE_RETRACE_TOLERANCE_DB = 3.0
 NATIVE_MIN_GAIN_SPAN_DB = 1.0
 
 
+class _EvidenceInvalidWithDetails(EvidenceInvalid):
+    """Evidence rejection carrying JSON-safe durable diagnostic details."""
+
+    def __init__(self, message: str, failure_evidence: Mapping[str, Any]) -> None:
+        super().__init__(message)
+        self.failure_evidence = dict(failure_evidence)
+
+
 @dataclass(frozen=True)
 class TandemQualityOptions:
     """All inputs that materially affect one reproducible matrix."""
@@ -326,7 +334,12 @@ def validate_options(options: TandemQualityOptions) -> None:
 def _exception_text(error: BaseException) -> str:
     number = getattr(error, "errno", None)
     suffix = f" errno={number}" if number is not None else ""
-    return f"{type(error).__name__}{suffix}: {error}"
+    error_type = (
+        "EvidenceInvalid"
+        if isinstance(error, EvidenceInvalid)
+        else type(error).__name__
+    )
+    return f"{error_type}{suffix}: {error}"
 
 
 def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
@@ -642,8 +655,24 @@ def _measure_ordinary(
             (before, after), expected_mode=expected_mode, prior=gain_band
         )
         if extended is None:
-            raise EvidenceInvalid(
-                f"{mode} gain left its settled band during a measurement frame"
+            raise _EvidenceInvalidWithDetails(
+                f"{mode} gain left its settled band during a measurement frame",
+                {
+                    "kind": "ordinary_gain_left_settled_band",
+                    "mode": mode,
+                    "expected_iio_mode": expected_mode,
+                    "level_index": level_index,
+                    "tx2_gain_requested_db": options.tx_gain_trajectory_db[level_index],
+                    "frame_index": frame_index,
+                    "allowed_cumulative_span_db": (
+                        0.0 if expected_mode == "manual" else 1.0
+                    ),
+                    "settled_gain_band": settled.to_dict(),
+                    "cumulative_gain_band_before_frame": gain_band.to_dict(),
+                    "rx_state_before": before,
+                    "rx_state_after": after,
+                    "captured_frame": frame,
+                },
             )
         gain_band = extended
         frame["rx_state_before"] = before
@@ -1898,6 +1927,8 @@ def run_tandem_quality_matrix(
     except BaseException as error:
         report["verdict"] = "invalid"
         report["fatal_error"] = _exception_text(error)
+        if isinstance(error, _EvidenceInvalidWithDetails):
+            report["failure_evidence"] = error.failure_evidence
         _atomic_json(report_path, report)
         raise
     finally:

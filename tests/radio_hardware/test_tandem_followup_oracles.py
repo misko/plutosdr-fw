@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -538,6 +539,47 @@ def test_full_runner_records_rf_attestation_and_every_native_cell(
     assert report["configuration"]["tandem_power_measurement_samples"] == 2_048
     assert report["configuration"]["tandem_low_power_dwell_periods"] == 7
     assert report["configuration"]["tandem_cooldown_periods"] == 11
+
+
+def test_full_runner_persists_structured_gain_band_failure_evidence(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    options = _options(output_dir=tmp_path)
+    manual = copy.deepcopy(_passing_report()["modes"][0])
+    failure_evidence = {
+        "kind": "ordinary_gain_left_settled_band",
+        "mode": MODE_NATIVE,
+        "expected_iio_mode": "slow_attack",
+        "level_index": 1,
+        "tx2_gain_requested_db": -30.0,
+        "frame_index": 2,
+        "allowed_cumulative_span_db": 1.0,
+        "settled_gain_band": {"planted": "settled"},
+        "cumulative_gain_band_before_frame": {"planted": "prior"},
+        "rx_state_before": {"planted": "before"},
+        "rx_state_after": {"planted": "after"},
+        "captured_frame": {"planted": "frame"},
+    }
+
+    def fake_run_mode(_radio, *, mode, report, **_kwargs) -> None:
+        if mode == MODE_MANUAL:
+            report["modes"].append(copy.deepcopy(manual))
+            return
+        raise tandem_quality._EvidenceInvalidWithDetails(
+            f"{mode} gain left its settled band during a measurement frame",
+            failure_evidence,
+        )
+
+    monkeypatch.setattr(tandem_quality, "_run_mode", fake_run_mode)
+
+    with pytest.raises(EvidenceInvalid, match="left its settled band"):
+        run_tandem_quality_matrix(_MatrixRadio(options), options)
+
+    report_path = tmp_path / "offline-radio" / "tandem-agc-quality-report.json"
+    persisted = json.loads(report_path.read_text(encoding="utf-8"))
+    assert persisted["verdict"] == "invalid"
+    assert persisted["fatal_error"].startswith("EvidenceInvalid:")
+    assert persisted["failure_evidence"] == failure_evidence
 
 
 def test_full_runner_rejects_a_planted_live_lo_drift_before_transmit(tmp_path) -> None:
