@@ -394,11 +394,15 @@ def _configure_dual_complex_rx_scan(rx: Any) -> dict[str, Any]:
     for expected_index, channel_id in enumerate(RX_SCAN_IDS):
         channel = scan_channels[channel_id]
         try:
-            observed_index = int(channel.index)
+            observed_index = channel.index
         except AttributeError as error:
             raise QualificationError(
                 f"RX {channel_id} does not expose its scan index"
             ) from error
+        if type(observed_index) is not int:
+            raise QualificationError(
+                f"RX {channel_id} scan index is not an exact integer"
+            )
         if observed_index != expected_index:
             raise QualificationError(
                 f"RX {channel_id} scan index {observed_index}, expected "
@@ -415,20 +419,34 @@ def _configure_dual_complex_rx_scan(rx: Any) -> dict[str, Any]:
             raise QualificationError(
                 f"RX {channel_id} does not expose its scan format"
             ) from error
-        else:
+        try:
             observed_format = {
-                "length": int(data_format.length),
-                "bits": int(data_format.bits),
-                "shift": int(data_format.shift),
-                "is_signed": bool(data_format.is_signed),
-                "is_be": bool(data_format.is_be),
-                "repeat": int(data_format.repeat),
+                "length": data_format.length,
+                "bits": data_format.bits,
+                "shift": data_format.shift,
+                "is_signed": data_format.is_signed,
+                "is_be": data_format.is_be,
+                "repeat": data_format.repeat,
             }
-            if observed_format != RX_SCAN_FORMAT:
+        except AttributeError as error:
+            raise QualificationError(
+                f"RX {channel_id} does not expose its complete scan format"
+            ) from error
+        for field in ("length", "bits", "shift", "repeat"):
+            if type(observed_format[field]) is not int:
                 raise QualificationError(
-                    f"RX {channel_id} scan format {observed_format}, expected "
-                    f"{RX_SCAN_FORMAT}"
+                    f"RX {channel_id} scan format {field} is not an exact integer"
                 )
+        for field in ("is_signed", "is_be"):
+            if type(observed_format[field]) is not bool:
+                raise QualificationError(
+                    f"RX {channel_id} scan format {field} is not an exact boolean"
+                )
+        if observed_format != RX_SCAN_FORMAT:
+            raise QualificationError(
+                f"RX {channel_id} scan format {observed_format}, expected "
+                f"{RX_SCAN_FORMAT}"
+            )
         layout.append(
             {
                 "id": channel_id,
@@ -440,19 +458,39 @@ def _configure_dual_complex_rx_scan(rx: Any) -> dict[str, Any]:
     for channel in rx.channels:
         if channel.scan_element:
             channel.enabled = channel.id in expected_ids
-    enabled_ids = [
-        channel_id
-        for channel_id in RX_SCAN_IDS
-        if bool(scan_channels[channel_id].enabled)
-    ]
-    if enabled_ids != list(RX_SCAN_IDS):
-        raise QualificationError(f"RX scan enable readback changed: {enabled_ids}")
-    enabled_mask = sum(1 << index for index in observed_indices)
+
+    enabled_readback: list[tuple[int, str]] = []
+    for channel in rx.channels:
+        if not channel.scan_element:
+            continue
+        enabled = channel.enabled
+        if type(enabled) is not bool:
+            raise QualificationError(
+                f"RX {channel.id} enabled readback is not an exact boolean"
+            )
+        if not enabled:
+            continue
+        index = channel.index
+        if type(index) is not int:
+            raise QualificationError(
+                f"enabled RX {channel.id} scan index is not an exact integer"
+            )
+        enabled_readback.append((index, channel.id))
+    enabled_readback.sort()
+    expected_readback = list(enumerate(RX_SCAN_IDS))
+    if enabled_readback != expected_readback:
+        raise QualificationError(
+            f"RX enabled scan readback changed: {enabled_readback}"
+        )
+    enabled_ids = [channel_id for _, channel_id in enabled_readback]
+    enabled_mask = sum(1 << index for index, _ in enabled_readback)
     if enabled_mask != RX_SCAN_MASK:
         raise QualificationError(
             f"RX enabled scan mask 0x{enabled_mask:02x}, expected 0x{RX_SCAN_MASK:02x}"
         )
-    sample_size = int(rx.sample_size)
+    sample_size = rx.sample_size
+    if type(sample_size) is not int:
+        raise QualificationError("dual-complex RX sample size is not an exact integer")
     if sample_size != RX_SCAN_SAMPLE_BYTES:
         raise QualificationError(
             f"dual-complex RX sample size is {sample_size}, expected "
@@ -1248,10 +1286,23 @@ def validate_durable_pass_report(value: Any) -> None:
     for field in ("rx_manual_before", "rx_after_full_drain"):
         _validate_rx_record(report.get(field), name=field)
     scan = _required_mapping(report.get("rx_scan"), name="RX scan")
+    if set(scan) != {
+        "enabled_channel_ids",
+        "enabled_scan_mask",
+        "sample_size_bytes",
+        "layout",
+    }:
+        raise QualificationError("durable RX scan evidence fields changed")
+    enabled_channel_ids = _required_list(
+        scan.get("enabled_channel_ids"), name="RX enabled channel IDs"
+    )
     if (
-        scan.get("enabled_channel_ids") != list(RX_SCAN_IDS)
-        or scan.get("enabled_scan_mask") != RX_SCAN_MASK
-        or scan.get("sample_size_bytes") != RX_SCAN_SAMPLE_BYTES
+        any(type(channel_id) is not str for channel_id in enabled_channel_ids)
+        or enabled_channel_ids != list(RX_SCAN_IDS)
+        or _required_int(scan.get("enabled_scan_mask"), name="RX enabled scan mask")
+        != RX_SCAN_MASK
+        or _required_int(scan.get("sample_size_bytes"), name="RX sample size")
+        != RX_SCAN_SAMPLE_BYTES
     ):
         raise QualificationError("durable RX scan selection/mask/size changed")
     layout = _required_list(scan.get("layout"), name="RX scan layout")
@@ -1261,14 +1312,43 @@ def validate_durable_pass_report(value: Any) -> None:
         zip(RX_SCAN_IDS, layout, strict=True)
     ):
         channel = _required_mapping(channel_value, name=f"RX scan layout {channel_id}")
+        if set(channel) != {"id", "index", "format"}:
+            raise QualificationError(
+                f"durable RX scan lane {channel_id} fields changed"
+            )
+        if type(channel.get("id")) is not str or channel.get("id") != channel_id:
+            raise QualificationError(f"durable RX scan lane {channel_id} ID changed")
         if (
-            channel.get("id") != channel_id
-            or channel.get("index") != expected_index
-            or channel.get("format") != RX_SCAN_FORMAT
+            _required_int(channel.get("index"), name=f"RX scan lane {channel_id} index")
+            != expected_index
         ):
             raise QualificationError(
                 f"durable RX scan lane {channel_id} index/format changed"
             )
+        scan_format = _required_mapping(
+            channel.get("format"), name=f"RX scan lane {channel_id} format"
+        )
+        if set(scan_format) != set(RX_SCAN_FORMAT):
+            raise QualificationError(
+                f"durable RX scan lane {channel_id} format fields changed"
+            )
+        for field in ("length", "bits", "shift", "repeat"):
+            if (
+                _required_int(
+                    scan_format.get(field),
+                    name=f"RX scan lane {channel_id} format {field}",
+                )
+                != RX_SCAN_FORMAT[field]
+            ):
+                raise QualificationError(
+                    f"durable RX scan lane {channel_id} format {field} changed"
+                )
+        for field in ("is_signed", "is_be"):
+            value = scan_format.get(field)
+            if type(value) is not bool or value is not RX_SCAN_FORMAT[field]:
+                raise QualificationError(
+                    f"durable RX scan lane {channel_id} format {field} changed"
+                )
 
     full = _required_mapping(report.get("full_drain"), name="full drain")
     if (

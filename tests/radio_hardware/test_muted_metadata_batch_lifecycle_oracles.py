@@ -109,20 +109,50 @@ def _scan_evidence():
 
 
 class _ScanChannel:
-    def __init__(self, channel_id, index, *, format_overrides=None):
+    def __init__(
+        self,
+        channel_id,
+        index,
+        *,
+        format_overrides=None,
+        initially_enabled=False,
+        sticky_enabled=False,
+    ):
         self.id = channel_id
         self.index = index
         self.scan_element = True
-        self.enabled = False
+        self._enabled = initially_enabled
+        self._sticky_enabled = sticky_enabled
         data_format = dict(RX_SCAN_FORMAT)
         data_format.update(format_overrides or {})
         self.data_format = SimpleNamespace(**data_format)
 
+    @property
+    def enabled(self):
+        return self._enabled
+
+    @enabled.setter
+    def enabled(self, value):
+        if self._sticky_enabled and not value:
+            self._enabled = True
+        else:
+            self._enabled = value
+
 
 class _ScanRx:
-    def __init__(self, channel_ids=None, indexes=None, *, format_overrides=None):
-        channel_ids = channel_ids or [f"voltage{index}" for index in range(4)]
-        indexes = indexes or list(range(len(channel_ids)))
+    def __init__(
+        self,
+        channel_ids=None,
+        indexes=None,
+        *,
+        format_overrides=None,
+        sample_size_override=None,
+        sticky_extra=False,
+    ):
+        if channel_ids is None:
+            channel_ids = [f"voltage{index}" for index in range(4)]
+        if indexes is None:
+            indexes = list(range(len(channel_ids)))
         self.channels = [
             _ScanChannel(
                 channel_id,
@@ -131,9 +161,21 @@ class _ScanRx:
             )
             for ordinal, (channel_id, index) in enumerate(zip(channel_ids, indexes))
         ]
+        if sticky_extra:
+            self.channels.append(
+                _ScanChannel(
+                    "voltage4",
+                    4,
+                    initially_enabled=True,
+                    sticky_enabled=True,
+                )
+            )
+        self._sample_size_override = sample_size_override
 
     @property
     def sample_size(self):
+        if self._sample_size_override is not None:
+            return self._sample_size_override
         return 2 * sum(channel.enabled for channel in self.channels)
 
 
@@ -151,9 +193,51 @@ def test_real_four_scalar_rx_scan_shape_is_attested():
         (_ScanRx(format_overrides={"is_signed": False}), "scan format"),
         (_ScanRx(format_overrides={"is_be": True}), "scan format"),
         (_ScanRx(format_overrides={"bits": 12}), "scan format"),
+        (_ScanRx(format_overrides={"length": 12}), "scan format"),
+        (_ScanRx(format_overrides={"shift": 1}), "scan format"),
+        (_ScanRx(format_overrides={"repeat": 2}), "scan format"),
+        (_ScanRx(sticky_extra=True), "enabled scan readback"),
+        (_ScanRx(sample_size_override=6), "sample size is 6"),
     ],
 )
 def test_rx_scan_rejects_two_lane_reordered_or_non_cs16_shape(rx, message):
+    with pytest.raises(QualificationError, match=message):
+        _configure_dual_complex_rx_scan(rx)
+
+
+@pytest.mark.parametrize(
+    ("rx", "message"),
+    [
+        (_ScanRx(indexes=[0, "1", 2, 3]), "index is not an exact integer"),
+        (_ScanRx(indexes=[False, 1, 2, 3]), "index is not an exact integer"),
+        (
+            _ScanRx(format_overrides={"length": "16"}),
+            "length is not an exact integer",
+        ),
+        (
+            _ScanRx(format_overrides={"bits": 16.0}),
+            "bits is not an exact integer",
+        ),
+        (
+            _ScanRx(format_overrides={"shift": False}),
+            "shift is not an exact integer",
+        ),
+        (
+            _ScanRx(format_overrides={"repeat": 1.0}),
+            "repeat is not an exact integer",
+        ),
+        (
+            _ScanRx(format_overrides={"is_signed": 1}),
+            "is_signed is not an exact boolean",
+        ),
+        (
+            _ScanRx(format_overrides={"is_be": 0}),
+            "is_be is not an exact boolean",
+        ),
+        (_ScanRx(sample_size_override=8.0), "sample size is not an exact integer"),
+    ],
+)
+def test_rx_scan_rejects_coercible_noncanonical_types(rx, message):
     with pytest.raises(QualificationError, match=message):
         _configure_dual_complex_rx_scan(rx)
 
@@ -445,8 +529,34 @@ def test_durable_report_validator_accepts_frame_derived_pass():
         (("runner_provenance", "metadata_abi_path"), "/tmp/metadata_abi.py"),
         (("rx_scan", "enabled_channel_ids"), ["voltage0", "voltage1"]),
         (("rx_scan", "enabled_scan_mask"), 0x03),
+        (("rx_scan", "enabled_scan_mask"), 15.0),
+        (("rx_scan", "sample_size_bytes"), 6),
+        (("rx_scan", "sample_size_bytes"), 8.0),
+        (("rx_scan", "layout", 0, "index"), False),
+        (("rx_scan", "layout", 1, "index"), 1.0),
         (("rx_scan", "layout", 2, "index"), 3),
         (("rx_scan", "layout", 2, "format", "is_signed"), False),
+        (("rx_scan", "layout", 2, "format", "is_signed"), 1),
+        (("rx_scan", "layout", 2, "format", "is_be"), 0),
+        (("rx_scan", "layout", 2, "format", "length"), 12),
+        (("rx_scan", "layout", 2, "format", "length"), 16.0),
+        (("rx_scan", "layout", 2, "format", "bits"), 16.0),
+        (("rx_scan", "layout", 2, "format", "shift"), 1),
+        (("rx_scan", "layout", 2, "format", "shift"), False),
+        (("rx_scan", "layout", 2, "format", "repeat"), 2),
+        (("rx_scan", "layout", 2, "format", "repeat"), 1.0),
+        (
+            ("rx_scan",),
+            {**_scan_evidence(), "unexpected": True},
+        ),
+        (
+            ("rx_scan", "layout", 0),
+            {**_scan_evidence()["layout"][0], "unexpected": True},
+        ),
+        (
+            ("rx_scan", "layout", 0, "format"),
+            {**RX_SCAN_FORMAT, "unexpected": True},
+        ),
         (("full_drain", "batch_cache_bound_bytes"), EXPECTED_BATCH_CACHE_BYTES - 1),
         (("full_drain", "frames", 7, "ownership_epoch"), 99),
         (("full_drain", "frames", 7, "features"), FEATURE_HARDWARE_SAMPLE_COUNTER),
