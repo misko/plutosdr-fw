@@ -1,8 +1,7 @@
-# Immutable source graph for the final tandem AGC v8 build.
-#
-# This is component-identical to the RC3 graph.  The final build changes only
-# the top-level release identity and packaging, while also requiring exact
-# component identities in the packed /opt/VERSIONS file.
+# Immutable source graph for the forward-only tandem AGC v8 RC3 candidate.
+# RC3 advances the bounded libiio batch transport, its Buildroot recipe pin,
+# and the Linux tandem-session cleanup. Every unchanged dependency continues
+# to use its existing protected source lock.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1

@@ -136,7 +136,7 @@ scripts/run_tandem_agc_quality_hardware.sh \
   --tx2-loopback \
   --radio-serial SERIAL \
   --radio-uri usb:BUS.DEVICE.INTERFACE \
-  --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc2$' \
+  --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc3$' \
   --loopback-attenuation-db 0 \
   --tandem-quality-center-frequency-hz 915000000 \
   --tandem-quality-profile smoke
@@ -234,22 +234,26 @@ report after close, and requires durable verified-cleanup evidence. Public CI
 exercises only deterministic synthetic and planted-failure oracles.
 
 Before another loudness-step transient attempt, the dedicated transport probe
-can qualify the proposed larger-frame transport without producing a release
-PASS. It opens one AUTO metadata session at the already-qualified `-45` dB
-rung, requires 32 consecutive 65,536-sample frames with K=2, then reasserts the
-same `-45` dB level while streaming and requires eight more consecutive frames.
-The command is accepted only with the coherent FPGA-counter A-to-B-to-C bound,
-at most six queued/bracketed frames, and at least two fully post-command frames.
-It never writes the `-30` dB transient rung. Returned IQ from the stable anchor
-and final suffix must also meet the configured tone-level, SNR, clipping, and
-phase-stability gates. A successful artifact is explicitly transport-only and
-has `release_pass_eligible: false`.
+can qualify the continuous larger-frame transport without producing a release
+PASS. It deliberately keeps the exact RC2 device firmware while advancing only
+the host to the protected RC3 libiio transport lock. It opens one AUTO metadata
+session at the already-qualified `-45` dB
+rung with K=8 device buffers and one 64-frame libiio batch. While the initiating
+batch refill remains in flight, it reasserts the same `-45` dB level at the
+frozen post-open target `S0 + 40 * 65,536` samples, then replays all 64 cached
+frames. The command is accepted only with the coherent FPGA-counter A-to-B-to-C
+bound, target overshoot and causal uncertainty no greater than 16,384 samples,
+at least 32 fully pre-command frames, and at least eight fully post-command
+frames. It never writes the `-30` dB transient rung. Returned IQ from the stable
+anchor and final suffix must also meet the configured tone-level, SNR,
+clipping, and phase-stability gates. A successful artifact is explicitly
+transport-only and has `release_pass_eligible: false`.
 
 The probe's AUTO request is deliberately initialized at the configured maximum
 gain (`62 dB`) while the muted HOLD normalization and final manual restoration
 remain at `40 dB`. At the qualified `-45 dB` weak rung this removes expected
 startup INCREASE decisions: the first frame must be transition-free at the
-paired maximum gain-table endpoint, and all 40 retained frames must keep
+paired maximum gain-table endpoint, and all 64 retained frames must keep
 transition count zero, contain no events, and remain paired at that endpoint.
 Any represented or hidden transition is still fatal. Every hardware retry must
 use a fresh output directory so an earlier invalid artifact cannot be mistaken

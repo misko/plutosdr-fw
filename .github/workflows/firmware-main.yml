@@ -38,6 +38,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc2' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc1' ||
          github.ref == 'refs/heads/feature/tandem-agc-v2')))
@@ -50,6 +51,8 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'tandem-agc-v8-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' &&
+          'tandem-agc-v8-rc3-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc2' &&
           'tandem-agc-v8-rc2-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc1' &&
@@ -60,6 +63,8 @@ jobs:
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-tandem-agc-v8' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' &&
+          'plutoplus-spf-tandem-agc-v8-rc3' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc2' &&
           'plutoplus-spf-tandem-agc-v8-rc2' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc1' &&

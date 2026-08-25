@@ -43,6 +43,25 @@ mislabelling.
 - `.github/workflows/firmware-main.yml` — `workflow_dispatch` input
   `release_version`, and the stamped string appears in the job summary.
 
+## Current tandem RC3 gate
+
+RC2 exposed two release blockers: a closed tandem session could report IDLE
+while leaving event records inaccessible in the FPGA FIFO, and the synchronous
+host metadata request/response cadence could lose a full 65,536-sample frame
+without a device-overflow indication. RC3 advances the Linux RELEASE cleanup,
+the bounded libiio batch transport, and the matching Buildroot recipe pin. It
+therefore contains product-code changes and cannot inherit RC2's hardware
+qualification. Its exact source graph is
+`manifests/tandem-agc-v8-rc3-source.yaml`; its trusted build branch is
+`codex/firmware-tandem-agc-v8-rc3`; and its requested device string is
+`v0.41-plutoplus-spf-tandem-agc-v8-rc3`.
+
+Protected dependency source locks must exist before the build so CI can resolve
+and pack them. They are not release tags. Do not create the annotated
+`v0.41-plutoplus-spf-tandem-agc-v8-rc3` release tag until the exact attested RC3
+artifact completes the full four-radio RAM qualification. If RC3 fails, mint a
+new source lock and RC4; never move an existing lock or release tag.
+
 ## Procedure
 
 1. **Decide the name.** Drop the candidate's `-rcNN`, keep the intended
@@ -94,10 +113,13 @@ mislabelling.
 
 4. **Hardware-qualify these exact bytes.** A rebuild for the name change is
    byte-different from the RC that was qualified, so the RC's campaign does not
-   transfer literally. When the only delta is the version string, a confirmation
-   pass — boot, TX2 loopback on every release-gate radio, and one protocol-v3
-   stream run — covers the real risk, which is build-environment drift rather
-   than a code change.
+   transfer literally. When the only delta from a fully qualified RC is the
+   version string, a confirmation pass — boot, TX2 loopback on every
+   release-gate radio, and one protocol-v3 stream run — covers the real risk,
+   which is build-environment drift. RC3 is not such a candidate: its Linux
+   cleanup and libiio batch-transport changes require the full campaign before
+   merge. Only the subsequent final build may use the reduced confirmation pass
+   if its sole functional delta from qualified RC3 is the stamped version.
 
 5. **Tag, annotated, on the built commit.** Annotated, not lightweight: `rc16`
    is lightweight and `rc17` is not, and the inconsistency is worth ending.

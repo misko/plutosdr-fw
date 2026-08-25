@@ -70,10 +70,13 @@ The workflow never flashes a radio and never connects to the QNAP.
 `manifests/tandem-agc-v8-source.yaml` is the source graph selected for `main`.
 It pins libiio, Buildroot, HDL, timestamp HDL, Linux, U-Boot, and both gadget
 implementations by exact 40-character commit and protected source-lock tag.
-The final v8 graph deliberately reuses qualified locks from the tandem-v8 RC2,
-tandem-v2, gain-series, and libiio-metadata families instead of minting aliases
-for unchanged components. Active GitHub rulesets prevent every referenced lock
-from being updated or deleted in its owning repository.
+The final v8 graph advances libiio to the protected RC3 bounded-batch transport,
+Buildroot to its matching RC3 recipe lock, and Linux to the tandem-v2
+`linux-v11` cleanup lock. It deliberately reuses every unchanged gadget, HDL,
+timestamp HDL, and U-Boot lock from the tandem-v2, gain-series, and
+libiio-metadata families instead of minting aliases at the same commits. Active
+GitHub rulesets prevent every referenced lock from being updated or deleted in
+its owning repository.
 
 The source check requires exact tag-to-commit equality and requires each packed
 `/opt/VERSIONS` identity to equal its declared source-lock tag. The trusted
@@ -81,10 +84,11 @@ runner then synchronizes only those declared tags and checks the live
 `git describe --tags` result before building. Moving development branches and
 ambient persistent-runner tags are not build inputs.
 
-For a later candidate, create a new source-lock namespace, protect it, and
-update the new manifest in the same reviewed change. Never reuse or repoint an
-existing source-lock tag. The firmware release tag remains separate and is
-created only after the hardware promotion gate.
+For a later candidate, advance an existing protected, versioned component
+lineage or create and protect a new source-lock namespace, then update the new
+manifest in the same reviewed change. Never reuse or repoint an existing
+source-lock tag. The firmware release tag remains separate and is created only
+after the hardware promotion gate.
 
 ## Main-branch policy
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
-MANIFEST=${IIO_MANIFEST:-${ROOT}/manifests/tandem-agc-v8-rc2-source.yaml}
+MANIFEST=${IIO_MANIFEST:-${ROOT}/manifests/tandem-agc-v8-rc3-source.yaml}
 IIO_SOURCE=${IIO_SOURCE:-$(cd -- "${ROOT}/.." && pwd)/libiio}
 pytest_target=tests/radio_hardware/test_tandem_agc_quality.py
 quality_requested=false
