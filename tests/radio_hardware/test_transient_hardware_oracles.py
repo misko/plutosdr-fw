@@ -1213,6 +1213,39 @@ def test_tandem_stable_suffix_requires_rf_and_event_stability(
         _run_fake(radio, _quality(tmp_path))
 
 
+@pytest.mark.parametrize(
+    ("phase", "endpoint"),
+    (
+        ("fully_post_attack_pre_release", 65),
+        ("fully_post_release", 64),
+    ),
+)
+def test_tandem_stable_suffix_requires_commanded_endpoint_directions(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    phase: str,
+    endpoint: int,
+) -> None:
+    original = transient_hardware_module._stable_tandem_partition_suffix
+
+    def planted_suffix(*args: object, **kwargs: object) -> dict[str, Any]:
+        result = original(*args, **kwargs)
+        if kwargs["label"] == phase:
+            result["bench_gain_indices"] = [endpoint, endpoint]
+        return result
+
+    monkeypatch.setattr(
+        transient_hardware_module,
+        "_stable_tandem_partition_suffix",
+        planted_suffix,
+    )
+    with pytest.raises(
+        EvidenceInvalid,
+        match="stable endpoints do not prove the commanded attack decrease",
+    ):
+        _run_fake(_FakeRadio(tmp_path), _quality(tmp_path))
+
+
 def test_tandem_close_counter_ledger_preserves_bounded_forward_deltas(
     tmp_path: Path,
 ) -> None:

@@ -4092,6 +4092,26 @@ def _run_tandem_batch_mode_body(
                 "fully_post_release",
             )
         }
+        pre_attack_metadata = frames[
+            groups["fully_pre_attack"]["frame_indices"][-1]
+        ].metadata
+        if pre_attack_metadata is None:
+            raise EvidenceInvalid("tandem pre-attack endpoint evidence is missing")
+        pre_attack_endpoint = pre_attack_metadata.bench_gain_indices[0]
+        middle_endpoint = partition["stable_suffixes"][
+            "fully_post_attack_pre_release"
+        ]["bench_gain_indices"][0]
+        final_endpoint = partition["stable_suffixes"]["fully_post_release"][
+            "bench_gain_indices"
+        ][0]
+        if not (
+            middle_endpoint < pre_attack_endpoint
+            and final_endpoint > middle_endpoint
+        ):
+            raise EvidenceInvalid(
+                "tandem stable endpoints do not prove the commanded "
+                "attack decrease and release increase"
+            )
         anchor_index = groups["fully_pre_attack"]["frame_indices"][-1]
         anchor_frame = frames[anchor_index]
         anchor_observation = _analyze_tandem_frame_slice(

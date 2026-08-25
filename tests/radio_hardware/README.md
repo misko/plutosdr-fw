@@ -241,7 +241,9 @@ the three stable groups must each contain at least eight whole frames. The
 conditioning anchor is exactly the final 8192 samples of the last fully-pre
 frame, and the final eight middle and release frames must be event-free,
 endpoint-stable, quality-valid, and within the configured RF settling tolerance
-in every 1024-sample window.
+in every 1024-sample window. Their settled gain endpoints must also prove the
+command directions: the strong middle endpoint is below the weak pre-attack
+maximum, and the final weak endpoint is above the strong middle endpoint.
 
 The layer fails closed on missing sample brackets, host-write jitter over the
 configured limit, excessive sample uncertainty, event-sequence holes, torn or
