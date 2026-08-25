@@ -764,6 +764,17 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     assert ("data_pipe_teardown",) not in radio.operations
     assert report["acquisition"]["configured_batch_frames"] == 64
     assert report["acquisition"]["configured_batch_cache_bytes"] == 37_749_760
+    assert report["acquisition"][
+        "initiating_refill_completion_monotonic_ns"
+    ] == report["frames"][0]["refill_monotonic_ns"]
+    assert (
+        report["weak_conditioning_command"]["host_after_ns"]
+        <= report["command_contention"]["command"]["host_before_ns"]
+    )
+    assert (
+        report["command_contention"]["command"]["host_after_ns"]
+        <= report["frames"][0]["refill_monotonic_ns"]
+    )
     assert report["acquisition"]["shutdown_path"] == (
         "normal_close_after_full_cache_replay"
     )
@@ -773,6 +784,83 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     ] == 80_872_448
     assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
     validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+@pytest.mark.parametrize(
+    ("status_update", "expected"),
+    (
+        ({"ownership_epoch": 999}, "ownership_epoch"),
+        ({"transition_count": 123}, "transition count"),
+        ({"rx1_gain_index": 1, "rx2_gain_index": 99}, "paired 7-bit"),
+        ({"rx1_gain_index": 128, "rx2_gain_index": 128}, "paired 7-bit"),
+        ({"unexpected_status_field": 1}, "fields are incomplete"),
+    ),
+)
+def test_probe_rejects_unsafe_live_post_close_status(
+    tmp_path: Path, status_update: dict[str, int], expected: str
+) -> None:
+    class UnsafeReleaseRadio(_FakeProbeRadio):
+        def tandem_status(self) -> dict[str, int]:
+            status = super().tandem_status()
+            if ("buffer_close",) in self.operations:
+                status.update(status_update)
+            return status
+
+    radio = UnsafeReleaseRadio(tmp_path)
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+
+    failure = _failure_report(radio)
+    assert failure["verdict"] == "invalid"
+    assert failure["release_pass_eligible"] is False
+
+
+def test_probe_rejects_live_host_chronology_outside_initiating_refill(
+    tmp_path: Path,
+) -> None:
+    class LateClock:
+        def __init__(self) -> None:
+            self.value = 100_000_000
+
+        def __call__(self) -> int:
+            self.value += 100
+            return self.value
+
+    radio = _FakeProbeRadio(tmp_path)
+    with pytest.raises(BaseException, match="did not complete while"):
+        run_transient_transport_probe(
+            radio,
+            _quality(tmp_path),
+            clock_ns=LateClock(),
+            sleep=radio.paced_sleep,
+            metadata_parser=radio.parse_metadata,
+        )
+
+    assert _failure_report(radio)["verdict"] == "invalid"
+    assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
+
+
+def test_probe_rejects_live_command_that_predates_initial_conditioning(
+    tmp_path: Path,
+) -> None:
+    class ReorderedClock:
+        def __init__(self) -> None:
+            self.values = iter((20_000, 20_100, 10_000, 10_100))
+
+        def __call__(self) -> int:
+            return next(self.values)
+
+    radio = _FakeProbeRadio(tmp_path)
+    with pytest.raises(BaseException, match="predates initial conditioning"):
+        run_transient_transport_probe(
+            radio,
+            _quality(tmp_path),
+            clock_ns=ReorderedClock(),
+            sleep=radio.paced_sleep,
+            metadata_parser=radio.parse_metadata,
+        )
+
+    assert _failure_report(radio)["verdict"] == "invalid"
 
 
 def test_probe_clears_stale_fifo_in_muted_hold_before_tx(tmp_path: Path) -> None:
@@ -994,7 +1082,7 @@ def test_probe_never_commands_after_batch_fails_before_counter_target(
     radio = _FakeProbeRadio(tmp_path)
     radio.partial_batch_failure = True
 
-    with pytest.raises(BaseException):
+    with pytest.raises(OSError, match="partial metadata batch"):
         _run_fake(radio, _quality(tmp_path))
 
     tx_writes = [
@@ -1503,6 +1591,70 @@ def test_report_validator_rejects_planted_mutations(tmp_path: Path) -> None:
     for forged in mutations:
         with pytest.raises(EvidenceInvalid):
             validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_report_validator_binds_command_to_initiating_refill_chronology(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    after_refill = copy.deepcopy(report)
+    refill_completion = max(
+        int(frame["refill_monotonic_ns"]) for frame in after_refill["frames"]
+    )
+    command = after_refill["command_contention"]["command"]
+    command.update(
+        host_before_ns=refill_completion + 100,
+        host_after_ns=refill_completion + 200,
+        host_jitter_ns=100,
+    )
+    with pytest.raises(EvidenceInvalid, match="did not complete while"):
+        validate_transient_transport_probe_report(after_refill, _quality(tmp_path))
+
+    reordered_initial = copy.deepcopy(report)
+    command_start = reordered_initial["command_contention"]["command"][
+        "host_before_ns"
+    ]
+    reordered_initial["weak_conditioning_command"].update(
+        host_before_ns=command_start + 100,
+        host_after_ns=command_start + 200,
+        host_jitter_ns=100,
+    )
+    with pytest.raises(EvidenceInvalid, match="predates initial conditioning"):
+        validate_transient_transport_probe_report(
+            reordered_initial, _quality(tmp_path)
+        )
+
+    forged_completion = copy.deepcopy(report)
+    forged_completion["acquisition"][
+        "initiating_refill_completion_monotonic_ns"
+    ] += 1
+    with pytest.raises(EvidenceInvalid, match="acquisition ledger"):
+        validate_transient_transport_probe_report(
+            forged_completion, _quality(tmp_path)
+        )
+
+
+def test_report_validator_rejects_unsafe_post_close_status(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    mutations = (
+        ({"ownership_epoch": 999}, "ownership_epoch"),
+        ({"transition_count": 123}, "transition count"),
+        ({"rx1_gain_index": 1, "rx2_gain_index": 99}, "paired 7-bit"),
+        ({"rx1_gain_index": 128, "rx2_gain_index": 128}, "paired 7-bit"),
+    )
+    for status_update, expected in mutations:
+        forged = copy.deepcopy(report)
+        forged["tandem_status_after"].update(status_update)
+        with pytest.raises(EvidenceInvalid, match=expected):
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+    missing_field = copy.deepcopy(report)
+    missing_field["tandem_status_after"].pop("ownership_epoch")
+    with pytest.raises(EvidenceInvalid, match="fields are incomplete"):
+        validate_transient_transport_probe_report(missing_field, _quality(tmp_path))
 
 
 def test_report_validator_binds_stale_fifo_hold_normalization(tmp_path: Path) -> None:

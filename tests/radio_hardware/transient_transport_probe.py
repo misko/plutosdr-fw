@@ -943,6 +943,37 @@ def _schedule_batched_command(
     }
 
 
+def _validate_batch_host_chronology(
+    *,
+    initial_host_after_ns: int,
+    command_host_before_ns: int,
+    command_host_after_ns: int,
+    initiating_refill_completion_ns: int,
+) -> None:
+    """Bind the command to the initiating refill in one monotonic clock domain."""
+
+    values = {
+        "initial host completion": initial_host_after_ns,
+        "command host start": command_host_before_ns,
+        "command host completion": command_host_after_ns,
+        "initiating refill completion": initiating_refill_completion_ns,
+    }
+    for name, value in values.items():
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise EvidenceInvalid(
+                f"transport probe {name} is not a nonnegative monotonic timestamp"
+            )
+    if initial_host_after_ns > command_host_before_ns:
+        raise EvidenceInvalid(
+            "transport probe same-level command predates initial conditioning"
+        )
+    if command_host_after_ns > initiating_refill_completion_ns:
+        raise EvidenceInvalid(
+            "transport probe same-level command did not complete while the "
+            "initiating metadata batch refill was in flight"
+        )
+
+
 def _bind_batch_counter_schedule(
     frames: Sequence[_DeferredFrame],
     command: StimulusCommand,
@@ -1439,22 +1470,6 @@ def _capacity_policy(
     }
 
 
-def _status_is_idle(status: Mapping[str, Any], *, label: str) -> None:
-    required = {
-        "state": int(TandemState.IDLE),
-        "fault_flags": 0,
-        "overflow_count": 0,
-        "fifo_level": 0,
-    }
-    for name, expected in required.items():
-        value = status.get(name)
-        if isinstance(value, bool) or not isinstance(value, int) or value != expected:
-            raise EvidenceInvalid(
-                f"transport probe {label} tandem {name} is {value!r}, "
-                f"expected {expected}"
-            )
-
-
 _FIFO_NORMALIZATION_POLICY = (
     "while fully muted, an ABI-2 HOLD MetadataBuffer open/close may normalize only "
     "a stale FIFO on an otherwise safe unowned IDLE controller; construction "
@@ -1502,6 +1517,28 @@ def _safe_unowned_idle_status(
     if require_empty_fifo and fifo_level != 0:
         raise EvidenceInvalid(
             f"transport probe {label} FIFO remains nonempty at {fifo_level}"
+        )
+    return normalized
+
+
+def _safe_completed_weak_session_status(
+    status: Mapping[str, Any], *, label: str, require_zero_transitions: bool = True
+) -> dict[str, int]:
+    """Require complete post-close ownership and optional success invariants."""
+
+    normalized = _safe_unowned_idle_status(
+        status, require_empty_fifo=True, label=label
+    )
+    if require_zero_transitions and normalized["transition_count"] != 0:
+        raise EvidenceInvalid(
+            f"transport probe {label} transition count is "
+            f"{normalized['transition_count']}, expected 0"
+        )
+    rx1 = normalized["rx1_gain_index"]
+    rx2 = normalized["rx2_gain_index"]
+    if rx1 != rx2 or not 0 <= rx1 <= 0x7F:
+        raise EvidenceInvalid(
+            f"transport probe {label} endpoint is not a paired 7-bit gain index"
         )
     return normalized
 
@@ -1850,6 +1887,17 @@ def _run_probe_body(
                     check_deadline()
                     frame = worker.take()
                     retained.append(frame)
+                initiating_refill_completion_ns = int(
+                    retained[0].record["refill_monotonic_ns"]
+                )
+                _validate_batch_host_chronology(
+                    initial_host_after_ns=initial.host_after_ns,
+                    command_host_before_ns=unbound_command.host_before_ns,
+                    command_host_after_ns=unbound_command.host_after_ns,
+                    initiating_refill_completion_ns=(
+                        initiating_refill_completion_ns
+                    ),
+                )
                 command, counter_bracket = _bind_batch_counter_schedule(
                     retained, unbound_command, raw_schedule, probe
                 )
@@ -1908,6 +1956,9 @@ def _run_probe_body(
                         "public_refill_calls": probe.batch_frames,
                         "cached_replay_refill_calls": probe.batch_frames - 1,
                         "batch_cache_fully_replayed": True,
+                        "initiating_refill_completion_monotonic_ns": (
+                            initiating_refill_completion_ns
+                        ),
                     }
                 )
             except BaseException as error:  # noqa: BLE001
@@ -1997,8 +2048,11 @@ def _run_probe_body(
     except BaseException as error:  # noqa: BLE001
         post_session_errors.append(error)
     try:
-        status_after = _wait_for_idle(radio, monotonic=monotonic, sleep=sleep)
-        _status_is_idle(status_after, label="after")
+        status_after = _safe_completed_weak_session_status(
+            _wait_for_idle(radio, monotonic=monotonic, sleep=sleep),
+            label="post-session status",
+            require_zero_transitions=session_error is None,
+        )
         report["tandem_status_after"] = status_after
     except BaseException as error:  # noqa: BLE001
         post_session_errors.append(error)
@@ -2076,11 +2130,6 @@ def _required_number(value: Any, *, name: str) -> float:
 
 def _json_domain(value: Any) -> Any:
     return json.loads(json.dumps(value, allow_nan=False))
-
-
-def _validate_idle_report_status(value: Any, *, name: str) -> None:
-    status = _required_mapping(value, name=name)
-    _status_is_idle(status, label=name)
 
 
 def _validate_report_unowned_idle_status(
@@ -3409,6 +3458,7 @@ def _validate_transient_transport_probe_report_impl(
         "public_refill_calls",
         "cached_replay_refill_calls",
         "batch_cache_fully_replayed",
+        "initiating_refill_completion_monotonic_ns",
         "worker_in_flight_at_command",
         "worker_in_flight_before_shutdown",
         "cancel_required",
@@ -3432,6 +3482,20 @@ def _validate_transient_transport_probe_report_impl(
     )
     post_open_raw = _required_int(
         acquisition.get("post_open_baseline_raw"), name="post_open_baseline_raw"
+    )
+    initiating_refill_completion_ns = _required_int(
+        acquisition.get("initiating_refill_completion_monotonic_ns"),
+        name="initiating_refill_completion_monotonic_ns",
+    )
+    frame_zero_refill_completion_ns = _required_int(
+        _required_mapping(frames[0], name="frame zero").get("refill_monotonic_ns"),
+        name="frame zero refill_monotonic_ns",
+    )
+    _validate_batch_host_chronology(
+        initial_host_after_ns=initial_host_after,
+        command_host_before_ns=command.host_before_ns,
+        command_host_after_ns=command.host_after_ns,
+        initiating_refill_completion_ns=initiating_refill_completion_ns,
     )
     command_bracket = _required_mapping(
         _required_mapping(
@@ -3462,6 +3526,7 @@ def _validate_transient_transport_probe_report_impl(
         or acquisition.get("public_refill_calls") != probe.batch_frames
         or acquisition.get("cached_replay_refill_calls") != probe.batch_frames - 1
         or acquisition.get("batch_cache_fully_replayed") is not True
+        or initiating_refill_completion_ns != frame_zero_refill_completion_ns
         or acquisition.get("worker_in_flight_at_command") is not True
         or acquisition.get("worker_in_flight_before_shutdown") is not False
         or acquisition.get("cancel_required") is not False
@@ -3483,8 +3548,17 @@ def _validate_transient_transport_probe_report_impl(
         raise EvidenceInvalid(
             "transport probe initial status differs from FIFO normalization"
         )
-    _validate_idle_report_status(report.get("tandem_status_before"), name="before")
-    _validate_idle_report_status(report.get("tandem_status_after"), name="after")
+    _validate_report_unowned_idle_status(
+        report.get("tandem_status_before"),
+        name="pre-session status",
+        require_empty_fifo=True,
+    )
+    _safe_completed_weak_session_status(
+        _required_mapping(
+            report.get("tandem_status_after"), name="post-session status"
+        ),
+        label="post-session status",
+    )
     final_rx = _required_mapping(report.get("final_rx_state"), name="final_rx_state")
     if final_rx.get("modes") != ["manual", "manual"]:
         raise EvidenceInvalid("transport probe final RX mode is not manual")
@@ -3623,6 +3697,7 @@ def run_transient_transport_probe(
             "public_refill_calls": 0,
             "cached_replay_refill_calls": 0,
             "batch_cache_fully_replayed": False,
+            "initiating_refill_completion_monotonic_ns": None,
             "worker_in_flight_at_command": False,
             "worker_in_flight_before_shutdown": False,
             "cancel_required": False,
