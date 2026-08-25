@@ -1680,6 +1680,26 @@ def _transient_ordinary_errors(
     def finite_number(value: Any) -> bool:
         return _release_finite_number(value)
 
+    def command_rx_state_valid(
+        value: Any,
+        *,
+        expected_mode: str,
+        require_manual_gain: bool,
+    ) -> bool:
+        if not isinstance(value, Mapping) or set(value) != {"modes", "gains_db"}:
+            return False
+        gains = value.get("gains_db")
+        if (
+            value.get("modes") != [expected_mode, expected_mode]
+            or not isinstance(gains, list)
+            or len(gains) != 2
+            or any(not finite_number(gain) for gain in gains)
+        ):
+            return False
+        return not require_manual_gain or all(
+            abs(float(gain) - quality.manual_gain_db) <= 0.1 for gain in gains
+        )
+
     def command_from_report(record: Mapping[str, Any]) -> StimulusCommand:
         return StimulusCommand(
             command_id=record["command_id"],
@@ -2004,6 +2024,22 @@ def _transient_ordinary_errors(
                     f"{context} command violates the 30 dB effective-attenuation "
                     "boundary"
                 )
+        for command_index, command in enumerate(commands):
+            command_expected_mode = (
+                "manual" if command_index == 0 else expected_iio_mode
+            )
+            require_manual_gain = command_expected_mode == "manual"
+            for state_name in ("rx_state_before", "rx_state_after"):
+                if not command_rx_state_valid(
+                    command.get(state_name),
+                    expected_mode=command_expected_mode,
+                    require_manual_gain=require_manual_gain,
+                ):
+                    errors.append(
+                        f"{context} {command.get('command_id', command_index)} "
+                        f"{state_name} does not prove the required RX state"
+                    )
+                    command_records_valid = False
         attack_lower = baseline[-1].get("sample_end_exclusive")
         attack_upper = attack[0].get("sample_end_exclusive")
         release_lower = attack[-1].get("sample_end_exclusive")

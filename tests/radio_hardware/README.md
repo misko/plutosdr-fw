@@ -73,6 +73,10 @@ comparison interface. `slow_attack` and `fast_attack` are the autonomous
 release-native modes. The release-default steady-state, transient, and
 modulated matrices therefore contain manual, native slow-attack, native
 fast-attack, and tandem-auto cells; they deliberately exclude native hybrid.
+Before entering either native mode, the runner arms the tone and applies and
+reads back the weakest authorized TX2 rung while RX remains in manual mode.
+This prevents fast attack from locking on a muted input and carrying a prior
+run's retained lock level into the new trajectory.
 
 Selecting `hybrid` explicitly remains supported for exploratory comparisons,
 but its result is **quality-only evidence**, not an autonomous AGC or release

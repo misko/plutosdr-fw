@@ -1634,6 +1634,18 @@ def test_report_retains_immediate_iq_gain_and_tandem_event_evidence(
     assert report["comparison"][0]["attack"]["maximum_post_clipping_fraction"] == 0.0
 
 
+def test_native_transient_preloads_weak_stimulus_before_agc_entry(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+
+    _run_fake(radio, _quality(tmp_path))
+
+    for native_mode in AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES:
+        entry = radio.operations.index(("configure_rx", native_mode, None))
+        assert radio.operations[entry - 1] == ("set_tx2_gain", -60.0)
+
+
 def test_host_writes_have_bounded_sample_intervals_and_initial_is_unanchored(
     tmp_path: Path,
 ) -> None:

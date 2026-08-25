@@ -4798,19 +4798,10 @@ def _run_mode_body(
     radio.arm_tx2_tone(tone_hz=quality.tone_hz, scale=quality.dds_scale)
 
     native_iio_mode = native_gain_control_mode(mode)
-    if native_iio_mode is not None:
-        radio.configure_rx(native_iio_mode)
-        expected_iio_mode = native_iio_mode
-    elif mode == MODE_MANUAL or mode == MODE_TANDEM:
-        expected_iio_mode = "manual"
-    else:
+    if native_iio_mode is None and mode != MODE_MANUAL:
         raise ValueError(f"unknown transient mode {mode!r}")
 
-    initial_gain_state_before = (
-        None
-        if mode == MODE_TANDEM
-        else _rx_state(radio, expected_mode=expected_iio_mode)
-    )
+    initial_gain_state_before = _rx_state(radio, expected_mode="manual")
     initial_unanchored = timestamp_stimulus_command(
         "weak_initial",
         capture.weak_stimulus_tx_gain_db,
@@ -4820,16 +4811,18 @@ def _run_mode_body(
         readback_tolerance_db=capture.readback_tolerance_db,
     )
     initial_effective = _check_effective_attenuation(quality, initial_unanchored)
-    initial_gain_state_after = (
-        None
-        if mode == MODE_TANDEM
-        else _rx_state(radio, expected_mode=expected_iio_mode)
-    )
+    initial_gain_state_after = _rx_state(radio, expected_mode="manual")
+    if native_iio_mode is not None:
+        # Preload the actual weak stimulus before entering native AGC.  Fast
+        # attack may otherwise lock on the muted state and retain a prior run's
+        # lock level through this trajectory.
+        radio.configure_rx(native_iio_mode)
+        expected_iio_mode = native_iio_mode
+    else:
+        expected_iio_mode = "manual"
 
-    request = _build_tandem_request(quality, capture) if mode == MODE_TANDEM else None
-    timing_basis = (
-        _TANDEM_TIMING_BASIS if mode == MODE_TANDEM else _ORDINARY_TIMING_BASIS
-    )
+    request = None
+    timing_basis = _ORDINARY_TIMING_BASIS
     record: dict[str, Any] = {
         "mode": mode,
         "timing_basis": timing_basis,

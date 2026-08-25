@@ -286,6 +286,9 @@ def test_run_mode_programs_each_selected_native_iio_mode(
         operation[1] for operation in radio.operations if operation[0] == "configure_rx"
     ]
     assert configured == ["manual", iio_mode, "manual"]
+    weakest_command = radio.operations.index(("set_tx2_gain", -60.0))
+    native_entry = radio.operations.index(("configure_rx", iio_mode, None))
+    assert weakest_command < native_entry
 
 
 def test_multi_native_evaluator_reports_every_mode_and_keeps_legacy_reference() -> None:

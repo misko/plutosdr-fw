@@ -1401,6 +1401,13 @@ def test_production_validator_rejects_planted_v2_contract_mutations(
             "planted restore failure"
         )
 
+    def ordinary_initial_rx_state(report: dict[str, Any]) -> None:
+        mode = next(
+            item for item in report["modes"] if item["mode"] == "native_fast_attack"
+        )
+        initial = mode["commands"][0]
+        initial["rx_state_before"]["modes"] = ["fast_attack", "fast_attack"]
+
     mutations = [
         ("frozen target", target),
         ("pre-start chronology", frozen_chronology),
@@ -1462,6 +1469,7 @@ def test_production_validator_rejects_planted_v2_contract_mutations(
         ("bench mapping", bench_mapping),
         ("cleanup unknown field", cleanup_unknown_field),
         ("final RX state unknown field", final_rx_state_unknown_field),
+        ("ordinary initial RX state", ordinary_initial_rx_state),
     ]
     for label, mutate in mutations:
         planted = json.loads(json.dumps(valid_report))

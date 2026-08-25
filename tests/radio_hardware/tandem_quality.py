@@ -815,9 +815,7 @@ def _run_mode(
     metadata = mode == MODE_TANDEM
     request: Optional[bytes] = None
     native_iio_mode = native_gain_control_mode(mode)
-    if native_iio_mode is not None:
-        radio.configure_rx(native_iio_mode)
-    elif mode == MODE_TANDEM:
+    if native_iio_mode is None and mode == MODE_TANDEM:
         request = build_tandem_request(
             mode=TandemMode.AUTO,
             initial_gain_db=int(options.manual_gain_db),
@@ -830,10 +828,16 @@ def _run_mode(
             small_adc_overload_threshold=(options.tandem_small_adc_overload_threshold),
             samples_per_channel=options.samples_per_channel,
         )
-    elif mode != MODE_MANUAL:
+    elif native_iio_mode is None and mode != MODE_MANUAL:
         raise ValueError(f"unknown quality mode {mode!r}")
 
     first_readback = radio.set_tx2_gain(options.tx_gain_trajectory_db[0])
+    if native_iio_mode is not None:
+        # Enter autonomous native AGC with the real weakest-rung stimulus
+        # already present.  Fast attack may retain its prior lock level and
+        # disallow gain increases after lock; entering it while TX2 is still
+        # muted therefore makes later cells depend on earlier campaign runs.
+        radio.configure_rx(native_iio_mode)
     mode_record: dict[str, Any] = {
         "mode": mode,
         "tandem_status_before": before,
