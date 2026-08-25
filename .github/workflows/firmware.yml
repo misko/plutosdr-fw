@@ -55,7 +55,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: ab270f9e3128187372f27de887be65353f9e195d
+          ref: 1bbe9f0ee4a70374964804de09b7503da260b059
           path: usb-gadget
           persist-credentials: false
       - name: Check out pinned IP gadget source
@@ -79,7 +79,7 @@ jobs:
           ctest --test-dir usb-gadget/build-tests --output-on-failure
           count=$(ctest --test-dir usb-gadget/build-tests -N |
             sed -n 's/^Total Tests: //p')
-          test "${count:-0}" -eq 15
+          test "${count:-0}" -eq 16
           cmake --install usb-gadget/build-tests
       - name: Build and test the direct-IP implementation
         run: |

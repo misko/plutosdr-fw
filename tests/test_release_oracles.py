@@ -112,3 +112,36 @@ def test_required_hdl_simulation_uses_final_timestamp_source() -> None:
     assert checkout is not None
     assert checkout.group(1) == values["submodule_hdl_quantulum"]
     assert "./run_timestamp_check_pipeline.sh" in workflow
+
+
+def test_required_usb_gadget_job_uses_final_source_and_complete_suite() -> None:
+    values = _manifest_values(FINAL_SOURCE_MANIFEST)
+    workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
+    usb_job = re.search(
+        r"- name: Check out pinned USB gadget source(?P<body>.*?)"
+        r"- name: Build and test the direct-IP implementation",
+        workflow,
+        flags=re.DOTALL,
+    )
+
+    assert usb_job is not None
+    body = usb_job.group("body")
+    checkout = re.search(
+        r"repository:\s*misko/plutosdr-fw\s*\n\s*"
+        r"ref:\s*([0-9a-f]{40})",
+        body,
+    )
+    asserted_count = re.search(
+        r'test "\$\{count:-0\}" -eq ([0-9]+)',
+        body,
+    )
+
+    assert checkout is not None
+    assert checkout.group(1) == values["gadget_source"]
+    assert "ctest --test-dir usb-gadget/build-tests --output-on-failure" in body
+    assert asserted_count is not None
+
+    cmake = _git("show", f"{values['gadget_source']}:CMakeLists.txt", cwd=ROOT)
+    suite_count = len(re.findall(r"(?m)^\s*add_test\s*\(", cmake))
+    assert suite_count > 0
+    assert int(asserted_count.group(1)) == suite_count
