@@ -201,6 +201,13 @@ def test_required_hdl_simulation_uses_final_timestamp_source() -> None:
     assert "./run_timestamp_check_pipeline.sh" in workflow
 
 
+def test_required_pr_gate_runs_root_tandem_rtl_suite() -> None:
+    workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "iverilog python3-numpy python3-pytest" in workflow
+    assert "./hdl-tandem/run_tests.sh" in workflow
+
+
 def test_required_usb_gadget_job_uses_final_source_and_complete_suite() -> None:
     values = _manifest_values(FINAL_SOURCE_MANIFEST)
     workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")

@@ -194,6 +194,7 @@ module tandem_agc_core #(
   reg [1:0] fire_dir;              // latched direction for the pulse in flight
   reg       fire_req;
   reg [1:0] req_dir;
+  wire      pulse_pending = fire_req || pulse_busy;
 
   always @(posedge l_clk) begin
     if (!l_resetn) begin
@@ -255,8 +256,15 @@ module tandem_agc_core #(
   reg [3:0]  evt_reason;
   reg        evt_push;
 
-  wire may_decide = (state == ST_ACTIVE) && !blanked && !cooldown_active
-                    && !pulse_busy && (fault == 8'd0);
+  // `fire_req` is registered one cycle before the pulse generator raises
+  // `pulse_busy`.  Treat that handoff cycle as busy too.  Without this guard a
+  // zero-period cooldown can accept a second decision, advance the expected
+  // index twice, and still emit only the first physical AD9361 pulse.  Gate on
+  // the live AUTO request as well, so the edge withdrawing AUTO cannot accept
+  // a final command before the lifecycle state catches up.
+  wire may_decide = (state == ST_ACTIVE) && (mode_req == 2'd2)
+                    && !blanked && !cooldown_active && !pulse_pending
+                    && (fault == 8'd0);
 
   always @(posedge l_clk) begin
     if (!l_resetn) begin
@@ -336,7 +344,7 @@ module tandem_agc_core #(
   // synchronisation check, §6.2 quiescence rule
   // ---------------------------------------------------------------------------
   reg mismatch_seen;
-  wire quiescent = !pulse_busy && !cooldown_active;
+  wire quiescent = !pulse_pending && !cooldown_active;
   always @(posedge l_clk) begin
     if (!l_resetn) begin
       mismatch_seen <= 1'b0; cnt_stale <= 8'd0;
@@ -420,7 +428,7 @@ module tandem_agc_core #(
         ST_ACTIVE:
           if (fault != 8'd0)            state <= ST_DISARMING;
           else if (mode_req == 2'd0)    state <= ST_DISARMING;
-          else if (mode_req == 2'd1 && !pulse_busy)
+          else if (mode_req == 2'd1 && !pulse_pending)
                                             state <= ST_OWNED_IDLE;
         ST_DISARMING:
           if (!pulse_busy && mode_req != 2'd0 && fault == 8'd0)

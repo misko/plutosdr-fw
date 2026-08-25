@@ -271,7 +271,66 @@ module tb_tandem_agc_stress;
       stop;
     end
 
-    // -- 9. software/FPGA index mismatch under the quiescence rule ---------
+    // -- 9. zero cooldown must still issue exactly one decision per pulse ---
+    begin : zero_cooldown
+      reg [7:0] transitions0;
+      reg [31:0] accepted0;
+      cfg_cooldown = 8'd0;
+      cfg_idx_min = 8'd30;
+      rx1_level = -16'sd62; rx2_level = -16'sd62;
+      go(2'd2);
+      tick(40);
+      transitions0 = cnt_trans;
+      accepted0 = m_acc;
+      rx1_level = -16'sd25; rx2_level = -16'sd25;
+      tick(300);
+      check(expected_index == m_rx1 && expected_index == m_rx2,
+            "zero cooldown keeps the expected and physical indices equal");
+      check((cnt_trans - transitions0) == (m_acc - accepted0),
+            "zero cooldown accepts exactly one transition per physical pulse");
+      stop;
+
+      // Linux uses HOLD as the pulse-quiescence barrier before comparing the
+      // FPGA's expected index with the two AD9361 SPI readbacks.  Request it in
+      // the registered fire-request handoff cycle and prove it is not exposed
+      // until the physical pulse has completed.
+      cfg_idx_min = 8'd0;
+      rx1_level = -16'sd62; rx2_level = -16'sd62;
+      go(2'd2);
+      rx1_level = -16'sd25; rx2_level = -16'sd25;
+      wait (core.fire_req);
+      mode_req = 2'd1;
+      @(posedge l_clk); #1;
+      check(state == 3'd3 && pulse_busy,
+            "HOLD remains ACTIVE while a queued pulse starts");
+      wait (!core.fire_req && !pulse_busy);
+      tick(2);
+      check(state == 3'd2,
+            "HOLD becomes visible only after the queued pulse completes");
+      stop;
+
+      // A mode request can change in the cycle before the lifecycle FSM leaves
+      // ACTIVE.  Once AUTO is withdrawn, that edge must not accept a new gain
+      // decision even if a detector remains asserted.
+      rx1_level = -16'sd62; rx2_level = -16'sd62;
+      go(2'd2);
+      rx1_level = -16'sd25; rx2_level = -16'sd25;
+      wait (core.want_decrease && !core.pulse_pending && !core.blanked);
+      @(negedge l_clk);
+      transitions0 = cnt_trans;
+      mode_req = 2'd1;
+      @(posedge l_clk); #1;
+      check(cnt_trans == transitions0 && !core.fire_req && !pulse_busy,
+            "withdrawing AUTO cannot accept a final unrequested pulse");
+      tick(2);
+      check(state == 3'd2, "withdrawn AUTO reaches quiescent HOLD");
+      stop;
+      cfg_cooldown = 8'd2;
+      cfg_idx_min = 8'd0;
+      tick(4);
+    end
+
+    // -- 10. software/FPGA index mismatch under the quiescence rule --------
     begin : mismatch
       go(2'd2);
       rx1_level = -16'sd62; rx2_level = -16'sd62;   // hold band, so it is quiet
