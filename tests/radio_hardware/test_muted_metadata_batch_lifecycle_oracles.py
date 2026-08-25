@@ -1,7 +1,12 @@
 import copy
+import errno
 import fcntl
 import hashlib
 import json
+import pathlib
+import struct
+import subprocess
+import zlib
 from dataclasses import replace
 from types import SimpleNamespace
 
@@ -9,23 +14,34 @@ import pytest
 
 from . import muted_metadata_batch_lifecycle as lifecycle
 from .metadata_abi import (
-    FEATURE_AD9361_TEMPERATURE,
-    FEATURE_FPGA_GAIN_EVENTS,
     FEATURE_HARDWARE_SAMPLE_COUNTER,
-    FEATURE_TANDEM_METADATA,
-    FLAG_HARDWARE_SAMPLE_COUNTER_VALID,
     FLAG_SAMPLE_SEQUENCE_VALID,
-    FLAG_TANDEM_METADATA_VALID,
+    GAIN_EVENT_BYTES,
+    GAIN_OBSERVATION_BYTES,
+    METADATA_MAGIC,
+    TANDEM_V5_EXTENSION,
+    V5_PREFIX_BYTES,
     TandemFrameMetadata,
     TandemGainTable,
     TandemState,
 )
 from .muted_metadata_batch_lifecycle import (
     BATCH_FRAMES,
+    CENTER_FREQUENCY_HZ,
+    EXACT_HOLD_METADATA_FLAGS,
     EXACT_LIBIIO_COMMIT,
+    EXACT_METADATA_FEATURES,
     EXPECTED_BATCH_CACHE_BYTES,
+    EXPECTED_FIRMWARE_PATTERN,
+    EXPECTED_FIRMWARE_VERSION,
+    EXPECTED_HARDWARE_MODEL,
+    EXPECTED_KERNEL_VERSION,
     FRAME_SAMPLES,
+    HOLD_GAIN_DB,
+    RAW_METADATA_BYTES,
+    RF_BANDWIDTH_HZ,
     RX_SCAN_FORMAT,
+    SAMPLE_RATE_HZ,
     QualificationError,
     _atomic_json,
     _attest_mapped_libiio,
@@ -37,6 +53,31 @@ from .muted_metadata_batch_lifecycle import (
     validate_durable_pass_report,
     validate_full_drain_frames,
 )
+
+
+@pytest.fixture(autouse=True)
+def _attested_in_progress_runner_tree(monkeypatch):
+    """Model the eventual committed blobs while this frozen patch is uncommitted."""
+
+    repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
+    original = lifecycle._git_bytes
+    protected = {
+        "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
+        "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
+        "tests/radio_hardware/metadata_abi.py",
+    }
+
+    def fake_git(observed_repository, *arguments):
+        if pathlib.Path(observed_repository) == repository:
+            if arguments == ("status", "--porcelain", "--untracked-files=no"):
+                return b""
+            if arguments and arguments[0] == "show":
+                relative = arguments[1].split(":", 1)[1]
+                if relative in protected:
+                    return (repository / relative).read_bytes()
+        return original(observed_repository, *arguments)
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", fake_git)
 
 
 def _hold_status(epoch=11):
@@ -87,6 +128,28 @@ def _rx():
     return {"modes": ["manual", "manual"], "gains_db": [40.0, 40.0]}
 
 
+def _boot_rx():
+    return {"modes": ["slow_attack", "slow_attack"], "gains_db": [71.0, 71.0]}
+
+
+def _rf(*, normalized=True):
+    lo = CENTER_FREQUENCY_HZ if normalized else 2_400_000_000
+    tx_lo = CENTER_FREQUENCY_HZ if normalized else 2_450_000_000
+    rate = SAMPLE_RATE_HZ if normalized else 30_720_000
+    bandwidth = RF_BANDWIDTH_HZ if normalized else 18_000_000
+    return {
+        "rx_lo_hz": lo,
+        "tx_lo_hz": tx_lo,
+        "channels": {
+            role: {
+                "sampling_frequency_hz": rate,
+                "rf_bandwidth_hz": bandwidth,
+            }
+            for role in ("rx0", "rx1", "tx0", "tx1")
+        },
+    }
+
+
 def _scan_evidence():
     return {
         "enabled_channel_ids": [
@@ -106,6 +169,351 @@ def _scan_evidence():
             for index in range(4)
         ],
     }
+
+
+class _Attribute:
+    def __init__(self, value, *, label, writes, readback_offset=0):
+        self._value = str(value)
+        self.label = label
+        self.writes = writes
+        self.readback_offset = readback_offset
+
+    @property
+    def value(self):
+        return self._value
+
+    @value.setter
+    def value(self, requested):
+        self.writes.append((self.label, str(requested)))
+        try:
+            self._value = str(float(requested) + self.readback_offset)
+        except ValueError:
+            self._value = str(requested)
+
+
+class _Channel:
+    def __init__(self, channel_id, output, attrs):
+        self.id = channel_id
+        self.output = output
+        self.attrs = attrs
+
+
+class _Device:
+    def __init__(self, device_id, channels, *, writes, registers=None):
+        self.id = device_id
+        self.channels = channels
+        self.attrs = {}
+        self.writes = writes
+        self.registers = dict(registers or {})
+
+    def find_channel(self, channel_id, output):
+        return next(
+            (
+                channel
+                for channel in self.channels
+                if channel.id == channel_id and channel.output is output
+            ),
+            None,
+        )
+
+    def reg_read(self, address):
+        return self.registers.get(address, 0)
+
+    def reg_write(self, address, value):
+        self.writes.append((f"register:{address:#x}", str(value)))
+        self.registers[address] = value
+
+
+def _attr(value, label, writes, *, readback_offset=0):
+    return _Attribute(
+        value, label=label, writes=writes, readback_offset=readback_offset
+    )
+
+
+def _hardware_state(*, tx_gain=-80.0, tx_lo_readback_offset=0):
+    writes = []
+    phy_channels = []
+    for index in (0, 1):
+        phy_channels.append(
+            _Channel(
+                f"voltage{index}",
+                False,
+                {
+                    "gain_control_mode": _attr(
+                        "slow_attack", f"rx{index}:gain_control_mode", writes
+                    ),
+                    "hardwaregain": _attr(71.0, f"rx{index}:hardwaregain", writes),
+                    "sampling_frequency": _attr(
+                        30_720_000, f"rx{index}:sampling_frequency", writes
+                    ),
+                    "rf_bandwidth": _attr(
+                        18_000_000, f"rx{index}:rf_bandwidth", writes
+                    ),
+                },
+            )
+        )
+        phy_channels.append(
+            _Channel(
+                f"voltage{index}",
+                True,
+                {
+                    "hardwaregain": _attr(tx_gain, f"tx{index}:hardwaregain", writes),
+                    "sampling_frequency": _attr(
+                        30_720_000, f"tx{index}:sampling_frequency", writes
+                    ),
+                    "rf_bandwidth": _attr(
+                        18_000_000, f"tx{index}:rf_bandwidth", writes
+                    ),
+                },
+            )
+        )
+    phy_channels.extend(
+        [
+            _Channel(
+                "altvoltage0",
+                True,
+                {"frequency": _attr(2_400_000_000, "rx_lo:frequency", writes)},
+            ),
+            _Channel(
+                "altvoltage1",
+                True,
+                {
+                    "frequency": _attr(
+                        2_450_000_000,
+                        "tx_lo:frequency",
+                        writes,
+                        readback_offset=tx_lo_readback_offset,
+                    )
+                },
+            ),
+        ]
+    )
+    phy = _Device("ad9361-phy", phy_channels, writes=writes)
+    dds_channels = [
+        _Channel(
+            f"altvoltage{index}",
+            True,
+            {
+                "raw": _attr(0, f"dds{index}:raw", writes),
+                "scale": _attr(0, f"dds{index}:scale", writes),
+            },
+        )
+        for index in range(8)
+    ]
+    registers = {lifecycle._selector_address(index): 3 for index in range(4)} | {
+        lifecycle._legacy_address(index): 0 for index in range(4)
+    }
+    tx = _Device("dds", dds_channels, writes=writes, registers=registers)
+    tandem = SimpleNamespace(
+        id="tandem-agc",
+        attrs={
+            name: SimpleNamespace(value=str(value))
+            for name, value in _idle_status(65).items()
+        },
+    )
+    context = SimpleNamespace(
+        attrs={
+            "hw_model": EXPECTED_HARDWARE_MODEL,
+            "hw_serial": lifecycle.DEFAULT_R18_SERIAL,
+            "fw_version": EXPECTED_FIRMWARE_VERSION,
+            "ad9361-phy,model": "ad9361",
+            "local,kernel": EXPECTED_KERNEL_VERSION,
+            "uri": "usb:3.21.5",
+            "iio,buffer-metadata": "2",
+        }
+    )
+    return context, phy, tx, tandem, writes
+
+
+def test_safe_preflight_accepts_cold_rc3_rx_rf_without_writes():
+    context, phy, tx, tandem, writes = _hardware_state()
+    result = lifecycle._preflight(
+        context,
+        phy,
+        tx,
+        tandem,
+        serial=lifecycle.DEFAULT_R18_SERIAL,
+        uri="usb:3.21.5",
+        firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+    )
+    assert result["rx_state"] == _boot_rx()
+    assert result["rf_state"] == _rf(normalized=False)
+    assert result["configuration_write_count"] == 0
+    assert result["metadata_buffer_open_count"] == 0
+    assert writes == []
+
+
+def test_safe_preflight_rejects_unmuted_tx_without_writes():
+    context, phy, tx, tandem, writes = _hardware_state(tx_gain=-70.0)
+    with pytest.raises(QualificationError, match="already muted"):
+        lifecycle._preflight(
+            context,
+            phy,
+            tx,
+            tandem,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            uri="usb:3.21.5",
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+        )
+    assert writes == []
+
+
+@pytest.mark.parametrize("gain", [float("nan"), float("inf")])
+def test_safe_preflight_rejects_nonfinite_mute_without_writes(gain):
+    context, phy, tx, tandem, writes = _hardware_state(tx_gain=gain)
+    with pytest.raises(QualificationError, match="already muted"):
+        lifecycle._preflight(
+            context,
+            phy,
+            tx,
+            tandem,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            uri="usb:3.21.5",
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+        )
+    assert writes == []
+
+
+def test_safe_preflight_rejects_nonfinite_dds_without_writes():
+    context, phy, tx, tandem, writes = _hardware_state()
+    tx.find_channel("altvoltage0", True).attrs["scale"]._value = "nan"
+    with pytest.raises(QualificationError, match="already muted"):
+        lifecycle._preflight(
+            context,
+            phy,
+            tx,
+            tandem,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            uri="usb:3.21.5",
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+        )
+    assert writes == []
+
+
+def test_force_mute_rejects_nonfinite_write_readback_before_normalization():
+    context, phy, tx, tandem, writes = _hardware_state()
+    preflight = lifecycle._preflight(
+        context,
+        phy,
+        tx,
+        tandem,
+        serial=lifecycle.DEFAULT_R18_SERIAL,
+        uri="usb:3.21.5",
+        firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+    )
+    phy.find_channel("voltage0", True).attrs["hardwaregain"].readback_offset = float(
+        "nan"
+    )
+    with pytest.raises(QualificationError, match="finite|muted|readback"):
+        lifecycle._normalize_before_hold(phy, tx, tandem, preflight=preflight)
+    assert not any("frequency" in label for label, _ in writes)
+
+
+def test_normalization_is_ordered_after_mute_and_before_any_buffer():
+    context, phy, tx, tandem, writes = _hardware_state()
+    preflight = lifecycle._preflight(
+        context,
+        phy,
+        tx,
+        tandem,
+        serial=lifecycle.DEFAULT_R18_SERIAL,
+        uri="usb:3.21.5",
+        firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+    )
+    result = lifecycle._normalize_before_hold(phy, tx, tandem, preflight=preflight)
+    assert result["metadata_buffer_open_count_before"] == 0
+    assert result["metadata_buffer_open_count_after"] == 0
+    assert [
+        (item["target"], item["attribute"], item["requested"])
+        for item in result["operations"]
+    ] == [item[:3] for item in lifecycle._normalization_operation_contract()]
+    first_lo_write = writes.index(("rx_lo:frequency", str(CENTER_FREQUENCY_HZ)))
+    assert all(
+        any(label == expected for label, _ in writes[:first_lo_write])
+        for expected in ("tx0:hardwaregain", "tx1:hardwaregain", "dds0:raw")
+    )
+    assert result["rf_state_after"] == _rf()
+    assert result["rx_state_after"] == _rx()
+
+
+def test_normalization_rejects_missing_tx_lo_readback():
+    context, phy, tx, tandem, _writes = _hardware_state(tx_lo_readback_offset=3)
+    preflight = lifecycle._preflight(
+        context,
+        phy,
+        tx,
+        tandem,
+        serial=lifecycle.DEFAULT_R18_SERIAL,
+        uri="usb:3.21.5",
+        firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+    )
+    with pytest.raises(QualificationError, match="readback"):
+        lifecycle._normalize_before_hold(phy, tx, tandem, preflight=preflight)
+
+
+def test_normalization_refuses_to_write_before_safe_preflight():
+    _context, phy, tx, tandem, writes = _hardware_state()
+    with pytest.raises(QualificationError, match="safe preflight"):
+        lifecycle._normalize_before_hold(phy, tx, tandem, preflight={"verdict": "FAIL"})
+    assert writes == []
+
+
+def test_cleanup_unknown_identity_is_read_only():
+    _context, phy, tx, tandem, writes = _hardware_state(tx_gain=-70.0)
+    report = {"cleanup": {"verified": False}}
+    errors = []
+    lifecycle._cleanup_live_state(
+        report,
+        phy=phy,
+        tx=tx,
+        tandem=tandem,
+        identity_verified=False,
+        safe_preflight_completed=False,
+        cleanup_errors=errors,
+    )
+    assert writes == []
+    assert report["cleanup"]["preflight_failed_without_writes"] is True
+
+
+def test_cleanup_exact_identity_unmuted_is_mute_only():
+    _context, phy, tx, tandem, writes = _hardware_state(tx_gain=-70.0)
+    report = {"cleanup": {"verified": False}}
+    errors = []
+    lifecycle._cleanup_live_state(
+        report,
+        phy=phy,
+        tx=tx,
+        tandem=tandem,
+        identity_verified=True,
+        safe_preflight_completed=False,
+        cleanup_errors=errors,
+    )
+    assert errors == []
+    assert report["cleanup"]["verified"] is True
+    assert not any("gain_control_mode" in label for label, _ in writes)
+    assert writes[0][0] == "tx0:hardwaregain"
+
+
+def test_cleanup_idle_failure_forbids_manual40(monkeypatch):
+    _context, phy, tx, tandem, writes = _hardware_state()
+    report = {"cleanup": {"verified": False}}
+    errors = []
+
+    def reject_idle(*_args, **_kwargs):
+        raise QualificationError("planted non-IDLE")
+
+    monkeypatch.setattr(lifecycle, "_wait_idle", reject_idle)
+    lifecycle._cleanup_live_state(
+        report,
+        phy=phy,
+        tx=tx,
+        tandem=tandem,
+        identity_verified=True,
+        safe_preflight_completed=True,
+        cleanup_errors=errors,
+    )
+    assert len(errors) == 2
+    assert not any("gain_control_mode" in label for label, _ in writes)
 
 
 class _ScanChannel:
@@ -259,17 +667,8 @@ def _frames():
     base = TandemFrameMetadata(
         version=5,
         header_bytes=3_256,
-        features=(
-            FEATURE_AD9361_TEMPERATURE
-            | FEATURE_FPGA_GAIN_EVENTS
-            | FEATURE_HARDWARE_SAMPLE_COUNTER
-            | FEATURE_TANDEM_METADATA
-        ),
-        flags=(
-            FLAG_HARDWARE_SAMPLE_COUNTER_VALID
-            | FLAG_SAMPLE_SEQUENCE_VALID
-            | FLAG_TANDEM_METADATA_VALID
-        ),
+        features=EXACT_METADATA_FEATURES,
+        flags=EXACT_HOLD_METADATA_FLAGS,
         stream_id=7,
         buffer_sequence=0,
         first_sample_sequence=123_456,
@@ -289,7 +688,7 @@ def _frames():
         tandem_fault_flags=0,
         tandem_transition_count=0,
         gain_table_id=TandemGainTable.MHZ_200_1300,
-        threshold_provenance=572_733_972,
+        threshold_provenance=lifecycle.EXPECTED_THRESHOLD_PROVENANCE,
         minimum_gain_db=0,
         maximum_gain_db=62,
         initial_gain_db=40,
@@ -308,6 +707,279 @@ def _frames():
         )
         for index in range(BATCH_FRAMES)
     ]
+
+
+_GAIN_OBSERVATION = struct.Struct("<QQIHBBbbHI")
+
+
+def _metadata_wire(metadata):
+    payload = bytearray(RAW_METADATA_BYTES)
+    struct.pack_into(
+        "<IHHIIQQQIIIHB",
+        payload,
+        0,
+        METADATA_MAGIC,
+        5,
+        RAW_METADATA_BYTES,
+        metadata.features,
+        metadata.flags,
+        metadata.stream_id,
+        metadata.buffer_sequence,
+        metadata.first_sample_sequence,
+        metadata.samples_per_channel,
+        metadata.iq_payload_bytes,
+        metadata.enabled_scan_mask,
+        metadata.sample_format,
+        metadata.channel_count,
+    )
+    struct.pack_into("<bbbbB", payload, 55, *(HOLD_GAIN_DB,) * 4, 0)
+    struct.pack_into("<IIII", payload, 60, 1_000, 1_000, 0xFFFFFFFF, 0xFFFFFFFF)
+    struct.pack_into("<HHHH", payload, 76, 100, 100, 100, 100)
+    struct.pack_into("<III", payload, 84, 1_000, 1_000, FRAME_SAMPLES // 4)
+    struct.pack_into(
+        "<HHHHHHII",
+        payload,
+        96,
+        metadata.observation_count,
+        metadata.observation_capacity,
+        GAIN_OBSERVATION_BYTES,
+        metadata.event_count,
+        metadata.event_capacity,
+        GAIN_EVENT_BYTES,
+        metadata.observation_overflow_count,
+        metadata.event_overflow_count,
+    )
+    TANDEM_V5_EXTENSION.pack_into(
+        payload,
+        124,
+        metadata.ownership_epoch,
+        int(metadata.tandem_state),
+        metadata.tandem_fault_flags,
+        metadata.tandem_transition_count,
+        int(metadata.gain_table_id),
+        metadata.threshold_provenance,
+        metadata.minimum_gain_db,
+        metadata.maximum_gain_db,
+        metadata.initial_gain_db,
+        metadata.minimum_gain_index,
+        metadata.maximum_gain_index,
+        metadata.rx1_gain_index,
+        metadata.rx2_gain_index,
+        metadata.ad9361_temperature_mdeg_c,
+        0,
+        0,
+        0,
+    )
+    for index in range(metadata.observation_count):
+        sample_before = metadata.first_sample_sequence + index * (FRAME_SAMPLES // 4)
+        _GAIN_OBSERVATION.pack_into(
+            payload,
+            V5_PREFIX_BYTES + index * GAIN_OBSERVATION_BYTES,
+            sample_before,
+            sample_before + 1,
+            1_000,
+            0x0003,
+            metadata.rx1_gain_index,
+            metadata.rx2_gain_index,
+            HOLD_GAIN_DB,
+            HOLD_GAIN_DB,
+            0,
+            0,
+        )
+    struct.pack_into("<I", payload, len(payload) - 4, 0)
+    struct.pack_into("<I", payload, len(payload) - 4, zlib.crc32(payload) & 0xFFFFFFFF)
+    return bytes(payload)
+
+
+class _IntegrationState:
+    def __init__(self, tandem, *, phy, writes):
+        self.tandem = tandem
+        self.phy = phy
+        self.writes = writes
+        self.active_buffer = None
+        self.open_count = 0
+        self.close_count = 0
+        self.kernel_buffer_counts = []
+        self.buffers = []
+        self.flip_tx_on_close = set()
+
+    def set_status(self, status):
+        for name, value in status.items():
+            self.tandem.attrs[name].value = str(value)
+
+
+class _IntegrationRx(_ScanRx):
+    def __init__(self, state):
+        super().__init__()
+        self.id = "cf-ad9361-lpc"
+        self.state = state
+
+    def set_kernel_buffers_count(self, count):
+        self.state.kernel_buffer_counts.append(count)
+
+
+class _IntegrationMetadataBuffer:
+    _iq = b"\x00" * lifecycle.EXPECTED_IQ_BYTES
+
+    def __init__(
+        self,
+        device,
+        samples_per_channel,
+        request,
+        *,
+        metadata_capacity,
+        batch_frames,
+    ):
+        state = device.state
+        if state.active_buffer is not None:
+            raise OSError(errno.EBUSY, "planted active metadata owner")
+        if (
+            samples_per_channel != FRAME_SAMPLES
+            or request != lifecycle._hold_request()
+            or metadata_capacity != lifecycle.METADATA_CAPACITY
+            or batch_frames != BATCH_FRAMES
+        ):
+            raise AssertionError("integration MetadataBuffer request changed")
+        state.open_count += 1
+        self.state = state
+        self.session_ordinal = state.open_count
+        self.batch_frames = batch_frames
+        self.batch_cache_bytes = EXPECTED_BATCH_CACHE_BYTES
+        self.stream_id = 6 + self.session_ordinal
+        self.ownership_epoch = 10 + self.session_ordinal
+        self.first_sample = (123_456, 9_000_000, 18_000_000)[self.session_ordinal - 1]
+        self.refill_count = 0
+        self.cancelled = False
+        self.closed = False
+        state.active_buffer = self
+        state.buffers.append(self)
+        state.writes.append((f"buffer{self.session_ordinal}:open", ""))
+        state.set_status(_hold_status(self.ownership_epoch))
+
+    def refill(self):
+        if self.cancelled or self.closed:
+            raise OSError(errno.EBADF, "planted poisoned metadata buffer")
+        if self.refill_count >= self.batch_frames:
+            raise OSError(errno.ENODATA, "planted batch exhausted")
+        metadata = replace(
+            _frames()[0],
+            stream_id=self.stream_id,
+            ownership_epoch=self.ownership_epoch,
+            buffer_sequence=self.refill_count,
+            first_sample_sequence=(
+                self.first_sample + self.refill_count * FRAME_SAMPLES
+            ),
+        )
+        self.refill_count += 1
+        return _metadata_wire(metadata)
+
+    def read(self):
+        if self.refill_count == 0 or self.closed:
+            raise OSError(errno.EBADF, "planted read without refill")
+        return self._iq
+
+    def cancel(self):
+        if self.closed:
+            raise OSError(errno.EBADF, "planted cancel after close")
+        self.cancelled = True
+
+    def close(self):
+        if self.closed:
+            return
+        self.closed = True
+        self.state.close_count += 1
+        self.state.writes.append((f"buffer{self.session_ordinal}:close", ""))
+        if self.session_ordinal in self.state.flip_tx_on_close:
+            for index in (0, 1):
+                channel = self.state.phy.find_channel(f"voltage{index}", True)
+                channel.attrs["hardwaregain"]._value = "-70.0"
+        if self.state.active_buffer is self:
+            self.state.active_buffer = None
+            self.state.set_status(_idle_status())
+
+
+class _IntegrationContext:
+    def __init__(self, attrs, devices):
+        self.attrs = attrs
+        self.devices = devices
+        self.closed = False
+        self.timeout_ms = None
+
+    def set_timeout(self, timeout_ms):
+        self.timeout_ms = timeout_ms
+
+    def find_device(self, device_id):
+        return self.devices.get(device_id)
+
+    def close(self):
+        self.closed = True
+
+
+class _IntegrationIio:
+    MetadataBuffer = _IntegrationMetadataBuffer
+
+    def __init__(self, context, pylibiio_path):
+        self._context = context
+        self.__file__ = str(pylibiio_path)
+
+    def scan_contexts(self):
+        return {
+            "usb:3.21.5": ("R18 offline integration " + lifecycle.DEFAULT_R18_SERIAL)
+        }
+
+    def Context(self, uri):
+        if uri != "usb:3.21.5":
+            raise AssertionError(f"unexpected integration URI {uri}")
+        return self._context
+
+
+def _normalization():
+    operations = []
+    clock = 1_100
+    for ordinal, (target, attribute, requested, tolerance) in enumerate(
+        lifecycle._normalization_operation_contract()
+    ):
+        operations.append(
+            {
+                "ordinal": ordinal,
+                "target": target,
+                "attribute": attribute,
+                "requested": requested,
+                "readback": requested
+                if isinstance(requested, str)
+                else float(requested),
+                "tolerance": tolerance,
+                "host_before_ns": clock,
+                "host_after_ns": clock + 1,
+            }
+        )
+        clock += 10
+    return {
+        "verified": True,
+        "policy": (
+            "safe preflight, complete mute barrier, then RF/RX normalization; "
+            "zero metadata buffers until every readback passes"
+        ),
+        "started_monotonic_ns": 1_050,
+        "mute_barrier_completed_monotonic_ns": 1_075,
+        "completed_monotonic_ns": 1_300,
+        "metadata_buffer_open_count_before": 0,
+        "metadata_buffer_open_count_after": 0,
+        "mute_barrier": _mute(),
+        "tandem_status_before": _idle_status(65),
+        "operations": operations,
+        "rf_state_after": _rf(),
+        "rx_state_after": _rx(),
+        "mute_after": _mute(),
+        "tandem_status_after": _idle_status(65),
+        "expected_gain_table": {
+            "selection_basis": "common RX/TX LO at or below 1300000000 Hz",
+            "center_frequency_hz": CENTER_FREQUENCY_HZ,
+            "gain_table_id": 1,
+            "gain_table_name": "mhz_200_1300",
+            "hold_frame_attestation_required": True,
+        },
+    }
 
 
 def test_exact_event_free_hold_batch_passes():
@@ -360,15 +1032,16 @@ def test_continuity_oracle_requires_exactly_64_frames():
         )
 
 
-def _valid_report():
+def _valid_report(tmp_path):
     frames = _frames()
+    full_wires = [_metadata_wire(metadata) for metadata in frames]
     frame_records = [
         _frame_evidence(
             index,
             metadata,
             duration_ns=index + 1,
-            iq_sha256="a" * 64,
-            metadata_sha256="b" * 64,
+            returned_iq_sha256_in_process="a" * 64,
+            metadata_sha256=hashlib.sha256(full_wires[index]).hexdigest(),
         )
         for index, metadata in enumerate(frames)
     ]
@@ -382,52 +1055,117 @@ def _valid_report():
         0,
         cancel_metadata,
         duration_ns=10,
-        iq_sha256="c" * 64,
-        metadata_sha256="d" * 64,
+        returned_iq_sha256_in_process="c" * 64,
+        metadata_sha256=hashlib.sha256(_metadata_wire(cancel_metadata)).hexdigest(),
     )
-    serial = "1040007c4a94000211000b009186843ef2"
-    firmware = "v0.41-plutoplus-spf-tandem-agc-v8-rc2"
+    serial = lifecycle.DEFAULT_R18_SERIAL
+    firmware = EXPECTED_FIRMWARE_VERSION
     final_status = _idle_status()
     cleanup = _mute()
     cleanup.update(
         {
+            "started_monotonic_ns": 1_810,
+            "mute_completed_monotonic_ns": 1_820,
+            "idle_verified_monotonic_ns": 1_830,
+            "rx_completed_monotonic_ns": 1_840,
+            "final_idle_verified_monotonic_ns": 1_850,
+            "rf_readback_completed_monotonic_ns": 1_860,
+            "operation_order": [
+                "force_mute",
+                "verify_idle",
+                "configure_manual40",
+                "verify_final_idle",
+                "read_final_rf",
+            ],
             "tandem_status": final_status,
             "rx_state": _rx(),
+            "rf_state": _rf(),
             "errors": [],
         }
     )
+    repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
+    commit = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+    def blob_sha(relative):
+        return hashlib.sha256((repository / relative).read_bytes()).hexdigest()
+
+    module_relative = "tests/radio_hardware/muted_metadata_batch_lifecycle.py"
+    shell_relative = "scripts/run_muted_metadata_batch_lifecycle_hardware.sh"
+    abi_relative = "tests/radio_hardware/metadata_abi.py"
+    module_sha = blob_sha(module_relative)
+    shell_sha = blob_sha(shell_relative)
+    abi_sha = blob_sha(abi_relative)
+    output_path = tmp_path / "result.json"
+    output_preflight = lifecycle._prepare_fresh_output_path(output_path)
+    captures = [
+        *(("full_drain", index, payload) for index, payload in enumerate(full_wires)),
+        ("cancel_first", 0, _metadata_wire(cancel_metadata)),
+    ]
+    metadata_artifacts = lifecycle._new_metadata_artifact_manifest(captures)
+    lifecycle._write_metadata_artifacts(output_path, captures, metadata_artifacts)
+    libiio_source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    libiio_build = tmp_path / "libiio-build"
+    libiio_build.mkdir()
+    library = libiio_build / "libiio.so.0.25"
+    library.write_bytes(b"attested fixture libiio")
+    library_sha = hashlib.sha256(library.read_bytes()).hexdigest()
+    (libiio_build / "CMakeCache.txt").write_text(
+        f"CMAKE_HOME_DIRECTORY:INTERNAL={libiio_source}\n", encoding="utf-8"
+    )
     return {
-        "schema": "plutosdr-fw.muted-metadata-batch-lifecycle.v1",
+        "schema": lifecycle.SCHEMA,
         "verdict": "PASS",
         "release_claim": "none; muted host-transport lifecycle qualification only",
+        "release_pass_eligible": False,
+        "hardware_qualified": False,
         "started_unix_ns": 1,
         "completed_unix_ns": 2,
         "host_libiio": {
             "source_commit": EXACT_LIBIIO_COMMIT,
-            "source_directory": "/src/libiio",
-            "build_directory": "/tmp/libiio-build",
-            "mapped_shared_objects": ["/tmp/libiio-build/libiio.so.0.25"],
-            "mapped_shared_object": "/tmp/libiio-build/libiio.so.0.25",
-            "mapped_shared_object_sha256": "e" * 64,
-            "runner_shared_object_sha256": "e" * 64,
-            "pylibiio_file": "/src/libiio/bindings/python/iio.py",
+            "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+            "source_directory": str(libiio_source),
+            "build_directory": str(libiio_build),
+            "mapped_shared_objects": [str(library)],
+            "mapped_shared_object": str(library),
+            "mapped_shared_object_sha256": library_sha,
+            "runner_shared_object_sha256": library_sha,
+            "pylibiio_file": str(libiio_source / "bindings/python/iio.py"),
         },
         "runner_provenance": {
-            "firmware_repo_commit": "f" * 40,
-            "python_module_path": "/src/plutosdr-fw/tests/radio_hardware/muted_metadata_batch_lifecycle.py",
-            "python_module_sha256": "1" * 64,
-            "python_module_head_blob_sha256": "1" * 64,
-            "shell_runner_path": "/src/plutosdr-fw/scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
-            "shell_runner_sha256": "2" * 64,
-            "shell_runner_head_blob_sha256": "2" * 64,
-            "metadata_abi_path": "/src/plutosdr-fw/tests/radio_hardware/metadata_abi.py",
-            "metadata_abi_sha256": "3" * 64,
-            "metadata_abi_head_blob_sha256": "3" * 64,
+            "firmware_repo_commit": commit,
+            "firmware_repository": str(repository),
+            "python_module_path": str(repository / module_relative),
+            "python_module_sha256": module_sha,
+            "python_module_head_blob_sha256": module_sha,
+            "shell_runner_path": str(repository / shell_relative),
+            "shell_runner_sha256": shell_sha,
+            "shell_runner_head_blob_sha256": shell_sha,
+            "metadata_abi_path": str(repository / abi_relative),
+            "metadata_abi_sha256": abi_sha,
+            "metadata_abi_head_blob_sha256": abi_sha,
         },
+        "output_preflight": output_preflight,
         "configuration": {
             "serial": serial,
-            "firmware_pattern": r"v0[.]41-plutoplus-spf-tandem-agc-v8-rc2",
+            "firmware_pattern": EXPECTED_FIRMWARE_PATTERN,
+            "firmware_version": EXPECTED_FIRMWARE_VERSION,
+            "kernel_version": EXPECTED_KERNEL_VERSION,
             "tx_policy": "fully muted; no DDS/DMA enable and no TX gain increase",
+            "normalization_policy": (
+                "under verified mute with zero buffers: common LO, all PHY rates "
+                "and bandwidths, then RX manual 40"
+            ),
+            "iq_evidence_policy": lifecycle.IQ_EVIDENCE_POLICY,
+            "center_frequency_hz": CENTER_FREQUENCY_HZ,
+            "sample_rate_hz": SAMPLE_RATE_HZ,
+            "rf_bandwidth_hz": RF_BANDWIDTH_HZ,
+            "expected_gain_table_id": 1,
+            "expected_gain_table_name": "mhz_200_1300",
             "tandem_mode": "hold",
             "hold_gain_db": 40,
             "frame_samples_per_channel": FRAME_SAMPLES,
@@ -444,14 +1182,22 @@ def _valid_report():
             "context_attrs": {
                 "hw_serial": serial,
                 "fw_version": firmware,
+                "hw_model": EXPECTED_HARDWARE_MODEL,
+                "ad9361-phy,model": "ad9361",
+                "local,kernel": EXPECTED_KERNEL_VERSION,
                 "iio,buffer-metadata": "2",
+                "uri": "usb:3.17.5",
             },
             "mute": _mute(),
-            "rx_state": _rx(),
+            "rx_state": _boot_rx(),
+            "rf_state": _rf(normalized=False),
             "tandem_status": _idle_status(65),
+            "started_monotonic_ns": 900,
+            "completed_monotonic_ns": 1_000,
+            "configuration_write_count": 0,
+            "metadata_buffer_open_count": 0,
         },
-        "forced_mute_before": _mute(),
-        "rx_manual_before": _rx(),
+        "normalization": _normalization(),
         "rx_scan": _scan_evidence(),
         "full_drain": {
             "kernel_buffers": 8,
@@ -459,9 +1205,12 @@ def _valid_report():
             "metadata_capacity_bytes": 64 * 1024,
             "batch_cache_bound_bytes": EXPECTED_BATCH_CACHE_BYTES,
             "expected_batch_cache_bytes": EXPECTED_BATCH_CACHE_BYTES,
+            "normalization_completed_monotonic_ns": 1_300,
+            "first_buffer_open_requested_monotonic_ns": 1_400,
             "status_after_open": _hold_status(11),
             "status_before_close": _hold_status(11),
             "close_method": "explicit_normal_close",
+            "close_completed_monotonic_ns": 1_500,
             "frames": frame_records,
             "continuity": {
                 "verified": True,
@@ -480,18 +1229,34 @@ def _valid_report():
             },
             "status_after_close": _idle_status(),
         },
-        "rx_after_full_drain": _rx(),
-        "mute_after_full_drain": _mute(),
+        "post_full_drain_barrier": {
+            "verified": True,
+            "policy": (
+                "force mute, verify closed HOLD IDLE, then read RX without writes"
+            ),
+            "started_monotonic_ns": 1_510,
+            "mute_completed_monotonic_ns": 1_520,
+            "idle_verified_monotonic_ns": 1_530,
+            "completed_monotonic_ns": 1_540,
+            "metadata_buffer_open_count": 0,
+            "operation_order": ["force_mute", "verify_idle", "read_rx_state"],
+            "mute": _mute(),
+            "tandem_status": _idle_status(),
+            "rx_state": _rx(),
+        },
         "cancel_lifecycle": {
             "verified": True,
             "kernel_buffers": 8,
             "batch_frames": 64,
+            "old_buffer_open_requested_monotonic_ns": 1_600,
             "operation_order": [
                 "first_cached_frame_returned",
                 "old_buffer_cancel",
                 "second_open_ebusy",
                 "old_refill_ebadf",
                 "old_buffer_close",
+                "mute_after_old_close",
+                "verify_old_close_idle",
                 "fresh_buffer_open",
                 "fresh_buffer_close",
             ],
@@ -507,24 +1272,55 @@ def _valid_report():
                 "errno": 9,
                 "message": "bad fd",
             },
+            "old_buffer_close_completed_monotonic_ns": 1_700,
+            "mute_after_old_close_started_monotonic_ns": 1_710,
+            "mute_after_old_close": _mute(),
+            "mute_after_old_close_completed_monotonic_ns": 1_720,
+            "old_close_idle_verified_monotonic_ns": 1_730,
             "status_after_old_close": _idle_status(),
+            "fresh_buffer_open_requested_monotonic_ns": 1_740,
             "status_after_fresh_open": _hold_status(13),
             "status_after_fresh_close": final_status,
+            "fresh_buffer_close_completed_monotonic_ns": 1_800,
         },
+        "metadata_artifacts": metadata_artifacts,
         "final_tandem_status": final_status,
         "final_rx_state": _rx(),
+        "final_rf_state": _rf(),
         "cleanup": cleanup,
     }
 
 
-def test_durable_report_validator_accepts_frame_derived_pass():
-    validate_durable_pass_report(_valid_report())
+def test_durable_report_validator_accepts_frame_derived_pass(tmp_path):
+    validate_durable_pass_report(_valid_report(tmp_path))
 
 
 @pytest.mark.parametrize(
     ("path", "value"),
     [
         (("host_libiio", "runner_shared_object_sha256"), "0" * 64),
+        (("host_libiio", "protected_source_tag"), "wrong-tag"),
+        (("release_pass_eligible",), True),
+        (("release_pass_eligible",), 0),
+        (("hardware_qualified",), True),
+        (("hardware_qualified",), 0),
+        (("configuration", "serial"), "another-radio"),
+        (("configuration", "iq_evidence_policy"), "IQ independently retained"),
+        (("configuration", "center_frequency_hz"), 914_999_999),
+        (("preflight", "context_attrs", "local,kernel"), "5.15.0-wrong"),
+        (("preflight", "configuration_write_count"), True),
+        (("preflight", "metadata_buffer_open_count"), 1),
+        (("preflight", "mute", "dds", "altvoltage0", "raw"), 0),
+        (("normalization", "started_monotonic_ns"), 999),
+        (("normalization", "metadata_buffer_open_count_after"), 1),
+        (("normalization", "operations", 0, "readback"), 915_000_003.0),
+        (("normalization", "operations", 0, "ordinal"), False),
+        (("normalization", "expected_gain_table", "gain_table_id"), 2),
+        (("full_drain", "first_buffer_open_requested_monotonic_ns"), 1_299),
+        (("full_drain", "close_completed_monotonic_ns"), 9_999),
+        (("post_full_drain_barrier", "started_monotonic_ns"), 1_499),
+        (("post_full_drain_barrier", "operation_order"), []),
+        (("post_full_drain_barrier", "mute", "tx1_gain_db"), -81.0),
         (("runner_provenance", "python_module_sha256"), "0" * 64),
         (("runner_provenance", "shell_runner_sha256"), "0" * 64),
         (("runner_provenance", "metadata_abi_sha256"), "0" * 64),
@@ -563,14 +1359,25 @@ def test_durable_report_validator_accepts_frame_derived_pass():
         (("full_drain", "batch_cache_bound_bytes"), EXPECTED_BATCH_CACHE_BYTES - 1),
         (("full_drain", "frames", 7, "ownership_epoch"), 99),
         (("full_drain", "frames", 7, "features"), FEATURE_HARDWARE_SAMPLE_COUNTER),
+        (("full_drain", "frames", 7, "threshold_provenance"), 1),
+        (("full_drain", "frames", 7, "metadata_bytes"), 3_256.0),
         (("full_drain", "continuity", "frame_count"), 63),
+        (("cancel_lifecycle", "status_after_old_open", "ownership_epoch"), 14),
+        (("cancel_lifecycle", "old_buffer_open_requested_monotonic_ns"), 1_539),
+        (("cancel_lifecycle", "old_buffer_close_completed_monotonic_ns"), 1_900),
+        (("cancel_lifecycle", "mute_after_old_close", "tx1_gain_db"), -81.0),
+        (("cancel_lifecycle", "fresh_buffer_open_requested_monotonic_ns"), 1_729),
         (("cancel_lifecycle", "second_open_error", "errno"), 5),
         (("cancel_lifecycle", "operation_order"), []),
         (("cleanup", "verified"), False),
+        (("cleanup", "tx1_gain_db"), -81.0),
+        (("cleanup", "started_monotonic_ns"), 1_799),
+        (("cleanup", "operation_order"), []),
+        (("final_rf_state", "rx_lo_hz"), 2_400_000_000),
     ],
 )
-def test_planted_false_pass_is_rejected(path, value):
-    report = copy.deepcopy(_valid_report())
+def test_planted_false_pass_is_rejected(tmp_path, path, value):
+    report = copy.deepcopy(_valid_report(tmp_path))
     target = report
     for component in path[:-1]:
         target = target[component]
@@ -579,16 +1386,399 @@ def test_planted_false_pass_is_rejected(path, value):
         validate_durable_pass_report(report)
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), 10**4000])
+def test_hostile_numeric_is_a_domain_failure(tmp_path, value):
+    report = _valid_report(tmp_path)
+    report["cleanup"]["dds"]["altvoltage0"]["raw"] = value
+    with pytest.raises(QualificationError):
+        validate_durable_pass_report(report)
+
+
+def test_in_process_iq_digest_is_explicitly_not_durable_revalidated(tmp_path):
+    report = _valid_report(tmp_path)
+    report["full_drain"]["frames"][0]["returned_iq_sha256_in_process"] = "b" * 64
+    validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), 10**4000])
+def test_hostile_extra_context_attribute_is_a_domain_failure(tmp_path, value):
+    report = _valid_report(tmp_path)
+    report["preflight"]["context_attrs"]["planted"] = value
+    with pytest.raises(QualificationError):
+        validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize("encoded", ['"\\ud800"', '"\\udfff"'])
+def test_lone_surrogate_json_string_is_a_domain_failure(tmp_path, encoded):
+    report = _valid_report(tmp_path)
+    report["preflight"]["context_attrs"]["planted"] = json.loads(encoded)
+    with pytest.raises(QualificationError, match="Unicode"):
+        validate_durable_pass_report(report)
+
+
+def test_embedded_nul_provenance_path_is_a_domain_failure(tmp_path):
+    report = _valid_report(tmp_path)
+    report["host_libiio"]["source_directory"] = json.loads('"/tmp/a\\u0000b"')
+    with pytest.raises(QualificationError, match="NUL"):
+        validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ("started_unix_ns",),
+        ("normalization", "operations", 0, "host_before_ns"),
+        ("full_drain", "frames", 0, "refill_duration_ns"),
+    ],
+)
+def test_huge_integer_timestamps_and_durations_are_domain_failures(tmp_path, path):
+    report = _valid_report(tmp_path)
+    target = report
+    for component in path[:-1]:
+        target = target[component]
+    target[path[-1]] = 10**4000
+    with pytest.raises(QualificationError):
+        validate_durable_pass_report(report)
+
+
+def test_fresh_output_rejects_ancestor_and_leaf_symlinks(tmp_path):
+    target = tmp_path / "target"
+    target.mkdir()
+    ancestor = tmp_path / "ancestor"
+    ancestor.symlink_to(target, target_is_directory=True)
+    with pytest.raises(QualificationError, match="symlink"):
+        lifecycle._prepare_fresh_output_path(ancestor / "result.json")
+    leaf = tmp_path / "leaf.json"
+    leaf.symlink_to(target / "redirected.json")
+    with pytest.raises(QualificationError, match="symlink"):
+        lifecycle._prepare_fresh_output_path(leaf)
+
+
+def test_overlong_durable_output_component_is_a_domain_failure(tmp_path):
+    report = _valid_report(tmp_path)
+    report_path = pathlib.Path("/") / ("x" * 300) / "result.json"
+    preflight = report["output_preflight"]
+    preflight["absolute_report_path"] = str(report_path)
+    preflight["absolute_temporary_path"] = str(report_path.with_suffix(".json.tmp"))
+    preflight["absolute_raw_metadata_directory"] = str(
+        report_path.parent / lifecycle.RAW_METADATA_DIRECTORY
+    )
+    with pytest.raises(QualificationError):
+        validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize("plant", ["build", "library"])
+def test_overlong_durable_host_path_is_a_domain_failure(tmp_path, plant):
+    report = _valid_report(tmp_path)
+    host = report["host_libiio"]
+    if plant == "build":
+        build = pathlib.Path("/tmp") / ("x" * 300) / "build"
+        library = build / "libiio.so.0.25"
+        host["build_directory"] = str(build)
+    else:
+        library = pathlib.Path(host["build_directory"]) / ("x" * 300) / "libiio.so.0.25"
+    host["mapped_shared_object"] = str(library)
+    host["mapped_shared_objects"] = [str(library)]
+    with pytest.raises(QualificationError):
+        validate_durable_pass_report(report)
+
+
+def test_existing_lock_is_nofollow_regular_and_forced_private(tmp_path, monkeypatch):
+    lock_path = tmp_path / "radio.lock"
+    lock_path.write_text("stale\n", encoding="utf-8")
+    lock_path.chmod(0o664)
+    monkeypatch.setattr(lifecycle, "_lock_path", lambda _serial: lock_path)
+    lock = lifecycle._open_lock(lifecycle.DEFAULT_R18_SERIAL)
+    lock.close()
+    assert lock_path.stat().st_mode & 0o777 == 0o600
+    lock_path.unlink()
+    target = tmp_path / "target"
+    target.write_text("not a lock\n", encoding="utf-8")
+    lock_path.symlink_to(target.name)
+    with pytest.raises(QualificationError):
+        lifecycle._open_lock(lifecycle.DEFAULT_R18_SERIAL)
+
+
+@pytest.mark.parametrize(
+    "plant", ["delete", "extra", "temporary", "symlink", "oversized"]
+)
+def test_metadata_inventory_mutation_is_rejected(tmp_path, monkeypatch, plant):
+    report = _valid_report(tmp_path)
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    directory = report_path.parent / lifecycle.RAW_METADATA_DIRECTORY
+    victim = directory / "full-frame-0000.metadata.bin"
+    if plant == "delete":
+        victim.unlink()
+    elif plant == "extra":
+        (directory / "extra.metadata.bin").write_bytes(b"x")
+    elif plant == "temporary":
+        (directory / "full-frame-0000.metadata.bin.tmp").write_bytes(b"x")
+    else:
+        if plant == "symlink":
+            target = directory / "full-frame-0001.metadata.bin"
+            victim.unlink()
+            victim.symlink_to(target.name)
+        else:
+            victim.write_bytes(b"x" * (RAW_METADATA_BYTES + 1))
+            victim_identity = (victim.stat().st_dev, victim.stat().st_ino)
+            original_read = lifecycle.os.read
+
+            def forbid_unbounded_read(descriptor, size):
+                observed = lifecycle.os.fstat(descriptor)
+                if (observed.st_dev, observed.st_ino) == victim_identity:
+                    raise AssertionError("oversized metadata must fail before read")
+                return original_read(descriptor, size)
+
+            monkeypatch.setattr(lifecycle.os, "read", forbid_unbounded_read)
+    with pytest.raises(QualificationError):
+        validate_durable_pass_report(report)
+
+
+def _refresh_first_metadata_artifact(report, payload):
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    entry = report["metadata_artifacts"]["entries"][0]
+    path = report_path.parent / entry["relative_path"]
+    path.write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    entry["sha256"] = digest
+    report["full_drain"]["frames"][0]["metadata_sha256"] = digest
+    report["metadata_artifacts"]["manifest_sha256"] = (
+        lifecycle._metadata_manifest_digest(report["metadata_artifacts"]["entries"])
+    )
+
+
+def _replace_cancel_metadata_artifact(report, metadata):
+    payload = _metadata_wire(metadata)
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    entry = report["metadata_artifacts"]["entries"][-1]
+    path = report_path.parent / entry["relative_path"]
+    path.write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    entry["sha256"] = digest
+    report["cancel_lifecycle"]["first_returned_cached_frame"] = _frame_evidence(
+        0,
+        metadata,
+        duration_ns=10,
+        returned_iq_sha256_in_process="c" * 64,
+        metadata_sha256=digest,
+    )
+    report["metadata_artifacts"]["manifest_sha256"] = (
+        lifecycle._metadata_manifest_digest(report["metadata_artifacts"]["entries"])
+    )
+
+
+@pytest.mark.parametrize(
+    ("stream_id", "first_sample_sequence"),
+    [
+        (7, 9_000_000),
+        (8, 123_456),
+    ],
+)
+def test_cancel_session_must_follow_full_stream(
+    tmp_path, stream_id, first_sample_sequence
+):
+    report = _valid_report(tmp_path)
+    cancel_metadata = replace(
+        _frames()[0],
+        stream_id=stream_id,
+        ownership_epoch=12,
+        first_sample_sequence=first_sample_sequence,
+    )
+    _replace_cancel_metadata_artifact(report, cancel_metadata)
+    with pytest.raises(QualificationError, match="cancel session"):
+        validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize(
+    "plant",
+    [
+        "nonmax_index",
+        "short_cadence",
+        "unknown_flag",
+        "bad_magic",
+        "bad_crc",
+        "bad_header",
+        "invalid_temperature",
+    ],
+)
+def test_synchronized_raw_metadata_mutation_is_rejected(tmp_path, plant):
+    report = _valid_report(tmp_path)
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    path = (
+        report_path.parent / report["metadata_artifacts"]["entries"][0]["relative_path"]
+    )
+    payload = bytearray(path.read_bytes())
+    if plant == "nonmax_index":
+        payload[V5_PREFIX_BYTES + 22] = 44
+        payload[V5_PREFIX_BYTES + 23] = 44
+    elif plant == "short_cadence":
+        first_sample = report["full_drain"]["frames"][0]["first_sample_sequence"]
+        struct.pack_into(
+            "<QQ",
+            payload,
+            V5_PREFIX_BYTES + GAIN_OBSERVATION_BYTES,
+            first_sample + 1,
+            first_sample + 2,
+        )
+    elif plant == "unknown_flag":
+        flags = struct.unpack_from("<I", payload, 12)[0] | (1 << 31)
+        struct.pack_into("<I", payload, 12, flags)
+        report["full_drain"]["frames"][0]["flags"] = flags
+    elif plant == "bad_magic":
+        struct.pack_into("<I", payload, 0, 0)
+    elif plant == "bad_crc":
+        payload[200] ^= 1
+    elif plant == "invalid_temperature":
+        struct.pack_into("<i", payload, 164, -(1 << 31))
+        report["full_drain"]["frames"][0]["ad9361_temperature_mdeg_c"] = None
+    else:
+        struct.pack_into("<H", payload, 6, RAW_METADATA_BYTES - 1)
+    if plant != "bad_crc":
+        struct.pack_into("<I", payload, len(payload) - 4, 0)
+        struct.pack_into(
+            "<I", payload, len(payload) - 4, zlib.crc32(payload) & 0xFFFFFFFF
+        )
+    _refresh_first_metadata_artifact(report, bytes(payload))
+    with pytest.raises(QualificationError):
+        validate_durable_pass_report(report)
+
+
 def test_atomic_report_must_reread_exact_before_pass(tmp_path):
-    report = _valid_report()
+    report = _valid_report(tmp_path)
     path = tmp_path / "result.json"
-    _atomic_json(path, report)
+    identity = _atomic_json(path, report)
     assert _reread_exact_report(path, report) == report
     changed = json.loads(path.read_text())
     changed["full_drain"]["continuity"]["frame_count"] = 63
-    _atomic_json(path, changed)
+    _atomic_json(
+        path,
+        changed,
+        replace_existing=True,
+        expected_existing_identity=identity,
+    )
     with pytest.raises(QualificationError):
         _reread_exact_report(path, report)
+
+
+def test_atomic_fail_report_reread_rejects_int_float_alias(tmp_path):
+    path = tmp_path / "failure.json"
+    expected = {"verdict": "FAIL", "error": {"errno": 5}}
+    identity = _atomic_json(path, expected)
+    changed = {"verdict": "FAIL", "error": {"errno": 5.0}}
+    _atomic_json(
+        path,
+        changed,
+        replace_existing=True,
+        expected_existing_identity=identity,
+    )
+    with pytest.raises(QualificationError, match="bytes|size"):
+        _reread_exact_report(path, expected)
+
+
+def test_oversized_report_is_rejected_before_read(tmp_path, monkeypatch):
+    path = tmp_path / "failure.json"
+    expected = {"verdict": "FAIL", "error": {"errno": 5}}
+    path.write_bytes(lifecycle._json_payload(expected) + b"x")
+    victim_identity = (path.stat().st_dev, path.stat().st_ino)
+    original_read = lifecycle.os.read
+
+    def forbid_unbounded_read(descriptor, size):
+        observed = lifecycle.os.fstat(descriptor)
+        if (observed.st_dev, observed.st_ino) == victim_identity:
+            raise AssertionError("oversized report must fail before read")
+        return original_read(descriptor, size)
+
+    monkeypatch.setattr(lifecycle.os, "read", forbid_unbounded_read)
+    with pytest.raises(QualificationError, match="size"):
+        _reread_exact_report(path, expected)
+
+
+def test_first_report_promotion_never_clobbers_raced_target(tmp_path, monkeypatch):
+    output = tmp_path / "result.json"
+    lock_path = tmp_path / "radio.lock"
+    lock = lock_path.open("a+", encoding="utf-8")
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    original_link = lifecycle.os.link
+
+    def plant_target_before_link(source, target, **kwargs):
+        pathlib.Path(target).write_bytes(b"external winner")
+        return original_link(source, target, **kwargs)
+
+    monkeypatch.setattr(lifecycle.os, "link", plant_target_before_link)
+    durable, error = _close_resources_and_persist(
+        {
+            "schema": lifecycle.SCHEMA,
+            "verdict": "FAIL",
+            "started_unix_ns": 1,
+            "cleanup": _mute(),
+        },
+        output_path=output,
+        context=None,
+        lock=lock,
+        lock_acquired=True,
+        cleanup_errors=[],
+        primary_error=None,
+    )
+    assert durable["verdict"] == "FAIL"
+    assert isinstance(error, QualificationError)
+    assert output.read_bytes() == b"external winner"
+    assert not output.with_suffix(".json.tmp").exists()
+    with lock_path.open("a+", encoding="utf-8") as reopened:
+        fcntl.flock(reopened, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(reopened, fcntl.LOCK_UN)
+
+
+def test_linked_report_is_removed_when_temporary_unlink_fails(tmp_path, monkeypatch):
+    output = tmp_path / "result.json"
+    temporary = output.with_suffix(".json.tmp")
+    lock_path = tmp_path / "radio.lock"
+    lock = lock_path.open("a+", encoding="utf-8")
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    original_unlink = pathlib.Path.unlink
+
+    def fail_temporary_unlink(path, *args, **kwargs):
+        if path == temporary:
+            raise OSError(errno.EIO, "planted persistent temporary unlink failure")
+        return original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(pathlib.Path, "unlink", fail_temporary_unlink)
+    monkeypatch.setattr(lifecycle, "validate_durable_pass_report", lambda _report: None)
+    durable, error = _close_resources_and_persist(
+        {
+            "schema": lifecycle.SCHEMA,
+            "verdict": "PASS",
+            "started_unix_ns": 1,
+            "cleanup": _mute(),
+        },
+        output_path=output,
+        context=None,
+        lock=lock,
+        lock_acquired=True,
+        cleanup_errors=[],
+        primary_error=None,
+    )
+    assert durable["verdict"] == "FAIL"
+    assert isinstance(error, lifecycle._AtomicPromotionError)
+    assert not output.exists()
+    assert temporary.exists()
+    with lock_path.open("a+", encoding="utf-8") as reopened:
+        fcntl.flock(reopened, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(reopened, fcntl.LOCK_UN)
+
+
+def test_metadata_promotion_never_clobbers_raced_target(tmp_path, monkeypatch):
+    target = tmp_path / "frame.metadata.bin"
+    original_link = lifecycle.os.link
+
+    def plant_target_before_link(source, destination, **kwargs):
+        pathlib.Path(destination).write_bytes(b"external sidecar")
+        return original_link(source, destination, **kwargs)
+
+    monkeypatch.setattr(lifecycle.os, "link", plant_target_before_link)
+    with pytest.raises(QualificationError, match="without overwrite"):
+        lifecycle._atomic_bytes(target, b"owned payload")
+    assert target.read_bytes() == b"external sidecar"
+    assert not target.with_suffix(".bin.tmp").exists()
 
 
 def test_mapped_library_sha_is_computed_in_hardware_process(tmp_path, monkeypatch):
@@ -612,15 +1802,366 @@ def test_mapped_library_sha_is_computed_in_hardware_process(tmp_path, monkeypatc
     assert evidence["runner_shared_object_sha256"] == digest
 
 
+def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
+    source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    build = tmp_path / "build"
+    build.mkdir()
+    library = build / "libiio.so.0.25"
+    library.write_bytes(b"mapped")
+    called = []
+
+    def context_factory(_uri):
+        called.append(True)
+        raise AssertionError("context must not open")
+
+    fake_iio = SimpleNamespace(
+        __file__=str(tmp_path / "forged-iio.py"), Context=context_factory
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "_attest_mapped_libiio",
+        lambda: {
+            "source_commit": EXACT_LIBIIO_COMMIT,
+            "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+            "source_directory": str(source),
+            "build_directory": str(build),
+            "mapped_shared_objects": [str(library)],
+            "mapped_shared_object": str(library),
+            "mapped_shared_object_sha256": hashlib.sha256(
+                library.read_bytes()
+            ).hexdigest(),
+            "runner_shared_object_sha256": hashlib.sha256(
+                library.read_bytes()
+            ).hexdigest(),
+        },
+    )
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
+    output = tmp_path / "private" / "report.json"
+    with pytest.raises(QualificationError, match="pylibiio"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+        )
+    assert called == []
+
+
+def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monkeypatch):
+    source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    build = tmp_path / "build"
+    build.mkdir()
+    library = build / "libiio.so.0.25"
+    library.write_bytes(b"mapped")
+    called = []
+
+    def context_factory(_uri):
+        called.append(True)
+        raise AssertionError("context must not open")
+
+    fake_iio = SimpleNamespace(
+        __file__=str(source / "bindings/python/iio.py"), Context=context_factory
+    )
+    digest = hashlib.sha256(library.read_bytes()).hexdigest()
+    monkeypatch.setattr(
+        lifecycle,
+        "_attest_mapped_libiio",
+        lambda: {
+            "source_commit": EXACT_LIBIIO_COMMIT,
+            "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+            "source_directory": str(source),
+            "build_directory": str(build),
+            "mapped_shared_objects": [str(library)],
+            "mapped_shared_object": str(library),
+            "mapped_shared_object_sha256": digest,
+            "runner_shared_object_sha256": digest,
+        },
+    )
+
+    def wrong_tag_git(_repository, *arguments):
+        if arguments == ("rev-parse", "HEAD"):
+            return f"{EXACT_LIBIIO_COMMIT}\n".encode()
+        if arguments == (
+            "rev-parse",
+            f"refs/tags/{lifecycle.EXACT_LIBIIO_TAG}^{{commit}}",
+        ):
+            return ("0" * 40 + "\n").encode()
+        if arguments == ("status", "--porcelain", "--untracked-files=no"):
+            return b""
+        raise AssertionError(arguments)
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", wrong_tag_git)
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", digest)
+    output = tmp_path / "private" / "report.json"
+    with pytest.raises(QualificationError, match="source graph"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+        )
+    assert called == []
+
+
+def _set_integration_runner_environment(monkeypatch):
+    repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
+    commit = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    paths = {
+        "MODULE": repository / "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
+        "SHELL": repository / "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
+        "METADATA_ABI": repository / "tests/radio_hardware/metadata_abi.py",
+    }
+    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", commit)
+    for role, path in paths.items():
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        monkeypatch.setenv(f"PLUTOSDR_FW_RUNNER_{role}_SHA256", digest)
+        monkeypatch.setenv(f"PLUTOSDR_FW_RUNNER_{role}_HEAD_SHA256", digest)
+        if role != "MODULE":
+            monkeypatch.setenv(f"PLUTOSDR_FW_RUNNER_{role}_PATH", str(path))
+
+
+def _integration_run_components(tmp_path, monkeypatch):
+    source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    build = tmp_path / "libiio-build"
+    build.mkdir()
+    library = build / "libiio.so.0.25"
+    library.write_bytes(b"exact end-to-end fixture libiio")
+    library_sha = hashlib.sha256(library.read_bytes()).hexdigest()
+    (build / "CMakeCache.txt").write_text(
+        f"CMAKE_HOME_DIRECTORY:INTERNAL={source}\n", encoding="utf-8"
+    )
+    host_libiio = {
+        "source_commit": EXACT_LIBIIO_COMMIT,
+        "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+        "source_directory": str(source),
+        "build_directory": str(build),
+        "mapped_shared_objects": [str(library)],
+        "mapped_shared_object": str(library),
+        "mapped_shared_object_sha256": library_sha,
+        "runner_shared_object_sha256": library_sha,
+        "pylibiio_file": str(source / "bindings/python/iio.py"),
+    }
+    monkeypatch.setattr(
+        lifecycle, "_attest_host_libiio", lambda _iio_module: host_libiio
+    )
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", library_sha)
+    _set_integration_runner_environment(monkeypatch)
+
+    context_record, phy, tx, tandem, writes = _hardware_state()
+    state = _IntegrationState(tandem, phy=phy, writes=writes)
+    rx = _IntegrationRx(state)
+    context = _IntegrationContext(
+        context_record.attrs,
+        {
+            "ad9361-phy": phy,
+            "cf-ad9361-lpc": rx,
+            "cf-ad9361-dds-core-lpc": tx,
+            "tandem-agc": tandem,
+        },
+    )
+    fake_iio = _IntegrationIio(context, source / "bindings/python/iio.py")
+    lock_path = tmp_path / "radio.lock"
+    monkeypatch.setattr(lifecycle, "_lock_path", lambda _serial: lock_path)
+    output = tmp_path / "evidence" / "lifecycle.json"
+    return fake_iio, context, state, output, lock_path
+
+
+def test_run_hardware_fake_end_to_end_persists_closed_valid_pass(tmp_path, monkeypatch):
+    fake_iio, context, state, output, lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+
+    report = lifecycle.run_hardware(
+        fake_iio,
+        serial=lifecycle.DEFAULT_R18_SERIAL,
+        firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+        output_path=output,
+    )
+
+    assert report == json.loads(output.read_text(encoding="utf-8"))
+    validate_durable_pass_report(report)
+    assert report["verdict"] == "PASS"
+    assert report["release_pass_eligible"] is False
+    assert report["hardware_qualified"] is False
+    assert context.closed is True
+    assert context.timeout_ms == 10_000
+    assert state.active_buffer is None
+    assert state.open_count == state.close_count == 3
+    assert all(buffer.closed for buffer in state.buffers)
+    assert state.kernel_buffer_counts == [8, 8]
+    artifact_directory = output.parent / lifecycle.RAW_METADATA_DIRECTORY
+    assert len(list(artifact_directory.iterdir())) == lifecycle.RAW_METADATA_FILE_COUNT
+    with lock_path.open("r+", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def test_close_drift_is_remuted_before_rx_write_or_next_buffer_open(
+    tmp_path, monkeypatch
+):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    state.flip_tx_on_close = {1, 2, 3}
+
+    report = lifecycle.run_hardware(
+        fake_iio,
+        serial=lifecycle.DEFAULT_R18_SERIAL,
+        firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+        output_path=output,
+    )
+
+    assert report["verdict"] == "PASS"
+    labels = [label for label, _value in state.writes]
+    for session, next_boundary in ((1, "buffer2:open"), (2, "buffer3:open")):
+        close_index = labels.index(f"buffer{session}:close")
+        boundary_index = labels.index(next_boundary, close_index + 1)
+        mute_index = labels.index("tx0:hardwaregain", close_index + 1)
+        assert close_index < mute_index < boundary_index
+        assert not any(
+            label.startswith("rx") for label in labels[close_index + 1 : mute_index]
+        )
+    final_close = labels.index("buffer3:close")
+    final_mute = labels.index("tx0:hardwaregain", final_close + 1)
+    final_rx_write = next(
+        index
+        for index in range(final_close + 1, len(labels))
+        if labels[index].startswith("rx")
+    )
+    assert final_close < final_mute < final_rx_write
+    assert context.closed is True
+
+
+@pytest.mark.parametrize("plant", ["report", "sidecar"])
+def test_post_context_freshness_race_never_overwrites_evidence(
+    tmp_path, monkeypatch, plant
+):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_preflight = lifecycle._prepare_fresh_output_path
+    calls = 0
+    planted_path = output
+    planted_bytes = b"external post-context evidence"
+
+    def plant_on_final_freshness(path):
+        nonlocal calls, planted_path
+        calls += 1
+        if calls == 3:
+            if plant == "sidecar":
+                directory = output.parent / lifecycle.RAW_METADATA_DIRECTORY
+                directory.mkdir()
+                planted_path = directory / "full-frame-0000.metadata.bin"
+            planted_path.write_bytes(planted_bytes)
+        return original_preflight(path)
+
+    monkeypatch.setattr(
+        lifecycle, "_prepare_fresh_output_path", plant_on_final_freshness
+    )
+    with pytest.raises(QualificationError, match="fresh"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+        )
+    assert calls == 3
+    assert planted_path.read_bytes() == planted_bytes
+    assert context.closed is True
+    assert state.active_buffer is None
+    assert state.open_count == state.close_count == 3
+    if plant == "sidecar":
+        assert json.loads(output.read_text(encoding="utf-8"))["verdict"] == "FAIL"
+
+
+def _stub_precontext_provenance(monkeypatch):
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
+    monkeypatch.setattr(lifecycle, "_attest_host_libiio", lambda _module: {})
+    monkeypatch.setattr(lifecycle, "_attest_runner_provenance", dict)
+
+
+def test_post_lock_freshness_recheck_preserves_existing_winner_evidence(
+    tmp_path, monkeypatch
+):
+    _stub_precontext_provenance(monkeypatch)
+    output = tmp_path / "evidence" / "lifecycle.json"
+    lock_path = tmp_path / "radio.lock"
+    context_calls = []
+    fake_iio = SimpleNamespace(
+        Context=lambda _uri: context_calls.append(True),
+        scan_contexts=dict,
+    )
+
+    def open_after_winner_promotion(_serial):
+        output.write_bytes(b"immutable winner evidence")
+        return lock_path.open("a+", encoding="utf-8")
+
+    monkeypatch.setattr(lifecycle, "_open_lock", open_after_winner_promotion)
+    with pytest.raises(QualificationError, match="fresh"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+        )
+    assert output.read_bytes() == b"immutable winner evidence"
+    assert context_calls == []
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+
+
+def test_lock_loser_never_writes_requested_evidence(tmp_path, monkeypatch):
+    _stub_precontext_provenance(monkeypatch)
+    output = tmp_path / "evidence" / "lifecycle.json"
+    lock_path = tmp_path / "radio.lock"
+    lock_path.touch()
+    winner_lock = lock_path.open("r+", encoding="utf-8")
+    fcntl.flock(winner_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    context_calls = []
+    fake_iio = SimpleNamespace(
+        Context=lambda _uri: context_calls.append(True),
+        scan_contexts=dict,
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "_open_lock",
+        lambda _serial: lock_path.open("r+", encoding="utf-8"),
+    )
+    try:
+        with pytest.raises(QualificationError, match="lock is held"):
+            lifecycle.run_hardware(
+                fake_iio,
+                serial=lifecycle.DEFAULT_R18_SERIAL,
+                firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+                output_path=output,
+            )
+    finally:
+        fcntl.flock(winner_lock, fcntl.LOCK_UN)
+        winner_lock.close()
+    assert not output.exists()
+    assert not output.with_suffix(".json.tmp").exists()
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    assert context_calls == []
+
+
 def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch):
     module_path = lifecycle.pathlib.Path(lifecycle.__file__).resolve()
-    shell = tmp_path / "runner.sh"
-    shell.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    repository = module_path.parents[2]
+    shell = repository / "scripts/run_muted_metadata_batch_lifecycle_hardware.sh"
     metadata_abi_path = module_path.parent / "metadata_abi.py"
     module_sha = hashlib.sha256(module_path.read_bytes()).hexdigest()
     shell_sha = hashlib.sha256(shell.read_bytes()).hexdigest()
     metadata_abi_sha = hashlib.sha256(metadata_abi_path.read_bytes()).hexdigest()
-    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", "a" * 40)
+    commit = "a" * 40
+    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", commit)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_MODULE_SHA256", module_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_MODULE_HEAD_SHA256", module_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_SHELL_SHA256", shell_sha)
@@ -629,6 +2170,16 @@ def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", metadata_abi_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", metadata_abi_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", str(metadata_abi_path))
+
+    def fake_git(_repository, *arguments):
+        if arguments == ("rev-parse", "HEAD"):
+            return f"{commit}\n".encode()
+        if arguments[0] == "show":
+            relative = arguments[1].split(":", 1)[1]
+            return (repository / relative).read_bytes()
+        raise AssertionError(arguments)
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", fake_git)
     evidence = _attest_runner_provenance()
     assert evidence["python_module_sha256"] == module_sha
     assert evidence["shell_runner_sha256"] == shell_sha
@@ -637,10 +2188,11 @@ def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch
 
 def test_runner_rejects_metadata_abi_mutation(tmp_path, monkeypatch):
     module_path = lifecycle.pathlib.Path(lifecycle.__file__).resolve()
-    shell = tmp_path / "runner.sh"
-    shell.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    repository = module_path.parents[2]
+    shell = repository / "scripts/run_muted_metadata_batch_lifecycle_hardware.sh"
     metadata_abi_path = module_path.parent / "metadata_abi.py"
-    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", "a" * 40)
+    commit = "a" * 40
+    monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", commit)
     monkeypatch.setenv(
         "PLUTOSDR_FW_RUNNER_MODULE_SHA256",
         hashlib.sha256(module_path.read_bytes()).hexdigest(),
@@ -661,7 +2213,17 @@ def test_runner_rejects_metadata_abi_mutation(tmp_path, monkeypatch):
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", "0" * 64)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", "0" * 64)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", str(metadata_abi_path))
-    with pytest.raises(QualificationError, match="SHA-256"):
+
+    def fake_git(_repository, *arguments):
+        if arguments == ("rev-parse", "HEAD"):
+            return f"{commit}\n".encode()
+        if arguments[0] == "show":
+            relative = arguments[1].split(":", 1)[1]
+            return (repository / relative).read_bytes()
+        raise AssertionError(arguments)
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", fake_git)
+    with pytest.raises(QualificationError, match="SHA-256|commit blob"):
         _attest_runner_provenance()
 
 
@@ -702,3 +2264,45 @@ def test_context_close_failure_still_unlocks_and_persists_failure(tmp_path):
     finally:
         fcntl.flock(reopened, fcntl.LOCK_UN)
         reopened.close()
+
+
+def test_report_promotion_failure_still_closes_context_and_unlocks(
+    tmp_path, monkeypatch
+):
+    class ClosableContext:
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    context = ClosableContext()
+    lock_path = tmp_path / "radio.lock"
+    lock = lock_path.open("a+", encoding="utf-8")
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    output = tmp_path / "durable.json"
+
+    def reject_promotion(_path, _report):
+        raise OSError(errno.EIO, "planted report promotion failure")
+
+    monkeypatch.setattr(lifecycle, "_atomic_json", reject_promotion)
+    durable, error = _close_resources_and_persist(
+        {
+            "schema": lifecycle.SCHEMA,
+            "verdict": "FAIL",
+            "started_unix_ns": 1,
+            "cleanup": _mute(),
+        },
+        output_path=output,
+        context=context,
+        lock=lock,
+        lock_acquired=True,
+        cleanup_errors=[],
+        primary_error=None,
+    )
+    assert durable["verdict"] == "FAIL"
+    assert isinstance(error, OSError)
+    assert context.closed is True
+    assert not output.exists()
+    with lock_path.open("a+", encoding="utf-8") as reopened:
+        fcntl.flock(reopened, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(reopened, fcntl.LOCK_UN)
