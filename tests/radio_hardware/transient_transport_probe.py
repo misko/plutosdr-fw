@@ -143,6 +143,33 @@ _PROBE_REQUIRED_METADATA_FLAGS = (
     | FLAG_TANDEM_METADATA_VALID
 )
 _PROBE_METADATA_HEADER_BYTES = 180 + 64 * 32 + 64 * 16 + 4
+_PROBE_RAW_SCHEDULE_FIELDS = frozenset(
+    {
+        "register_address",
+        "counter_width_bits",
+        "counter_source",
+        "post_open_baseline_raw",
+        "target_offset_frames",
+        "target_offset_samples",
+        "target_raw",
+        "last_below_raw",
+        "raw_a_prewrite",
+        "raw_post_write_initial",
+        "raw_b_first_advance",
+        "raw_c_causal_advance",
+        "target_poll_read_count",
+        "target_poll_policy",
+        "target_coarse_guard_samples",
+        "target_fine_sleep_samples",
+        "target_max_poll_reads",
+        "target_poll_observations",
+        "target_total_requested_sleep_samples",
+        "post_write_read_count",
+        "target_overshoot_samples",
+        "causal_uncertainty_samples",
+        "worker_in_flight_at_command",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -1265,10 +1292,8 @@ def _bind_batch_counter_schedule(
     raw_s0 = _strict_low32_counter(raw.get("post_open_baseline_raw"))
     s0 = _extend_low32_near(raw_s0, reference=first_start)
     target = s0 + probe.target_sample_offset
-    if not first_start <= s0 < target:
-        raise EvidenceInvalid(
-            "transport probe post-open baseline does not lie in the batch origin"
-        )
+    if not s0 < target:
+        raise EvidenceInvalid("transport probe post-open target does not follow S0")
     if not first_start <= target < last_end:
         raise EvidenceInvalid("transport probe predeclared target is outside the batch")
 
@@ -2158,13 +2183,34 @@ def _run_probe_body(
                 command_effective = _check_effective_attenuation(
                     quality, unbound_command
                 )
-                report["acquisition"]["worker_in_flight_at_command"] = True
+                report["acquisition"].update(
+                    {
+                        "worker_in_flight_at_command": True,
+                        "prebind_unbound_command": {
+                            **unbound_command.as_dict(),
+                            "effective_attenuation_db": command_effective,
+                        },
+                        "prebind_raw_counter_schedule": dict(raw_schedule),
+                    }
+                )
                 for _ in range(probe.batch_frames):
                     check_deadline()
                     frame = worker.take()
                     retained.append(frame)
                 initiating_refill_completion_ns = int(
                     retained[0].record["refill_monotonic_ns"]
+                )
+                report["acquisition"].update(
+                    {
+                        "single_core_batch_initiated": True,
+                        "initiating_batch_refill_calls": 1,
+                        "public_refill_calls": probe.batch_frames,
+                        "cached_replay_refill_calls": probe.batch_frames - 1,
+                        "batch_cache_fully_replayed": True,
+                        "initiating_refill_completion_monotonic_ns": (
+                            initiating_refill_completion_ns
+                        ),
+                    }
                 )
                 _validate_batch_host_chronology(
                     initial_host_after_ns=initial.host_after_ns,
@@ -2225,18 +2271,6 @@ def _run_probe_body(
                     "command_timing_qualified": True,
                     "gain_transient_exercised": False,
                 }
-                report["acquisition"].update(
-                    {
-                        "single_core_batch_initiated": True,
-                        "initiating_batch_refill_calls": 1,
-                        "public_refill_calls": probe.batch_frames,
-                        "cached_replay_refill_calls": probe.batch_frames - 1,
-                        "batch_cache_fully_replayed": True,
-                        "initiating_refill_completion_monotonic_ns": (
-                            initiating_refill_completion_ns
-                        ),
-                    }
-                )
             except BaseException as error:  # noqa: BLE001
                 acquisition_error = error
 
@@ -3258,7 +3292,8 @@ def _validate_command_report(
         or lower != extended_a
         or upper != extended_c
         or lower < last_qualified_frame_end
-        or not first_batch_sample <= s0 < target < last_batch_sample_exclusive
+        or not s0 < target
+        or not first_batch_sample <= target < last_batch_sample_exclusive
         or not extended_p < target <= extended_a < extended_c
         or not 0 < extended_a - extended_p < 1 << 31
         or not 0 <= target_error <= probe.max_command_sample_uncertainty
@@ -4049,6 +4084,8 @@ def _validate_transient_transport_probe_report_impl(
         "configured_batch_cache_bytes",
         "batch_cache_attested",
         "post_open_baseline_raw",
+        "prebind_unbound_command",
+        "prebind_raw_counter_schedule",
     }
     if set(acquisition) != expected_acquisition_fields:
         raise EvidenceInvalid("transport probe acquisition fields changed")
@@ -4080,6 +4117,37 @@ def _validate_transient_transport_probe_report_impl(
         ).get("command"),
         name="command_contention.command",
     ).get("sample_counter_bracket")
+    unbound_command = _required_mapping(
+        acquisition.get("prebind_unbound_command"),
+        name="prebind unbound command",
+    )
+    raw_schedule = _required_mapping(
+        acquisition.get("prebind_raw_counter_schedule"),
+        name="prebind raw counter schedule",
+    )
+    bound_command = _required_mapping(
+        _required_mapping(
+            report.get("command_contention"), name="command_contention"
+        ).get("command"),
+        name="command_contention.command",
+    )
+    expected_unbound_fields = {
+        "command_id",
+        "requested_level_db",
+        "applied_level_db",
+        "host_before_ns",
+        "host_after_ns",
+        "host_jitter_ns",
+        "sample_sequence_before",
+        "sample_sequence_after",
+        "sample_uncertainty",
+        "effective_attenuation_db",
+    }
+    bound_fields = expected_unbound_fields - {
+        "sample_sequence_before",
+        "sample_sequence_after",
+        "sample_uncertainty",
+    }
     if (
         acquisition.get("threaded") is not True
         or acquisition.get("worker_started") is not True
@@ -4093,6 +4161,19 @@ def _validate_transient_transport_probe_report_impl(
         or not 0 <= post_open_raw < 1 << 32
         or not isinstance(command_bracket, Mapping)
         or command_bracket.get("post_open_baseline_raw") != post_open_raw
+        or set(unbound_command) != expected_unbound_fields
+        or unbound_command.get("sample_sequence_before") is not None
+        or unbound_command.get("sample_sequence_after") is not None
+        or unbound_command.get("sample_uncertainty") is not None
+        or any(
+            unbound_command.get(field) != bound_command.get(field)
+            for field in bound_fields
+        )
+        or set(raw_schedule) != _PROBE_RAW_SCHEDULE_FIELDS
+        or any(
+            raw_schedule.get(field) != command_bracket.get(field)
+            for field in _PROBE_RAW_SCHEDULE_FIELDS
+        )
         or acquisition.get("queue_capacity_frames") != _PROBE_QUEUE_FRAMES
         or acquisition.get("required_consumed_frames") != probe.retained_frames
         or produced != probe.batch_frames
@@ -4283,6 +4364,8 @@ def run_transient_transport_probe(
             "cached_replay_refill_calls": 0,
             "batch_cache_fully_replayed": False,
             "initiating_refill_completion_monotonic_ns": None,
+            "prebind_unbound_command": None,
+            "prebind_raw_counter_schedule": None,
             "worker_in_flight_at_command": False,
             "worker_in_flight_before_shutdown": False,
             "cancel_required": False,

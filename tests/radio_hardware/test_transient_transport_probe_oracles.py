@@ -341,6 +341,8 @@ class _FakeProbeRadio:
         self.hold_request_initial_gain_db: int | None = None
         self.sample_counter = self.first_sample
         self.counter_read_step = 4_096
+        self.precapture_baseline_offset_samples = 0
+        self.precapture_baseline_reads = 0
         self.sleep_advances_counter = True
         self.refill_ns = 1_000_000
         self.metadata_by_token: dict[bytes, Any] = {}
@@ -733,6 +735,15 @@ class _FakeProbeRadio:
         return self.metadata_by_token[token]
 
     def read_rx_sample_counter_low32(self) -> int:
+        if (
+            self.precapture_baseline_offset_samples
+            and not self.batch_inflight.is_set()
+            and self.precapture_baseline_reads == 0
+        ):
+            current = self.first_sample - self.precapture_baseline_offset_samples
+            self.precapture_baseline_reads += 1
+            self.sample_counter = current + self.counter_read_step
+            return current % (1 << 32)
         current = max(self.sample_counter, self.first_sample)
         self.sample_counter = current + self.counter_read_step
         return current % (1 << 32)
@@ -930,6 +941,135 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     ] == 80_872_448
     assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
     validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_accepts_v4_precapture_s0_with_target_inside_exact_batch(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.precapture_baseline_offset_samples = 22_043
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    frames = report["frames"]
+    contention = report["command_contention"]
+    bracket = contention["command"]["sample_counter_bracket"]
+    partition = contention["partition"]
+    assert frames[0]["first_sample_sequence"] - bracket[
+        "post_open_baseline_sample"
+    ] == 22_043
+    assert bracket["post_open_baseline_sample"] < frames[0]["first_sample_sequence"]
+    assert (
+        frames[0]["first_sample_sequence"]
+        <= bracket["target_sample"]
+        < frames[-1]["sample_end_exclusive"]
+    )
+    assert frames[39]["first_sample_sequence"] < bracket["target_sample"] < (
+        frames[39]["sample_end_exclusive"]
+    )
+    assert partition["fully_pre_command_frames"] == 39
+    assert partition["fully_post_command_frames"] == 24
+    acquisition = report["acquisition"]
+    assert acquisition["prebind_unbound_command"]["sample_sequence_before"] is None
+    assert acquisition["prebind_unbound_command"]["sample_sequence_after"] is None
+    assert acquisition["prebind_raw_counter_schedule"] == {
+        field: bracket[field] for field in probe_module._PROBE_RAW_SCHEDULE_FIELDS
+    }
+    validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_rejects_target_outside_batch_and_insufficient_partition(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.precapture_baseline_offset_samples = 22_043
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    acquisition = report["acquisition"]
+    unbound = acquisition["prebind_unbound_command"]
+    command = probe_module.StimulusCommand(
+        command_id=unbound["command_id"],
+        requested_level_db=unbound["requested_level_db"],
+        applied_level_db=unbound["applied_level_db"],
+        host_before_ns=unbound["host_before_ns"],
+        host_after_ns=unbound["host_after_ns"],
+        sample_sequence_before=None,
+        sample_sequence_after=None,
+    )
+    raw_schedule = acquisition["prebind_raw_counter_schedule"]
+    target = report["command_contention"]["command"]["sample_counter_bracket"][
+        "target_sample"
+    ]
+    shifted_frames = [SimpleNamespace(record=copy.deepcopy(frame)) for frame in report["frames"]]
+    shift = target - shifted_frames[-1].record["sample_end_exclusive"]
+    for frame in shifted_frames:
+        frame.record["first_sample_sequence"] += shift
+        frame.record["sample_end_exclusive"] += shift
+    with pytest.raises(EvidenceInvalid, match="target is outside the batch"):
+        probe_module._bind_batch_counter_schedule(
+            shifted_frames,
+            command,
+            raw_schedule,
+            TransientTransportProbeOptions(),
+        )
+
+    frames = [SimpleNamespace(record=copy.deepcopy(frame)) for frame in report["frames"]]
+    lower = frames[30].record["sample_end_exclusive"]
+    insufficient = replace(
+        command,
+        sample_sequence_before=lower,
+        sample_sequence_after=lower + 4_096,
+    )
+    with pytest.raises(EvidenceInvalid, match="retained 31 fully pre-command"):
+        probe_module._probe_command_partition(
+            frames,
+            insufficient,
+            required_fully_pre_frames=32,
+            required_fully_post_frames=8,
+        )
+
+
+def test_probe_persists_prebind_diagnostics_on_posthoc_bind_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+
+    def fail_bind(*_args: Any, **_kwargs: Any) -> Any:
+        raise EvidenceInvalid("planted posthoc bind failure")
+
+    monkeypatch.setattr(probe_module, "_bind_batch_counter_schedule", fail_bind)
+    with pytest.raises(EvidenceInvalid, match="planted posthoc bind failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    acquisition = report["acquisition"]
+    assert report["verdict"] == "invalid"
+    assert len(report["frames"]) == 64
+    assert acquisition["single_core_batch_initiated"] is True
+    assert acquisition["initiating_batch_refill_calls"] == 1
+    assert acquisition["public_refill_calls"] == 64
+    assert acquisition["cached_replay_refill_calls"] == 63
+    assert acquisition["batch_cache_fully_replayed"] is True
+    assert acquisition["initiating_refill_completion_monotonic_ns"] == (
+        report["frames"][0]["refill_monotonic_ns"]
+    )
+    assert acquisition["prebind_unbound_command"]["command_id"] == (
+        "weak_control_reassertion"
+    )
+    assert set(acquisition["prebind_raw_counter_schedule"]) == (
+        probe_module._PROBE_RAW_SCHEDULE_FIELDS
+    )
+    with pytest.raises(EvidenceInvalid, match="report is not qualified"):
+        validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_precapture_s0_does_not_relax_first_transition_gate(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.precapture_baseline_offset_samples = 22_043
+    radio.first_unrepresented_transitions = 1
+    with pytest.raises(EvidenceInvalid, match="unrepresented prior transitions"):
+        _run_fake(radio, _quality(tmp_path))
+    assert _failure_report(radio)["verdict"] == "invalid"
 
 
 def test_probe_attests_complete_exact_runtime_provenance(tmp_path: Path) -> None:
@@ -1480,6 +1620,12 @@ def test_probe_never_commands_after_batch_fails_before_counter_target(
     assert report["verdict"] == "invalid"
     assert "partial metadata batch" in report["fatal_error"]
     assert "command_contention" not in report
+    assert report["acquisition"]["single_core_batch_initiated"] is False
+    assert report["acquisition"]["initiating_batch_refill_calls"] == 0
+    assert report["acquisition"]["public_refill_calls"] == 0
+    assert report["acquisition"]["cached_replay_refill_calls"] == 0
+    assert report["acquisition"]["batch_cache_fully_replayed"] is False
+    assert report["acquisition"]["initiating_refill_completion_monotonic_ns"] is None
     assert radio.cancel_calls == 1
     assert radio.core_cancel_calls == 1
     assert radio.cleanup_cancel_calls == 1
@@ -1828,7 +1974,15 @@ def test_probe_worker_error_after_final_frame_is_not_discarded(tmp_path: Path) -
     radio.worker_error_at = 63
     with pytest.raises(BaseException, match="worker failure"):
         _run_fake(radio, _quality(tmp_path))
-    assert _failure_report(radio)["verdict"] == "invalid"
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert len(report["frames"]) == 63
+    assert report["acquisition"]["single_core_batch_initiated"] is False
+    assert report["acquisition"]["initiating_batch_refill_calls"] == 0
+    assert report["acquisition"]["public_refill_calls"] == 0
+    assert report["acquisition"]["cached_replay_refill_calls"] == 0
+    assert report["acquisition"]["batch_cache_fully_replayed"] is False
+    assert report["acquisition"]["initiating_refill_completion_monotonic_ns"] is None
 
 
 def test_probe_radio_authorization_forbids_strong_write(tmp_path: Path) -> None:
@@ -2024,6 +2178,16 @@ def test_report_validator_rejects_planted_mutations(tmp_path: Path) -> None:
                 lambda value: value["acquisition"].update(
                     configured_batch_cache_bytes=1
                 )
+            ),
+            mutated(
+                lambda value: value["acquisition"][
+                    "prebind_unbound_command"
+                ].update(host_before_ns=0)
+            ),
+            mutated(
+                lambda value: value["acquisition"][
+                    "prebind_raw_counter_schedule"
+                ].update(target_raw=0)
             ),
             mutated(
                 lambda value: value["memory_policy"]["aggregate"].update(
