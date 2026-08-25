@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE_LIB = ROOT / "scripts" / "ci" / "source_manifest_lib.sh"
 RC2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc2-source.yaml"
 RC3_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc3-source.yaml"
+RC4_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc4-source.yaml"
 FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
@@ -118,9 +119,10 @@ def test_final_packed_identities_match_declared_source_lock_tags() -> None:
         assert values[identity_key] == _tag_identity(values[ref_key])
 
 
-def test_rc3_advances_only_libiio_buildroot_and_linux_and_is_final() -> None:
+def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None:
     rc2 = _manifest_values(RC2_SOURCE_MANIFEST)
     rc3 = _manifest_values(RC3_SOURCE_MANIFEST)
+    rc4 = _manifest_values(RC4_SOURCE_MANIFEST)
     final = _manifest_values(FINAL_SOURCE_MANIFEST)
     tandem_v2 = _manifest_values(TANDEM_V2_SOURCE_MANIFEST)
     changed_component_keys = {
@@ -144,15 +146,15 @@ def test_rc3_advances_only_libiio_buildroot_and_linux_and_is_final() -> None:
         key for key, value in rc2.items() if rc3[key] != value
     } == changed_component_keys
 
-    assert rc3 == final
-    assert "release_tag" not in rc3
-    for values in (rc3, final):
+    assert rc3 == rc4 == final
+    for values in (rc3, rc4, final):
+        assert "release_tag" not in values
         assert values["libiio_0_25_source"] == RC3_LIBIIO_SOURCE
         assert values["libiio_0_25_ref"] == RC3_LIBIIO_REF
         assert values["submodule_buildroot"] == RC3_BUILDROOT_SOURCE
         assert values["submodule_buildroot_ref"] == RC3_BUILDROOT_REF
         assert values["versions_buildroot"] == RC3_BUILDROOT_IDENTITY
-    for values in (rc3, final, tandem_v2):
+    for values in (rc3, rc4, final, tandem_v2):
         assert values["submodule_linux"] == RC3_LINUX_SOURCE
         assert values["submodule_linux_ref"] == RC3_LINUX_REF
     assert rc3["versions_linux"] == RC3_LINUX_IDENTITY
@@ -170,21 +172,23 @@ def test_tandem_v2_preserves_historical_transport_but_prevents_linux_rollback() 
     assert tandem_v2["submodule_linux_ref"] == RC3_LINUX_REF
 
 
-def test_rc3_has_explicit_trusted_build_and_pr_source_graph_routes() -> None:
-    branch = "refs/heads/codex/firmware-tandem-agc-v8-rc3"
+def test_rc3_and_rc4_have_explicit_trusted_build_and_source_graph_routes() -> None:
     main_workflow = FIRMWARE_MAIN_WORKFLOW.read_text(encoding="utf-8")
     pr_workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
     launcher = QUALITY_HARDWARE_LAUNCHER.read_text(encoding="utf-8")
 
-    assert main_workflow.count(branch) == 3
-    assert "tandem-agc-v8-rc3-source.yaml" in main_workflow
-    assert "plutoplus-spf-tandem-agc-v8-rc3" in main_workflow
+    for candidate in ("rc3", "rc4"):
+        branch = f"refs/heads/codex/firmware-tandem-agc-v8-{candidate}"
+        assert main_workflow.count(branch) == 3
+        assert f"tandem-agc-v8-{candidate}-source.yaml" in main_workflow
+        assert f"plutoplus-spf-tandem-agc-v8-{candidate}" in main_workflow
     for manifest in (
         "manifests/tandem-agc-v8-rc3-source.yaml",
+        "manifests/tandem-agc-v8-rc4-source.yaml",
         "manifests/tandem-agc-v8-source.yaml",
     ):
         assert f"./scripts/check_source_graph.sh {manifest}" in pr_workflow
-    assert "manifests/tandem-agc-v8-rc3-source.yaml" in launcher
+    assert "manifests/tandem-agc-v8-rc4-source.yaml" in launcher
 
 
 def test_required_hdl_simulation_uses_final_timestamp_source() -> None:

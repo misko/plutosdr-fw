@@ -140,7 +140,7 @@ scripts/run_tandem_agc_quality_hardware.sh \
   --tx2-loopback \
   --radio-serial SERIAL \
   --radio-uri usb:BUS.DEVICE.INTERFACE \
-  --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc3$' \
+  --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc4$' \
   --loopback-attenuation-db 0 \
   --tandem-quality-center-frequency-hz 915000000 \
   --tandem-quality-profile smoke
