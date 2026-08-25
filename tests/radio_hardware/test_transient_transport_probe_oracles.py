@@ -30,6 +30,7 @@ from .metadata_abi import (
     TandemEventReason,
     TandemGainEvent,
     TandemGainTable,
+    TandemMode,
     TandemState,
 )
 from .tandem_quality import TandemQualityOptions
@@ -120,6 +121,11 @@ class _FakeProbeRadio:
         self.buffer_mute_failures = 0
         self.cancel_failures = 0
         self.buffer_close_failures = 0
+        self.hold_open_failures = 0
+        self.hold_close_failures = 0
+        self.hold_fifo_after_clear = 0
+        self.hold_fifo_after_close: int | None = None
+        self.hold_active = False
         self.close_failures = 0
         self.cleanup_verified = False
         self.capture_count = 0
@@ -158,6 +164,7 @@ class _FakeProbeRadio:
         self.transition_count = 0
         self.event_sequence = 100
         self.gain_index = 40
+        self.fifo_level = 0
         self.sample_counter = self.first_sample
         self.refill_ns = 1_000_000
         self.metadata_by_token: dict[bytes, Any] = {}
@@ -165,7 +172,24 @@ class _FakeProbeRadio:
         self.raw = _tone_raw(self.options.samples_per_channel)
         self.closed = False
 
-    def mute_all(self) -> None:
+    def _mute_evidence(self) -> dict[str, Any]:
+        return {
+            "verified": True,
+            "tx1_gain_db": -89.75,
+            "tx2_gain_db": -89.75,
+            "selectors": [3, 3, 3, 3],
+            "dds": {
+                f"altvoltage{index}": {
+                    "present": True,
+                    "raw": 0.0,
+                    "scale": 0.0,
+                }
+                for index in range(8)
+            },
+            "failures": [],
+        }
+
+    def mute_all(self) -> dict[str, Any]:
         self.operations.append(("mute", self.buffer_open))
         self.tx_gain_db = -89.75
         if self.mute_failures:
@@ -174,6 +198,7 @@ class _FakeProbeRadio:
         if self.buffer_open and self.buffer_mute_failures:
             self.buffer_mute_failures -= 1
             raise RuntimeError("planted mute failure")
+        return self._mute_evidence()
 
     def arm_tx2_tone(self, *, tone_hz: int, scale: float) -> None:
         self.operations.append(("arm_tone", tone_hz, scale))
@@ -202,11 +227,13 @@ class _FakeProbeRadio:
 
     def tandem_status(self) -> dict[str, int]:
         return {
-            "state": int(TandemState.IDLE),
+            "state": int(
+                TandemState.ARMED_HOLD if self.hold_active else TandemState.IDLE
+            ),
             "fault_flags": 0,
             "overflow_count": 0,
-            "fifo_level": 0,
-            "ownership_epoch": 0,
+            "fifo_level": self.fifo_level,
+            "ownership_epoch": 7 if self.hold_active else 0,
             "transition_count": self.transition_count,
             "rx1_gain_index": self.gain_index,
             "rx2_gain_index": self.gain_index,
@@ -223,15 +250,26 @@ class _FakeProbeRadio:
         @contextmanager
         def opened():
             assert api == "metadata"
-            assert kernel_buffers == 2
             assert samples_per_channel == 65_536
             assert (
                 tandem_request is not None
                 and len(tandem_request) == TANDEM_REQUEST.size
             )
-            self.operations.append(("buffer_enter", api, kernel_buffers))
+            request_mode = TandemMode(TANDEM_REQUEST.unpack(tandem_request)[4])
+            is_hold = request_mode is TandemMode.HOLD
+            assert kernel_buffers == (1 if is_hold else 2)
+            operation_prefix = "hold_buffer" if is_hold else "buffer"
+            self.operations.append((f"{operation_prefix}_enter", api, kernel_buffers))
+            if is_hold and self.hold_open_failures:
+                self.hold_open_failures -= 1
+                raise RuntimeError("planted HOLD FIFO clear open failure")
             self.buffer_open = True
             self.cancelled.clear()
+            if is_hold:
+                self.hold_active = True
+                self.fifo_level = self.hold_fifo_after_clear
+                self.transition_count = 0
+                self.event_sequence = 0
             body_error: BaseException | None = None
             try:
                 yield _FakeBuffer(self), 2
@@ -239,8 +277,14 @@ class _FakeProbeRadio:
                 body_error = error
             close_error: BaseException | None = None
             self.buffer_open = False
-            self.operations.append(("buffer_close",))
-            if self.buffer_close_failures:
+            self.hold_active = False
+            if is_hold and self.hold_fifo_after_close is not None:
+                self.fifo_level = self.hold_fifo_after_close
+            self.operations.append((f"{operation_prefix}_close",))
+            if is_hold and self.hold_close_failures:
+                self.hold_close_failures -= 1
+                close_error = RuntimeError("planted HOLD FIFO clear close failure")
+            elif not is_hold and self.buffer_close_failures:
                 self.buffer_close_failures -= 1
                 close_error = RuntimeError("planted buffer close failure")
             if body_error is not None and close_error is not None:
@@ -457,15 +501,8 @@ class _FakeProbeRadio:
         self.closed = True
         self.cleanup_verified = self.close_failures == 0
         cleanup = {
+            **self._mute_evidence(),
             "verified": self.cleanup_verified,
-            "tx1_gain_db": -89.75,
-            "tx2_gain_db": -89.75,
-            "selectors": [3, 3, 3, 3],
-            "dds": {
-                f"altvoltage{index}": {"present": True, "raw": 0.0, "scale": 0.0}
-                for index in range(8)
-            },
-            "failures": [],
         }
         if self._report_path is not None and self._report_path.is_file():
             report = json.loads(self._report_path.read_text(encoding="utf-8"))
@@ -516,6 +553,12 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     assert path.is_file()
     assert report["verdict"] == PROBE_PENDING_VERDICT
     assert report["release_pass_eligible"] is False
+    assert report["stale_fifo_normalization"]["action"] == "not_required"
+    assert report["stale_fifo_normalization"]["stale_fifo_events"] == 0
+    assert report["stale_fifo_normalization"]["hold_session"] is None
+    assert not any(
+        operation[0] == "hold_buffer_enter" for operation in radio.operations
+    )
     assert len(report["frames"]) == 40
     assert report["frames"][31]["probe_phase"] == "uncontended_continuity"
     assert report["command_contention"]["command"]["requested_level_db"] == -45.0
@@ -540,6 +583,119 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     assert cancel_index < close_index
     assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
     validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_clears_stale_fifo_in_muted_hold_before_tx(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    normalization = report["stale_fifo_normalization"]
+    assert normalization["stale_fifo_events"] == 8
+    assert normalization["action"] == "muted_hold_session_acquire_clear"
+    hold = normalization["hold_session"]
+    assert hold["metadata_request"]["decoded"]["mode"] == int(TandemMode.HOLD)
+    assert hold["metadata_abi"] == 2
+    assert hold["refill_count"] == 0
+    assert hold["opened"] is True and hold["closed"] is True
+    assert hold["status_while_open"]["state"] == int(TandemState.ARMED_HOLD)
+    assert hold["status_while_open"]["ownership_epoch"] > 0
+    assert hold["status_while_open"]["fifo_level"] == 0
+    assert normalization["status_after"]["state"] == int(TandemState.IDLE)
+    assert normalization["status_after"]["ownership_epoch"] == 0
+    assert normalization["status_after"]["fifo_level"] == 0
+    assert normalization["rx_state_before"] == normalization["rx_state_after"]
+
+    mute_index = radio.operations.index(("mute", False))
+    hold_enter = radio.operations.index(("hold_buffer_enter", "metadata", 1))
+    hold_close = radio.operations.index(("hold_buffer_close",))
+    arm_index = next(
+        index
+        for index, operation in enumerate(radio.operations)
+        if operation[0] == "arm_tone"
+    )
+    tx_index = next(
+        index
+        for index, operation in enumerate(radio.operations)
+        if operation[0] == "set_tx2_gain"
+    )
+    assert mute_index < hold_enter < hold_close < arm_index < tx_index
+    validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_fifo_clear_open_failure_never_arms_tx(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    radio.hold_open_failures = 1
+
+    with pytest.raises(BaseException, match="HOLD FIFO clear open failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0] in {"arm_tone", "set_tx2_gain"} for operation in radio.operations
+    )
+    hold_enter = radio.operations.index(("hold_buffer_enter", "metadata", 1))
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[:hold_enter]
+    )
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[hold_enter + 1 :]
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_rejects_impossible_stale_fifo_level_before_tx(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 65
+
+    with pytest.raises(BaseException, match="FIFO level is invalid"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0] in {"hold_buffer_enter", "arm_tone", "set_tx2_gain"}
+        for operation in radio.operations
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_rejects_fifo_remaining_after_hold_close_before_tx(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    radio.hold_fifo_after_close = 8
+
+    with pytest.raises(BaseException, match="FIFO remains nonempty"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0] in {"arm_tone", "set_tx2_gain"} for operation in radio.operations
+    )
+    hold_close = radio.operations.index(("hold_buffer_close",))
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[hold_close + 1 :]
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_hold_close_failure_is_muted_and_never_arms_tx(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    radio.hold_close_failures = 1
+
+    with pytest.raises(BaseException, match="HOLD FIFO clear close failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0] in {"arm_tone", "set_tx2_gain"} for operation in radio.operations
+    )
+    hold_close = radio.operations.index(("hold_buffer_close",))
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[hold_close + 1 :]
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
 
 
 @pytest.mark.parametrize(
@@ -861,6 +1017,42 @@ def test_report_validator_rejects_planted_mutations(tmp_path: Path) -> None:
     )
     for forged in mutations:
         with pytest.raises(EvidenceInvalid):
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_report_validator_binds_stale_fifo_hold_normalization(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    mutations = []
+    for mutation in (
+        lambda value: value["stale_fifo_normalization"]["hold_session"].update(
+            refill_count=1
+        ),
+        lambda value: value["stale_fifo_normalization"]["hold_session"][
+            "metadata_request"
+        ]["decoded"].update(mode=int(TandemMode.AUTO)),
+        lambda value: value["stale_fifo_normalization"]["hold_session"][
+            "status_while_open"
+        ].update(ownership_epoch=0),
+        lambda value: value["stale_fifo_normalization"]["mute_evidence_before"].update(
+            tx2_gain_db=-70.0
+        ),
+        lambda value: value["stale_fifo_normalization"]["rx_state_after"][
+            "gains_db"
+        ].__setitem__(0, 39.0),
+        lambda value: (
+            value["stale_fifo_normalization"]["status_before"].update(fifo_level=65),
+            value["stale_fifo_normalization"].update(stale_fifo_events=65),
+        ),
+    ):
+        forged = copy.deepcopy(report)
+        mutation(forged)
+        mutations.append(forged)
+
+    for forged in mutations:
+        with pytest.raises((EvidenceInvalid, FixtureSafetyError)):
             validate_transient_transport_probe_report(forged, _quality(tmp_path))
 
 

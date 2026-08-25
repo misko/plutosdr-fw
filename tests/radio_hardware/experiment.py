@@ -636,10 +636,13 @@ class Issue46Radio:
         if close_error is not None:
             raise close_error.with_traceback(close_error.__traceback__)
 
-    def mute_all(self) -> None:
+    def mute_all(self) -> dict[str, Any]:
         """Force the fixture into its verified non-transmitting configuration."""
 
-        self._mute_everything()
+        evidence, failures = self._best_effort_mute()
+        if failures:
+            raise FixtureSafetyError("; ".join(failures))
+        return evidence
 
     def arm_tx2_tone(self, *, tone_hz: int, scale: float) -> None:
         """Route one DDS tone to physical TX2 while both transmitters stay muted."""

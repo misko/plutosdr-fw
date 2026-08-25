@@ -38,6 +38,7 @@ from .metadata_abi import (
     TandemFrameMetadata,
     TandemMode,
     TandemState,
+    build_tandem_request,
     maximum_tandem_events_per_frame,
     parse_tandem_frame_metadata,
 )
@@ -834,6 +835,224 @@ def _status_is_idle(status: Mapping[str, Any], *, label: str) -> None:
             )
 
 
+_FIFO_NORMALIZATION_POLICY = (
+    "while fully muted, an ABI-2 HOLD MetadataBuffer open/close may normalize only "
+    "a stale FIFO on an otherwise safe unowned IDLE controller; construction "
+    "synchronously acquires and clears the session, no refill or TX write occurs"
+)
+_TANDEM_STATUS_FIELDS = {
+    "state",
+    "fault_flags",
+    "overflow_count",
+    "fifo_level",
+    "ownership_epoch",
+    "transition_count",
+    "rx1_gain_index",
+    "rx2_gain_index",
+}
+
+
+def _safe_unowned_idle_status(
+    status: Mapping[str, Any], *, require_empty_fifo: bool, label: str
+) -> dict[str, int]:
+    if set(status) != _TANDEM_STATUS_FIELDS:
+        raise EvidenceInvalid(f"transport probe {label} status fields are incomplete")
+    normalized: dict[str, int] = {}
+    for name, value in status.items():
+        if type(value) is not int:
+            raise EvidenceInvalid(
+                f"transport probe {label} {name} is not an exact integer"
+            )
+        normalized[name] = value
+    required = {
+        "state": int(TandemState.IDLE),
+        "fault_flags": 0,
+        "overflow_count": 0,
+        "ownership_epoch": 0,
+    }
+    for name, expected in required.items():
+        if normalized.get(name) != expected:
+            raise EvidenceInvalid(
+                f"transport probe {label} {name} is {normalized.get(name)!r}, "
+                f"expected {expected}"
+            )
+    fifo_level = normalized.get("fifo_level")
+    if fifo_level is None or not 0 <= fifo_level <= 64:
+        raise EvidenceInvalid(f"transport probe {label} FIFO level is invalid")
+    if require_empty_fifo and fifo_level != 0:
+        raise EvidenceInvalid(
+            f"transport probe {label} FIFO remains nonempty at {fifo_level}"
+        )
+    return normalized
+
+
+def _safe_owned_hold_status(status: Mapping[str, Any], *, label: str) -> dict[str, int]:
+    if set(status) != _TANDEM_STATUS_FIELDS:
+        raise EvidenceInvalid(f"transport probe {label} status fields are incomplete")
+    normalized: dict[str, int] = {}
+    for name, value in status.items():
+        if type(value) is not int:
+            raise EvidenceInvalid(
+                f"transport probe {label} {name} is not an exact integer"
+            )
+        normalized[name] = value
+    if (
+        normalized["state"] != int(TandemState.ARMED_HOLD)
+        or normalized["ownership_epoch"] <= 0
+        or normalized["fault_flags"] != 0
+        or normalized["overflow_count"] != 0
+        or normalized["fifo_level"] != 0
+        or normalized["transition_count"] != 0
+        or normalized["rx1_gain_index"] != normalized["rx2_gain_index"]
+    ):
+        raise EvidenceInvalid(f"transport probe {label} is not a safe owned HOLD")
+    return normalized
+
+
+def _manual_gain_state(
+    radio: TransientRadioTransport,
+    quality: TandemQualityOptions,
+    *,
+    label: str,
+) -> dict[str, Any]:
+    state = _rx_state(radio, expected_mode="manual")
+    gains = [float(value) for value in state["gains_db"]]
+    if any(abs(value - quality.manual_gain_db) > 0.1 for value in gains):
+        raise EvidenceInvalid(
+            f"transport probe {label} RX gains differ from configured manual gain"
+        )
+    return state
+
+
+def _hold_normalization_request(
+    quality: TandemQualityOptions, probe: TransientTransportProbeOptions
+) -> bytes:
+    return build_tandem_request(
+        mode=TandemMode.HOLD,
+        initial_gain_db=int(quality.manual_gain_db),
+        power_measurement_samples=quality.tandem_power_measurement_samples,
+        low_power_dwell_periods=quality.tandem_low_power_dwell_periods,
+        cooldown_periods=quality.tandem_cooldown_periods,
+        low_power_threshold=quality.tandem_low_power_threshold,
+        large_lmt_overload_threshold=quality.tandem_large_lmt_overload_threshold,
+        large_adc_overload_threshold=quality.tandem_large_adc_overload_threshold,
+        small_adc_overload_threshold=quality.tandem_small_adc_overload_threshold,
+        samples_per_channel=probe.frame_samples,
+    )
+
+
+def _normalize_stale_fifo(
+    radio: TransientRadioTransport,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+    evidence: dict[str, Any],
+    *,
+    mute_evidence: Mapping[str, Any] | None,
+    check_deadline: Callable[[], None],
+) -> dict[str, int]:
+    """Clear only a stale FIFO, under mute, through one bounded HOLD session."""
+
+    _validate_verified_mute_evidence(
+        mute_evidence, label="pre-normalization mute evidence"
+    )
+    rx_before = _manual_gain_state(radio, quality, label="pre-normalization")
+    before = _safe_unowned_idle_status(
+        radio.tandem_status(),
+        require_empty_fifo=False,
+        label="pre-normalization status",
+    )
+    fifo_level = before["fifo_level"]
+    evidence.update(
+        {
+            "policy": _FIFO_NORMALIZATION_POLICY,
+            "mute_evidence_before": dict(mute_evidence or {}),
+            "rx_state_before": rx_before,
+            "status_before": before,
+            "stale_fifo_events": fifo_level,
+        }
+    )
+    if fifo_level == 0:
+        after = _safe_unowned_idle_status(
+            radio.tandem_status(),
+            require_empty_fifo=True,
+            label="no-op normalization status",
+        )
+        if after != before:
+            raise EvidenceInvalid(
+                "transport probe no-op FIFO normalization status changed"
+            )
+        rx_after = _manual_gain_state(radio, quality, label="post-no-op normalization")
+        if rx_after != rx_before:
+            raise EvidenceInvalid(
+                "transport probe no-op FIFO normalization changed RX state"
+            )
+        evidence.update(
+            {
+                "action": "not_required",
+                "hold_session": None,
+                "status_after": after,
+                "rx_state_after": rx_after,
+            }
+        )
+        return after
+
+    request = _hold_normalization_request(quality, probe)
+    hold_session = {
+        "mode": "hold",
+        "kernel_buffers": 1,
+        "samples_per_channel": probe.frame_samples,
+        "refill_count": 0,
+        "metadata_request": _request_evidence(request),
+        "metadata_abi": None,
+        "opened": False,
+        "closed": False,
+        "status_while_open": None,
+        "tx_policy": "fully muted before and throughout normalization",
+    }
+    evidence.update(
+        {
+            "action": "muted_hold_session_acquire_clear",
+            "hold_session": hold_session,
+        }
+    )
+    check_deadline()
+    with radio.buffer(
+        "metadata",
+        1,
+        probe.frame_samples,
+        tandem_request=request,
+    ) as (_buffer, metadata_abi):
+        hold_session["opened"] = True
+        hold_session["metadata_abi"] = metadata_abi
+        if metadata_abi != 2:
+            raise EvidenceInvalid(
+                "transport probe FIFO normalization requires metadata ABI 2"
+            )
+        hold_session["status_while_open"] = _safe_owned_hold_status(
+            radio.tandem_status(), label="in-session HOLD status"
+        )
+    hold_session["closed"] = True
+    check_deadline()
+    after = _safe_unowned_idle_status(
+        radio.tandem_status(),
+        require_empty_fifo=True,
+        label="post-normalization status",
+    )
+    active_status = hold_session["status_while_open"]
+    assert isinstance(active_status, Mapping)
+    for field in ("transition_count", "rx1_gain_index", "rx2_gain_index"):
+        if after[field] != active_status[field]:
+            raise EvidenceInvalid(
+                "transport probe HOLD normalization changed event/gain state on close"
+            )
+    rx_after = _manual_gain_state(radio, quality, label="post-HOLD normalization")
+    if rx_after != rx_before:
+        raise EvidenceInvalid("transport probe HOLD normalization did not restore RX")
+    evidence["status_after"] = after
+    evidence["rx_state_after"] = rx_after
+    return after
+
+
 def _run_probe_body(
     radio: TransientRadioTransport,
     quality: TandemQualityOptions,
@@ -847,11 +1066,19 @@ def _run_probe_body(
     sleep: Callable[[float], None],
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
 ) -> None:
-    radio.mute_all()
-    status_before = _wait_for_idle(radio, monotonic=monotonic, sleep=sleep)
-    _status_is_idle(status_before, label="before")
-    report["tandem_status_before"] = status_before
+    mute_evidence = radio.mute_all()
     radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
+    fifo_normalization: dict[str, Any] = {}
+    report["stale_fifo_normalization"] = fifo_normalization
+    status_before = _normalize_stale_fifo(
+        radio,
+        quality,
+        probe,
+        fifo_normalization,
+        mute_evidence=mute_evidence,
+        check_deadline=check_deadline,
+    )
+    report["tandem_status_before"] = status_before
     radio.arm_tx2_tone(tone_hz=quality.tone_hz, scale=quality.dds_scale)
 
     initial = timestamp_stimulus_command(
@@ -1173,24 +1400,178 @@ def _validate_idle_report_status(value: Any, *, name: str) -> None:
     _status_is_idle(status, label=name)
 
 
-def _validate_cleanup_evidence(value: Any) -> None:
-    cleanup = _required_mapping(value, name="cleanup")
+def _validate_report_unowned_idle_status(
+    value: Any, *, name: str, require_empty_fifo: bool
+) -> dict[str, int]:
+    status = _required_mapping(value, name=name)
+    if set(status) != _TANDEM_STATUS_FIELDS:
+        raise EvidenceInvalid(f"transport probe {name} status fields changed")
+    parsed = {
+        field: _required_int(status.get(field), name=f"{name} {field}")
+        for field in _TANDEM_STATUS_FIELDS
+    }
+    required = {
+        "state": int(TandemState.IDLE),
+        "fault_flags": 0,
+        "overflow_count": 0,
+        "ownership_epoch": 0,
+    }
+    if any(parsed[field] != expected for field, expected in required.items()):
+        raise EvidenceInvalid(f"transport probe {name} is not safely unowned IDLE")
+    if parsed["fifo_level"] > 64:
+        raise EvidenceInvalid(f"transport probe {name} FIFO exceeds capacity")
+    if require_empty_fifo and parsed["fifo_level"] != 0:
+        raise EvidenceInvalid(f"transport probe {name} FIFO is not empty")
+    return parsed
+
+
+def _validate_report_owned_hold_status(value: Any, *, name: str) -> dict[str, int]:
+    status = _required_mapping(value, name=name)
+    if set(status) != _TANDEM_STATUS_FIELDS:
+        raise EvidenceInvalid(f"transport probe {name} status fields changed")
+    parsed = {
+        field: _required_int(status.get(field), name=f"{name} {field}")
+        for field in _TANDEM_STATUS_FIELDS
+    }
+    if (
+        parsed["state"] != int(TandemState.ARMED_HOLD)
+        or parsed["ownership_epoch"] <= 0
+        or parsed["fault_flags"] != 0
+        or parsed["overflow_count"] != 0
+        or parsed["fifo_level"] != 0
+        or parsed["transition_count"] != 0
+        or parsed["rx1_gain_index"] != parsed["rx2_gain_index"]
+    ):
+        raise EvidenceInvalid(f"transport probe {name} is not safe owned HOLD")
+    return parsed
+
+
+def _validate_manual_rx_report(
+    value: Any, *, quality: TandemQualityOptions, name: str
+) -> dict[str, Any]:
+    state = _required_mapping(value, name=name)
+    if set(state) != {"modes", "gains_db"} or state.get("modes") != [
+        "manual",
+        "manual",
+    ]:
+        raise EvidenceInvalid(f"transport probe {name} RX mode is not manual")
+    gains = _required_list(state.get("gains_db"), name=f"{name} RX gains")
+    if len(gains) != 2 or any(
+        abs(_required_number(gain, name=f"{name} RX gain") - quality.manual_gain_db)
+        > 0.1
+        for gain in gains
+    ):
+        raise EvidenceInvalid(f"transport probe {name} RX gain is invalid")
+    return {"modes": ["manual", "manual"], "gains_db": list(gains)}
+
+
+def _validate_fifo_normalization_report(
+    value: Any,
+    *,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+) -> dict[str, int]:
+    record = _required_mapping(value, name="stale_fifo_normalization")
+    if set(record) != {
+        "policy",
+        "mute_evidence_before",
+        "rx_state_before",
+        "status_before",
+        "stale_fifo_events",
+        "action",
+        "hold_session",
+        "status_after",
+        "rx_state_after",
+    }:
+        raise EvidenceInvalid("transport probe FIFO-normalization ledger changed")
+    if record.get("policy") != _FIFO_NORMALIZATION_POLICY:
+        raise EvidenceInvalid("transport probe FIFO-normalization policy changed")
+    _validate_verified_mute_evidence(
+        record.get("mute_evidence_before"), label="pre-normalization mute evidence"
+    )
+    rx_before = _validate_manual_rx_report(
+        record.get("rx_state_before"),
+        quality=quality,
+        name="pre-normalization",
+    )
+    before = _validate_report_unowned_idle_status(
+        record.get("status_before"),
+        name="pre-normalization status",
+        require_empty_fifo=False,
+    )
+    if record.get("stale_fifo_events") != before["fifo_level"]:
+        raise EvidenceInvalid("transport probe stale-FIFO event count changed")
+    after = _validate_report_unowned_idle_status(
+        record.get("status_after"),
+        name="post-normalization status",
+        require_empty_fifo=True,
+    )
+    rx_after = _validate_manual_rx_report(
+        record.get("rx_state_after"),
+        quality=quality,
+        name="post-normalization",
+    )
+    if rx_after != rx_before:
+        raise EvidenceInvalid("transport probe FIFO normalization changed RX state")
+    if before["fifo_level"] == 0:
+        if (
+            record.get("action") != "not_required"
+            or record.get("hold_session") is not None
+            or after != before
+        ):
+            raise EvidenceInvalid("transport probe forged a no-op FIFO normalization")
+        return after
+
+    hold_session = _required_mapping(record.get("hold_session"), name="HOLD session")
+    active_status = _validate_report_owned_hold_status(
+        hold_session.get("status_while_open"), name="in-session HOLD status"
+    )
+    if any(
+        after[field] != active_status[field]
+        for field in ("transition_count", "rx1_gain_index", "rx2_gain_index")
+    ):
+        raise EvidenceInvalid(
+            "transport probe HOLD close changed transition or endpoint state"
+        )
+    expected_hold_session = {
+        "mode": "hold",
+        "kernel_buffers": 1,
+        "samples_per_channel": probe.frame_samples,
+        "refill_count": 0,
+        "metadata_request": _request_evidence(
+            _hold_normalization_request(quality, probe)
+        ),
+        "metadata_abi": 2,
+        "opened": True,
+        "closed": True,
+        "status_while_open": active_status,
+        "tx_policy": "fully muted before and throughout normalization",
+    }
+    if record.get("action") != "muted_hold_session_acquire_clear" or record.get(
+        "hold_session"
+    ) != _json_domain(expected_hold_session):
+        raise EvidenceInvalid("transport probe HOLD FIFO normalization changed")
+    return after
+
+
+def _validate_verified_mute_evidence(value: Any, *, label: str) -> None:
+    cleanup = _required_mapping(value, name=label)
     if cleanup.get("verified") is not True or cleanup.get("failures") != []:
-        raise FixtureSafetyError("transport probe durable cleanup is invalid")
+        raise FixtureSafetyError(f"transport probe {label} is invalid")
     for name in ("tx1_gain_db", "tx2_gain_db"):
         if _required_number(cleanup.get(name), name=f"cleanup {name}") > -80.0:
-            raise FixtureSafetyError(f"transport probe cleanup {name} is not muted")
+            raise FixtureSafetyError(f"transport probe {label} {name} is not muted")
     selectors = _required_list(cleanup.get("selectors"), name="cleanup selectors")
     if selectors != [3, 3, 3, 3]:
-        raise FixtureSafetyError("transport probe cleanup selectors are not ZERO")
+        raise FixtureSafetyError(f"transport probe {label} selectors are not ZERO")
     dds = _required_mapping(cleanup.get("dds"), name="cleanup DDS")
     expected_names = {f"altvoltage{index}" for index in range(8)}
     if set(dds) != expected_names:
-        raise FixtureSafetyError("transport probe cleanup DDS inventory is incomplete")
+        raise FixtureSafetyError(f"transport probe {label} DDS inventory is incomplete")
     for name in sorted(expected_names):
         channel = _required_mapping(dds.get(name), name=f"cleanup DDS {name}")
         if channel.get("present") is not True:
-            raise FixtureSafetyError(f"transport probe cleanup DDS {name} is absent")
+            raise FixtureSafetyError(f"transport probe {label} DDS {name} is absent")
         for attribute in ("raw", "scale"):
             if (
                 _required_number(
@@ -1199,8 +1580,12 @@ def _validate_cleanup_evidence(value: Any) -> None:
                 != 0.0
             ):
                 raise FixtureSafetyError(
-                    f"transport probe cleanup DDS {name} {attribute} is nonzero"
+                    f"transport probe {label} DDS {name} {attribute} is nonzero"
                 )
+
+
+def _validate_cleanup_evidence(value: Any) -> None:
+    _validate_verified_mute_evidence(value, label="durable cleanup")
 
 
 def _validate_stable_report_suffix(
@@ -1524,6 +1909,9 @@ def _validate_transient_transport_probe_report_impl(
         raise EvidenceInvalid("transport probe safety policy changed")
     if report.get("evidence_policy") != _json_domain(_evidence_policy(probe)):
         raise EvidenceInvalid("transport probe evidence policy changed")
+    normalized_status_after = _validate_fifo_normalization_report(
+        report.get("stale_fifo_normalization"), quality=quality, probe=probe
+    )
 
     configuration = _required_mapping(report.get("configuration"), name="configuration")
     if configuration.get("probe") != _json_domain(asdict(probe)):
@@ -2120,6 +2508,10 @@ def _validate_transient_transport_probe_report_impl(
         or acquisition.get("worker_stopped_before_buffer_close") is not True
     ):
         raise EvidenceInvalid("transport probe acquisition ledger is invalid")
+    if report.get("tandem_status_before") != _json_domain(normalized_status_after):
+        raise EvidenceInvalid(
+            "transport probe initial status differs from FIFO normalization"
+        )
     _validate_idle_report_status(report.get("tandem_status_before"), name="before")
     _validate_idle_report_status(report.get("tandem_status_after"), name="after")
     final_rx = _required_mapping(report.get("final_rx_state"), name="final_rx_state")
