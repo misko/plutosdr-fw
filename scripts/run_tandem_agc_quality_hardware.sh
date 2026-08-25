@@ -4,6 +4,25 @@ set -euo pipefail
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 MANIFEST=${IIO_MANIFEST:-${ROOT}/manifests/tandem-agc-v8-rc2-source.yaml}
 IIO_SOURCE=${IIO_SOURCE:-$(cd -- "${ROOT}/.." && pwd)/libiio}
+pytest_target=tests/radio_hardware/test_tandem_agc_quality.py
+quality_requested=false
+probe_requested=false
+for argument in "$@"; do
+  case "${argument}" in
+    --tandem-quality-hardware)
+      quality_requested=true
+      ;;
+    --tandem-transient-transport-probe)
+      probe_requested=true
+      pytest_target=tests/radio_hardware/test_transient_transport_probe.py
+      ;;
+  esac
+done
+if [[ "${quality_requested}" == true && "${probe_requested}" == true ]]; then
+  printf '%s\n' \
+    'ERROR: choose either the quality matrix or transport probe, not both' >&2
+  exit 2
+fi
 
 [[ -f "${MANIFEST}" ]] || {
   printf 'ERROR: source manifest not found: %s\n' "${MANIFEST}" >&2
@@ -99,5 +118,5 @@ printf '%s\n' \
 
 cd -- "${ROOT}"
 exec "${python_bin}" -m pytest \
-  tests/radio_hardware/test_tandem_agc_quality.py \
+  "${pytest_target}" \
   "$@"

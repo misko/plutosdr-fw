@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 import pytest
 
@@ -27,6 +28,13 @@ def pytest_addoption(parser: Any) -> None:
         "--tandem-quality-hardware",
         action="store_true",
         help="run the manual/native/tandem AGC TX2 quality matrix",
+    )
+    group.addoption(
+        "--tandem-transient-transport-probe",
+        action="store_true",
+        help=(
+            "run only the weak-signal tandem transient transport qualification probe"
+        ),
     )
     group.addoption(
         "--tx2-loopback", action="store_true", help="authorize attenuated TX2 RF"
@@ -112,6 +120,11 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
     quality_skip = pytest.mark.skip(
         reason="requires --tandem-quality-hardware and explicit TX2 authorization"
     )
+    transport_probe_skip = pytest.mark.skip(
+        reason=(
+            "requires --tandem-transient-transport-probe and explicit TX2 authorization"
+        )
+    )
     for item in items:
         if "issue46" in item.keywords and not config.getoption("--issue46-hardware"):
             item.add_marker(issue46_skip)
@@ -119,6 +132,10 @@ def pytest_collection_modifyitems(config: Any, items: list[Any]) -> None:
             "--tandem-quality-hardware"
         ):
             item.add_marker(quality_skip)
+        if "tandem_transient_transport_probe" in item.keywords and not (
+            config.getoption("--tandem-transient-transport-probe")
+        ):
+            item.add_marker(transport_probe_skip)
 
 
 @pytest.fixture(scope="session")
@@ -183,10 +200,11 @@ def pnxx_issue46_radio(qualified_issue46_radio: Issue46Radio) -> Issue46Radio:
     return qualified_issue46_radio
 
 
-@pytest.fixture(scope="session")
-def tandem_quality_options(pytestconfig: Any) -> TandemQualityOptions:
-    if not pytestconfig.getoption("--tandem-quality-hardware"):
-        pytest.skip("tandem AGC quality hardware run was not requested")
+def _require_tandem_authorization(
+    pytestconfig: Any, *, option: str, description: str
+) -> float:
+    if not pytestconfig.getoption(option):
+        pytest.skip(f"{description} was not requested")
     if not pytestconfig.getoption("--tx2-loopback"):
         pytest.fail("--tx2-loopback is required before any TX mutation", pytrace=False)
     if not pytestconfig.getoption("--radio-serial"):
@@ -199,6 +217,12 @@ def tandem_quality_options(pytestconfig: Any) -> TandemQualityOptions:
             "--loopback-attenuation-db must declare current physical loss",
             pytrace=False,
         )
+    return float(attenuation)
+
+
+def _configured_tandem_quality_options(
+    pytestconfig: Any, physical_attenuation_db: float
+) -> TandemQualityOptions:
     profile = pytestconfig.getoption("--tandem-quality-profile")
     supplied_levels = pytestconfig.getoption("--tandem-quality-tx-gains")
     try:
@@ -209,7 +233,7 @@ def tandem_quality_options(pytestconfig: Any) -> TandemQualityOptions:
         )
         options = TandemQualityOptions(
             tx_gain_trajectory_db=levels,
-            physical_attenuation_db=attenuation,
+            physical_attenuation_db=physical_attenuation_db,
             center_frequency_hz=pytestconfig.getoption(
                 "--tandem-quality-center-frequency-hz"
             ),
@@ -258,6 +282,75 @@ def tandem_quality_options(pytestconfig: Any) -> TandemQualityOptions:
     except ValueError as error:
         pytest.fail(str(error), pytrace=False)
     return options
+
+
+@pytest.fixture(scope="session")
+def tandem_quality_options(pytestconfig: Any) -> TandemQualityOptions:
+    attenuation = _require_tandem_authorization(
+        pytestconfig,
+        option="--tandem-quality-hardware",
+        description="tandem AGC quality hardware run",
+    )
+    return _configured_tandem_quality_options(pytestconfig, attenuation)
+
+
+@pytest.fixture(scope="session")
+def tandem_transient_transport_probe_quality(
+    pytestconfig: Any,
+) -> TandemQualityOptions:
+    attenuation = _require_tandem_authorization(
+        pytestconfig,
+        option="--tandem-transient-transport-probe",
+        description="tandem transient transport probe",
+    )
+    options = _configured_tandem_quality_options(pytestconfig, attenuation)
+    if options.samples_per_channel != 65_536:
+        pytest.fail(
+            "--tandem-quality-samples must equal 65536 for the transport probe",
+            pytrace=False,
+        )
+    if -45.0 not in options.tx_gain_trajectory_db:
+        pytest.fail(
+            "--tandem-quality-tx-gains must include the guarded -45 dB probe level",
+            pytrace=False,
+        )
+    return options
+
+
+@pytest.fixture(scope="session")
+def tandem_transient_transport_probe_options() -> Any:
+    from .transient_transport_probe import TransientTransportProbeOptions
+
+    return TransientTransportProbeOptions()
+
+
+@pytest.fixture(scope="session")
+def tandem_transient_transport_probe_radio_options(
+    pytestconfig: Any,
+    tandem_transient_transport_probe_quality: TandemQualityOptions,
+) -> Issue46Options:
+    quality = tandem_transient_transport_probe_quality
+    return Issue46Options(
+        serial=pytestconfig.getoption("--radio-serial"),
+        uri=pytestconfig.getoption("--radio-uri"),
+        allow_non_usb=pytestconfig.getoption("--allow-non-usb"),
+        firmware_pattern=pytestconfig.getoption("--firmware-pattern"),
+        libiio_source_commit=pytestconfig.getoption("--libiio-source-commit"),
+        attenuation_db=quality.physical_attenuation_db,
+        tx_gain_db=-45.0,
+        center_frequency_hz=quality.center_frequency_hz,
+        sample_rate_hz=quality.sample_rate_hz,
+        samples_per_channel=65_536,
+        profile="smoke",
+        sink="ram",
+        expected="green",
+        output_dir=quality.output_dir,
+        max_seconds=quality.max_seconds,
+        save_iq=False,
+        pn_min_coherence=0.03,
+        pn_min_peak_ratio=1.5,
+        lock_namespace="tandem-transient-transport-probe",
+    )
 
 
 @pytest.fixture(scope="session")

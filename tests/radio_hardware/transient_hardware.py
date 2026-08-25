@@ -874,7 +874,11 @@ class _TandemCapturePump:
     """Continuously refill tandem IQ on one bounded acquisition-only thread."""
 
     def __init__(
-        self, acquire: Callable[[], _DeferredFrame], *, maximum_frames: int
+        self,
+        acquire: Callable[[], _DeferredFrame],
+        *,
+        maximum_frames: int,
+        thread_name: str = "tandem-transient-acquisition",
     ) -> None:
         self._acquire = acquire
         self._maximum_frames = maximum_frames
@@ -884,16 +888,22 @@ class _TandemCapturePump:
         self._stop = threading.Event()
         self._thread = threading.Thread(
             target=self._run,
-            name="tandem-transient-acquisition",
+            name=thread_name,
             daemon=True,
         )
         self.produced_frames = 0
         self.consumed_frames = 0
         self.discarded_tail_frames = 0
         self._terminal_error: BaseException | None = None
+        self._started = False
 
     def start(self) -> None:
         self._thread.start()
+        self._started = True
+
+    @property
+    def queue_capacity_frames(self) -> int:
+        return self._queue.maxsize
 
     def _offer(self, item: _DeferredFrame | BaseException) -> bool:
         while not self._stop.is_set():
@@ -946,6 +956,8 @@ class _TandemCapturePump:
 
     def stop(self) -> None:
         self.request_stop()
+        if not self._started:
+            return
         self._thread.join(timeout=_CAPTURE_THREAD_WAIT_SECONDS)
         if self._thread.is_alive():
             raise EvidenceInvalid("tandem acquisition thread did not stop")

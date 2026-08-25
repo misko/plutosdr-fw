@@ -233,6 +233,43 @@ anchor. `run_serial_transient_hardware()` owns the radio lifecycle, reloads the
 report after close, and requires durable verified-cleanup evidence. Public CI
 exercises only deterministic synthetic and planted-failure oracles.
 
+Before another loudness-step transient attempt, the dedicated transport probe
+can qualify the proposed larger-frame transport without producing a release
+PASS. It opens one AUTO metadata session at the already-qualified `-45` dB
+rung, requires 32 consecutive 65,536-sample frames with K=2, then reasserts the
+same `-45` dB level while streaming and requires eight more consecutive frames.
+The command is accepted only with the coherent FPGA-counter A-to-B-to-C bound,
+at most six queued/bracketed frames, and at least two fully post-command frames.
+It never writes the `-30` dB transient rung. Returned IQ from the stable anchor
+and final suffix must also meet the configured tone-level, SNR, clipping, and
+phase-stability gates. A successful artifact is explicitly transport-only and
+has `release_pass_eligible: false`.
+
+Run the probe through the pinned-libiio launcher:
+
+```bash
+PYTHON=/home/mouse9911/gits/spf/.venv/bin/python \
+IIO_SOURCE=../libiio \
+scripts/run_tandem_agc_quality_hardware.sh \
+  --tandem-transient-transport-probe \
+  --tx2-loopback \
+  --radio-serial SERIAL \
+  --firmware-pattern '^v0[.]41-plutoplus-spf-tandem-agc-v8-rc2$' \
+  --loopback-attenuation-db 0 \
+  --tandem-quality-center-frequency-hz 915000000 \
+  --tandem-quality-samples 65536 \
+  --tandem-quality-output \
+    build/radio-hardware/tandem-agc-transient-transport-probe
+```
+
+The durable artifact is written to
+`build/radio-hardware/tandem-agc-transient-transport-probe/SERIAL/`
+`tandem-agc-transient-transport-probe.json`. Its body remains
+`qualified_transport_pending_cleanup` until the serial-owning wrapper closes
+the radio, verifies mute/selector/DDS cleanup and identity, then atomically
+promotes it to `qualified_transport`. A host loss or close failure therefore
+cannot leave a final qualified artifact.
+
 ## Host setup and first RC2 run
 
 Create a test-only environment; the special libiio itself is selected by the

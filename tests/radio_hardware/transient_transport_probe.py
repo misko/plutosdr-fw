@@ -1,0 +1,2511 @@
+"""Weak-only qualification probe for tandem transient metadata transport.
+
+This module deliberately does not run a gain transient.  It asks the current
+metadata provider to return one exact, gap-free 65,536-sample sequence while
+the tandem controller is in AUTO at the already-qualified -45 dB TX2 rung.  A
+same-level TX2 write then exercises control/data contention without increasing
+RF power.  The resulting artifact can qualify the transport design for a later
+transient attempt, but can never be a firmware-release PASS by itself.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import statistics
+import time
+from builtins import BaseExceptionGroup
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import asdict, dataclass
+from itertools import pairwise
+from pathlib import Path
+from typing import Any
+
+from .experiment import EvidenceInvalid, FixtureSafetyError, Issue46Radio
+from .metadata_abi import (
+    FEATURE_AD9361_TEMPERATURE,
+    FEATURE_FPGA_GAIN_EVENTS,
+    FEATURE_HARDWARE_SAMPLE_COUNTER,
+    FEATURE_TANDEM_METADATA,
+    FLAG_HARDWARE_SAMPLE_COUNTER_VALID,
+    FLAG_SAMPLE_SEQUENCE_VALID,
+    FLAG_TANDEM_METADATA_VALID,
+    TANDEM_REQUEST,
+    TANDEM_UNSAFE_FLAGS,
+    TandemEventDirection,
+    TandemEventReason,
+    TandemFrameMetadata,
+    TandemMode,
+    TandemState,
+    maximum_tandem_events_per_frame,
+    parse_tandem_frame_metadata,
+)
+from .tandem_quality import (
+    MODE_TANDEM,
+    TandemQualityOptions,
+    expected_tandem_gain_table,
+    validate_options,
+)
+from .transient_hardware import (
+    TransientCaptureOptions,
+    TransientRadioTransport,
+    _build_tandem_request,
+    _capture_frame,
+    _CaptureState,
+    _check_effective_attenuation,
+    _DeferredFrame,
+    _exception_text,
+    _rx_state,
+    _TandemCapturePump,
+    _timestamp_tandem_command,
+    _wait_for_idle,
+)
+from .transient_quality import (
+    StimulusCommand,
+    analyze_immediate_dual_rx,
+    timestamp_stimulus_command,
+)
+
+PROBE_SCHEMA = "plutosdr-fw.tandem-agc-transient-transport-probe.v1"
+PROBE_VERDICT = "qualified_transport"
+PROBE_PENDING_VERDICT = "qualified_transport_pending_cleanup"
+PROBE_THREAD_NAME = "tandem-transient-transport-probe-acquisition"
+
+_PROBE_WEAK_GAIN_DB = -45.0
+_PROBE_FRAME_SAMPLES = 65_536
+_PROBE_KERNEL_BUFFERS = 2
+_PROBE_CONTINUITY_FRAMES = 32
+_PROBE_COMMAND_PREFIX_FRAMES = 6
+_PROBE_FULLY_POST_COMMAND_FRAMES = 2
+_PROBE_STABLE_FRAMES = 3
+_PROBE_ANCHOR_SAMPLES = 8_192
+_PROBE_WINDOW_SAMPLES = 1_024
+_PROBE_QUEUE_FRAMES = 4
+_PROBE_MAX_RAW_BYTES = 32 * 1024 * 1024
+_PROBE_REQUIRED_METADATA_FEATURES = (
+    FEATURE_AD9361_TEMPERATURE
+    | FEATURE_FPGA_GAIN_EVENTS
+    | FEATURE_HARDWARE_SAMPLE_COUNTER
+    | FEATURE_TANDEM_METADATA
+)
+_PROBE_REQUIRED_METADATA_FLAGS = (
+    FLAG_SAMPLE_SEQUENCE_VALID
+    | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
+    | FLAG_TANDEM_METADATA_VALID
+)
+_PROBE_METADATA_HEADER_BYTES = 180 + 64 * 32 + 64 * 16 + 4
+
+
+@dataclass(frozen=True)
+class TransientTransportProbeOptions:
+    """Frozen safety and evidence bounds for the qualification-only probe."""
+
+    weak_stimulus_tx_gain_db: float = _PROBE_WEAK_GAIN_DB
+    frame_samples: int = _PROBE_FRAME_SAMPLES
+    kernel_buffers: int = _PROBE_KERNEL_BUFFERS
+    continuity_frames: int = _PROBE_CONTINUITY_FRAMES
+    command_prefix_frames: int = _PROBE_COMMAND_PREFIX_FRAMES
+    fully_post_command_frames: int = _PROBE_FULLY_POST_COMMAND_FRAMES
+    stable_frames: int = _PROBE_STABLE_FRAMES
+    anchor_samples: int = _PROBE_ANCHOR_SAMPLES
+    window_samples: int = _PROBE_WINDOW_SAMPLES
+    max_host_jitter_ns: int = 50_000_000
+    max_command_sample_uncertainty: int = 16_384
+    readback_tolerance_db: float = 0.25
+    maximum_retained_raw_bytes: int = _PROBE_MAX_RAW_BYTES
+
+    @property
+    def command_observation_frames(self) -> int:
+        return self.command_prefix_frames + self.fully_post_command_frames
+
+    @property
+    def retained_frames(self) -> int:
+        return self.continuity_frames + self.command_observation_frames
+
+    @property
+    def maximum_python_raw_frames(self) -> int:
+        return self.retained_frames + _PROBE_QUEUE_FRAMES + 1
+
+    @property
+    def maximum_python_raw_bytes(self) -> int:
+        return self.maximum_python_raw_frames * self.frame_samples * 8
+
+    @property
+    def maximum_pump_frames(self) -> int:
+        # The extra two avoid a terminal-budget race after the final take.  At
+        # most queue+producer frames are resident beyond the consumed ledger.
+        return self.retained_frames + _PROBE_QUEUE_FRAMES + 2
+
+
+_DEFAULT_PROBE_OPTIONS = TransientTransportProbeOptions()
+
+
+def validate_transient_transport_probe_options(
+    quality: TandemQualityOptions, probe: TransientTransportProbeOptions
+) -> None:
+    """Reject every weakening or ambiguity before a radio object is opened."""
+
+    validate_options(quality)
+    exact = {
+        "weak_stimulus_tx_gain_db": (
+            probe.weak_stimulus_tx_gain_db,
+            _PROBE_WEAK_GAIN_DB,
+        ),
+        "frame_samples": (probe.frame_samples, _PROBE_FRAME_SAMPLES),
+        "kernel_buffers": (probe.kernel_buffers, _PROBE_KERNEL_BUFFERS),
+        "continuity_frames": (
+            probe.continuity_frames,
+            _PROBE_CONTINUITY_FRAMES,
+        ),
+        "command_prefix_frames": (
+            probe.command_prefix_frames,
+            _PROBE_COMMAND_PREFIX_FRAMES,
+        ),
+        "fully_post_command_frames": (
+            probe.fully_post_command_frames,
+            _PROBE_FULLY_POST_COMMAND_FRAMES,
+        ),
+        "stable_frames": (probe.stable_frames, _PROBE_STABLE_FRAMES),
+        "anchor_samples": (probe.anchor_samples, _PROBE_ANCHOR_SAMPLES),
+        "window_samples": (probe.window_samples, _PROBE_WINDOW_SAMPLES),
+        "maximum_retained_raw_bytes": (
+            probe.maximum_retained_raw_bytes,
+            _PROBE_MAX_RAW_BYTES,
+        ),
+    }
+    for name, (actual, expected) in exact.items():
+        if actual != expected:
+            raise ValueError(
+                f"transport probe {name} is frozen at {expected!r}, got {actual!r}"
+            )
+    if isinstance(probe.max_host_jitter_ns, bool) or not isinstance(
+        probe.max_host_jitter_ns, int
+    ):
+        raise TypeError("transport probe host-jitter bound must be an integer")
+    if not 0 < probe.max_host_jitter_ns <= 50_000_000:
+        raise ValueError("transport probe host-jitter bound must be in (0, 50000000]")
+    if isinstance(probe.max_command_sample_uncertainty, bool) or not isinstance(
+        probe.max_command_sample_uncertainty, int
+    ):
+        raise TypeError("transport probe sample-uncertainty bound must be an integer")
+    if not probe.anchor_samples <= probe.max_command_sample_uncertainty <= 16_384:
+        raise ValueError(
+            "transport probe sample uncertainty must cover the 8192-sample "
+            "anchor without exceeding 16384 samples"
+        )
+    if (
+        isinstance(probe.readback_tolerance_db, bool)
+        or not isinstance(probe.readback_tolerance_db, (int, float))
+        or not math.isfinite(float(probe.readback_tolerance_db))
+        or not 0 <= probe.readback_tolerance_db <= 0.25
+    ):
+        raise ValueError("transport probe readback tolerance must be in [0, 0.25] dB")
+    if probe.weak_stimulus_tx_gain_db not in quality.tx_gain_trajectory_db:
+        raise ValueError(
+            "transport probe weak stimulus must be a configured quality rung"
+        )
+    if quality.samples_per_channel != probe.frame_samples:
+        raise ValueError(
+            "transport probe requires an exact 65536-sample quality configuration"
+        )
+    if quality.physical_attenuation_db - probe.weak_stimulus_tx_gain_db < 30.0:
+        raise ValueError("transport probe weak stimulus violates 30 dB attenuation")
+    if probe.maximum_python_raw_bytes > probe.maximum_retained_raw_bytes:
+        raise ValueError("transport probe bounded Python IQ retention exceeds 32 MiB")
+
+
+def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(value, indent=2, sort_keys=True, allow_nan=False) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
+def _quality_configuration(quality: TandemQualityOptions) -> dict[str, Any]:
+    result = asdict(quality)
+    result["output_dir"] = str(quality.output_dir)
+    result["thresholds"] = asdict(quality.thresholds)
+    return result
+
+
+_REQUEST_FIELD_NAMES = (
+    "magic",
+    "abi_version",
+    "request_bytes",
+    "required_features",
+    "mode",
+    "observation_capacity",
+    "event_capacity",
+    "minimum_gain_db",
+    "maximum_gain_db",
+    "initial_gain_db",
+    "power_measurement_samples",
+    "low_power_dwell_periods",
+    "cooldown_periods",
+    "pulse_high_cycles",
+    "pulse_low_cycles",
+    "detector_blanking_cycles",
+    "low_power_threshold",
+    "large_lmt_overload_threshold",
+    "large_adc_overload_threshold",
+    "small_adc_overload_threshold",
+    "observation_overflow_policy",
+    "event_overflow_policy",
+    "reserved_0",
+    "reserved_1",
+    "reserved_2",
+    "reserved_3",
+    "reserved_4",
+    "reserved_5",
+    "reserved_6",
+    "reserved_7",
+)
+
+
+def _request_evidence(request: bytes) -> dict[str, Any]:
+    unpacked = TANDEM_REQUEST.unpack(request)
+    decoded = dict(zip(_REQUEST_FIELD_NAMES, unpacked, strict=True))
+    return {
+        "wire_bytes": len(request),
+        "wire_hex": request.hex(),
+        "sha256": hashlib.sha256(request).hexdigest(),
+        "decoded": decoded,
+    }
+
+
+def _expected_threshold_provenance(quality: TandemQualityOptions) -> int:
+    return (
+        quality.tandem_low_power_threshold
+        | quality.tandem_large_lmt_overload_threshold << 8
+        | quality.tandem_large_adc_overload_threshold << 16
+        | quality.tandem_small_adc_overload_threshold << 24
+    )
+
+
+def _full_metadata_dict(metadata: TandemFrameMetadata) -> dict[str, Any]:
+    events = []
+    for event in metadata.gain_events:
+        events.append(
+            {
+                "sample_sequence": int(event.sample_sequence),
+                "event_sequence": int(event.event_sequence),
+                "flags": int(event.flags),
+                "direction": int(event.direction),
+                "direction_name": event.direction.name.lower(),
+                "reason": int(event.reason),
+                "reason_name": event.reason.name.lower(),
+                "rx1_gain_index": int(event.rx1_gain_index),
+                "rx2_gain_index": int(event.rx2_gain_index),
+            }
+        )
+    return {
+        "version": metadata.version,
+        "header_bytes": metadata.header_bytes,
+        "features": metadata.features,
+        "flags": metadata.flags,
+        "stream_id": metadata.stream_id,
+        "buffer_sequence": metadata.buffer_sequence,
+        "first_sample_sequence": metadata.first_sample_sequence,
+        "samples_per_channel": metadata.samples_per_channel,
+        "iq_payload_bytes": metadata.iq_payload_bytes,
+        "enabled_scan_mask": metadata.enabled_scan_mask,
+        "sample_format": metadata.sample_format,
+        "channel_count": metadata.channel_count,
+        "observation_count": metadata.observation_count,
+        "observation_capacity": metadata.observation_capacity,
+        "event_count": metadata.event_count,
+        "event_capacity": metadata.event_capacity,
+        "observation_overflow_count": metadata.observation_overflow_count,
+        "event_overflow_count": metadata.event_overflow_count,
+        "ownership_epoch": metadata.ownership_epoch,
+        "tandem_state": int(metadata.tandem_state),
+        "tandem_state_name": metadata.tandem_state.name.lower(),
+        "tandem_fault_flags": metadata.tandem_fault_flags,
+        "tandem_transition_count": metadata.tandem_transition_count,
+        "gain_table_id": int(metadata.gain_table_id),
+        "threshold_provenance": metadata.threshold_provenance,
+        "gain_db_range": [metadata.minimum_gain_db, metadata.maximum_gain_db],
+        "initial_gain_db": metadata.initial_gain_db,
+        "gain_index_range": [
+            metadata.minimum_gain_index,
+            metadata.maximum_gain_index,
+        ],
+        "bench_gain_indices": list(metadata.bench_gain_indices),
+        "temperature_mdeg_c": metadata.ad9361_temperature_mdeg_c,
+        "gain_events": events,
+    }
+
+
+def _capture_adapter(probe: TransientTransportProbeOptions) -> TransientCaptureOptions:
+    return TransientCaptureOptions(
+        weak_stimulus_tx_gain_db=probe.weak_stimulus_tx_gain_db,
+        frame_samples=probe.frame_samples,
+        window_samples=probe.window_samples,
+        max_host_jitter_ns=probe.max_host_jitter_ns,
+        max_sample_uncertainty=probe.max_command_sample_uncertainty,
+        readback_tolerance_db=probe.readback_tolerance_db,
+    )
+
+
+def _validate_probe_metadata(
+    metadata: TandemFrameMetadata,
+    *,
+    frame_index: int,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+    session_provenance: dict[str, Any],
+    event_timing_state: dict[str, int],
+    previous_refill_ns: int | None,
+    refill_ns: int,
+) -> None:
+    if metadata.version != 5:
+        raise EvidenceInvalid("transport probe requires metadata protocol v5")
+    if metadata.header_bytes != _PROBE_METADATA_HEADER_BYTES:
+        raise EvidenceInvalid("transport probe metadata has an unexpected layout")
+    if metadata.features & _PROBE_REQUIRED_METADATA_FEATURES != (
+        _PROBE_REQUIRED_METADATA_FEATURES
+    ):
+        raise EvidenceInvalid("transport probe metadata lacks required features")
+    if metadata.flags & _PROBE_REQUIRED_METADATA_FLAGS != (
+        _PROBE_REQUIRED_METADATA_FLAGS
+    ):
+        raise EvidenceInvalid("transport probe metadata lacks required valid flags")
+    if metadata.flags & TANDEM_UNSAFE_FLAGS:
+        raise EvidenceInvalid("transport probe metadata carries an unsafe flag")
+    if metadata.stream_id <= 0 or metadata.ownership_epoch <= 0:
+        raise EvidenceInvalid("transport probe stream and ownership must be nonzero")
+    if frame_index == 0 and metadata.buffer_sequence != 0:
+        raise EvidenceInvalid(
+            "transport probe first accepted provider buffer sequence is not zero"
+        )
+    if frame_index == 0 and metadata.tandem_transition_count != len(
+        metadata.gain_events
+    ):
+        raise EvidenceInvalid(
+            "transport probe first frame has unrepresented prior transitions"
+        )
+    if metadata.observation_capacity != 64 or metadata.event_capacity != 64:
+        raise EvidenceInvalid("transport probe metadata capacity differs from request")
+    if not 0 <= metadata.observation_count <= metadata.observation_capacity:
+        raise EvidenceInvalid("transport probe observation count exceeds capacity")
+    provider_observation_interval = probe.frame_samples // 4
+    overlap_safe_observations = probe.frame_samples // provider_observation_interval + 1
+    if metadata.observation_count > overlap_safe_observations:
+        raise EvidenceInvalid(
+            "transport probe observation count exceeds the provider overlap bound"
+        )
+    if metadata.event_count != len(metadata.gain_events):
+        raise EvidenceInvalid("transport probe event count differs from event ledger")
+    if not 0 <= metadata.event_count <= metadata.event_capacity:
+        raise EvidenceInvalid("transport probe event count exceeds capacity")
+    if metadata.tandem_fault_flags:
+        raise EvidenceInvalid("transport probe metadata carries tandem fault flags")
+    if metadata.tandem_state is not TandemState.ARMED_AUTO:
+        raise EvidenceInvalid("transport probe controller left tandem AUTO")
+    if metadata.gain_table_id is not expected_tandem_gain_table(
+        quality.center_frequency_hz
+    ):
+        raise EvidenceInvalid("transport probe selected the wrong gain table")
+    if (
+        metadata.minimum_gain_db != 0
+        or metadata.maximum_gain_db != 62
+        or metadata.initial_gain_db != int(quality.manual_gain_db)
+    ):
+        raise EvidenceInvalid("transport probe metadata differs from its AUTO request")
+    if metadata.sample_format != 1 or metadata.threshold_provenance != (
+        _expected_threshold_provenance(quality)
+    ):
+        raise EvidenceInvalid("transport probe wire/request provenance is invalid")
+    for event in metadata.gain_events:
+        expected_flags = (int(event.direction) << 4) | int(event.reason)
+        if event.flags != expected_flags or event.flags & ~0x3F:
+            raise EvidenceInvalid("transport probe event flags are inconsistent")
+    if previous_refill_ns is not None and refill_ns < previous_refill_ns:
+        raise EvidenceInvalid("transport probe refill completion clock regressed")
+    maximum_events = maximum_tandem_events_per_frame(
+        mode=TandemMode.AUTO,
+        samples_per_channel=probe.frame_samples,
+        power_measurement_samples=quality.tandem_power_measurement_samples,
+        cooldown_periods=quality.tandem_cooldown_periods,
+    )
+    if maximum_events > metadata.event_capacity:
+        raise EvidenceInvalid("transport probe event capacity proof failed")
+    if metadata.event_count > maximum_events:
+        raise EvidenceInvalid(
+            "transport probe event count exceeds its configured physics bound"
+        )
+    minimum_event_spacing = quality.tandem_power_measurement_samples * (
+        quality.tandem_cooldown_periods + 1
+    )
+    prior_event_sample = event_timing_state.get("last_event_sample")
+    for event in metadata.gain_events:
+        if (
+            prior_event_sample is not None
+            and event.sample_sequence - prior_event_sample < minimum_event_spacing
+        ):
+            raise EvidenceInvalid(
+                "transport probe gain events violate the configured cooldown spacing"
+            )
+        prior_event_sample = event.sample_sequence
+    if prior_event_sample is not None:
+        event_timing_state["last_event_sample"] = prior_event_sample
+    current_provenance = {
+        "features": metadata.features,
+        "sample_format": metadata.sample_format,
+        "threshold_provenance": metadata.threshold_provenance,
+        "gain_index_range": (
+            metadata.minimum_gain_index,
+            metadata.maximum_gain_index,
+        ),
+    }
+    if not session_provenance:
+        session_provenance.update(current_provenance)
+    elif current_provenance != session_provenance:
+        raise EvidenceInvalid("transport probe metadata provenance changed in session")
+
+
+def _stable_suffix(
+    frames: Sequence[_DeferredFrame], *, count: int, label: str
+) -> dict[str, Any]:
+    if len(frames) < count:
+        raise EvidenceInvalid(f"transport probe {label} lacks {count} stable frames")
+    suffix = frames[-count:]
+    metadata = [frame.metadata for frame in suffix]
+    if any(item is None for item in metadata):
+        raise EvidenceInvalid(f"transport probe {label} lacks tandem metadata")
+    typed = [item for item in metadata if item is not None]
+    transition_counts = {item.tandem_transition_count for item in typed}
+    endpoints = {item.bench_gain_indices for item in typed}
+    if any(item.gain_events for item in typed):
+        raise EvidenceInvalid(f"transport probe {label} contains a gain event")
+    if len(transition_counts) != 1 or len(endpoints) != 1:
+        raise EvidenceInvalid(f"transport probe {label} endpoint is not stable")
+    return {
+        "frame_indices": [int(frame.record["frame_index"]) for frame in suffix],
+        "transition_count": typed[-1].tandem_transition_count,
+        "bench_gain_indices": list(typed[-1].bench_gain_indices),
+        "event_count": 0,
+    }
+
+
+def _probe_command_partition(
+    frames: Sequence[_DeferredFrame],
+    command: StimulusCommand,
+    *,
+    maximum_non_post_frames: int,
+    required_fully_post_frames: int,
+) -> dict[str, Any]:
+    lower = command.sample_sequence_before
+    upper = command.sample_sequence_after
+    if lower is None or upper is None:
+        raise EvidenceInvalid("transport probe command lacks a hardware bracket")
+    contexts: list[str] = []
+    for frame in frames:
+        start = int(frame.record["first_sample_sequence"])
+        end = int(frame.record["sample_end_exclusive"])
+        if end <= lower:
+            context = "precommand_prefetch"
+        elif start < upper:
+            context = "command_bracket"
+        else:
+            context = "fully_post_command"
+        frame.record["probe_phase"] = context
+        contexts.append(context)
+    order = {
+        "precommand_prefetch": 0,
+        "command_bracket": 1,
+        "fully_post_command": 2,
+    }
+    if contexts != sorted(contexts, key=order.__getitem__):
+        raise EvidenceInvalid("transport probe command frames are not sample ordered")
+    non_post = sum(context != "fully_post_command" for context in contexts)
+    fully_post = len(contexts) - non_post
+    if non_post > maximum_non_post_frames:
+        raise EvidenceInvalid(
+            f"transport probe retained {non_post} pre/bracketed command frames; "
+            f"maximum is {maximum_non_post_frames}"
+        )
+    if fully_post < required_fully_post_frames:
+        raise EvidenceInvalid(
+            f"transport probe retained {fully_post} fully post-command frames; "
+            f"requires {required_fully_post_frames}"
+        )
+    return {
+        "frame_indices": [int(frame.record["frame_index"]) for frame in frames],
+        "phase_by_frame": contexts,
+        "precommand_prefetch_frames": contexts.count("precommand_prefetch"),
+        "command_bracket_frames": contexts.count("command_bracket"),
+        "non_post_command_frames": non_post,
+        "maximum_non_post_command_frames": maximum_non_post_frames,
+        "fully_post_command_frames": fully_post,
+        "required_fully_post_command_frames": required_fully_post_frames,
+    }
+
+
+def _command_record(
+    command: StimulusCommand,
+    *,
+    effective_attenuation_db: float,
+    counter_bracket: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        **command.as_dict(),
+        "effective_attenuation_db": effective_attenuation_db,
+        "timing_role": "same_level_write_bracketed_by_coherent_fpga_counter",
+        "sample_timing_basis": "hardware_sample_counter",
+        "sample_anchor_policy": (
+            "max(last qualified frame end, coherent low32 pre-read) through the "
+            "second distinct coherent low32 advance after the initial post-write read"
+        ),
+        "sample_counter_bracket": dict(counter_bracket),
+    }
+
+
+def _initial_command_record(
+    command: StimulusCommand, *, effective_attenuation_db: float
+) -> dict[str, Any]:
+    return {
+        **command.as_dict(),
+        "effective_attenuation_db": effective_attenuation_db,
+        "timing_role": "pre_session_weak_conditioning_write",
+        "sample_timing_basis": None,
+        "sample_anchor_policy": (
+            "unbounded in hardware sample time; the write predates the AUTO session"
+        ),
+    }
+
+
+def _materialize_frames(frames: Sequence[_DeferredFrame]) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    for frame in frames:
+        record = frame.record
+        record["sha256"] = hashlib.sha256(frame.raw).hexdigest()
+        if frame.metadata is None:
+            raise EvidenceInvalid("transport probe frame lacks tandem metadata")
+        record["metadata"] = _full_metadata_dict(frame.metadata)
+        records.append(record)
+    return records
+
+
+def _analyze_quality_tail(
+    frame: _DeferredFrame,
+    *,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+) -> dict[str, Any]:
+    byte_count = probe.anchor_samples * 8
+    byte_offset = len(frame.raw) - byte_count
+    tail = frame.raw[byte_offset:]
+    frame_end = int(frame.record["sample_end_exclusive"])
+    first_sample = frame_end - probe.anchor_samples
+    analysis = dict(
+        analyze_immediate_dual_rx(
+            tail,
+            first_sample_sequence=first_sample,
+            sample_rate_hz=quality.sample_rate_hz,
+            expected_tone_hz=quality.tone_hz,
+            window_samples=probe.window_samples,
+            min_tone_snr_db=quality.thresholds.min_tone_snr_db,
+            max_clipping_fraction=quality.thresholds.max_clipping_fraction,
+            max_phase_std_deg=quality.thresholds.max_phase_std_deg,
+        )
+    )
+    for raw_window in analysis.get("windows", []):
+        window = dict(raw_window)
+        tone_snr = [float(value) for value in window.get("tone_snr_db", [])]
+        tone_levels = [float(value) for value in window.get("tone_dbfs", [])]
+        clipping = [float(value) for value in window.get("clipping_fraction", [])]
+        if not (len(tone_snr) == len(tone_levels) == len(clipping) == 2):
+            raise EvidenceInvalid(
+                "transport probe weak-signal tail lacks dual-RX quality evidence"
+            )
+        reasons: list[str] = []
+        for channel in (0, 1):
+            if tone_snr[channel] < quality.thresholds.min_tone_snr_db:
+                reasons.append(f"rx{channel}_tone_snr_low")
+            if tone_levels[channel] < quality.thresholds.min_tone_dbfs:
+                reasons.append(f"rx{channel}_tone_too_weak")
+            if tone_levels[channel] > quality.thresholds.max_tone_dbfs:
+                reasons.append(f"rx{channel}_tone_too_strong")
+            if clipping[channel] > quality.thresholds.max_clipping_fraction:
+                reasons.append(f"rx{channel}_clipping")
+        if (
+            float(window.get("within_window_phase_std_deg", math.inf))
+            > quality.thresholds.max_phase_std_deg
+        ):
+            reasons.append("within_window_phase_unstable")
+        window["quality_reasons"] = reasons
+        window["quality_valid"] = not reasons
+        raw_window.clear()
+        raw_window.update(window)
+    analysis["quality_valid"] = all(
+        bool(window.get("quality_valid")) for window in analysis.get("windows", [])
+    )
+    if analysis.get("quality_valid") is not True:
+        reasons = [
+            reason
+            for window in analysis.get("windows", [])
+            for reason in window.get("quality_reasons", [])
+        ]
+        raise EvidenceInvalid(
+            f"transport probe weak-signal tail failed RF quality gates: {reasons!r}"
+        )
+    return {
+        "frame_index": int(frame.record["frame_index"]),
+        "sample_sequence_before": first_sample,
+        "sample_sequence_after": frame_end,
+        "sample_offset_in_frame": probe.frame_samples - probe.anchor_samples,
+        "sample_count": probe.anchor_samples,
+        "byte_offset_in_iq_payload": byte_offset,
+        "byte_count": byte_count,
+        "source_frame_sha256": hashlib.sha256(frame.raw).hexdigest(),
+        "tail_sha256": hashlib.sha256(tail).hexdigest(),
+        "analysis": analysis,
+    }
+
+
+def _materialize_weak_signal_quality(
+    frames: Sequence[_DeferredFrame],
+    *,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+) -> dict[str, Any]:
+    if len(frames) != probe.retained_frames:
+        raise EvidenceInvalid(
+            "transport probe cannot analyze an incomplete frame ledger"
+        )
+    conditioning = _analyze_quality_tail(
+        frames[probe.continuity_frames - 1], quality=quality, probe=probe
+    )
+    final = [
+        _analyze_quality_tail(frame, quality=quality, probe=probe)
+        for frame in frames[-probe.stable_frames :]
+    ]
+    return {
+        "timing_scope": "post-buffer analysis of returned weak-IQ tails",
+        "quality_required": True,
+        "conditioning_anchor": conditioning,
+        "final_stable_suffix": final,
+    }
+
+
+def _bind_anchor_artifact(
+    report: dict[str, Any],
+    frames: Sequence[_DeferredFrame],
+    probe: TransientTransportProbeOptions,
+) -> None:
+    if len(frames) < probe.continuity_frames:
+        return
+    frame = frames[probe.continuity_frames - 1]
+    byte_count = probe.anchor_samples * 8
+    byte_offset = len(frame.raw) - byte_count
+    tail = frame.raw[byte_offset:]
+    anchor = report.get("conditioning_anchor_candidate")
+    if not isinstance(anchor, dict):
+        return
+    anchor.update(
+        {
+            "sample_offset_in_frame": probe.frame_samples - probe.anchor_samples,
+            "sample_count": probe.anchor_samples,
+            "byte_offset_in_iq_payload": byte_offset,
+            "byte_count": byte_count,
+            "source_frame_sha256": hashlib.sha256(frame.raw).hexdigest(),
+            "tail_sha256": hashlib.sha256(tail).hexdigest(),
+        }
+    )
+
+
+def _report_memory_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
+    maximum_command_prefix = _PROBE_QUEUE_FRAMES + 1 + (probe.kernel_buffers - 1)
+    return {
+        "raw_bytes_per_frame": probe.frame_samples * 8,
+        "retained_frame_count": probe.retained_frames,
+        "queue_capacity_frames": _PROBE_QUEUE_FRAMES,
+        "producer_held_frame_bound": 1,
+        "maximum_python_raw_frames": probe.maximum_python_raw_frames,
+        "maximum_python_raw_bytes": probe.maximum_python_raw_bytes,
+        "configured_limit_bytes": probe.maximum_retained_raw_bytes,
+        "kernel_buffers": probe.kernel_buffers,
+        "maximum_additional_kernel_backlog_frames": probe.kernel_buffers - 1,
+        "kernel_backlog_is_returned_evidence": False,
+        "maximum_command_prefix_frames": maximum_command_prefix,
+        "command_prefix_derivation": (
+            "queue_capacity_frames + producer_held_frame_bound + "
+            "maximum_additional_kernel_backlog_frames"
+        ),
+        "pump_frame_budget": probe.maximum_pump_frames,
+    }
+
+
+def _qualification_scope() -> str:
+    return (
+        "weak-only tandem AUTO metadata transport continuity and same-level "
+        "control/data contention; no loudness step or gain transient"
+    )
+
+
+def _evidence_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
+    prefix_bound = _PROBE_QUEUE_FRAMES + 1 + (probe.kernel_buffers - 1)
+    return {
+        "provider_gaps": "forbidden",
+        "hidden_transitions": "forbidden",
+        "first_provider_buffer_sequence": 0,
+        "first_frame_unrepresented_transitions": 0,
+        "uncontended_consecutive_frames": probe.continuity_frames,
+        "same_level_command_observation_frames": probe.command_observation_frames,
+        "maximum_command_prefix_frames": prefix_bound,
+        "command_prefix_derivation": "queue4 + producer1 + K2 backlog1",
+        "required_fully_post_command_frames": probe.fully_post_command_frames,
+        "final_stable_frames": probe.stable_frames,
+        "release_claim": "never eligible",
+    }
+
+
+def _safety_policy(
+    quality: TandemQualityOptions, probe: TransientTransportProbeOptions
+) -> dict[str, Any]:
+    return {
+        "physical_attenuation_db": quality.physical_attenuation_db,
+        "authorized_tx2_gain_ceiling_db": probe.weak_stimulus_tx_gain_db,
+        "minimum_effective_attenuation_db": (
+            quality.physical_attenuation_db - probe.weak_stimulus_tx_gain_db
+        ),
+        "required_effective_attenuation_db": 30.0,
+        "strong_tx_write_permitted": False,
+        "tx1_policy": "muted below -80 dB throughout",
+    }
+
+
+def _capacity_policy(
+    quality: TandemQualityOptions, probe: TransientTransportProbeOptions
+) -> dict[str, Any]:
+    maximum_events = maximum_tandem_events_per_frame(
+        mode=TandemMode.AUTO,
+        samples_per_channel=probe.frame_samples,
+        power_measurement_samples=quality.tandem_power_measurement_samples,
+        cooldown_periods=quality.tandem_cooldown_periods,
+    )
+    nominal_observations = (
+        probe.frame_samples // quality.tandem_power_measurement_samples
+    )
+    # Provider metadata samples four gain observations per returned frame,
+    # independent of the controller's detector-window configuration.
+    provider_observation_interval = probe.frame_samples // 4
+    nominal_stored_observations = probe.frame_samples // provider_observation_interval
+    overlap_safe_observations = nominal_stored_observations + 1
+    return {
+        "maximum_gain_events_per_frame": maximum_events,
+        "event_capacity": 64,
+        "event_capacity_safe": maximum_events <= 64,
+        "controller_measurement_periods_per_frame": nominal_observations,
+        "provider_observation_interval_samples": provider_observation_interval,
+        "nominal_stored_observations_per_frame": nominal_stored_observations,
+        "overlap_safe_stored_observations_per_frame": overlap_safe_observations,
+        "nominal_k2_initial_sampler_demand": (
+            nominal_stored_observations * (probe.kernel_buffers + 1)
+        ),
+        "overlap_safe_k2_initial_sampler_demand": (
+            overlap_safe_observations * (probe.kernel_buffers + 1)
+        ),
+        "observation_ring_capacity": 1_024,
+        "observation_capacity_safe": (
+            overlap_safe_observations * (probe.kernel_buffers + 1) <= 1_024
+        ),
+    }
+
+
+def _status_is_idle(status: Mapping[str, Any], *, label: str) -> None:
+    required = {
+        "state": int(TandemState.IDLE),
+        "fault_flags": 0,
+        "overflow_count": 0,
+        "fifo_level": 0,
+    }
+    for name, expected in required.items():
+        value = status.get(name)
+        if isinstance(value, bool) or not isinstance(value, int) or value != expected:
+            raise EvidenceInvalid(
+                f"transport probe {label} tandem {name} is {value!r}, "
+                f"expected {expected}"
+            )
+
+
+def _run_probe_body(
+    radio: TransientRadioTransport,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+    report: dict[str, Any],
+    retained: list[_DeferredFrame],
+    *,
+    check_deadline: Callable[[], None],
+    clock_ns: Callable[[], int],
+    monotonic: Callable[[], float],
+    sleep: Callable[[float], None],
+    metadata_parser: Callable[[bytes], TandemFrameMetadata],
+) -> None:
+    radio.mute_all()
+    status_before = _wait_for_idle(radio, monotonic=monotonic, sleep=sleep)
+    _status_is_idle(status_before, label="before")
+    report["tandem_status_before"] = status_before
+    radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
+    radio.arm_tx2_tone(tone_hz=quality.tone_hz, scale=quality.dds_scale)
+
+    initial = timestamp_stimulus_command(
+        "weak_initial",
+        probe.weak_stimulus_tx_gain_db,
+        apply=radio.set_tx2_gain,
+        clock_ns=clock_ns,
+        max_host_jitter_ns=probe.max_host_jitter_ns,
+        readback_tolerance_db=probe.readback_tolerance_db,
+    )
+    initial_effective = _check_effective_attenuation(quality, initial)
+    report["weak_conditioning_command"] = _initial_command_record(
+        initial, effective_attenuation_db=initial_effective
+    )
+
+    capture = _capture_adapter(probe)
+    request = _build_tandem_request(quality, capture)
+    report["metadata_request"] = _request_evidence(request)
+    state = _CaptureState()
+    metadata_abi: int | None = None
+    pump: _TandemCapturePump | None = None
+    previous_refill_ns: int | None = None
+    session_provenance: dict[str, Any] = {}
+    event_timing_state: dict[str, int] = {}
+    command: StimulusCommand | None = None
+    counter_bracket: Mapping[str, Any] | None = None
+    command_partition: Mapping[str, Any] | None = None
+    initial_stability: Mapping[str, Any] | None = None
+    final_stability: Mapping[str, Any] | None = None
+
+    session_error: BaseException | None = None
+    try:
+        with radio.buffer(
+            "metadata",
+            probe.kernel_buffers,
+            probe.frame_samples,
+            tandem_request=request,
+        ) as (buffer, metadata_abi):
+            cancel_capture = getattr(buffer, "cancel", None)
+            if metadata_abi != 2 or not callable(cancel_capture):
+                setup_error = EvidenceInvalid(
+                    "transport probe requires metadata ABI 2 and thread-safe cancel"
+                )
+                mute_error: BaseException | None = None
+                try:
+                    radio.mute_all()
+                except BaseException as error:  # noqa: BLE001
+                    mute_error = error
+                cancel_error: BaseException | None = None
+                if callable(cancel_capture):
+                    try:
+                        cancel_capture()
+                    except BaseException as error:  # noqa: BLE001
+                        cancel_error = error
+                setup_errors = [
+                    error
+                    for error in (setup_error, mute_error, cancel_error)
+                    if error is not None
+                ]
+                if len(setup_errors) > 1:
+                    raise BaseExceptionGroup(
+                        "transport probe setup, pre-close mute, or cancel failed",
+                        setup_errors,
+                    )
+                raise setup_error
+
+            def acquire_one() -> _DeferredFrame:
+                nonlocal previous_refill_ns
+                frame = _capture_frame(
+                    radio,
+                    buffer,
+                    mode=MODE_TANDEM,
+                    expected_iio_mode="manual",
+                    quality=quality,
+                    capture=capture,
+                    state=state,
+                    metadata_parser=metadata_parser,
+                    gap_context="continuous_acquisition_unclassified",
+                )
+                assert frame.metadata is not None
+                refill_ns = int(frame.record["refill_monotonic_ns"])
+                _validate_probe_metadata(
+                    frame.metadata,
+                    frame_index=int(frame.record["frame_index"]),
+                    quality=quality,
+                    probe=probe,
+                    session_provenance=session_provenance,
+                    event_timing_state=event_timing_state,
+                    previous_refill_ns=previous_refill_ns,
+                    refill_ns=refill_ns,
+                )
+                previous_refill_ns = refill_ns
+                return frame
+
+            acquisition_error: BaseException | None = None
+            try:
+                pump = _TandemCapturePump(
+                    acquire_one,
+                    maximum_frames=probe.maximum_pump_frames,
+                    thread_name=PROBE_THREAD_NAME,
+                )
+                actual_prefix_bound = (
+                    pump.queue_capacity_frames + 1 + (probe.kernel_buffers - 1)
+                )
+                if actual_prefix_bound != probe.command_prefix_frames:
+                    raise EvidenceInvalid(
+                        "transport probe command prefix differs from the actual "
+                        "queue, producer, and K2 backlog bound"
+                    )
+                pump.start()
+                report["acquisition"]["worker_started"] = True
+                for _ in range(probe.continuity_frames):
+                    check_deadline()
+                    frame = pump.take()
+                    frame.record["probe_phase"] = "uncontended_continuity"
+                    retained.append(frame)
+                initial_stability = _stable_suffix(
+                    retained,
+                    count=probe.stable_frames,
+                    label="pre-command suffix",
+                )
+                anchor_frame = retained[probe.continuity_frames - 1]
+                anchor_end = int(anchor_frame.record["sample_end_exclusive"])
+                report["conditioning_anchor_candidate"] = {
+                    "frame_index": int(anchor_frame.record["frame_index"]),
+                    "sample_sequence_before": anchor_end - probe.anchor_samples,
+                    "sample_sequence_after": anchor_end,
+                    "sample_uncertainty": probe.anchor_samples,
+                    "timing_basis": "hardware_sample_counter",
+                    "role": "stable_tail_candidate_for_future_transient",
+                    "release_latency_evidence": False,
+                }
+
+                command, counter_bracket = _timestamp_tandem_command(
+                    radio,
+                    "weak_control_reassertion",
+                    probe.weak_stimulus_tx_gain_db,
+                    last_observed_frame_end=anchor_end,
+                    clock_ns=clock_ns,
+                    max_host_jitter_ns=probe.max_host_jitter_ns,
+                    max_sample_uncertainty=probe.max_command_sample_uncertainty,
+                    readback_tolerance_db=probe.readback_tolerance_db,
+                )
+                command_effective = _check_effective_attenuation(quality, command)
+                command_frames: list[_DeferredFrame] = []
+                for _ in range(probe.command_observation_frames):
+                    check_deadline()
+                    frame = pump.take()
+                    retained.append(frame)
+                    command_frames.append(frame)
+                command_partition = _probe_command_partition(
+                    command_frames,
+                    command,
+                    maximum_non_post_frames=actual_prefix_bound,
+                    required_fully_post_frames=probe.fully_post_command_frames,
+                )
+                final_stability = _stable_suffix(
+                    retained,
+                    count=probe.stable_frames,
+                    label="final suffix",
+                )
+                report["command_contention"] = {
+                    "command": _command_record(
+                        command,
+                        effective_attenuation_db=command_effective,
+                        counter_bracket=counter_bracket,
+                    ),
+                    "partition": dict(command_partition),
+                    "command_timing_qualified": True,
+                    "gain_transient_exercised": False,
+                }
+            except BaseException as error:  # noqa: BLE001
+                acquisition_error = error
+
+            # Required ordering on success and every failure: remove RF first,
+            # then stop/cancel the in-flight refill, then join before close.
+            prejoin_mute_error: BaseException | None = None
+            try:
+                radio.mute_all()
+            except BaseException as error:  # noqa: BLE001
+                prejoin_mute_error = error
+            if pump is not None:
+                pump.request_stop()
+            cancel_error: BaseException | None = None
+            try:
+                cancel_capture()
+            except BaseException as error:  # noqa: BLE001
+                cancel_error = error
+            stop_error: BaseException | None = None
+            if pump is not None:
+                try:
+                    pump.stop()
+                except BaseException as error:  # noqa: BLE001
+                    stop_error = error
+                report["acquisition"].update(
+                    {
+                        "produced_frames": pump.produced_frames,
+                        "consumed_frames": pump.consumed_frames,
+                        "discarded_tail_frames": pump.discarded_tail_frames,
+                    }
+                )
+            report["acquisition"].update(
+                {
+                    "buffer_cancelled_before_join": cancel_error is None,
+                    "worker_stopped_before_buffer_close": stop_error is None,
+                }
+            )
+            errors = [
+                error
+                for error in (
+                    acquisition_error,
+                    prejoin_mute_error,
+                    cancel_error,
+                    stop_error,
+                )
+                if error is not None
+            ]
+            if len(errors) > 1:
+                raise BaseExceptionGroup(
+                    "transport acquisition, emergency mute, buffer cancel, or "
+                    "worker shutdown failed",
+                    errors,
+                )
+            if errors:
+                error = errors[0]
+                raise error.with_traceback(error.__traceback__)
+    except BaseException as error:  # noqa: BLE001
+        session_error = error
+
+    post_session_errors: list[BaseException] = []
+    try:
+        radio.mute_all()
+    except BaseException as error:  # noqa: BLE001
+        post_session_errors.append(error)
+    try:
+        status_after = _wait_for_idle(radio, monotonic=monotonic, sleep=sleep)
+        _status_is_idle(status_after, label="after")
+        report["tandem_status_after"] = status_after
+    except BaseException as error:  # noqa: BLE001
+        post_session_errors.append(error)
+    try:
+        radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
+        report["final_rx_state"] = _rx_state(radio, expected_mode="manual")
+    except BaseException as error:  # noqa: BLE001
+        post_session_errors.append(error)
+
+    report["metadata_abi"] = metadata_abi
+    if initial_stability is not None:
+        report["initial_stable_suffix"] = dict(initial_stability)
+    if final_stability is not None:
+        report["final_stable_suffix"] = dict(final_stability)
+    all_errors = [
+        error for error in ([session_error] + post_session_errors) if error is not None
+    ]
+    if len(all_errors) > 1:
+        raise BaseExceptionGroup(
+            "transport probe session or post-session restoration failed", all_errors
+        )
+    if all_errors:
+        error = all_errors[0]
+        raise error.with_traceback(error.__traceback__)
+
+
+def _refill_cadence(
+    frames: Sequence[Mapping[str, Any]], sample_rate_hz: int
+) -> dict[str, Any]:
+    values = [int(frame["refill_monotonic_ns"]) for frame in frames]
+    deltas = [current - previous for previous, current in pairwise(values)]
+    ordered = sorted(deltas)
+    p95_index = max(0, math.ceil(len(ordered) * 0.95) - 1)
+    frame_period_ns = _PROBE_FRAME_SAMPLES * 1_000_000_000 / sample_rate_hz
+    return {
+        "adjacent_refill_completion_delta_ns": deltas,
+        "median_refill_completion_delta_ns": statistics.median(deltas),
+        "p95_refill_completion_delta_ns": ordered[p95_index],
+        "maximum_refill_completion_delta_ns": max(deltas),
+        "nominal_hardware_frame_period_ns": frame_period_ns,
+        "timing_scope": "host refill completion cadence; not capture latency",
+    }
+
+
+def _required_mapping(value: Any, *, name: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise EvidenceInvalid(f"transport probe report lacks object {name}")
+    return value
+
+
+def _required_list(value: Any, *, name: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise EvidenceInvalid(f"transport probe report lacks list {name}")
+    return value
+
+
+def _required_int(value: Any, *, name: str, minimum: int | None = 0) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise EvidenceInvalid(f"transport probe report {name} is not an integer")
+    if minimum is not None and value < minimum:
+        raise EvidenceInvalid(
+            f"transport probe report {name} must be at least {minimum}"
+        )
+    return value
+
+
+def _required_number(value: Any, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise EvidenceInvalid(f"transport probe report {name} is not numeric")
+    result = float(value)
+    if not math.isfinite(result):
+        raise EvidenceInvalid(f"transport probe report {name} is not finite")
+    return result
+
+
+def _json_domain(value: Any) -> Any:
+    return json.loads(json.dumps(value, allow_nan=False))
+
+
+def _validate_idle_report_status(value: Any, *, name: str) -> None:
+    status = _required_mapping(value, name=name)
+    _status_is_idle(status, label=name)
+
+
+def _validate_cleanup_evidence(value: Any) -> None:
+    cleanup = _required_mapping(value, name="cleanup")
+    if cleanup.get("verified") is not True or cleanup.get("failures") != []:
+        raise FixtureSafetyError("transport probe durable cleanup is invalid")
+    for name in ("tx1_gain_db", "tx2_gain_db"):
+        if _required_number(cleanup.get(name), name=f"cleanup {name}") > -80.0:
+            raise FixtureSafetyError(f"transport probe cleanup {name} is not muted")
+    selectors = _required_list(cleanup.get("selectors"), name="cleanup selectors")
+    if selectors != [3, 3, 3, 3]:
+        raise FixtureSafetyError("transport probe cleanup selectors are not ZERO")
+    dds = _required_mapping(cleanup.get("dds"), name="cleanup DDS")
+    expected_names = {f"altvoltage{index}" for index in range(8)}
+    if set(dds) != expected_names:
+        raise FixtureSafetyError("transport probe cleanup DDS inventory is incomplete")
+    for name in sorted(expected_names):
+        channel = _required_mapping(dds.get(name), name=f"cleanup DDS {name}")
+        if channel.get("present") is not True:
+            raise FixtureSafetyError(f"transport probe cleanup DDS {name} is absent")
+        for attribute in ("raw", "scale"):
+            if (
+                _required_number(
+                    channel.get(attribute), name=f"cleanup DDS {name} {attribute}"
+                )
+                != 0.0
+            ):
+                raise FixtureSafetyError(
+                    f"transport probe cleanup DDS {name} {attribute} is nonzero"
+                )
+
+
+def _validate_stable_report_suffix(
+    frames: Sequence[Mapping[str, Any]],
+    reported: Any,
+    *,
+    count: int,
+    name: str,
+) -> None:
+    if len(frames) < count:
+        raise EvidenceInvalid(f"transport probe report {name} is too short")
+    suffix = list(frames[-count:])
+    metadata = [
+        _required_mapping(frame.get("metadata"), name=f"{name} metadata")
+        for frame in suffix
+    ]
+    if any(
+        _required_list(item.get("gain_events"), name="gain_events") for item in metadata
+    ):
+        raise EvidenceInvalid(f"transport probe report {name} contains events")
+    transitions = {
+        _required_int(item.get("tandem_transition_count"), name="transition_count")
+        for item in metadata
+    }
+    endpoints = {
+        tuple(_required_list(item.get("bench_gain_indices"), name="endpoint"))
+        for item in metadata
+    }
+    if len(transitions) != 1 or len(endpoints) != 1:
+        raise EvidenceInvalid(f"transport probe report {name} is not stable")
+    expected = {
+        "frame_indices": [
+            _required_int(frame.get("frame_index"), name="frame_index")
+            for frame in suffix
+        ],
+        "transition_count": next(iter(transitions)),
+        "bench_gain_indices": list(next(iter(endpoints))),
+        "event_count": 0,
+    }
+    if reported != expected:
+        raise EvidenceInvalid(f"transport probe report {name} ledger is inconsistent")
+
+
+def _validate_quality_tail_report(
+    value: Any,
+    *,
+    frame: Mapping[str, Any],
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+    name: str,
+) -> None:
+    record = _required_mapping(value, name=name)
+    frame_index = _required_int(frame.get("frame_index"), name=f"{name} frame_index")
+    frame_end = _required_int(
+        frame.get("sample_end_exclusive"), name=f"{name} frame end"
+    )
+    first_sample = frame_end - probe.anchor_samples
+    expected_geometry = {
+        "frame_index": frame_index,
+        "sample_sequence_before": first_sample,
+        "sample_sequence_after": frame_end,
+        "sample_offset_in_frame": probe.frame_samples - probe.anchor_samples,
+        "sample_count": probe.anchor_samples,
+        "byte_offset_in_iq_payload": ((probe.frame_samples - probe.anchor_samples) * 8),
+        "byte_count": probe.anchor_samples * 8,
+        "source_frame_sha256": frame.get("sha256"),
+    }
+    if any(record.get(key) != expected for key, expected in expected_geometry.items()):
+        raise EvidenceInvalid(f"transport probe {name} geometry changed")
+    digest = record.get("tail_sha256")
+    if not isinstance(digest, str) or len(digest) != 64:
+        raise EvidenceInvalid(f"transport probe {name} lacks a tail digest")
+    try:
+        int(digest, 16)
+    except ValueError as exc:
+        raise EvidenceInvalid(f"transport probe {name} digest is invalid") from exc
+    analysis = _required_mapping(record.get("analysis"), name=f"{name} analysis")
+    expected_analysis = {
+        "first_sample_sequence": first_sample,
+        "samples_per_channel": probe.anchor_samples,
+        "sample_rate_hz": quality.sample_rate_hz,
+        "expected_tone_hz": float(quality.tone_hz),
+        "window_samples": probe.window_samples,
+        "stride_samples": probe.window_samples,
+        "window_count": probe.anchor_samples // probe.window_samples,
+        "uncovered_tail_samples": 0,
+        "quality_valid": True,
+    }
+    if any(
+        analysis.get(key) != expected for key, expected in expected_analysis.items()
+    ):
+        raise EvidenceInvalid(f"transport probe {name} analysis geometry changed")
+    selected_tone = _required_number(
+        analysis.get("selected_tone_hz"), name=f"{name} selected tone"
+    )
+    if abs(selected_tone) != abs(float(quality.tone_hz)):
+        raise EvidenceInvalid(f"transport probe {name} selected the wrong tone")
+    windows = _required_list(analysis.get("windows"), name=f"{name} windows")
+    if len(windows) != probe.anchor_samples // probe.window_samples:
+        raise EvidenceInvalid(f"transport probe {name} window count changed")
+    for index, raw_window in enumerate(windows):
+        window = _required_mapping(raw_window, name=f"{name} window {index}")
+        offset = index * probe.window_samples
+        if (
+            window.get("window_index") != index
+            or window.get("offset_start") != offset
+            or window.get("offset_end_exclusive") != offset + probe.window_samples
+            or window.get("sample_start") != first_sample + offset
+            or window.get("sample_end_exclusive")
+            != first_sample + offset + probe.window_samples
+        ):
+            raise EvidenceInvalid(f"transport probe {name} window geometry changed")
+        tone_snr = _required_list(window.get("tone_snr_db"), name=f"{name} tone SNR")
+        tone_levels = _required_list(window.get("tone_dbfs"), name=f"{name} tone level")
+        clipping = _required_list(
+            window.get("clipping_fraction"), name=f"{name} clipping"
+        )
+        if len(tone_snr) != 2 or len(tone_levels) != 2 or len(clipping) != 2:
+            raise EvidenceInvalid(f"transport probe {name} lacks dual-RX quality")
+        reasons: list[str] = []
+        for channel in (0, 1):
+            if (
+                _required_number(tone_snr[channel], name=f"{name} RX{channel} tone SNR")
+                < quality.thresholds.min_tone_snr_db
+            ):
+                reasons.append(f"rx{channel}_tone_snr_low")
+            tone_level = _required_number(
+                tone_levels[channel], name=f"{name} RX{channel} tone level"
+            )
+            if tone_level < quality.thresholds.min_tone_dbfs:
+                reasons.append(f"rx{channel}_tone_too_weak")
+            if tone_level > quality.thresholds.max_tone_dbfs:
+                reasons.append(f"rx{channel}_tone_too_strong")
+            clipping_value = _required_number(
+                clipping[channel], name=f"{name} RX{channel} clipping"
+            )
+            if not 0 <= clipping_value <= 1:
+                raise EvidenceInvalid(
+                    f"transport probe {name} RX{channel} clipping is impossible"
+                )
+            if clipping_value > quality.thresholds.max_clipping_fraction:
+                reasons.append(f"rx{channel}_clipping")
+        phase_std = _required_number(
+            window.get("within_window_phase_std_deg"),
+            name=f"{name} phase standard deviation",
+        )
+        if phase_std < 0:
+            raise EvidenceInvalid(
+                f"transport probe {name} phase standard deviation is negative"
+            )
+        if phase_std > quality.thresholds.max_phase_std_deg:
+            reasons.append("within_window_phase_unstable")
+        if window.get("quality_reasons") != reasons or window.get(
+            "quality_valid"
+        ) is not (not reasons):
+            raise EvidenceInvalid(f"transport probe {name} quality verdict changed")
+        if reasons:
+            raise EvidenceInvalid(f"transport probe {name} failed RF quality gates")
+
+
+def _validate_command_report(
+    value: Any,
+    *,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+    last_qualified_frame_end: int,
+) -> StimulusCommand:
+    command = _required_mapping(value, name="command_contention.command")
+    if command.get("command_id") != "weak_control_reassertion":
+        raise EvidenceInvalid("transport probe command identity changed")
+    requested = _required_number(
+        command.get("requested_level_db"), name="command requested level"
+    )
+    applied = _required_number(
+        command.get("applied_level_db"), name="command applied level"
+    )
+    if requested != probe.weak_stimulus_tx_gain_db or abs(applied - requested) > (
+        probe.readback_tolerance_db
+    ):
+        raise EvidenceInvalid("transport probe command is not the guarded weak level")
+    effective = _required_number(
+        command.get("effective_attenuation_db"), name="command attenuation"
+    )
+    if effective != quality.physical_attenuation_db - applied or effective < 30.0:
+        raise EvidenceInvalid("transport probe command attenuation is invalid")
+    host_before = _required_int(command.get("host_before_ns"), name="host_before_ns")
+    host_after = _required_int(command.get("host_after_ns"), name="host_after_ns")
+    host_jitter = _required_int(command.get("host_jitter_ns"), name="host_jitter_ns")
+    if host_after - host_before != host_jitter or not (
+        0 <= host_jitter <= probe.max_host_jitter_ns
+    ):
+        raise EvidenceInvalid("transport probe command host bracket is invalid")
+    lower = _required_int(
+        command.get("sample_sequence_before"), name="command sample lower"
+    )
+    upper = _required_int(
+        command.get("sample_sequence_after"), name="command sample upper"
+    )
+    uncertainty = _required_int(
+        command.get("sample_uncertainty"), name="command sample uncertainty"
+    )
+    if upper - lower != uncertainty or not (
+        0 < uncertainty <= probe.max_command_sample_uncertainty
+    ):
+        raise EvidenceInvalid("transport probe command sample bracket is invalid")
+    if lower < last_qualified_frame_end:
+        raise EvidenceInvalid("transport probe command predates its 32-frame gate")
+    if (
+        command.get("timing_role")
+        != ("same_level_write_bracketed_by_coherent_fpga_counter")
+        or command.get("sample_timing_basis") != "hardware_sample_counter"
+        or command.get("sample_anchor_policy")
+        != (
+            "max(last qualified frame end, coherent low32 pre-read) through the "
+            "second distinct coherent low32 advance after the initial post-write read"
+        )
+    ):
+        raise EvidenceInvalid("transport probe command timing role is invalid")
+
+    bracket = _required_mapping(
+        command.get("sample_counter_bracket"), name="sample_counter_bracket"
+    )
+    raw_before = _required_int(bracket.get("raw_before"), name="counter raw_before")
+    raw_initial = _required_int(
+        bracket.get("raw_post_write_initial"), name="counter raw_initial"
+    )
+    raw_first = _required_int(
+        bracket.get("raw_post_write_first_advance"), name="counter raw_first"
+    )
+    raw_causal = _required_int(
+        bracket.get("raw_post_write_causal"), name="counter raw_causal"
+    )
+    if any(
+        not 0 <= value < 1 << 32
+        for value in (raw_before, raw_initial, raw_first, raw_causal)
+    ):
+        raise EvidenceInvalid("transport probe raw command counter exceeds uint32")
+    initial_delta = (raw_initial - raw_before) % (1 << 32)
+    first_delta = (raw_first - raw_initial) % (1 << 32)
+    causal_delta = (raw_causal - raw_first) % (1 << 32)
+    if initial_delta >= 1 << 31 or not all(
+        0 < delta < 1 << 31 for delta in (first_delta, causal_delta)
+    ):
+        raise EvidenceInvalid("transport probe command counter advances are ambiguous")
+    extended_before = _required_int(
+        bracket.get("extended_before"), name="extended_before"
+    )
+    extended_initial = _required_int(
+        bracket.get("extended_post_write_initial"), name="extended_initial"
+    )
+    extended_first = _required_int(
+        bracket.get("extended_post_write_first_advance"), name="extended_first"
+    )
+    extended_after = _required_int(bracket.get("extended_after"), name="extended_after")
+    if (
+        extended_before & ((1 << 32) - 1) != raw_before
+        or extended_initial & ((1 << 32) - 1) != raw_initial
+        or extended_first & ((1 << 32) - 1) != raw_first
+        or extended_after & ((1 << 32) - 1) != raw_causal
+        or not all(
+            0 <= item < 1 << 64
+            for item in (
+                extended_before,
+                extended_initial,
+                extended_first,
+                extended_after,
+                lower,
+                upper,
+            )
+        )
+        or extended_initial != extended_before + initial_delta
+        or extended_first != extended_initial + first_delta
+        or extended_after != extended_first + causal_delta
+        or lower != max(last_qualified_frame_end, extended_before)
+        or upper != extended_after
+        or bracket.get("sample_sequence_lower") != lower
+        or bracket.get("sample_sequence_upper") != upper
+        or bracket.get("extension_reference_sample") != last_qualified_frame_end
+        or bracket.get("register_address") != "0x800000b8"
+        or bracket.get("counter_width_bits") != 32
+        or bracket.get("counter_source") != "coherent FPGA RX sample counter low word"
+        or bracket.get("lower_clamped_to_last_observed_frame_end")
+        is not (lower != extended_before)
+    ):
+        raise EvidenceInvalid("transport probe command counter ledger is inconsistent")
+    reads = _required_int(
+        bracket.get("post_write_read_count"), name="post_write_read_count"
+    )
+    if not 3 <= reads <= 9:
+        raise EvidenceInvalid("transport probe command read count is outside policy")
+    return StimulusCommand(
+        command_id="weak_control_reassertion",
+        requested_level_db=requested,
+        applied_level_db=applied,
+        host_before_ns=host_before,
+        host_after_ns=host_after,
+        sample_sequence_before=lower,
+        sample_sequence_after=upper,
+    )
+
+
+def _validate_transient_transport_probe_report_impl(
+    report: Mapping[str, Any],
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+    *,
+    require_cleanup: bool,
+) -> None:
+    if report.get("schema") != PROBE_SCHEMA:
+        raise EvidenceInvalid("transport probe report schema is invalid")
+    expected_verdict = PROBE_VERDICT if require_cleanup else PROBE_PENDING_VERDICT
+    if report.get("verdict") != expected_verdict:
+        raise EvidenceInvalid("transport probe report is not qualified")
+    if report.get("release_pass_eligible") is not False:
+        raise EvidenceInvalid("transport probe report is release-pass eligible")
+    if "fatal_error" in report or report.get("iq_artifacts_saved") is not False:
+        raise EvidenceInvalid("transport probe qualified report carries invalid state")
+    if report.get("qualification_scope") != _qualification_scope():
+        raise EvidenceInvalid("transport probe qualification scope changed")
+    if report.get("safety") != _json_domain(_safety_policy(quality, probe)):
+        raise EvidenceInvalid("transport probe safety policy changed")
+    if report.get("evidence_policy") != _json_domain(_evidence_policy(probe)):
+        raise EvidenceInvalid("transport probe evidence policy changed")
+
+    configuration = _required_mapping(report.get("configuration"), name="configuration")
+    if configuration.get("probe") != _json_domain(asdict(probe)):
+        raise EvidenceInvalid("transport probe report configuration changed")
+    if configuration.get("quality") != _json_domain(_quality_configuration(quality)):
+        raise EvidenceInvalid("transport probe quality configuration changed")
+    rf = _required_mapping(report.get("rf"), name="rf")
+    expected_rf = {
+        "center_frequency_hz_requested": quality.center_frequency_hz,
+        "center_frequency_hz_readback": {
+            "rx_lo_hz": quality.center_frequency_hz,
+            "tx_lo_hz": quality.center_frequency_hz,
+        },
+        "sample_rate_hz": quality.sample_rate_hz,
+        "tone_hz": quality.tone_hz,
+        "dds_scale": quality.dds_scale,
+        "weak_tx2_gain_db": probe.weak_stimulus_tx_gain_db,
+    }
+    if set(rf) != set(expected_rf):
+        raise EvidenceInvalid("transport probe RF ledger has unexpected fields")
+    readback = _required_mapping(
+        rf.get("center_frequency_hz_readback"), name="LO readback"
+    )
+    for key, expected in expected_rf.items():
+        if key == "center_frequency_hz_readback":
+            if set(readback) != {"rx_lo_hz", "tx_lo_hz"} or any(
+                abs(
+                    _required_int(readback.get(name), name=name)
+                    - quality.center_frequency_hz
+                )
+                > 2
+                for name in ("rx_lo_hz", "tx_lo_hz")
+            ):
+                raise EvidenceInvalid("transport probe LO readback is invalid")
+        elif rf.get(key) != expected:
+            raise EvidenceInvalid(f"transport probe RF field {key} changed")
+
+    capture = _capture_adapter(probe)
+    expected_request = _request_evidence(_build_tandem_request(quality, capture))
+    if report.get("metadata_request") != _json_domain(expected_request):
+        raise EvidenceInvalid("transport probe AUTO request evidence changed")
+    if report.get("metadata_abi") != 2:
+        raise EvidenceInvalid("transport probe report lacks metadata ABI 2")
+    if report.get("capacity_policy") != _json_domain(_capacity_policy(quality, probe)):
+        raise EvidenceInvalid("transport probe capacity proof changed")
+    if report.get("memory_policy") != _json_domain(_report_memory_policy(probe)):
+        raise EvidenceInvalid("transport probe memory proof changed")
+
+    frames = _required_list(report.get("frames"), name="frames")
+    if len(frames) != probe.retained_frames:
+        raise EvidenceInvalid(
+            f"transport probe report retained {len(frames)} frames, "
+            f"requires {probe.retained_frames}"
+        )
+    prior_metadata: Mapping[str, Any] | None = None
+    prior_refill: int | None = None
+    prior_event: Mapping[str, Any] | None = None
+    stream_id: int | None = None
+    ownership_epoch: int | None = None
+    provenance: tuple[Any, ...] | None = None
+    maximum_events = maximum_tandem_events_per_frame(
+        mode=TandemMode.AUTO,
+        samples_per_channel=probe.frame_samples,
+        power_measurement_samples=quality.tandem_power_measurement_samples,
+        cooldown_periods=quality.tandem_cooldown_periods,
+    )
+    minimum_event_spacing = quality.tandem_power_measurement_samples * (
+        quality.tandem_cooldown_periods + 1
+    )
+    maximum_observations = int(
+        _capacity_policy(quality, probe)["overlap_safe_stored_observations_per_frame"]
+    )
+    for index, raw_frame in enumerate(frames):
+        frame = _required_mapping(raw_frame, name=f"frame {index}")
+        if _required_int(frame.get("frame_index"), name="frame_index") != index:
+            raise EvidenceInvalid("transport probe frame indices are not exact")
+        if frame.get("timing_basis") != "hardware_sample_counter":
+            raise EvidenceInvalid("transport probe frame timing basis changed")
+        if frame.get("physical_sample_continuity_proven") is not True:
+            raise EvidenceInvalid("transport probe frame continuity is not proven")
+        if (
+            frame.get("sample_gap_before") != 0
+            or frame.get("gap_context") != "continuous_acquisition_unclassified"
+            or frame.get("command_boundary_gap_allowed") is not False
+        ):
+            raise EvidenceInvalid("transport probe top-level gap ledger changed")
+        if _required_int(frame.get("iq_bytes"), name="iq_bytes") != (
+            probe.frame_samples * 8
+        ):
+            raise EvidenceInvalid("transport probe frame IQ byte count changed")
+        digest = frame.get("sha256")
+        if not isinstance(digest, str) or len(digest) != 64:
+            raise EvidenceInvalid("transport probe frame lacks a SHA-256 digest")
+        try:
+            int(digest, 16)
+        except ValueError as exc:
+            raise EvidenceInvalid(
+                "transport probe frame digest is not hexadecimal"
+            ) from exc
+        refill = _required_int(
+            frame.get("refill_monotonic_ns"), name="refill_monotonic_ns"
+        )
+        if prior_refill is not None and refill < prior_refill:
+            raise EvidenceInvalid("transport probe refill ledger regressed")
+        prior_refill = refill
+        metadata = _required_mapping(frame.get("metadata"), name="metadata")
+        if _required_int(metadata.get("version"), name="metadata version") != 5:
+            raise EvidenceInvalid("transport probe metadata version changed")
+        if _required_int(metadata.get("header_bytes"), name="header_bytes") != (
+            _PROBE_METADATA_HEADER_BYTES
+        ):
+            raise EvidenceInvalid("transport probe metadata layout changed")
+        features = _required_int(metadata.get("features"), name="features")
+        flags = _required_int(metadata.get("flags"), name="flags")
+        if features & _PROBE_REQUIRED_METADATA_FEATURES != (
+            _PROBE_REQUIRED_METADATA_FEATURES
+        ) or flags & _PROBE_REQUIRED_METADATA_FLAGS != (_PROBE_REQUIRED_METADATA_FLAGS):
+            raise EvidenceInvalid("transport probe required metadata bits are absent")
+        if flags & TANDEM_UNSAFE_FLAGS:
+            raise EvidenceInvalid("transport probe metadata has unsafe flags")
+        current_stream = _required_int(
+            metadata.get("stream_id"), name="stream_id", minimum=1
+        )
+        current_epoch = _required_int(
+            metadata.get("ownership_epoch"), name="ownership_epoch", minimum=1
+        )
+        if stream_id is None:
+            stream_id, ownership_epoch = current_stream, current_epoch
+        elif (current_stream, current_epoch) != (stream_id, ownership_epoch):
+            raise EvidenceInvalid("transport probe stream or ownership changed")
+        buffer_sequence = _required_int(
+            metadata.get("buffer_sequence"), name="buffer_sequence"
+        )
+        first_sample = _required_int(
+            metadata.get("first_sample_sequence"), name="first_sample_sequence"
+        )
+        if first_sample + probe.frame_samples > 1 << 64:
+            raise EvidenceInvalid("transport probe frame exceeds uint64 sample time")
+        if index == 0 and buffer_sequence != 0:
+            raise EvidenceInvalid("transport probe first buffer is not sequence zero")
+        if (
+            current_stream >= 1 << 64
+            or buffer_sequence >= 1 << 64
+            or current_epoch >= 1 << 32
+        ):
+            raise EvidenceInvalid("transport probe stream counters exceed wire range")
+        if (
+            frame.get("first_sample_sequence") != first_sample
+            or frame.get("sample_end_exclusive") != first_sample + probe.frame_samples
+        ):
+            raise EvidenceInvalid("transport probe frame/sample ledger disagrees")
+        if (
+            metadata.get("samples_per_channel") != probe.frame_samples
+            or metadata.get("iq_payload_bytes") != probe.frame_samples * 8
+        ):
+            raise EvidenceInvalid("transport probe metadata payload geometry changed")
+        if (
+            metadata.get("enabled_scan_mask") != 0x0F
+            or metadata.get("channel_count") != 2
+        ):
+            raise EvidenceInvalid("transport probe metadata is not dual complex RX")
+        observation_count = _required_int(
+            metadata.get("observation_count"), name="observation_count"
+        )
+        event_count = _required_int(metadata.get("event_count"), name="event_count")
+        if (
+            metadata.get("observation_capacity") != 64
+            or metadata.get("event_capacity") != 64
+        ):
+            raise EvidenceInvalid("transport probe metadata capacity changed")
+        if not 0 <= observation_count <= 64 or not 0 <= event_count <= 64:
+            raise EvidenceInvalid("transport probe metadata count exceeds capacity")
+        if observation_count > maximum_observations:
+            raise EvidenceInvalid(
+                "transport probe observation count exceeds the provider overlap bound"
+            )
+        if event_count > maximum_events:
+            raise EvidenceInvalid(
+                "transport probe event count exceeds its configured physics bound"
+            )
+        if (
+            metadata.get("observation_overflow_count") != 0
+            or metadata.get("event_overflow_count") != 0
+        ):
+            raise EvidenceInvalid("transport probe metadata overflowed")
+        if (
+            metadata.get("tandem_state") != int(TandemState.ARMED_AUTO)
+            or metadata.get("tandem_state_name") != "armed_auto"
+        ):
+            raise EvidenceInvalid("transport probe tandem state changed")
+        if metadata.get("tandem_fault_flags") != 0:
+            raise EvidenceInvalid("transport probe tandem metadata faulted")
+        if metadata.get("gain_table_id") != int(
+            expected_tandem_gain_table(quality.center_frequency_hz)
+        ):
+            raise EvidenceInvalid("transport probe gain table changed")
+        if metadata.get("gain_db_range") != [0, 62] or metadata.get(
+            "initial_gain_db"
+        ) != int(quality.manual_gain_db):
+            raise EvidenceInvalid("transport probe request provenance changed")
+        if metadata.get("sample_format") != 1 or metadata.get(
+            "threshold_provenance"
+        ) != _expected_threshold_provenance(quality):
+            raise EvidenceInvalid("transport probe wire/request provenance changed")
+        gain_range = _required_list(
+            metadata.get("gain_index_range"), name="gain_index_range"
+        )
+        endpoint = _required_list(
+            metadata.get("bench_gain_indices"), name="bench_gain_indices"
+        )
+        if len(gain_range) != 2 or len(endpoint) != 2:
+            raise EvidenceInvalid("transport probe gain geometry is invalid")
+        minimum_gain = _required_int(gain_range[0], name="minimum_gain_index")
+        maximum_gain = _required_int(gain_range[1], name="maximum_gain_index")
+        endpoint_pair = (
+            _required_int(endpoint[0], name="rx1_gain_index"),
+            _required_int(endpoint[1], name="rx2_gain_index"),
+        )
+        if endpoint_pair[0] != endpoint_pair[1] or not (
+            minimum_gain <= endpoint_pair[0] <= maximum_gain
+        ):
+            raise EvidenceInvalid("transport probe endpoint is invalid")
+        current_provenance = (
+            features,
+            metadata.get("sample_format"),
+            metadata.get("threshold_provenance"),
+            tuple(gain_range),
+        )
+        if provenance is None:
+            provenance = current_provenance
+        elif current_provenance != provenance:
+            raise EvidenceInvalid("transport probe provenance changed in session")
+
+        events = _required_list(metadata.get("gain_events"), name="gain_events")
+        if event_count != len(events):
+            raise EvidenceInvalid("transport probe event count disagrees with ledger")
+        for raw_event in events:
+            event = _required_mapping(raw_event, name="gain event")
+            event_flags = _required_int(event.get("flags"), name="event flags")
+            direction = _required_int(event.get("direction"), name="event direction")
+            reason = _required_int(event.get("reason"), name="event reason")
+            try:
+                parsed_direction = TandemEventDirection(direction)
+                parsed_reason = TandemEventReason(reason)
+            except ValueError as exc:
+                raise EvidenceInvalid("transport probe event enum is invalid") from exc
+            if (
+                event_flags != (direction << 4) | reason
+                or event_flags & ~0x3F
+                or event.get("direction_name") != parsed_direction.name.lower()
+                or event.get("reason_name") != parsed_reason.name.lower()
+            ):
+                raise EvidenceInvalid("transport probe event flags/names disagree")
+            event_sample = _required_int(
+                event.get("sample_sequence"), name="event sample_sequence"
+            )
+            event_sequence = _required_int(
+                event.get("event_sequence"), name="event_sequence"
+            )
+            if event_sequence >= 1 << 32:
+                raise EvidenceInvalid("transport probe event sequence exceeds uint32")
+            rx1 = _required_int(event.get("rx1_gain_index"), name="event rx1 gain")
+            rx2 = _required_int(event.get("rx2_gain_index"), name="event rx2 gain")
+            if rx1 != rx2 or not minimum_gain <= rx1 <= maximum_gain:
+                raise EvidenceInvalid("transport probe event gain is invalid")
+            if not first_sample <= event_sample < first_sample + probe.frame_samples:
+                raise EvidenceInvalid("transport probe event is outside its frame")
+            if prior_event is not None:
+                prior_sequence = _required_int(
+                    prior_event.get("event_sequence"), name="prior event sequence"
+                )
+                if (event_sequence - prior_sequence) % (1 << 32) != 1:
+                    raise EvidenceInvalid("transport probe event sequence has a hole")
+                prior_event_sample = _required_int(
+                    prior_event.get("sample_sequence"), name="prior event sample"
+                )
+                if event_sample < prior_event_sample:
+                    raise EvidenceInvalid("transport probe event samples regressed")
+                if event_sample - prior_event_sample < minimum_event_spacing:
+                    raise EvidenceInvalid(
+                        "transport probe gain events violate cooldown spacing"
+                    )
+                prior_gain = _required_int(
+                    prior_event.get("rx1_gain_index"), name="prior event gain"
+                )
+                expected_gain = prior_gain + (
+                    1 if parsed_direction is TandemEventDirection.INCREASE else -1
+                )
+                if rx1 != expected_gain:
+                    raise EvidenceInvalid("transport probe event step is not exact")
+            elif prior_metadata is not None:
+                prior_endpoint = _required_list(
+                    prior_metadata.get("bench_gain_indices"), name="prior endpoint"
+                )
+                expected_gain = _required_int(
+                    prior_endpoint[0], name="prior endpoint gain"
+                ) + (1 if parsed_direction is TandemEventDirection.INCREASE else -1)
+                if rx1 != expected_gain:
+                    raise EvidenceInvalid("transport probe first event step is invalid")
+            prior_event = event
+        if events:
+            last_event = _required_mapping(events[-1], name="last event")
+            if endpoint_pair != (
+                last_event.get("rx1_gain_index"),
+                last_event.get("rx2_gain_index"),
+            ):
+                raise EvidenceInvalid(
+                    "transport probe endpoint differs from last event"
+                )
+        elif prior_metadata is not None and endpoint != prior_metadata.get(
+            "bench_gain_indices"
+        ):
+            raise EvidenceInvalid("transport probe endpoint changed without event")
+
+        transition_count = _required_int(
+            metadata.get("tandem_transition_count"), name="transition_count"
+        )
+        if transition_count >= 1 << 32:
+            raise EvidenceInvalid("transport probe transition count exceeds uint32")
+        continuity = _required_mapping(frame.get("continuity"), name="continuity")
+        if prior_metadata is None:
+            if transition_count != event_count:
+                raise EvidenceInvalid(
+                    "transport probe first frame has unrepresented transitions"
+                )
+            expected_continuity = {
+                "buffer_delta": None,
+                "sample_delta": None,
+                "transition_count_delta": None,
+                "initial_unrepresented_transition_count": transition_count
+                - event_count,
+            }
+        else:
+            prior_buffer = _required_int(
+                prior_metadata.get("buffer_sequence"), name="prior buffer_sequence"
+            )
+            prior_sample = _required_int(
+                prior_metadata.get("first_sample_sequence"), name="prior sample"
+            )
+            prior_transition = _required_int(
+                prior_metadata.get("tandem_transition_count"), name="prior transition"
+            )
+            transition_delta = (transition_count - prior_transition) % (1 << 32)
+            if (
+                buffer_sequence - prior_buffer != 1
+                or first_sample - prior_sample != probe.frame_samples
+                or transition_delta != event_count
+            ):
+                raise EvidenceInvalid("transport probe has a gap or hidden transition")
+            expected_continuity = {
+                "buffer_delta": 1,
+                "sample_delta": probe.frame_samples,
+                "transition_count_delta": transition_delta,
+                "initial_unrepresented_transition_count": 0,
+            }
+        for key, expected in expected_continuity.items():
+            if continuity.get(key) != expected:
+                raise EvidenceInvalid(
+                    f"transport probe continuity field {key} is inconsistent"
+                )
+        exact_zero = {
+            "missing_frame_count": 0,
+            "sample_gap_before": 0,
+            "hidden_transition_count": 0,
+            "cumulative_missing_frame_count": 0,
+            "cumulative_hidden_transition_count": 0,
+            "cumulative_event_sequence_hole_count": 0,
+        }
+        if any(continuity.get(key) != expected for key, expected in exact_zero.items()):
+            raise EvidenceInvalid("transport probe continuity counters are nonzero")
+        if (
+            continuity.get("visible_event_count") != event_count
+            or continuity.get("provider_gap_accepted") is not False
+            or continuity.get("command_boundary_gap_allowed") is not False
+        ):
+            raise EvidenceInvalid("transport probe event/gap ledger is inconsistent")
+        prior_metadata = metadata
+
+    initial_frames = frames[: probe.continuity_frames]
+    command_frames = frames[probe.continuity_frames :]
+    if any(
+        frame.get("probe_phase") != "uncontended_continuity" for frame in initial_frames
+    ):
+        raise EvidenceInvalid("transport probe command occurred before 32-frame gate")
+    _validate_stable_report_suffix(
+        initial_frames,
+        report.get("initial_stable_suffix"),
+        count=probe.stable_frames,
+        name="initial_stable_suffix",
+    )
+    anchor_frame = _required_mapping(initial_frames[-1], name="anchor frame")
+    anchor_end = _required_int(
+        anchor_frame.get("sample_end_exclusive"), name="anchor frame end"
+    )
+    anchor_digest = anchor_frame.get("sha256")
+    tail_digest_value = _required_mapping(
+        report.get("conditioning_anchor_candidate"),
+        name="conditioning_anchor_candidate",
+    ).get("tail_sha256")
+    if not isinstance(tail_digest_value, str) or len(tail_digest_value) != 64:
+        raise EvidenceInvalid("transport probe anchor lacks a tail SHA-256")
+    try:
+        int(tail_digest_value, 16)
+    except ValueError as exc:
+        raise EvidenceInvalid("transport probe anchor tail digest is invalid") from exc
+    expected_anchor = {
+        "frame_index": probe.continuity_frames - 1,
+        "sample_sequence_before": anchor_end - probe.anchor_samples,
+        "sample_sequence_after": anchor_end,
+        "sample_uncertainty": probe.anchor_samples,
+        "sample_offset_in_frame": probe.frame_samples - probe.anchor_samples,
+        "sample_count": probe.anchor_samples,
+        "byte_offset_in_iq_payload": ((probe.frame_samples - probe.anchor_samples) * 8),
+        "byte_count": probe.anchor_samples * 8,
+        "source_frame_sha256": anchor_digest,
+        "tail_sha256": tail_digest_value,
+        "timing_basis": "hardware_sample_counter",
+        "role": "stable_tail_candidate_for_future_transient",
+        "release_latency_evidence": False,
+    }
+    if report.get("conditioning_anchor_candidate") != expected_anchor:
+        raise EvidenceInvalid("transport probe conditioning anchor changed")
+
+    contention = _required_mapping(
+        report.get("command_contention"), name="command_contention"
+    )
+    if (
+        contention.get("command_timing_qualified") is not True
+        or contention.get("gain_transient_exercised") is not False
+    ):
+        raise EvidenceInvalid("transport probe contention scope is invalid")
+    command = _validate_command_report(
+        contention.get("command"),
+        quality=quality,
+        probe=probe,
+        last_qualified_frame_end=anchor_end,
+    )
+    assert command.sample_sequence_before is not None
+    assert command.sample_sequence_after is not None
+    contexts: list[str] = []
+    for raw_frame in command_frames:
+        frame = _required_mapping(raw_frame, name="command frame")
+        start = _required_int(
+            frame.get("first_sample_sequence"), name="command frame start"
+        )
+        end = _required_int(frame.get("sample_end_exclusive"), name="command frame end")
+        if end <= command.sample_sequence_before:
+            context = "precommand_prefetch"
+        elif start < command.sample_sequence_after:
+            context = "command_bracket"
+        else:
+            context = "fully_post_command"
+        if frame.get("probe_phase") != context:
+            raise EvidenceInvalid(
+                "transport probe command phase ledger is inconsistent"
+            )
+        contexts.append(context)
+    order = {
+        "precommand_prefetch": 0,
+        "command_bracket": 1,
+        "fully_post_command": 2,
+    }
+    if contexts != sorted(contexts, key=order.__getitem__):
+        raise EvidenceInvalid("transport probe command phases are not ordered")
+    non_post = sum(context != "fully_post_command" for context in contexts)
+    fully_post = len(contexts) - non_post
+    expected_partition = {
+        "frame_indices": list(range(probe.continuity_frames, probe.retained_frames)),
+        "phase_by_frame": contexts,
+        "precommand_prefetch_frames": contexts.count("precommand_prefetch"),
+        "command_bracket_frames": contexts.count("command_bracket"),
+        "non_post_command_frames": non_post,
+        "maximum_non_post_command_frames": probe.command_prefix_frames,
+        "fully_post_command_frames": fully_post,
+        "required_fully_post_command_frames": probe.fully_post_command_frames,
+    }
+    if non_post > probe.command_prefix_frames or fully_post < (
+        probe.fully_post_command_frames
+    ):
+        raise EvidenceInvalid("transport probe command partition is insufficient")
+    if contention.get("partition") != expected_partition:
+        raise EvidenceInvalid("transport probe command partition ledger changed")
+    _validate_stable_report_suffix(
+        frames,
+        report.get("final_stable_suffix"),
+        count=probe.stable_frames,
+        name="final_stable_suffix",
+    )
+    weak_quality = _required_mapping(
+        report.get("weak_signal_quality"), name="weak_signal_quality"
+    )
+    if (
+        weak_quality.get("timing_scope")
+        != "post-buffer analysis of returned weak-IQ tails"
+        or weak_quality.get("quality_required") is not True
+    ):
+        raise EvidenceInvalid("transport probe weak-signal quality scope changed")
+    conditioning_quality = weak_quality.get("conditioning_anchor")
+    _validate_quality_tail_report(
+        conditioning_quality,
+        frame=initial_frames[-1],
+        quality=quality,
+        probe=probe,
+        name="conditioning quality tail",
+    )
+    if (
+        _required_mapping(conditioning_quality, name="conditioning quality tail").get(
+            "tail_sha256"
+        )
+        != tail_digest_value
+    ):
+        raise EvidenceInvalid("transport probe anchor quality digest changed")
+    final_quality = _required_list(
+        weak_quality.get("final_stable_suffix"), name="final quality suffix"
+    )
+    if len(final_quality) != probe.stable_frames:
+        raise EvidenceInvalid("transport probe final quality suffix is incomplete")
+    for value, frame in zip(final_quality, frames[-probe.stable_frames :], strict=True):
+        _validate_quality_tail_report(
+            value,
+            frame=frame,
+            quality=quality,
+            probe=probe,
+            name="final quality tail",
+        )
+
+    initial_command = _required_mapping(
+        report.get("weak_conditioning_command"), name="weak_conditioning_command"
+    )
+    if (
+        initial_command.get("command_id") != "weak_initial"
+        or initial_command.get("sample_sequence_before") is not None
+        or initial_command.get("sample_sequence_after") is not None
+        or initial_command.get("sample_uncertainty") is not None
+    ):
+        raise EvidenceInvalid("transport probe conditioning command is invalid")
+    if (
+        initial_command.get("timing_role") != "pre_session_weak_conditioning_write"
+        or initial_command.get("sample_timing_basis") is not None
+        or initial_command.get("sample_anchor_policy")
+        != ("unbounded in hardware sample time; the write predates the AUTO session")
+    ):
+        raise EvidenceInvalid("transport probe conditioning timing role changed")
+    initial_requested = _required_number(
+        initial_command.get("requested_level_db"), name="initial requested level"
+    )
+    initial_applied = _required_number(
+        initial_command.get("applied_level_db"), name="initial applied level"
+    )
+    if (
+        initial_requested != probe.weak_stimulus_tx_gain_db
+        or abs(initial_applied - initial_requested) > probe.readback_tolerance_db
+    ):
+        raise EvidenceInvalid("transport probe conditioning level changed")
+    initial_effective = _required_number(
+        initial_command.get("effective_attenuation_db"), name="initial attenuation"
+    )
+    if initial_effective != quality.physical_attenuation_db - initial_applied or (
+        initial_effective < 30.0
+    ):
+        raise EvidenceInvalid("transport probe conditioning attenuation is invalid")
+    initial_host_before = _required_int(
+        initial_command.get("host_before_ns"), name="initial host_before_ns"
+    )
+    initial_host_after = _required_int(
+        initial_command.get("host_after_ns"), name="initial host_after_ns"
+    )
+    initial_host_jitter = _required_int(
+        initial_command.get("host_jitter_ns"), name="initial host_jitter_ns"
+    )
+    if initial_host_after - initial_host_before != initial_host_jitter or not (
+        0 <= initial_host_jitter <= probe.max_host_jitter_ns
+    ):
+        raise EvidenceInvalid("transport probe conditioning host bracket is invalid")
+
+    acquisition = _required_mapping(report.get("acquisition"), name="acquisition")
+    produced = _required_int(acquisition.get("produced_frames"), name="produced_frames")
+    consumed = _required_int(acquisition.get("consumed_frames"), name="consumed_frames")
+    discarded = _required_int(
+        acquisition.get("discarded_tail_frames"), name="discarded_tail_frames"
+    )
+    if (
+        acquisition.get("threaded") is not True
+        or acquisition.get("worker_started") is not True
+        or acquisition.get("thread_name") != PROBE_THREAD_NAME
+        or acquisition.get("kernel_buffers") != probe.kernel_buffers
+        or acquisition.get("queue_capacity_frames") != _PROBE_QUEUE_FRAMES
+        or acquisition.get("required_consumed_frames") != probe.retained_frames
+        or consumed != probe.retained_frames
+        or not consumed <= produced <= probe.maximum_pump_frames
+        or produced - consumed > _PROBE_QUEUE_FRAMES + 1
+        or discarded != produced - consumed
+        or acquisition.get("buffer_cancelled_before_join") is not True
+        or acquisition.get("worker_stopped_before_buffer_close") is not True
+    ):
+        raise EvidenceInvalid("transport probe acquisition ledger is invalid")
+    _validate_idle_report_status(report.get("tandem_status_before"), name="before")
+    _validate_idle_report_status(report.get("tandem_status_after"), name="after")
+    final_rx = _required_mapping(report.get("final_rx_state"), name="final_rx_state")
+    if final_rx.get("modes") != ["manual", "manual"]:
+        raise EvidenceInvalid("transport probe final RX mode is not manual")
+    gains = _required_list(final_rx.get("gains_db"), name="final RX gains")
+    if len(gains) != 2 or any(
+        abs(_required_number(value, name="final RX gain") - quality.manual_gain_db)
+        > 0.1
+        for value in gains
+    ):
+        raise EvidenceInvalid("transport probe final RX gains are invalid")
+    expected_cadence = _refill_cadence(frames, quality.sample_rate_hz)
+    if report.get("refill_cadence") != _json_domain(expected_cadence):
+        raise EvidenceInvalid("transport probe refill cadence ledger changed")
+    if require_cleanup:
+        _validate_cleanup_evidence(report.get("cleanup"))
+
+
+def validate_transient_transport_probe_report(
+    report: Mapping[str, Any],
+    quality: TandemQualityOptions,
+    *,
+    probe: TransientTransportProbeOptions = _DEFAULT_PROBE_OPTIONS,
+    require_cleanup: bool = False,
+) -> None:
+    """Independently recheck a probe artifact in its serialized JSON domain."""
+
+    validate_transient_transport_probe_options(quality, probe)
+    try:
+        _validate_transient_transport_probe_report_impl(
+            _json_domain(report), quality, probe, require_cleanup=require_cleanup
+        )
+    except (EvidenceInvalid, FixtureSafetyError):
+        raise
+    except (KeyError, TypeError, ValueError, IndexError) as error:
+        raise EvidenceInvalid(
+            "transport probe report is malformed: " + _exception_text(error)
+        ) from error
+
+
+def run_transient_transport_probe(
+    radio: Issue46Radio | TransientRadioTransport,
+    quality: TandemQualityOptions,
+    *,
+    probe: TransientTransportProbeOptions = _DEFAULT_PROBE_OPTIONS,
+    clock_ns: Callable[[], int] = time.monotonic_ns,
+    monotonic: Callable[[], float] = time.monotonic,
+    wall_clock_ns: Callable[[], int] = time.time_ns,
+    sleep: Callable[[float], None] = time.sleep,
+    metadata_parser: Callable[
+        [bytes], TandemFrameMetadata
+    ] = parse_tandem_frame_metadata,
+    report_writer: Callable[[Path, Mapping[str, Any]], None] = _atomic_json,
+) -> tuple[dict[str, Any], Path]:
+    """Run the weak-only transport qualification and preserve a durable artifact."""
+
+    validate_transient_transport_probe_options(quality, probe)
+    if radio.options.sample_rate_hz != quality.sample_rate_hz:
+        raise ValueError("radio and transport-probe sample rates differ")
+    if radio.options.samples_per_channel != probe.frame_samples:
+        raise ValueError("radio buffer authorization differs from transport probe")
+    if float(radio.options.tx_gain_db) != probe.weak_stimulus_tx_gain_db:
+        raise ValueError("radio TX ceiling must equal the -45 dB probe level")
+    if radio.options.center_frequency_hz != quality.center_frequency_hz:
+        raise ValueError("radio and transport-probe center frequencies differ")
+    if float(radio.options.attenuation_db) != quality.physical_attenuation_db:
+        raise ValueError("radio and transport-probe attenuation declarations differ")
+
+    center_frequency = {
+        key: int(value) for key, value in radio.read_center_frequency().items()
+    }
+    expected_frequency = quality.center_frequency_hz
+    if set(center_frequency) != {"rx_lo_hz", "tx_lo_hz"} or any(
+        abs(value - expected_frequency) > 2 for value in center_frequency.values()
+    ):
+        raise EvidenceInvalid(
+            "live RX/TX LO differs from transport-probe configuration"
+        )
+
+    serial = str(radio.options.serial)
+    if str(radio.identity.get("serial", "")) != serial:
+        raise EvidenceInvalid(
+            "transport probe radio identity differs from authorization"
+        )
+    report_path = (
+        quality.output_dir / serial / "tandem-agc-transient-transport-probe.json"
+    )
+    radio._report_path = report_path
+    started = monotonic()
+
+    def check_deadline() -> None:
+        if monotonic() - started >= quality.max_seconds:
+            raise TimeoutError(
+                "tandem transient transport probe exceeded "
+                f"{quality.max_seconds:.1f} seconds"
+            )
+
+    report: dict[str, Any] = {
+        "schema": PROBE_SCHEMA,
+        "started_unix_ns": wall_clock_ns(),
+        "identity": dict(radio.identity),
+        "release_pass_eligible": False,
+        "qualification_scope": _qualification_scope(),
+        "rf": {
+            "center_frequency_hz_requested": expected_frequency,
+            "center_frequency_hz_readback": center_frequency,
+            "sample_rate_hz": quality.sample_rate_hz,
+            "tone_hz": quality.tone_hz,
+            "dds_scale": quality.dds_scale,
+            "weak_tx2_gain_db": probe.weak_stimulus_tx_gain_db,
+        },
+        "configuration": {
+            "quality": _quality_configuration(quality),
+            "probe": asdict(probe),
+        },
+        "safety": _safety_policy(quality, probe),
+        "evidence_policy": _evidence_policy(probe),
+        "capacity_policy": _capacity_policy(quality, probe),
+        "memory_policy": _report_memory_policy(probe),
+        "acquisition": {
+            "threaded": True,
+            "thread_name": PROBE_THREAD_NAME,
+            "kernel_buffers": probe.kernel_buffers,
+            "queue_capacity_frames": _PROBE_QUEUE_FRAMES,
+            "required_consumed_frames": probe.retained_frames,
+            "worker_started": False,
+            "produced_frames": 0,
+            "consumed_frames": 0,
+            "discarded_tail_frames": 0,
+            "buffer_cancelled_before_join": False,
+            "worker_stopped_before_buffer_close": False,
+        },
+        "frames": [],
+        "iq_artifacts_saved": False,
+        "cleanup": {
+            "verified": False,
+            "status": "pending_radio_lifecycle_close",
+            "owner": "Issue46Radio.close",
+        },
+        "verdict": "running",
+    }
+
+    initial_report_error: BaseException | None = None
+    try:
+        report_writer(report_path, report)
+    except BaseException as error:  # noqa: BLE001
+        initial_report_error = error
+
+    retained: list[_DeferredFrame] = []
+    campaign_error: BaseException | None = initial_report_error
+    if campaign_error is None:
+        try:
+            _run_probe_body(
+                radio,
+                quality,
+                probe,
+                report,
+                retained,
+                check_deadline=check_deadline,
+                clock_ns=clock_ns,
+                monotonic=monotonic,
+                sleep=sleep,
+                metadata_parser=metadata_parser,
+            )
+        except BaseException as error:  # noqa: BLE001
+            campaign_error = error
+
+    materialize_error: BaseException | None = None
+    try:
+        report["frames"] = _materialize_frames(retained)
+        _bind_anchor_artifact(report, retained, probe)
+        if len(retained) == probe.retained_frames:
+            report["weak_signal_quality"] = _materialize_weak_signal_quality(
+                retained, quality=quality, probe=probe
+            )
+        if len(report["frames"]) >= 2:
+            report["refill_cadence"] = _refill_cadence(
+                report["frames"], quality.sample_rate_hz
+            )
+    except BaseException as error:  # noqa: BLE001
+        materialize_error = error
+
+    final_mute_error: BaseException | None = None
+    try:
+        radio.mute_all()
+    except BaseException as error:  # noqa: BLE001
+        final_mute_error = error
+
+    pre_report_errors = [
+        error
+        for error in (campaign_error, materialize_error, final_mute_error)
+        if error is not None
+    ]
+    if not pre_report_errors:
+        report["verdict"] = PROBE_PENDING_VERDICT
+        try:
+            validate_transient_transport_probe_report(
+                report, quality, probe=probe, require_cleanup=False
+            )
+        except BaseException as error:  # noqa: BLE001
+            pre_report_errors.append(error)
+    if pre_report_errors:
+        report["verdict"] = "invalid"
+        report["fatal_error"] = _exception_text(
+            pre_report_errors[0]
+            if len(pre_report_errors) == 1
+            else BaseExceptionGroup("transport probe failures", pre_report_errors)
+        )
+    report["elapsed_seconds"] = monotonic() - started
+    report["completed_unix_ns"] = wall_clock_ns()
+
+    report_error: BaseException | None = None
+    try:
+        report_writer(report_path, report)
+    except BaseException as error:  # noqa: BLE001
+        report_error = error
+
+    errors = [*pre_report_errors, *([report_error] if report_error is not None else [])]
+    if len(errors) > 1:
+        raise BaseExceptionGroup(
+            "transport probe or its fail-closed exit handling failed", errors
+        )
+    if errors:
+        error = errors[0]
+        raise error.with_traceback(error.__traceback__)
+    return report, report_path
+
+
+def run_serial_transient_transport_probe(
+    iio_module: Any,
+    radio_options: Any,
+    quality: TandemQualityOptions,
+    *,
+    probe: TransientTransportProbeOptions = _DEFAULT_PROBE_OPTIONS,
+    radio_factory: Callable[[Any, Any], Issue46Radio] = Issue46Radio,
+    clock_ns: Callable[[], int] = time.monotonic_ns,
+    monotonic: Callable[[], float] = time.monotonic,
+    wall_clock_ns: Callable[[], int] = time.time_ns,
+    sleep: Callable[[float], None] = time.sleep,
+    metadata_parser: Callable[
+        [bytes], TandemFrameMetadata
+    ] = parse_tandem_frame_metadata,
+    report_writer: Callable[[Path, Mapping[str, Any]], None] = _atomic_json,
+) -> tuple[dict[str, Any], Path]:
+    """Own one radio and require durable close-time cleanup evidence."""
+
+    validate_transient_transport_probe_options(quality, probe)
+    radio = radio_factory(iio_module, radio_options)
+    body_error: BaseException | None = None
+    result: tuple[dict[str, Any], Path] | None = None
+    try:
+        result = run_transient_transport_probe(
+            radio,
+            quality,
+            probe=probe,
+            clock_ns=clock_ns,
+            monotonic=monotonic,
+            wall_clock_ns=wall_clock_ns,
+            sleep=sleep,
+            metadata_parser=metadata_parser,
+            report_writer=report_writer,
+        )
+    except BaseException as error:  # noqa: BLE001
+        body_error = error
+
+    close_error: BaseException | None = None
+    try:
+        radio.close()
+    except BaseException as error:  # noqa: BLE001
+        close_error = FixtureSafetyError(
+            "radio close failed after transport probe: " + _exception_text(error)
+        )
+
+    report_path_value = (
+        result[1] if result is not None else getattr(radio, "_report_path", None)
+    )
+    report_path = Path(report_path_value) if report_path_value is not None else None
+    close_invalidation_error: BaseException | None = None
+    if close_error is not None and report_path is not None and report_path.is_file():
+        try:
+            parsed_failure = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(parsed_failure, dict):
+                raise EvidenceInvalid(
+                    "close-failed transport-probe report is not a JSON object"
+                )
+            parsed_failure["verdict"] = "invalid"
+            parsed_failure["release_pass_eligible"] = False
+            parsed_failure["fatal_error"] = _exception_text(close_error)
+            prior_cleanup = parsed_failure.get("cleanup")
+            cleanup_failure = (
+                dict(prior_cleanup) if isinstance(prior_cleanup, Mapping) else {}
+            )
+            failures = cleanup_failure.get("failures")
+            cleanup_failure["failures"] = [
+                *(failures if isinstance(failures, list) else []),
+                _exception_text(close_error),
+            ]
+            cleanup_failure["verified"] = False
+            parsed_failure["cleanup"] = cleanup_failure
+            report_writer(report_path, parsed_failure)
+        except BaseException as error:  # noqa: BLE001
+            close_invalidation_error = error
+    durable_report: dict[str, Any] | None = None
+    durable_error: BaseException | None = None
+    if close_error is None and body_error is None:
+        try:
+            if not bool(getattr(radio, "cleanup_verified", False)):
+                raise FixtureSafetyError(
+                    "radio close did not verify final transport-probe cleanup"
+                )
+            if report_path is None or not report_path.is_file():
+                raise EvidenceInvalid("post-close transport-probe report is missing")
+            if report_path.with_suffix(report_path.suffix + ".tmp").exists():
+                raise EvidenceInvalid("transport-probe atomic report temp remains")
+            parsed = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(parsed, dict):
+                raise EvidenceInvalid(
+                    "post-close transport-probe report is not an object"
+                )
+            _validate_cleanup_evidence(parsed.get("cleanup"))
+            if parsed.get("schema") != PROBE_SCHEMA:
+                raise EvidenceInvalid("durable transport-probe schema changed")
+            if parsed.get("verdict") != PROBE_PENDING_VERDICT:
+                raise EvidenceInvalid(
+                    "durable transport probe lacks its pending-cleanup verdict"
+                )
+            if parsed.get("release_pass_eligible") is not False:
+                raise EvidenceInvalid(
+                    "transport probe was mislabelled release eligible"
+                )
+            if parsed.get("identity") != _json_domain(dict(radio.identity)):
+                raise EvidenceInvalid("durable transport-probe identity changed")
+            parsed["verdict"] = PROBE_VERDICT
+            validate_transient_transport_probe_report(
+                parsed, quality, probe=probe, require_cleanup=True
+            )
+            report_writer(report_path, parsed)
+            if report_path.with_suffix(report_path.suffix + ".tmp").exists():
+                raise EvidenceInvalid(
+                    "transport-probe promotion left an atomic report temp"
+                )
+            promoted = json.loads(report_path.read_text(encoding="utf-8"))
+            if not isinstance(promoted, dict):
+                raise EvidenceInvalid(
+                    "promoted transport-probe report is not a JSON object"
+                )
+            if promoted.get("identity") != _json_domain(dict(radio.identity)):
+                raise EvidenceInvalid("promoted transport-probe identity changed")
+            validate_transient_transport_probe_report(
+                promoted, quality, probe=probe, require_cleanup=True
+            )
+            durable_report = promoted
+        except BaseException as error:  # noqa: BLE001
+            durable_error = error
+
+    errors = [
+        error
+        for error in (
+            body_error,
+            close_error,
+            close_invalidation_error,
+            durable_error,
+        )
+        if error is not None
+    ]
+    if len(errors) > 1:
+        raise BaseExceptionGroup(
+            "transport probe, radio close, or durable cleanup proof failed", errors
+        )
+    if errors:
+        error = errors[0]
+        raise error.with_traceback(error.__traceback__)
+    assert result is not None
+    assert report_path is not None
+    assert durable_report is not None
+    return durable_report, report_path
+
+
+__all__ = [
+    "PROBE_PENDING_VERDICT",
+    "PROBE_SCHEMA",
+    "PROBE_VERDICT",
+    "TransientTransportProbeOptions",
+    "run_serial_transient_transport_probe",
+    "run_transient_transport_probe",
+    "validate_transient_transport_probe_options",
+    "validate_transient_transport_probe_report",
+]
