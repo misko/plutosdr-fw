@@ -14,9 +14,12 @@ import errno
 import hashlib
 import json
 import math
+import os
 import queue
+import re
 import statistics
 import struct
+import subprocess
 import threading
 import time
 from builtins import BaseExceptionGroup
@@ -75,6 +78,35 @@ PROBE_SCHEMA = "plutosdr-fw.tandem-agc-transient-transport-probe.v2"
 PROBE_VERDICT = "qualified_transport"
 PROBE_PENDING_VERDICT = "qualified_transport_pending_cleanup"
 PROBE_THREAD_NAME = "tandem-transient-transport-probe-acquisition"
+PROBE_EXACT_SERIAL = "1040007c4a94000211000b009186843ef2"
+PROBE_EXACT_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc2"
+PROBE_EXACT_FIRMWARE_PATTERN = (
+    r"^v0[.]41-plutoplus-spf-tandem-agc-v8-rc2$"
+)
+PROBE_EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
+PROBE_EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
+PROBE_EXACT_LIBIIO_REF = f"refs/tags/{PROBE_EXACT_LIBIIO_TAG}"
+
+_PROBE_MANIFEST_PATH = "manifests/tandem-agc-v8-rc3-source.yaml"
+_PROBE_LOCAL_RUNTIME_DEPENDENCIES = (
+    "pytest.ini",
+    "scripts/run_tandem_agc_quality_hardware.sh",
+    _PROBE_MANIFEST_PATH,
+    "tests/__init__.py",
+    "tests/radio_hardware/__init__.py",
+    "tests/radio_hardware/conftest.py",
+    "tests/radio_hardware/continuity.py",
+    "tests/radio_hardware/experiment.py",
+    "tests/radio_hardware/metadata_abi.py",
+    "tests/radio_hardware/pnxx.py",
+    "tests/radio_hardware/requirements.txt",
+    "tests/radio_hardware/tandem_quality.py",
+    "tests/radio_hardware/test_transient_transport_probe.py",
+    "tests/radio_hardware/tone_quality.py",
+    "tests/radio_hardware/transient_hardware.py",
+    "tests/radio_hardware/transient_quality.py",
+    "tests/radio_hardware/transient_transport_probe.py",
+)
 
 _PROBE_WEAK_GAIN_DB = -45.0
 _PROBE_AUTO_INITIAL_GAIN_DB = 62
@@ -346,6 +378,207 @@ def _durable_exception_text(error: BaseException) -> str:
     return " | ".join(rendered)
 
 
+def _sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _git_bytes(repository: Path, *arguments: str) -> bytes:
+    try:
+        completed = subprocess.run(
+            ("git", "-C", str(repository), *arguments),
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        detail = (
+            error.stderr.decode("utf-8", errors="replace").strip()
+            if isinstance(error, subprocess.CalledProcessError)
+            else str(error)
+        )
+        raise EvidenceInvalid(
+            f"transport probe provenance git {' '.join(arguments)} failed: {detail}"
+        ) from error
+    return completed.stdout
+
+
+def _git_text(repository: Path, *arguments: str) -> str:
+    return _git_bytes(repository, *arguments).decode("utf-8").strip()
+
+
+def _manifest_source_identity(raw: bytes) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in raw.decode("utf-8").splitlines():
+        key, separator, value = line.partition(":")
+        if separator and key in {"libiio_0_25_source", "libiio_0_25_ref"}:
+            values[key] = value.strip()
+    expected = {
+        "libiio_0_25_source": PROBE_EXACT_LIBIIO_COMMIT,
+        "libiio_0_25_ref": PROBE_EXACT_LIBIIO_REF,
+    }
+    if values != expected:
+        raise EvidenceInvalid(
+            f"transport probe source manifest libiio identity is {values}, "
+            f"expected {expected}"
+        )
+    return values
+
+
+def _firmware_repository() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _attest_firmware_runner(repository: Path | None = None) -> dict[str, Any]:
+    repository = (
+        _firmware_repository() if repository is None else repository.resolve()
+    )
+    commit = _git_text(repository, "rev-parse", "HEAD")
+    if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise EvidenceInvalid("transport probe runner commit is not exact SHA-1")
+
+    dependencies = []
+    manifest_blob: bytes | None = None
+    for relative_path in _PROBE_LOCAL_RUNTIME_DEPENDENCIES:
+        absolute_path = (repository / relative_path).resolve()
+        if not absolute_path.is_file():
+            raise EvidenceInvalid(
+                f"transport probe runtime dependency is absent: {relative_path}"
+            )
+        committed = _git_bytes(repository, "show", f"{commit}:{relative_path}")
+        observed_sha256 = _sha256_file(absolute_path)
+        commit_blob_sha256 = hashlib.sha256(committed).hexdigest()
+        if observed_sha256 != commit_blob_sha256:
+            raise EvidenceInvalid(
+                f"transport probe runtime dependency differs from {commit}: "
+                f"{relative_path}"
+            )
+        if relative_path == _PROBE_MANIFEST_PATH:
+            manifest_blob = committed
+        dependencies.append(
+            {
+                "relative_path": relative_path,
+                "absolute_path": str(absolute_path),
+                "observed_sha256": observed_sha256,
+                "commit_blob_sha256": commit_blob_sha256,
+            }
+        )
+    if manifest_blob is None:
+        raise EvidenceInvalid("transport probe source manifest was not attested")
+    manifest_identity = _manifest_source_identity(manifest_blob)
+    return {
+        "repository": str(repository),
+        "commit": commit,
+        "local_dependencies": dependencies,
+        "manifest_relative_path": _PROBE_MANIFEST_PATH,
+        "manifest_libiio_identity": manifest_identity,
+    }
+
+
+def _cmake_source_directory(cache: Path) -> Path:
+    if not cache.is_file():
+        raise EvidenceInvalid(f"transport probe CMake cache is absent: {cache}")
+    prefix = "CMAKE_HOME_DIRECTORY:INTERNAL="
+    values = [
+        line[len(prefix) :]
+        for line in cache.read_text(encoding="utf-8").splitlines()
+        if line.startswith(prefix)
+    ]
+    if len(values) != 1:
+        raise EvidenceInvalid("transport probe CMake source identity is ambiguous")
+    return Path(values[0]).resolve()
+
+
+def _attest_host_libiio(iio_module: Any) -> dict[str, Any]:
+    environment_commit = os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", "")
+    if environment_commit != PROBE_EXACT_LIBIIO_COMMIT:
+        raise EvidenceInvalid(
+            "transport probe launcher did not attest exact protected libiio "
+            f"{PROBE_EXACT_LIBIIO_COMMIT}"
+        )
+
+    pylibiio = Path(str(getattr(iio_module, "__file__", ""))).resolve()
+    if not pylibiio.is_file() or pylibiio.parts[-3:] != (
+        "bindings",
+        "python",
+        "iio.py",
+    ):
+        raise EvidenceInvalid(
+            f"transport probe pylibiio path is not source-backed: {pylibiio}"
+        )
+    source = pylibiio.parents[2]
+    source_head = _git_text(source, "rev-parse", "HEAD")
+    protected_tag_commit = _git_text(
+        source, "rev-parse", f"{PROBE_EXACT_LIBIIO_REF}^{{commit}}"
+    )
+    if source_head != PROBE_EXACT_LIBIIO_COMMIT or (
+        protected_tag_commit != PROBE_EXACT_LIBIIO_COMMIT
+    ):
+        raise EvidenceInvalid(
+            "transport probe libiio HEAD/protected tag does not resolve to the "
+            "exact qualified commit"
+        )
+    if _git_text(source, "status", "--porcelain", "--untracked-files=no"):
+        raise EvidenceInvalid("transport probe libiio source has tracked changes")
+
+    mapped = sorted(
+        {
+            str(Path(line.rsplit(maxsplit=1)[-1]).resolve())
+            for line in Path("/proc/self/maps").read_text(encoding="utf-8").splitlines()
+            if "/libiio.so" in line.rsplit(maxsplit=1)[-1]
+        }
+    )
+    if len(mapped) != 1:
+        raise EvidenceInvalid(
+            f"transport probe mapped libiio set is not unique: {mapped}"
+        )
+    mapped_shared_object = Path(mapped[0])
+    build = mapped_shared_object.parent.resolve()
+    if not mapped_shared_object.is_file() or not mapped_shared_object.is_relative_to(
+        build
+    ):
+        raise EvidenceInvalid("transport probe mapped libiio path is invalid")
+    cmake_cache = build / "CMakeCache.txt"
+    cmake_source = _cmake_source_directory(cmake_cache)
+    if cmake_source != source:
+        raise EvidenceInvalid(
+            "transport probe mapped libiio build belongs to another source tree"
+        )
+
+    pylibiio_commit_blob = _git_bytes(
+        source, "show", f"{PROBE_EXACT_LIBIIO_COMMIT}:bindings/python/iio.py"
+    )
+    pylibiio_sha256 = _sha256_file(pylibiio)
+    pylibiio_commit_blob_sha256 = hashlib.sha256(pylibiio_commit_blob).hexdigest()
+    if pylibiio_sha256 != pylibiio_commit_blob_sha256:
+        raise EvidenceInvalid(
+            "transport probe pylibiio differs from the exact protected commit"
+        )
+    return {
+        "source_commit": PROBE_EXACT_LIBIIO_COMMIT,
+        "protected_source_tag": PROBE_EXACT_LIBIIO_TAG,
+        "protected_source_ref": PROBE_EXACT_LIBIIO_REF,
+        "source_directory": str(source),
+        "source_head_commit": source_head,
+        "protected_tag_commit": protected_tag_commit,
+        "source_tracked_clean": True,
+        "build_directory": str(build),
+        "cmake_cache_path": str(cmake_cache.resolve()),
+        "cmake_source_directory": str(cmake_source),
+        "mapped_shared_objects": mapped,
+        "mapped_shared_object": str(mapped_shared_object),
+        "mapped_shared_object_sha256": _sha256_file(mapped_shared_object),
+        "pylibiio_path": str(pylibiio),
+        "pylibiio_sha256": pylibiio_sha256,
+        "pylibiio_commit_blob_sha256": pylibiio_commit_blob_sha256,
+    }
+
+
+def _attest_runtime_provenance(iio_module: Any) -> dict[str, Any]:
+    return {
+        "host_libiio": _attest_host_libiio(iio_module),
+        "firmware_runner": _attest_firmware_runner(),
+    }
+
+
 def validate_transient_transport_probe_options(
     quality: TandemQualityOptions, probe: TransientTransportProbeOptions
 ) -> None:
@@ -439,6 +672,49 @@ def validate_transient_transport_probe_options(
         raise ValueError("transport probe libiio batch cache exceeds 64 MiB")
     if probe.aggregate_resident_bytes > probe.maximum_aggregate_bytes:
         raise ValueError("transport probe aggregate capture memory exceeds 96 MiB")
+
+
+def _validate_probe_radio_options(
+    options: Any,
+    quality: TandemQualityOptions,
+    probe: TransientTransportProbeOptions,
+) -> None:
+    if type(getattr(options, "serial", None)) is not str or (
+        options.serial != PROBE_EXACT_SERIAL
+    ):
+        raise ValueError("transport probe is authorized only for exact R18 serial")
+    if type(getattr(options, "firmware_pattern", None)) is not str or (
+        options.firmware_pattern != PROBE_EXACT_FIRMWARE_PATTERN
+    ):
+        raise ValueError("transport probe firmware pattern is not exact anchored RC2")
+    if type(getattr(options, "libiio_source_commit", None)) is not str or (
+        options.libiio_source_commit != PROBE_EXACT_LIBIIO_COMMIT
+    ):
+        raise ValueError("transport probe radio options do not bind exact host libiio")
+    if getattr(options, "uri", None) is not None or (
+        getattr(options, "allow_non_usb", None) is not False
+    ):
+        raise ValueError("transport probe requires unique serial-resolved local USB")
+    if getattr(options, "sample_rate_hz", None) != quality.sample_rate_hz:
+        raise ValueError("radio and transport-probe sample rates differ")
+    if getattr(options, "samples_per_channel", None) != probe.frame_samples:
+        raise ValueError("radio buffer authorization differs from transport probe")
+    if float(getattr(options, "tx_gain_db", math.nan)) != (
+        probe.weak_stimulus_tx_gain_db
+    ):
+        raise ValueError("radio TX ceiling must equal the -45 dB probe level")
+    if getattr(options, "center_frequency_hz", None) != quality.center_frequency_hz:
+        raise ValueError("radio and transport-probe center frequencies differ")
+    if float(getattr(options, "attenuation_db", math.nan)) != (
+        quality.physical_attenuation_db
+    ):
+        raise ValueError("radio and transport-probe attenuation declarations differ")
+    try:
+        radio_output = Path(options.output_dir).resolve()
+    except (AttributeError, TypeError) as error:
+        raise ValueError("transport probe radio output directory is invalid") from error
+    if radio_output != quality.output_dir.resolve():
+        raise ValueError("radio and transport-probe output directories differ")
 
 
 def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
@@ -2132,6 +2408,301 @@ def _json_domain(value: Any) -> Any:
     return json.loads(json.dumps(value, allow_nan=False))
 
 
+def _required_sha256(value: Any, *, name: str) -> str:
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None:
+        raise EvidenceInvalid(f"transport probe report {name} is not SHA-256")
+    return value
+
+
+def _validate_firmware_runner_provenance(value: Any) -> dict[str, Any]:
+    record = _required_mapping(value, name="firmware runner provenance")
+    expected_fields = {
+        "repository",
+        "commit",
+        "local_dependencies",
+        "manifest_relative_path",
+        "manifest_libiio_identity",
+    }
+    if set(record) != expected_fields:
+        raise EvidenceInvalid("transport probe firmware provenance fields changed")
+
+    repository_value = record.get("repository")
+    if not isinstance(repository_value, str):
+        raise EvidenceInvalid("transport probe firmware repository path is invalid")
+    repository = Path(repository_value)
+    if not repository.is_absolute() or not repository.is_dir():
+        raise EvidenceInvalid("transport probe firmware repository is not absolute")
+    repository = repository.resolve()
+    if str(repository) != repository_value:
+        raise EvidenceInvalid("transport probe firmware repository is not canonical")
+    if repository != _firmware_repository():
+        raise EvidenceInvalid("transport probe firmware repository path changed")
+    commit = record.get("commit")
+    if not isinstance(commit, str) or re.fullmatch(r"[0-9a-f]{40}", commit) is None:
+        raise EvidenceInvalid("transport probe firmware commit is not exact SHA-1")
+    if _git_text(repository, "rev-parse", f"{commit}^{{commit}}") != commit:
+        raise EvidenceInvalid("transport probe firmware commit cannot be resolved")
+    if _git_text(repository, "rev-parse", "HEAD") != commit:
+        raise EvidenceInvalid("transport probe firmware runner HEAD changed")
+
+    dependencies = _required_list(
+        record.get("local_dependencies"), name="local runtime dependencies"
+    )
+    if len(dependencies) != len(_PROBE_LOCAL_RUNTIME_DEPENDENCIES):
+        raise EvidenceInvalid("transport probe local dependency inventory changed")
+    manifest_blob: bytes | None = None
+    for expected_path, dependency_value in zip(
+        _PROBE_LOCAL_RUNTIME_DEPENDENCIES, dependencies, strict=True
+    ):
+        dependency = _required_mapping(
+            dependency_value, name=f"runtime dependency {expected_path}"
+        )
+        if set(dependency) != {
+            "relative_path",
+            "absolute_path",
+            "observed_sha256",
+            "commit_blob_sha256",
+        }:
+            raise EvidenceInvalid(
+                f"transport probe runtime dependency {expected_path} fields changed"
+            )
+        absolute = (repository / expected_path).resolve()
+        if (
+            dependency.get("relative_path") != expected_path
+            or dependency.get("absolute_path") != str(absolute)
+        ):
+            raise EvidenceInvalid(
+                f"transport probe runtime dependency {expected_path} path changed"
+            )
+        committed = _git_bytes(repository, "show", f"{commit}:{expected_path}")
+        expected_sha256 = hashlib.sha256(committed).hexdigest()
+        observed_sha256 = _required_sha256(
+            dependency.get("observed_sha256"),
+            name=f"runtime dependency {expected_path} observed digest",
+        )
+        commit_blob_sha256 = _required_sha256(
+            dependency.get("commit_blob_sha256"),
+            name=f"runtime dependency {expected_path} commit digest",
+        )
+        if observed_sha256 != expected_sha256 or commit_blob_sha256 != expected_sha256:
+            raise EvidenceInvalid(
+                f"transport probe runtime dependency {expected_path} digest changed"
+            )
+        try:
+            current_sha256 = _sha256_file(absolute)
+        except OSError as error:
+            raise EvidenceInvalid(
+                f"transport probe runtime dependency {expected_path} cannot be "
+                f"reread: {error}"
+            ) from error
+        if current_sha256 != expected_sha256:
+            raise EvidenceInvalid(
+                f"transport probe runtime dependency {expected_path} no longer "
+                "matches the runner commit"
+            )
+        if expected_path == _PROBE_MANIFEST_PATH:
+            manifest_blob = committed
+
+    if record.get("manifest_relative_path") != _PROBE_MANIFEST_PATH:
+        raise EvidenceInvalid("transport probe source manifest path changed")
+    if manifest_blob is None:
+        raise EvidenceInvalid("transport probe source manifest blob is absent")
+    manifest_identity = _manifest_source_identity(manifest_blob)
+    if record.get("manifest_libiio_identity") != manifest_identity:
+        raise EvidenceInvalid("transport probe source manifest identity changed")
+    return dict(record)
+
+
+def _validate_host_libiio_provenance(value: Any) -> dict[str, Any]:
+    record = _required_mapping(value, name="host libiio provenance")
+    expected_fields = {
+        "source_commit",
+        "protected_source_tag",
+        "protected_source_ref",
+        "source_directory",
+        "source_head_commit",
+        "protected_tag_commit",
+        "source_tracked_clean",
+        "build_directory",
+        "cmake_cache_path",
+        "cmake_source_directory",
+        "mapped_shared_objects",
+        "mapped_shared_object",
+        "mapped_shared_object_sha256",
+        "pylibiio_path",
+        "pylibiio_sha256",
+        "pylibiio_commit_blob_sha256",
+    }
+    if set(record) != expected_fields:
+        raise EvidenceInvalid("transport probe host libiio provenance fields changed")
+    exact = {
+        "source_commit": PROBE_EXACT_LIBIIO_COMMIT,
+        "protected_source_tag": PROBE_EXACT_LIBIIO_TAG,
+        "protected_source_ref": PROBE_EXACT_LIBIIO_REF,
+        "source_head_commit": PROBE_EXACT_LIBIIO_COMMIT,
+        "protected_tag_commit": PROBE_EXACT_LIBIIO_COMMIT,
+        "source_tracked_clean": True,
+    }
+    if record.get("source_tracked_clean") is not True or any(
+        record.get(field) != expected
+        for field, expected in exact.items()
+        if field != "source_tracked_clean"
+    ):
+        raise EvidenceInvalid("transport probe protected libiio identity changed")
+
+    path_fields = (
+        "source_directory",
+        "build_directory",
+        "cmake_cache_path",
+        "cmake_source_directory",
+        "mapped_shared_object",
+        "pylibiio_path",
+    )
+    paths: dict[str, Path] = {}
+    for field in path_fields:
+        raw_path = record.get(field)
+        if not isinstance(raw_path, str) or not Path(raw_path).is_absolute():
+            raise EvidenceInvalid(
+                f"transport probe host libiio {field} is not an absolute path"
+            )
+        paths[field] = Path(raw_path).resolve()
+        if str(paths[field]) != raw_path:
+            raise EvidenceInvalid(
+                f"transport probe host libiio {field} is not canonical"
+            )
+    if (
+        paths["cmake_source_directory"] != paths["source_directory"]
+        or paths["cmake_cache_path"] != paths["build_directory"] / "CMakeCache.txt"
+        or paths["mapped_shared_object"].parent != paths["build_directory"]
+        or paths["pylibiio_path"]
+        != paths["source_directory"] / "bindings/python/iio.py"
+    ):
+        raise EvidenceInvalid("transport probe host libiio paths are not cross-bound")
+    if _cmake_source_directory(paths["cmake_cache_path"]) != paths[
+        "source_directory"
+    ]:
+        raise EvidenceInvalid("transport probe durable CMake source changed")
+
+    source = paths["source_directory"]
+    source_head = _git_text(source, "rev-parse", "HEAD")
+    protected_tag_commit = _git_text(
+        source, "rev-parse", f"{PROBE_EXACT_LIBIIO_REF}^{{commit}}"
+    )
+    if (
+        source_head != PROBE_EXACT_LIBIIO_COMMIT
+        or protected_tag_commit != PROBE_EXACT_LIBIIO_COMMIT
+        or source_head != record.get("source_head_commit")
+        or protected_tag_commit != record.get("protected_tag_commit")
+    ):
+        raise EvidenceInvalid("transport probe durable libiio source identity changed")
+    if _git_text(source, "status", "--porcelain", "--untracked-files=no"):
+        raise EvidenceInvalid("transport probe durable libiio source is not clean")
+
+    mapped = _required_list(
+        record.get("mapped_shared_objects"), name="mapped libiio objects"
+    )
+    if mapped != [str(paths["mapped_shared_object"])]:
+        raise EvidenceInvalid("transport probe mapped libiio inventory changed")
+    mapped_sha256 = _required_sha256(
+        record.get("mapped_shared_object_sha256"), name="mapped libiio digest"
+    )
+    pylibiio_sha256 = _required_sha256(
+        record.get("pylibiio_sha256"), name="pylibiio digest"
+    )
+    pylibiio_commit_sha256 = _required_sha256(
+        record.get("pylibiio_commit_blob_sha256"),
+        name="pylibiio commit digest",
+    )
+    try:
+        recomputed_mapped_sha256 = _sha256_file(paths["mapped_shared_object"])
+        recomputed_pylibiio_sha256 = _sha256_file(paths["pylibiio_path"])
+        protected_pylibiio_sha256 = hashlib.sha256(
+            _git_bytes(
+                source,
+                "show",
+                f"{PROBE_EXACT_LIBIIO_COMMIT}:bindings/python/iio.py",
+            )
+        ).hexdigest()
+    except OSError as error:
+        raise EvidenceInvalid(
+            f"transport probe host provenance file cannot be reread: {error}"
+        ) from error
+    if mapped_sha256 != recomputed_mapped_sha256:
+        raise EvidenceInvalid("transport probe mapped libiio digest changed")
+    if not (
+        pylibiio_sha256
+        == pylibiio_commit_sha256
+        == recomputed_pylibiio_sha256
+        == protected_pylibiio_sha256
+    ):
+        raise EvidenceInvalid("transport probe pylibiio digest changed")
+    return dict(record)
+
+
+def _validate_runtime_provenance(value: Any) -> dict[str, Any]:
+    record = _required_mapping(value, name="runtime provenance")
+    if set(record) != {"host_libiio", "firmware_runner"}:
+        raise EvidenceInvalid("transport probe runtime provenance fields changed")
+    return {
+        "host_libiio": _validate_host_libiio_provenance(
+            record.get("host_libiio")
+        ),
+        "firmware_runner": _validate_firmware_runner_provenance(
+            record.get("firmware_runner")
+        ),
+    }
+
+
+def _validate_probe_identity(
+    value: Any, *, runtime_provenance: Mapping[str, Any]
+) -> dict[str, Any]:
+    identity = _required_mapping(value, name="radio identity")
+    if set(identity) != {
+        "serial",
+        "uri",
+        "context_name",
+        "context_description",
+        "context_version",
+        "context_attrs",
+        "pylibiio_file",
+        "libiio_source_commit",
+    }:
+        raise EvidenceInvalid("transport probe radio identity fields changed")
+    uri = identity.get("uri")
+    if not isinstance(uri, str) or not uri.startswith("usb:"):
+        raise EvidenceInvalid("transport probe radio URI is not local USB")
+    description = identity.get("context_description")
+    if not isinstance(description, str) or not description:
+        raise EvidenceInvalid("transport probe context description is empty")
+    version = _required_list(identity.get("context_version"), name="context version")
+    host = _required_mapping(
+        runtime_provenance.get("host_libiio"), name="host libiio provenance"
+    )
+    attrs = _required_mapping(identity.get("context_attrs"), name="context attrs")
+    pylibiio_file = identity.get("pylibiio_file")
+    if (
+        identity.get("serial") != PROBE_EXACT_SERIAL
+        or identity.get("context_name") != "usb"
+        or len(version) != 3
+        or _required_int(version[0], name="context version major") != 0
+        or _required_int(version[1], name="context version minor") != 25
+        or type(version[2]) is not str
+        or version[2] != "v0.25"
+        or attrs.get("hw_serial") != PROBE_EXACT_SERIAL
+        or attrs.get("usb,serial") != PROBE_EXACT_SERIAL
+        or attrs.get("fw_version") != PROBE_EXACT_FIRMWARE_VERSION
+        or attrs.get("iio,buffer-metadata") != "2"
+        or attrs.get("uri") != uri
+        or identity.get("libiio_source_commit") != PROBE_EXACT_LIBIIO_COMMIT
+        or type(pylibiio_file) is not str
+        or pylibiio_file != host.get("pylibiio_path")
+    ):
+        raise EvidenceInvalid(
+            "transport probe radio/firmware/host identity is not exact R18 RC2"
+        )
+    return dict(identity)
+
+
 def _validate_report_unowned_idle_status(
     value: Any, *, name: str, require_empty_fifo: bool
 ) -> dict[str, int]:
@@ -2832,6 +3403,12 @@ def _validate_transient_transport_probe_report_impl(
         raise EvidenceInvalid("transport probe report is release-pass eligible")
     if "fatal_error" in report or report.get("iq_artifacts_saved") is not False:
         raise EvidenceInvalid("transport probe qualified report carries invalid state")
+    runtime_provenance = _validate_runtime_provenance(
+        report.get("runtime_provenance")
+    )
+    _validate_probe_identity(
+        report.get("identity"), runtime_provenance=runtime_provenance
+    )
     if report.get("qualification_scope") != _qualification_scope():
         raise EvidenceInvalid("transport probe qualification scope changed")
     if report.get("safety") != _json_domain(_safety_policy(quality, probe)):
@@ -3611,20 +4188,23 @@ def run_transient_transport_probe(
         [bytes], TandemFrameMetadata
     ] = parse_tandem_frame_metadata,
     report_writer: Callable[[Path, Mapping[str, Any]], None] = _atomic_json,
+    runtime_provenance: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], Path]:
     """Run the weak-only transport qualification and preserve a durable artifact."""
 
     validate_transient_transport_probe_options(quality, probe)
-    if radio.options.sample_rate_hz != quality.sample_rate_hz:
-        raise ValueError("radio and transport-probe sample rates differ")
-    if radio.options.samples_per_channel != probe.frame_samples:
-        raise ValueError("radio buffer authorization differs from transport probe")
-    if float(radio.options.tx_gain_db) != probe.weak_stimulus_tx_gain_db:
-        raise ValueError("radio TX ceiling must equal the -45 dB probe level")
-    if radio.options.center_frequency_hz != quality.center_frequency_hz:
-        raise ValueError("radio and transport-probe center frequencies differ")
-    if float(radio.options.attenuation_db) != quality.physical_attenuation_db:
-        raise ValueError("radio and transport-probe attenuation declarations differ")
+    if runtime_provenance is None:
+        iio_module = getattr(radio, "iio", None)
+        if iio_module is None:
+            raise EvidenceInvalid(
+                "transport probe lacks an IIO module for runtime attestation"
+            )
+        runtime_provenance = _attest_runtime_provenance(iio_module)
+    attested_runtime = _validate_runtime_provenance(runtime_provenance)
+    _validate_probe_radio_options(radio.options, quality, probe)
+    _validate_probe_identity(
+        radio.identity, runtime_provenance=attested_runtime
+    )
 
     center_frequency = {
         key: int(value) for key, value in radio.read_center_frequency().items()
@@ -3645,6 +4225,10 @@ def run_transient_transport_probe(
     report_path = (
         quality.output_dir / serial / "tandem-agc-transient-transport-probe.json"
     )
+    if report_path.exists():
+        raise EvidenceInvalid(
+            f"transport probe refuses to overwrite existing artifact: {report_path}"
+        )
     radio._report_path = report_path
     started = monotonic()
 
@@ -3659,6 +4243,7 @@ def run_transient_transport_probe(
         "schema": PROBE_SCHEMA,
         "started_unix_ns": wall_clock_ns(),
         "identity": dict(radio.identity),
+        "runtime_provenance": attested_runtime,
         "release_pass_eligible": False,
         "qualification_scope": _qualification_scope(),
         "rf": {
@@ -3818,10 +4403,24 @@ def run_serial_transient_transport_probe(
         [bytes], TandemFrameMetadata
     ] = parse_tandem_frame_metadata,
     report_writer: Callable[[Path, Mapping[str, Any]], None] = _atomic_json,
+    runtime_provenance: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], Path]:
     """Own one radio and require durable close-time cleanup evidence."""
 
     validate_transient_transport_probe_options(quality, probe)
+    if runtime_provenance is None:
+        runtime_provenance = _attest_runtime_provenance(iio_module)
+    attested_runtime = _validate_runtime_provenance(runtime_provenance)
+    _validate_probe_radio_options(radio_options, quality, probe)
+    report_path = (
+        quality.output_dir
+        / PROBE_EXACT_SERIAL
+        / "tandem-agc-transient-transport-probe.json"
+    )
+    if report_path.exists():
+        raise EvidenceInvalid(
+            f"transport probe refuses to overwrite existing artifact: {report_path}"
+        )
     radio = radio_factory(iio_module, radio_options)
     body_error: BaseException | None = None
     result: tuple[dict[str, Any], Path] | None = None
@@ -3836,6 +4435,7 @@ def run_serial_transient_transport_probe(
             sleep=sleep,
             metadata_parser=metadata_parser,
             report_writer=report_writer,
+            runtime_provenance=attested_runtime,
         )
     except BaseException as error:  # noqa: BLE001
         body_error = error

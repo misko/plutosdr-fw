@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import ast
 import copy
 import errno
+import hashlib
 import json
+import subprocess
 import threading
 from builtins import BaseExceptionGroup
 from contextlib import contextmanager
@@ -54,6 +57,131 @@ _REQUIRED_FLAGS = (
     | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
     | FLAG_TANDEM_METADATA_VALID
 )
+
+
+@pytest.fixture(autouse=True)
+def _protected_libiio_source_fixture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    real_git_bytes = probe_module._git_bytes
+    firmware_repository = (tmp_path / ".probe-provenance/firmware").resolve()
+
+    def git_bytes(repository: Path, *arguments: str) -> bytes:
+        if (
+            repository.name == "libiio-source"
+            and repository.parent.name == ".probe-provenance"
+        ):
+            if arguments in {
+                ("rev-parse", "HEAD"),
+                (
+                    "rev-parse",
+                    f"{probe_module.PROBE_EXACT_LIBIIO_REF}^{{commit}}",
+                ),
+            }:
+                return f"{probe_module.PROBE_EXACT_LIBIIO_COMMIT}\n".encode()
+            if arguments == ("status", "--porcelain", "--untracked-files=no"):
+                return b""
+            if arguments == (
+                "show",
+                f"{probe_module.PROBE_EXACT_LIBIIO_COMMIT}:bindings/python/iio.py",
+            ):
+                return b"# offline pinned pylibiio fixture\n"
+            raise AssertionError(f"unexpected fake libiio git query: {arguments}")
+        return real_git_bytes(repository, *arguments)
+
+    monkeypatch.setattr(probe_module, "_git_bytes", git_bytes)
+    monkeypatch.setattr(
+        probe_module, "_firmware_repository", lambda: firmware_repository
+    )
+
+
+def _digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _fake_runtime_provenance(root: Path) -> dict[str, Any]:
+    provenance_root = root / ".probe-provenance"
+    firmware = provenance_root / "firmware"
+    source = provenance_root / "libiio-source"
+    build = provenance_root / "libiio-build"
+    if not (firmware / ".git").exists():
+        firmware.mkdir(parents=True)
+        for relative_path in probe_module._PROBE_LOCAL_RUNTIME_DEPENDENCIES:
+            path = firmware / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if relative_path == probe_module._PROBE_MANIFEST_PATH:
+                content = (
+                    "libiio_0_25_source: "
+                    f"{probe_module.PROBE_EXACT_LIBIIO_COMMIT}\n"
+                    "libiio_0_25_ref: "
+                    f"{probe_module.PROBE_EXACT_LIBIIO_REF}\n"
+                )
+            else:
+                content = f"offline runtime dependency {relative_path}\n"
+            path.write_text(content, encoding="utf-8")
+        subprocess.run(("git", "init", "-q", str(firmware)), check=True)
+        subprocess.run(
+            ("git", "-C", str(firmware), "config", "user.name", "Probe Oracle"),
+            check=True,
+        )
+        subprocess.run(
+            (
+                "git",
+                "-C",
+                str(firmware),
+                "config",
+                "user.email",
+                "probe-oracle@example.invalid",
+            ),
+            check=True,
+        )
+        subprocess.run(("git", "-C", str(firmware), "add", "."), check=True)
+        subprocess.run(
+            (
+                "git",
+                "-C",
+                str(firmware),
+                "commit",
+                "-q",
+                "-m",
+                "offline provenance fixture",
+            ),
+            check=True,
+        )
+    pylibiio = source / "bindings/python/iio.py"
+    pylibiio.parent.mkdir(parents=True, exist_ok=True)
+    if not pylibiio.exists():
+        pylibiio.write_text("# offline pinned pylibiio fixture\n", encoding="utf-8")
+    build.mkdir(parents=True, exist_ok=True)
+    shared_object = build / "libiio.so.0.25"
+    if not shared_object.exists():
+        shared_object.write_bytes(b"offline mapped libiio fixture\n")
+    cmake_cache = build / "CMakeCache.txt"
+    cmake_cache.write_text(
+        f"CMAKE_HOME_DIRECTORY:INTERNAL={source.resolve()}\n", encoding="utf-8"
+    )
+    pylibiio_sha256 = _digest(pylibiio)
+    return {
+        "host_libiio": {
+            "source_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+            "protected_source_tag": probe_module.PROBE_EXACT_LIBIIO_TAG,
+            "protected_source_ref": probe_module.PROBE_EXACT_LIBIIO_REF,
+            "source_directory": str(source.resolve()),
+            "source_head_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+            "protected_tag_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+            "source_tracked_clean": True,
+            "build_directory": str(build.resolve()),
+            "cmake_cache_path": str(cmake_cache.resolve()),
+            "cmake_source_directory": str(source.resolve()),
+            "mapped_shared_objects": [str(shared_object.resolve())],
+            "mapped_shared_object": str(shared_object.resolve()),
+            "mapped_shared_object_sha256": _digest(shared_object),
+            "pylibiio_path": str(pylibiio.resolve()),
+            "pylibiio_sha256": pylibiio_sha256,
+            "pylibiio_commit_blob_sha256": pylibiio_sha256,
+        },
+        "firmware_runner": probe_module._attest_firmware_runner(firmware),
+    }
 
 
 def _tone_raw(
@@ -106,8 +234,13 @@ class _FakeBuffer:
 
 class _FakeProbeRadio:
     def __init__(self, output_dir: Path) -> None:
+        self.runtime_provenance = _fake_runtime_provenance(output_dir)
         self.options = SimpleNamespace(
-            serial="FAKE-TRANSPORT-PROBE",
+            serial=probe_module.PROBE_EXACT_SERIAL,
+            uri=None,
+            allow_non_usb=False,
+            firmware_pattern=probe_module.PROBE_EXACT_FIRMWARE_PATTERN,
+            libiio_source_commit=probe_module.PROBE_EXACT_LIBIIO_COMMIT,
             sample_rate_hz=2_500_000,
             samples_per_channel=65_536,
             tx_gain_db=-45.0,
@@ -115,10 +248,22 @@ class _FakeProbeRadio:
             attenuation_db=0.0,
             output_dir=output_dir,
         )
+        pylibiio_path = self.runtime_provenance["host_libiio"]["pylibiio_path"]
         self.identity = {
             "serial": self.options.serial,
-            "fw_version": "fake-rc2",
-            "libiio_source_commit": "1" * 40,
+            "uri": "usb:offline.fixture.0",
+            "context_name": "usb",
+            "context_description": "offline transport probe fixture",
+            "context_version": [0, 25, "v0.25"],
+            "context_attrs": {
+                "hw_serial": self.options.serial,
+                "usb,serial": self.options.serial,
+                "fw_version": probe_module.PROBE_EXACT_FIRMWARE_VERSION,
+                "iio,buffer-metadata": "2",
+                "uri": "usb:offline.fixture.0",
+            },
+            "pylibiio_file": pylibiio_path,
+            "libiio_source_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
         }
         self._report_path: Path | None = None
         self.operations: list[tuple[Any, ...]] = []
@@ -637,6 +782,7 @@ def _run_fake(
         clock_ns=_Clock(),
         sleep=radio.paced_sleep,
         metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
     )
 
 
@@ -786,6 +932,245 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     validate_transient_transport_probe_report(report, _quality(tmp_path))
 
 
+def test_probe_attests_complete_exact_runtime_provenance(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    provenance = report["runtime_provenance"]
+    host = provenance["host_libiio"]
+    runner = provenance["firmware_runner"]
+    assert host["source_commit"] == probe_module.PROBE_EXACT_LIBIIO_COMMIT
+    assert host["protected_source_tag"] == probe_module.PROBE_EXACT_LIBIIO_TAG
+    assert host["protected_source_ref"] == probe_module.PROBE_EXACT_LIBIIO_REF
+    assert host["source_head_commit"] == probe_module.PROBE_EXACT_LIBIIO_COMMIT
+    assert host["protected_tag_commit"] == probe_module.PROBE_EXACT_LIBIIO_COMMIT
+    assert host["mapped_shared_objects"] == [host["mapped_shared_object"]]
+    assert host["cmake_source_directory"] == host["source_directory"]
+    assert host["pylibiio_sha256"] == host["pylibiio_commit_blob_sha256"]
+    assert [
+        dependency["relative_path"] for dependency in runner["local_dependencies"]
+    ] == list(probe_module._PROBE_LOCAL_RUNTIME_DEPENDENCIES)
+    assert all(
+        dependency["observed_sha256"] == dependency["commit_blob_sha256"]
+        for dependency in runner["local_dependencies"]
+    )
+    assert report["identity"]["serial"] == probe_module.PROBE_EXACT_SERIAL
+    assert (
+        report["identity"]["context_attrs"]["fw_version"]
+        == probe_module.PROBE_EXACT_FIRMWARE_VERSION
+    )
+    validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_runtime_dependency_inventory_covers_relative_import_closure() -> None:
+    repository = Path(__file__).resolve().parents[2]
+    radio_hardware = repository / "tests/radio_hardware"
+    pending = {
+        "conftest.py",
+        "test_transient_transport_probe.py",
+        "transient_transport_probe.py",
+    }
+    closure: set[str] = set()
+    while pending:
+        relative_name = pending.pop()
+        if relative_name in closure:
+            continue
+        closure.add(relative_name)
+        tree = ast.parse(
+            (radio_hardware / relative_name).read_text(encoding="utf-8"),
+            filename=relative_name,
+        )
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or node.level != 1:
+                continue
+            modules = [node.module] if node.module else [item.name for item in node.names]
+            for module in modules:
+                candidate = f"{module.replace('.', '/')}.py"
+                if (radio_hardware / candidate).is_file():
+                    pending.add(candidate)
+
+    expected = {
+        "pytest.ini",
+        "scripts/run_tandem_agc_quality_hardware.sh",
+        probe_module._PROBE_MANIFEST_PATH,
+        "tests/__init__.py",
+        "tests/radio_hardware/__init__.py",
+        "tests/radio_hardware/requirements.txt",
+        *(f"tests/radio_hardware/{name}" for name in closure),
+    }
+    assert set(probe_module._PROBE_LOCAL_RUNTIME_DEPENDENCIES) == expected
+
+
+def test_probe_validator_rejects_provenance_and_identity_substitutions(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    alternate_repository = tmp_path / "alternate-firmware-clone"
+    subprocess.run(
+        (
+            "git",
+            "clone",
+            "-q",
+            report["runtime_provenance"]["firmware_runner"]["repository"],
+            str(alternate_repository),
+        ),
+        check=True,
+    )
+
+    def mutation(name: str, apply: Any) -> tuple[str, dict[str, Any]]:
+        forged = copy.deepcopy(report)
+        apply(forged)
+        return name, forged
+
+    def dependency_zero(value: dict[str, Any]) -> None:
+        value["runtime_provenance"]["firmware_runner"]["local_dependencies"][
+            0
+        ].update(
+            observed_sha256="0" * 64,
+            commit_blob_sha256="0" * 64,
+        )
+
+    def alternate_runner_clone(value: dict[str, Any]) -> None:
+        runner = value["runtime_provenance"]["firmware_runner"]
+        runner["repository"] = str(alternate_repository.resolve())
+        for dependency in runner["local_dependencies"]:
+            dependency["absolute_path"] = str(
+                (alternate_repository / dependency["relative_path"]).resolve()
+            )
+
+    cases = [
+        mutation("serial", lambda value: value["identity"].update(serial="R17")),
+        mutation(
+            "firmware",
+            lambda value: value["identity"]["context_attrs"].update(
+                fw_version="v0.41-plutoplus-spf-tandem-agc-v8-rc3"
+            ),
+        ),
+        mutation(
+            "identity libiio commit",
+            lambda value: value["identity"].update(libiio_source_commit="0" * 40),
+        ),
+        mutation(
+            "identity pylibiio path",
+            lambda value: value["identity"].update(
+                pylibiio_file=str(
+                    Path(value["identity"]["pylibiio_file"]).parent
+                    / ".."
+                    / "python"
+                    / "iio.py"
+                )
+            ),
+        ),
+        mutation(
+            "context numeric alias",
+            lambda value: value["identity"]["context_version"].__setitem__(0, False),
+        ),
+        mutation(
+            "protected commit",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                source_commit="0" * 40
+            ),
+        ),
+        mutation(
+            "protected tag",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                protected_source_tag="tandem-agc-v8-rc3-source/libiio-v2"
+            ),
+        ),
+        mutation(
+            "clean bool alias",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                source_tracked_clean=1
+            ),
+        ),
+        mutation(
+            "mapped digest",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                mapped_shared_object_sha256="0" * 64
+            ),
+        ),
+        mutation(
+            "mapped path",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                mapped_shared_object=value["runtime_provenance"]["host_libiio"][
+                    "pylibiio_path"
+                ]
+            ),
+        ),
+        mutation(
+            "pylibiio digests",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                pylibiio_sha256="0" * 64,
+                pylibiio_commit_blob_sha256="0" * 64,
+            ),
+        ),
+        mutation(
+            "pylibiio path",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                pylibiio_path=value["runtime_provenance"]["host_libiio"][
+                    "mapped_shared_object"
+                ]
+            ),
+        ),
+        mutation(
+            "runner commit",
+            lambda value: value["runtime_provenance"]["firmware_runner"].update(
+                commit="0" * 40
+            ),
+        ),
+        mutation(
+            "runner repository",
+            lambda value: value["runtime_provenance"]["firmware_runner"].update(
+                repository=(
+                    value["runtime_provenance"]["firmware_runner"]["repository"]
+                    + "/."
+                )
+            ),
+        ),
+        mutation("alternate valid runner clone", alternate_runner_clone),
+        mutation("dependency digests", dependency_zero),
+        mutation(
+            "dependency path",
+            lambda value: value["runtime_provenance"]["firmware_runner"][
+                "local_dependencies"
+            ][0].update(
+                absolute_path=value["runtime_provenance"]["firmware_runner"][
+                    "local_dependencies"
+                ][1]["absolute_path"]
+            ),
+        ),
+        mutation(
+            "manifest commit",
+            lambda value: value["runtime_provenance"]["firmware_runner"][
+                "manifest_libiio_identity"
+            ].update(libiio_0_25_source="0" * 40),
+        ),
+    ]
+    for name, forged in cases:
+        with pytest.raises(EvidenceInvalid) as caught:
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+        assert name and "transport probe" in str(caught.value)
+
+
+def test_probe_validator_rejects_pylibiio_mutation_with_coordinated_digests(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    forged = copy.deepcopy(report)
+    pylibiio = Path(forged["runtime_provenance"]["host_libiio"]["pylibiio_path"])
+    pylibiio.write_text("# forged but valid source-shaped pylibiio\n", encoding="utf-8")
+    forged_digest = _digest(pylibiio)
+    forged["runtime_provenance"]["host_libiio"].update(
+        pylibiio_sha256=forged_digest,
+        pylibiio_commit_blob_sha256=forged_digest,
+    )
+
+    with pytest.raises(EvidenceInvalid, match="pylibiio digest changed"):
+        validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
 @pytest.mark.parametrize(
     ("status_update", "expected"),
     (
@@ -834,6 +1219,7 @@ def test_probe_rejects_live_host_chronology_outside_initiating_refill(
             clock_ns=LateClock(),
             sleep=radio.paced_sleep,
             metadata_parser=radio.parse_metadata,
+            runtime_provenance=radio.runtime_provenance,
         )
 
     assert _failure_report(radio)["verdict"] == "invalid"
@@ -858,6 +1244,7 @@ def test_probe_rejects_live_command_that_predates_initial_conditioning(
             clock_ns=ReorderedClock(),
             sleep=radio.paced_sleep,
             metadata_parser=radio.parse_metadata,
+            runtime_provenance=radio.runtime_provenance,
         )
 
     assert _failure_report(radio)["verdict"] == "invalid"
@@ -1450,6 +1837,76 @@ def test_probe_radio_authorization_forbids_strong_write(tmp_path: Path) -> None:
         radio.set_tx2_gain(-30.0)
 
 
+@pytest.mark.parametrize(
+    ("update", "expected"),
+    (
+        ({"serial": "R17"}, "exact R18"),
+        (
+            {"firmware_pattern": r"^v0[.]41-.*$"},
+            "exact anchored RC2",
+        ),
+        ({"libiio_source_commit": "0" * 40}, "exact host libiio"),
+        ({"uri": "usb:offline.fixture.0"}, "serial-resolved local USB"),
+        ({"allow_non_usb": True}, "serial-resolved local USB"),
+        ({"tx_gain_db": -30.0}, "-45 dB probe level"),
+    ),
+)
+def test_serial_probe_rejects_nonexact_authorization_before_radio_factory(
+    tmp_path: Path, update: dict[str, Any], expected: str
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    options = SimpleNamespace(**vars(radio.options))
+    for field, value in update.items():
+        setattr(options, field, value)
+    factory_calls = 0
+
+    def radio_factory(_iio: Any, _options: Any) -> _FakeProbeRadio:
+        nonlocal factory_calls
+        factory_calls += 1
+        return radio
+
+    with pytest.raises(ValueError, match=expected):
+        run_serial_transient_transport_probe(
+            object(),
+            options,
+            _quality(tmp_path),
+            radio_factory=radio_factory,
+            runtime_provenance=radio.runtime_provenance,
+        )
+    assert factory_calls == 0
+    assert radio.operations == []
+
+
+def test_serial_probe_rejects_existing_artifact_before_radio_factory(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    artifact = (
+        tmp_path
+        / probe_module.PROBE_EXACT_SERIAL
+        / "tandem-agc-transient-transport-probe.json"
+    )
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("{}\n", encoding="utf-8")
+    factory_calls = 0
+
+    def radio_factory(_iio: Any, _options: Any) -> _FakeProbeRadio:
+        nonlocal factory_calls
+        factory_calls += 1
+        return radio
+
+    with pytest.raises(EvidenceInvalid, match="refuses to overwrite"):
+        run_serial_transient_transport_probe(
+            object(),
+            radio.options,
+            _quality(tmp_path),
+            radio_factory=radio_factory,
+            runtime_provenance=radio.runtime_provenance,
+        )
+    assert factory_calls == 0
+    assert radio.operations == []
+
+
 def test_serial_probe_persists_verified_cleanup(tmp_path: Path) -> None:
     radio = _FakeProbeRadio(tmp_path)
     report, _path = run_serial_transient_transport_probe(
@@ -1460,6 +1917,7 @@ def test_serial_probe_persists_verified_cleanup(tmp_path: Path) -> None:
         clock_ns=_Clock(),
         sleep=radio.paced_sleep,
         metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
     )
     assert report["cleanup"]["verified"] is True
     assert report["cleanup"]["selectors"] == [3, 3, 3, 3]
@@ -1478,6 +1936,7 @@ def test_serial_close_failure_invalidates_durable_qualification(tmp_path: Path) 
             clock_ns=_Clock(),
             sleep=radio.paced_sleep,
             metadata_parser=radio.parse_metadata,
+            runtime_provenance=radio.runtime_provenance,
         )
     report = _failure_report(radio)
     assert report["verdict"] == "invalid"
@@ -1706,6 +2165,7 @@ def test_cleanup_validator_rejects_unsafe_durable_readbacks(tmp_path: Path) -> N
         clock_ns=_Clock(),
         sleep=radio.paced_sleep,
         metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
     )
     forged = copy.deepcopy(report)
     forged["cleanup"]["selectors"][0] = 0
@@ -1728,6 +2188,7 @@ def test_report_write_failure_never_starts_rf(tmp_path: Path) -> None:
             clock_ns=_Clock(),
             metadata_parser=radio.parse_metadata,
             report_writer=fail_write,
+            runtime_provenance=radio.runtime_provenance,
         )
     assert "report write failure" in repr(caught.value)
     assert not any(operation[0] == "arm_tone" for operation in radio.operations)
