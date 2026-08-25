@@ -2206,7 +2206,10 @@ def test_mapped_library_sha_is_computed_in_hardware_process(tmp_path, monkeypatc
 
 
 def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
-    source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    source = (tmp_path / "attested-fixture-libiio-source").resolve()
+    pylibiio = source / "bindings/python/iio.py"
+    pylibiio.parent.mkdir(parents=True)
+    pylibiio.write_bytes(b"attested fixture pylibiio")
     build = tmp_path / "build"
     build.mkdir()
     library = build / "libiio.so.0.25"
@@ -2407,7 +2410,10 @@ def test_device_lineage_requires_source_ancestor_of_host_runner(tmp_path, monkey
 
 
 def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monkeypatch):
-    source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    source = (tmp_path / "attested-fixture-libiio-source").resolve()
+    pylibiio = source / "bindings/python/iio.py"
+    pylibiio.parent.mkdir(parents=True)
+    pylibiio.write_bytes(b"attested fixture pylibiio")
     build = tmp_path / "build"
     build.mkdir()
     library = build / "libiio.so.0.25"
@@ -2516,7 +2522,10 @@ def test_tracked_dirty_runner_tree_fails_before_context_factory(tmp_path, monkey
 
 
 def _integration_run_components(tmp_path, monkeypatch):
-    source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    source = (tmp_path / "attested-fixture-libiio-source").resolve()
+    pylibiio = source / "bindings/python/iio.py"
+    pylibiio.parent.mkdir(parents=True)
+    pylibiio.write_bytes(b"attested fixture pylibiio")
     build = tmp_path / "libiio-build"
     build.mkdir()
     library = build / "libiio.so.0.25"
