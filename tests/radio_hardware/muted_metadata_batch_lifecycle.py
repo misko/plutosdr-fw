@@ -52,7 +52,9 @@ from .metadata_abi import (
     parse_tandem_frame_metadata,
 )
 
-SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v2"
+SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v3"
+PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v2"
+REPORT_FILENAME = "muted-metadata-batch-lifecycle-v3.json"
 EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
 EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
 DEFAULT_R18_SERIAL = "1040007c4a94000211000b009186843ef2"
@@ -60,6 +62,42 @@ EXPECTED_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc3"
 EXPECTED_FIRMWARE_PATTERN = r"\Av0[.]41-plutoplus-spf-tandem-agc-v8-rc3\Z"
 EXPECTED_KERNEL_VERSION = "5.15.0-g77a1f2352162"
 EXPECTED_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
+DEVICE_FIRMWARE_SOURCE_COMMIT = "01eff4051f63bd14ee7490093e4b9e2099de4de5"
+DEVICE_FIRMWARE_SOURCE_TAG = "tandem-agc-v8-rc3-source/firmware-v1"
+DEVICE_FIRMWARE_BUILD_RUN_ID = 32_834_624_500
+DEVICE_FIRMWARE_BUILD_RUN_ATTEMPT = 1
+DEVICE_FIRMWARE_DFU_SHA256 = (
+    "d5117721d0a1de038a3ee1e01be77de2b46e64030b2003fd373b0c2a05811cac"
+)
+DEVICE_FIRMWARE_FIT_SHA256 = (
+    "cc2c9305589bb4e297e6adeda94a99a50838b83964671fb9795dbaa470ab11c1"
+)
+DEVICE_FIRMWARE_FIT_BYTES = 12_783_051
+DEVICE_FIRMWARE_DFU_BYTES = 12_783_067
+DEVICE_RAM_BOOT_RECEIPT_SHA256 = (
+    "0f3f622bf4f68af8a317efc31534fd43822fde6cf7f73b3c5909a286efe81dc3"
+)
+DEVICE_RAM_BOOT_RECEIPT_BYTES = 1_934
+DEVICE_RAM_BOOT_RECEIPT_ID = "825fee881ce54a849c32b8e43624369f"
+DEVICE_RAM_BOOT_PLAN_ID = "634bb550deca414cbb0b1dbc7011553f"
+DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256 = (
+    "480410384e19ab629cfabb7978a2327f99edd32d2d3d8a7fcfe72a700add33b4"
+)
+DEVICE_RAM_BOOT_PHASES = (
+    "preflight_revalidated",
+    "dfu_util_ready",
+    "ram_transition_dispatch_attempted",
+    "ram_transition_dispatched",
+    "exact_path_entered_dfu",
+    "volatile_dfu_downloaded",
+    "dfu_detach_dispatched",
+    "exact_path_returned_runtime",
+    "return_attested",
+    "tx_safe_attested",
+)
+PREDECESSOR_V2_FAILURE_REPORT_SHA256 = (
+    "8f3341cc0cd63455234ce3eb85c2dd4816a42e512f0730ef8decd629df9c78f2"
+)
 TX_MUTE_DB = -89.75
 DAC_SELECT_ZERO = 0x3
 CENTER_FREQUENCY_HZ = 915_000_000
@@ -113,6 +151,32 @@ EXPECTED_MINIMUM_GAIN_INDEX = 3
 EXPECTED_MAXIMUM_GAIN_INDEX = 65
 EXPECTED_HOLD_GAIN_INDEX = EXPECTED_MINIMUM_GAIN_INDEX + HOLD_GAIN_DB
 EXPECTED_THRESHOLD_PROVENANCE = 20 | (58 << 8) | (49 << 16) | (48 << 24)
+TEMPERATURE_INVALID_SENTINEL = -(1 << 31)
+MINIMUM_TEMPERATURE_MDEG_C = -40_000
+MAXIMUM_TEMPERATURE_MDEG_C = 125_000
+TEMPERATURE_PRODUCER_POLICY = (
+    "the protected provider serializes exact INT32_MIN, parsed as null, while "
+    "its asynchronous temperature cache is starting, unavailable, or stale"
+)
+TEMPERATURE_QUALIFICATION_POLICY = (
+    "the full 64-frame drain accepts only a leading null prefix, requires at "
+    "least one valid exact integer, and rejects any null after the first valid "
+    "sample; cancel-first may be null or a valid exact integer"
+)
+TEMPERATURE_POLICY = (
+    f"producer semantics: {TEMPERATURE_PRODUCER_POLICY}; qualification acceptance: "
+    f"{TEMPERATURE_QUALIFICATION_POLICY}"
+)
+FAILURE_ARTIFACT_POLICY = (
+    "pre-artifact capture failures do not promote raw metadata; the exact 65-file "
+    "artifact namespace is privately staged, fully reread and reparsed, then "
+    "published without replacement only after complete validated capture; any "
+    "assembly or publication failure remains FAIL and non-authorizing, omits the "
+    "artifact manifest, and makes a best-effort no-replace move of a still-verifiable "
+    "owned directory intact under a reserved aborted prefix without deleting names "
+    "through a raceable path; any staging, canonical, or aborted residue is "
+    "nonauthorizing and blocks a later preflight or durable PASS"
+)
 RX_SCAN_IDS = ("voltage0", "voltage1", "voltage2", "voltage3")
 RX_SCAN_MASK = 0x0F
 RX_SCAN_SAMPLE_BYTES = 8
@@ -131,6 +195,8 @@ RF_CHANNELS = (
     ("tx1", "voltage1", True),
 )
 RAW_METADATA_DIRECTORY = "raw-metadata"
+RAW_METADATA_STAGING_PREFIX = f".{RAW_METADATA_DIRECTORY}.staging-"
+RAW_METADATA_ABORTED_PREFIX = f".{RAW_METADATA_DIRECTORY}.aborted-"
 RAW_METADATA_BYTES = 3_256
 RAW_METADATA_FILE_COUNT = BATCH_FRAMES + 1
 MAXIMUM_SIGNED_64 = (1 << 63) - 1
@@ -141,6 +207,7 @@ MAXIMUM_JSON_STRING_BYTES = 1_048_576
 MAXIMUM_CMAKE_CACHE_BYTES = 1_048_576
 MAXIMUM_LIBIIO_BYTES = 67_108_864
 MAXIMUM_PYLIBIIO_BYTES = 8_388_608
+RENAME_NOREPLACE = 1
 
 
 class QualificationError(RuntimeError):
@@ -151,6 +218,226 @@ class _AtomicPromotionError(QualificationError):
     def __init__(self, message: str, target_identity: tuple[int, int] | None):
         super().__init__(message)
         self.target_identity = target_identity
+
+
+class _AtomicArtifactError(QualificationError):
+    def __init__(self, message: str, target_identity: tuple[int, int] | None):
+        super().__init__(message)
+        self.target_identity = target_identity
+
+
+class _ArtifactDirectoryClaimError(QualificationError):
+    def __init__(
+        self,
+        message: str,
+        ownership: Mapping[str, Any] | None,
+    ):
+        super().__init__(message)
+        self.ownership = ownership
+
+
+def _rename_noreplace_at(
+    old_parent_descriptor: int,
+    old_name: str,
+    new_parent_descriptor: int,
+    new_name: str,
+) -> None:
+    try:
+        renameat2 = ctypes.CDLL(None, use_errno=True).renameat2
+    except AttributeError as error:
+        raise OSError(errno.ENOSYS, "renameat2 is unavailable") from error
+    renameat2.argtypes = (
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    )
+    renameat2.restype = ctypes.c_int
+    if (
+        renameat2(
+            old_parent_descriptor,
+            os.fsencode(old_name),
+            new_parent_descriptor,
+            os.fsencode(new_name),
+            RENAME_NOREPLACE,
+        )
+        != 0
+    ):
+        error_number = ctypes.get_errno()
+        raise OSError(error_number, os.strerror(error_number))
+
+
+def _expected_ram_boot_receipt(
+    *, receipt_path: pathlib.Path, image_path: pathlib.Path
+) -> dict[str, Any]:
+    return {
+        "error": None,
+        "outcome": "success",
+        "phases": list(DEVICE_RAM_BOOT_PHASES),
+        "plan": {
+            "before_firmware": "v0.41-plutoplus-spf-tandem-agc-v8-rc2",
+            "before_model": EXPECTED_HARDWARE_MODEL,
+            "before_phy": "ad9361",
+            "confirmation_phrase": f"RAM BOOT {DEFAULT_R18_SERIAL}",
+            "created_at": "2026-08-25T10:53:24.030666+00:00",
+            "expected_firmware": EXPECTED_FIRMWARE_VERSION,
+            "expected_metadata_abi": 2,
+            "expected_tandem_agc": True,
+            "fit_sha256": DEVICE_FIRMWARE_FIT_SHA256,
+            "fit_size": DEVICE_FIRMWARE_FIT_BYTES,
+            "image_path": str(image_path),
+            "image_sha256": DEVICE_FIRMWARE_DFU_SHA256,
+            "known_hosts_sha256": DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256,
+            "plan_id": DEVICE_RAM_BOOT_PLAN_ID,
+            "profile_id": "tandem-agc-v8-rc3-ram",
+            "raw_usb_write_access": True,
+            "runtime_usb_device_node": "/dev/bus/usb/003/017",
+            "schema_version": 1,
+            "serial": DEFAULT_R18_SERIAL,
+            "transition_host": "192.168.1.18",
+            "transition_route_mode": "lan",
+            "usb_interface": "enx00e02297811f",
+            "usb_port": "3-8",
+            "usb_sysfs_path": "/sys/bus/usb/devices/3-8",
+        },
+        "receipt_id": DEVICE_RAM_BOOT_RECEIPT_ID,
+        "receipt_path": str(receipt_path),
+        "remediation": (
+            "RAM-only image is active. Power cycle to return to the unchanged "
+            "QSPI image; persistent promotion requires a separate qualified "
+            "flash plan."
+        ),
+        "retryable": False,
+        "returned_firmware": EXPECTED_FIRMWARE_VERSION,
+        "returned_phy": "ad9361",
+        "returned_serial": DEFAULT_R18_SERIAL,
+        "schema_version": 1,
+    }
+
+
+def _attest_device_firmware_lineage(
+    receipt_path: pathlib.Path, *, repository: pathlib.Path | None = None
+) -> dict[str, Any]:
+    """Bind the exact RC3 RAM receipt, image, and protected source graph."""
+
+    receipt_path = receipt_path.absolute()
+    receipt_payload = _read_exact_owned_regular_file(
+        receipt_path,
+        expected_bytes=DEVICE_RAM_BOOT_RECEIPT_BYTES,
+        name="RC3 RAM-boot receipt",
+        required_mode=0o600,
+    )
+    if hashlib.sha256(receipt_payload).hexdigest() != DEVICE_RAM_BOOT_RECEIPT_SHA256:
+        raise QualificationError("RC3 RAM-boot receipt SHA-256 changed")
+    try:
+        receipt = json.loads(receipt_payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise QualificationError("RC3 RAM-boot receipt JSON is invalid") from error
+    _validate_strict_json_domain(receipt)
+    receipt_record = _required_mapping(receipt, name="RC3 RAM-boot receipt")
+    plan = _required_mapping(receipt_record.get("plan"), name="RC3 RAM-boot plan")
+    image_text = plan.get("image_path")
+    if type(image_text) is not str:
+        raise QualificationError("RC3 RAM-boot image path is not an exact string")
+    image_path = pathlib.Path(image_text)
+    if not image_path.is_absolute() or ".." in image_path.parts:
+        raise QualificationError("RC3 RAM-boot image path is not absolute/normalized")
+    expected_receipt = _expected_ram_boot_receipt(
+        receipt_path=receipt_path, image_path=image_path
+    )
+    if not _json_identical(dict(receipt_record), expected_receipt):
+        raise QualificationError("RC3 RAM-boot receipt semantics changed")
+
+    image_payload = _read_exact_owned_regular_file(
+        image_path,
+        expected_bytes=DEVICE_FIRMWARE_DFU_BYTES,
+        name="attested RC3 DFU image",
+    )
+    if hashlib.sha256(image_payload).hexdigest() != DEVICE_FIRMWARE_DFU_SHA256:
+        raise QualificationError("attested RC3 DFU SHA-256 changed")
+    if (
+        hashlib.sha256(image_payload[:DEVICE_FIRMWARE_FIT_BYTES]).hexdigest()
+        != DEVICE_FIRMWARE_FIT_SHA256
+    ):
+        raise QualificationError("attested RC3 FIT body SHA-256 changed")
+
+    repository = (
+        pathlib.Path(__file__).resolve().parents[2]
+        if repository is None
+        else repository.absolute()
+    )
+    source_tag_commit = (
+        _git_bytes(
+            repository,
+            "rev-parse",
+            f"refs/tags/{DEVICE_FIRMWARE_SOURCE_TAG}^{{commit}}",
+        )
+        .decode()
+        .strip()
+    )
+    if source_tag_commit != DEVICE_FIRMWARE_SOURCE_COMMIT:
+        raise QualificationError("protected RC3 firmware source tag moved")
+    host_head = _git_bytes(repository, "rev-parse", "HEAD").decode().strip()
+    _git_bytes(
+        repository,
+        "merge-base",
+        "--is-ancestor",
+        DEVICE_FIRMWARE_SOURCE_COMMIT,
+        host_head,
+    )
+    return {
+        "attestation": (
+            "exact private RAM receipt, DFU/FIT bytes, and protected firmware "
+            "source ancestry verified before radio context"
+        ),
+        "source_tag": DEVICE_FIRMWARE_SOURCE_TAG,
+        "source_commit": DEVICE_FIRMWARE_SOURCE_COMMIT,
+        "build_run_binding": (
+            "exact prior release-candidate audit declaration; the RAM receipt "
+            "does not encode the GitHub Actions run identity"
+        ),
+        "build_run_id": DEVICE_FIRMWARE_BUILD_RUN_ID,
+        "build_run_attempt": DEVICE_FIRMWARE_BUILD_RUN_ATTEMPT,
+        "dfu_sha256": DEVICE_FIRMWARE_DFU_SHA256,
+        "dfu_bytes": DEVICE_FIRMWARE_DFU_BYTES,
+        "fit_sha256": DEVICE_FIRMWARE_FIT_SHA256,
+        "fit_bytes": DEVICE_FIRMWARE_FIT_BYTES,
+        "ram_boot_receipt_path": str(receipt_path),
+        "ram_boot_receipt_bytes": DEVICE_RAM_BOOT_RECEIPT_BYTES,
+        "ram_boot_receipt_sha256": DEVICE_RAM_BOOT_RECEIPT_SHA256,
+        "ram_boot_receipt": expected_receipt,
+    }
+
+
+def _observed_device_firmware_provenance(
+    lineage: Mapping[str, Any], *, preflight: Mapping[str, Any]
+) -> dict[str, Any]:
+    preflight_record = _required_mapping(preflight, name="device preflight binding")
+    context_attrs = _required_mapping(
+        preflight_record.get("context_attrs"), name="device preflight context attrs"
+    )
+    return {
+        "attestation_status": "exact lineage cross-bound to live RC3 identity",
+        "lineage": dict(lineage),
+        "live_serial": preflight_record.get("serial"),
+        "live_firmware_version": preflight_record.get("firmware_version"),
+        "live_kernel_version": context_attrs.get("local,kernel"),
+        "live_phy": context_attrs.get("ad9361-phy,model"),
+        "live_metadata_abi": 2,
+        "live_tandem_agc": True,
+    }
+
+
+def _temperature_policy_predecessor() -> dict[str, Any]:
+    return {
+        "schema": PREDECESSOR_SCHEMA,
+        "failed_report_sha256": PREDECESSOR_V2_FAILURE_REPORT_SHA256,
+        "disposition": (
+            "immutable FAIL retained; v3 supersedes only the INT32_MIN/null "
+            "producer-omission interpretation and does not promote v2 evidence"
+        ),
+    }
 
 
 def _require_nonsymlink_path(path: pathlib.Path, *, include_leaf: bool) -> None:
@@ -198,7 +485,19 @@ def _prepare_fresh_output_path(path: pathlib.Path) -> dict[str, Any]:
     _require_nonsymlink_path(path, include_leaf=True)
     _require_nonsymlink_path(temporary, include_leaf=True)
     _require_nonsymlink_path(artifact_directory, include_leaf=True)
-    if path.exists() or temporary.exists() or artifact_directory.exists():
+    try:
+        work_residue = any(
+            name.startswith((RAW_METADATA_STAGING_PREFIX, RAW_METADATA_ABORTED_PREFIX))
+            for name in os.listdir(path.parent)
+        )
+    except OSError as error:
+        raise QualificationError("fresh output parent cannot be inventoried") from error
+    if (
+        path.exists()
+        or temporary.exists()
+        or artifact_directory.exists()
+        or work_residue
+    ):
         raise QualificationError("output report changed during fresh-path preflight")
     return {
         "verified": True,
@@ -209,7 +508,60 @@ def _prepare_fresh_output_path(path: pathlib.Path) -> dict[str, Any]:
         "temporary_existed_before_context": False,
         "raw_metadata_directory_existed_before_context": False,
         "symlink_components": 0,
+        "output_parent_device": parent_stat.st_dev,
+        "output_parent_inode": parent_stat.st_ino,
     }
+
+
+def _verify_claimed_output_namespace(
+    output_path: pathlib.Path,
+    *,
+    report_identity: tuple[int, int],
+    parent_descriptor: int,
+    parent_identity: tuple[int, int],
+    require_raw_absent: bool = True,
+) -> None:
+    try:
+        lexical_parent = output_path.parent.lstat()
+        held_parent = os.fstat(parent_descriptor)
+    except OSError as error:
+        raise QualificationError("owned output parent cannot be reattested") from error
+    if (
+        (lexical_parent.st_dev, lexical_parent.st_ino) != parent_identity
+        or (held_parent.st_dev, held_parent.st_ino) != parent_identity
+        or not stat.S_ISDIR(lexical_parent.st_mode)
+        or lexical_parent.st_uid != os.getuid()
+        or stat.S_IMODE(lexical_parent.st_mode) != 0o700
+    ):
+        raise QualificationError("owned output parent pathname changed")
+    if not _entry_matches_owned_identity(
+        parent_descriptor, output_path, report_identity
+    ):
+        raise QualificationError("owned assembling report changed")
+    names = [output_path.with_suffix(output_path.suffix + ".tmp").name]
+    if require_raw_absent:
+        names.append(RAW_METADATA_DIRECTORY)
+    for name in names:
+        try:
+            os.stat(name, dir_fd=parent_descriptor, follow_symlinks=False)
+        except FileNotFoundError:
+            continue
+        except OSError as error:
+            raise QualificationError(
+                "owned output namespace cannot be inspected"
+            ) from error
+        raise QualificationError(f"owned output namespace member was raced: {name}")
+    try:
+        work_residue = any(
+            name.startswith((RAW_METADATA_STAGING_PREFIX, RAW_METADATA_ABORTED_PREFIX))
+            for name in os.listdir(parent_descriptor)
+        )
+    except OSError as error:
+        raise QualificationError(
+            "owned output namespace cannot be inventoried"
+        ) from error
+    if work_residue:
+        raise QualificationError("owned output namespace has metadata staging residue")
 
 
 def _fsync_directory(path: pathlib.Path) -> None:
@@ -221,13 +573,22 @@ def _fsync_directory(path: pathlib.Path) -> None:
 
 
 def _read_exact_owned_regular_file(
-    path: pathlib.Path, *, expected_bytes: int, name: str
+    path: pathlib.Path,
+    *,
+    expected_bytes: int,
+    name: str,
+    required_mode: int | None = None,
+    parent_descriptor: int | None = None,
 ) -> bytes:
     """Bound a no-follow evidence read and reject replacement while open."""
 
     _require_nonsymlink_path(path, include_leaf=True)
     try:
-        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+        descriptor = os.open(
+            path.name if parent_descriptor is not None else path,
+            os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent_descriptor,
+        )
     except OSError as error:
         raise QualificationError(f"{name} cannot be opened safely") from error
     try:
@@ -236,6 +597,10 @@ def _read_exact_owned_regular_file(
             not stat.S_ISREG(before.st_mode)
             or before.st_uid != os.getuid()
             or before.st_size != expected_bytes
+            or (
+                required_mode is not None
+                and stat.S_IMODE(before.st_mode) != required_mode
+            )
         ):
             raise QualificationError(f"{name} size/type/owner changed")
         chunks: list[bytes] = []
@@ -316,30 +681,6 @@ def _json_payload(value: Mapping[str, Any]) -> bytes:
     )
 
 
-def _unlink_same_inode(path: pathlib.Path, identity: tuple[int, int]) -> None:
-    try:
-        info = path.lstat()
-    except FileNotFoundError:
-        return
-    if (
-        (info.st_dev, info.st_ino) == identity
-        and stat.S_ISREG(info.st_mode)
-        and info.st_uid == os.getuid()
-    ):
-        path.unlink()
-
-
-def _best_effort_unlink_same_inode(
-    path: pathlib.Path, identity: tuple[int, int]
-) -> None:
-    """Remove only our inode without masking the operation's primary failure."""
-
-    try:
-        _unlink_same_inode(path, identity)
-    except OSError:
-        pass
-
-
 def _path_matches_owned_identity(
     path: pathlib.Path, identity: tuple[int, int] | None
 ) -> bool:
@@ -357,118 +698,507 @@ def _path_matches_owned_identity(
     )
 
 
+def _entry_matches_owned_identity(
+    parent_descriptor: int | None,
+    path: pathlib.Path,
+    identity: tuple[int, int] | None,
+) -> bool:
+    if parent_descriptor is None:
+        return _path_matches_owned_identity(path, identity)
+    if identity is None:
+        return False
+    try:
+        info = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except OSError:
+        return False
+    return (
+        (info.st_dev, info.st_ino) == identity
+        and stat.S_ISREG(info.st_mode)
+        and info.st_uid == os.getuid()
+    )
+
+
+def _open_owned_output_parent(output_path: pathlib.Path) -> tuple[int, tuple[int, int]]:
+    try:
+        descriptor = os.open(
+            output_path.parent,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+        )
+    except OSError as error:
+        raise QualificationError("output parent cannot be opened safely") from error
+    try:
+        info = os.fstat(descriptor)
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or info.st_uid != os.getuid()
+            or stat.S_IMODE(info.st_mode) != 0o700
+        ):
+            raise QualificationError("output parent is not owned private mode-0700")
+        return descriptor, (info.st_dev, info.st_ino)
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    offset = 0
+    while offset < len(payload):
+        written = os.write(descriptor, payload[offset:])
+        if written <= 0:
+            raise OSError(errno.EIO, "short evidence write")
+        offset += written
+
+
 def _atomic_json(
     path: pathlib.Path,
     value: Mapping[str, Any],
     *,
     replace_existing: bool = False,
     expected_existing_identity: tuple[int, int] | None = None,
+    parent_descriptor: int | None = None,
+    expected_parent_identity: tuple[int, int] | None = None,
 ) -> tuple[int, int]:
+    """Create without replacement, or rewrite only a held exact owned inode.
+
+    Rewrites intentionally use the already-open target file descriptor.  If a
+    same-user process unlinks or swaps the pathname during the write, its new
+    pathname is never overwritten and the post-write identity check fails.
+    """
+
     path = path.absolute()
     _require_nonsymlink_path(path, include_leaf=True)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if parent_descriptor is not None:
+        parent = os.fstat(parent_descriptor)
+        if (parent.st_dev, parent.st_ino) != expected_parent_identity:
+            raise QualificationError("held output parent identity changed")
     temporary = path.with_suffix(path.suffix + ".tmp")
     _require_nonsymlink_path(temporary, include_leaf=True)
-    if temporary.exists():
-        raise QualificationError(f"atomic report temporary path exists: {temporary}")
-    if replace_existing:
-        try:
-            existing = path.lstat()
-        except OSError as error:
-            raise QualificationError("owned report to replace is absent") from error
-        if (
-            not stat.S_ISREG(existing.st_mode)
-            or existing.st_uid != os.getuid()
-            or path.is_symlink()
-            or (existing.st_dev, existing.st_ino) != expected_existing_identity
-        ):
-            raise QualificationError("owned report to replace changed")
-    elif path.exists():
-        raise QualificationError(f"atomic report path is not fresh: {path}")
-    payload = _json_payload(value)
-    descriptor = os.open(
-        temporary,
-        os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0),
-        0o600,
-    )
     try:
-        temporary_identity = os.fstat(descriptor)
-        with os.fdopen(descriptor, "wb", closefd=False) as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-    finally:
-        os.close(descriptor)
-    identity = (temporary_identity.st_dev, temporary_identity.st_ino)
-    target_identity: tuple[int, int] | None = None
-    try:
-        if replace_existing:
-            temporary.replace(path)
-            target_identity = identity
+        if parent_descriptor is None:
+            temporary_exists = temporary.exists()
         else:
-            os.link(temporary, path, follow_symlinks=False)
-            target_identity = identity
-            _unlink_same_inode(temporary, identity)
-    except OSError as error:
-        _best_effort_unlink_same_inode(temporary, identity)
-        if target_identity is not None:
-            # A failed cleanup after a successful hard-link promotion must not
-            # leave an apparently authoritative PASS behind.  The identity
-            # check prevents deleting a raced-in file owned by another writer.
-            _best_effort_unlink_same_inode(path, target_identity)
-        raise _AtomicPromotionError(
-            "atomic report promotion failed without overwrite", target_identity
-        ) from error
-    try:
-        _fsync_directory(path.parent)
-        if temporary.exists() or not _path_matches_owned_identity(path, identity):
-            raise QualificationError(
-                "atomic report promotion did not produce one owned file"
+            os.stat(
+                temporary.name,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
             )
+            temporary_exists = True
+    except FileNotFoundError:
+        temporary_exists = False
+    if temporary_exists:
+        raise QualificationError(f"atomic report temporary path exists: {temporary}")
+    payload = _json_payload(value)
+    descriptor: int | None = None
+    identity: tuple[int, int] | None = None
+    try:
+        flags = os.O_RDWR | getattr(os, "O_NOFOLLOW", 0)
+        if not replace_existing:
+            flags |= os.O_CREAT | os.O_EXCL
+        descriptor = os.open(
+            path.name if parent_descriptor is not None else path,
+            flags,
+            0o600,
+            dir_fd=parent_descriptor,
+        )
+        opened = os.fstat(descriptor)
+        identity = (opened.st_dev, opened.st_ino)
+        if (
+            not stat.S_ISREG(opened.st_mode)
+            or opened.st_uid != os.getuid()
+            or stat.S_IMODE(opened.st_mode) != 0o600
+        ):
+            raise QualificationError("atomic report target is not owned mode-0600")
+        if replace_existing and identity != expected_existing_identity:
+            raise QualificationError("owned report to rewrite changed")
+        os.ftruncate(descriptor, 0)
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        _write_all(descriptor, payload)
+        os.fsync(descriptor)
+        after = os.fstat(descriptor)
+        if (after.st_dev, after.st_ino, after.st_size) != (
+            opened.st_dev,
+            opened.st_ino,
+            len(payload),
+        ):
+            raise QualificationError("atomic report inode changed while writing")
     except BaseException as error:
         raise _AtomicPromotionError(
-            "atomic report promotion did not become durable", identity
+            "owned report write failed without replacing another inode", identity
+        ) from error
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+    try:
+        current = (
+            path.lstat()
+            if parent_descriptor is None
+            else os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+        )
+    except OSError as error:
+        raise _AtomicPromotionError(
+            "owned report pathname disappeared after write", identity
+        ) from error
+    if (
+        identity is None
+        or (current.st_dev, current.st_ino) != identity
+        or not stat.S_ISREG(current.st_mode)
+        or current.st_uid != os.getuid()
+        or path.is_symlink()
+    ):
+        raise _AtomicPromotionError(
+            "owned report pathname was replaced during write", identity
+        )
+    try:
+        if parent_descriptor is None:
+            _fsync_directory(path.parent)
+        else:
+            os.fsync(parent_descriptor)
+    except OSError as error:
+        raise _AtomicPromotionError(
+            "owned report directory fsync failed", identity
         ) from error
     return identity
 
 
-def _atomic_bytes(path: pathlib.Path, payload: bytes) -> None:
+def _directory_matches_owned_identity(
+    path: pathlib.Path, identity: tuple[int, int] | None
+) -> bool:
+    if identity is None:
+        return False
+    try:
+        info = path.lstat()
+    except OSError:
+        return False
+    return (
+        (info.st_dev, info.st_ino) == identity
+        and stat.S_ISDIR(info.st_mode)
+        and info.st_uid == os.getuid()
+        and stat.S_IMODE(info.st_mode) == 0o700
+        and not path.is_symlink()
+    )
+
+
+def _directory_entry_matches_owned_identity(
+    parent_descriptor: int | None,
+    path: pathlib.Path,
+    identity: tuple[int, int] | None,
+) -> bool:
+    if parent_descriptor is None:
+        return _directory_matches_owned_identity(path, identity)
+    if identity is None:
+        return False
+    try:
+        info = os.stat(path.name, dir_fd=parent_descriptor, follow_symlinks=False)
+    except OSError:
+        return False
+    return (
+        (info.st_dev, info.st_ino) == identity
+        and stat.S_ISDIR(info.st_mode)
+        and info.st_uid == os.getuid()
+        and stat.S_IMODE(info.st_mode) == 0o700
+    )
+
+
+def _claim_metadata_artifact_directory(
+    output_path: pathlib.Path,
+    *,
+    parent_descriptor: int | None = None,
+    expected_parent_identity: tuple[int, int] | None = None,
+) -> dict[str, Any]:
+    """Claim an unpredictable private staging directory under a held parent.
+
+    The canonical ``raw-metadata`` name is not exposed until all 65 files have
+    been written, reread, and reparsed.  The random staging name makes an
+    ordinary cooperative namespace insertion unguessable.  The pre-open stat
+    and held directory descriptor also detect replacement after that stat.  A
+    malicious same-UID process capable of intercepting the mkdir call itself is
+    outside this single-user release-host evidence boundary.
+    """
+
+    owns_parent_descriptor = False
+    if parent_descriptor is None:
+        parent_descriptor, expected_parent_identity = _open_owned_output_parent(
+            output_path
+        )
+        owns_parent_descriptor = True
+    assert parent_descriptor is not None
+    assert expected_parent_identity is not None
+    staging_name = f"{RAW_METADATA_STAGING_PREFIX}{os.urandom(32).hex()}"
+    ownership: dict[str, Any] = {
+        "directory_identity": None,
+        "directory_descriptor": None,
+        "directory_name": staging_name,
+        "published": False,
+        "output_parent_descriptor": parent_descriptor,
+        "output_parent_identity": expected_parent_identity,
+        "owns_output_parent_descriptor": owns_parent_descriptor,
+        "files": [],
+    }
+    try:
+        parent = os.fstat(parent_descriptor)
+        if (parent.st_dev, parent.st_ino) != expected_parent_identity:
+            raise QualificationError("held output parent identity changed")
+        os.mkdir(staging_name, mode=0o700, dir_fd=parent_descriptor)
+        created = os.stat(
+            staging_name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+        directory_identity = (created.st_dev, created.st_ino)
+        ownership["directory_identity"] = directory_identity
+        directory_descriptor = os.open(
+            staging_name,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent_descriptor,
+        )
+        ownership["directory_descriptor"] = directory_descriptor
+        info = os.fstat(directory_descriptor)
+        identity = (info.st_dev, info.st_ino)
+        if identity != directory_identity:
+            raise QualificationError("claimed metadata staging directory was replaced")
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or info.st_uid != os.getuid()
+            or stat.S_IMODE(info.st_mode) != 0o700
+        ):
+            raise QualificationError("claimed metadata staging directory is not exact")
+        os.fsync(parent_descriptor)
+        return ownership
+    except FileExistsError:
+        claim_error = QualificationError(
+            "metadata staging directory was raced or reused"
+        )
+        raise _ArtifactDirectoryClaimError(
+            "raw metadata staging claim failed", ownership
+        ) from claim_error
+    except BaseException as error:
+        raise _ArtifactDirectoryClaimError(
+            "raw metadata staging claim failed",
+            ownership,
+        ) from error
+
+
+def _verify_metadata_artifact_ownership(
+    output_path: pathlib.Path,
+    ownership: Mapping[str, Any],
+    *,
+    expected_report_identity: tuple[int, int] | None = None,
+    require_complete: bool = True,
+) -> None:
+    parent_descriptor = ownership.get("output_parent_descriptor")
+    parent_identity = ownership.get("output_parent_identity")
+    directory_descriptor = ownership.get("directory_descriptor")
+    directory_identity = ownership.get("directory_identity")
+    directory_name = ownership.get("directory_name")
+    if (
+        type(parent_descriptor) is not int
+        or type(parent_identity) is not tuple
+        or len(parent_identity) != 2
+        or type(directory_descriptor) is not int
+        or type(directory_identity) is not tuple
+        or len(directory_identity) != 2
+        or type(directory_name) is not str
+    ):
+        raise QualificationError("metadata artifact ownership is incomplete")
+    try:
+        parent = os.fstat(parent_descriptor)
+        directory = os.fstat(directory_descriptor)
+        named = os.stat(
+            directory_name,
+            dir_fd=parent_descriptor,
+            follow_symlinks=False,
+        )
+    except OSError as error:
+        raise QualificationError(
+            "metadata artifact ownership cannot be inspected"
+        ) from error
+    if (
+        (parent.st_dev, parent.st_ino) != parent_identity
+        or (directory.st_dev, directory.st_ino) != directory_identity
+        or (named.st_dev, named.st_ino) != directory_identity
+        or not stat.S_ISDIR(directory.st_mode)
+        or not stat.S_ISDIR(named.st_mode)
+        or directory.st_uid != os.getuid()
+        or named.st_uid != os.getuid()
+        or stat.S_IMODE(directory.st_mode) != 0o700
+        or stat.S_IMODE(named.st_mode) != 0o700
+    ):
+        raise QualificationError("metadata artifact directory identity changed")
+    if expected_report_identity is not None and not _entry_matches_owned_identity(
+        parent_descriptor, output_path, expected_report_identity
+    ):
+        raise QualificationError(
+            "owned assembling report changed during metadata assembly"
+        )
+    expected_names = {
+        _metadata_relative_path(role, ordinal).name
+        for role, ordinal in _expected_metadata_identities()
+    }
+    try:
+        observed_names = set(os.listdir(directory_descriptor))
+        observed = [
+            os.stat(name, dir_fd=directory_descriptor, follow_symlinks=False)
+            for name in observed_names
+        ]
+    except OSError as error:
+        raise QualificationError(
+            "metadata artifact inventory cannot be inspected"
+        ) from error
+    names_match = (
+        observed_names == expected_names
+        if require_complete
+        else observed_names <= expected_names
+    )
+    if not names_match or any(
+        not stat.S_ISREG(item.st_mode)
+        or item.st_uid != os.getuid()
+        or stat.S_IMODE(item.st_mode) != 0o600
+        or item.st_size != RAW_METADATA_BYTES
+        for item in observed
+    ):
+        raise QualificationError("metadata artifact inventory changed")
+
+
+def _promote_metadata_artifact_directory(
+    output_path: pathlib.Path,
+    ownership: dict[str, Any],
+    *,
+    expected_report_identity: tuple[int, int] | None = None,
+) -> None:
+    _verify_metadata_artifact_ownership(
+        output_path,
+        ownership,
+        expected_report_identity=expected_report_identity,
+    )
+    if ownership.get("published") is not False:
+        raise QualificationError("metadata artifact directory was already published")
+    parent_descriptor = ownership["output_parent_descriptor"]
+    staging_name = ownership["directory_name"]
+    try:
+        _rename_noreplace_at(
+            parent_descriptor,
+            staging_name,
+            parent_descriptor,
+            RAW_METADATA_DIRECTORY,
+        )
+    except OSError as error:
+        raise QualificationError(
+            "canonical raw metadata directory was raced or reused"
+        ) from error
+    ownership["directory_name"] = RAW_METADATA_DIRECTORY
+    ownership["published"] = True
+    try:
+        os.fsync(parent_descriptor)
+    except OSError as error:
+        raise QualificationError(
+            "metadata directory promotion was not durable"
+        ) from error
+    _verify_metadata_artifact_ownership(
+        output_path,
+        ownership,
+        expected_report_identity=expected_report_identity,
+    )
+
+
+def _atomic_bytes(
+    path: pathlib.Path,
+    payload: bytes,
+    *,
+    expected_parent_identity: tuple[int, int] | None = None,
+    parent_descriptor: int | None = None,
+) -> tuple[int, int]:
     path = path.absolute()
     _require_nonsymlink_path(path, include_leaf=True)
-    path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-    _require_nonsymlink_path(path, include_leaf=True)
-    if path.exists():
-        raise QualificationError(f"metadata artifact is not fresh: {path}")
+    if expected_parent_identity is None:
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        parent = path.parent.lstat()
+        expected_parent_identity = (parent.st_dev, parent.st_ino)
+    if parent_descriptor is None:
+        if not _directory_matches_owned_identity(path.parent, expected_parent_identity):
+            raise QualificationError("metadata artifact parent directory changed")
+        _require_nonsymlink_path(path, include_leaf=True)
+    else:
+        parent = os.fstat(parent_descriptor)
+        if (parent.st_dev, parent.st_ino) != expected_parent_identity:
+            raise QualificationError("metadata artifact parent descriptor changed")
     temporary = path.with_suffix(path.suffix + ".tmp")
     _require_nonsymlink_path(temporary, include_leaf=True)
     if temporary.exists():
         raise QualificationError(f"metadata temporary is not fresh: {temporary}")
-    descriptor = os.open(
-        temporary,
-        os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0),
-        0o600,
-    )
+    identity: tuple[int, int] | None = None
     try:
-        temporary_identity = os.fstat(descriptor)
-        with os.fdopen(descriptor, "wb", closefd=False) as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-    finally:
-        os.close(descriptor)
-    identity = (temporary_identity.st_dev, temporary_identity.st_ino)
-    try:
-        os.link(temporary, path, follow_symlinks=False)
-        _unlink_same_inode(temporary, identity)
+        descriptor = os.open(
+            path.name if parent_descriptor is not None else path,
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+            dir_fd=parent_descriptor,
+        )
     except OSError as error:
-        _best_effort_unlink_same_inode(temporary, identity)
-        _best_effort_unlink_same_inode(path, identity)
         raise QualificationError(
-            f"metadata artifact promotion failed without overwrite: {path}"
+            f"metadata artifact is not fresh and owned: {path}"
         ) from error
-    _fsync_directory(path.parent)
-    if temporary.exists() or path.is_symlink() or not path.is_file():
-        raise QualificationError(f"metadata artifact promotion failed: {path}")
+    write_error: BaseException | None = None
+    try:
+        opened = os.fstat(descriptor)
+        identity = (opened.st_dev, opened.st_ino)
+        _write_all(descriptor, payload)
+        os.fsync(descriptor)
+        after = os.fstat(descriptor)
+        if (after.st_dev, after.st_ino, after.st_size) != (
+            opened.st_dev,
+            opened.st_ino,
+            len(payload),
+        ):
+            raise QualificationError(f"metadata artifact changed while writing: {path}")
+    except BaseException as error:
+        write_error = error
+    finally:
+        try:
+            os.close(descriptor)
+        except BaseException as error:
+            if write_error is None:
+                write_error = error
+    if write_error is not None:
+        raise _AtomicArtifactError(
+            f"metadata artifact write failed: {path}", identity
+        ) from write_error
+    try:
+        if parent_descriptor is not None:
+            os.fsync(parent_descriptor)
+            try:
+                os.stat(
+                    temporary.name,
+                    dir_fd=parent_descriptor,
+                    follow_symlinks=False,
+                )
+                temporary_exists = True
+            except FileNotFoundError:
+                temporary_exists = False
+            parent = os.fstat(parent_descriptor)
+            parent_matches = (
+                parent.st_dev,
+                parent.st_ino,
+            ) == expected_parent_identity
+        else:
+            _fsync_directory(path.parent)
+            temporary_exists = temporary.exists()
+            parent_matches = _directory_matches_owned_identity(
+                path.parent, expected_parent_identity
+            )
+        if (
+            temporary_exists
+            or not _entry_matches_owned_identity(parent_descriptor, path, identity)
+            or not parent_matches
+        ):
+            raise QualificationError(f"metadata artifact promotion failed: {path}")
+    except BaseException as error:
+        raise _AtomicArtifactError(
+            f"metadata artifact did not become durable: {path}", identity
+        ) from error
+    if identity is None:
+        raise QualificationError(f"metadata artifact identity missing: {path}")
+    return identity
 
 
 def _metadata_relative_path(role: str, ordinal: int) -> pathlib.PurePosixPath:
@@ -493,6 +1223,13 @@ def _metadata_manifest_digest(entries: Sequence[Mapping[str, Any]]) -> str:
     return digest.hexdigest()
 
 
+def _expected_metadata_identities() -> list[tuple[str, int]]:
+    return [
+        *(("full_drain", index) for index in range(BATCH_FRAMES)),
+        ("cancel_first", 0),
+    ]
+
+
 def _new_metadata_artifact_manifest(
     captures: Sequence[tuple[str, int, bytes]],
 ) -> dict[str, Any]:
@@ -502,12 +1239,14 @@ def _new_metadata_artifact_manifest(
             f"{RAW_METADATA_FILE_COUNT}"
         )
     entries: list[dict[str, Any]] = []
-    identities: set[tuple[str, int]] = set()
-    for role, ordinal, payload in captures:
+    expected_identities = _expected_metadata_identities()
+    for capture_index, (role, ordinal, payload) in enumerate(captures):
         identity = (role, ordinal)
-        if identity in identities:
-            raise QualificationError(f"duplicate raw metadata identity: {identity}")
-        identities.add(identity)
+        if identity != expected_identities[capture_index]:
+            raise QualificationError(
+                "raw metadata captures are not the exact ordered full-drain then "
+                f"cancel-first prefix at index {capture_index}: {identity}"
+            )
         if len(payload) != RAW_METADATA_BYTES:
             raise QualificationError(
                 f"raw metadata {role}/{ordinal} has {len(payload)} bytes"
@@ -522,12 +1261,6 @@ def _new_metadata_artifact_manifest(
                 "write_completed": False,
             }
         )
-    expected_identities = {
-        *(("full_drain", index) for index in range(BATCH_FRAMES)),
-        ("cancel_first", 0),
-    }
-    if identities != expected_identities:
-        raise QualificationError("raw metadata capture inventory is incomplete")
     return {
         "policy": "retain, reread, hash, and reparse all 64 drain plus cancel-first metadata records",
         "directory_relative": RAW_METADATA_DIRECTORY,
@@ -545,29 +1278,228 @@ def _write_metadata_artifacts(
     output_path: pathlib.Path,
     captures: Sequence[tuple[str, int, bytes]],
     manifest: dict[str, Any],
-) -> None:
+    *,
+    expected_report_identity: tuple[int, int] | None = None,
+    output_parent_descriptor: int | None = None,
+    expected_output_parent_identity: tuple[int, int] | None = None,
+) -> dict[str, Any]:
+    try:
+        ownership = _claim_metadata_artifact_directory(
+            output_path,
+            parent_descriptor=output_parent_descriptor,
+            expected_parent_identity=expected_output_parent_identity,
+        )
+    except _ArtifactDirectoryClaimError as error:
+        _rollback_owned_metadata_artifacts(output_path, error.ownership)
+        raise
+    directory_identity = ownership["directory_identity"]
+    directory_descriptor = ownership["directory_descriptor"]
     by_identity = {(role, ordinal): payload for role, ordinal, payload in captures}
-    for entry in manifest["entries"]:
-        relative = pathlib.PurePosixPath(entry["relative_path"])
-        target = output_path.parent / pathlib.Path(*relative.parts)
-        payload = by_identity[(entry["role"], entry["ordinal"])]
-        _atomic_bytes(target, payload)
-        entry["write_completed"] = True
-        manifest["completed_file_count"] += 1
-    manifest["inventory_state"] = "complete"
-    artifact_directory = output_path.parent / RAW_METADATA_DIRECTORY
-    expected_names = {
-        pathlib.PurePosixPath(entry["relative_path"]).name
-        for entry in manifest["entries"]
-    }
-    observed = list(artifact_directory.iterdir())
+    try:
+        for entry in manifest["entries"]:
+            if (
+                expected_report_identity is not None
+                and not _entry_matches_owned_identity(
+                    output_parent_descriptor, output_path, expected_report_identity
+                )
+            ):
+                raise QualificationError(
+                    "owned assembling report changed during metadata writes"
+                )
+            relative = pathlib.PurePosixPath(entry["relative_path"])
+            target = output_path.parent / pathlib.Path(*relative.parts)
+            payload = by_identity[(entry["role"], entry["ordinal"])]
+            try:
+                file_identity = _atomic_bytes(
+                    target,
+                    payload,
+                    expected_parent_identity=directory_identity,
+                    parent_descriptor=directory_descriptor,
+                )
+            except _AtomicArtifactError as error:
+                if error.target_identity is not None:
+                    ownership["files"].append((target, error.target_identity))
+                raise
+            try:
+                _verify_metadata_artifact_ownership(
+                    output_path,
+                    ownership,
+                    expected_report_identity=expected_report_identity,
+                    require_complete=False,
+                )
+            except QualificationError:
+                ownership["files"].append((target, file_identity))
+                raise
+            ownership["files"].append((target, file_identity))
+            entry["write_completed"] = True
+            manifest["completed_file_count"] += 1
+        manifest["inventory_state"] = "complete"
+        _verify_metadata_artifact_ownership(
+            output_path,
+            ownership,
+            expected_report_identity=expected_report_identity,
+        )
+        os.fsync(directory_descriptor)
+        if expected_report_identity is None:
+            _promote_metadata_artifact_directory(output_path, ownership)
+            _close_metadata_artifact_ownership(ownership, require_success=True)
+        return ownership
+    except BaseException:
+        _rollback_owned_metadata_artifacts(output_path, ownership)
+        raise
+
+
+def _rollback_owned_metadata_artifacts(
+    output_path: pathlib.Path, ownership: Mapping[str, Any] | None
+) -> None:
+    """Best-effort no-replace quarantine of a still-verifiable owned directory."""
+
+    if ownership is None:
+        return
+    directory_identity = ownership.get("directory_identity")
+    output_parent_descriptor = ownership.get("output_parent_descriptor")
+    output_parent_identity = ownership.get("output_parent_identity")
+    directory_name = ownership.get("directory_name")
     if (
-        {path.name for path in observed} != expected_names
-        or any(path.is_symlink() or not path.is_file() for path in observed)
-        or any(path.name.endswith(".tmp") for path in observed)
+        type(directory_identity) is not tuple
+        or len(directory_identity) != 2
+        or type(directory_name) is not str
     ):
-        raise QualificationError("raw metadata post-write inventory changed")
-    _fsync_directory(artifact_directory)
+        _close_metadata_artifact_ownership(ownership)
+        return
+    if type(output_parent_descriptor) is not int:
+        if (
+            type(output_parent_identity) is not tuple
+            or len(output_parent_identity) != 2
+        ):
+            _close_metadata_artifact_ownership(ownership)
+            return
+        try:
+            output_parent_descriptor, observed_parent_identity = (
+                _open_owned_output_parent(output_path)
+            )
+        except QualificationError:
+            _close_metadata_artifact_ownership(ownership)
+            return
+        if observed_parent_identity != output_parent_identity:
+            os.close(output_parent_descriptor)
+            _close_metadata_artifact_ownership(ownership)
+            return
+        if isinstance(ownership, dict):
+            ownership["output_parent_descriptor"] = output_parent_descriptor
+            ownership["owns_output_parent_descriptor"] = True
+    descriptor = ownership.get("directory_descriptor")
+    if type(descriptor) is int:
+        try:
+            opened = os.fstat(descriptor)
+            if (opened.st_dev, opened.st_ino) != directory_identity:
+                _close_metadata_artifact_ownership(ownership)
+                return
+        except OSError:
+            if isinstance(ownership, dict):
+                ownership["directory_descriptor"] = None
+            descriptor = None
+    if type(descriptor) is not int:
+        try:
+            descriptor = os.open(
+                directory_name,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=output_parent_descriptor,
+            )
+            if isinstance(ownership, dict):
+                ownership["directory_descriptor"] = descriptor
+        except OSError:
+            _close_metadata_artifact_ownership(ownership)
+            return
+    try:
+        opened = os.fstat(descriptor)
+        if (opened.st_dev, opened.st_ino) != directory_identity:
+            _close_metadata_artifact_ownership(ownership)
+            return
+        os.fsync(descriptor)
+    except OSError:
+        _close_metadata_artifact_ownership(ownership)
+        return
+    try:
+        named = os.stat(
+            directory_name,
+            dir_fd=output_parent_descriptor,
+            follow_symlinks=False,
+        )
+        name_matches = (named.st_dev, named.st_ino) == directory_identity
+    except OSError:
+        name_matches = False
+    if not name_matches:
+        _close_metadata_artifact_ownership(ownership)
+        return
+    try:
+        quarantine_name = f"{RAW_METADATA_ABORTED_PREFIX}{os.urandom(32).hex()}"
+        _rename_noreplace_at(
+            output_parent_descriptor,
+            directory_name,
+            output_parent_descriptor,
+            quarantine_name,
+        )
+        quarantined = os.stat(
+            quarantine_name,
+            dir_fd=output_parent_descriptor,
+            follow_symlinks=False,
+        )
+        if (quarantined.st_dev, quarantined.st_ino) != directory_identity:
+            # Preserve a raced external directory rather than deleting it.
+            _rename_noreplace_at(
+                output_parent_descriptor,
+                quarantine_name,
+                output_parent_descriptor,
+                directory_name,
+            )
+        # POSIX has no compare-and-unlink/rmdir primitive.  Keep the verified,
+        # unpredictable quarantine intact rather than risk deleting a same-UID
+        # replacement of either a child or the directory pathname.
+        _close_metadata_artifact_ownership(ownership, close_parent=False)
+        os.fsync(output_parent_descriptor)
+    except BaseException:
+        _close_metadata_artifact_ownership(ownership)
+        return
+    _close_metadata_artifact_ownership(ownership)
+
+
+def _close_metadata_artifact_ownership(
+    ownership: Mapping[str, Any] | None,
+    *,
+    require_success: bool = False,
+    close_parent: bool = True,
+) -> None:
+    if ownership is None:
+        return
+    descriptor = ownership.get("directory_descriptor")
+    if type(descriptor) is int:
+        try:
+            os.close(descriptor)
+        except OSError as error:
+            if require_success:
+                raise QualificationError(
+                    "owned raw metadata directory descriptor did not close"
+                ) from error
+        if isinstance(ownership, dict):
+            ownership["directory_descriptor"] = None
+    parent_descriptor = ownership.get("output_parent_descriptor")
+    if (
+        close_parent
+        and ownership.get("owns_output_parent_descriptor") is True
+        and type(parent_descriptor) is int
+    ):
+        try:
+            os.close(parent_descriptor)
+        except OSError as error:
+            if require_success:
+                raise QualificationError(
+                    "owned output parent descriptor did not close"
+                ) from error
+        if isinstance(ownership, dict):
+            ownership["output_parent_descriptor"] = None
 
 
 def _error_record(error: BaseException) -> dict[str, Any]:
@@ -575,6 +1507,21 @@ def _error_record(error: BaseException) -> dict[str, Any]:
         "type": type(error).__name__,
         "errno": getattr(error, "errno", None),
         "message": str(error),
+    }
+
+
+def _assembling_report_claim(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Small durable reservation that can never be mistaken for qualification."""
+
+    return {
+        "schema": SCHEMA,
+        "verdict": "assembling",
+        "release_claim": "none; incomplete evidence namespace reservation",
+        "release_pass_eligible": False,
+        "hardware_qualified": False,
+        "started_unix_ns": report["started_unix_ns"],
+        "claim_token": os.urandom(32).hex(),
+        "process_id": os.getpid(),
     }
 
 
@@ -764,9 +1711,11 @@ def _attest_runner_provenance() -> dict[str, str]:
         else pathlib.Path()
     )
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
-        raise QualificationError("runner firmware-repository commit is invalid")
+        raise QualificationError("host runner repository commit is invalid")
     if _git_bytes(repository, "rev-parse", "HEAD").decode().strip() != commit:
         raise QualificationError("runner commit is not the live repository HEAD")
+    if _git_bytes(repository, "status", "--porcelain", "--untracked-files=no").strip():
+        raise QualificationError("runner repository has tracked changes")
     if not shell_text or not shell_path.is_absolute() or not shell_path.is_file():
         raise QualificationError("runner shell path is absent or non-absolute")
     if (
@@ -811,8 +1760,8 @@ def _attest_runner_provenance() -> dict[str, str]:
     ):
         raise QualificationError("runner source SHA-256 does not match its process")
     return {
-        "firmware_repo_commit": commit,
-        "firmware_repository": str(repository),
+        "host_runner_repository_commit": commit,
+        "host_runner_repository": str(repository),
         "python_module_path": str(module_path),
         "python_module_sha256": calculated_module_sha,
         "python_module_head_blob_sha256": module_head_sha,
@@ -1418,7 +2367,152 @@ def _frame_evidence(
     }
 
 
-def _validate_hold_metadata(metadata: TandemFrameMetadata, *, ordinal: int) -> None:
+FRAME_EVIDENCE_FIELDS = frozenset(
+    {
+        "ordinal",
+        "refill_duration_ns",
+        "returned_iq_bytes_in_process",
+        "returned_iq_sha256_in_process",
+        "metadata_bytes",
+        "metadata_sha256",
+        "version",
+        "header_bytes",
+        "features",
+        "stream_id",
+        "buffer_sequence",
+        "first_sample_sequence",
+        "samples_per_channel",
+        "iq_payload_bytes",
+        "enabled_scan_mask",
+        "sample_format",
+        "channel_count",
+        "flags",
+        "observation_count",
+        "observation_capacity",
+        "event_capacity",
+        "ownership_epoch",
+        "tandem_state",
+        "tandem_state_name",
+        "tandem_fault_flags",
+        "tandem_transition_count",
+        "gain_table_id",
+        "gain_table_name",
+        "threshold_provenance",
+        "minimum_gain_db",
+        "maximum_gain_db",
+        "initial_gain_db",
+        "minimum_gain_index",
+        "maximum_gain_index",
+        "rx1_gain_index",
+        "rx2_gain_index",
+        "ad9361_temperature_mdeg_c",
+        "event_count",
+        "observation_overflow_count",
+        "event_overflow_count",
+    }
+)
+
+
+def _validate_temperature_sample(value: Any, *, role: str, ordinal: int) -> None:
+    if role == "full_drain":
+        if not 0 <= ordinal < BATCH_FRAMES:
+            raise QualificationError(
+                f"full_drain temperature ordinal {ordinal} is outside the batch"
+            )
+    elif role == "cancel_first":
+        if ordinal != 0:
+            raise QualificationError(
+                f"cancel_first temperature ordinal {ordinal} is not zero"
+            )
+    else:
+        raise QualificationError(f"unknown temperature evidence role: {role}")
+    if value is None:
+        return
+    if type(value) is not int or not (
+        MINIMUM_TEMPERATURE_MDEG_C <= value <= MAXIMUM_TEMPERATURE_MDEG_C
+    ):
+        raise QualificationError(
+            f"{role} frame {ordinal} temperature evidence is not null or an exact "
+            f"integer in [{MINIMUM_TEMPERATURE_MDEG_C}, "
+            f"{MAXIMUM_TEMPERATURE_MDEG_C}] mdeg C"
+        )
+
+
+def _full_drain_temperature_summary(
+    full_drain_values: Sequence[Any],
+) -> dict[str, Any]:
+    if len(full_drain_values) != BATCH_FRAMES:
+        raise QualificationError(
+            "temperature evidence does not cover the exact 64-frame full drain"
+        )
+    for ordinal, value in enumerate(full_drain_values):
+        _validate_temperature_sample(value, role="full_drain", ordinal=ordinal)
+    first_valid_ordinal = next(
+        (
+            ordinal
+            for ordinal, value in enumerate(full_drain_values)
+            if value is not None
+        ),
+        None,
+    )
+    if first_valid_ordinal is None:
+        raise QualificationError(
+            "full_drain temperature evidence has no valid sample after omissions"
+        )
+    if any(value is not None for value in full_drain_values[:first_valid_ordinal]):
+        raise AssertionError("first valid temperature ordinal is inconsistent")
+    if any(value is None for value in full_drain_values[first_valid_ordinal:]):
+        raise QualificationError(
+            "full_drain temperature omission appears after the first valid sample"
+        )
+    valid_full = list(full_drain_values[first_valid_ordinal:])
+    # The scalar validator above proves these are exact built-in integers.
+    assert all(type(value) is int for value in valid_full)
+    return {
+        "frame_count": BATCH_FRAMES,
+        "leading_omission_count": first_valid_ordinal,
+        "omitted_ordinals": list(range(first_valid_ordinal)),
+        "first_valid_ordinal": first_valid_ordinal,
+        "valid_temperature_count": len(valid_full),
+        "minimum_valid_temperature_mdeg_c": min(valid_full),
+        "maximum_valid_temperature_mdeg_c": max(valid_full),
+    }
+
+
+def _temperature_evidence(
+    full_drain_values: Sequence[Any], cancel_first_value: Any
+) -> dict[str, Any]:
+    full_summary = _full_drain_temperature_summary(full_drain_values)
+    _validate_temperature_sample(cancel_first_value, role="cancel_first", ordinal=0)
+    cancel_omitted = cancel_first_value is None
+    return {
+        "verified": True,
+        "producer_semantics": TEMPERATURE_PRODUCER_POLICY,
+        "qualification_acceptance": TEMPERATURE_QUALIFICATION_POLICY,
+        "raw_invalid_sentinel": TEMPERATURE_INVALID_SENTINEL,
+        "parser_omission_representation": None,
+        "producer_range_mdeg_c": [
+            MINIMUM_TEMPERATURE_MDEG_C,
+            MAXIMUM_TEMPERATURE_MDEG_C,
+        ],
+        "newly_opened_stream_roles": ["full_drain", "cancel_first"],
+        "full_drain": full_summary,
+        "cancel_first": {
+            "frame_count": 1,
+            "ordinal": 0,
+            "producer_omitted": cancel_omitted,
+            "omitted_ordinals": [0] if cancel_omitted else [],
+            "valid_temperature_count": 0 if cancel_omitted else 1,
+            "temperature_mdeg_c": cancel_first_value,
+        },
+        "actual_omission_count": full_summary["leading_omission_count"]
+        + int(cancel_omitted),
+    }
+
+
+def _validate_hold_metadata(
+    metadata: TandemFrameMetadata, *, role: str, ordinal: int
+) -> None:
     if metadata.stream_id <= 0 or metadata.ownership_epoch <= 0:
         raise QualificationError(f"frame {ordinal} stream/epoch is not nonzero")
     if metadata.features != EXACT_METADATA_FEATURES:
@@ -1446,10 +2540,9 @@ def _validate_hold_metadata(metadata: TandemFrameMetadata, *, ordinal: int) -> N
         raise QualificationError(f"frame {ordinal} observation/provenance is invalid")
     if metadata.tandem_state is not TandemState.ARMED_HOLD:
         raise QualificationError(f"frame {ordinal} is not HOLD")
-    if type(metadata.ad9361_temperature_mdeg_c) is not int or not (
-        -100_000 <= metadata.ad9361_temperature_mdeg_c <= 200_000
-    ):
-        raise QualificationError(f"frame {ordinal} temperature evidence is invalid")
+    _validate_temperature_sample(
+        metadata.ad9361_temperature_mdeg_c, role=role, ordinal=ordinal
+    )
     if (
         metadata.gain_table_id is not EXPECTED_GAIN_TABLE
         or metadata.minimum_gain_db != EXPECTED_MINIMUM_GAIN_DB
@@ -1494,7 +2587,7 @@ def validate_full_drain_frames(
     if first.buffer_sequence != 0:
         raise QualificationError("full drain did not begin at buffer sequence zero")
     for ordinal, metadata in enumerate(frames):
-        _validate_hold_metadata(metadata, ordinal=ordinal)
+        _validate_hold_metadata(metadata, role="full_drain", ordinal=ordinal)
         if (
             metadata.stream_id != first.stream_id
             or metadata.ownership_epoch != first.ownership_epoch
@@ -1515,6 +2608,9 @@ def validate_full_drain_frames(
             raise QualificationError(
                 f"frame {ordinal} does not bind to owned HOLD status"
             )
+    _full_drain_temperature_summary(
+        [metadata.ad9361_temperature_mdeg_c for metadata in frames]
+    )
     return {
         "verified": True,
         "frame_count": len(frames),
@@ -1583,12 +2679,12 @@ def _full_drain(
             started = time.monotonic_ns()
             metadata_bytes = bytes(buffer.refill())
             completed = time.monotonic_ns()
+            if raw_metadata_sink is not None:
+                raw_metadata_sink.append(("full_drain", ordinal, metadata_bytes))
             iq = bytes(buffer.read())
             record, metadata = _frame_record(
                 ordinal, metadata_bytes, iq, completed - started
             )
-            if raw_metadata_sink is not None:
-                raw_metadata_sink.append(("full_drain", ordinal, metadata_bytes))
             records.append(record)
             frames.append(metadata)
         status_before_close = _require_hold(
@@ -1703,13 +2799,13 @@ def _cancel_lifecycle(
         started = time.monotonic_ns()
         metadata_bytes = bytes(old.refill())
         completed = time.monotonic_ns()
+        if raw_metadata_sink is not None:
+            raw_metadata_sink.append(("cancel_first", 0, metadata_bytes))
         iq = bytes(old.read())
         first_record, first_metadata = _frame_record(
             0, metadata_bytes, iq, completed - started
         )
-        if raw_metadata_sink is not None:
-            raw_metadata_sink.append(("cancel_first", 0, metadata_bytes))
-        _validate_hold_metadata(first_metadata, ordinal=0)
+        _validate_hold_metadata(first_metadata, role="cancel_first", ordinal=0)
         if first_metadata.buffer_sequence != 0:
             raise QualificationError(
                 "canceled session first frame is not sequence zero"
@@ -2439,6 +3535,8 @@ def _validate_output_preflight(value: Any) -> pathlib.Path:
         "temporary_existed_before_context",
         "raw_metadata_directory_existed_before_context",
         "symlink_components",
+        "output_parent_device",
+        "output_parent_inode",
     }:
         raise QualificationError("durable output preflight fields changed")
     if (
@@ -2459,17 +3557,45 @@ def _validate_output_preflight(value: Any) -> pathlib.Path:
     )
     if (
         not report_path.is_absolute()
-        or report_path.suffix != ".json"
+        or report_path.name != REPORT_FILENAME
         or temporary != report_path.with_suffix(report_path.suffix + ".tmp")
         or artifact_directory != report_path.parent / RAW_METADATA_DIRECTORY
     ):
         raise QualificationError("durable output paths changed")
+    parent_device = _required_int(
+        record.get("output_parent_device"),
+        name="output parent device",
+        minimum=0,
+        maximum=MAXIMUM_UNSIGNED_64,
+    )
+    parent_inode = _required_int(
+        record.get("output_parent_inode"),
+        name="output parent inode",
+        minimum=1,
+        maximum=MAXIMUM_UNSIGNED_64,
+    )
     try:
         _require_nonsymlink_path(report_path, include_leaf=True)
         _require_nonsymlink_path(temporary, include_leaf=True)
         _require_nonsymlink_path(artifact_directory, include_leaf=True)
         if temporary.exists():
             raise QualificationError("durable output temporary path remains")
+        if any(
+            path.name.startswith(
+                (RAW_METADATA_STAGING_PREFIX, RAW_METADATA_ABORTED_PREFIX)
+            )
+            for path in report_path.parent.iterdir()
+        ):
+            raise QualificationError("durable output has metadata staging residue")
+        observed_parent = report_path.parent.lstat()
+        if (
+            (observed_parent.st_dev, observed_parent.st_ino)
+            != (parent_device, parent_inode)
+            or not stat.S_ISDIR(observed_parent.st_mode)
+            or observed_parent.st_uid != os.getuid()
+            or stat.S_IMODE(observed_parent.st_mode) != 0o700
+        ):
+            raise QualificationError("durable output parent identity changed")
     except QualificationError:
         raise
     except (OSError, ValueError) as error:
@@ -2589,8 +3715,68 @@ def _validate_hold_observation_wire(
 
 
 def _validate_metadata_artifacts(
-    report: Mapping[str, Any], *, report_path: pathlib.Path
+    report: Mapping[str, Any],
+    *,
+    report_path: pathlib.Path,
+    directory_descriptor: int | None = None,
+    expected_directory_identity: tuple[int, int] | None = None,
 ) -> None:
+    artifact_directory = report_path.parent / RAW_METADATA_DIRECTORY
+    if directory_descriptor is None:
+        _require_nonsymlink_path(artifact_directory, include_leaf=True)
+        try:
+            opened_descriptor = os.open(
+                artifact_directory,
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0),
+            )
+        except OSError as error:
+            raise QualificationError(
+                "durable metadata directory cannot be opened safely"
+            ) from error
+        validation_error: BaseException | None = None
+        try:
+            opened = os.fstat(opened_descriptor)
+            named = artifact_directory.lstat()
+            identity = (opened.st_dev, opened.st_ino)
+            if (
+                (named.st_dev, named.st_ino) != identity
+                or not stat.S_ISDIR(opened.st_mode)
+                or opened.st_uid != os.getuid()
+                or stat.S_IMODE(opened.st_mode) != 0o700
+            ):
+                raise QualificationError(
+                    "durable metadata directory identity changed before validation"
+                )
+            _validate_metadata_artifacts(
+                report,
+                report_path=report_path,
+                directory_descriptor=opened_descriptor,
+                expected_directory_identity=identity,
+            )
+            after = os.fstat(opened_descriptor)
+            renamed = artifact_directory.lstat()
+            if (after.st_dev, after.st_ino) != identity or (
+                renamed.st_dev,
+                renamed.st_ino,
+            ) != identity:
+                raise QualificationError(
+                    "durable metadata directory changed during validation"
+                )
+        except BaseException as error:
+            validation_error = error
+            raise
+        finally:
+            try:
+                os.close(opened_descriptor)
+            except OSError as error:
+                if validation_error is None:
+                    raise QualificationError(
+                        "durable metadata directory descriptor did not close"
+                    ) from error
+        return
+
     manifest = _required_mapping(
         report.get("metadata_artifacts"), name="metadata artifacts"
     )
@@ -2629,16 +3815,19 @@ def _validate_metadata_artifacts(
     entries = _required_list(manifest.get("entries"), name="metadata entries")
     if len(entries) != RAW_METADATA_FILE_COUNT:
         raise QualificationError("durable metadata artifact inventory is incomplete")
-    expected_identities = [
-        *(("full_drain", index) for index in range(BATCH_FRAMES)),
-        ("cancel_first", 0),
-    ]
-    artifact_directory = report_path.parent / RAW_METADATA_DIRECTORY
+    expected_identities = _expected_metadata_identities()
     try:
+        directory = os.fstat(directory_descriptor)
+        observed_names = set(os.listdir(directory_descriptor))
         inventory_valid = (
-            artifact_directory.is_dir()
-            and not artifact_directory.is_symlink()
-            and {path.name for path in artifact_directory.iterdir()}
+            stat.S_ISDIR(directory.st_mode)
+            and directory.st_uid == os.getuid()
+            and stat.S_IMODE(directory.st_mode) == 0o700
+            and (
+                expected_directory_identity is None
+                or (directory.st_dev, directory.st_ino) == expected_directory_identity
+            )
+            and observed_names
             == {
                 _metadata_relative_path(role, ordinal).name
                 for role, ordinal in expected_identities
@@ -2714,6 +3903,8 @@ def _validate_metadata_artifacts(
             path,
             expected_bytes=RAW_METADATA_BYTES,
             name=f"durable metadata {role}/{ordinal}",
+            required_mode=0o600,
+            parent_descriptor=directory_descriptor,
         )
         digest = hashlib.sha256(payload).hexdigest()
         if digest != entry.get("sha256"):
@@ -2791,12 +3982,15 @@ def _validate_frame_json(
     value: Any,
     *,
     name: str,
+    role: str,
     ordinal: int,
     status: Mapping[str, Any],
     expected_stream_id: int | None,
     expected_first_sample: int | None,
 ) -> tuple[int, int, int, int]:
     record = _required_mapping(value, name=name)
+    if set(record) != FRAME_EVIDENCE_FIELDS:
+        raise QualificationError(f"durable {name} frame evidence fields changed")
     exact = {
         "ordinal": ordinal,
         "buffer_sequence": ordinal,
@@ -2836,11 +4030,8 @@ def _validate_frame_json(
         raise QualificationError(f"durable {name} feature mask changed")
     if flags != EXACT_HOLD_METADATA_FLAGS or flags & TANDEM_UNSAFE_FLAGS:
         raise QualificationError(f"durable {name} validity/unsafe flags changed")
-    _required_int(
-        record.get("ad9361_temperature_mdeg_c"),
-        name=f"{name} AD9361 temperature",
-        minimum=-100_000,
-        maximum=200_000,
+    _validate_temperature_sample(
+        record.get("ad9361_temperature_mdeg_c"), role=role, ordinal=ordinal
     )
     stream_id = _required_int(record.get("stream_id"), name=f"{name} stream", minimum=1)
     epoch = _required_int(
@@ -2917,6 +4108,8 @@ def validate_durable_pass_report(value: Any) -> None:
         "completed_unix_ns",
         "host_libiio",
         "runner_provenance",
+        "expected_device_firmware_lineage",
+        "device_firmware_provenance",
         "configuration",
         "output_preflight",
         "preflight",
@@ -2925,6 +4118,7 @@ def validate_durable_pass_report(value: Any) -> None:
         "full_drain",
         "post_full_drain_barrier",
         "cancel_lifecycle",
+        "temperature_evidence",
         "metadata_artifacts",
         "final_tandem_status",
         "final_rx_state",
@@ -3054,8 +4248,8 @@ def validate_durable_pass_report(value: Any) -> None:
         report.get("runner_provenance"), name="runner provenance"
     )
     if set(provenance) != {
-        "firmware_repo_commit",
-        "firmware_repository",
+        "host_runner_repository_commit",
+        "host_runner_repository",
         "python_module_path",
         "python_module_sha256",
         "python_module_head_blob_sha256",
@@ -3068,7 +4262,10 @@ def validate_durable_pass_report(value: Any) -> None:
     }:
         raise QualificationError("durable runner provenance fields changed")
     if (
-        re.fullmatch(r"[0-9a-f]{40}", str(provenance.get("firmware_repo_commit", "")))
+        re.fullmatch(
+            r"[0-9a-f]{40}",
+            str(provenance.get("host_runner_repository_commit", "")),
+        )
         is None
     ):
         raise QualificationError("durable runner commit is invalid")
@@ -3090,7 +4287,7 @@ def validate_durable_pass_report(value: Any) -> None:
     module_path = pathlib.Path(str(provenance.get("python_module_path", "")))
     shell_path = pathlib.Path(str(provenance.get("shell_runner_path", "")))
     metadata_abi_path = pathlib.Path(str(provenance.get("metadata_abi_path", "")))
-    repository = pathlib.Path(str(provenance.get("firmware_repository", "")))
+    repository = pathlib.Path(str(provenance.get("host_runner_repository", "")))
     expected_repository = pathlib.Path(__file__).resolve().parents[2]
     if (
         not repository.is_absolute()
@@ -3105,7 +4302,7 @@ def validate_durable_pass_report(value: Any) -> None:
         or metadata_abi_path != module_path.parent / "metadata_abi.py"
     ):
         raise QualificationError("durable runner source paths are not absolute")
-    commit = str(provenance.get("firmware_repo_commit", ""))
+    commit = str(provenance.get("host_runner_repository_commit", ""))
     if _git_bytes(repository, "cat-file", "-t", commit).decode().strip() != "commit":
         raise QualificationError("durable runner provenance is not a commit object")
     if _git_bytes(repository, "rev-parse", "HEAD").decode().strip() != commit:
@@ -3137,6 +4334,28 @@ def validate_durable_pass_report(value: Any) -> None:
         if _sha256_file(repository / relative) != provenance.get(observed_name):
             raise QualificationError(f"durable runner live file changed: {relative}")
 
+    device_lineage = _required_mapping(
+        report.get("expected_device_firmware_lineage"),
+        name="expected device firmware lineage",
+    )
+    receipt_path = pathlib.Path(str(device_lineage.get("ram_boot_receipt_path", "")))
+    expected_device_lineage = _attest_device_firmware_lineage(
+        receipt_path, repository=repository
+    )
+    if not _json_identical(dict(device_lineage), expected_device_lineage):
+        raise QualificationError("durable device firmware lineage changed")
+    device_firmware = _required_mapping(
+        report.get("device_firmware_provenance"), name="device firmware provenance"
+    )
+    expected_device_firmware = _observed_device_firmware_provenance(
+        expected_device_lineage,
+        preflight=_required_mapping(report.get("preflight"), name="preflight"),
+    )
+    if not _json_identical(dict(device_firmware), expected_device_firmware):
+        raise QualificationError(
+            "durable device firmware provenance does not bind live identity"
+        )
+
     report_path = _validate_output_preflight(report.get("output_preflight"))
 
     configuration = _required_mapping(report.get("configuration"), name="configuration")
@@ -3151,6 +4370,16 @@ def validate_durable_pass_report(value: Any) -> None:
             "bandwidths, then RX manual 40"
         ),
         "iq_evidence_policy": IQ_EVIDENCE_POLICY,
+        "temperature_policy": TEMPERATURE_POLICY,
+        "temperature_producer_policy": TEMPERATURE_PRODUCER_POLICY,
+        "temperature_qualification_policy": TEMPERATURE_QUALIFICATION_POLICY,
+        "temperature_producer_range_mdeg_c": [
+            MINIMUM_TEMPERATURE_MDEG_C,
+            MAXIMUM_TEMPERATURE_MDEG_C,
+        ],
+        "temperature_invalid_sentinel": TEMPERATURE_INVALID_SENTINEL,
+        "temperature_policy_predecessor": _temperature_policy_predecessor(),
+        "failure_artifact_policy": FAILURE_ARTIFACT_POLICY,
         "center_frequency_hz": CENTER_FREQUENCY_HZ,
         "sample_rate_hz": SAMPLE_RATE_HZ,
         "rf_bandwidth_hz": RF_BANDWIDTH_HZ,
@@ -3366,6 +4595,7 @@ def validate_durable_pass_report(value: Any) -> None:
             _validate_frame_json(
                 frame,
                 name=f"full frame {ordinal}",
+                role="full_drain",
                 ordinal=ordinal,
                 status=status_open,
                 expected_stream_id=stream_id,
@@ -3484,6 +4714,7 @@ def validate_durable_pass_report(value: Any) -> None:
         _validate_frame_json(
             cancel.get("first_returned_cached_frame"),
             name="cancel first cached frame",
+            role="cancel_first",
             ordinal=0,
             status=old_status,
             expected_stream_id=None,
@@ -3494,6 +4725,16 @@ def validate_durable_pass_report(value: Any) -> None:
     if cancel_stream_id == stream_id or cancel_first_sample < full_sample_end:
         raise QualificationError(
             "durable cancel session does not follow the completed full-drain stream"
+        )
+    expected_temperature_evidence = _temperature_evidence(
+        [frame["ad9361_temperature_mdeg_c"] for frame in frames],
+        cancel["first_returned_cached_frame"]["ad9361_temperature_mdeg_c"],
+    )
+    if not _json_identical(
+        report.get("temperature_evidence"), expected_temperature_evidence
+    ):
+        raise QualificationError(
+            "durable temperature evidence is not derived from all 65 frames"
         )
     _validate_errno_record(
         cancel.get("second_open_error"), errno.EBUSY, name="second open"
@@ -3642,13 +4883,17 @@ def validate_durable_pass_report(value: Any) -> None:
 
 
 def _reread_exact_report(
-    path: pathlib.Path, expected: Mapping[str, Any]
+    path: pathlib.Path,
+    expected: Mapping[str, Any],
+    *,
+    parent_descriptor: int | None = None,
 ) -> dict[str, Any]:
     expected_payload = _json_payload(expected)
     observed_payload = _read_exact_owned_regular_file(
         path,
         expected_bytes=len(expected_payload),
         name="atomic durable report",
+        parent_descriptor=parent_descriptor,
     )
     if observed_payload != expected_payload:
         raise QualificationError("atomic report bytes differ from in-memory evidence")
@@ -3670,6 +4915,10 @@ def _close_resources_and_persist(
     lock_acquired: bool,
     cleanup_errors: list[dict[str, Any]],
     primary_error: BaseException | None,
+    raw_metadata: Sequence[tuple[str, int, bytes]] = (),
+    output_parent_descriptor: int | None = None,
+    output_parent_identity: tuple[int, int] | None = None,
+    owned_report_identity: tuple[int, int] | None = None,
 ) -> tuple[dict[str, Any], BaseException | None]:
     """Close the context, persist while locked, then unlock unconditionally."""
 
@@ -3698,43 +4947,156 @@ def _close_resources_and_persist(
         if primary_error is None:
             primary_error = cleanup_failure
             report["error"] = _error_record(cleanup_failure)
-    if report.get("verdict") == "PASS":
-        try:
-            validate_durable_pass_report(report)
-        except BaseException as error:
-            report["verdict"] = "FAIL"
-            report["error"] = _error_record(error)
-            if primary_error is None:
-                primary_error = error
-
     durable_report = report
     persistence_error: BaseException | None = None
-    owned_report_identity: tuple[int, int] | None = None
+    artifact_ownership: Mapping[str, Any] | None = None
     lock_error_count_before = len(cleanup_errors)
     try:
         try:
-            owned_report_identity = _atomic_json(output_path, report)
-            durable_report = _reread_exact_report(output_path, report)
+            if report.get("verdict") == "PASS":
+                if (
+                    owned_report_identity is None
+                    or output_parent_descriptor is None
+                    or output_parent_identity is None
+                ):
+                    raise QualificationError(
+                        "PASS assembly lacks an owned report namespace"
+                    )
+                _verify_claimed_output_namespace(
+                    output_path,
+                    report_identity=owned_report_identity,
+                    parent_descriptor=output_parent_descriptor,
+                    parent_identity=output_parent_identity,
+                )
+                metadata_manifest = _new_metadata_artifact_manifest(raw_metadata)
+                artifact_ownership = _write_metadata_artifacts(
+                    output_path,
+                    raw_metadata,
+                    metadata_manifest,
+                    expected_report_identity=owned_report_identity,
+                    output_parent_descriptor=output_parent_descriptor,
+                    expected_output_parent_identity=output_parent_identity,
+                )
+                report["metadata_artifacts"] = metadata_manifest
+                _validate_metadata_artifacts(
+                    report,
+                    report_path=output_path,
+                    directory_descriptor=artifact_ownership["directory_descriptor"],
+                    expected_directory_identity=artifact_ownership[
+                        "directory_identity"
+                    ],
+                )
+                _promote_metadata_artifact_directory(
+                    output_path,
+                    artifact_ownership,
+                    expected_report_identity=owned_report_identity,
+                )
+                _validate_metadata_artifacts(report, report_path=output_path)
+                if not _entry_matches_owned_identity(
+                    output_parent_descriptor,
+                    output_path,
+                    owned_report_identity,
+                ):
+                    raise QualificationError(
+                        "owned assembling report changed before PASS validation"
+                    )
+                validate_durable_pass_report(report)
+                owned_report_identity = _atomic_json(
+                    output_path,
+                    report,
+                    replace_existing=True,
+                    expected_existing_identity=owned_report_identity,
+                    parent_descriptor=output_parent_descriptor,
+                    expected_parent_identity=output_parent_identity,
+                )
+            else:
+                report.pop("metadata_artifacts", None)
+                if owned_report_identity is None:
+                    owned_report_identity = _atomic_json(
+                        output_path,
+                        report,
+                        parent_descriptor=output_parent_descriptor,
+                        expected_parent_identity=output_parent_identity,
+                    )
+                else:
+                    owned_report_identity = _atomic_json(
+                        output_path,
+                        report,
+                        replace_existing=True,
+                        expected_existing_identity=owned_report_identity,
+                        parent_descriptor=output_parent_descriptor,
+                        expected_parent_identity=output_parent_identity,
+                    )
+            durable_report = _reread_exact_report(
+                output_path,
+                report,
+                parent_descriptor=output_parent_descriptor,
+            )
+            if report.get("verdict") == "PASS":
+                assert output_parent_descriptor is not None
+                assert output_parent_identity is not None
+                assert owned_report_identity is not None
+                _verify_claimed_output_namespace(
+                    output_path,
+                    report_identity=owned_report_identity,
+                    parent_descriptor=output_parent_descriptor,
+                    parent_identity=output_parent_identity,
+                    require_raw_absent=False,
+                )
+                assert artifact_ownership is not None
+                _verify_metadata_artifact_ownership(
+                    output_path,
+                    artifact_ownership,
+                    expected_report_identity=owned_report_identity,
+                )
+                _close_metadata_artifact_ownership(
+                    artifact_ownership, require_success=True
+                )
+                if not _directory_entry_matches_owned_identity(
+                    output_parent_descriptor,
+                    output_path.parent / RAW_METADATA_DIRECTORY,
+                    artifact_ownership.get("directory_identity"),
+                ):
+                    raise QualificationError(
+                        "completed raw metadata directory changed before unlock"
+                    )
         except BaseException as error:
-            if isinstance(error, _AtomicPromotionError):
+            if (
+                isinstance(error, _AtomicPromotionError)
+                and owned_report_identity is None
+            ):
                 owned_report_identity = error.target_identity
+            _rollback_owned_metadata_artifacts(output_path, artifact_ownership)
+            artifact_ownership = None
+            report.pop("metadata_artifacts", None)
             persistence_error = error
             report["verdict"] = "FAIL"
             report["error"] = _error_record(error)
             if primary_error is None:
                 primary_error = error
-            if _path_matches_owned_identity(output_path, owned_report_identity):
+            if _entry_matches_owned_identity(
+                output_parent_descriptor,
+                output_path,
+                owned_report_identity,
+            ):
                 try:
                     owned_report_identity = _atomic_json(
                         output_path,
                         report,
                         replace_existing=True,
                         expected_existing_identity=owned_report_identity,
+                        parent_descriptor=output_parent_descriptor,
+                        expected_parent_identity=output_parent_identity,
                     )
-                    durable_report = _reread_exact_report(output_path, report)
+                    durable_report = _reread_exact_report(
+                        output_path,
+                        report,
+                        parent_descriptor=output_parent_descriptor,
+                    )
                     persistence_error = None
                 except BaseException as demotion_error:
                     persistence_error = demotion_error
+        _close_metadata_artifact_ownership(artifact_ownership)
     finally:
         if lock is not None:
             if lock_acquired:
@@ -3747,6 +5109,9 @@ def _close_resources_and_persist(
             except BaseException as error:
                 cleanup_errors.append(_error_record(error))
     if len(cleanup_errors) != lock_error_count_before:
+        _rollback_owned_metadata_artifacts(output_path, artifact_ownership)
+        artifact_ownership = None
+        report.pop("metadata_artifacts", None)
         cleanup_record["errors"] = cleanup_errors
         cleanup_record["verified"] = False
         report["verdict"] = "FAIL"
@@ -3756,18 +5121,55 @@ def _close_resources_and_persist(
         report["error"] = _error_record(cleanup_failure)
         if primary_error is None:
             primary_error = cleanup_failure
-        if _path_matches_owned_identity(output_path, owned_report_identity):
+        if _entry_matches_owned_identity(
+            output_parent_descriptor,
+            output_path,
+            owned_report_identity,
+        ):
             try:
                 owned_report_identity = _atomic_json(
                     output_path,
                     report,
                     replace_existing=True,
                     expected_existing_identity=owned_report_identity,
+                    parent_descriptor=output_parent_descriptor,
+                    expected_parent_identity=output_parent_identity,
                 )
-                durable_report = _reread_exact_report(output_path, report)
+                durable_report = _reread_exact_report(
+                    output_path,
+                    report,
+                    parent_descriptor=output_parent_descriptor,
+                )
                 persistence_error = None
             except BaseException as error:
                 persistence_error = error
+    if output_parent_descriptor is not None:
+        parent_close_error: BaseException | None = None
+        try:
+            os.close(output_parent_descriptor)
+        except BaseException as error:
+            parent_close_error = error
+        if parent_close_error is not None:
+            if isinstance(artifact_ownership, dict):
+                artifact_ownership["output_parent_descriptor"] = None
+            _rollback_owned_metadata_artifacts(output_path, artifact_ownership)
+            artifact_ownership = None
+            report.pop("metadata_artifacts", None)
+            report["verdict"] = "FAIL"
+            report["error"] = _error_record(parent_close_error)
+            if primary_error is None:
+                primary_error = parent_close_error
+            if _path_matches_owned_identity(output_path, owned_report_identity):
+                try:
+                    owned_report_identity = _atomic_json(
+                        output_path,
+                        report,
+                        replace_existing=True,
+                        expected_existing_identity=owned_report_identity,
+                    )
+                    durable_report = _reread_exact_report(output_path, report)
+                except BaseException as error:
+                    persistence_error = error
     if persistence_error is not None and primary_error is None:
         primary_error = persistence_error
     return durable_report, primary_error
@@ -3779,6 +5181,7 @@ def _close_without_persisting_unowned_output(
     lock: Any,
     lock_acquired: bool,
     cleanup_errors: list[dict[str, Any]],
+    output_parent_descriptor: int | None = None,
 ) -> None:
     """Release resources after a pre-ownership failure without touching evidence."""
 
@@ -3795,6 +5198,11 @@ def _close_without_persisting_unowned_output(
                 cleanup_errors.append(_error_record(error))
         try:
             lock.close()
+        except BaseException as error:
+            cleanup_errors.append(_error_record(error))
+    if output_parent_descriptor is not None:
+        try:
+            os.close(output_parent_descriptor)
         except BaseException as error:
             cleanup_errors.append(_error_record(error))
     gc.collect()
@@ -3882,8 +5290,13 @@ def run_hardware(
     serial: str,
     firmware_pattern: str,
     output_path: pathlib.Path,
+    ram_boot_receipt_path: pathlib.Path,
 ) -> dict[str, Any]:
     output_path = output_path.absolute()
+    if output_path.name != REPORT_FILENAME:
+        raise QualificationError(
+            f"v3 output filename must be exact {REPORT_FILENAME!r}"
+        )
     output_preflight = _prepare_fresh_output_path(output_path)
     if serial != DEFAULT_R18_SERIAL or firmware_pattern != EXPECTED_FIRMWARE_PATTERN:
         raise QualificationError("lifecycle runner is frozen to exact R18/RC3")
@@ -3897,6 +5310,11 @@ def run_hardware(
     if re.fullmatch(r"[0-9a-f]{64}", runner_library_sha) is None:
         raise QualificationError("runner did not attest the mapped libiio SHA-256")
     host_libiio = _attest_host_libiio(iio_module)
+    runner_provenance = _attest_runner_provenance()
+    expected_device_lineage = _attest_device_firmware_lineage(
+        ram_boot_receipt_path,
+        repository=pathlib.Path(runner_provenance["host_runner_repository"]),
+    )
     report: dict[str, Any] = {
         "schema": SCHEMA,
         "verdict": "running",
@@ -3905,7 +5323,8 @@ def run_hardware(
         "hardware_qualified": False,
         "started_unix_ns": time.time_ns(),
         "host_libiio": host_libiio,
-        "runner_provenance": _attest_runner_provenance(),
+        "runner_provenance": runner_provenance,
+        "expected_device_firmware_lineage": expected_device_lineage,
         "output_preflight": output_preflight,
         "configuration": {
             "serial": serial,
@@ -3918,6 +5337,16 @@ def run_hardware(
                 "and bandwidths, then RX manual 40"
             ),
             "iq_evidence_policy": IQ_EVIDENCE_POLICY,
+            "temperature_policy": TEMPERATURE_POLICY,
+            "temperature_producer_policy": TEMPERATURE_PRODUCER_POLICY,
+            "temperature_qualification_policy": TEMPERATURE_QUALIFICATION_POLICY,
+            "temperature_producer_range_mdeg_c": [
+                MINIMUM_TEMPERATURE_MDEG_C,
+                MAXIMUM_TEMPERATURE_MDEG_C,
+            ],
+            "temperature_invalid_sentinel": TEMPERATURE_INVALID_SENTINEL,
+            "temperature_policy_predecessor": _temperature_policy_predecessor(),
+            "failure_artifact_policy": FAILURE_ARTIFACT_POLICY,
             "center_frequency_hz": CENTER_FREQUENCY_HZ,
             "sample_rate_hz": SAMPLE_RATE_HZ,
             "rf_bandwidth_hz": RF_BANDWIDTH_HZ,
@@ -3941,6 +5370,9 @@ def run_hardware(
     identity_verified = False
     safe_preflight_completed = False
     evidence_path_claimed = False
+    output_parent_descriptor: int | None = None
+    output_parent_identity: tuple[int, int] | None = None
+    owned_report_identity: tuple[int, int] | None = None
     raw_metadata: list[tuple[str, int, bytes]] = []
     try:
         lock = _open_lock(serial)
@@ -3955,6 +5387,21 @@ def run_hardware(
         locked_output_preflight = _prepare_fresh_output_path(output_path)
         if not _json_identical(locked_output_preflight, output_preflight):
             raise QualificationError("fresh output identity changed after R18 lock")
+        output_parent_descriptor, output_parent_identity = _open_owned_output_parent(
+            output_path
+        )
+        owned_report_identity = _atomic_json(
+            output_path,
+            _assembling_report_claim(report),
+            parent_descriptor=output_parent_descriptor,
+            expected_parent_identity=output_parent_identity,
+        )
+        _verify_claimed_output_namespace(
+            output_path,
+            report_identity=owned_report_identity,
+            parent_descriptor=output_parent_descriptor,
+            parent_identity=output_parent_identity,
+        )
         evidence_path_claimed = True
         lock.seek(0)
         lock.truncate()
@@ -3986,6 +5433,9 @@ def run_hardware(
             firmware_pattern=firmware_pattern,
             identity=identity,
         )
+        report["device_firmware_provenance"] = _observed_device_firmware_provenance(
+            expected_device_lineage, preflight=report["preflight"]
+        )
         safe_preflight_completed = True
         report["normalization"] = _normalize_before_hold(
             phy, tx, tandem, preflight=report["preflight"]
@@ -4004,12 +5454,15 @@ def run_hardware(
         report["cancel_lifecycle"] = _cancel_lifecycle(
             iio_module, rx, phy, tx, tandem, raw_metadata_sink=raw_metadata
         )
-        final_freshness = _prepare_fresh_output_path(output_path)
-        if not _json_identical(final_freshness, output_preflight):
-            raise QualificationError("fresh output identity changed before persistence")
-        metadata_manifest = _new_metadata_artifact_manifest(raw_metadata)
-        report["metadata_artifacts"] = metadata_manifest
-        _write_metadata_artifacts(output_path, raw_metadata, metadata_manifest)
+        report["temperature_evidence"] = _temperature_evidence(
+            [
+                frame["ad9361_temperature_mdeg_c"]
+                for frame in report["full_drain"]["frames"]
+            ],
+            report["cancel_lifecycle"]["first_returned_cached_frame"][
+                "ad9361_temperature_mdeg_c"
+            ],
+        )
         report["verdict"] = "PASS"
     except BaseException as error:
         primary_error = error
@@ -4041,14 +5494,21 @@ def run_hardware(
                 lock_acquired=lock_acquired,
                 cleanup_errors=cleanup_errors,
                 primary_error=primary_error,
+                raw_metadata=raw_metadata,
+                output_parent_descriptor=output_parent_descriptor,
+                output_parent_identity=output_parent_identity,
+                owned_report_identity=owned_report_identity,
             )
+            output_parent_descriptor = None
         else:
             _close_without_persisting_unowned_output(
                 context=context,
                 lock=lock,
                 lock_acquired=lock_acquired,
                 cleanup_errors=cleanup_errors,
+                output_parent_descriptor=output_parent_descriptor,
             )
+            output_parent_descriptor = None
             durable_report = report
         context = None
         lock = None
@@ -4064,6 +5524,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--serial", default=DEFAULT_R18_SERIAL)
     parser.add_argument("--firmware-pattern", required=True)
     parser.add_argument("--output", type=pathlib.Path, required=True)
+    parser.add_argument("--ram-boot-receipt", type=pathlib.Path, required=True)
     return parser
 
 
@@ -4079,6 +5540,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             serial=args.serial,
             firmware_pattern=args.firmware_pattern,
             output_path=args.output.absolute(),
+            ram_boot_receipt_path=args.ram_boot_receipt.absolute(),
         )
     except BaseException as error:
         print(f"FAIL: {type(error).__name__}: {error}", file=sys.stderr)

@@ -54,9 +54,11 @@ from .muted_metadata_batch_lifecycle import (
     validate_full_drain_frames,
 )
 
+_REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE = lifecycle._attest_device_firmware_lineage
+
 
 @pytest.fixture(autouse=True)
-def _attested_in_progress_runner_tree(monkeypatch):
+def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
     """Model the eventual committed blobs while this frozen patch is uncommitted."""
 
     repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
@@ -78,6 +80,40 @@ def _attested_in_progress_runner_tree(monkeypatch):
         return original(observed_repository, *arguments)
 
     monkeypatch.setattr(lifecycle, "_git_bytes", fake_git)
+
+    def fake_device_lineage(receipt_path, *, repository=None):
+        del repository
+        receipt_path = pathlib.Path(receipt_path).absolute()
+        image_path = tmp_path / "attested-rc3.dfu"
+        receipt = lifecycle._expected_ram_boot_receipt(
+            receipt_path=receipt_path, image_path=image_path
+        )
+        return {
+            "attestation": (
+                "exact private RAM receipt, DFU/FIT bytes, and protected firmware "
+                "source ancestry verified before radio context"
+            ),
+            "source_tag": lifecycle.DEVICE_FIRMWARE_SOURCE_TAG,
+            "source_commit": lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT,
+            "build_run_binding": (
+                "exact prior release-candidate audit declaration; the RAM receipt "
+                "does not encode the GitHub Actions run identity"
+            ),
+            "build_run_id": lifecycle.DEVICE_FIRMWARE_BUILD_RUN_ID,
+            "build_run_attempt": lifecycle.DEVICE_FIRMWARE_BUILD_RUN_ATTEMPT,
+            "dfu_sha256": lifecycle.DEVICE_FIRMWARE_DFU_SHA256,
+            "dfu_bytes": lifecycle.DEVICE_FIRMWARE_DFU_BYTES,
+            "fit_sha256": lifecycle.DEVICE_FIRMWARE_FIT_SHA256,
+            "fit_bytes": lifecycle.DEVICE_FIRMWARE_FIT_BYTES,
+            "ram_boot_receipt_path": str(receipt_path),
+            "ram_boot_receipt_bytes": lifecycle.DEVICE_RAM_BOOT_RECEIPT_BYTES,
+            "ram_boot_receipt_sha256": lifecycle.DEVICE_RAM_BOOT_RECEIPT_SHA256,
+            "ram_boot_receipt": receipt,
+        }
+
+    monkeypatch.setattr(
+        lifecycle, "_attest_device_firmware_lineage", fake_device_lineage
+    )
 
 
 def _hold_status(epoch=11):
@@ -765,7 +801,11 @@ def _metadata_wire(metadata):
         metadata.maximum_gain_index,
         metadata.rx1_gain_index,
         metadata.rx2_gain_index,
-        metadata.ad9361_temperature_mdeg_c,
+        (
+            lifecycle.TEMPERATURE_INVALID_SENTINEL
+            if metadata.ad9361_temperature_mdeg_c is None
+            else metadata.ad9361_temperature_mdeg_c
+        ),
         0,
         0,
         0,
@@ -802,6 +842,7 @@ class _IntegrationState:
         self.kernel_buffer_counts = []
         self.buffers = []
         self.flip_tx_on_close = set()
+        self.temperature_overrides = {}
 
     def set_status(self, status):
         for name, value in status.items():
@@ -868,6 +909,12 @@ class _IntegrationMetadataBuffer:
             buffer_sequence=self.refill_count,
             first_sample_sequence=(
                 self.first_sample + self.refill_count * FRAME_SAMPLES
+            ),
+            ad9361_temperature_mdeg_c=self.state.temperature_overrides.get(
+                (self.session_ordinal, self.refill_count),
+                None
+                if self.session_ordinal == 2 and self.refill_count == 0
+                else 35_000,
             ),
         )
         self.refill_count += 1
@@ -1032,6 +1079,59 @@ def test_continuity_oracle_requires_exactly_64_frames():
         )
 
 
+def test_full_drain_accepts_only_a_leading_temperature_omission_prefix():
+    frames = _frames()
+    for ordinal in range(3):
+        frames[ordinal] = replace(frames[ordinal], ad9361_temperature_mdeg_c=None)
+    result = validate_full_drain_frames(
+        frames,
+        status_after_open=_hold_status(),
+        status_before_close=_hold_status(),
+    )
+    assert result["verified"] is True
+
+
+def test_full_drain_rejects_all_invalid_sentinels():
+    frames = [replace(frame, ad9361_temperature_mdeg_c=None) for frame in _frames()]
+    with pytest.raises(QualificationError, match="no valid sample"):
+        validate_full_drain_frames(
+            frames,
+            status_after_open=_hold_status(),
+            status_before_close=_hold_status(),
+        )
+
+
+def test_full_drain_rejects_temperature_omission_after_first_valid():
+    frames = _frames()
+    frames[4] = replace(frames[4], ad9361_temperature_mdeg_c=None)
+    with pytest.raises(QualificationError, match="after the first valid"):
+        validate_full_drain_frames(
+            frames,
+            status_after_open=_hold_status(),
+            status_before_close=_hold_status(),
+        )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        True,
+        35_000.0,
+        lifecycle.MINIMUM_TEMPERATURE_MDEG_C - 1,
+        lifecycle.MAXIMUM_TEMPERATURE_MDEG_C + 1,
+    ],
+)
+def test_temperature_samples_reject_types_and_values_outside_producer_range(value):
+    with pytest.raises(QualificationError, match="exact integer"):
+        lifecycle._validate_temperature_sample(value, role="full_drain", ordinal=0)
+    with pytest.raises(QualificationError, match="cancel_first frame 0"):
+        lifecycle._validate_temperature_sample(value, role="cancel_first", ordinal=0)
+
+
+def test_cancel_first_accepts_exact_invalid_sentinel_representation():
+    lifecycle._validate_temperature_sample(None, role="cancel_first", ordinal=0)
+
+
 def _valid_report(tmp_path):
     frames = _frames()
     full_wires = [_metadata_wire(metadata) for metadata in frames]
@@ -1100,7 +1200,7 @@ def _valid_report(tmp_path):
     module_sha = blob_sha(module_relative)
     shell_sha = blob_sha(shell_relative)
     abi_sha = blob_sha(abi_relative)
-    output_path = tmp_path / "result.json"
+    output_path = tmp_path / lifecycle.REPORT_FILENAME
     output_preflight = lifecycle._prepare_fresh_output_path(output_path)
     captures = [
         *(("full_drain", index, payload) for index, payload in enumerate(full_wires)),
@@ -1117,6 +1217,32 @@ def _valid_report(tmp_path):
     (libiio_build / "CMakeCache.txt").write_text(
         f"CMAKE_HOME_DIRECTORY:INTERNAL={libiio_source}\n", encoding="utf-8"
     )
+    device_lineage = lifecycle._attest_device_firmware_lineage(
+        tmp_path / "ram-boot-receipt.json", repository=repository
+    )
+    preflight = {
+        "verdict": "GO",
+        "serial": serial,
+        "uri": "usb:3.17.5",
+        "firmware_version": firmware,
+        "context_attrs": {
+            "hw_serial": serial,
+            "fw_version": firmware,
+            "hw_model": EXPECTED_HARDWARE_MODEL,
+            "ad9361-phy,model": "ad9361",
+            "local,kernel": EXPECTED_KERNEL_VERSION,
+            "iio,buffer-metadata": "2",
+            "uri": "usb:3.17.5",
+        },
+        "mute": _mute(),
+        "rx_state": _boot_rx(),
+        "rf_state": _rf(normalized=False),
+        "tandem_status": _idle_status(65),
+        "started_monotonic_ns": 900,
+        "completed_monotonic_ns": 1_000,
+        "configuration_write_count": 0,
+        "metadata_buffer_open_count": 0,
+    }
     return {
         "schema": lifecycle.SCHEMA,
         "verdict": "PASS",
@@ -1137,8 +1263,8 @@ def _valid_report(tmp_path):
             "pylibiio_file": str(libiio_source / "bindings/python/iio.py"),
         },
         "runner_provenance": {
-            "firmware_repo_commit": commit,
-            "firmware_repository": str(repository),
+            "host_runner_repository_commit": commit,
+            "host_runner_repository": str(repository),
             "python_module_path": str(repository / module_relative),
             "python_module_sha256": module_sha,
             "python_module_head_blob_sha256": module_sha,
@@ -1149,6 +1275,12 @@ def _valid_report(tmp_path):
             "metadata_abi_sha256": abi_sha,
             "metadata_abi_head_blob_sha256": abi_sha,
         },
+        "expected_device_firmware_lineage": device_lineage,
+        "device_firmware_provenance": (
+            lifecycle._observed_device_firmware_provenance(
+                device_lineage, preflight=preflight
+            )
+        ),
         "output_preflight": output_preflight,
         "configuration": {
             "serial": serial,
@@ -1161,6 +1293,20 @@ def _valid_report(tmp_path):
                 "and bandwidths, then RX manual 40"
             ),
             "iq_evidence_policy": lifecycle.IQ_EVIDENCE_POLICY,
+            "temperature_policy": lifecycle.TEMPERATURE_POLICY,
+            "temperature_producer_policy": lifecycle.TEMPERATURE_PRODUCER_POLICY,
+            "temperature_qualification_policy": (
+                lifecycle.TEMPERATURE_QUALIFICATION_POLICY
+            ),
+            "temperature_producer_range_mdeg_c": [
+                lifecycle.MINIMUM_TEMPERATURE_MDEG_C,
+                lifecycle.MAXIMUM_TEMPERATURE_MDEG_C,
+            ],
+            "temperature_invalid_sentinel": lifecycle.TEMPERATURE_INVALID_SENTINEL,
+            "temperature_policy_predecessor": (
+                lifecycle._temperature_policy_predecessor()
+            ),
+            "failure_artifact_policy": lifecycle.FAILURE_ARTIFACT_POLICY,
             "center_frequency_hz": CENTER_FREQUENCY_HZ,
             "sample_rate_hz": SAMPLE_RATE_HZ,
             "rf_bandwidth_hz": RF_BANDWIDTH_HZ,
@@ -1174,29 +1320,7 @@ def _valid_report(tmp_path):
             "metadata_capacity_bytes": 64 * 1024,
             "expected_batch_cache_bytes": EXPECTED_BATCH_CACHE_BYTES,
         },
-        "preflight": {
-            "verdict": "GO",
-            "serial": serial,
-            "uri": "usb:3.17.5",
-            "firmware_version": firmware,
-            "context_attrs": {
-                "hw_serial": serial,
-                "fw_version": firmware,
-                "hw_model": EXPECTED_HARDWARE_MODEL,
-                "ad9361-phy,model": "ad9361",
-                "local,kernel": EXPECTED_KERNEL_VERSION,
-                "iio,buffer-metadata": "2",
-                "uri": "usb:3.17.5",
-            },
-            "mute": _mute(),
-            "rx_state": _boot_rx(),
-            "rf_state": _rf(normalized=False),
-            "tandem_status": _idle_status(65),
-            "started_monotonic_ns": 900,
-            "completed_monotonic_ns": 1_000,
-            "configuration_write_count": 0,
-            "metadata_buffer_open_count": 0,
-        },
+        "preflight": preflight,
         "normalization": _normalization(),
         "rx_scan": _scan_evidence(),
         "full_drain": {
@@ -1283,6 +1407,10 @@ def _valid_report(tmp_path):
             "status_after_fresh_close": final_status,
             "fresh_buffer_close_completed_monotonic_ns": 1_800,
         },
+        "temperature_evidence": lifecycle._temperature_evidence(
+            [frame.ad9361_temperature_mdeg_c for frame in frames],
+            cancel_metadata.ad9361_temperature_mdeg_c,
+        ),
         "metadata_artifacts": metadata_artifacts,
         "final_tandem_status": final_status,
         "final_rx_state": _rx(),
@@ -1304,8 +1432,23 @@ def test_durable_report_validator_accepts_frame_derived_pass(tmp_path):
         (("release_pass_eligible",), 0),
         (("hardware_qualified",), True),
         (("hardware_qualified",), 0),
+        (("expected_device_firmware_lineage", "source_tag"), "wrong-tag"),
+        (("expected_device_firmware_lineage", "source_commit"), "0" * 40),
+        (("expected_device_firmware_lineage", "build_run_id"), True),
+        (("expected_device_firmware_lineage", "build_run_attempt"), 1.0),
+        (("expected_device_firmware_lineage", "dfu_sha256"), "0" * 64),
+        (("expected_device_firmware_lineage", "fit_sha256"), "0" * 64),
+        (("expected_device_firmware_lineage", "fit_bytes"), 12_783_050),
+        (("expected_device_firmware_lineage", "ram_boot_receipt_sha256"), "0" * 64),
         (("configuration", "serial"), "another-radio"),
         (("configuration", "iq_evidence_policy"), "IQ independently retained"),
+        (("configuration", "temperature_policy"), "accept arbitrary nulls"),
+        (("configuration", "temperature_invalid_sentinel"), 0),
+        (("configuration", "failure_artifact_policy"), "promote partial failures"),
+        (
+            ("configuration", "temperature_policy_predecessor", "failed_report_sha256"),
+            "0" * 64,
+        ),
         (("configuration", "center_frequency_hz"), 914_999_999),
         (("preflight", "context_attrs", "local,kernel"), "5.15.0-wrong"),
         (("preflight", "configuration_write_count"), True),
@@ -1325,6 +1468,17 @@ def test_durable_report_validator_accepts_frame_derived_pass(tmp_path):
         (("runner_provenance", "shell_runner_sha256"), "0" * 64),
         (("runner_provenance", "metadata_abi_sha256"), "0" * 64),
         (("runner_provenance", "metadata_abi_path"), "/tmp/metadata_abi.py"),
+        (("temperature_evidence", "verified"), 1),
+        (("temperature_evidence", "producer_semantics"), "startup only"),
+        (("temperature_evidence", "qualification_acceptance"), "any omission"),
+        (("temperature_evidence", "raw_invalid_sentinel"), 0),
+        (
+            ("temperature_evidence", "full_drain", "first_valid_ordinal"),
+            1,
+        ),
+        (("temperature_evidence", "full_drain", "leading_omission_count"), 1),
+        (("temperature_evidence", "cancel_first", "producer_omitted"), True),
+        (("temperature_evidence", "actual_omission_count"), 1),
         (("rx_scan", "enabled_channel_ids"), ["voltage0", "voltage1"]),
         (("rx_scan", "enabled_scan_mask"), 0x03),
         (("rx_scan", "enabled_scan_mask"), 15.0),
@@ -1454,6 +1608,33 @@ def test_fresh_output_rejects_ancestor_and_leaf_symlinks(tmp_path):
         lifecycle._prepare_fresh_output_path(leaf)
 
 
+def test_durable_validator_rejects_nonprivate_raw_metadata_directory(tmp_path):
+    report = _valid_report(tmp_path)
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    artifact_directory = report_path.parent / lifecycle.RAW_METADATA_DIRECTORY
+    artifact_directory.chmod(0o755)
+    with pytest.raises(QualificationError, match="directory"):
+        validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize(
+    "prefix",
+    [lifecycle.RAW_METADATA_STAGING_PREFIX, lifecycle.RAW_METADATA_ABORTED_PREFIX],
+)
+def test_reserved_metadata_transaction_residue_is_rejected(tmp_path, prefix):
+    fresh_parent = tmp_path / "fresh"
+    fresh_parent.mkdir(mode=0o700)
+    (fresh_parent / f"{prefix}planted").mkdir(mode=0o700)
+    with pytest.raises(QualificationError, match="preflight"):
+        lifecycle._prepare_fresh_output_path(fresh_parent / lifecycle.REPORT_FILENAME)
+
+    report = _valid_report(tmp_path / "durable")
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    (report_path.parent / f"{prefix}planted").mkdir(mode=0o700)
+    with pytest.raises(QualificationError, match="staging residue"):
+        validate_durable_pass_report(report)
+
+
 def test_overlong_durable_output_component_is_a_domain_failure(tmp_path):
     report = _valid_report(tmp_path)
     report_path = pathlib.Path("/") / ("x" * 300) / "result.json"
@@ -1547,6 +1728,38 @@ def _refresh_first_metadata_artifact(report, payload):
     )
 
 
+def _replace_full_metadata_artifact(report, ordinal, metadata):
+    payload = _metadata_wire(metadata)
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    entry = report["metadata_artifacts"]["entries"][ordinal]
+    path = report_path.parent / entry["relative_path"]
+    path.write_bytes(payload)
+    digest = hashlib.sha256(payload).hexdigest()
+    entry["sha256"] = digest
+    report["full_drain"]["frames"][ordinal] = _frame_evidence(
+        ordinal,
+        metadata,
+        duration_ns=ordinal + 1,
+        returned_iq_sha256_in_process="a" * 64,
+        metadata_sha256=digest,
+    )
+    report["metadata_artifacts"]["manifest_sha256"] = (
+        lifecycle._metadata_manifest_digest(report["metadata_artifacts"]["entries"])
+    )
+
+
+def _refresh_temperature_evidence(report):
+    report["temperature_evidence"] = lifecycle._temperature_evidence(
+        [
+            frame["ad9361_temperature_mdeg_c"]
+            for frame in report["full_drain"]["frames"]
+        ],
+        report["cancel_lifecycle"]["first_returned_cached_frame"][
+            "ad9361_temperature_mdeg_c"
+        ],
+    )
+
+
 def _replace_cancel_metadata_artifact(report, metadata):
     payload = _metadata_wire(metadata)
     report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
@@ -1565,6 +1778,124 @@ def _replace_cancel_metadata_artifact(report, metadata):
     report["metadata_artifacts"]["manifest_sha256"] = (
         lifecycle._metadata_manifest_digest(report["metadata_artifacts"]["entries"])
     )
+
+
+def test_durable_report_accepts_multi_frame_leading_temperature_sentinels(tmp_path):
+    report = _valid_report(tmp_path)
+    base_frames = _frames()
+    for ordinal in range(3):
+        _replace_full_metadata_artifact(
+            report,
+            ordinal,
+            replace(base_frames[ordinal], ad9361_temperature_mdeg_c=None),
+        )
+    _refresh_temperature_evidence(report)
+    validate_durable_pass_report(report)
+    evidence = report["temperature_evidence"]["full_drain"]
+    assert evidence["leading_omission_count"] == 3
+    assert evidence["first_valid_ordinal"] == 3
+    assert evidence["omitted_ordinals"] == [0, 1, 2]
+
+
+def test_durable_report_accepts_and_reparses_cancel_first_sentinel(tmp_path):
+    report = _valid_report(tmp_path)
+    cancel = replace(
+        _frames()[0],
+        stream_id=8,
+        ownership_epoch=12,
+        first_sample_sequence=9_000_000,
+        ad9361_temperature_mdeg_c=None,
+    )
+    _replace_cancel_metadata_artifact(report, cancel)
+    _refresh_temperature_evidence(report)
+    validate_durable_pass_report(report)
+    entry = report["metadata_artifacts"]["entries"][-1]
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    parsed = lifecycle.parse_tandem_frame_metadata(
+        (report_path.parent / entry["relative_path"]).read_bytes()
+    )
+    assert parsed.ad9361_temperature_mdeg_c is None
+    assert report["temperature_evidence"]["cancel_first"] == {
+        "frame_count": 1,
+        "ordinal": 0,
+        "producer_omitted": True,
+        "omitted_ordinals": [0],
+        "valid_temperature_count": 0,
+        "temperature_mdeg_c": None,
+    }
+    assert report["release_pass_eligible"] is False
+    assert report["hardware_qualified"] is False
+    assert report["schema"] == lifecycle.SCHEMA
+
+
+def test_durable_report_rejects_all_full_drain_temperature_sentinels(tmp_path):
+    report = _valid_report(tmp_path)
+    for ordinal, frame in enumerate(_frames()):
+        _replace_full_metadata_artifact(
+            report,
+            ordinal,
+            replace(frame, ad9361_temperature_mdeg_c=None),
+        )
+    with pytest.raises(QualificationError, match="no valid sample"):
+        validate_durable_pass_report(report)
+
+
+def test_durable_report_rejects_temperature_sentinel_after_valid_sample(tmp_path):
+    report = _valid_report(tmp_path)
+    _replace_full_metadata_artifact(
+        report,
+        7,
+        replace(_frames()[7], ad9361_temperature_mdeg_c=None),
+    )
+    with pytest.raises(QualificationError, match="after the first valid"):
+        validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        lifecycle.MINIMUM_TEMPERATURE_MDEG_C - 1,
+        lifecycle.MAXIMUM_TEMPERATURE_MDEG_C + 1,
+    ],
+)
+def test_durable_report_rejects_cancel_temperature_outside_producer_range(
+    tmp_path, value
+):
+    report = _valid_report(tmp_path)
+    cancel = replace(
+        _frames()[0],
+        stream_id=8,
+        ownership_epoch=12,
+        first_sample_sequence=9_000_000,
+        ad9361_temperature_mdeg_c=value,
+    )
+    _replace_cancel_metadata_artifact(report, cancel)
+    with pytest.raises(QualificationError, match="cancel_first frame 0"):
+        validate_durable_pass_report(report)
+
+
+def test_v3_validator_rejects_v2_schema_and_temperature_authority_promotion(tmp_path):
+    report = _valid_report(tmp_path)
+    report["schema"] = lifecycle.PREDECESSOR_SCHEMA
+    with pytest.raises(QualificationError, match="schema"):
+        validate_durable_pass_report(report)
+    report["schema"] = lifecycle.SCHEMA
+    report["release_pass_eligible"] = True
+    with pytest.raises(QualificationError, match="release authority"):
+        validate_durable_pass_report(report)
+
+
+@pytest.mark.parametrize("role", ["full_drain", "cancel_first"])
+def test_missing_temperature_field_is_a_clean_schema_rejection(tmp_path, role):
+    report = _valid_report(tmp_path)
+    frame = (
+        report["full_drain"]["frames"][0]
+        if role == "full_drain"
+        else report["cancel_lifecycle"]["first_returned_cached_frame"]
+    )
+    del frame["ad9361_temperature_mdeg_c"]
+    with pytest.raises(QualificationError, match="frame evidence fields"):
+        validate_durable_pass_report(report)
 
 
 @pytest.mark.parametrize(
@@ -1629,8 +1960,8 @@ def test_synchronized_raw_metadata_mutation_is_rejected(tmp_path, plant):
     elif plant == "bad_crc":
         payload[200] ^= 1
     elif plant == "invalid_temperature":
-        struct.pack_into("<i", payload, 164, -(1 << 31))
-        report["full_drain"]["frames"][0]["ad9361_temperature_mdeg_c"] = None
+        struct.pack_into("<i", payload, 164, 150_000)
+        report["full_drain"]["frames"][0]["ad9361_temperature_mdeg_c"] = 150_000
     else:
         struct.pack_into("<H", payload, 6, RAW_METADATA_BYTES - 1)
     if plant != "bad_crc":
@@ -1698,13 +2029,18 @@ def test_first_report_promotion_never_clobbers_raced_target(tmp_path, monkeypatc
     lock_path = tmp_path / "radio.lock"
     lock = lock_path.open("a+", encoding="utf-8")
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    original_link = lifecycle.os.link
+    original_open = lifecycle.os.open
 
-    def plant_target_before_link(source, target, **kwargs):
-        pathlib.Path(target).write_bytes(b"external winner")
-        return original_link(source, target, **kwargs)
+    planted = False
 
-    monkeypatch.setattr(lifecycle.os, "link", plant_target_before_link)
+    def plant_target_before_open(path, flags, *args, **kwargs):
+        nonlocal planted
+        if pathlib.Path(path) == output and flags & lifecycle.os.O_EXCL and not planted:
+            planted = True
+            output.write_bytes(b"external winner")
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(lifecycle.os, "open", plant_target_before_open)
     durable, error = _close_resources_and_persist(
         {
             "schema": lifecycle.SCHEMA,
@@ -1728,57 +2064,101 @@ def test_first_report_promotion_never_clobbers_raced_target(tmp_path, monkeypatc
         fcntl.flock(reopened, fcntl.LOCK_UN)
 
 
-def test_linked_report_is_removed_when_temporary_unlink_fails(tmp_path, monkeypatch):
+def test_owned_report_rewrite_never_clobbers_swapped_path(tmp_path, monkeypatch):
     output = tmp_path / "result.json"
-    temporary = output.with_suffix(".json.tmp")
-    lock_path = tmp_path / "radio.lock"
-    lock = lock_path.open("a+", encoding="utf-8")
-    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-    original_unlink = pathlib.Path.unlink
+    identity = _atomic_json(output, {"verdict": "assembling"})
+    original_ftruncate = lifecycle.os.ftruncate
+    swapped = False
 
-    def fail_temporary_unlink(path, *args, **kwargs):
-        if path == temporary:
-            raise OSError(errno.EIO, "planted persistent temporary unlink failure")
-        return original_unlink(path, *args, **kwargs)
+    def swap_before_owned_write(descriptor, length):
+        nonlocal swapped
+        if not swapped:
+            swapped = True
+            output.unlink()
+            output.write_bytes(b"external swapped report")
+        return original_ftruncate(descriptor, length)
 
-    monkeypatch.setattr(pathlib.Path, "unlink", fail_temporary_unlink)
-    monkeypatch.setattr(lifecycle, "validate_durable_pass_report", lambda _report: None)
-    durable, error = _close_resources_and_persist(
-        {
-            "schema": lifecycle.SCHEMA,
-            "verdict": "PASS",
-            "started_unix_ns": 1,
-            "cleanup": _mute(),
-        },
-        output_path=output,
-        context=None,
-        lock=lock,
-        lock_acquired=True,
-        cleanup_errors=[],
-        primary_error=None,
-    )
-    assert durable["verdict"] == "FAIL"
-    assert isinstance(error, lifecycle._AtomicPromotionError)
-    assert not output.exists()
-    assert temporary.exists()
-    with lock_path.open("a+", encoding="utf-8") as reopened:
-        fcntl.flock(reopened, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        fcntl.flock(reopened, fcntl.LOCK_UN)
+    monkeypatch.setattr(lifecycle.os, "ftruncate", swap_before_owned_write)
+    with pytest.raises(lifecycle._AtomicPromotionError, match="replaced"):
+        _atomic_json(
+            output,
+            {"verdict": "FAIL"},
+            replace_existing=True,
+            expected_existing_identity=identity,
+        )
+    assert output.read_bytes() == b"external swapped report"
 
 
 def test_metadata_promotion_never_clobbers_raced_target(tmp_path, monkeypatch):
     target = tmp_path / "frame.metadata.bin"
-    original_link = lifecycle.os.link
+    original_open = lifecycle.os.open
+    planted = False
 
-    def plant_target_before_link(source, destination, **kwargs):
-        pathlib.Path(destination).write_bytes(b"external sidecar")
-        return original_link(source, destination, **kwargs)
+    def plant_target_before_open(path, flags, *args, **kwargs):
+        nonlocal planted
+        if pathlib.Path(path) == target and flags & lifecycle.os.O_EXCL and not planted:
+            planted = True
+            target.write_bytes(b"external sidecar")
+        return original_open(path, flags, *args, **kwargs)
 
-    monkeypatch.setattr(lifecycle.os, "link", plant_target_before_link)
-    with pytest.raises(QualificationError, match="without overwrite"):
+    monkeypatch.setattr(lifecycle.os, "open", plant_target_before_open)
+    with pytest.raises(QualificationError, match="not fresh"):
         lifecycle._atomic_bytes(target, b"owned payload")
     assert target.read_bytes() == b"external sidecar"
     assert not target.with_suffix(".bin.tmp").exists()
+
+
+def test_artifact_directory_claim_fsync_failure_leaves_no_raw_namespace(
+    tmp_path, monkeypatch
+):
+    output = tmp_path / lifecycle.REPORT_FILENAME
+    lifecycle._prepare_fresh_output_path(output)
+    frames = _frames()
+    captures = [
+        *(
+            ("full_drain", ordinal, _metadata_wire(frame))
+            for ordinal, frame in enumerate(frames)
+        ),
+        (
+            "cancel_first",
+            0,
+            _metadata_wire(
+                replace(
+                    frames[0],
+                    stream_id=8,
+                    ownership_epoch=12,
+                    first_sample_sequence=9_000_000,
+                )
+            ),
+        ),
+    ]
+    manifest = lifecycle._new_metadata_artifact_manifest(captures)
+    original_fsync = lifecycle.os.fsync
+    planted = False
+
+    def fail_first_fsync(descriptor):
+        nonlocal planted
+        if not planted:
+            planted = True
+            raise OSError(errno.EIO, "planted claim fsync failure")
+        return original_fsync(descriptor)
+
+    monkeypatch.setattr(lifecycle.os, "fsync", fail_first_fsync)
+    with pytest.raises(lifecycle._ArtifactDirectoryClaimError):
+        lifecycle._write_metadata_artifacts(output, captures, manifest)
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    residues = [
+        path
+        for path in output.parent.iterdir()
+        if path.name.startswith(lifecycle.RAW_METADATA_ABORTED_PREFIX)
+    ]
+    assert len(residues) == 1
+    assert list(residues[0].iterdir()) == []
+    assert lifecycle.stat.S_IMODE(residues[0].stat().st_mode) == 0o700
+    assert not any(
+        path.name.startswith(lifecycle.RAW_METADATA_STAGING_PREFIX)
+        for path in output.parent.iterdir()
+    )
 
 
 def test_mapped_library_sha_is_computed_in_hardware_process(tmp_path, monkeypatch):
@@ -1837,15 +2217,170 @@ def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
     )
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
-    output = tmp_path / "private" / "report.json"
+    output = tmp_path / "private" / lifecycle.REPORT_FILENAME
     with pytest.raises(QualificationError, match="pylibiio"):
         lifecycle.run_hardware(
             fake_iio,
             serial=lifecycle.DEFAULT_R18_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
         )
     assert called == []
+
+
+def test_v3_runner_rejects_legacy_report_filename_before_context(tmp_path):
+    called = []
+    output = tmp_path / "muted-metadata-batch-lifecycle-v2.json"
+    fake_iio = SimpleNamespace(Context=lambda _uri: called.append(True))
+    with pytest.raises(QualificationError, match="v3 output filename"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    assert called == []
+    assert not output.exists()
+    assert not output.parent.joinpath(lifecycle.RAW_METADATA_DIRECTORY).exists()
+
+
+def _hermetic_device_lineage_files(tmp_path, monkeypatch):
+    image_path = tmp_path / "attested-rc3.dfu"
+    image_payload = b"F" * 96 + b"D" * 16
+    image_path.write_bytes(image_payload)
+    monkeypatch.setattr(lifecycle, "DEVICE_FIRMWARE_DFU_BYTES", len(image_payload))
+    monkeypatch.setattr(
+        lifecycle,
+        "DEVICE_FIRMWARE_DFU_SHA256",
+        hashlib.sha256(image_payload).hexdigest(),
+    )
+    monkeypatch.setattr(lifecycle, "DEVICE_FIRMWARE_FIT_BYTES", len(image_payload) - 16)
+    monkeypatch.setattr(
+        lifecycle,
+        "DEVICE_FIRMWARE_FIT_SHA256",
+        hashlib.sha256(image_payload[:-16]).hexdigest(),
+    )
+    receipt_path = tmp_path / "ram-boot-receipt.json"
+    receipt = lifecycle._expected_ram_boot_receipt(
+        receipt_path=receipt_path, image_path=image_path
+    )
+    receipt_payload = json.dumps(
+        receipt, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode()
+    receipt_path.write_bytes(receipt_payload)
+    receipt_path.chmod(0o600)
+    monkeypatch.setattr(
+        lifecycle, "DEVICE_RAM_BOOT_RECEIPT_BYTES", len(receipt_payload)
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "DEVICE_RAM_BOOT_RECEIPT_SHA256",
+        hashlib.sha256(receipt_payload).hexdigest(),
+    )
+    return receipt_path, image_path
+
+
+def test_device_lineage_recomputes_receipt_image_tag_and_ancestry(
+    tmp_path, monkeypatch
+):
+    receipt_path, image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
+    repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
+    result = _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(receipt_path, repository=repository)
+    assert result["source_tag"] == lifecycle.DEVICE_FIRMWARE_SOURCE_TAG
+    assert result["source_commit"] == lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT
+    assert result["ram_boot_receipt_path"] == str(receipt_path)
+    assert result["ram_boot_receipt"]["plan"]["image_path"] == str(image_path)
+
+
+def test_device_lineage_rejects_missing_receipt(tmp_path):
+    with pytest.raises(QualificationError, match="receipt.*opened"):
+        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
+            tmp_path / "missing-receipt.json",
+            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
+        )
+
+
+@pytest.mark.parametrize("plant", ["receipt-bytes", "receipt-semantics", "image"])
+def test_device_lineage_rejects_receipt_or_image_substitution(
+    tmp_path, monkeypatch, plant
+):
+    receipt_path, image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
+    if plant == "receipt-bytes":
+        receipt_path.write_bytes(receipt_path.read_bytes() + b"x")
+    elif plant == "receipt-semantics":
+        receipt = json.loads(receipt_path.read_bytes())
+        receipt["outcome"] = "failure"
+        payload = json.dumps(
+            receipt, sort_keys=True, separators=(",", ":"), allow_nan=False
+        ).encode()
+        receipt_path.write_bytes(payload)
+        monkeypatch.setattr(lifecycle, "DEVICE_RAM_BOOT_RECEIPT_BYTES", len(payload))
+        monkeypatch.setattr(
+            lifecycle,
+            "DEVICE_RAM_BOOT_RECEIPT_SHA256",
+            hashlib.sha256(payload).hexdigest(),
+        )
+    else:
+        image_path.write_bytes(image_path.read_bytes() + b"x")
+    with pytest.raises(QualificationError, match="receipt|DFU|semantics"):
+        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
+            receipt_path,
+            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
+        )
+
+
+def test_device_lineage_rejects_moved_source_tag(tmp_path, monkeypatch):
+    receipt_path, _image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
+    original_git = lifecycle._git_bytes
+
+    def moved_tag(repository, *arguments):
+        if arguments == (
+            "rev-parse",
+            f"refs/tags/{lifecycle.DEVICE_FIRMWARE_SOURCE_TAG}^{{commit}}",
+        ):
+            return ("0" * 40 + "\n").encode()
+        return original_git(repository, *arguments)
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", moved_tag)
+    with pytest.raises(QualificationError, match="source tag moved"):
+        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
+            receipt_path,
+            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
+        )
+
+
+def test_device_lineage_requires_source_ancestor_of_host_runner(tmp_path, monkeypatch):
+    receipt_path, _image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
+    original_git = lifecycle._git_bytes
+    observed = []
+
+    def nonancestor(repository, *arguments):
+        if arguments[:2] == ("merge-base", "--is-ancestor"):
+            observed.append(arguments)
+            raise QualificationError("planted non-ancestor source")
+        return original_git(repository, *arguments)
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", nonancestor)
+    with pytest.raises(QualificationError, match="non-ancestor"):
+        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
+            receipt_path,
+            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
+        )
+    assert observed == [
+        (
+            "merge-base",
+            "--is-ancestor",
+            lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT,
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+        )
+    ]
 
 
 def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monkeypatch):
@@ -1894,13 +2429,14 @@ def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monke
     monkeypatch.setattr(lifecycle, "_git_bytes", wrong_tag_git)
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", digest)
-    output = tmp_path / "private" / "report.json"
+    output = tmp_path / "private" / lifecycle.REPORT_FILENAME
     with pytest.raises(QualificationError, match="source graph"):
         lifecycle.run_hardware(
             fake_iio,
             serial=lifecycle.DEFAULT_R18_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
         )
     assert called == []
 
@@ -1925,6 +2461,35 @@ def _set_integration_runner_environment(monkeypatch):
         monkeypatch.setenv(f"PLUTOSDR_FW_RUNNER_{role}_HEAD_SHA256", digest)
         if role != "MODULE":
             monkeypatch.setenv(f"PLUTOSDR_FW_RUNNER_{role}_PATH", str(path))
+
+
+def test_tracked_dirty_runner_tree_fails_before_context_factory(tmp_path, monkeypatch):
+    _set_integration_runner_environment(monkeypatch)
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
+    monkeypatch.setattr(lifecycle, "_attest_host_libiio", lambda _module: {})
+    original_git = lifecycle._git_bytes
+
+    def dirty_runner_tree(repository, *arguments):
+        if arguments == ("status", "--porcelain", "--untracked-files=no"):
+            return b" M README.md\n"
+        return original_git(repository, *arguments)
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", dirty_runner_tree)
+    context_calls = []
+    fake_iio = SimpleNamespace(
+        Context=lambda _uri: context_calls.append(True), scan_contexts=dict
+    )
+    output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
+    with pytest.raises(QualificationError, match="tracked changes"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    assert context_calls == []
 
 
 def _integration_run_components(tmp_path, monkeypatch):
@@ -1970,7 +2535,7 @@ def _integration_run_components(tmp_path, monkeypatch):
     fake_iio = _IntegrationIio(context, source / "bindings/python/iio.py")
     lock_path = tmp_path / "radio.lock"
     monkeypatch.setattr(lifecycle, "_lock_path", lambda _serial: lock_path)
-    output = tmp_path / "evidence" / "lifecycle.json"
+    output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
     return fake_iio, context, state, output, lock_path
 
 
@@ -1984,6 +2549,7 @@ def test_run_hardware_fake_end_to_end_persists_closed_valid_pass(tmp_path, monke
         serial=lifecycle.DEFAULT_R18_SERIAL,
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
         output_path=output,
+        ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
     )
 
     assert report == json.loads(output.read_text(encoding="utf-8"))
@@ -1991,6 +2557,15 @@ def test_run_hardware_fake_end_to_end_persists_closed_valid_pass(tmp_path, monke
     assert report["verdict"] == "PASS"
     assert report["release_pass_eligible"] is False
     assert report["hardware_qualified"] is False
+    assert report["schema"] == lifecycle.SCHEMA
+    assert output.name == lifecycle.REPORT_FILENAME
+    assert (
+        report["cancel_lifecycle"]["first_returned_cached_frame"][
+            "ad9361_temperature_mdeg_c"
+        ]
+        is None
+    )
+    assert report["temperature_evidence"]["cancel_first"]["producer_omitted"] is True
     assert context.closed is True
     assert context.timeout_ms == 10_000
     assert state.active_buffer is None
@@ -1999,6 +2574,39 @@ def test_run_hardware_fake_end_to_end_persists_closed_valid_pass(tmp_path, monke
     assert state.kernel_buffer_counts == [8, 8]
     artifact_directory = output.parent / lifecycle.RAW_METADATA_DIRECTORY
     assert len(list(artifact_directory.iterdir())) == lifecycle.RAW_METADATA_FILE_COUNT
+    with lock_path.open("r+", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def test_cancel_temperature_failure_is_typed_non_authorizing_and_promotes_no_raw(
+    tmp_path, monkeypatch
+):
+    fake_iio, context, state, output, lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    state.temperature_overrides[(2, 0)] = lifecycle.MAXIMUM_TEMPERATURE_MDEG_C + 1
+
+    with pytest.raises(QualificationError, match="cancel_first frame 0"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+
+    report = json.loads(output.read_text(encoding="utf-8"))
+    assert report["schema"] == lifecycle.SCHEMA
+    assert report["verdict"] == "FAIL"
+    assert report["release_pass_eligible"] is False
+    assert report["hardware_qualified"] is False
+    assert "cancel_first frame 0" in report["error"]["message"]
+    assert "metadata_artifacts" not in report
+    assert "temperature_evidence" not in report
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    assert context.closed is True
+    assert state.active_buffer is None
     with lock_path.open("r+", encoding="utf-8") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         fcntl.flock(lock, fcntl.LOCK_UN)
@@ -2017,6 +2625,7 @@ def test_close_drift_is_remuted_before_rx_write_or_next_buffer_open(
         serial=lifecycle.DEFAULT_R18_SERIAL,
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
         output_path=output,
+        ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
     )
 
     assert report["verdict"] == "PASS"
@@ -2040,6 +2649,358 @@ def test_close_drift_is_remuted_before_rx_write_or_next_buffer_open(
     assert context.closed is True
 
 
+def test_second_sidecar_failure_rolls_back_pass_namespace(tmp_path, monkeypatch):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_atomic_bytes = lifecycle._atomic_bytes
+    calls = 0
+
+    def fail_second_sidecar(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError(errno.EIO, "planted second sidecar failure")
+        return original_atomic_bytes(*args, **kwargs)
+
+    monkeypatch.setattr(lifecycle, "_atomic_bytes", fail_second_sidecar)
+    monkeypatch.setattr(
+        lifecycle.os,
+        "unlink",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("rollback must not unlink raceable child names")
+        ),
+    )
+    with pytest.raises(OSError, match="second sidecar"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    report = json.loads(output.read_bytes())
+    assert report["verdict"] == "FAIL"
+    assert "metadata_artifacts" not in report
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    residues = [
+        path
+        for path in output.parent.iterdir()
+        if path.name.startswith(lifecycle.RAW_METADATA_ABORTED_PREFIX)
+    ]
+    assert len(residues) == 1
+    assert [path.name for path in residues[0].iterdir()] == [
+        "full-frame-0000.metadata.bin"
+    ]
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
+def test_staging_directory_swap_after_preopen_stat_is_rejected(tmp_path, monkeypatch):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_open = lifecycle.os.open
+    swapped = False
+    external_directory = None
+    moved_owned_directory = output.parent / "created-staging-moved"
+
+    def swap_staging_before_open(path, flags, *args, **kwargs):
+        nonlocal external_directory, swapped
+        if (
+            not swapped
+            and isinstance(path, str)
+            and path.startswith(lifecycle.RAW_METADATA_STAGING_PREFIX)
+            and flags & getattr(lifecycle.os, "O_DIRECTORY", 0)
+        ):
+            swapped = True
+            external_directory = output.parent / path
+            external_directory.rename(moved_owned_directory)
+            external_directory.mkdir(mode=0o700)
+        return original_open(path, flags, *args, **kwargs)
+
+    monkeypatch.setattr(lifecycle.os, "open", swap_staging_before_open)
+    with pytest.raises(QualificationError, match="staging claim"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    assert external_directory is not None
+    assert list(external_directory.iterdir()) == []
+    assert list(moved_owned_directory.iterdir()) == []
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    assert json.loads(output.read_bytes())["verdict"] == "FAIL"
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
+def test_final_metadata_directory_promotion_never_clobbers_raced_namespace(
+    tmp_path, monkeypatch
+):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_rename = lifecycle._rename_noreplace_at
+    planted = b"external canonical raw namespace"
+    raced = False
+
+    def race_canonical_before_promotion(old_fd, old_name, new_fd, new_name):
+        nonlocal raced
+        if (
+            not raced
+            and old_name.startswith(lifecycle.RAW_METADATA_STAGING_PREFIX)
+            and new_name == lifecycle.RAW_METADATA_DIRECTORY
+        ):
+            raced = True
+            canonical = output.parent / lifecycle.RAW_METADATA_DIRECTORY
+            canonical.mkdir(mode=0o700)
+            (canonical / "external.bin").write_bytes(planted)
+        return original_rename(old_fd, old_name, new_fd, new_name)
+
+    monkeypatch.setattr(
+        lifecycle, "_rename_noreplace_at", race_canonical_before_promotion
+    )
+    with pytest.raises(QualificationError, match="raced or reused"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    canonical = output.parent / lifecycle.RAW_METADATA_DIRECTORY
+    assert [path.name for path in canonical.iterdir()] == ["external.bin"]
+    assert (canonical / "external.bin").read_bytes() == planted
+    assert json.loads(output.read_bytes())["verdict"] == "FAIL"
+    residues = [
+        path
+        for path in output.parent.iterdir()
+        if path.name.startswith(lifecycle.RAW_METADATA_ABORTED_PREFIX)
+    ]
+    assert len(residues) == 1
+    assert len(list(residues[0].iterdir())) == lifecycle.RAW_METADATA_FILE_COUNT
+    assert not any(
+        path.name.startswith(lifecycle.RAW_METADATA_STAGING_PREFIX)
+        for path in output.parent.iterdir()
+    )
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
+def test_final_report_swap_preserves_external_and_rolls_back_sidecars(
+    tmp_path, monkeypatch
+):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_atomic_json = lifecycle._atomic_json
+    planted = b"external final-report winner"
+    swapped = False
+
+    def swap_before_final_rewrite(path, report, **kwargs):
+        nonlocal swapped
+        if (
+            not swapped
+            and report.get("verdict") == "PASS"
+            and kwargs.get("replace_existing") is True
+        ):
+            swapped = True
+            output.unlink()
+            output.write_bytes(planted)
+        return original_atomic_json(path, report, **kwargs)
+
+    monkeypatch.setattr(lifecycle, "_atomic_json", swap_before_final_rewrite)
+    with pytest.raises(QualificationError, match="rewrite changed|without replacing"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    assert output.read_bytes() == planted
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
+def test_late_completed_raw_directory_move_demotes_durable_pass(tmp_path, monkeypatch):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_verify = lifecycle._verify_claimed_output_namespace
+    moved = output.parent / "raw-metadata-moved-after-pass-reread"
+    planted = False
+
+    def move_raw_during_final_verify(*args, **kwargs):
+        nonlocal planted
+        if not planted and kwargs.get("require_raw_absent") is False:
+            planted = True
+            (output.parent / lifecycle.RAW_METADATA_DIRECTORY).rename(moved)
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(
+        lifecycle, "_verify_claimed_output_namespace", move_raw_during_final_verify
+    )
+    with pytest.raises(QualificationError, match="metadata artifact ownership"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    durable = json.loads(output.read_bytes())
+    assert durable["verdict"] == "FAIL"
+    assert "metadata_artifacts" not in durable
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    assert len(list(moved.iterdir())) == lifecycle.RAW_METADATA_FILE_COUNT
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
+@pytest.mark.parametrize("target", ["raw", "parent"])
+def test_evidence_directory_descriptor_close_failure_demotes_pass(
+    tmp_path, monkeypatch, target
+):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_close = lifecycle.os.close
+    planted = False
+
+    def fail_selected_directory_close(descriptor):
+        nonlocal planted
+        selected_path = (
+            output.parent / lifecycle.RAW_METADATA_DIRECTORY
+            if target == "raw"
+            else output.parent
+        )
+        try:
+            descriptor_stat = lifecycle.os.fstat(descriptor)
+            selected_stat = selected_path.stat(follow_symlinks=False)
+            selected = (descriptor_stat.st_dev, descriptor_stat.st_ino) == (
+                selected_stat.st_dev,
+                selected_stat.st_ino,
+            )
+        except OSError:
+            selected = False
+        if not planted and selected and output.exists():
+            planted = True
+            original_close(descriptor)
+            raise OSError(errno.EIO, f"planted {target} descriptor close failure")
+        return original_close(descriptor)
+
+    monkeypatch.setattr(lifecycle.os, "close", fail_selected_directory_close)
+    with pytest.raises((OSError, QualificationError), match="descriptor"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    durable = json.loads(output.read_bytes())
+    assert durable["verdict"] == "FAIL"
+    assert "metadata_artifacts" not in durable
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    residues = [
+        path
+        for path in output.parent.iterdir()
+        if path.name.startswith(lifecycle.RAW_METADATA_ABORTED_PREFIX)
+    ]
+    assert len(residues) == 1
+    assert len(list(residues[0].iterdir())) == lifecycle.RAW_METADATA_FILE_COUNT
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
+@pytest.mark.parametrize("plant", ["cleanup", "context-close"])
+def test_post_capture_failure_promotes_no_metadata_artifacts(
+    tmp_path, monkeypatch, plant
+):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    if plant == "cleanup":
+        original_cleanup = lifecycle._cleanup_live_state
+
+        def fail_cleanup(*args, **kwargs):
+            original_cleanup(*args, **kwargs)
+            kwargs["cleanup_errors"].append(
+                lifecycle._error_record(OSError(errno.EIO, "planted cleanup failure"))
+            )
+
+        monkeypatch.setattr(lifecycle, "_cleanup_live_state", fail_cleanup)
+    else:
+        original_close = lifecycle.close_iio_object
+
+        def fail_context_close(value):
+            if value is context:
+                context.close()
+                raise OSError(errno.EIO, "planted context close failure")
+            return original_close(value)
+
+        monkeypatch.setattr(lifecycle, "close_iio_object", fail_context_close)
+    with pytest.raises(QualificationError, match="cleanup"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    report = json.loads(output.read_bytes())
+    assert report["verdict"] == "FAIL"
+    assert "metadata_artifacts" not in report
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
+def test_output_parent_replacement_cannot_receive_report_or_sidecars(
+    tmp_path, monkeypatch
+):
+    fake_iio, context, state, output, _lock_path = _integration_run_components(
+        tmp_path, monkeypatch
+    )
+    original_verify = lifecycle._verify_claimed_output_namespace
+    calls = 0
+    original_parent = output.parent
+    moved_parent = output.parent.with_name(output.parent.name + "-moved")
+
+    def replace_parent_before_final_verify(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            original_parent.rename(moved_parent)
+            original_parent.mkdir(mode=0o700)
+        return original_verify(*args, **kwargs)
+
+    monkeypatch.setattr(
+        lifecycle,
+        "_verify_claimed_output_namespace",
+        replace_parent_before_final_verify,
+    )
+    with pytest.raises(QualificationError, match="parent pathname"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    assert not output.exists()
+    assert not (original_parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+    moved_report = moved_parent / lifecycle.REPORT_FILENAME
+    assert json.loads(moved_report.read_bytes())["verdict"] == "FAIL"
+    assert context.closed is True
+    assert state.active_buffer is None
+
+
 @pytest.mark.parametrize("plant", ["report", "sidecar"])
 def test_post_context_freshness_race_never_overwrites_evidence(
     tmp_path, monkeypatch, plant
@@ -2047,53 +3008,124 @@ def test_post_context_freshness_race_never_overwrites_evidence(
     fake_iio, context, state, output, _lock_path = _integration_run_components(
         tmp_path, monkeypatch
     )
-    original_preflight = lifecycle._prepare_fresh_output_path
-    calls = 0
+    original_writer = lifecycle._write_metadata_artifacts
     planted_path = output
     planted_bytes = b"external post-context evidence"
 
-    def plant_on_final_freshness(path):
-        nonlocal calls, planted_path
-        calls += 1
-        if calls == 3:
-            if plant == "sidecar":
-                directory = output.parent / lifecycle.RAW_METADATA_DIRECTORY
-                directory.mkdir()
-                planted_path = directory / "full-frame-0000.metadata.bin"
-            planted_path.write_bytes(planted_bytes)
-        return original_preflight(path)
+    def plant_before_first_sidecar(*args, **kwargs):
+        nonlocal planted_path
+        if plant == "report":
+            output.unlink()
+        else:
+            directory = output.parent / lifecycle.RAW_METADATA_DIRECTORY
+            directory.mkdir()
+            planted_path = directory / "full-frame-0000.metadata.bin"
+        planted_path.write_bytes(planted_bytes)
+        return original_writer(*args, **kwargs)
 
     monkeypatch.setattr(
-        lifecycle, "_prepare_fresh_output_path", plant_on_final_freshness
+        lifecycle, "_write_metadata_artifacts", plant_before_first_sidecar
     )
-    with pytest.raises(QualificationError, match="fresh"):
+    with pytest.raises(QualificationError, match="owned|raced|claim"):
         lifecycle.run_hardware(
             fake_iio,
             serial=lifecycle.DEFAULT_R18_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
         )
-    assert calls == 3
     assert planted_path.read_bytes() == planted_bytes
     assert context.closed is True
     assert state.active_buffer is None
     assert state.open_count == state.close_count == 3
     if plant == "sidecar":
         assert json.loads(output.read_text(encoding="utf-8"))["verdict"] == "FAIL"
+        assert list((output.parent / lifecycle.RAW_METADATA_DIRECTORY).iterdir()) == [
+            planted_path
+        ]
+    else:
+        assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
 
 
 def _stub_precontext_provenance(monkeypatch):
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
     monkeypatch.setattr(lifecycle, "_attest_host_libiio", lambda _module: {})
-    monkeypatch.setattr(lifecycle, "_attest_runner_provenance", dict)
+    monkeypatch.setattr(
+        lifecycle,
+        "_attest_runner_provenance",
+        lambda: {
+            "host_runner_repository": str(
+                pathlib.Path(lifecycle.__file__).resolve().parents[2]
+            )
+        },
+    )
+
+
+def test_report_namespace_is_claimed_before_context_factory(tmp_path, monkeypatch):
+    _stub_precontext_provenance(monkeypatch)
+    output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
+    lock_path = tmp_path / "radio.lock"
+    context_calls = []
+    fake_iio = SimpleNamespace(
+        Context=lambda _uri: context_calls.append(True), scan_contexts=dict
+    )
+    monkeypatch.setattr(lifecycle, "_open_lock", lambda _serial: lock_path.open("a+"))
+    original_atomic = lifecycle._atomic_json
+    planted = False
+
+    def race_report_claim(path, report, **kwargs):
+        nonlocal planted
+        if not planted:
+            planted = True
+            output.write_bytes(b"external winner")
+        return original_atomic(path, report, **kwargs)
+
+    monkeypatch.setattr(lifecycle, "_atomic_json", race_report_claim)
+    with pytest.raises(QualificationError, match="without replacing"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
+        )
+    assert output.read_bytes() == b"external winner"
+    assert context_calls == []
+    assert not (output.parent / lifecycle.RAW_METADATA_DIRECTORY).exists()
+
+
+def test_receipt_attestation_failure_precedes_context_factory(tmp_path, monkeypatch):
+    _stub_precontext_provenance(monkeypatch)
+    context_calls = []
+    fake_iio = SimpleNamespace(
+        Context=lambda _uri: context_calls.append(True), scan_contexts=dict
+    )
+    monkeypatch.setattr(
+        lifecycle,
+        "_attest_device_firmware_lineage",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            QualificationError("planted malformed RAM receipt")
+        ),
+    )
+    output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
+    with pytest.raises(QualificationError, match="malformed RAM receipt"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=lifecycle.DEFAULT_R18_SERIAL,
+            firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
+            output_path=output,
+            ram_boot_receipt_path=tmp_path / "missing-receipt.json",
+        )
+    assert context_calls == []
+    assert not output.exists()
 
 
 def test_post_lock_freshness_recheck_preserves_existing_winner_evidence(
     tmp_path, monkeypatch
 ):
     _stub_precontext_provenance(monkeypatch)
-    output = tmp_path / "evidence" / "lifecycle.json"
+    output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
     lock_path = tmp_path / "radio.lock"
     context_calls = []
     fake_iio = SimpleNamespace(
@@ -2112,6 +3144,7 @@ def test_post_lock_freshness_recheck_preserves_existing_winner_evidence(
             serial=lifecycle.DEFAULT_R18_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
+            ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
         )
     assert output.read_bytes() == b"immutable winner evidence"
     assert context_calls == []
@@ -2120,7 +3153,7 @@ def test_post_lock_freshness_recheck_preserves_existing_winner_evidence(
 
 def test_lock_loser_never_writes_requested_evidence(tmp_path, monkeypatch):
     _stub_precontext_provenance(monkeypatch)
-    output = tmp_path / "evidence" / "lifecycle.json"
+    output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
     lock_path = tmp_path / "radio.lock"
     lock_path.touch()
     winner_lock = lock_path.open("r+", encoding="utf-8")
@@ -2142,6 +3175,7 @@ def test_lock_loser_never_writes_requested_evidence(tmp_path, monkeypatch):
                 serial=lifecycle.DEFAULT_R18_SERIAL,
                 firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
                 output_path=output,
+                ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
             )
     finally:
         fcntl.flock(winner_lock, fcntl.LOCK_UN)
@@ -2174,6 +3208,8 @@ def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch
     def fake_git(_repository, *arguments):
         if arguments == ("rev-parse", "HEAD"):
             return f"{commit}\n".encode()
+        if arguments == ("status", "--porcelain", "--untracked-files=no"):
+            return b""
         if arguments[0] == "show":
             relative = arguments[1].split(":", 1)[1]
             return (repository / relative).read_bytes()
@@ -2217,6 +3253,8 @@ def test_runner_rejects_metadata_abi_mutation(tmp_path, monkeypatch):
     def fake_git(_repository, *arguments):
         if arguments == ("rev-parse", "HEAD"):
             return f"{commit}\n".encode()
+        if arguments == ("status", "--porcelain", "--untracked-files=no"):
+            return b""
         if arguments[0] == "show":
             relative = arguments[1].split(":", 1)[1]
             return (repository / relative).read_bytes()
@@ -2281,7 +3319,7 @@ def test_report_promotion_failure_still_closes_context_and_unlocks(
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     output = tmp_path / "durable.json"
 
-    def reject_promotion(_path, _report):
+    def reject_promotion(_path, _report, **_kwargs):
         raise OSError(errno.EIO, "planted report promotion failure")
 
     monkeypatch.setattr(lifecycle, "_atomic_json", reject_promotion)
