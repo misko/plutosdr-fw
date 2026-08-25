@@ -14,22 +14,34 @@ only ``Issue46Radio.close()`` performs and records verified final cleanup.
 
 from __future__ import annotations
 
+import ctypes
 import errno
 import hashlib
 import json
 import math
 import queue
 import statistics
+import sys
 import threading
 import time
 from builtins import BaseExceptionGroup
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field, is_dataclass, replace
+from dataclasses import fields as dataclass_fields
+from itertools import pairwise
 from pathlib import Path
 from typing import Any, Protocol
 
-from .experiment import EvidenceInvalid, FixtureSafetyError, Issue46Radio
+from .experiment import TX_MUTE_DB, EvidenceInvalid, FixtureSafetyError, Issue46Radio
 from .metadata_abi import (
+    FEATURE_AD9361_TEMPERATURE,
+    FEATURE_FPGA_GAIN_EVENTS,
+    FEATURE_HARDWARE_SAMPLE_COUNTER,
+    FEATURE_TANDEM_METADATA,
+    FLAG_HARDWARE_SAMPLE_COUNTER_VALID,
+    FLAG_SAMPLE_SEQUENCE_VALID,
+    FLAG_TANDEM_METADATA_VALID,
+    TANDEM_REQUEST,
     TANDEM_UNSAFE_FLAGS,
     TandemEventDirection,
     TandemFrameMetadata,
@@ -64,6 +76,59 @@ _TANDEM_CAPTURE_QUEUE_FRAMES = 4
 _TANDEM_CAPTURE_TAIL_FRAMES = _TANDEM_CAPTURE_QUEUE_FRAMES + 1
 _MAX_DEFERRED_CAPTURE_BYTES = 64 * 1024 * 1024
 _CAPTURE_THREAD_WAIT_SECONDS = 6.0
+
+# Release tandem is deliberately a different transport from every ordinary
+# comparison cell.  These constants describe the one previously qualified
+# libiio batch shape and are not user-tunable knobs.
+_TANDEM_FRAME_SAMPLES = 65_536
+_TANDEM_KERNEL_BUFFERS = 8
+_TANDEM_BATCH_FRAMES = 64
+_TANDEM_METADATA_CAPACITY_BYTES = 64 * 1024
+_TANDEM_INITIAL_GAIN_DB = 62
+_TANDEM_ATTACK_TARGET_FRAMES = 16
+_TANDEM_RELEASE_TARGET_FRAMES = 40
+_TANDEM_REQUIRED_PARTITION_FRAMES = 8
+_TANDEM_CONDITIONING_TAIL_SAMPLES = 8_192
+_TANDEM_WINDOW_SAMPLES = 1_024
+_TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES = 16_384
+_TANDEM_MAX_CAUSAL_UNCERTAINTY_SAMPLES = 16_384
+_TANDEM_TARGET_COARSE_GUARD_SAMPLES = 65_536
+_TANDEM_TARGET_FINE_SLEEP_SAMPLES = 4_096
+_TANDEM_TARGET_MAX_POLL_READS = 64
+_TANDEM_FRAME_IQ_BYTES = _TANDEM_FRAME_SAMPLES * 8
+_TANDEM_BATCH_CACHE_BYTES = _TANDEM_BATCH_FRAMES * (
+    _TANDEM_FRAME_IQ_BYTES
+    + _TANDEM_METADATA_CAPACITY_BYTES
+    + 2 * ctypes.sizeof(ctypes.c_size_t)
+)
+_TANDEM_MAXIMUM_PYTHON_RAW_BYTES = (
+    _TANDEM_BATCH_FRAMES * _TANDEM_FRAME_IQ_BYTES
+)
+_TANDEM_MAXIMUM_PYTHON_RAW_METADATA_BYTES = (
+    _TANDEM_BATCH_FRAMES * _TANDEM_METADATA_CAPACITY_BYTES
+)
+_TANDEM_PARSED_EVIDENCE_RESERVATION_BYTES = 8 * 1024 * 1024
+_TANDEM_POST_CLOSE_FFT_WORKSPACE_BYTES = 8 * 1024 * 1024
+_TANDEM_MAXIMUM_AGGREGATE_BYTES = 96 * 1024 * 1024
+_TANDEM_EVIDENCE_PROJECTION_SCHEMA = "plutosdr-fw.tandem-evidence-projection.v1"
+_TANDEM_EVIDENCE_PROJECTION_METHOD = (
+    "canonical-json-v1: finished tandem mode with attestation value fields "
+    "replaced by fixed sentinels plus 64 normalized reparsed metadata records"
+)
+_TANDEM_AGGREGATE_RESIDENT_BYTES = sum(
+    (
+        _TANDEM_BATCH_CACHE_BYTES,
+        _TANDEM_FRAME_IQ_BYTES,  # ordinary libiio C buffer
+        _TANDEM_MAXIMUM_PYTHON_RAW_BYTES,
+        _TANDEM_MAXIMUM_PYTHON_RAW_METADATA_BYTES,
+        _TANDEM_FRAME_IQ_BYTES,  # transient Buffer.read() bytearray
+        _TANDEM_METADATA_CAPACITY_BYTES,  # ctypes refill scratch
+        _TANDEM_METADATA_CAPACITY_BYTES,  # returned metadata bytes
+        _TANDEM_PARSED_EVIDENCE_RESERVATION_BYTES,
+        _TANDEM_KERNEL_BUFFERS * _TANDEM_FRAME_IQ_BYTES,  # K8 DMA reservation
+    )
+)
+assert _TANDEM_AGGREGATE_RESIDENT_BYTES <= _TANDEM_MAXIMUM_AGGREGATE_BYTES
 TRANSIENT_MODES = (
     MODE_MANUAL,
     *(native_mode_name(mode) for mode in AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES),
@@ -83,6 +148,18 @@ _GAP_CONTEXTS = {
 }
 _ORDINARY_TIMING_BASIS = "ordinary_returned_iq_ordinal_axis"
 _TANDEM_TIMING_BASIS = "hardware_sample_counter"
+_TANDEM_REQUIRED_METADATA_FLAGS = (
+    FLAG_SAMPLE_SEQUENCE_VALID
+    | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
+    | FLAG_TANDEM_METADATA_VALID
+)
+_TANDEM_REQUIRED_METADATA_FEATURES = (
+    FEATURE_AD9361_TEMPERATURE
+    | FEATURE_FPGA_GAIN_EVENTS
+    | FEATURE_HARDWARE_SAMPLE_COUNTER
+    | FEATURE_TANDEM_METADATA
+)
+_TANDEM_METADATA_HEADER_BYTES = 180 + 64 * 32 + 64 * 16 + 4
 
 
 class TransientRadioTransport(Protocol):
@@ -165,6 +242,7 @@ class _DeferredFrame:
     record: dict[str, Any]
     raw: bytes
     metadata: TandemFrameMetadata | None
+    raw_metadata: bytes | None = None
     iq_dir: Path | None = None
 
 
@@ -215,17 +293,40 @@ def transient_evidence_policy(
             ),
         },
         "tandem_acquisition": (
-            "one kernel buffer; one bounded acquisition-only thread continuously "
-            "refills and copies IQ while commands execute; FFT, hashing, and IQ "
-            "artifact writes begin only after buffer close"
+            "one continuous AUTO metadata session; one F65536/K8/batch64 refill "
+            "and 63 cached replays on a bounded acquisition-only thread; both "
+            "commands execute while the initiating refill is in flight; FFT, "
+            "hashing, and IQ artifact writes begin only after normal buffer close"
         ),
         "tandem_provider_gaps": (
             "reject every buffer/sample gap and every hidden transition; the "
             "provider does not retain exact events or signal response for omitted "
             "frames"
         ),
+        "tandem_provider_frame_samples": _TANDEM_FRAME_SAMPLES,
+        "tandem_kernel_buffers": _TANDEM_KERNEL_BUFFERS,
+        "tandem_batch_frames": _TANDEM_BATCH_FRAMES,
         "tandem_capture_queue_frames": _TANDEM_CAPTURE_QUEUE_FRAMES,
-        "tandem_response_tail_frames": _TANDEM_CAPTURE_TAIL_FRAMES,
+        "tandem_attack_target_frames_after_s0": _TANDEM_ATTACK_TARGET_FRAMES,
+        "tandem_release_target_frames_after_s0": _TANDEM_RELEASE_TARGET_FRAMES,
+        "tandem_maximum_target_overshoot_samples": (
+            _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES
+        ),
+        "tandem_maximum_a_to_c_uncertainty_samples": (
+            _TANDEM_MAX_CAUSAL_UNCERTAINTY_SAMPLES
+        ),
+        "tandem_required_partition_frames": _TANDEM_REQUIRED_PARTITION_FRAMES,
+        "tandem_conditioning_tail_samples": _TANDEM_CONDITIONING_TAIL_SAMPLES,
+        "tandem_analysis_window_samples": _TANDEM_WINDOW_SAMPLES,
+        "tandem_batch_cache_bytes": _TANDEM_BATCH_CACHE_BYTES,
+        "tandem_aggregate_resident_bytes": _TANDEM_AGGREGATE_RESIDENT_BYTES,
+        "tandem_success_close": (
+            "full 1+63 replay; normal close; no cancel"
+        ),
+        "tandem_post_close": (
+            "IDLE/fault0/overflow0/FIFO0/unowned; retain pre-close diagnostics "
+            "without exact retired-tail claim"
+        ),
         "maximum_deferred_capture_bytes": _MAX_DEFERRED_CAPTURE_BYTES,
         "configured_worst_case_deferred_capture_bytes": (
             _maximum_deferred_capture_bytes(capture)
@@ -269,6 +370,11 @@ def validate_transient_options(
         raise ValueError("transient frame_samples must be at least 1024")
     if capture.frame_samples > quality.samples_per_channel:
         raise ValueError("transient frames cannot exceed the authorized quality frame")
+    if quality.samples_per_channel < _TANDEM_FRAME_SAMPLES:
+        raise ValueError(
+            "transient release quality authorization must cover the frozen "
+            f"{_TANDEM_FRAME_SAMPLES}-sample tandem provider frame"
+        )
     if capture.window_samples < 64 or capture.frame_samples % capture.window_samples:
         raise ValueError(
             "transient windows must divide each frame and contain at least 64 samples"
@@ -404,12 +510,38 @@ def _wait_for_idle(
     timeout_seconds: float = 2.0,
 ) -> dict[str, int]:
     deadline = monotonic() + timeout_seconds
+    names = (
+        "state",
+        "fault_flags",
+        "overflow_count",
+        "fifo_level",
+        "ownership_epoch",
+        "transition_count",
+        "rx1_gain_index",
+        "rx2_gain_index",
+    )
     while True:
-        status = {name: int(value) for name, value in radio.tandem_status().items()}
+        raw = radio.tandem_status()
+        try:
+            values = {name: raw[name] for name in names}
+        except (KeyError, TypeError) as error:
+            raise EvidenceInvalid("tandem IDLE status is incomplete") from error
+        if any(type(value) is not int for value in values.values()):
+            raise EvidenceInvalid("tandem IDLE status contains a non-exact integer")
+        status = dict(values)
+        if (
+            status["fault_flags"]
+            or status["overflow_count"]
+            or status["rx1_gain_index"] != status["rx2_gain_index"]
+            or not 0 <= status["rx1_gain_index"] <= 127
+        ):
+            raise EvidenceInvalid(f"tandem controller status is unsafe: {status}")
         if (
             status.get("state") == int(TandemState.IDLE)
             and status.get("fault_flags") == 0
+            and status.get("overflow_count") == 0
             and status.get("fifo_level") == 0
+            and status.get("ownership_epoch") == 0
         ):
             return status
         if monotonic() >= deadline:
@@ -433,12 +565,21 @@ def _event_dict(event: Any) -> dict[str, Any]:
 
 def _metadata_dict(metadata: TandemFrameMetadata) -> dict[str, Any]:
     return {
+        "version": metadata.version,
+        "header_bytes": metadata.header_bytes,
+        "features": metadata.features,
         "stream_id": metadata.stream_id,
         "buffer_sequence": metadata.buffer_sequence,
         "first_sample_sequence": metadata.first_sample_sequence,
         "samples_per_channel": metadata.samples_per_channel,
+        "iq_payload_bytes": metadata.iq_payload_bytes,
+        "enabled_scan_mask": metadata.enabled_scan_mask,
         "flags": metadata.flags,
+        "sample_format": metadata.sample_format,
+        "channel_count": metadata.channel_count,
         "observation_count": metadata.observation_count,
+        "observation_capacity": metadata.observation_capacity,
+        "event_capacity": metadata.event_capacity,
         "ownership_epoch": metadata.ownership_epoch,
         "tandem_state": int(metadata.tandem_state),
         "tandem_state_name": metadata.tandem_state.name.lower(),
@@ -453,6 +594,8 @@ def _metadata_dict(metadata: TandemFrameMetadata) -> dict[str, Any]:
             metadata.maximum_gain_index,
         ],
         "bench_gain_indices": list(metadata.bench_gain_indices),
+        "rx1_gain_index": metadata.rx1_gain_index,
+        "rx2_gain_index": metadata.rx2_gain_index,
         "event_count": metadata.event_count,
         "observation_overflow_count": metadata.observation_overflow_count,
         "event_overflow_count": metadata.event_overflow_count,
@@ -503,6 +646,18 @@ def _validate_tandem_metadata(
         raise EvidenceInvalid("tandem metadata IQ length differs from returned payload")
     if metadata.enabled_scan_mask != 0x0F or metadata.channel_count != 2:
         raise EvidenceInvalid("tandem metadata does not describe dual complex RX")
+    if (
+        metadata.version != 5
+        or metadata.header_bytes != _TANDEM_METADATA_HEADER_BYTES
+        or metadata.features & _TANDEM_REQUIRED_METADATA_FEATURES
+        != _TANDEM_REQUIRED_METADATA_FEATURES
+        or metadata.sample_format != 1
+    ):
+        raise EvidenceInvalid("tandem metadata v5 wire provenance changed")
+    if metadata.flags & _TANDEM_REQUIRED_METADATA_FLAGS != (
+        _TANDEM_REQUIRED_METADATA_FLAGS
+    ):
+        raise EvidenceInvalid("tandem metadata lacks required valid flags")
     if metadata.flags & TANDEM_UNSAFE_FLAGS:
         raise EvidenceInvalid(
             "tandem metadata reports unsafe flags "
@@ -510,6 +665,28 @@ def _validate_tandem_metadata(
         )
     if metadata.observation_overflow_count or metadata.event_overflow_count:
         raise EvidenceInvalid("tandem transient metadata capacity overflowed")
+    if metadata.observation_capacity != 64 or metadata.event_capacity != 64:
+        raise EvidenceInvalid("tandem transient metadata capacity changed")
+    maximum_observations = (
+        capture.frame_samples // (capture.frame_samples // 4) + 1
+    )
+    if not 1 <= metadata.observation_count <= maximum_observations:
+        raise EvidenceInvalid(
+            "tandem transient observation count exceeds the overlap-safe bound"
+        )
+    maximum_events = maximum_tandem_events_per_frame(
+        mode=TandemMode.AUTO,
+        samples_per_channel=capture.frame_samples,
+        power_measurement_samples=quality.tandem_power_measurement_samples,
+        cooldown_periods=quality.tandem_cooldown_periods,
+    )
+    if (
+        metadata.event_count != len(metadata.gain_events)
+        or not 0 <= metadata.event_count <= maximum_events
+    ):
+        raise EvidenceInvalid(
+            "tandem transient event count exceeds the configured physics bound"
+        )
     if metadata.tandem_state is not TandemState.ARMED_AUTO:
         raise EvidenceInvalid("tandem controller left AUTO during transient capture")
     if metadata.gain_table_id is not expected_tandem_gain_table(
@@ -522,6 +699,16 @@ def _validate_tandem_metadata(
         or metadata.initial_gain_db != expected_initial_gain_db
     ):
         raise EvidenceInvalid("tandem transient metadata differs from its request")
+    expected_threshold_provenance = (
+        quality.tandem_low_power_threshold
+        | quality.tandem_large_lmt_overload_threshold << 8
+        | quality.tandem_large_adc_overload_threshold << 16
+        | quality.tandem_small_adc_overload_threshold << 24
+    )
+    if metadata.threshold_provenance != expected_threshold_provenance:
+        raise EvidenceInvalid(
+            "tandem transient threshold provenance differs from its request"
+        )
     if metadata.rx1_gain_index != metadata.rx2_gain_index:
         raise EvidenceInvalid("tandem transient metadata contains a torn endpoint")
     if metadata.first_sample_sequence + capture.frame_samples > _UINT64_MODULUS:
@@ -651,6 +838,16 @@ def _validate_tandem_metadata(
                 "tandem transient event gain lies outside the session range"
             )
         if state.last_event is not None:
+            minimum_event_spacing = quality.tandem_power_measurement_samples * (
+                quality.tandem_cooldown_periods + 1
+            )
+            if (
+                event.sample_sequence - state.last_event.sample_sequence
+                < minimum_event_spacing
+            ):
+                raise EvidenceInvalid(
+                    "tandem transient gain events violate cooldown spacing"
+                )
             sequence_delta = _forward_u32_delta(
                 event.event_sequence,
                 state.last_event.event_sequence,
@@ -750,7 +947,15 @@ def _capture_frame(
     if metadata_mode:
         if raw_metadata is None:
             raise EvidenceInvalid("tandem transient capture returned no metadata")
+        if not 0 < len(raw_metadata) <= _TANDEM_METADATA_CAPACITY_BYTES:
+            raise EvidenceInvalid(
+                "tandem transient raw metadata exceeds its retained-byte bound"
+            )
         parsed = metadata_parser(raw_metadata)
+        if parsed.header_bytes != len(raw_metadata):
+            raise EvidenceInvalid(
+                "tandem transient declared metadata bytes differ from sidecar"
+            )
         continuity = _validate_tandem_metadata(
             parsed,
             raw_bytes=len(raw),
@@ -794,7 +999,12 @@ def _capture_frame(
         record["continuity"] = dict(continuity or {})
     state.frame_index += 1
     state.next_nominal_sample = first_sample + capture.frame_samples
-    return _DeferredFrame(record=record, raw=raw, metadata=parsed)
+    return _DeferredFrame(
+        record=record,
+        raw=raw,
+        metadata=parsed,
+        raw_metadata=raw_metadata,
+    )
 
 
 def _classify_deferred_frame(
@@ -896,7 +1106,7 @@ class _TandemCapturePump:
     ) -> None:
         self._acquire = acquire
         self._maximum_frames = maximum_frames
-        self._queue: queue.Queue[_DeferredFrame | BaseException] = queue.Queue(
+        self._queue: queue.Queue[_DeferredFrame] = queue.Queue(
             maxsize=_TANDEM_CAPTURE_QUEUE_FRAMES
         )
         self._stop = threading.Event()
@@ -919,7 +1129,7 @@ class _TandemCapturePump:
     def queue_capacity_frames(self) -> int:
         return self._queue.maxsize
 
-    def _offer(self, item: _DeferredFrame | BaseException) -> bool:
+    def _offer(self, item: _DeferredFrame) -> bool:
         while not self._stop.is_set():
             try:
                 self._queue.put(item, timeout=0.05)
@@ -990,6 +1200,147 @@ class _TandemCapturePump:
             raise error.with_traceback(error.__traceback__)
 
 
+class _TandemBatchWorker:
+    """Replay exactly one 64-frame metadata batch on one bounded thread."""
+
+    def __init__(self, acquire: Callable[[], _DeferredFrame]) -> None:
+        self._acquire = acquire
+        self._queue: queue.Queue[_DeferredFrame | BaseException] = queue.Queue(
+            maxsize=_TANDEM_CAPTURE_QUEUE_FRAMES
+        )
+        self._stop = threading.Event()
+        self._first_refill_started = threading.Event()
+        self._first_refill_completed = threading.Event()
+        self._finished = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="tandem-transient-batch-acquisition",
+            daemon=True,
+        )
+        self._terminal_error_lock = threading.Lock()
+        self._terminal_error: BaseException | None = None
+        self._started = False
+        self.produced_frames = 0
+        self.consumed_frames = 0
+        self.discarded_tail_frames = 0
+
+    @property
+    def queue_capacity_frames(self) -> int:
+        return self._queue.maxsize
+
+    @property
+    def first_refill_in_flight(self) -> bool:
+        return self._first_refill_started.is_set() and not (
+            self._first_refill_completed.is_set()
+        )
+
+    @property
+    def finished(self) -> bool:
+        return self._finished.is_set()
+
+    def start(self) -> None:
+        self._thread.start()
+        self._started = True
+        if not self._first_refill_started.wait(_CAPTURE_THREAD_WAIT_SECONDS):
+            raise EvidenceInvalid(
+                "tandem batch worker did not initiate its first refill"
+            )
+
+    def _offer(self, item: _DeferredFrame | BaseException) -> bool:
+        while not self._stop.is_set():
+            try:
+                self._queue.put(item, timeout=0.05)
+                return True
+            except queue.Full:
+                continue
+        return False
+
+    def _claim_terminal_error(self) -> BaseException | None:
+        with self._terminal_error_lock:
+            error = self._terminal_error
+            self._terminal_error = None
+            return error
+
+    def _run(self) -> None:
+        try:
+            for index in range(_TANDEM_BATCH_FRAMES):
+                if self._stop.is_set():
+                    return
+                if index == 0:
+                    self._first_refill_started.set()
+                try:
+                    frame = self._acquire()
+                finally:
+                    if index == 0:
+                        self._first_refill_completed.set()
+                self.produced_frames += 1
+                if not self._offer(frame):
+                    self.discarded_tail_frames += 1
+                    return
+        except BaseException as error:  # noqa: BLE001 - cross-thread propagation
+            if not (
+                self._stop.is_set()
+                and isinstance(error, OSError)
+                and error.errno == errno.EBADF
+            ):
+                with self._terminal_error_lock:
+                    self._terminal_error = error
+        finally:
+            self._finished.set()
+
+    def require_first_refill_in_flight(self) -> None:
+        if self.first_refill_in_flight:
+            return
+        error = self._claim_terminal_error()
+        if error is not None:
+            raise error.with_traceback(error.__traceback__)
+        raise EvidenceInvalid(
+            "tandem metadata batch completed before a predeclared command target"
+        )
+
+    def take(self) -> _DeferredFrame:
+        deadline = time.monotonic() + _CAPTURE_THREAD_WAIT_SECONDS
+        while True:
+            error = self._claim_terminal_error()
+            if error is not None:
+                raise error.with_traceback(error.__traceback__)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise EvidenceInvalid(
+                    "tandem batch worker returned no cached frame before timeout"
+                )
+            try:
+                item = self._queue.get(timeout=min(0.05, remaining))
+            except queue.Empty:
+                if self._finished.is_set():
+                    error = self._claim_terminal_error()
+                    if error is not None:
+                        raise error.with_traceback(error.__traceback__)
+                continue
+            self.consumed_frames += 1
+            return item
+
+    def request_stop(self) -> None:
+        self._stop.set()
+
+    def stop(self) -> None:
+        self.request_stop()
+        if not self._started:
+            return
+        self._thread.join(timeout=_CAPTURE_THREAD_WAIT_SECONDS)
+        if self._thread.is_alive():
+            raise EvidenceInvalid("tandem batch worker did not stop")
+        while True:
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+            self.discarded_tail_frames += 1
+        error = self._claim_terminal_error()
+        if error is not None:
+            raise error.with_traceback(error.__traceback__)
+
+
 def _strict_low32_counter(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise EvidenceInvalid("RX sample-counter readback is not an integer")
@@ -1014,6 +1365,1300 @@ def _extend_low32_near(raw: int, *, reference: int) -> int:
     if minimum >= _UINT32_MODULUS // 2 or distances.count(minimum) != 1:
         raise EvidenceInvalid("RX sample-counter low32 extension is ambiguous")
     return candidates[distances.index(minimum)]
+
+
+def _tandem_memory_ledger() -> dict[str, Any]:
+    """Return the frozen worst-case host/device resident-byte accounting."""
+
+    components = {
+        "core_batch_cache_bytes": _TANDEM_BATCH_CACHE_BYTES,
+        "ordinary_libiio_c_buffer_bytes": _TANDEM_FRAME_IQ_BYTES,
+        "maximum_python_retained_raw_bytes": _TANDEM_MAXIMUM_PYTHON_RAW_BYTES,
+        "maximum_python_retained_raw_metadata_bytes": (
+            _TANDEM_MAXIMUM_PYTHON_RAW_METADATA_BYTES
+        ),
+        "transient_buffer_read_bytearray_bytes": _TANDEM_FRAME_IQ_BYTES,
+        "ctypes_refill_scratch_bytes": _TANDEM_METADATA_CAPACITY_BYTES,
+        "returned_metadata_bytes": _TANDEM_METADATA_CAPACITY_BYTES,
+        "parsed_evidence_reservation_bytes": (
+            _TANDEM_PARSED_EVIDENCE_RESERVATION_BYTES
+        ),
+        "device_k8_dma_reservation_bytes": (
+            _TANDEM_KERNEL_BUFFERS * _TANDEM_FRAME_IQ_BYTES
+        ),
+    }
+    calculated = sum(components.values())
+    if calculated != _TANDEM_AGGREGATE_RESIDENT_BYTES:
+        raise EvidenceInvalid("tandem resident-memory ledger calculation changed")
+    post_close_materialization = sum(
+        (
+            _TANDEM_MAXIMUM_PYTHON_RAW_BYTES,
+            _TANDEM_MAXIMUM_PYTHON_RAW_METADATA_BYTES,
+            _TANDEM_PARSED_EVIDENCE_RESERVATION_BYTES,
+            _TANDEM_POST_CLOSE_FFT_WORKSPACE_BYTES,
+        )
+    )
+    return {
+        **components,
+        "post_close_fft_workspace_bytes": _TANDEM_POST_CLOSE_FFT_WORKSPACE_BYTES,
+        "capture_phase_envelope_bytes": calculated,
+        "post_close_materialization_envelope_bytes": post_close_materialization,
+        "maximum_phase_envelope_bytes": max(calculated, post_close_materialization),
+        "aggregate_resident_bytes": calculated,
+        "maximum_aggregate_bytes": _TANDEM_MAXIMUM_AGGREGATE_BYTES,
+        "within_cap": calculated <= _TANDEM_MAXIMUM_AGGREGATE_BYTES,
+        "measured_finished_mode_and_parsed_metadata_bytes": None,
+        "measured_evidence_within_reservation": None,
+        "canonical_evidence_projection_method": (
+            _TANDEM_EVIDENCE_PROJECTION_METHOD
+        ),
+        "canonical_evidence_projection_bytes": None,
+        "canonical_evidence_projection_sha256": None,
+        "accounting_scope": (
+            "campaign-owned conservative payload envelope; excludes interpreter, "
+            "library and allocator state, thread stacks, JSON serialization, and "
+            "page cache"
+        ),
+        "phase_overlap_policy": (
+            "core batch cache and K8 DMA capture precede normal close; the 8MiB "
+            "FFT workspace is counted only in the post-close materialization "
+            "envelope, and the larger conservative capture envelope governs"
+        ),
+        "python_raw_ownership": (
+            "retained list, queue4, and producer own disjoint frames from the "
+            "same exact 64-frame batch"
+        ),
+    }
+
+
+def _recursive_resident_bytes(value: Any, seen: set[int] | None = None) -> int:
+    """Measure one bounded campaign-owned Python object graph without aliases."""
+
+    visited = set() if seen is None else seen
+    identity = id(value)
+    if identity in visited:
+        return 0
+    visited.add(identity)
+    total = sys.getsizeof(value)
+    if isinstance(value, Mapping):
+        return total + sum(
+            _recursive_resident_bytes(key, visited)
+            + _recursive_resident_bytes(item, visited)
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple, set, frozenset)):
+        return total + sum(_recursive_resident_bytes(item, visited) for item in value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return total + sum(
+            _recursive_resident_bytes(getattr(value, item.name), visited)
+            for item in dataclass_fields(value)
+        )
+    return total
+
+
+def _canonical_tandem_evidence_bytes(
+    record: Mapping[str, Any],
+    parsed_metadata: Sequence[TandemFrameMetadata],
+) -> bytes:
+    """Encode the durable alias-independent evidence projection."""
+
+    mode_projection = dict(record)
+    acquisition_projection = dict(record["acquisition"])
+    ledger_projection = dict(acquisition_projection["memory_ledger"])
+    ledger_projection.update(
+        {
+            "measured_finished_mode_and_parsed_metadata_bytes": 0,
+            "measured_evidence_within_reservation": True,
+            "canonical_evidence_projection_bytes": 0,
+            "canonical_evidence_projection_sha256": "0" * 64,
+        }
+    )
+    acquisition_projection["memory_ledger"] = ledger_projection
+    mode_projection["acquisition"] = acquisition_projection
+    projection = {
+        "schema": _TANDEM_EVIDENCE_PROJECTION_SCHEMA,
+        "mode": mode_projection,
+        "reparsed_metadata": [_metadata_dict(item) for item in parsed_metadata],
+    }
+    return json.dumps(
+        projection,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+
+
+def _attest_tandem_evidence_reservation(
+    record: Mapping[str, Any], frames: Sequence[_DeferredFrame]
+) -> None:
+    ledger = record["acquisition"]["memory_ledger"]
+    reservation = ledger.get("parsed_evidence_reservation_bytes")
+    if (
+        type(reservation) is not int
+        or reservation != _TANDEM_PARSED_EVIDENCE_RESERVATION_BYTES
+    ):
+        raise EvidenceInvalid("tandem parsed-evidence reservation was substituted")
+    if len(frames) != _TANDEM_BATCH_FRAMES or any(
+        frame.metadata is None for frame in frames
+    ):
+        raise EvidenceInvalid(
+            "tandem evidence measurement lacks the exact parsed batch"
+        )
+    parsed_metadata = tuple(frame.metadata for frame in frames)
+    if ledger.get("canonical_evidence_projection_method") != (
+        _TANDEM_EVIDENCE_PROJECTION_METHOD
+    ):
+        raise EvidenceInvalid("tandem canonical evidence method was substituted")
+    canonical = _canonical_tandem_evidence_bytes(record, parsed_metadata)
+    ledger["canonical_evidence_projection_bytes"] = len(canonical)
+    ledger["canonical_evidence_projection_sha256"] = hashlib.sha256(
+        canonical
+    ).hexdigest()
+    measured = 0
+    for _ in range(4):
+        ledger["measured_finished_mode_and_parsed_metadata_bytes"] = measured
+        ledger["measured_evidence_within_reservation"] = (
+            measured <= reservation
+        )
+        updated = _recursive_resident_bytes((record, parsed_metadata))
+        if updated == measured:
+            break
+        measured = updated
+    else:
+        raise EvidenceInvalid("tandem evidence measurement did not converge")
+    if not len(canonical) <= measured <= reservation:
+        raise EvidenceInvalid(
+            "tandem canonical/live evidence sizes violate the retained "
+            "evidence reservation"
+        )
+
+
+def _schedule_timestamp(clock_ns: Callable[[], int], *, name: str) -> int:
+    value = clock_ns()
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise EvidenceInvalid(f"tandem {name} is not a monotonic timestamp")
+    return value
+
+
+def _new_batch_command_diagnostics(
+    *, command_id: str, requested_level_db: float, target_frames: int, s0_raw: int
+) -> dict[str, Any]:
+    target_samples = target_frames * _TANDEM_FRAME_SAMPLES
+    return {
+        "status": "pending",
+        "qualified": False,
+        "current_stage": "created",
+        "failure_stage": None,
+        "failure_error": None,
+        "command_id": command_id,
+        "requested_level_db": requested_level_db,
+        "applied_level_db": None,
+        "target": {
+            "s0_raw": s0_raw,
+            "offset_frames": target_frames,
+            "offset_samples": target_samples,
+            "target_raw": (s0_raw + target_samples) % _UINT32_MODULUS,
+            "last_below_raw": None,
+            "raw_a_prewrite": None,
+            "poll_read_count": 0,
+            "poll_observations": [],
+            "total_requested_sleep_samples": 0,
+            "overshoot_samples": None,
+            "overshoot_limit_samples": _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES,
+        },
+        "worker_in_flight_observations": [],
+        "tx1_mute_assurance": {
+            phase: {
+                "attempt_count": 0,
+                "host_before_ns": None,
+                "host_after_ns": None,
+                "observed_level_db": None,
+                "passed": False,
+                "error": None,
+            }
+            for phase in ("pre", "post")
+        },
+        "write_ack": {
+            "operation": "one_exact_tx2_hardwaregain_write",
+            "attempt_count": 0,
+            "host_before_ns": None,
+            "host_after_ns": None,
+            "host_jitter_ns": None,
+            "acknowledged": False,
+            "error": None,
+        },
+        "counter_reads": [],
+        "raw_bracket": {
+            "register_address": "0x800000b8",
+            "counter_width_bits": 32,
+            "counter_source": "coherent FPGA RX sample counter low word",
+            "raw_a_prewrite": None,
+            "raw_post_write_initial": None,
+            "raw_b_first_advance": None,
+            "raw_c_causal_advance": None,
+            "initial_from_a_samples": None,
+            "b_from_initial_samples": None,
+            "c_from_b_samples": None,
+            "post_write_read_count": 0,
+            "causal_uncertainty_samples": None,
+            "causal_uncertainty_limit_samples": None,
+            "worker_in_flight_at_command": False,
+        },
+        "deferred_tx2_readback": {
+            "operation": "one_exact_tx2_hardwaregain_read",
+            "attempt_count": 0,
+            "host_before_ns": None,
+            "host_after_ns": None,
+            "observed_level_db": None,
+            "tolerance_db": None,
+            "passed": False,
+            "error": None,
+        },
+    }
+
+
+def _mark_batch_command_failure(
+    diagnostics: dict[str, Any], error: BaseException
+) -> None:
+    if diagnostics.get("status") == "complete":
+        return
+    diagnostics["status"] = "failed"
+    diagnostics["qualified"] = False
+    diagnostics["failure_stage"] = str(diagnostics.get("current_stage", "unknown"))
+    diagnostics["failure_error"] = _exception_text(error)
+
+
+def _schedule_tandem_batch_command(
+    radio: TransientRadioTransport,
+    worker: _TandemBatchWorker,
+    *,
+    command_id: str,
+    requested_level_db: float,
+    target_frames: int,
+    s0_raw: int,
+    diagnostics: dict[str, Any],
+    check_deadline: Callable[[], None],
+    clock_ns: Callable[[], int],
+    sleep: Callable[[float], None],
+    sample_rate_hz: int,
+    max_host_jitter_ns: int,
+    max_sample_uncertainty: int,
+    readback_tolerance_db: float,
+) -> StimulusCommand:
+    """Apply one exact TX2 write at an S0-relative target during the refill."""
+
+    target = diagnostics["target"]
+    raw_bracket = diagnostics["raw_bracket"]
+    counter_reads = diagnostics["counter_reads"]
+
+    def set_stage(value: str) -> None:
+        diagnostics["current_stage"] = value
+
+    def record_worker(stage: str) -> None:
+        diagnostics["worker_in_flight_observations"].append(
+            {
+                "stage": stage,
+                "first_refill_in_flight": worker.first_refill_in_flight,
+            }
+        )
+
+    def read_counter(role: str) -> int:
+        observation: dict[str, Any] = {
+            "ordinal": len(counter_reads),
+            "role": role,
+            "host_before_ns": _schedule_timestamp(
+                clock_ns, name=f"{command_id} {role} read start"
+            ),
+            "host_after_ns": None,
+            "raw": None,
+            "error": None,
+        }
+        counter_reads.append(observation)
+        try:
+            observed = _strict_low32_counter(radio.read_rx_sample_counter_low32())
+        except BaseException as error:
+            observation["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name=f"{command_id} {role} failed read completion"
+            )
+            observation["error"] = _exception_text(error)
+            raise
+        observation["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{command_id} {role} read completion"
+        )
+        observation["raw"] = observed
+        if observation["host_after_ns"] < observation["host_before_ns"]:
+            raise EvidenceInvalid(
+                f"command {command_id!r} counter read clock moved backward"
+            )
+        return observed
+
+    def attest_tx1(phase: str) -> None:
+        evidence = diagnostics["tx1_mute_assurance"][phase]
+        evidence["attempt_count"] = 1
+        evidence["host_before_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{command_id} TX1 {phase} mute start"
+        )
+        try:
+            observed = float(radio.attest_tx1_muted())
+        except BaseException as error:
+            evidence["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name=f"{command_id} TX1 {phase} failed completion"
+            )
+            evidence["error"] = _exception_text(error)
+            raise
+        evidence["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{command_id} TX1 {phase} mute completion"
+        )
+        evidence["observed_level_db"] = observed
+        if (
+            not math.isfinite(observed)
+            or abs(observed - TX_MUTE_DB) > 0.26
+            or evidence["host_after_ns"] < evidence["host_before_ns"]
+        ):
+            raise EvidenceInvalid(
+                f"command {command_id!r} TX1 {phase} mute assurance failed"
+            )
+        evidence["passed"] = True
+
+    try:
+        if diagnostics.get("command_id") != command_id or (
+            diagnostics.get("requested_level_db") != requested_level_db
+        ):
+            raise EvidenceInvalid("tandem command diagnostics identity changed")
+        target_samples = target_frames * _TANDEM_FRAME_SAMPLES
+        if (
+            target.get("s0_raw") != s0_raw
+            or target.get("offset_frames") != target_frames
+            or target.get("offset_samples") != target_samples
+            or target.get("target_raw")
+            != (s0_raw + target_samples) % _UINT32_MODULUS
+        ):
+            raise EvidenceInvalid("tandem command diagnostic target changed")
+        if not 0 < target_samples < _UINT32_MODULUS // 2:
+            raise EvidenceInvalid(f"command {command_id!r} target is ambiguous")
+
+        set_stage("pre_tx1_mute_assurance")
+        worker.require_first_refill_in_flight()
+        record_worker("pre_tx1_mute_assurance")
+        attest_tx1("pre")
+
+        set_stage("target_poll")
+        last_below_raw: int | None = None
+        raw_a: int | None = None
+        overshoot: int | None = None
+        for _ in range(_TANDEM_TARGET_MAX_POLL_READS):
+            check_deadline()
+            worker.require_first_refill_in_flight()
+            current = read_counter("target_poll")
+            advance = (current - s0_raw) % _UINT32_MODULUS
+            if advance >= _UINT32_MODULUS // 2:
+                raise EvidenceInvalid(
+                    f"command {command_id!r} target poll crossed ambiguous wrap"
+                )
+            remaining = target_samples - advance
+            if remaining > 0:
+                last_below_raw = current
+                if remaining > _TANDEM_TARGET_COARSE_GUARD_SAMPLES:
+                    phase = "coarse_sleep"
+                    sleep_samples = remaining - _TANDEM_TARGET_COARSE_GUARD_SAMPLES
+                elif remaining > 2 * _TANDEM_TARGET_FINE_SLEEP_SAMPLES:
+                    phase = "fine_sleep"
+                    sleep_samples = _TANDEM_TARGET_FINE_SLEEP_SAMPLES
+                else:
+                    phase = "tail_poll"
+                    sleep_samples = 0
+                target["poll_observations"].append(
+                    {
+                        "raw": current,
+                        "advance_samples": advance,
+                        "remaining_samples": remaining,
+                        "phase": phase,
+                        "requested_sleep_samples": sleep_samples,
+                    }
+                )
+                target["poll_read_count"] += 1
+                target["last_below_raw"] = current
+                if sleep_samples:
+                    target["total_requested_sleep_samples"] += sleep_samples
+                    sleep(sleep_samples / sample_rate_hz)
+                    check_deadline()
+                continue
+            raw_a = current
+            overshoot = advance - target_samples
+            counter_reads[-1]["role"] = "raw_a_prewrite"
+            target["poll_observations"].append(
+                {
+                    "raw": current,
+                    "advance_samples": advance,
+                    "remaining_samples": 0,
+                    "phase": "target_reached",
+                    "requested_sleep_samples": 0,
+                }
+            )
+            target["poll_read_count"] += 1
+            target["raw_a_prewrite"] = raw_a
+            target["overshoot_samples"] = overshoot
+            break
+        if raw_a is None:
+            raise EvidenceInvalid(
+                f"command {command_id!r} exceeded its target-poll read budget"
+            )
+        if last_below_raw is None:
+            raise EvidenceInvalid(
+                f"command {command_id!r} target lacks a last-below counter read"
+            )
+        set_stage("target_overshoot_validation")
+        if overshoot is None or overshoot > _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES:
+            raise EvidenceInvalid(
+                f"command {command_id!r} target overshoot {overshoot} exceeds "
+                f"{_TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES} samples"
+            )
+
+        set_stage("exact_tx2_write")
+        worker.require_first_refill_in_flight()
+        record_worker("exact_tx2_write")
+        raw_bracket["worker_in_flight_at_command"] = True
+        write_ack = diagnostics["write_ack"]
+        write_ack["attempt_count"] = 1
+        write_ack["host_before_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{command_id} exact TX2 write start"
+        )
+        try:
+            radio.write_tx2_gain_exact(requested_level_db)
+        except BaseException as error:
+            write_ack["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name=f"{command_id} failed exact TX2 write completion"
+            )
+            write_ack["host_jitter_ns"] = (
+                write_ack["host_after_ns"] - write_ack["host_before_ns"]
+            )
+            write_ack["error"] = _exception_text(error)
+            raise
+        write_ack["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{command_id} exact TX2 write acknowledgement"
+        )
+        write_ack["host_jitter_ns"] = (
+            write_ack["host_after_ns"] - write_ack["host_before_ns"]
+        )
+        write_ack["acknowledged"] = True
+
+        set_stage("raw_post_write_initial")
+        raw_initial = read_counter("raw_post_write_initial")
+        raw_bracket["raw_a_prewrite"] = raw_a
+        raw_bracket["raw_post_write_initial"] = raw_initial
+        initial_delta = (raw_initial - raw_a) % _UINT32_MODULUS
+        raw_bracket["initial_from_a_samples"] = initial_delta
+        raw_bracket["post_write_read_count"] = 1
+        raw_b: int | None = None
+        raw_c: int | None = None
+        b_delta: int | None = None
+        c_delta: int | None = None
+        uncertainty: int | None = None
+        set_stage("causal_counter_advances")
+        for _ in range(8):
+            current = read_counter("post_write_advance_candidate")
+            raw_bracket["post_write_read_count"] += 1
+            if raw_b is None and current != raw_initial:
+                raw_b = current
+                counter_reads[-1]["role"] = "raw_b_first_advance"
+                b_delta = (raw_b - raw_initial) % _UINT32_MODULUS
+                raw_bracket["raw_b_first_advance"] = raw_b
+                raw_bracket["b_from_initial_samples"] = b_delta
+            elif raw_b is not None and current != raw_b:
+                raw_c = current
+                counter_reads[-1]["role"] = "raw_c_causal_advance"
+                c_delta = (raw_c - raw_b) % _UINT32_MODULUS
+                uncertainty = initial_delta + b_delta + c_delta
+                raw_bracket["raw_c_causal_advance"] = raw_c
+                raw_bracket["c_from_b_samples"] = c_delta
+                raw_bracket["causal_uncertainty_samples"] = uncertainty
+                raw_bracket["causal_uncertainty_limit_samples"] = (
+                    max_sample_uncertainty
+                )
+                break
+        if raw_b is None or raw_c is None:
+            raise EvidenceInvalid(
+                f"command {command_id!r} did not observe causal B and C advances"
+            )
+        assert b_delta is not None and c_delta is not None and uncertainty is not None
+
+        set_stage("deferred_tx2_readback")
+        readback = diagnostics["deferred_tx2_readback"]
+        readback["tolerance_db"] = readback_tolerance_db
+        readback["attempt_count"] = 1
+        readback["host_before_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{command_id} deferred TX2 readback start"
+        )
+        try:
+            applied_level_db = float(radio.read_tx2_gain())
+        except BaseException as error:
+            readback["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name=f"{command_id} failed deferred readback completion"
+            )
+            readback["error"] = _exception_text(error)
+            raise
+        readback["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{command_id} deferred TX2 readback completion"
+        )
+        readback["observed_level_db"] = applied_level_db
+        if (
+            readback["host_after_ns"] < readback["host_before_ns"]
+            or not math.isfinite(applied_level_db)
+            or abs(applied_level_db - requested_level_db) > readback_tolerance_db
+        ):
+            raise EvidenceInvalid(
+                f"command {command_id!r} deferred TX2 readback differs from request"
+            )
+        readback["passed"] = True
+        diagnostics["applied_level_db"] = applied_level_db
+
+        set_stage("post_tx1_mute_assurance")
+        attest_tx1("post")
+
+        set_stage("schedule_validation")
+        if initial_delta >= _UINT32_MODULUS // 2 or not all(
+            0 < value < _UINT32_MODULUS // 2 for value in (b_delta, c_delta)
+        ):
+            raise EvidenceInvalid(
+                f"command {command_id!r} A-to-initial-to-B-to-C bracket is ambiguous"
+            )
+        if not 0 < uncertainty <= max_sample_uncertainty:
+            raise EvidenceInvalid(
+                f"command {command_id!r} causal uncertainty {uncertainty} exceeds "
+                f"{max_sample_uncertainty} samples"
+            )
+        if (
+            write_ack["host_after_ns"] < write_ack["host_before_ns"]
+            or not 0 <= write_ack["host_jitter_ns"] <= max_host_jitter_ns
+        ):
+            raise EvidenceInvalid(
+                f"command {command_id!r} exact write host bracket is invalid"
+            )
+        diagnostics["status"] = "complete"
+        diagnostics["qualified"] = True
+        diagnostics["current_stage"] = "complete"
+        return StimulusCommand(
+            command_id=command_id,
+            requested_level_db=requested_level_db,
+            applied_level_db=applied_level_db,
+            host_before_ns=write_ack["host_before_ns"],
+            host_after_ns=write_ack["host_after_ns"],
+            sample_sequence_before=None,
+            sample_sequence_after=None,
+        )
+    except BaseException as error:
+        _mark_batch_command_failure(diagnostics, error)
+        raise
+
+
+def _bind_tandem_batch_command(
+    frames: Sequence[_DeferredFrame],
+    command: StimulusCommand,
+    diagnostics: Mapping[str, Any],
+) -> tuple[StimulusCommand, dict[str, Any]]:
+    """Extend one low32 schedule against the exact retained batch."""
+
+    if len(frames) != _TANDEM_BATCH_FRAMES:
+        raise EvidenceInvalid("tandem command cannot bind an incomplete batch")
+    first_start = int(frames[0].record["first_sample_sequence"])
+    last_end = int(frames[-1].record["sample_end_exclusive"])
+    target = diagnostics.get("target")
+    raw_bracket = diagnostics.get("raw_bracket")
+    if not isinstance(target, Mapping) or not isinstance(raw_bracket, Mapping):
+        raise EvidenceInvalid("tandem command lacks raw schedule diagnostics")
+    s0_raw = _strict_low32_counter(target.get("s0_raw"))
+    s0 = _extend_low32_near(s0_raw, reference=first_start)
+    target_samples = int(target.get("offset_samples", -1))
+    target_sample = s0 + target_samples
+    if not first_start <= target_sample < last_end:
+        raise EvidenceInvalid("tandem command target lies outside its retained batch")
+
+    raw_p = _strict_low32_counter(target.get("last_below_raw"))
+    raw_a = _strict_low32_counter(target.get("raw_a_prewrite"))
+    raw_initial = _strict_low32_counter(raw_bracket.get("raw_post_write_initial"))
+    raw_b = _strict_low32_counter(raw_bracket.get("raw_b_first_advance"))
+    raw_c = _strict_low32_counter(raw_bracket.get("raw_c_causal_advance"))
+    p_delta = (raw_p - s0_raw) % _UINT32_MODULUS
+    a_delta = (raw_a - s0_raw) % _UINT32_MODULUS
+    initial_delta = (raw_initial - raw_a) % _UINT32_MODULUS
+    b_delta = (raw_b - raw_initial) % _UINT32_MODULUS
+    c_delta = (raw_c - raw_b) % _UINT32_MODULUS
+    if any(
+        value >= _UINT32_MODULUS // 2
+        for value in (p_delta, a_delta, initial_delta)
+    ) or any(
+        not 0 < value < _UINT32_MODULUS // 2 for value in (b_delta, c_delta)
+    ):
+        raise EvidenceInvalid("tandem command counter extension is ambiguous")
+    extended_p = s0 + p_delta
+    extended_a = s0 + a_delta
+    extended_initial = extended_a + initial_delta
+    extended_b = extended_initial + b_delta
+    extended_c = extended_b + c_delta
+    overshoot = extended_a - target_sample
+    uncertainty = extended_c - extended_a
+    if not extended_p < target_sample <= extended_a:
+        raise EvidenceInvalid("tandem last-below/target/A ordering is invalid")
+    if not 0 < extended_a - extended_p < _UINT32_MODULUS // 2:
+        raise EvidenceInvalid("tandem last-below to A advance is ambiguous")
+    if not 0 <= overshoot <= _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES:
+        raise EvidenceInvalid("tandem posthoc target overshoot exceeds policy")
+    uncertainty_limit = raw_bracket.get("causal_uncertainty_limit_samples")
+    if (
+        isinstance(uncertainty_limit, bool)
+        or not isinstance(uncertainty_limit, int)
+        or not 0 < uncertainty <= uncertainty_limit
+    ):
+        raise EvidenceInvalid("tandem posthoc causal bracket exceeds policy")
+    if (
+        target.get("target_raw") != target_sample % _UINT32_MODULUS
+        or target.get("overshoot_samples") != overshoot
+        or target.get("overshoot_limit_samples")
+        != _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES
+        or raw_bracket.get("raw_a_prewrite") != raw_a
+        or raw_bracket.get("initial_from_a_samples") != initial_delta
+        or raw_bracket.get("b_from_initial_samples") != b_delta
+        or raw_bracket.get("c_from_b_samples") != c_delta
+        or raw_bracket.get("causal_uncertainty_samples") != uncertainty
+        or raw_bracket.get("worker_in_flight_at_command") is not True
+    ):
+        raise EvidenceInvalid("tandem raw and extended command schedules disagree")
+    bracketed = replace(
+        command,
+        sample_sequence_before=extended_a,
+        sample_sequence_after=extended_c,
+    )
+    return bracketed, {
+        "register_address": "0x800000b8",
+        "counter_width_bits": 32,
+        "counter_source": "coherent FPGA RX sample counter low word",
+        "first_batch_sample": first_start,
+        "last_batch_sample_exclusive": last_end,
+        "post_open_s0_raw": s0_raw,
+        "post_open_s0_sample": s0,
+        "target_offset_frames": target.get("offset_frames"),
+        "target_offset_samples": target_samples,
+        "target_raw": target.get("target_raw"),
+        "target_sample": target_sample,
+        "last_below_raw": raw_p,
+        "last_below_sample": extended_p,
+        "raw_a_prewrite": raw_a,
+        "a_prewrite_sample": extended_a,
+        "raw_post_write_initial": raw_initial,
+        "post_write_initial_sample": extended_initial,
+        "raw_b_first_advance": raw_b,
+        "b_first_advance_sample": extended_b,
+        "raw_c_causal_advance": raw_c,
+        "c_causal_advance_sample": extended_c,
+        "target_overshoot_samples": overshoot,
+        "target_overshoot_limit_samples": _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES,
+        "causal_uncertainty_samples": uncertainty,
+        "causal_uncertainty_limit_samples": uncertainty_limit,
+        "command_interval": "[A,C)",
+    }
+
+
+_TANDEM_PARTITION_PHASES = (
+    "fully_pre_attack",
+    "attack_bracket",
+    "fully_post_attack_pre_release",
+    "release_bracket",
+    "fully_post_release",
+)
+
+
+def _partition_tandem_batch(
+    frames: Sequence[_DeferredFrame],
+    *,
+    attack: StimulusCommand,
+    release: StimulusCommand,
+) -> dict[str, Any]:
+    """Classify every retained frame into the five ordered transient regions."""
+
+    attack_lower = attack.sample_sequence_before
+    attack_upper = attack.sample_sequence_after
+    release_lower = release.sample_sequence_before
+    release_upper = release.sample_sequence_after
+    if None in (attack_lower, attack_upper, release_lower, release_upper):
+        raise EvidenceInvalid("tandem partition commands lack hardware brackets")
+    assert attack_lower is not None and attack_upper is not None
+    assert release_lower is not None and release_upper is not None
+    if not attack_lower < attack_upper <= release_lower < release_upper:
+        raise EvidenceInvalid("tandem attack/release command brackets overlap")
+
+    phase_by_frame: list[str] = []
+    groups: dict[str, list[int]] = {name: [] for name in _TANDEM_PARTITION_PHASES}
+    for frame in frames:
+        start = int(frame.record["first_sample_sequence"])
+        end = int(frame.record["sample_end_exclusive"])
+        if end <= attack_lower:
+            phase = "fully_pre_attack"
+        elif start < attack_upper and end > attack_lower:
+            phase = "attack_bracket"
+        elif start >= attack_upper and end <= release_lower:
+            phase = "fully_post_attack_pre_release"
+        elif start < release_upper and end > release_lower:
+            phase = "release_bracket"
+        elif start >= release_upper:
+            phase = "fully_post_release"
+        else:
+            raise EvidenceInvalid(
+                "tandem frame cannot be assigned to an exact command partition"
+            )
+        frame.record["batch_phase"] = phase
+        frame.record["gap_context"] = phase
+        continuity = frame.record.get("continuity")
+        if isinstance(continuity, dict):
+            continuity["gap_context"] = phase
+        phase_by_frame.append(phase)
+        groups[phase].append(int(frame.record["frame_index"]))
+
+    phase_order = {name: index for index, name in enumerate(_TANDEM_PARTITION_PHASES)}
+    if phase_by_frame != sorted(phase_by_frame, key=phase_order.__getitem__):
+        raise EvidenceInvalid("tandem five-way frame partition is not ordered")
+    required = {
+        "fully_pre_attack": _TANDEM_REQUIRED_PARTITION_FRAMES,
+        "fully_post_attack_pre_release": _TANDEM_REQUIRED_PARTITION_FRAMES,
+        "fully_post_release": _TANDEM_REQUIRED_PARTITION_FRAMES,
+    }
+    for phase, minimum in required.items():
+        if len(groups[phase]) < minimum:
+            raise EvidenceInvalid(
+                f"tandem partition {phase!r} has {len(groups[phase])} frames; "
+                f"requires {minimum}"
+            )
+    if not groups["attack_bracket"] or not groups["release_bracket"]:
+        raise EvidenceInvalid("tandem command bracket lacks a retained frame")
+
+    # AUTO starts at the request maximum specifically to preclude an
+    # unobserved low-power startup ramp before the attack.
+    for frame in frames:
+        if frame.record["batch_phase"] != "fully_pre_attack":
+            continue
+        metadata = frame.metadata
+        if metadata is None:
+            raise EvidenceInvalid("tandem pre-attack frame lacks metadata")
+        if (
+            metadata.tandem_transition_count != 0
+            or metadata.gain_events
+            or metadata.bench_gain_indices
+            != (metadata.maximum_gain_index, metadata.maximum_gain_index)
+        ):
+            raise EvidenceInvalid(
+                "tandem pre-attack AUTO evidence contains a startup transition"
+            )
+
+    return {
+        "phase_order": list(_TANDEM_PARTITION_PHASES),
+        "phase_by_frame": phase_by_frame,
+        "groups": {
+            name: {"count": len(indices), "frame_indices": indices}
+            for name, indices in groups.items()
+        },
+        "minimum_required_fully_pre_attack_frames": (
+            _TANDEM_REQUIRED_PARTITION_FRAMES
+        ),
+        "minimum_required_fully_post_attack_pre_release_frames": (
+            _TANDEM_REQUIRED_PARTITION_FRAMES
+        ),
+        "minimum_required_fully_post_release_frames": (
+            _TANDEM_REQUIRED_PARTITION_FRAMES
+        ),
+        "frame_count": len(frames),
+    }
+
+
+def _validate_exact_tandem_batch(frames: Sequence[_DeferredFrame]) -> None:
+    if len(frames) != _TANDEM_BATCH_FRAMES:
+        raise EvidenceInvalid("tandem batch did not retain exactly 64 frames")
+    first = frames[0].metadata
+    if first is None:
+        raise EvidenceInvalid("tandem batch first frame lacks metadata")
+    if first.buffer_sequence != 0:
+        raise EvidenceInvalid("tandem batch first provider sequence is not zero")
+    if first.stream_id <= 0 or first.ownership_epoch <= 0:
+        raise EvidenceInvalid("tandem batch stream/ownership identity is invalid")
+    for index, frame in enumerate(frames):
+        metadata = frame.metadata
+        if metadata is None:
+            raise EvidenceInvalid(f"tandem batch frame {index} lacks metadata")
+        if (
+            int(frame.record["frame_index"]) != index
+            or metadata.buffer_sequence != index
+            or metadata.stream_id != first.stream_id
+            or metadata.ownership_epoch != first.ownership_epoch
+            or metadata.first_sample_sequence
+            != first.first_sample_sequence + index * _TANDEM_FRAME_SAMPLES
+            or int(frame.record["first_sample_sequence"])
+            != metadata.first_sample_sequence
+            or int(frame.record["sample_end_exclusive"])
+            != metadata.first_sample_sequence + _TANDEM_FRAME_SAMPLES
+            or len(frame.raw) != _TANDEM_FRAME_IQ_BYTES
+        ):
+            raise EvidenceInvalid(
+                f"tandem batch frame {index} breaks exact stream continuity"
+            )
+
+
+def _checked_transient_output_relative_path(
+    path: Path, *, output_root: Path, label: str
+) -> Path:
+    """Resolve a planned output without following an output-tree symlink."""
+
+    lexical_root = output_root.absolute()
+    lexical_path = path.absolute()
+    try:
+        relative = lexical_path.relative_to(lexical_root)
+    except ValueError as error:
+        raise EvidenceInvalid(
+            f"{label} path escapes the configured output directory"
+        ) from error
+    if not relative.parts or any(part in {"", ".", ".."} for part in relative.parts):
+        raise EvidenceInvalid(f"{label} relative path is not canonical")
+
+    current = lexical_root
+    for part in relative.parts:
+        current /= part
+        if current.is_symlink():
+            raise EvidenceInvalid(
+                f"{label} path contains a symlink: {relative.as_posix()}"
+            )
+    temporary = lexical_path.with_suffix(lexical_path.suffix + ".tmp")
+    if temporary.is_symlink():
+        raise EvidenceInvalid(
+            f"{label} temporary path is a symlink: {relative.as_posix()}"
+        )
+    try:
+        lexical_path.resolve(strict=False).relative_to(
+            lexical_root.resolve(strict=False)
+        )
+    except ValueError as error:
+        raise EvidenceInvalid(
+            f"{label} resolved path escapes the configured output directory"
+        ) from error
+    return relative
+
+
+def _safe_transient_serial_component(value: Any) -> str:
+    if (
+        type(value) is not str
+        or not 1 <= len(value) <= 128
+        or value in {".", ".."}
+        or not value[0].isalnum()
+        or any(not (character.isalnum() or character in "._-") for character in value)
+    ):
+        raise ValueError("transient serial is not one safe path component")
+    return value
+
+
+def _preflight_transient_output_paths(
+    output_root: Path,
+    serial: Any,
+    *,
+    sidecar_inventory_policy: str = "empty",
+) -> Path:
+    """Create and recheck the exact report/sidecar tree before radio access."""
+
+    selected_serial = _safe_transient_serial_component(serial)
+    if output_root.is_symlink():
+        raise EvidenceInvalid("transient configured output directory is a symlink")
+    output_root.mkdir(parents=True, exist_ok=True)
+    if output_root.is_symlink() or not output_root.is_dir():
+        raise EvidenceInvalid("transient configured output directory is unsafe")
+
+    serial_directory = output_root / selected_serial
+    sidecar_directory = serial_directory / "transient-iq" / MODE_TANDEM / "batch"
+    current = output_root
+    for component in (
+        selected_serial,
+        "transient-iq",
+        MODE_TANDEM,
+        "batch",
+    ):
+        current /= component
+        _checked_transient_output_relative_path(
+            current,
+            output_root=output_root,
+            label="transient output directory",
+        )
+        current.mkdir(exist_ok=True)
+        _checked_transient_output_relative_path(
+            current,
+            output_root=output_root,
+            label="transient output directory",
+        )
+        if not current.is_dir():
+            raise EvidenceInvalid("transient output component is not a directory")
+
+    report_path = serial_directory / "tandem-agc-transient-report.json"
+    _checked_transient_output_relative_path(
+        report_path,
+        output_root=output_root,
+        label="transient atomic report",
+    )
+    allowed_sidecar_names: set[str] = set()
+    for frame_index in range(_TANDEM_BATCH_FRAMES):
+        for suffix in (".cs16", ".metadata.bin"):
+            filename = f"frame-{frame_index:04d}{suffix}"
+            allowed_sidecar_names.add(filename)
+            _checked_transient_output_relative_path(
+                sidecar_directory / filename,
+                output_root=output_root,
+                label="tandem sidecar",
+            )
+    if sidecar_inventory_policy not in {"empty", "partial", "complete"}:
+        raise ValueError("unknown transient sidecar inventory policy")
+    observed: set[str] = set()
+    allowed_partial_names = {
+        *allowed_sidecar_names,
+        *(f"{name}.tmp" for name in allowed_sidecar_names),
+    }
+    for existing in sidecar_directory.iterdir():
+        observed.add(existing.name)
+        allowed = (
+            allowed_partial_names
+            if sidecar_inventory_policy == "partial"
+            else allowed_sidecar_names
+        )
+        if (
+            existing.name not in allowed
+            or existing.is_symlink()
+            or not existing.is_file()
+        ):
+            raise EvidenceInvalid(
+                "tandem sidecar directory contains an unplanned artifact"
+            )
+    if sidecar_inventory_policy == "empty" and observed:
+        raise EvidenceInvalid("tandem sidecar directory is not empty before RF")
+    if (
+        sidecar_inventory_policy == "complete"
+        and observed != allowed_sidecar_names
+    ):
+        raise EvidenceInvalid(
+            "tandem sidecar directory does not contain the exact 128-file inventory"
+        )
+    return report_path
+
+
+def _prepare_tandem_artifact_inventory(
+    frames: Sequence[_DeferredFrame],
+    *,
+    quality: TandemQualityOptions,
+    iq_dir: Path,
+) -> None:
+    """Predeclare and validate the exact 128 sidecars before the first write."""
+
+    if quality.output_dir.is_symlink():
+        raise EvidenceInvalid(
+            "tandem configured output directory must not be a symlink"
+        )
+    try:
+        relative_directory = iq_dir.absolute().relative_to(
+            quality.output_dir.absolute()
+        )
+    except ValueError as error:
+        raise EvidenceInvalid(
+            "tandem sidecar directory escapes the configured output directory"
+        ) from error
+    if (
+        len(relative_directory.parts) != 4
+        or relative_directory.parts[1:]
+        != ("transient-iq", MODE_TANDEM, "batch")
+    ):
+        raise EvidenceInvalid(
+            "tandem sidecar directory does not use the exact serial-scoped layout"
+        )
+
+    planned_paths: set[str] = set()
+    for frame in frames:
+        frame_index = int(frame.record["frame_index"])
+        if frame.metadata is None:
+            raise EvidenceInvalid("tandem retained frame lacks metadata")
+        if frame.raw_metadata is None:
+            raise EvidenceInvalid("tandem retained frame lacks raw metadata")
+        iq_path = iq_dir / f"frame-{frame_index:04d}.cs16"
+        metadata_path = iq_dir / f"frame-{frame_index:04d}.metadata.bin"
+        iq_relative = _checked_transient_output_relative_path(
+            iq_path, output_root=quality.output_dir, label="tandem sidecar"
+        )
+        metadata_relative = _checked_transient_output_relative_path(
+            metadata_path,
+            output_root=quality.output_dir,
+            label="tandem sidecar",
+        )
+        for relative in (iq_relative, metadata_relative):
+            encoded = relative.as_posix()
+            if encoded in planned_paths:
+                raise EvidenceInvalid("tandem sidecar inventory contains a duplicate")
+            planned_paths.add(encoded)
+        frame.record.update(
+            {
+                "sha256": hashlib.sha256(frame.raw).hexdigest(),
+                "iq_path": iq_relative.as_posix(),
+                "raw_metadata_path": metadata_relative.as_posix(),
+                "raw_metadata_bytes": len(frame.raw_metadata),
+                "raw_metadata_sha256": hashlib.sha256(
+                    frame.raw_metadata
+                ).hexdigest(),
+                "artifact_policy": "mandatory_exact_release_sidecars",
+                "artifact_write_status": {
+                    "iq_write_completed": False,
+                    "raw_metadata_write_completed": False,
+                },
+            }
+        )
+    if len(planned_paths) != 2 * _TANDEM_BATCH_FRAMES:
+        raise EvidenceInvalid("tandem sidecar inventory is not exactly 128 files")
+
+
+def _materialize_tandem_batch(
+    frames: Sequence[_DeferredFrame],
+    *,
+    quality: TandemQualityOptions,
+    check_deadline: Callable[[], None],
+) -> None:
+    """Hash, analyze, and persist every frame only after normal buffer close."""
+
+    for frame in frames:
+        check_deadline()
+        if frame.metadata is None:
+            raise EvidenceInvalid("tandem retained frame lacks metadata")
+        if frame.raw_metadata is None:
+            raise EvidenceInvalid("tandem retained frame lacks raw metadata")
+        frame.record["metadata"] = _metadata_dict(frame.metadata)
+        frame.record["analysis"] = dict(
+            analyze_immediate_dual_rx(
+                frame.raw,
+                first_sample_sequence=int(frame.record["first_sample_sequence"]),
+                sample_rate_hz=quality.sample_rate_hz,
+                expected_tone_hz=quality.tone_hz,
+                window_samples=_TANDEM_WINDOW_SAMPLES,
+                min_tone_snr_db=quality.thresholds.min_tone_snr_db,
+                max_clipping_fraction=quality.thresholds.max_clipping_fraction,
+                max_phase_std_deg=quality.thresholds.max_phase_std_deg,
+            )
+        )
+        iq_path = quality.output_dir / frame.record["iq_path"]
+        metadata_path = quality.output_dir / frame.record["raw_metadata_path"]
+        _atomic_bytes(iq_path, frame.raw)
+        frame.record["artifact_write_status"]["iq_write_completed"] = True
+        _atomic_bytes(metadata_path, frame.raw_metadata)
+        frame.record["artifact_write_status"][
+            "raw_metadata_write_completed"
+        ] = True
+
+
+def _tandem_artifact_manifest(frames: Sequence[_DeferredFrame]) -> dict[str, Any]:
+    entries = [
+        {
+            "frame_index": int(frame.record["frame_index"]),
+            "iq_path": frame.record["iq_path"],
+            "iq_bytes": int(frame.record["iq_bytes"]),
+            "iq_sha256": frame.record["sha256"],
+            "raw_metadata_path": frame.record["raw_metadata_path"],
+            "raw_metadata_bytes": int(frame.record["raw_metadata_bytes"]),
+            "raw_metadata_sha256": frame.record["raw_metadata_sha256"],
+            "write_status": frame.record["artifact_write_status"],
+        }
+        for frame in frames
+    ]
+    if len(entries) != _TANDEM_BATCH_FRAMES:
+        raise EvidenceInvalid("tandem artifact manifest is not exactly 64 frames")
+    encoded = json.dumps(
+        entries, sort_keys=True, separators=(",", ":"), allow_nan=False
+    ).encode("utf-8")
+    return {
+        "path_root": "quality.output_dir",
+        "relative_directory": (
+            f"{frames[0].record['iq_path'].rsplit('/', 1)[0]}"
+        ),
+        "frame_count": len(entries),
+        "file_count": 2 * len(entries),
+        "iq_total_bytes": sum(item["iq_bytes"] for item in entries),
+        "raw_metadata_total_bytes": sum(
+            item["raw_metadata_bytes"] for item in entries
+        ),
+        "completed_iq_files": sum(
+            item["write_status"]["iq_write_completed"] for item in entries
+        ),
+        "completed_raw_metadata_files": sum(
+            item["write_status"]["raw_metadata_write_completed"]
+            for item in entries
+        ),
+        "write_complete": all(
+            item["write_status"]["iq_write_completed"]
+            and item["write_status"]["raw_metadata_write_completed"]
+            for item in entries
+        ),
+        "entries": entries,
+        "entries_canonical_json_sha256": hashlib.sha256(encoded).hexdigest(),
+    }
+
+
+def _require_tandem_batch_window_quality(
+    frames: Sequence[_DeferredFrame],
+    *,
+    commands: Sequence[StimulusCommand],
+) -> None:
+    brackets: list[tuple[int, int]] = []
+    for command in commands:
+        if (
+            command.sample_sequence_before is None
+            or command.sample_sequence_after is None
+        ):
+            raise EvidenceInvalid("tandem quality gate command lacks a bracket")
+        brackets.append(
+            (command.sample_sequence_before, command.sample_sequence_after)
+        )
+    for frame in frames:
+        for window in frame.record["analysis"]["windows"]:
+            start = int(window["sample_start"])
+            end = int(window["sample_end_exclusive"])
+            intersects_command = any(
+                start < upper and end > lower for lower, upper in brackets
+            )
+            if not intersects_command and window.get("quality_valid") is not True:
+                raise EvidenceInvalid(
+                    "tandem returned-IQ window outside both command brackets "
+                    f"failed quality gates: {window.get('quality_reasons')!r}"
+                )
+
+
+def _analyze_tandem_frame_slice(
+    frame: _DeferredFrame,
+    *,
+    offset_samples: int,
+    sample_count: int,
+    role: str,
+    quality: TandemQualityOptions,
+) -> dict[str, Any]:
+    if (
+        offset_samples < 0
+        or sample_count <= 0
+        or offset_samples + sample_count > _TANDEM_FRAME_SAMPLES
+        or sample_count % _TANDEM_WINDOW_SAMPLES
+    ):
+        raise EvidenceInvalid(f"tandem {role} analysis slice is invalid")
+    byte_start = offset_samples * 8
+    byte_end = byte_start + sample_count * 8
+    raw = frame.raw[byte_start:byte_end]
+    first_sample = int(frame.record["first_sample_sequence"]) + offset_samples
+    analysis = dict(
+        analyze_immediate_dual_rx(
+            raw,
+            first_sample_sequence=first_sample,
+            sample_rate_hz=quality.sample_rate_hz,
+            expected_tone_hz=quality.tone_hz,
+            window_samples=_TANDEM_WINDOW_SAMPLES,
+            min_tone_snr_db=quality.thresholds.min_tone_snr_db,
+            max_clipping_fraction=quality.thresholds.max_clipping_fraction,
+            max_phase_std_deg=quality.thresholds.max_phase_std_deg,
+        )
+    )
+    if analysis.get("quality_valid") is not True:
+        raise EvidenceInvalid(f"tandem {role} returned-IQ slice failed quality gates")
+    return {
+        "role": role,
+        "source_frame_index": int(frame.record["frame_index"]),
+        "source_frame_sha256": frame.record.get("sha256"),
+        "sample_offset_in_frame": offset_samples,
+        "samples_per_channel": sample_count,
+        "byte_offset_in_frame": byte_start,
+        "byte_end_exclusive_in_frame": byte_end,
+        "iq_bytes": len(raw),
+        "first_sample_sequence": first_sample,
+        "sample_end_exclusive": first_sample + sample_count,
+        "sha256": hashlib.sha256(raw).hexdigest(),
+        "analysis": analysis,
+    }
+
+
+def _stable_tandem_partition_suffix(
+    frames: Sequence[_DeferredFrame],
+    *,
+    frame_indices: Sequence[int],
+    label: str,
+    tolerance_db: float,
+) -> dict[str, Any]:
+    selected_indices = list(frame_indices[-_TANDEM_REQUIRED_PARTITION_FRAMES:])
+    if len(selected_indices) != _TANDEM_REQUIRED_PARTITION_FRAMES:
+        raise EvidenceInvalid(f"tandem {label} lacks an exact eight-frame suffix")
+    selected = [frames[index] for index in selected_indices]
+    metadata = [frame.metadata for frame in selected]
+    if any(item is None for item in metadata):
+        raise EvidenceInvalid(f"tandem {label} stable suffix lacks metadata")
+    typed = [item for item in metadata if item is not None]
+    transition_counts = {item.tandem_transition_count for item in typed}
+    endpoints = {item.bench_gain_indices for item in typed}
+    if (
+        len(transition_counts) != 1
+        or len(endpoints) != 1
+        or any(item.gain_events for item in typed)
+    ):
+        raise EvidenceInvalid(
+            f"tandem {label} eight-frame suffix is not event/endpoint stable"
+        )
+    windows = [
+        window
+        for frame in selected
+        for window in frame.record["analysis"]["windows"]
+    ]
+    if not windows or any(window.get("quality_valid") is not True for window in windows):
+        raise EvidenceInvalid(f"tandem {label} stable suffix failed RF quality")
+    frame_channel_medians = [
+        [
+            float(
+                statistics.median(
+                    float(window["tone_dbfs"][channel])
+                    for window in frame.record["analysis"]["windows"]
+                )
+            )
+            for channel in (0, 1)
+        ]
+        for frame in selected
+    ]
+    suffix_channel_medians = [
+        float(
+            statistics.median(
+                float(window["tone_dbfs"][channel]) for window in windows
+            )
+        )
+        for channel in (0, 1)
+    ]
+    maximum_frame_median_deviations = [
+        max(
+            abs(row[channel] - suffix_channel_medians[channel])
+            for row in frame_channel_medians
+        )
+        for channel in (0, 1)
+    ]
+    maximum_window_deviations = [
+        max(
+            abs(float(window["tone_dbfs"][channel]) - suffix_channel_medians[channel])
+            for window in windows
+        )
+        for channel in (0, 1)
+    ]
+    if any(value > tolerance_db for value in maximum_window_deviations):
+        raise EvidenceInvalid(
+            f"tandem {label} stable suffix exceeds its RF tolerance"
+        )
+    endpoint = typed[-1].bench_gain_indices
+    return {
+        "frame_indices": selected_indices,
+        "required_frame_count": _TANDEM_REQUIRED_PARTITION_FRAMES,
+        "transition_count": typed[-1].tandem_transition_count,
+        "bench_gain_indices": [endpoint[0], endpoint[1]],
+        "event_count": 0,
+        "rf_window_count": len(windows),
+        "rf_quality_valid": True,
+        "frame_channel_median_tone_dbfs": frame_channel_medians,
+        "suffix_channel_median_tone_dbfs": suffix_channel_medians,
+        "maximum_frame_median_deviation_db": maximum_frame_median_deviations,
+        "maximum_frame_median_deviation_limit_db": tolerance_db,
+        "maximum_window_deviation_db": maximum_window_deviations,
+        "maximum_window_deviation_limit_db": tolerance_db,
+    }
 
 
 def _timestamp_tandem_command(
@@ -1455,9 +3100,10 @@ def _response_summary(
 def _build_tandem_request(
     quality: TandemQualityOptions, capture: TransientCaptureOptions
 ) -> bytes:
+    del capture  # Tandem release transport is frozen independently of ordinary cells.
     return build_tandem_request(
         mode=TandemMode.AUTO,
-        initial_gain_db=int(quality.manual_gain_db),
+        initial_gain_db=_TANDEM_INITIAL_GAIN_DB,
         power_measurement_samples=quality.tandem_power_measurement_samples,
         low_power_dwell_periods=quality.tandem_low_power_dwell_periods,
         cooldown_periods=quality.tandem_cooldown_periods,
@@ -1465,8 +3111,54 @@ def _build_tandem_request(
         large_lmt_overload_threshold=quality.tandem_large_lmt_overload_threshold,
         large_adc_overload_threshold=quality.tandem_large_adc_overload_threshold,
         small_adc_overload_threshold=quality.tandem_small_adc_overload_threshold,
-        samples_per_channel=capture.frame_samples,
+        samples_per_channel=_TANDEM_FRAME_SAMPLES,
     )
+
+
+_TANDEM_REQUEST_FIELD_NAMES = (
+    "magic",
+    "abi_version",
+    "request_bytes",
+    "required_features",
+    "mode",
+    "observation_capacity",
+    "event_capacity",
+    "minimum_gain_db",
+    "maximum_gain_db",
+    "initial_gain_db",
+    "power_measurement_samples",
+    "low_power_dwell_periods",
+    "cooldown_periods",
+    "pulse_high_cycles",
+    "pulse_low_cycles",
+    "detector_blanking_cycles",
+    "low_power_threshold",
+    "large_lmt_overload_threshold",
+    "large_adc_overload_threshold",
+    "small_adc_overload_threshold",
+    "observation_overflow_policy",
+    "event_overflow_policy",
+    "reserved_0",
+    "reserved_1",
+    "reserved_2",
+    "reserved_3",
+    "reserved_4",
+    "reserved_5",
+    "reserved_6",
+    "reserved_7",
+)
+
+
+def _tandem_request_evidence(request: bytes) -> dict[str, Any]:
+    decoded = dict(
+        zip(_TANDEM_REQUEST_FIELD_NAMES, TANDEM_REQUEST.unpack(request), strict=True)
+    )
+    return {
+        "wire_bytes": len(request),
+        "wire_hex": request.hex(),
+        "sha256": hashlib.sha256(request).hexdigest(),
+        "decoded": decoded,
+    }
 
 
 def _check_effective_attenuation(
@@ -1594,6 +3286,970 @@ def _command_record(
     return record
 
 
+def _batch_command_record(
+    command: StimulusCommand,
+    *,
+    effective_attenuation_db: float,
+    sample_counter_bracket: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        **command.as_dict(),
+        "effective_attenuation_db": effective_attenuation_db,
+        "rx_state_before": None,
+        "rx_state_after": None,
+        "timing_role": (
+            "s0_targeted_one_write_bracketed_by_coherent_fpga_counter"
+        ),
+        "sample_timing_basis": _TANDEM_TIMING_BASIS,
+        "sample_anchor_policy": (
+            "post-open S0 plus frozen target; exact one-TX2-write interval is "
+            "[A,C) during initiating batch refill"
+        ),
+        "sample_counter_bracket": dict(sample_counter_bracket),
+    }
+
+
+def _strict_tandem_status(
+    radio: TransientRadioTransport, *, owned: bool, label: str
+) -> dict[str, int]:
+    names = (
+        "state",
+        "fault_flags",
+        "overflow_count",
+        "fifo_level",
+        "ownership_epoch",
+        "transition_count",
+        "rx1_gain_index",
+        "rx2_gain_index",
+    )
+    raw = radio.tandem_status()
+    try:
+        values = {name: raw[name] for name in names}
+    except (KeyError, TypeError) as error:
+        raise EvidenceInvalid(f"{label} tandem status is incomplete") from error
+    if any(type(value) is not int for value in values.values()):
+        raise EvidenceInvalid(f"{label} tandem status contains a non-exact integer")
+    status = dict(values)
+    if status["fault_flags"] or status["overflow_count"]:
+        raise EvidenceInvalid(f"{label} tandem status reports a fault/overflow")
+    if not all(
+        0 <= status[name] < _UINT32_MODULUS
+        for name in (
+            "fault_flags",
+            "overflow_count",
+            "fifo_level",
+            "ownership_epoch",
+            "transition_count",
+        )
+    ):
+        raise EvidenceInvalid(f"{label} tandem status counter lies outside uint32")
+    if status["rx1_gain_index"] != status["rx2_gain_index"]:
+        raise EvidenceInvalid(f"{label} tandem endpoint is torn")
+    if not 0 <= status["rx1_gain_index"] <= 127:
+        raise EvidenceInvalid(f"{label} tandem endpoint lies outside uint7")
+    if owned:
+        if (
+            status["state"] != int(TandemState.ARMED_AUTO)
+            or status["ownership_epoch"] <= 0
+            or not 0 <= status["fifo_level"] <= 64
+        ):
+            raise EvidenceInvalid(f"{label} tandem AUTO ownership is invalid")
+    elif (
+        status["state"] != int(TandemState.IDLE)
+        or status["fifo_level"] != 0
+        or status["ownership_epoch"] != 0
+    ):
+        raise EvidenceInvalid(f"{label} tandem controller is not fully idle")
+    return status
+
+
+def _response_window_ledger(
+    frames: Sequence[_DeferredFrame],
+    *,
+    sample_start: int,
+    sample_end_exclusive: int,
+    label: str,
+) -> tuple[list[Mapping[str, Any]], dict[str, Any]]:
+    windows = [
+        window
+        for frame in frames
+        for window in frame.record["analysis"]["windows"]
+        if int(window["sample_start"]) >= sample_start
+        and int(window["sample_end_exclusive"]) <= sample_end_exclusive
+    ]
+    if not windows:
+        raise EvidenceInvalid(f"tandem {label} response window selection is empty")
+    for previous, current in pairwise(windows):
+        if int(previous["sample_end_exclusive"]) != int(current["sample_start"]):
+            raise EvidenceInvalid(
+                f"tandem {label} response windows are not sample contiguous"
+            )
+    selected_indices = sorted(
+        {
+            int(frame.record["frame_index"])
+            for frame in frames
+            if any(window in frame.record["analysis"]["windows"] for window in windows)
+        }
+    )
+    return windows, {
+        "frame_indices": selected_indices,
+        "sample_sequence_before": int(windows[0]["sample_start"]),
+        "sample_sequence_after": int(windows[-1]["sample_end_exclusive"]),
+        "window_samples": _TANDEM_WINDOW_SAMPLES,
+        "window_count": len(windows),
+        "selection": (
+            "all complete persisted batch-frame windows inside the stated "
+            "half-open sample interval"
+        ),
+    }
+
+
+def _run_tandem_batch_mode_body(
+    radio: TransientRadioTransport,
+    *,
+    quality: TandemQualityOptions,
+    capture: TransientCaptureOptions,
+    check_deadline: Callable[[], None],
+    clock_ns: Callable[[], int],
+    monotonic: Callable[[], float],
+    sleep: Callable[[float], None],
+    metadata_parser: Callable[[bytes], TandemFrameMetadata],
+    output_dir: Path,
+    failure_sink: Callable[[Mapping[str, Any]], None] | None,
+    command_specs: Sequence[tuple[str, float, int]] | None = None,
+    release_eligible: bool = True,
+) -> dict[str, Any]:
+    """Run one reusable two-command batch session for tandem release evidence."""
+
+    selected_specs = tuple(
+        command_specs
+        or (
+            (
+                "strong_attack",
+                capture.strong_stimulus_tx_gain_db,
+                _TANDEM_ATTACK_TARGET_FRAMES,
+            ),
+            (
+                "weak_release",
+                capture.weak_stimulus_tx_gain_db,
+                _TANDEM_RELEASE_TARGET_FRAMES,
+            ),
+        )
+    )
+    if type(release_eligible) is not bool:
+        raise TypeError("tandem batch release eligibility must be a boolean")
+    if (
+        len(selected_specs) != 2
+        or [item[2] for item in selected_specs]
+        != [_TANDEM_ATTACK_TARGET_FRAMES, _TANDEM_RELEASE_TARGET_FRAMES]
+        or len({item[0] for item in selected_specs}) != 2
+    ):
+        raise ValueError("tandem batch session requires two frozen ordered targets")
+    for command_id, level_db, target_frames in selected_specs:
+        if type(command_id) is not str or not command_id:
+            raise ValueError("tandem batch command IDs must be nonempty strings")
+        if (
+            isinstance(level_db, bool)
+            or not isinstance(level_db, (int, float))
+            or not math.isfinite(float(level_db))
+            or not TX_MUTE_DB <= float(level_db) <= (
+                capture.strong_stimulus_tx_gain_db
+            )
+        ):
+            raise ValueError("tandem batch command level is not authorized")
+        if type(target_frames) is not int:
+            raise ValueError("tandem batch target frame offset must be an integer")
+    production_specs = (
+        (
+            "strong_attack",
+            float(capture.strong_stimulus_tx_gain_db),
+            _TANDEM_ATTACK_TARGET_FRAMES,
+        ),
+        (
+            "weak_release",
+            float(capture.weak_stimulus_tx_gain_db),
+            _TANDEM_RELEASE_TARGET_FRAMES,
+        ),
+    )
+    normalized_specs = tuple(
+        (command_id, float(level_db), target_frames)
+        for command_id, level_db, target_frames in selected_specs
+    )
+    if release_eligible and normalized_specs != production_specs:
+        raise ValueError(
+            "release-eligible tandem batch commands differ from the exact "
+            "strong/weak production trajectory"
+        )
+
+    memory_ledger = _tandem_memory_ledger()
+    if memory_ledger["within_cap"] is not True:
+        raise EvidenceInvalid("tandem batch resident-memory ledger exceeds its cap")
+    record: dict[str, Any] = {
+        "mode": MODE_TANDEM,
+        "verdict": "running",
+        "timing_basis": _TANDEM_TIMING_BASIS,
+        "commands": [],
+        "batch_frames": [],
+        "partition": None,
+        "conditioning_anchor": None,
+        "response_observations": {},
+        "responses": {},
+        "gain_evidence": None,
+        "metadata_request": None,
+        "acquisition": {
+            "transport": "single_metadata_batch",
+            "provider_frame_samples": _TANDEM_FRAME_SAMPLES,
+            "kernel_buffers": _TANDEM_KERNEL_BUFFERS,
+            "batch_frames": _TANDEM_BATCH_FRAMES,
+            "queue_capacity_frames": _TANDEM_CAPTURE_QUEUE_FRAMES,
+            "metadata_capacity_bytes": _TANDEM_METADATA_CAPACITY_BYTES,
+            "metadata_physics_policy": {
+                "protocol_version": 5,
+                "header_bytes": _TANDEM_METADATA_HEADER_BYTES,
+                "required_features": _TANDEM_REQUIRED_METADATA_FEATURES,
+                "required_flags": _TANDEM_REQUIRED_METADATA_FLAGS,
+                "sample_format": 1,
+                "observation_capacity": 64,
+                "event_capacity": 64,
+                "maximum_observations_per_frame": 5,
+                "maximum_events_per_frame": maximum_tandem_events_per_frame(
+                    mode=TandemMode.AUTO,
+                    samples_per_channel=_TANDEM_FRAME_SAMPLES,
+                    power_measurement_samples=(
+                        quality.tandem_power_measurement_samples
+                    ),
+                    cooldown_periods=quality.tandem_cooldown_periods,
+                ),
+                "minimum_event_spacing_samples": (
+                    quality.tandem_power_measurement_samples
+                    * (quality.tandem_cooldown_periods + 1)
+                ),
+            },
+            "metadata_abi": None,
+            "configured_batch_frames": None,
+            "configured_batch_cache_bytes": None,
+            "batch_cache_attested": False,
+            "memory_ledger": memory_ledger,
+            "s0_read": {
+                "host_before_ns": None,
+                "host_after_ns": None,
+                "raw": None,
+            },
+            "post_open_s0_raw": None,
+            "targets": {},
+            "schedule_diagnostics": {},
+            "schedule_frozen_before_worker_start": False,
+            "schedule_plan": {
+                "s0_read_host_after_ns": None,
+                "targets_frozen_host_ns": None,
+                "worker_start_requested_ns": None,
+                "worker_start_returned_ns": None,
+                "commands": [],
+            },
+            "unbound_commands": {},
+            "initiating_batch_refill_calls": 0,
+            "public_refill_calls": 0,
+            "cached_replay_refill_calls": 0,
+            "batch_cache_fully_replayed": False,
+            "initiating_refill_completion_monotonic_ns": None,
+            "produced_frames": 0,
+            "consumed_frames": 0,
+            "discarded_tail_frames": 0,
+            "pre_close_tandem_status": None,
+            "buffer_close_completed": False,
+            "post_close_tandem_status": None,
+            "close_counter_ledger": None,
+            "artifact_manifest": None,
+            "shutdown": {
+                "events": [],
+                "worker_in_flight_before_shutdown": None,
+                "cancel_required": None,
+                "cancel_called": False,
+                "cancel_succeeded": None,
+                "worker_stopped": False,
+                "batch_fully_consumed": False,
+                "shutdown_path": None,
+            },
+        },
+    }
+    acquisition = record["acquisition"]
+    frames: list[_DeferredFrame] = []
+    initial_unanchored: StimulusCommand | None = None
+    bound_commands: dict[str, StimulusCommand] = {}
+    command_brackets: dict[str, Mapping[str, Any]] = {}
+
+    try:
+        radio.mute_all()
+        record["tandem_status_before"] = _wait_for_idle(
+            radio, monotonic=monotonic, sleep=sleep
+        )
+        radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
+        radio.arm_tx2_tone(tone_hz=quality.tone_hz, scale=quality.dds_scale)
+        initial_unanchored = timestamp_stimulus_command(
+            "weak_initial",
+            capture.weak_stimulus_tx_gain_db,
+            apply=radio.set_tx2_gain,
+            clock_ns=clock_ns,
+            max_host_jitter_ns=capture.max_host_jitter_ns,
+            readback_tolerance_db=capture.readback_tolerance_db,
+        )
+        initial_effective = _check_effective_attenuation(quality, initial_unanchored)
+        record["commands"].append(
+            {
+                **initial_unanchored.as_dict(),
+                "effective_attenuation_db": initial_effective,
+                "rx_state_before": None,
+                "rx_state_after": None,
+                "timing_role": "pre_session_weak_conditioning_write",
+                "sample_timing_basis": None,
+                "sample_anchor_policy": (
+                    "unbounded in hardware sample time; write predates AUTO62 "
+                    "batch ownership"
+                ),
+            }
+        )
+        request = _build_tandem_request(quality, capture)
+        record["metadata_request"] = _tandem_request_evidence(request)
+        state = _CaptureState()
+        tandem_capture = replace(
+            capture,
+            frame_samples=_TANDEM_FRAME_SAMPLES,
+            window_samples=_TANDEM_WINDOW_SAMPLES,
+        )
+        worker: _TandemBatchWorker | None = None
+        cancel_capture: Callable[[], Any] | None = None
+        session_error: BaseException | None = None
+        try:
+            with radio.buffer(
+                "metadata",
+                _TANDEM_KERNEL_BUFFERS,
+                _TANDEM_FRAME_SAMPLES,
+                tandem_request=request,
+                batch_frames=_TANDEM_BATCH_FRAMES,
+            ) as (buffer, metadata_abi):
+                cancel_value = getattr(buffer, "cancel", None)
+                cancel_capture = cancel_value if callable(cancel_value) else None
+                configured_batch_frames = getattr(buffer, "batch_frames", None)
+                configured_batch_cache_bytes = getattr(
+                    buffer, "batch_cache_bytes", None
+                )
+                acquisition.update(
+                    {
+                        "metadata_abi": metadata_abi,
+                        "configured_batch_frames": configured_batch_frames,
+                        "configured_batch_cache_bytes": configured_batch_cache_bytes,
+                    }
+                )
+                try:
+                    if (
+                        metadata_abi != 2
+                        or cancel_capture is None
+                        or type(configured_batch_frames) is not int
+                        or configured_batch_frames != _TANDEM_BATCH_FRAMES
+                        or type(configured_batch_cache_bytes) is not int
+                        or configured_batch_cache_bytes != _TANDEM_BATCH_CACHE_BYTES
+                    ):
+                        raise EvidenceInvalid(
+                            "tandem release requires ABI2, batch64 cache "
+                            "attestation, and thread-safe cancel"
+                        )
+                    acquisition["batch_cache_attested"] = True
+                    s0_read = acquisition["s0_read"]
+                    s0_read["host_before_ns"] = _schedule_timestamp(
+                        clock_ns, name="post-open S0 read start"
+                    )
+                    s0_raw = _strict_low32_counter(
+                        radio.read_rx_sample_counter_low32()
+                    )
+                    s0_read["host_after_ns"] = _schedule_timestamp(
+                        clock_ns, name="post-open S0 read completion"
+                    )
+                    if s0_read["host_after_ns"] < s0_read["host_before_ns"]:
+                        raise EvidenceInvalid("post-open S0 read clock moved backward")
+                    s0_read["raw"] = s0_raw
+                    acquisition["post_open_s0_raw"] = s0_raw
+
+                    def acquire_one() -> _DeferredFrame:
+                        return _capture_frame(
+                            radio,
+                            buffer,
+                            mode=MODE_TANDEM,
+                            expected_iio_mode="manual",
+                            quality=quality,
+                            capture=tandem_capture,
+                            state=state,
+                            metadata_parser=metadata_parser,
+                            gap_context=_GAP_CONTEXT_ACQUISITION,
+                            expected_tandem_initial_gain_db=(
+                                _TANDEM_INITIAL_GAIN_DB
+                            ),
+                        )
+
+                    worker = _TandemBatchWorker(acquire_one)
+                    if worker.queue_capacity_frames != _TANDEM_CAPTURE_QUEUE_FRAMES:
+                        raise EvidenceInvalid(
+                            "tandem batch worker queue differs from memory ledger"
+                        )
+                    for command_id, level_db, target_frames in selected_specs:
+                        diagnostics = _new_batch_command_diagnostics(
+                            command_id=command_id,
+                            requested_level_db=level_db,
+                            target_frames=target_frames,
+                            s0_raw=s0_raw,
+                        )
+                        acquisition["schedule_diagnostics"][command_id] = diagnostics
+                        acquisition["targets"][command_id] = {
+                            "offset_frames": target_frames,
+                            "offset_samples": (
+                                target_frames * _TANDEM_FRAME_SAMPLES
+                            ),
+                            "target_raw": diagnostics["target"]["target_raw"],
+                        }
+                    schedule_plan = acquisition["schedule_plan"]
+                    schedule_plan["s0_read_host_after_ns"] = s0_read[
+                        "host_after_ns"
+                    ]
+                    schedule_plan["commands"] = [
+                        {
+                            "command_id": command_id,
+                            "requested_level_db": level_db,
+                            **acquisition["targets"][command_id],
+                        }
+                        for command_id, level_db, _target_frames in selected_specs
+                    ]
+                    schedule_plan["targets_frozen_host_ns"] = _schedule_timestamp(
+                        clock_ns, name="both tandem targets frozen"
+                    )
+                    acquisition["schedule_frozen_before_worker_start"] = True
+                    schedule_plan["worker_start_requested_ns"] = _schedule_timestamp(
+                        clock_ns, name="tandem worker start requested"
+                    )
+                    worker.start()
+                    schedule_plan["worker_start_returned_ns"] = _schedule_timestamp(
+                        clock_ns, name="tandem worker start returned"
+                    )
+                    chronology = (
+                        schedule_plan["s0_read_host_after_ns"],
+                        schedule_plan["targets_frozen_host_ns"],
+                        schedule_plan["worker_start_requested_ns"],
+                        schedule_plan["worker_start_returned_ns"],
+                    )
+                    if list(chronology) != sorted(chronology):
+                        raise EvidenceInvalid(
+                            "tandem schedule freeze/start chronology is invalid"
+                        )
+                    unbound_commands: dict[str, StimulusCommand] = {}
+                    for command_id, level_db, target_frames in selected_specs:
+                        diagnostics = acquisition["schedule_diagnostics"][command_id]
+                        unbound = _schedule_tandem_batch_command(
+                            radio,
+                            worker,
+                            command_id=command_id,
+                            requested_level_db=level_db,
+                            target_frames=target_frames,
+                            s0_raw=s0_raw,
+                            diagnostics=diagnostics,
+                            check_deadline=check_deadline,
+                            clock_ns=clock_ns,
+                            sleep=sleep,
+                            sample_rate_hz=quality.sample_rate_hz,
+                            max_host_jitter_ns=capture.max_host_jitter_ns,
+                            max_sample_uncertainty=min(
+                                capture.max_sample_uncertainty,
+                                _TANDEM_MAX_CAUSAL_UNCERTAINTY_SAMPLES,
+                            ),
+                            readback_tolerance_db=capture.readback_tolerance_db,
+                        )
+                        unbound_commands[command_id] = unbound
+                        acquisition["unbound_commands"][command_id] = {
+                            **unbound.as_dict(),
+                            "effective_attenuation_db": _check_effective_attenuation(
+                                quality, unbound
+                            ),
+                        }
+
+                    for _ in range(_TANDEM_BATCH_FRAMES):
+                        check_deadline()
+                        frame = worker.take()
+                        frames.append(frame)
+                        retained_bytes = sum(len(item.raw) for item in frames)
+                        if retained_bytes > _TANDEM_MAXIMUM_PYTHON_RAW_BYTES:
+                            raise EvidenceInvalid(
+                                "tandem retained raw IQ exceeds its exact memory bound"
+                            )
+                        retained_metadata_bytes = sum(
+                            len(item.raw_metadata or b"") for item in frames
+                        )
+                        if retained_metadata_bytes > (
+                            _TANDEM_MAXIMUM_PYTHON_RAW_METADATA_BYTES
+                        ):
+                            raise EvidenceInvalid(
+                                "tandem retained raw metadata exceeds its exact "
+                                "memory bound"
+                            )
+                    acquisition.update(
+                        {
+                            "initiating_batch_refill_calls": 1,
+                            "public_refill_calls": _TANDEM_BATCH_FRAMES,
+                            "cached_replay_refill_calls": _TANDEM_BATCH_FRAMES - 1,
+                            "batch_cache_fully_replayed": True,
+                            "initiating_refill_completion_monotonic_ns": int(
+                                frames[0].record["refill_monotonic_ns"]
+                            ),
+                        }
+                    )
+                    _validate_exact_tandem_batch(frames)
+                    record["batch_frames"] = [frame.record for frame in frames]
+                    for command_id, _level_db, _target_frames in selected_specs:
+                        bound, bracket = _bind_tandem_batch_command(
+                            frames,
+                            unbound_commands[command_id],
+                            acquisition["schedule_diagnostics"][command_id],
+                        )
+                        bound_commands[command_id] = bound
+                        command_brackets[command_id] = bracket
+                        record["commands"].append(
+                            _batch_command_record(
+                                bound,
+                                effective_attenuation_db=(
+                                    _check_effective_attenuation(quality, bound)
+                                ),
+                                sample_counter_bracket=bracket,
+                            )
+                        )
+                    attack = bound_commands[selected_specs[0][0]]
+                    release = bound_commands[selected_specs[1][0]]
+                    record["partition"] = _partition_tandem_batch(
+                        frames, attack=attack, release=release
+                    )
+                    initiating_completion = acquisition[
+                        "initiating_refill_completion_monotonic_ns"
+                    ]
+                    if initial_unanchored.host_after_ns > attack.host_before_ns or any(
+                        command.host_after_ns > initiating_completion
+                        for command in bound_commands.values()
+                    ):
+                        raise EvidenceInvalid(
+                            "tandem commands did not complete inside the initiating "
+                            "batch refill"
+                        )
+                except BaseException as error:  # noqa: BLE001 - preserve interrupts
+                    session_error = error
+
+                shutdown = acquisition["shutdown"]
+
+                def shutdown_event(name: str) -> None:
+                    shutdown["events"].append(
+                        {"event": name, "monotonic_ns": time.monotonic_ns()}
+                    )
+
+                mute_error: BaseException | None = None
+                shutdown_event("prejoin_mute_start")
+                try:
+                    radio.mute_all()
+                except BaseException as error:  # noqa: BLE001
+                    mute_error = error
+                    shutdown_event("prejoin_mute_failed")
+                else:
+                    shutdown_event("prejoin_mute_complete")
+                preclose_status_error: BaseException | None = None
+                if session_error is None and mute_error is None:
+                    try:
+                        acquisition["pre_close_tandem_status"] = (
+                            _strict_tandem_status(
+                                radio, owned=True, label="pre-close after mute"
+                            )
+                        )
+                    except BaseException as error:  # noqa: BLE001
+                        preclose_status_error = error
+                worker_in_flight = bool(
+                    worker is not None and worker.first_refill_in_flight
+                )
+                batch_fully_consumed = bool(
+                    worker is not None
+                    and len(frames) == _TANDEM_BATCH_FRAMES
+                    and worker.produced_frames == _TANDEM_BATCH_FRAMES
+                    and worker.consumed_frames == _TANDEM_BATCH_FRAMES
+                )
+                cancel_required = (
+                    session_error is not None
+                    or mute_error is not None
+                    or preclose_status_error is not None
+                    or worker_in_flight
+                )
+                if worker is not None:
+                    worker.request_stop()
+                cancel_error: BaseException | None = None
+                cancel_called = False
+                if cancel_required:
+                    cancel_called = True
+                    shutdown_event("cancel_start")
+                    if cancel_capture is None:
+                        cancel_error = EvidenceInvalid(
+                            "tandem error path lacks buffer cancellation"
+                        )
+                        shutdown_event("cancel_failed")
+                    else:
+                        try:
+                            cancel_capture()
+                        except BaseException as error:  # noqa: BLE001
+                            cancel_error = error
+                            shutdown_event("cancel_failed")
+                        else:
+                            shutdown_event("cancel_complete")
+                stop_error: BaseException | None = None
+                if worker is not None:
+                    shutdown_event("worker_stop_start")
+                    try:
+                        worker.stop()
+                    except BaseException as error:  # noqa: BLE001
+                        stop_error = error
+                        shutdown_event("worker_stop_failed")
+                    else:
+                        shutdown_event("worker_stop_complete")
+                    acquisition.update(
+                        {
+                            "produced_frames": worker.produced_frames,
+                            "consumed_frames": worker.consumed_frames,
+                            "discarded_tail_frames": worker.discarded_tail_frames,
+                        }
+                    )
+                shutdown.update(
+                    {
+                        "worker_in_flight_before_shutdown": worker_in_flight,
+                        "cancel_required": cancel_required,
+                        "cancel_called": cancel_called,
+                        "cancel_succeeded": (
+                            cancel_error is None if cancel_called else None
+                        ),
+                        "worker_stopped": stop_error is None,
+                        "batch_fully_consumed": batch_fully_consumed,
+                        "shutdown_path": (
+                            "cancel_after_error_or_in_flight_batch"
+                            if cancel_required
+                            else "normal_close_after_full_cache_replay"
+                        ),
+                    }
+                )
+                errors = [
+                    error
+                    for error in (
+                        session_error,
+                        mute_error,
+                        preclose_status_error,
+                        cancel_error,
+                        stop_error,
+                    )
+                    if error is not None
+                ]
+                if len(errors) > 1:
+                    raise BaseExceptionGroup(
+                        "tandem batch acquisition or shutdown reported multiple "
+                        "failures",
+                        errors,
+                    )
+                if errors:
+                    error = errors[0]
+                    raise error.with_traceback(error.__traceback__)
+            acquisition["buffer_close_completed"] = True
+        except BaseException:
+            acquisition["buffer_close_completed"] = False
+            raise
+
+        acquisition["post_close_tandem_status"] = _strict_tandem_status(
+            radio, owned=False, label="post-close"
+        )
+        pre_close_status = acquisition["pre_close_tandem_status"]
+        post_close_status = acquisition["post_close_tandem_status"]
+        last_frame_metadata = frames[-1].metadata
+        if last_frame_metadata is None:
+            raise EvidenceInvalid("tandem final retained frame lacks metadata")
+        frame_to_pre_delta = _forward_u32_delta(
+            pre_close_status["transition_count"],
+            last_frame_metadata.tandem_transition_count,
+            context="tandem final frame to pre-close transition count",
+        )
+        transition_delta = _forward_u32_delta(
+            post_close_status["transition_count"],
+            pre_close_status["transition_count"],
+            context="tandem pre-close to post-close transition count",
+        )
+        if frame_to_pre_delta > 64 or transition_delta > 64:
+            raise EvidenceInvalid(
+                "tandem close transition diagnostics exceed the FIFO retirement "
+                "bound"
+            )
+        if pre_close_status["ownership_epoch"] != (
+            last_frame_metadata.ownership_epoch
+        ):
+            raise EvidenceInvalid(
+                "tandem pre-close ownership epoch differs from retained batch"
+            )
+        minimum_gain_index = last_frame_metadata.minimum_gain_index
+        maximum_gain_index = last_frame_metadata.maximum_gain_index
+        frame_endpoint = last_frame_metadata.bench_gain_indices[0]
+        pre_endpoint_value = pre_close_status["rx1_gain_index"]
+        post_endpoint_value = post_close_status["rx1_gain_index"]
+        if any(
+            not minimum_gain_index <= value <= maximum_gain_index
+            for value in (frame_endpoint, pre_endpoint_value, post_endpoint_value)
+        ):
+            raise EvidenceInvalid(
+                "tandem close endpoint lies outside the retained gain-index range"
+            )
+
+        def require_endpoint_delta(
+            before: int, after: int, transitions: int, *, label: str
+        ) -> None:
+            difference = abs(after - before)
+            if difference > transitions or (transitions - difference) % 2:
+                raise EvidenceInvalid(
+                    f"{label} endpoint movement disagrees with transition count"
+                )
+
+        require_endpoint_delta(
+            frame_endpoint,
+            pre_endpoint_value,
+            frame_to_pre_delta,
+            label="tandem final-frame to pre-close",
+        )
+        require_endpoint_delta(
+            pre_endpoint_value,
+            post_endpoint_value,
+            transition_delta,
+            label="tandem pre-close to post-close",
+        )
+        acquisition["close_counter_ledger"] = {
+            "last_frame_transition_count": (
+                last_frame_metadata.tandem_transition_count
+            ),
+            "pre_transition_count": pre_close_status["transition_count"],
+            "post_transition_count": post_close_status["transition_count"],
+            "last_frame_to_pre_close_forward_delta": frame_to_pre_delta,
+            "transition_count_forward_delta": transition_delta,
+            "maximum_forward_delta": 64,
+            "pre_fifo_level": pre_close_status["fifo_level"],
+            "post_fifo_level": post_close_status["fifo_level"],
+            "pre_endpoint": [
+                pre_close_status["rx1_gain_index"],
+                pre_close_status["rx2_gain_index"],
+            ],
+            "post_endpoint": [
+                post_close_status["rx1_gain_index"],
+                post_close_status["rx2_gain_index"],
+            ],
+            "exact_retired_tail_count_claim": None,
+            "policy": (
+                "preserve forward modulo-u32 diagnostics across RELEASE without "
+                "claiming an exact retired FIFO tail count"
+            ),
+        }
+        radio.mute_all()
+        _prepare_tandem_artifact_inventory(
+            frames,
+            quality=quality,
+            iq_dir=output_dir / MODE_TANDEM / "batch",
+        )
+        acquisition["artifact_manifest"] = _tandem_artifact_manifest(frames)
+        try:
+            _materialize_tandem_batch(
+                frames,
+                quality=quality,
+                check_deadline=check_deadline,
+            )
+        finally:
+            acquisition["artifact_manifest"] = _tandem_artifact_manifest(frames)
+        _require_tandem_batch_window_quality(
+            frames,
+            commands=[
+                bound_commands[selected_specs[0][0]],
+                bound_commands[selected_specs[1][0]],
+            ],
+        )
+        record["batch_frames"] = [frame.record for frame in frames]
+
+        attack = bound_commands[selected_specs[0][0]]
+        release = bound_commands[selected_specs[1][0]]
+        partition = record["partition"]
+        groups = partition["groups"]
+        partition["stable_suffixes"] = {
+            phase: _stable_tandem_partition_suffix(
+                frames,
+                frame_indices=groups[phase]["frame_indices"],
+                label=phase,
+                tolerance_db=capture.settling_tolerance_db,
+            )
+            for phase in (
+                "fully_post_attack_pre_release",
+                "fully_post_release",
+            )
+        }
+        anchor_index = groups["fully_pre_attack"]["frame_indices"][-1]
+        anchor_frame = frames[anchor_index]
+        anchor_observation = _analyze_tandem_frame_slice(
+            anchor_frame,
+            offset_samples=(
+                _TANDEM_FRAME_SAMPLES - _TANDEM_CONDITIONING_TAIL_SAMPLES
+            ),
+            sample_count=_TANDEM_CONDITIONING_TAIL_SAMPLES,
+            role="weak_conditioning_tail",
+            quality=quality,
+        )
+        assert initial_unanchored is not None
+        conditioning_command = replace(
+            initial_unanchored,
+            command_id="weak_conditioning_anchor",
+            sample_sequence_before=anchor_observation["first_sample_sequence"],
+            sample_sequence_after=anchor_observation["sample_end_exclusive"],
+        )
+        record["conditioning_anchor"] = {
+            **conditioning_command.as_dict(),
+            "timing_role": "exact_retained_pre_attack_tail",
+            "sample_timing_basis": _TANDEM_TIMING_BASIS,
+            "sample_anchor_policy": (
+                "exact final 8192 samples of the final fully-pre-attack frame; "
+                "conditioning evidence, not initial-write timing"
+            ),
+            "source": anchor_observation,
+        }
+
+        release_baseline_index = groups[
+            "fully_post_attack_pre_release"
+        ]["frame_indices"][-1]
+        release_baseline = _analyze_tandem_frame_slice(
+            frames[release_baseline_index],
+            offset_samples=(
+                _TANDEM_FRAME_SAMPLES - _TANDEM_CONDITIONING_TAIL_SAMPLES
+            ),
+            sample_count=_TANDEM_CONDITIONING_TAIL_SAMPLES,
+            role="strong_pre_release_tail",
+            quality=quality,
+        )
+        attack_windows, attack_window_ledger = _response_window_ledger(
+            frames,
+            sample_start=anchor_observation["first_sample_sequence"],
+            sample_end_exclusive=release.sample_sequence_before,
+            label="attack",
+        )
+        release_windows, release_window_ledger = _response_window_ledger(
+            frames,
+            sample_start=release_baseline["first_sample_sequence"],
+            sample_end_exclusive=int(frames[-1].record["sample_end_exclusive"]),
+            label="release",
+        )
+        record["response_observations"] = {
+            "attack": {
+                **attack_window_ledger,
+                "baseline_anchor": anchor_observation,
+            },
+            "release": {
+                **release_window_ledger,
+                "baseline_anchor": release_baseline,
+            },
+        }
+        record["baseline_frames"] = [anchor_observation]
+        record["attack_frames"] = [
+            frames[index].record
+            for index in (
+                groups["attack_bracket"]["frame_indices"]
+                + groups["fully_post_attack_pre_release"]["frame_indices"]
+            )
+        ]
+        record["release_frames"] = [
+            frames[index].record
+            for index in (
+                groups["release_bracket"]["frame_indices"]
+                + groups["fully_post_release"]["frame_indices"]
+            )
+        ]
+        record["preconditioning"] = {
+            "frame_count": groups["fully_pre_attack"]["count"],
+            "trace_frame_indices": groups["fully_pre_attack"]["frame_indices"],
+            "retained_baseline_frame_indices": [anchor_index],
+            "auto_initial_gain_db": _TANDEM_INITIAL_GAIN_DB,
+            "startup_transition_count": 0,
+        }
+
+        response_kwargs = {
+            "sample_rate_hz": quality.sample_rate_hz,
+            "baseline_windows": capture.baseline_windows,
+            "steady_windows": capture.steady_windows,
+            "stable_windows": capture.stable_windows,
+            "settling_tolerance_db": capture.settling_tolerance_db,
+            "ringing_deadband_db": capture.ringing_deadband_db,
+            "max_host_jitter_ns": capture.max_host_jitter_ns,
+            "max_sample_uncertainty": min(
+                capture.max_sample_uncertainty,
+                _TANDEM_MAX_CAUSAL_UNCERTAINTY_SAMPLES,
+            ),
+        }
+        record["responses"] = {
+            "attack": _qualify_response_timing(
+                calculate_transient_response(
+                    attack_windows,
+                    previous_command=conditioning_command,
+                    command=attack,
+                    **response_kwargs,
+                ),
+                hardware_latency_qualified=True,
+            ),
+            "release": _qualify_response_timing(
+                calculate_transient_response(
+                    release_windows,
+                    previous_command=attack,
+                    command=release,
+                    **response_kwargs,
+                ),
+                hardware_latency_qualified=True,
+            ),
+        }
+        events = [
+            event
+            for frame in frames
+            if frame.metadata is not None
+            for event in frame.metadata.gain_events
+        ]
+        record["gain_evidence"] = dict(
+            reconcile_tandem_events(
+                (conditioning_command, attack, release),
+                events,
+                sample_rate_hz=quality.sample_rate_hz,
+                max_host_jitter_ns=capture.max_host_jitter_ns,
+                max_sample_uncertainty=capture.max_sample_uncertainty,
+                max_latency_samples=capture.max_event_latency_samples,
+            )
+        )
+        record["gain_evidence"].update(
+            {
+                "timing_qualification": "fpga_sample_counter_bounded",
+                "hardware_latency_qualified": True,
+            }
+        )
+        record["metadata_abi"] = acquisition["metadata_abi"]
+        record["tandem_status_after"] = acquisition[
+            "post_close_tandem_status"
+        ]
+        radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
+        record["final_rx_state"] = _rx_state(radio, expected_mode="manual")
+        record["verdict"] = "pass"
+        _attest_tandem_evidence_reservation(record, frames)
+        return record
+    except BaseException as error:
+        if frames and not record["batch_frames"]:
+            partial_records: list[dict[str, Any]] = []
+            for frame in frames:
+                partial = frame.record
+                if frame.metadata is not None and "metadata" not in partial:
+                    partial["metadata"] = _metadata_dict(frame.metadata)
+                partial_records.append(partial)
+            record["batch_frames"] = partial_records
+        record["verdict"] = "invalid"
+        record["fatal_error"] = _exception_text(error)
+        if failure_sink is not None:
+            failure_sink(record)
+        raise
+
+
 def _run_mode_body(
     radio: TransientRadioTransport,
     *,
@@ -1606,7 +4262,22 @@ def _run_mode_body(
     sleep: Callable[[float], None],
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
     output_dir: Path,
+    failure_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
+    if mode == MODE_TANDEM:
+        return _run_tandem_batch_mode_body(
+            radio,
+            quality=quality,
+            capture=capture,
+            check_deadline=check_deadline,
+            clock_ns=clock_ns,
+            monotonic=monotonic,
+            sleep=sleep,
+            metadata_parser=metadata_parser,
+            output_dir=output_dir,
+            failure_sink=failure_sink,
+        )
+
     radio.mute_all()
     status_before = _wait_for_idle(radio, monotonic=monotonic, sleep=sleep)
     radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
@@ -2117,6 +4788,7 @@ def _run_mode(
     sleep: Callable[[float], None],
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
     output_dir: Path,
+    failure_sink: Callable[[Mapping[str, Any]], None] | None = None,
 ) -> dict[str, Any]:
     """Run a mode while preserving both its body and fail-safe mute errors."""
 
@@ -2134,6 +4806,7 @@ def _run_mode(
             sleep=sleep,
             metadata_parser=metadata_parser,
             output_dir=output_dir,
+            failure_sink=failure_sink,
         )
     except BaseException as error:  # noqa: BLE001 - preserve body and cleanup errors
         mode_error = error
@@ -2151,6 +4824,13 @@ def _run_mode(
     if mode_error is not None:
         raise mode_error.with_traceback(mode_error.__traceback__)
     if mute_error is not None:
+        if mode == MODE_TANDEM and result is not None:
+            cleanup_error = _exception_text(mute_error)
+            result["verdict"] = "invalid"
+            result["fatal_error"] = cleanup_error
+            result["cleanup_request_error"] = cleanup_error
+            if failure_sink is not None:
+                failure_sink(result)
         raise mute_error.with_traceback(mute_error.__traceback__)
     assert result is not None
     return result
@@ -2195,6 +4875,11 @@ def run_transient_hardware(
     """Run four guarded transient cells and atomically preserve all evidence."""
 
     validate_transient_options(quality, capture)
+    report_path = _preflight_transient_output_paths(
+        quality.output_dir, radio.options.serial
+    )
+    serial = report_path.parent.name
+    radio._report_path = report_path
     if radio.options.sample_rate_hz != quality.sample_rate_hz:
         raise ValueError("radio and transient sample rates differ")
     if abs(float(radio.options.tx_gain_db) - capture.strong_stimulus_tx_gain_db) > 0.01:
@@ -2212,10 +4897,63 @@ def run_transient_hardware(
             "live RX/TX LO readback differs from transient configuration"
         )
 
-    serial = str(radio.options.serial)
-    report_path = quality.output_dir / serial / "tandem-agc-transient-report.json"
-    radio._report_path = report_path
     started = monotonic()
+
+    def report_inventory_policy(value: Mapping[str, Any]) -> str:
+        if value.get("verdict") == "invalid":
+            return "partial"
+        modes = value.get("modes")
+        if isinstance(modes, list) and any(
+            isinstance(mode, Mapping) and mode.get("mode") == MODE_TANDEM
+            for mode in modes
+        ):
+            return "complete"
+        return "empty"
+
+    def write_report(value: Mapping[str, Any]) -> None:
+        inventory_policy = report_inventory_policy(value)
+        checked_path = _preflight_transient_output_paths(
+            quality.output_dir,
+            serial,
+            sidecar_inventory_policy=inventory_policy,
+        )
+        if checked_path != report_path:
+            raise EvidenceInvalid("transient report path changed after preflight")
+        report_writer(report_path, value)
+        try:
+            checked_after = _preflight_transient_output_paths(
+                quality.output_dir,
+                serial,
+                sidecar_inventory_policy=inventory_policy,
+            )
+            if checked_after != report_path:
+                raise EvidenceInvalid("transient report path changed after write")
+        except BaseException as post_error:  # noqa: BLE001 - demote durable PASS
+            recovery_error: BaseException | None = None
+            if isinstance(value, dict):
+                value["verdict"] = "invalid"
+                value["fatal_error"] = _exception_text(post_error)
+                try:
+                    if (
+                        _preflight_transient_output_paths(
+                            quality.output_dir,
+                            serial,
+                            sidecar_inventory_policy="partial",
+                        )
+                        != report_path
+                    ):
+                        raise EvidenceInvalid(
+                            "transient report path changed during invalid recovery"
+                        )
+                    report_writer(report_path, value)
+                except BaseException as error:  # noqa: BLE001
+                    recovery_error = error
+            if recovery_error is not None:
+                raise BaseExceptionGroup(
+                    "transient output recheck and invalid-report recovery failed",
+                    [post_error, recovery_error],
+                )
+            raise post_error.with_traceback(post_error.__traceback__)
 
     def check_deadline() -> None:
         if monotonic() - started >= quality.max_seconds:
@@ -2228,7 +4966,7 @@ def run_transient_hardware(
     quality_configuration["output_dir"] = str(quality.output_dir)
     quality_configuration["thresholds"] = asdict(quality.thresholds)
     report: dict[str, Any] = {
-        "schema": "plutosdr-fw.tandem-agc-transient.v1",
+        "schema": "plutosdr-fw.tandem-agc-transient.v2",
         "started_unix_ns": wall_clock_ns(),
         "identity": dict(radio.identity),
         "bench_port_mapping": {
@@ -2254,6 +4992,13 @@ def run_transient_hardware(
             "quality": quality_configuration,
             "transient_capture": asdict(capture),
             "kernel_buffers": _TRANSIENT_KERNEL_BUFFERS,
+            "tandem_transport": {
+                "provider_frame_samples": _TANDEM_FRAME_SAMPLES,
+                "kernel_buffers": _TANDEM_KERNEL_BUFFERS,
+                "batch_frames": _TANDEM_BATCH_FRAMES,
+                "queue_capacity_frames": _TANDEM_CAPTURE_QUEUE_FRAMES,
+                "metadata_abi": 2,
+            },
         },
         "safety": {
             "physical_attenuation_db": quality.physical_attenuation_db,
@@ -2271,27 +5016,48 @@ def run_transient_hardware(
             "status": "pending_radio_lifecycle_close",
             "owner": "Issue46Radio.close",
         },
+        "failure_evidence": None,
         "verdict": "running",
     }
-    report_writer(report_path, report)
+    write_report(report)
     campaign_error: BaseException | None = None
     try:
         for mode in TRANSIENT_MODES:
             check_deadline()
-            mode_record = _run_mode(
-                radio,
-                mode=mode,
-                quality=quality,
-                capture=capture,
-                check_deadline=check_deadline,
-                clock_ns=clock_ns,
-                monotonic=monotonic,
-                sleep=sleep,
-                metadata_parser=metadata_parser,
-                output_dir=report_path.parent / "transient-iq",
-            )
+            failed_mode: dict[str, Any] = {}
+
+            def preserve_failed_mode(
+                value: Mapping[str, Any], sink: dict[str, Any] = failed_mode
+            ) -> None:
+                # Keep the progressively populated object in memory while the
+                # batch is active.  The enclosing failure path writes it only
+                # after mute/cancel/join/close have completed.
+                sink.clear()
+                sink.update(value)
+
+            try:
+                mode_record = _run_mode(
+                    radio,
+                    mode=mode,
+                    quality=quality,
+                    capture=capture,
+                    check_deadline=check_deadline,
+                    clock_ns=clock_ns,
+                    monotonic=monotonic,
+                    sleep=sleep,
+                    metadata_parser=metadata_parser,
+                    output_dir=report_path.parent / "transient-iq",
+                    failure_sink=(
+                        preserve_failed_mode if mode == MODE_TANDEM else None
+                    ),
+                )
+            except BaseException:
+                if failed_mode:
+                    report["failure_evidence"] = failed_mode
+                    report["modes"].append(failed_mode)
+                raise
             report["modes"].append(mode_record)
-            report_writer(report_path, report)
+            write_report(report)
         report["comparison"] = _comparison(report["modes"])
         report["verdict"] = "pass"
     except BaseException as error:  # noqa: BLE001 - preserve shutdown interrupts
@@ -2311,7 +5077,7 @@ def run_transient_hardware(
 
     report_error: BaseException | None = None
     try:
-        report_writer(report_path, report)
+        write_report(report)
     except BaseException as error:  # noqa: BLE001 - retain report-write failures
         report_error = error
 
@@ -2351,6 +5117,9 @@ def run_serial_transient_hardware(
 
     # Static failures must occur before a USB context or fixture lock is opened.
     validate_transient_options(quality, capture)
+    expected_report_path = _preflight_transient_output_paths(
+        quality.output_dir, radio_options.serial
+    )
     radio = radio_factory(iio_module, radio_options)
     body_error: BaseException | None = None
     result: tuple[dict[str, Any], Path] | None = None
@@ -2385,6 +5154,17 @@ def run_serial_transient_hardware(
     durable_error: BaseException | None = None
     if close_error is None:
         try:
+            if (
+                _preflight_transient_output_paths(
+                    quality.output_dir,
+                    radio_options.serial,
+                    sidecar_inventory_policy="partial",
+                )
+                != expected_report_path
+            ):
+                raise EvidenceInvalid(
+                    "post-close transient report path changed after preflight"
+                )
             if not bool(getattr(radio, "cleanup_verified", False)):
                 raise FixtureSafetyError(
                     "radio close did not verify final transient hardware cleanup"
@@ -2400,6 +5180,12 @@ def run_serial_transient_hardware(
                 if not isinstance(parsed, dict):
                     raise EvidenceInvalid(
                         "post-close transient report is not a JSON object"
+                    )
+                if parsed.get("verdict") == "pass":
+                    _preflight_transient_output_paths(
+                        quality.output_dir,
+                        radio_options.serial,
+                        sidecar_inventory_policy="complete",
                     )
                 cleanup = parsed.get("cleanup")
                 if not isinstance(cleanup, Mapping) or not bool(

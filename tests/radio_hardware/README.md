@@ -175,12 +175,24 @@ the same absolute envelope.
 `transient_hardware.py` runs a guarded weak/strong/weak TX2 trajectory in
 manual, native slow-attack, native fast-attack, and tandem-auto modes. Native
 hybrid is intentionally absent from the release transient matrix under the
-mode policy above. The runner uses one kernel buffer and retains the first
-frame around each level write instead of draining away the transition. A
-bounded acquisition-only thread keeps metadata refills active while tandem TX
-writes execute. IQ analysis, hashing, and optional artifact writes are deferred
-until the buffer is closed; the default worst-case retained IQ is about 6 MiB
-and every configuration is capped at 64 MiB.
+mode policy above. Ordinary comparison cells are unchanged: they use serial
+ordinary-IIO refills with the release default F=8192 and K=1, retain the first
+frame around each level write instead of draining away the transition, and
+qualify only returned-IQ observation spans. Release tandem uses a separate,
+fixed transport: one continuous AUTO metadata session at F=65536, K=8, one
+64-frame libiio batch, and a four-frame host queue. It freezes the post-open
+sample counter S0 before starting the acquisition worker and targets attack at
+S0+16F and release at S0+40F while the initiating batch refill remains in
+flight. The worker then returns that initiating frame plus all 63 cached
+replays, with no second batch or session.
+
+Tandem retains all 64 IQ frames and raw metadata records in memory until the
+buffer has closed normally. Only then does it analyze, hash, and atomically
+write the mandatory 128 sidecars (64 `.cs16` plus 64 `.metadata.bin`) beneath
+the serial-scoped report directory. The frozen campaign-owned envelope is
+89,261,056 bytes, below a 96 MiB cap; the separately attested post-close
+materialization envelope is 54,525,952 bytes and includes an 8 MiB FFT
+workspace. These are bounded campaign payloads, not whole-process RSS.
 
 The release transient stimulus is explicitly `-45,-30,-45` dB; it does not
 inherit the full steady trajectory's `-61` dB endpoint. Across 22
@@ -196,12 +208,13 @@ signal-quality acceptance.
 - `timestamp_stimulus_command()` brackets every write in monotonic host time.
   Ordinary IIO only positions the write on an ordinal axis over returned IQ;
   refill/readback intervals are unobserved, so its settling spans are not
-  hardware latency and cannot be ranked against tandem timing. Tandem reads the
-  coherent low 32 bits of the same FPGA counter used by metadata immediately
-  before and after the TX write. The upper bound is accepted only after two
-  distinct advances beyond the initial post-write read: a word already in the
-  closed-loop CDC path can explain the first, while the second is causally
-  post-command. Low words are extended around nearby 64-bit frame metadata.
+  hardware latency and cannot be ranked against tandem timing. Each tandem
+  command uses the same exact primitive: attest TX1 muted, poll the coherent
+  FPGA low32 counter to the frozen target, read A, perform exactly one TX2
+  hardware-gain write, read the initial post-write value, then distinct B and C
+  advances, defer exactly one TX2 readback until after C, and attest TX1 muted
+  again. Target overshoot and the A-to-C uncertainty are each capped at 16,384
+  samples. Low words are extended around the retained 64-bit frame metadata.
 - `analyze_immediate_dual_rx()` analyzes fixed windows beginning at sample zero
   of each returned frame. It does not discard the transition and reports
   dual-RX tone level, SNR, clipping, differential phase, and phase stability.
@@ -221,7 +234,14 @@ counter carried in `first_sample_sequence`, but it does not return exact events
 or IQ for omitted frames. Transient qualification therefore rejects every
 provider gap, including a matched whole-frame gap with zero transitions: it
 could still hide signal overshoot or settling. Any transition-count increment
-not represented by an exact in-frame event is also fatal.
+not represented by an exact in-frame event is also fatal. The retained batch is
+partitioned after close into fully-pre-attack, attack-bracket,
+fully-post-attack/pre-release, release-bracket, and fully-post-release groups;
+the three stable groups must each contain at least eight whole frames. The
+conditioning anchor is exactly the final 8192 samples of the last fully-pre
+frame, and the final eight middle and release frames must be event-free,
+endpoint-stable, quality-valid, and within the configured RF settling tolerance
+in every 1024-sample window.
 
 The layer fails closed on missing sample brackets, host-write jitter over the
 configured limit, excessive sample uncertainty, event-sequence holes, torn or
@@ -231,7 +251,11 @@ evidence. The initial weak write remains sample-unbounded because it predates
 streaming; a separately labelled stable-IQ interval is the conditioning
 anchor. `run_serial_transient_hardware()` owns the radio lifecycle, reloads the
 report after close, and requires durable verified-cleanup evidence. Public CI
-exercises only deterministic synthetic and planted-failure oracles.
+exercises only deterministic synthetic and planted-failure oracles. A passing
+tandem cell fully replays all 64 frames and closes normally without cancel; any
+session or shutdown failure follows mute, cancel, worker join, and close while
+retaining progressive schedule and acquisition diagnostics in the invalid
+atomic report.
 
 Before another loudness-step transient attempt, the dedicated transport probe
 can qualify the continuous larger-frame transport without producing a release
