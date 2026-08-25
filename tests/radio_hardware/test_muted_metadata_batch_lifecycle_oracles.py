@@ -3,6 +3,7 @@ import fcntl
 import hashlib
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -24,11 +25,13 @@ from .muted_metadata_batch_lifecycle import (
     EXACT_LIBIIO_COMMIT,
     EXPECTED_BATCH_CACHE_BYTES,
     FRAME_SAMPLES,
+    RX_SCAN_FORMAT,
     QualificationError,
     _atomic_json,
     _attest_mapped_libiio,
     _attest_runner_provenance,
     _close_resources_and_persist,
+    _configure_dual_complex_rx_scan,
     _frame_evidence,
     _reread_exact_report,
     validate_durable_pass_report,
@@ -82,6 +85,88 @@ def _mute():
 
 def _rx():
     return {"modes": ["manual", "manual"], "gains_db": [40.0, 40.0]}
+
+
+def _scan_evidence():
+    return {
+        "enabled_channel_ids": [
+            "voltage0",
+            "voltage1",
+            "voltage2",
+            "voltage3",
+        ],
+        "enabled_scan_mask": 0x0F,
+        "sample_size_bytes": 8,
+        "layout": [
+            {
+                "id": f"voltage{index}",
+                "index": index,
+                "format": dict(RX_SCAN_FORMAT),
+            }
+            for index in range(4)
+        ],
+    }
+
+
+class _ScanChannel:
+    def __init__(self, channel_id, index, *, format_overrides=None):
+        self.id = channel_id
+        self.index = index
+        self.scan_element = True
+        self.enabled = False
+        data_format = dict(RX_SCAN_FORMAT)
+        data_format.update(format_overrides or {})
+        self.data_format = SimpleNamespace(**data_format)
+
+
+class _ScanRx:
+    def __init__(self, channel_ids=None, indexes=None, *, format_overrides=None):
+        channel_ids = channel_ids or [f"voltage{index}" for index in range(4)]
+        indexes = indexes or list(range(len(channel_ids)))
+        self.channels = [
+            _ScanChannel(
+                channel_id,
+                index,
+                format_overrides=(format_overrides if ordinal == 2 else None),
+            )
+            for ordinal, (channel_id, index) in enumerate(zip(channel_ids, indexes))
+        ]
+
+    @property
+    def sample_size(self):
+        return 2 * sum(channel.enabled for channel in self.channels)
+
+
+def test_real_four_scalar_rx_scan_shape_is_attested():
+    rx = _ScanRx()
+    assert _configure_dual_complex_rx_scan(rx) == _scan_evidence()
+    assert all(channel.enabled for channel in rx.channels)
+
+
+@pytest.mark.parametrize(
+    ("rx", "message"),
+    [
+        (_ScanRx(channel_ids=["voltage0", "voltage1"]), "lacks channels"),
+        (_ScanRx(indexes=[0, 1, 3, 2]), "scan index"),
+        (_ScanRx(format_overrides={"is_signed": False}), "scan format"),
+        (_ScanRx(format_overrides={"is_be": True}), "scan format"),
+        (_ScanRx(format_overrides={"bits": 12}), "scan format"),
+    ],
+)
+def test_rx_scan_rejects_two_lane_reordered_or_non_cs16_shape(rx, message):
+    with pytest.raises(QualificationError, match=message):
+        _configure_dual_complex_rx_scan(rx)
+
+
+@pytest.mark.parametrize(
+    ("attribute", "message"),
+    [("index", "does not expose its scan index"), ("data_format", "scan format")],
+)
+def test_rx_scan_fails_closed_when_shape_property_is_absent(attribute, message):
+    rx = _ScanRx()
+    delattr(rx.channels[0], attribute)
+    with pytest.raises(QualificationError, match=message):
+        _configure_dual_complex_rx_scan(rx)
 
 
 def _frames():
@@ -281,7 +366,7 @@ def _valid_report():
         },
         "forced_mute_before": _mute(),
         "rx_manual_before": _rx(),
-        "enabled_rx_scan_channels": ["voltage0", "voltage1"],
+        "rx_scan": _scan_evidence(),
         "full_drain": {
             "kernel_buffers": 8,
             "batch_frames": 64,
@@ -358,6 +443,10 @@ def test_durable_report_validator_accepts_frame_derived_pass():
         (("runner_provenance", "shell_runner_sha256"), "0" * 64),
         (("runner_provenance", "metadata_abi_sha256"), "0" * 64),
         (("runner_provenance", "metadata_abi_path"), "/tmp/metadata_abi.py"),
+        (("rx_scan", "enabled_channel_ids"), ["voltage0", "voltage1"]),
+        (("rx_scan", "enabled_scan_mask"), 0x03),
+        (("rx_scan", "layout", 2, "index"), 3),
+        (("rx_scan", "layout", 2, "format", "is_signed"), False),
         (("full_drain", "batch_cache_bound_bytes"), EXPECTED_BATCH_CACHE_BYTES - 1),
         (("full_drain", "frames", 7, "ownership_epoch"), 99),
         (("full_drain", "frames", 7, "features"), FEATURE_HARDWARE_SAMPLE_COUNTER),
