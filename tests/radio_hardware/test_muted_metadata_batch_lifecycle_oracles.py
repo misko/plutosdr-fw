@@ -181,7 +181,9 @@ class _ScanRx:
 
 def test_real_four_scalar_rx_scan_shape_is_attested():
     rx = _ScanRx()
-    assert _configure_dual_complex_rx_scan(rx) == _scan_evidence()
+    evidence = _configure_dual_complex_rx_scan(rx)
+    assert evidence == _scan_evidence()
+    assert [lane["format"]["bits"] for lane in evidence["layout"]] == [12] * 4
     assert all(channel.enabled for channel in rx.channels)
 
 
@@ -192,7 +194,7 @@ def test_real_four_scalar_rx_scan_shape_is_attested():
         (_ScanRx(indexes=[0, 1, 3, 2]), "scan index"),
         (_ScanRx(format_overrides={"is_signed": False}), "scan format"),
         (_ScanRx(format_overrides={"is_be": True}), "scan format"),
-        (_ScanRx(format_overrides={"bits": 12}), "scan format"),
+        (_ScanRx(format_overrides={"bits": 16}), "scan format"),
         (_ScanRx(format_overrides={"length": 12}), "scan format"),
         (_ScanRx(format_overrides={"shift": 1}), "scan format"),
         (_ScanRx(format_overrides={"repeat": 2}), "scan format"),
@@ -200,7 +202,7 @@ def test_real_four_scalar_rx_scan_shape_is_attested():
         (_ScanRx(sample_size_override=6), "sample size is 6"),
     ],
 )
-def test_rx_scan_rejects_two_lane_reordered_or_non_cs16_shape(rx, message):
+def test_rx_scan_rejects_two_lane_reordered_or_non_signed_le16_12_shape(rx, message):
     with pytest.raises(QualificationError, match=message):
         _configure_dual_complex_rx_scan(rx)
 
@@ -215,7 +217,7 @@ def test_rx_scan_rejects_two_lane_reordered_or_non_cs16_shape(rx, message):
             "length is not an exact integer",
         ),
         (
-            _ScanRx(format_overrides={"bits": 16.0}),
+            _ScanRx(format_overrides={"bits": 12.0}),
             "bits is not an exact integer",
         ),
         (
@@ -540,7 +542,8 @@ def test_durable_report_validator_accepts_frame_derived_pass():
         (("rx_scan", "layout", 2, "format", "is_be"), 0),
         (("rx_scan", "layout", 2, "format", "length"), 12),
         (("rx_scan", "layout", 2, "format", "length"), 16.0),
-        (("rx_scan", "layout", 2, "format", "bits"), 16.0),
+        (("rx_scan", "layout", 2, "format", "bits"), 16),
+        (("rx_scan", "layout", 2, "format", "bits"), 12.0),
         (("rx_scan", "layout", 2, "format", "shift"), 1),
         (("rx_scan", "layout", 2, "format", "shift"), False),
         (("rx_scan", "layout", 2, "format", "repeat"), 2),

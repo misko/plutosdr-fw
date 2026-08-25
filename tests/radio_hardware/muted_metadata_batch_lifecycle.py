@@ -82,7 +82,7 @@ RX_SCAN_MASK = 0x0F
 RX_SCAN_SAMPLE_BYTES = 8
 RX_SCAN_FORMAT = {
     "length": 16,
-    "bits": 16,
+    "bits": 12,
     "shift": 0,
     "is_signed": True,
     "is_be": False,
@@ -374,7 +374,7 @@ def _configure_manual_40(phy: Any) -> dict[str, list[Any]]:
 
 
 def _configure_dual_complex_rx_scan(rx: Any) -> dict[str, Any]:
-    """Enable exact I0/Q0/I1/Q1 scalar lanes and attest their CS16LE shape."""
+    """Attest four signed LE16 lanes with 12 significant, unshifted bits."""
 
     expected_ids = set(RX_SCAN_IDS)
     scan_channels: dict[str, Any] = {}
