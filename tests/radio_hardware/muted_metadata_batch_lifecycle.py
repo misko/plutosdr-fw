@@ -52,10 +52,10 @@ from .metadata_abi import (
     parse_tandem_frame_metadata,
 )
 
-SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v4"
-PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v3"
+SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v5"
+PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v4"
 TEMPERATURE_POLICY_PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v2"
-REPORT_FILENAME = "muted-metadata-batch-lifecycle-v4.json"
+REPORT_FILENAME = "muted-metadata-batch-lifecycle-v5.json"
 EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
 EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
 DEFAULT_R18_SERIAL = "1040007c4a94000211000b009186843ef2"
@@ -98,6 +98,9 @@ DEVICE_RAM_BOOT_PHASES = (
 )
 PREDECESSOR_V2_FAILURE_REPORT_SHA256 = (
     "8f3341cc0cd63455234ce3eb85c2dd4816a42e512f0730ef8decd629df9c78f2"
+)
+PREDECESSOR_V4_FAILURE_REPORT_SHA256 = (
+    "5f6be9a751954003e8869d3bed8175bc0b2e0d7aaeb048431262057e8b54e196"
 )
 TX_MUTE_DB = -89.75
 DAC_SELECT_ZERO = 0x3
@@ -167,6 +170,13 @@ TEMPERATURE_QUALIFICATION_POLICY = (
 TEMPERATURE_POLICY = (
     f"producer semantics: {TEMPERATURE_PRODUCER_POLICY}; qualification acceptance: "
     f"{TEMPERATURE_QUALIFICATION_POLICY}"
+)
+OBSERVATION_RETENTION_POLICY = (
+    "every observation retained by the preceding metadata snapshot because its "
+    "sample-after reaches the next frame must be the exact leading prefix of the "
+    "next frame's inherited observations; additional inherited observations are "
+    "allowed because the asynchronous sampler can append them between metadata "
+    "snapshots, and all distinct observations remain subject to the global cadence"
 )
 FAILURE_ARTIFACT_POLICY = (
     "pre-artifact capture failures do not promote raw metadata; the exact 65-file "
@@ -437,6 +447,18 @@ def _temperature_policy_predecessor() -> dict[str, Any]:
         "disposition": (
             "immutable FAIL retained; v3 supersedes only the INT32_MIN/null "
             "producer-omission interpretation and does not promote v2 evidence"
+        ),
+    }
+
+
+def _observation_retention_policy_predecessor() -> dict[str, Any]:
+    return {
+        "schema": PREDECESSOR_SCHEMA,
+        "failed_report_sha256": PREDECESSOR_V4_FAILURE_REPORT_SHA256,
+        "disposition": (
+            "immutable FAIL retained; v5 supersedes only the false exact-equality "
+            "check between consecutive asynchronous observation snapshots and does "
+            "not promote v4 evidence"
         ),
     }
 
@@ -3935,7 +3957,7 @@ def _validate_metadata_artifacts(
                     for item in previous_observations
                     if item[1] >= parsed.first_sample_sequence
                 )
-                if inherited != retained:
+                if inherited[: len(retained)] != retained:
                     raise QualificationError(
                         f"durable metadata frame {ordinal} observation retention changed"
                     )
@@ -4380,6 +4402,10 @@ def validate_durable_pass_report(value: Any) -> None:
         ],
         "temperature_invalid_sentinel": TEMPERATURE_INVALID_SENTINEL,
         "temperature_policy_predecessor": _temperature_policy_predecessor(),
+        "observation_retention_policy": OBSERVATION_RETENTION_POLICY,
+        "observation_retention_policy_predecessor": (
+            _observation_retention_policy_predecessor()
+        ),
         "failure_artifact_policy": FAILURE_ARTIFACT_POLICY,
         "center_frequency_hz": CENTER_FREQUENCY_HZ,
         "sample_rate_hz": SAMPLE_RATE_HZ,
@@ -5296,7 +5322,7 @@ def run_hardware(
     output_path = output_path.absolute()
     if output_path.name != REPORT_FILENAME:
         raise QualificationError(
-            f"v4 output filename must be exact {REPORT_FILENAME!r}"
+            f"v5 output filename must be exact {REPORT_FILENAME!r}"
         )
     output_preflight = _prepare_fresh_output_path(output_path)
     if serial != DEFAULT_R18_SERIAL or firmware_pattern != EXPECTED_FIRMWARE_PATTERN:
@@ -5347,6 +5373,10 @@ def run_hardware(
             ],
             "temperature_invalid_sentinel": TEMPERATURE_INVALID_SENTINEL,
             "temperature_policy_predecessor": _temperature_policy_predecessor(),
+            "observation_retention_policy": OBSERVATION_RETENTION_POLICY,
+            "observation_retention_policy_predecessor": (
+                _observation_retention_policy_predecessor()
+            ),
             "failure_artifact_policy": FAILURE_ARTIFACT_POLICY,
             "center_frequency_hz": CENTER_FREQUENCY_HZ,
             "sample_rate_hz": SAMPLE_RATE_HZ,

@@ -768,7 +768,22 @@ def _frames():
 _GAIN_OBSERVATION = struct.Struct("<QQIHBBbbHI")
 
 
-def _metadata_wire(metadata):
+def _hold_observation(sample_before, sample_after):
+    return (
+        sample_before,
+        sample_after,
+        1_000,
+        0x0003,
+        43,
+        43,
+        HOLD_GAIN_DB,
+        HOLD_GAIN_DB,
+        0,
+        0,
+    )
+
+
+def _metadata_wire(metadata, *, observations=None):
     payload = bytearray(RAW_METADATA_BYTES)
     struct.pack_into(
         "<IHHIIQQQIIIHB",
@@ -830,21 +845,28 @@ def _metadata_wire(metadata):
         0,
         0,
     )
-    for index in range(metadata.observation_count):
-        sample_before = metadata.first_sample_sequence + index * (FRAME_SAMPLES // 4)
+    if observations is None:
+        observations = [
+            (
+                metadata.first_sample_sequence + index * (FRAME_SAMPLES // 4),
+                metadata.first_sample_sequence + index * (FRAME_SAMPLES // 4) + 1,
+                1_000,
+                0x0003,
+                metadata.rx1_gain_index,
+                metadata.rx2_gain_index,
+                HOLD_GAIN_DB,
+                HOLD_GAIN_DB,
+                0,
+                0,
+            )
+            for index in range(metadata.observation_count)
+        ]
+    assert len(observations) == metadata.observation_count
+    for index, observation in enumerate(observations):
         _GAIN_OBSERVATION.pack_into(
             payload,
             V5_PREFIX_BYTES + index * GAIN_OBSERVATION_BYTES,
-            sample_before,
-            sample_before + 1,
-            1_000,
-            0x0003,
-            metadata.rx1_gain_index,
-            metadata.rx2_gain_index,
-            HOLD_GAIN_DB,
-            HOLD_GAIN_DB,
-            0,
-            0,
+            *observation,
         )
     struct.pack_into("<I", payload, len(payload) - 4, 0)
     struct.pack_into("<I", payload, len(payload) - 4, zlib.crc32(payload) & 0xFFFFFFFF)
@@ -1329,6 +1351,10 @@ def _valid_report(tmp_path):
             "temperature_policy_predecessor": (
                 lifecycle._temperature_policy_predecessor()
             ),
+            "observation_retention_policy": (lifecycle.OBSERVATION_RETENTION_POLICY),
+            "observation_retention_policy_predecessor": (
+                lifecycle._observation_retention_policy_predecessor()
+            ),
             "failure_artifact_policy": lifecycle.FAILURE_ARTIFACT_POLICY,
             "center_frequency_hz": CENTER_FREQUENCY_HZ,
             "sample_rate_hz": SAMPLE_RATE_HZ,
@@ -1446,6 +1472,70 @@ def test_durable_report_validator_accepts_frame_derived_pass(tmp_path):
     validate_durable_pass_report(_valid_report(tmp_path))
 
 
+def test_durable_report_accepts_new_boundary_observation_between_snapshots(tmp_path):
+    report = _valid_report(tmp_path)
+    first, second = _frames()[:2]
+    first = replace(first, observation_count=2)
+    second = replace(second, observation_count=3)
+    first_start = first.first_sample_sequence
+    second_start = second.first_sample_sequence
+    first_observations = [
+        _hold_observation(first_start + 12_000, first_start + 12_001),
+        _hold_observation(first_start + 29_308, first_start + 62_727),
+    ]
+    second_observations = [
+        # This sample was appended after frame 0's metadata snapshot. It
+        # legitimately straddles frame 1 without having appeared in frame 0.
+        _hold_observation(second_start - 2_149, second_start + 2_061),
+        _hold_observation(second_start + 15_389, second_start + 15_390),
+        _hold_observation(second_start + 32_642, second_start + 32_643),
+    ]
+    _replace_full_metadata_payload(
+        report,
+        0,
+        first,
+        _metadata_wire(first, observations=first_observations),
+    )
+    _replace_full_metadata_payload(
+        report,
+        1,
+        second,
+        _metadata_wire(second, observations=second_observations),
+    )
+    validate_durable_pass_report(report)
+
+
+def test_durable_report_rejects_missing_previously_retained_observation(tmp_path):
+    report = _valid_report(tmp_path)
+    first, second = _frames()[:2]
+    first = replace(first, observation_count=2)
+    second = replace(second, observation_count=2)
+    first_start = first.first_sample_sequence
+    second_start = second.first_sample_sequence
+    first_observations = [
+        _hold_observation(first_start + 1_000, first_start + 1_001),
+        _hold_observation(second_start - 20_000, second_start + 100),
+    ]
+    second_observations = [
+        _hold_observation(second_start + 1_000, second_start + 1_001),
+        _hold_observation(second_start + 18_000, second_start + 18_001),
+    ]
+    _replace_full_metadata_payload(
+        report,
+        0,
+        first,
+        _metadata_wire(first, observations=first_observations),
+    )
+    _replace_full_metadata_payload(
+        report,
+        1,
+        second,
+        _metadata_wire(second, observations=second_observations),
+    )
+    with pytest.raises(QualificationError, match="observation retention"):
+        validate_durable_pass_report(report)
+
+
 @pytest.mark.parametrize(
     ("path", "value"),
     [
@@ -1470,6 +1560,15 @@ def test_durable_report_validator_accepts_frame_derived_pass(tmp_path):
         (("configuration", "failure_artifact_policy"), "promote partial failures"),
         (
             ("configuration", "temperature_policy_predecessor", "failed_report_sha256"),
+            "0" * 64,
+        ),
+        (("configuration", "observation_retention_policy"), "require equality"),
+        (
+            (
+                "configuration",
+                "observation_retention_policy_predecessor",
+                "failed_report_sha256",
+            ),
             "0" * 64,
         ),
         (("configuration", "center_frequency_hz"), 914_999_999),
@@ -1753,6 +1852,10 @@ def _refresh_first_metadata_artifact(report, payload):
 
 def _replace_full_metadata_artifact(report, ordinal, metadata):
     payload = _metadata_wire(metadata)
+    _replace_full_metadata_payload(report, ordinal, metadata, payload)
+
+
+def _replace_full_metadata_payload(report, ordinal, metadata, payload):
     report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
     entry = report["metadata_artifacts"]["entries"][ordinal]
     path = report_path.parent / entry["relative_path"]
@@ -1897,7 +2000,7 @@ def test_durable_report_rejects_cancel_temperature_outside_producer_range(
         validate_durable_pass_report(report)
 
 
-def test_v4_validator_rejects_v3_schema_and_temperature_authority_promotion(tmp_path):
+def test_v5_validator_rejects_v4_schema_and_temperature_authority_promotion(tmp_path):
     report = _valid_report(tmp_path)
     report["schema"] = lifecycle.PREDECESSOR_SCHEMA
     with pytest.raises(QualificationError, match="schema"):
@@ -2255,11 +2358,11 @@ def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
     assert called == []
 
 
-def test_v4_runner_rejects_legacy_report_filename_before_context(tmp_path):
+def test_v5_runner_rejects_legacy_report_filename_before_context(tmp_path):
     called = []
-    output = tmp_path / "muted-metadata-batch-lifecycle-v3.json"
+    output = tmp_path / "muted-metadata-batch-lifecycle-v4.json"
     fake_iio = SimpleNamespace(Context=lambda _uri: called.append(True))
-    with pytest.raises(QualificationError, match="v4 output filename"):
+    with pytest.raises(QualificationError, match="v5 output filename"):
         lifecycle.run_hardware(
             fake_iio,
             serial=lifecycle.DEFAULT_R18_SERIAL,
@@ -2309,8 +2412,8 @@ def _hermetic_device_lineage_files(tmp_path, monkeypatch):
 
 
 def test_rc4_device_lineage_constants_are_exact():
-    assert lifecycle.SCHEMA == "plutosdr-fw.muted-metadata-batch-lifecycle.v4"
-    assert lifecycle.REPORT_FILENAME == "muted-metadata-batch-lifecycle-v4.json"
+    assert lifecycle.SCHEMA == "plutosdr-fw.muted-metadata-batch-lifecycle.v5"
+    assert lifecycle.REPORT_FILENAME == "muted-metadata-batch-lifecycle-v5.json"
     assert lifecycle.EXPECTED_FIRMWARE_VERSION == (
         "v0.41-plutoplus-spf-tandem-agc-v8-rc4"
     )
@@ -2337,6 +2440,9 @@ def test_rc4_device_lineage_constants_are_exact():
     assert lifecycle.DEVICE_RAM_BOOT_PLAN_ID == "cd3c1bdfa41f4463ab91e8f0fe2f34bb"
     assert lifecycle.DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256 == (
         "1b7aa093d3cea62553885bf9e06979c85bb24c8b2e1b6975479d5ff847803726"
+    )
+    assert lifecycle.PREDECESSOR_V4_FAILURE_REPORT_SHA256 == (
+        "5f6be9a751954003e8869d3bed8175bc0b2e0d7aaeb048431262057e8b54e196"
     )
 
 
