@@ -919,6 +919,53 @@ class Issue46Radio:
             self._read_attr(self._phy_channel("voltage1", True), "hardwaregain")
         )
 
+    def write_tx2_gain_exact(self, gain_db: float) -> None:
+        """Perform one authorized TX2 hardware-gain write without a readback.
+
+        This bracket-specific primitive intentionally does not touch TX1 and
+        does not turn the requested value into an asserted readback.  Callers
+        must separately attest TX1 mute before and after the bracket and read
+        TX2 back only after their timing-critical operations are complete.
+        """
+
+        if (
+            isinstance(gain_db, bool)
+            or not isinstance(gain_db, (int, float))
+            or not math.isfinite(float(gain_db))
+            or not TX_MUTE_DB <= float(gain_db) <= self.options.tx_gain_db
+        ):
+            raise FixtureSafetyError(
+                f"TX2 gain {gain_db!r} dB is outside the authorized "
+                f"[{TX_MUTE_DB}, {self.options.tx_gain_db}] dB range"
+            )
+        channel = self._phy_channel("voltage1", True)
+        if "hardwaregain" not in channel.attrs:
+            raise FixtureSafetyError("TX2 lacks hardwaregain")
+        channel.attrs["hardwaregain"].value = str(float(gain_db))
+
+    def read_tx2_gain(self) -> float:
+        """Return one finite TX2 hardware-gain readback without writing."""
+
+        observed = _first_number(
+            self._read_attr(self._phy_channel("voltage1", True), "hardwaregain")
+        )
+        if not math.isfinite(observed):
+            raise FixtureSafetyError("TX2 hardwaregain returned a non-finite readback")
+        return observed
+
+    def attest_tx1_muted(self) -> float:
+        """Require TX1 to remain at the independently enforced mute setting."""
+
+        observed = _first_number(
+            self._read_attr(self._phy_channel("voltage0", True), "hardwaregain")
+        )
+        if not math.isfinite(observed) or abs(observed - TX_MUTE_DB) > 0.26:
+            raise FixtureSafetyError(
+                f"TX1 hardwaregain readback {observed} dB does not prove mute at "
+                f"{TX_MUTE_DB} dB"
+            )
+        return observed
+
     def configure_rx(
         self, mode: str, *, manual_gain_db: Optional[float] = None
     ) -> None:

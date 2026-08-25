@@ -29,7 +29,7 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
-from .experiment import EvidenceInvalid, FixtureSafetyError, Issue46Radio
+from .experiment import TX_MUTE_DB, EvidenceInvalid, FixtureSafetyError, Issue46Radio
 from .metadata_abi import (
     FEATURE_AD9361_TEMPERATURE,
     FEATURE_FPGA_GAIN_EVENTS,
@@ -74,7 +74,7 @@ from .transient_quality import (
     timestamp_stimulus_command,
 )
 
-PROBE_SCHEMA = "plutosdr-fw.tandem-agc-transient-transport-probe.v2"
+PROBE_SCHEMA = "plutosdr-fw.tandem-agc-transient-transport-probe.v3"
 PROBE_VERDICT = "qualified_transport"
 PROBE_PENDING_VERDICT = "qualified_transport_pending_cleanup"
 PROBE_THREAD_NAME = "tandem-transient-transport-probe-acquisition"
@@ -130,6 +130,8 @@ _PROBE_MAX_AGGREGATE_BYTES = (
 _PROBE_TARGET_COARSE_GUARD_SAMPLES = 65_536
 _PROBE_TARGET_FINE_SLEEP_SAMPLES = 4_096
 _PROBE_TARGET_MAX_POLL_READS = 64
+_PROBE_MAX_TARGET_OVERSHOOT_SAMPLES = 16_384
+_PROBE_MAX_CAUSAL_UNCERTAINTY_SAMPLES = 16_384
 _PROBE_WORKER_WAIT_SECONDS = 6.0
 _PROBE_REQUIRED_METADATA_FEATURES = (
     FEATURE_AD9361_TEMPERATURE
@@ -166,7 +168,12 @@ _PROBE_RAW_SCHEDULE_FIELDS = frozenset(
         "target_total_requested_sleep_samples",
         "post_write_read_count",
         "target_overshoot_samples",
+        "target_overshoot_limit_samples",
+        "initial_from_a_samples",
+        "b_from_initial_samples",
+        "c_from_b_samples",
         "causal_uncertainty_samples",
+        "causal_uncertainty_limit_samples",
         "worker_in_flight_at_command",
     }
 )
@@ -188,7 +195,8 @@ class TransientTransportProbeOptions:
     anchor_samples: int = _PROBE_ANCHOR_SAMPLES
     window_samples: int = _PROBE_WINDOW_SAMPLES
     max_host_jitter_ns: int = 50_000_000
-    max_command_sample_uncertainty: int = 16_384
+    max_target_overshoot_samples: int = _PROBE_MAX_TARGET_OVERSHOOT_SAMPLES
+    max_command_sample_uncertainty: int = _PROBE_MAX_CAUSAL_UNCERTAINTY_SAMPLES
     readback_tolerance_db: float = 0.25
     maximum_retained_raw_bytes: int = _PROBE_MAX_PYTHON_RAW_BYTES
     maximum_core_batch_bytes: int = _PROBE_MAX_CORE_BATCH_BYTES
@@ -653,6 +661,14 @@ def validate_transient_transport_probe_options(
             probe.maximum_aggregate_bytes,
             _PROBE_MAX_AGGREGATE_BYTES,
         ),
+        "max_target_overshoot_samples": (
+            probe.max_target_overshoot_samples,
+            _PROBE_MAX_TARGET_OVERSHOOT_SAMPLES,
+        ),
+        "max_command_sample_uncertainty": (
+            probe.max_command_sample_uncertainty,
+            _PROBE_MAX_CAUSAL_UNCERTAINTY_SAMPLES,
+        ),
     }
     for name, (actual, expected) in exact.items():
         if actual != expected:
@@ -665,15 +681,6 @@ def validate_transient_transport_probe_options(
         raise TypeError("transport probe host-jitter bound must be an integer")
     if not 0 < probe.max_host_jitter_ns <= 50_000_000:
         raise ValueError("transport probe host-jitter bound must be in (0, 50000000]")
-    if isinstance(probe.max_command_sample_uncertainty, bool) or not isinstance(
-        probe.max_command_sample_uncertainty, int
-    ):
-        raise TypeError("transport probe sample-uncertainty bound must be an integer")
-    if not probe.anchor_samples <= probe.max_command_sample_uncertainty <= 16_384:
-        raise ValueError(
-            "transport probe sample uncertainty must cover the 8192-sample "
-            "anchor without exceeding 16384 samples"
-        )
     if (
         isinstance(probe.readback_tolerance_db, bool)
         or not isinstance(probe.readback_tolerance_db, (int, float))
@@ -1091,159 +1098,452 @@ def _stable_suffix(
     }
 
 
+def _new_schedule_diagnostics(
+    probe: TransientTransportProbeOptions, *, post_open_baseline_raw: int
+) -> dict[str, Any]:
+    """Create the fail-closed ledger before the acquisition worker starts."""
+
+    target_delta = probe.target_sample_offset
+    return {
+        "status": "pending",
+        "qualified": False,
+        "current_stage": "created",
+        "failure_stage": None,
+        "failure_error": None,
+        "worker": {
+            "first_refill_started": False,
+            "in_flight_observations": [],
+        },
+        "command": {
+            "command_id": "weak_control_reassertion",
+            "requested_level_db": probe.weak_stimulus_tx_gain_db,
+            "applied_level_db": None,
+            "write_ack": {
+                "operation": "one_exact_tx2_hardwaregain_write",
+                "attempt_count": 0,
+                "host_before_ns": None,
+                "host_after_ns": None,
+                "host_jitter_ns": None,
+                "acknowledged": False,
+                "error": None,
+            },
+            "deferred_tx2_readback": {
+                "operation": "one_exact_tx2_hardwaregain_read",
+                "attempt_count": 0,
+                "host_before_ns": None,
+                "host_after_ns": None,
+                "observed_level_db": None,
+                "tolerance_db": probe.readback_tolerance_db,
+                "passed": False,
+                "error": None,
+            },
+            "tx1_mute_assurance": {
+                phase: {
+                    "attempt_count": 0,
+                    "host_before_ns": None,
+                    "host_after_ns": None,
+                    "observed_level_db": None,
+                    "passed": False,
+                    "error": None,
+                }
+                for phase in ("pre", "post")
+            },
+        },
+        "counter_reads": [],
+        "raw_schedule": {
+            "register_address": "0x800000b8",
+            "counter_width_bits": 32,
+            "counter_source": "coherent FPGA RX sample counter low word",
+            "post_open_baseline_raw": post_open_baseline_raw,
+            "target_offset_frames": probe.command_target_frames,
+            "target_offset_samples": target_delta,
+            "target_raw": (post_open_baseline_raw + target_delta) % (1 << 32),
+            "last_below_raw": None,
+            "raw_a_prewrite": None,
+            "raw_post_write_initial": None,
+            "raw_b_first_advance": None,
+            "raw_c_causal_advance": None,
+            "target_poll_read_count": 0,
+            "target_poll_policy": (
+                "counter-adaptive coarse guard, 4096-sample fine sleeps, "
+                "bounded tail polls"
+            ),
+            "target_coarse_guard_samples": _PROBE_TARGET_COARSE_GUARD_SAMPLES,
+            "target_fine_sleep_samples": _PROBE_TARGET_FINE_SLEEP_SAMPLES,
+            "target_max_poll_reads": _PROBE_TARGET_MAX_POLL_READS,
+            "target_poll_observations": [],
+            "target_total_requested_sleep_samples": 0,
+            "post_write_read_count": 0,
+            "target_overshoot_samples": None,
+            "target_overshoot_limit_samples": probe.max_target_overshoot_samples,
+            "initial_from_a_samples": None,
+            "b_from_initial_samples": None,
+            "c_from_b_samples": None,
+            "causal_uncertainty_samples": None,
+            "causal_uncertainty_limit_samples": (
+                probe.max_command_sample_uncertainty
+            ),
+            "worker_in_flight_at_command": False,
+        },
+        "shutdown": {
+            "worker_in_flight_before_shutdown": None,
+            "cancel_required": None,
+            "cancel_called": False,
+            "cancel_succeeded": None,
+            "worker_stopped": False,
+            "events": [],
+        },
+    }
+
+
+def _schedule_timestamp(clock_ns: Callable[[], int], *, name: str) -> int:
+    value = clock_ns()
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise EvidenceInvalid(f"transport probe {name} is not a monotonic timestamp")
+    return value
+
+
+def _mark_schedule_failure(
+    diagnostics: dict[str, Any], error: BaseException, *, stage: str | None = None
+) -> None:
+    if diagnostics.get("status") == "complete":
+        return
+    diagnostics["status"] = "failed"
+    diagnostics["qualified"] = False
+    diagnostics["failure_stage"] = stage or str(
+        diagnostics.get("current_stage", "unknown")
+    )
+    diagnostics["failure_error"] = _durable_exception_text(error)
+
+
 def _schedule_batched_command(
     radio: TransientRadioTransport,
     worker: _ProbeBatchCaptureWorker,
     probe: TransientTransportProbeOptions,
     *,
+    diagnostics: dict[str, Any],
     post_open_baseline_raw: int,
     check_deadline: Callable[[], None],
     clock_ns: Callable[[], int],
     sleep: Callable[[float], None],
     sample_rate_hz: int,
 ) -> tuple[StimulusCommand, dict[str, Any]]:
-    """Issue the weak write at a predeclared B8 target during batch drain."""
+    """Issue one exact weak write and retain diagnostics on every exit."""
 
-    target_delta = probe.target_sample_offset
-    if not 0 < target_delta < (1 << 31):
-        raise EvidenceInvalid("transport probe command target is ambiguous in low32")
-    target_raw = (post_open_baseline_raw + target_delta) % (1 << 32)
-    last_below_raw: int | None = None
-    poll_read_count = 0
-    poll_observations: list[dict[str, Any]] = []
-    total_requested_sleep_samples = 0
-    for _ in range(_PROBE_TARGET_MAX_POLL_READS):
-        check_deadline()
-        worker.require_first_refill_in_flight()
-        current = _strict_low32_counter(radio.read_rx_sample_counter_low32())
-        poll_read_count += 1
-        advance = (current - post_open_baseline_raw) % (1 << 32)
-        if advance >= 1 << 31:
-            raise EvidenceInvalid(
-                "transport probe command target polling crossed an ambiguous wrap"
+    raw_schedule = diagnostics["raw_schedule"]
+    counter_reads = diagnostics["counter_reads"]
+    command_diagnostics = diagnostics["command"]
+
+    def set_stage(stage: str) -> None:
+        diagnostics["current_stage"] = stage
+
+    def record_worker(stage: str) -> None:
+        diagnostics["worker"]["in_flight_observations"].append(
+            {
+                "stage": stage,
+                "first_refill_in_flight": worker.first_refill_in_flight,
+            }
+        )
+
+    def read_counter(role: str) -> int:
+        observation: dict[str, Any] = {
+            "ordinal": len(counter_reads),
+            "role": role,
+            "host_before_ns": _schedule_timestamp(
+                clock_ns, name=f"{role} read start"
+            ),
+            "host_after_ns": None,
+            "raw": None,
+            "error": None,
+        }
+        counter_reads.append(observation)
+        try:
+            observed = _strict_low32_counter(radio.read_rx_sample_counter_low32())
+        except BaseException as error:
+            observation["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name=f"{role} failed read completion"
             )
-        remaining = target_delta - advance
-        if remaining > 0:
-            last_below_raw = current
-            if remaining > _PROBE_TARGET_COARSE_GUARD_SAMPLES:
-                phase = "coarse_sleep"
-                sleep_samples = remaining - _PROBE_TARGET_COARSE_GUARD_SAMPLES
-            elif remaining > 2 * _PROBE_TARGET_FINE_SLEEP_SAMPLES:
-                phase = "fine_sleep"
-                sleep_samples = _PROBE_TARGET_FINE_SLEEP_SAMPLES
-            else:
-                phase = "tail_poll"
-                sleep_samples = 0
-            poll_observations.append(
+            observation["error"] = _exception_text(error)
+            raise
+        observation["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name=f"{role} read completion"
+        )
+        observation["raw"] = observed
+        if observation["host_after_ns"] < observation["host_before_ns"]:
+            raise EvidenceInvalid(
+                f"transport probe {role} counter read clock moved backward"
+            )
+        return observed
+
+    def attest_tx1(phase: str) -> float:
+        evidence = command_diagnostics["tx1_mute_assurance"][phase]
+        evidence["attempt_count"] = 1
+        evidence["host_before_ns"] = _schedule_timestamp(
+            clock_ns, name=f"TX1 {phase}-bracket mute read start"
+        )
+        try:
+            observed = float(radio.attest_tx1_muted())
+        except BaseException as error:
+            evidence["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name=f"TX1 {phase}-bracket failed read completion"
+            )
+            evidence["error"] = _exception_text(error)
+            raise
+        evidence["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name=f"TX1 {phase}-bracket mute read completion"
+        )
+        if not math.isfinite(observed):
+            evidence["error"] = "non-finite TX1 hardwaregain readback"
+            raise EvidenceInvalid(
+                f"transport probe TX1 {phase}-bracket mute assurance is invalid"
+            )
+        evidence["observed_level_db"] = observed
+        if abs(observed - TX_MUTE_DB) > 0.26 or (
+            evidence["host_after_ns"] < evidence["host_before_ns"]
+        ):
+            raise EvidenceInvalid(
+                f"transport probe TX1 {phase}-bracket mute assurance is invalid"
+            )
+        evidence["passed"] = True
+        return observed
+
+    try:
+        target_delta = probe.target_sample_offset
+        if not 0 < target_delta < (1 << 31):
+            raise EvidenceInvalid(
+                "transport probe command target is ambiguous in low32"
+            )
+        if raw_schedule["post_open_baseline_raw"] != post_open_baseline_raw:
+            raise EvidenceInvalid("transport probe diagnostic baseline changed")
+
+        set_stage("pre_tx1_mute_assurance")
+        worker.require_first_refill_in_flight()
+        record_worker("pre_tx1_mute_assurance")
+        attest_tx1("pre")
+
+        last_below_raw: int | None = None
+        total_requested_sleep_samples = 0
+        raw_a: int | None = None
+        target_overshoot: int | None = None
+        set_stage("target_poll")
+        for _ in range(_PROBE_TARGET_MAX_POLL_READS):
+            check_deadline()
+            worker.require_first_refill_in_flight()
+            current = read_counter("target_poll")
+            advance = (current - post_open_baseline_raw) % (1 << 32)
+            if advance >= 1 << 31:
+                raise EvidenceInvalid(
+                    "transport probe command target polling crossed an ambiguous wrap"
+                )
+            remaining = target_delta - advance
+            if remaining > 0:
+                last_below_raw = current
+                if remaining > _PROBE_TARGET_COARSE_GUARD_SAMPLES:
+                    phase = "coarse_sleep"
+                    sleep_samples = remaining - _PROBE_TARGET_COARSE_GUARD_SAMPLES
+                elif remaining > 2 * _PROBE_TARGET_FINE_SLEEP_SAMPLES:
+                    phase = "fine_sleep"
+                    sleep_samples = _PROBE_TARGET_FINE_SLEEP_SAMPLES
+                else:
+                    phase = "tail_poll"
+                    sleep_samples = 0
+                raw_schedule["target_poll_observations"].append(
+                    {
+                        "raw": current,
+                        "advance_samples": advance,
+                        "remaining_samples": remaining,
+                        "phase": phase,
+                        "requested_sleep_samples": sleep_samples,
+                    }
+                )
+                raw_schedule["target_poll_read_count"] += 1
+                raw_schedule["last_below_raw"] = last_below_raw
+                if sleep_samples:
+                    total_requested_sleep_samples += sleep_samples
+                    raw_schedule["target_total_requested_sleep_samples"] = (
+                        total_requested_sleep_samples
+                    )
+                    sleep(sleep_samples / sample_rate_hz)
+                    check_deadline()
+                continue
+            raw_a = current
+            target_overshoot = advance - target_delta
+            counter_reads[-1]["role"] = "raw_a_prewrite"
+            raw_schedule["target_poll_observations"].append(
                 {
                     "raw": current,
                     "advance_samples": advance,
-                    "remaining_samples": remaining,
-                    "phase": phase,
-                    "requested_sleep_samples": sleep_samples,
+                    "remaining_samples": 0,
+                    "phase": "target_reached",
+                    "requested_sleep_samples": 0,
                 }
             )
-            if sleep_samples:
-                total_requested_sleep_samples += sleep_samples
-                sleep(sleep_samples / sample_rate_hz)
-                check_deadline()
-            continue
-        target_overshoot = advance - target_delta
-        if target_overshoot > probe.max_command_sample_uncertainty:
+            raw_schedule["target_poll_read_count"] += 1
+            raw_schedule["raw_a_prewrite"] = raw_a
+            raw_schedule["target_overshoot_samples"] = target_overshoot
+            break
+        if raw_a is None:
+            raise EvidenceInvalid(
+                "transport probe command target exceeded its 64-read polling budget"
+            )
+        if last_below_raw is None:
+            raise EvidenceInvalid(
+                "transport probe command target lacks a last-below read"
+            )
+        set_stage("target_overshoot_validation")
+        if target_overshoot is None or (
+            target_overshoot > probe.max_target_overshoot_samples
+        ):
             raise EvidenceInvalid(
                 "transport probe command target overshoot "
-                f"{target_overshoot} exceeds {probe.max_command_sample_uncertainty} "
-                "samples"
+                f"{target_overshoot} exceeds "
+                f"{probe.max_target_overshoot_samples} samples"
             )
-        raw_a = current
-        poll_observations.append(
-            {
-                "raw": current,
-                "advance_samples": advance,
-                "remaining_samples": 0,
-                "phase": "target_reached",
-                "requested_sleep_samples": 0,
-            }
-        )
-        break
-    else:
-        raise EvidenceInvalid(
-            "transport probe command target exceeded its 64-read polling budget"
-        )
-    if last_below_raw is None:
-        raise EvidenceInvalid("transport probe command target lacks a last-below read")
-    worker.require_first_refill_in_flight()
-    command = timestamp_stimulus_command(
-        "weak_control_reassertion",
-        probe.weak_stimulus_tx_gain_db,
-        apply=radio.set_tx2_gain,
-        clock_ns=clock_ns,
-        max_host_jitter_ns=probe.max_host_jitter_ns,
-        readback_tolerance_db=probe.readback_tolerance_db,
-    )
 
-    raw_initial = _strict_low32_counter(radio.read_rx_sample_counter_low32())
-    raw_b: int | None = None
-    raw_c: int | None = None
-    post_write_read_count = 1
-    for _ in range(8):
-        current = _strict_low32_counter(radio.read_rx_sample_counter_low32())
-        post_write_read_count += 1
-        if raw_b is None:
-            if current != raw_initial:
-                raw_b = current
-        elif current != raw_b:
-            raw_c = current
-            break
-    else:
-        raise EvidenceInvalid(
-            "transport probe command did not observe causal B and C counter advances"
+        set_stage("exact_tx2_write")
+        worker.require_first_refill_in_flight()
+        raw_schedule["worker_in_flight_at_command"] = True
+        record_worker("exact_tx2_write")
+        write_ack = command_diagnostics["write_ack"]
+        write_ack["attempt_count"] = 1
+        write_ack["host_before_ns"] = _schedule_timestamp(
+            clock_ns, name="exact TX2 write start"
         )
-    assert raw_b is not None
-    assert raw_c is not None
-    initial_delta = (raw_initial - raw_a) % (1 << 32)
-    b_delta = (raw_b - raw_initial) % (1 << 32)
-    c_delta = (raw_c - raw_b) % (1 << 32)
-    if initial_delta >= 1 << 31 or not all(
-        0 < value < 1 << 31 for value in (b_delta, c_delta)
-    ):
-        raise EvidenceInvalid(
-            "transport probe command A-to-B-to-C bracket is ambiguous"
+        try:
+            radio.write_tx2_gain_exact(probe.weak_stimulus_tx_gain_db)
+        except BaseException as error:
+            write_ack["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name="failed exact TX2 write completion"
+            )
+            write_ack["host_jitter_ns"] = (
+                write_ack["host_after_ns"] - write_ack["host_before_ns"]
+            )
+            write_ack["error"] = _exception_text(error)
+            raise
+        write_ack["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name="exact TX2 write acknowledgement"
         )
-    causal_uncertainty = initial_delta + b_delta + c_delta
-    if not 0 < causal_uncertainty <= probe.max_command_sample_uncertainty:
-        raise EvidenceInvalid(
-            "transport probe command causal uncertainty "
-            f"{causal_uncertainty} exceeds {probe.max_command_sample_uncertainty} "
-            "samples"
+        write_ack["host_jitter_ns"] = (
+            write_ack["host_after_ns"] - write_ack["host_before_ns"]
         )
-    return command, {
-        "register_address": "0x800000b8",
-        "counter_width_bits": 32,
-        "counter_source": "coherent FPGA RX sample counter low word",
-        "post_open_baseline_raw": post_open_baseline_raw,
-        "target_offset_frames": probe.command_target_frames,
-        "target_offset_samples": target_delta,
-        "target_raw": target_raw,
-        "last_below_raw": last_below_raw,
-        "raw_a_prewrite": raw_a,
-        "raw_post_write_initial": raw_initial,
-        "raw_b_first_advance": raw_b,
-        "raw_c_causal_advance": raw_c,
-        "target_poll_read_count": poll_read_count,
-        "target_poll_policy": (
-            "counter-adaptive coarse guard, 4096-sample fine sleeps, bounded tail polls"
-        ),
-        "target_coarse_guard_samples": _PROBE_TARGET_COARSE_GUARD_SAMPLES,
-        "target_fine_sleep_samples": _PROBE_TARGET_FINE_SLEEP_SAMPLES,
-        "target_max_poll_reads": _PROBE_TARGET_MAX_POLL_READS,
-        "target_poll_observations": poll_observations,
-        "target_total_requested_sleep_samples": total_requested_sleep_samples,
-        "post_write_read_count": post_write_read_count,
-        "target_overshoot_samples": target_overshoot,
-        "causal_uncertainty_samples": causal_uncertainty,
-        "worker_in_flight_at_command": True,
-    }
+        write_ack["acknowledged"] = True
+
+        set_stage("raw_post_write_initial")
+        raw_initial = read_counter("raw_post_write_initial")
+        raw_schedule["raw_post_write_initial"] = raw_initial
+        initial_delta = (raw_initial - raw_a) % (1 << 32)
+        raw_schedule["initial_from_a_samples"] = initial_delta
+        raw_schedule["post_write_read_count"] = 1
+        raw_b: int | None = None
+        raw_c: int | None = None
+        b_delta: int | None = None
+        c_delta: int | None = None
+        causal_uncertainty: int | None = None
+        set_stage("causal_counter_advances")
+        for _ in range(8):
+            current = read_counter("post_write_advance_candidate")
+            raw_schedule["post_write_read_count"] += 1
+            if raw_b is None:
+                if current != raw_initial:
+                    raw_b = current
+                    counter_reads[-1]["role"] = "raw_b_first_advance"
+                    raw_schedule["raw_b_first_advance"] = raw_b
+                    b_delta = (raw_b - raw_initial) % (1 << 32)
+                    raw_schedule["b_from_initial_samples"] = b_delta
+            elif current != raw_b:
+                raw_c = current
+                counter_reads[-1]["role"] = "raw_c_causal_advance"
+                raw_schedule["raw_c_causal_advance"] = raw_c
+                c_delta = (raw_c - raw_b) % (1 << 32)
+                causal_uncertainty = initial_delta + b_delta + c_delta
+                raw_schedule["c_from_b_samples"] = c_delta
+                raw_schedule["causal_uncertainty_samples"] = causal_uncertainty
+                break
+        if raw_b is None or raw_c is None:
+            raise EvidenceInvalid(
+                "transport probe command did not observe causal B and C counter "
+                "advances"
+            )
+        assert b_delta is not None
+        assert c_delta is not None
+        assert causal_uncertainty is not None
+
+        set_stage("deferred_tx2_readback")
+        readback = command_diagnostics["deferred_tx2_readback"]
+        readback["attempt_count"] = 1
+        readback["host_before_ns"] = _schedule_timestamp(
+            clock_ns, name="deferred TX2 readback start"
+        )
+        try:
+            applied_level_db = float(radio.read_tx2_gain())
+        except BaseException as error:
+            readback["host_after_ns"] = _schedule_timestamp(
+                clock_ns, name="failed deferred TX2 readback completion"
+            )
+            readback["error"] = _exception_text(error)
+            raise
+        readback["host_after_ns"] = _schedule_timestamp(
+            clock_ns, name="deferred TX2 readback completion"
+        )
+        if not math.isfinite(applied_level_db):
+            readback["error"] = "non-finite deferred TX2 hardwaregain readback"
+            raise EvidenceInvalid(
+                "transport probe deferred TX2 readback is non-finite"
+            )
+        readback["observed_level_db"] = applied_level_db
+        if abs(applied_level_db - probe.weak_stimulus_tx_gain_db) > (
+            probe.readback_tolerance_db
+        ):
+            raise EvidenceInvalid(
+                "transport probe deferred TX2 readback differs from the requested "
+                f"level by more than {probe.readback_tolerance_db:g} dB"
+            )
+        readback["passed"] = True
+        command_diagnostics["applied_level_db"] = applied_level_db
+
+        set_stage("post_tx1_mute_assurance")
+        attest_tx1("post")
+
+        set_stage("schedule_validation")
+        if initial_delta >= 1 << 31 or not all(
+            0 < value < 1 << 31 for value in (b_delta, c_delta)
+        ):
+            raise EvidenceInvalid(
+                "transport probe command A-to-B-to-C bracket is ambiguous"
+            )
+        if not 0 < causal_uncertainty <= probe.max_command_sample_uncertainty:
+            raise EvidenceInvalid(
+                "transport probe command causal uncertainty "
+                f"{causal_uncertainty} exceeds "
+                f"{probe.max_command_sample_uncertainty} samples"
+            )
+        if (
+            write_ack["host_after_ns"] < write_ack["host_before_ns"]
+            or not 0 <= write_ack["host_jitter_ns"] <= probe.max_host_jitter_ns
+        ):
+            raise EvidenceInvalid(
+                "transport probe exact TX2 write host bracket is invalid"
+            )
+        command = StimulusCommand(
+            command_id="weak_control_reassertion",
+            requested_level_db=probe.weak_stimulus_tx_gain_db,
+            applied_level_db=applied_level_db,
+            host_before_ns=write_ack["host_before_ns"],
+            host_after_ns=write_ack["host_after_ns"],
+            sample_sequence_before=None,
+            sample_sequence_after=None,
+        )
+        if set(raw_schedule) != _PROBE_RAW_SCHEDULE_FIELDS:
+            raise EvidenceInvalid(
+                "transport probe completed raw schedule fields changed"
+            )
+        diagnostics["status"] = "complete"
+        diagnostics["qualified"] = True
+        diagnostics["current_stage"] = "complete"
+        return command, dict(raw_schedule)
+    except BaseException as error:
+        _mark_schedule_failure(diagnostics, error)
+        raise
 
 
 def _validate_batch_host_chronology(
@@ -1322,7 +1622,7 @@ def _bind_batch_counter_schedule(
         raise EvidenceInvalid("transport probe last-below/target/A ordering is invalid")
     if not 0 < extended_a - extended_p < 1 << 31:
         raise EvidenceInvalid("transport probe last-below to A advance is ambiguous")
-    if not 0 <= target_error <= probe.max_command_sample_uncertainty:
+    if not 0 <= target_error <= probe.max_target_overshoot_samples:
         raise EvidenceInvalid("transport probe posthoc target error exceeds policy")
     if not 0 < causal_uncertainty <= probe.max_command_sample_uncertainty:
         raise EvidenceInvalid("transport probe posthoc A-to-C bracket exceeds policy")
@@ -1331,7 +1631,14 @@ def _bind_batch_counter_schedule(
         or raw.get("target_offset_frames") != probe.command_target_frames
         or raw.get("target_offset_samples") != probe.target_sample_offset
         or raw.get("target_overshoot_samples") != target_error
+        or raw.get("target_overshoot_limit_samples")
+        != probe.max_target_overshoot_samples
+        or raw.get("initial_from_a_samples") != initial_delta
+        or raw.get("b_from_initial_samples") != b_delta
+        or raw.get("c_from_b_samples") != c_delta
         or raw.get("causal_uncertainty_samples") != causal_uncertainty
+        or raw.get("causal_uncertainty_limit_samples")
+        != probe.max_command_sample_uncertainty
         or raw.get("worker_in_flight_at_command") is not True
     ):
         raise EvidenceInvalid("transport probe raw and extended schedule disagree")
@@ -1697,7 +2004,7 @@ def _evidence_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
         "command_target": (
             "post-open coherent S0 + 40 * 65536 samples while first refill is in flight"
         ),
-        "maximum_target_overshoot_samples": probe.max_command_sample_uncertainty,
+        "maximum_target_overshoot_samples": probe.max_target_overshoot_samples,
         "maximum_a_to_c_uncertainty_samples": probe.max_command_sample_uncertainty,
         "target_poll_pacing": {
             "coarse_guard_samples": _PROBE_TARGET_COARSE_GUARD_SAMPLES,
@@ -2157,6 +2464,12 @@ def _run_probe_body(
                 return frame
 
             acquisition_error: BaseException | None = None
+            schedule_diagnostics = _new_schedule_diagnostics(
+                probe, post_open_baseline_raw=post_open_baseline_raw
+            )
+            report["acquisition"]["prebind_schedule_diagnostics"] = (
+                schedule_diagnostics
+            )
             try:
                 worker = _ProbeBatchCaptureWorker(
                     acquire_one,
@@ -2168,12 +2481,15 @@ def _run_probe_body(
                         "transport probe worker queue differs from the exact "
                         "Python memory ledger"
                     )
+                schedule_diagnostics["current_stage"] = "worker_start"
                 worker.start()
                 report["acquisition"]["worker_started"] = True
+                schedule_diagnostics["worker"]["first_refill_started"] = True
                 unbound_command, raw_schedule = _schedule_batched_command(
                     radio,
                     worker,
                     probe,
+                    diagnostics=schedule_diagnostics,
                     post_open_baseline_raw=post_open_baseline_raw,
                     check_deadline=check_deadline,
                     clock_ns=clock_ns,
@@ -2273,15 +2589,27 @@ def _run_probe_body(
                 }
             except BaseException as error:  # noqa: BLE001
                 acquisition_error = error
+                _mark_schedule_failure(schedule_diagnostics, error)
 
             # Required ordering on success and every failure: remove RF first,
             # cancel a failed/in-flight batch, then join before close.  A fully
             # replayed successful batch closes normally to exercise RELEASE.
             prejoin_mute_error: BaseException | None = None
+            shutdown_diagnostics = schedule_diagnostics["shutdown"]
+
+            def record_shutdown_event(event: str) -> None:
+                shutdown_diagnostics["events"].append(
+                    {"event": event, "monotonic_ns": time.monotonic_ns()}
+                )
+
+            record_shutdown_event("prejoin_mute_start")
             try:
                 radio.mute_all()
             except BaseException as error:  # noqa: BLE001
                 prejoin_mute_error = error
+                record_shutdown_event("prejoin_mute_failed")
+            else:
+                record_shutdown_event("prejoin_mute_complete")
             worker_in_flight_before_shutdown = bool(
                 worker is not None and worker.first_refill_in_flight
             )
@@ -2294,16 +2622,24 @@ def _run_probe_body(
             cancel_called = False
             if cancel_required:
                 cancel_called = True
+                record_shutdown_event("cancel_start")
                 try:
                     cancel_capture()
                 except BaseException as error:  # noqa: BLE001
                     cancel_error = error
+                    record_shutdown_event("cancel_failed")
+                else:
+                    record_shutdown_event("cancel_complete")
             stop_error: BaseException | None = None
             if worker is not None:
+                record_shutdown_event("worker_stop_start")
                 try:
                     worker.stop()
                 except BaseException as error:  # noqa: BLE001
                     stop_error = error
+                    record_shutdown_event("worker_stop_failed")
+                else:
+                    record_shutdown_event("worker_stop_complete")
                 report["acquisition"].update(
                     {
                         "produced_frames": worker.produced_frames,
@@ -2327,6 +2663,19 @@ def _run_probe_body(
                         else "normal_close_after_full_cache_replay"
                     ),
                     "worker_stopped_before_buffer_close": stop_error is None,
+                }
+            )
+            shutdown_diagnostics.update(
+                {
+                    "worker_in_flight_before_shutdown": (
+                        worker_in_flight_before_shutdown
+                    ),
+                    "cancel_required": cancel_required,
+                    "cancel_called": cancel_called,
+                    "cancel_succeeded": (
+                        cancel_error is None if cancel_called else None
+                    ),
+                    "worker_stopped": stop_error is None,
                 }
             )
             errors = [
@@ -3193,7 +3542,12 @@ def _validate_command_report(
         "target_total_requested_sleep_samples",
         "post_write_read_count",
         "target_overshoot_samples",
+        "target_overshoot_limit_samples",
+        "initial_from_a_samples",
+        "b_from_initial_samples",
+        "c_from_b_samples",
         "causal_uncertainty_samples",
+        "causal_uncertainty_limit_samples",
         "worker_in_flight_at_command",
         "first_batch_sample",
         "last_batch_sample_exclusive",
@@ -3296,7 +3650,7 @@ def _validate_command_report(
         or not first_batch_sample <= target < last_batch_sample_exclusive
         or not extended_p < target <= extended_a < extended_c
         or not 0 < extended_a - extended_p < 1 << 31
-        or not 0 <= target_error <= probe.max_command_sample_uncertainty
+        or not 0 <= target_error <= probe.max_target_overshoot_samples
         or not 0 < causal_uncertainty <= probe.max_command_sample_uncertainty
         or bracket.get("first_batch_sample") != first_batch_sample
         or bracket.get("last_batch_sample_exclusive")
@@ -3304,7 +3658,14 @@ def _validate_command_report(
         or bracket.get("target_offset_frames") != probe.command_target_frames
         or bracket.get("target_offset_samples") != target_offset
         or bracket.get("target_overshoot_samples") != target_error
+        or bracket.get("target_overshoot_limit_samples")
+        != probe.max_target_overshoot_samples
+        or bracket.get("initial_from_a_samples") != initial_delta
+        or bracket.get("b_from_initial_samples") != b_delta
+        or bracket.get("c_from_b_samples") != c_delta
         or bracket.get("causal_uncertainty_samples") != causal_uncertainty
+        or bracket.get("causal_uncertainty_limit_samples")
+        != probe.max_command_sample_uncertainty
         or bracket.get("worker_in_flight_at_command") is not True
         or bracket.get("command_interval") != "[A,C)"
         or bracket.get("register_address") != "0x800000b8"
@@ -3420,6 +3781,339 @@ def _validate_command_report(
         sample_sequence_before=lower,
         sample_sequence_after=upper,
     )
+
+
+def _validate_prebind_schedule_diagnostics(
+    value: Any,
+    *,
+    acquisition: Mapping[str, Any],
+    unbound_command: Mapping[str, Any],
+    raw_schedule: Mapping[str, Any],
+    probe: TransientTransportProbeOptions,
+) -> None:
+    diagnostics = _required_mapping(value, name="prebind schedule diagnostics")
+    if set(diagnostics) != {
+        "status",
+        "qualified",
+        "current_stage",
+        "failure_stage",
+        "failure_error",
+        "worker",
+        "command",
+        "counter_reads",
+        "raw_schedule",
+        "shutdown",
+    }:
+        raise EvidenceInvalid("transport probe schedule diagnostic fields changed")
+    if (
+        diagnostics.get("status") != "complete"
+        or diagnostics.get("qualified") is not True
+        or diagnostics.get("current_stage") != "complete"
+        or diagnostics.get("failure_stage") is not None
+        or diagnostics.get("failure_error") is not None
+    ):
+        raise EvidenceInvalid("transport probe schedule diagnostic is not qualified")
+    diagnostic_raw = _required_mapping(
+        diagnostics.get("raw_schedule"), name="diagnostic raw schedule"
+    )
+    if dict(diagnostic_raw) != dict(raw_schedule):
+        raise EvidenceInvalid("transport probe diagnostic raw schedule changed")
+
+    worker = _required_mapping(
+        diagnostics.get("worker"), name="schedule diagnostic worker"
+    )
+    if set(worker) != {"first_refill_started", "in_flight_observations"} or (
+        worker.get("first_refill_started") is not True
+    ) or acquisition.get("worker_started") is not True:
+        raise EvidenceInvalid("transport probe diagnostic worker start is invalid")
+    in_flight = _required_list(
+        worker.get("in_flight_observations"), name="worker in-flight observations"
+    )
+    if [item.get("stage") for item in in_flight if isinstance(item, Mapping)] != [
+        "pre_tx1_mute_assurance",
+        "exact_tx2_write",
+    ] or any(
+        not isinstance(item, Mapping)
+        or set(item) != {"stage", "first_refill_in_flight"}
+        or item.get("first_refill_in_flight") is not True
+        for item in in_flight
+    ):
+        raise EvidenceInvalid("transport probe diagnostic worker chronology is invalid")
+
+    command = _required_mapping(
+        diagnostics.get("command"), name="schedule diagnostic command"
+    )
+    if set(command) != {
+        "command_id",
+        "requested_level_db",
+        "applied_level_db",
+        "write_ack",
+        "deferred_tx2_readback",
+        "tx1_mute_assurance",
+    }:
+        raise EvidenceInvalid("transport probe diagnostic command fields changed")
+    if (
+        command.get("command_id") != "weak_control_reassertion"
+        or command.get("requested_level_db") != probe.weak_stimulus_tx_gain_db
+        or command.get("applied_level_db") != unbound_command.get("applied_level_db")
+    ):
+        raise EvidenceInvalid("transport probe diagnostic command changed")
+
+    write_ack = _required_mapping(
+        command.get("write_ack"), name="exact TX2 write acknowledgement"
+    )
+    if set(write_ack) != {
+        "operation",
+        "attempt_count",
+        "host_before_ns",
+        "host_after_ns",
+        "host_jitter_ns",
+        "acknowledged",
+        "error",
+    }:
+        raise EvidenceInvalid("transport probe TX2 write diagnostic fields changed")
+    write_before = _required_int(
+        write_ack.get("host_before_ns"), name="exact TX2 write start"
+    )
+    write_after = _required_int(
+        write_ack.get("host_after_ns"), name="exact TX2 write completion"
+    )
+    if (
+        write_ack.get("operation") != "one_exact_tx2_hardwaregain_write"
+        or write_ack.get("attempt_count") != 1
+        or write_ack.get("acknowledged") is not True
+        or write_ack.get("error") is not None
+        or write_ack.get("host_jitter_ns") != write_after - write_before
+        or unbound_command.get("host_before_ns") != write_before
+        or unbound_command.get("host_after_ns") != write_after
+    ):
+        raise EvidenceInvalid("transport probe exact TX2 write diagnostic is invalid")
+
+    readback = _required_mapping(
+        command.get("deferred_tx2_readback"), name="deferred TX2 readback"
+    )
+    if set(readback) != {
+        "operation",
+        "attempt_count",
+        "host_before_ns",
+        "host_after_ns",
+        "observed_level_db",
+        "tolerance_db",
+        "passed",
+        "error",
+    }:
+        raise EvidenceInvalid("transport probe deferred readback fields changed")
+    readback_before = _required_int(
+        readback.get("host_before_ns"), name="deferred TX2 readback start"
+    )
+    readback_after = _required_int(
+        readback.get("host_after_ns"), name="deferred TX2 readback completion"
+    )
+    if (
+        readback.get("operation") != "one_exact_tx2_hardwaregain_read"
+        or readback.get("attempt_count") != 1
+        or readback.get("passed") is not True
+        or readback.get("error") is not None
+        or readback.get("observed_level_db")
+        != unbound_command.get("applied_level_db")
+        or readback.get("tolerance_db") != probe.readback_tolerance_db
+        or not write_after <= readback_before <= readback_after
+    ):
+        raise EvidenceInvalid("transport probe deferred TX2 readback is invalid")
+
+    tx1 = _required_mapping(
+        command.get("tx1_mute_assurance"), name="TX1 mute assurance"
+    )
+    if set(tx1) != {"pre", "post"}:
+        raise EvidenceInvalid("transport probe TX1 assurance phases changed")
+    tx1_timing: dict[str, tuple[int, int]] = {}
+    for phase in ("pre", "post"):
+        assurance = _required_mapping(
+            tx1.get(phase), name=f"TX1 {phase}-bracket mute assurance"
+        )
+        if set(assurance) != {
+            "attempt_count",
+            "host_before_ns",
+            "host_after_ns",
+            "observed_level_db",
+            "passed",
+            "error",
+        }:
+            raise EvidenceInvalid("transport probe TX1 assurance fields changed")
+        before = _required_int(
+            assurance.get("host_before_ns"), name=f"TX1 {phase} read start"
+        )
+        after = _required_int(
+            assurance.get("host_after_ns"), name=f"TX1 {phase} read completion"
+        )
+        observed = _required_number(
+            assurance.get("observed_level_db"), name=f"TX1 {phase} readback"
+        )
+        if (
+            assurance.get("attempt_count") != 1
+            or assurance.get("passed") is not True
+            or assurance.get("error") is not None
+            or abs(observed - TX_MUTE_DB) > 0.26
+            or after < before
+        ):
+            raise EvidenceInvalid("transport probe TX1 mute assurance is invalid")
+        tx1_timing[phase] = (before, after)
+
+    counter_reads = _required_list(
+        diagnostics.get("counter_reads"), name="diagnostic counter reads"
+    )
+    target_reads = _required_int(
+        raw_schedule.get("target_poll_read_count"), name="diagnostic target reads"
+    )
+    post_reads = _required_int(
+        raw_schedule.get("post_write_read_count"), name="diagnostic post-write reads"
+    )
+    if len(counter_reads) != target_reads + post_reads:
+        raise EvidenceInvalid("transport probe diagnostic counter read count changed")
+    prior_after = tx1_timing["pre"][1]
+    for index, counter_value in enumerate(counter_reads):
+        item = _required_mapping(
+            counter_value, name=f"diagnostic counter read {index}"
+        )
+        if set(item) != {
+            "ordinal",
+            "role",
+            "host_before_ns",
+            "host_after_ns",
+            "raw",
+            "error",
+        }:
+            raise EvidenceInvalid("transport probe counter diagnostic fields changed")
+        before = _required_int(
+            item.get("host_before_ns"), name=f"counter read {index} start"
+        )
+        after = _required_int(
+            item.get("host_after_ns"), name=f"counter read {index} completion"
+        )
+        raw = _required_int(item.get("raw"), name=f"counter read {index} raw")
+        if (
+            item.get("ordinal") != index
+            or item.get("error") is not None
+            or not 0 <= raw < 1 << 32
+            or not prior_after <= before <= after
+        ):
+            raise EvidenceInvalid("transport probe counter diagnostic is invalid")
+        prior_after = after
+    poll_observations = _required_list(
+        raw_schedule.get("target_poll_observations"),
+        name="diagnostic target poll observations",
+    )
+    if len(poll_observations) != target_reads:
+        raise EvidenceInvalid("transport probe diagnostic target poll count changed")
+    for index, poll_value in enumerate(poll_observations):
+        poll = _required_mapping(
+            poll_value, name=f"diagnostic target poll {index}"
+        )
+        expected_role = "raw_a_prewrite" if index == target_reads - 1 else "target_poll"
+        if (
+            counter_reads[index].get("role") != expected_role
+            or counter_reads[index].get("raw") != poll.get("raw")
+        ):
+            raise EvidenceInvalid(
+                "transport probe target poll counter diagnostics changed"
+            )
+    post_counter_reads = counter_reads[target_reads:]
+    raw_initial = raw_schedule.get("raw_post_write_initial")
+    raw_b = raw_schedule.get("raw_b_first_advance")
+    raw_c = raw_schedule.get("raw_c_causal_advance")
+    if (
+        not post_counter_reads
+        or post_counter_reads[0].get("role") != "raw_post_write_initial"
+        or post_counter_reads[0].get("raw") != raw_initial
+    ):
+        raise EvidenceInvalid("transport probe initial counter diagnostic changed")
+    observed_b = False
+    observed_c = False
+    for index, item in enumerate(post_counter_reads[1:], start=1):
+        role = item.get("role")
+        raw = item.get("raw")
+        if not observed_b:
+            if raw == raw_initial and role == "post_write_advance_candidate":
+                continue
+            if raw == raw_b and role == "raw_b_first_advance":
+                observed_b = True
+                continue
+        elif not observed_c:
+            if raw == raw_b and role == "post_write_advance_candidate":
+                continue
+            if (
+                raw == raw_c
+                and role == "raw_c_causal_advance"
+                and index == len(post_counter_reads) - 1
+            ):
+                observed_c = True
+                continue
+        raise EvidenceInvalid("transport probe B/C counter diagnostics changed")
+    if not observed_b or not observed_c:
+        raise EvidenceInvalid("transport probe B/C counter diagnostics are incomplete")
+    if (
+        counter_reads[target_reads - 1].get("role") != "raw_a_prewrite"
+        or counter_reads[target_reads - 1].get("raw")
+        != raw_schedule.get("raw_a_prewrite")
+        or counter_reads[target_reads].get("role") != "raw_post_write_initial"
+        or counter_reads[target_reads].get("raw")
+        != raw_schedule.get("raw_post_write_initial")
+        or counter_reads[-1].get("role") != "raw_c_causal_advance"
+        or counter_reads[-1].get("raw")
+        != raw_schedule.get("raw_c_causal_advance")
+        or not counter_reads[target_reads - 1].get("host_after_ns") <= write_before
+        or not write_after <= counter_reads[target_reads].get("host_before_ns")
+        or not counter_reads[-1].get("host_after_ns") <= readback_before
+        or not readback_after <= tx1_timing["post"][0]
+    ):
+        raise EvidenceInvalid("transport probe command operation order changed")
+
+    shutdown = _required_mapping(
+        diagnostics.get("shutdown"), name="schedule diagnostic shutdown"
+    )
+    if set(shutdown) != {
+        "worker_in_flight_before_shutdown",
+        "cancel_required",
+        "cancel_called",
+        "cancel_succeeded",
+        "worker_stopped",
+        "events",
+    }:
+        raise EvidenceInvalid("transport probe shutdown diagnostic fields changed")
+    events = _required_list(shutdown.get("events"), name="shutdown events")
+    if (
+        shutdown.get("worker_in_flight_before_shutdown") is not False
+        or shutdown.get("cancel_required") is not False
+        or shutdown.get("cancel_called") is not False
+        or shutdown.get("cancel_succeeded") is not None
+        or shutdown.get("worker_stopped") is not True
+        or shutdown.get("worker_in_flight_before_shutdown")
+        != acquisition.get("worker_in_flight_before_shutdown")
+        or shutdown.get("cancel_required") != acquisition.get("cancel_required")
+        or shutdown.get("cancel_called") != acquisition.get("cancel_called")
+        or shutdown.get("cancel_succeeded") != acquisition.get("cancel_succeeded")
+        or shutdown.get("worker_stopped")
+        != acquisition.get("worker_stopped_before_buffer_close")
+        or [event.get("event") for event in events if isinstance(event, Mapping)]
+        != [
+            "prejoin_mute_start",
+            "prejoin_mute_complete",
+            "worker_stop_start",
+            "worker_stop_complete",
+        ]
+    ):
+        raise EvidenceInvalid("transport probe shutdown chronology is invalid")
+    prior_event_ns = -1
+    for event_value in events:
+        event = _required_mapping(event_value, name="shutdown event")
+        if set(event) != {"event", "monotonic_ns"}:
+            raise EvidenceInvalid("transport probe shutdown event fields changed")
+        event_ns = _required_int(
+            event.get("monotonic_ns"), name="shutdown event timestamp"
+        )
+        if event_ns < prior_event_ns:
+            raise EvidenceInvalid("transport probe shutdown clock moved backward")
+        prior_event_ns = event_ns
 
 
 def _validate_transient_transport_probe_report_impl(
@@ -4084,6 +4778,7 @@ def _validate_transient_transport_probe_report_impl(
         "configured_batch_cache_bytes",
         "batch_cache_attested",
         "post_open_baseline_raw",
+        "prebind_schedule_diagnostics",
         "prebind_unbound_command",
         "prebind_raw_counter_schedule",
     }
@@ -4130,6 +4825,13 @@ def _validate_transient_transport_probe_report_impl(
             report.get("command_contention"), name="command_contention"
         ).get("command"),
         name="command_contention.command",
+    )
+    _validate_prebind_schedule_diagnostics(
+        acquisition.get("prebind_schedule_diagnostics"),
+        acquisition=acquisition,
+        unbound_command=unbound_command,
+        raw_schedule=raw_schedule,
+        probe=probe,
     )
     expected_unbound_fields = {
         "command_id",
@@ -4364,6 +5066,7 @@ def run_transient_transport_probe(
             "cached_replay_refill_calls": 0,
             "batch_cache_fully_replayed": False,
             "initiating_refill_completion_monotonic_ns": None,
+            "prebind_schedule_diagnostics": None,
             "prebind_unbound_command": None,
             "prebind_raw_counter_schedule": None,
             "worker_in_flight_at_command": False,

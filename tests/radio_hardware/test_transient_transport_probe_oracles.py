@@ -270,6 +270,7 @@ class _FakeProbeRadio:
         self.mode = "manual"
         self.rx_gain_db = 40.0
         self.tx_gain_db = -89.75
+        self.tx1_gain_db = -89.75
         self.buffer_open = False
         self.active_buffer: _FakeBuffer | None = None
         self.cancelled = threading.Event()
@@ -331,6 +332,11 @@ class _FakeProbeRadio:
         self.nonmax_endpoint_without_event_at: int | None = None
         self.first_unrepresented_transitions = 0
         self.readback_offset_db = 0.0
+        self.deferred_readback_offset_db = 0.0
+        self.exact_write_failures = 0
+        self.deferred_readback_failures = 0
+        self.freeze_counter_after_exact_write = False
+        self.mutate_tx1_after_exact_write_db: float | None = None
         self.first_sample = 10_000_000
         self.buffer_sequence = 0
         self.transition_count = 0
@@ -391,6 +397,31 @@ class _FakeProbeRadio:
         ) >= 2:
             self.command_reasserted.set()
         return self.tx_gain_db + self.readback_offset_db
+
+    def write_tx2_gain_exact(self, gain_db: float) -> None:
+        if gain_db > self.options.tx_gain_db:
+            raise FixtureSafetyError("planted radio rejected strong exact TX write")
+        self.operations.append(("write_tx2_gain_exact", float(gain_db)))
+        if self.exact_write_failures:
+            self.exact_write_failures -= 1
+            raise OSError("planted exact TX2 write failure")
+        self.tx_gain_db = float(gain_db)
+        if self.mutate_tx1_after_exact_write_db is not None:
+            self.tx1_gain_db = self.mutate_tx1_after_exact_write_db
+        self.command_reasserted.set()
+
+    def read_tx2_gain(self) -> float:
+        self.operations.append(("read_tx2_gain",))
+        if self.deferred_readback_failures:
+            self.deferred_readback_failures -= 1
+            raise OSError("planted deferred TX2 readback failure")
+        return self.tx_gain_db + self.deferred_readback_offset_db
+
+    def attest_tx1_muted(self) -> float:
+        self.operations.append(("attest_tx1_muted", self.tx1_gain_db))
+        if abs(self.tx1_gain_db + 89.75) > 0.26:
+            raise FixtureSafetyError("planted TX1 mute assurance failure")
+        return self.tx1_gain_db
 
     def configure_rx(self, mode: str, *, manual_gain_db: float | None = None) -> None:
         self.mode = mode
@@ -735,6 +766,8 @@ class _FakeProbeRadio:
         return self.metadata_by_token[token]
 
     def read_rx_sample_counter_low32(self) -> int:
+        if self.freeze_counter_after_exact_write and self.command_reasserted.is_set():
+            return max(self.sample_counter, self.first_sample) % (1 << 32)
         if (
             self.precapture_baseline_offset_samples
             and not self.batch_inflight.is_set()
@@ -800,6 +833,42 @@ def _run_fake(
 def _failure_report(radio: _FakeProbeRadio) -> dict[str, Any]:
     assert radio._report_path is not None and radio._report_path.is_file()
     return json.loads(radio._report_path.read_text(encoding="utf-8"))
+
+
+def _assert_failed_schedule_diagnostics(
+    radio: _FakeProbeRadio, *, failure_stage: str
+) -> dict[str, Any]:
+    report = _failure_report(radio)
+    acquisition = report["acquisition"]
+    diagnostics = acquisition["prebind_schedule_diagnostics"]
+    assert report["schema"] == probe_module.PROBE_SCHEMA
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert diagnostics["status"] == "failed"
+    assert diagnostics["qualified"] is False
+    assert diagnostics["failure_stage"] == failure_stage
+    assert diagnostics["failure_error"]
+    assert acquisition["prebind_unbound_command"] is None
+    assert acquisition["prebind_raw_counter_schedule"] is None
+    shutdown = diagnostics["shutdown"]
+    assert shutdown["cancel_required"] is True
+    assert shutdown["cancel_called"] is True
+    assert shutdown["cancel_succeeded"] is True
+    events = [item["event"] for item in shutdown["events"]]
+    assert events == [
+        "prejoin_mute_start",
+        "prejoin_mute_complete",
+        "cancel_start",
+        "cancel_complete",
+        "worker_stop_start",
+        "worker_stop_complete",
+    ]
+    json.dumps(report, allow_nan=False)
+    with pytest.raises(EvidenceInvalid, match="report is not qualified"):
+        validate_transient_transport_probe_report(
+            report, _quality(Path(radio.options.output_dir))
+        )
+    return diagnostics
 
 
 def _forge_mid_session_event_excursion(
@@ -911,8 +980,34 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     assert all(
         operation[1] <= -45.0
         for operation in radio.operations
-        if operation[0] == "set_tx2_gain"
+        if operation[0] in {"set_tx2_gain", "write_tx2_gain_exact"}
     )
+    assert [
+        operation
+        for operation in radio.operations
+        if operation[0] == "write_tx2_gain_exact"
+    ] == [("write_tx2_gain_exact", -45.0)]
+    command_operations = [
+        operation
+        for operation in radio.operations
+        if operation[0]
+        in {"attest_tx1_muted", "write_tx2_gain_exact", "read_tx2_gain"}
+    ]
+    assert command_operations == [
+        ("attest_tx1_muted", -89.75),
+        ("write_tx2_gain_exact", -45.0),
+        ("read_tx2_gain",),
+        ("attest_tx1_muted", -89.75),
+    ]
+    diagnostics = report["acquisition"]["prebind_schedule_diagnostics"]
+    assert diagnostics["status"] == "complete"
+    assert diagnostics["qualified"] is True
+    assert diagnostics["command"]["write_ack"]["attempt_count"] == 1
+    assert diagnostics["command"]["deferred_tx2_readback"]["attempt_count"] == 1
+    assert diagnostics["command"]["deferred_tx2_readback"]["passed"] is True
+    assert diagnostics["command"]["tx1_mute_assurance"]["pre"]["passed"] is True
+    assert diagnostics["command"]["tx1_mute_assurance"]["post"]["passed"] is True
+    assert radio.tx1_gain_db == -89.75
     close_index = radio.operations.index(("buffer_close",))
     assert any(
         operation == ("mute", True) for operation in radio.operations[:close_index]
@@ -975,6 +1070,65 @@ def test_probe_accepts_v4_precapture_s0_with_target_inside_exact_batch(
         field: bracket[field] for field in probe_module._PROBE_RAW_SCHEDULE_FIELDS
     }
     validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_rejects_qualified_schedule_diagnostic_mutations(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    mutations: list[tuple[str, Any]] = []
+
+    middle_raw = copy.deepcopy(report)
+    middle_reads = middle_raw["acquisition"]["prebind_schedule_diagnostics"][
+        "counter_reads"
+    ]
+    middle_b = next(
+        item for item in middle_reads if item["role"] == "raw_b_first_advance"
+    )
+    middle_b["raw"] = (middle_b["raw"] + 1) % (1 << 32)
+    mutations.append(("B/C counter diagnostics changed", middle_raw))
+
+    host_order = copy.deepcopy(report)
+    host_reads = host_order["acquisition"]["prebind_schedule_diagnostics"][
+        "counter_reads"
+    ]
+    host_reads[1]["host_before_ns"] = host_reads[0]["host_after_ns"] - 1
+    mutations.append(("counter diagnostic is invalid", host_order))
+
+    write_count = copy.deepcopy(report)
+    write_count["acquisition"]["prebind_schedule_diagnostics"]["command"][
+        "write_ack"
+    ]["attempt_count"] = 2
+    mutations.append(("exact TX2 write diagnostic is invalid", write_count))
+
+    shutdown_order = copy.deepcopy(report)
+    shutdown_events = shutdown_order["acquisition"][
+        "prebind_schedule_diagnostics"
+    ]["shutdown"]["events"]
+    shutdown_events[1], shutdown_events[2] = shutdown_events[2], shutdown_events[1]
+    mutations.append(("shutdown chronology is invalid", shutdown_order))
+
+    cancel_cross_bind = copy.deepcopy(report)
+    cancel_shutdown = cancel_cross_bind["acquisition"][
+        "prebind_schedule_diagnostics"
+    ]["shutdown"]
+    cancel_shutdown["cancel_required"] = True
+    cancel_shutdown["cancel_called"] = True
+    cancel_shutdown["cancel_succeeded"] = True
+    mutations.append(("shutdown chronology is invalid", cancel_cross_bind))
+
+    partial = copy.deepcopy(report)
+    partial_diagnostics = partial["acquisition"]["prebind_schedule_diagnostics"]
+    partial_diagnostics["status"] = "failed"
+    partial_diagnostics["qualified"] = False
+    partial_diagnostics["failure_stage"] = "planted_partial"
+    mutations.append(("schedule diagnostic is not qualified", partial))
+
+    for expected, forged in mutations:
+        with pytest.raises(EvidenceInvalid, match=expected):
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
 
 
 def test_probe_rejects_target_outside_batch_and_insufficient_partition(
@@ -1369,25 +1523,14 @@ def test_probe_rejects_live_host_chronology_outside_initiating_refill(
 def test_probe_rejects_live_command_that_predates_initial_conditioning(
     tmp_path: Path,
 ) -> None:
-    class ReorderedClock:
-        def __init__(self) -> None:
-            self.values = iter((20_000, 20_100, 10_000, 10_100))
-
-        def __call__(self) -> int:
-            return next(self.values)
-
-    radio = _FakeProbeRadio(tmp_path)
-    with pytest.raises(BaseException, match="predates initial conditioning"):
-        run_transient_transport_probe(
-            radio,
-            _quality(tmp_path),
-            clock_ns=ReorderedClock(),
-            sleep=radio.paced_sleep,
-            metadata_parser=radio.parse_metadata,
-            runtime_provenance=radio.runtime_provenance,
+    del tmp_path
+    with pytest.raises(EvidenceInvalid, match="predates initial conditioning"):
+        probe_module._validate_batch_host_chronology(
+            initial_host_after_ns=20_100,
+            command_host_before_ns=10_000,
+            command_host_after_ns=10_100,
+            initiating_refill_completion_ns=1_000_000,
         )
-
-    assert _failure_report(radio)["verdict"] == "invalid"
 
 
 def test_probe_clears_stale_fifo_in_muted_hold_before_tx(tmp_path: Path) -> None:
@@ -1439,7 +1582,8 @@ def test_probe_fifo_clear_open_failure_never_arms_tx(tmp_path: Path) -> None:
         _run_fake(radio, _quality(tmp_path))
 
     assert not any(
-        operation[0] in {"arm_tone", "set_tx2_gain"} for operation in radio.operations
+        operation[0] in {"arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
+        for operation in radio.operations
     )
     hold_enter = radio.operations.index(("hold_buffer_enter", "metadata", 1))
     assert any(
@@ -1461,7 +1605,8 @@ def test_probe_rejects_impossible_stale_fifo_level_before_tx(
         _run_fake(radio, _quality(tmp_path))
 
     assert not any(
-        operation[0] in {"hold_buffer_enter", "arm_tone", "set_tx2_gain"}
+        operation[0]
+        in {"hold_buffer_enter", "arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
         for operation in radio.operations
     )
     assert _failure_report(radio)["verdict"] == "invalid"
@@ -1478,7 +1623,8 @@ def test_probe_rejects_fifo_remaining_after_hold_close_before_tx(
         _run_fake(radio, _quality(tmp_path))
 
     assert not any(
-        operation[0] in {"arm_tone", "set_tx2_gain"} for operation in radio.operations
+        operation[0] in {"arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
+        for operation in radio.operations
     )
     hold_close = radio.operations.index(("hold_buffer_close",))
     assert any(
@@ -1496,7 +1642,8 @@ def test_probe_hold_close_failure_is_muted_and_never_arms_tx(tmp_path: Path) -> 
         _run_fake(radio, _quality(tmp_path))
 
     assert not any(
-        operation[0] in {"arm_tone", "set_tx2_gain"} for operation in radio.operations
+        operation[0] in {"arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
+        for operation in radio.operations
     )
     hold_close = radio.operations.index(("hold_buffer_close",))
     assert any(
@@ -1597,7 +1744,9 @@ def test_probe_rejects_nonstable_mid_and_command_phase_gain_state(
         _run_fake(radio, _quality(tmp_path))
 
     tx_writes = [
-        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+        operation
+        for operation in radio.operations
+        if operation[0] in {"set_tx2_gain", "write_tx2_gain_exact"}
     ]
     assert len(tx_writes) == expected_tx_writes
     assert _failure_report(radio)["verdict"] == "invalid"
@@ -1726,6 +1875,162 @@ def test_probe_rejects_counter_target_overshoot_before_same_level_write(
         operation for operation in radio.operations if operation[0] == "set_tx2_gain"
     ] == [("set_tx2_gain", -45.0)]
     assert radio.cancel_calls == 1
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="target_overshoot_validation"
+    )
+    assert diagnostics["raw_schedule"]["target_overshoot_samples"] > 16_384
+    assert not any(
+        operation[0] == "write_tx2_gain_exact" for operation in radio.operations
+    )
+
+
+def test_probe_persists_exact_write_failure_before_any_post_write_read(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.exact_write_failures = 1
+
+    with pytest.raises(OSError, match="exact TX2 write failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="exact_tx2_write"
+    )
+    raw = diagnostics["raw_schedule"]
+    write_ack = diagnostics["command"]["write_ack"]
+    assert raw["raw_a_prewrite"] is not None
+    assert raw["raw_post_write_initial"] is None
+    assert write_ack["attempt_count"] == 1
+    assert write_ack["acknowledged"] is False
+    assert write_ack["host_after_ns"] >= write_ack["host_before_ns"]
+    assert "planted exact TX2 write failure" in write_ack["error"]
+    assert ("read_tx2_gain",) not in radio.operations
+
+
+def test_probe_persists_deferred_readback_mismatch_after_complete_raw_bracket(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.deferred_readback_offset_db = 0.5
+
+    with pytest.raises(EvidenceInvalid, match="deferred TX2 readback differs"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="deferred_tx2_readback"
+    )
+    raw = diagnostics["raw_schedule"]
+    readback = diagnostics["command"]["deferred_tx2_readback"]
+    assert all(
+        raw[field] is not None
+        for field in (
+            "raw_a_prewrite",
+            "raw_post_write_initial",
+            "raw_b_first_advance",
+            "raw_c_causal_advance",
+            "initial_from_a_samples",
+            "b_from_initial_samples",
+            "c_from_b_samples",
+            "causal_uncertainty_samples",
+        )
+    )
+    assert readback["observed_level_db"] == -44.5
+    assert readback["passed"] is False
+    assert diagnostics["command"]["applied_level_db"] is None
+
+
+@pytest.mark.parametrize(
+    ("failure_count", "offset", "expected"),
+    (
+        (1, 0.0, "planted deferred TX2 readback failure"),
+        (0, float("nan"), "deferred TX2 readback is non-finite"),
+    ),
+)
+def test_probe_persists_unavailable_or_nonfinite_deferred_readback(
+    tmp_path: Path, failure_count: int, offset: float, expected: str
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.deferred_readback_failures = failure_count
+    radio.deferred_readback_offset_db = offset
+
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="deferred_tx2_readback"
+    )
+    readback = diagnostics["command"]["deferred_tx2_readback"]
+    assert readback["attempt_count"] == 1
+    assert readback["observed_level_db"] is None
+    assert readback["passed"] is False
+    assert readback["error"]
+
+
+def test_probe_persists_partial_deltas_when_b_and_c_never_advance(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.freeze_counter_after_exact_write = True
+
+    with pytest.raises(EvidenceInvalid, match="did not observe causal B and C"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="causal_counter_advances"
+    )
+    raw = diagnostics["raw_schedule"]
+    assert raw["raw_post_write_initial"] is not None
+    assert raw["initial_from_a_samples"] is not None
+    assert raw["raw_b_first_advance"] is None
+    assert raw["b_from_initial_samples"] is None
+    assert raw["raw_c_causal_advance"] is None
+    assert raw["causal_uncertainty_samples"] is None
+    assert raw["post_write_read_count"] == 9
+    assert ("read_tx2_gain",) not in radio.operations
+
+
+def test_probe_persists_deferred_readback_before_strict_causal_limit_failure(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.counter_read_step = 6_000
+
+    with pytest.raises(EvidenceInvalid, match="causal uncertainty 18000 exceeds 16384"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="schedule_validation"
+    )
+    raw = diagnostics["raw_schedule"]
+    assert raw["target_overshoot_samples"] <= 16_384
+    assert raw["initial_from_a_samples"] == 6_000
+    assert raw["b_from_initial_samples"] == 6_000
+    assert raw["c_from_b_samples"] == 6_000
+    assert raw["causal_uncertainty_samples"] == 18_000
+    assert raw["causal_uncertainty_limit_samples"] == 16_384
+    assert diagnostics["command"]["deferred_tx2_readback"]["passed"] is True
+    assert diagnostics["command"]["tx1_mute_assurance"]["post"]["passed"] is True
+
+
+def test_probe_detects_tx1_mutation_after_exact_tx2_write(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.mutate_tx1_after_exact_write_db = -40.0
+
+    with pytest.raises(FixtureSafetyError, match="TX1 mute assurance failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="post_tx1_mute_assurance"
+    )
+    post = diagnostics["command"]["tx1_mute_assurance"]["post"]
+    assert post["attempt_count"] == 1
+    assert post["passed"] is False
+    assert "TX1 mute assurance failure" in post["error"]
+    assert [
+        operation
+        for operation in radio.operations
+        if operation[0] == "write_tx2_gain_exact"
+    ] == [("write_tx2_gain_exact", -45.0)]
 
 
 def test_probe_rejects_excessive_target_polling_without_command(
@@ -1742,6 +2047,11 @@ def test_probe_rejects_excessive_target_polling_without_command(
         operation for operation in radio.operations if operation[0] == "set_tx2_gain"
     ] == [("set_tx2_gain", -45.0)]
     assert radio.cancel_calls == 1
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="target_poll"
+    )
+    assert diagnostics["raw_schedule"]["target_poll_read_count"] == 64
+    assert diagnostics["raw_schedule"]["raw_a_prewrite"] is None
 
 
 def test_probe_requires_eight_fully_post_frames_in_the_same_batch(
@@ -1769,8 +2079,10 @@ def test_probe_max_gain_start_keeps_first_frame_transition_gate_fatal(
 
     assert radio.auto_request_initial_gain_db == 62
     assert [
-        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
-    ] == [("set_tx2_gain", -45.0), ("set_tx2_gain", -45.0)]
+        operation
+        for operation in radio.operations
+        if operation[0] in {"set_tx2_gain", "write_tx2_gain_exact"}
+    ] == [("set_tx2_gain", -45.0), ("write_tx2_gain_exact", -45.0)]
     failure = _failure_report(radio)
     assert failure["frames"] == []
     assert "unrepresented prior transitions" in failure["fatal_error"]

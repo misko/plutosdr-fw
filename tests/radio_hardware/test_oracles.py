@@ -68,9 +68,11 @@ class _FakeAttr:
         self._value = str(value)
         self.fail_write = fail_write
         self.write_attempts = 0
+        self.read_attempts = 0
 
     @property
     def value(self) -> str:
+        self.read_attempts += 1
         return self._value
 
     @value.setter
@@ -151,8 +153,46 @@ def _fake_radio(
     radio = Issue46Radio.__new__(Issue46Radio)
     radio.phy = _FakePhy(fail_tx1=fail_tx1)
     radio.tx = _FakeTx(fail_dds0=fail_dds0, fail_selector0=fail_selector0)
+    radio.options = SimpleNamespace(tx_gain_db=-45.0)
     radio._last_mute_evidence = None
     return radio
+
+
+def test_exact_tx2_gain_write_is_one_authorized_tx2_write_without_readback() -> None:
+    radio = _fake_radio()
+    tx1 = radio.phy.channels["voltage0"].attrs["hardwaregain"]
+    tx2 = radio.phy.channels["voltage1"].attrs["hardwaregain"]
+    tx1._value = "-89.75"
+    tx2._value = "-89.75"
+
+    radio.write_tx2_gain_exact(-45.0)
+
+    assert tx1.write_attempts == 0
+    assert tx1.read_attempts == 0
+    assert tx2.write_attempts == 1
+    assert tx2.read_attempts == 0
+    assert tx2._value == "-45.0"
+    assert radio.attest_tx1_muted() == pytest.approx(-89.75)
+    assert radio.read_tx2_gain() == pytest.approx(-45.0)
+    assert tx1.read_attempts == 1
+    assert tx2.read_attempts == 1
+
+
+@pytest.mark.parametrize(
+    "gain_db", (-90.0, -44.75, float("nan"), float("inf"), True, "-45")
+)
+def test_exact_tx2_gain_write_rejects_outside_authorization_without_io(
+    gain_db: object,
+) -> None:
+    radio = _fake_radio()
+    tx1 = radio.phy.channels["voltage0"].attrs["hardwaregain"]
+    tx2 = radio.phy.channels["voltage1"].attrs["hardwaregain"]
+
+    with pytest.raises(FixtureSafetyError, match="outside the authorized"):
+        radio.write_tx2_gain_exact(gain_db)  # type: ignore[arg-type]
+
+    assert tx1.write_attempts == tx1.read_attempts == 0
+    assert tx2.write_attempts == tx2.read_attempts == 0
 
 
 def test_all_suites_share_one_canonical_serial_lock() -> None:
