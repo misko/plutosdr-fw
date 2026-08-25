@@ -104,7 +104,7 @@ def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
     def fake_device_lineage(receipt_path, *, repository=None):
         del repository
         receipt_path = pathlib.Path(receipt_path).absolute()
-        image_path = tmp_path / "attested-rc3.dfu"
+        image_path = tmp_path / "attested-rc4.dfu"
         receipt = lifecycle._expected_ram_boot_receipt(
             receipt_path=receipt_path, image_path=image_path
         )
@@ -381,7 +381,7 @@ def _hardware_state(*, tx_gain=-80.0, tx_lo_readback_offset=0):
     return context, phy, tx, tandem, writes
 
 
-def test_safe_preflight_accepts_cold_rc3_rx_rf_without_writes():
+def test_safe_preflight_accepts_cold_rc4_rx_rf_without_writes():
     context, phy, tx, tandem, writes = _hardware_state()
     result = lifecycle._preflight(
         context,
@@ -1897,7 +1897,7 @@ def test_durable_report_rejects_cancel_temperature_outside_producer_range(
         validate_durable_pass_report(report)
 
 
-def test_v3_validator_rejects_v2_schema_and_temperature_authority_promotion(tmp_path):
+def test_v4_validator_rejects_v3_schema_and_temperature_authority_promotion(tmp_path):
     report = _valid_report(tmp_path)
     report["schema"] = lifecycle.PREDECESSOR_SCHEMA
     with pytest.raises(QualificationError, match="schema"):
@@ -2255,11 +2255,11 @@ def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
     assert called == []
 
 
-def test_v3_runner_rejects_legacy_report_filename_before_context(tmp_path):
+def test_v4_runner_rejects_legacy_report_filename_before_context(tmp_path):
     called = []
-    output = tmp_path / "muted-metadata-batch-lifecycle-v2.json"
+    output = tmp_path / "muted-metadata-batch-lifecycle-v3.json"
     fake_iio = SimpleNamespace(Context=lambda _uri: called.append(True))
-    with pytest.raises(QualificationError, match="v3 output filename"):
+    with pytest.raises(QualificationError, match="v4 output filename"):
         lifecycle.run_hardware(
             fake_iio,
             serial=lifecycle.DEFAULT_R18_SERIAL,
@@ -2273,7 +2273,7 @@ def test_v3_runner_rejects_legacy_report_filename_before_context(tmp_path):
 
 
 def _hermetic_device_lineage_files(tmp_path, monkeypatch):
-    image_path = tmp_path / "attested-rc3.dfu"
+    image_path = tmp_path / "attested-rc4.dfu"
     image_payload = b"F" * 96 + b"D" * 16
     image_path.write_bytes(image_payload)
     monkeypatch.setattr(lifecycle, "DEVICE_FIRMWARE_DFU_BYTES", len(image_payload))
@@ -2306,6 +2306,38 @@ def _hermetic_device_lineage_files(tmp_path, monkeypatch):
         hashlib.sha256(receipt_payload).hexdigest(),
     )
     return receipt_path, image_path
+
+
+def test_rc4_device_lineage_constants_are_exact():
+    assert lifecycle.SCHEMA == "plutosdr-fw.muted-metadata-batch-lifecycle.v4"
+    assert lifecycle.REPORT_FILENAME == "muted-metadata-batch-lifecycle-v4.json"
+    assert lifecycle.EXPECTED_FIRMWARE_VERSION == (
+        "v0.41-plutoplus-spf-tandem-agc-v8-rc4"
+    )
+    assert lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT == (
+        "557a08749d9c0c34fe8096099b5be9d2b2a1b24f"
+    )
+    assert lifecycle.DEVICE_FIRMWARE_SOURCE_TAG == (
+        "tandem-agc-v8-rc4-source/firmware-v1"
+    )
+    assert lifecycle.DEVICE_FIRMWARE_BUILD_RUN_ID == 32_898_297_518
+    assert lifecycle.DEVICE_FIRMWARE_DFU_SHA256 == (
+        "b18f3fd0590eef13d77a60d9c4e36398b9a40e5c230aa34d96e7c78e7ff46bf6"
+    )
+    assert lifecycle.DEVICE_FIRMWARE_DFU_BYTES == 12_787_327
+    assert lifecycle.DEVICE_FIRMWARE_FIT_SHA256 == (
+        "a3e98393c4ae3caecee53b3b81808b9790f2c7a8bce0cb201005502fd5d02521"
+    )
+    assert lifecycle.DEVICE_FIRMWARE_FIT_BYTES == 12_787_311
+    assert lifecycle.DEVICE_RAM_BOOT_RECEIPT_SHA256 == (
+        "9854b03dc8e0b9ee66b7f26ee8951f8352ec0d6f9fbaa3fae62a8f8d4b0c347e"
+    )
+    assert lifecycle.DEVICE_RAM_BOOT_RECEIPT_BYTES == 2_017
+    assert lifecycle.DEVICE_RAM_BOOT_RECEIPT_ID == ("62155abae0b4408ea77fc3d407e9b8c6")
+    assert lifecycle.DEVICE_RAM_BOOT_PLAN_ID == "cd3c1bdfa41f4463ab91e8f0fe2f34bb"
+    assert lifecycle.DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256 == (
+        "1b7aa093d3cea62553885bf9e06979c85bb24c8b2e1b6975479d5ff847803726"
+    )
 
 
 def test_device_lineage_recomputes_receipt_image_tag_and_ancestry(

@@ -52,36 +52,37 @@ from .metadata_abi import (
     parse_tandem_frame_metadata,
 )
 
-SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v3"
-PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v2"
-REPORT_FILENAME = "muted-metadata-batch-lifecycle-v3.json"
+SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v4"
+PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v3"
+TEMPERATURE_POLICY_PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v2"
+REPORT_FILENAME = "muted-metadata-batch-lifecycle-v4.json"
 EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
 EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
 DEFAULT_R18_SERIAL = "1040007c4a94000211000b009186843ef2"
-EXPECTED_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc3"
-EXPECTED_FIRMWARE_PATTERN = r"\Av0[.]41-plutoplus-spf-tandem-agc-v8-rc3\Z"
+EXPECTED_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc4"
+EXPECTED_FIRMWARE_PATTERN = r"\Av0[.]41-plutoplus-spf-tandem-agc-v8-rc4\Z"
 EXPECTED_KERNEL_VERSION = "5.15.0-g77a1f2352162"
 EXPECTED_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
-DEVICE_FIRMWARE_SOURCE_COMMIT = "01eff4051f63bd14ee7490093e4b9e2099de4de5"
-DEVICE_FIRMWARE_SOURCE_TAG = "tandem-agc-v8-rc3-source/firmware-v1"
-DEVICE_FIRMWARE_BUILD_RUN_ID = 32_834_624_500
+DEVICE_FIRMWARE_SOURCE_COMMIT = "557a08749d9c0c34fe8096099b5be9d2b2a1b24f"
+DEVICE_FIRMWARE_SOURCE_TAG = "tandem-agc-v8-rc4-source/firmware-v1"
+DEVICE_FIRMWARE_BUILD_RUN_ID = 32_898_297_518
 DEVICE_FIRMWARE_BUILD_RUN_ATTEMPT = 1
 DEVICE_FIRMWARE_DFU_SHA256 = (
-    "d5117721d0a1de038a3ee1e01be77de2b46e64030b2003fd373b0c2a05811cac"
+    "b18f3fd0590eef13d77a60d9c4e36398b9a40e5c230aa34d96e7c78e7ff46bf6"
 )
 DEVICE_FIRMWARE_FIT_SHA256 = (
-    "cc2c9305589bb4e297e6adeda94a99a50838b83964671fb9795dbaa470ab11c1"
+    "a3e98393c4ae3caecee53b3b81808b9790f2c7a8bce0cb201005502fd5d02521"
 )
-DEVICE_FIRMWARE_FIT_BYTES = 12_783_051
-DEVICE_FIRMWARE_DFU_BYTES = 12_783_067
+DEVICE_FIRMWARE_FIT_BYTES = 12_787_311
+DEVICE_FIRMWARE_DFU_BYTES = 12_787_327
 DEVICE_RAM_BOOT_RECEIPT_SHA256 = (
-    "0f3f622bf4f68af8a317efc31534fd43822fde6cf7f73b3c5909a286efe81dc3"
+    "9854b03dc8e0b9ee66b7f26ee8951f8352ec0d6f9fbaa3fae62a8f8d4b0c347e"
 )
-DEVICE_RAM_BOOT_RECEIPT_BYTES = 1_934
-DEVICE_RAM_BOOT_RECEIPT_ID = "825fee881ce54a849c32b8e43624369f"
-DEVICE_RAM_BOOT_PLAN_ID = "634bb550deca414cbb0b1dbc7011553f"
+DEVICE_RAM_BOOT_RECEIPT_BYTES = 2_017
+DEVICE_RAM_BOOT_RECEIPT_ID = "62155abae0b4408ea77fc3d407e9b8c6"
+DEVICE_RAM_BOOT_PLAN_ID = "cd3c1bdfa41f4463ab91e8f0fe2f34bb"
 DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256 = (
-    "480410384e19ab629cfabb7978a2327f99edd32d2d3d8a7fcfe72a700add33b4"
+    "1b7aa093d3cea62553885bf9e06979c85bb24c8b2e1b6975479d5ff847803726"
 )
 DEVICE_RAM_BOOT_PHASES = (
     "preflight_revalidated",
@@ -276,11 +277,11 @@ def _expected_ram_boot_receipt(
         "outcome": "success",
         "phases": list(DEVICE_RAM_BOOT_PHASES),
         "plan": {
-            "before_firmware": "v0.41-plutoplus-spf-tandem-agc-v8-rc2",
+            "before_firmware": "v0.41-plutoplus-spf-tandem-agc-v8-rc3",
             "before_model": EXPECTED_HARDWARE_MODEL,
             "before_phy": "ad9361",
             "confirmation_phrase": f"RAM BOOT {DEFAULT_R18_SERIAL}",
-            "created_at": "2026-08-25T10:53:24.030666+00:00",
+            "created_at": "2026-08-25T21:35:34.476644+00:00",
             "expected_firmware": EXPECTED_FIRMWARE_VERSION,
             "expected_metadata_abi": 2,
             "expected_tandem_agc": True,
@@ -290,9 +291,9 @@ def _expected_ram_boot_receipt(
             "image_sha256": DEVICE_FIRMWARE_DFU_SHA256,
             "known_hosts_sha256": DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256,
             "plan_id": DEVICE_RAM_BOOT_PLAN_ID,
-            "profile_id": "tandem-agc-v8-rc3-ram",
+            "profile_id": "tandem-agc-v8-rc4-ram",
             "raw_usb_write_access": True,
-            "runtime_usb_device_node": "/dev/bus/usb/003/017",
+            "runtime_usb_device_node": "/dev/bus/usb/003/021",
             "schema_version": 1,
             "serial": DEFAULT_R18_SERIAL,
             "transition_host": "192.168.1.18",
@@ -319,48 +320,48 @@ def _expected_ram_boot_receipt(
 def _attest_device_firmware_lineage(
     receipt_path: pathlib.Path, *, repository: pathlib.Path | None = None
 ) -> dict[str, Any]:
-    """Bind the exact RC3 RAM receipt, image, and protected source graph."""
+    """Bind the exact RC4 RAM receipt, image, and protected source graph."""
 
     receipt_path = receipt_path.absolute()
     receipt_payload = _read_exact_owned_regular_file(
         receipt_path,
         expected_bytes=DEVICE_RAM_BOOT_RECEIPT_BYTES,
-        name="RC3 RAM-boot receipt",
+        name="RC4 RAM-boot receipt",
         required_mode=0o600,
     )
     if hashlib.sha256(receipt_payload).hexdigest() != DEVICE_RAM_BOOT_RECEIPT_SHA256:
-        raise QualificationError("RC3 RAM-boot receipt SHA-256 changed")
+        raise QualificationError("RC4 RAM-boot receipt SHA-256 changed")
     try:
         receipt = json.loads(receipt_payload)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise QualificationError("RC3 RAM-boot receipt JSON is invalid") from error
+        raise QualificationError("RC4 RAM-boot receipt JSON is invalid") from error
     _validate_strict_json_domain(receipt)
-    receipt_record = _required_mapping(receipt, name="RC3 RAM-boot receipt")
-    plan = _required_mapping(receipt_record.get("plan"), name="RC3 RAM-boot plan")
+    receipt_record = _required_mapping(receipt, name="RC4 RAM-boot receipt")
+    plan = _required_mapping(receipt_record.get("plan"), name="RC4 RAM-boot plan")
     image_text = plan.get("image_path")
     if type(image_text) is not str:
-        raise QualificationError("RC3 RAM-boot image path is not an exact string")
+        raise QualificationError("RC4 RAM-boot image path is not an exact string")
     image_path = pathlib.Path(image_text)
     if not image_path.is_absolute() or ".." in image_path.parts:
-        raise QualificationError("RC3 RAM-boot image path is not absolute/normalized")
+        raise QualificationError("RC4 RAM-boot image path is not absolute/normalized")
     expected_receipt = _expected_ram_boot_receipt(
         receipt_path=receipt_path, image_path=image_path
     )
     if not _json_identical(dict(receipt_record), expected_receipt):
-        raise QualificationError("RC3 RAM-boot receipt semantics changed")
+        raise QualificationError("RC4 RAM-boot receipt semantics changed")
 
     image_payload = _read_exact_owned_regular_file(
         image_path,
         expected_bytes=DEVICE_FIRMWARE_DFU_BYTES,
-        name="attested RC3 DFU image",
+        name="attested RC4 DFU image",
     )
     if hashlib.sha256(image_payload).hexdigest() != DEVICE_FIRMWARE_DFU_SHA256:
-        raise QualificationError("attested RC3 DFU SHA-256 changed")
+        raise QualificationError("attested RC4 DFU SHA-256 changed")
     if (
         hashlib.sha256(image_payload[:DEVICE_FIRMWARE_FIT_BYTES]).hexdigest()
         != DEVICE_FIRMWARE_FIT_SHA256
     ):
-        raise QualificationError("attested RC3 FIT body SHA-256 changed")
+        raise QualificationError("attested RC4 FIT body SHA-256 changed")
 
     repository = (
         pathlib.Path(__file__).resolve().parents[2]
@@ -377,7 +378,7 @@ def _attest_device_firmware_lineage(
         .strip()
     )
     if source_tag_commit != DEVICE_FIRMWARE_SOURCE_COMMIT:
-        raise QualificationError("protected RC3 firmware source tag moved")
+        raise QualificationError("protected RC4 firmware source tag moved")
     host_head = _git_bytes(repository, "rev-parse", "HEAD").decode().strip()
     _git_bytes(
         repository,
@@ -418,7 +419,7 @@ def _observed_device_firmware_provenance(
         preflight_record.get("context_attrs"), name="device preflight context attrs"
     )
     return {
-        "attestation_status": "exact lineage cross-bound to live RC3 identity",
+        "attestation_status": "exact lineage cross-bound to live RC4 identity",
         "lineage": dict(lineage),
         "live_serial": preflight_record.get("serial"),
         "live_firmware_version": preflight_record.get("firmware_version"),
@@ -431,7 +432,7 @@ def _observed_device_firmware_provenance(
 
 def _temperature_policy_predecessor() -> dict[str, Any]:
     return {
-        "schema": PREDECESSOR_SCHEMA,
+        "schema": TEMPERATURE_POLICY_PREDECESSOR_SCHEMA,
         "failed_report_sha256": PREDECESSOR_V2_FAILURE_REPORT_SHA256,
         "disposition": (
             "immutable FAIL retained; v3 supersedes only the INT32_MIN/null "
@@ -2886,7 +2887,7 @@ def _attest_identity(
     if serial != DEFAULT_R18_SERIAL:
         raise QualificationError("lifecycle gate is frozen to the exact R18 serial")
     if firmware_pattern != EXPECTED_FIRMWARE_PATTERN:
-        raise QualificationError("lifecycle gate requires the exact RC3 pattern")
+        raise QualificationError("lifecycle gate requires the exact RC4 pattern")
     if not uri.startswith("usb:"):
         raise QualificationError("lifecycle gate requires a local USB context")
     attrs = {str(name): str(value) for name, value in context.attrs.items()}
@@ -5295,11 +5296,11 @@ def run_hardware(
     output_path = output_path.absolute()
     if output_path.name != REPORT_FILENAME:
         raise QualificationError(
-            f"v3 output filename must be exact {REPORT_FILENAME!r}"
+            f"v4 output filename must be exact {REPORT_FILENAME!r}"
         )
     output_preflight = _prepare_fresh_output_path(output_path)
     if serial != DEFAULT_R18_SERIAL or firmware_pattern != EXPECTED_FIRMWARE_PATTERN:
-        raise QualificationError("lifecycle runner is frozen to exact R18/RC3")
+        raise QualificationError("lifecycle runner is frozen to exact R18/RC4")
     expected_commit = os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", "")
     if expected_commit != EXACT_LIBIIO_COMMIT:
         raise QualificationError(
