@@ -233,15 +233,23 @@ module tandem_agc_core #(
   end
 
   // ---------------------------------------------------------------------------
-  // policy, §5.3. Strict priority DECREASE > INHIBIT > INCREASE > HOLD.
+  // policy, §5.3. Strict priority LARGE DECREASE > SMALL-LATCH CLEAR >
+  // INHIBIT > INCREASE > HOLD.
   // Small LMT is deliberately absent -- it is on no CTRL_OUT page (§3).
   // ---------------------------------------------------------------------------
   wire want_decrease = ch1_lglmt | ch1_lgadc | ch2_lglmt | ch2_lgadc;
   wire inhibit       = ch1_smadc | ch2_smadc;
   wire both_lp       = ch1_lp & ch2_lp;
   wire one_lp        = ch1_lp ^ ch2_lp;
+  // UG-570: small-ADC overload is latched until a gain change, but MGC
+  // low-power follows the current average.  Thus this combination can be a
+  // stale latch left by an earlier strong signal, not a current overload.
+  wire small_latch_conflict = both_lp && inhibit && !want_decrease;
 
-  reg [7:0] cooldown_cnt, dwell_cnt;
+  reg [7:0] cooldown_cnt, dwell_cnt, small_latch_dwell_cnt;
+  reg [7:0] small_latch_rearm_dwell_cnt;
+  reg       small_latch_clear_attempted;
+  reg       small_latch_rearm_pending;
   wire cooldown_active = (cooldown_cnt != 8'd0);
 
   reg [7:0]  expected_index;
@@ -265,10 +273,26 @@ module tandem_agc_core #(
   wire may_decide = (state == ST_ACTIVE) && (mode_req == 2'd2)
                     && !blanked && !cooldown_active && !pulse_pending
                     && (fault == 8'd0);
+  wire small_latch_conflict_ready = small_latch_conflict
+                                  && (small_latch_dwell_cnt != 8'd0)
+                                  && (small_latch_dwell_cnt >= cfg_dwell);
+  wire small_latch_rearm_ready = may_decide
+                               && small_latch_clear_attempted
+                               && small_latch_rearm_pending
+                               && !ch1_lp && !ch2_lp && !want_decrease
+                               && (small_latch_rearm_dwell_cnt != 8'd0)
+                               && (small_latch_rearm_dwell_cnt >= cfg_dwell);
+  wire small_latch_conflict_fatal = may_decide
+                                  && small_latch_conflict_ready
+                                  && (at_min || small_latch_clear_attempted);
 
   always @(posedge l_clk) begin
     if (!l_resetn) begin
       expected_index <= 8'd0; cooldown_cnt <= 8'd0; dwell_cnt <= 8'd0;
+      small_latch_dwell_cnt <= 8'd0;
+      small_latch_rearm_dwell_cnt <= 8'd0;
+      small_latch_clear_attempted <= 1'b0;
+      small_latch_rearm_pending <= 1'b0;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
       evt_seq <= 32'd0; event_index <= 8'd0;
       evt_reason <= 4'd0; evt_push <= 1'b0;
@@ -276,6 +300,10 @@ module tandem_agc_core #(
     end else if (fault_clear && state != ST_ACTIVE) begin
       expected_index <= cfg_idx_init;
       cooldown_cnt <= 8'd0; dwell_cnt <= 8'd0;
+      small_latch_dwell_cnt <= 8'd0;
+      small_latch_rearm_dwell_cnt <= 8'd0;
+      small_latch_clear_attempted <= 1'b0;
+      small_latch_rearm_pending <= 1'b0;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
       evt_seq <= 32'd0; event_index <= cfg_idx_init;
       evt_reason <= 4'd0; evt_push <= 1'b0;
@@ -289,15 +317,57 @@ module tandem_agc_core #(
         expected_index <= cfg_idx_init;
         dwell_cnt      <= 8'd0;
         cooldown_cnt   <= 8'd0;
+        small_latch_dwell_cnt <= 8'd0;
+        small_latch_rearm_dwell_cnt <= 8'd0;
+        small_latch_clear_attempted <= 1'b0;
+        small_latch_rearm_pending <= 1'b0;
       end
 
-      // dwell and cooldown advance on the power-measurement tick, D-10
+      // Cooldown advances on the power-measurement tick, D-10.
       if (pwr_tick) begin
         if (cooldown_cnt != 8'd0) cooldown_cnt <= cooldown_cnt - 8'd1;
-        if (both_lp && !inhibit)
-          dwell_cnt <= (dwell_cnt == 8'hFF) ? dwell_cnt : dwell_cnt + 8'd1;
-        else
+      end
+
+      // Dwell evidence is fresh only while a decision could otherwise be
+      // accepted.  Pulse handoff, AD9361 blanking, cooldown, HOLD, and faults
+      // all reset it; cfg_dwell=0 still requires one eligible power tick.
+      if (!may_decide) begin
+        dwell_cnt <= 8'd0;
+        small_latch_dwell_cnt <= 8'd0;
+        small_latch_rearm_dwell_cnt <= 8'd0;
+      end else begin
+        if (!both_lp || inhibit)
           dwell_cnt <= 8'd0;
+        else if (pwr_tick)
+          dwell_cnt <= (dwell_cnt == 8'hFF) ? dwell_cnt : dwell_cnt + 8'd1;
+
+        // A stale small-ADC latch is acted on only after its own full,
+        // consecutive dwell.  Clean both-low history never credits this path.
+        if (!small_latch_conflict)
+          small_latch_dwell_cnt <= 8'd0;
+        else if (pwr_tick)
+          small_latch_dwell_cnt <= (small_latch_dwell_cnt == 8'hFF) ?
+                                   small_latch_dwell_cnt :
+                                   small_latch_dwell_cnt + 8'd1;
+
+        // A consumed clear can be re-armed only by a later ordinary large-
+        // overload decrease followed, after its pulse/guard/cooldown, by a
+        // separate full dwell with neither low-power bit asserted.  Further
+        // large decreases reset this proof window in the decision block.
+        if (!(small_latch_clear_attempted && small_latch_rearm_pending &&
+              !ch1_lp && !ch2_lp && !want_decrease))
+          small_latch_rearm_dwell_cnt <= 8'd0;
+        else if (pwr_tick)
+          small_latch_rearm_dwell_cnt <=
+              (small_latch_rearm_dwell_cnt == 8'hFF) ?
+              small_latch_rearm_dwell_cnt :
+              small_latch_rearm_dwell_cnt + 8'd1;
+      end
+
+      if (small_latch_rearm_ready) begin
+        small_latch_clear_attempted <= 1'b0;
+        small_latch_rearm_pending <= 1'b0;
+        small_latch_rearm_dwell_cnt <= 8'd0;
       end
 
       if (may_decide) begin
@@ -315,10 +385,43 @@ module tandem_agc_core #(
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
+            small_latch_dwell_cnt <= 8'd0;
+            if (small_latch_clear_attempted) begin
+              small_latch_rearm_pending <= 1'b1;
+              small_latch_rearm_dwell_cnt <= 8'd0;
+            end
+          end
+        end else if (small_latch_conflict_ready) begin
+          cnt_inhib <= (cnt_inhib == 8'hFF) ? cnt_inhib : cnt_inhib + 8'd1;
+          if (at_min || small_latch_clear_attempted) begin
+            // There is no conservative second edge.  The sticky fault below
+            // withdraws AUTO instead of silently deadlocking or walking the
+            // gain toward the minimum under a persistent/high-PAPR conflict.
+            if (at_min)
+              cnt_clamp <= (cnt_clamp == 8'hFF) ? cnt_clamp : cnt_clamp + 8'd1;
+            dwell_cnt <= 8'd0;
+            small_latch_dwell_cnt <= 8'd0;
+          end else begin
+            req_dir        <= 2'd2;
+            fire_req       <= 1'b1;
+            expected_index <= expected_index - 8'd1;
+            event_index     <= expected_index - 8'd1;
+            evt_reason     <= R_SM_INHIB;
+            evt_push       <= 1'b1;
+            evt_seq        <= evt_seq + 32'd1;
+            cnt_trans      <= cnt_trans + 32'd1;
+            cooldown_cnt   <= cfg_cooldown;
+            dwell_cnt      <= 8'd0;
+            small_latch_dwell_cnt <= 8'd0;
+            small_latch_clear_attempted <= 1'b1;
+            small_latch_rearm_pending <= 1'b0;
+            small_latch_rearm_dwell_cnt <= 8'd0;
           end
         end else if (inhibit) begin
-          if (both_lp) cnt_inhib <= (cnt_inhib == 8'hFF) ? cnt_inhib : cnt_inhib + 8'd1;
-        end else if (both_lp && (dwell_cnt >= cfg_dwell)) begin
+          if (both_lp)
+            cnt_inhib <= (cnt_inhib == 8'hFF) ? cnt_inhib : cnt_inhib + 8'd1;
+        end else if (both_lp && (dwell_cnt != 8'd0) &&
+                     (dwell_cnt >= cfg_dwell)) begin
           if (at_max) begin
             cnt_clamp <= (cnt_clamp == 8'hFF) ? cnt_clamp : cnt_clamp + 8'd1;
           end else begin
@@ -402,6 +505,11 @@ module tandem_agc_core #(
           ((sw_idx_rx1 != expected_index) || (sw_idx_rx2 != expected_index)))
                                               fault[F_IDX_MISMTCH] <= 1'b1;
       if (state == ST_ARMING && !consumer_ready) fault[F_NO_CONSUMER] <= 1'b1;
+      // At the minimum there is no conservative latch-clearing edge.  A
+      // conflict that survives the sole clear attempt is likewise
+      // unrecoverable without risking a downward ratchet.  Leave AUTO through
+      // the existing sticky illegal-condition fault path.
+      if (small_latch_conflict_fatal)       fault[F_ILLEGAL]       <= 1'b1;
     end
   end
 

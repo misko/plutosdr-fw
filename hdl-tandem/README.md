@@ -56,15 +56,20 @@ Six runs across five suites, all under Icarus Verilog:
 |---|---|
 | `tb_tandem_cdc` | reset bridges, coherent bus crossings, FIFO ordering, and explicit overflow |
 | `tb_ad9361_model` | 27 checks that the model itself is faithful, including that a 1-ClkRF pulse is rejected and a 2-cycle one accepted |
-| `tb_tandem_agc` (ratio 1.0) | closed loop at `rx_fir_dec = 2`, SPF production |
-| `tb_tandem_agc` (ratio 2.0) | closed loop at `rx_fir_dec = 1`, the device-tree boot default |
+| `tb_tandem_agc` (ratio 1.0) | closed loop at `rx_fir_dec = 2`, SPF production, including stale small-ADC-latch recovery and fail-closed persistent/high-PAPR conflict handling |
+| `tb_tandem_agc` (ratio 2.0) | the same policy and latch-recovery checks at `rx_fir_dec = 1`, the device-tree boot default |
 | `tb_tandem_agc_stress` | §8.2 edge cases: randomised traffic, reset in every lifecycle state, disable at every pulse phase, chatter, long idle, FIFO overflow, sequence and 64-bit counter rollover, zero-cooldown request/pulse and HOLD handoffs, index-mismatch fault |
 | `tb_tandem_agc_axi` | exact `TAG2` ABI, 32-bit kernel epoch, 16-byte post-change events, asynchronous AXI/RX clocks, and HOLD-low teardown ordering |
 
 The twelve §10 assertions run continuously as procedural checkers
 (`tandem_agc_checkers.v`) — Icarus has no SVA and this repository uses none.
 
-## Out-of-context synthesis, xc7z010clg400-1, l_clk @ 61.44 MHz
+## Pre-recovery out-of-context reference (superseded)
+
+The figures below predate the stale-small-ADC recovery state and are retained
+only as the last size baseline. They are not timing/utilization evidence for the
+current RTL. A new release candidate requires fresh out-of-context and
+integrated synthesis evidence before any fit or timing claim is made.
 
 | Resource | Core + regs | Device | % | Plan §6 estimate |
 |---|---:|---:|---:|---|
@@ -73,7 +78,7 @@ The twelve §10 assertions run continuously as procedural checkers
 | BRAM36 | 2 | 60 | 3.33% | ~1 |
 | DSP | 0 | 80 | 0% | 0 |
 
-Against the measured RC17 baseline of 13,088 LUT this projects to **13,604 LUT
-= 77.3%**, inside the ~82% guardrail, with DSP unchanged at 72/80.
+Against the measured RC17 baseline of 13,088 LUT, that prior core projected to
+**13,604 LUT = 77.3%**, inside the ~82% guardrail, with DSP unchanged at 72/80.
 
 Reproduce: `vivado -mode batch -source core_ooc.tcl`
