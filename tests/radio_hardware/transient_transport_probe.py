@@ -51,7 +51,6 @@ from .tandem_quality import (
 from .transient_hardware import (
     TransientCaptureOptions,
     TransientRadioTransport,
-    _build_tandem_request,
     _capture_frame,
     _CaptureState,
     _check_effective_attenuation,
@@ -74,6 +73,7 @@ PROBE_PENDING_VERDICT = "qualified_transport_pending_cleanup"
 PROBE_THREAD_NAME = "tandem-transient-transport-probe-acquisition"
 
 _PROBE_WEAK_GAIN_DB = -45.0
+_PROBE_AUTO_INITIAL_GAIN_DB = 62
 _PROBE_FRAME_SAMPLES = 65_536
 _PROBE_KERNEL_BUFFERS = 2
 _PROBE_CONTINUITY_FRAMES = 32
@@ -103,6 +103,7 @@ class TransientTransportProbeOptions:
     """Frozen safety and evidence bounds for the qualification-only probe."""
 
     weak_stimulus_tx_gain_db: float = _PROBE_WEAK_GAIN_DB
+    auto_initial_gain_db: int = _PROBE_AUTO_INITIAL_GAIN_DB
     frame_samples: int = _PROBE_FRAME_SAMPLES
     kernel_buffers: int = _PROBE_KERNEL_BUFFERS
     continuity_frames: int = _PROBE_CONTINUITY_FRAMES
@@ -142,16 +143,37 @@ class TransientTransportProbeOptions:
 _DEFAULT_PROBE_OPTIONS = TransientTransportProbeOptions()
 
 
+def _durable_exception_text(error: BaseException) -> str:
+    """Render every nested failure leaf into the durable invalid artifact."""
+
+    rendered: list[str] = []
+
+    def visit(current: BaseException, path: str) -> None:
+        rendered.append(f"{path}: {_exception_text(current)}")
+        if isinstance(current, BaseExceptionGroup):
+            for index, child in enumerate(current.exceptions):
+                visit(child, f"{path}.{index}")
+
+    visit(error, "root")
+    return " | ".join(rendered)
+
+
 def validate_transient_transport_probe_options(
     quality: TandemQualityOptions, probe: TransientTransportProbeOptions
 ) -> None:
     """Reject every weakening or ambiguity before a radio object is opened."""
 
     validate_options(quality)
+    if type(probe.auto_initial_gain_db) is not int:
+        raise TypeError("transport probe AUTO initial gain must be an exact integer")
     exact = {
         "weak_stimulus_tx_gain_db": (
             probe.weak_stimulus_tx_gain_db,
             _PROBE_WEAK_GAIN_DB,
+        ),
+        "auto_initial_gain_db": (
+            probe.auto_initial_gain_db,
+            _PROBE_AUTO_INITIAL_GAIN_DB,
         ),
         "frame_samples": (probe.frame_samples, _PROBE_FRAME_SAMPLES),
         "kernel_buffers": (probe.kernel_buffers, _PROBE_KERNEL_BUFFERS),
@@ -352,6 +374,32 @@ def _capture_adapter(probe: TransientTransportProbeOptions) -> TransientCaptureO
     )
 
 
+def _probe_auto_request(
+    quality: TandemQualityOptions, probe: TransientTransportProbeOptions
+) -> bytes:
+    """Build the probe-only AUTO request at its stable maximum-gain clamp.
+
+    The weak -45 dB stimulus needs no downward response on the qualified R18
+    fixture.  Starting AUTO at the request maximum prevents the controller's
+    expected low-power increases from preceding the first provider frame.  A
+    real startup transition remains disqualifying; this only changes the
+    explicit initial condition.
+    """
+
+    return build_tandem_request(
+        mode=TandemMode.AUTO,
+        initial_gain_db=probe.auto_initial_gain_db,
+        power_measurement_samples=quality.tandem_power_measurement_samples,
+        low_power_dwell_periods=quality.tandem_low_power_dwell_periods,
+        cooldown_periods=quality.tandem_cooldown_periods,
+        low_power_threshold=quality.tandem_low_power_threshold,
+        large_lmt_overload_threshold=quality.tandem_large_lmt_overload_threshold,
+        large_adc_overload_threshold=quality.tandem_large_adc_overload_threshold,
+        small_adc_overload_threshold=quality.tandem_small_adc_overload_threshold,
+        samples_per_channel=probe.frame_samples,
+    )
+
+
 def _validate_probe_metadata(
     metadata: TandemFrameMetadata,
     *,
@@ -387,7 +435,23 @@ def _validate_probe_metadata(
         metadata.gain_events
     ):
         raise EvidenceInvalid(
-            "transport probe first frame has unrepresented prior transitions"
+            "transport probe first frame has unrepresented prior transitions: "
+            f"buffer_sequence={metadata.buffer_sequence}, "
+            f"first_sample_sequence={metadata.first_sample_sequence}, "
+            f"transition_count={metadata.tandem_transition_count}, "
+            f"visible_events={len(metadata.gain_events)}, "
+            f"endpoint={metadata.bench_gain_indices}"
+        )
+    if frame_index == 0 and (
+        metadata.tandem_transition_count != 0 or metadata.gain_events
+    ):
+        raise EvidenceInvalid(
+            "transport probe first frame contains a represented startup transition: "
+            f"buffer_sequence={metadata.buffer_sequence}, "
+            f"first_sample_sequence={metadata.first_sample_sequence}, "
+            f"transition_count={metadata.tandem_transition_count}, "
+            f"visible_events={len(metadata.gain_events)}, "
+            f"endpoint={metadata.bench_gain_indices}"
         )
     if metadata.observation_capacity != 64 or metadata.event_capacity != 64:
         raise EvidenceInvalid("transport probe metadata capacity differs from request")
@@ -414,9 +478,16 @@ def _validate_probe_metadata(
     if (
         metadata.minimum_gain_db != 0
         or metadata.maximum_gain_db != 62
-        or metadata.initial_gain_db != int(quality.manual_gain_db)
+        or metadata.initial_gain_db != probe.auto_initial_gain_db
     ):
         raise EvidenceInvalid("transport probe metadata differs from its AUTO request")
+    if frame_index == 0 and metadata.bench_gain_indices != (
+        metadata.maximum_gain_index,
+        metadata.maximum_gain_index,
+    ):
+        raise EvidenceInvalid(
+            "transport probe first frame is not at the maximum-gain endpoint"
+        )
     if metadata.sample_format != 1 or metadata.threshold_provenance != (
         _expected_threshold_provenance(quality)
     ):
@@ -483,6 +554,13 @@ def _stable_suffix(
     endpoints = {item.bench_gain_indices for item in typed}
     if any(item.gain_events for item in typed):
         raise EvidenceInvalid(f"transport probe {label} contains a gain event")
+    if any(
+        item.bench_gain_indices != (item.maximum_gain_index, item.maximum_gain_index)
+        for item in typed
+    ):
+        raise EvidenceInvalid(
+            f"transport probe {label} is not at the maximum-gain endpoint"
+        )
     if len(transition_counts) != 1 or len(endpoints) != 1:
         raise EvidenceInvalid(f"transport probe {label} endpoint is not stable")
     return {
@@ -745,7 +823,8 @@ def _report_memory_policy(probe: TransientTransportProbeOptions) -> dict[str, An
 def _qualification_scope() -> str:
     return (
         "weak-only tandem AUTO metadata transport continuity and same-level "
-        "control/data contention; no loudness step or gain transient"
+        "control/data contention; no commanded loudness step or intentionally "
+        "induced gain transient"
     )
 
 
@@ -756,6 +835,14 @@ def _evidence_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
         "hidden_transitions": "forbidden",
         "first_provider_buffer_sequence": 0,
         "first_frame_unrepresented_transitions": 0,
+        "auto_initial_gain_db": probe.auto_initial_gain_db,
+        "auto_initial_gain_policy": (
+            "start at the maximum-gain clamp so the weak-only session has no "
+            "expected startup increase; any observed startup transition remains fatal"
+        ),
+        "stable_suffix_endpoint": (
+            "paired maximum_gain_index with zero gain events in both required suffixes"
+        ),
         "uncontended_consecutive_frames": probe.continuity_frames,
         "same_level_command_observation_frames": probe.command_observation_frames,
         "maximum_command_prefix_frames": prefix_bound,
@@ -1095,7 +1182,7 @@ def _run_probe_body(
     )
 
     capture = _capture_adapter(probe)
-    request = _build_tandem_request(quality, capture)
+    request = _probe_auto_request(quality, probe)
     report["metadata_request"] = _request_evidence(request)
     state = _CaptureState()
     metadata_abi: int | None = None
@@ -1157,6 +1244,7 @@ def _run_probe_body(
                     state=state,
                     metadata_parser=metadata_parser,
                     gap_context="continuous_acquisition_unclassified",
+                    expected_tandem_initial_gain_db=probe.auto_initial_gain_db,
                 )
                 assert frame.metadata is not None
                 refill_ns = int(frame.record["refill_monotonic_ns"])
@@ -1616,6 +1704,13 @@ def _validate_stable_report_suffix(
     }
     if len(transitions) != 1 or len(endpoints) != 1:
         raise EvidenceInvalid(f"transport probe report {name} is not stable")
+    for item in metadata:
+        gain_range = _required_list(item.get("gain_index_range"), name="gain range")
+        endpoint = _required_list(item.get("bench_gain_indices"), name="endpoint")
+        if len(gain_range) != 2 or endpoint != [gain_range[1], gain_range[1]]:
+            raise EvidenceInvalid(
+                f"transport probe report {name} is not at the maximum-gain endpoint"
+            )
     expected = {
         "frame_indices": [
             _required_int(frame.get("frame_index"), name="frame_index")
@@ -1949,8 +2044,7 @@ def _validate_transient_transport_probe_report_impl(
         elif rf.get(key) != expected:
             raise EvidenceInvalid(f"transport probe RF field {key} changed")
 
-    capture = _capture_adapter(probe)
-    expected_request = _request_evidence(_build_tandem_request(quality, capture))
+    expected_request = _request_evidence(_probe_auto_request(quality, probe))
     if report.get("metadata_request") != _json_domain(expected_request):
         raise EvidenceInvalid("transport probe AUTO request evidence changed")
     if report.get("metadata_abi") != 2:
@@ -2108,9 +2202,10 @@ def _validate_transient_transport_probe_report_impl(
             expected_tandem_gain_table(quality.center_frequency_hz)
         ):
             raise EvidenceInvalid("transport probe gain table changed")
-        if metadata.get("gain_db_range") != [0, 62] or metadata.get(
-            "initial_gain_db"
-        ) != int(quality.manual_gain_db):
+        if (
+            metadata.get("gain_db_range") != [0, 62]
+            or metadata.get("initial_gain_db") != probe.auto_initial_gain_db
+        ):
             raise EvidenceInvalid("transport probe request provenance changed")
         if metadata.get("sample_format") != 1 or metadata.get(
             "threshold_provenance"
@@ -2134,6 +2229,13 @@ def _validate_transient_transport_probe_report_impl(
             minimum_gain <= endpoint_pair[0] <= maximum_gain
         ):
             raise EvidenceInvalid("transport probe endpoint is invalid")
+        if prior_metadata is None and endpoint_pair != (
+            maximum_gain,
+            maximum_gain,
+        ):
+            raise EvidenceInvalid(
+                "transport probe first frame is not at the maximum-gain endpoint"
+            )
         current_provenance = (
             features,
             metadata.get("sample_format"),
@@ -2236,6 +2338,11 @@ def _validate_transient_transport_probe_report_impl(
             if transition_count != event_count:
                 raise EvidenceInvalid(
                     "transport probe first frame has unrepresented transitions"
+                )
+            if transition_count != 0 or event_count != 0:
+                raise EvidenceInvalid(
+                    "transport probe first frame contains a represented startup "
+                    "transition"
                 )
             expected_continuity = {
                 "buffer_delta": None,
@@ -2716,7 +2823,7 @@ def run_transient_transport_probe(
             pre_report_errors.append(error)
     if pre_report_errors:
         report["verdict"] = "invalid"
-        report["fatal_error"] = _exception_text(
+        report["fatal_error"] = _durable_exception_text(
             pre_report_errors[0]
             if len(pre_report_errors) == 1
             else BaseExceptionGroup("transport probe failures", pre_report_errors)
@@ -2800,7 +2907,7 @@ def run_serial_transient_transport_probe(
                 )
             parsed_failure["verdict"] = "invalid"
             parsed_failure["release_pass_eligible"] = False
-            parsed_failure["fatal_error"] = _exception_text(close_error)
+            parsed_failure["fatal_error"] = _durable_exception_text(close_error)
             prior_cleanup = parsed_failure.get("cleanup")
             cleanup_failure = (
                 dict(prior_cleanup) if isinstance(prior_cleanup, Mapping) else {}

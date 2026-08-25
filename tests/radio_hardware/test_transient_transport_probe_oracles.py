@@ -157,6 +157,8 @@ class _FakeProbeRadio:
         self.excess_observations_at: int | None = None
         self.bad_sample_format_at: int | None = None
         self.bad_threshold_provenance_at: int | None = None
+        self.bad_initial_gain_at: int | None = None
+        self.auto_initial_endpoint_offset = 0
         self.first_unrepresented_transitions = 0
         self.readback_offset_db = 0.0
         self.first_sample = 10_000_000
@@ -165,6 +167,8 @@ class _FakeProbeRadio:
         self.event_sequence = 100
         self.gain_index = 40
         self.fifo_level = 0
+        self.auto_request_initial_gain_db: int | None = None
+        self.hold_request_initial_gain_db: int | None = None
         self.sample_counter = self.first_sample
         self.refill_ns = 1_000_000
         self.metadata_by_token: dict[bytes, Any] = {}
@@ -255,8 +259,14 @@ class _FakeProbeRadio:
                 tandem_request is not None
                 and len(tandem_request) == TANDEM_REQUEST.size
             )
-            request_mode = TandemMode(TANDEM_REQUEST.unpack(tandem_request)[4])
+            unpacked_request = TANDEM_REQUEST.unpack(tandem_request)
+            request_mode = TandemMode(unpacked_request[4])
+            request_initial_gain_db = int(unpacked_request[9])
             is_hold = request_mode is TandemMode.HOLD
+            if is_hold:
+                self.hold_request_initial_gain_db = request_initial_gain_db
+            else:
+                self.auto_request_initial_gain_db = request_initial_gain_db
             assert kernel_buffers == (1 if is_hold else 2)
             operation_prefix = "hold_buffer" if is_hold else "buffer"
             self.operations.append((f"{operation_prefix}_enter", api, kernel_buffers))
@@ -268,6 +278,10 @@ class _FakeProbeRadio:
             if is_hold:
                 self.hold_active = True
                 self.fifo_level = self.hold_fifo_after_clear
+                self.transition_count = 0
+                self.event_sequence = 0
+            else:
+                self.gain_index = 65 + self.auto_initial_endpoint_offset
                 self.transition_count = 0
                 self.event_sequence = 0
             body_error: BaseException | None = None
@@ -311,9 +325,9 @@ class _FakeProbeRadio:
             built_events = []
             for event_index in range(self.dense_event_count):
                 direction = (
-                    TandemEventDirection.INCREASE
+                    TandemEventDirection.DECREASE
                     if event_index % 2 == 0
-                    else TandemEventDirection.DECREASE
+                    else TandemEventDirection.INCREASE
                 )
                 reason = (
                     TandemEventReason.BOTH_LOW_POWER
@@ -340,39 +354,41 @@ class _FakeProbeRadio:
             self.transition_count += self.dense_event_count
             self.event_sequence += self.dense_event_count
         elif self.regressed_event_samples_at == index:
-            direction = TandemEventDirection.INCREASE
-            event_flags = (int(direction) << 4) | int(TandemEventReason.BOTH_LOW_POWER)
+            direction = TandemEventDirection.DECREASE
+            event_flags = (int(direction) << 4) | int(
+                TandemEventReason.LARGE_ADC_OVERLOAD
+            )
             events = (
                 TandemGainEvent(
                     sample_sequence=first_sample + 512,
                     event_sequence=self.event_sequence,
                     flags=event_flags,
-                    rx1_gain_index=self.gain_index + 1,
-                    rx2_gain_index=self.gain_index + 1,
+                    rx1_gain_index=self.gain_index - 1,
+                    rx2_gain_index=self.gain_index - 1,
                 ),
                 TandemGainEvent(
                     sample_sequence=first_sample + 256,
                     event_sequence=self.event_sequence + 1,
                     flags=event_flags,
-                    rx1_gain_index=self.gain_index + 2,
-                    rx2_gain_index=self.gain_index + 2,
+                    rx1_gain_index=self.gain_index - 2,
+                    rx2_gain_index=self.gain_index - 2,
                 ),
             )
-            self.gain_index += 2
+            self.gain_index -= 2
             self.transition_count += 2
             self.event_sequence += 2
         elif index in self.visible_event_at:
-            direction = TandemEventDirection.INCREASE
-            next_gain = self.gain_index + 1
+            direction = TandemEventDirection.DECREASE
+            next_gain = self.gain_index - 1
             if self.bad_event_step_at == index:
-                next_gain += 1
+                next_gain -= 1
             event_sequence = self.event_sequence
             if self.bad_event_sequence_at == index:
                 event_sequence += 1
             event_sample = first_sample + 256
             if self.bad_event_sample_at == index:
                 event_sample = first_sample + samples
-            flags = (int(direction) << 4) | int(TandemEventReason.BOTH_LOW_POWER)
+            flags = (int(direction) << 4) | int(TandemEventReason.LARGE_ADC_OVERLOAD)
             if self.bad_event_flags_at == index:
                 flags |= 1 << 8
             event_gain = next_gain
@@ -391,7 +407,7 @@ class _FakeProbeRadio:
             self.transition_count += 1
             self.event_sequence += 1
         if self.hidden_transition_at == index:
-            self.gain_index += 1
+            self.gain_index -= 1
             self.transition_count += 1
 
         features = _REQUIRED_FEATURES
@@ -449,7 +465,11 @@ class _FakeProbeRadio:
             threshold_provenance=threshold_provenance,
             minimum_gain_db=0,
             maximum_gain_db=62,
-            initial_gain_db=40,
+            initial_gain_db=(
+                40
+                if self.bad_initial_gain_at == index
+                else self.auto_request_initial_gain_db
+            ),
             minimum_gain_index=3,
             maximum_gain_index=65,
             rx1_gain_index=self.gain_index,
@@ -553,6 +573,11 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     assert path.is_file()
     assert report["verdict"] == PROBE_PENDING_VERDICT
     assert report["release_pass_eligible"] is False
+    assert radio.auto_request_initial_gain_db == 62
+    assert report["configuration"]["probe"]["auto_initial_gain_db"] == 62
+    assert report["metadata_request"]["decoded"]["initial_gain_db"] == 62
+    assert report["evidence_policy"]["auto_initial_gain_db"] == 62
+    assert all(frame["metadata"]["initial_gain_db"] == 62 for frame in report["frames"])
     assert report["stale_fifo_normalization"]["action"] == "not_required"
     assert report["stale_fifo_normalization"]["stale_fifo_events"] == 0
     assert report["stale_fifo_normalization"]["hold_session"] is None
@@ -595,6 +620,8 @@ def test_probe_clears_stale_fifo_in_muted_hold_before_tx(tmp_path: Path) -> None
     assert normalization["action"] == "muted_hold_session_acquire_clear"
     hold = normalization["hold_session"]
     assert hold["metadata_request"]["decoded"]["mode"] == int(TandemMode.HOLD)
+    assert hold["metadata_request"]["decoded"]["initial_gain_db"] == 40
+    assert report["metadata_request"]["decoded"]["initial_gain_db"] == 62
     assert hold["metadata_abi"] == 2
     assert hold["refill_count"] == 0
     assert hold["opened"] is True and hold["closed"] is True
@@ -715,6 +742,14 @@ def test_probe_hold_close_failure_is_muted_and_never_arms_tx(tmp_path: Path) -> 
             lambda radio: setattr(radio, "first_unrepresented_transitions", 1),
             "unrepresented prior transitions",
         ),
+        (
+            lambda radio: radio.visible_event_at.add(0),
+            "represented startup transition",
+        ),
+        (
+            lambda radio: setattr(radio, "auto_initial_endpoint_offset", -1),
+            "maximum-gain endpoint",
+        ),
         (lambda radio: setattr(radio, "stream_change_at", 8), "stream or ownership"),
         (lambda radio: setattr(radio, "zero_epoch_at", 8), "stream or ownership"),
         (lambda radio: setattr(radio, "missing_feature_at", 8), "required features"),
@@ -732,6 +767,10 @@ def test_probe_hold_close_failure_is_muted_and_never_arms_tx(tmp_path: Path) -> 
         (
             lambda radio: setattr(radio, "bad_threshold_provenance_at", 8),
             "wire/request provenance",
+        ),
+        (
+            lambda radio: setattr(radio, "bad_initial_gain_at", 8),
+            "differs from its request",
         ),
         (lambda radio: setattr(radio, "worker_error_at", 31), "worker failure"),
         (lambda radio: radio.visible_event_at.add(30), "gain event"),
@@ -769,6 +808,25 @@ def test_probe_requires_all_32_frames_before_control_reassertion(
     report = _failure_report(radio)
     assert report["verdict"] == "invalid"
     assert "command_contention" not in report
+
+
+def test_probe_max_gain_start_keeps_first_frame_transition_gate_fatal(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.first_unrepresented_transitions = 2
+
+    with pytest.raises(BaseException, match="unrepresented prior transitions"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert radio.auto_request_initial_gain_db == 62
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    failure = _failure_report(radio)
+    assert failure["frames"] == []
+    assert "unrepresented prior transitions" in failure["fatal_error"]
+    assert "command_contention" not in failure
 
 
 def test_probe_fails_closed_after_bounded_startup_eagain_retries(
@@ -857,6 +915,52 @@ def test_report_validator_rejects_forged_event_cooldown_spacing(
         validate_transient_transport_probe_report(forged, _quality(tmp_path))
 
 
+def test_report_validator_rejects_self_consistent_nonmax_stable_suffix(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    forged = copy.deepcopy(report)
+    frames = forged["frames"]
+    direction = TandemEventDirection.DECREASE
+    reason = TandemEventReason.LARGE_ADC_OVERLOAD
+    event_frame = frames[1]
+    event_sample = event_frame["first_sample_sequence"] + 256
+    event = {
+        "sample_sequence": event_sample,
+        "event_sequence": 0,
+        "flags": (int(direction) << 4) | int(reason),
+        "direction": int(direction),
+        "direction_name": direction.name.lower(),
+        "reason": int(reason),
+        "reason_name": reason.name.lower(),
+        "rx1_gain_index": 64,
+        "rx2_gain_index": 64,
+    }
+    for index, frame in enumerate(frames[1:], start=1):
+        metadata = frame["metadata"]
+        metadata.update(
+            tandem_transition_count=1,
+            rx1_gain_index=64,
+            rx2_gain_index=64,
+            bench_gain_indices=[64, 64],
+            event_count=1 if index == 1 else 0,
+            gain_events=[event] if index == 1 else [],
+        )
+        frame["continuity"].update(
+            transition_count_delta=1 if index == 1 else 0,
+            visible_event_count=1 if index == 1 else 0,
+        )
+    for name in ("initial_stable_suffix", "final_stable_suffix"):
+        forged[name].update(
+            transition_count=1,
+            bench_gain_indices=[64, 64],
+        )
+
+    with pytest.raises(EvidenceInvalid, match="maximum-gain endpoint"):
+        validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
 def test_probe_rejects_tone_below_configured_level_gate(tmp_path: Path) -> None:
     radio = _FakeProbeRadio(tmp_path)
     radio.raw = _tone_raw(
@@ -898,7 +1002,17 @@ def test_probe_groups_acquisition_mute_cancel_and_close_failures(
     assert "mute failure" in rendered
     assert "cancel failure" in rendered
     assert "buffer close failure" in rendered
-    assert _failure_report(radio)["verdict"] == "invalid"
+    failure = _failure_report(radio)
+    assert failure["verdict"] == "invalid"
+    assert all(
+        detail in failure["fatal_error"]
+        for detail in (
+            "worker failure",
+            "mute failure",
+            "cancel failure",
+            "buffer close failure",
+        )
+    )
 
 
 def test_probe_worker_error_after_final_frame_is_not_discarded(tmp_path: Path) -> None:
@@ -978,6 +1092,22 @@ def test_report_validator_rejects_planted_mutations(tmp_path: Path) -> None:
                     threshold_provenance=0
                 )
             ),
+            mutated(
+                lambda value: value["frames"][12]["metadata"].update(initial_gain_db=40)
+            ),
+            mutated(
+                lambda value: value["frames"][0]["metadata"].update(
+                    bench_gain_indices=[64, 64]
+                )
+            ),
+            mutated(
+                lambda value: value["metadata_request"]["decoded"].update(
+                    initial_gain_db=40
+                )
+            ),
+            mutated(
+                lambda value: value["evidence_policy"].update(auto_initial_gain_db=40)
+            ),
             mutated(lambda value: value["frames"][12].update(sample_gap_before=None)),
             mutated(
                 lambda value: value["conditioning_anchor_candidate"].update(
@@ -1033,6 +1163,9 @@ def test_report_validator_binds_stale_fifo_hold_normalization(tmp_path: Path) ->
         lambda value: value["stale_fifo_normalization"]["hold_session"][
             "metadata_request"
         ]["decoded"].update(mode=int(TandemMode.AUTO)),
+        lambda value: value["stale_fifo_normalization"]["hold_session"][
+            "metadata_request"
+        ]["decoded"].update(initial_gain_db=62),
         lambda value: value["stale_fifo_normalization"]["hold_session"][
             "status_while_open"
         ].update(ownership_epoch=0),
@@ -1169,4 +1302,10 @@ def test_probe_options_are_not_relaxable(tmp_path: Path) -> None:
     relaxed = TransientTransportProbeOptions(continuity_frames=31)
     with pytest.raises(ValueError, match="frozen"):
         run_transient_transport_probe(radio, _quality(tmp_path), probe=relaxed)
+    unstable_start = TransientTransportProbeOptions(auto_initial_gain_db=40)
+    with pytest.raises(ValueError, match="frozen"):
+        run_transient_transport_probe(radio, _quality(tmp_path), probe=unstable_start)
+    noninteger_start = TransientTransportProbeOptions(auto_initial_gain_db=62.0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="exact integer"):
+        run_transient_transport_probe(radio, _quality(tmp_path), probe=noninteger_start)
     assert radio.operations == []

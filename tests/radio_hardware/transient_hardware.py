@@ -484,6 +484,7 @@ def _validate_tandem_metadata(
     capture: TransientCaptureOptions,
     state: _CaptureState,
     gap_context: str,
+    expected_initial_gain_db: int,
 ) -> Mapping[str, Any]:
     if gap_context not in _GAP_CONTEXTS:
         raise ValueError(f"unknown transient gap context {gap_context!r}")
@@ -511,7 +512,7 @@ def _validate_tandem_metadata(
     if (
         metadata.minimum_gain_db != 0
         or metadata.maximum_gain_db != 62
-        or metadata.initial_gain_db != int(quality.manual_gain_db)
+        or metadata.initial_gain_db != expected_initial_gain_db
     ):
         raise EvidenceInvalid("tandem transient metadata differs from its request")
     if metadata.rx1_gain_index != metadata.rx2_gain_index:
@@ -721,6 +722,7 @@ def _capture_frame(
     state: _CaptureState,
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
     gap_context: str = _GAP_CONTEXT_CONTINUOUS_RESPONSE,
+    expected_tandem_initial_gain_db: int | None = None,
 ) -> _DeferredFrame:
     metadata_mode = mode == MODE_TANDEM
     before = (
@@ -749,6 +751,11 @@ def _capture_frame(
             capture=capture,
             state=state,
             gap_context=gap_context,
+            expected_initial_gain_db=(
+                int(quality.manual_gain_db)
+                if expected_tandem_initial_gain_db is None
+                else expected_tandem_initial_gain_db
+            ),
         )
         sample_gap_before = int(continuity["sample_gap_before"])
         first_sample = parsed.first_sample_sequence
