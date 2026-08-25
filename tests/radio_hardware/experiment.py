@@ -592,9 +592,16 @@ class Issue46Radio:
         samples_per_channel: int,
         *,
         tandem_request: Optional[bytes] = None,
+        batch_frames: int = 1,
     ) -> Iterator[tuple[Any, Optional[int]]]:
         if kernel_buffers <= 0:
             raise ValueError("kernel buffer count must be positive")
+        if isinstance(batch_frames, bool) or not isinstance(batch_frames, int):
+            raise TypeError("metadata batch frame count must be an integer")
+        if not 1 <= batch_frames <= 64:
+            raise ValueError("metadata batch frame count must be in [1, 64]")
+        if api != "metadata" and batch_frames != 1:
+            raise ValueError("metadata batching requires the metadata capture API")
         self.rx.set_kernel_buffers_count(kernel_buffers)
         value = None
         metadata_abi: Optional[int] = None
@@ -612,6 +619,7 @@ class Issue46Radio:
                         if tandem_request is not None
                         else build_hold_request(gain_db=20)
                     ),
+                    batch_frames=batch_frames,
                 )
             else:
                 raise ValueError(f"unknown capture API {api!r}")

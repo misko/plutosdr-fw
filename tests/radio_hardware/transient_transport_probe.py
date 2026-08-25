@@ -10,10 +10,14 @@ transient attempt, but can never be a firmware-release PASS by itself.
 
 from __future__ import annotations
 
+import errno
 import hashlib
 import json
 import math
+import queue
 import statistics
+import struct
+import threading
 import time
 from builtins import BaseExceptionGroup
 from collections.abc import Callable, Mapping, Sequence
@@ -56,9 +60,9 @@ from .transient_hardware import (
     _check_effective_attenuation,
     _DeferredFrame,
     _exception_text,
+    _extend_low32_near,
     _rx_state,
-    _TandemCapturePump,
-    _timestamp_tandem_command,
+    _strict_low32_counter,
     _wait_for_idle,
 )
 from .transient_quality import (
@@ -67,7 +71,7 @@ from .transient_quality import (
     timestamp_stimulus_command,
 )
 
-PROBE_SCHEMA = "plutosdr-fw.tandem-agc-transient-transport-probe.v1"
+PROBE_SCHEMA = "plutosdr-fw.tandem-agc-transient-transport-probe.v2"
 PROBE_VERDICT = "qualified_transport"
 PROBE_PENDING_VERDICT = "qualified_transport_pending_cleanup"
 PROBE_THREAD_NAME = "tandem-transient-transport-probe-acquisition"
@@ -75,15 +79,26 @@ PROBE_THREAD_NAME = "tandem-transient-transport-probe-acquisition"
 _PROBE_WEAK_GAIN_DB = -45.0
 _PROBE_AUTO_INITIAL_GAIN_DB = 62
 _PROBE_FRAME_SAMPLES = 65_536
-_PROBE_KERNEL_BUFFERS = 2
-_PROBE_CONTINUITY_FRAMES = 32
-_PROBE_COMMAND_PREFIX_FRAMES = 6
-_PROBE_FULLY_POST_COMMAND_FRAMES = 2
+_PROBE_KERNEL_BUFFERS = 8
+_PROBE_BATCH_FRAMES = 64
+_PROBE_COMMAND_TARGET_FRAMES = 40
+_PROBE_FULLY_PRE_COMMAND_FRAMES = 32
+_PROBE_FULLY_POST_COMMAND_FRAMES = 8
 _PROBE_STABLE_FRAMES = 3
 _PROBE_ANCHOR_SAMPLES = 8_192
 _PROBE_WINDOW_SAMPLES = 1_024
 _PROBE_QUEUE_FRAMES = 4
-_PROBE_MAX_RAW_BYTES = 32 * 1024 * 1024
+_PROBE_METADATA_CAPACITY_BYTES = 64 * 1024
+_PROBE_SIZE_T_BYTES = 8
+_PROBE_MAX_PYTHON_RAW_BYTES = 32 * 1024 * 1024
+_PROBE_MAX_CORE_BATCH_BYTES = 64 * 1024 * 1024
+_PROBE_MAX_AGGREGATE_BYTES = (
+    _PROBE_MAX_PYTHON_RAW_BYTES + _PROBE_MAX_CORE_BATCH_BYTES
+)
+_PROBE_TARGET_COARSE_GUARD_SAMPLES = 65_536
+_PROBE_TARGET_FINE_SLEEP_SAMPLES = 4_096
+_PROBE_TARGET_MAX_POLL_READS = 64
+_PROBE_WORKER_WAIT_SECONDS = 6.0
 _PROBE_REQUIRED_METADATA_FEATURES = (
     FEATURE_AD9361_TEMPERATURE
     | FEATURE_FPGA_GAIN_EVENTS
@@ -106,8 +121,9 @@ class TransientTransportProbeOptions:
     auto_initial_gain_db: int = _PROBE_AUTO_INITIAL_GAIN_DB
     frame_samples: int = _PROBE_FRAME_SAMPLES
     kernel_buffers: int = _PROBE_KERNEL_BUFFERS
-    continuity_frames: int = _PROBE_CONTINUITY_FRAMES
-    command_prefix_frames: int = _PROBE_COMMAND_PREFIX_FRAMES
+    batch_frames: int = _PROBE_BATCH_FRAMES
+    command_target_frames: int = _PROBE_COMMAND_TARGET_FRAMES
+    fully_pre_command_frames: int = _PROBE_FULLY_PRE_COMMAND_FRAMES
     fully_post_command_frames: int = _PROBE_FULLY_POST_COMMAND_FRAMES
     stable_frames: int = _PROBE_STABLE_FRAMES
     anchor_samples: int = _PROBE_ANCHOR_SAMPLES
@@ -115,32 +131,204 @@ class TransientTransportProbeOptions:
     max_host_jitter_ns: int = 50_000_000
     max_command_sample_uncertainty: int = 16_384
     readback_tolerance_db: float = 0.25
-    maximum_retained_raw_bytes: int = _PROBE_MAX_RAW_BYTES
+    maximum_retained_raw_bytes: int = _PROBE_MAX_PYTHON_RAW_BYTES
+    maximum_core_batch_bytes: int = _PROBE_MAX_CORE_BATCH_BYTES
+    maximum_aggregate_bytes: int = _PROBE_MAX_AGGREGATE_BYTES
 
     @property
-    def command_observation_frames(self) -> int:
-        return self.command_prefix_frames + self.fully_post_command_frames
+    def target_sample_offset(self) -> int:
+        return self.command_target_frames * self.frame_samples
 
     @property
     def retained_frames(self) -> int:
-        return self.continuity_frames + self.command_observation_frames
+        return self.batch_frames
 
     @property
     def maximum_python_raw_frames(self) -> int:
-        return self.retained_frames + _PROBE_QUEUE_FRAMES + 1
+        # The retained list, worker queue, and producer own disjoint frames
+        # from the same one-batch budget; they never duplicate raw IQ bytes.
+        return self.batch_frames
 
     @property
     def maximum_python_raw_bytes(self) -> int:
         return self.maximum_python_raw_frames * self.frame_samples * 8
 
     @property
-    def maximum_pump_frames(self) -> int:
-        # The extra two avoid a terminal-budget race after the final take.  At
-        # most queue+producer frames are resident beyond the consumed ledger.
-        return self.retained_frames + _PROBE_QUEUE_FRAMES + 2
+    def core_batch_cache_bytes(self) -> int:
+        per_frame = (
+            self.frame_samples * 8
+            + _PROBE_METADATA_CAPACITY_BYTES
+            + 2 * _PROBE_SIZE_T_BYTES
+        )
+        return self.batch_frames * per_frame
+
+    @property
+    def aggregate_resident_bytes(self) -> int:
+        iq_frame_bytes = self.frame_samples * 8
+        return sum(
+            (
+                self.core_batch_cache_bytes,
+                iq_frame_bytes,  # ordinary libiio C buffer
+                self.maximum_python_raw_bytes,
+                iq_frame_bytes,  # transient Buffer.read() bytearray
+                _PROBE_METADATA_CAPACITY_BYTES,  # ctypes refill scratch
+                _PROBE_METADATA_CAPACITY_BYTES,  # returned metadata bytes
+                self.batch_frames
+                * _PROBE_METADATA_CAPACITY_BYTES,  # parsed-evidence reservation
+                self.kernel_buffers * iq_frame_bytes,  # device K8 DMA reservation
+            )
+        )
 
 
 _DEFAULT_PROBE_OPTIONS = TransientTransportProbeOptions()
+
+
+class _ProbeBatchCaptureWorker:
+    """Drain exactly one configured metadata batch on one acquisition thread."""
+
+    def __init__(
+        self,
+        acquire: Callable[[], _DeferredFrame],
+        *,
+        batch_frames: int,
+        thread_name: str,
+    ) -> None:
+        self._acquire = acquire
+        self._batch_frames = batch_frames
+        self._queue: queue.Queue[_DeferredFrame | BaseException] = queue.Queue(
+            maxsize=_PROBE_QUEUE_FRAMES
+        )
+        self._stop = threading.Event()
+        self._first_refill_started = threading.Event()
+        self._first_refill_completed = threading.Event()
+        self._finished = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name=thread_name,
+            daemon=True,
+        )
+        self._terminal_error: BaseException | None = None
+        self._started = False
+        self.produced_frames = 0
+        self.consumed_frames = 0
+        self.discarded_tail_frames = 0
+
+    @property
+    def queue_capacity_frames(self) -> int:
+        return self._queue.maxsize
+
+    @property
+    def first_refill_in_flight(self) -> bool:
+        return self._first_refill_started.is_set() and not (
+            self._first_refill_completed.is_set()
+        )
+
+    @property
+    def is_alive(self) -> bool:
+        return self._thread.is_alive()
+
+    @property
+    def finished(self) -> bool:
+        return self._finished.is_set()
+
+    def start(self) -> None:
+        self._thread.start()
+        self._started = True
+        if not self._first_refill_started.wait(_PROBE_WORKER_WAIT_SECONDS):
+            raise EvidenceInvalid(
+                "transport probe acquisition worker did not initiate its batch refill"
+            )
+
+    def _offer(self, item: _DeferredFrame | BaseException) -> bool:
+        while not self._stop.is_set():
+            try:
+                self._queue.put(item, timeout=0.05)
+                return True
+            except queue.Full:
+                continue
+        return False
+
+    def _run(self) -> None:
+        try:
+            for index in range(self._batch_frames):
+                if self._stop.is_set():
+                    return
+                if index == 0:
+                    self._first_refill_started.set()
+                try:
+                    frame = self._acquire()
+                finally:
+                    if index == 0:
+                        self._first_refill_completed.set()
+                self.produced_frames += 1
+                if not self._offer(frame):
+                    self.discarded_tail_frames += 1
+                    return
+        except BaseException as error:  # noqa: BLE001 - cross-thread propagation
+            if not (
+                self._stop.is_set()
+                and isinstance(error, OSError)
+                and error.errno == errno.EBADF
+            ):
+                self._terminal_error = error
+                self._offer(error)
+        finally:
+            self._finished.set()
+
+    def require_first_refill_in_flight(self) -> None:
+        if self.first_refill_in_flight:
+            return
+        if self._terminal_error is not None:
+            error = self._terminal_error
+            self._terminal_error = None
+            try:
+                queued = self._queue.get_nowait()
+            except queue.Empty:
+                queued = None
+            if queued is not None and queued is not error:
+                self._queue.put_nowait(queued)
+            raise error.with_traceback(error.__traceback__)
+        raise EvidenceInvalid(
+            "transport probe full metadata batch completed before the "
+            "predeclared command target"
+        )
+
+    def take(self) -> _DeferredFrame:
+        try:
+            item = self._queue.get(timeout=_PROBE_WORKER_WAIT_SECONDS)
+        except queue.Empty as exc:
+            raise EvidenceInvalid(
+                "transport probe acquisition worker returned no cached frame"
+            ) from exc
+        if isinstance(item, BaseException):
+            self._terminal_error = None
+            raise item.with_traceback(item.__traceback__)
+        self.consumed_frames += 1
+        return item
+
+    def request_stop(self) -> None:
+        self._stop.set()
+
+    def stop(self) -> None:
+        self.request_stop()
+        if not self._started:
+            return
+        self._thread.join(timeout=_PROBE_WORKER_WAIT_SECONDS)
+        if self._thread.is_alive():
+            raise EvidenceInvalid("transport probe acquisition worker did not stop")
+        while True:
+            try:
+                item = self._queue.get_nowait()
+            except queue.Empty:
+                break
+            if isinstance(item, BaseException):
+                self._terminal_error = None
+                raise item.with_traceback(item.__traceback__)
+            self.discarded_tail_frames += 1
+        if self._terminal_error is not None:
+            error = self._terminal_error
+            self._terminal_error = None
+            raise error.with_traceback(error.__traceback__)
 
 
 def _durable_exception_text(error: BaseException) -> str:
@@ -177,13 +365,14 @@ def validate_transient_transport_probe_options(
         ),
         "frame_samples": (probe.frame_samples, _PROBE_FRAME_SAMPLES),
         "kernel_buffers": (probe.kernel_buffers, _PROBE_KERNEL_BUFFERS),
-        "continuity_frames": (
-            probe.continuity_frames,
-            _PROBE_CONTINUITY_FRAMES,
+        "batch_frames": (probe.batch_frames, _PROBE_BATCH_FRAMES),
+        "command_target_frames": (
+            probe.command_target_frames,
+            _PROBE_COMMAND_TARGET_FRAMES,
         ),
-        "command_prefix_frames": (
-            probe.command_prefix_frames,
-            _PROBE_COMMAND_PREFIX_FRAMES,
+        "fully_pre_command_frames": (
+            probe.fully_pre_command_frames,
+            _PROBE_FULLY_PRE_COMMAND_FRAMES,
         ),
         "fully_post_command_frames": (
             probe.fully_post_command_frames,
@@ -194,7 +383,15 @@ def validate_transient_transport_probe_options(
         "window_samples": (probe.window_samples, _PROBE_WINDOW_SAMPLES),
         "maximum_retained_raw_bytes": (
             probe.maximum_retained_raw_bytes,
-            _PROBE_MAX_RAW_BYTES,
+            _PROBE_MAX_PYTHON_RAW_BYTES,
+        ),
+        "maximum_core_batch_bytes": (
+            probe.maximum_core_batch_bytes,
+            _PROBE_MAX_CORE_BATCH_BYTES,
+        ),
+        "maximum_aggregate_bytes": (
+            probe.maximum_aggregate_bytes,
+            _PROBE_MAX_AGGREGATE_BYTES,
         ),
     }
     for name, (actual, expected) in exact.items():
@@ -234,8 +431,14 @@ def validate_transient_transport_probe_options(
         )
     if quality.physical_attenuation_db - probe.weak_stimulus_tx_gain_db < 30.0:
         raise ValueError("transport probe weak stimulus violates 30 dB attenuation")
+    if struct.calcsize("P") != _PROBE_SIZE_T_BYTES:
+        raise ValueError("transport probe requires an exact 64-bit host size_t")
     if probe.maximum_python_raw_bytes > probe.maximum_retained_raw_bytes:
         raise ValueError("transport probe bounded Python IQ retention exceeds 32 MiB")
+    if probe.core_batch_cache_bytes > probe.maximum_core_batch_bytes:
+        raise ValueError("transport probe libiio batch cache exceeds 64 MiB")
+    if probe.aggregate_resident_bytes > probe.maximum_aggregate_bytes:
+        raise ValueError("transport probe aggregate capture memory exceeds 96 MiB")
 
 
 def _atomic_json(path: Path, value: Mapping[str, Any]) -> None:
@@ -585,11 +788,250 @@ def _stable_suffix(
     }
 
 
+def _schedule_batched_command(
+    radio: TransientRadioTransport,
+    worker: _ProbeBatchCaptureWorker,
+    probe: TransientTransportProbeOptions,
+    *,
+    post_open_baseline_raw: int,
+    check_deadline: Callable[[], None],
+    clock_ns: Callable[[], int],
+    sleep: Callable[[float], None],
+    sample_rate_hz: int,
+) -> tuple[StimulusCommand, dict[str, Any]]:
+    """Issue the weak write at a predeclared B8 target during batch drain."""
+
+    target_delta = probe.target_sample_offset
+    if not 0 < target_delta < (1 << 31):
+        raise EvidenceInvalid("transport probe command target is ambiguous in low32")
+    target_raw = (post_open_baseline_raw + target_delta) % (1 << 32)
+    last_below_raw: int | None = None
+    poll_read_count = 0
+    poll_observations: list[dict[str, Any]] = []
+    total_requested_sleep_samples = 0
+    for _ in range(_PROBE_TARGET_MAX_POLL_READS):
+        check_deadline()
+        worker.require_first_refill_in_flight()
+        current = _strict_low32_counter(radio.read_rx_sample_counter_low32())
+        poll_read_count += 1
+        advance = (current - post_open_baseline_raw) % (1 << 32)
+        if advance >= 1 << 31:
+            raise EvidenceInvalid(
+                "transport probe command target polling crossed an ambiguous wrap"
+            )
+        remaining = target_delta - advance
+        if remaining > 0:
+            last_below_raw = current
+            if remaining > _PROBE_TARGET_COARSE_GUARD_SAMPLES:
+                phase = "coarse_sleep"
+                sleep_samples = remaining - _PROBE_TARGET_COARSE_GUARD_SAMPLES
+            elif remaining > 2 * _PROBE_TARGET_FINE_SLEEP_SAMPLES:
+                phase = "fine_sleep"
+                sleep_samples = _PROBE_TARGET_FINE_SLEEP_SAMPLES
+            else:
+                phase = "tail_poll"
+                sleep_samples = 0
+            poll_observations.append(
+                {
+                    "raw": current,
+                    "advance_samples": advance,
+                    "remaining_samples": remaining,
+                    "phase": phase,
+                    "requested_sleep_samples": sleep_samples,
+                }
+            )
+            if sleep_samples:
+                total_requested_sleep_samples += sleep_samples
+                sleep(sleep_samples / sample_rate_hz)
+                check_deadline()
+            continue
+        target_overshoot = advance - target_delta
+        if target_overshoot > probe.max_command_sample_uncertainty:
+            raise EvidenceInvalid(
+                "transport probe command target overshoot "
+                f"{target_overshoot} exceeds {probe.max_command_sample_uncertainty} "
+                "samples"
+            )
+        raw_a = current
+        poll_observations.append(
+            {
+                "raw": current,
+                "advance_samples": advance,
+                "remaining_samples": 0,
+                "phase": "target_reached",
+                "requested_sleep_samples": 0,
+            }
+        )
+        break
+    else:
+        raise EvidenceInvalid(
+            "transport probe command target exceeded its 64-read polling budget"
+        )
+    if last_below_raw is None:
+        raise EvidenceInvalid("transport probe command target lacks a last-below read")
+    worker.require_first_refill_in_flight()
+    command = timestamp_stimulus_command(
+        "weak_control_reassertion",
+        probe.weak_stimulus_tx_gain_db,
+        apply=radio.set_tx2_gain,
+        clock_ns=clock_ns,
+        max_host_jitter_ns=probe.max_host_jitter_ns,
+        readback_tolerance_db=probe.readback_tolerance_db,
+    )
+
+    raw_initial = _strict_low32_counter(radio.read_rx_sample_counter_low32())
+    raw_b: int | None = None
+    raw_c: int | None = None
+    post_write_read_count = 1
+    for _ in range(8):
+        current = _strict_low32_counter(radio.read_rx_sample_counter_low32())
+        post_write_read_count += 1
+        if raw_b is None:
+            if current != raw_initial:
+                raw_b = current
+        elif current != raw_b:
+            raw_c = current
+            break
+    else:
+        raise EvidenceInvalid(
+            "transport probe command did not observe causal B and C counter advances"
+        )
+    assert raw_b is not None
+    assert raw_c is not None
+    initial_delta = (raw_initial - raw_a) % (1 << 32)
+    b_delta = (raw_b - raw_initial) % (1 << 32)
+    c_delta = (raw_c - raw_b) % (1 << 32)
+    if initial_delta >= 1 << 31 or not all(
+        0 < value < 1 << 31 for value in (b_delta, c_delta)
+    ):
+        raise EvidenceInvalid(
+            "transport probe command A-to-B-to-C bracket is ambiguous"
+        )
+    causal_uncertainty = initial_delta + b_delta + c_delta
+    if not 0 < causal_uncertainty <= probe.max_command_sample_uncertainty:
+        raise EvidenceInvalid(
+            "transport probe command causal uncertainty "
+            f"{causal_uncertainty} exceeds {probe.max_command_sample_uncertainty} "
+            "samples"
+        )
+    return command, {
+        "register_address": "0x800000b8",
+        "counter_width_bits": 32,
+        "counter_source": "coherent FPGA RX sample counter low word",
+        "post_open_baseline_raw": post_open_baseline_raw,
+        "target_offset_frames": probe.command_target_frames,
+        "target_offset_samples": target_delta,
+        "target_raw": target_raw,
+        "last_below_raw": last_below_raw,
+        "raw_a_prewrite": raw_a,
+        "raw_post_write_initial": raw_initial,
+        "raw_b_first_advance": raw_b,
+        "raw_c_causal_advance": raw_c,
+        "target_poll_read_count": poll_read_count,
+        "target_poll_policy": (
+            "counter-adaptive coarse guard, 4096-sample fine sleeps, bounded tail polls"
+        ),
+        "target_coarse_guard_samples": _PROBE_TARGET_COARSE_GUARD_SAMPLES,
+        "target_fine_sleep_samples": _PROBE_TARGET_FINE_SLEEP_SAMPLES,
+        "target_max_poll_reads": _PROBE_TARGET_MAX_POLL_READS,
+        "target_poll_observations": poll_observations,
+        "target_total_requested_sleep_samples": total_requested_sleep_samples,
+        "post_write_read_count": post_write_read_count,
+        "target_overshoot_samples": target_overshoot,
+        "causal_uncertainty_samples": causal_uncertainty,
+        "worker_in_flight_at_command": True,
+    }
+
+
+def _bind_batch_counter_schedule(
+    frames: Sequence[_DeferredFrame],
+    command: StimulusCommand,
+    raw: Mapping[str, Any],
+    probe: TransientTransportProbeOptions,
+) -> tuple[StimulusCommand, dict[str, Any]]:
+    """Extend the low32 schedule only after the exact batch is available."""
+
+    if len(frames) != probe.batch_frames:
+        raise EvidenceInvalid("transport probe cannot bind an incomplete batch")
+    first_start = int(frames[0].record["first_sample_sequence"])
+    last_end = int(frames[-1].record["sample_end_exclusive"])
+    raw_s0 = _strict_low32_counter(raw.get("post_open_baseline_raw"))
+    s0 = _extend_low32_near(raw_s0, reference=first_start)
+    target = s0 + probe.target_sample_offset
+    if not first_start <= s0 < target:
+        raise EvidenceInvalid(
+            "transport probe post-open baseline does not lie in the batch origin"
+        )
+    if not first_start <= target < last_end:
+        raise EvidenceInvalid("transport probe predeclared target is outside the batch")
+
+    raw_p = _strict_low32_counter(raw.get("last_below_raw"))
+    raw_a = _strict_low32_counter(raw.get("raw_a_prewrite"))
+    raw_initial = _strict_low32_counter(raw.get("raw_post_write_initial"))
+    raw_b = _strict_low32_counter(raw.get("raw_b_first_advance"))
+    raw_c = _strict_low32_counter(raw.get("raw_c_causal_advance"))
+    p_delta = (raw_p - raw_s0) % (1 << 32)
+    a_delta = (raw_a - raw_s0) % (1 << 32)
+    initial_delta = (raw_initial - raw_a) % (1 << 32)
+    b_delta = (raw_b - raw_initial) % (1 << 32)
+    c_delta = (raw_c - raw_b) % (1 << 32)
+    if any(value >= 1 << 31 for value in (p_delta, a_delta, initial_delta)) or any(
+        not 0 < value < 1 << 31 for value in (b_delta, c_delta)
+    ):
+        raise EvidenceInvalid("transport probe batch counter extension is ambiguous")
+    extended_p = s0 + p_delta
+    extended_a = s0 + a_delta
+    extended_initial = extended_a + initial_delta
+    extended_b = extended_initial + b_delta
+    extended_c = extended_b + c_delta
+    target_error = extended_a - target
+    causal_uncertainty = extended_c - extended_a
+    if not extended_p < target <= extended_a:
+        raise EvidenceInvalid("transport probe last-below/target/A ordering is invalid")
+    if not 0 < extended_a - extended_p < 1 << 31:
+        raise EvidenceInvalid("transport probe last-below to A advance is ambiguous")
+    if not 0 <= target_error <= probe.max_command_sample_uncertainty:
+        raise EvidenceInvalid("transport probe posthoc target error exceeds policy")
+    if not 0 < causal_uncertainty <= probe.max_command_sample_uncertainty:
+        raise EvidenceInvalid("transport probe posthoc A-to-C bracket exceeds policy")
+    if (
+        raw.get("target_raw") != target % (1 << 32)
+        or raw.get("target_offset_frames") != probe.command_target_frames
+        or raw.get("target_offset_samples") != probe.target_sample_offset
+        or raw.get("target_overshoot_samples") != target_error
+        or raw.get("causal_uncertainty_samples") != causal_uncertainty
+        or raw.get("worker_in_flight_at_command") is not True
+    ):
+        raise EvidenceInvalid("transport probe raw and extended schedule disagree")
+    bracketed = StimulusCommand(
+        command_id=command.command_id,
+        requested_level_db=command.requested_level_db,
+        applied_level_db=command.applied_level_db,
+        host_before_ns=command.host_before_ns,
+        host_after_ns=command.host_after_ns,
+        sample_sequence_before=extended_a,
+        sample_sequence_after=extended_c,
+    )
+    return bracketed, {
+        **dict(raw),
+        "first_batch_sample": first_start,
+        "last_batch_sample_exclusive": last_end,
+        "post_open_baseline_sample": s0,
+        "target_sample": target,
+        "last_below_sample": extended_p,
+        "a_prewrite_sample": extended_a,
+        "post_write_initial_sample": extended_initial,
+        "b_first_advance_sample": extended_b,
+        "c_causal_advance_sample": extended_c,
+        "command_interval": "[A,C)",
+    }
+
+
 def _probe_command_partition(
     frames: Sequence[_DeferredFrame],
     command: StimulusCommand,
     *,
-    maximum_non_post_frames: int,
+    required_fully_pre_frames: int,
     required_fully_post_frames: int,
 ) -> dict[str, Any]:
     lower = command.sample_sequence_before
@@ -601,26 +1043,26 @@ def _probe_command_partition(
         start = int(frame.record["first_sample_sequence"])
         end = int(frame.record["sample_end_exclusive"])
         if end <= lower:
-            context = "precommand_prefetch"
-        elif start < upper:
+            context = "fully_pre_command"
+        elif start < upper and end > lower:
             context = "command_bracket"
         else:
             context = "fully_post_command"
         frame.record["probe_phase"] = context
         contexts.append(context)
     order = {
-        "precommand_prefetch": 0,
+        "fully_pre_command": 0,
         "command_bracket": 1,
         "fully_post_command": 2,
     }
     if contexts != sorted(contexts, key=order.__getitem__):
         raise EvidenceInvalid("transport probe command frames are not sample ordered")
-    non_post = sum(context != "fully_post_command" for context in contexts)
-    fully_post = len(contexts) - non_post
-    if non_post > maximum_non_post_frames:
+    fully_pre = contexts.count("fully_pre_command")
+    fully_post = contexts.count("fully_post_command")
+    if fully_pre < required_fully_pre_frames:
         raise EvidenceInvalid(
-            f"transport probe retained {non_post} pre/bracketed command frames; "
-            f"maximum is {maximum_non_post_frames}"
+            f"transport probe retained {fully_pre} fully pre-command frames; "
+            f"requires {required_fully_pre_frames}"
         )
     if fully_post < required_fully_post_frames:
         raise EvidenceInvalid(
@@ -630,10 +1072,9 @@ def _probe_command_partition(
     return {
         "frame_indices": [int(frame.record["frame_index"]) for frame in frames],
         "phase_by_frame": contexts,
-        "precommand_prefetch_frames": contexts.count("precommand_prefetch"),
+        "fully_pre_command_frames": fully_pre,
+        "required_fully_pre_command_frames": required_fully_pre_frames,
         "command_bracket_frames": contexts.count("command_bracket"),
-        "non_post_command_frames": non_post,
-        "maximum_non_post_command_frames": maximum_non_post_frames,
         "fully_post_command_frames": fully_post,
         "required_fully_post_command_frames": required_fully_post_frames,
     }
@@ -651,8 +1092,8 @@ def _command_record(
         "timing_role": "same_level_write_bracketed_by_coherent_fpga_counter",
         "sample_timing_basis": "hardware_sample_counter",
         "sample_anchor_policy": (
-            "max(last qualified frame end, coherent low32 pre-read) through the "
-            "second distinct coherent low32 advance after the initial post-write read"
+            "post-open S0 plus a frozen 40-frame target; command interval is the "
+            "coherent causal counter bracket [A,C) while the first batch refill runs"
         ),
         "sample_counter_bracket": dict(counter_bracket),
     }
@@ -772,7 +1213,7 @@ def _materialize_weak_signal_quality(
             "transport probe cannot analyze an incomplete frame ledger"
         )
     conditioning = _analyze_quality_tail(
-        frames[probe.continuity_frames - 1], quality=quality, probe=probe
+        frames[probe.fully_pre_command_frames - 1], quality=quality, probe=probe
     )
     final = [
         _analyze_quality_tail(frame, quality=quality, probe=probe)
@@ -791,9 +1232,9 @@ def _bind_anchor_artifact(
     frames: Sequence[_DeferredFrame],
     probe: TransientTransportProbeOptions,
 ) -> None:
-    if len(frames) < probe.continuity_frames:
+    if len(frames) < probe.fully_pre_command_frames:
         return
-    frame = frames[probe.continuity_frames - 1]
+    frame = frames[probe.fully_pre_command_frames - 1]
     byte_count = probe.anchor_samples * 8
     byte_offset = len(frame.raw) - byte_count
     tail = frame.raw[byte_offset:]
@@ -813,24 +1254,83 @@ def _bind_anchor_artifact(
 
 
 def _report_memory_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
-    maximum_command_prefix = _PROBE_QUEUE_FRAMES + 1 + (probe.kernel_buffers - 1)
+    iq_bytes_per_frame = probe.frame_samples * 8
+    ledger_bytes_per_frame = 2 * _PROBE_SIZE_T_BYTES
+    core_bytes_per_frame = (
+        iq_bytes_per_frame + _PROBE_METADATA_CAPACITY_BYTES + ledger_bytes_per_frame
+    )
     return {
-        "raw_bytes_per_frame": probe.frame_samples * 8,
-        "retained_frame_count": probe.retained_frames,
-        "queue_capacity_frames": _PROBE_QUEUE_FRAMES,
-        "producer_held_frame_bound": 1,
-        "maximum_python_raw_frames": probe.maximum_python_raw_frames,
-        "maximum_python_raw_bytes": probe.maximum_python_raw_bytes,
-        "configured_limit_bytes": probe.maximum_retained_raw_bytes,
-        "kernel_buffers": probe.kernel_buffers,
-        "maximum_additional_kernel_backlog_frames": probe.kernel_buffers - 1,
-        "kernel_backlog_is_returned_evidence": False,
-        "maximum_command_prefix_frames": maximum_command_prefix,
-        "command_prefix_derivation": (
-            "queue_capacity_frames + producer_held_frame_bound + "
-            "maximum_additional_kernel_backlog_frames"
-        ),
-        "pump_frame_budget": probe.maximum_pump_frames,
+        "core_cache": {
+            "batch_frames": probe.batch_frames,
+            "iq_bytes_per_frame": iq_bytes_per_frame,
+            "metadata_capacity_bytes_per_frame": _PROBE_METADATA_CAPACITY_BYTES,
+            "size_t_bytes": _PROBE_SIZE_T_BYTES,
+            "size_ledger_bytes_per_frame": ledger_bytes_per_frame,
+            "bytes_per_frame": core_bytes_per_frame,
+            "configured_batch_cache_bytes": probe.core_batch_cache_bytes,
+            "formula": (
+                "batch_frames * (samples_per_channel * 8 + "
+                "metadata_capacity + 2 * sizeof(size_t))"
+            ),
+            "cap_bytes": probe.maximum_core_batch_bytes,
+            "within_cap": probe.core_batch_cache_bytes
+            <= probe.maximum_core_batch_bytes,
+            "allocation_lifetime": (
+                "full configured cache remains allocated through final cached replay"
+            ),
+        },
+        "python_raw": {
+            "retained_frame_count": probe.retained_frames,
+            "queue_capacity_frames": _PROBE_QUEUE_FRAMES,
+            "producer_held_frame_bound": 1,
+            "maximum_unique_raw_frames": probe.maximum_python_raw_frames,
+            "bytes_per_frame": iq_bytes_per_frame,
+            "maximum_bytes": probe.maximum_python_raw_bytes,
+            "cap_bytes": probe.maximum_retained_raw_bytes,
+            "within_cap": probe.maximum_python_raw_bytes
+            <= probe.maximum_retained_raw_bytes,
+            "ownership_proof": (
+                "retained, queue, and producer partitions own disjoint frames from "
+                "the frozen one-batch budget"
+            ),
+        },
+        "ordinary_core_buffer": {
+            "bytes": iq_bytes_per_frame,
+            "scope": "libiio destination buffer outside the retained batch cache",
+        },
+        "python_read_temporary": {
+            "bytes": iq_bytes_per_frame,
+            "scope": "transient Buffer.read() bytearray while bytes are materialized",
+        },
+        "metadata_reservations": {
+            "ctypes_refill_scratch_bytes": _PROBE_METADATA_CAPACITY_BYTES,
+            "returned_metadata_bytes_bound": _PROBE_METADATA_CAPACITY_BYTES,
+            "parsed_evidence_bytes_bound": (
+                probe.batch_frames * _PROBE_METADATA_CAPACITY_BYTES
+            ),
+            "parsed_evidence_policy": (
+                "reserve one full metadata-capacity budget per retained frame"
+            ),
+        },
+        "device_kernel_dma": {
+            "kernel_buffers": probe.kernel_buffers,
+            "bytes_per_buffer": iq_bytes_per_frame,
+            "reserved_bytes": probe.kernel_buffers * iq_bytes_per_frame,
+        },
+        "aggregate": {
+            "conservative_capture_upper_bound_bytes": probe.aggregate_resident_bytes,
+            "cap_bytes": probe.maximum_aggregate_bytes,
+            "within_cap": probe.aggregate_resident_bytes
+            <= probe.maximum_aggregate_bytes,
+            "formula": (
+                "retained C cache + ordinary C buffer + Python raw + transient "
+                "read bytearray + metadata scratch/result/parsed reservations + K8 DMA"
+            ),
+            "scope": (
+                "capture-path byte reservoirs; Python allocator and report-object "
+                "overhead are covered by conservative metadata reservations"
+            ),
+        },
     }
 
 
@@ -843,7 +1343,6 @@ def _qualification_scope() -> str:
 
 
 def _evidence_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
-    prefix_bound = _PROBE_QUEUE_FRAMES + 1 + (probe.kernel_buffers - 1)
     return {
         "provider_gaps": "forbidden",
         "hidden_transitions": "forbidden",
@@ -858,12 +1357,31 @@ def _evidence_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
             "transition_count=0, event_count=0, and paired maximum_gain_index "
             "for every retained frame"
         ),
-        "uncontended_consecutive_frames": probe.continuity_frames,
-        "same_level_command_observation_frames": probe.command_observation_frames,
-        "maximum_command_prefix_frames": prefix_bound,
-        "command_prefix_derivation": "queue4 + producer1 + K2 backlog1",
+        "metadata_batch_frames": probe.batch_frames,
+        "metadata_batch_policy": (
+            "one full C batch is initiated by the acquisition thread; all returned "
+            "frames are cached replays from that batch"
+        ),
+        "command_target": (
+            "post-open coherent S0 + 40 * 65536 samples while first refill is in flight"
+        ),
+        "maximum_target_overshoot_samples": probe.max_command_sample_uncertainty,
+        "maximum_a_to_c_uncertainty_samples": probe.max_command_sample_uncertainty,
+        "target_poll_pacing": {
+            "coarse_guard_samples": _PROBE_TARGET_COARSE_GUARD_SAMPLES,
+            "fine_sleep_samples": _PROBE_TARGET_FINE_SLEEP_SAMPLES,
+            "maximum_poll_reads": _PROBE_TARGET_MAX_POLL_READS,
+            "policy": (
+                "sleep to the guard band, pace within it, then use bounded tail reads"
+            ),
+        },
+        "required_fully_pre_command_frames": probe.fully_pre_command_frames,
         "required_fully_post_command_frames": probe.fully_post_command_frames,
         "final_stable_frames": probe.stable_frames,
+        "batch_failure_policy": (
+            "partial batch failures free the cache, poison, and core-cancel before "
+            "return; future refill is EBADF and explicit cleanup cancel is idempotent"
+        ),
         "release_claim": "never eligible",
     }
 
@@ -908,10 +1426,10 @@ def _capacity_policy(
         "provider_observation_interval_samples": provider_observation_interval,
         "nominal_stored_observations_per_frame": nominal_stored_observations,
         "overlap_safe_stored_observations_per_frame": overlap_safe_observations,
-        "nominal_k2_initial_sampler_demand": (
+        "nominal_k8_initial_sampler_demand": (
             nominal_stored_observations * (probe.kernel_buffers + 1)
         ),
-        "overlap_safe_k2_initial_sampler_demand": (
+        "overlap_safe_k8_initial_sampler_demand": (
             overlap_safe_observations * (probe.kernel_buffers + 1)
         ),
         "observation_ring_capacity": 1_024,
@@ -1201,13 +1719,10 @@ def _run_probe_body(
     report["metadata_request"] = _request_evidence(request)
     state = _CaptureState()
     metadata_abi: int | None = None
-    pump: _TandemCapturePump | None = None
+    worker: _ProbeBatchCaptureWorker | None = None
     previous_refill_ns: int | None = None
     session_provenance: dict[str, Any] = {}
     event_timing_state: dict[str, int] = {}
-    command: StimulusCommand | None = None
-    counter_bracket: Mapping[str, Any] | None = None
-    command_partition: Mapping[str, Any] | None = None
     initial_stability: Mapping[str, Any] | None = None
     final_stability: Mapping[str, Any] | None = None
 
@@ -1218,11 +1733,23 @@ def _run_probe_body(
             probe.kernel_buffers,
             probe.frame_samples,
             tandem_request=request,
+            batch_frames=probe.batch_frames,
         ) as (buffer, metadata_abi):
             cancel_capture = getattr(buffer, "cancel", None)
-            if metadata_abi != 2 or not callable(cancel_capture):
+            configured_batch_frames = getattr(buffer, "batch_frames", None)
+            configured_batch_cache_bytes = getattr(buffer, "batch_cache_bytes", None)
+            setup_valid = (
+                metadata_abi == 2
+                and callable(cancel_capture)
+                and type(configured_batch_frames) is int
+                and configured_batch_frames == probe.batch_frames
+                and type(configured_batch_cache_bytes) is int
+                and configured_batch_cache_bytes == probe.core_batch_cache_bytes
+            )
+            if not setup_valid:
                 setup_error = EvidenceInvalid(
-                    "transport probe requires metadata ABI 2 and thread-safe cancel"
+                    "transport probe requires metadata ABI 2, batch64 cache "
+                    "attestation, and thread-safe cancel"
                 )
                 mute_error: BaseException | None = None
                 try:
@@ -1246,6 +1773,21 @@ def _run_probe_body(
                         setup_errors,
                     )
                 raise setup_error
+
+            report["acquisition"].update(
+                {
+                    "metadata_abi": metadata_abi,
+                    "configured_batch_frames": configured_batch_frames,
+                    "configured_batch_cache_bytes": configured_batch_cache_bytes,
+                    "batch_cache_attested": True,
+                }
+            )
+            post_open_baseline_raw = _strict_low32_counter(
+                radio.read_rx_sample_counter_low32()
+            )
+            report["acquisition"]["post_open_baseline_raw"] = (
+                post_open_baseline_raw
+            )
 
             def acquire_one() -> _DeferredFrame:
                 nonlocal previous_refill_ns
@@ -1278,32 +1820,62 @@ def _run_probe_body(
 
             acquisition_error: BaseException | None = None
             try:
-                pump = _TandemCapturePump(
+                worker = _ProbeBatchCaptureWorker(
                     acquire_one,
-                    maximum_frames=probe.maximum_pump_frames,
+                    batch_frames=probe.batch_frames,
                     thread_name=PROBE_THREAD_NAME,
                 )
-                actual_prefix_bound = (
-                    pump.queue_capacity_frames + 1 + (probe.kernel_buffers - 1)
-                )
-                if actual_prefix_bound != probe.command_prefix_frames:
+                if worker.queue_capacity_frames != _PROBE_QUEUE_FRAMES:
                     raise EvidenceInvalid(
-                        "transport probe command prefix differs from the actual "
-                        "queue, producer, and K2 backlog bound"
+                        "transport probe worker queue differs from the exact "
+                        "Python memory ledger"
                     )
-                pump.start()
+                worker.start()
                 report["acquisition"]["worker_started"] = True
-                for _ in range(probe.continuity_frames):
-                    check_deadline()
-                    frame = pump.take()
-                    frame.record["probe_phase"] = "uncontended_continuity"
-                    retained.append(frame)
-                initial_stability = _stable_suffix(
-                    retained,
-                    count=probe.stable_frames,
-                    label="pre-command suffix",
+                unbound_command, raw_schedule = _schedule_batched_command(
+                    radio,
+                    worker,
+                    probe,
+                    post_open_baseline_raw=post_open_baseline_raw,
+                    check_deadline=check_deadline,
+                    clock_ns=clock_ns,
+                    sleep=sleep,
+                    sample_rate_hz=quality.sample_rate_hz,
                 )
-                anchor_frame = retained[probe.continuity_frames - 1]
+                command_effective = _check_effective_attenuation(
+                    quality, unbound_command
+                )
+                report["acquisition"]["worker_in_flight_at_command"] = True
+                for _ in range(probe.batch_frames):
+                    check_deadline()
+                    frame = worker.take()
+                    retained.append(frame)
+                command, counter_bracket = _bind_batch_counter_schedule(
+                    retained, unbound_command, raw_schedule, probe
+                )
+                command_partition = _probe_command_partition(
+                    retained,
+                    command,
+                    required_fully_pre_frames=probe.fully_pre_command_frames,
+                    required_fully_post_frames=probe.fully_post_command_frames,
+                )
+                fully_pre = [
+                    frame
+                    for frame in retained
+                    if frame.record.get("probe_phase") == "fully_pre_command"
+                ]
+                fully_post = [
+                    frame
+                    for frame in retained
+                    if frame.record.get("probe_phase") == "fully_post_command"
+                ]
+                qualification_prefix = fully_pre[: probe.fully_pre_command_frames]
+                initial_stability = _stable_suffix(
+                    qualification_prefix,
+                    count=probe.stable_frames,
+                    label="fully pre-command qualification suffix",
+                )
+                anchor_frame = qualification_prefix[-1]
                 anchor_end = int(anchor_frame.record["sample_end_exclusive"])
                 report["conditioning_anchor_candidate"] = {
                     "frame_index": int(anchor_frame.record["frame_index"]),
@@ -1314,34 +1886,10 @@ def _run_probe_body(
                     "role": "stable_tail_candidate_for_future_transient",
                     "release_latency_evidence": False,
                 }
-
-                command, counter_bracket = _timestamp_tandem_command(
-                    radio,
-                    "weak_control_reassertion",
-                    probe.weak_stimulus_tx_gain_db,
-                    last_observed_frame_end=anchor_end,
-                    clock_ns=clock_ns,
-                    max_host_jitter_ns=probe.max_host_jitter_ns,
-                    max_sample_uncertainty=probe.max_command_sample_uncertainty,
-                    readback_tolerance_db=probe.readback_tolerance_db,
-                )
-                command_effective = _check_effective_attenuation(quality, command)
-                command_frames: list[_DeferredFrame] = []
-                for _ in range(probe.command_observation_frames):
-                    check_deadline()
-                    frame = pump.take()
-                    retained.append(frame)
-                    command_frames.append(frame)
-                command_partition = _probe_command_partition(
-                    command_frames,
-                    command,
-                    maximum_non_post_frames=actual_prefix_bound,
-                    required_fully_post_frames=probe.fully_post_command_frames,
-                )
                 final_stability = _stable_suffix(
-                    retained,
+                    fully_post,
                     count=probe.stable_frames,
-                    label="final suffix",
+                    label="fully post-command final suffix",
                 )
                 report["command_contention"] = {
                     "command": _command_record(
@@ -1353,39 +1901,70 @@ def _run_probe_body(
                     "command_timing_qualified": True,
                     "gain_transient_exercised": False,
                 }
+                report["acquisition"].update(
+                    {
+                        "single_core_batch_initiated": True,
+                        "initiating_batch_refill_calls": 1,
+                        "public_refill_calls": probe.batch_frames,
+                        "cached_replay_refill_calls": probe.batch_frames - 1,
+                        "batch_cache_fully_replayed": True,
+                    }
+                )
             except BaseException as error:  # noqa: BLE001
                 acquisition_error = error
 
             # Required ordering on success and every failure: remove RF first,
-            # then stop/cancel the in-flight refill, then join before close.
+            # cancel a failed/in-flight batch, then join before close.  A fully
+            # replayed successful batch closes normally to exercise RELEASE.
             prejoin_mute_error: BaseException | None = None
             try:
                 radio.mute_all()
             except BaseException as error:  # noqa: BLE001
                 prejoin_mute_error = error
-            if pump is not None:
-                pump.request_stop()
+            worker_in_flight_before_shutdown = bool(
+                worker is not None and worker.first_refill_in_flight
+            )
+            cancel_required = acquisition_error is not None or (
+                worker_in_flight_before_shutdown
+            )
+            if worker is not None:
+                worker.request_stop()
             cancel_error: BaseException | None = None
-            try:
-                cancel_capture()
-            except BaseException as error:  # noqa: BLE001
-                cancel_error = error
-            stop_error: BaseException | None = None
-            if pump is not None:
+            cancel_called = False
+            if cancel_required:
+                cancel_called = True
                 try:
-                    pump.stop()
+                    cancel_capture()
+                except BaseException as error:  # noqa: BLE001
+                    cancel_error = error
+            stop_error: BaseException | None = None
+            if worker is not None:
+                try:
+                    worker.stop()
                 except BaseException as error:  # noqa: BLE001
                     stop_error = error
                 report["acquisition"].update(
                     {
-                        "produced_frames": pump.produced_frames,
-                        "consumed_frames": pump.consumed_frames,
-                        "discarded_tail_frames": pump.discarded_tail_frames,
+                        "produced_frames": worker.produced_frames,
+                        "consumed_frames": worker.consumed_frames,
+                        "discarded_tail_frames": worker.discarded_tail_frames,
                     }
                 )
             report["acquisition"].update(
                 {
-                    "buffer_cancelled_before_join": cancel_error is None,
+                    "worker_in_flight_before_shutdown": (
+                        worker_in_flight_before_shutdown
+                    ),
+                    "cancel_required": cancel_required,
+                    "cancel_called": cancel_called,
+                    "cancel_succeeded": (
+                        cancel_error is None if cancel_called else None
+                    ),
+                    "shutdown_path": (
+                        "cancel_failed_or_in_flight_batch"
+                        if cancel_required
+                        else "normal_close_after_full_cache_replay"
+                    ),
                     "worker_stopped_before_buffer_close": stop_error is None,
                 }
             )
@@ -1408,6 +1987,7 @@ def _run_probe_body(
             if errors:
                 error = errors[0]
                 raise error.with_traceback(error.__traceback__)
+        report["acquisition"]["buffer_close_completed"] = True
     except BaseException as error:  # noqa: BLE001
         session_error = error
 
@@ -1862,8 +2442,27 @@ def _validate_command_report(
     quality: TandemQualityOptions,
     probe: TransientTransportProbeOptions,
     last_qualified_frame_end: int,
+    first_batch_sample: int,
+    last_batch_sample_exclusive: int,
 ) -> StimulusCommand:
     command = _required_mapping(value, name="command_contention.command")
+    if set(command) != {
+        "command_id",
+        "requested_level_db",
+        "applied_level_db",
+        "host_before_ns",
+        "host_after_ns",
+        "host_jitter_ns",
+        "sample_sequence_before",
+        "sample_sequence_after",
+        "sample_uncertainty",
+        "effective_attenuation_db",
+        "timing_role",
+        "sample_timing_basis",
+        "sample_anchor_policy",
+        "sample_counter_bracket",
+    }:
+        raise EvidenceInvalid("transport probe command fields changed")
     if command.get("command_id") != "weak_control_reassertion":
         raise EvidenceInvalid("transport probe command identity changed")
     requested = _required_number(
@@ -1909,8 +2508,8 @@ def _validate_command_report(
         or command.get("sample_timing_basis") != "hardware_sample_counter"
         or command.get("sample_anchor_policy")
         != (
-            "max(last qualified frame end, coherent low32 pre-read) through the "
-            "second distinct coherent low32 advance after the initial post-write read"
+            "post-open S0 plus a frozen 40-frame target; command interval is the "
+            "coherent causal counter bracket [A,C) while the first batch refill runs"
         )
     ):
         raise EvidenceInvalid("transport probe command timing role is invalid")
@@ -1918,74 +2517,245 @@ def _validate_command_report(
     bracket = _required_mapping(
         command.get("sample_counter_bracket"), name="sample_counter_bracket"
     )
-    raw_before = _required_int(bracket.get("raw_before"), name="counter raw_before")
+    expected_bracket_fields = {
+        "register_address",
+        "counter_width_bits",
+        "counter_source",
+        "post_open_baseline_raw",
+        "target_offset_frames",
+        "target_offset_samples",
+        "target_raw",
+        "last_below_raw",
+        "raw_a_prewrite",
+        "raw_post_write_initial",
+        "raw_b_first_advance",
+        "raw_c_causal_advance",
+        "target_poll_read_count",
+        "target_poll_policy",
+        "target_coarse_guard_samples",
+        "target_fine_sleep_samples",
+        "target_max_poll_reads",
+        "target_poll_observations",
+        "target_total_requested_sleep_samples",
+        "post_write_read_count",
+        "target_overshoot_samples",
+        "causal_uncertainty_samples",
+        "worker_in_flight_at_command",
+        "first_batch_sample",
+        "last_batch_sample_exclusive",
+        "post_open_baseline_sample",
+        "target_sample",
+        "last_below_sample",
+        "a_prewrite_sample",
+        "post_write_initial_sample",
+        "b_first_advance_sample",
+        "c_causal_advance_sample",
+        "command_interval",
+    }
+    if set(bracket) != expected_bracket_fields:
+        raise EvidenceInvalid("transport probe command bracket fields changed")
+    raw_s0 = _required_int(
+        bracket.get("post_open_baseline_raw"), name="counter raw S0"
+    )
+    raw_target = _required_int(bracket.get("target_raw"), name="counter raw target")
+    raw_p = _required_int(
+        bracket.get("last_below_raw"), name="counter raw last-below"
+    )
+    raw_a = _required_int(bracket.get("raw_a_prewrite"), name="counter raw A")
     raw_initial = _required_int(
         bracket.get("raw_post_write_initial"), name="counter raw_initial"
     )
-    raw_first = _required_int(
-        bracket.get("raw_post_write_first_advance"), name="counter raw_first"
+    raw_b = _required_int(
+        bracket.get("raw_b_first_advance"), name="counter raw B"
     )
-    raw_causal = _required_int(
-        bracket.get("raw_post_write_causal"), name="counter raw_causal"
+    raw_c = _required_int(
+        bracket.get("raw_c_causal_advance"), name="counter raw C"
     )
     if any(
         not 0 <= value < 1 << 32
-        for value in (raw_before, raw_initial, raw_first, raw_causal)
+        for value in (raw_s0, raw_target, raw_p, raw_a, raw_initial, raw_b, raw_c)
     ):
         raise EvidenceInvalid("transport probe raw command counter exceeds uint32")
-    initial_delta = (raw_initial - raw_before) % (1 << 32)
-    first_delta = (raw_first - raw_initial) % (1 << 32)
-    causal_delta = (raw_causal - raw_first) % (1 << 32)
+    p_delta = (raw_p - raw_s0) % (1 << 32)
+    a_delta = (raw_a - raw_s0) % (1 << 32)
+    initial_delta = (raw_initial - raw_a) % (1 << 32)
+    b_delta = (raw_b - raw_initial) % (1 << 32)
+    c_delta = (raw_c - raw_b) % (1 << 32)
     if initial_delta >= 1 << 31 or not all(
-        0 < delta < 1 << 31 for delta in (first_delta, causal_delta)
+        0 < delta < 1 << 31 for delta in (b_delta, c_delta)
     ):
         raise EvidenceInvalid("transport probe command counter advances are ambiguous")
-    extended_before = _required_int(
-        bracket.get("extended_before"), name="extended_before"
+    s0 = _required_int(
+        bracket.get("post_open_baseline_sample"), name="extended S0"
+    )
+    target = _required_int(bracket.get("target_sample"), name="extended target")
+    extended_p = _required_int(
+        bracket.get("last_below_sample"), name="extended last-below"
+    )
+    extended_a = _required_int(
+        bracket.get("a_prewrite_sample"), name="extended A"
     )
     extended_initial = _required_int(
-        bracket.get("extended_post_write_initial"), name="extended_initial"
+        bracket.get("post_write_initial_sample"), name="extended initial"
     )
-    extended_first = _required_int(
-        bracket.get("extended_post_write_first_advance"), name="extended_first"
+    extended_b = _required_int(
+        bracket.get("b_first_advance_sample"), name="extended B"
     )
-    extended_after = _required_int(bracket.get("extended_after"), name="extended_after")
+    extended_c = _required_int(
+        bracket.get("c_causal_advance_sample"), name="extended C"
+    )
+    target_offset = probe.target_sample_offset
+    target_error = extended_a - target
+    causal_uncertainty = extended_c - extended_a
     if (
-        extended_before & ((1 << 32) - 1) != raw_before
+        s0 & ((1 << 32) - 1) != raw_s0
+        or target & ((1 << 32) - 1) != raw_target
+        or extended_p & ((1 << 32) - 1) != raw_p
+        or extended_a & ((1 << 32) - 1) != raw_a
         or extended_initial & ((1 << 32) - 1) != raw_initial
-        or extended_first & ((1 << 32) - 1) != raw_first
-        or extended_after & ((1 << 32) - 1) != raw_causal
+        or extended_b & ((1 << 32) - 1) != raw_b
+        or extended_c & ((1 << 32) - 1) != raw_c
         or not all(
             0 <= item < 1 << 64
             for item in (
-                extended_before,
+                s0,
+                target,
+                extended_p,
+                extended_a,
                 extended_initial,
-                extended_first,
-                extended_after,
+                extended_b,
+                extended_c,
                 lower,
                 upper,
             )
         )
-        or extended_initial != extended_before + initial_delta
-        or extended_first != extended_initial + first_delta
-        or extended_after != extended_first + causal_delta
-        or lower != max(last_qualified_frame_end, extended_before)
-        or upper != extended_after
-        or bracket.get("sample_sequence_lower") != lower
-        or bracket.get("sample_sequence_upper") != upper
-        or bracket.get("extension_reference_sample") != last_qualified_frame_end
+        or extended_p != s0 + p_delta
+        or extended_a != s0 + a_delta
+        or extended_initial != extended_a + initial_delta
+        or extended_b != extended_initial + b_delta
+        or extended_c != extended_b + c_delta
+        or target != s0 + target_offset
+        or lower != extended_a
+        or upper != extended_c
+        or lower < last_qualified_frame_end
+        or not first_batch_sample <= s0 < target < last_batch_sample_exclusive
+        or not extended_p < target <= extended_a < extended_c
+        or not 0 < extended_a - extended_p < 1 << 31
+        or not 0 <= target_error <= probe.max_command_sample_uncertainty
+        or not 0 < causal_uncertainty <= probe.max_command_sample_uncertainty
+        or bracket.get("first_batch_sample") != first_batch_sample
+        or bracket.get("last_batch_sample_exclusive")
+        != last_batch_sample_exclusive
+        or bracket.get("target_offset_frames") != probe.command_target_frames
+        or bracket.get("target_offset_samples") != target_offset
+        or bracket.get("target_overshoot_samples") != target_error
+        or bracket.get("causal_uncertainty_samples") != causal_uncertainty
+        or bracket.get("worker_in_flight_at_command") is not True
+        or bracket.get("command_interval") != "[A,C)"
         or bracket.get("register_address") != "0x800000b8"
         or bracket.get("counter_width_bits") != 32
         or bracket.get("counter_source") != "coherent FPGA RX sample counter low word"
-        or bracket.get("lower_clamped_to_last_observed_frame_end")
-        is not (lower != extended_before)
     ):
         raise EvidenceInvalid("transport probe command counter ledger is inconsistent")
-    reads = _required_int(
+    target_reads = _required_int(
+        bracket.get("target_poll_read_count"), name="target_poll_read_count"
+    )
+    post_reads = _required_int(
         bracket.get("post_write_read_count"), name="post_write_read_count"
     )
-    if not 3 <= reads <= 9:
+    poll_observations = _required_list(
+        bracket.get("target_poll_observations"), name="target_poll_observations"
+    )
+    if (
+        bracket.get("target_poll_policy")
+        != (
+            "counter-adaptive coarse guard, 4096-sample fine sleeps, bounded "
+            "tail polls"
+        )
+        or bracket.get("target_coarse_guard_samples")
+        != _PROBE_TARGET_COARSE_GUARD_SAMPLES
+        or bracket.get("target_fine_sleep_samples")
+        != _PROBE_TARGET_FINE_SLEEP_SAMPLES
+        or bracket.get("target_max_poll_reads") != _PROBE_TARGET_MAX_POLL_READS
+        or not 2 <= target_reads == len(poll_observations) <= (
+            _PROBE_TARGET_MAX_POLL_READS
+        )
+        or not 3 <= post_reads <= 9
+    ):
         raise EvidenceInvalid("transport probe command read count is outside policy")
+    prior_advance = -1
+    expected_total_sleep = 0
+    for index, raw_observation in enumerate(poll_observations):
+        observation = _required_mapping(
+            raw_observation, name=f"target poll observation {index}"
+        )
+        if set(observation) != {
+            "raw",
+            "advance_samples",
+            "remaining_samples",
+            "phase",
+            "requested_sleep_samples",
+        }:
+            raise EvidenceInvalid("transport probe target poll fields changed")
+        observed_raw = _required_int(observation.get("raw"), name="poll raw")
+        advance = _required_int(
+            observation.get("advance_samples"), name="poll advance"
+        )
+        remaining = _required_int(
+            observation.get("remaining_samples"), name="poll remaining"
+        )
+        sleep_samples = _required_int(
+            observation.get("requested_sleep_samples"), name="poll sleep"
+        )
+        if (
+            not 0 <= observed_raw < 1 << 32
+            or observed_raw != (raw_s0 + advance) % (1 << 32)
+            or not prior_advance <= advance < 1 << 31
+            or sleep_samples < 0
+        ):
+            raise EvidenceInvalid("transport probe target poll counter is invalid")
+        prior_advance = advance
+        if index == len(poll_observations) - 1:
+            expected = {
+                "remaining": 0,
+                "phase": "target_reached",
+                "sleep": 0,
+            }
+            if advance != a_delta:
+                raise EvidenceInvalid("transport probe target poll does not end at A")
+        else:
+            expected_remaining = target_offset - advance
+            if expected_remaining <= 0:
+                raise EvidenceInvalid("transport probe target poll passed T early")
+            if expected_remaining > _PROBE_TARGET_COARSE_GUARD_SAMPLES:
+                expected_phase = "coarse_sleep"
+                expected_sleep = (
+                    expected_remaining - _PROBE_TARGET_COARSE_GUARD_SAMPLES
+                )
+            elif expected_remaining > 2 * _PROBE_TARGET_FINE_SLEEP_SAMPLES:
+                expected_phase = "fine_sleep"
+                expected_sleep = _PROBE_TARGET_FINE_SLEEP_SAMPLES
+            else:
+                expected_phase = "tail_poll"
+                expected_sleep = 0
+            expected = {
+                "remaining": expected_remaining,
+                "phase": expected_phase,
+                "sleep": expected_sleep,
+            }
+            expected_total_sleep += expected_sleep
+        if (
+            remaining != expected["remaining"]
+            or observation.get("phase") != expected["phase"]
+            or sleep_samples != expected["sleep"]
+        ):
+            raise EvidenceInvalid("transport probe target poll pacing is inconsistent")
+    if (
+        poll_observations[-2].get("raw") != raw_p
+        or bracket.get("target_total_requested_sleep_samples")
+        != expected_total_sleep
+    ):
+        raise EvidenceInvalid("transport probe target sleep ledger is inconsistent")
     return StimulusCommand(
         command_id="weak_control_reassertion",
         requested_level_db=requested,
@@ -2416,12 +3186,7 @@ def _validate_transient_transport_probe_report_impl(
             raise EvidenceInvalid("transport probe event/gap ledger is inconsistent")
         prior_metadata = metadata
 
-    initial_frames = frames[: probe.continuity_frames]
-    command_frames = frames[probe.continuity_frames :]
-    if any(
-        frame.get("probe_phase") != "uncontended_continuity" for frame in initial_frames
-    ):
-        raise EvidenceInvalid("transport probe command occurred before 32-frame gate")
+    initial_frames = frames[: probe.fully_pre_command_frames]
     _validate_stable_report_suffix(
         initial_frames,
         report.get("initial_stable_suffix"),
@@ -2444,7 +3209,7 @@ def _validate_transient_transport_probe_report_impl(
     except ValueError as exc:
         raise EvidenceInvalid("transport probe anchor tail digest is invalid") from exc
     expected_anchor = {
-        "frame_index": probe.continuity_frames - 1,
+        "frame_index": probe.fully_pre_command_frames - 1,
         "sample_sequence_before": anchor_end - probe.anchor_samples,
         "sample_sequence_after": anchor_end,
         "sample_uncertainty": probe.anchor_samples,
@@ -2474,19 +3239,27 @@ def _validate_transient_transport_probe_report_impl(
         quality=quality,
         probe=probe,
         last_qualified_frame_end=anchor_end,
+        first_batch_sample=_required_int(
+            frames[0].get("first_sample_sequence"), name="first batch sample"
+        ),
+        last_batch_sample_exclusive=_required_int(
+            frames[-1].get("sample_end_exclusive"), name="last batch sample"
+        ),
     )
     assert command.sample_sequence_before is not None
     assert command.sample_sequence_after is not None
     contexts: list[str] = []
-    for raw_frame in command_frames:
+    for raw_frame in frames:
         frame = _required_mapping(raw_frame, name="command frame")
         start = _required_int(
             frame.get("first_sample_sequence"), name="command frame start"
         )
         end = _required_int(frame.get("sample_end_exclusive"), name="command frame end")
         if end <= command.sample_sequence_before:
-            context = "precommand_prefetch"
-        elif start < command.sample_sequence_after:
+            context = "fully_pre_command"
+        elif start < command.sample_sequence_after and end > (
+            command.sample_sequence_before
+        ):
             context = "command_bracket"
         else:
             context = "fully_post_command"
@@ -2496,32 +3269,38 @@ def _validate_transient_transport_probe_report_impl(
             )
         contexts.append(context)
     order = {
-        "precommand_prefetch": 0,
+        "fully_pre_command": 0,
         "command_bracket": 1,
         "fully_post_command": 2,
     }
     if contexts != sorted(contexts, key=order.__getitem__):
         raise EvidenceInvalid("transport probe command phases are not ordered")
-    non_post = sum(context != "fully_post_command" for context in contexts)
-    fully_post = len(contexts) - non_post
+    fully_pre = contexts.count("fully_pre_command")
+    fully_post = contexts.count("fully_post_command")
     expected_partition = {
-        "frame_indices": list(range(probe.continuity_frames, probe.retained_frames)),
+        "frame_indices": list(range(probe.retained_frames)),
         "phase_by_frame": contexts,
-        "precommand_prefetch_frames": contexts.count("precommand_prefetch"),
+        "fully_pre_command_frames": fully_pre,
+        "required_fully_pre_command_frames": probe.fully_pre_command_frames,
         "command_bracket_frames": contexts.count("command_bracket"),
-        "non_post_command_frames": non_post,
-        "maximum_non_post_command_frames": probe.command_prefix_frames,
         "fully_post_command_frames": fully_post,
         "required_fully_post_command_frames": probe.fully_post_command_frames,
     }
-    if non_post > probe.command_prefix_frames or fully_post < (
+    if fully_pre < probe.fully_pre_command_frames or fully_post < (
         probe.fully_post_command_frames
-    ):
+    ) or contexts[: probe.fully_pre_command_frames] != [
+        "fully_pre_command"
+    ] * probe.fully_pre_command_frames:
         raise EvidenceInvalid("transport probe command partition is insufficient")
     if contention.get("partition") != expected_partition:
         raise EvidenceInvalid("transport probe command partition ledger changed")
+    final_frames = [
+        frame
+        for frame, context in zip(frames, contexts, strict=True)
+        if context == "fully_post_command"
+    ]
     _validate_stable_report_suffix(
-        frames,
+        final_frames,
         report.get("final_stable_suffix"),
         count=probe.stable_frames,
         name="final_stable_suffix",
@@ -2614,24 +3393,90 @@ def _validate_transient_transport_probe_report_impl(
         raise EvidenceInvalid("transport probe conditioning host bracket is invalid")
 
     acquisition = _required_mapping(report.get("acquisition"), name="acquisition")
+    expected_acquisition_fields = {
+        "threaded",
+        "thread_name",
+        "kernel_buffers",
+        "queue_capacity_frames",
+        "required_consumed_frames",
+        "partial_batch_failure_contract",
+        "worker_started",
+        "produced_frames",
+        "consumed_frames",
+        "discarded_tail_frames",
+        "single_core_batch_initiated",
+        "initiating_batch_refill_calls",
+        "public_refill_calls",
+        "cached_replay_refill_calls",
+        "batch_cache_fully_replayed",
+        "worker_in_flight_at_command",
+        "worker_in_flight_before_shutdown",
+        "cancel_required",
+        "cancel_called",
+        "cancel_succeeded",
+        "shutdown_path",
+        "worker_stopped_before_buffer_close",
+        "buffer_close_completed",
+        "metadata_abi",
+        "configured_batch_frames",
+        "configured_batch_cache_bytes",
+        "batch_cache_attested",
+        "post_open_baseline_raw",
+    }
+    if set(acquisition) != expected_acquisition_fields:
+        raise EvidenceInvalid("transport probe acquisition fields changed")
     produced = _required_int(acquisition.get("produced_frames"), name="produced_frames")
     consumed = _required_int(acquisition.get("consumed_frames"), name="consumed_frames")
     discarded = _required_int(
         acquisition.get("discarded_tail_frames"), name="discarded_tail_frames"
     )
+    post_open_raw = _required_int(
+        acquisition.get("post_open_baseline_raw"), name="post_open_baseline_raw"
+    )
+    command_bracket = _required_mapping(
+        _required_mapping(
+            report.get("command_contention"), name="command_contention"
+        ).get("command"),
+        name="command_contention.command",
+    ).get("sample_counter_bracket")
     if (
         acquisition.get("threaded") is not True
         or acquisition.get("worker_started") is not True
         or acquisition.get("thread_name") != PROBE_THREAD_NAME
         or acquisition.get("kernel_buffers") != probe.kernel_buffers
+        or acquisition.get("metadata_abi") != 2
+        or acquisition.get("configured_batch_frames") != probe.batch_frames
+        or acquisition.get("configured_batch_cache_bytes")
+        != probe.core_batch_cache_bytes
+        or acquisition.get("batch_cache_attested") is not True
+        or not 0 <= post_open_raw < 1 << 32
+        or not isinstance(command_bracket, Mapping)
+        or command_bracket.get("post_open_baseline_raw") != post_open_raw
         or acquisition.get("queue_capacity_frames") != _PROBE_QUEUE_FRAMES
         or acquisition.get("required_consumed_frames") != probe.retained_frames
-        or consumed != probe.retained_frames
-        or not consumed <= produced <= probe.maximum_pump_frames
-        or produced - consumed > _PROBE_QUEUE_FRAMES + 1
-        or discarded != produced - consumed
-        or acquisition.get("buffer_cancelled_before_join") is not True
+        or produced != probe.batch_frames
+        or consumed != probe.batch_frames
+        or discarded != 0
+        or acquisition.get("single_core_batch_initiated") is not True
+        or acquisition.get("initiating_batch_refill_calls") != 1
+        or acquisition.get("public_refill_calls") != probe.batch_frames
+        or acquisition.get("cached_replay_refill_calls") != probe.batch_frames - 1
+        or acquisition.get("batch_cache_fully_replayed") is not True
+        or acquisition.get("worker_in_flight_at_command") is not True
+        or acquisition.get("worker_in_flight_before_shutdown") is not False
+        or acquisition.get("cancel_required") is not False
+        or acquisition.get("cancel_called") is not False
+        or acquisition.get("cancel_succeeded") is not None
+        or acquisition.get("shutdown_path")
+        != "normal_close_after_full_cache_replay"
         or acquisition.get("worker_stopped_before_buffer_close") is not True
+        or acquisition.get("buffer_close_completed") is not True
+        or acquisition.get("partial_batch_failure_contract")
+        != (
+            "initiating refill fails after core cache free/poison/core cancel; future "
+            "refill is EBADF; explicit cleanup cancel is idempotent and precedes "
+            "join/close; a fresh session may recover"
+        )
     ):
         raise EvidenceInvalid("transport probe acquisition ledger is invalid")
     if report.get("tandem_status_before") != _json_domain(normalized_status_after):
@@ -2764,12 +3609,28 @@ def run_transient_transport_probe(
             "kernel_buffers": probe.kernel_buffers,
             "queue_capacity_frames": _PROBE_QUEUE_FRAMES,
             "required_consumed_frames": probe.retained_frames,
+            "partial_batch_failure_contract": (
+                "initiating refill fails after core cache free/poison/core cancel; "
+                "future refill is EBADF; explicit cleanup cancel is idempotent and "
+                "precedes join/close; a fresh session may recover"
+            ),
             "worker_started": False,
             "produced_frames": 0,
             "consumed_frames": 0,
             "discarded_tail_frames": 0,
-            "buffer_cancelled_before_join": False,
+            "single_core_batch_initiated": False,
+            "initiating_batch_refill_calls": 0,
+            "public_refill_calls": 0,
+            "cached_replay_refill_calls": 0,
+            "batch_cache_fully_replayed": False,
+            "worker_in_flight_at_command": False,
+            "worker_in_flight_before_shutdown": False,
+            "cancel_required": False,
+            "cancel_called": False,
+            "cancel_succeeded": None,
+            "shutdown_path": "pending",
             "worker_stopped_before_buffer_close": False,
+            "buffer_close_completed": False,
         },
         "frames": [],
         "iq_artifacts_saved": False,

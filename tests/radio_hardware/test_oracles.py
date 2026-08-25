@@ -6,6 +6,7 @@ import math
 import struct
 import zlib
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -41,6 +42,7 @@ from .metadata_abi import (
     FrameMetadata,
     MetadataProtocolError,
     build_hold_request,
+    create_metadata_buffer,
     metadata_buffer_abi,
     parse_frame_metadata,
 )
@@ -309,6 +311,62 @@ def test_metadata_constructor_abi_detection() -> None:
 
     assert metadata_buffer_abi(LegacyMetadataBuffer) == 1
     assert metadata_buffer_abi(RequestMetadataBuffer) == 2
+
+
+def test_metadata_constructor_forwards_explicit_batch_and_rejects_legacy() -> None:
+    class RequestMetadataBuffer:
+        def __init__(
+            self,
+            device: object,
+            samples_count: int,
+            request: bytes,
+            metadata_capacity: int = 64 * 1024,
+            batch_frames: int = 1,
+        ) -> None:
+            self.arguments = (
+                device,
+                samples_count,
+                request,
+                metadata_capacity,
+                batch_frames,
+            )
+
+    request_module = SimpleNamespace(MetadataBuffer=RequestMetadataBuffer)
+    device = object()
+    value, abi = create_metadata_buffer(
+        request_module,
+        device,
+        65_536,
+        tandem_request=b"request",
+        batch_frames=64,
+    )
+    assert abi == 2
+    assert value.arguments == (device, 65_536, b"request", 64 * 1024, 64)
+
+    class LegacyMetadataBuffer:
+        def __init__(
+            self,
+            device: object,
+            samples_count: int,
+            metadata_capacity: int = 64 * 1024,
+        ) -> None:
+            del device, samples_count, metadata_capacity
+
+    with pytest.raises(RuntimeError, match="requires request ABI 2"):
+        create_metadata_buffer(
+            SimpleNamespace(MetadataBuffer=LegacyMetadataBuffer),
+            device,
+            65_536,
+            batch_frames=2,
+        )
+    with pytest.raises(TypeError, match="must be an integer"):
+        create_metadata_buffer(
+            request_module, device, 65_536, tandem_request=b"request", batch_frames=True
+        )
+    with pytest.raises(ValueError, match=r"\[1, 64\]"):
+        create_metadata_buffer(
+            request_module, device, 65_536, tandem_request=b"request", batch_frames=65
+        )
 
 
 def _frame(first: int, *, flags: int = 0, buffer_sequence: int = 2) -> FrameMetadata:

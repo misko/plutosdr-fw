@@ -80,13 +80,25 @@ class _Clock:
 
 
 class _FakeBuffer:
-    def __init__(self, radio: _FakeProbeRadio) -> None:
+    def __init__(self, radio: _FakeProbeRadio, *, batch_frames: int) -> None:
         self.radio = radio
+        self.batch_frames = batch_frames + radio.batch_frames_readback_offset
+        self.batch_cache_bytes = (
+            0
+            if batch_frames == 1
+            else batch_frames * (65_536 * 8 + 64 * 1024 + 16)
+        ) + radio.batch_cache_readback_offset
+        self.poisoned = False
 
     def cancel(self) -> None:
         self.radio.operations.append(("buffer_cancel",))
         self.radio.cancel_calls += 1
+        self.radio.cleanup_cancel_calls += 1
         self.radio.cancelled.set()
+        if self.radio.batch_inflight.is_set() and not (
+            self.radio.batch_completed.is_set()
+        ):
+            self.poisoned = True
         if self.radio.cancel_failures:
             self.radio.cancel_failures -= 1
             raise RuntimeError("planted cancel failure")
@@ -114,9 +126,15 @@ class _FakeProbeRadio:
         self.rx_gain_db = 40.0
         self.tx_gain_db = -89.75
         self.buffer_open = False
+        self.active_buffer: _FakeBuffer | None = None
         self.cancelled = threading.Event()
         self.blocked_refill = threading.Event()
+        self.batch_inflight = threading.Event()
+        self.batch_completed = threading.Event()
+        self.command_reasserted = threading.Event()
         self.cancel_calls = 0
+        self.core_cancel_calls = 0
+        self.cleanup_cancel_calls = 0
         self.mute_failures = 0
         self.buffer_mute_failures = 0
         self.cancel_failures = 0
@@ -130,6 +148,12 @@ class _FakeProbeRadio:
         self.cleanup_verified = False
         self.capture_count = 0
         self.capture_attempts = 0
+        self.core_batch_initiations = 0
+        self.cached_replays = 0
+        self.batch_frames_readback_offset = 0
+        self.batch_cache_readback_offset = 0
+        self.partial_batch_failure = False
+        self.future_poison_refills = 0
         self.startup_eagain_attempts = 0
         self.startup_eagain_remaining = 0
         self.block_capture_at: int | None = None
@@ -171,6 +195,8 @@ class _FakeProbeRadio:
         self.auto_request_initial_gain_db: int | None = None
         self.hold_request_initial_gain_db: int | None = None
         self.sample_counter = self.first_sample
+        self.counter_read_step = 4_096
+        self.sleep_advances_counter = True
         self.refill_ns = 1_000_000
         self.metadata_by_token: dict[bytes, Any] = {}
         self.capture_thread_names: list[str] = []
@@ -213,6 +239,10 @@ class _FakeProbeRadio:
             raise FixtureSafetyError("planted radio rejected strong TX")
         self.tx_gain_db = float(gain_db)
         self.operations.append(("set_tx2_gain", self.tx_gain_db))
+        if sum(
+            operation[0] == "set_tx2_gain" for operation in self.operations
+        ) >= 2:
+            self.command_reasserted.set()
         return self.tx_gain_db + self.readback_offset_db
 
     def configure_rx(self, mode: str, *, manual_gain_db: float | None = None) -> None:
@@ -251,6 +281,7 @@ class _FakeProbeRadio:
         samples_per_channel: int,
         *,
         tandem_request: bytes | None,
+        batch_frames: int = 1,
     ):
         @contextmanager
         def opened():
@@ -268,7 +299,8 @@ class _FakeProbeRadio:
                 self.hold_request_initial_gain_db = request_initial_gain_db
             else:
                 self.auto_request_initial_gain_db = request_initial_gain_db
-            assert kernel_buffers == (1 if is_hold else 2)
+            assert kernel_buffers == (1 if is_hold else 8)
+            assert batch_frames == (1 if is_hold else 64)
             operation_prefix = "hold_buffer" if is_hold else "buffer"
             self.operations.append((f"{operation_prefix}_enter", api, kernel_buffers))
             if is_hold and self.hold_open_failures:
@@ -276,6 +308,9 @@ class _FakeProbeRadio:
                 raise RuntimeError("planted HOLD FIFO clear open failure")
             self.buffer_open = True
             self.cancelled.clear()
+            self.batch_inflight.clear()
+            self.batch_completed.clear()
+            self.command_reasserted.clear()
             if is_hold:
                 self.hold_active = True
                 self.fifo_level = self.hold_fifo_after_clear
@@ -285,17 +320,28 @@ class _FakeProbeRadio:
                 self.gain_index = 65 + self.auto_initial_endpoint_offset
                 self.transition_count = 0
                 self.event_sequence = 0
+            buffer = _FakeBuffer(self, batch_frames=batch_frames)
+            self.active_buffer = buffer
             body_error: BaseException | None = None
             try:
-                yield _FakeBuffer(self), 2
+                yield buffer, 2
             except BaseException as error:  # noqa: BLE001
                 body_error = error
             close_error: BaseException | None = None
             self.buffer_open = False
             self.hold_active = False
+            self.active_buffer = None
             if is_hold and self.hold_fifo_after_close is not None:
                 self.fifo_level = self.hold_fifo_after_close
             self.operations.append((f"{operation_prefix}_close",))
+            if not is_hold:
+                self.operations.append(
+                    (
+                        "data_pipe_teardown"
+                        if buffer.poisoned or self.cancelled.is_set()
+                        else "wire_close",
+                    )
+                )
             if is_hold and self.hold_close_failures:
                 self.hold_close_failures -= 1
                 close_error = RuntimeError("planted HOLD FIFO clear close failure")
@@ -490,8 +536,13 @@ class _FakeProbeRadio:
         self, _buffer: Any, *, metadata: bool, samples_per_channel: int
     ) -> tuple[bytes, bytes | None, int]:
         assert metadata is True
+        assert isinstance(_buffer, _FakeBuffer)
         self.capture_thread_names.append(threading.current_thread().name)
         self.capture_attempts += 1
+        if _buffer.poisoned:
+            self.future_poison_refills += 1
+            self.operations.append(("poison_refill_ebadf",))
+            raise OSError(errno.EBADF, "planted poisoned metadata batch")
         for attempt in range(65):
             if not self.startup_eagain_remaining:
                 break
@@ -506,6 +557,27 @@ class _FakeProbeRadio:
             raise OSError(errno.EBADF, "planted cancelled refill")
         if self.worker_error_at == self.capture_count:
             raise EvidenceInvalid("planted acquisition worker failure")
+        if _buffer.batch_frames == 64 and self.capture_count == 0:
+            self.core_batch_initiations += 1
+            self.batch_inflight.set()
+            if self.partial_batch_failure:
+                _buffer.poisoned = True
+                self.core_cancel_calls += 1
+                self.operations.append(("core_batch_cancel",))
+                self.batch_completed.set()
+                raise OSError(errno.EIO, "planted partial metadata batch failure")
+            for _ in range(200):
+                if self.command_reasserted.wait(timeout=0.01):
+                    break
+                if self.cancelled.is_set():
+                    raise OSError(errno.EBADF, "planted cancelled metadata batch")
+            else:
+                raise EvidenceInvalid(
+                    "planted batch refill did not overlap the same-level command"
+                )
+            self.batch_completed.set()
+        elif _buffer.batch_frames == 64:
+            self.cached_replays += 1
         parsed = self._metadata(samples_per_channel)
         token = f"metadata-{self.capture_count}".encode()
         self.metadata_by_token[token] = parsed
@@ -517,8 +589,13 @@ class _FakeProbeRadio:
 
     def read_rx_sample_counter_low32(self) -> int:
         current = max(self.sample_counter, self.first_sample)
-        self.sample_counter = current + 256
+        self.sample_counter = current + self.counter_read_step
         return current % (1 << 32)
+
+    def paced_sleep(self, seconds: float) -> None:
+        self.operations.append(("paced_sleep", seconds))
+        if self.sleep_advances_counter:
+            self.sample_counter += round(seconds * self.options.sample_rate_hz)
 
     def close(self) -> None:
         self.closed = True
@@ -558,6 +635,7 @@ def _run_fake(
         radio,
         quality,
         clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
         metadata_parser=radio.parse_metadata,
     )
 
@@ -618,7 +696,6 @@ def _forge_mid_session_event_excursion(
 
 def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     radio = _FakeProbeRadio(tmp_path)
-    radio.block_capture_at = 40
     radio.startup_eagain_remaining = 3
     report, path = _run_fake(radio, _quality(tmp_path))
 
@@ -643,15 +720,35 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     assert not any(
         operation[0] == "hold_buffer_enter" for operation in radio.operations
     )
-    assert len(report["frames"]) == 40
-    assert report["frames"][31]["probe_phase"] == "uncontended_continuity"
+    assert len(report["frames"]) == 64
+    assert report["frames"][31]["probe_phase"] == "fully_pre_command"
     assert report["command_contention"]["command"]["requested_level_db"] == -45.0
-    assert report["command_contention"]["partition"]["fully_post_command_frames"] >= 2
+    partition = report["command_contention"]["partition"]
+    assert partition["fully_pre_command_frames"] >= 32
+    assert partition["fully_post_command_frames"] >= 8
+    bracket = report["command_contention"]["command"]["sample_counter_bracket"]
+    assert bracket["target_offset_frames"] == 40
+    assert bracket["worker_in_flight_at_command"] is True
+    assert bracket["post_open_baseline_sample"] + 40 * 65_536 == bracket[
+        "target_sample"
+    ]
+    assert bracket["last_below_sample"] < bracket["target_sample"] <= bracket[
+        "a_prewrite_sample"
+    ]
+    assert bracket["a_prewrite_sample"] < bracket["c_causal_advance_sample"]
+    assert 2 <= bracket["target_poll_read_count"] <= 64
+    assert any(
+        observation["phase"] == "coarse_sleep"
+        for observation in bracket["target_poll_observations"]
+    )
+    assert bracket["target_total_requested_sleep_samples"] > 0
     assert report["conditioning_anchor_candidate"]["sample_count"] == 8_192
     assert report["conditioning_anchor_candidate"]["byte_count"] == 65_536
     assert len(report["conditioning_anchor_candidate"]["tail_sha256"]) == 64
-    assert radio.blocked_refill.is_set()
-    assert radio.cancel_calls == 1
+    assert radio.batch_inflight.is_set() and radio.batch_completed.is_set()
+    assert radio.core_batch_initiations == 1
+    assert radio.cached_replays == 63
+    assert radio.cancel_calls == 0
     assert radio.startup_eagain_attempts == 3
     assert set(radio.capture_thread_names) == {PROBE_THREAD_NAME}
     assert all(
@@ -659,12 +756,21 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
         for operation in radio.operations
         if operation[0] == "set_tx2_gain"
     )
-    cancel_index = radio.operations.index(("buffer_cancel",))
     close_index = radio.operations.index(("buffer_close",))
     assert any(
-        operation == ("mute", True) for operation in radio.operations[:cancel_index]
+        operation == ("mute", True) for operation in radio.operations[:close_index]
     )
-    assert cancel_index < close_index
+    assert ("wire_close",) in radio.operations
+    assert ("data_pipe_teardown",) not in radio.operations
+    assert report["acquisition"]["configured_batch_frames"] == 64
+    assert report["acquisition"]["configured_batch_cache_bytes"] == 37_749_760
+    assert report["acquisition"]["shutdown_path"] == (
+        "normal_close_after_full_cache_replay"
+    )
+    assert report["memory_policy"]["python_raw"]["maximum_bytes"] == 33_554_432
+    assert report["memory_policy"]["aggregate"][
+        "conservative_capture_upper_bound_bytes"
+    ] == 80_872_448
     assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
     validate_transient_transport_probe_report(report, _quality(tmp_path))
 
@@ -853,9 +959,9 @@ def test_probe_rejects_runtime_evidence_mutations(
 @pytest.mark.parametrize(
     ("frame_index", "visible_event", "expected", "expected_tx_writes"),
     (
-        (10, True, "AUTO session contains a gain transition", 1),
+        (10, True, "AUTO session contains a gain transition", 2),
         (32, True, "AUTO session contains a gain transition", 2),
-        (10, False, "endpoint changed without a visible event", 1),
+        (10, False, "endpoint changed without a visible event", 2),
         (32, False, "endpoint changed without a visible event", 2),
     ),
 )
@@ -882,13 +988,13 @@ def test_probe_rejects_nonstable_mid_and_command_phase_gain_state(
     assert _failure_report(radio)["verdict"] == "invalid"
 
 
-def test_probe_requires_all_32_frames_before_control_reassertion(
+def test_probe_never_commands_after_batch_fails_before_counter_target(
     tmp_path: Path,
 ) -> None:
     radio = _FakeProbeRadio(tmp_path)
-    radio.worker_error_at = 31
+    radio.partial_batch_failure = True
 
-    with pytest.raises(BaseException, match="worker failure"):
+    with pytest.raises(BaseException):
         _run_fake(radio, _quality(tmp_path))
 
     tx_writes = [
@@ -897,7 +1003,138 @@ def test_probe_requires_all_32_frames_before_control_reassertion(
     assert tx_writes == [("set_tx2_gain", -45.0)]
     report = _failure_report(radio)
     assert report["verdict"] == "invalid"
+    assert "partial metadata batch" in report["fatal_error"]
     assert "command_contention" not in report
+    assert radio.cancel_calls == 1
+    assert radio.core_cancel_calls == 1
+    assert radio.cleanup_cancel_calls == 1
+    assert radio.operations.index(("core_batch_cancel",)) < radio.operations.index(
+        ("buffer_cancel",)
+    ) < radio.operations.index(("buffer_close",))
+    assert ("data_pipe_teardown",) in radio.operations
+    assert ("wire_close",) not in radio.operations
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("batch_frames_readback_offset", "batch_cache_readback_offset"),
+)
+def test_probe_rejects_batch_configuration_attestation_mismatch(
+    tmp_path: Path, field: str
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    setattr(radio, field, 1)
+
+    with pytest.raises(BaseException, match="batch64 cache attestation"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    assert radio.operations.index(("buffer_cancel",)) < radio.operations.index(
+        ("buffer_close",)
+    )
+
+
+def test_fake_batch_poison_is_ebadf_and_fresh_session_recovers(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    quality = _quality(tmp_path)
+    request = probe_module._probe_auto_request(
+        quality, TransientTransportProbeOptions()
+    )
+    radio.partial_batch_failure = True
+    with radio.buffer(
+        "metadata",
+        8,
+        65_536,
+        tandem_request=request,
+        batch_frames=64,
+    ) as (buffer, metadata_abi):
+        assert metadata_abi == 2
+        assert buffer.batch_frames == 64
+        assert buffer.batch_cache_bytes == 37_749_760
+        with pytest.raises(OSError) as initiating:
+            radio.capture_iq(buffer, metadata=True, samples_per_channel=65_536)
+        assert initiating.value.errno == errno.EIO
+        with pytest.raises(OSError) as future:
+            radio.capture_iq(buffer, metadata=True, samples_per_channel=65_536)
+        assert future.value.errno == errno.EBADF
+        buffer.cancel()
+
+    radio.partial_batch_failure = False
+    with radio.buffer(
+        "metadata",
+        8,
+        65_536,
+        tandem_request=request,
+        batch_frames=64,
+    ) as (fresh, metadata_abi):
+        assert metadata_abi == 2
+        radio.command_reasserted.set()
+        for _ in range(64):
+            raw, token, _refill_ns = radio.capture_iq(
+                fresh, metadata=True, samples_per_channel=65_536
+            )
+            assert len(raw) == 65_536 * 8
+            assert token is not None
+
+    assert radio.future_poison_refills == 1
+    assert radio.core_batch_initiations == 2
+    assert radio.cached_replays == 63
+    assert radio.core_cancel_calls == 1
+    assert radio.cleanup_cancel_calls == 1
+    assert radio.operations.index(("core_batch_cancel",)) < radio.operations.index(
+        ("poison_refill_ebadf",)
+    ) < radio.operations.index(("buffer_cancel",)) < radio.operations.index(
+        ("buffer_close",)
+    )
+
+
+def test_probe_rejects_counter_target_overshoot_before_same_level_write(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.counter_read_step = 50_000
+
+    with pytest.raises(BaseException, match="target overshoot"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    assert radio.cancel_calls == 1
+
+
+def test_probe_rejects_excessive_target_polling_without_command(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.counter_read_step = 1
+    radio.sleep_advances_counter = False
+
+    with pytest.raises(BaseException, match="64-read polling budget"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    assert radio.cancel_calls == 1
+
+
+def test_probe_requires_eight_fully_post_frames_in_the_same_batch(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.sample_counter = radio.first_sample + 20 * 65_536
+
+    with pytest.raises(BaseException, match="fully post-command frames"):
+        _run_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    assert len(report["frames"]) == 64
+    assert report["verdict"] == "invalid"
 
 
 def test_probe_max_gain_start_keeps_first_frame_transition_gate_fatal(
@@ -912,7 +1149,7 @@ def test_probe_max_gain_start_keeps_first_frame_transition_gate_fatal(
     assert radio.auto_request_initial_gain_db == 62
     assert [
         operation for operation in radio.operations if operation[0] == "set_tx2_gain"
-    ] == [("set_tx2_gain", -45.0)]
+    ] == [("set_tx2_gain", -45.0), ("set_tx2_gain", -45.0)]
     failure = _failure_report(radio)
     assert failure["frames"] == []
     assert "unrepresented prior transitions" in failure["fatal_error"]
@@ -1076,10 +1313,9 @@ def test_probe_rejects_tone_below_configured_level_gate(tmp_path: Path) -> None:
 
     report = _failure_report(radio)
     assert report["verdict"] == "invalid"
-    assert len(report["frames"]) == 40
-    assert radio.operations.index(("buffer_cancel",)) < radio.operations.index(
-        ("buffer_close",)
-    )
+    assert len(report["frames"]) == 64
+    assert ("buffer_cancel",) not in radio.operations
+    assert ("wire_close",) in radio.operations
 
 
 def test_probe_groups_acquisition_mute_cancel_and_close_failures(
@@ -1114,7 +1350,7 @@ def test_probe_groups_acquisition_mute_cancel_and_close_failures(
 
 def test_probe_worker_error_after_final_frame_is_not_discarded(tmp_path: Path) -> None:
     radio = _FakeProbeRadio(tmp_path)
-    radio.worker_error_at = 40
+    radio.worker_error_at = 63
     with pytest.raises(BaseException, match="worker failure"):
         _run_fake(radio, _quality(tmp_path))
     assert _failure_report(radio)["verdict"] == "invalid"
@@ -1134,6 +1370,7 @@ def test_serial_probe_persists_verified_cleanup(tmp_path: Path) -> None:
         _quality(tmp_path),
         radio_factory=lambda _iio, _options: radio,
         clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
         metadata_parser=radio.parse_metadata,
     )
     assert report["cleanup"]["verified"] is True
@@ -1151,6 +1388,7 @@ def test_serial_close_failure_invalidates_durable_qualification(tmp_path: Path) 
             _quality(tmp_path),
             radio_factory=lambda _iio, _options: radio,
             clock_ns=_Clock(),
+            sleep=radio.paced_sleep,
             metadata_parser=radio.parse_metadata,
         )
     report = _failure_report(radio)
@@ -1214,7 +1452,17 @@ def test_report_validator_rejects_planted_mutations(tmp_path: Path) -> None:
             mutated(
                 lambda value: value["command_contention"]["command"][
                     "sample_counter_bracket"
-                ].update(raw_post_write_causal=-1)
+                ].update(raw_c_causal_advance=-1)
+            ),
+            mutated(
+                lambda value: value["command_contention"]["command"][
+                    "sample_counter_bracket"
+                ].update(target_sample=0)
+            ),
+            mutated(
+                lambda value: value["command_contention"]["partition"].update(
+                    fully_pre_command_frames=31
+                )
             ),
             mutated(
                 lambda value: value["command_contention"]["command"].update(
@@ -1225,6 +1473,16 @@ def test_report_validator_rejects_planted_mutations(tmp_path: Path) -> None:
                 lambda value: value["safety"].update(strong_tx_write_permitted=True)
             ),
             mutated(lambda value: value["acquisition"].update(discarded_tail_frames=6)),
+            mutated(
+                lambda value: value["acquisition"].update(
+                    configured_batch_cache_bytes=1
+                )
+            ),
+            mutated(
+                lambda value: value["memory_policy"]["aggregate"].update(
+                    conservative_capture_upper_bound_bytes=1
+                )
+            ),
             mutated(
                 lambda value: value["weak_signal_quality"]["conditioning_anchor"][
                     "analysis"
@@ -1294,6 +1552,7 @@ def test_cleanup_validator_rejects_unsafe_durable_readbacks(tmp_path: Path) -> N
         _quality(tmp_path),
         radio_factory=lambda _iio, _options: radio,
         clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
         metadata_parser=radio.parse_metadata,
     )
     forged = copy.deepcopy(report)
@@ -1331,7 +1590,7 @@ def test_probe_setup_failure_mutes_and_cancels_before_close(
         def __init__(self, *_args: Any, **_kwargs: Any) -> None:
             raise RuntimeError("planted pump construction failure")
 
-    monkeypatch.setattr(probe_module, "_TandemCapturePump", FailingPump)
+    monkeypatch.setattr(probe_module, "_ProbeBatchCaptureWorker", FailingPump)
     with pytest.raises(BaseException, match="pump construction failure"):
         _run_fake(radio, _quality(tmp_path))
     cancel_index = radio.operations.index(("buffer_cancel",))
@@ -1346,13 +1605,13 @@ def test_probe_start_failure_mutes_and_cancels_before_close(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     radio = _FakeProbeRadio(tmp_path)
-    base_pump = probe_module._TandemCapturePump
+    base_pump = probe_module._ProbeBatchCaptureWorker
 
     class FailingStartPump(base_pump):
         def start(self) -> None:
             raise RuntimeError("planted pump start failure")
 
-    monkeypatch.setattr(probe_module, "_TandemCapturePump", FailingStartPump)
+    monkeypatch.setattr(probe_module, "_ProbeBatchCaptureWorker", FailingStartPump)
     with pytest.raises(BaseException, match="pump start failure"):
         _run_fake(radio, _quality(tmp_path))
 
@@ -1367,19 +1626,21 @@ def test_probe_start_failure_mutes_and_cancels_before_close(
     assert cancel_index < close_index
 
 
-def test_probe_binds_command_prefix_to_live_pump_queue_capacity(
+def test_probe_binds_live_worker_queue_to_exact_python_memory_ledger(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     radio = _FakeProbeRadio(tmp_path)
-    base_pump = probe_module._TandemCapturePump
+    base_pump = probe_module._ProbeBatchCaptureWorker
 
     class WrongQueueCapacityPump(base_pump):
         @property
         def queue_capacity_frames(self) -> int:
             return 3
 
-    monkeypatch.setattr(probe_module, "_TandemCapturePump", WrongQueueCapacityPump)
-    with pytest.raises(BaseException, match="command prefix differs"):
+    monkeypatch.setattr(
+        probe_module, "_ProbeBatchCaptureWorker", WrongQueueCapacityPump
+    )
+    with pytest.raises(BaseException, match="exact Python memory ledger"):
         _run_fake(radio, _quality(tmp_path))
 
     assert [
@@ -1396,7 +1657,7 @@ def test_probe_binds_command_prefix_to_live_pump_queue_capacity(
 
 def test_probe_options_are_not_relaxable(tmp_path: Path) -> None:
     radio = _FakeProbeRadio(tmp_path)
-    relaxed = TransientTransportProbeOptions(continuity_frames=31)
+    relaxed = TransientTransportProbeOptions(fully_pre_command_frames=31)
     with pytest.raises(ValueError, match="frozen"):
         run_transient_transport_probe(radio, _quality(tmp_path), probe=relaxed)
     unstable_start = TransientTransportProbeOptions(auto_initial_gain_db=40)

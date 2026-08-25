@@ -115,6 +115,7 @@ class TransientRadioTransport(Protocol):
         samples_per_channel: int,
         *,
         tandem_request: bytes | None = None,
+        batch_frames: int = 1,
     ) -> Any: ...
 
     def capture_iq(

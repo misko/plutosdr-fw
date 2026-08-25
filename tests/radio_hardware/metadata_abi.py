@@ -580,9 +580,14 @@ def create_metadata_buffer(
     *,
     metadata_capacity: int = 64 * 1024,
     tandem_request: Optional[bytes] = None,
+    batch_frames: int = 1,
 ) -> tuple[Any, int]:
     """Open either metadata ABI without silently falling back to ordinary IIO."""
 
+    if isinstance(batch_frames, bool) or not isinstance(batch_frames, int):
+        raise TypeError("metadata batch frame count must be an integer")
+    if not 1 <= batch_frames <= 64:
+        raise ValueError("metadata batch frame count must be in [1, 64]")
     buffer_type = getattr(iio_module, "MetadataBuffer", None)
     if buffer_type is None:
         raise RuntimeError(
@@ -597,8 +602,13 @@ def create_metadata_buffer(
                 samples_per_channel,
                 request,
                 metadata_capacity=metadata_capacity,
+                batch_frames=batch_frames,
             ),
             abi,
+        )
+    if batch_frames != 1:
+        raise RuntimeError(
+            "metadata batching requires request ABI 2 and cannot use the legacy ABI"
         )
     return (
         buffer_type(
