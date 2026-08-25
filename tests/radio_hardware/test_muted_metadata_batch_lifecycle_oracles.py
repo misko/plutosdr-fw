@@ -59,7 +59,7 @@ _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE = lifecycle._attest_device_firmware_lineage
 
 @pytest.fixture(autouse=True)
 def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
-    """Model the eventual committed blobs while this frozen patch is uncommitted."""
+    """Model committed runner and protected libiio provenance without host paths."""
 
     repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
     original = lifecycle._git_bytes
@@ -70,13 +70,33 @@ def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
     }
 
     def fake_git(observed_repository, *arguments):
-        if pathlib.Path(observed_repository) == repository:
+        observed_repository = pathlib.Path(observed_repository)
+        if observed_repository == repository:
             if arguments == ("status", "--porcelain", "--untracked-files=no"):
                 return b""
             if arguments and arguments[0] == "show":
                 relative = arguments[1].split(":", 1)[1]
                 if relative in protected:
                     return (repository / relative).read_bytes()
+        if (
+            observed_repository.name == "attested-fixture-libiio-source"
+            and observed_repository.is_relative_to(tmp_path)
+        ):
+            if arguments in {
+                ("rev-parse", "HEAD"),
+                (
+                    "rev-parse",
+                    f"refs/tags/{lifecycle.EXACT_LIBIIO_TAG}^{{commit}}",
+                ),
+            }:
+                return f"{EXACT_LIBIIO_COMMIT}\n".encode()
+            if arguments == ("status", "--porcelain", "--untracked-files=no"):
+                return b""
+            if arguments == (
+                "show",
+                f"{EXACT_LIBIIO_COMMIT}:bindings/python/iio.py",
+            ):
+                return (observed_repository / "bindings/python/iio.py").read_bytes()
         return original(observed_repository, *arguments)
 
     monkeypatch.setattr(lifecycle, "_git_bytes", fake_git)
@@ -1208,7 +1228,10 @@ def _valid_report(tmp_path):
     ]
     metadata_artifacts = lifecycle._new_metadata_artifact_manifest(captures)
     lifecycle._write_metadata_artifacts(output_path, captures, metadata_artifacts)
-    libiio_source = pathlib.Path("/home/mouse9911/gits/libiio").resolve()
+    libiio_source = (tmp_path / "attested-fixture-libiio-source").resolve()
+    pylibiio = libiio_source / "bindings/python/iio.py"
+    pylibiio.parent.mkdir(parents=True, exist_ok=True)
+    pylibiio.write_bytes(b"attested fixture pylibiio")
     libiio_build = tmp_path / "libiio-build"
     libiio_build.mkdir()
     library = libiio_build / "libiio.so.0.25"
