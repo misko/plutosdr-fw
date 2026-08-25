@@ -159,6 +159,7 @@ class _FakeProbeRadio:
         self.bad_threshold_provenance_at: int | None = None
         self.bad_initial_gain_at: int | None = None
         self.auto_initial_endpoint_offset = 0
+        self.nonmax_endpoint_without_event_at: int | None = None
         self.first_unrepresented_transitions = 0
         self.readback_offset_db = 0.0
         self.first_sample = 10_000_000
@@ -409,6 +410,8 @@ class _FakeProbeRadio:
         if self.hidden_transition_at == index:
             self.gain_index -= 1
             self.transition_count += 1
+        if self.nonmax_endpoint_without_event_at == index:
+            self.gain_index = 64
 
         features = _REQUIRED_FEATURES
         flags = _REQUIRED_FLAGS
@@ -564,6 +567,55 @@ def _failure_report(radio: _FakeProbeRadio) -> dict[str, Any]:
     return json.loads(radio._report_path.read_text(encoding="utf-8"))
 
 
+def _forge_mid_session_event_excursion(
+    report: dict[str, Any], *, spacing_samples: int
+) -> dict[str, Any]:
+    forged = copy.deepcopy(report)
+    frames = forged["frames"]
+    event_frame_index = 10
+    event_frame = frames[event_frame_index]
+    first_sample = event_frame["first_sample_sequence"]
+    directions = (
+        TandemEventDirection.DECREASE,
+        TandemEventDirection.INCREASE,
+    )
+    reasons = (
+        TandemEventReason.LARGE_ADC_OVERLOAD,
+        TandemEventReason.BOTH_LOW_POWER,
+    )
+    gains = (64, 65)
+    events = []
+    for index, (direction, reason, gain) in enumerate(
+        zip(directions, reasons, gains, strict=True)
+    ):
+        events.append(
+            {
+                "sample_sequence": first_sample + 256 + index * spacing_samples,
+                "event_sequence": index,
+                "flags": (int(direction) << 4) | int(reason),
+                "direction": int(direction),
+                "direction_name": direction.name.lower(),
+                "reason": int(reason),
+                "reason_name": reason.name.lower(),
+                "rx1_gain_index": gain,
+                "rx2_gain_index": gain,
+            }
+        )
+    for index, frame in enumerate(frames[event_frame_index:], start=event_frame_index):
+        frame["metadata"].update(
+            tandem_transition_count=2,
+            event_count=2 if index == event_frame_index else 0,
+            gain_events=events if index == event_frame_index else [],
+        )
+        frame["continuity"].update(
+            transition_count_delta=2 if index == event_frame_index else 0,
+            visible_event_count=2 if index == event_frame_index else 0,
+        )
+    for name in ("initial_stable_suffix", "final_stable_suffix"):
+        forged[name]["transition_count"] = 2
+    return forged
+
+
 def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     radio = _FakeProbeRadio(tmp_path)
     radio.block_capture_at = 40
@@ -578,6 +630,13 @@ def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
     assert report["metadata_request"]["decoded"]["initial_gain_db"] == 62
     assert report["evidence_policy"]["auto_initial_gain_db"] == 62
     assert all(frame["metadata"]["initial_gain_db"] == 62 for frame in report["frames"])
+    assert all(
+        frame["metadata"]["tandem_transition_count"] == 0
+        and frame["metadata"]["event_count"] == 0
+        and frame["metadata"]["bench_gain_indices"]
+        == [frame["metadata"]["gain_index_range"][1]] * 2
+        for frame in report["frames"]
+    )
     assert report["stale_fifo_normalization"]["action"] == "not_required"
     assert report["stale_fifo_normalization"]["stale_fifo_events"] == 0
     assert report["stale_fifo_normalization"]["hold_session"] is None
@@ -773,7 +832,6 @@ def test_probe_hold_close_failure_is_muted_and_never_arms_tx(tmp_path: Path) -> 
             "differs from its request",
         ),
         (lambda radio: setattr(radio, "worker_error_at", 31), "worker failure"),
-        (lambda radio: radio.visible_event_at.add(30), "gain event"),
         (lambda radio: setattr(radio, "readback_offset_db", 0.5), "readback"),
     ),
 )
@@ -790,6 +848,38 @@ def test_probe_rejects_runtime_evidence_mutations(
     assert report["verdict"] == "invalid"
     assert report["release_pass_eligible"] is False
     assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
+
+
+@pytest.mark.parametrize(
+    ("frame_index", "visible_event", "expected", "expected_tx_writes"),
+    (
+        (10, True, "AUTO session contains a gain transition", 1),
+        (32, True, "AUTO session contains a gain transition", 2),
+        (10, False, "endpoint changed without a visible event", 1),
+        (32, False, "endpoint changed without a visible event", 2),
+    ),
+)
+def test_probe_rejects_nonstable_mid_and_command_phase_gain_state(
+    tmp_path: Path,
+    frame_index: int,
+    visible_event: bool,
+    expected: str,
+    expected_tx_writes: int,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    if visible_event:
+        radio.visible_event_at.add(frame_index)
+    else:
+        radio.nonmax_endpoint_without_event_at = frame_index
+
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+
+    tx_writes = [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ]
+    assert len(tx_writes) == expected_tx_writes
+    assert _failure_report(radio)["verdict"] == "invalid"
 
 
 def test_probe_requires_all_32_frames_before_control_reassertion(
@@ -903,15 +993,22 @@ def test_report_validator_rejects_forged_event_cooldown_spacing(
     tmp_path: Path,
 ) -> None:
     radio = _FakeProbeRadio(tmp_path)
-    radio.dense_events_at = 10
-    radio.dense_event_count = 2
-    radio.dense_event_spacing_samples = 17_408
     report, _path = _run_fake(radio, _quality(tmp_path))
-
-    forged = copy.deepcopy(report)
-    events = forged["frames"][10]["metadata"]["gain_events"]
-    events[1]["sample_sequence"] = events[0]["sample_sequence"] + 1
+    forged = _forge_mid_session_event_excursion(report, spacing_samples=1)
     with pytest.raises(EvidenceInvalid, match="cooldown spacing"):
+        validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_report_validator_rejects_self_consistent_visible_event_excursion(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    forged = _forge_mid_session_event_excursion(report, spacing_samples=17_408)
+
+    with pytest.raises(
+        EvidenceInvalid, match="AUTO session contains a gain transition"
+    ):
         validate_transient_transport_probe_report(forged, _quality(tmp_path))
 
 

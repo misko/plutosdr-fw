@@ -538,6 +538,20 @@ def _validate_probe_metadata(
         session_provenance.update(current_provenance)
     elif current_provenance != session_provenance:
         raise EvidenceInvalid("transport probe metadata provenance changed in session")
+    if metadata.tandem_transition_count != 0 or metadata.gain_events:
+        raise EvidenceInvalid(
+            "transport probe AUTO session contains a gain transition: "
+            f"frame={frame_index}, "
+            f"transition_count={metadata.tandem_transition_count}, "
+            f"visible_events={len(metadata.gain_events)}"
+        )
+    if metadata.bench_gain_indices != (
+        metadata.maximum_gain_index,
+        metadata.maximum_gain_index,
+    ):
+        raise EvidenceInvalid(
+            f"transport probe frame {frame_index} is not at the maximum-gain endpoint"
+        )
 
 
 def _stable_suffix(
@@ -840,8 +854,9 @@ def _evidence_policy(probe: TransientTransportProbeOptions) -> dict[str, Any]:
             "start at the maximum-gain clamp so the weak-only session has no "
             "expected startup increase; any observed startup transition remains fatal"
         ),
-        "stable_suffix_endpoint": (
-            "paired maximum_gain_index with zero gain events in both required suffixes"
+        "all_returned_frame_gain_state": (
+            "transition_count=0, event_count=0, and paired maximum_gain_index "
+            "for every retained frame"
         ),
         "uncontended_consecutive_frames": probe.continuity_frames,
         "same_level_command_observation_frames": probe.command_observation_frames,
@@ -2229,12 +2244,12 @@ def _validate_transient_transport_probe_report_impl(
             minimum_gain <= endpoint_pair[0] <= maximum_gain
         ):
             raise EvidenceInvalid("transport probe endpoint is invalid")
-        if prior_metadata is None and endpoint_pair != (
+        if endpoint_pair != (
             maximum_gain,
             maximum_gain,
         ):
             raise EvidenceInvalid(
-                "transport probe first frame is not at the maximum-gain endpoint"
+                f"transport probe frame {index} is not at the maximum-gain endpoint"
             )
         current_provenance = (
             features,
@@ -2374,6 +2389,10 @@ def _validate_transient_transport_probe_report_impl(
                 "transition_count_delta": transition_delta,
                 "initial_unrepresented_transition_count": 0,
             }
+            if transition_count != 0 or event_count != 0:
+                raise EvidenceInvalid(
+                    "transport probe AUTO session contains a gain transition"
+                )
         for key, expected in expected_continuity.items():
             if continuity.get(key) != expected:
                 raise EvidenceInvalid(

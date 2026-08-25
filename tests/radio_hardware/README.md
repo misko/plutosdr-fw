@@ -249,10 +249,11 @@ The probe's AUTO request is deliberately initialized at the configured maximum
 gain (`62 dB`) while the muted HOLD normalization and final manual restoration
 remain at `40 dB`. At the qualified `-45 dB` weak rung this removes expected
 startup INCREASE decisions: the first frame must be transition-free at the
-paired maximum gain-table endpoint, and both required stable suffixes must
-remain event-free at that endpoint. Any represented or hidden startup event is
-still fatal. Every hardware retry must use a fresh output directory so an
-earlier invalid artifact cannot be mistaken for the new attempt.
+paired maximum gain-table endpoint, and all 40 retained frames must keep
+transition count zero, contain no events, and remain paired at that endpoint.
+Any represented or hidden transition is still fatal. Every hardware retry must
+use a fresh output directory so an earlier invalid artifact cannot be mistaken
+for the new attempt.
 
 Run the probe through the pinned-libiio launcher:
 
