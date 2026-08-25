@@ -849,6 +849,26 @@ def _rewrite_tandem_metadata_sidecar(
     _refresh_tandem_manifest_digest(tandem)
 
 
+def _rewrite_tandem_temperatures(
+    report: dict[str, Any],
+    work_dir: Path,
+    temperatures: dict[int, int | None],
+) -> None:
+    tandem = _tandem_mode(report)
+    for frame_index, temperature in temperatures.items():
+        frame = tandem["batch_frames"][frame_index]
+        parsed = parse_tandem_frame_metadata(
+            (work_dir / frame["raw_metadata_path"]).read_bytes()
+        )
+        _rewrite_tandem_metadata_sidecar(
+            report,
+            work_dir,
+            frame_index=frame_index,
+            metadata=replace(parsed, ad9361_temperature_mdeg_c=temperature),
+        )
+    _refresh_tandem_projection_claim(report, work_dir)
+
+
 def _plant_tandem_directional_undo(
     report: dict[str, Any], work_dir: Path, *, response: str
 ) -> None:
@@ -1026,6 +1046,42 @@ def test_runtime_generated_v2_transient_passes_production_validator(
     assert validated.verdict == "pass"
     assert validated.cleanup_verified is True
     assert validated.summary["mode_count"] == len(TRANSIENT_MODES)
+
+
+def test_production_validator_accepts_only_leading_temperature_omissions(
+    tmp_path: Path,
+) -> None:
+    options, spec, work_dir, report_path, report = _generated_v2_transient_fixture(
+        tmp_path / "leading-temperature-omission"
+    )
+    _rewrite_tandem_temperatures(report, work_dir, {0: None, 1: None})
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+
+    validated = production_validator(options)(spec, report_path, work_dir)
+
+    assert validated.cleanup_verified is True
+
+
+@pytest.mark.parametrize(
+    "temperatures",
+    (
+        {2: None},
+        {index: None for index in range(64)},
+        {0: 125_001},
+        {0: -40_001},
+    ),
+)
+def test_production_validator_rejects_invalid_temperature_sessions(
+    tmp_path: Path, temperatures: dict[int, int | None]
+) -> None:
+    options, spec, work_dir, report_path, report = _generated_v2_transient_fixture(
+        tmp_path / f"invalid-temperature-{len(temperatures)}-{next(iter(temperatures))}"
+    )
+    _rewrite_tandem_temperatures(report, work_dir, temperatures)
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+
+    with pytest.raises(ReleaseCliError):
+        production_validator(options)(spec, report_path, work_dir)
 
 
 def test_release_validator_recomputes_whole_window_stable_suffix(

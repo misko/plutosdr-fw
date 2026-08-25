@@ -126,6 +126,8 @@ _TANDEM_BATCH_MAX_CAUSAL_UNCERTAINTY_SAMPLES = 16_384
 _TANDEM_BATCH_MAX_OBSERVATIONS_PER_FRAME = 5
 _TANDEM_BATCH_MAX_EVENTS_PER_FRAME = 4
 _TANDEM_BATCH_MINIMUM_EVENT_SPACING_SAMPLES = 17_408
+_TANDEM_BATCH_MINIMUM_TEMPERATURE_MDEG_C = -40_000
+_TANDEM_BATCH_MAXIMUM_TEMPERATURE_MDEG_C = 125_000
 _TANDEM_BATCH_MAX_CORE_CACHE_BYTES = 64 * 1_024 * 1_024
 _TANDEM_BATCH_MAX_PYTHON_RAW_BYTES = 32 * 1_024 * 1_024
 _TANDEM_BATCH_MAX_AGGREGATE_BYTES = 96 * 1_024 * 1_024
@@ -3167,6 +3169,9 @@ def _transient_batch_frame_errors(
     threshold_provenance: int | None = None
     metadata_features: int | None = None
     gain_index_range: tuple[int, int] | None = None
+    temperature_valid_seen = False
+    temperature_valid_count = 0
+    temperature_omission_count = 0
     required_flags = (
         FLAG_SAMPLE_SEQUENCE_VALID
         | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
@@ -3470,10 +3475,26 @@ def _transient_batch_frame_errors(
             or metadata.get("observation_count")
             > _TANDEM_BATCH_MAX_OBSERVATIONS_PER_FRAME
             or len(events) > _TANDEM_BATCH_MAX_EVENTS_PER_FRAME
-            or type(metadata.get("temperature_mdeg_c")) is not int
         ):
             errors.append(f"{context} metadata counters or gains are malformed")
             continue
+        temperature = metadata.get("temperature_mdeg_c")
+        if temperature is None:
+            if temperature_valid_seen:
+                errors.append(
+                    f"{context} temperature became unavailable after a valid sample"
+                )
+            temperature_omission_count += 1
+        elif (
+            not _release_exact_int(temperature)
+            or not _TANDEM_BATCH_MINIMUM_TEMPERATURE_MDEG_C
+            <= temperature
+            <= _TANDEM_BATCH_MAXIMUM_TEMPERATURE_MDEG_C
+        ):
+            errors.append(f"{context} temperature violates provider provenance")
+        else:
+            temperature_valid_seen = True
+            temperature_valid_count += 1
         if threshold_provenance is None:
             threshold_provenance = int(current_provenance)
         elif current_provenance != threshold_provenance:
@@ -3644,6 +3665,11 @@ def _transient_batch_frame_errors(
             errors.append(f"{context} endpoint changed without an event")
         previous_metadata = metadata
 
+    if (
+        temperature_valid_count < 1
+        or temperature_valid_count + temperature_omission_count != _TANDEM_BATCH_FRAMES
+    ):
+        errors.append("transient tandem batch lacks valid temperature evidence")
     return errors, typed_frames
 
 

@@ -95,6 +95,8 @@ _GAIN_OBSERVATION = struct.Struct("<QQIHBBbbHI")
 _GAIN_OBSERVATION_FLAGS = 0x0003
 _GAIN_OBSERVATION_CAPACITY = 64
 _PROVIDER_OBSERVATION_INTERVAL_SAMPLES = _FRAME_SAMPLES // 4
+_MINIMUM_TEMPERATURE_MDEG_C = -40_000
+_MAXIMUM_TEMPERATURE_MDEG_C = 125_000
 assert _GAIN_OBSERVATION.size == GAIN_OBSERVATION_BYTES
 _REQUIRED_FEATURES = (
     FEATURE_AD9361_TEMPERATURE
@@ -756,7 +758,6 @@ def _validate_metadata(
         or metadata.threshold_provenance != _expected_threshold_provenance(quality)
         or metadata.rx1_gain_index != metadata.maximum_gain_index
         or metadata.rx2_gain_index != metadata.maximum_gain_index
-        or type(metadata.ad9361_temperature_mdeg_c) is not int
     ):
         _fail(f"frame {index} metadata violates the weak transport contract")
     if first is None:
@@ -943,6 +944,27 @@ def _load_frames(
         typed.append(frame)
         raw_frames.append(raw)
         parsed.append(metadata)
+    temperature_valid_seen = False
+    temperature_valid_count = 0
+    for index, metadata in enumerate(parsed):
+        temperature = metadata.ad9361_temperature_mdeg_c
+        if temperature is None:
+            if temperature_valid_seen:
+                _fail(
+                    f"frame {index} temperature became unavailable after a valid sample"
+                )
+            continue
+        if (
+            type(temperature) is not int
+            or not _MINIMUM_TEMPERATURE_MDEG_C
+            <= temperature
+            <= _MAXIMUM_TEMPERATURE_MDEG_C
+        ):
+            _fail(f"frame {index} temperature violates provider provenance")
+        temperature_valid_seen = True
+        temperature_valid_count += 1
+    if temperature_valid_count < 1:
+        _fail("weak batch lacks valid temperature evidence")
     _inventory(root, serial)
     return typed, raw_frames, parsed
 

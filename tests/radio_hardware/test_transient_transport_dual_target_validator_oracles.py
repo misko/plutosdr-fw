@@ -15,7 +15,7 @@ from typing import Any
 import pytest
 
 from .experiment import EvidenceInvalid
-from .metadata_abi import GAIN_OBSERVATION_BYTES, V5_PREFIX_BYTES
+from .metadata_abi import GAIN_OBSERVATION_BYTES, V3_PREFIX_BYTES, V5_PREFIX_BYTES
 from .test_transient_transport_probe_oracles import (
     _alternating_window_tone_raw,
     _DualTargetFakeRadio,
@@ -136,6 +136,22 @@ def _rewrite_observation(
     _OBSERVATION.pack_into(payload, offset, *values)
 
 
+def _rewrite_temperature(
+    report: dict[str, Any], root: Path, *, frame_index: int, value: int | None
+) -> None:
+    frame = report["mode_evidence"]["batch_frames"][frame_index]
+    path = root / frame["raw_metadata_path"]
+    payload = bytearray(path.read_bytes())
+    struct.pack_into(
+        "<i", payload, V3_PREFIX_BYTES + 40, -(1 << 31) if value is None else value
+    )
+    _rewrite_crc(payload)
+    path.write_bytes(payload)
+    frame["raw_metadata_sha256"] = hashlib.sha256(payload).hexdigest()
+    frame["metadata"]["temperature_mdeg_c"] = value
+    _refresh_report(report)
+
+
 def _reject_raw_mutation(
     base: dict[str, Any],
     quality: Any,
@@ -183,6 +199,29 @@ def test_generated_pending_report_is_durably_valid(
 ) -> None:
     report, quality, probe, root = valid_pending
     _validate(report, quality, probe, root)
+
+
+def test_dual_target_validator_accepts_only_leading_temperature_omissions(
+    valid_pending: tuple[dict[str, Any], Any, TransientTransportProbeOptions, Path],
+) -> None:
+    base, quality, probe, root = valid_pending
+    report = copy.deepcopy(base)
+    paths = [
+        root / report["mode_evidence"]["batch_frames"][index]["raw_metadata_path"]
+        for index in (0, 1, 3)
+    ]
+    originals = [path.read_bytes() for path in paths]
+    try:
+        _rewrite_temperature(report, root, frame_index=0, value=None)
+        _rewrite_temperature(report, root, frame_index=1, value=None)
+        _validate(report, quality, probe, root)
+
+        _rewrite_temperature(report, root, frame_index=3, value=None)
+        with pytest.raises(EvidenceInvalid):
+            _validate(report, quality, probe, root)
+    finally:
+        for path, payload in zip(paths, originals, strict=True):
+            path.write_bytes(payload)
 
 
 def test_self_consistent_raw_observation_prefix_and_mask_mutations_are_rejected(

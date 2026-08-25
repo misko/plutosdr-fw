@@ -164,7 +164,11 @@ def _metadata_wire(metadata: Any) -> bytes:
         metadata.maximum_gain_index,
         metadata.rx1_gain_index,
         metadata.rx2_gain_index,
-        metadata.ad9361_temperature_mdeg_c,
+        (
+            -(1 << 31)
+            if metadata.ad9361_temperature_mdeg_c is None
+            else metadata.ad9361_temperature_mdeg_c
+        ),
         0,
         0,
         0,
@@ -238,6 +242,7 @@ class _FakeRadio:
         self.metadata_features_override: int | None = None
         self.metadata_observation_count_override: int | None = None
         self.metadata_threshold_provenance_override: int | None = None
+        self.metadata_temperature_overrides: dict[int, int | None] = {}
         self.metadata_amplitude_overrides: dict[int, float] = {}
         self.metadata_alternating_amplitude_capture_indices: set[int] = set()
         self.plant_too_close_event_pair = False
@@ -555,7 +560,9 @@ class _FakeRadio:
                 if self.metadata_threshold_provenance_override is None
                 else self.metadata_threshold_provenance_override
             ),
-            ad9361_temperature_mdeg_c=35_000,
+            ad9361_temperature_mdeg_c=self.metadata_temperature_overrides.get(
+                self.metadata_capture_count, 35_000
+            ),
             event_count=len(events),
             gain_events=events,
         )
@@ -1168,6 +1175,47 @@ def test_tandem_metadata_flags_features_and_physics_are_live_gates(
         "maximum_events_per_frame": 4,
         "minimum_event_spacing_samples": 17_408,
     }
+
+
+def test_tandem_temperature_allows_only_a_leading_startup_omission(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.metadata_temperature_overrides = {0: None, 1: None}
+
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
+    temperatures = [
+        frame["metadata"]["temperature_mdeg_c"]
+        for frame in tandem["batch_frames"]
+    ]
+    assert temperatures[:3] == [None, None, 35_000]
+    assert temperatures.count(None) == 2
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    (
+        ({2: None}, "became unavailable after its first valid sample"),
+        (
+            {index: None for index in range(64)},
+            "lacks one complete valid temperature session",
+        ),
+        ({0: 125_001}, "outside provider provenance"),
+        ({0: -40_001}, "outside provider provenance"),
+    ),
+)
+def test_tandem_temperature_rejects_late_missing_all_missing_and_out_of_range(
+    tmp_path: Path,
+    overrides: dict[int, int | None],
+    message: str,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.metadata_temperature_overrides = overrides
+
+    with pytest.raises(EvidenceInvalid, match=message):
+        _run_fake(radio, _quality(tmp_path))
 
 
 @pytest.mark.parametrize(

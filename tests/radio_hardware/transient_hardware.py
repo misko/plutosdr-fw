@@ -176,6 +176,8 @@ _TANDEM_REQUIRED_METADATA_FEATURES = (
 # fail closed for a release qualification.
 _TANDEM_KNOWN_METADATA_FEATURES = (1 << 10) - 1
 _TANDEM_METADATA_HEADER_BYTES = 180 + 64 * 32 + 64 * 16 + 4
+_TANDEM_MINIMUM_TEMPERATURE_MDEG_C = -40_000
+_TANDEM_MAXIMUM_TEMPERATURE_MDEG_C = 125_000
 
 
 class _TandemBatchProfile(Enum):
@@ -648,6 +650,64 @@ class _CaptureState:
     hidden_transition_count: int = 0
     event_sequence_hole_count: int = 0
     last_frame_continuity: dict[str, Any] = field(default_factory=dict)
+    temperature_valid_seen: bool = False
+    temperature_valid_count: int = 0
+    temperature_omission_count: int = 0
+    temperature_first_valid_ordinal: int | None = None
+    temperature_minimum_valid_mdeg_c: int | None = None
+    temperature_maximum_valid_mdeg_c: int | None = None
+
+
+def _observe_tandem_temperature(
+    metadata: TandemFrameMetadata, *, state: _CaptureState
+) -> None:
+    temperature = metadata.ad9361_temperature_mdeg_c
+    if temperature is None:
+        if state.temperature_valid_seen:
+            raise EvidenceInvalid(
+                "tandem temperature became unavailable after its first valid sample"
+            )
+        state.temperature_omission_count += 1
+        return
+    if (
+        type(temperature) is not int
+        or not _TANDEM_MINIMUM_TEMPERATURE_MDEG_C
+        <= temperature
+        <= _TANDEM_MAXIMUM_TEMPERATURE_MDEG_C
+    ):
+        raise EvidenceInvalid("tandem temperature is outside provider provenance")
+    if not state.temperature_valid_seen:
+        state.temperature_valid_seen = True
+        state.temperature_first_valid_ordinal = state.frame_index
+    state.temperature_valid_count += 1
+    state.temperature_minimum_valid_mdeg_c = (
+        temperature
+        if state.temperature_minimum_valid_mdeg_c is None
+        else min(state.temperature_minimum_valid_mdeg_c, temperature)
+    )
+    state.temperature_maximum_valid_mdeg_c = (
+        temperature
+        if state.temperature_maximum_valid_mdeg_c is None
+        else max(state.temperature_maximum_valid_mdeg_c, temperature)
+    )
+
+
+def _require_tandem_temperature_session(
+    state: _CaptureState, *, frame_count: int
+) -> None:
+    if (
+        frame_count != _TANDEM_BATCH_FRAMES
+        or state.frame_index != frame_count
+        or state.temperature_valid_count < 1
+        or state.temperature_valid_count + state.temperature_omission_count
+        != frame_count
+        or state.temperature_first_valid_ordinal != state.temperature_omission_count
+        or state.temperature_minimum_valid_mdeg_c is None
+        or state.temperature_maximum_valid_mdeg_c is None
+    ):
+        raise EvidenceInvalid(
+            "tandem batch lacks one complete valid temperature session"
+        )
 
 
 def _forward_u32_delta(current: int, previous: int, *, context: str) -> int:
@@ -747,6 +807,7 @@ def _validate_tandem_metadata(
         raise EvidenceInvalid("tandem transient metadata contains a torn endpoint")
     if metadata.first_sample_sequence + capture.frame_samples > _UINT64_MODULUS:
         raise EvidenceInvalid("tandem transient frame exceeds uint64 sample time")
+    _observe_tandem_temperature(metadata, state=state)
 
     if state.stream_id is None:
         state.stream_id = metadata.stream_id
@@ -4065,6 +4126,9 @@ def _run_tandem_batch_mode_body(
                                 frames[0].record["refill_monotonic_ns"]
                             ),
                         }
+                    )
+                    _require_tandem_temperature_session(
+                        state, frame_count=len(frames)
                     )
                     _validate_exact_tandem_batch(frames)
                     record["batch_frames"] = [frame.record for frame in frames]

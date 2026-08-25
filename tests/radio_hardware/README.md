@@ -194,6 +194,14 @@ the serial-scoped report directory. The frozen campaign-owned envelope is
 materialization envelope is 54,525,952 bytes and includes an 8 MiB FFT
 workspace. These are bounded campaign payloads, not whole-process RSS.
 
+Each newly opened provider stream also starts an asynchronous AD9361
+temperature cache. The protected wire producer can therefore serialize exact
+`INT32_MIN` until the cache is ready, unavailable, or stale; the parser exposes
+that sentinel as JSON `null`. Qualification accepts `null` only as a leading
+batch prefix, requires at least one exact integer in the producer range
+`[-40000,125000]` mdegC, and rejects any later `null`. The runtime, production
+validator, and weak-v4 durable validator independently enforce the same rule.
+
 The release transient stimulus is explicitly `-45,-30,-45` dB; it does not
 inherit the full steady trajectory's `-61` dB endpoint. Across 22
 release-equivalent RC2 reports on four radios (DDS scale 1 and manual gain 40
