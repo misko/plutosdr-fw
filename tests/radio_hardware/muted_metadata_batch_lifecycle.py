@@ -209,15 +209,36 @@ def _attest_runner_provenance() -> dict[str, str]:
     module_sha = os.environ.get("PLUTOSDR_FW_RUNNER_MODULE_SHA256", "")
     shell_sha = os.environ.get("PLUTOSDR_FW_RUNNER_SHELL_SHA256", "")
     shell_text = os.environ.get("PLUTOSDR_FW_RUNNER_SHELL_PATH", "")
+    metadata_abi_sha = os.environ.get("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", "")
+    metadata_abi_text = os.environ.get("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", "")
     module_path = pathlib.Path(__file__).resolve()
     shell_path = pathlib.Path(shell_text).resolve() if shell_text else pathlib.Path()
+    metadata_abi_path = (
+        pathlib.Path(metadata_abi_text).resolve()
+        if metadata_abi_text
+        else pathlib.Path()
+    )
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
         raise QualificationError("runner firmware-repository commit is invalid")
     if not shell_text or not shell_path.is_absolute() or not shell_path.is_file():
         raise QualificationError("runner shell path is absent or non-absolute")
+    if (
+        not metadata_abi_text
+        or not metadata_abi_path.is_absolute()
+        or not metadata_abi_path.is_file()
+        or metadata_abi_path != module_path.parent / "metadata_abi.py"
+    ):
+        raise QualificationError(
+            "runner metadata ABI path is absent, non-absolute, or unexpected"
+        )
     calculated_module_sha = _sha256_file(module_path)
     calculated_shell_sha = _sha256_file(shell_path)
-    if calculated_module_sha != module_sha or calculated_shell_sha != shell_sha:
+    calculated_metadata_abi_sha = _sha256_file(metadata_abi_path)
+    if (
+        calculated_module_sha != module_sha
+        or calculated_shell_sha != shell_sha
+        or calculated_metadata_abi_sha != metadata_abi_sha
+    ):
         raise QualificationError("runner source SHA-256 does not match its process")
     return {
         "firmware_repo_commit": commit,
@@ -225,6 +246,8 @@ def _attest_runner_provenance() -> dict[str, str]:
         "python_module_sha256": calculated_module_sha,
         "shell_runner_path": str(shell_path),
         "shell_runner_sha256": calculated_shell_sha,
+        "metadata_abi_path": str(metadata_abi_path),
+        "metadata_abi_sha256": calculated_metadata_abi_sha,
     }
 
 
@@ -1033,12 +1056,22 @@ def validate_durable_pass_report(value: Any) -> None:
         is None
     ):
         raise QualificationError("durable runner commit is invalid")
-    for name in ("python_module_sha256", "shell_runner_sha256"):
+    for name in (
+        "python_module_sha256",
+        "shell_runner_sha256",
+        "metadata_abi_sha256",
+    ):
         if re.fullmatch(r"[0-9a-f]{64}", str(provenance.get(name, ""))) is None:
             raise QualificationError(f"durable runner {name} is invalid")
     module_path = pathlib.Path(str(provenance.get("python_module_path", "")))
     shell_path = pathlib.Path(str(provenance.get("shell_runner_path", "")))
-    if not module_path.is_absolute() or not shell_path.is_absolute():
+    metadata_abi_path = pathlib.Path(str(provenance.get("metadata_abi_path", "")))
+    if (
+        not module_path.is_absolute()
+        or not shell_path.is_absolute()
+        or not metadata_abi_path.is_absolute()
+        or metadata_abi_path != module_path.parent / "metadata_abi.py"
+    ):
         raise QualificationError("durable runner source paths are not absolute")
 
     configuration = _required_mapping(report.get("configuration"), name="configuration")

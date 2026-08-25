@@ -52,7 +52,9 @@ export PLUTOSDR_FW_LIBIIO_BUILD="$(realpath -- "${IIO_BUILD}")"
 export PLUTOSDR_FW_LIBIIO_SOURCE="$(realpath -- "${IIO_SOURCE}")"
 runner_module=tests/radio_hardware/muted_metadata_batch_lifecycle.py
 runner_shell=scripts/run_muted_metadata_batch_lifecycle_hardware.sh
-for runner_path in "${runner_module}" "${runner_shell}"; do
+runner_metadata_abi=tests/radio_hardware/metadata_abi.py
+for runner_path in \
+  "${runner_module}" "${runner_shell}" "${runner_metadata_abi}"; do
   git -C "${ROOT}" diff --quiet HEAD -- "${runner_path}" || {
     printf 'ERROR: runner source differs from HEAD: %s\n' "${runner_path}" >&2
     exit 2
@@ -64,7 +66,12 @@ export PLUTOSDR_FW_RUNNER_MODULE_SHA256="$(sha256sum \
 export PLUTOSDR_FW_RUNNER_SHELL_SHA256="$(sha256sum \
   "${ROOT}/${runner_shell}" | awk '{print $1}')"
 export PLUTOSDR_FW_RUNNER_SHELL_PATH="$(realpath -- "${ROOT}/${runner_shell}")"
-for runner_path in "${runner_module}" "${runner_shell}"; do
+export PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256="$(sha256sum \
+  "${ROOT}/${runner_metadata_abi}" | awk '{print $1}')"
+export PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH="$(realpath -- \
+  "${ROOT}/${runner_metadata_abi}")"
+for runner_path in \
+  "${runner_module}" "${runner_shell}" "${runner_metadata_abi}"; do
   worktree_sha=$(sha256sum "${ROOT}/${runner_path}" | awk '{print $1}')
   commit_sha=$(git -C "${ROOT}" show \
     "${PLUTOSDR_FW_RUNNER_COMMIT}:${runner_path}" | sha256sum | awk '{print $1}')
