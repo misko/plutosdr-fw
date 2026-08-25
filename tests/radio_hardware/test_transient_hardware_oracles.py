@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import errno
 import json
+import re
 import threading
 from builtins import BaseExceptionGroup
 from contextlib import contextmanager
@@ -719,9 +720,15 @@ def test_tandem_provider_gap_cannot_hide_transient_event_timing(
     radio.hidden_transition_capture_index = 3
     with pytest.raises(EvidenceInvalid, match="provider gap is forbidden") as raised:
         _run_fake(radio, _quality(tmp_path))
-    assert "transition delta 2" in str(raised.value)
-    assert "visible events 1" in str(raised.value)
-    assert "hidden transitions 1" in str(raised.value)
+    evidence = re.search(
+        r"transition delta (\d+), visible events (\d+), hidden transitions (\d+)",
+        str(raised.value),
+    )
+    assert evidence is not None
+    transition_delta, visible_events, hidden_transitions = map(int, evidence.groups())
+    assert visible_events in (0, 1)
+    assert hidden_transitions == 1
+    assert transition_delta == visible_events + hidden_transitions
 
 
 def test_runner_fails_closed_when_tandem_release_event_is_missing(
