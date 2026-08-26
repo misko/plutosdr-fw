@@ -1,9 +1,12 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# This is component-identical to the RC4 graph. RC4 changes tracked top-level
-# tandem RTL while retaining RC3's external component pins. The final build
-# changes only the top-level release identity and packaging, while also
-# requiring exact component identities in the packed /opt/VERSIONS file.
+# The external component graph remains identical to RC4, but the tracked
+# top-level firmware does not: the release branch adds post-RC4
+# stale-small-ADC-latch recovery. That RTL must pass a newly locked candidate
+# build and full hardware qualification before this final graph is used. The
+# subsequent final build may change only the top-level release identity and
+# packaging, while requiring exact component identities in packed
+# /opt/VERSIONS.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1

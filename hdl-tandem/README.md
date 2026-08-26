@@ -1,15 +1,11 @@
 # Tandem AGC v2 RTL
 
-Answers the project's single unbounded risk before the real controller exists:
-does a block of this size and shape fit and close timing on a Zynq-7010 already
-at ~74% LUT?
+The historical canary first bounded whether a block of this size could fit a
+Zynq-7010 that was already near 74% LUT. The production implementation now
+uses the complete TAG2 AXI control surface described below; the canary source
+is no longer part of the tree.
 
-`tandem_agc_canary.v` is the real block's skeleton, not filler — the register
-bank of design-contract §8, the 256×128 event FIFO of D-9, the real counter
-widths, the pulse generator and ownership mux including tri-state, and the
-3-stage detector conditioning. Only the policy truth table is a placeholder.
-
-## Out-of-context synthesis, xc7z010clg400-1, l_clk @ 61.44 MHz
+## Historical canary synthesis (superseded)
 
 | Resource | Canary | Device | % | Plan §6 estimate |
 |---|---:|---:|---:|---|
@@ -21,9 +17,10 @@ widths, the pulse generator and ownership mux including tri-state, and the
 WNS **+10.628 ns** against a 16.276 ns period, 0 failing endpoints of 792.
 WPWS +7.638 ns.
 
-Reproduce: `vivado -mode batch -source canary_ooc.tcl`
+These canary figures predate the current TAG2 AXI control surface and are not
+release evidence for the current RTL.
 
-## Caveats
+## Historical canary caveats
 
 Out-of-context, so no placement pressure and no routing congestion. The
 integrated place-and-route against the RC17 baseline is the real answer.
@@ -45,6 +42,32 @@ used by the Linux ownership driver; the v1 standalone register wrapper has
 been removed so it cannot become a second control path.
 `ad9361_gain_model.v` is a behavioural model of the part; every behaviour in it
 is either cited to UG-570 or measured by experiment E-AGC1.
+
+## Routed out-of-context release gate
+
+The reproducible block-level gate uses the complete `tandem_agc_axi` top with
+its default event FIFO, both declared asynchronous clocks, placement, routing,
+timing, DRC, methodology, and CDC reports. Run it only from a clean committed
+tree and give it an absent output path:
+
+    scripts/run_tandem_agc_ooc.sh /absolute/path/to/fresh-ooc-evidence
+
+The launcher records the exact commit, tool version, input hashes, routed
+checkpoint, and reports in that private directory. A strict, bounded offline
+validator accepts only the frozen routed report inventory: CDC directions
+112/39 with CDC-3=5, CDC-6=2, and CDC-15=133; OOC-only DRC
+REQP-1839=18 and ZPS7-1=1; methodology TIMING-18=182 and LUTAR-1=1;
+exact timing/route/utilization values; and no unknown rule. The complete
+directory contains the input snapshot and hashes, Vivado and Python versions,
+provenance, log, routed checkpoint, eight reports, normalized timing metrics,
+an evidence checksum manifest, and `status.txt`.
+
+`status.txt` is linked with no-replace semantics only after every report,
+inventory, source, tool, and checksum check succeeds; its absence makes an
+interrupted or rejected directory nonauthorizing. Its PASS is explicitly
+block-level and `firmware_release_eligible=false`. Passing this gate is
+necessary but does not replace the exact-commit integrated Pluto
+implementation and routed timing/CDC checks used for a firmware candidate.
 
 ## Tests
 
@@ -81,4 +104,5 @@ integrated synthesis evidence before any fit or timing claim is made.
 Against the measured RC17 baseline of 13,088 LUT, that prior core projected to
 **13,604 LUT = 77.3%**, inside the ~82% guardrail, with DSP unchanged at 72/80.
 
-Reproduce: `vivado -mode batch -source core_ooc.tcl`
+The obsolete standalone wrapper and FIFO-only Tcl entry points have been
+removed; neither represented the complete production control surface.

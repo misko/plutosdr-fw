@@ -30,7 +30,9 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             iverilog python3-numpy python3-pytest
           python3 -m pytest \
-            tests/test_release_oracles.py tests/radio_hardware \
+            tests/test_release_oracles.py \
+            tests/test_tandem_agc_ooc_validator.py \
+            tests/radio_hardware \
             -m 'not radio_hardware'
           ./hdl-tandem/run_tests.sh
 

@@ -43,7 +43,7 @@ mislabelling.
 - `.github/workflows/firmware-main.yml` — `workflow_dispatch` input
   `release_version`, and the stamped string appears in the job summary.
 
-## Current tandem RC4 gate
+## Current tandem v8 gate
 
 RC2 exposed two release blockers: a closed tandem session could report IDLE
 while leaving event records inaccessible in the FPGA FIFO, and the synchronous
@@ -51,17 +51,43 @@ host metadata request/response cadence could lose a full 65,536-sample frame
 without a device-overflow indication. RC3 advanced the Linux RELEASE cleanup,
 the bounded libiio batch transport, and the matching Buildroot recipe pin, but
 hardware qualification found a top-level RTL request/pulse handoff bug at zero
-cooldown. RC4 retains RC3's external component pins and corrects that tracked
-top-level RTL. It cannot inherit RC3's failed hardware result. Its exact source
-graph is `manifests/tandem-agc-v8-rc4-source.yaml`; its trusted build branch is
-`codex/firmware-tandem-agc-v8-rc4`; and its requested device string is
-`v0.41-plutoplus-spf-tandem-agc-v8-rc4`.
+cooldown. RC4 retained RC3's external component pins and corrected that tracked
+top-level RTL.
+
+RC4 is no longer promotable as the final v8 source. After its protected
+firmware source lock at `557a08749d9c0c34fe8096099b5be9d2b2a1b24f`, the
+release branch added stale-small-ADC-latch recovery. That is another top-level
+RTL change, so neither the RC4 source lock nor RC4 hardware evidence covers the
+current branch. The next image must be treated as a new candidate (RC5 unless a
+different name is deliberately chosen); never move or reuse the RC4 source
+lock.
+
+The remaining gates, in order, are:
+
+1. Commit the complete source and run the routed block-level OOC gate from a
+   clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
+   `firmware_release_eligible=false`.
+2. Create a new protected firmware source lock and an explicit trusted build
+   route for the new candidate. Keep RC4's external component pins only if the
+   source-graph checks prove they remain exact.
+3. Build and route the complete Pluto FPGA design from that exact candidate;
+   retain integrated timing, CDC, DRC, methodology, utilization, and build
+   provenance. Block-level OOC evidence cannot replace this step.
+4. Build the candidate firmware with its exact `device-fw` string, verify the
+   attested artifact and packed component identities, and RAM-boot those exact
+   bytes on all four release-gate radios.
+5. Run the full release campaign, including the targeted stale-latch recovery,
+   muted metadata lifecycle, transient transport, signal-quality, teardown,
+   and cleanup gates. No RC4 result transfers across the new RTL.
+6. Only after the candidate passes, merge the exact qualified source to `main`,
+   build the final v8 identity, perform the confirmation pass described below,
+   then tag, publish, and write the immutable release manifest.
 
 Protected dependency source locks must exist before the build so CI can resolve
 and pack them. They are not release tags. Do not create the annotated
-`v0.41-plutoplus-spf-tandem-agc-v8-rc4` release tag until the exact attested RC4
-artifact completes the full four-radio RAM qualification. Never move or reuse
-the failed RC3 source lock, an existing candidate lock, or a release tag.
+candidate release tag until the exact attested artifact completes the full
+four-radio RAM qualification. Never move or reuse a failed source lock, an
+existing candidate lock, or a release tag.
 
 ## Procedure
 
@@ -117,11 +143,12 @@ the failed RC3 source lock, an existing candidate lock, or a release tag.
    transfer literally. When the only delta from a fully qualified RC is the
    version string, a confirmation pass — boot, TX2 loopback on every
    release-gate radio, and one protocol-v3 stream run — covers the real risk,
-   which is build-environment drift. RC4 is not such a candidate: it carries
-   RC3's Linux cleanup and libiio batch transport plus the corrected tandem RTL,
+   which is build-environment drift. The post-RC4 candidate is not such a
+   candidate: it carries the stale-small-ADC-latch recovery in addition to
+   RC3's Linux cleanup, libiio batch transport, and request/pulse correction,
    so it requires the full campaign before merge. Only the subsequent final
    build may use the reduced confirmation pass if its sole functional delta
-   from qualified RC4 is the stamped version.
+   from the newly qualified candidate is the stamped version.
 
 5. **Tag, annotated, on the built commit.** Annotated, not lightweight: `rc16`
    is lightweight and `rc17` is not, and the inconsistency is worth ending.

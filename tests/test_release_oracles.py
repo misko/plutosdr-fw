@@ -16,6 +16,9 @@ TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 FIRMWARE_PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
 QUALITY_HARDWARE_LAUNCHER = ROOT / "scripts" / "run_tandem_agc_quality_hardware.sh"
+TANDEM_OOC_LAUNCHER = ROOT / "scripts" / "run_tandem_agc_ooc.sh"
+TANDEM_OOC_TCL = ROOT / "hdl-tandem" / "axi_ooc.tcl"
+TANDEM_OOC_VALIDATOR = ROOT / "scripts" / "validate_tandem_agc_ooc.py"
 
 RC3_LIBIIO_SOURCE = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
 RC3_LIBIIO_REF = "refs/tags/tandem-agc-v8-rc3-source/libiio-v1"
@@ -209,7 +212,152 @@ def test_required_pr_gate_runs_root_tandem_rtl_suite() -> None:
     workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
 
     assert "iverilog python3-numpy python3-pytest" in workflow
+    assert "tests/test_tandem_agc_ooc_validator.py" in workflow
     assert "./hdl-tandem/run_tests.sh" in workflow
+
+
+def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
+    launcher = TANDEM_OOC_LAUNCHER.read_text(encoding="utf-8")
+    tcl = TANDEM_OOC_TCL.read_text(encoding="utf-8")
+    validator = TANDEM_OOC_VALIDATOR.read_text(encoding="utf-8")
+
+    assert TANDEM_OOC_LAUNCHER.stat().st_mode & 0o111
+    assert not (ROOT / "hdl-tandem" / "core_ooc.tcl").exists()
+    assert not (ROOT / "hdl-tandem" / "cdc_ooc.tcl").exists()
+    assert "plutosdr-fw-tandem-agc-v1" not in tcl
+    assert "/tmp/" not in tcl
+    assert "/home/" not in tcl
+    assert "synth_design -top $top -part $part -mode out_of_context" in tcl
+    assert "production event parameter is not exact" in tcl
+    for default in (
+        "EVT_AW[ \\t]*=[ \\t]*6,",
+        "EVT_DW[ \\t]*=[ \\t]*128,",
+        "EVENTS[ \\t]*=[ \\t]*1[ \\t]*$",
+    ):
+        assert default in tcl
+    for command in (
+        "place_design",
+        "route_design",
+        "report_timing_summary -delay_type min_max",
+        "report_cdc -no_waiver",
+        "report_cdc -details -no_waiver",
+        "report_route_status",
+        "report_drc -ruledeck default -no_waivers",
+        "report_methodology -no_waivers",
+        "get_msg_config -count -severity {CRITICAL WARNING}",
+        "get_msg_config -count -severity ERROR",
+        "=== TANDEM AXI ROUTE COMPLETE ===",
+    ):
+        assert command in tcl
+    assert "get_msg_config -count -severity FATAL" not in tcl
+    assert "=== TANDEM AXI ROUTED OOC PASS ===" not in tcl
+
+    for binding in (
+        "SW Build 3671981",
+        "IP Build 3669848",
+        "EXPECTED_SETTINGS_SHA256=",
+        "EXPECTED_VIVADO_SHA256=",
+        "EXPECTED_LIBTINFO_SHA256=",
+        'git -C "$ROOT" show',
+        "validate_tandem_agc_ooc.py",
+        "/usr/bin/python3 -I -B",
+        "evidence_manifest_sha256=",
+        "verdict=PASS",
+        "firmware_release_eligible=false",
+        "integrated_route_required=true",
+    ):
+        assert binding in launcher
+    assert launcher.index("=== TANDEM AXI ROUTE COMPLETE ===") < launcher.index(
+        "verdict=PASS"
+    )
+    assert launcher.index("validate_tandem_agc_ooc.py") < launcher.index(
+        "evidence-sha256.txt"
+    )
+    final_status_claim = (
+        'ln -- "$run_dir/status.txt" "/proc/$$/fd/$output_fd/status.txt"'
+    )
+    assert launcher.count(final_status_claim) == 1
+    assert launcher.count("/usr/bin/python3 -I -B") == 2
+    assert (
+        launcher.count('"$output_dir/input/validate_tandem_agc_ooc.py" "$output_dir"')
+        == 2
+    )
+    for final_gate in (
+        "output directory identity changed during final promotion",
+        "output parent identity changed during final promotion",
+        "firmware HEAD changed during final promotion",
+        "firmware source tree changed during final promotion",
+        "OOC input changed during final promotion",
+        "final staged OOC input hash inventory is not exact",
+        "final OOC evidence inventory is not exact",
+        "final strict routed OOC report validation failed",
+        "sha256sum -c evidence-sha256.txt",
+    ):
+        assert final_gate in launcher
+    commands = [
+        line.strip()
+        for line in launcher.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    assert commands[-1] == final_status_claim
+
+    for exact_inventory in (
+        '"CDC-3": ("Info", 5,',
+        '"CDC-6": ("Warning", 2,',
+        '"CDC-15": ("Warning", 133,',
+        '"REQP-1839": ("Warning", "RAMB36 async control check", 18)',
+        '"ZPS7-1": ("Warning", "PS7 block required", 1)',
+        '"LUTAR-1": ("Warning", "LUT drives async reset alert", 1)',
+        '"TIMING-18": ("Warning", "Missing input or output delay", 182)',
+        '"no_input_delay": 137',
+        '"no_output_delay": 45',
+        '"Slice LUTs": (475, 17600, Decimal("2.70"))',
+    ):
+        assert exact_inventory in validator
+
+
+def test_tandem_ooc_default_check_ignores_verilog_comment_decoys(
+    tmp_path: Path,
+) -> None:
+    staged = tmp_path / "hdl-tandem"
+    staged.mkdir()
+    output = tmp_path / "output"
+    output.mkdir()
+    for name in (
+        "axi_ooc.tcl",
+        "tandem_cdc_lib.v",
+        "tandem_agc_core.v",
+        "tandem_agc_axi.v",
+        "tandem_agc_axi.xdc",
+    ):
+        (staged / name).write_bytes((ROOT / "hdl-tandem" / name).read_bytes())
+
+    def early_tcl_result() -> str:
+        wrapper = f"""
+set argc 1
+set argv [list {{{output}}}]
+proc create_project {{args}} {{error STOP_AFTER_DEFAULT_CHECK}}
+if {{[catch {{source {{{staged / 'axi_ooc.tcl'}}}}} message]}} {{
+  puts $message
+  exit 0
+}}
+exit 3
+"""
+        return subprocess.check_output(
+            ["tclsh"], input=wrapper, text=True, stderr=subprocess.STDOUT
+        ).strip()
+
+    assert early_tcl_result() == "STOP_AFTER_DEFAULT_CHECK"
+    axi = staged / "tandem_agc_axi.v"
+    source = axi.read_text(encoding="utf-8")
+    live = "parameter integer EVT_AW = 6,"
+    assert source.count(live) == 1
+    axi.write_text(
+        "/* parameter integer EVT_AW = 6, */\n"
+        + source.replace(live, "parameter integer EVT_AW = 64,"),
+        encoding="utf-8",
+    )
+    assert early_tcl_result() == "production event parameter is not exact: EVT_AW"
 
 
 def test_required_usb_gadget_job_uses_final_source_and_complete_suite() -> None:
