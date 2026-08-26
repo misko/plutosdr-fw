@@ -106,10 +106,15 @@ output_identity="$(stat -Lc '%d:%i:%f:%u:%g' "/proc/$$/fd/$output_fd")"
 run_dir="$(mktemp -d "${output_parent}/.tandem-agc-ooc-work.XXXXXX")"
 chmod 700 "$run_dir"
 mkdir --mode=700 -- "$run_dir/home" "$run_dir/tmp"
+exec {run_fd}<"$run_dir"
+run_ref="/proc/$$/fd/$run_fd"
 cleanup() {
-    find "$run_dir" -depth -type f -delete 2>/dev/null || true
-    find "$run_dir" -depth -type l -delete 2>/dev/null || true
-    find "$run_dir" -depth -type d -empty -delete 2>/dev/null || true
+    # Traverse only the held directory inode.  Never delete through the released
+    # lexical name, which could have been replaced by an unrelated directory.
+    find -H "$run_ref" -mindepth 1 -depth -type f -delete 2>/dev/null || true
+    find -H "$run_ref" -mindepth 1 -depth -type l -delete 2>/dev/null || true
+    find -H "$run_ref" -mindepth 1 -depth -type d -empty -delete 2>/dev/null || true
+    exec {run_fd}>&-
 }
 trap cleanup EXIT
 
