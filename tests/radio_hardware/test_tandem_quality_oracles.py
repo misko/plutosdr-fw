@@ -7,6 +7,16 @@ import math
 
 import pytest
 
+from .tandem_quality import (
+    MODE_MANUAL,
+    MODE_NATIVE_FAST,
+    MODE_TANDEM,
+    NATIVE_FAST_MAX_TONE_DBFS,
+    TandemQualityOptions,
+    native_mode_name,
+    tone_quality_thresholds_for_mode,
+    validate_options,
+)
 from .tone_quality import (
     ToneQualityThresholds,
     analyze_common_tone,
@@ -145,6 +155,103 @@ def test_quality_reasons_detect_weak_noisy_clipped_and_wrong_frequency() -> None
     assert "rx1_clipping" in result["quality_reasons"]
     assert "tone_frequency_error_high" in result["quality_reasons"]
     assert result["clipping_fraction"][1] > 0.0
+
+
+def test_native_fast_uses_only_mode_specific_tone_ceiling() -> None:
+    options = TandemQualityOptions(
+        tx_gain_trajectory_db=(-61.0, -45.0, -30.0, -45.0, -61.0),
+        physical_attenuation_db=0.0,
+    )
+    validate_options(options)
+
+    assert options.thresholds.max_tone_dbfs == -3.0
+    assert options.native_fast_max_tone_dbfs == NATIVE_FAST_MAX_TONE_DBFS == -2.0
+    assert tone_quality_thresholds_for_mode(options, MODE_MANUAL).max_tone_dbfs == -3.0
+    assert (
+        tone_quality_thresholds_for_mode(
+            options, native_mode_name("slow_attack")
+        ).max_tone_dbfs
+        == -3.0
+    )
+    assert tone_quality_thresholds_for_mode(options, MODE_TANDEM).max_tone_dbfs == -3.0
+    assert (
+        tone_quality_thresholds_for_mode(options, MODE_NATIVE_FAST).max_tone_dbfs
+        == -2.0
+    )
+
+
+def test_native_fast_tone_ceiling_accepts_unclipped_rc19_level_only() -> None:
+    raw = _synthetic_dual_tone(
+        samples=16_384,
+        amplitudes=(1_520.0, 1_520.0),
+        noise_sigma=1.0,
+    )
+    options = TandemQualityOptions(
+        tx_gain_trajectory_db=(-61.0, -45.0, -30.0, -45.0, -61.0),
+        physical_attenuation_db=0.0,
+    )
+    common = {
+        "sample_rate_hz": 3_000_000,
+        "expected_tone_hz": 123_456.0,
+        "transient_samples": 256,
+        "phase_segments": 4,
+    }
+
+    ordinary = analyze_common_tone(raw, thresholds=options.thresholds, **common)
+    fast = analyze_common_tone(
+        raw,
+        thresholds=tone_quality_thresholds_for_mode(options, MODE_NATIVE_FAST),
+        **common,
+    )
+
+    assert ordinary["clipping_fraction"] == [0.0, 0.0]
+    assert not ordinary["quality_valid"]
+    assert ordinary["quality_reasons"] == [
+        "rx0_tone_too_strong",
+        "rx1_tone_too_strong",
+    ]
+    assert max(fast["tone_dbfs"]) < -2.0
+    assert fast["clipping_fraction"] == [0.0, 0.0]
+    assert fast["quality_valid"], fast["quality_reasons"]
+
+
+def test_native_fast_tone_ceiling_remains_fail_closed_above_minus_two_dbfs() -> None:
+    raw = _synthetic_dual_tone(
+        samples=16_384,
+        amplitudes=(1_700.0, 1_700.0),
+        noise_sigma=1.0,
+    )
+    options = TandemQualityOptions(
+        tx_gain_trajectory_db=(-61.0, -45.0, -30.0, -45.0, -61.0),
+        physical_attenuation_db=0.0,
+    )
+    result = analyze_common_tone(
+        raw,
+        sample_rate_hz=3_000_000,
+        expected_tone_hz=123_456.0,
+        transient_samples=256,
+        phase_segments=4,
+        thresholds=tone_quality_thresholds_for_mode(options, MODE_NATIVE_FAST),
+    )
+
+    assert min(result["tone_dbfs"]) > -2.0
+    assert result["clipping_fraction"] == [0.0, 0.0]
+    assert not result["quality_valid"]
+    assert result["quality_reasons"] == [
+        "rx0_tone_too_strong",
+        "rx1_tone_too_strong",
+    ]
+
+
+def test_native_fast_tone_ceiling_is_not_operator_tunable() -> None:
+    options = TandemQualityOptions(
+        tx_gain_trajectory_db=(-61.0, -45.0, -30.0, -45.0, -61.0),
+        physical_attenuation_db=0.0,
+        native_fast_max_tone_dbfs=-1.5,
+    )
+
+    with pytest.raises(ValueError, match="must remain exactly -2.0 dBFS"):
+        validate_options(options)
 
 
 @pytest.mark.parametrize(

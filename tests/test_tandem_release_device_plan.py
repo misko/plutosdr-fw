@@ -33,7 +33,7 @@ def _index(dfu: bytes) -> dict[str, Any]:
         "schema_version": 1,
         "stage": "candidate-pre-hardware",
         "release": {
-            "firmware_version": "v0.41-plutoplus-spf-tandem-agc-v8-rc19",
+            "firmware_version": "v0.41-plutoplus-spf-tandem-agc-v8-rc20",
             "kernel_version": "5.15.0-g77a1f2352162",
             "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
             "metadata_abi": "frame-metadata-v5",
@@ -41,7 +41,7 @@ def _index(dfu: bytes) -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc19-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc20-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1, "run_attempt": 1},

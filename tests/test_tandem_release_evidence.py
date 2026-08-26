@@ -23,12 +23,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "tandem_release_evidence.py"
 COMMIT = "1" * 40
 FINAL_COMMIT = "2" * 40
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc19"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc20"
 FINAL_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
 RUN_ID = 123456
 RUN_ATTEMPT = 1
 LIBIIO_COMMIT = "d" * 40
-PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc19-111111111111"
+PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc20-111111111111"
 SOURCE_MANIFEST_PAYLOAD = b"""schema: plutosdr-fw.source-manifest
 schema_version: 1
 release_state: candidate
@@ -277,7 +277,7 @@ def _fixture(
 ) -> tuple[Path, Path]:
     is_candidate = stage == "candidate-pre-hardware"
     manifest_name = (
-        "tandem-agc-v8-rc19-source.yaml"
+        "tandem-agc-v8-rc20-source.yaml"
         if is_candidate
         else "tandem-agc-v8-source.yaml"
     )
@@ -288,7 +288,7 @@ def _fixture(
             else EVIDENCE.FINAL_SOURCE_LOCK_REF
         )
     build_ref = (
-        "refs/heads/codex/firmware-tandem-agc-v8-rc19"
+        "refs/heads/codex/firmware-tandem-agc-v8-rc20"
         if is_candidate
         else "refs/heads/main"
     )
@@ -1123,7 +1123,7 @@ def _lineage_fixture(
         stage="candidate-pre-hardware",
     )
     _assemble_campaign(candidate_staging, monkeypatch, artifact_index=candidate)
-    candidate_root = root / "lineage" / "rc19"
+    candidate_root = root / "lineage" / "rc20"
     candidate_root.parent.mkdir(mode=0o755)
     candidate_staging.rename(candidate_root)
     candidate = candidate_root / "candidate-index.json"
@@ -1611,7 +1611,7 @@ def test_assemble_rejects_external_same_basename_source_manifest(
     "version",
     [
         "v0.41-plutoplus-spf-tandem-agc-v8-rc013",
-        "v0.41-plutoplus-spf-tandem-agc-v8-rc19-1-g1111111",
+        "v0.41-plutoplus-spf-tandem-agc-v8-rc20-1-g1111111",
     ],
 )
 def test_assemble_rejects_typo_or_git_describe_candidate_identity(
@@ -1619,7 +1619,7 @@ def test_assemble_rejects_typo_or_git_describe_candidate_identity(
 ) -> None:
     input_path, output = _fixture(tmp_path, version=version)
 
-    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC19"):
+    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC20"):
         EVIDENCE.assemble(
             archive_root=tmp_path,
             input_path=input_path,

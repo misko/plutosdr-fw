@@ -180,11 +180,19 @@ authorized retry stopped before USB because canonical JSON checkpoint key
 order differed from execution order. RC18 is immutable and not
 hardware-qualified.
 
-The forward-only RC19 route uses branch
-`codex/firmware-tandem-agc-v8-rc19`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc19`, and source lock
-`refs/tags/tandem-agc-v8-rc19-source/firmware-v1`; it does not move or reuse
-RC12 through RC18's branch, source lock, artifact, or evidence index. RC19 pins
+RC19 locked exact commit `70949a18a7f42d99fdd5356b128f37b7c7fa2b7e`,
+passed trusted run `33015979913`, and produced candidate index
+`f099bdfba1e529730b7012d6a75c995d73165994daaa00501eb2e5bcbca57e81`.
+All four radios passed RAM-only deployment and lifecycle. Its full steady
+campaign then found native-fast captures up to `-2.47 dBFS` with zero clipping
+against the shared `-3.0 dBFS` ceiling. RC19 remains immutable and is not
+hardware-qualified.
+
+The forward-only RC20 route uses branch
+`codex/firmware-tandem-agc-v8-rc20`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc20`, and source lock
+`refs/tags/tandem-agc-v8-rc20-source/firmware-v1`; it does not move or reuse
+RC12 through RC19's branch, source lock, artifact, or evidence index. RC20 pins
 `pluto-plus-utils` commit
 `2654f34eb909904ec65bc0526e0f8977cb30e2ed` as the sole live device operator.
 The firmware repository produces the private candidate plan and validates the
@@ -192,7 +200,9 @@ original utility plan, inventory, operation, and measured receipt. The bridge
 keeps the v5 release frame schema distinct from the v2 live buffer ABI. The utility
 uses password-only/no-host-key-checking SSH for ephemeral RAM keys while
 retaining every USB, topology, route, IIO/model, QSPI-equality, safe-state, and
-paired-selector guard.
+paired-selector guard. Native fast attack alone uses a fixed `-2.0 dBFS` tone
+ceiling; manual, native slow, tandem AUTO, zero clipping, and every other gate
+remain unchanged.
 
 ## One-time administrator installation
 
@@ -240,7 +250,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC19 workflow has no separate attestation job. An operator may capture GitHub
+The RC20 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

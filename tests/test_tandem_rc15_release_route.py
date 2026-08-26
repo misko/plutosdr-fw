@@ -84,12 +84,12 @@ def test_rc15_history_is_retained_while_rc16_is_active() -> None:
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
 
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc19" in evidence
-    assert "refs/tags/tandem-agc-v8-rc19-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc20" in evidence
+    assert "refs/tags/tandem-agc-v8-rc20-source/firmware-v1" in evidence
     for source in sources:
         assert "RC15" in source
         assert "pluto-plus-utils" in source
-    assert "The active candidate is RC19" in sources[0]
+    assert "The active candidate is RC20" in sources[0]
     assert "zero RC14 RAM transitions" in sources[1]
 
 
@@ -99,5 +99,5 @@ def test_rc15_keeps_single_owner_optional_github_attestation_policy() -> None:
 
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC19 workflow has no separate attestation job." in runner
+    assert "The RC20 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner

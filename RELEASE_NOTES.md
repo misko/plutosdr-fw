@@ -37,7 +37,8 @@
 | `tandem-agc-v8-rc16` | 2026-08-26 | **successful indexed build; observed safe RAM boot, no valid deployment receipt; superseded** | RAM boot and containment checks passed, but the device-plan bridge confused release frame schema v5 with live IIO buffer ABI v2 |
 | `tandem-agc-v8-rc17` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; full campaign blocked before USB; superseded** | host-libiio replay resolved the firmware wrapper beneath the distinct libiio repository |
 | `tandem-agc-v8-rc18` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; one marginal full-test result; superseded** | trusted build/evidence and muted lifecycle passed on all four; db696 steady characterization found one native-fast-attack cell 0.27332 dB above its quality ceiling, then canonical checkpoint key ordering blocked the authorized retry before USB |
-| `tandem-agc-v8-rc19` | 2026-08-26 | **active development; not hardware-qualified** | retains RC18 firmware and guardrails while making resume validation key-order-independent and binding every phase to its exact specification |
+| `tandem-agc-v8-rc19` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; full steady policy rejected; superseded** | resume passed; native-fast cells reached -2.47 dBFS without clipping against the shared -3.0 dBFS ceiling |
+| `tandem-agc-v8-rc20` | 2026-08-26 | **active development; not hardware-qualified** | fixed -2.0 dBFS native-fast ceiling; manual, native slow, tandem AUTO, clipping, and all other gates unchanged |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -46,7 +47,24 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc19 — 2026-08-26 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc20 — 2026-08-26 — **active development; not hardware-qualified**
+
+RC20 retains RC19's firmware implementation, external source graph,
+deterministic package, native `pluto-plus-utils` device lifecycle, and every
+release safety/evidence guard. It changes one fixed RF-quality policy only:
+native fast attack accepts a maximum tone of `-2.0 dBFS`; manual fixed gain,
+native slow attack, and tandem AUTO retain `-3.0 dBFS`. Zero clipping remains
+mandatory, and SNR, coherence, phase stability, frequency, gain behavior,
+metadata continuity, QSPI equality, cleanup, and all TX/fixture limits are
+unchanged. The limit is not exposed as an operator-tunable CLI option.
+
+RC20 uses branch `codex/firmware-tandem-agc-v8-rc20`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc20`, manifest
+`manifests/tandem-agc-v8-rc20-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc20`, and source lock
+`refs/tags/tandem-agc-v8-rc20-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc19 — 2026-08-26 — **four safe RAM deployments and lifecycle passes; full steady policy rejected; superseded**
 
 RC19 retains RC18's firmware implementation, external source graph,
 deterministic package, device operator, and release guardrails. It changes only
@@ -58,6 +76,28 @@ phase specification against the current requested plan. RC19 uses branch
 `manifests/tandem-agc-v8-rc19-source.yaml`, package prefix
 `plutoplus-spf-tandem-agc-v8-rc19`, and source lock
 `refs/tags/tandem-agc-v8-rc19-source/firmware-v1`.
+
+RC19 locked exact commit `70949a18a7f42d99fdd5356b128f37b7c7fa2b7e`.
+Trusted run `33015979913`, attempt 1, succeeded with artifact ID `9625051298`.
+Its verified candidate-index SHA-256 is
+`f099bdfba1e529730b7012d6a75c995d73165994daaa00501eb2e5bcbca57e81`;
+bundle SHA-256 is
+`48bc63f64db25352323687f8fa8e2fa8c244a6fff99b7f97344208d83f757919`;
+DFU SHA-256 is
+`a786dbc78b72e43474485d9af73765fda7e0fd4f9a47a3fadfd98fc1152b3242`;
+and FIT SHA-256 is
+`cb9d7027b775443bcc99535c96cf38effce132727827c2ba1bc796bf579f9283`.
+All four exact radios completed RAM-only deployment with unchanged QSPI and
+verified safe state, then passed the 64-frame muted metadata lifecycle plus
+cancel/reopen checks.
+
+The full steady campaign then exposed a policy mismatch, not clipping or
+signal corruption. Native fast attack produced zero-clipping, high-SNR,
+coherent dual-RX captures between `-3.00` and `-2.47 dBFS`; the shared
+`-3.0 dBFS` maximum rejected those cells on db696, db620, and R17. Cleanup
+passed after every stop. R18 separately saw one strict tandem transition-count
+continuity rejection; that rule is unchanged and must pass on retry. RC19 has
+no passing full campaign, no soak result, and is not hardware-qualified.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc18 — 2026-08-26 — **four safe RAM deployments and lifecycle passes; one marginal full-test result; superseded**
 
@@ -571,7 +611,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC19 route still requires the complete external paired-behavior,
+active RC20 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

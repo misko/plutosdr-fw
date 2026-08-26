@@ -8,10 +8,10 @@ import math
 import statistics
 import time
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 from itertools import pairwise
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from .experiment import (
     MAX_COMMON_CENTER_FREQUENCY_HZ,
@@ -35,6 +35,7 @@ from .tone_quality import ToneQualityThresholds, analyze_common_tone
 
 MODE_MANUAL = "manual_fixed"
 MODE_NATIVE = "native_slow_attack"
+MODE_NATIVE_FAST = "native_fast_attack"
 MODE_TANDEM = "tandem_auto"
 MODES = (MODE_MANUAL, MODE_NATIVE, MODE_TANDEM)
 NATIVE_GAIN_CONTROL_MODES = ("slow_attack", "fast_attack", "hybrid")
@@ -43,6 +44,7 @@ DEFAULT_NATIVE_GAIN_CONTROL_MODES = ("slow_attack",)
 MANUAL_TONE_TRACKING_TOLERANCE_DB = 3.0
 MANUAL_TONE_RETRACE_TOLERANCE_DB = 3.0
 NATIVE_MIN_GAIN_SPAN_DB = 1.0
+NATIVE_FAST_MAX_TONE_DBFS = -2.0
 
 
 class _EvidenceInvalidWithDetails(EvidenceInvalid):
@@ -83,6 +85,7 @@ class TandemQualityOptions:
     profile: str = "smoke"
     save_iq: bool = False
     thresholds: ToneQualityThresholds = field(default_factory=ToneQualityThresholds)
+    native_fast_max_tone_dbfs: float = NATIVE_FAST_MAX_TONE_DBFS
 
     @property
     def strongest_tx_gain_db(self) -> float:
@@ -115,6 +118,22 @@ def native_gain_control_mode(mode: str) -> str | None:
     if gain_control_mode not in NATIVE_GAIN_CONTROL_MODES:
         raise ValueError(f"unsupported native quality mode {mode!r}")
     return gain_control_mode
+
+
+def tone_quality_thresholds_for_mode(
+    options: TandemQualityOptions, mode: str
+) -> ToneQualityThresholds:
+    """Return the exact amplitude policy for one steady-state comparison mode."""
+
+    if mode in (MODE_MANUAL, MODE_TANDEM):
+        return options.thresholds
+    native_gain_control_mode(mode)
+    if mode == MODE_NATIVE_FAST:
+        return replace(
+            options.thresholds,
+            max_tone_dbfs=options.native_fast_max_tone_dbfs,
+        )
+    return options.thresholds
 
 
 def _ordinary_iio_mode(mode: str) -> str:
@@ -231,6 +250,10 @@ def validate_options(options: TandemQualityOptions) -> None:
         raise ValueError("native gain-control modes cannot contain duplicates")
     for native_mode in native_modes:
         native_mode_name(native_mode)
+    if options.native_fast_max_tone_dbfs != NATIVE_FAST_MAX_TONE_DBFS:
+        raise ValueError(
+            "native fast-attack maximum tone level must remain exactly -2.0 dBFS"
+        )
     levels = options.tx_gain_trajectory_db
     if any(not math.isfinite(level) for level in levels):
         raise ValueError("TX trajectory must contain only finite gains")
@@ -389,8 +412,8 @@ def _extend_gain_band(
     states: Sequence[Mapping[str, Sequence[Any]]],
     *,
     expected_mode: str,
-    prior: Optional[_OrdinaryGainBand] = None,
-) -> Optional[_OrdinaryGainBand]:
+    prior: _OrdinaryGainBand | None = None,
+) -> _OrdinaryGainBand | None:
     """Extend a stable band, rejecting cumulative drift hidden by pairwise checks."""
 
     if not states:
@@ -477,7 +500,7 @@ def _capture(
     *,
     options: TandemQualityOptions,
     metadata: bool,
-) -> tuple[bytes, Optional[TandemFrameMetadata], dict[str, Any]]:
+) -> tuple[bytes, TandemFrameMetadata | None, dict[str, Any]]:
     raw, raw_metadata, refill_ns = radio.capture_iq(
         buffer,
         metadata=metadata,
@@ -537,7 +560,7 @@ def _settle_ordinary(
     expected_mode = _ordinary_iio_mode(mode)
     trace: list[dict[str, Any]] = []
     stable = 0
-    stable_band: Optional[_OrdinaryGainBand] = None
+    stable_band: _OrdinaryGainBand | None = None
     deadline = time.monotonic() + options.settle_timeout_seconds
     minimum_drain = options.kernel_buffers + 1
     for attempt in range(1, options.max_settle_frames + 1):
@@ -597,8 +620,8 @@ def _settle_tandem(
 ) -> tuple[list[dict[str, Any]], TandemFrameMetadata]:
     trace: list[dict[str, Any]] = []
     stable = 0
-    previous: Optional[TandemFrameMetadata] = None
-    ownership_epoch: Optional[int] = None
+    previous: TandemFrameMetadata | None = None
+    ownership_epoch: int | None = None
     deadline = time.monotonic() + options.settle_timeout_seconds
     minimum_drain = options.kernel_buffers + 1
     for attempt in range(1, options.max_settle_frames + 1):
@@ -683,7 +706,7 @@ def _measure_ordinary(
                 raw,
                 sample_rate_hz=options.sample_rate_hz,
                 expected_tone_hz=options.tone_hz,
-                thresholds=options.thresholds,
+                thresholds=tone_quality_thresholds_for_mode(options, mode),
             )
         )
         if options.save_iq:
@@ -813,7 +836,7 @@ def _run_mode(
     radio.arm_tx2_tone(tone_hz=options.tone_hz, scale=options.dds_scale)
 
     metadata = mode == MODE_TANDEM
-    request: Optional[bytes] = None
+    request: bytes | None = None
     native_iio_mode = native_gain_control_mode(mode)
     if native_iio_mode is None and mode == MODE_TANDEM:
         request = build_tandem_request(

@@ -235,7 +235,19 @@ sorted phase-object keys while checkpoint replay required their iteration
 order to equal execution order. RC18 has no passing full or soak result and is
 not hardware-qualified.
 
-The active candidate is RC19. It retains RC18's firmware implementation,
+RC19 locked exact commit `70949a18a7f42d99fdd5356b128f37b7c7fa2b7e`,
+passed trusted run `33015979913`, and produced candidate index
+`f099bdfba1e529730b7012d6a75c995d73165994daaa00501eb2e5bcbca57e81`.
+All four exact radios passed RAM-only deployment, unchanged-QSPI/final-safe
+checks, and the muted metadata lifecycle. Its resume correction worked and the
+full steady campaign reached hardware. Native fast attack repeatedly measured
+between `-3.00` and `-2.47 dBFS` with zero clipping, strong SNR, and coherent
+dual-RX capture, but the shared `-3.0 dBFS` ceiling rejected otherwise valid
+cells. R18 also saw one strict tandem transition-continuity rejection; that
+rule remains mandatory. RC19 has no passing full or soak result and is not
+hardware-qualified.
+
+The active candidate is RC20. It retains RC19's firmware implementation,
 external source graph, deterministic package, topology-bound serialless-b674
 resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
 route, IIO/model/runtime checks, QSPI equality requirement, and safe-state
@@ -249,20 +261,22 @@ Ephemeral RAM host keys are accepted
 with password-only SSH and host-key files disabled. Exact topology remains
 mandatory; nonempty serial mismatch, ambiguity, wrong VID/PID, serialless b673,
 `-S`, `-R`, persistent targets, and returned-runtime mismatch remain forbidden
-or fail closed. RC19 accepts canonical phase-object key ordering while still
-requiring the exact phase-key set and exact stored specification for every
-requested phase. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc19-source/firmware-v1`. The later
+or fail closed. RC20 keeps RC19's corrected exact-set/spec checkpoint replay
+and changes one fixed release oracle only: native fast attack uses a
+`-2.0 dBFS` maximum tone, while manual fixed gain, native slow attack, and
+tandem AUTO remain at `-3.0 dBFS`. Zero clipping and every other RF, metadata,
+gain, cleanup, and safety gate remain unchanged. Its exact candidate source
+lock is `refs/tags/tandem-agc-v8-rc20-source/firmware-v1`. The later
 final build uses the different exact lock
 `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
 reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
-1. Commit the complete source and run the routed block-level OOC gate from a
+1. Commit the complete RC20 source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC19 firmware source lock and explicit trusted build route.
+2. Create the exact RC20 firmware source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
