@@ -7,6 +7,8 @@ export PATH
 unset BASH_ENV CDPATH ENV GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
 unset GIT_CONFIG_COUNT GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM GIT_DIR GIT_INDEX_FILE
 unset GIT_OBJECT_DIRECTORY GIT_WORK_TREE
+unset MYVIVADO RDI_APPROOT RDI_BASEROOT RDI_BINROOT RDI_JAVALAUNCH RDI_PATCHROOT
+unset XILINX_HLS XILINX_PATH XILINX_VITIS XILINX_VIVADO
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -15,6 +17,8 @@ CANONICAL_VIVADO=/opt/Xilinx/Vivado/2022.2/bin/vivado
 CANONICAL_SETUP_ENV=/opt/Xilinx/Vivado/2022.2/bin/setupEnv.sh
 CANONICAL_VIVADO_BINARY=/opt/Xilinx/Vivado/2022.2/bin/unwrapped/lnx64.o/vivado
 CANONICAL_LOADER=/opt/Xilinx/Vivado/2022.2/bin/loader
+CANONICAL_RDI_ARGS=/opt/Xilinx/Vivado/2022.2/bin/rdiArgs.sh
+CANONICAL_LDLIBPATH=/opt/Xilinx/Vivado/2022.2/bin/ldlibpath.sh
 CANONICAL_VIVADO_SETTINGS_CHILD=/opt/Xilinx/Vivado/2022.2/.settings64-Vivado.sh
 CANONICAL_HLS_SETTINGS_CHILD=/opt/Xilinx/Vitis_HLS/2022.2/.settings64-Vitis_HLS.sh
 CANONICAL_LIBEDIT=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/libedit.so.0
@@ -25,6 +29,8 @@ EXPECTED_VIVADO_SHA256=2924389be0c4297f3e2c4d267e22904a89962575497d0f5fd7eb15dc9
 EXPECTED_SETUP_ENV_SHA256=07553d9d7fb5915d44e9ac29a9c8bd33321b233231a66b5daff10985aa672d38
 EXPECTED_VIVADO_BINARY_SHA256=869fa7c4f4f7256ed386c79db0e479b18d3feb201eb77e1739dba633be6446de
 EXPECTED_LOADER_SHA256=1d0fb72724ad841d577c7ae3a92785966a7d13f7e29632b6c79ebd7129ab6719
+EXPECTED_RDI_ARGS_SHA256=6aeeb899b0ed16fe5ca498e2a2edbc3cc14e2980f4bde781d3e68d0bff6ef831
+EXPECTED_LDLIBPATH_SHA256=69631f2531878c38a834ee9be4b72b9d1c2c93352dde06689c0af6ff79e05169
 EXPECTED_VIVADO_SETTINGS_CHILD_SHA256=7ae101caddf078b5195bc56be0281cdde733162b59e8f15ebf5edb0a27a248bc
 EXPECTED_HLS_SETTINGS_CHILD_SHA256=982386b218be5a9af14bef824a8d07fbf40683e32db28a80315fa32bc29f68e5
 EXPECTED_LIBEDIT_SHA256=751b6bffc3edcac597ad5e69840ee0832c865d1038baa9b8aefee642125f2742
@@ -57,6 +63,10 @@ git_exact() {
     fail "Vivado executable binary hash does not match the qualified installation"
 [[ "$(sha256 "$CANONICAL_LOADER")" == "$EXPECTED_LOADER_SHA256" ]] ||
     fail "Vivado loader hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_RDI_ARGS")" == "$EXPECTED_RDI_ARGS_SHA256" ]] ||
+    fail "Vivado rdiArgs hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_LDLIBPATH")" == "$EXPECTED_LDLIBPATH_SHA256" ]] ||
+    fail "Vivado ldlibpath hash does not match the qualified installation"
 [[ "$(sha256 "$CANONICAL_VIVADO_SETTINGS_CHILD")" == \
     "$EXPECTED_VIVADO_SETTINGS_CHILD_SHA256" ]] ||
     fail "Vivado nested settings hash does not match the qualified installation"
@@ -163,7 +173,7 @@ done
 mv -- "$output_dir/.input-sha256.tmp" "$output_dir/input-sha256.txt"
 
 unset LD_PRELOAD PYTHONHOME PYTHONPATH LD_LIBRARY_PATH
-export LC_ALL=C LANG=C TZ=UTC HOME="$run_dir/home" TMPDIR="$run_dir/tmp"
+export LC_ALL=C LANG=C TZ=UTC HOME="$run_ref/home" TMPDIR="$run_ref/tmp"
 export XILINX_LOCAL_USER_DATA=no
 # shellcheck disable=SC1090
 source "$CANONICAL_SETTINGS"
@@ -221,6 +231,8 @@ branch="$(git_exact branch --show-current)"
     echo "vivado_setup_env_sha256=${EXPECTED_SETUP_ENV_SHA256}"
     echo "vivado_binary_sha256=${EXPECTED_VIVADO_BINARY_SHA256}"
     echo "vivado_loader_sha256=${EXPECTED_LOADER_SHA256}"
+    echo "vivado_rdi_args_sha256=${EXPECTED_RDI_ARGS_SHA256}"
+    echo "vivado_ldlibpath_sha256=${EXPECTED_LDLIBPATH_SHA256}"
     echo "vivado_nested_settings_sha256=${EXPECTED_VIVADO_SETTINGS_CHILD_SHA256}"
     echo "vitis_hls_nested_settings_sha256=${EXPECTED_HLS_SETTINGS_CHILD_SHA256}"
     echo "libedit_sha256=${EXPECTED_LIBEDIT_SHA256}"
@@ -231,7 +243,7 @@ mv -- "$output_dir/.provenance.tmp" "$output_dir/provenance.txt"
 
 set +e
 (
-    cd "$run_dir"
+    cd "$run_ref"
     "$CANONICAL_VIVADO" -mode batch -nojournal -nolog -notrace \
         -source "$output_dir/input/axi_ooc.tcl" -tclargs "$output_dir"
 ) >"$output_dir/vivado.log" 2>&1
@@ -294,8 +306,8 @@ fi
     fail "strict routed OOC report validation failed"
 mv -- "$output_ref/.timing-metrics.tmp" "$output_ref/timing-metrics.txt"
 
-expected_inventory="$run_dir/expected-inventory.txt"
-actual_inventory="$run_dir/actual-inventory.txt"
+expected_inventory="$run_ref/expected-inventory.txt"
+actual_inventory="$run_ref/actual-inventory.txt"
 {
     echo "cdc-details.rpt f"
     echo "cdc-summary.rpt f"
@@ -316,7 +328,7 @@ actual_inventory="$run_dir/actual-inventory.txt"
     echo "vivado-version.txt f"
     echo "vivado.log f"
 } | LC_ALL=C sort >"$expected_inventory"
-find "$output_ref" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
+find -H "$output_ref" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
     LC_ALL=C sort >"$actual_inventory"
 cmp -s -- "$expected_inventory" "$actual_inventory" ||
     fail "OOC evidence inventory is not exact before promotion"
@@ -325,16 +337,16 @@ while IFS= read -r -d '' evidence_file; do
     [[ ! -L "$evidence_file" && "$(stat -Lc '%F:%a:%u:%g' "$evidence_file")" == \
         "regular file:600:$(id -u):$(id -g)" ]] ||
         fail "unsafe OOC evidence file: $evidence_file"
-done < <(find "$output_ref" -type f -print0)
+done < <(find -H "$output_ref" -type f -print0)
 
 (
     cd "$output_ref"
     find . -maxdepth 2 -type f ! -name evidence-sha256.txt ! -name status.txt \
         -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
-) >"$run_dir/evidence-sha256.txt"
-ln -- "$run_dir/evidence-sha256.txt" "$output_ref/evidence-sha256.txt" ||
+) >"$run_ref/evidence-sha256.txt"
+ln -- "$run_ref/evidence-sha256.txt" "$output_ref/evidence-sha256.txt" ||
     fail "could not claim the final evidence manifest"
-unlink -- "$run_dir/evidence-sha256.txt"
+unlink -- "$run_ref/evidence-sha256.txt"
 manifest_sha256="$(sha256 "$output_ref/evidence-sha256.txt")"
 {
     echo "schema=plutosdr-fw.tandem-agc-ooc-status.v1"
@@ -345,7 +357,7 @@ manifest_sha256="$(sha256 "$output_ref/evidence-sha256.txt")"
     echo "integrated_route_required=true"
     echo "commit=${commit}"
     echo "evidence_manifest_sha256=${manifest_sha256}"
-} >"$run_dir/status.txt"
+} >"$run_ref/status.txt"
 
 [[ "$(stat -Lc '%d:%i:%f:%u:%g' "$output_dir")" == "$output_identity" ]] ||
     fail "output directory identity changed during final promotion"
@@ -365,24 +377,24 @@ done
 (
     cd "$output_ref/input"
     LC_ALL=C sha256sum "${input_names[@]}"
-) >"$run_dir/final-input-sha256.txt"
-cmp -s -- "$run_dir/final-input-sha256.txt" "$output_ref/input-sha256.txt" ||
+) >"$run_ref/final-input-sha256.txt"
+cmp -s -- "$run_ref/final-input-sha256.txt" "$output_ref/input-sha256.txt" ||
     fail "final staged OOC input hash inventory is not exact"
 {
     cat "$expected_inventory"
     echo "evidence-sha256.txt f"
-} | LC_ALL=C sort >"$run_dir/final-expected-inventory.txt"
-find "$output_ref" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
-    LC_ALL=C sort >"$run_dir/final-actual-inventory.txt"
-cmp -s -- "$run_dir/final-expected-inventory.txt" \
-    "$run_dir/final-actual-inventory.txt" ||
+} | LC_ALL=C sort >"$run_ref/final-expected-inventory.txt"
+find -H "$output_ref" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
+    LC_ALL=C sort >"$run_ref/final-actual-inventory.txt"
+cmp -s -- "$run_ref/final-expected-inventory.txt" \
+    "$run_ref/final-actual-inventory.txt" ||
     fail "final OOC evidence inventory is not exact"
 /usr/bin/env -u LD_LIBRARY_PATH /usr/bin/python3 -I -B \
     "$output_ref/input/validate_tandem_agc_ooc.py" \
     --directory-fd "$output_fd" \
-    >"$run_dir/revalidated-timing-metrics.txt" ||
+    >"$run_ref/revalidated-timing-metrics.txt" ||
     fail "final strict routed OOC report validation failed"
-cmp -s -- "$run_dir/revalidated-timing-metrics.txt" \
+cmp -s -- "$run_ref/revalidated-timing-metrics.txt" \
     "$output_ref/timing-metrics.txt" ||
     fail "final OOC report validation changed normalized timing evidence"
 (
@@ -393,14 +405,14 @@ while IFS= read -r -d '' evidence_file; do
     [[ ! -L "$evidence_file" && "$(stat -Lc '%F:%a:%u:%g' "$evidence_file")" == \
         "regular file:600:$(id -u):$(id -g)" ]] ||
         fail "unsafe final OOC evidence file: $evidence_file"
-done < <(find "$output_ref" -type f -print0)
+done < <(find -H "$output_ref" -type f -print0)
 [[ "$(stat -Lc '%F:%a:%u:%g' "$output_ref")" == \
     "directory:700:$(id -u):$(id -g)" ]] ||
     fail "unsafe final OOC output directory"
 [[ "$(stat -Lc '%F:%a:%u:%g' "$output_ref/input")" == \
     "directory:700:$(id -u):$(id -g)" ]] ||
     fail "unsafe final OOC input directory"
-[[ "$(stat -Lc '%F:%a:%u:%g' "$run_dir/status.txt")" == \
+[[ "$(stat -Lc '%F:%a:%u:%g' "$run_ref/status.txt")" == \
     "regular file:600:$(id -u):$(id -g)" ]] ||
     fail "prepared PASS status is not a private regular file"
 echo "All OOC checks complete at $output_dir; attempting final status claim"
@@ -408,4 +420,4 @@ echo "All OOC checks complete at $output_dir; attempting final status claim"
 # authorizing status exists if any prior validation or inventory check fails.
 [[ "$(stat -Lc '%d:%i:%f:%u:%g' "$output_dir")" == "$output_identity" ]] ||
     fail "output directory identity changed immediately before status claim"
-ln -- "$run_dir/status.txt" "/proc/$$/fd/$output_fd/status.txt"
+ln -- "$run_ref/status.txt" "/proc/$$/fd/$output_fd/status.txt"
