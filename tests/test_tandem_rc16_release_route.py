@@ -70,18 +70,18 @@ def test_rc16_pins_the_recovery_corrected_pushed_utility() -> None:
     assert 'pluto firmware candidate-ram "$@"' in WRAPPER.read_text(encoding="utf-8")
 
 
-def test_rc16_history_is_retained_while_rc18_is_active() -> None:
+def test_rc16_history_is_retained_while_rc19_is_active() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc18" in evidence
-    assert "refs/tags/tandem-agc-v8-rc18-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc19" in evidence
+    assert "refs/tags/tandem-agc-v8-rc19-source/firmware-v1" in evidence
     for source in sources:
         assert "RC16" in source
         assert "2654f34eb909904ec65bc0526e0f8977cb30e2ed" in source
         assert "pluto-plus-utils" in source
-    assert "The active candidate is RC18" in sources[0]
+    assert "The active candidate is RC19" in sources[0]
     assert "RC15" in sources[1]
 
 
@@ -90,5 +90,5 @@ def test_rc16_keeps_single_owner_optional_github_attestation_policy() -> None:
     runner = KALMAN.read_text(encoding="utf-8")
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC18 workflow has no separate attestation job." in runner
+    assert "The RC19 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner

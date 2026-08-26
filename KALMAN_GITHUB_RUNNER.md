@@ -171,11 +171,20 @@ and completed safe RAM deployment plus lifecycle on all four radios. Its first
 full campaign stopped before USB because host-libiio replay compared the
 firmware wrapper against the separate libiio repository.
 
-The forward-only RC18 route uses branch
-`codex/firmware-tandem-agc-v8-rc18`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc18`, and source lock
-`refs/tags/tandem-agc-v8-rc18-source/firmware-v1`; it does not move or reuse
-RC12 through RC17's branch, source lock, artifact, or evidence index. RC18 pins
+RC18 locked exact commit `ac7bbfebe7f0a2d639c8e68bc0efe493f950d389`,
+passed trusted run `33011655732`, and produced candidate index
+`8eea002ab8267ed4a53cad38cdc926cb961904baea83bb3ec9c3d136ed3360ee`.
+All four exact radios passed RAM deployment and lifecycle. The db696 steady
+comparison safely recorded one marginal native-fast-attack cell, then the
+authorized retry stopped before USB because canonical JSON checkpoint key
+order differed from execution order. RC18 is immutable and not
+hardware-qualified.
+
+The forward-only RC19 route uses branch
+`codex/firmware-tandem-agc-v8-rc19`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc19`, and source lock
+`refs/tags/tandem-agc-v8-rc19-source/firmware-v1`; it does not move or reuse
+RC12 through RC18's branch, source lock, artifact, or evidence index. RC19 pins
 `pluto-plus-utils` commit
 `2654f34eb909904ec65bc0526e0f8977cb30e2ed` as the sole live device operator.
 The firmware repository produces the private candidate plan and validates the
@@ -231,7 +240,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC18 workflow has no separate attestation job. An operator may capture GitHub
+The RC19 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

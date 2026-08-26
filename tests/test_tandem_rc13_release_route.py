@@ -136,7 +136,7 @@ def test_rc13_bundle_handoff_records_github_attestation_not_performed() -> None:
     assert "if-no-files-found: error" in workflow
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC18 workflow has no separate attestation job." in runner
+    assert "The RC19 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner
     assert "plutosdr-fw.github-attestation-not-performed.v1" in runner
     assert 'sidecars=("$artifact_dir"/*.tar.gz.sha256)' in runner
@@ -174,7 +174,7 @@ def test_rc13_docs_preserve_exact_rc12_build_and_ram_incident() -> None:
         "postboot QSPI equality is not claimed",
     )
 
-    assert "The active candidate is RC18" in releasing
+    assert "The active candidate is RC19" in releasing
     for source in sources:
         for exact_value in exact_history:
             assert exact_value in source
@@ -188,7 +188,7 @@ def test_rc13_docs_preserve_exact_rc12_build_and_ram_incident() -> None:
     assert "paired-selector `-D` and `-e`" in notes
     assert "returned exact `0456:b673`" in notes
     assert "exited 255" in notes
-    assert "The active candidate is RC18" in plan
-    assert "refs/tags/tandem-agc-v8-rc18-source/firmware-v1" in releasing
-    assert "refs/tags/tandem-agc-v8-rc18-source/firmware-v1" in notes
-    assert "refs/tags/tandem-agc-v8-rc18-source/firmware-v1" in plan
+    assert "The active candidate is RC19" in plan
+    assert "refs/tags/tandem-agc-v8-rc19-source/firmware-v1" in releasing
+    assert "refs/tags/tandem-agc-v8-rc19-source/firmware-v1" in notes
+    assert "refs/tags/tandem-agc-v8-rc19-source/firmware-v1" in plan

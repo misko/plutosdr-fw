@@ -2150,10 +2150,20 @@ def _load_checkpoint(
     checkpoint = json.loads(path.read_text(encoding="utf-8"))
     expected_keys = [spec.key for spec in specs]
     checkpoint_configuration = checkpoint.get("configuration")
+    checkpoint_phases = checkpoint.get("phases")
     if (
         checkpoint.get("schema") != AGGREGATE_SCHEMA
         or checkpoint.get("fingerprint") != _fingerprint(options, specs)
-        or list(checkpoint.get("phases", {})) != expected_keys
+        # _atomic_json deliberately canonicalizes object keys.  Phase execution
+        # order belongs to ``specs``/``plan``; it cannot be recovered from JSON
+        # object iteration order after that canonical serialization.
+        or not isinstance(checkpoint_phases, Mapping)
+        or set(checkpoint_phases) != set(expected_keys)
+        or any(
+            not isinstance(checkpoint_phases.get(spec.key), Mapping)
+            or checkpoint_phases[spec.key].get("spec") != spec.to_dict()
+            for spec in specs
+        )
         or not isinstance(checkpoint_configuration, Mapping)
         or _canonical_json(_stable_resume_configuration(checkpoint_configuration))
         != _canonical_json(_stable_resume_configuration(_configuration(options)))

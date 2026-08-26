@@ -1560,6 +1560,56 @@ def test_resume_revalidates_hash_and_never_reruns_completed_artifact(
     assert len(calls) == 1
 
 
+def test_resume_accepts_canonicalized_multi_phase_checkpoint_order(
+    tmp_path: Path,
+) -> None:
+    options = _parse(
+        tmp_path,
+        "--phase",
+        "transient",
+        "--band",
+        "low=915000000",
+        "--band",
+        "high=5800000000",
+    )
+    first_calls: list[tuple[str, str]] = []
+    execute, validate = _fake_boundaries(first_calls)
+    first, _path = run_aggregate(options, execute, validate)
+    assert first["verdict"] == "pass"
+    assert first_calls == [
+        ("transient_low", "attempt-0001"),
+        ("transient_high", "attempt-0001"),
+    ]
+
+    checkpoint_path = options.output_dir / AGGREGATE_CHECKPOINT
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    assert list(checkpoint["phases"]) == ["transient_high", "transient_low"]
+
+    resumed_calls: list[tuple[str, str]] = []
+    execute_resumed, validate_resumed = _fake_boundaries(resumed_calls)
+    resumed, _path = run_aggregate(options, execute_resumed, validate_resumed)
+    assert resumed["verdict"] == "pass"
+    assert resumed_calls == []
+
+
+def test_resume_rejects_tampered_phase_spec(tmp_path: Path) -> None:
+    options = _parse(tmp_path, "--phase", "transient", "--band", "low=915000000")
+    calls: list[tuple[str, str]] = []
+    execute, validate = _fake_boundaries(calls)
+    first, _path = run_aggregate(options, execute, validate)
+    assert first["verdict"] == "pass"
+
+    checkpoint_path = options.output_dir / AGGREGATE_CHECKPOINT
+    checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
+    checkpoint["phases"]["transient_low"]["spec"]["kind"] = "modulated"
+    checkpoint_path.write_text(
+        json.dumps(checkpoint, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ReleaseCliError, match="differs from the requested plan"):
+        run_aggregate(options, execute, validate)
+
+
 def test_interrupted_artifact_is_abandoned_and_fresh_attempt_is_used(
     tmp_path: Path,
 ) -> None:
