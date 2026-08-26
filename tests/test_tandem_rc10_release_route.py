@@ -49,7 +49,7 @@ def test_rc10_owner_only_route_maps_ref_manifest_and_package_together() -> None:
     assert workflow.count("'tandem-agc-v8-rc10-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc10'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc10'") == 1
-    assert "Require the exact protected RC10 candidate identity" in workflow
+    assert "Require the exact protected RC10 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index("tandem-agc-v8-rc9-source.yaml")
 
 
@@ -82,10 +82,13 @@ def test_rc10_bundle_upload_does_not_require_github_attestation() -> None:
     assert "\n  attest:" not in workflow
 
 
-def test_kalman_handoff_matches_the_rc10_bundle_checksum_contract() -> None:
+def test_kalman_handoff_preserves_the_rc10_build_and_transition_history() -> None:
     runner = KALMAN_RUNNER.read_text(encoding="utf-8")
 
-    assert "The RC10 workflow has no separate attestation job." in runner
+    assert "Trusted run `32964460396`" in runner
+    assert "RC10 has zero candidate deployments" in runner
+    assert "before any `dfu-util -D`" in runner
+    assert "persistent RC1" in runner
     assert "GitHub attestation is not required for this handoff." in runner
     assert "plutosdr-fw.github-attestation-not-performed.v1" in runner
     assert 'sidecars=("$artifact_dir"/*.tar.gz.sha256)' in runner
@@ -94,13 +97,13 @@ def test_kalman_handoff_matches_the_rc10_bundle_checksum_contract() -> None:
     assert "gh attestation verify" not in runner
 
 
-def test_rc10_release_docs_bind_exact_stage_locks_and_full_final_campaign() -> None:
+def test_release_docs_preserve_rc10_lock_and_bind_full_final_campaign() -> None:
     releasing = RELEASING.read_text(encoding="utf-8")
     plan = RELEASE_PLAN.read_text(encoding="utf-8")
     candidate_lock = "refs/tags/tandem-agc-v8-rc10-source/firmware-v1"
     final_lock = "refs/tags/tandem-agc-v8-source/firmware-v1"
 
-    assert "The active candidate is RC10" in releasing
+    assert "The active candidate is RC11" in releasing
     assert candidate_lock in releasing
     assert final_lock in releasing
     assert "repeat the full four-radio campaign" in releasing

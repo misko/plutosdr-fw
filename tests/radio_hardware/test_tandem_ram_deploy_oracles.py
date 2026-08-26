@@ -209,6 +209,26 @@ def _device(
     )
 
 
+def _write_sysfs_usb_device(
+    root: Path,
+    *,
+    topology: str,
+    vendor: str,
+    product: str,
+    serial: str | None,
+    busnum: int = 3,
+    devnum: int = 8,
+) -> None:
+    device = root / topology
+    device.mkdir(parents=True)
+    (device / "idVendor").write_text(f"{vendor}\n", encoding="ascii")
+    (device / "idProduct").write_text(f"{product}\n", encoding="ascii")
+    (device / "busnum").write_text(f"{busnum}\n", encoding="ascii")
+    (device / "devnum").write_text(f"{devnum}\n", encoding="ascii")
+    if serial is not None:
+        (device / "serial").write_text(f"{serial}\n", encoding="utf-8")
+
+
 def _attestation(
     *,
     firmware: str,
@@ -425,6 +445,134 @@ class FakeRouteKernel:
             raise AssertionError(f"unexpected subprocess: {command}")
         stdout = json.dumps(payload) if not isinstance(payload, str) else payload
         return subprocess.CompletedProcess(command, 0, stdout, "")
+
+
+@pytest.mark.parametrize("serial_file", [None, ""])
+def test_system_backend_accepts_real_shape_serialless_dfu_on_prebound_port(
+    tmp_path: Path, serial_file: str | None
+) -> None:
+    fixture = _fixture(tmp_path)
+    sysfs_root = tmp_path / "sysfs"
+    _write_sysfs_usb_device(
+        sysfs_root,
+        topology=TOPOLOGY,
+        vendor=deploy.USB_VENDOR,
+        product=deploy.DFU_PRODUCT,
+        serial=serial_file,
+    )
+    backend = deploy.SystemBackend(fixture.options, sysfs_root=sysfs_root)
+
+    inventory = backend.inventory()
+    assert len(inventory) == 1
+    assert inventory[0].serial == ""
+    assert (
+        backend.wait_for_mode(
+            serial=SERIAL,
+            topology=TOPOLOGY,
+            product_id=deploy.DFU_PRODUCT,
+            timeout_seconds=0.1,
+        )
+        == inventory[0]
+    )
+
+
+@pytest.mark.parametrize(
+    ("vendor", "product"),
+    [("1234", deploy.DFU_PRODUCT), (deploy.USB_VENDOR, "ffff")],
+)
+def test_real_shape_serialless_dfu_rejects_wrong_vendor_or_product(
+    tmp_path: Path, vendor: str, product: str
+) -> None:
+    fixture = _fixture(tmp_path)
+    sysfs_root = tmp_path / "sysfs"
+    _write_sysfs_usb_device(
+        sysfs_root,
+        topology=TOPOLOGY,
+        vendor=vendor,
+        product=product,
+        serial=None,
+    )
+    backend = deploy.SystemBackend(fixture.options, sysfs_root=sysfs_root)
+
+    assert backend.inventory() == ()
+    with pytest.raises(deploy.DeploymentError, match="expected exactly one"):
+        deploy.resolve_dfu_device(backend.inventory(), serial=SERIAL, topology=TOPOLOGY)
+
+
+def test_serialless_runtime_is_ignored_and_remains_serial_strict(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    sysfs_root = tmp_path / "sysfs"
+    _write_sysfs_usb_device(
+        sysfs_root,
+        topology=TOPOLOGY,
+        vendor=deploy.USB_VENDOR,
+        product=deploy.RUNTIME_PRODUCT,
+        serial=None,
+    )
+    backend = deploy.SystemBackend(fixture.options, sysfs_root=sysfs_root)
+
+    assert backend.inventory() == ()
+    with pytest.raises(deploy.DeploymentError, match="expected exactly one"):
+        deploy.resolve_device(
+            (_device(deploy.RUNTIME_PRODUCT, serial=""),),
+            serial=SERIAL,
+            product_id=deploy.RUNTIME_PRODUCT,
+            topology=TOPOLOGY,
+        )
+
+
+def test_serialless_dfu_rejects_wrong_prebound_topology() -> None:
+    with pytest.raises(deploy.DeploymentError, match="pre-bound topology"):
+        deploy.resolve_dfu_device(
+            (_device(deploy.DFU_PRODUCT, serial="", topology="4-2"),),
+            serial=SERIAL,
+            topology=TOPOLOGY,
+        )
+
+
+def test_serialless_dfu_rejects_ambiguous_devices_on_prebound_topology() -> None:
+    first = _device(deploy.DFU_PRODUCT, serial="")
+    second = replace(first, devnum=first.devnum + 1)
+
+    with pytest.raises(deploy.DeploymentError, match="expected exactly one"):
+        deploy.resolve_dfu_device((first, second), serial=SERIAL, topology=TOPOLOGY)
+
+
+@pytest.mark.parametrize(
+    "device",
+    [
+        replace(
+            _device(deploy.DFU_PRODUCT, serial=""),
+            sysfs_path="/sys/bus/usb/devices/4-2",
+        ),
+        replace(_device(deploy.DFU_PRODUCT, serial=""), busnum=0),
+        replace(_device(deploy.DFU_PRODUCT, serial=""), devnum=0),
+    ],
+)
+def test_serialless_dfu_rejects_unstable_linux_port_identity(
+    device: deploy.UsbDevice,
+) -> None:
+    with pytest.raises(deploy.DeploymentError, match="stable Linux port path"):
+        deploy.resolve_dfu_device((device,), serial=SERIAL, topology=TOPOLOGY)
+
+
+def test_dfu_present_wrong_serial_rejects_on_prebound_topology() -> None:
+    with pytest.raises(deploy.DeploymentError, match="serial differs"):
+        deploy.resolve_dfu_device(
+            (_device(deploy.DFU_PRODUCT, serial="different-radio"),),
+            serial=SERIAL,
+            topology=TOPOLOGY,
+        )
+
+
+def test_dfu_present_matching_serial_accepts_on_prebound_topology() -> None:
+    device = _device(deploy.DFU_PRODUCT)
+
+    assert (
+        deploy.resolve_dfu_device((device,), serial=SERIAL, topology=TOPOLOGY) == device
+    )
 
 
 def test_system_backend_leases_exact_host_route_and_accepts_bare_json_host(
@@ -1002,9 +1150,118 @@ def test_success_publishes_absent_only_private_bound_receipt(tmp_path: Path) -> 
     assert backend.dfu_commands[0][-1].startswith("/proc/self/fd/")
     assert backend.dfu_commands[1][-1] == "-e"
     assert all("-R" not in command for command in backend.dfu_commands)
+    assert all("-S" not in command for command in backend.dfu_commands)
     assert receipt["persistent_flash"]["pre_sha256"] == "7" * 64
     assert receipt["persistent_flash"]["post_sha256"] == "7" * 64
     assert receipt["persistent_flash"]["unchanged"] is True
+
+
+def test_success_accepts_serialless_dfu_only_during_prebound_transition(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+
+    class SeriallessDfuBackend(FakeBackend):
+        def wait_for_mode(
+            self,
+            *,
+            serial: str,
+            topology: str,
+            product_id: str,
+            timeout_seconds: float,
+        ) -> deploy.UsbDevice:
+            device = super().wait_for_mode(
+                serial=serial,
+                topology=topology,
+                product_id=product_id,
+                timeout_seconds=timeout_seconds,
+            )
+            if product_id == deploy.DFU_PRODUCT:
+                return replace(device, serial="")
+            return device
+
+    backend = SeriallessDfuBackend()
+    receipt, _digest = deploy.execute_deployment(fixture.options, backend)
+
+    assert receipt["verdict"] == "pass"
+    assert receipt["topology"]["dfu_sysfs_path"] == (f"/sys/bus/usb/devices/{TOPOLOGY}")
+    assert len(backend.dfu_commands) == 2
+
+
+@pytest.mark.parametrize("returned_serial", ["", "different-radio"])
+def test_serialless_or_wrong_postboot_runtime_rejects_without_receipt(
+    tmp_path: Path, returned_serial: str
+) -> None:
+    fixture = _fixture(tmp_path)
+
+    class InvalidReturnedRuntimeBackend(FakeBackend):
+        def __init__(self) -> None:
+            super().__init__()
+            self.runtime_waits = 0
+
+        def wait_for_mode(
+            self,
+            *,
+            serial: str,
+            topology: str,
+            product_id: str,
+            timeout_seconds: float,
+        ) -> deploy.UsbDevice:
+            device = super().wait_for_mode(
+                serial=serial,
+                topology=topology,
+                product_id=product_id,
+                timeout_seconds=timeout_seconds,
+            )
+            if product_id == deploy.RUNTIME_PRODUCT:
+                self.runtime_waits += 1
+                if self.runtime_waits == 1:
+                    return replace(device, serial=returned_serial)
+            return device
+
+    backend = InvalidReturnedRuntimeBackend()
+    with pytest.raises(deploy.DeploymentError, match="expected exactly one"):
+        deploy.execute_deployment(fixture.options, backend)
+
+    assert len(backend.dfu_commands) == 2
+    assert not fixture.options.receipt_path.exists()
+
+
+@pytest.mark.parametrize("cleanup_serial", ["", "different-radio"])
+def test_serialless_or_wrong_cleanup_runtime_rejects_without_receipt(
+    tmp_path: Path, cleanup_serial: str
+) -> None:
+    fixture = _fixture(tmp_path)
+
+    class InvalidCleanupRuntimeBackend(FakeBackend):
+        def request_ram_mode(self, argv: Sequence[str]) -> None:
+            super().request_ram_mode(argv)
+            raise deploy.DeploymentError("planted transition failure")
+
+        def wait_for_mode(
+            self,
+            *,
+            serial: str,
+            topology: str,
+            product_id: str,
+            timeout_seconds: float,
+        ) -> deploy.UsbDevice:
+            device = super().wait_for_mode(
+                serial=serial,
+                topology=topology,
+                product_id=product_id,
+                timeout_seconds=timeout_seconds,
+            )
+            if product_id == deploy.RUNTIME_PRODUCT:
+                return replace(device, serial=cleanup_serial)
+            return device
+
+    backend = InvalidCleanupRuntimeBackend()
+    with pytest.raises(deploy.DeploymentError, match="safe cleanup also failed"):
+        deploy.execute_deployment(fixture.options, backend)
+
+    assert not backend.dfu_commands
+    assert not fixture.options.receipt_path.exists()
 
 
 def test_qspi_change_blocks_receipt_after_ram_boot(tmp_path: Path) -> None:
@@ -1303,6 +1560,35 @@ def test_captured_inventory_plan_is_exact_and_still_hardware_free(
     assert blocked["usb"]["network_interfaces"] == [INTERFACE]
     assert "commands" not in blocked
     assert any("--ssh-password-file" in item for item in blocked["blockers"])
+
+
+def test_captured_inventory_remains_exact_serial_even_for_dfu(tmp_path: Path) -> None:
+    inventory_path = tmp_path / "usb-inventory.json"
+    inventory_path.write_text(
+        json.dumps(
+            {
+                "schema": "plutosdr-fw.usb-inventory",
+                "schema_version": 1,
+                "devices": [
+                    {
+                        "topology": TOPOLOGY,
+                        "sysfs_path": f"/sys/bus/usb/devices/{TOPOLOGY}",
+                        "serial": "",
+                        "vendor_id": deploy.USB_VENDOR,
+                        "product_id": deploy.DFU_PRODUCT,
+                        "busnum": 3,
+                        "devnum": 8,
+                        "network_interfaces": [],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    inventory_path.chmod(0o644)
+
+    with pytest.raises(deploy.DeploymentError, match="USB serial must be one exact"):
+        deploy.load_inventory(inventory_path)
 
 
 def test_legacy_downloader_is_quarantined_without_hardware_access() -> None:

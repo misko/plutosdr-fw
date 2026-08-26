@@ -54,9 +54,9 @@ FINAL_CONFIRMATION_INDEX_SCHEMA = "plutosdr-fw.tandem-agc-final-confirmation-ind
 SEMANTIC_VERIFIER_HARNESS_PATH = "scripts/tandem_release_evidence.py"
 RELEASE_VERIFIER_HARNESS_PATH = "scripts/verify_release.sh"
 RELEASE_GIT_REMOTE_URL = "https://github.com/misko/plutosdr-fw.git"
-CANDIDATE_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc10"
+CANDIDATE_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc11"
 FINAL_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
-CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc10-source/firmware-v1"
+CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc11-source/firmware-v1"
 FINAL_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-source/firmware-v1"
 PRE_HARDWARE_SOURCE_LOCK_REFS = {
     "candidate-pre-hardware": CANDIDATE_SOURCE_LOCK_REF,
@@ -946,8 +946,8 @@ def _verify_committed_source_manifest(
 ) -> None:
     if stage == "candidate-pre-hardware":
         if firmware_version != CANDIDATE_FIRMWARE_VERSION:
-            _fail("candidate pre-hardware firmware identity is not exact RC10")
-        basename = "tandem-agc-v8-rc10-source.yaml"
+            _fail("candidate pre-hardware firmware identity is not exact RC11")
+        basename = "tandem-agc-v8-rc11-source.yaml"
     elif stage == "final-pre-confirmation":
         if firmware_version != FINAL_FIRMWARE_VERSION:
             _fail("final pre-confirmation firmware identity is not exact v8")

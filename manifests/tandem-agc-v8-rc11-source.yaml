@@ -1,25 +1,16 @@
-# Immutable source graph for the final tandem AGC v8 build.
-#
-# The external component graph remains identical from RC4 through RC11, but the
-# tracked top-level repository does not. RC5 added post-RC4
-# stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
-# mutually exclusive dwell storage behind an explicit qualification-class tag.
-# RC7 corrected the integrated report policy, RC8 made the bundle/checksum
-# inventories bytewise deterministic, and RC9 removed the host deployer's
-# redundant historical-proof input without changing firmware behavior. RC9's
-# first live execute then stopped before reboot or DFU because duplicate
-# 192.168.2.0/24 routes and password-only factory SSH were not handled by the
-# guarded host transport. RC10 added an exact temporary /32 route lease,
-# private password-file authentication, and a v3 measured receipt. Its first
-# execute transitioned db696 to serial-less 0456:b674 DFU and failed closed
-# before any candidate download; exact-topology detach recovered persistent RC1
-# safely with no receipt or QSPI write and with the route absent. RC11 permits
-# an absent/empty serial only for exact b674 on the pre-attested topology while
-# keeping all runtime b673 paths exact-serial. RC11 must pass its new
-# source-locked build and full hardware qualification before this final graph
-# is used. The subsequent final build may
-# change only the top-level release identity and packaging, while requiring
-# exact component identities in packed /opt/VERSIONS.
+# Immutable source graph for the forward-only tandem AGC v8 RC11 candidate.
+# RC11 retains RC10's successfully built, indexed, fully routed, timing-clean
+# firmware implementation, deterministic package contract, exact /32 route
+# lease, password-file SSH transport, and measured receipt v3. RC10's first
+# execute on db696 transitioned the pre-attested 3-7 port to 0456:b674, whose
+# DFU enumeration omitted its serial. The exact-serial resolver failed closed
+# before any dfu-util -D, so zero candidate bytes were downloaded, no candidate
+# deployment or receipt occurred, and QSPI was not written. Exact-topology
+# dfu-util -e recovered the persistent RC1 runtime in a verified safe state and
+# the temporary /32 route was absent afterward. RC11 accepts an absent/empty
+# serial only for exact 0456:b674 on that pre-attested topology; runtime b673
+# discovery before, after, and during cleanup remains exact-serial.
+# The separately protected firmware source lock binds the reviewed commit.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1

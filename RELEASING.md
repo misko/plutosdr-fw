@@ -114,22 +114,49 @@ diagnostic `/32` route was removed and RC9 performed zero deployments. Its
 branch, lock `refs/tags/tandem-agc-v8-rc9-source/firmware-v1`, run, artifact,
 and candidate index remain immutable successful reproduction history.
 
-The active candidate is RC10. It retains RC9's firmware behavior and
-deterministic packaging contract while adding an exact temporary per-interface
-`192.168.2.1/32` route, private mode-0600 password-file SSH transport, verified
-route release, and the measured deployment receipt v3. Its exact candidate
-source lock is `refs/tags/tandem-agc-v8-rc10-source/firmware-v1`. The later
-final build uses the
-different exact lock `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and
-final evidence must reject a cross-stage substitution of those refs.
+RC10 then retained RC9's firmware behavior and deterministic package while
+adding the exact per-interface `/32` route, private password-file SSH, verified
+route cleanup, and measured receipt v3. Exact commit
+`1b3ba3dbe942b9880f21ca99dda1de5227794c3d` and lock
+`refs/tags/tandem-agc-v8-rc10-source/firmware-v1` passed trusted run
+`32964460396`, attempt 1. The verified candidate index is SHA-256
+`827cc1e6d5d36a7a7f6b61b5238dae7df986d0708eef4c2f4a2e41f2f2461b58`;
+the bundle is SHA-256
+`144aaef4ebab18e7b859f0855421060bcaae8031db3acc1d3b195561f1a2047d`;
+the DFU is SHA-256
+`c0a086eb945d27f728a7fb2504de85ef648fc1dcc1d70a928f9d8c999e523913`;
+and the FIT is SHA-256
+`7e725f5094f224126f98d923e2cb8668af69d2d79132a81f3ee5a74ff75d48cd`.
+
+The first execute pre-attested `winbond-db6968136727402c` on topology `3-7`,
+passed the route/auth/runtime/QSPI baseline, and sent
+`/usr/sbin/device_reboot ram`. The device transitioned to exact `0456:b674`
+but published no DFU sysfs serial, so RC10 stopped before any `dfu-util -D`.
+Zero candidate bytes were downloaded, RC10 has zero candidate deployments, no
+receipt was produced, and no QSPI write occurred. Exact-topology `dfu-util -e`
+recovered the persistent RC1 safe runtime, and the temporary
+`192.168.2.1/32` route is absent. RC10's branch, lock, run, artifact, candidate
+index, and zero-deployment history are immutable.
+
+The active candidate is RC11. It retains RC10's firmware bytes, external
+source graph, package, command plan, and receipt-v3 schema, and changes only
+DFU transition resolution. A serialless device is acceptable only when it is
+the unique exact `0456:b674` on the USB topology pre-attested while the same
+serial was in b673 runtime. Nonempty serial mismatch, wrong topology,
+ambiguity, wrong VID/PID, serialless b673, and returned-runtime mismatch still
+fail closed. Its exact candidate source lock is
+`refs/tags/tandem-agc-v8-rc11-source/firmware-v1`. The later final build uses
+the different exact lock `refs/tags/tandem-agc-v8-source/firmware-v1`;
+candidate and final evidence must reject a cross-stage substitution of those
+refs.
 
 The remaining gates, in order, are:
 
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC10 firmware source lock and explicit trusted build route.
-   Keep RC4 through RC9's external component pins only if source-graph checks
+2. Create the exact RC11 firmware source lock and explicit trusted build route.
+   Keep RC4 through RC10's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
    retain integrated timing, CDC, DRC, methodology, utilization, and build

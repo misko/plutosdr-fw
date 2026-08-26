@@ -1019,6 +1019,37 @@ def resolve_device(
     return device
 
 
+def resolve_dfu_device(
+    devices: Sequence[UsbDevice], *, serial: str, topology: str
+) -> UsbDevice:
+    """Resolve the pre-bound Pluto DFU port, tolerating an omitted serial only."""
+
+    matches = [
+        device
+        for device in devices
+        if device.vendor_id == USB_VENDOR
+        and device.product_id == DFU_PRODUCT
+        and device.topology == topology
+    ]
+    if len(matches) != 1:
+        raise DeploymentError(
+            f"expected exactly one {USB_VENDOR}:{DFU_PRODUCT} USB device on "
+            f"pre-bound topology {topology!r}; found "
+            f"{[(device.topology, device.serial) for device in matches]}"
+        )
+    device = matches[0]
+    if (
+        TOPOLOGY.fullmatch(device.topology) is None
+        or device.sysfs_path != f"/sys/bus/usb/devices/{device.topology}"
+        or device.busnum <= 0
+        or device.devnum <= 0
+    ):
+        raise DeploymentError("resolved USB identity is not one stable Linux port path")
+    if device.serial and device.serial != serial:
+        raise DeploymentError("DFU USB serial differs from the pre-attested radio")
+    return device
+
+
 def select_interface(device: UsbDevice, requested: str | None) -> str:
     interfaces = tuple(sorted(set(device.network_interfaces)))
     if requested is not None:
@@ -1467,10 +1498,9 @@ def execute_deployment(
                         product_id=DFU_PRODUCT,
                         timeout_seconds=options.timeout_seconds,
                     )
-                    resolve_device(
+                    resolve_dfu_device(
                         (dfu_device,),
                         serial=options.serial,
-                        product_id=DFU_PRODUCT,
                         topology=device.topology,
                     )
                     backend.run_dfu(commands[1]["argv"])
@@ -1584,6 +1614,12 @@ def execute_deployment(
                                 topology=device.topology,
                                 product_id=RUNTIME_PRODUCT,
                                 timeout_seconds=options.timeout_seconds,
+                            )
+                            resolve_device(
+                                (cleanup_device,),
+                                serial=options.serial,
+                                product_id=RUNTIME_PRODUCT,
+                                topology=device.topology,
                             )
                             cleanup_interface = select_interface(
                                 cleanup_device, options.usb_interface
@@ -1753,10 +1789,19 @@ class SystemBackend:
                 product = (
                     (target / "idProduct").read_text(encoding="ascii").strip().lower()
                 )
-                serial = (target / "serial").read_text(encoding="utf-8").strip()
                 busnum = int((target / "busnum").read_text(encoding="ascii"))
                 devnum = int((target / "devnum").read_text(encoding="ascii"))
             except (FileNotFoundError, PermissionError, UnicodeError, ValueError):
+                continue
+            try:
+                serial = (target / "serial").read_text(encoding="utf-8").strip()
+            except FileNotFoundError:
+                if vendor != USB_VENDOR or product != DFU_PRODUCT:
+                    continue
+                serial = ""
+            except (PermissionError, UnicodeError):
+                continue
+            if not serial and (vendor != USB_VENDOR or product != DFU_PRODUCT):
                 continue
             interfaces: set[str] = set()
             for usb_interface in self.sysfs_root.glob(f"{entry.name}:*"):
@@ -2252,16 +2297,23 @@ class SystemBackend:
     def wait_for_mode(
         self, *, serial: str, topology: str, product_id: str, timeout_seconds: float
     ) -> UsbDevice:
+        if product_id not in (RUNTIME_PRODUCT, DFU_PRODUCT):
+            raise DeploymentError(f"unsupported USB product mode {product_id!r}")
         deadline = time.monotonic() + timeout_seconds
         last_error: DeploymentError | None = None
         while time.monotonic() < deadline:
             try:
-                device = resolve_device(
-                    self.inventory(),
-                    serial=serial,
-                    product_id=product_id,
-                    topology=topology,
-                )
+                if product_id == DFU_PRODUCT:
+                    device = resolve_dfu_device(
+                        self.inventory(), serial=serial, topology=topology
+                    )
+                else:
+                    device = resolve_device(
+                        self.inventory(),
+                        serial=serial,
+                        product_id=product_id,
+                        topology=topology,
+                    )
                 if product_id == RUNTIME_PRODUCT:
                     select_interface(device, self.options.usb_interface)
                 return device

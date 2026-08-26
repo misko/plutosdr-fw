@@ -28,7 +28,8 @@
 | `tandem-agc-v8-rc7` | 2026-08-26 | **rejected before evidence/hardware** | successful integrated build; bundle rejected because checksum/member order depended on locale and shell-array order |
 | `tandem-agc-v8-rc8` | 2026-08-26 | **successful indexed build; not deployed** | deterministic bundle and verified candidate index; hardware transition blocked by an over-scoped serial-specific proof |
 | `tandem-agc-v8-rc9` | 2026-08-26 | **successful indexed build; rejected before hardware transition** | removed the redundant transition-proof input; first execute exposed duplicate-IP routing and factory-password transport gaps before reboot or DFU |
-| `tandem-agc-v8-rc10` | 2026-08-26 | **development; not hardware-authorized** | retains RC9 firmware bytes/behavior while adding exact per-radio host routing, private password-file SSH, and measured receipt v3 |
+| `tandem-agc-v8-rc10` | 2026-08-26 | **successful indexed build; zero candidate deployments** | trusted build and evidence passed; first execute reached DFU but stopped before candidate download because the selected b674 device omitted its USB serial |
+| `tandem-agc-v8-rc11` | 2026-08-26 | **development; not hardware-authorized** | retains RC10 firmware bytes/behavior and permits a serialless b674 transition only on the exact pre-attested USB topology |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -37,33 +38,70 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc10 — 2026-08-26 — **development; not hardware-authorized**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc11 — 2026-08-26 — **development; not hardware-authorized**
 
-RC10 is the forward-only candidate after RC9 completed every hardware-free
-gate but its first live execute exposed two host-transport assumptions before
-any radio transition. All four attached radios use `192.168.2.1`; binding SSH
-to an interface did not override four competing connected `/24` routes, so the
-kernel initially selected a different serial and strict host-key checking
-correctly refused it. A temporary exact `/32` route proved the intended radio,
-then SSH correctly reported that the factory image accepts its password rather
-than the deployer's former key-only `BatchMode=yes` transport.
+RC11 is the forward-only candidate after RC10's trusted build and evidence
+index passed but the first guarded live transition exposed a legitimate Pluto
+DFU enumeration detail: the exact radio can re-enumerate as `0456:b674`
+without publishing a USB serial. RC11 retains RC10's firmware behavior,
+external source graph, integrated result policy, deterministic package,
+per-radio `/32` route lease, private password-file SSH transport, command plan,
+receipt-v3 schema, and evidence-index contract.
 
-RC10 keeps RC9's firmware behavior, external source graph, integrated policy,
-and deterministic package implementation. Its guarded deployer now obtains an
-exact temporary `192.168.2.1/32` route lease for the selected interface,
-authenticates through a private mode-0600 password file without recording its
-contents, and verifies route deletion before publishing a measured v3 receipt.
-The allowed device transition remains only exact `dfu-util -D` followed by
-`-e`; persistent writes and `-R` remain forbidden. GitHub attestation is not a
-release requirement under this single-owner/operator workflow.
+The only transition change is a tightly bounded resolver rule. The deployer
+first attests the selected radio's exact serial and USB topology while it is in
+the `0456:b673` runtime. After the dedicated RAM-reboot command, a serialless
+`0456:b674` is acceptable only when it is the unique device on that same
+pre-attested topology. A nonempty wrong serial, wrong topology, ambiguous or
+unstable inventory, wrong VID/PID, and every serialless `b673` runtime path
+still fail closed. Returned-runtime and cleanup checks still require the exact
+serial. The allowed candidate transition remains only exact `dfu-util -D`
+followed by `-e`; persistent writes and `-R` remain forbidden.
 
-RC10 has its own manifest, owner-only workflow mapping, artifact namespace,
+RC11 has its own manifest, owner-only workflow mapping, artifact namespace,
 exact firmware identity, and required source lock
-`refs/tags/tandem-agc-v8-rc10-source/firmware-v1`. RC5 through RC9 branches,
+`refs/tags/tandem-agc-v8-rc11-source/firmware-v1`. RC5 through RC10 branches,
 source locks, runs, artifacts, and indexes remain immutable reproduction
-history and are not moved. RC10 must pass the complete hardware-free gate,
-commit-bound routed OOC gate, fresh trusted integrated build, exact evidence
-indexing, and full external four-radio RAM campaign before final v8 promotion.
+history and are not moved. GitHub attestation remains optional supporting
+metadata, not a release requirement. RC11 must pass the complete hardware-free
+gate, commit-bound routed OOC gate, fresh trusted integrated build, exact
+evidence indexing, and full external four-radio RAM campaign before final v8
+promotion.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc10 — 2026-08-26 — **successful indexed build; zero candidate deployments**
+
+RC10 locked exact source commit
+`1b3ba3dbe942b9880f21ca99dda1de5227794c3d` and source ref
+`refs/tags/tandem-agc-v8-rc10-source/firmware-v1`. Trusted run `32964460396`,
+attempt 1, routed all 32,908 nets, used 74 of 80 DSPs, and closed timing at WNS
+`+0.645 ns`, WHS `+0.022 ns`, and minimum bus skew `+8.606 ns`. Artifact ID
+`9605679961` was retained as
+`plutoplus-main-1b3ba3dbe942b9880f21ca99dda1de5227794c3d-32964460396-1`.
+
+Its outer ZIP SHA-256 is
+`273f4b02cf7438c1c5983ea3b87140000d947cc3dc30c7d0631847c5d934ba2c`;
+bundle SHA-256 is
+`144aaef4ebab18e7b859f0855421060bcaae8031db3acc1d3b195561f1a2047d`;
+DFU SHA-256 is
+`c0a086eb945d27f728a7fb2504de85ef648fc1dcc1d70a928f9d8c999e523913`;
+FIT SHA-256 is
+`7e725f5094f224126f98d923e2cb8668af69d2d79132a81f3ee5a74ff75d48cd`;
+source-manifest SHA-256 is
+`5c04a354075ef7ce98958b82ab8ef03277461f24621b88f4a4d2bda5b6d0931f`;
+and verified candidate-index SHA-256 is
+`827cc1e6d5d36a7a7f6b61b5238dae7df986d0708eef4c2f4a2e41f2f2461b58`.
+
+On radio `winbond-db6968136727402c` at pre-attested topology `3-7`, route,
+authentication, runtime, and QSPI baseline checks passed and
+`/usr/sbin/device_reboot ram` transitioned the device to exact `0456:b674`.
+That DFU device omitted its USB serial, so RC10's exact-serial resolver failed
+closed before any `dfu-util -D`. Consequently zero candidate bytes were
+downloaded, RC10 has zero candidate deployments, no receipt was published, and
+there was no QSPI write. Exact-topology `dfu-util -e` recovered the persistent RC1
+safe runtime, and the temporary `192.168.2.1/32` route was removed and is
+absent. RC10's commit, branch, lock, run, artifact, candidate index, and zero-
+deployment history remain immutable. RC11 changes only the serialless-b674
+transition boundary.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc9 — 2026-08-26 — **successful indexed build; rejected before hardware transition**
 
@@ -209,7 +247,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC10 route still requires the complete external paired-behavior,
+active RC11 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

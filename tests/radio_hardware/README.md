@@ -482,6 +482,14 @@ current firmware, operator phrase, new boot ID, safe state, and equal pre/post
 every DFU alternate except `firmware.dfu`; receipts and all later hardware
 evidence remain exact-serial scoped.
 
+The requested serial must first resolve to one exact `0456:b673` runtime
+device and USB topology. During the dedicated RAM transition only, a
+serialless `0456:b674` is accepted when it is the unique b674 device on that
+same pre-attested topology. A nonempty wrong serial, wrong topology, ambiguity,
+unstable inventory, wrong VID/PID, and every serialless b673 path fail closed.
+The returned runtime and all cleanup/evidence paths still require the exact
+requested serial.
+
 Factory images use password SSH. Execution therefore also requires an owned,
 non-symlinked mode-`0600` `--ssh-password-file` outside the candidate archive.
 The password contents are revalidated before every SSH process and are never
@@ -513,7 +521,7 @@ IIO_SOURCE=../libiio \
 scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc10-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc11-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \
@@ -543,7 +551,7 @@ IIO_SOURCE=../libiio \
 scripts/run_stale_small_adc_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc10-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc11-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \

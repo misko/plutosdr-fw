@@ -470,15 +470,24 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
   --execute
 ```
 
-The executor permits only `firmware.dfu` download on the serial's unique USB
-topology followed by DFU detach. Because several attached Plutos can all use
-host `192.168.2.10` and target `192.168.2.1`, it serializes deployments with a
-global lease, refuses any pre-existing target `/32`, temporarily adds that
-`/32` through the selected USB interface and source address, verifies the
-kernel route choice before every SSH call, and removes and verifies the route
-before publishing a receipt. It never changes the connected `/24` routes. The
-SSH command uses the supplied password file through `sshpass`, permits one
-password prompt, and pins only the supplied known-hosts file.
+The executor permits only `firmware.dfu` download on the selected radio's
+unique USB topology followed by DFU detach. It first binds the requested serial
+to an exact `0456:b673` runtime device and topology. During the dedicated DFU
+transition, Pluto firmware may expose the same topology as `0456:b674` without
+a sysfs serial; that one missing value is acceptable only when the b674 device
+is unique on the pre-attested topology. A nonempty mismatching serial, wrong
+topology, ambiguous or unstable inventory, wrong VID/PID, or serialless b673
+runtime still fails closed. The returning runtime and all cleanup decisions
+again require the exact requested serial.
+
+Because several attached Plutos can all use host `192.168.2.10` and target
+`192.168.2.1`, the executor serializes deployments with a global lease, refuses
+any pre-existing target `/32`, temporarily adds that `/32` through the selected
+USB interface and source address, verifies the kernel route choice before
+every SSH call, and removes and verifies the route before publishing a receipt.
+It never changes the connected `/24` routes. The SSH command uses the supplied
+password file through `sshpass`, permits one password prompt, and pins only the
+supplied known-hosts file.
 
 The executor rejects USB reset, SPI-flash/QSPI, boot and environment
 alternates, full ZIP/FRM files, and raw MTD targets. It publishes a passing v3

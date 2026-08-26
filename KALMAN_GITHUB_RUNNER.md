@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC10 trusted workflow ends after the build job uploads the exact deployment
+- The RC11 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -55,9 +55,41 @@ Its first live execute stopped before reboot or DFU: duplicate connected `/24`
 routes selected the wrong serial, then a temporary exact `/32` route exposed
 the factory image's password-only SSH service. No radio changed state and no
 receipt was produced. RC9's source lock, run, artifact, and index remain
-immutable reproduction history. RC10 advances only the guarded host
-route/authentication boundary and receipt schema; firmware behavior is
-unchanged.
+immutable reproduction history.
+
+RC10 then advanced only the guarded host route/authentication boundary and
+receipt schema; firmware behavior remained unchanged. Exact source commit
+`1b3ba3dbe942b9880f21ca99dda1de5227794c3d` and lock
+`refs/tags/tandem-agc-v8-rc10-source/firmware-v1` passed Trusted run `32964460396`,
+attempt 1. The run fully routed 32,908 of 32,908 nets, used 74
+of 80 DSPs, and closed timing at WNS `+0.645 ns`, WHS `+0.022 ns`, and minimum
+bus skew `+8.606 ns`. Artifact ID `9605679961` is named
+`plutoplus-main-1b3ba3dbe942b9880f21ca99dda1de5227794c3d-32964460396-1`.
+Its outer ZIP SHA-256 is
+`273f4b02cf7438c1c5983ea3b87140000d947cc3dc30c7d0631847c5d934ba2c`,
+bundle SHA-256 is
+`144aaef4ebab18e7b859f0855421060bcaae8031db3acc1d3b195561f1a2047d`,
+DFU SHA-256 is
+`c0a086eb945d27f728a7fb2504de85ef648fc1dcc1d70a928f9d8c999e523913`,
+FIT SHA-256 is
+`7e725f5094f224126f98d923e2cb8668af69d2d79132a81f3ee5a74ff75d48cd`,
+source-manifest SHA-256 is
+`5c04a354075ef7ce98958b82ab8ef03277461f24621b88f4a4d2bda5b6d0931f`,
+and verified candidate-index SHA-256 is
+`827cc1e6d5d36a7a7f6b61b5238dae7df986d0708eef4c2f4a2e41f2f2461b58`.
+
+On `winbond-db6968136727402c` at pre-attested topology `3-7`, route,
+authentication, runtime, and QSPI baseline checks passed, and
+`/usr/sbin/device_reboot ram` transitioned the device to exact `0456:b674`.
+The b674 sysfs serial was absent, so the exact-serial resolver stopped before any `dfu-util -D`:
+zero candidate bytes were downloaded. RC10 has zero candidate deployments,
+no receipt was published, and no QSPI write occurred.
+Exact-topology `dfu-util -e` recovered the persistent RC1 safe runtime. The
+temporary `192.168.2.1/32` route is absent. RC10's source lock, trusted run,
+artifact, candidate index, and zero-deployment history remain immutable. RC11
+advances only the serialless-b674 resolver boundary: only a unique exact
+`0456:b674` on the pre-attested topology may omit its serial; all b673 paths
+and returned-runtime checks remain exact-serial.
 
 ## One-time administrator installation
 
@@ -105,7 +137,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC10 workflow has no separate attestation job. An operator may capture GitHub
+The RC11 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.
