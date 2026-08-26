@@ -349,7 +349,7 @@ def test_tandem_ooc_default_check_ignores_verilog_comment_decoys(
 set argc 1
 set argv [list {{{output}}}]
 proc create_project {{args}} {{error STOP_AFTER_DEFAULT_CHECK}}
-if {{[catch {{source {{{staged / 'axi_ooc.tcl'}}}}} message]}} {{
+if {{[catch {{source {{{staged / "axi_ooc.tcl"}}}}} message]}} {{
   puts $message
   exit 0
 }}

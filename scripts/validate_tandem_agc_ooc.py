@@ -323,7 +323,9 @@ def _validate_cdc_summary(text: str) -> None:
     if text.count(header) != 1:
         _fail("CDC summary table header is not unique and exact")
     lines = text.splitlines()
-    header_indices = [index for index, line in enumerate(lines) if line.rstrip() == header]
+    header_indices = [
+        index for index, line in enumerate(lines) if line.rstrip() == header
+    ]
     if len(header_indices) != 1:
         _fail("CDC summary table header is not uniquely scoped")
     header_index = header_indices[0]
@@ -456,7 +458,9 @@ def _validate_cdc_details(text: str) -> None:
             "Destination (To)"
         )
         header_indices = [
-            index for index, line in enumerate(body_lines) if line.rstrip() == detail_header
+            index
+            for index, line in enumerate(body_lines)
+            if line.rstrip() == detail_header
         ]
         if len(header_indices) != 1:
             _fail(f"CDC detail table header is not unique and exact for {key}")
@@ -468,9 +472,7 @@ def _validate_cdc_details(text: str) -> None:
         ):
             _fail(f"CDC detail table separator is malformed for {key}")
         candidate_rows = [
-            line
-            for line in body_lines[detail_header_index + 2 :]
-            if line.strip()
+            line for line in body_lines[detail_header_index + 2 :] if line.strip()
         ]
         for line in candidate_rows:
             match = detail_pattern.fullmatch(line)
@@ -492,20 +494,19 @@ def _validate_cdc_details(text: str) -> None:
             counter[(rule, severity, int(depth))] += 1
             global_counts[(rule, severity)] += 1
             if rule == "CDC-6":
-                source_ranges = re.findall(
-                    r"\[([0-9]+):([0-9]+)\]", source_endpoint
-                )
+                source_ranges = re.findall(r"\[([0-9]+):([0-9]+)\]", source_endpoint)
                 destination_ranges = re.findall(
                     r"\[([0-9]+):([0-9]+)\]", destination_endpoint
                 )
                 if len(source_ranges) != 1 or len(destination_ranges) != 1:
                     _fail(f"CDC-6 must have exactly two ranged endpoints for {key}")
-                source_width = abs(
-                    int(source_ranges[0][0]) - int(source_ranges[0][1])
-                ) + 1
-                destination_width = abs(
-                    int(destination_ranges[0][0]) - int(destination_ranges[0][1])
-                ) + 1
+                source_width = (
+                    abs(int(source_ranges[0][0]) - int(source_ranges[0][1])) + 1
+                )
+                destination_width = (
+                    abs(int(destination_ranges[0][0]) - int(destination_ranges[0][1]))
+                    + 1
+                )
                 if (
                     source_width != destination_width
                     or source_width != CDC_BUS_WIDTHS[key]
@@ -586,9 +587,7 @@ def _parse_pipe_rule_summary(
     if identifiers != set(expected):
         _fail(f"{label} contains an unknown or missing rule: {identifiers}")
     details: dict[str, list[int]] = {rule: [] for rule in expected}
-    detail_heading = re.compile(
-        r"^([A-Z][A-Z0-9_-]*-[0-9]+)#([1-9][0-9]*)\s+(.+?)\s*$"
-    )
+    detail_heading = re.compile(r"^([A-Z][A-Z0-9_-]*-[0-9]+)#([1-9][0-9]*)\s+(.+?)\s*$")
     for index, line in enumerate(lines):
         match = detail_heading.fullmatch(line)
         if match is None:
@@ -903,10 +902,7 @@ def _validate_timing(text: str) -> dict[str, str]:
         flags=re.MULTILINE,
     )
     if len(met_slacks) != TIMING_MET_PATH_COUNT:
-        _fail(
-            "timing detailed-path inventory is not exact: "
-            f"{len(met_slacks)}"
-        )
+        _fail(f"timing detailed-path inventory is not exact: {len(met_slacks)}")
     try:
         setup_slacks = [
             Decimal(value)
@@ -953,9 +949,7 @@ def _validate_route(text: str) -> None:
     for separator in (lines[2], lines[10]):
         if re.fullmatch(r"\s*-+\s*:\s*-+\s*:\s*", separator) is None:
             _fail("route-status separator is malformed")
-    row_pattern = re.compile(
-        r"^\s*# of ([a-z ]+?)\.*\s*:\s*([0-9]+)\s*:\s*$"
-    )
+    row_pattern = re.compile(r"^\s*# of ([a-z ]+?)\.*\s*:\s*([0-9]+)\s*:\s*$")
     counts: dict[str, int] = {}
     for expected_label, line in zip(ROUTE_COUNTS, lines[3:10], strict=True):
         match = row_pattern.fullmatch(line)
@@ -1066,7 +1060,9 @@ def _validate_utilization(text: str) -> None:
     if black_box_section.count(end_marker) != 1:
         _fail("utilization black-box section has no unique exact end boundary")
     black_box_section = black_box_section.split(end_marker, 1)[0]
-    black_box_lines = [line.strip() for line in black_box_section.splitlines() if line.strip()]
+    black_box_lines = [
+        line.strip() for line in black_box_section.splitlines() if line.strip()
+    ]
     if black_box_lines != [
         "+----------+------+",
         "| Ref Name | Used |",
@@ -1144,12 +1140,16 @@ def validate_ooc_reports(
                 os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC | os.O_NOFOLLOW,
             )
         except (OSError, TypeError, ValueError) as error:
-            raise ValidationError(f"cannot open OOC output directory: {error}") from error
+            raise ValidationError(
+                f"cannot open OOC output directory: {error}"
+            ) from error
     else:
         try:
             opened_fd = os.dup(directory_fd)
         except (OSError, TypeError, ValueError) as error:
-            raise ValidationError(f"cannot duplicate OOC directory fd: {error}") from error
+            raise ValidationError(
+                f"cannot duplicate OOC directory fd: {error}"
+            ) from error
     try:
         opened_stat = os.fstat(opened_fd)
         if not stat.S_ISDIR(opened_stat.st_mode):
@@ -1157,7 +1157,9 @@ def validate_ooc_reports(
         try:
             expected_directory = Path(os.readlink(f"/proc/self/fd/{opened_fd}"))
         except OSError as error:
-            raise ValidationError("cannot resolve the OOC evidence descriptor") from error
+            raise ValidationError(
+                "cannot resolve the OOC evidence descriptor"
+            ) from error
         if not expected_directory.is_absolute() or str(expected_directory).endswith(
             " (deleted)"
         ):

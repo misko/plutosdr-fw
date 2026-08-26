@@ -273,20 +273,8 @@ def _timing() -> str:
         for ordinal, (name, count) in enumerate(checks, start=1)
     ]
     detailed_slacks = "\n".join(
-        [
-            (
-                "Slack (MET) :             3.765ns  "
-                "(required time - arrival time)"
-            )
-        ]
-        * 100
-        + [
-            (
-                "Slack (MET) :             0.079ns  "
-                "(arrival time - required time)"
-            )
-        ]
-        * 100
+        [("Slack (MET) :             3.765ns  (required time - arrival time)")] * 100
+        + [("Slack (MET) :             0.079ns  (arrival time - required time)")] * 100
     )
     return (
         _header(
@@ -466,7 +454,9 @@ def test_directory_fd_validation_and_command_path_binding(tmp_path: Path) -> Non
     _valid_reports(tmp_path)
     descriptor = VALIDATOR.os.open(tmp_path, VALIDATOR.os.O_RDONLY)
     try:
-        assert VALIDATOR.validate_ooc_reports(directory_fd=descriptor)["WNS_ns"] == "3.765"
+        assert (
+            VALIDATOR.validate_ooc_reports(directory_fd=descriptor)["WNS_ns"] == "3.765"
+        )
     finally:
         VALIDATOR.os.close(descriptor)
 
@@ -685,9 +675,7 @@ def test_clock_tables_reject_unknown_clock_rows(tmp_path: Path) -> None:
     _valid_reports(tmp_path)
     interaction = tmp_path / "clock_interaction.rpt"
     with interaction.open("a", encoding="utf-8") as stream:
-        stream.write(
-            "rogue_clk l_clk rise - rise 1.00 0.00 0 1 2.00 Clean Timed\n"
-        )
+        stream.write("rogue_clk l_clk rise - rise 1.00 0.00 0 1 2.00 Clean Timed\n")
     with pytest.raises(VALIDATOR.ValidationError):
         _validate(tmp_path)
 
@@ -753,8 +741,7 @@ def test_timing_detailed_violation_and_utilization_black_box_reject(
     _replace(
         tmp_path / "timing_summary.rpt",
         "Slack (MET) :             3.765ns  (required time - arrival time)",
-        "Slack (VIOLATED) :        -1.000ns  "
-        "(required time - arrival time)",
+        "Slack (VIOLATED) :        -1.000ns  (required time - arrival time)",
         count=100,
     )
     with pytest.raises(VALIDATOR.ValidationError):
@@ -802,10 +789,7 @@ def test_timing_detailed_violation_and_utilization_black_box_reject(
         ),
         (
             "=== TANDEM AXI ROUTE COMPLETE ===",
-            (
-                "=== TANDEM AXI ROUTE COMPLETE ===\n"
-                "=== TANDEM AXI ROUTE COMPLETE ==="
-            ),
+            ("=== TANDEM AXI ROUTE COMPLETE ===\n=== TANDEM AXI ROUTE COMPLETE ==="),
             1,
         ),
         (
@@ -934,7 +918,10 @@ def test_route_table_has_an_exact_row_grammar(
     row = "       # of routable nets..................... :        1127 :\n"
     assert text.count(row) == 1
     if mutation == "unknown":
-        text = text.replace(row, row + "       # of unsafe nets....................... :           1 :\n")
+        text = text.replace(
+            row,
+            row + "       # of unsafe nets....................... :           1 :\n",
+        )
     elif mutation == "duplicate":
         text = text.replace(row, row + row)
     else:
