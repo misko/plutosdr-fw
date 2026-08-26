@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC8 trusted workflow ends after the build job uploads the exact deployment
+- The RC9 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -28,6 +28,21 @@ use because bundle member/checksum order depended on locale and shell-array
 order. There was no deployment. Its branch, source lock, run, and bytes remain
 immutable reproduction history; RC8 fixes only that deterministic packaging
 boundary.
+
+RC8 trusted run `32952343526` then completed the exact deterministic build:
+32,908 of 32,908 nets routed, 4,399 of 4,400 slices placed, 74 of 80 DSPs used,
+WNS `+0.645 ns`, WHS `+0.022 ns`, and minimum bus skew `+8.606 ns`. Bundle
+SHA-256 was
+`d55b58e489a58c3c8868f4bfcec4a7901c229a25e801c172bf2dd1fa08965c77`,
+DFU SHA-256 was
+`2c74f06bff072d9c3250e5e028e18ddda4f700f5960cd07153432f1a081a8f49`,
+and the verifier-accepted candidate-index SHA-256 was
+`d94b9c37a8c6f1e5935df5ae4bdfd03be49b7aba40236a32386382a0f09004a8`.
+No radio was opened or deployed: the RAM deployer still required a redundant
+historical transition-proof input in addition to its live safeguards. RC8's
+source lock, run, bundle, DFU, and index remain immutable reproduction history;
+RC9 removes only that redundant input, versions the receipt, and advances the
+lineage.
 
 ## One-time administrator installation
 
@@ -75,7 +90,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC8 workflow has no separate attestation job. An operator may capture GitHub
+The RC9 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

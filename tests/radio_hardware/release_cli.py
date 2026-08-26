@@ -1492,6 +1492,7 @@ def _attest_candidate_binding(
                 artifact_index_sha256=artifact_index_sha256,
                 serial=serial,
                 firmware_version=firmware_version,
+                hardware_model=artifact_index["release"]["hardware_model"],
                 dfu_sha256=dfu_file["sha256"],
             )
         except CandidateBindingError as error:

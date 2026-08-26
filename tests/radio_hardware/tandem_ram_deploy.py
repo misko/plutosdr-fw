@@ -1,8 +1,8 @@
 """Fail-closed, exact-serial RAM-only firmware deployment.
 
-The default CLI path is an offline planner.  Hardware access requires both
-``--execute`` and an exact operator confirmation, and remains blocked until a
-reviewed RAM-transition proof selects the download-then-detach sequence.
+The default CLI path is an offline planner. Hardware access requires both
+``--execute`` and an exact operator confirmation. The executable command plan
+permits only a firmware.dfu download followed by DFU detach.
 """
 
 from __future__ import annotations
@@ -32,6 +32,8 @@ from scripts.tandem_release_evidence import (
 )
 
 from .candidate_binding import (
+    PLUTOPLUS_HARDWARE_MODEL,
+    RAM_BOOT_RECEIPT_SCHEMA_VERSION,
     REQUIRED_EVIDENCE_ROLES,
     CandidateBindingError,
     validate_artifact_index,
@@ -39,7 +41,6 @@ from .candidate_binding import (
 )
 
 RECEIPT_SCHEMA = "plutosdr-fw.tandem-ram-boot-receipt"
-TRANSITION_PROOF_SCHEMA = "plutosdr-fw.tandem-ram-transition-proof"
 USB_INVENTORY_SCHEMA = "plutosdr-fw.usb-inventory"
 USB_VENDOR = "0456"
 RUNTIME_PRODUCT = "b673"
@@ -95,6 +96,7 @@ class CandidateArtifact:
     index_path: Path
     index_sha256: str
     firmware_version: str
+    hardware_model: str
     source_commit: str
     source_manifest_path: Path
     source_manifest_sha256: str
@@ -111,6 +113,7 @@ class CandidateArtifact:
 @dataclass(frozen=True)
 class RuntimeAttestation:
     serial: str
+    hardware_model: str
     boot_id: str
     firmware_version: str
     qspi_partition: str
@@ -141,8 +144,6 @@ class DeploymentOptions:
     ssh_user: str
     ssh_identity_file: Path | None
     usb_interface: str | None
-    transition_proof_path: Path | None
-    transition_proof_sha256: str | None
     operator_confirmation: str | None
     timeout_seconds: float
 
@@ -481,6 +482,13 @@ def load_candidate_artifact(options: DeploymentOptions) -> CandidateArtifact:
     firmware = _required_string(
         release.get("firmware_version"), label="release firmware version"
     )
+    hardware_model = _required_string(
+        release.get("hardware_model"), label="release hardware model"
+    )
+    if hardware_model != PLUTOPLUS_HARDWARE_MODEL:
+        raise DeploymentError(
+            "candidate hardware model is not the exact supported Pluto+ class"
+        )
     commit = _required_string(source.get("commit"), label="source commit")
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
         raise DeploymentError("source commit must be a full lowercase commit")
@@ -542,6 +550,7 @@ def load_candidate_artifact(options: DeploymentOptions) -> CandidateArtifact:
         index_path=index_path,
         index_sha256=index_sha,
         firmware_version=firmware,
+        hardware_model=hardware_model,
         source_commit=commit,
         source_manifest_path=manifest_path,
         source_manifest_sha256=manifest_sha,
@@ -827,72 +836,6 @@ def attest_candidate_inputs(
     }
 
 
-def load_transition_proof(options: DeploymentOptions) -> tuple[Mapping[str, Any], str]:
-    if options.transition_proof_path is None or options.transition_proof_sha256 is None:
-        raise DeploymentError(
-            "execution is blocked until --transition-proof and its SHA-256 are supplied"
-        )
-    path = _canonical_absolute(options.transition_proof_path, label="transition proof")
-    payload = _read_owned_regular(
-        path,
-        label="transition proof",
-        maximum_bytes=MAX_JSON_BYTES,
-        required_mode=0o600,
-    )
-    digest = _sha256_bytes(payload)
-    if digest != options.transition_proof_sha256:
-        raise DeploymentError(
-            "transition proof SHA-256 differs from the requested value"
-        )
-    proof = _required_mapping(
-        _parse_json(payload, label="transition proof"), label="transition proof"
-    )
-    expected_keys = {
-        "schema",
-        "schema_version",
-        "verdict",
-        "method",
-        "reviewed",
-        "tested_serial",
-        "evidence_sha256",
-        "observations",
-    }
-    if set(proof) != expected_keys:
-        raise DeploymentError("transition proof keys are not exact")
-    observations = _required_mapping(
-        proof.get("observations"), label="transition proof observations"
-    )
-    if set(observations) != {"usb_reset_R", "dfu_detach_e", "qspi_written"}:
-        raise DeploymentError("transition proof observation keys are not exact")
-    if (
-        proof.get("schema") != TRANSITION_PROOF_SCHEMA
-        or type(proof.get("schema_version")) is not int
-        or proof.get("schema_version") != 1
-        or proof.get("verdict") != "pass"
-        or proof.get("method") != TRANSITION_METHOD
-        or type(proof.get("reviewed")) is not bool
-        or proof.get("reviewed") is not True
-        or observations.get("usb_reset_R") != "persistent-image"
-        or observations.get("dfu_detach_e") != "ram-image"
-        or type(observations.get("qspi_written")) is not bool
-        or observations.get("qspi_written") is not False
-    ):
-        raise DeploymentError(
-            "transition proof does not authorize download-then-detach"
-        )
-    if (
-        _required_string(
-            proof.get("tested_serial"), label="transition proof tested serial"
-        )
-        != options.serial
-    ):
-        raise DeploymentError("transition proof was not observed on the exact radio")
-    _required_sha(
-        proof.get("evidence_sha256"), label="transition proof evidence SHA-256"
-    )
-    return proof, digest
-
-
 def load_inventory(path: Path) -> tuple[UsbDevice, ...]:
     payload = _read_owned_regular(
         path, label="USB inventory", maximum_bytes=MAX_JSON_BYTES
@@ -1149,59 +1092,6 @@ def validate_command_plan(
         )
 
 
-def sequence_experiment_plan(
-    serial: str, artifact: CandidateArtifact
-) -> dict[str, Any]:
-    return {
-        "schema": "plutosdr-fw.tandem-ram-transition-experiment-plan",
-        "schema_version": 1,
-        "executable": False,
-        "verdict": "blocked-pending-isolated-hardware-experiment",
-        "serial": serial,
-        "artifact_index_sha256": artifact.index_sha256,
-        "dfu_sha256": artifact.dfu_sha256,
-        "preconditions": [
-            "disconnect every radio except the exact serial under test",
-            "record the known persistent firmware identity and boot ID",
-            "verify TX mute before each transition",
-        ],
-        "comparisons": [
-            {
-                "method": "download-then-usb-reset-R",
-                "expected_from_rc4_record": "persistent-image",
-                "execution_command_intentionally_omitted": True,
-            },
-            {
-                "method": TRANSITION_METHOD,
-                "expected_from_rc4_record": "ram-image",
-                "execution_command_intentionally_omitted": True,
-            },
-        ],
-        "required_observations": [
-            "pre/post boot IDs",
-            "exact returned serial and firmware version",
-            "TX/DDS/DAC/tandem safe state",
-            "power-cycle rollback to the known persistent image",
-            "explicit confirmation that no QSPI write occurred",
-        ],
-        "non_authorizing_proof_template": {
-            "schema": TRANSITION_PROOF_SCHEMA,
-            "schema_version": 1,
-            "verdict": "blocked-until-reviewed",
-            "method": TRANSITION_METHOD,
-            "reviewed": False,
-            "tested_serial": serial,
-            "evidence_sha256": "replace-with-captured-evidence-sha256",
-            "observations": {
-                "usb_reset_R": "record-observation",
-                "dfu_detach_e": "record-observation",
-                "qspi_written": None,
-            },
-        },
-        "output": "reviewed transition-proof JSON; this plan itself authorizes nothing",
-    }
-
-
 def _receipt_output_path(path: Path, *, serial: str, archive_root: Path) -> Path:
     if not path.is_absolute() or ".." in path.parts:
         raise DeploymentError("receipt path must be absolute and normalized")
@@ -1317,7 +1207,6 @@ def execute_deployment(
     options: DeploymentOptions, backend: HardwareBackend
 ) -> tuple[dict[str, Any], str]:
     artifact = load_candidate_artifact(options)
-    _proof, proof_sha = load_transition_proof(options)
     if options.operator_confirmation != f"RAM BOOT {options.serial}":
         raise DeploymentError("operator confirmation must be exactly RAM BOOT <serial>")
     _receipt_output_path(
@@ -1382,6 +1271,7 @@ def execute_deployment(
             )
             if (
                 pre.serial != options.serial
+                or pre.hardware_model != artifact.hardware_model
                 or pre.firmware_version != options.expected_current_firmware
                 or not pre.boot_id
                 or not _attestation_is_safe(pre)
@@ -1429,6 +1319,7 @@ def execute_deployment(
                 raise DeploymentError("RAM deployment did not produce a new boot ID")
             if (
                 post.serial != options.serial
+                or post.hardware_model != artifact.hardware_model
                 or post.firmware_version != artifact.firmware_version
                 or not _attestation_is_safe(post)
             ):
@@ -1452,13 +1343,16 @@ def execute_deployment(
             completed = time.time_ns()
             receipt: dict[str, Any] = {
                 "schema": RECEIPT_SCHEMA,
-                "schema_version": 1,
+                "schema_version": RAM_BOOT_RECEIPT_SCHEMA_VERSION,
                 "verdict": "pass",
                 "boot_mode": "ram-only",
                 "radio": {"serial": options.serial},
                 "artifact_index_sha256": artifact.index_sha256,
                 "artifact": {"dfu_sha256": artifact.dfu_sha256},
-                "runtime": {"firmware_version": post.firmware_version},
+                "runtime": {
+                    "firmware_version": post.firmware_version,
+                    "hardware_model": post.hardware_model,
+                },
                 "boot": {"pre_id": pre.boot_id, "post_id": post.boot_id},
                 "persistent_flash": {
                     "partition": pre.qspi_partition,
@@ -1491,7 +1385,6 @@ def execute_deployment(
                     {"phase": item["phase"], "argv": list(item["argv"])}
                     for item in commands
                 ],
-                "transition_proof_sha256": proof_sha,
                 "known_hosts_sha256": options.known_hosts_sha256,
             }
             try:
@@ -1500,6 +1393,7 @@ def execute_deployment(
                     artifact_index_sha256=artifact.index_sha256,
                     serial=options.serial,
                     firmware_version=artifact.firmware_version,
+                    hardware_model=artifact.hardware_model,
                     dfu_sha256=artifact.dfu_sha256,
                 )
             except CandidateBindingError as error:
@@ -1534,8 +1428,10 @@ def execute_deployment(
                         expected_firmware=artifact.firmware_version,
                         force_safe=True,
                     )
-                    if cleanup.serial != options.serial or not _attestation_is_safe(
-                        cleanup
+                    if (
+                        cleanup.serial != options.serial
+                        or cleanup.hardware_model != artifact.hardware_model
+                        or not _attestation_is_safe(cleanup)
                     ):
                         raise DeploymentError(
                             "failure cleanup did not prove safe state"
@@ -1729,9 +1625,14 @@ class SystemBackend:
                 "hw_serial", attrs.get("usb,serial", attrs.get("serial", ""))
             )
             context_firmware = attrs.get("fw_version", "")
-            if observed_serial != self.options.serial or not context_firmware:
+            hardware_model = attrs.get("hw_model", "")
+            if (
+                observed_serial != self.options.serial
+                or not context_firmware
+                or hardware_model != PLUTOPLUS_HARDWARE_MODEL
+            ):
                 raise DeploymentError(
-                    "USB IIO runtime identity differs or is incomplete"
+                    "USB IIO runtime identity or Pluto+ hardware model differs"
                 )
 
             phy = context.find_device("ad9361-phy")
@@ -1854,6 +1755,7 @@ class SystemBackend:
             }
             return RuntimeAttestation(
                 serial=observed_serial,
+                hardware_model=hardware_model,
                 boot_id=_required_string(
                     remote_fields.get("boot_id"), label="runtime boot ID"
                 ),
@@ -1966,13 +1868,9 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--ssh-identity-file", type=Path)
     parser.add_argument("--usb-interface")
     parser.add_argument("--usb-inventory", type=Path)
-    parser.add_argument("--transition-proof", type=Path)
-    parser.add_argument("--transition-proof-sha256")
     parser.add_argument("--operator-confirmation")
     parser.add_argument("--timeout-seconds", type=float, default=45.0)
-    modes = parser.add_mutually_exclusive_group()
-    modes.add_argument("--execute", action="store_true")
-    modes.add_argument("--sequence-experiment-plan", action="store_true")
+    parser.add_argument("--execute", action="store_true")
     return parser
 
 
@@ -2023,8 +1921,6 @@ def _options(namespace: argparse.Namespace) -> DeploymentOptions:
         ssh_user=namespace.ssh_user,
         ssh_identity_file=identity,
         usb_interface=namespace.usb_interface,
-        transition_proof_path=namespace.transition_proof,
-        transition_proof_sha256=namespace.transition_proof_sha256,
         operator_confirmation=namespace.operator_confirmation,
         timeout_seconds=namespace.timeout_seconds,
     )
@@ -2065,7 +1961,7 @@ def _plan_document(
         document["verdict"] = "blocked"
         document["blockers"] = [
             "offline plan has no captured USB inventory; live exact-serial topology is resolved only under --execute",
-            "execution also requires a reviewed transition proof and exact operator confirmation",
+            "execution also requires exact operator confirmation",
         ]
         return document
     device = resolve_device(
@@ -2077,7 +1973,7 @@ def _plan_document(
     document["verdict"] = "ready-for-review"
     document["blockers"] = [
         "this offline plan authorizes no device access",
-        "execution requires a reviewed transition proof and exact operator confirmation",
+        "execution requires exact operator confirmation",
     ]
     return document
 
@@ -2093,15 +1989,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             serial=options.serial,
             archive_root=artifact.index_path.parent,
         )
-        if namespace.sequence_experiment_plan:
-            print(
-                json.dumps(
-                    sequence_experiment_plan(options.serial, artifact),
-                    indent=2,
-                    sort_keys=True,
-                )
-            )
-            return 0
         if not namespace.execute:
             inventory = (
                 load_inventory(namespace.usb_inventory)

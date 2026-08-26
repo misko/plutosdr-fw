@@ -413,11 +413,12 @@ Never select `boot.dfu` or `uboot-env.dfu` during a routine Pluto+ update.
 RAM boot runs a candidate without changing QSPI. A power cycle returns the
 radio to its persistently installed firmware.
 
-Do not use a raw `dfu-util -R` recipe for this transition. The RC4 hardware
-record found that USB reset returned a tested Pluto+ to its persistent image,
-while download followed by DFU detach entered the RAM image. Because the old
-guide and helper disagreed with that result, raw RAM boot is quarantined until
-the transition has a reviewed, exact-serial proof.
+Do not use a raw `dfu-util -R` recipe for this transition. The retained RC4
+record directly shows a successful firmware download followed by DFU detach
+into the candidate image. It does not independently prove the previously
+described `-R` result or that no QSPI write occurred, so it is historical
+support for selecting `-e`, not a deployment authorization artifact. The
+guarded deployer proves the safety-relevant facts directly on every run.
 
 Use the guarded deployer. Its default mode is an offline plan: it validates the
 exact candidate index, source manifest, DFU/FIT bytes, harness and evidence
@@ -440,14 +441,9 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
   --known-hosts-sha256 "$known_hosts_sha256"
 ```
 
-If the `-R` versus `-e` behavior still needs to be reproduced for a radio, add
-`--sequence-experiment-plan`. That output is deliberately non-executable and
-contains the isolated-radio preconditions and required observations, but no
-DFU command.
-
-Actual execution additionally requires a reviewed mode-`0600` transition proof
-and its hash, an owned mode-`0600` known-hosts file, an exact serial-bound
-confirmation, and `--execute`:
+Actual execution requires an owned mode-`0600` known-hosts file, an exact
+serial-bound confirmation, and `--execute`; there is no external transition
+proof or other authorization file:
 
 ```bash
 scripts/deploy_tandem_agc_ram_hardware.sh \
@@ -460,8 +456,6 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
   --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
   --known-hosts "$absolute_known_hosts" \
   --known-hosts-sha256 "$known_hosts_sha256" \
-  --transition-proof "$absolute_transition_proof" \
-  --transition-proof-sha256 "$transition_proof_sha256" \
   --operator-confirmation "RAM BOOT $serial" \
   --execute
 ```
@@ -469,8 +463,10 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
 The executor permits only `firmware.dfu` download on the serial's unique USB
 topology followed by DFU detach. It rejects USB reset, SPI-flash/QSPI, boot and
 environment alternates, full ZIP/FRM files, and raw MTD targets. It publishes a
-passing receipt only after the same serial returns with a new boot ID, the
-candidate firmware identity, and verified TX/DDS/DAC/tandem safe state.
+passing v2 receipt, including the observed hardware model, only after the same
+serial and exact Pluto+ hardware model
+return with a new boot ID, the candidate firmware identity, and verified
+TX/DDS/DAC/tandem safe state.
 Before and after the RAM transition it also reads SHA-256 over the exact
 `qspi-linux` `/dev/mtdblock3` partition. The receipt's `persistent_flash`
 record must identify the same partition/size and equal digests; any change
@@ -479,7 +475,7 @@ blocks receipt publication.
 `download_and_test.sh` is now quarantined and points to this guarded entry
 point. The legacy `make dfu-ram` target is not an authorized candidate or
 release procedure because it cannot carry the required serial, artifact-index,
-proof, and receipt bindings.
+and receipt bindings or perform the measured pre/post checks.
 
 An important trap: while a RAM image is active, `/opt/VERSIONS` describes that
 RAM image—not the image stored in QSPI. Reboot or power-cycle back to QSPI

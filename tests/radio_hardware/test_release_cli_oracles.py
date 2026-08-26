@@ -310,13 +310,16 @@ def _candidate_binding_files(tmp_path: Path) -> dict[str, Any]:
     index_payload = _write_binding_json(index_path, artifact_index)
     receipt = {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
-        "schema_version": 1,
+        "schema_version": 2,
         "verdict": "pass",
         "boot_mode": "ram-only",
         "artifact_index_sha256": hashlib.sha256(index_payload).hexdigest(),
         "radio": {"serial": "radio-a"},
         "artifact": {"dfu_sha256": artifact_index["artifact"]["dfu_sha256"]},
-        "runtime": {"firmware_version": FIRMWARE_VERSION},
+        "runtime": {
+            "firmware_version": FIRMWARE_VERSION,
+            "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+        },
         "boot": {"pre_id": "boot-before", "post_id": "boot-after"},
         "persistent_flash": {
             "partition": "/dev/mtdblock3",
@@ -391,7 +394,6 @@ def _candidate_binding_files(tmp_path: Path) -> dict[str, Any]:
                 ],
             },
         ],
-        "transition_proof_sha256": "5" * 64,
         "known_hosts_sha256": "6" * 64,
     }
     _write_binding_json(receipt_path, receipt, mode=0o600)

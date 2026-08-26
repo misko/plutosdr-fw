@@ -1,16 +1,12 @@
-# Immutable source graph for the final tandem AGC v8 build.
-#
-# The external component graph remains identical from RC4 through RC9, but the
-# tracked top-level repository does not. RC5 added post-RC4
-# stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
-# mutually exclusive dwell storage behind an explicit qualification-class tag.
-# RC7 corrected the integrated report policy, RC8 made the bundle/checksum
-# inventories bytewise deterministic, and RC9 removes only the host deployer's
-# redundant historical-proof input without changing firmware behavior. RC9
-# must pass its new source-locked build and full hardware qualification before
-# this final graph is used. The subsequent final build may
-# change only the top-level release identity and packaging, while requiring
-# exact component identities in packed /opt/VERSIONS.
+# Immutable source graph for the forward-only tandem AGC v8 RC9 candidate.
+# RC9 retains RC8's successfully built, indexed, fully routed, timing-clean
+# firmware implementation and deterministic package contract. Its stamped
+# candidate bytes are necessarily new. RC8 was not deployed
+# because the RAM deployer unnecessarily required a separate historical
+# transition-proof input in addition to its live command, identity, QSPI, and
+# safe-state checks. RC9 removes that redundant input without changing firmware
+# behavior or external pins. The
+# separately protected firmware source lock binds the final reviewed commit.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1

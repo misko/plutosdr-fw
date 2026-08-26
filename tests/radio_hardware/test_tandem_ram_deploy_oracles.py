@@ -81,7 +81,6 @@ class Fixture:
     index_path: Path
     artifact_path: Path
     manifest_path: Path
-    proof_path: Path
     known_hosts_path: Path
 
     def rewrite_index(self) -> None:
@@ -158,24 +157,6 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
     index_payload = (json.dumps(index, sort_keys=True) + "\n").encode()
     _write(index_path, index_payload)
 
-    proof = {
-        "schema": "plutosdr-fw.tandem-ram-transition-proof",
-        "schema_version": 1,
-        "verdict": "pass",
-        "method": "download-then-detach-e",
-        "reviewed": True,
-        "tested_serial": SERIAL,
-        "evidence_sha256": "a" * 64,
-        "observations": {
-            "usb_reset_R": "persistent-image",
-            "dfu_detach_e": "ram-image",
-            "qspi_written": False,
-        },
-    }
-    proof_path = tmp_path / "transition-proof.json"
-    proof_payload = (json.dumps(proof, sort_keys=True) + "\n").encode()
-    _write(proof_path, proof_payload, mode=0o600)
-
     known_hosts_path = tmp_path / "known_hosts"
     known_hosts_payload = b"192.168.2.1 ssh-ed25519 AAAAtestkey\n"
     _write(known_hosts_path, known_hosts_payload, mode=0o600)
@@ -196,8 +177,6 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
         ssh_user="root",
         ssh_identity_file=None,
         usb_interface=None,
-        transition_proof_path=proof_path,
-        transition_proof_sha256=_sha(proof_payload),
         operator_confirmation=f"RAM BOOT {SERIAL}",
         timeout_seconds=1.0,
     )
@@ -207,7 +186,6 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
         index_path=index_path,
         artifact_path=artifact_path,
         manifest_path=manifest_path,
-        proof_path=proof_path,
         known_hosts_path=known_hosts_path,
     )
 
@@ -232,11 +210,13 @@ def _attestation(
     firmware: str,
     boot_id: str,
     serial: str = SERIAL,
+    hardware_model: str = deploy.PLUTOPLUS_HARDWARE_MODEL,
     safe: bool = True,
     qspi_sha256: str = "7" * 64,
 ) -> deploy.RuntimeAttestation:
     return deploy.RuntimeAttestation(
         serial=serial,
+        hardware_model=hardware_model,
         boot_id=boot_id,
         firmware_version=firmware,
         qspi_partition="/dev/mtdblock3",
@@ -335,8 +315,21 @@ def test_candidate_load_binds_index_manifest_dfu_fit_and_evidence_contract(
 
     assert artifact.dfu_path == fixture.artifact_path
     assert artifact.dfu_sha256 == fixture.options.artifact_sha256
+    assert artifact.hardware_model == deploy.PLUTOPLUS_HARDWARE_MODEL
     assert artifact.source_manifest_path == fixture.manifest_path
     assert artifact.evidence_roles == REQUIRED_EVIDENCE_ROLES
+
+
+def test_candidate_load_rejects_a_different_hardware_class(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path)
+    fixture.index["release"]["hardware_model"] = "Analog Devices PlutoSDR Rev.B"
+    fixture.rewrite_index()
+    backend = FakeBackend()
+
+    with pytest.raises(deploy.DeploymentError, match="supported Pluto\\+ class"):
+        deploy.execute_deployment(fixture.options, backend)
+
+    assert backend.inventory_calls == 0
 
 
 def test_runner_provenance_requires_clean_head_blob_and_index_agreement(
@@ -414,7 +407,7 @@ def test_runner_provenance_requires_clean_head_blob_and_index_agreement(
         )
 
 
-@pytest.mark.parametrize("which", ["artifact", "index", "known-hosts", "proof"])
+@pytest.mark.parametrize("which", ["artifact", "index", "known-hosts"])
 def test_exact_hash_mutations_fail_before_inventory(tmp_path: Path, which: str) -> None:
     fixture = _fixture(tmp_path)
     options = fixture.options
@@ -424,8 +417,6 @@ def test_exact_hash_mutations_fail_before_inventory(tmp_path: Path, which: str) 
         options = replace(options, artifact_index_sha256="0" * 64)
     elif which == "known-hosts":
         options = replace(options, known_hosts_sha256="0" * 64)
-    else:
-        options = replace(options, transition_proof_sha256="0" * 64)
     backend = FakeBackend()
 
     with pytest.raises(deploy.DeploymentError):
@@ -509,35 +500,36 @@ def test_non_firmware_targets_are_rejected_offline(
     assert backend.inventory_calls == 0
 
 
-def test_transition_proof_is_exact_serial_private_and_reviewed(tmp_path: Path) -> None:
-    fixture = _fixture(tmp_path)
-    proof = json.loads(fixture.proof_path.read_text())
-    proof["tested_serial"] = "another-radio"
-    payload = (json.dumps(proof, sort_keys=True) + "\n").encode()
-    fixture.proof_path.write_bytes(payload)
-    options = replace(fixture.options, transition_proof_sha256=_sha(payload))
-
-    with pytest.raises(deploy.DeploymentError, match="exact radio"):
-        deploy.load_transition_proof(options)
-
-    fixture.proof_path.chmod(0o644)
-    with pytest.raises(deploy.DeploymentError, match="mode"):
-        deploy.load_transition_proof(options)
-
-
-def test_missing_transition_proof_blocks_without_hardware(tmp_path: Path) -> None:
+@pytest.mark.parametrize("confirmation", [None, "RAM BOOT another-radio"])
+def test_exact_operator_confirmation_is_required_before_inventory(
+    tmp_path: Path, confirmation: str | None
+) -> None:
     fixture = _fixture(tmp_path)
     backend = FakeBackend()
-    options = replace(
-        fixture.options,
-        transition_proof_path=None,
-        transition_proof_sha256=None,
-    )
 
-    with pytest.raises(deploy.DeploymentError, match="execution is blocked"):
-        deploy.execute_deployment(options, backend)
+    with pytest.raises(deploy.DeploymentError, match="operator confirmation"):
+        deploy.execute_deployment(
+            replace(fixture.options, operator_confirmation=confirmation), backend
+        )
 
     assert backend.inventory_calls == 0
+    assert not backend.ram_requests and not backend.dfu_commands
+
+
+def test_current_firmware_identity_is_required_before_transition(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    backend = FakeBackend(
+        attestations=(
+            _attestation(firmware="unexpected-current", boot_id="boot-before"),
+        )
+    )
+
+    with pytest.raises(deploy.DeploymentError, match="pre-reboot runtime identity"):
+        deploy.execute_deployment(fixture.options, backend)
+
+    assert not backend.ram_requests and not backend.dfu_commands
 
 
 def test_exact_serial_ambiguity_stops_before_any_mutation(tmp_path: Path) -> None:
@@ -651,11 +643,15 @@ def test_success_publishes_absent_only_private_bound_receipt(tmp_path: Path) -> 
     assert digest == _sha(payload)
     assert stat.S_IMODE(fixture.options.receipt_path.stat().st_mode) == 0o600
     assert receipt == json.loads(payload)
+    assert receipt["schema_version"] == 2
+    assert "transition_proof_sha256" not in receipt
+    assert receipt["runtime"]["hardware_model"] == deploy.PLUTOPLUS_HARDWARE_MODEL
     validated = validate_deployment_receipt(
         receipt,
         artifact_index_sha256=fixture.options.artifact_index_sha256,
         serial=SERIAL,
         firmware_version=CANDIDATE_VERSION,
+        hardware_model=deploy.PLUTOPLUS_HARDWARE_MODEL,
         dfu_sha256=fixture.options.artifact_sha256,
     )
     assert validated == receipt
@@ -750,12 +746,14 @@ def test_receipt_binding_mutations_are_rejected(tmp_path: Path) -> None:
         {"artifact_index_sha256": "0" * 64},
         {"serial": "another-radio"},
         {"firmware_version": "wrong-version"},
+        {"hardware_model": "wrong-model"},
         {"dfu_sha256": "f" * 64},
     ):
         arguments = {
             "artifact_index_sha256": fixture.options.artifact_index_sha256,
             "serial": SERIAL,
             "firmware_version": CANDIDATE_VERSION,
+            "hardware_model": deploy.PLUTOPLUS_HARDWARE_MODEL,
             "dfu_sha256": fixture.options.artifact_sha256,
             **changed,
         }
@@ -828,6 +826,39 @@ def test_new_boot_epoch_and_final_safe_state_are_mandatory(tmp_path: Path) -> No
     assert not fixture.options.receipt_path.exists()
 
 
+def test_actual_pre_and_post_hardware_model_must_match_candidate(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    wrong_pre = FakeBackend(
+        attestations=(
+            _attestation(
+                firmware=CURRENT_VERSION,
+                boot_id="boot-before",
+                hardware_model="Analog Devices PlutoSDR Rev.B",
+            ),
+        )
+    )
+    with pytest.raises(deploy.DeploymentError, match="pre-reboot runtime identity"):
+        deploy.execute_deployment(fixture.options, wrong_pre)
+    assert not wrong_pre.ram_requests and not wrong_pre.dfu_commands
+
+    wrong_post = FakeBackend(
+        attestations=(
+            _attestation(firmware=CURRENT_VERSION, boot_id="boot-before"),
+            _attestation(
+                firmware=CANDIDATE_VERSION,
+                boot_id="boot-after",
+                hardware_model="Analog Devices PlutoSDR Rev.B",
+            ),
+            _attestation(firmware=CANDIDATE_VERSION, boot_id="boot-cleanup"),
+        )
+    )
+    with pytest.raises(deploy.DeploymentError, match="returned runtime identity"):
+        deploy.execute_deployment(fixture.options, wrong_post)
+    assert not fixture.options.receipt_path.exists()
+
+
 def _cli_arguments(fixture: Fixture) -> list[str]:
     options = fixture.options
     return [
@@ -867,6 +898,13 @@ def test_default_cli_is_offline_and_never_constructs_backend(
     assert document["executable"] is False
     assert document["verdict"] == "blocked"
     assert "commands" not in document
+
+
+def test_cli_has_no_legacy_transition_authorization_inputs() -> None:
+    help_text = deploy._parser().format_help()
+    assert "--transition-proof" not in help_text
+    assert "--transition-proof-sha256" not in help_text
+    assert "--sequence-experiment-plan" not in help_text
 
 
 def test_captured_inventory_plan_is_exact_and_still_hardware_free(
@@ -918,23 +956,6 @@ def test_captured_inventory_plan_is_exact_and_still_hardware_free(
     assert "-R" not in json.dumps(document["commands"])
 
 
-def test_sequence_experiment_is_non_executable_and_omits_commands(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    fixture = _fixture(tmp_path)
-
-    assert deploy.main([*_cli_arguments(fixture), "--sequence-experiment-plan"]) == 0
-    document = json.loads(capsys.readouterr().out)
-    assert document["executable"] is False
-    assert document["verdict"].startswith("blocked")
-    assert "argv" not in json.dumps(document)
-    assert "dfu-util" not in json.dumps(document)
-    assert all(
-        item["execution_command_intentionally_omitted"]
-        for item in document["comparisons"]
-    )
-
-
 def test_legacy_downloader_is_quarantined_without_hardware_access() -> None:
     script = ROOT / "download_and_test.sh"
     text = script.read_text()
@@ -961,8 +982,8 @@ def test_flashing_guide_has_no_executable_reset_ram_recipe() -> None:
 
     assert "sudo dfu-util -R" not in ram_section
     assert "scripts/deploy_tandem_agc_ram_hardware.sh" in ram_section
-    assert "--sequence-experiment-plan" in ram_section
-    assert "deliberately non-executable" in ram_section
+    assert "--sequence-experiment-plan" not in ram_section
+    assert "--transition-proof" not in ram_section
 
 
 def test_flashing_guide_distinguishes_v8_frm_and_persistent_dfu_detach() -> None:

@@ -473,6 +473,15 @@ acceptance boundary.
 
 ## Candidate-bound lifecycle and stale-small-ADC phases
 
+The guarded RAM deployer has no external transition-proof input. The retained
+RC4 record explains why the fixed command plan uses firmware download followed
+by DFU detach (`-e`), but it does not authorize a run. Each run instead binds
+the exact candidate and Pluto+ runtime model, USB serial/topology, SSH host key,
+current firmware, operator phrase, new boot ID, safe state, and equal pre/post
+`qspi-linux` digests. The command validator forbids `-R`, flash targets, and
+every DFU alternate except `firmware.dfu`; receipts and all later hardware
+evidence remain exact-serial scoped.
+
 The release lifecycle runner consumes an exact candidate artifact index and
 the RAM-only deployment receipt for one immutable radio serial. It does not
 deploy, reboot, or flash the radio. Every path below must be absolute, the
@@ -490,7 +499,7 @@ IIO_SOURCE=../libiio \
 scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc8-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc9-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \
@@ -520,7 +529,7 @@ IIO_SOURCE=../libiio \
 scripts/run_stale_small_adc_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc8-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc9-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \

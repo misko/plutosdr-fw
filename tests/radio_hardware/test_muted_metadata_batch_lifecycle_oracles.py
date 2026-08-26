@@ -2707,13 +2707,16 @@ def _candidate_binding_files(
     index_payload = _write_candidate_json(index_path, artifact_index)
     receipt = {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
-        "schema_version": 1,
+        "schema_version": 2,
         "verdict": "pass",
         "boot_mode": "ram-only",
         "artifact_index_sha256": hashlib.sha256(index_payload).hexdigest(),
         "radio": {"serial": serial},
         "artifact": {"dfu_sha256": artifact_index["artifact"]["dfu_sha256"]},
-        "runtime": {"firmware_version": EXPECTED_FIRMWARE_VERSION},
+        "runtime": {
+            "firmware_version": EXPECTED_FIRMWARE_VERSION,
+            "hardware_model": EXPECTED_HARDWARE_MODEL,
+        },
         "boot": {"pre_id": "boot-before", "post_id": "boot-after"},
         "persistent_flash": {
             "partition": "/dev/mtdblock3",
@@ -2788,7 +2791,6 @@ def _candidate_binding_files(
                 ],
             },
         ],
-        "transition_proof_sha256": "5" * 64,
         "known_hosts_sha256": "6" * 64,
     }
     receipt_path = root / "deployment-receipt.json"

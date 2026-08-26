@@ -16,7 +16,12 @@ from typing import Any
 
 ARTIFACT_INDEX_SCHEMA = "plutosdr-fw.tandem-release-evidence"
 RAM_BOOT_RECEIPT_SCHEMA = "plutosdr-fw.tandem-ram-boot-receipt"
-SCHEMA_VERSION = 1
+ARTIFACT_INDEX_SCHEMA_VERSION = 1
+RAM_BOOT_RECEIPT_SCHEMA_VERSION = 2
+PLUTOPLUS_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
+# Backward-compatible public name used by release-evidence code for the
+# artifact-index schema. Receipt validation has its own version above.
+SCHEMA_VERSION = ARTIFACT_INDEX_SCHEMA_VERSION
 ARTIFACT_INDEX_STAGES = frozenset(
     {
         "candidate-pre-hardware",
@@ -167,7 +172,7 @@ def validate_artifact_index(value: object) -> dict[str, Any]:
     if record["schema"] != ARTIFACT_INDEX_SCHEMA:
         _fail("artifact index schema is not exact")
     if (
-        record["schema_version"] != SCHEMA_VERSION
+        record["schema_version"] != ARTIFACT_INDEX_SCHEMA_VERSION
         or type(record["schema_version"]) is not int
     ):
         _fail("artifact index schema_version is not exact")
@@ -280,6 +285,7 @@ def validate_deployment_receipt(
     artifact_index_sha256: str,
     serial: str,
     firmware_version: str,
+    hardware_model: str,
     dfu_sha256: str,
 ) -> dict[str, Any]:
     """Validate a passing RAM-only receipt against exact expected identities."""
@@ -291,6 +297,11 @@ def validate_deployment_receipt(
     expected_version = _string(
         firmware_version, name="expected firmware version", maximum=256
     )
+    expected_hardware_model = _string(
+        hardware_model, name="expected hardware model", maximum=256
+    )
+    if expected_hardware_model != PLUTOPLUS_HARDWARE_MODEL:
+        _fail("expected hardware model is not the exact Pluto+ model")
     expected_dfu_sha = _sha256(dfu_sha256, name="expected DFU SHA-256")
 
     record = _mapping(value, name="RAM-boot receipt")
@@ -311,7 +322,6 @@ def validate_deployment_receipt(
             "timestamps",
             "topology",
             "commands",
-            "transition_proof_sha256",
             "known_hosts_sha256",
         },
         name="RAM-boot receipt",
@@ -319,7 +329,7 @@ def validate_deployment_receipt(
     if record["schema"] != RAM_BOOT_RECEIPT_SCHEMA:
         _fail("RAM-boot receipt schema is not exact")
     if (
-        record["schema_version"] != SCHEMA_VERSION
+        record["schema_version"] != RAM_BOOT_RECEIPT_SCHEMA_VERSION
         or type(record["schema_version"]) is not int
     ):
         _fail("RAM-boot receipt schema_version is not exact")
@@ -345,7 +355,11 @@ def validate_deployment_receipt(
         _fail("RAM-boot receipt binds different DFU bytes")
 
     runtime = _mapping(record["runtime"], name="RAM-boot receipt runtime")
-    _exact_keys(runtime, {"firmware_version"}, name="RAM-boot receipt runtime")
+    _exact_keys(
+        runtime,
+        {"firmware_version", "hardware_model"},
+        name="RAM-boot receipt runtime",
+    )
     if (
         _string(
             runtime["firmware_version"], name="receipt firmware version", maximum=256
@@ -353,6 +367,11 @@ def validate_deployment_receipt(
         != expected_version
     ):
         _fail("RAM-boot receipt binds a different firmware version")
+    if (
+        _string(runtime["hardware_model"], name="receipt hardware model", maximum=256)
+        != expected_hardware_model
+    ):
+        _fail("RAM-boot receipt binds a different hardware model")
 
     boot = _mapping(record["boot"], name="RAM-boot receipt boot")
     _exact_keys(boot, {"pre_id", "post_id"}, name="RAM-boot receipt boot")
@@ -600,7 +619,6 @@ def validate_deployment_receipt(
     if detach != [*dfu_prefix, "-e"]:
         _fail("RAM-boot receipt DFU detach command is not exact")
 
-    _sha256(record["transition_proof_sha256"], name="receipt transition proof SHA-256")
     _sha256(record["known_hosts_sha256"], name="receipt known-hosts SHA-256")
 
     return _normalized(record)

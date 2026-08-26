@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 from .candidate_binding import (
+    PLUTOPLUS_HARDWARE_MODEL,
     REQUIRED_EVIDENCE_ROLES,
     CandidateBindingError,
     validate_artifact_index,
@@ -18,7 +19,7 @@ from .candidate_binding import (
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SERIAL = "104473222a87000abc00123456789def"
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc8"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc9"
 
 
 def _artifact_index() -> dict[str, Any]:
@@ -35,7 +36,7 @@ def _artifact_index() -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc8-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc9-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1234, "run_attempt": 1},
@@ -72,13 +73,16 @@ def _artifact_index() -> dict[str, Any]:
 def _receipt() -> dict[str, Any]:
     return {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
-        "schema_version": 1,
+        "schema_version": 2,
         "verdict": "pass",
         "boot_mode": "ram-only",
         "artifact_index_sha256": SHA_B,
         "radio": {"serial": SERIAL},
         "artifact": {"dfu_sha256": SHA_A},
-        "runtime": {"firmware_version": VERSION},
+        "runtime": {
+            "firmware_version": VERSION,
+            "hardware_model": PLUTOPLUS_HARDWARE_MODEL,
+        },
         "boot": {"pre_id": "boot-before", "post_id": "boot-after"},
         "persistent_flash": {
             "partition": "/dev/mtdblock3",
@@ -153,7 +157,6 @@ def _receipt() -> dict[str, Any]:
                 ],
             },
         ],
-        "transition_proof_sha256": "5" * 64,
         "known_hosts_sha256": "6" * 64,
     }
 
@@ -164,11 +167,12 @@ def _validate_receipt(value: object) -> dict[str, Any]:
         artifact_index_sha256=SHA_B,
         serial=SERIAL,
         firmware_version=VERSION,
+        hardware_model=PLUTOPLUS_HARDWARE_MODEL,
         dfu_sha256=SHA_A,
     )
 
 
-def test_candidate_bindings_accept_exact_v1_records_and_return_copies() -> None:
+def test_candidate_bindings_accept_exact_versioned_records_and_return_copies() -> None:
     index = _artifact_index()
     receipt = _receipt()
 
@@ -213,12 +217,15 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
     "mutation",
     [
         lambda value: value.update(extra=True),
+        lambda value: value.update(schema_version=1),
         lambda value: value.update(verdict="fail"),
         lambda value: value.update(boot_mode="persistent"),
         lambda value: value.update(artifact_index_sha256="0" * 64),
         lambda value: value["radio"].update(serial="another-radio"),
         lambda value: value["artifact"].update(dfu_sha256="0" * 64),
         lambda value: value["runtime"].update(firmware_version="wrong"),
+        lambda value: value["runtime"].update(hardware_model="wrong"),
+        lambda value: value["runtime"].pop("hardware_model"),
         lambda value: value["boot"].update(post_id="boot-before"),
         lambda value: value["persistent_flash"].update(mtd_name="bootloader"),
         lambda value: value["persistent_flash"].update(post_sha256="8" * 64),
@@ -244,7 +251,7 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
         lambda value: value["commands"][2].update(argv=["dfu-util", "-e"]),
         lambda value: value["commands"][1]["argv"].append("-R"),
         lambda value: value["commands"][1]["argv"].append("--reset"),
-        lambda value: value.update(transition_proof_sha256="A" * 64),
+        lambda value: value.update(transition_proof_sha256="5" * 64),
         lambda value: value.update(known_hosts_sha256="short"),
     ],
 )
@@ -264,6 +271,7 @@ def test_ram_receipt_rejects_wrong_bytes_identity_epoch_or_cleanup(
         ("artifact_index_sha256", "0" * 64),
         ("serial", "different"),
         ("firmware_version", "different"),
+        ("hardware_model", "different"),
         ("dfu_sha256", "0" * 64),
     ],
 )
@@ -274,6 +282,7 @@ def test_ram_receipt_rejects_mismatched_caller_expectations(
         "artifact_index_sha256": SHA_B,
         "serial": SERIAL,
         "firmware_version": VERSION,
+        "hardware_model": PLUTOPLUS_HARDWARE_MODEL,
         "dfu_sha256": SHA_A,
     }
     expected[override] = value

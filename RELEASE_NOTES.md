@@ -26,7 +26,8 @@
 | `tandem-agc-v8-rc5` | 2026-08-26 | **rejected; no release artifact** | complete candidate route reached the trusted build, but integrated placement was 17 slices over the available device capacity |
 | `tandem-agc-v8-rc6` | 2026-08-26 | **rejected; diagnostics only** | fully routed and timing-clean, then rejected by stale post-route report policy before packaging |
 | `tandem-agc-v8-rc7` | 2026-08-26 | **rejected before evidence/hardware** | successful integrated build; bundle rejected because checksum/member order depended on locale and shell-array order |
-| `tandem-agc-v8-rc8` | 2026-08-26 | **development; not hardware-authorized** | retains RC7 firmware behavior and makes bundle/checksum ordering bytewise deterministic |
+| `tandem-agc-v8-rc8` | 2026-08-26 | **successful indexed build; not deployed** | deterministic bundle and verified candidate index; hardware transition blocked by an over-scoped serial-specific proof |
+| `tandem-agc-v8-rc9` | 2026-08-26 | **development; not hardware-authorized** | retains RC8 firmware behavior and packaging contract; removes a redundant historical transition-proof gate |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -35,22 +36,55 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc8 — 2026-08-26 — **development; not hardware-authorized**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc9 — 2026-08-26 — **development; not hardware-authorized**
 
-RC8 is the forward-only candidate after RC7's successful trusted build exposed
-a reproducibility defect at the packaging boundary. It retains RC7's external
-source graph, firmware RTL, placed-and-routed result, and integrated validation
-policy. The candidate-only change makes archive inventories, checksum inputs,
-and bundle members use one explicit bytewise order independent of runner locale
-and shell-array discovery order.
+RC9 is the forward-only candidate after RC8 completed its trusted build and
+candidate index but the RAM deployer required a separate historical transition
+proof in addition to its live safeguards. That input is redundant: the guarded
+executor permits only the reviewed download-plus-detach sequence, rejects
+reset and persistent-write targets, checks QSPI before and after, and attests
+the exact serial, hardware model, boot identity, firmware identity, and safe
+state. RC9 retains RC8's firmware behavior, external source graph, integrated
+policy, and deterministic package implementation; only that redundant proof
+gate, the receipt schema, and immutable release lineage change.
 
-RC8 has its own manifest, owner-only workflow mapping, artifact namespace,
+RC9 has its own manifest, owner-only workflow mapping, artifact namespace,
 exact firmware identity, and required source lock
-`refs/tags/tandem-agc-v8-rc8-source/firmware-v1`. RC5, RC6, and RC7 branches
-and source locks remain immutable failed/rejected history and are not moved.
-RC8 must pass the complete hardware-free gate, commit-bound routed OOC gate,
-fresh trusted integrated build, exact evidence indexing, and full external
-four-radio RAM campaign before any final v8 promotion.
+`refs/tags/tandem-agc-v8-rc9-source/firmware-v1`. RC5 through RC8 branches,
+source locks, runs, artifacts, and indexes remain immutable reproduction
+history and are not moved. RC9 must pass the complete hardware-free gate,
+commit-bound routed OOC gate, fresh trusted integrated build, exact evidence
+indexing, and full external four-radio RAM campaign before final v8 promotion.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc8 — 2026-08-26 — **successful indexed build; not deployed**
+
+RC8 was the forward-only candidate after RC7's successful trusted build exposed
+a reproducibility defect at the packaging boundary. It retained RC7's external
+source graph, firmware RTL, placed-and-routed behavior, and integrated
+validation policy. The candidate-only change made archive inventories,
+checksum inputs, and bundle members use one explicit bytewise order independent
+of runner locale and shell-array discovery order.
+
+Trusted Actions run `32952343526`, attempt 1, built exact source commit
+`cc62b65ea8082aad0625a891f0b79b81c78e78c7`. Vivado routed 32,908 of 32,908
+nets, placed 4,399 of 4,400 slices, used 74 of 80 DSPs, and closed timing at
+WNS `+0.645 ns`, WHS `+0.022 ns`, and bus-skew minimum `+8.606 ns`. The run
+produced deterministic bundle SHA-256
+`d55b58e489a58c3c8868f4bfcec4a7901c229a25e801c172bf2dd1fa08965c77`,
+DFU SHA-256
+`2c74f06bff072d9c3250e5e028e18ddda4f700f5960cd07153432f1a081a8f49`,
+and FIT SHA-256
+`30f7816ea2f1b66aff928613b95748f952cafbb35bc7320a05bfdd5e3075b9d8`.
+The verified candidate index SHA-256 is
+`d94b9c37a8c6f1e5935df5ae4bdfd03be49b7aba40236a32386382a0f09004a8`.
+
+No radio was touched. The deployer still required a redundant historical
+transition-proof input, so RC8 stopped with zero hardware deployment. Its
+branch, exact source lock
+`refs/tags/tandem-agc-v8-rc8-source/firmware-v1`, run, artifact, and candidate
+index remain immutable successful reproduction history. RC9 removes only that
+redundant host-side input and versions the receipt accordingly; firmware
+behavior and deterministic package implementation are unchanged.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc7 — 2026-08-26 — **rejected before evidence or hardware**
 
@@ -69,7 +103,7 @@ integrated report gate. It uploaded a bundle with SHA-256
 Before evidence assembly, review found that archive/checksum ordering depended
 on locale and shell-array order, so those bytes were rejected. There was no
 deployment, no hardware use, and no candidate evidence index. RC7's branch,
-source lock, run, and bundle are immutable reproduction history. RC8 advances
+source lock, run, and bundle are immutable reproduction history. RC8 advanced
 only the deterministic packaging boundary.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc6 — 2026-08-26 — **rejected; post-route policy failed**
@@ -137,7 +171,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC8 route still requires the complete external paired-behavior,
+active RC9 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 
