@@ -257,6 +257,8 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
         "IP Build 3669848",
         "EXPECTED_SETTINGS_SHA256=",
         "EXPECTED_VIVADO_SHA256=",
+        "EXPECTED_SETUP_ENV_SHA256=",
+        "EXPECTED_VIVADO_BINARY_SHA256=",
         "EXPECTED_LIBTINFO_SHA256=",
         'git -C "$ROOT" show',
         "validate_tandem_agc_ooc.py",
@@ -278,10 +280,8 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
     )
     assert launcher.count(final_status_claim) == 1
     assert launcher.count("/usr/bin/python3 -I -B") == 2
-    assert (
-        launcher.count('"$output_dir/input/validate_tandem_agc_ooc.py" "$output_dir"')
-        == 2
-    )
+    assert launcher.count('"$output_ref/input/validate_tandem_agc_ooc.py"') == 2
+    assert launcher.count('--directory-fd "$output_fd"') == 2
     for final_gate in (
         "output directory identity changed during final promotion",
         "output parent identity changed during final promotion",
@@ -292,6 +292,7 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
         "final OOC evidence inventory is not exact",
         "final strict routed OOC report validation failed",
         "sha256sum -c evidence-sha256.txt",
+        "output directory identity changed immediately before status claim",
     ):
         assert final_gate in launcher
     commands = [

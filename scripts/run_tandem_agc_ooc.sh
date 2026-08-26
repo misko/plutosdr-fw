@@ -1,15 +1,21 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Reproducible routed out-of-context gate for the complete tandem AGC block.
 
 set -euo pipefail
+PATH=/usr/bin:/bin
+export PATH
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CANONICAL_SETTINGS=/opt/Xilinx/Vivado/2022.2/settings64.sh
 CANONICAL_VIVADO=/opt/Xilinx/Vivado/2022.2/bin/vivado
+CANONICAL_SETUP_ENV=/opt/Xilinx/Vivado/2022.2/bin/setupEnv.sh
+CANONICAL_VIVADO_BINARY=/opt/Xilinx/Vivado/2022.2/bin/unwrapped/lnx64.o/vivado
 CANONICAL_LIBTINFO=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE/libtinfo.so.5
 CANONICAL_PYTHON=/usr/bin/python3
 EXPECTED_SETTINGS_SHA256=9bf3eb45ee64972189ceb1b604d7400c086882e12f5788b3a5fefe4c7269602d
 EXPECTED_VIVADO_SHA256=2924389be0c4297f3e2c4d267e22904a89962575497d0f5fd7eb15dc959e5505
+EXPECTED_SETUP_ENV_SHA256=07553d9d7fb5915d44e9ac29a9c8bd33321b233231a66b5daff10985aa672d38
+EXPECTED_VIVADO_BINARY_SHA256=869fa7c4f4f7256ed386c79db0e479b18d3feb201eb77e1739dba633be6446de
 EXPECTED_LIBTINFO_SHA256=78a3f1dbaf81f27ba85ee0f0eb0d1176d5664446f42755c1a93d4b510f95fa7f
 VIVADO_SETTINGS="${VIVADO_SETTINGS:-$CANONICAL_SETTINGS}"
 
@@ -28,6 +34,11 @@ sha256() {
     fail "Vivado settings must resolve to $CANONICAL_SETTINGS"
 [[ "$(sha256 "$CANONICAL_SETTINGS")" == "$EXPECTED_SETTINGS_SHA256" ]] ||
     fail "Vivado settings hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_SETUP_ENV")" == "$EXPECTED_SETUP_ENV_SHA256" ]] ||
+    fail "Vivado setupEnv hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_VIVADO_BINARY")" == \
+    "$EXPECTED_VIVADO_BINARY_SHA256" ]] ||
+    fail "Vivado executable binary hash does not match the qualified installation"
 [[ -r "$CANONICAL_LIBTINFO" ]] || fail "bundled libtinfo.so.5 is missing"
 [[ "$(sha256 "$CANONICAL_LIBTINFO")" == "$EXPECTED_LIBTINFO_SHA256" ]] ||
     fail "bundled libtinfo.so.5 hash does not match the qualified installation"
@@ -54,6 +65,7 @@ parent_identity="$(stat -c '%d:%i:%f:%u:%g' "$output_parent")"
 mkdir --mode=700 -- "$output_dir"
 mkdir --mode=700 -- "$output_dir/input"
 exec {output_fd}<"$output_dir"
+output_ref="/proc/$$/fd/$output_fd"
 output_identity="$(stat -Lc '%d:%i:%f:%u:%g' "/proc/$$/fd/$output_fd")"
 [[ -d "$output_dir" && ! -L "$output_dir" ]] || fail "output path is not a directory"
 [[ "$(stat -Lc '%a:%u:%g' "/proc/$$/fd/$output_fd")" == \
@@ -121,6 +133,8 @@ export XILINX_LOCAL_USER_DATA=no
 # shellcheck disable=SC1090
 source "$CANONICAL_SETTINGS"
 export LD_LIBRARY_PATH="$(dirname "$CANONICAL_LIBTINFO")${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+PATH=/usr/bin:/bin:/opt/Xilinx/Vivado/2022.2/bin
+export PATH
 [[ "$(realpath -- "$(command -v vivado)")" == "$CANONICAL_VIVADO" ]] ||
     fail "Vivado executable does not resolve to $CANONICAL_VIVADO"
 [[ "$(sha256 "$CANONICAL_VIVADO")" == "$EXPECTED_VIVADO_SHA256" ]] ||
@@ -177,7 +191,7 @@ mv -- "$output_dir/.provenance.tmp" "$output_dir/provenance.txt"
 set +e
 (
     cd "$run_dir"
-    vivado -mode batch -nojournal -nolog -notrace \
+    "$CANONICAL_VIVADO" -mode batch -nojournal -nolog -notrace \
         -source "$output_dir/input/axi_ooc.tcl" -tclargs "$output_dir"
 ) >"$output_dir/vivado.log" 2>&1
 vivado_status=$?
@@ -205,8 +219,8 @@ done
     fail "output parent identity changed during routing"
 [[ "$(stat -Lc '%a:%u:%g' "$output_dir")" == "700:$(id -u):$(id -g)" ]] ||
     fail "output directory ownership or mode changed during routing"
-[[ -d "$output_dir/input" && ! -L "$output_dir/input" &&
-   "$(stat -c '%a:%u:%g' "$output_dir/input")" == "700:$(id -u):$(id -g)" ]] ||
+[[ -d "$output_ref/input" && ! -L "$output_ref/input" &&
+   "$(stat -c '%a:%u:%g' "$output_ref/input")" == "700:$(id -u):$(id -g)" ]] ||
     fail "input snapshot directory changed during routing"
 
 required=(
@@ -221,22 +235,23 @@ required=(
     tandem_agc_axi_routed.dcp
 )
 for report in "${required[@]}"; do
-    [[ -f "$output_dir/$report" && ! -L "$output_dir/$report" &&
-       -s "$output_dir/$report" ]] || fail "missing safe OOC evidence: $report"
+    [[ -f "$output_ref/$report" && ! -L "$output_ref/$report" &&
+       -s "$output_ref/$report" ]] || fail "missing safe OOC evidence: $report"
 done
 
-grep -Fq "=== TANDEM AXI ROUTE COMPLETE ===" "$output_dir/vivado.log" ||
+grep -Fq "=== TANDEM AXI ROUTE COMPLETE ===" "$output_ref/vivado.log" ||
     fail "Vivado log lacks the nonauthorizing route-complete marker"
 
-if grep -Eiq '^[[:space:]]*(CRITICAL WARNING|ERROR|FATAL):' "$output_dir/vivado.log"; then
+if grep -Eiq '^[[:space:]]*(CRITICAL WARNING|ERROR|FATAL):' "$output_ref/vivado.log"; then
     fail "Vivado log contains an error, fatal, or critical warning"
 fi
 
 /usr/bin/env -u LD_LIBRARY_PATH /usr/bin/python3 -I -B \
-    "$output_dir/input/validate_tandem_agc_ooc.py" "$output_dir" \
-    >"$output_dir/.timing-metrics.tmp" ||
+    "$output_ref/input/validate_tandem_agc_ooc.py" \
+    --directory-fd "$output_fd" \
+    >"$output_ref/.timing-metrics.tmp" ||
     fail "strict routed OOC report validation failed"
-mv -- "$output_dir/.timing-metrics.tmp" "$output_dir/timing-metrics.txt"
+mv -- "$output_ref/.timing-metrics.tmp" "$output_ref/timing-metrics.txt"
 
 expected_inventory="$run_dir/expected-inventory.txt"
 actual_inventory="$run_dir/actual-inventory.txt"
@@ -260,7 +275,7 @@ actual_inventory="$run_dir/actual-inventory.txt"
     echo "vivado-version.txt f"
     echo "vivado.log f"
 } | LC_ALL=C sort >"$expected_inventory"
-find "$output_dir" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
+find "$output_ref" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
     LC_ALL=C sort >"$actual_inventory"
 cmp -s -- "$expected_inventory" "$actual_inventory" ||
     fail "OOC evidence inventory is not exact before promotion"
@@ -269,17 +284,17 @@ while IFS= read -r -d '' evidence_file; do
     [[ ! -L "$evidence_file" && "$(stat -Lc '%F:%a:%u:%g' "$evidence_file")" == \
         "regular file:600:$(id -u):$(id -g)" ]] ||
         fail "unsafe OOC evidence file: $evidence_file"
-done < <(find "$output_dir" -type f -print0)
+done < <(find "$output_ref" -type f -print0)
 
 (
-    cd "$output_dir"
+    cd "$output_ref"
     find . -maxdepth 2 -type f ! -name evidence-sha256.txt ! -name status.txt \
         -print0 | LC_ALL=C sort -z | xargs -0 sha256sum
 ) >"$run_dir/evidence-sha256.txt"
-ln -- "$run_dir/evidence-sha256.txt" "$output_dir/evidence-sha256.txt" ||
+ln -- "$run_dir/evidence-sha256.txt" "$output_ref/evidence-sha256.txt" ||
     fail "could not claim the final evidence manifest"
 unlink -- "$run_dir/evidence-sha256.txt"
-manifest_sha256="$(sha256 "$output_dir/evidence-sha256.txt")"
+manifest_sha256="$(sha256 "$output_ref/evidence-sha256.txt")"
 {
     echo "schema=plutosdr-fw.tandem-agc-ooc-status.v1"
     echo "verdict=PASS"
@@ -303,39 +318,53 @@ manifest_sha256="$(sha256 "$output_dir/evidence-sha256.txt")"
     fail "firmware source tree changed during final promotion"
 for index in "${!input_names[@]}"; do
     cmp -s -- "${input_sources[$index]}" \
-        "$output_dir/input/${input_names[$index]}" ||
+        "$output_ref/input/${input_names[$index]}" ||
         fail "OOC input changed during final promotion: ${input_git_paths[$index]}"
 done
 (
-    cd "$output_dir/input"
+    cd "$output_ref/input"
     LC_ALL=C sha256sum "${input_names[@]}"
 ) >"$run_dir/final-input-sha256.txt"
-cmp -s -- "$run_dir/final-input-sha256.txt" "$output_dir/input-sha256.txt" ||
+cmp -s -- "$run_dir/final-input-sha256.txt" "$output_ref/input-sha256.txt" ||
     fail "final staged OOC input hash inventory is not exact"
 {
     cat "$expected_inventory"
     echo "evidence-sha256.txt f"
 } | LC_ALL=C sort >"$run_dir/final-expected-inventory.txt"
-find "$output_dir" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
+find "$output_ref" -mindepth 1 -maxdepth 2 -printf '%P %y\n' |
     LC_ALL=C sort >"$run_dir/final-actual-inventory.txt"
 cmp -s -- "$run_dir/final-expected-inventory.txt" \
     "$run_dir/final-actual-inventory.txt" ||
     fail "final OOC evidence inventory is not exact"
 /usr/bin/env -u LD_LIBRARY_PATH /usr/bin/python3 -I -B \
-    "$output_dir/input/validate_tandem_agc_ooc.py" "$output_dir" \
+    "$output_ref/input/validate_tandem_agc_ooc.py" \
+    --directory-fd "$output_fd" \
     >"$run_dir/revalidated-timing-metrics.txt" ||
     fail "final strict routed OOC report validation failed"
 cmp -s -- "$run_dir/revalidated-timing-metrics.txt" \
-    "$output_dir/timing-metrics.txt" ||
+    "$output_ref/timing-metrics.txt" ||
     fail "final OOC report validation changed normalized timing evidence"
 (
-    cd "$output_dir"
+    cd "$output_ref"
     sha256sum -c evidence-sha256.txt
 ) >/dev/null || fail "final OOC evidence manifest does not verify"
+while IFS= read -r -d '' evidence_file; do
+    [[ ! -L "$evidence_file" && "$(stat -Lc '%F:%a:%u:%g' "$evidence_file")" == \
+        "regular file:600:$(id -u):$(id -g)" ]] ||
+        fail "unsafe final OOC evidence file: $evidence_file"
+done < <(find "$output_ref" -type f -print0)
+[[ "$(stat -Lc '%F:%a:%u:%g' "$output_ref")" == \
+    "directory:700:$(id -u):$(id -g)" ]] ||
+    fail "unsafe final OOC output directory"
+[[ "$(stat -Lc '%F:%a:%u:%g' "$output_ref/input")" == \
+    "directory:700:$(id -u):$(id -g)" ]] ||
+    fail "unsafe final OOC input directory"
 [[ "$(stat -Lc '%F:%a:%u:%g' "$run_dir/status.txt")" == \
     "regular file:600:$(id -u):$(id -g)" ]] ||
     fail "prepared PASS status is not a private regular file"
 echo "All OOC checks complete at $output_dir; attempting final status claim"
 # This NOREPLACE link is deliberately the final fallible operation.  No
 # authorizing status exists if any prior validation or inventory check fails.
+[[ "$(stat -Lc '%d:%i:%f:%u:%g' "$output_dir")" == "$output_identity" ]] ||
+    fail "output directory identity changed immediately before status claim"
 ln -- "$run_dir/status.txt" "/proc/$$/fd/$output_fd/status.txt"

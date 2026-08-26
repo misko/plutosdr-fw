@@ -274,13 +274,17 @@ def _timing() -> str:
     ]
     detailed_slacks = "\n".join(
         [
-            "Slack (MET) :             3.765ns  "
-            "(required time - arrival time)"
+            (
+                "Slack (MET) :             3.765ns  "
+                "(required time - arrival time)"
+            )
         ]
         * 100
         + [
-            "Slack (MET) :             0.079ns  "
-            "(arrival time - required time)"
+            (
+                "Slack (MET) :             0.079ns  "
+                "(arrival time - required time)"
+            )
         ]
         * 100
     )
@@ -456,6 +460,23 @@ def test_valid_exact_report_set_passes(tmp_path: Path) -> None:
         "TPWS_failing_endpoints": "0",
         "TPWS_total_endpoints": "698",
     }
+
+
+def test_directory_fd_validation_and_command_path_binding(tmp_path: Path) -> None:
+    _valid_reports(tmp_path)
+    descriptor = VALIDATOR.os.open(tmp_path, VALIDATOR.os.O_RDONLY)
+    try:
+        assert VALIDATOR.validate_ooc_reports(directory_fd=descriptor)["WNS_ns"] == "3.765"
+    finally:
+        VALIDATOR.os.close(descriptor)
+
+    _replace(
+        tmp_path / "cdc-summary.rpt",
+        f"-file {tmp_path}/cdc-summary.rpt",
+        "-file /stale/copied/cdc-summary.rpt",
+    )
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
 
 
 @pytest.mark.parametrize(
