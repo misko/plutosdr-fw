@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import importlib.util
+import random
+import warnings
+import zipfile
 from pathlib import Path
 from types import ModuleType
 
@@ -23,12 +26,63 @@ def _load_validator() -> ModuleType:
 
 
 VALIDATOR = _load_validator()
+DCP_PAD = random.Random(0).randbytes(600 * 1024)
+DCP_FILE_TYPES = {
+    "tandem_agc_axi_stub.v": "VERILOG_STUB",
+    "tandem_agc_axi_stub.vhdl": "VHDL_STUB",
+    "tandem_agc_axi_iPhysOpt.replay": "REPLAY",
+    "tandem_agc_axi.xdc": "XDC",
+    "tandem_agc_axi_in_context.xdc": "XDC_IN_CONTEXT",
+    "tandem_agc_axi.shape": "SHAPE",
+    "tandem_agc_axi.xn": "XN",
+    "tandem_agc_axi.xbdc": "XBDC",
+    "tandem_agc_axi.edf": "EDIF",
+    "tandem_agc_axi.sta": "STA",
+    "tandem_agc_axi.devns": "PHYSDB_DEVICE_NAME_STORE",
+    "tandem_agc_axi.pdb": "PHYSDB_PLACE",
+    "tandem_agc_axi.rdb": "PHYSDB_ROUTE",
+    "tandem_agc_axi.dfxdb": "PHYSDB_DFX_DATA",
+    "tandem_agc_axi.clkdb": "PHYSDB_CLOCK_DATA",
+    "tandem_agc_axi.nnlns": "PHYSDB_NEW_NETLIST_NAME_STORE",
+    "tandem_agc_axi.incr": "INCR",
+    "tandem_agc_axi.rda": "RDA",
+    "tandem_agc_axi_rda.json": "JSON_RDA",
+    "tandem_agc_axi.wdf": "WDF",
+    "tandem_agc_axi.synth": "SYNTH",
+    "tandem_agc_axi.mvs": "METHODOLOGY_VIO_SUMMARY",
+}
+DCP_ARCHIVE_ORDER = (
+    "tandem_agc_axi.rdb",
+    "tandem_agc_axi.shape",
+    "tandem_agc_axi.synth",
+    "tandem_agc_axi.sta",
+    "tandem_agc_axi.nnlns",
+    "tandem_agc_axi_iPhysOpt.replay",
+    "tandem_agc_axi.xn",
+    "tandem_agc_axi.xbdc",
+    "tandem_agc_axi.incr",
+    "tandem_agc_axi.clkdb",
+    "tandem_agc_axi.pdb",
+    "tandem_agc_axi.devns",
+    "tandem_agc_axi.xdc",
+    "tandem_agc_axi.wdf",
+    "tandem_agc_axi_stub.v",
+    "tandem_agc_axi.dfxdb",
+    "tandem_agc_axi.rda",
+    "tandem_agc_axi_stub.vhdl",
+    "tandem_agc_axi.mvs",
+    "tandem_agc_axi.edf",
+    "tandem_agc_axi_rda.json",
+    "tandem_agc_axi_in_context.xdc",
+)
 
 
 def _header(command: str, device: str, state: str | None = None) -> str:
+    separator = "-" * 100
+    speed_file = "-1  PRODUCTION 1.12 2019-11-22" if device == "7z010-clg400" else "-1"
     lines = [
         "Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.",
-        "---",
+        separator,
         (
             "| Tool Version : Vivado v.2022.2 (lin64) Build 3671981 "
             "Fri Oct 14 04:59:54 MDT 2022"
@@ -38,10 +92,11 @@ def _header(command: str, device: str, state: str | None = None) -> str:
         f"| Command      : {command}",
         "| Design       : tandem_agc_axi",
         f"| Device       : {device}",
+        f"| Speed File   : {speed_file}",
     ]
     if state is not None:
         lines.append(f"| Design State : {state}")
-    lines.extend(["---", ""])
+    lines.extend([separator, ""])
     return "\n".join(lines)
 
 
@@ -381,11 +436,42 @@ def _utilization() -> str:
             "Routed",
         )
         + """Utilization Design Information
+
+Table of Contents
+-----------------
+1. Slice Logic
+1.1 Summary of Registers by Type
+2. Slice Logic Distribution
+3. Memory
+4. DSP
+5. IO and GT Specific
+6. Clocking
+7. Specific Feature
+8. Primitives
+9. Black Boxes
+10. Instantiated Netlists
+
+1. Slice Logic
+--------------
+
 | Slice LUTs              |  475 |     0 |          0 |     17600 |  2.70 |
 | Slice Registers         |  694 |     0 |          0 |     35200 |  1.97 |
-| Slice Registers         |  694 |     0 |          0 |     35200 |  1.97 |
+
+1.1 Summary of Registers by Type
+--------------------------------
+
+3. Memory
+---------
+
 | Block RAM Tile          |    2 |     0 |          0 |        60 |  3.33 |
+
+4. DSP
+------
+
 | DSPs                    |    0 |     0 |          0 |        80 |  0.00 |
+
+5. IO and GT Specific
+---------------------
 
 9. Black Boxes
 --------------
@@ -399,6 +485,93 @@ def _utilization() -> str:
 -------------------------
 """
     )
+
+
+def _write_dcp(path: Path) -> None:
+    metadata = [
+        '<?xml version="1.0"?>',
+        '<Checkpoint Version="19" Minor="0">',
+        '  <BUILD_NUMBER Name="3671981"/>',
+        '  <FULL_BUILD Name="SW Build 3671981 on Fri Oct 14 04:59:54 MDT 2022"/>',
+        '  <PRODUCT Name="Vivado v2022.2 (64-bit)"/>',
+        '  <Part Name="xc7z010clg400-1"/>',
+        '  <Top Name="tandem_agc_axi"/>',
+        '  <DisableAutoIOBuffers Name="1"/>',
+        '  <OutOfContext Name="1"/>',
+        '  <HDPlatform Name="0"/>',
+    ]
+    metadata.extend(
+        f'  <File Type="{kind}" Name="{name}" ModTime="1787701238"/>'
+        for name, kind in DCP_FILE_TYPES.items()
+    )
+    metadata.append("</Checkpoint>")
+    with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("dcp.xml", "\n".join(metadata) + "\n")
+        for name in DCP_ARCHIVE_ORDER:
+            payload = DCP_PAD if name == "tandem_agc_axi.pdb" else b"x"
+            archive.writestr(name, payload)
+
+
+def _rewrite_dcp(
+    path: Path,
+    mutation: str,
+) -> None:
+    with zipfile.ZipFile(path, "r") as archive:
+        members = [
+            (info.filename, archive.read(info.filename)) for info in archive.infolist()
+        ]
+    if mutation == "missing-route-db":
+        members = [
+            (name, payload) for name, payload in members if not name.endswith(".rdb")
+        ]
+    elif mutation == "duplicate-route-db":
+        members.append(next(member for member in members if member[0].endswith(".rdb")))
+    elif mutation == "extra-member":
+        members.append(("unexpected-member", b"x"))
+    elif mutation == "reordered":
+        members = [members[0], *reversed(members[1:])]
+    elif mutation == "wrong-part":
+        members = [
+            (
+                name,
+                payload.replace(b'Part Name="xc7z010clg400-1"', b'Part Name="wrong"'),
+            )
+            if name == "dcp.xml"
+            else (name, payload)
+            for name, payload in members
+        ]
+    elif mutation == "traversal":
+        members[-1] = ("../escaped", members[-1][1])
+    elif mutation in {"unknown-encoding", "nested-node", "doctype"}:
+        rewritten: list[tuple[str, bytes]] = []
+        for name, payload in members:
+            if name == "dcp.xml":
+                if mutation == "unknown-encoding":
+                    payload = payload.replace(b'encoding="1.0"', b'encoding="x-nope"')
+                    if b'encoding="x-nope"' not in payload:
+                        payload = payload.replace(
+                            b'<?xml version="1.0"?>',
+                            b'<?xml version="1.0" encoding="x-nope"?>',
+                        )
+                elif mutation == "nested-node":
+                    payload = payload.replace(
+                        b'<Part Name="xc7z010clg400-1"/>',
+                        b'<Part Name="xc7z010clg400-1"><rogue/></Part>',
+                    )
+                else:
+                    payload = payload.replace(
+                        b'<?xml version="1.0"?>',
+                        b'<?xml version="1.0"?>\n<!DOCTYPE Checkpoint>',
+                    )
+            rewritten.append((name, payload))
+        members = rewritten
+    else:
+        raise AssertionError(f"unknown DCP mutation: {mutation}")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", UserWarning)
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+            for name, payload in members:
+                archive.writestr(name, payload)
 
 
 def _valid_reports(directory: Path) -> None:
@@ -418,6 +591,7 @@ def _valid_reports(directory: Path) -> None:
             text.replace("/evidence", str(directory)),
             encoding="utf-8",
         )
+    _write_dcp(directory / VALIDATOR.DCP_NAME)
 
 
 def _replace(path: Path, old: str, new: str, *, count: int = 1) -> None:
@@ -467,6 +641,98 @@ def test_directory_fd_validation_and_command_path_binding(tmp_path: Path) -> Non
     )
     with pytest.raises(VALIDATOR.ValidationError):
         _validate(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "wrong-part",
+        "traversal",
+        "unknown-encoding",
+        "nested-node",
+        "doctype",
+    ],
+)
+def test_routed_dcp_inventory_and_identity_are_strict(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    _valid_reports(tmp_path)
+    _rewrite_dcp(tmp_path / VALIDATOR.DCP_NAME, mutation)
+
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    ["missing-route-db", "duplicate-route-db", "extra-member"],
+)
+def test_routed_dcp_member_inventory_is_exact(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    _valid_reports(tmp_path)
+    _rewrite_dcp(tmp_path / VALIDATOR.DCP_NAME, mutation)
+
+    with pytest.raises(VALIDATOR.ValidationError, match="member inventory"):
+        _validate(tmp_path)
+
+
+def test_routed_dcp_exact_member_set_is_order_independent(tmp_path: Path) -> None:
+    _valid_reports(tmp_path)
+    dcp = tmp_path / VALIDATOR.DCP_NAME
+    _rewrite_dcp(dcp, "reordered")
+
+    assert _validate(tmp_path)["WNS_ns"] == "3.765"
+
+
+def test_routed_dcp_rejects_pk_prefixed_junk_and_bounds_before_read(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _valid_reports(tmp_path)
+    dcp = tmp_path / VALIDATOR.DCP_NAME
+    dcp.write_bytes(b"PK\x03\x04" + DCP_PAD)
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+    with dcp.open("wb") as stream:
+        stream.truncate(VALIDATOR.DCP_MAX_BYTES + 1)
+    directory_fd = VALIDATOR.os.open(tmp_path, VALIDATOR.os.O_RDONLY)
+    try:
+
+        def forbidden_read(*_args: object, **_kwargs: object) -> bytes:
+            raise AssertionError("oversized DCP was read before its fstat size gate")
+
+        monkeypatch.setattr(VALIDATOR.os, "read", forbidden_read)
+        with pytest.raises(VALIDATOR.ValidationError, match="size is outside"):
+            VALIDATOR._read_bounded_file(
+                directory_fd,
+                VALIDATOR.DCP_NAME,
+                minimum=VALIDATOR.DCP_MIN_BYTES,
+                maximum=VALIDATOR.DCP_MAX_BYTES,
+            )
+    finally:
+        VALIDATOR.os.close(directory_fd)
+
+
+def test_public_cli_normalizes_corrupt_dcp_deflate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _valid_reports(tmp_path)
+
+    def corrupt_testzip(_archive: object) -> str | None:
+        raise VALIDATOR.zlib.error("planted corrupt deflate stream")
+
+    monkeypatch.setattr(VALIDATOR.zipfile.ZipFile, "testzip", corrupt_testzip)
+    assert VALIDATOR.main([str(VALIDATOR_PATH), str(tmp_path)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.startswith("OOC report validation failed:")
+    assert "Traceback" not in captured.err
 
 
 @pytest.mark.parametrize(
@@ -748,6 +1014,12 @@ def test_timing_detailed_violation_and_utilization_black_box_reject(
         _validate(tmp_path)
 
     _valid_reports(tmp_path)
+    with (tmp_path / "timing_summary.rpt").open("a", encoding="utf-8") as stream:
+        stream.write("  Slack (VIOLATED) : -1.000ns  (required time - arrival time)\n")
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+    _valid_reports(tmp_path)
     _replace(
         tmp_path / "timing_summary.rpt",
         "Slack (MET) :             3.765ns",
@@ -904,6 +1176,60 @@ def test_black_box_section_rejects_decoy_end_marker(tmp_path: Path) -> None:
         "| evil_stub | 1 |\n\n10. Instantiated Netlists",
     )
     with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+
+def test_utilization_rows_cannot_be_spoofed_outside_their_sections(
+    tmp_path: Path,
+) -> None:
+    _valid_reports(tmp_path)
+    utilization = tmp_path / "utilization.rpt"
+    exact = (
+        "| Slice LUTs              |  475 |     0 |          0 |     17600 |  2.70 |"
+    )
+    _replace(utilization, exact, exact.replace("Slice LUTs", "Slice LUTx"))
+    with utilization.open("a", encoding="utf-8") as stream:
+        stream.write(exact + "\n")
+
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+
+def test_utilization_real_toc_and_authoritative_body_are_distinct(
+    tmp_path: Path,
+) -> None:
+    _valid_reports(tmp_path)
+    utilization = (tmp_path / "utilization.rpt").read_text(encoding="utf-8")
+
+    assert utilization.count("\n1. Slice Logic\n") == 2
+    assert utilization.count("\n10. Instantiated Netlists\n") == 2
+    assert _validate(tmp_path)["WNS_ns"] == "3.765"
+
+
+@pytest.mark.parametrize("mutation", ["duplicate-body-heading", "reordered-body"])
+def test_utilization_authoritative_body_heading_decoys_reject(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    _valid_reports(tmp_path)
+    utilization = tmp_path / "utilization.rpt"
+    text = utilization.read_text(encoding="utf-8")
+    slice_heading = "1. Slice Logic\n--------------"
+    memory_heading = "3. Memory\n---------"
+    dsp_heading = "4. DSP\n------"
+    if mutation == "duplicate-body-heading":
+        text = text.replace(
+            "Utilization Design Information\n",
+            f"Utilization Design Information\n\n{slice_heading}\n",
+            1,
+        )
+    else:
+        text = text.replace(memory_heading, "BODY-HEADING-SWAP", 1)
+        text = text.replace(dsp_heading, memory_heading, 1)
+        text = text.replace("BODY-HEADING-SWAP", dsp_heading, 1)
+    utilization.write_text(text, encoding="utf-8")
+
+    with pytest.raises(VALIDATOR.ValidationError, match="heading|section order"):
         _validate(tmp_path)
 
 

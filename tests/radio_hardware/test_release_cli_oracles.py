@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import builtins
 import hashlib
 import json
+import os
+import subprocess
 from dataclasses import asdict, replace
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from . import release_cli as release_cli_module
+from .candidate_binding import REQUIRED_EVIDENCE_ROLES
 from .metadata_abi import (
     TandemEventDirection,
     TandemGainEvent,
@@ -27,16 +32,29 @@ from .modulated_hardware import (
 from .release_campaign import build_release_plan
 from .release_cli import (
     AGGREGATE_CHECKPOINT,
+    HARNESS_SOURCE_NAMES,
+    HOST_LIBIIO_CMAKE_CONFIGURATION,
+    HOST_LIBIIO_RUNTIME_SCHEMA,
+    HOST_LIBIIO_WRAPPER_MARKER,
+    RUNNER_PROVENANCE_PATHS,
+    RUNNER_PROVENANCE_SCHEMA,
     PhaseSpec,
     ReleaseCliError,
     ReleaseHardwareOptions,
     ValidatedPhase,
+    _attest_host_libiio_preimport,
+    _attest_imported_libiio,
+    _attest_runner_provenance,
     _base_quality,
+    _bind_host_libiio,
+    _fingerprint,
+    _harness_sources,
     _release_canonical_tandem_evidence_bytes,
     _release_tandem_metadata_dict,
     _soak_temperature_errors,
     _steady_inputs,
     _tandem_batch_stable_suffix,
+    main,
     parse_cli_args,
     phase_specs,
     plan_document,
@@ -55,16 +73,349 @@ from .transient_hardware import (
     TransientCaptureOptions,
 )
 
-COMMIT = "6" * 40
+COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
+FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
+SHARED_HARNESS_PATHS = tuple(
+    sorted(
+        {
+            *HARNESS_SOURCE_NAMES,
+            "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
+            "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
+        }
+    )
+)
+
+
+def _repository() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def _git_head() -> str:
+    return subprocess.run(
+        ["git", "-C", str(_repository()), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def _runner_provenance() -> dict[str, Any]:
+    repository = _repository()
+    sources = []
+    for relative in RUNNER_PROVENANCE_PATHS:
+        path = repository / relative
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        sources.append(
+            {
+                "path": relative,
+                "absolute_path": str(path),
+                "sha256": digest,
+                "committed_sha256": digest,
+            }
+        )
+    return {
+        "schema": RUNNER_PROVENANCE_SCHEMA,
+        "repository": str(repository),
+        "commit": _git_head(),
+        "clean": True,
+        "sources": sources,
+    }
+
+
+def _runner_attestor() -> dict[str, Any]:
+    return _runner_provenance()
+
+
+@pytest.fixture(autouse=True)
+def _stub_semantic_evidence_verifier(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Semantic mechanics are covered by tests/test_tandem_release_evidence.py."""
+
+    def verify(index_path: Path, *, expected_stage: str) -> dict[str, Any]:
+        value = json.loads(index_path.read_text())
+        normalized = release_cli_module.validate_artifact_index(value)
+        assert normalized["stage"] == expected_stage
+        return normalized
+
+    monkeypatch.setattr(release_cli_module, "verify_artifact_index_semantics", verify)
+
+
+def _fake_host_libiio_provenance(tmp_path: Path) -> dict[str, Any]:
+    private = (tmp_path / "host-libiio").resolve()
+    source = private / "source"
+    build = private / "build"
+    binding = source / "bindings/python/iio.py"
+    library = build / "libiio.so"
+    cache = build / "CMakeCache.txt"
+    repository = _repository()
+    wrapper = repository / "scripts/run_tandem_agc_release_hardware.sh"
+    wrapper_sha = hashlib.sha256(wrapper.read_bytes()).hexdigest()
+    configuration = {
+        **HOST_LIBIIO_CMAKE_CONFIGURATION,
+        "CMAKE_HOME_DIRECTORY": "$HOST_LIBIIO_ROOT/source",
+        "PYTHON_EXECUTABLE": "/usr/bin/python3",
+        "CMAKE_C_COMPILER": "/usr/bin/cc",
+        "CMAKE_GENERATOR": "Unix Makefiles",
+        "CMAKE_MAKE_PROGRAM": "/usr/bin/make",
+    }
+    binding_record = {
+        "path": str(binding),
+        "bytes": 101,
+        "sha256": "a" * 64,
+        "mode": 0o644,
+    }
+    library_record = {
+        "path": str(library),
+        "bytes": 202,
+        "sha256": "b" * 64,
+        "mode": 0o755,
+    }
+    cache_record = {
+        "path": str(cache),
+        "bytes": 303,
+        "sha256": "c" * 64,
+        "mode": 0o644,
+        "configuration": configuration,
+    }
+    resume_identity = {
+        "source_commit": COMMIT,
+        "wrapper_commit": _git_head(),
+        "wrapper_sha256": wrapper_sha,
+        "binding_sha256": binding_record["sha256"],
+        "library_sha256": library_record["sha256"],
+        "cmake_configuration": configuration,
+    }
+    return {
+        "schema": HOST_LIBIIO_RUNTIME_SCHEMA,
+        "source_commit": COMMIT,
+        "repository_path": str(repository),
+        "private_root_path": str(private),
+        "source_path": str(source),
+        "build_path": str(build),
+        "binding": binding_record,
+        "library": library_record,
+        "cmake_cache": cache_record,
+        "wrapper": {
+            "repository_path": str(repository),
+            "commit": _git_head(),
+            "path": str(wrapper),
+            "sha256": wrapper_sha,
+        },
+        "resume_identity": resume_identity,
+        "imported_binding_path": str(binding),
+        "mapped_library_paths": [str(library)],
+    }
+
+
+def _write_binding_file(path: Path, payload: bytes, *, mode: int = 0o644) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    candidate_roots = [parent for parent in path.parents if parent.name == "candidate"]
+    if not candidate_roots:
+        raise AssertionError("binding fixture path has no candidate root")
+    candidate_root = candidate_roots[0]
+    current = path.parent
+    while True:
+        os.chmod(current, 0o755)
+        if current == candidate_root:
+            break
+        current = current.parent
+    path.write_bytes(payload)
+    os.chmod(path, mode)
+
+
+def _write_binding_json(path: Path, value: object, *, mode: int = 0o644) -> bytes:
+    payload = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    _write_binding_file(path, payload, mode=mode)
+    return payload
+
+
+def _candidate_binding_files(tmp_path: Path) -> dict[str, Any]:
+    root = (tmp_path / "candidate").resolve()
+    index_path = root / "candidate-index.json"
+    receipt_path = root / "hardware/deploy/radio-a/ram-boot-receipt.json"
+    if root.exists():
+        return {
+            "root": root,
+            "index": index_path,
+            "receipt": receipt_path,
+            "manifest": root / "source/tandem-agc-v8-source.yaml",
+            "dfu": root / "artifact/firmware.dfu",
+        }
+    root.mkdir(parents=True, exist_ok=True)
+    os.chmod(root, 0o755)
+    repository = _repository()
+    manifest_path = root / "source/tandem-agc-v8-source.yaml"
+    manifest_payload = (repository / "manifests/tandem-agc-v8-source.yaml").read_bytes()
+    _write_binding_file(manifest_path, manifest_payload)
+    dfu_path = root / "artifact/firmware.dfu"
+    fit_payload = b"release-candidate-fit"
+    dfu_payload = fit_payload + b"D" * 16
+    _write_binding_file(dfu_path, dfu_payload)
+
+    harness_files = []
+    live_harness = dict(_harness_sources())
+    assert tuple(live_harness) == HARNESS_SOURCE_NAMES
+    for relative in SHARED_HARNESS_PATHS:
+        payload = (repository / relative).read_bytes()
+        _write_binding_file(root / relative, payload)
+        harness_files.append(
+            {"path": relative, "sha256": hashlib.sha256(payload).hexdigest()}
+        )
+
+    evidence_members = []
+    for position, role in enumerate(REQUIRED_EVIDENCE_ROLES, 1):
+        relative = f"evidence/{role}.evidence"
+        payload = f"{position}:{role}\n".encode()
+        _write_binding_file(root / relative, payload)
+        evidence_members.append(
+            {
+                "role": role,
+                "path": relative,
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+
+    artifact_index = {
+        "schema": "plutosdr-fw.tandem-release-evidence",
+        "schema_version": 1,
+        "stage": "candidate-pre-hardware",
+        "release": {
+            "firmware_version": FIRMWARE_VERSION,
+            "kernel_version": "5.15.0-g77a1f2352162",
+            "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+            "metadata_abi": "frame-metadata-v5",
+            "tandem_agc": "request-v2",
+        },
+        "source": {
+            "commit": _git_head(),
+            "manifest_path": manifest_path.relative_to(root).as_posix(),
+            "manifest_sha256": hashlib.sha256(manifest_payload).hexdigest(),
+        },
+        "build": {"run_id": 1234, "run_attempt": 1},
+        "artifact": {
+            "dfu_path": dfu_path.relative_to(root).as_posix(),
+            "dfu_bytes": len(dfu_payload),
+            "dfu_sha256": hashlib.sha256(dfu_payload).hexdigest(),
+            "fit_bytes": len(fit_payload),
+            "fit_sha256": hashlib.sha256(fit_payload).hexdigest(),
+        },
+        "harness": {"files": harness_files},
+        "evidence": {"members": evidence_members},
+    }
+    index_payload = _write_binding_json(index_path, artifact_index)
+    receipt = {
+        "schema": "plutosdr-fw.tandem-ram-boot-receipt",
+        "schema_version": 1,
+        "verdict": "pass",
+        "boot_mode": "ram-only",
+        "artifact_index_sha256": hashlib.sha256(index_payload).hexdigest(),
+        "radio": {"serial": "radio-a"},
+        "artifact": {"dfu_sha256": artifact_index["artifact"]["dfu_sha256"]},
+        "runtime": {"firmware_version": FIRMWARE_VERSION},
+        "boot": {"pre_id": "boot-before", "post_id": "boot-after"},
+        "persistent_flash": {
+            "partition": "/dev/mtdblock3",
+            "mtd_name": "qspi-linux",
+            "bytes": 32 * 1024 * 1024,
+            "pre_sha256": "7" * 64,
+            "post_sha256": "7" * 64,
+            "unchanged": True,
+        },
+        "safety": {
+            "final_tx_muted": True,
+            "final_dds_disabled": True,
+            "final_dac_selectors_zero": True,
+            "final_tandem_state": "IDLE",
+            "final_fifo_level": 0,
+            "final_fault_flags": 0,
+        },
+        "timestamps": {"started_unix_ns": 100, "completed_unix_ns": 200},
+        "topology": {
+            "usb_port": "3-8",
+            "pre_sysfs_path": "/sys/bus/usb/devices/3-8",
+            "dfu_sysfs_path": "/sys/bus/usb/devices/3-8",
+            "post_sysfs_path": "/sys/bus/usb/devices/3-8",
+            "network_interface": "enx001122334455",
+        },
+        "commands": [
+            {
+                "phase": "request-ram-mode",
+                "argv": [
+                    "ssh",
+                    "-F",
+                    "/dev/null",
+                    "-B",
+                    "enx001122334455",
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "StrictHostKeyChecking=yes",
+                    "-o",
+                    f"UserKnownHostsFile={root / 'known_hosts'}",
+                    "-o",
+                    "CheckHostIP=no",
+                    "root@192.168.2.1",
+                    "/usr/sbin/device_reboot ram",
+                ],
+            },
+            {
+                "phase": "download-firmware-to-ram",
+                "argv": [
+                    "dfu-util",
+                    "-d",
+                    "0456:b674",
+                    "-p",
+                    "3-8",
+                    "-a",
+                    "firmware.dfu",
+                    "-D",
+                    "/proc/self/fd/9",
+                ],
+            },
+            {
+                "phase": "detach-into-downloaded-image",
+                "argv": [
+                    "dfu-util",
+                    "-d",
+                    "0456:b674",
+                    "-p",
+                    "3-8",
+                    "-a",
+                    "firmware.dfu",
+                    "-e",
+                ],
+            },
+        ],
+        "transition_proof_sha256": "5" * 64,
+        "known_hosts_sha256": "6" * 64,
+    }
+    _write_binding_json(receipt_path, receipt, mode=0o600)
+    return {
+        "root": root,
+        "index": index_path,
+        "receipt": receipt_path,
+        "manifest": manifest_path,
+        "dfu": dfu_path,
+    }
 
 
 def _arguments(tmp_path: Path, *extra: str) -> list[str]:
+    binding = _candidate_binding_files(tmp_path)
     return [
         "--authorize-tx2-loopback",
         "--radio-serial",
         "radio-a",
         "--firmware-version",
-        "v0.41-plutoplus-spf-tandem-agc-v8",
+        FIRMWARE_VERSION,
+        "--artifact-index",
+        str(binding["index"]),
+        "--deployment-receipt",
+        str(binding["receipt"]),
         "--physical-attenuation-db",
         "0",
         "--output",
@@ -74,9 +425,17 @@ def _arguments(tmp_path: Path, *extra: str) -> list[str]:
 
 
 def _parse(tmp_path: Path, *extra: str):
-    return parse_cli_args(
+    options = parse_cli_args(
         _arguments(tmp_path, *extra),
         environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+        runner_attestor=_runner_attestor,
+    )
+    if options.plan_only:
+        return options
+    provenance = _fake_host_libiio_provenance(tmp_path)
+    return _bind_host_libiio(
+        options,
+        lambda: json.loads(json.dumps(provenance)),
     )
 
 
@@ -91,6 +450,230 @@ def test_parser_requires_explicit_authorization_and_env_pinned_libiio(
         parse_cli_args(_arguments(tmp_path), environ={})
 
 
+def test_parser_rejects_semantically_invalid_evidence_before_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reject(_path: Path, *, expected_stage: str) -> dict[str, Any]:
+        assert expected_stage == "candidate-pre-hardware"
+        raise release_cli_module.EvidenceError("planted incoherent bundle")
+
+    monkeypatch.setattr(release_cli_module, "verify_artifact_index_semantics", reject)
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path, "--plan-only"),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+@pytest.mark.parametrize("option", ["--artifact-index", "--deployment-receipt"])
+def test_parser_requires_both_candidate_binding_paths(
+    tmp_path: Path, option: str
+) -> None:
+    arguments = _arguments(tmp_path)
+    position = arguments.index(option)
+    del arguments[position : position + 2]
+
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            arguments,
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+@pytest.mark.parametrize("option", ["--artifact-index", "--deployment-receipt"])
+def test_parser_rejects_missing_and_noncanonical_binding_paths(
+    tmp_path: Path, option: str
+) -> None:
+    arguments = _arguments(tmp_path)
+    position = arguments.index(option) + 1
+    original = Path(arguments[position])
+    arguments[position] = f"{original.parent}/./missing.json"
+
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            arguments,
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+@pytest.mark.parametrize("member", ["index", "receipt", "manifest", "dfu"])
+def test_parser_rejects_symlinked_candidate_binding_members(
+    tmp_path: Path, member: str
+) -> None:
+    binding = _candidate_binding_files(tmp_path)
+    arguments = _arguments(tmp_path)
+    original = Path(binding[member])
+    if member in {"index", "receipt"}:
+        link = original.with_name(f"linked-{original.name}")
+        link.symlink_to(original)
+        option = "--artifact-index" if member == "index" else "--deployment-receipt"
+        arguments[arguments.index(option) + 1] = str(link)
+    else:
+        target = original.with_name(f"real-{original.name}")
+        original.rename(target)
+        original.symlink_to(target.name)
+
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            arguments,
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+@pytest.mark.parametrize("member", ["index", "receipt", "manifest", "dfu"])
+def test_parser_rejects_missing_candidate_binding_members(
+    tmp_path: Path, member: str
+) -> None:
+    binding = _candidate_binding_files(tmp_path)
+    arguments = _arguments(tmp_path)
+    Path(binding[member]).unlink()
+
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            arguments,
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+@pytest.mark.parametrize(
+    "plant",
+    ["serial", "firmware", "dfu", "index-receipt", "source-commit"],
+)
+def test_parser_rejects_mismatched_candidate_and_receipt_bindings(
+    tmp_path: Path, plant: str
+) -> None:
+    binding = _candidate_binding_files(tmp_path)
+    index_path = Path(binding["index"])
+    receipt_path = Path(binding["receipt"])
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+    if plant == "serial":
+        receipt["radio"]["serial"] = "radio-b"
+        _write_binding_json(receipt_path, receipt, mode=0o600)
+    elif plant == "firmware":
+        index["release"]["firmware_version"] = f"{FIRMWARE_VERSION}-decoy"
+        _write_binding_json(index_path, index)
+    elif plant == "dfu":
+        dfu_path = Path(binding["dfu"])
+        payload = bytearray(dfu_path.read_bytes())
+        payload[0] ^= 0xFF
+        _write_binding_file(dfu_path, bytes(payload))
+    elif plant == "index-receipt":
+        receipt["artifact_index_sha256"] = "0" * 64
+        _write_binding_json(receipt_path, receipt, mode=0o600)
+    else:
+        index["source"]["commit"] = "0" * 40
+        _write_binding_json(index_path, index)
+
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+def test_parser_requires_release_and_receipt_harness_subset_and_rehashes_superset(
+    tmp_path: Path,
+) -> None:
+    missing = _candidate_binding_files(tmp_path / "missing-required")
+    missing_index_path = Path(missing["index"])
+    missing_index = json.loads(missing_index_path.read_text(encoding="utf-8"))
+    missing_index["harness"]["files"] = [
+        entry
+        for entry in missing_index["harness"]["files"]
+        if entry["path"] != "scripts/deploy_tandem_agc_ram_hardware.sh"
+    ]
+    _write_binding_json(missing_index_path, missing_index)
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path / "missing-required"),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+    changed = _candidate_binding_files(tmp_path / "changed-superset")
+    lifecycle_member = (
+        Path(changed["root"]) / "tests/radio_hardware/muted_metadata_batch_lifecycle.py"
+    )
+    payload = bytearray(lifecycle_member.read_bytes())
+    payload[0] ^= 0xFF
+    _write_binding_file(lifecycle_member, bytes(payload))
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path / "changed-superset"),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+def test_parser_rejects_duplicate_json_keys_unsafe_modes_and_hardlinks(
+    tmp_path: Path,
+) -> None:
+    binding = _candidate_binding_files(tmp_path / "duplicate")
+    index_path = Path(binding["index"])
+    payload = index_path.read_bytes()
+    planted = b'{"schema":"decoy",' + payload[1:]
+    _write_binding_file(index_path, planted)
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path / "duplicate"),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+    binding = _candidate_binding_files(tmp_path / "mode")
+    os.chmod(binding["receipt"], 0o644)
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path / "mode"),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+    binding = _candidate_binding_files(tmp_path / "hardlink")
+    os.link(binding["index"], binding["root"] / "index-hardlink.json")
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path / "hardlink"),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+
+
+def test_parser_rejects_a_candidate_file_changed_during_guarded_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binding = _candidate_binding_files(tmp_path)
+    index_path = Path(binding["index"])
+    index_inode = index_path.stat().st_ino
+    original_read = os.read
+    planted = False
+
+    def racing_read(descriptor: int, count: int) -> bytes:
+        nonlocal planted
+        chunk = original_read(descriptor, count)
+        if not planted and chunk and os.fstat(descriptor).st_ino == index_inode:
+            planted = True
+            with index_path.open("ab") as stream:
+                stream.write(b" ")
+        return chunk
+
+    monkeypatch.setattr(release_cli_module.os, "read", racing_read)
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+    assert planted is True
+
+
 def test_parser_anchors_literal_firmware_and_scopes_output_by_serial(
     tmp_path: Path,
 ) -> None:
@@ -99,10 +682,10 @@ def test_parser_anchors_literal_firmware_and_scopes_output_by_serial(
     assert options.firmware_pattern == (r"\Av0\.41\-plutoplus\-spf\-tandem\-agc\-v8\Z")
     assert options.output_dir == (tmp_path / "release" / "radio-a").resolve()
     assert set(dict(options.harness_sources)) >= {
-        "release_cli.py",
-        "release_campaign.py",
-        "transient_hardware.py",
-        "modulated_hardware.py",
+        "tests/radio_hardware/release_cli.py",
+        "tests/radio_hardware/release_campaign.py",
+        "tests/radio_hardware/transient_hardware.py",
+        "tests/radio_hardware/modulated_hardware.py",
     }
     assert all(len(digest) == 64 for _name, digest in options.harness_sources)
     plan = plan_document(options)
@@ -125,12 +708,11 @@ def test_plan_fingerprint_binds_release_harness_source_manifest(
         (options.harness_sources[-1][0], "0" * 64),
     )
 
-    assert (
-        plan_document(options)["fingerprint"]
-        != plan_document(replace(options, harness_sources=planted_sources))[
-            "fingerprint"
-        ]
+    assert _fingerprint(options, phase_specs(options)) != _fingerprint(
+        replace(options, harness_sources=planted_sources), phase_specs(options)
     )
+    with pytest.raises(ReleaseCliError, match="changed|bind"):
+        plan_document(replace(options, harness_sources=planted_sources))
 
 
 def test_parser_rejects_serial_path_traversal_before_output_join(
@@ -245,6 +827,652 @@ def _fake_boundaries(calls: list[tuple[str, str]]):
         )
 
     return execute, validate
+
+
+def test_binding_hashes_and_ids_reach_plan_checkpoint_report_and_fingerprint(
+    tmp_path: Path,
+) -> None:
+    options = _parse(
+        tmp_path,
+        "--phase",
+        "transient",
+        "--band",
+        "low=915000000",
+    )
+    plan = plan_document(options)
+    binding = plan["configuration"]["candidate_binding"]
+    host_libiio = plan["configuration"]["host_libiio"]
+    assert binding["serial"] == "radio-a"
+    assert binding["firmware_version"] == FIRMWARE_VERSION
+    assert binding["source_commit"] == _git_head()
+    assert binding["build_run_id"] == 1234
+    assert (
+        binding["artifact_index_sha256"]
+        == hashlib.sha256(options.artifact_index_path.read_bytes()).hexdigest()
+    )
+    assert (
+        binding["deployment_receipt_sha256"]
+        == hashlib.sha256(options.deployment_receipt_path.read_bytes()).hexdigest()
+    )
+    assert binding["deployment_boot_pre_id"] == "boot-before"
+    assert binding["deployment_boot_post_id"] == "boot-after"
+    assert len(binding["evidence_files"]) == len(REQUIRED_EVIDENCE_ROLES)
+    assert (
+        tuple(member["role"] for member in binding["evidence_files"])
+        == REQUIRED_EVIDENCE_ROLES
+    )
+    indexed_harness = {
+        member["relative_path"]: member for member in binding["harness_files"]
+    }
+    assert tuple(indexed_harness) == SHARED_HARNESS_PATHS
+    assert all(
+        indexed_harness[path]["required_for_release_hardware"] is True
+        and indexed_harness[path]["committed_sha256"] == indexed_harness[path]["sha256"]
+        for path in HARNESS_SOURCE_NAMES
+    )
+    assert (
+        indexed_harness["tests/radio_hardware/muted_metadata_batch_lifecycle.py"][
+            "required_for_release_hardware"
+        ]
+        is False
+    )
+    assert host_libiio["schema"] == HOST_LIBIIO_RUNTIME_SCHEMA
+    assert host_libiio["source_commit"] == COMMIT
+    assert host_libiio["resume_identity"]["binding_sha256"] == "a" * 64
+    assert host_libiio["resume_identity"]["library_sha256"] == "b" * 64
+    assert (
+        host_libiio["resume_identity"]["cmake_configuration"]
+        == host_libiio["cmake_cache"]["configuration"]
+    )
+
+    calls: list[tuple[str, str]] = []
+    execute, validate = _fake_boundaries(calls)
+    report, _path = run_aggregate(options, execute, validate)
+    checkpoint = json.loads(
+        (options.output_dir / AGGREGATE_CHECKPOINT).read_text(encoding="utf-8")
+    )
+    assert report["configuration"]["candidate_binding"] == binding
+    assert checkpoint["configuration"]["candidate_binding"] == binding
+    assert report["configuration"]["host_libiio"] == host_libiio
+    assert checkpoint["configuration"]["host_libiio"] == host_libiio
+    assert report["host_libiio_invocations"] == checkpoint["host_libiio_invocations"]
+    assert report["host_libiio_invocations"][0]["provenance"] == host_libiio
+    assert report["all_host_libiio_verified"] is True
+    phase = report["phases"]["transient_low"]
+    assert phase["host_libiio_before_phase"] == host_libiio
+    assert phase["host_libiio_after_cleanup"] == host_libiio
+
+    planted_binding = json.loads(options.candidate_binding_json)
+    planted_binding["deployment_receipt_sha256"] = "0" * 64
+    planted = replace(
+        options,
+        candidate_binding_json=json.dumps(
+            planted_binding,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+    )
+    assert _fingerprint(options, phase_specs(options)) != _fingerprint(
+        planted, phase_specs(planted)
+    )
+
+    equivalent = _fake_host_libiio_provenance(tmp_path / "equivalent-build")
+    equivalent["cmake_cache"]["sha256"] = "e" * 64
+    equivalent_options = replace(
+        options,
+        host_libiio_json=json.dumps(equivalent, sort_keys=True, separators=(",", ":")),
+        host_libiio_attestor=lambda: equivalent,
+    )
+    assert _fingerprint(options, phase_specs(options)) == _fingerprint(
+        equivalent_options, phase_specs(equivalent_options)
+    )
+    changed_library = json.loads(json.dumps(equivalent))
+    changed_library["library"]["sha256"] = "f" * 64
+    changed_library["resume_identity"]["library_sha256"] = "f" * 64
+    changed_options = replace(
+        options,
+        host_libiio_json=json.dumps(
+            changed_library, sort_keys=True, separators=(",", ":")
+        ),
+        host_libiio_attestor=lambda: changed_library,
+    )
+    assert _fingerprint(options, phase_specs(options)) != _fingerprint(
+        changed_options, phase_specs(changed_options)
+    )
+
+
+def test_resume_accepts_equivalent_fresh_host_libiio_build_and_records_invocation(
+    tmp_path: Path,
+) -> None:
+    options = _parse(tmp_path, "--phase", "transient", "--band", "low=915000000")
+    first_calls: list[tuple[str, str]] = []
+    execute, validate = _fake_boundaries(first_calls)
+    first, _path = run_aggregate(options, execute, validate)
+    assert first["verdict"] == "pass"
+
+    equivalent = _fake_host_libiio_provenance(tmp_path / "fresh-rebuild")
+    equivalent["cmake_cache"]["sha256"] = "e" * 64
+    resumed = replace(
+        options,
+        host_libiio_json=json.dumps(equivalent, sort_keys=True, separators=(",", ":")),
+        host_libiio_attestor=lambda: equivalent,
+    )
+    resumed_calls: list[tuple[str, str]] = []
+    execute_resumed, validate_resumed = _fake_boundaries(resumed_calls)
+    second, _path = run_aggregate(resumed, execute_resumed, validate_resumed)
+
+    assert second["verdict"] == "pass"
+    assert resumed_calls == []
+    assert len(second["host_libiio_invocations"]) == 2
+    assert second["host_libiio_invocations"][1]["provenance"] == equivalent
+
+
+def test_aggregate_fails_closed_when_host_libiio_changes_during_cleanup(
+    tmp_path: Path,
+) -> None:
+    options = _parse(
+        tmp_path,
+        "--phase",
+        "transient",
+        "--band",
+        "low=915000000",
+        "--band",
+        "high=5800000000",
+    )
+    observed = json.loads(options.host_libiio_json or "{}")
+    calls: list[str] = []
+
+    def attest() -> dict[str, Any]:
+        return json.loads(json.dumps(observed))
+
+    options = replace(options, host_libiio_attestor=attest)
+
+    def execute(spec: PhaseSpec, work_dir: Path) -> Path:
+        calls.append(spec.key)
+        report = work_dir / "fake-report.json"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text('{"verdict":"pass"}\n', encoding="utf-8")
+        observed["library"]["bytes"] += 1
+        return report
+
+    def validate(spec: PhaseSpec, _path: Path, _work_dir: Path) -> ValidatedPhase:
+        return ValidatedPhase("pass", True, {"key": spec.key})
+
+    with pytest.raises(ReleaseCliError, match="host libiio"):
+        run_aggregate(options, execute, validate)
+    report = json.loads(
+        (options.output_dir / "release-hardware-report.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    assert report["verdict"] == "invalid"
+    assert report["all_host_libiio_verified"] is False
+    assert calls == ["transient_low"]
+    assert report["phases"]["transient_low"]["status"] == "failed"
+    assert "host libiio" in report["phases"]["transient_low"]["error"]
+
+
+def test_aggregate_reattests_host_libiio_before_each_hardware_phase(
+    tmp_path: Path,
+) -> None:
+    options = _parse(
+        tmp_path,
+        "--phase",
+        "transient",
+        "--band",
+        "low=915000000",
+        "--band",
+        "high=5800000000",
+    )
+    observed = json.loads(options.host_libiio_json or "{}")
+    calls: list[str] = []
+
+    def attest() -> dict[str, Any]:
+        return json.loads(json.dumps(observed))
+
+    options = replace(options, host_libiio_attestor=attest)
+
+    def execute(spec: PhaseSpec, work_dir: Path) -> Path:
+        calls.append(spec.key)
+        report = work_dir / "fake-report.json"
+        report.parent.mkdir(parents=True, exist_ok=True)
+        report.write_text('{"verdict":"pass"}\n', encoding="utf-8")
+        return report
+
+    def validate(spec: PhaseSpec, _path: Path, _work_dir: Path) -> ValidatedPhase:
+        observed["cmake_cache"]["sha256"] = "d" * 64
+        return ValidatedPhase("pass", True, {"key": spec.key})
+
+    with pytest.raises(ReleaseCliError, match="host libiio"):
+        run_aggregate(options, execute, validate)
+    assert calls == ["transient_low"]
+    checkpoint = json.loads(
+        (options.output_dir / AGGREGATE_CHECKPOINT).read_text(encoding="utf-8")
+    )
+    assert checkpoint["phases"]["transient_low"]["status"] == "complete"
+    assert checkpoint["phases"]["transient_high"]["status"] == "pending"
+
+
+def test_aggregate_reattests_inputs_before_each_hardware_phase(
+    tmp_path: Path,
+) -> None:
+    options = _parse(
+        tmp_path,
+        "--phase",
+        "transient",
+        "--band",
+        "low=915000000",
+        "--band",
+        "high=5800000000",
+    )
+    dfu_path = Path(json.loads(options.candidate_binding_json)["dfu_file"]["path"])
+    calls: list[str] = []
+
+    def execute(spec: PhaseSpec, work_dir: Path) -> Path:
+        calls.append(spec.key)
+        path = work_dir / "fake-report.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({"key": spec.key, "verdict": "pass", "cleanup": True}),
+            encoding="utf-8",
+        )
+        if len(calls) == 1:
+            payload = bytearray(dfu_path.read_bytes())
+            payload[0] ^= 0xFF
+            _write_binding_file(dfu_path, bytes(payload))
+        return path
+
+    def validate(spec: PhaseSpec, _path: Path, _work_dir: Path) -> ValidatedPhase:
+        return ValidatedPhase("pass", True, {"key": spec.key})
+
+    with pytest.raises(ReleaseCliError, match="DFU|changed"):
+        run_aggregate(options, execute, validate)
+    assert calls == ["transient_low"]
+    checkpoint = json.loads(
+        (options.output_dir / AGGREGATE_CHECKPOINT).read_text(encoding="utf-8")
+    )
+    assert checkpoint["phases"]["transient_low"]["status"] == "complete"
+    assert checkpoint["phases"]["transient_high"]["status"] == "pending"
+
+
+def test_plan_only_never_imports_iio_or_constructs_hardware(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    original_import = builtins.__import__
+
+    def guarded_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        if name == "iio" or name.startswith("iio."):
+            raise AssertionError("plan-only attempted to import iio")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    assert (
+        main(
+            _arguments(tmp_path, "--plan-only"),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+        == 0
+    )
+
+
+def test_direct_python_invocation_is_rejected_before_importing_iio(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    imported_iio = False
+    original_import = builtins.__import__
+
+    def guarded_import(name: str, *args: Any, **kwargs: Any) -> Any:
+        nonlocal imported_iio
+        if name == "iio" or name.startswith("iio."):
+            imported_iio = True
+            raise AssertionError("iio import must follow wrapper provenance")
+        return original_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", guarded_import)
+    with pytest.raises(SystemExit, match="use scripts/run_tandem_agc_release_hardware"):
+        main(
+            _arguments(tmp_path),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=_runner_attestor,
+        )
+    assert imported_iio is False
+
+
+def test_shell_plan_only_precedes_iio_build_and_has_no_deployer() -> None:
+    shell = _repository() / "scripts/run_tandem_agc_release_hardware.sh"
+    source = shell.read_text(encoding="utf-8")
+
+    plan_branch = source.index('if [[ "${plan_only}" == true ]]')
+    assert plan_branch < source.index("IIO_BUILD=")
+    assert "import iio" not in source
+    assert "dfu-util" not in source
+    assert "-m tests.radio_hardware.tandem_ram_deploy" not in source
+    assert "--porcelain=v1 --untracked-files=all" in source
+    assert "IIO_BUILD reuse is forbidden" in source
+    assert "--clean-first" in source
+    for name in (
+        "PLUTOSDR_FW_LIBIIO_REPOSITORY",
+        "PLUTOSDR_FW_LIBIIO_SOURCE",
+        "PLUTOSDR_FW_LIBIIO_BUILD",
+        "PLUTOSDR_FW_LIBIIO_SO_PATH",
+        "PLUTOSDR_FW_LIBIIO_SO_SHA256",
+        "PLUTOSDR_FW_PYLIBIIO_PATH",
+        "PLUTOSDR_FW_PYLIBIIO_SHA256",
+        "PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_PATH",
+        "PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_SHA256",
+        "PLUTOSDR_FW_LIBIIO_PYTHON_EXECUTABLE",
+        "PLUTOSDR_FW_LIBIIO_GUARDED_WRAPPER",
+    ):
+        assert name in source
+
+
+def _host_libiio_fixture(
+    tmp_path: Path,
+) -> tuple[dict[str, str], Any, Path, dict[str, Path]]:
+    repository = (tmp_path / "libiio-repository").resolve()
+    binding = repository / "bindings/python/iio.py"
+    binding.parent.mkdir(parents=True)
+    binding.write_text("class MetadataBuffer: pass\n", encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(repository)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.email", "test@example.invalid"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.name", "Release Test"],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-q", "-m", "fixture"],
+        check=True,
+    )
+    private = (tmp_path / "private-libiio-root").resolve()
+    private.mkdir(mode=0o700)
+    snapshot = private / "source"
+    snapshot.mkdir(mode=0o700)
+    snapshot_binding = snapshot / "bindings/python/iio.py"
+    snapshot_binding.parent.mkdir(parents=True)
+    snapshot_binding.write_bytes(binding.read_bytes())
+    snapshot_binding.chmod(0o644)
+    build = private / "build"
+    build.mkdir(mode=0o700)
+    library = build / "libiio.so.0.25"
+    library.write_bytes(b"fresh pinned libiio\n")
+    library.chmod(0o755)
+    python_executable = "/usr/bin/python3"
+    cmake_values = {
+        **HOST_LIBIIO_CMAKE_CONFIGURATION,
+        "CMAKE_HOME_DIRECTORY": str(snapshot),
+        "PYTHON_EXECUTABLE": python_executable,
+        "CMAKE_C_COMPILER": "/usr/bin/cc",
+        "CMAKE_GENERATOR": "Unix Makefiles",
+        "CMAKE_MAKE_PROGRAM": "/usr/bin/make",
+    }
+    cache = build / "CMakeCache.txt"
+    cache.write_text(
+        "".join(f"{key}:STRING={value}\n" for key, value in cmake_values.items()),
+        encoding="utf-8",
+    )
+    cache.chmod(0o644)
+    maps = tmp_path / "maps"
+    maps.write_text(
+        f"00000000-00001000 r-xp 00000000 00:00 0 {library}\n",
+        encoding="utf-8",
+    )
+    wrapper_repository = _repository()
+    wrapper = wrapper_repository / "scripts/run_tandem_agc_release_hardware.sh"
+    wrapper_sha = hashlib.sha256(wrapper.read_bytes()).hexdigest()
+    environment = {
+        "PLUTOSDR_FW_LIBIIO_GUARDED_WRAPPER": HOST_LIBIIO_WRAPPER_MARKER,
+        "PLUTOSDR_FW_LIBIIO_REPOSITORY": str(repository),
+        "PLUTOSDR_FW_LIBIIO_SOURCE": str(snapshot),
+        "PLUTOSDR_FW_LIBIIO_BUILD": str(build),
+        "PLUTOSDR_FW_LIBIIO_SO_PATH": str(library),
+        "PLUTOSDR_FW_LIBIIO_SO_SHA256": hashlib.sha256(
+            library.read_bytes()
+        ).hexdigest(),
+        "PLUTOSDR_FW_PYLIBIIO_PATH": str(snapshot_binding),
+        "PLUTOSDR_FW_PYLIBIIO_SHA256": hashlib.sha256(
+            snapshot_binding.read_bytes()
+        ).hexdigest(),
+        "PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_PATH": str(cache),
+        "PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_SHA256": hashlib.sha256(
+            cache.read_bytes()
+        ).hexdigest(),
+        "PLUTOSDR_FW_LIBIIO_PYTHON_EXECUTABLE": python_executable,
+        "PLUTOSDR_FW_RUNNER_REPOSITORY": str(wrapper_repository),
+        "PLUTOSDR_FW_RUNNER_COMMIT": _git_head(),
+        "PLUTOSDR_FW_RUNNER_SHELL_PATH": str(wrapper),
+        "PLUTOSDR_FW_RUNNER_SHELL_SHA256": wrapper_sha,
+        "PLUTOSDR_FW_RUNNER_SHELL_COMMITTED_SHA256": wrapper_sha,
+    }
+    module = type(
+        "PinnedIio",
+        (),
+        {"__file__": str(snapshot_binding), "MetadataBuffer": object()},
+    )
+    return (
+        environment,
+        module,
+        maps,
+        {
+            "binding": snapshot_binding,
+            "library": library,
+            "cache": cache,
+        },
+    )
+
+
+def test_imported_libiio_requires_clean_source_fresh_build_and_exact_bytes(
+    tmp_path: Path,
+) -> None:
+    environment, module, maps, files = _host_libiio_fixture(tmp_path)
+    attestation = _attest_imported_libiio(
+        module,
+        environment,
+        expected_commit=subprocess.run(
+            [
+                "git",
+                "-C",
+                environment["PLUTOSDR_FW_LIBIIO_REPOSITORY"],
+                "rev-parse",
+                "HEAD",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip(),
+        maps_path=maps,
+    )
+    assert attestation["schema"] == HOST_LIBIIO_RUNTIME_SCHEMA
+    assert (
+        attestation["library"]["sha256"] == environment["PLUTOSDR_FW_LIBIIO_SO_SHA256"]
+    )
+    assert (
+        attestation["cmake_cache"]["sha256"]
+        == environment["PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_SHA256"]
+    )
+
+    files["library"].write_bytes(b"substituted library\n")
+    with pytest.raises(ReleaseCliError, match="bytes changed"):
+        _attest_imported_libiio(
+            module,
+            environment,
+            expected_commit=attestation["source_commit"],
+            maps_path=maps,
+        )
+
+
+def test_host_libiio_rejects_self_hashed_cache_without_guarded_wrapper(
+    tmp_path: Path,
+) -> None:
+    environment, _module, _maps, _files = _host_libiio_fixture(tmp_path)
+    environment.pop("PLUTOSDR_FW_LIBIIO_GUARDED_WRAPPER")
+
+    with pytest.raises(ReleaseCliError, match="guarded.*wrapper"):
+        _attest_host_libiio_preimport(
+            environment,
+            expected_commit=subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    environment["PLUTOSDR_FW_LIBIIO_REPOSITORY"],
+                    "rev-parse",
+                    "HEAD",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+        )
+
+
+def test_host_libiio_rejects_rehashed_nonrelease_cmake_configuration(
+    tmp_path: Path,
+) -> None:
+    environment, _module, _maps, files = _host_libiio_fixture(tmp_path)
+    cache = files["cache"]
+    cache.write_text(
+        cache.read_text(encoding="utf-8").replace(
+            "WITH_USB_BACKEND:STRING=ON", "WITH_USB_BACKEND:STRING=OFF"
+        ),
+        encoding="utf-8",
+    )
+    cache.chmod(0o644)
+    environment["PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_SHA256"] = hashlib.sha256(
+        cache.read_bytes()
+    ).hexdigest()
+
+    with pytest.raises(ReleaseCliError, match="CMake configuration changed"):
+        _attest_host_libiio_preimport(
+            environment,
+            expected_commit=subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    environment["PLUTOSDR_FW_LIBIIO_REPOSITORY"],
+                    "rev-parse",
+                    "HEAD",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+        )
+
+
+def test_host_libiio_rejects_cmake_cache_mutation_during_attestation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    environment, _module, _maps, files = _host_libiio_fixture(tmp_path)
+    cache = files["cache"]
+    cache_inode = cache.stat().st_ino
+    original_read = os.read
+    mutated = False
+
+    def racing_read(descriptor: int, size: int) -> bytes:
+        nonlocal mutated
+        if not mutated and os.fstat(descriptor).st_ino == cache_inode:
+            mutated = True
+            with cache.open("ab") as stream:
+                stream.write(b"# planted race\n")
+        return original_read(descriptor, size)
+
+    monkeypatch.setattr(os, "read", racing_read)
+    with pytest.raises(ReleaseCliError, match="changed while it was read"):
+        _attest_host_libiio_preimport(
+            environment,
+            expected_commit=subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    environment["PLUTOSDR_FW_LIBIIO_REPOSITORY"],
+                    "rev-parse",
+                    "HEAD",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip(),
+        )
+    assert mutated is True
+
+
+def test_parser_rejects_malformed_test_runner_provenance(tmp_path: Path) -> None:
+    provenance = _runner_provenance()
+    provenance["clean"] = False
+
+    with pytest.raises(SystemExit):
+        parse_cli_args(
+            _arguments(tmp_path),
+            environ={"PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT": COMMIT},
+            runner_attestor=lambda: provenance,
+        )
+
+
+def test_production_runner_attestor_requires_exact_committed_clean_sources(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = (tmp_path / "runner-repository").resolve()
+    repository.mkdir()
+    source_paths: dict[str, Path] = {}
+    for relative in RUNNER_PROVENANCE_PATHS:
+        path = repository / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(f"committed runner source: {relative}\n", encoding="utf-8")
+        os.chmod(path, 0o644)
+        source_paths[relative] = path
+
+    def git(*arguments: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(repository), *arguments],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.name", "Release Oracle")
+    git("config", "user.email", "release-oracle@example.invalid")
+    git("add", ".")
+    git("commit", "-q", "-m", "runner fixture")
+    commit = git("rev-parse", "HEAD")
+    environment = {
+        "PLUTOSDR_FW_RUNNER_REPOSITORY": str(repository),
+        "PLUTOSDR_FW_RUNNER_COMMIT": commit,
+    }
+    stems = {
+        "scripts/deploy_tandem_agc_ram_hardware.sh": "DEPLOY_SHELL",
+        "scripts/run_tandem_agc_release_hardware.sh": "SHELL",
+        "scripts/tandem_release_evidence.py": "SEMANTIC_EVIDENCE",
+        "tests/radio_hardware/candidate_binding.py": "CANDIDATE_BINDING",
+        "tests/radio_hardware/release_cli.py": "RELEASE_CLI",
+        "tests/radio_hardware/tandem_ram_deploy.py": "TANDEM_RAM_DEPLOY",
+    }
+    for relative, path in source_paths.items():
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        stem = stems[relative]
+        environment[f"PLUTOSDR_FW_RUNNER_{stem}_PATH"] = str(path)
+        environment[f"PLUTOSDR_FW_RUNNER_{stem}_SHA256"] = digest
+        environment[f"PLUTOSDR_FW_RUNNER_{stem}_COMMITTED_SHA256"] = digest
+
+    monkeypatch.setattr(
+        release_cli_module,
+        "__file__",
+        str(source_paths["tests/radio_hardware/release_cli.py"]),
+    )
+    provenance = _attest_runner_provenance(environment)
+    assert provenance["commit"] == commit
+    assert provenance["clean"] is True
+    assert tuple(source["path"] for source in provenance["sources"]) == (
+        RUNNER_PROVENANCE_PATHS
+    )
+
+    (repository / "untracked-decoy").write_text("decoy\n", encoding="utf-8")
+    with pytest.raises(ReleaseCliError, match="fully clean"):
+        _attest_runner_provenance(environment)
 
 
 def test_fake_aggregate_requires_every_requested_phase_and_cleanup(

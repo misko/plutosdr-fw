@@ -22,6 +22,8 @@
 | `libiio-metadata-v6` | 2026-08-17 | superseded | final RC4 graph, exact release identity, four-board persistent qualification |
 | **`tandem-agc-v7`** | 2026-08-19 | **current hardware-qualified** | paired RX1/RX2 AGC, ABI-2 metadata control, synchronous close, and four-board persistent qualification |
 | `tandem-agc-v8-rc1` | 2026-08-21 | **hardware-qualified persistent prerelease** | device-side cached AD9361 temperature in each fresh metadata frame |
+| `tandem-agc-v8-rc2` – `rc4` | 2026-08-22 – 2026-08-25 | superseded candidates | bounded batch lifecycle, Linux cleanup, and corrected request/pulse handoff; RC4 was invalidated by the later stale-small-ADC recovery change |
+| `tandem-agc-v8-rc5` | 2026-08-26 | **development; no release artifact** | forward-only candidate route and exact-byte build/deploy/evidence gates for the post-RC4 RTL |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -29,6 +31,43 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc5 — 2026-08-26 — **development; not hardware-authorized**
+
+RC5 is the forward-only candidate for the stale-small-ADC-latch recovery added
+after RC4. RC4's protected source lock, routed build, artifact, and hardware
+reports therefore cannot authorize the current RTL and will not be moved or
+relabelled.
+
+The release route now has an RC5 source manifest plus owner-only build mapping,
+an exact candidate/evidence index, a guarded exact-serial RAM deployer, and
+candidate-bound release and muted-64-frame lifecycle harnesses. The trusted
+package regenerates timing, route, DRC, methodology, CDC, bus-skew, and
+utilization reports from the packaged routed DCP and checks their complete
+inventory and reviewed resource ceilings against a committed policy. It also
+builds, verifies, checksums, and attests a
+`pluto.frm` whose FIT bytes must exactly match the candidate DFU. The final
+release verifier no longer treats a missing `dfu-suffix` tool as a successful
+skipped check.
+The RAM receipt additionally requires equal pre/post SHA-256 readback of the
+exact `qspi-linux` `/dev/mtdblock3` partition, so a candidate transition cannot
+claim unchanged persistent firmware from command intent alone.
+
+Earlier scoped OOC evidence for firmware commit `2d15b897e` validates at WNS
+`+3.765 ns` and WHS `+0.079 ns`, with zero failing endpoints. That evidence is
+explicitly nonauthorizing for firmware and predates the final RC5 tooling
+commit, so clean OOC and integrated routes must be rerun on the eventual
+protected RC5 source lock.
+
+No RC5 DFU has been built, deployed, or tested on radio hardware as of this
+entry, and no QSPI write is authorized. The current exact-release ABI does not
+expose enough internal detector/latch state for a deterministic stale-latch RF
+test without adding release-only debug interfaces. RC5 therefore uses the
+deterministic RTL suite at both clock ratios as the authority for that internal
+FSM and keeps the guarded `BLOCKED` observer as optional diagnostic evidence.
+Hardware promotion still requires the complete external paired-behavior,
+lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
+radios.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc1 — 2026-08-21 — **hardware-qualified persistent prerelease**
 

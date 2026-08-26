@@ -1,7 +1,7 @@
 # PlutoSDR radio-hardware pytest
 
-This directory owns two independent hardware acceptance tests: the refill
-continuity experiment for
+This directory owns independent, guarded hardware acceptance tests, including
+the refill continuity experiment for
 [plutosdr-fw issue 46](https://github.com/misko/plutosdr-fw/issues/46), and a
 manual/native-AGC/tandem-AUTO dual-RX tone-quality comparison. Neither imports
 SPF. Public pull-request CI runs only offline metadata, continuity, planted
@@ -470,3 +470,105 @@ The runner detects v0.38's requestless metadata constructor and RC2's required
 104-byte tandem request without an SPF import. Component-level provider fixes
 still need libiio unit tests; this directory remains the firmware/hardware
 acceptance boundary.
+
+## Candidate-bound lifecycle and stale-small-ADC phases
+
+The release lifecycle runner consumes an exact candidate artifact index and
+the RAM-only deployment receipt for one immutable radio serial. It does not
+deploy, reboot, or flash the radio. Every path below must be absolute, the
+output name must be exact and fresh beneath an owned mode-0700 directory, and
+the candidate index, source manifest, DFU/FIT bytes, receipt, clean committed
+harness, runtime identity, and freshly built manifest-pinned libiio must all
+bind before the runner opens an IIO context.
+
+Run the muted 64-frame lifecycle phase only after the exact candidate has been
+RAM-booted and its deployment receipt is durable:
+
+```bash
+PYTHON=.venv-radio-hardware/bin/python \
+IIO_SOURCE=../libiio \
+scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
+  --hardware \
+  --serial SERIAL \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc5-source.yaml \
+  --artifact-index /absolute/candidate/candidate-index.json \
+  --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
+  --candidate-dfu /absolute/candidate/pluto.dfu \
+  --output /absolute/evidence/SERIAL/muted-metadata-batch-lifecycle-v5.json
+```
+
+The v5 report can authorize only the muted lifecycle claim. It reopens the
+candidate inputs and every retained metadata sidecar, revalidates close/FIFO/
+fault/overflow and final mute state, and remains serial-scoped. Use a new
+output namespace for every attempt.
+
+The shared RAM deployment receipt also carries a `persistent_flash` proof:
+the exact `qspi-linux` `/dev/mtdblock3` size and SHA-256 must match before and
+after RAM boot. Release and lifecycle consumers validate that proof as part of
+their candidate binding.
+
+The A1.2 release-image interface observer has an intentionally different
+result. It audits the committed driver, UAPI, and metadata adapter; attests the
+same exact candidate and receipt; opens only the selected USB serial; forces
+and verifies mute; and inventories the release's read-only tandem attributes.
+It never acquires a tandem session, creates a metadata buffer, or enables TX
+stimulus:
+
+```bash
+PYTHON=.venv-radio-hardware/bin/python \
+IIO_SOURCE=../libiio \
+scripts/run_stale_small_adc_hardware.sh \
+  --hardware \
+  --serial SERIAL \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc5-source.yaml \
+  --artifact-index /absolute/candidate/candidate-index.json \
+  --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
+  --candidate-dfu /absolute/candidate/pluto.dfu \
+  --output /absolute/evidence/SERIAL/stale-latch-report.json
+```
+
+A successful observer run writes a mode-0600
+`plutosdr-fw.stale-small-adc-hardware.v1` report with verdict `BLOCKED` and
+exits with status 2. It cannot produce `PASS`, `release_pass_eligible`, or
+`hardware_qualified`. The exact release ABI exposes accepted
+`SMALL_ADC_INHIBIT` events and general status, but it does not expose the
+sample-aligned detector snapshot, stale-episode state, same-epoch HOLD/AUTO
+control, deterministic detector injection/fixture marker, or a physical paired
+pulse count independent of accepted events. Those interfaces are required to
+prove the conflict, one-clear budget, recurrence/minimum behavior, and re-arm
+sequence in A1.2. Until the exact release image provides a deterministic
+end-to-end observation path, this report records the blocker; it does not
+close it.
+
+This observer is optional diagnostic evidence, not a release phase. The
+internal stale-latch one-clear/re-arm behavior is qualified by the deterministic
+RTL suite at both supported clock ratios; the release-image hardware campaign
+qualifies the externally observable paired gain, lifecycle, transient,
+modulated, soak, teardown, and safety behavior. A `BLOCKED` observer report
+therefore neither authorizes nor blocks candidate promotion.
+
+The candidate index's existing `harness.files` array must include exact
+committed SHA-256 bindings for all of these paths; this uses the shared harness
+schema without adding a new schema field:
+
+```text
+scripts/run_muted_metadata_batch_lifecycle_hardware.sh
+tests/radio_hardware/candidate_binding.py
+tests/radio_hardware/metadata_abi.py
+tests/radio_hardware/muted_metadata_batch_lifecycle.py
+linux/drivers/iio/adc/adi_tandem_agc.c
+linux/include/uapi/linux/adi_tandem_agc.h
+scripts/run_stale_small_adc_hardware.sh
+tests/radio_hardware/stale_small_adc_hardware.py
+```
+
+Offline development uses the pure public-trace analyzer and planted oracles;
+it never substitutes an inferred stale-latch PASS for missing release-image
+evidence:
+
+```bash
+uv run --with pytest pytest -q \
+  tests/radio_hardware/test_candidate_binding_oracles.py \
+  tests/radio_hardware/test_muted_metadata_batch_lifecycle_oracles.py \
+  tests/radio_hardware/test_stale_small_adc_hardware_oracles.py
+```

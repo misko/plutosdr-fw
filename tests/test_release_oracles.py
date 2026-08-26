@@ -19,6 +19,7 @@ QUALITY_HARDWARE_LAUNCHER = ROOT / "scripts" / "run_tandem_agc_quality_hardware.
 TANDEM_OOC_LAUNCHER = ROOT / "scripts" / "run_tandem_agc_ooc.sh"
 TANDEM_OOC_TCL = ROOT / "hdl-tandem" / "axi_ooc.tcl"
 TANDEM_OOC_VALIDATOR = ROOT / "scripts" / "validate_tandem_agc_ooc.py"
+TANDEM_OFFLINE_CHECK = ROOT / "scripts" / "check_tandem_release_offline.sh"
 
 RC3_LIBIIO_SOURCE = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
 RC3_LIBIIO_REF = "refs/tags/tandem-agc-v8-rc3-source/libiio-v1"
@@ -178,6 +179,7 @@ def test_tandem_v2_preserves_historical_transport_but_prevents_linux_rollback() 
 def test_rc3_and_rc4_have_explicit_trusted_build_and_source_graph_routes() -> None:
     main_workflow = FIRMWARE_MAIN_WORKFLOW.read_text(encoding="utf-8")
     pr_workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
+    offline_check = TANDEM_OFFLINE_CHECK.read_text(encoding="utf-8")
     launcher = QUALITY_HARDWARE_LAUNCHER.read_text(encoding="utf-8")
 
     for candidate in ("rc3", "rc4"):
@@ -190,7 +192,8 @@ def test_rc3_and_rc4_have_explicit_trusted_build_and_source_graph_routes() -> No
         "manifests/tandem-agc-v8-rc4-source.yaml",
         "manifests/tandem-agc-v8-source.yaml",
     ):
-        assert f"./scripts/check_source_graph.sh {manifest}" in pr_workflow
+        assert f"./scripts/check_source_graph.sh {manifest}" in offline_check
+    assert "./scripts/check_tandem_release_offline.sh source-graph" in pr_workflow
     assert "manifests/tandem-agc-v8-rc4-source.yaml" in launcher
 
 
@@ -210,10 +213,12 @@ def test_required_hdl_simulation_uses_final_timestamp_source() -> None:
 
 def test_required_pr_gate_runs_root_tandem_rtl_suite() -> None:
     workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
+    offline_check = TANDEM_OFFLINE_CHECK.read_text(encoding="utf-8")
 
     assert "iverilog python3-numpy python3-pytest" in workflow
-    assert "tests/test_tandem_agc_ooc_validator.py" in workflow
-    assert "./hdl-tandem/run_tests.sh" in workflow
+    assert "./scripts/check_tandem_release_offline.sh oracles" in workflow
+    assert "tests/test_tandem_agc_ooc_validator.py" in offline_check
+    assert "./hdl-tandem/run_tests.sh" in offline_check
 
 
 def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
@@ -221,6 +226,7 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
     tcl = TANDEM_OOC_TCL.read_text(encoding="utf-8")
     validator = TANDEM_OOC_VALIDATOR.read_text(encoding="utf-8")
 
+    assert launcher.splitlines()[0] == "#!/bin/bash -p"
     assert TANDEM_OOC_LAUNCHER.stat().st_mode & 0o111
     assert not (ROOT / "hdl-tandem" / "core_ooc.tcl").exists()
     assert not (ROOT / "hdl-tandem" / "cdc_ooc.tcl").exists()
@@ -326,6 +332,23 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
         '"Slice LUTs": (475, 17600, Decimal("2.70"))',
     ):
         assert exact_inventory in validator
+
+
+def test_tandem_ooc_launcher_ignores_exported_shell_functions() -> None:
+    environment = {
+        "PATH": "/usr/bin:/bin",
+        "BASH_FUNC_stat%%": '() { printf "%s\\n" FORGED-STAT; }',
+    }
+    result = subprocess.run(
+        ["/bin/bash", "-p", "-c", "type stat"],
+        check=True,
+        text=True,
+        capture_output=True,
+        env=environment,
+    )
+
+    assert "stat is /usr/bin/stat" in result.stdout
+    assert "function" not in result.stdout
 
 
 def test_tandem_ooc_default_check_ignores_verilog_comment_decoys(

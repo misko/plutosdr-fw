@@ -1,0 +1,139 @@
+{
+  "schema": "plutosdr-fw.integrated-route-waivers.v1",
+  "schema_version": 1,
+  "review": {
+    "owner": "firmware-release-owners",
+    "applies_to": "tandem-agc-v8",
+    "rationale": "Reviewed Pluto+ platform findings inherited by the tandem-AGC v8 design; any rule, severity, count, or named critical CDC path change requires a new review."
+  },
+  "tool": {
+    "name": "Vivado",
+    "version": "2022.2",
+    "build": "3671981"
+  },
+  "design": {
+    "name": "system_top",
+    "devices": [
+      "7z010-clg400",
+      "xc7z010clg400-1"
+    ]
+  },
+  "utilization": [
+    {
+      "section": "1. Slice Logic",
+      "resource": "Slice LUTs",
+      "available": 17600,
+      "max_used": 14080,
+      "max_utilization_percent": 80.0,
+      "rationale": "Keep routed LUT use below eighty percent so the release does not consume the remaining placement margin."
+    },
+    {
+      "section": "1. Slice Logic",
+      "resource": "Slice Registers",
+      "available": 35200,
+      "max_used": 24640,
+      "max_utilization_percent": 70.0,
+      "rationale": "Keep routed register use below seventy percent and reject unexpected device-capacity changes."
+    },
+    {
+      "section": "3. Memory",
+      "resource": "Block RAM Tile",
+      "available": 60,
+      "max_used": 12,
+      "max_utilization_percent": 20.0,
+      "rationale": "Reserve block RAM capacity for future capture and buffering work while freezing the qualified device size."
+    },
+    {
+      "section": "4. DSP",
+      "resource": "DSPs",
+      "available": 80,
+      "max_used": 72,
+      "max_utilization_percent": 90.0,
+      "rationale": "The current design already uses seventy-two DSP blocks; any increase requires explicit architectural review."
+    },
+    {
+      "section": "5. IO and GT Specific",
+      "resource": "Bonded IOB",
+      "available": 100,
+      "max_used": 55,
+      "max_utilization_percent": 55.0,
+      "rationale": "Preserve the reviewed Pluto Plus package IO budget and reject an unexpected part or interface expansion."
+    },
+    {
+      "section": "6. Clocking",
+      "resource": "BUFGCTRL",
+      "available": 32,
+      "max_used": 4,
+      "max_utilization_percent": 12.5,
+      "rationale": "Preserve global clocking headroom and reject an unreviewed new clock-domain implementation."
+    }
+  ],
+  "check_timing": [
+    {"check": "no_clock", "count": 0, "rationale": "Every sequential endpoint has a clock."},
+    {"check": "constant_clock", "count": 0, "rationale": "No sequential endpoint is driven by a constant clock."},
+    {"check": "pulse_width_clock", "count": 0, "rationale": "No unanalysed pulse-width clock endpoint."},
+    {"check": "unconstrained_internal_endpoints", "count": 0, "rationale": "All internal maximum-delay endpoints are constrained."},
+    {"check": "no_input_delay", "count": 24, "rationale": "Board-level asynchronous/control inputs inherited from the Pluto+ top-level interface."},
+    {"check": "no_output_delay", "count": 24, "rationale": "Board-level asynchronous/control outputs inherited from the Pluto+ top-level interface."},
+    {"check": "multiple_clock", "count": 0, "rationale": "No endpoint has ambiguous multiple clocks."},
+    {"check": "generated_clocks", "count": 0, "rationale": "All generated clocks have a source."},
+    {"check": "loops", "count": 0, "rationale": "No combinational timing loops."},
+    {"check": "partial_input_delay", "count": 0, "rationale": "No partially constrained input delays."},
+    {"check": "partial_output_delay", "count": 0, "rationale": "No partially constrained output delays."},
+    {"check": "latch_loops", "count": 0, "rationale": "No combinational latch loops."}
+  ],
+  "drc": [
+    {"rule": "CHECK-3", "severity": "Warning", "count": 1, "rationale": "Vivado reports the reviewed REQP-1839 display limit."},
+    {"rule": "PLIO-6", "severity": "Warning", "count": 1, "rationale": "Inherited ADI QSPI IO1 IOB property is not connected directly to a package IO."},
+    {"rule": "REQP-1617", "severity": "Warning", "count": 1, "rationale": "Same inherited ADI QSPI IO1 register condition as PLIO-6."},
+    {"rule": "REQP-1839", "severity": "Warning", "count": 20, "rationale": "Reviewed ADI DMA RAM enable path; Vivado caps the displayed inventory at 20."},
+    {"rule": "AVAL-4", "severity": "Advisory", "count": 24, "rationale": "Power-only DSP48 optimization advice in inherited ADI IQ-correction datapaths."},
+    {"rule": "REQP-28", "severity": "Advisory", "count": 4, "rationale": "Power-only DSP48 clock-enable advice in inherited ADI datapaths."},
+    {"rule": "REQP-30", "severity": "Advisory", "count": 4, "rationale": "Power-only DSP48 clock-enable advice in inherited ADI datapaths."},
+    {"rule": "REQP-32", "severity": "Advisory", "count": 4, "rationale": "DSP48 OPMODE advice in inherited ADI datapaths."},
+    {"rule": "REQP-181", "severity": "Advisory", "count": 2, "rationale": "Reviewed write-first block-RAM inference in inherited ADI datapaths."}
+  ],
+  "methodology": [
+    {"rule": "PDRC-190", "severity": "Warning", "count": 33, "rationale": "Reviewed synchronizer placement inventory; any count change is rejected for renewed review."},
+    {"rule": "TIMING-9", "severity": "Warning", "count": 1, "rationale": "The two explicitly named tandem timestamp/overflow crossings are reviewed below in the CDC inventory."},
+    {"rule": "TIMING-18", "severity": "Warning", "count": 46, "rationale": "Inherited Pluto+ asynchronous/control package ports do not use synchronous IO-delay constraints."},
+    {"rule": "ULMTCS-1", "severity": "Warning", "count": 1, "rationale": "Utilization guidance only; the routed design closes timing and route."},
+    {"rule": "XDCB-5", "severity": "Warning", "count": 4, "rationale": "Constraint runtime-efficiency advice; it does not alter the selected objects."},
+    {"rule": "RTGT-1", "severity": "Advisory", "count": 4, "rationale": "Block-RAM retargeting optimization advice in inherited ADI memories."}
+  ],
+  "cdc": {
+    "summary": [
+      {"rule": "CDC-1", "severity": "Critical", "count": 1, "rationale": "Reviewed single-bit overflow snapshot crossing named in critical_paths."},
+      {"rule": "CDC-3", "severity": "Info", "count": 75, "rationale": "Recognized ASYNC_REG single-bit synchronizers."},
+      {"rule": "CDC-4", "severity": "Critical", "count": 1, "rationale": "Reviewed coherent multi-bit timestamp snapshot crossing named in critical_paths."},
+      {"rule": "CDC-6", "severity": "Warning", "count": 5, "rationale": "Recognized ASYNC_REG multi-bit synchronizers."},
+      {"rule": "CDC-9", "severity": "Info", "count": 4, "rationale": "Recognized ASYNC_REG reset synchronizers."},
+      {"rule": "CDC-15", "severity": "Warning", "count": 2084, "rationale": "Inherited ADI clock-enable controlled false-path crossings; exact inventory is frozen."},
+      {"rule": "CDC-17", "severity": "Warning", "count": 18, "rationale": "Inherited ADI MUX-hold controlled false-path crossings; exact inventory is frozen."}
+    ],
+    "critical_paths": [
+      {
+        "rule": "CDC-1",
+        "source": "i_system_wrapper/system_i/cpack_timestamp/inst/overflow_sync/input_reg_reg[0]/C",
+        "destination": "i_system_wrapper/system_i/cpack_timestamp/inst/overflow_sync/output_reg_reg[0]/D",
+        "rationale": "Single-bit overflow snapshot uses the tandem snapshot/hold protocol and is covered by coherent-counter RTL and hardware lifecycle tests."
+      },
+      {
+        "rule": "CDC-4",
+        "source": "i_system_wrapper/system_i/cpack_timestamp/inst/timestamp_cpu_sync/input_reg_reg[31:0]/C",
+        "destination": "i_system_wrapper/system_i/cpack_timestamp/inst/timestamp_cpu_sync/output_reg_reg[31:0]/D",
+        "rationale": "The multi-bit timestamp is transferred only under the tandem snapshot/hold protocol and is covered by coherent-counter RTL and hardware lifecycle tests."
+      }
+    ]
+  },
+  "bus_skew": {
+    "requirement_ns": 10.0,
+    "endpoints": 4,
+    "constraints": [
+      "cpack_timestamp/inst/fifo/gnuram_async_fifo.xpm_fifo_base_inst/gen_cdc_pntr.rd_pntr_cdc_inst",
+      "cpack_timestamp/inst/fifo/gnuram_async_fifo.xpm_fifo_base_inst/gen_cdc_pntr.wr_pntr_cdc_inst",
+      "upack_timestamp/inst/fifo/gnuram_async_fifo.xpm_fifo_base_inst/gen_cdc_pntr.rd_pntr_cdc_inst",
+      "upack_timestamp/inst/fifo/gnuram_async_fifo.xpm_fifo_base_inst/gen_cdc_pntr.wr_pntr_cdc_inst"
+    ]
+  }
+}

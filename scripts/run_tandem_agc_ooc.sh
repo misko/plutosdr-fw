@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -p
 # Reproducible routed out-of-context gate for the complete tandem AGC block.
 
 set -euo pipefail

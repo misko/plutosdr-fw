@@ -6,9 +6,13 @@ import os
 import re
 import stat
 import sys
+import zipfile
+import zlib
 from collections import Counter
 from decimal import Decimal, InvalidOperation
+from io import BytesIO
 from pathlib import Path
+from xml.etree import ElementTree
 
 
 class ValidationError(RuntimeError):
@@ -27,6 +31,34 @@ REPORT_LIMITS = {
     "timing_summary.rpt": 8 * 1024 * 1024,
     "utilization.rpt": 1024 * 1024,
     "vivado.log": 16 * 1024 * 1024,
+}
+DCP_NAME = "tandem_agc_axi_routed.dcp"
+DCP_MIN_BYTES = 512 * 1024
+DCP_MAX_BYTES = 16 * 1024 * 1024
+DCP_MAX_EXPANDED_BYTES = 16 * 1024 * 1024
+DCP_FILE_TYPES = {
+    "tandem_agc_axi.mvs": "METHODOLOGY_VIO_SUMMARY",
+    "tandem_agc_axi.synth": "SYNTH",
+    "tandem_agc_axi.wdf": "WDF",
+    "tandem_agc_axi_rda.json": "JSON_RDA",
+    "tandem_agc_axi.rda": "RDA",
+    "tandem_agc_axi.incr": "INCR",
+    "tandem_agc_axi.devns": "PHYSDB_DEVICE_NAME_STORE",
+    "tandem_agc_axi.nnlns": "PHYSDB_NEW_NETLIST_NAME_STORE",
+    "tandem_agc_axi.rdb": "PHYSDB_ROUTE",
+    "tandem_agc_axi.clkdb": "PHYSDB_CLOCK_DATA",
+    "tandem_agc_axi.dfxdb": "PHYSDB_DFX_DATA",
+    "tandem_agc_axi.xbdc": "XBDC",
+    "tandem_agc_axi.edf": "EDIF",
+    "tandem_agc_axi.xn": "XN",
+    "tandem_agc_axi.pdb": "PHYSDB_PLACE",
+    "tandem_agc_axi.sta": "STA",
+    "tandem_agc_axi.shape": "SHAPE",
+    "tandem_agc_axi_in_context.xdc": "XDC_IN_CONTEXT",
+    "tandem_agc_axi.xdc": "XDC",
+    "tandem_agc_axi_iPhysOpt.replay": "REPLAY",
+    "tandem_agc_axi_stub.vhdl": "VHDL_STUB",
+    "tandem_agc_axi_stub.v": "VERILOG_STUB",
 }
 
 CDC_SUMMARY = {
@@ -153,12 +185,6 @@ UTILIZATION = {
     "Block RAM Tile": (2, 60, Decimal("3.33")),
     "DSPs": (0, 80, Decimal("0.00")),
 }
-UTILIZATION_OCCURRENCES = {
-    "Slice LUTs": 1,
-    "Slice Registers": 2,
-    "Block RAM Tile": 1,
-    "DSPs": 1,
-}
 HEADED_REPORTS = tuple(name for name in REPORT_LIMITS if name.endswith(".rpt"))
 
 
@@ -173,7 +199,13 @@ def _close_descriptor(descriptor: int, label: str) -> None:
         raise ValidationError(f"cannot close {label}: {error}") from error
 
 
-def _read_report(directory_fd: int, name: str, limit: int) -> str:
+def _read_bounded_file(
+    directory_fd: int,
+    name: str,
+    *,
+    minimum: int,
+    maximum: int,
+) -> bytes:
     flags = os.O_RDONLY | os.O_CLOEXEC
     if hasattr(os, "O_NOFOLLOW"):
         flags |= os.O_NOFOLLOW
@@ -185,8 +217,8 @@ def _read_report(directory_fd: int, name: str, limit: int) -> str:
         before = os.fstat(descriptor)
         if not stat.S_ISREG(before.st_mode):
             _fail(f"{name} is not a regular file")
-        if before.st_size <= 0 or before.st_size > limit:
-            _fail(f"{name} size is outside 1..{limit}: {before.st_size}")
+        if before.st_size < minimum or before.st_size > maximum:
+            _fail(f"{name} size is outside {minimum}..{maximum}: {before.st_size}")
         chunks: list[bytes] = []
         remaining = before.st_size
         while remaining:
@@ -212,13 +244,111 @@ def _read_report(directory_fd: int, name: str, limit: int) -> str:
         raise ValidationError(f"cannot read {name}: {error}") from error
     finally:
         _close_descriptor(descriptor, name)
+    return b"".join(chunks)
+
+
+def _read_report(directory_fd: int, name: str, limit: int) -> str:
+    payload = _read_bounded_file(
+        directory_fd,
+        name,
+        minimum=1,
+        maximum=limit,
+    )
     try:
-        text = b"".join(chunks).decode("utf-8", errors="strict")
+        text = payload.decode("utf-8", errors="strict")
     except UnicodeDecodeError as error:
         raise ValidationError(f"{name} is not strict UTF-8") from error
     if "\x00" in text:
         _fail(f"{name} contains a NUL byte")
     return text
+
+
+def _validate_dcp(payload: bytes) -> None:
+    try:
+        with zipfile.ZipFile(BytesIO(payload), mode="r") as archive:
+            members = archive.infolist()
+            names = [member.filename for member in members]
+            expected_names = {"dcp.xml", *DCP_FILE_TYPES}
+            if set(names) != expected_names or len(names) != len(expected_names):
+                _fail(f"routed DCP member inventory is not exact: {names}")
+            expanded_size = 0
+            for member in members:
+                member_path = Path(member.filename)
+                if (
+                    member.is_dir()
+                    or member_path.is_absolute()
+                    or ".." in member_path.parts
+                    or member.flag_bits & 0x1
+                    or member.compress_type != zipfile.ZIP_DEFLATED
+                    or member.file_size <= 0
+                    or member.file_size > DCP_MAX_EXPANDED_BYTES
+                ):
+                    _fail(f"routed DCP has an unsafe member: {member.filename}")
+                expanded_size += member.file_size
+            if expanded_size > DCP_MAX_EXPANDED_BYTES:
+                _fail("routed DCP expanded size exceeds the bounded limit")
+            if archive.testzip() is not None:
+                _fail("routed DCP has a CRC failure")
+            xml_payload = archive.read("dcp.xml")
+    except (
+        EOFError,
+        OSError,
+        RuntimeError,
+        ValueError,
+        zipfile.BadZipFile,
+        zipfile.LargeZipFile,
+        zlib.error,
+    ) as error:
+        raise ValidationError(f"routed DCP container is malformed: {error}") from error
+
+    if b"<!DOCTYPE" in xml_payload or b"<!ENTITY" in xml_payload:
+        _fail("routed DCP metadata XML contains a forbidden declaration")
+    try:
+        root = ElementTree.fromstring(xml_payload)
+    except (ElementTree.ParseError, LookupError, UnicodeError, ValueError) as error:
+        raise ValidationError(
+            f"routed DCP metadata XML is malformed: {error}"
+        ) from error
+    if root.tag != "Checkpoint" or root.attrib != {"Version": "19", "Minor": "0"}:
+        _fail("routed DCP checkpoint schema is not exact")
+    expected_identity = {
+        "BUILD_NUMBER": "3671981",
+        "FULL_BUILD": "SW Build 3671981 on Fri Oct 14 04:59:54 MDT 2022",
+        "PRODUCT": "Vivado v2022.2 (64-bit)",
+        "Part": "xc7z010clg400-1",
+        "Top": DESIGN,
+        "DisableAutoIOBuffers": "1",
+        "OutOfContext": "1",
+        "HDPlatform": "0",
+    }
+    identity: dict[str, str] = {}
+    files: dict[str, str] = {}
+    if root.text is not None and root.text.strip():
+        _fail("routed DCP metadata root has unexpected text")
+    for child in root:
+        if len(child) != 0:
+            _fail(f"routed DCP metadata node is nested: {child.tag}")
+        if child.tag == "File":
+            if set(child.attrib) != {"Type", "Name", "ModTime"}:
+                _fail("routed DCP File metadata keys are not exact")
+            if re.fullmatch(r"[0-9]{10}", child.attrib["ModTime"]) is None:
+                _fail("routed DCP File timestamp is malformed")
+            name = child.attrib["Name"]
+            if name in files:
+                _fail(f"routed DCP metadata duplicates File {name}")
+            files[name] = child.attrib["Type"]
+        else:
+            if set(child.attrib) != {"Name"} or child.tag in identity:
+                _fail(f"routed DCP identity node is malformed: {child.tag}")
+            identity[child.tag] = child.attrib["Name"]
+        if child.text is not None and child.text.strip():
+            _fail(f"routed DCP metadata node has unexpected text: {child.tag}")
+        if child.tail is not None and child.tail.strip():
+            _fail(f"routed DCP metadata node has unexpected tail: {child.tag}")
+    if identity != expected_identity:
+        _fail(f"routed DCP identity is not exact: {identity}")
+    if files != DCP_FILE_TYPES:
+        _fail(f"routed DCP file metadata is not exact: {files}")
 
 
 def _single_regex(text: str, pattern: str, label: str) -> re.Match[str]:
@@ -235,23 +365,74 @@ def _require_header(
     device: str,
     command_pattern: str,
 ) -> None:
-    escaped_tool = re.escape(TOOL_VERSION)
-    _single_regex(
-        text,
-        rf"^\| Tool Version\s*:\s*{escaped_tool}\s*$",
-        f"{name} tool header",
+    lines = text.splitlines()
+    if not lines or lines[0] != "Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.":
+        _fail(f"{name} copyright banner is not exact")
+    if len(lines) < 4 or re.fullmatch(r"-{20,}", lines[1]) is None:
+        _fail(f"{name} opening banner separator is malformed")
+    closing_indices = [
+        index
+        for index, line in enumerate(lines[2:], start=2)
+        if re.fullmatch(r"-{20,}", line) is not None
+    ]
+    if not closing_indices:
+        _fail(f"{name} banner has no closing separator")
+    closing_index = closing_indices[0]
+    header_lines = lines[2:closing_index]
+    fields: dict[str, str] = {}
+    field_order: list[str] = []
+    for line in header_lines:
+        match = re.fullmatch(r"\| ([A-Za-z ]+?)\s*:\s*(.*?)\s*", line)
+        if match is None:
+            _fail(f"{name} banner field is malformed: {line}")
+        key, value = match.groups()
+        if key in fields or not value:
+            _fail(f"{name} banner field is duplicate or empty: {key}")
+        fields[key] = value
+        field_order.append(key)
+    expected_order = [
+        "Tool Version",
+        "Date",
+        "Host",
+        "Command",
+        "Design",
+        "Device",
+        "Speed File",
+    ]
+    if "Design State" in fields:
+        expected_order.append("Design State")
+    if field_order != expected_order:
+        _fail(f"{name} banner field inventory/order is not exact: {field_order}")
+    expected_speed = (
+        "-1  PRODUCTION 1.12 2019-11-22" if device == "7z010-clg400" else "-1"
     )
-    _single_regex(
-        text,
-        rf"^\| Design\s*:\s*{re.escape(DESIGN)}\s*$",
-        f"{name} design header",
-    )
-    _single_regex(
-        text,
-        rf"^\| Device\s*:\s*{re.escape(device)}\s*$",
-        f"{name} device header",
-    )
-    _single_regex(text, command_pattern, f"{name} command header")
+    if (
+        fields["Tool Version"] != TOOL_VERSION
+        or fields["Design"] != DESIGN
+        or fields["Device"] != device
+        or fields["Speed File"] != expected_speed
+    ):
+        _fail(f"{name} banner identity is not exact")
+    authoritative_command = f"| Command : {fields['Command']}"
+    if re.fullmatch(command_pattern, authoritative_command) is None:
+        _fail(f"{name} command header is not exact: {fields['Command']}")
+    for identity_field in (
+        "Tool Version",
+        "Command",
+        "Design",
+        "Device",
+        "Design State",
+    ):
+        occurrences = len(
+            re.findall(
+                rf"^\| {re.escape(identity_field)}\s*:",
+                text,
+                flags=re.MULTILINE,
+            )
+        )
+        expected_occurrences = 1 if identity_field in fields else 0
+        if occurrences != expected_occurrences:
+            _fail(f"{name} has a decoy or duplicate {identity_field} field")
 
 
 def _split_columns(line: str) -> list[str]:
@@ -893,14 +1074,17 @@ def _validate_timing(text: str) -> dict[str, str]:
     ):
         _fail("timing report methodology inventory is not exact")
 
-    if re.search(r"^Slack \(VIOLATED\)\s*:", text, flags=re.MULTILINE):
-        _fail("timing report contains a violated detailed path")
-    met_slacks = re.findall(
+    slack_lines = [line.strip() for line in text.splitlines() if "Slack (" in line]
+    slack_pattern = re.compile(
         r"^Slack \(MET\)\s*:\s*([+-]?[0-9]+(?:\.[0-9]+)?)ns\s+"
-        r"\((required time - arrival time|arrival time - required time)\)\s*$",
-        text,
-        flags=re.MULTILINE,
+        r"\((required time - arrival time|arrival time - required time)\)$"
     )
+    met_slacks: list[tuple[str, str]] = []
+    for line in slack_lines:
+        match = slack_pattern.fullmatch(line)
+        if match is None:
+            _fail(f"timing report has a noncanonical detailed-path status: {line}")
+        met_slacks.append((match.group(1), match.group(2)))
     if len(met_slacks) != TIMING_MET_PATH_COUNT:
         _fail(f"timing detailed-path inventory is not exact: {len(met_slacks)}")
     try:
@@ -1032,6 +1216,58 @@ def _validate_utilization(text: str) -> None:
         r"^\| Design State\s*:\s*Routed\s*$",
         "utilization routed state",
     )
+
+    heading_titles = (
+        "1. Slice Logic",
+        "1.1 Summary of Registers by Type",
+        "3. Memory",
+        "4. DSP",
+        "5. IO and GT Specific",
+        "9. Black Boxes",
+        "10. Instantiated Netlists",
+    )
+    toc_positions: list[int] = []
+    body_headings: dict[str, re.Match[str]] = {}
+    for title in heading_titles:
+        title_matches = list(
+            re.finditer(rf"^{re.escape(title)}$", text, flags=re.MULTILINE)
+        )
+        body_matches = list(
+            re.finditer(
+                rf"^{re.escape(title)}\n-{{{len(title)}}}$",
+                text,
+                flags=re.MULTILINE,
+            )
+        )
+        if (
+            len(title_matches) != 2
+            or len(body_matches) != 1
+            or body_matches[0].start() != title_matches[1].start()
+        ):
+            _fail(f"utilization {title} heading inventory is not exact")
+        toc_positions.append(title_matches[0].start())
+        body_headings[title] = body_matches[0]
+
+    body_positions = [body_headings[title].start() for title in heading_titles]
+    if (
+        toc_positions != sorted(toc_positions)
+        or body_positions != sorted(body_positions)
+        or max(toc_positions) >= min(body_positions)
+    ):
+        _fail("utilization authoritative section order is not exact")
+
+    def section(start: str, end: str) -> str:
+        return text[body_headings[start].end() : body_headings[end].start()]
+
+    slice_logic = section("1. Slice Logic", "1.1 Summary of Registers by Type")
+    memory = section("3. Memory", "4. DSP")
+    dsp = section("4. DSP", "5. IO and GT Specific")
+    scoped_values = {
+        "Slice LUTs": slice_logic,
+        "Slice Registers": slice_logic,
+        "Block RAM Tile": memory,
+        "DSPs": dsp,
+    }
     found: dict[str, tuple[int, int, Decimal]] = {}
     for label, expected in UTILIZATION.items():
         matches = list(
@@ -1039,7 +1275,7 @@ def _validate_utilization(text: str) -> None:
                 rf"^\|\s*{re.escape(label)}\s*\|\s*([0-9]+)\s*\|\s*"
                 rf"[0-9]+\s*\|\s*[0-9]+\s*\|\s*([0-9]+)\s*\|\s*"
                 rf"([0-9]+\.[0-9]+)\s*\|\s*$",
-                text,
+                scoped_values[label],
                 flags=re.MULTILINE,
             )
         )
@@ -1047,19 +1283,12 @@ def _validate_utilization(text: str) -> None:
             (int(match.group(1)), int(match.group(2)), Decimal(match.group(3)))
             for match in matches
         }
-        if unique != {expected} or len(matches) != UTILIZATION_OCCURRENCES[label]:
+        if unique != {expected} or len(matches) != 1:
             _fail(f"utilization row is not unique and exact for {label}: {unique}")
         found[label] = expected
     if found != UTILIZATION:
         _fail("utilization inventory is incomplete")
-    black_box_marker = "\n9. Black Boxes\n--------------\n"
-    if text.count(black_box_marker) != 1:
-        _fail("utilization black-box section is not unique")
-    black_box_section = text.split(black_box_marker, 1)[1]
-    end_marker = "\n10. Instantiated Netlists\n"
-    if black_box_section.count(end_marker) != 1:
-        _fail("utilization black-box section has no unique exact end boundary")
-    black_box_section = black_box_section.split(end_marker, 1)[0]
+    black_box_section = section("9. Black Boxes", "10. Instantiated Netlists")
     black_box_lines = [
         line.strip() for line in black_box_section.splitlines() if line.strip()
     ]
@@ -1098,6 +1327,13 @@ def _validate_from_directory_descriptor(
         name: _read_report(directory_fd, name, limit)
         for name, limit in REPORT_LIMITS.items()
     }
+    dcp_payload = _read_bounded_file(
+        directory_fd,
+        DCP_NAME,
+        minimum=DCP_MIN_BYTES,
+        maximum=DCP_MAX_BYTES,
+    )
+    _validate_dcp(dcp_payload)
     _validate_report_output_paths(reports, expected_directory)
     try:
         for name, text in reports.items():

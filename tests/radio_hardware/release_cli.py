@@ -15,19 +15,32 @@ import json
 import math
 import os
 import re
+import stat
 import statistics
+import subprocess
 import sys
 import time
 from builtins import BaseExceptionGroup
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass, is_dataclass, replace
+from dataclasses import asdict, dataclass, field, is_dataclass, replace
 from dataclasses import fields as dataclass_fields
 from itertools import pairwise
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from scripts.tandem_release_evidence import (
+    EvidenceError,
+    verify_artifact_index_semantics,
+)
+
 from . import release_campaign as steady_campaign
+from .candidate_binding import (
+    REQUIRED_EVIDENCE_ROLES,
+    CandidateBindingError,
+    validate_artifact_index,
+    validate_deployment_receipt,
+)
 from .experiment import TX_MUTE_DB, Issue46Options, Issue46Radio
 from .metadata_abi import (
     FLAG_HARDWARE_SAMPLE_COUNTER_VALID,
@@ -89,17 +102,55 @@ AGGREGATE_REPORT = "release-hardware-report.json"
 DEFAULT_PHASES = ("steady", "transient", "modulated")
 BASELINE_POLICY = PolicyCase("baseline", "baseline")
 HARNESS_SOURCE_NAMES = (
-    "experiment.py",
-    "metadata_abi.py",
-    "tone_quality.py",
-    "tandem_quality.py",
-    "release_campaign.py",
-    "transient_quality.py",
-    "transient_hardware.py",
-    "modulated_quality.py",
-    "modulated_hardware.py",
-    "release_cli.py",
+    "scripts/deploy_tandem_agc_ram_hardware.sh",
+    "scripts/run_tandem_agc_release_hardware.sh",
+    "scripts/tandem_release_evidence.py",
+    "tests/radio_hardware/candidate_binding.py",
+    "tests/radio_hardware/experiment.py",
+    "tests/radio_hardware/metadata_abi.py",
+    "tests/radio_hardware/modulated_hardware.py",
+    "tests/radio_hardware/modulated_quality.py",
+    "tests/radio_hardware/release_campaign.py",
+    "tests/radio_hardware/release_cli.py",
+    "tests/radio_hardware/tandem_quality.py",
+    "tests/radio_hardware/tandem_ram_deploy.py",
+    "tests/radio_hardware/tone_quality.py",
+    "tests/radio_hardware/transient_hardware.py",
+    "tests/radio_hardware/transient_quality.py",
 )
+RUNNER_PROVENANCE_SCHEMA = "plutosdr-fw.tandem-release-runner-provenance.v1"
+HOST_LIBIIO_RUNTIME_SCHEMA = "plutosdr-fw.tandem-release-host-libiio-runtime.v1"
+HOST_LIBIIO_WRAPPER_MARKER = "tandem-release-host-libiio-v1"
+RUNNER_PROVENANCE_PATHS = (
+    "scripts/deploy_tandem_agc_ram_hardware.sh",
+    "scripts/run_tandem_agc_release_hardware.sh",
+    "scripts/tandem_release_evidence.py",
+    "tests/radio_hardware/candidate_binding.py",
+    "tests/radio_hardware/release_cli.py",
+    "tests/radio_hardware/tandem_ram_deploy.py",
+)
+MAXIMUM_ARTIFACT_INDEX_BYTES = 8 * 1024 * 1024
+MAXIMUM_DEPLOYMENT_RECEIPT_BYTES = 8 * 1024 * 1024
+MAXIMUM_SOURCE_MANIFEST_BYTES = 1024 * 1024
+MAXIMUM_DFU_BYTES = 256 * 1024 * 1024
+MAXIMUM_EVIDENCE_MEMBER_BYTES = 512 * 1024 * 1024
+MAXIMUM_HARNESS_SOURCE_BYTES = 16 * 1024 * 1024
+MAXIMUM_HOST_LIBIIO_CACHE_BYTES = 16 * 1024 * 1024
+HOST_LIBIIO_CMAKE_CONFIGURATION = {
+    "CMAKE_BUILD_TYPE": "Release",
+    "HAVE_DNS_SD": "OFF",
+    "INSTALL_UDEV_RULE": "OFF",
+    "PYTHON_BINDINGS": "ON",
+    "WITH_AIO": "OFF",
+    "WITH_DOC": "OFF",
+    "WITH_EXAMPLES": "OFF",
+    "WITH_IIOD": "OFF",
+    "WITH_LOCAL_BACKEND": "ON",
+    "WITH_NETWORK_BACKEND": "ON",
+    "WITH_SERIAL_BACKEND": "OFF",
+    "WITH_TESTS": "OFF",
+    "WITH_USB_BACKEND": "ON",
+}
 
 # Release-grade tandem transient acquisition is intentionally a different
 # transport contract from the ordinary-mode 8,192-sample captures.  Keep the
@@ -158,6 +209,13 @@ class ReleaseHardwareOptions:
     firmware_pattern: str
     libiio_source_commit: str
     harness_sources: tuple[tuple[str, str], ...]
+    artifact_index_path: Path
+    deployment_receipt_path: Path
+    candidate_binding_json: str
+    runner_attestor: Callable[[], Mapping[str, Any]] = field(
+        repr=False,
+        compare=False,
+    )
     physical_attenuation_db: float
     output_dir: Path
     phases: tuple[str, ...]
@@ -173,6 +231,12 @@ class ReleaseHardwareOptions:
     retry_failed: bool
     resume: bool
     plan_only: bool
+    host_libiio_json: str | None = None
+    host_libiio_attestor: Callable[[], Mapping[str, Any]] | None = field(
+        default=None,
+        repr=False,
+        compare=False,
+    )
 
     @property
     def steady_key(self) -> str:
@@ -226,8 +290,1264 @@ def _positive_integer(value: str) -> int:
 
 
 def _harness_sources() -> tuple[tuple[str, str], ...]:
-    root = Path(__file__).resolve().parent
+    root = Path(__file__).resolve().parents[2]
     return tuple((name, _sha256(root / name)) for name in HARNESS_SOURCE_NAMES)
+
+
+def _canonical_json(value: Any) -> str:
+    return json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
+def _canonical_cli_path(value: str, *, name: str) -> Path:
+    if not value or value.strip() != value or "\x00" in value or "\n" in value:
+        raise ReleaseCliError(f"{name} must be one canonical absolute path")
+    pure = PurePosixPath(value)
+    if (
+        not pure.is_absolute()
+        or any(part in {"", ".", ".."} for part in pure.parts)
+        or str(pure) != value
+    ):
+        raise ReleaseCliError(f"{name} must be one canonical absolute path")
+    path = Path(value)
+    try:
+        resolved = path.resolve(strict=True)
+    except (OSError, RuntimeError) as error:
+        raise ReleaseCliError(f"{name} does not exist") from error
+    if resolved != path:
+        raise ReleaseCliError(f"{name} contains a symlink or noncanonical component")
+    return path
+
+
+def _stat_identity(value: os.stat_result) -> tuple[int, ...]:
+    return (
+        value.st_dev,
+        value.st_ino,
+        value.st_mode,
+        value.st_nlink,
+        value.st_uid,
+        value.st_gid,
+        value.st_size,
+        value.st_mtime_ns,
+        value.st_ctime_ns,
+    )
+
+
+def _validate_owned_directory(value: os.stat_result, *, name: str) -> None:
+    if not stat.S_ISDIR(value.st_mode):
+        raise ReleaseCliError(f"{name} is not a directory")
+    if value.st_uid != os.getuid() or value.st_gid != os.getgid():
+        raise ReleaseCliError(f"{name} ownership is not the invoking user/group")
+    if stat.S_IMODE(value.st_mode) & 0o022:
+        raise ReleaseCliError(f"{name} is group/world writable")
+
+
+def _validate_owned_regular(
+    value: os.stat_result,
+    *,
+    name: str,
+    exact_mode: int | None,
+) -> None:
+    if not stat.S_ISREG(value.st_mode) or value.st_nlink != 1:
+        raise ReleaseCliError(f"{name} is not a singly linked regular file")
+    if value.st_uid != os.getuid() or value.st_gid != os.getgid():
+        raise ReleaseCliError(f"{name} ownership is not the invoking user/group")
+    mode = stat.S_IMODE(value.st_mode)
+    if mode & 0o7022:
+        raise ReleaseCliError(f"{name} has unsafe write/special mode bits")
+    if exact_mode is not None and mode != exact_mode:
+        raise ReleaseCliError(f"{name} mode must be {exact_mode:04o}")
+
+
+@contextmanager
+def _open_candidate_root(root: Path) -> Iterator[int]:
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        before = os.lstat(root)
+        descriptor = os.open(root, flags)
+    except OSError as error:
+        raise ReleaseCliError("artifact-index root cannot be opened safely") from error
+    try:
+        opened = os.fstat(descriptor)
+        _validate_owned_directory(opened, name="artifact-index root")
+        if _stat_identity(before) != _stat_identity(opened):
+            raise ReleaseCliError("artifact-index root changed while it was opened")
+        yield descriptor
+        try:
+            after = os.lstat(root)
+        except OSError as error:
+            raise ReleaseCliError(
+                "artifact-index root disappeared during attestation"
+            ) from error
+        if _stat_identity(opened) != _stat_identity(after):
+            raise ReleaseCliError("artifact-index root changed during attestation")
+    finally:
+        os.close(descriptor)
+
+
+def _member_parts(relative: str, *, name: str) -> tuple[str, ...]:
+    pure = PurePosixPath(relative)
+    if (
+        pure.is_absolute()
+        or not pure.parts
+        or any(part in {"", ".", ".."} for part in pure.parts)
+        or str(pure) != relative
+    ):
+        raise ReleaseCliError(f"{name} is not a canonical relative member path")
+    return pure.parts
+
+
+@contextmanager
+def _open_member_parent(
+    root_descriptor: int, relative: str, *, name: str
+) -> Iterator[tuple[int, str]]:
+    parts = _member_parts(relative, name=name)
+    directory = os.dup(root_descriptor)
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        for component in parts[:-1]:
+            try:
+                child = os.open(component, flags, dir_fd=directory)
+            except OSError as error:
+                raise ReleaseCliError(
+                    f"{name} has a missing, symlinked, or non-directory component"
+                ) from error
+            os.close(directory)
+            directory = child
+            _validate_owned_directory(os.fstat(directory), name=f"{name} parent")
+        yield directory, parts[-1]
+    finally:
+        os.close(directory)
+
+
+def _read_candidate_member(
+    root_descriptor: int,
+    root: Path,
+    relative: str,
+    *,
+    maximum_bytes: int,
+    name: str,
+    expected_bytes: int | None = None,
+    exact_mode: int | None = None,
+    retain_payload: bool = True,
+    prefix_bytes: int | None = None,
+) -> tuple[bytes | None, dict[str, Any], str | None]:
+    flags = os.O_RDONLY | os.O_CLOEXEC
+    flags |= getattr(os, "O_NOFOLLOW", 0)
+    with _open_member_parent(root_descriptor, relative, name=name) as (
+        parent_descriptor,
+        filename,
+    ):
+        try:
+            before = os.stat(
+                filename,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+            descriptor = os.open(filename, flags, dir_fd=parent_descriptor)
+        except OSError as error:
+            raise ReleaseCliError(f"{name} cannot be opened safely") from error
+        try:
+            opened = os.fstat(descriptor)
+            _validate_owned_regular(opened, name=name, exact_mode=exact_mode)
+            if _stat_identity(before) != _stat_identity(opened):
+                raise ReleaseCliError(f"{name} changed while it was opened")
+            if opened.st_size <= 0 or opened.st_size > maximum_bytes:
+                raise ReleaseCliError(f"{name} size is outside its safe bound")
+            if expected_bytes is not None and opened.st_size != expected_bytes:
+                raise ReleaseCliError(f"{name} byte length differs from its index")
+            if prefix_bytes is not None and not 0 < prefix_bytes <= opened.st_size:
+                raise ReleaseCliError(f"{name} prefix length is invalid")
+            digest = hashlib.sha256()
+            prefix_digest = hashlib.sha256() if prefix_bytes is not None else None
+            remaining_prefix = prefix_bytes or 0
+            payload = bytearray() if retain_payload else None
+            observed_bytes = 0
+            while True:
+                chunk = os.read(descriptor, min(1 << 20, maximum_bytes + 1))
+                if not chunk:
+                    break
+                observed_bytes += len(chunk)
+                if observed_bytes > maximum_bytes:
+                    raise ReleaseCliError(f"{name} exceeded its safe read bound")
+                digest.update(chunk)
+                if prefix_digest is not None and remaining_prefix:
+                    prefix_chunk = chunk[:remaining_prefix]
+                    prefix_digest.update(prefix_chunk)
+                    remaining_prefix -= len(prefix_chunk)
+                if payload is not None:
+                    payload.extend(chunk)
+            after_fd = os.fstat(descriptor)
+            after_path = os.stat(
+                filename,
+                dir_fd=parent_descriptor,
+                follow_symlinks=False,
+            )
+            if (
+                observed_bytes != opened.st_size
+                or remaining_prefix
+                or _stat_identity(opened) != _stat_identity(after_fd)
+                or _stat_identity(opened) != _stat_identity(after_path)
+            ):
+                raise ReleaseCliError(f"{name} changed while it was read")
+        except OSError as error:
+            raise ReleaseCliError(f"{name} failed during its guarded read") from error
+        finally:
+            os.close(descriptor)
+    absolute = root.joinpath(*_member_parts(relative, name=name))
+    snapshot = {
+        "path": str(absolute),
+        "relative_path": relative,
+        "bytes": observed_bytes,
+        "sha256": digest.hexdigest(),
+        "device": opened.st_dev,
+        "inode": opened.st_ino,
+        "mode": f"{stat.S_IMODE(opened.st_mode):04o}",
+        "links": opened.st_nlink,
+        "uid": opened.st_uid,
+        "gid": opened.st_gid,
+        "mtime_ns": opened.st_mtime_ns,
+        "ctime_ns": opened.st_ctime_ns,
+    }
+    return (
+        bytes(payload) if payload is not None else None,
+        snapshot,
+        prefix_digest.hexdigest() if prefix_digest is not None else None,
+    )
+
+
+def _strict_json(payload: bytes, *, name: str) -> dict[str, Any]:
+    def pairs_hook(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate key: {key}")
+            result[key] = value
+        return result
+
+    def reject_number(token: str) -> Any:
+        raise ValueError(f"non-integer JSON number: {token}")
+
+    try:
+        decoded = payload.decode("utf-8", errors="strict")
+        value = json.loads(
+            decoded,
+            object_pairs_hook=pairs_hook,
+            parse_float=reject_number,
+            parse_constant=reject_number,
+        )
+    except (
+        UnicodeDecodeError,
+        json.JSONDecodeError,
+        RecursionError,
+        ValueError,
+    ) as error:
+        raise ReleaseCliError(f"{name} is not strict JSON") from error
+    if not isinstance(value, dict):
+        raise ReleaseCliError(f"{name} must contain one JSON object")
+    return value
+
+
+def _source_manifest_values(payload: bytes) -> dict[str, str]:
+    try:
+        lines = payload.decode("utf-8", errors="strict").splitlines()
+    except UnicodeDecodeError as error:
+        raise ReleaseCliError("source manifest is not strict UTF-8") from error
+    values: dict[str, str] = {}
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if ":" not in line:
+            raise ReleaseCliError("source manifest contains a non-key/value line")
+        key, value = (part.strip() for part in line.split(":", 1))
+        if (
+            not key
+            or not value
+            or key in values
+            or re.fullmatch(r"[a-z0-9_]+", key) is None
+            or "\x00" in value
+        ):
+            raise ReleaseCliError("source manifest contains an invalid field")
+        values[key] = value
+    if (
+        values.get("schema") != "plutosdr-fw.source-manifest"
+        or values.get("schema_version") != "1"
+        or re.fullmatch(r"[0-9a-f]{40}", values.get("libiio_0_25_source", "")) is None
+    ):
+        raise ReleaseCliError("source manifest identity/source pin is invalid")
+    return values
+
+
+def _git_bytes(repository: Path, *arguments: str) -> bytes:
+    try:
+        return subprocess.run(
+            ["git", "-C", str(repository), *arguments],
+            check=True,
+            capture_output=True,
+        ).stdout
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ReleaseCliError("runner repository provenance check failed") from error
+
+
+def _runner_source_environment_name(relative: str, field_name: str) -> str:
+    stem = {
+        "scripts/deploy_tandem_agc_ram_hardware.sh": "DEPLOY_SHELL",
+        "scripts/run_tandem_agc_release_hardware.sh": "SHELL",
+        "scripts/tandem_release_evidence.py": "SEMANTIC_EVIDENCE",
+        "tests/radio_hardware/candidate_binding.py": "CANDIDATE_BINDING",
+        "tests/radio_hardware/release_cli.py": "RELEASE_CLI",
+        "tests/radio_hardware/tandem_ram_deploy.py": "TANDEM_RAM_DEPLOY",
+    }[relative]
+    return f"PLUTOSDR_FW_RUNNER_{stem}_{field_name}"
+
+
+def _validate_runner_provenance(value: Mapping[str, Any]) -> dict[str, Any]:
+    expected_keys = {"schema", "repository", "commit", "clean", "sources"}
+    if not isinstance(value, Mapping) or set(value) != expected_keys:
+        raise ReleaseCliError("runner provenance shape is not exact")
+    repository = _canonical_cli_path(str(value["repository"]), name="runner repository")
+    commit = str(value["commit"])
+    sources = value["sources"]
+    if (
+        value["schema"] != RUNNER_PROVENANCE_SCHEMA
+        or value["clean"] is not True
+        or re.fullmatch(r"[0-9a-f]{40}", commit) is None
+        or not isinstance(sources, Sequence)
+        or isinstance(sources, (str, bytes))
+        or len(sources) != len(RUNNER_PROVENANCE_PATHS)
+    ):
+        raise ReleaseCliError("runner provenance identity is invalid")
+    normalized_sources: list[dict[str, Any]] = []
+    for index, (source, expected_relative) in enumerate(
+        zip(sources, RUNNER_PROVENANCE_PATHS, strict=False)
+    ):
+        if not isinstance(source, Mapping) or set(source) != {
+            "path",
+            "absolute_path",
+            "sha256",
+            "committed_sha256",
+        }:
+            raise ReleaseCliError(f"runner provenance source {index} is malformed")
+        relative = str(source["path"])
+        absolute = _canonical_cli_path(
+            str(source["absolute_path"]), name=f"runner source {index}"
+        )
+        digest = str(source["sha256"])
+        committed_digest = str(source["committed_sha256"])
+        if (
+            relative != expected_relative
+            or absolute != repository / expected_relative
+            or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+            or digest != committed_digest
+        ):
+            raise ReleaseCliError(f"runner provenance source {index} is not exact")
+        normalized_sources.append(
+            {
+                "path": relative,
+                "absolute_path": str(absolute),
+                "sha256": digest,
+                "committed_sha256": committed_digest,
+            }
+        )
+    if len(normalized_sources) != len(RUNNER_PROVENANCE_PATHS):
+        raise ReleaseCliError("runner provenance source inventory is not exact")
+    return {
+        "schema": RUNNER_PROVENANCE_SCHEMA,
+        "repository": str(repository),
+        "commit": commit,
+        "clean": True,
+        "sources": normalized_sources,
+    }
+
+
+def _attest_runner_provenance(environment: Mapping[str, str]) -> dict[str, Any]:
+    repository_text = environment.get("PLUTOSDR_FW_RUNNER_REPOSITORY", "")
+    repository = _canonical_cli_path(repository_text, name="runner repository")
+    expected_repository = Path(__file__).resolve().parents[2]
+    commit = environment.get("PLUTOSDR_FW_RUNNER_COMMIT", "")
+    if repository != expected_repository:
+        raise ReleaseCliError("runner repository path is not the imported repository")
+    if _git_bytes(repository, "rev-parse", "HEAD").decode().strip() != commit:
+        raise ReleaseCliError("runner commit is not the current repository HEAD")
+    if _git_bytes(
+        repository, "status", "--porcelain=v1", "--untracked-files=all"
+    ).strip():
+        raise ReleaseCliError("runner repository is not fully clean")
+    sources: list[dict[str, Any]] = []
+    for relative in RUNNER_PROVENANCE_PATHS:
+        path_text = environment.get(
+            _runner_source_environment_name(relative, "PATH"), ""
+        )
+        path = _canonical_cli_path(path_text, name=f"runner source {relative}")
+        if path != repository / relative:
+            raise ReleaseCliError(f"runner source path is unexpected: {relative}")
+        flags = os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0)
+        try:
+            before = os.lstat(path)
+            descriptor = os.open(path, flags)
+        except OSError as error:
+            raise ReleaseCliError(
+                f"runner source cannot be opened: {relative}"
+            ) from error
+        try:
+            opened = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or opened.st_uid != os.getuid()
+                or opened.st_gid != os.getgid()
+                or stat.S_IMODE(opened.st_mode) & 0o7002
+                or opened.st_size <= 0
+                or opened.st_size > MAXIMUM_HARNESS_SOURCE_BYTES
+                or _stat_identity(before) != _stat_identity(opened)
+            ):
+                raise ReleaseCliError(f"runner source metadata is unsafe: {relative}")
+            digest = hashlib.sha256()
+            observed = 0
+            while chunk := os.read(descriptor, 1 << 20):
+                observed += len(chunk)
+                digest.update(chunk)
+            after_fd = os.fstat(descriptor)
+            after_path = os.lstat(path)
+            if (
+                observed != opened.st_size
+                or _stat_identity(opened) != _stat_identity(after_fd)
+                or _stat_identity(opened) != _stat_identity(after_path)
+            ):
+                raise ReleaseCliError(f"runner source changed while read: {relative}")
+        except OSError as error:
+            raise ReleaseCliError(
+                f"runner source failed during guarded read: {relative}"
+            ) from error
+        finally:
+            os.close(descriptor)
+        calculated = digest.hexdigest()
+        committed = hashlib.sha256(
+            _git_bytes(repository, "show", f"{commit}:{relative}")
+        ).hexdigest()
+        supplied = environment.get(
+            _runner_source_environment_name(relative, "SHA256"), ""
+        )
+        supplied_committed = environment.get(
+            _runner_source_environment_name(relative, "COMMITTED_SHA256"), ""
+        )
+        if (
+            calculated != committed
+            or calculated != supplied
+            or committed != supplied_committed
+        ):
+            raise ReleaseCliError(
+                f"runner source is not its committed blob: {relative}"
+            )
+        sources.append(
+            {
+                "path": relative,
+                "absolute_path": str(path),
+                "sha256": calculated,
+                "committed_sha256": committed,
+            }
+        )
+    return _validate_runner_provenance(
+        {
+            "schema": RUNNER_PROVENANCE_SCHEMA,
+            "repository": str(repository),
+            "commit": commit,
+            "clean": True,
+            "sources": sources,
+        }
+    )
+
+
+def _runtime_regular_evidence(
+    path: Path,
+    *,
+    name: str,
+    maximum_bytes: int,
+    retain_payload: bool = False,
+) -> tuple[dict[str, Any], bytes | None]:
+    path = _canonical_cli_path(str(path), name=name)
+    flags = os.O_RDONLY | os.O_CLOEXEC | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        before = os.lstat(path)
+        descriptor = os.open(path, flags)
+    except OSError as error:
+        raise ReleaseCliError(f"{name} cannot be opened safely") from error
+    try:
+        opened = os.fstat(descriptor)
+        _validate_owned_regular(opened, name=name, exact_mode=None)
+        if (
+            _stat_identity(before) != _stat_identity(opened)
+            or opened.st_size <= 0
+            or opened.st_size > maximum_bytes
+        ):
+            raise ReleaseCliError(f"{name} metadata is unsafe")
+        digest = hashlib.sha256()
+        observed = 0
+        retained: list[bytes] | None = [] if retain_payload else None
+        while chunk := os.read(descriptor, 1 << 20):
+            observed += len(chunk)
+            if observed > maximum_bytes:
+                raise ReleaseCliError(f"{name} exceeded its size bound")
+            digest.update(chunk)
+            if retained is not None:
+                retained.append(chunk)
+        after_fd = os.fstat(descriptor)
+        after_path = os.lstat(path)
+        if (
+            observed != opened.st_size
+            or _stat_identity(opened) != _stat_identity(after_fd)
+            or _stat_identity(opened) != _stat_identity(after_path)
+        ):
+            raise ReleaseCliError(f"{name} changed while it was read")
+        return (
+            {
+                "path": str(path),
+                "bytes": observed,
+                "sha256": digest.hexdigest(),
+                "mode": stat.S_IMODE(opened.st_mode),
+            },
+            b"".join(retained) if retained is not None else None,
+        )
+    except OSError as error:
+        raise ReleaseCliError(f"{name} failed during guarded read") from error
+    finally:
+        os.close(descriptor)
+
+
+def _runtime_regular_sha256(path: Path, *, name: str, maximum_bytes: int) -> str:
+    evidence, _payload = _runtime_regular_evidence(
+        path,
+        name=name,
+        maximum_bytes=maximum_bytes,
+    )
+    return str(evidence["sha256"])
+
+
+def _cmake_cache_configuration(
+    payload: bytes,
+    *,
+    source: Path,
+    expected_python: str,
+) -> dict[str, str]:
+    try:
+        lines = payload.decode("utf-8", errors="strict").splitlines()
+    except UnicodeDecodeError as error:
+        raise ReleaseCliError("fresh host libiio CMake cache is not UTF-8") from error
+    values: dict[str, str] = {}
+    for line in lines:
+        if not line or line.startswith(("#", "//")) or "=" not in line:
+            continue
+        typed_key, value = line.split("=", 1)
+        key = typed_key.split(":", 1)[0]
+        if key in values:
+            raise ReleaseCliError(f"fresh host libiio CMake key is duplicated: {key}")
+        values[key] = value
+    expected = {
+        **HOST_LIBIIO_CMAKE_CONFIGURATION,
+        "CMAKE_HOME_DIRECTORY": str(source),
+        "PYTHON_EXECUTABLE": expected_python,
+    }
+    if any(values.get(key) != value for key, value in expected.items()):
+        raise ReleaseCliError("fresh host libiio CMake configuration changed")
+    dynamic_keys = ("CMAKE_C_COMPILER", "CMAKE_GENERATOR", "CMAKE_MAKE_PROGRAM")
+    if any(not values.get(key) for key in dynamic_keys):
+        raise ReleaseCliError("fresh host libiio toolchain identity is incomplete")
+    return {
+        **HOST_LIBIIO_CMAKE_CONFIGURATION,
+        "CMAKE_HOME_DIRECTORY": "$HOST_LIBIIO_ROOT/source",
+        "PYTHON_EXECUTABLE": expected_python,
+        **{key: values[key] for key in dynamic_keys},
+    }
+
+
+def _attest_host_libiio_preimport(
+    environment: Mapping[str, str],
+    *,
+    expected_commit: str,
+) -> dict[str, Any]:
+    if (
+        environment.get("PLUTOSDR_FW_LIBIIO_GUARDED_WRAPPER")
+        != HOST_LIBIIO_WRAPPER_MARKER
+    ):
+        raise ReleaseCliError(
+            "guarded host-libiio wrapper provenance is absent; use "
+            "scripts/run_tandem_agc_release_hardware.sh"
+        )
+    repository = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_LIBIIO_REPOSITORY", ""),
+        name="host libiio repository",
+    )
+    source = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_LIBIIO_SOURCE", ""),
+        name="host libiio source snapshot",
+    )
+    build = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_LIBIIO_BUILD", ""),
+        name="fresh host libiio build directory",
+    )
+    if not repository.is_dir() or not source.is_dir() or not build.is_dir():
+        raise ReleaseCliError("host libiio source/build path is not a directory")
+    private_root = source.parent
+    if source.parent != build.parent:
+        raise ReleaseCliError("host libiio source/build do not share one private root")
+    _validate_owned_directory(os.lstat(private_root), name="host libiio private root")
+    _validate_owned_directory(os.lstat(source), name="host libiio source snapshot")
+    _validate_owned_directory(os.lstat(build), name="fresh host libiio build directory")
+    if any(
+        stat.S_IMODE(os.lstat(path).st_mode) != 0o700
+        for path in (private_root, source, build)
+    ):
+        raise ReleaseCliError("host libiio private source/build mode is not 0700")
+    if _git_bytes(repository, "rev-parse", "HEAD").decode().strip() != expected_commit:
+        raise ReleaseCliError("host libiio source is not the manifest-pinned HEAD")
+    if _git_bytes(repository, "status", "--porcelain", "--untracked-files=all").strip():
+        raise ReleaseCliError("host libiio source repository is not fully clean")
+
+    binding = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_PYLIBIIO_PATH", ""),
+        name="pylibiio binding",
+    )
+    library = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_LIBIIO_SO_PATH", ""),
+        name="built host libiio",
+    )
+    cache = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_PATH", ""),
+        name="fresh host libiio CMake cache",
+    )
+    if binding != source / "bindings/python/iio.py":
+        raise ReleaseCliError("pylibiio binding is outside the pinned source path")
+    try:
+        library.relative_to(build)
+    except ValueError as error:
+        raise ReleaseCliError(
+            "mapped host libiio is outside the fresh build"
+        ) from error
+    if cache != build / "CMakeCache.txt":
+        raise ReleaseCliError("host libiio CMake cache is outside the fresh build")
+
+    expected_binding_sha = environment.get("PLUTOSDR_FW_PYLIBIIO_SHA256", "")
+    expected_library_sha = environment.get("PLUTOSDR_FW_LIBIIO_SO_SHA256", "")
+    expected_cache_sha = environment.get("PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_SHA256", "")
+    if (
+        re.fullmatch(r"[0-9a-f]{64}", expected_binding_sha) is None
+        or re.fullmatch(r"[0-9a-f]{64}", expected_library_sha) is None
+        or re.fullmatch(r"[0-9a-f]{64}", expected_cache_sha) is None
+    ):
+        raise ReleaseCliError("host libiio hash environment is malformed")
+    binding_evidence, _payload = _runtime_regular_evidence(
+        binding, name="pylibiio binding", maximum_bytes=MAXIMUM_HARNESS_SOURCE_BYTES
+    )
+    library_evidence, _payload = _runtime_regular_evidence(
+        library, name="built host libiio", maximum_bytes=MAXIMUM_EVIDENCE_MEMBER_BYTES
+    )
+    cache_evidence, cache_payload = _runtime_regular_evidence(
+        cache,
+        name="fresh host libiio CMake cache",
+        maximum_bytes=MAXIMUM_HOST_LIBIIO_CACHE_BYTES,
+        retain_payload=True,
+    )
+    assert cache_payload is not None
+    committed_binding_sha = hashlib.sha256(
+        _git_bytes(repository, "show", f"{expected_commit}:bindings/python/iio.py")
+    ).hexdigest()
+    if (
+        binding_evidence["sha256"] != expected_binding_sha
+        or binding_evidence["sha256"] != committed_binding_sha
+    ):
+        raise ReleaseCliError("pylibiio bytes are not the pinned committed binding")
+    if library_evidence["sha256"] != expected_library_sha:
+        raise ReleaseCliError("mapped host libiio bytes changed after the fresh build")
+    if cache_evidence["sha256"] != expected_cache_sha:
+        raise ReleaseCliError("fresh host libiio CMake cache bytes changed")
+    expected_python = environment.get("PLUTOSDR_FW_LIBIIO_PYTHON_EXECUTABLE", "")
+    if not expected_python or "\x00" in expected_python or "\n" in expected_python:
+        raise ReleaseCliError("host libiio Python build identity is malformed")
+    cmake_configuration = _cmake_cache_configuration(
+        cache_payload,
+        source=source,
+        expected_python=expected_python,
+    )
+
+    runner_repository = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_RUNNER_REPOSITORY", ""),
+        name="host libiio wrapper repository",
+    )
+    wrapper = _canonical_cli_path(
+        environment.get("PLUTOSDR_FW_RUNNER_SHELL_PATH", ""),
+        name="host libiio wrapper source",
+    )
+    wrapper_sha = environment.get("PLUTOSDR_FW_RUNNER_SHELL_SHA256", "")
+    wrapper_committed_sha = environment.get(
+        "PLUTOSDR_FW_RUNNER_SHELL_COMMITTED_SHA256", ""
+    )
+    wrapper_commit = environment.get("PLUTOSDR_FW_RUNNER_COMMIT", "")
+    if (
+        wrapper != runner_repository / "scripts/run_tandem_agc_release_hardware.sh"
+        or re.fullmatch(r"[0-9a-f]{40}", wrapper_commit) is None
+        or re.fullmatch(r"[0-9a-f]{64}", wrapper_sha) is None
+        or wrapper_sha != wrapper_committed_sha
+        or _sha256(wrapper) != wrapper_sha
+    ):
+        raise ReleaseCliError("guarded host libiio wrapper identity changed")
+
+    resume_identity = {
+        "source_commit": expected_commit,
+        "wrapper_commit": wrapper_commit,
+        "wrapper_sha256": wrapper_sha,
+        "binding_sha256": binding_evidence["sha256"],
+        "library_sha256": library_evidence["sha256"],
+        "cmake_configuration": cmake_configuration,
+    }
+    return {
+        "source_commit": expected_commit,
+        "repository_path": str(repository),
+        "private_root_path": str(private_root),
+        "source_path": str(source),
+        "build_path": str(build),
+        "binding": binding_evidence,
+        "library": library_evidence,
+        "cmake_cache": {**cache_evidence, "configuration": cmake_configuration},
+        "wrapper": {
+            "repository_path": str(runner_repository),
+            "commit": wrapper_commit,
+            "path": str(wrapper),
+            "sha256": wrapper_sha,
+        },
+        "resume_identity": resume_identity,
+    }
+
+
+def _attest_imported_libiio(
+    module: Any,
+    environment: Mapping[str, str],
+    *,
+    expected_commit: str,
+    maps_path: Path = Path("/proc/self/maps"),
+) -> dict[str, Any]:
+    preimport = _attest_host_libiio_preimport(
+        environment,
+        expected_commit=expected_commit,
+    )
+    binding = Path(str(preimport["binding"]["path"]))
+    library = Path(str(preimport["library"]["path"]))
+    imported = Path(str(getattr(module, "__file__", ""))).resolve(strict=True)
+    if imported != binding or getattr(module, "MetadataBuffer", None) is None:
+        raise ReleaseCliError("imported pylibiio is not the pinned release binding")
+    mapped = {
+        str(Path(line.rsplit(maxsplit=1)[-1]).resolve())
+        for line in maps_path.read_text(encoding="utf-8").splitlines()
+        if "/libiio.so" in line.rsplit(maxsplit=1)[-1]
+    }
+    if mapped != {str(library)}:
+        raise ReleaseCliError("process mapped an unexpected host libiio library")
+    return {
+        "schema": HOST_LIBIIO_RUNTIME_SCHEMA,
+        **preimport,
+        "imported_binding_path": str(imported),
+        "mapped_library_paths": sorted(mapped),
+    }
+
+
+def _validate_host_libiio_runtime(value: Mapping[str, Any]) -> dict[str, Any]:
+    expected_keys = {
+        "schema",
+        "source_commit",
+        "repository_path",
+        "private_root_path",
+        "source_path",
+        "build_path",
+        "binding",
+        "library",
+        "cmake_cache",
+        "wrapper",
+        "resume_identity",
+        "imported_binding_path",
+        "mapped_library_paths",
+    }
+    if not isinstance(value, Mapping) or set(value) != expected_keys:
+        raise ReleaseCliError("host libiio runtime provenance shape is not exact")
+    source_commit = value.get("source_commit")
+    if (
+        value.get("schema") != HOST_LIBIIO_RUNTIME_SCHEMA
+        or not isinstance(source_commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", source_commit) is None
+    ):
+        raise ReleaseCliError("host libiio runtime provenance identity is invalid")
+
+    def path_text(raw: object, *, name: str) -> str:
+        if not isinstance(raw, str):
+            raise ReleaseCliError(f"{name} is not an absolute path")
+        pure = PurePosixPath(raw)
+        if not pure.is_absolute() or str(pure) != raw or ".." in pure.parts:
+            raise ReleaseCliError(f"{name} is not an absolute path")
+        return raw
+
+    normalized_paths = {
+        name: path_text(value.get(name), name=f"host libiio {name}")
+        for name in (
+            "repository_path",
+            "private_root_path",
+            "source_path",
+            "build_path",
+            "imported_binding_path",
+        )
+    }
+
+    def file_record(raw: object, *, name: str, cache: bool = False) -> dict[str, Any]:
+        record = raw if isinstance(raw, Mapping) else {}
+        keys = {"path", "bytes", "sha256", "mode"}
+        if cache:
+            keys.add("configuration")
+        if set(record) != keys:
+            raise ReleaseCliError(f"{name} record shape is not exact")
+        path = path_text(record.get("path"), name=f"{name} path")
+        byte_count = record.get("bytes")
+        mode = record.get("mode")
+        digest = record.get("sha256")
+        if (
+            type(byte_count) is not int
+            or byte_count <= 0
+            or type(mode) is not int
+            or not 0 <= mode <= 0o7777
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        ):
+            raise ReleaseCliError(f"{name} file evidence is malformed")
+        result = {
+            "path": path,
+            "bytes": byte_count,
+            "sha256": digest,
+            "mode": mode,
+        }
+        if cache:
+            result["configuration"] = configuration(record.get("configuration"))
+        return result
+
+    def configuration(raw: object) -> dict[str, str]:
+        record = raw if isinstance(raw, Mapping) else {}
+        expected = {
+            *HOST_LIBIIO_CMAKE_CONFIGURATION,
+            "CMAKE_HOME_DIRECTORY",
+            "PYTHON_EXECUTABLE",
+            "CMAKE_C_COMPILER",
+            "CMAKE_GENERATOR",
+            "CMAKE_MAKE_PROGRAM",
+        }
+        if set(record) != expected or any(
+            not isinstance(item, str) or not item for item in record.values()
+        ):
+            raise ReleaseCliError("host libiio CMake configuration is malformed")
+        if record.get("CMAKE_HOME_DIRECTORY") != "$HOST_LIBIIO_ROOT/source" or any(
+            record.get(key) != expected_value
+            for key, expected_value in HOST_LIBIIO_CMAKE_CONFIGURATION.items()
+        ):
+            raise ReleaseCliError("host libiio CMake configuration is not exact")
+        return {str(key): str(item) for key, item in record.items()}
+
+    binding = file_record(value.get("binding"), name="host libiio binding")
+    library = file_record(value.get("library"), name="host libiio library")
+    cache = file_record(
+        value.get("cmake_cache"), name="host libiio CMake cache", cache=True
+    )
+    wrapper_raw = value.get("wrapper")
+    wrapper = wrapper_raw if isinstance(wrapper_raw, Mapping) else {}
+    if set(wrapper) != {"repository_path", "commit", "path", "sha256"}:
+        raise ReleaseCliError("host libiio wrapper record shape is not exact")
+    wrapper_commit = wrapper.get("commit")
+    wrapper_sha = wrapper.get("sha256")
+    if (
+        not isinstance(wrapper_commit, str)
+        or re.fullmatch(r"[0-9a-f]{40}", wrapper_commit) is None
+        or not isinstance(wrapper_sha, str)
+        or re.fullmatch(r"[0-9a-f]{64}", wrapper_sha) is None
+    ):
+        raise ReleaseCliError("host libiio wrapper record is malformed")
+    normalized_wrapper = {
+        "repository_path": path_text(
+            wrapper.get("repository_path"), name="host libiio wrapper repository"
+        ),
+        "commit": wrapper_commit,
+        "path": path_text(wrapper.get("path"), name="host libiio wrapper path"),
+        "sha256": wrapper_sha,
+    }
+    resume_raw = value.get("resume_identity")
+    resume = resume_raw if isinstance(resume_raw, Mapping) else {}
+    if set(resume) != {
+        "source_commit",
+        "wrapper_commit",
+        "wrapper_sha256",
+        "binding_sha256",
+        "library_sha256",
+        "cmake_configuration",
+    }:
+        raise ReleaseCliError("host libiio resume identity shape is not exact")
+    normalized_resume = {
+        "source_commit": source_commit,
+        "wrapper_commit": wrapper_commit,
+        "wrapper_sha256": wrapper_sha,
+        "binding_sha256": binding["sha256"],
+        "library_sha256": library["sha256"],
+        "cmake_configuration": cache["configuration"],
+    }
+    if _canonical_json(resume) != _canonical_json(normalized_resume):
+        raise ReleaseCliError("host libiio resume identity is internally inconsistent")
+    imported = str(value["imported_binding_path"])
+    mapped = value.get("mapped_library_paths")
+    if imported != binding["path"] or mapped != [library["path"]]:
+        raise ReleaseCliError("host libiio imported/mapped paths are inconsistent")
+    private_root = PurePosixPath(normalized_paths["private_root_path"])
+    source = PurePosixPath(normalized_paths["source_path"])
+    build = PurePosixPath(normalized_paths["build_path"])
+    repository = PurePosixPath(normalized_paths["repository_path"])
+    if (
+        source != private_root / "source"
+        or build != private_root / "build"
+        or PurePosixPath(binding["path"]) != source / "bindings/python/iio.py"
+        or PurePosixPath(cache["path"]) != build / "CMakeCache.txt"
+        or build not in PurePosixPath(library["path"]).parents
+        or PurePosixPath(normalized_wrapper["path"])
+        != repository / "scripts/run_tandem_agc_release_hardware.sh"
+    ):
+        raise ReleaseCliError("host libiio runtime paths are internally inconsistent")
+    return {
+        "schema": HOST_LIBIIO_RUNTIME_SCHEMA,
+        "source_commit": source_commit,
+        **normalized_paths,
+        "binding": binding,
+        "library": library,
+        "cmake_cache": cache,
+        "wrapper": normalized_wrapper,
+        "resume_identity": normalized_resume,
+        "mapped_library_paths": [library["path"]],
+    }
+
+
+def _bind_host_libiio(
+    options: ReleaseHardwareOptions,
+    attestor: Callable[[], Mapping[str, Any]],
+) -> ReleaseHardwareOptions:
+    observed = _validate_host_libiio_runtime(attestor())
+    return replace(
+        options,
+        host_libiio_json=_canonical_json(observed),
+        host_libiio_attestor=attestor,
+    )
+
+
+def _assert_host_libiio_unchanged(options: ReleaseHardwareOptions) -> dict[str, Any]:
+    if options.host_libiio_json is None or not callable(options.host_libiio_attestor):
+        raise ReleaseCliError(
+            "host libiio is not bound; use the guarded release hardware wrapper"
+        )
+    observed = _validate_host_libiio_runtime(options.host_libiio_attestor())
+    if _canonical_json(observed) != options.host_libiio_json:
+        raise ReleaseCliError(
+            "host libiio binding, library, or build configuration changed"
+        )
+    return observed
+
+
+def _attest_candidate_binding(
+    *,
+    artifact_index_path: Path,
+    deployment_receipt_path: Path,
+    serial: str,
+    firmware_version: str,
+    libiio_source_commit: str,
+    harness_sources: tuple[tuple[str, str], ...],
+    runner_provenance: Mapping[str, Any],
+    semantic_verify: bool = False,
+) -> dict[str, Any]:
+    runner = _validate_runner_provenance(runner_provenance)
+    root = artifact_index_path.parent
+    try:
+        receipt_relative = deployment_receipt_path.relative_to(root).as_posix()
+    except ValueError as error:
+        raise ReleaseCliError(
+            "deployment receipt must be a descendant of the artifact-index root"
+        ) from error
+    index_relative = artifact_index_path.name
+    if deployment_receipt_path == artifact_index_path:
+        raise ReleaseCliError("artifact index and deployment receipt must differ")
+
+    with _open_candidate_root(root) as root_descriptor:
+        index_payload, index_file, _prefix = _read_candidate_member(
+            root_descriptor,
+            root,
+            index_relative,
+            maximum_bytes=MAXIMUM_ARTIFACT_INDEX_BYTES,
+            name="artifact index",
+        )
+        assert index_payload is not None
+        try:
+            artifact_index = validate_artifact_index(
+                _strict_json(index_payload, name="artifact index")
+            )
+        except CandidateBindingError as error:
+            raise ReleaseCliError(f"artifact index is invalid: {error}") from error
+        if semantic_verify:
+            try:
+                semantic_index = verify_artifact_index_semantics(
+                    artifact_index_path,
+                    expected_stage=str(artifact_index["stage"]),
+                )
+            except (EvidenceError, OSError) as error:
+                raise ReleaseCliError(
+                    f"candidate release evidence is not authorizing: {error}"
+                ) from error
+            if semantic_index != artifact_index:
+                raise ReleaseCliError(
+                    "semantic release verifier returned a different artifact index"
+                )
+        artifact_index_sha256 = index_file["sha256"]
+
+        release = artifact_index["release"]
+        source = artifact_index["source"]
+        artifact = artifact_index["artifact"]
+        if release["firmware_version"] != firmware_version:
+            raise ReleaseCliError("artifact index binds a different firmware version")
+        if (
+            release["metadata_abi"] != "frame-metadata-v5"
+            or release["tandem_agc"] != "request-v2"
+        ):
+            raise ReleaseCliError(
+                "artifact index binds a different tandem metadata ABI"
+            )
+        if source["commit"] != runner["commit"]:
+            raise ReleaseCliError(
+                "artifact index source commit differs from the runner commit"
+            )
+
+        seen_paths = {index_relative, receipt_relative}
+        manifest_relative = source["manifest_path"]
+        if manifest_relative in seen_paths or not manifest_relative.endswith(
+            "-source.yaml"
+        ):
+            raise ReleaseCliError(
+                "artifact source manifest member is aliased or unsafe"
+            )
+        seen_paths.add(manifest_relative)
+        manifest_payload, manifest_file, _prefix = _read_candidate_member(
+            root_descriptor,
+            root,
+            manifest_relative,
+            maximum_bytes=MAXIMUM_SOURCE_MANIFEST_BYTES,
+            name="artifact source manifest",
+        )
+        assert manifest_payload is not None
+        if manifest_file["sha256"] != source["manifest_sha256"]:
+            raise ReleaseCliError("artifact source manifest SHA-256 changed")
+        manifest_values = _source_manifest_values(manifest_payload)
+        if manifest_values["libiio_0_25_source"] != libiio_source_commit:
+            raise ReleaseCliError(
+                "source manifest libiio pin differs from the guarded host source"
+            )
+        committed_manifest_path = f"manifests/{PurePosixPath(manifest_relative).name}"
+        repository = Path(runner["repository"])
+        if (
+            _git_bytes(
+                repository,
+                "show",
+                f"{runner['commit']}:{committed_manifest_path}",
+            )
+            != manifest_payload
+        ):
+            raise ReleaseCliError(
+                "artifact source manifest differs from its committed source blob"
+            )
+        manifest_file["committed_path"] = committed_manifest_path
+
+        dfu_relative = artifact["dfu_path"]
+        if dfu_relative in seen_paths or not dfu_relative.endswith(".dfu"):
+            raise ReleaseCliError(
+                "artifact DFU member is aliased or has no .dfu suffix"
+            )
+        seen_paths.add(dfu_relative)
+        dfu_bytes = artifact["dfu_bytes"]
+        fit_bytes = artifact["fit_bytes"]
+        if dfu_bytes != fit_bytes + 16 or dfu_bytes > MAXIMUM_DFU_BYTES:
+            raise ReleaseCliError(
+                "artifact DFU is not an exact bounded FIT plus suffix"
+            )
+        _payload, dfu_file, fit_sha256 = _read_candidate_member(
+            root_descriptor,
+            root,
+            dfu_relative,
+            maximum_bytes=MAXIMUM_DFU_BYTES,
+            expected_bytes=dfu_bytes,
+            prefix_bytes=fit_bytes,
+            retain_payload=False,
+            name="artifact DFU",
+        )
+        if (
+            dfu_file["sha256"] != artifact["dfu_sha256"]
+            or fit_sha256 != artifact["fit_sha256"]
+        ):
+            raise ReleaseCliError("artifact DFU/FIT SHA-256 changed")
+        dfu_file["fit_bytes"] = fit_bytes
+        dfu_file["fit_sha256"] = fit_sha256
+
+        indexed_harness = {
+            entry["path"]: entry["sha256"]
+            for entry in artifact_index["harness"]["files"]
+        }
+        live_harness = dict(harness_sources)
+        missing_harness = set(HARNESS_SOURCE_NAMES) - set(indexed_harness)
+        if missing_harness:
+            raise ReleaseCliError(
+                "artifact index lacks required release/receipt harness sources: "
+                + ", ".join(sorted(missing_harness))
+            )
+        runner_sources = {
+            source_record["path"]: source_record["sha256"]
+            for source_record in runner["sources"]
+        }
+        harness_files: list[dict[str, Any]] = []
+        for relative, indexed_digest in indexed_harness.items():
+            if relative in seen_paths:
+                raise ReleaseCliError("artifact index aliases a harness member")
+            seen_paths.add(relative)
+            _payload, snapshot, _prefix = _read_candidate_member(
+                root_descriptor,
+                root,
+                relative,
+                maximum_bytes=MAXIMUM_HARNESS_SOURCE_BYTES,
+                retain_payload=False,
+                name=f"artifact harness {relative}",
+            )
+            digest = snapshot["sha256"]
+            if digest != indexed_digest:
+                raise ReleaseCliError(
+                    f"artifact harness archive member changed: {relative}"
+                )
+            required = relative in live_harness
+            snapshot["required_for_release_hardware"] = required
+            if required:
+                if digest != live_harness[relative]:
+                    raise ReleaseCliError(
+                        f"artifact harness does not bind the live source: {relative}"
+                    )
+                committed_digest = runner_sources.get(relative)
+                if committed_digest is None:
+                    committed_digest = hashlib.sha256(
+                        _git_bytes(
+                            repository,
+                            "show",
+                            f"{runner['commit']}:{relative}",
+                        )
+                    ).hexdigest()
+                if digest != committed_digest:
+                    raise ReleaseCliError(
+                        f"artifact harness does not bind committed source: {relative}"
+                    )
+                snapshot["committed_sha256"] = committed_digest
+            harness_files.append(snapshot)
+
+        evidence_files: list[dict[str, Any]] = []
+        for member, expected_role in zip(
+            artifact_index["evidence"]["members"],
+            REQUIRED_EVIDENCE_ROLES,
+            strict=True,
+        ):
+            relative = member["path"]
+            if member["role"] != expected_role or relative in seen_paths:
+                raise ReleaseCliError("artifact index aliases an evidence member")
+            seen_paths.add(relative)
+            _payload, snapshot, _prefix = _read_candidate_member(
+                root_descriptor,
+                root,
+                relative,
+                maximum_bytes=MAXIMUM_EVIDENCE_MEMBER_BYTES,
+                expected_bytes=member["bytes"],
+                retain_payload=False,
+                name=f"artifact evidence {expected_role}",
+            )
+            if snapshot["sha256"] != member["sha256"]:
+                raise ReleaseCliError(
+                    f"artifact evidence member changed: {expected_role}"
+                )
+            snapshot["role"] = expected_role
+            evidence_files.append(snapshot)
+
+        receipt_payload, receipt_file, _prefix = _read_candidate_member(
+            root_descriptor,
+            root,
+            receipt_relative,
+            maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+            exact_mode=0o600,
+            name="deployment receipt",
+        )
+        assert receipt_payload is not None
+        try:
+            deployment_receipt = validate_deployment_receipt(
+                _strict_json(receipt_payload, name="deployment receipt"),
+                artifact_index_sha256=artifact_index_sha256,
+                serial=serial,
+                firmware_version=firmware_version,
+                dfu_sha256=dfu_file["sha256"],
+            )
+        except CandidateBindingError as error:
+            raise ReleaseCliError(f"deployment receipt is invalid: {error}") from error
+
+    return {
+        "schema": "plutosdr-fw.tandem-release-candidate-binding.v1",
+        "serial": serial,
+        "firmware_version": firmware_version,
+        "source_commit": source["commit"],
+        "build_run_id": artifact_index["build"]["run_id"],
+        "build_run_attempt": artifact_index["build"]["run_attempt"],
+        "artifact_index_sha256": artifact_index_sha256,
+        "dfu_sha256": dfu_file["sha256"],
+        "fit_sha256": fit_sha256,
+        "deployment_receipt_sha256": receipt_file["sha256"],
+        "deployment_boot_pre_id": deployment_receipt["boot"]["pre_id"],
+        "deployment_boot_post_id": deployment_receipt["boot"]["post_id"],
+        "artifact_root": str(root),
+        "runner_provenance": runner,
+        "artifact_index_file": index_file,
+        "artifact_index": artifact_index,
+        "initial_semantic_verification": {
+            "stage": artifact_index["stage"],
+            "normalized_index_sha256": hashlib.sha256(
+                _canonical_json(artifact_index).encode()
+            ).hexdigest(),
+        },
+        "source_manifest_file": manifest_file,
+        "source_manifest_values": manifest_values,
+        "dfu_file": dfu_file,
+        "harness_files": harness_files,
+        "evidence_files": evidence_files,
+        "deployment_receipt_file": receipt_file,
+        "deployment_receipt": deployment_receipt,
+    }
+
+
+def _assert_release_inputs_unchanged(options: ReleaseHardwareOptions) -> None:
+    live_harness = _harness_sources()
+    if live_harness != options.harness_sources:
+        raise ReleaseCliError("release harness source changed after plan validation")
+    observed = _attest_candidate_binding(
+        artifact_index_path=options.artifact_index_path,
+        deployment_receipt_path=options.deployment_receipt_path,
+        serial=options.serial,
+        firmware_version=options.firmware_version,
+        libiio_source_commit=options.libiio_source_commit,
+        harness_sources=live_harness,
+        runner_provenance=options.runner_attestor(),
+    )
+    if _canonical_json(observed) != options.candidate_binding_json:
+        raise ReleaseCliError(
+            "artifact, receipt, manifest, harness, evidence, or runner input changed "
+            "after plan validation"
+        )
 
 
 def _band(value: str) -> BandCase:
@@ -254,6 +1574,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--firmware-version",
         required=True,
         help="literal complete fw_version (converted to an anchored escaped regex)",
+    )
+    parser.add_argument(
+        "--artifact-index",
+        required=True,
+        help="canonical absolute candidate/final artifact-index path",
+    )
+    parser.add_argument(
+        "--deployment-receipt",
+        required=True,
+        help="canonical absolute serial-scoped RAM-only receipt path",
     )
     parser.add_argument(
         "--physical-attenuation-db",
@@ -312,6 +1642,7 @@ def parse_cli_args(
     argv: Sequence[str] | None = None,
     *,
     environ: Mapping[str, str] | None = None,
+    runner_attestor: Callable[[], Mapping[str, Any]] | None = None,
 ) -> ReleaseHardwareOptions:
     parser = build_parser()
     namespace = parser.parse_args(argv)
@@ -332,6 +1663,15 @@ def parse_cli_args(
             "PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT must contain the manifest-pinned "
             "40-hex host libiio commit"
         )
+    try:
+        artifact_index_path = _canonical_cli_path(
+            namespace.artifact_index, name="artifact index"
+        )
+        deployment_receipt_path = _canonical_cli_path(
+            namespace.deployment_receipt, name="deployment receipt"
+        )
+    except ReleaseCliError as error:
+        parser.error(str(error))
     requested_phases = tuple(namespace.phase or DEFAULT_PHASES)
     if len(set(requested_phases)) != len(requested_phases):
         parser.error("--phase values cannot be duplicated")
@@ -352,12 +1692,39 @@ def parse_cli_args(
     deadline = namespace.soak_deadline_seconds
     if deadline is None:
         deadline = 14_400.0 if namespace.policy_set == "full" else 5_400.0
+    harness_sources = _harness_sources()
+    if runner_attestor is None:
+        attestor: Callable[[], Mapping[str, Any]] = lambda: _attest_runner_provenance(
+            environment
+        )
+    else:
+        # This callable boundary exists solely for hardware-free planted oracles.
+        # The executable entry point never supplies it and therefore cannot bypass
+        # the committed, fully clean repository checks above.
+        attestor = runner_attestor
+    try:
+        binding = _attest_candidate_binding(
+            artifact_index_path=artifact_index_path,
+            deployment_receipt_path=deployment_receipt_path,
+            serial=serial,
+            firmware_version=firmware,
+            libiio_source_commit=commit,
+            harness_sources=harness_sources,
+            runner_provenance=attestor(),
+            semantic_verify=True,
+        )
+    except ReleaseCliError as error:
+        parser.error(str(error))
     options = ReleaseHardwareOptions(
         serial=serial,
         firmware_version=firmware,
         firmware_pattern=r"\A" + re.escape(firmware) + r"\Z",
         libiio_source_commit=commit,
-        harness_sources=_harness_sources(),
+        harness_sources=harness_sources,
+        artifact_index_path=artifact_index_path,
+        deployment_receipt_path=deployment_receipt_path,
+        candidate_binding_json=_canonical_json(binding),
+        runner_attestor=attestor,
         physical_attenuation_db=namespace.physical_attenuation_db,
         # Every invocation owns exactly one immutable serial.  Scope even an
         # explicit base directory so four parallel radios cannot share state.
@@ -444,6 +1811,40 @@ def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
         for _name, digest in options.harness_sources
     ):
         raise ValueError("release harness source manifest is incomplete or malformed")
+    if (
+        not options.artifact_index_path.is_absolute()
+        or not options.deployment_receipt_path.is_absolute()
+        or not callable(options.runner_attestor)
+    ):
+        raise ValueError("candidate binding paths/attestor are incomplete")
+    if (options.host_libiio_json is None) != (options.host_libiio_attestor is None):
+        raise ValueError(
+            "host libiio provenance and attestor must be supplied together"
+        )
+    if options.host_libiio_json is not None:
+        try:
+            host_libiio = _validate_host_libiio_runtime(
+                json.loads(options.host_libiio_json)
+            )
+        except (ReleaseCliError, TypeError, json.JSONDecodeError) as error:
+            raise ValueError("host libiio provenance JSON is invalid") from error
+        if (
+            _canonical_json(host_libiio) != options.host_libiio_json
+            or host_libiio["source_commit"] != options.libiio_source_commit
+        ):
+            raise ValueError("host libiio provenance is noncanonical or mismatched")
+    try:
+        binding = json.loads(options.candidate_binding_json)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ValueError("candidate binding JSON is invalid") from error
+    if (
+        not isinstance(binding, Mapping)
+        or binding.get("schema") != "plutosdr-fw.tandem-release-candidate-binding.v1"
+        or binding.get("serial") != options.serial
+        or binding.get("firmware_version") != options.firmware_version
+        or _canonical_json(binding) != options.candidate_binding_json
+    ):
+        raise ValueError("candidate binding identity is incomplete or noncanonical")
     if re.fullmatch(options.firmware_pattern, options.firmware_version) is None:
         raise ValueError("anchored firmware regex does not match the exact version")
     if options.firmware_pattern != r"\A" + re.escape(options.firmware_version) + r"\Z":
@@ -489,8 +1890,7 @@ def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
 
 
 def _assert_harness_unchanged(options: ReleaseHardwareOptions) -> None:
-    if _harness_sources() != options.harness_sources:
-        raise ReleaseCliError("release harness source changed after plan validation")
+    _assert_release_inputs_unchanged(options)
 
 
 def _json_safe(value: Any) -> Any:
@@ -516,6 +1916,14 @@ def _configuration(options: ReleaseHardwareOptions) -> dict[str, Any]:
         "firmware_pattern": options.firmware_pattern,
         "libiio_source_commit": options.libiio_source_commit,
         "harness_sources": dict(options.harness_sources),
+        "artifact_index_path": str(options.artifact_index_path),
+        "deployment_receipt_path": str(options.deployment_receipt_path),
+        "candidate_binding": json.loads(options.candidate_binding_json),
+        "host_libiio": (
+            json.loads(options.host_libiio_json)
+            if options.host_libiio_json is not None
+            else None
+        ),
         "physical_attenuation_db": options.physical_attenuation_db,
         "output_dir": str(options.output_dir),
         "requested_phases": list(options.phases),
@@ -540,8 +1948,20 @@ def _configuration(options: ReleaseHardwareOptions) -> dict[str, Any]:
     }
 
 
+def _stable_resume_configuration(value: Mapping[str, Any]) -> dict[str, Any]:
+    configuration = dict(value)
+    host_libiio = configuration.get("host_libiio")
+    if isinstance(host_libiio, Mapping):
+        configuration["host_libiio"] = {
+            "schema": host_libiio.get("schema"),
+            "resume_identity": host_libiio.get("resume_identity"),
+        }
+    return configuration
+
+
 def _fingerprint(options: ReleaseHardwareOptions, specs: Sequence[PhaseSpec]) -> str:
-    payload = {"schema": AGGREGATE_SCHEMA, "configuration": _configuration(options)}
+    configuration = _stable_resume_configuration(_configuration(options))
+    payload = {"schema": AGGREGATE_SCHEMA, "configuration": configuration}
     payload["plan"] = [spec.to_dict() for spec in specs]
     encoded = json.dumps(
         _json_safe(payload), sort_keys=True, separators=(",", ":"), allow_nan=False
@@ -575,10 +1995,14 @@ def _new_checkpoint(
     options: ReleaseHardwareOptions, specs: Sequence[PhaseSpec]
 ) -> dict[str, Any]:
     stamp = time.time_ns()
+    host_libiio = _assert_host_libiio_unchanged(options)
     return {
         "schema": AGGREGATE_SCHEMA,
         "fingerprint": _fingerprint(options, specs),
         "configuration": _configuration(options),
+        "host_libiio_invocations": [
+            {"started_unix_ns": stamp, "provenance": host_libiio}
+        ],
         "started_unix_ns": stamp,
         "updated_unix_ns": stamp,
         "phases": {
@@ -604,12 +2028,21 @@ def _aggregate_report(
     all_cleanup = len(complete) == len(specs) and all(
         record.get("cleanup_verified") is True for record in complete
     )
+    all_host_libiio = len(complete) == len(specs) and all(
+        isinstance(record.get("host_libiio_before_phase"), Mapping)
+        and isinstance(record.get("host_libiio_after_cleanup"), Mapping)
+        and _canonical_json(record["host_libiio_before_phase"])
+        == _canonical_json(record["host_libiio_after_cleanup"])
+        for record in complete
+    )
     if any(status in ("failed", "running") for status in statuses):
         verdict = "invalid"
     elif len(complete) != len(specs):
         verdict = "incomplete"
-    elif not all_cleanup or any(
-        record.get("phase_verdict") != "pass" for record in complete
+    elif (
+        not all_cleanup
+        or not all_host_libiio
+        or any(record.get("phase_verdict") != "pass" for record in complete)
     ):
         verdict = "fail"
     else:
@@ -620,7 +2053,9 @@ def _aggregate_report(
         "verdict": verdict,
         "all_requested_phases_complete": len(complete) == len(specs),
         "all_cleanup_verified": all_cleanup,
+        "all_host_libiio_verified": all_host_libiio,
         "configuration": checkpoint["configuration"],
+        "host_libiio_invocations": checkpoint["host_libiio_invocations"],
         "plan": [spec.to_dict() for spec in specs],
         "counts": {
             status: statuses.count(status)
@@ -637,12 +2072,31 @@ def _load_checkpoint(
 ) -> dict[str, Any]:
     checkpoint = json.loads(path.read_text(encoding="utf-8"))
     expected_keys = [spec.key for spec in specs]
+    checkpoint_configuration = checkpoint.get("configuration")
     if (
         checkpoint.get("schema") != AGGREGATE_SCHEMA
         or checkpoint.get("fingerprint") != _fingerprint(options, specs)
         or list(checkpoint.get("phases", {})) != expected_keys
+        or not isinstance(checkpoint_configuration, Mapping)
+        or _canonical_json(_stable_resume_configuration(checkpoint_configuration))
+        != _canonical_json(_stable_resume_configuration(_configuration(options)))
     ):
         raise ReleaseCliError("aggregate checkpoint differs from the requested plan")
+    invocations = checkpoint.get("host_libiio_invocations")
+    if not isinstance(invocations, list) or not invocations:
+        raise ReleaseCliError("aggregate checkpoint lacks host libiio provenance")
+    current = _assert_host_libiio_unchanged(options)
+    previous = invocations[-1]
+    if (
+        not isinstance(previous, Mapping)
+        or set(previous) != {"started_unix_ns", "provenance"}
+        or type(previous.get("started_unix_ns")) is not int
+        or previous["started_unix_ns"] <= 0
+        or not isinstance(previous.get("provenance"), Mapping)
+    ):
+        raise ReleaseCliError("aggregate host libiio invocation record is malformed")
+    if _canonical_json(previous["provenance"]) != _canonical_json(current):
+        invocations.append({"started_unix_ns": time.time_ns(), "provenance": current})
     return checkpoint
 
 
@@ -727,6 +2181,27 @@ def _verify_completed(
         record = checkpoint["phases"][spec.key]
         if record["status"] != "complete":
             continue
+        before_raw = record.get("host_libiio_before_phase")
+        after_raw = record.get("host_libiio_after_cleanup")
+        if not isinstance(before_raw, Mapping) or not isinstance(after_raw, Mapping):
+            raise ReleaseCliError(
+                f"completed {spec.key} lacks host libiio boundary provenance"
+            )
+        before = _validate_host_libiio_runtime(before_raw)
+        after = _validate_host_libiio_runtime(after_raw)
+        configured = checkpoint.get("configuration", {}).get("host_libiio")
+        configured_resume = (
+            configured.get("resume_identity")
+            if isinstance(configured, Mapping)
+            else None
+        )
+        if (
+            _canonical_json(before) != _canonical_json(after)
+            or before["resume_identity"] != configured_resume
+        ):
+            raise ReleaseCliError(
+                f"completed {spec.key} host libiio provenance changed"
+            )
         report_path = Path(record["report_path"])
         work_dir = Path(record["work_dir"])
         _require_nonsymlink_descendant(
@@ -805,6 +2280,8 @@ def _run_aggregate_locked(
             continue
         if record["status"] == "failed":
             break
+        _assert_release_inputs_unchanged(options)
+        host_libiio_before = _assert_host_libiio_unchanged(options)
         resume_work = record.get("resumable") is True and record.get("work_dir")
         record["attempts"] += 1
         work_dir = (
@@ -815,19 +2292,26 @@ def _run_aggregate_locked(
         work_dir = _require_nonsymlink_descendant(
             work_dir, root, label=f"{spec.key} attempt directory"
         )
+        record.pop("host_libiio_after_cleanup", None)
         record.update(
             {
                 "status": "running",
                 "work_dir": str(work_dir.resolve()),
                 "started_unix_ns": time.time_ns(),
                 "resumable": False,
+                "host_libiio_before_phase": host_libiio_before,
             }
         )
         checkpoint["updated_unix_ns"] = time.time_ns()
         _atomic_json(checkpoint_path, checkpoint)
         _atomic_json(report_path, _aggregate_report(checkpoint, specs))
         try:
-            returned_artifact = Path(executor(spec, work_dir.resolve()))
+            try:
+                returned_artifact = Path(executor(spec, work_dir.resolve()))
+            finally:
+                record["host_libiio_after_cleanup"] = _assert_host_libiio_unchanged(
+                    options
+                )
             _require_nonsymlink_descendant(
                 returned_artifact,
                 work_dir,
@@ -900,6 +2384,8 @@ def run_aggregate(
     """Serialize one immutable radio's aggregate state for this invocation."""
 
     specs = phase_specs(options)
+    _assert_release_inputs_unchanged(options)
+    _assert_host_libiio_unchanged(options)
     _verify_release_output_plan(options, specs)
     options.output_dir.mkdir(parents=True, exist_ok=True)
     _verify_release_output_plan(options, specs)
@@ -917,6 +2403,7 @@ def run_aggregate(
         lock.write(f"pid={os.getpid()} serial={options.serial}\n")
         lock.flush()
         result = _run_aggregate_locked(options, executor, validator)
+        _assert_host_libiio_unchanged(options)
         _verify_release_output_plan(options, specs)
         return result
 
@@ -5995,6 +7482,7 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
 
 
 def plan_document(options: ReleaseHardwareOptions) -> dict[str, Any]:
+    _assert_release_inputs_unchanged(options)
     specs = phase_specs(options)
     return {
         "schema": AGGREGATE_SCHEMA,
@@ -6005,16 +7493,52 @@ def plan_document(options: ReleaseHardwareOptions) -> dict[str, Any]:
     }
 
 
-def main(argv: Sequence[str] | None = None) -> int:
-    options = parse_cli_args(argv)
+def main(
+    argv: Sequence[str] | None = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+    runner_attestor: Callable[[], Mapping[str, Any]] | None = None,
+) -> int:
+    environment = os.environ if environ is None else environ
+    options = parse_cli_args(
+        argv,
+        environ=environment,
+        runner_attestor=runner_attestor,
+    )
     if options.plan_only:
         print(json.dumps(plan_document(options), indent=2, sort_keys=True))
         return 0
+    try:
+        _attest_host_libiio_preimport(
+            environment,
+            expected_commit=options.libiio_source_commit,
+        )
+    except ReleaseCliError as error:
+        raise SystemExit(
+            f"host libiio provenance is not authorizing before import: {error}"
+        ) from error
     try:
         import iio
     except ImportError as error:
         raise SystemExit(
             "manifest-pinned pylibiio is not importable; use the guarded shell runner"
+        ) from error
+
+    def host_libiio_attestor() -> Mapping[str, Any]:
+        return _attest_imported_libiio(
+            iio,
+            environment,
+            expected_commit=options.libiio_source_commit,
+        )
+
+    try:
+        options = _bind_host_libiio(
+            options,
+            host_libiio_attestor,
+        )
+    except ReleaseCliError as error:
+        raise SystemExit(
+            f"host libiio provenance is not authorizing: {error}"
         ) from error
     report, path = run_aggregate(
         options,

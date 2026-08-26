@@ -28,8 +28,9 @@
 #   scripts/verify_release.sh manifests/fingerprint-v3.yaml --image /path/to.dfu
 #   scripts/verify_release.sh manifests/fingerprint-v3.yaml --json
 #
-# Dependencies are deliberately coreutils + dumpimage + cpio only, so this runs
-# in a minimal CI container with no Python or YAML library available.
+# Dependencies are deliberately coreutils + dumpimage + cpio + dfu-suffix, so
+# this runs without Python or a YAML library while still failing closed on the
+# release container format.
 
 set -euo pipefail
 
@@ -76,7 +77,7 @@ done
 [[ -n "$MANIFEST" ]] || usage
 [[ -f "$MANIFEST" ]] || die "manifest not found: $MANIFEST"
 
-for tool in sha256sum md5sum dumpimage cpio gzip awk sed grep; do
+for tool in sha256sum md5sum dumpimage cpio gzip awk sed grep dfu-suffix; do
     command -v "$tool" >/dev/null || die "required tool not found: $tool"
 done
 
@@ -152,12 +153,8 @@ else
 fi
 
 # ----------------------------------------------------------- 2. DFU suffix ---
-if command -v dfu-suffix >/dev/null; then
-    dfu-suffix -c "$IMAGE" >/dev/null 2>&1 || die "DFU suffix is invalid or absent"
-    note "dfu suffix valid"
-else
-    note "dfu suffix SKIPPED (dfu-suffix not installed)"
-fi
+dfu-suffix -c "$IMAGE" >/dev/null 2>&1 || die "DFU suffix is invalid or absent"
+note "dfu suffix valid"
 
 # ------------------------------------------------------------ 3. FIT layout ---
 dumpimage -l "$IMAGE" > "${WORK}/fit.txt" 2>/dev/null ||

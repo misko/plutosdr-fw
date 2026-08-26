@@ -29,12 +29,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             iverilog python3-numpy python3-pytest
-          python3 -m pytest \
-            tests/test_release_oracles.py \
-            tests/test_tandem_agc_ooc_validator.py \
-            tests/radio_hardware \
-            -m 'not radio_hardware'
-          ./hdl-tandem/run_tests.sh
+          PYTHON=python3 ./scripts/check_tandem_release_offline.sh oracles
 
   source-graph:
     name: source graph
@@ -48,10 +43,7 @@ jobs:
         run: git submodule update --init --depth 1 buildroot
       - name: Verify pins, URLs, refs, and overrides
         run: |
-          ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc3-source.yaml
-          ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc4-source.yaml
-          ./scripts/check_source_graph.sh manifests/tandem-agc-v8-source.yaml
-          ./scripts/test_legal_info_network.sh
+          ./scripts/check_tandem_release_offline.sh source-graph
 
   gadget-tests:
     name: USB and IP gadget unit tests

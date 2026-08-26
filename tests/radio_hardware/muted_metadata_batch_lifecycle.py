@@ -4,6 +4,12 @@ This module deliberately has no transmit-arm operation.  Its only TX writes
 are independent fail-closed mute barriers: both hardware attenuators at
 -89.75 dB, all DDS raw/scale attributes at zero, and all DAC selectors at ZERO.
 The acquisition request is tandem HOLD at 40 dB, so no gain event is expected.
+
+Release identity is never inferred from a version pattern.  Before USB access,
+the runner cross-binds a committed source-manifest copy, candidate artifact
+index, exact DFU/FIT bytes, indexed release evidence, committed harness blobs,
+and one serial-scoped RAM-deployment receipt.  A durable PASS reopens and
+revalidates the same inputs after the radio and process lock are closed.
 """
 
 # Fail-safe mute, close, unlock, and evidence persistence must also run for
@@ -31,6 +37,11 @@ import time
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .candidate_binding import (
+    CandidateBindingError,
+    validate_artifact_index,
+    validate_deployment_receipt,
+)
 from .metadata_abi import (
     FEATURE_AD9361_TEMPERATURE,
     FEATURE_FPGA_GAIN_EVENTS,
@@ -56,46 +67,6 @@ SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v5"
 PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v4"
 TEMPERATURE_POLICY_PREDECESSOR_SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v2"
 REPORT_FILENAME = "muted-metadata-batch-lifecycle-v5.json"
-EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
-EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
-DEFAULT_R18_SERIAL = "1040007c4a94000211000b009186843ef2"
-EXPECTED_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc4"
-EXPECTED_FIRMWARE_PATTERN = r"\Av0[.]41-plutoplus-spf-tandem-agc-v8-rc4\Z"
-EXPECTED_KERNEL_VERSION = "5.15.0-g77a1f2352162"
-EXPECTED_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
-DEVICE_FIRMWARE_SOURCE_COMMIT = "557a08749d9c0c34fe8096099b5be9d2b2a1b24f"
-DEVICE_FIRMWARE_SOURCE_TAG = "tandem-agc-v8-rc4-source/firmware-v1"
-DEVICE_FIRMWARE_BUILD_RUN_ID = 32_898_297_518
-DEVICE_FIRMWARE_BUILD_RUN_ATTEMPT = 1
-DEVICE_FIRMWARE_DFU_SHA256 = (
-    "b18f3fd0590eef13d77a60d9c4e36398b9a40e5c230aa34d96e7c78e7ff46bf6"
-)
-DEVICE_FIRMWARE_FIT_SHA256 = (
-    "a3e98393c4ae3caecee53b3b81808b9790f2c7a8bce0cb201005502fd5d02521"
-)
-DEVICE_FIRMWARE_FIT_BYTES = 12_787_311
-DEVICE_FIRMWARE_DFU_BYTES = 12_787_327
-DEVICE_RAM_BOOT_RECEIPT_SHA256 = (
-    "9854b03dc8e0b9ee66b7f26ee8951f8352ec0d6f9fbaa3fae62a8f8d4b0c347e"
-)
-DEVICE_RAM_BOOT_RECEIPT_BYTES = 2_017
-DEVICE_RAM_BOOT_RECEIPT_ID = "62155abae0b4408ea77fc3d407e9b8c6"
-DEVICE_RAM_BOOT_PLAN_ID = "cd3c1bdfa41f4463ab91e8f0fe2f34bb"
-DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256 = (
-    "1b7aa093d3cea62553885bf9e06979c85bb24c8b2e1b6975479d5ff847803726"
-)
-DEVICE_RAM_BOOT_PHASES = (
-    "preflight_revalidated",
-    "dfu_util_ready",
-    "ram_transition_dispatch_attempted",
-    "ram_transition_dispatched",
-    "exact_path_entered_dfu",
-    "volatile_dfu_downloaded",
-    "dfu_detach_dispatched",
-    "exact_path_returned_runtime",
-    "return_attested",
-    "tx_safe_attested",
-)
 PREDECESSOR_V2_FAILURE_REPORT_SHA256 = (
     "8f3341cc0cd63455234ce3eb85c2dd4816a42e512f0730ef8decd629df9c78f2"
 )
@@ -218,11 +189,71 @@ MAXIMUM_JSON_STRING_BYTES = 1_048_576
 MAXIMUM_CMAKE_CACHE_BYTES = 1_048_576
 MAXIMUM_LIBIIO_BYTES = 67_108_864
 MAXIMUM_PYLIBIIO_BYTES = 8_388_608
+MAXIMUM_SOURCE_MANIFEST_BYTES = 1_048_576
+MAXIMUM_CANDIDATE_INDEX_BYTES = 8_388_608
+MAXIMUM_DEPLOYMENT_RECEIPT_BYTES = 8_388_608
+MAXIMUM_CANDIDATE_DFU_BYTES = 134_217_728
+MAXIMUM_HARNESS_FILE_BYTES = 16_777_216
 RENAME_NOREPLACE = 1
+CANDIDATE_HARNESS_PATHS = (
+    "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
+    "tests/radio_hardware/candidate_binding.py",
+    "tests/radio_hardware/metadata_abi.py",
+    "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
+)
+SOURCE_MANIFEST_FIELDS = frozenset(
+    {
+        "schema",
+        "schema_version",
+        "release_state",
+        "firmware_repo",
+        "libiio_0_25_source",
+        "libiio_0_25_repo",
+        "libiio_0_25_ref",
+        "gadget_source",
+        "gadget_repo",
+        "gadget_ref",
+        "ip_gadget_source",
+        "ip_gadget_repo",
+        "ip_gadget_ref",
+        "submodule_buildroot",
+        "submodule_buildroot_repo",
+        "submodule_buildroot_ref",
+        "submodule_hdl",
+        "submodule_hdl_repo",
+        "submodule_hdl_ref",
+        "submodule_hdl_quantulum",
+        "submodule_hdl_quantulum_repo",
+        "submodule_hdl_quantulum_ref",
+        "submodule_linux",
+        "submodule_linux_repo",
+        "submodule_linux_ref",
+        "submodule_u_boot_xlnx",
+        "submodule_u_boot_xlnx_repo",
+        "submodule_u_boot_xlnx_ref",
+        "versions_hdl",
+        "versions_buildroot",
+        "versions_linux",
+        "versions_u_boot_xlnx",
+    }
+)
 
 
 class QualificationError(RuntimeError):
     """Evidence is unsafe, incomplete, or inconsistent."""
+
+
+def verify_artifact_index_semantics(
+    index_path: pathlib.Path, *, expected_stage: str
+) -> dict[str, Any]:
+    """Load the release semantic verifier only for live candidate preflight."""
+
+    from scripts.tandem_release_evidence import verify_artifact_index_semantics
+
+    return verify_artifact_index_semantics(
+        index_path,
+        expected_stage=expected_stage,
+    )
 
 
 class _AtomicPromotionError(QualificationError):
@@ -279,148 +310,6 @@ def _rename_noreplace_at(
         raise OSError(error_number, os.strerror(error_number))
 
 
-def _expected_ram_boot_receipt(
-    *, receipt_path: pathlib.Path, image_path: pathlib.Path
-) -> dict[str, Any]:
-    return {
-        "error": None,
-        "outcome": "success",
-        "phases": list(DEVICE_RAM_BOOT_PHASES),
-        "plan": {
-            "before_firmware": "v0.41-plutoplus-spf-tandem-agc-v8-rc3",
-            "before_model": EXPECTED_HARDWARE_MODEL,
-            "before_phy": "ad9361",
-            "confirmation_phrase": f"RAM BOOT {DEFAULT_R18_SERIAL}",
-            "created_at": "2026-08-25T21:35:34.476644+00:00",
-            "expected_firmware": EXPECTED_FIRMWARE_VERSION,
-            "expected_metadata_abi": 2,
-            "expected_tandem_agc": True,
-            "fit_sha256": DEVICE_FIRMWARE_FIT_SHA256,
-            "fit_size": DEVICE_FIRMWARE_FIT_BYTES,
-            "image_path": str(image_path),
-            "image_sha256": DEVICE_FIRMWARE_DFU_SHA256,
-            "known_hosts_sha256": DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256,
-            "plan_id": DEVICE_RAM_BOOT_PLAN_ID,
-            "profile_id": "tandem-agc-v8-rc4-ram",
-            "raw_usb_write_access": True,
-            "runtime_usb_device_node": "/dev/bus/usb/003/021",
-            "schema_version": 1,
-            "serial": DEFAULT_R18_SERIAL,
-            "transition_host": "192.168.1.18",
-            "transition_route_mode": "lan",
-            "usb_interface": "enx00e02297811f",
-            "usb_port": "3-8",
-            "usb_sysfs_path": "/sys/bus/usb/devices/3-8",
-        },
-        "receipt_id": DEVICE_RAM_BOOT_RECEIPT_ID,
-        "receipt_path": str(receipt_path),
-        "remediation": (
-            "RAM-only image is active. Power cycle to return to the unchanged "
-            "QSPI image; persistent promotion requires a separate qualified "
-            "flash plan."
-        ),
-        "retryable": False,
-        "returned_firmware": EXPECTED_FIRMWARE_VERSION,
-        "returned_phy": "ad9361",
-        "returned_serial": DEFAULT_R18_SERIAL,
-        "schema_version": 1,
-    }
-
-
-def _attest_device_firmware_lineage(
-    receipt_path: pathlib.Path, *, repository: pathlib.Path | None = None
-) -> dict[str, Any]:
-    """Bind the exact RC4 RAM receipt, image, and protected source graph."""
-
-    receipt_path = receipt_path.absolute()
-    receipt_payload = _read_exact_owned_regular_file(
-        receipt_path,
-        expected_bytes=DEVICE_RAM_BOOT_RECEIPT_BYTES,
-        name="RC4 RAM-boot receipt",
-        required_mode=0o600,
-    )
-    if hashlib.sha256(receipt_payload).hexdigest() != DEVICE_RAM_BOOT_RECEIPT_SHA256:
-        raise QualificationError("RC4 RAM-boot receipt SHA-256 changed")
-    try:
-        receipt = json.loads(receipt_payload)
-    except (UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise QualificationError("RC4 RAM-boot receipt JSON is invalid") from error
-    _validate_strict_json_domain(receipt)
-    receipt_record = _required_mapping(receipt, name="RC4 RAM-boot receipt")
-    plan = _required_mapping(receipt_record.get("plan"), name="RC4 RAM-boot plan")
-    image_text = plan.get("image_path")
-    if type(image_text) is not str:
-        raise QualificationError("RC4 RAM-boot image path is not an exact string")
-    image_path = pathlib.Path(image_text)
-    if not image_path.is_absolute() or ".." in image_path.parts:
-        raise QualificationError("RC4 RAM-boot image path is not absolute/normalized")
-    expected_receipt = _expected_ram_boot_receipt(
-        receipt_path=receipt_path, image_path=image_path
-    )
-    if not _json_identical(dict(receipt_record), expected_receipt):
-        raise QualificationError("RC4 RAM-boot receipt semantics changed")
-
-    image_payload = _read_exact_owned_regular_file(
-        image_path,
-        expected_bytes=DEVICE_FIRMWARE_DFU_BYTES,
-        name="attested RC4 DFU image",
-    )
-    if hashlib.sha256(image_payload).hexdigest() != DEVICE_FIRMWARE_DFU_SHA256:
-        raise QualificationError("attested RC4 DFU SHA-256 changed")
-    if (
-        hashlib.sha256(image_payload[:DEVICE_FIRMWARE_FIT_BYTES]).hexdigest()
-        != DEVICE_FIRMWARE_FIT_SHA256
-    ):
-        raise QualificationError("attested RC4 FIT body SHA-256 changed")
-
-    repository = (
-        pathlib.Path(__file__).resolve().parents[2]
-        if repository is None
-        else repository.absolute()
-    )
-    source_tag_commit = (
-        _git_bytes(
-            repository,
-            "rev-parse",
-            f"refs/tags/{DEVICE_FIRMWARE_SOURCE_TAG}^{{commit}}",
-        )
-        .decode()
-        .strip()
-    )
-    if source_tag_commit != DEVICE_FIRMWARE_SOURCE_COMMIT:
-        raise QualificationError("protected RC4 firmware source tag moved")
-    host_head = _git_bytes(repository, "rev-parse", "HEAD").decode().strip()
-    _git_bytes(
-        repository,
-        "merge-base",
-        "--is-ancestor",
-        DEVICE_FIRMWARE_SOURCE_COMMIT,
-        host_head,
-    )
-    return {
-        "attestation": (
-            "exact private RAM receipt, DFU/FIT bytes, and protected firmware "
-            "source ancestry verified before radio context"
-        ),
-        "source_tag": DEVICE_FIRMWARE_SOURCE_TAG,
-        "source_commit": DEVICE_FIRMWARE_SOURCE_COMMIT,
-        "build_run_binding": (
-            "exact prior release-candidate audit declaration; the RAM receipt "
-            "does not encode the GitHub Actions run identity"
-        ),
-        "build_run_id": DEVICE_FIRMWARE_BUILD_RUN_ID,
-        "build_run_attempt": DEVICE_FIRMWARE_BUILD_RUN_ATTEMPT,
-        "dfu_sha256": DEVICE_FIRMWARE_DFU_SHA256,
-        "dfu_bytes": DEVICE_FIRMWARE_DFU_BYTES,
-        "fit_sha256": DEVICE_FIRMWARE_FIT_SHA256,
-        "fit_bytes": DEVICE_FIRMWARE_FIT_BYTES,
-        "ram_boot_receipt_path": str(receipt_path),
-        "ram_boot_receipt_bytes": DEVICE_RAM_BOOT_RECEIPT_BYTES,
-        "ram_boot_receipt_sha256": DEVICE_RAM_BOOT_RECEIPT_SHA256,
-        "ram_boot_receipt": expected_receipt,
-    }
-
-
 def _observed_device_firmware_provenance(
     lineage: Mapping[str, Any], *, preflight: Mapping[str, Any]
 ) -> dict[str, Any]:
@@ -429,7 +318,9 @@ def _observed_device_firmware_provenance(
         preflight_record.get("context_attrs"), name="device preflight context attrs"
     )
     return {
-        "attestation_status": "exact lineage cross-bound to live RC4 identity",
+        "attestation_status": (
+            "exact candidate index and RAM receipt cross-bound to live identity"
+        ),
         "lineage": dict(lineage),
         "live_serial": preflight_record.get("serial"),
         "live_firmware_version": preflight_record.get("firmware_version"),
@@ -696,6 +587,50 @@ def _sha256_bounded_owned_regular_file(
     return hashlib.sha256(
         _read_bounded_owned_regular_file(path, maximum_bytes=maximum_bytes, name=name)
     ).hexdigest()
+
+
+def _sha256_exact_owned_regular_file(
+    path: pathlib.Path, *, expected_bytes: int, name: str
+) -> str:
+    """Hash a no-follow regular file while proving its identity and exact size."""
+
+    if not 0 < expected_bytes <= MAXIMUM_SIGNED_64:
+        raise QualificationError(f"{name} expected size is not exact and bounded")
+    _require_nonsymlink_path(path, include_leaf=True)
+    try:
+        descriptor = os.open(path, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0))
+    except OSError as error:
+        raise QualificationError(f"{name} cannot be opened safely") from error
+    try:
+        before = os.fstat(descriptor)
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.getuid()
+            or before.st_size != expected_bytes
+        ):
+            raise QualificationError(f"{name} size/type/owner changed")
+        digest = hashlib.sha256()
+        consumed = 0
+        while consumed < expected_bytes:
+            chunk = os.read(descriptor, min(1024 * 1024, expected_bytes - consumed))
+            if not chunk:
+                break
+            consumed += len(chunk)
+            digest.update(chunk)
+        if os.read(descriptor, 1):
+            raise QualificationError(f"{name} grew while hashing")
+        after = os.fstat(descriptor)
+        if consumed != expected_bytes or (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+        ) != (before.st_dev, before.st_ino, before.st_size):
+            raise QualificationError(f"{name} changed while hashing")
+        return digest.hexdigest()
+    except OSError as error:
+        raise QualificationError(f"{name} cannot be hashed safely") from error
+    finally:
+        os.close(descriptor)
 
 
 def _json_payload(value: Mapping[str, Any]) -> bytes:
@@ -1618,6 +1553,383 @@ def _git_bytes(repository: pathlib.Path, *arguments: str) -> bytes:
         ) from error
 
 
+def _parse_source_manifest(payload: bytes) -> dict[str, Any]:
+    """Parse the repository's deliberately flat, scalar source-manifest format."""
+
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise QualificationError("candidate source manifest is not UTF-8") from error
+    values: dict[str, Any] = {}
+    for line_number, line in enumerate(text.splitlines(), 1):
+        if not line or line.startswith("#"):
+            continue
+        match = re.fullmatch(r"([a-z][a-z0-9_]*):[ \t]+([^#\r\n]*\S)", line)
+        if match is None:
+            raise QualificationError(
+                f"candidate source manifest line {line_number} is not a flat scalar"
+            )
+        key, raw_value = match.groups()
+        if key in values:
+            raise QualificationError(
+                f"candidate source manifest key {key!r} is duplicated"
+            )
+        values[key] = int(raw_value) if raw_value.isdecimal() else raw_value
+    if set(values) != SOURCE_MANIFEST_FIELDS:
+        raise QualificationError("candidate source manifest fields changed")
+    if (
+        values.get("schema") != "plutosdr-fw.source-manifest"
+        or values.get("schema_version") != 1
+        or values.get("release_state") != "candidate"
+    ):
+        raise QualificationError("candidate source manifest header changed")
+    commit_fields = {
+        "libiio_0_25_source",
+        "gadget_source",
+        "ip_gadget_source",
+        "submodule_buildroot",
+        "submodule_hdl",
+        "submodule_hdl_quantulum",
+        "submodule_linux",
+        "submodule_u_boot_xlnx",
+    }
+    ref_fields = {
+        "libiio_0_25_ref",
+        "gadget_ref",
+        "ip_gadget_ref",
+        "submodule_buildroot_ref",
+        "submodule_hdl_ref",
+        "submodule_hdl_quantulum_ref",
+        "submodule_linux_ref",
+        "submodule_u_boot_xlnx_ref",
+    }
+    repo_fields = {name for name in SOURCE_MANIFEST_FIELDS if name.endswith("_repo")}
+    repo_fields.add("firmware_repo")
+    version_fields = {
+        name for name in SOURCE_MANIFEST_FIELDS if name.startswith("versions_")
+    }
+    if any(
+        re.fullmatch(r"[0-9a-f]{40}", str(values.get(name, ""))) is None
+        for name in commit_fields
+    ):
+        raise QualificationError("candidate source manifest has an invalid source pin")
+    if any(
+        not isinstance(values.get(name), str)
+        or not str(values[name]).startswith("refs/tags/")
+        for name in ref_fields
+    ):
+        raise QualificationError("candidate source manifest has an unprotected ref")
+    if any(
+        not isinstance(values.get(name), str)
+        or not str(values[name]).startswith("https://")
+        for name in repo_fields
+    ):
+        raise QualificationError("candidate source manifest has an invalid repository")
+    if any(
+        not isinstance(values.get(name), str) or not values[name]
+        for name in version_fields
+    ):
+        raise QualificationError("candidate source manifest has an invalid version")
+    return values
+
+
+def _read_candidate_json(
+    path: pathlib.Path, *, maximum_bytes: int, name: str
+) -> tuple[bytes, dict[str, Any]]:
+    if not path.is_absolute() or ".." in path.parts:
+        raise QualificationError(f"{name} path is not absolute and normalized")
+    payload = _read_bounded_owned_regular_file(
+        path, maximum_bytes=maximum_bytes, name=name
+    )
+    try:
+        value = json.loads(payload)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise QualificationError(f"{name} JSON is invalid") from error
+    _validate_strict_json_domain(value)
+    return payload, dict(_required_mapping(value, name=name))
+
+
+def _attest_source_manifest(
+    path: pathlib.Path,
+    *,
+    repository: pathlib.Path,
+    repository_relative_path: str,
+    source_commit: str,
+    expected_sha256: str,
+) -> dict[str, Any]:
+    path = path.absolute()
+    repository = repository.absolute()
+    relative = pathlib.PurePosixPath(repository_relative_path)
+    if (
+        relative.is_absolute()
+        or not relative.parts
+        or any(part in {"", ".", ".."} for part in relative.parts)
+        or not relative.name.endswith("-source.yaml")
+    ):
+        raise QualificationError("candidate source manifest member path is unsafe")
+    committed_relative = pathlib.PurePosixPath("manifests") / relative.name
+    payload = _read_bounded_owned_regular_file(
+        path,
+        maximum_bytes=MAXIMUM_SOURCE_MANIFEST_BYTES,
+        name="candidate source manifest",
+    )
+    digest = hashlib.sha256(payload).hexdigest()
+    if digest != expected_sha256:
+        raise QualificationError("candidate source manifest SHA-256 changed")
+    if (
+        _git_bytes(
+            repository, "show", f"{source_commit}:{committed_relative.as_posix()}"
+        )
+        != payload
+    ):
+        raise QualificationError(
+            "candidate source manifest differs from its source commit blob"
+        )
+    values = _parse_source_manifest(payload)
+    return {
+        "path": str(path),
+        "relative_path": relative.as_posix(),
+        "committed_relative_path": committed_relative.as_posix(),
+        "bytes": len(payload),
+        "sha256": digest,
+        "values": values,
+    }
+
+
+def _attest_candidate_binding(
+    *,
+    source_manifest_path: pathlib.Path,
+    artifact_index_path: pathlib.Path,
+    deployment_receipt_path: pathlib.Path,
+    candidate_dfu_path: pathlib.Path,
+    serial: str,
+    runner_provenance: Mapping[str, Any],
+    semantic_verify: bool = False,
+) -> dict[str, Any]:
+    """Bind one serial to committed sources, exact bytes, and its RAM receipt."""
+
+    artifact_payload, artifact_raw = _read_candidate_json(
+        artifact_index_path.absolute(),
+        maximum_bytes=MAXIMUM_CANDIDATE_INDEX_BYTES,
+        name="candidate artifact index",
+    )
+    try:
+        artifact_index = validate_artifact_index(artifact_raw)
+    except CandidateBindingError as error:
+        raise QualificationError(f"candidate artifact index: {error}") from error
+    artifact_stage = str(artifact_index.get("stage", ""))
+    if artifact_stage not in {"candidate-pre-hardware", "final-pre-confirmation"}:
+        raise QualificationError(
+            "muted lifecycle requires a hardware-authorizing artifact index"
+        )
+    if semantic_verify:
+        try:
+            semantic_index = verify_artifact_index_semantics(
+                artifact_index_path.absolute(),
+                expected_stage=artifact_stage,
+            )
+        except (RuntimeError, OSError) as error:
+            raise QualificationError(
+                f"candidate release evidence is not authorizing: {error}"
+            ) from error
+        if semantic_index != artifact_index:
+            raise QualificationError(
+                "semantic release verifier returned a different artifact index"
+            )
+    artifact_index_sha256 = hashlib.sha256(artifact_payload).hexdigest()
+    evidence = _required_mapping(
+        artifact_index.get("evidence"), name="candidate evidence inventory"
+    )
+    evidence_members = _required_list(
+        evidence.get("members"), name="candidate evidence members"
+    )
+    artifact_root = artifact_index_path.absolute().parent
+    for raw_member in evidence_members:
+        member = _required_mapping(raw_member, name="candidate evidence member")
+        member_path = (artifact_root / str(member["path"])).absolute()
+        observed_digest = _sha256_exact_owned_regular_file(
+            member_path,
+            expected_bytes=_required_int(
+                member.get("bytes"), name="candidate evidence member bytes", minimum=1
+            ),
+            name=f"candidate evidence member {member.get('role')}",
+        )
+        if observed_digest != member.get("sha256"):
+            raise QualificationError(
+                f"candidate evidence member {member.get('role')} SHA-256 changed"
+            )
+
+    source = _required_mapping(
+        artifact_index.get("source"), name="candidate artifact source"
+    )
+    source_commit = str(source.get("commit", ""))
+    repository = pathlib.Path(str(runner_provenance.get("host_runner_repository", "")))
+    runner_commit = str(runner_provenance.get("host_runner_repository_commit", ""))
+    if source_commit != runner_commit:
+        raise QualificationError(
+            "candidate source commit does not match the attested harness commit"
+        )
+    if (
+        _git_bytes(repository, "cat-file", "-t", source_commit).decode().strip()
+        != "commit"
+    ):
+        raise QualificationError("candidate source lock is not a commit object")
+    if _git_bytes(repository, "rev-parse", "HEAD").decode().strip() != source_commit:
+        raise QualificationError("candidate source lock is not the live HEAD")
+    manifest_member = str(source.get("manifest_path", ""))
+    expected_manifest_path = (
+        artifact_index_path.absolute().parent / manifest_member
+    ).absolute()
+    if source_manifest_path.absolute() != expected_manifest_path:
+        raise QualificationError(
+            "candidate source manifest path does not match its artifact-index member"
+        )
+    manifest = _attest_source_manifest(
+        source_manifest_path,
+        repository=repository,
+        repository_relative_path=manifest_member,
+        source_commit=source_commit,
+        expected_sha256=str(source.get("manifest_sha256", "")),
+    )
+
+    harness = _required_mapping(
+        artifact_index.get("harness"), name="candidate harness binding"
+    )
+    files = _required_list(harness.get("files"), name="candidate harness files")
+    indexed_files: dict[str, str] = {}
+    for raw_entry in files:
+        entry = _required_mapping(raw_entry, name="candidate harness file")
+        path = str(entry.get("path", ""))
+        digest = str(entry.get("sha256", ""))
+        if path in indexed_files:
+            raise QualificationError(f"candidate harness path is duplicated: {path}")
+        indexed_files[path] = digest
+    if not set(CANDIDATE_HARNESS_PATHS).issubset(indexed_files):
+        raise QualificationError("candidate harness omits lifecycle acceptance code")
+    provenance_digests = {
+        "scripts/run_muted_metadata_batch_lifecycle_hardware.sh": (
+            runner_provenance.get("shell_runner_sha256")
+        ),
+        "tests/radio_hardware/candidate_binding.py": runner_provenance.get(
+            "candidate_binding_sha256"
+        ),
+        "tests/radio_hardware/metadata_abi.py": runner_provenance.get(
+            "metadata_abi_sha256"
+        ),
+        "tests/radio_hardware/muted_metadata_batch_lifecycle.py": (
+            runner_provenance.get("python_module_sha256")
+        ),
+    }
+    for relative, digest in indexed_files.items():
+        committed = hashlib.sha256(
+            _git_bytes(repository, "show", f"{source_commit}:{relative}")
+        ).hexdigest()
+        live = _sha256_bounded_owned_regular_file(
+            repository / relative,
+            maximum_bytes=MAXIMUM_HARNESS_FILE_BYTES,
+            name=f"candidate harness file {relative}",
+        )
+        if (
+            digest != committed
+            or digest != live
+            or (
+                relative in provenance_digests
+                and digest != provenance_digests[relative]
+            )
+        ):
+            raise QualificationError(
+                f"candidate harness hash does not bind live committed file: {relative}"
+            )
+
+    artifact = _required_mapping(
+        artifact_index.get("artifact"), name="candidate DFU artifact"
+    )
+    dfu_path = (
+        artifact_index_path.absolute().parent / str(artifact["dfu_path"])
+    ).absolute()
+    if candidate_dfu_path.absolute() != dfu_path:
+        raise QualificationError(
+            "candidate DFU path does not match its artifact-index member"
+        )
+    dfu_bytes = _required_int(
+        artifact.get("dfu_bytes"), name="candidate DFU bytes", minimum=1
+    )
+    fit_bytes = _required_int(
+        artifact.get("fit_bytes"), name="candidate FIT bytes", minimum=1
+    )
+    if dfu_bytes != fit_bytes + 16 or dfu_bytes > MAXIMUM_CANDIDATE_DFU_BYTES:
+        raise QualificationError("candidate DFU/FIT structure is not exact")
+    dfu_payload = _read_exact_owned_regular_file(
+        dfu_path, expected_bytes=dfu_bytes, name="candidate DFU image"
+    )
+    dfu_sha256 = hashlib.sha256(dfu_payload).hexdigest()
+    fit_sha256 = hashlib.sha256(dfu_payload[:fit_bytes]).hexdigest()
+    if dfu_sha256 != artifact.get("dfu_sha256") or fit_sha256 != artifact.get(
+        "fit_sha256"
+    ):
+        raise QualificationError("candidate DFU/FIT SHA-256 changed")
+
+    release = _required_mapping(
+        artifact_index.get("release"), name="candidate release identity"
+    )
+    firmware_version = str(release.get("firmware_version", ""))
+    if (
+        release.get("metadata_abi") != "frame-metadata-v5"
+        or release.get("tandem_agc") != "request-v2"
+    ):
+        raise QualificationError(
+            "candidate metadata/tandem ABI is not the qualified lifecycle contract"
+        )
+    receipt_payload, receipt_raw = _read_candidate_json(
+        deployment_receipt_path.absolute(),
+        maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+        name="candidate RAM deployment receipt",
+    )
+    try:
+        deployment_receipt = validate_deployment_receipt(
+            receipt_raw,
+            artifact_index_sha256=artifact_index_sha256,
+            serial=serial,
+            firmware_version=firmware_version,
+            dfu_sha256=dfu_sha256,
+        )
+    except CandidateBindingError as error:
+        raise QualificationError(
+            f"candidate RAM deployment receipt: {error}"
+        ) from error
+    receipt_sha256 = hashlib.sha256(receipt_payload).hexdigest()
+    return {
+        "attestation": (
+            "exact committed source manifest, candidate index, DFU/FIT bytes, "
+            "harness blobs, and serial-scoped RAM receipt verified before radio context"
+        ),
+        "source_commit": source_commit,
+        "source_manifest": manifest,
+        "build_run_id": artifact_index["build"]["run_id"],
+        "build_run_attempt": artifact_index["build"]["run_attempt"],
+        "artifact_index_path": str(artifact_index_path.absolute()),
+        "artifact_index_bytes": len(artifact_payload),
+        "artifact_index_sha256": artifact_index_sha256,
+        "artifact_index": artifact_index,
+        "evidence_member_count": len(evidence_members),
+        "evidence_members_verified": True,
+        "dfu_path": str(dfu_path),
+        "dfu_bytes": dfu_bytes,
+        "dfu_sha256": dfu_sha256,
+        "fit_bytes": fit_bytes,
+        "fit_sha256": fit_sha256,
+        "deployment_receipt_path": str(deployment_receipt_path.absolute()),
+        "deployment_receipt_bytes": len(receipt_payload),
+        "deployment_receipt_sha256": receipt_sha256,
+        "deployment_receipt": deployment_receipt,
+        "serial": serial,
+        "firmware_version": firmware_version,
+        "firmware_pattern": rf"\A{re.escape(firmware_version)}\Z",
+        "kernel_version": release["kernel_version"],
+        "hardware_model": release["hardware_model"],
+    }
+
+
 def _attest_mapped_libiio() -> dict[str, Any]:
     mapped = _mapped_libiio()
     if len(mapped) != 1:
@@ -1627,8 +1939,16 @@ def _attest_mapped_libiio() -> dict[str, Any]:
     build_text = os.environ.get("PLUTOSDR_FW_LIBIIO_BUILD", "")
     source_text = os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE", "")
     expected_sha = os.environ.get("PLUTOSDR_FW_LIBIIO_SHA256", "")
-    if not all((expected_path_text, build_text, source_text)):
-        raise QualificationError("runner omitted libiio path/build/source attestation")
+    source_commit = os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", "")
+    source_ref = os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE_REF", "")
+    if (
+        not all((expected_path_text, build_text, source_text))
+        or re.fullmatch(r"[0-9a-f]{40}", source_commit) is None
+        or not source_ref.startswith("refs/tags/")
+    ):
+        raise QualificationError(
+            "runner omitted exact libiio path/build/source/ref attestation"
+        )
     expected_path = pathlib.Path(expected_path_text).resolve()
     build = pathlib.Path(build_text).resolve()
     source = pathlib.Path(source_text).resolve()
@@ -1664,8 +1984,8 @@ def _attest_mapped_libiio() -> dict[str, Any]:
             f"libiio build source {home} does not match runner source {source}"
         )
     return {
-        "source_commit": EXACT_LIBIIO_COMMIT,
-        "protected_source_tag": EXACT_LIBIIO_TAG,
+        "source_commit": source_commit,
+        "protected_source_tag": source_ref.removeprefix("refs/tags/"),
         "source_directory": str(source),
         "build_directory": str(build),
         "mapped_shared_objects": [str(mapped_path)],
@@ -1680,12 +2000,14 @@ def _attest_host_libiio(iio_module: Any) -> dict[str, Any]:
 
     record = _attest_mapped_libiio()
     source = pathlib.Path(record["source_directory"])
+    source_commit = str(record["source_commit"])
+    source_tag = str(record["protected_source_tag"])
     if (
-        _git_bytes(source, "rev-parse", "HEAD").decode().strip() != EXACT_LIBIIO_COMMIT
-        or _git_bytes(source, "rev-parse", f"refs/tags/{EXACT_LIBIIO_TAG}^{{commit}}")
+        _git_bytes(source, "rev-parse", "HEAD").decode().strip() != source_commit
+        or _git_bytes(source, "rev-parse", f"refs/tags/{source_tag}^{{commit}}")
         .decode()
         .strip()
-        != EXACT_LIBIIO_COMMIT
+        != source_commit
         or _git_bytes(source, "status", "--porcelain", "--untracked-files=no").strip()
     ):
         raise QualificationError("host libiio source graph is not exact and clean")
@@ -1697,7 +2019,7 @@ def _attest_host_libiio(iio_module: Any) -> dict[str, Any]:
         _git_bytes(
             source,
             "show",
-            f"{EXACT_LIBIIO_COMMIT}:bindings/python/iio.py",
+            f"{source_commit}:bindings/python/iio.py",
         )
     ).hexdigest()
     if (
@@ -1725,12 +2047,26 @@ def _attest_runner_provenance() -> dict[str, str]:
         "PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", ""
     )
     metadata_abi_text = os.environ.get("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", "")
+    candidate_binding_sha = os.environ.get(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_SHA256", ""
+    )
+    candidate_binding_head_sha = os.environ.get(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_HEAD_SHA256", ""
+    )
+    candidate_binding_text = os.environ.get(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_PATH", ""
+    )
     module_path = pathlib.Path(__file__).resolve()
     repository = module_path.parents[2]
     shell_path = pathlib.Path(shell_text).resolve() if shell_text else pathlib.Path()
     metadata_abi_path = (
         pathlib.Path(metadata_abi_text).resolve()
         if metadata_abi_text
+        else pathlib.Path()
+    )
+    candidate_binding_path = (
+        pathlib.Path(candidate_binding_text).resolve()
+        if candidate_binding_text
         else pathlib.Path()
     )
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
@@ -1750,13 +2086,24 @@ def _attest_runner_provenance() -> dict[str, str]:
         raise QualificationError(
             "runner metadata ABI path is absent, non-absolute, or unexpected"
         )
+    if (
+        not candidate_binding_text
+        or not candidate_binding_path.is_absolute()
+        or not candidate_binding_path.is_file()
+        or candidate_binding_path != module_path.parent / "candidate_binding.py"
+    ):
+        raise QualificationError(
+            "runner candidate binding path is absent, non-absolute, or unexpected"
+        )
     calculated_module_sha = _sha256_file(module_path)
     calculated_shell_sha = _sha256_file(shell_path)
     calculated_metadata_abi_sha = _sha256_file(metadata_abi_path)
+    calculated_candidate_binding_sha = _sha256_file(candidate_binding_path)
     expected_paths = {
         module_path: "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
         shell_path: "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
         metadata_abi_path: "tests/radio_hardware/metadata_abi.py",
+        candidate_binding_path: "tests/radio_hardware/candidate_binding.py",
     }
     for observed_path, relative in expected_paths.items():
         if observed_path != repository / relative:
@@ -1770,6 +2117,7 @@ def _attest_runner_provenance() -> dict[str, str]:
             module_path: module_head_sha,
             shell_path: shell_head_sha,
             metadata_abi_path: metadata_abi_head_sha,
+            candidate_binding_path: candidate_binding_head_sha,
         }[observed_path]
         if blob_sha != expected_sha:
             raise QualificationError(f"runner commit blob changed: {relative}")
@@ -1780,6 +2128,8 @@ def _attest_runner_provenance() -> dict[str, str]:
         or calculated_shell_sha != shell_head_sha
         or calculated_metadata_abi_sha != metadata_abi_sha
         or calculated_metadata_abi_sha != metadata_abi_head_sha
+        or calculated_candidate_binding_sha != candidate_binding_sha
+        or calculated_candidate_binding_sha != candidate_binding_head_sha
     ):
         raise QualificationError("runner source SHA-256 does not match its process")
     return {
@@ -1794,6 +2144,9 @@ def _attest_runner_provenance() -> dict[str, str]:
         "metadata_abi_path": str(metadata_abi_path),
         "metadata_abi_sha256": calculated_metadata_abi_sha,
         "metadata_abi_head_blob_sha256": metadata_abi_head_sha,
+        "candidate_binding_path": str(candidate_binding_path),
+        "candidate_binding_sha256": calculated_candidate_binding_sha,
+        "candidate_binding_head_blob_sha256": candidate_binding_head_sha,
     }
 
 
@@ -2905,11 +3258,18 @@ def _attest_identity(
     serial: str,
     uri: str,
     firmware_pattern: str,
+    firmware_version: str,
+    kernel_version: str,
+    hardware_model: str,
 ) -> dict[str, Any]:
-    if serial != DEFAULT_R18_SERIAL:
-        raise QualificationError("lifecycle gate is frozen to the exact R18 serial")
-    if firmware_pattern != EXPECTED_FIRMWARE_PATTERN:
-        raise QualificationError("lifecycle gate requires the exact RC4 pattern")
+    if (
+        not serial
+        or not firmware_version
+        or firmware_pattern != rf"\A{re.escape(firmware_version)}\Z"
+        or not kernel_version
+        or not hardware_model
+    ):
+        raise QualificationError("lifecycle candidate identity is incomplete")
     if not uri.startswith("usb:"):
         raise QualificationError("lifecycle gate requires a local USB context")
     attrs = {str(name): str(value) for name, value in context.attrs.items()}
@@ -2919,19 +3279,16 @@ def _attest_identity(
             f"opened serial {observed_serial!r}, expected {serial!r}"
         )
     firmware = attrs.get("fw_version", "")
-    if (
-        firmware != EXPECTED_FIRMWARE_VERSION
-        or re.fullmatch(firmware_pattern, firmware) is None
-    ):
+    if firmware != firmware_version or re.fullmatch(firmware_pattern, firmware) is None:
         raise QualificationError(
             f"firmware {firmware!r} does not fullmatch {firmware_pattern!r}"
         )
     expected_attrs = {
-        "hw_model": EXPECTED_HARDWARE_MODEL,
-        "hw_serial": DEFAULT_R18_SERIAL,
-        "fw_version": EXPECTED_FIRMWARE_VERSION,
+        "hw_model": hardware_model,
+        "hw_serial": serial,
+        "fw_version": firmware_version,
         "ad9361-phy,model": "ad9361",
-        "local,kernel": EXPECTED_KERNEL_VERSION,
+        "local,kernel": kernel_version,
         "iio,buffer-metadata": "2",
     }
     for name, expected in expected_attrs.items():
@@ -2958,6 +3315,9 @@ def _preflight(
     serial: str,
     uri: str,
     firmware_pattern: str,
+    firmware_version: str,
+    kernel_version: str,
+    hardware_model: str,
     identity: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     started_ns = time.monotonic_ns()
@@ -2969,6 +3329,9 @@ def _preflight(
             serial=serial,
             uri=uri,
             firmware_pattern=firmware_pattern,
+            firmware_version=firmware_version,
+            kernel_version=kernel_version,
+            hardware_model=hardware_model,
         )
     )
     mute = _read_mute(phy, tx)
@@ -3025,17 +3388,21 @@ def _open_lock(serial: str) -> Any:
             0o600,
         )
     except OSError as error:
-        raise QualificationError(f"R18 lock cannot be opened safely: {path}") from error
+        raise QualificationError(
+            f"serial-scoped lock cannot be opened safely: {path}"
+        ) from error
     info = os.fstat(descriptor)
     if not stat.S_ISREG(info.st_mode) or info.st_uid != os.getuid():
         os.close(descriptor)
-        raise QualificationError("R18 lock is not an owned regular file")
+        raise QualificationError("serial-scoped lock is not an owned regular file")
     if stat.S_IMODE(info.st_mode) != 0o600:
         os.fchmod(descriptor, 0o600)
         info = os.fstat(descriptor)
         if stat.S_IMODE(info.st_mode) != 0o600:
             os.close(descriptor)
-            raise QualificationError("R18 lock could not be made private mode 0600")
+            raise QualificationError(
+                "serial-scoped lock could not be made private mode 0600"
+            )
     return os.fdopen(descriptor, "r+", encoding="utf-8")
 
 
@@ -3547,7 +3914,9 @@ def _validate_post_full_drain_barrier(
     _validate_rx_record(record.get("rx_state"), name="post-full RX")
 
 
-def _validate_output_preflight(value: Any) -> pathlib.Path:
+def _validate_output_preflight(
+    value: Any, *, inspect_filesystem: bool = True
+) -> pathlib.Path:
     record = _required_mapping(value, name="output preflight")
     if set(record) != {
         "verified",
@@ -3573,13 +3942,22 @@ def _validate_output_preflight(value: Any) -> pathlib.Path:
         != 0
     ):
         raise QualificationError("durable output was not fresh before context open")
-    report_path = pathlib.Path(str(record.get("absolute_report_path", "")))
-    temporary = pathlib.Path(str(record.get("absolute_temporary_path", "")))
-    artifact_directory = pathlib.Path(
-        str(record.get("absolute_raw_metadata_directory", ""))
-    )
+    report_text = str(record.get("absolute_report_path", ""))
+    temporary_text = str(record.get("absolute_temporary_path", ""))
+    artifact_text = str(record.get("absolute_raw_metadata_directory", ""))
+    report_path = pathlib.Path(report_text)
+    temporary = pathlib.Path(temporary_text)
+    artifact_directory = pathlib.Path(artifact_text)
     if (
         not report_path.is_absolute()
+        or pathlib.PurePosixPath(report_text).as_posix() != report_text
+        or pathlib.PurePosixPath(temporary_text).as_posix() != temporary_text
+        or pathlib.PurePosixPath(artifact_text).as_posix() != artifact_text
+        or any(
+            part in {"", ".", ".."}
+            for path in (report_path, temporary, artifact_directory)
+            for part in path.parts[1:]
+        )
         or report_path.name != REPORT_FILENAME
         or temporary != report_path.with_suffix(report_path.suffix + ".tmp")
         or artifact_directory != report_path.parent / RAW_METADATA_DIRECTORY
@@ -3597,6 +3975,8 @@ def _validate_output_preflight(value: Any) -> pathlib.Path:
         minimum=1,
         maximum=MAXIMUM_UNSIGNED_64,
     )
+    if not inspect_filesystem:
+        return report_path
     try:
         _require_nonsymlink_path(report_path, include_leaf=True)
         _require_nonsymlink_path(temporary, include_leaf=True)
@@ -3743,9 +4123,10 @@ def _validate_metadata_artifacts(
     report_path: pathlib.Path,
     directory_descriptor: int | None = None,
     expected_directory_identity: tuple[int, int] | None = None,
+    archive_payloads: Mapping[str, bytes] | None = None,
 ) -> None:
     artifact_directory = report_path.parent / RAW_METADATA_DIRECTORY
-    if directory_descriptor is None:
+    if directory_descriptor is None and archive_payloads is None:
         _require_nonsymlink_path(artifact_directory, include_leaf=True)
         try:
             opened_descriptor = os.open(
@@ -3839,27 +4220,38 @@ def _validate_metadata_artifacts(
     if len(entries) != RAW_METADATA_FILE_COUNT:
         raise QualificationError("durable metadata artifact inventory is incomplete")
     expected_identities = _expected_metadata_identities()
-    try:
-        directory = os.fstat(directory_descriptor)
-        observed_names = set(os.listdir(directory_descriptor))
-        inventory_valid = (
-            stat.S_ISDIR(directory.st_mode)
-            and directory.st_uid == os.getuid()
-            and stat.S_IMODE(directory.st_mode) == 0o700
-            and (
-                expected_directory_identity is None
-                or (directory.st_dev, directory.st_ino) == expected_directory_identity
-            )
-            and observed_names
-            == {
-                _metadata_relative_path(role, ordinal).name
-                for role, ordinal in expected_identities
-            }
+    expected_archive_paths = {
+        _metadata_relative_path(role, ordinal).as_posix()
+        for role, ordinal in expected_identities
+    }
+    if archive_payloads is not None:
+        inventory_valid = set(archive_payloads) == expected_archive_paths and all(
+            type(path) is str and type(payload) is bytes
+            for path, payload in archive_payloads.items()
         )
-    except (OSError, ValueError) as error:
-        raise QualificationError(
-            "durable metadata directory cannot be inspected"
-        ) from error
+    else:
+        try:
+            directory = os.fstat(directory_descriptor)
+            observed_names = set(os.listdir(directory_descriptor))
+            inventory_valid = (
+                stat.S_ISDIR(directory.st_mode)
+                and directory.st_uid == os.getuid()
+                and stat.S_IMODE(directory.st_mode) == 0o700
+                and (
+                    expected_directory_identity is None
+                    or (directory.st_dev, directory.st_ino)
+                    == expected_directory_identity
+                )
+                and observed_names
+                == {
+                    _metadata_relative_path(role, ordinal).name
+                    for role, ordinal in expected_identities
+                }
+            )
+        except (OSError, ValueError) as error:
+            raise QualificationError(
+                "durable metadata directory cannot be inspected"
+            ) from error
     if not inventory_valid:
         raise QualificationError("durable metadata directory inventory changed")
     full = _required_mapping(report.get("full_drain"), name="full drain")
@@ -3921,14 +4313,21 @@ def _validate_metadata_artifacts(
             raise QualificationError(
                 f"durable metadata {role}/{ordinal} identity changed"
             )
-        path = report_path.parent / pathlib.Path(*relative.parts)
-        payload = _read_exact_owned_regular_file(
-            path,
-            expected_bytes=RAW_METADATA_BYTES,
-            name=f"durable metadata {role}/{ordinal}",
-            required_mode=0o600,
-            parent_descriptor=directory_descriptor,
-        )
+        if archive_payloads is None:
+            path = report_path.parent / pathlib.Path(*relative.parts)
+            payload = _read_exact_owned_regular_file(
+                path,
+                expected_bytes=RAW_METADATA_BYTES,
+                name=f"durable metadata {role}/{ordinal}",
+                required_mode=0o600,
+                parent_descriptor=directory_descriptor,
+            )
+        else:
+            payload = archive_payloads[relative.as_posix()]
+            if len(payload) != RAW_METADATA_BYTES:
+                raise QualificationError(
+                    f"durable metadata {role}/{ordinal} byte count changed"
+                )
         digest = hashlib.sha256(payload).hexdigest()
         if digest != entry.get("sha256"):
             raise QualificationError(
@@ -4116,9 +4515,12 @@ def _validate_errno_record(value: Any, expected: int, *, name: str) -> None:
         raise QualificationError(f"durable {name} does not prove errno {expected}")
 
 
-def validate_durable_pass_report(value: Any) -> None:
-    """Reject any durable artifact that could otherwise claim a false PASS."""
+def _validate_pass_report(
+    value: Any, *, archive_payloads: Mapping[str, bytes] | None
+) -> None:
+    """Apply the common v5 report oracle, with optional archived metadata bytes."""
 
+    archive_only = archive_payloads is not None
     _validate_strict_json_domain(value)
     report = _required_mapping(value, name="report")
     if set(report) != {
@@ -4177,6 +4579,24 @@ def validate_durable_pass_report(value: Any) -> None:
     if completed < started:
         raise QualificationError("durable report completion predates start")
 
+    device_lineage = _required_mapping(
+        report.get("expected_device_firmware_lineage"),
+        name="expected device firmware lineage",
+    )
+    source_manifest = _required_mapping(
+        device_lineage.get("source_manifest"), name="candidate source manifest"
+    )
+    source_values = _required_mapping(
+        source_manifest.get("values"), name="candidate source manifest values"
+    )
+    candidate_libiio_commit = str(source_values.get("libiio_0_25_source", ""))
+    candidate_libiio_ref = str(source_values.get("libiio_0_25_ref", ""))
+    if re.fullmatch(
+        r"[0-9a-f]{40}", candidate_libiio_commit
+    ) is None or not candidate_libiio_ref.startswith("refs/tags/"):
+        raise QualificationError("durable candidate libiio identity is invalid")
+    candidate_libiio_tag = candidate_libiio_ref.removeprefix("refs/tags/")
+
     host = _required_mapping(report.get("host_libiio"), name="host libiio")
     if set(host) != {
         "source_commit",
@@ -4191,8 +4611,8 @@ def validate_durable_pass_report(value: Any) -> None:
     }:
         raise QualificationError("durable host libiio fields changed")
     if (
-        host.get("source_commit") != EXACT_LIBIIO_COMMIT
-        or host.get("protected_source_tag") != EXACT_LIBIIO_TAG
+        host.get("source_commit") != candidate_libiio_commit
+        or host.get("protected_source_tag") != candidate_libiio_tag
     ):
         raise QualificationError("durable host libiio source identity changed")
     mapped = _required_list(
@@ -4216,56 +4636,62 @@ def validate_durable_pass_report(value: Any) -> None:
     pylibiio = pathlib.Path(str(host.get("pylibiio_file", "")))
     if pylibiio != source / "bindings/python/iio.py":
         raise QualificationError("durable pylibiio is outside exact source tree")
-    if (
-        _git_bytes(source, "rev-parse", "HEAD").decode().strip() != EXACT_LIBIIO_COMMIT
-        or _git_bytes(source, "rev-parse", f"refs/tags/{EXACT_LIBIIO_TAG}^{{commit}}")
+    if not archive_only and (
+        _git_bytes(source, "rev-parse", "HEAD").decode().strip()
+        != candidate_libiio_commit
+        or _git_bytes(
+            source, "rev-parse", f"refs/tags/{candidate_libiio_tag}^{{commit}}"
+        )
         .decode()
         .strip()
-        != EXACT_LIBIIO_COMMIT
+        != candidate_libiio_commit
         or _git_bytes(source, "status", "--porcelain", "--untracked-files=no").strip()
     ):
         raise QualificationError("durable libiio source graph changed")
-    cache = build / "CMakeCache.txt"
-    cmake_home = None
-    try:
-        cache_text = _read_bounded_owned_regular_file(
-            cache,
-            maximum_bytes=MAXIMUM_CMAKE_CACHE_BYTES,
-            name="durable libiio CMake cache",
-        ).decode("utf-8")
-    except UnicodeDecodeError as error:
-        raise QualificationError("durable libiio CMake cache is not UTF-8") from error
-    for line in cache_text.splitlines():
-        if line.startswith("CMAKE_HOME_DIRECTORY:INTERNAL="):
-            cmake_home = pathlib.Path(line.split("=", 1)[1]).resolve()
-            break
-    if cmake_home != source:
-        raise QualificationError("durable libiio build source changed")
-    if (
-        _sha256_bounded_owned_regular_file(
-            library,
-            maximum_bytes=MAXIMUM_LIBIIO_BYTES,
-            name="durable mapped libiio",
-        )
-        != calculated_sha
-    ):
-        raise QualificationError("durable mapped libiio bytes changed")
-    pylibiio_blob = hashlib.sha256(
-        _git_bytes(
-            source,
-            "show",
-            f"{EXACT_LIBIIO_COMMIT}:bindings/python/iio.py",
-        )
-    ).hexdigest()
-    if (
-        _sha256_bounded_owned_regular_file(
-            pylibiio,
-            maximum_bytes=MAXIMUM_PYLIBIIO_BYTES,
-            name="durable pylibiio",
-        )
-        != pylibiio_blob
-    ):
-        raise QualificationError("durable pylibiio source changed")
+    if not archive_only:
+        cache = build / "CMakeCache.txt"
+        cmake_home = None
+        try:
+            cache_text = _read_bounded_owned_regular_file(
+                cache,
+                maximum_bytes=MAXIMUM_CMAKE_CACHE_BYTES,
+                name="durable libiio CMake cache",
+            ).decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise QualificationError(
+                "durable libiio CMake cache is not UTF-8"
+            ) from error
+        for line in cache_text.splitlines():
+            if line.startswith("CMAKE_HOME_DIRECTORY:INTERNAL="):
+                cmake_home = pathlib.Path(line.split("=", 1)[1]).resolve()
+                break
+        if cmake_home != source:
+            raise QualificationError("durable libiio build source changed")
+        if (
+            _sha256_bounded_owned_regular_file(
+                library,
+                maximum_bytes=MAXIMUM_LIBIIO_BYTES,
+                name="durable mapped libiio",
+            )
+            != calculated_sha
+        ):
+            raise QualificationError("durable mapped libiio bytes changed")
+        pylibiio_blob = hashlib.sha256(
+            _git_bytes(
+                source,
+                "show",
+                f"{candidate_libiio_commit}:bindings/python/iio.py",
+            )
+        ).hexdigest()
+        if (
+            _sha256_bounded_owned_regular_file(
+                pylibiio,
+                maximum_bytes=MAXIMUM_PYLIBIIO_BYTES,
+                name="durable pylibiio",
+            )
+            != pylibiio_blob
+        ):
+            raise QualificationError("durable pylibiio source changed")
 
     provenance = _required_mapping(
         report.get("runner_provenance"), name="runner provenance"
@@ -4282,6 +4708,9 @@ def validate_durable_pass_report(value: Any) -> None:
         "metadata_abi_path",
         "metadata_abi_sha256",
         "metadata_abi_head_blob_sha256",
+        "candidate_binding_path",
+        "candidate_binding_sha256",
+        "candidate_binding_head_blob_sha256",
     }:
         raise QualificationError("durable runner provenance fields changed")
     if (
@@ -4296,6 +4725,7 @@ def validate_durable_pass_report(value: Any) -> None:
         ("python_module_sha256", "python_module_head_blob_sha256"),
         ("shell_runner_sha256", "shell_runner_head_blob_sha256"),
         ("metadata_abi_sha256", "metadata_abi_head_blob_sha256"),
+        ("candidate_binding_sha256", "candidate_binding_head_blob_sha256"),
     ):
         observed = str(provenance.get(observed_name, ""))
         head = str(provenance.get(head_name, ""))
@@ -4310,61 +4740,87 @@ def validate_durable_pass_report(value: Any) -> None:
     module_path = pathlib.Path(str(provenance.get("python_module_path", "")))
     shell_path = pathlib.Path(str(provenance.get("shell_runner_path", "")))
     metadata_abi_path = pathlib.Path(str(provenance.get("metadata_abi_path", "")))
+    candidate_binding_path = pathlib.Path(
+        str(provenance.get("candidate_binding_path", ""))
+    )
     repository = pathlib.Path(str(provenance.get("host_runner_repository", "")))
     expected_repository = pathlib.Path(__file__).resolve().parents[2]
     if (
         not repository.is_absolute()
-        or repository != expected_repository
+        or (not archive_only and repository != expected_repository)
         or not module_path.is_absolute()
         or not shell_path.is_absolute()
         or not metadata_abi_path.is_absolute()
+        or not candidate_binding_path.is_absolute()
         or module_path
         != repository / "tests/radio_hardware/muted_metadata_batch_lifecycle.py"
         or shell_path
         != repository / "scripts/run_muted_metadata_batch_lifecycle_hardware.sh"
         or metadata_abi_path != module_path.parent / "metadata_abi.py"
+        or candidate_binding_path != module_path.parent / "candidate_binding.py"
     ):
         raise QualificationError("durable runner source paths are not absolute")
     commit = str(provenance.get("host_runner_repository_commit", ""))
-    if _git_bytes(repository, "cat-file", "-t", commit).decode().strip() != "commit":
-        raise QualificationError("durable runner provenance is not a commit object")
-    if _git_bytes(repository, "rev-parse", "HEAD").decode().strip() != commit:
-        raise QualificationError("durable runner commit is not live HEAD")
-    if _git_bytes(repository, "status", "--porcelain", "--untracked-files=no").strip():
-        raise QualificationError("durable runner repository has tracked changes")
-    for relative, digest_name, observed_name in (
-        (
-            "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
-            "python_module_head_blob_sha256",
-            "python_module_sha256",
-        ),
-        (
-            "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
-            "shell_runner_head_blob_sha256",
-            "shell_runner_sha256",
-        ),
-        (
-            "tests/radio_hardware/metadata_abi.py",
-            "metadata_abi_head_blob_sha256",
-            "metadata_abi_sha256",
-        ),
-    ):
-        observed = hashlib.sha256(
-            _git_bytes(repository, "show", f"{commit}:{relative}")
-        ).hexdigest()
-        if observed != provenance.get(digest_name):
-            raise QualificationError(f"durable runner commit blob changed: {relative}")
-        if _sha256_file(repository / relative) != provenance.get(observed_name):
-            raise QualificationError(f"durable runner live file changed: {relative}")
+    if not archive_only:
+        if (
+            _git_bytes(repository, "cat-file", "-t", commit).decode().strip()
+            != "commit"
+        ):
+            raise QualificationError("durable runner provenance is not a commit object")
+        if _git_bytes(repository, "rev-parse", "HEAD").decode().strip() != commit:
+            raise QualificationError("durable runner commit is not live HEAD")
+        if _git_bytes(
+            repository, "status", "--porcelain", "--untracked-files=no"
+        ).strip():
+            raise QualificationError("durable runner repository has tracked changes")
+        for relative, digest_name, observed_name in (
+            (
+                "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
+                "python_module_head_blob_sha256",
+                "python_module_sha256",
+            ),
+            (
+                "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
+                "shell_runner_head_blob_sha256",
+                "shell_runner_sha256",
+            ),
+            (
+                "tests/radio_hardware/metadata_abi.py",
+                "metadata_abi_head_blob_sha256",
+                "metadata_abi_sha256",
+            ),
+            (
+                "tests/radio_hardware/candidate_binding.py",
+                "candidate_binding_head_blob_sha256",
+                "candidate_binding_sha256",
+            ),
+        ):
+            observed = hashlib.sha256(
+                _git_bytes(repository, "show", f"{commit}:{relative}")
+            ).hexdigest()
+            if observed != provenance.get(digest_name):
+                raise QualificationError(
+                    f"durable runner commit blob changed: {relative}"
+                )
+            if _sha256_file(repository / relative) != provenance.get(observed_name):
+                raise QualificationError(
+                    f"durable runner live file changed: {relative}"
+                )
 
-    device_lineage = _required_mapping(
-        report.get("expected_device_firmware_lineage"),
-        name="expected device firmware lineage",
-    )
-    receipt_path = pathlib.Path(str(device_lineage.get("ram_boot_receipt_path", "")))
-    expected_device_lineage = _attest_device_firmware_lineage(
-        receipt_path, repository=repository
-    )
+        expected_device_lineage = _attest_candidate_binding(
+            source_manifest_path=pathlib.Path(str(source_manifest.get("path", ""))),
+            artifact_index_path=pathlib.Path(
+                str(device_lineage.get("artifact_index_path", ""))
+            ),
+            deployment_receipt_path=pathlib.Path(
+                str(device_lineage.get("deployment_receipt_path", ""))
+            ),
+            candidate_dfu_path=pathlib.Path(str(device_lineage.get("dfu_path", ""))),
+            serial=str(device_lineage.get("serial", "")),
+            runner_provenance=provenance,
+        )
+    else:
+        expected_device_lineage = dict(device_lineage)
     if not _json_identical(dict(device_lineage), expected_device_lineage):
         raise QualificationError("durable device firmware lineage changed")
     device_firmware = _required_mapping(
@@ -4379,14 +4835,22 @@ def validate_durable_pass_report(value: Any) -> None:
             "durable device firmware provenance does not bind live identity"
         )
 
-    report_path = _validate_output_preflight(report.get("output_preflight"))
+    report_path = _validate_output_preflight(
+        report.get("output_preflight"), inspect_filesystem=not archive_only
+    )
 
     configuration = _required_mapping(report.get("configuration"), name="configuration")
+    serial = str(expected_device_lineage["serial"])
+    firmware_pattern = str(expected_device_lineage["firmware_pattern"])
+    firmware_version = str(expected_device_lineage["firmware_version"])
+    kernel_version = str(expected_device_lineage["kernel_version"])
+    hardware_model = str(expected_device_lineage["hardware_model"])
     exact_configuration = {
-        "serial": DEFAULT_R18_SERIAL,
-        "firmware_pattern": EXPECTED_FIRMWARE_PATTERN,
-        "firmware_version": EXPECTED_FIRMWARE_VERSION,
-        "kernel_version": EXPECTED_KERNEL_VERSION,
+        "serial": serial,
+        "firmware_pattern": firmware_pattern,
+        "firmware_version": firmware_version,
+        "kernel_version": kernel_version,
+        "hardware_model": hardware_model,
         "tx_policy": "fully muted; no DDS/DMA enable and no TX gain increase",
         "normalization_policy": (
             "under verified mute with zero buffers: common LO, all PHY rates and "
@@ -4425,8 +4889,6 @@ def validate_durable_pass_report(value: Any) -> None:
             raise QualificationError(f"durable configuration {field} changed")
     if set(configuration) != set(exact_configuration):
         raise QualificationError("durable configuration fields changed")
-    serial = DEFAULT_R18_SERIAL
-    firmware_pattern = EXPECTED_FIRMWARE_PATTERN
 
     preflight = _required_mapping(report.get("preflight"), name="preflight")
     if set(preflight) != {
@@ -4449,7 +4911,7 @@ def validate_durable_pass_report(value: Any) -> None:
         preflight.get("verdict") != "GO"
         or preflight.get("serial") != serial
         or not str(preflight.get("uri", "")).startswith("usb:")
-        or preflight.get("firmware_version") != EXPECTED_FIRMWARE_VERSION
+        or preflight.get("firmware_version") != firmware_version
         or re.fullmatch(firmware_pattern, str(preflight.get("firmware_version", "")))
         is None
         or _required_int(
@@ -4475,8 +4937,8 @@ def validate_durable_pass_report(value: Any) -> None:
         or context_attrs.get("hw_serial") != serial
         or context_attrs.get("fw_version") != preflight.get("firmware_version")
         or context_attrs.get("iio,buffer-metadata") != "2"
-        or context_attrs.get("local,kernel") != EXPECTED_KERNEL_VERSION
-        or context_attrs.get("hw_model") != EXPECTED_HARDWARE_MODEL
+        or context_attrs.get("local,kernel") != kernel_version
+        or context_attrs.get("hw_model") != hardware_model
         or context_attrs.get("ad9361-phy,model") != "ad9361"
         or context_attrs.get("uri", preflight.get("uri")) != preflight.get("uri")
     ):
@@ -4906,7 +5368,27 @@ def validate_durable_pass_report(value: Any) -> None:
             minimum=previous_cleanup_ns,
             maximum=MAXIMUM_SIGNED_64,
         )
-    _validate_metadata_artifacts(report, report_path=report_path)
+    _validate_metadata_artifacts(
+        report,
+        report_path=report_path,
+        archive_payloads=archive_payloads,
+    )
+
+
+def validate_durable_pass_report(value: Any) -> None:
+    """Validate a live durable PASS, including its original filesystem state."""
+
+    _validate_pass_report(value, archive_payloads=None)
+
+
+def validate_archived_pass_report(
+    value: Any, *, raw_metadata: Mapping[str, bytes]
+) -> None:
+    """Validate v5 producer semantics using only report and archived metadata bytes."""
+
+    if not isinstance(raw_metadata, Mapping):
+        raise QualificationError("archived raw metadata is not a mapping")
+    _validate_pass_report(value, archive_payloads=raw_metadata)
 
 
 def _reread_exact_report(
@@ -5315,33 +5797,71 @@ def run_hardware(
     iio_module: Any,
     *,
     serial: str,
-    firmware_pattern: str,
     output_path: pathlib.Path,
-    ram_boot_receipt_path: pathlib.Path,
+    source_manifest_path: pathlib.Path,
+    artifact_index_path: pathlib.Path,
+    deployment_receipt_path: pathlib.Path,
+    candidate_dfu_path: pathlib.Path,
+    firmware_pattern: str | None = None,
 ) -> dict[str, Any]:
-    output_path = output_path.absolute()
+    candidate_paths = {
+        "output": output_path,
+        "source manifest": source_manifest_path,
+        "artifact index": artifact_index_path,
+        "deployment receipt": deployment_receipt_path,
+        "candidate DFU": candidate_dfu_path,
+    }
+    for name, path in candidate_paths.items():
+        if not path.is_absolute() or ".." in path.parts:
+            raise QualificationError(f"{name} path must be absolute and normalized")
     if output_path.name != REPORT_FILENAME:
         raise QualificationError(
             f"v5 output filename must be exact {REPORT_FILENAME!r}"
         )
     output_preflight = _prepare_fresh_output_path(output_path)
-    if serial != DEFAULT_R18_SERIAL or firmware_pattern != EXPECTED_FIRMWARE_PATTERN:
-        raise QualificationError("lifecycle runner is frozen to exact R18/RC4")
-    expected_commit = os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", "")
-    if expected_commit != EXACT_LIBIIO_COMMIT:
+    runner_provenance = _attest_runner_provenance()
+    expected_device_lineage = _attest_candidate_binding(
+        source_manifest_path=source_manifest_path.absolute(),
+        artifact_index_path=artifact_index_path.absolute(),
+        deployment_receipt_path=deployment_receipt_path.absolute(),
+        candidate_dfu_path=candidate_dfu_path.absolute(),
+        serial=serial,
+        runner_provenance=runner_provenance,
+        semantic_verify=True,
+    )
+    expected_pattern = str(expected_device_lineage["firmware_pattern"])
+    if firmware_pattern is not None and firmware_pattern != expected_pattern:
         raise QualificationError(
-            f"host libiio attestation {expected_commit!r} is not exact "
-            f"{EXACT_LIBIIO_COMMIT}"
+            "explicit firmware pattern does not match the candidate artifact index"
+        )
+    firmware_pattern = expected_pattern
+    source_values = _required_mapping(
+        _required_mapping(
+            expected_device_lineage.get("source_manifest"),
+            name="candidate source manifest",
+        ).get("values"),
+        name="candidate source manifest values",
+    )
+    expected_libiio_commit = str(source_values.get("libiio_0_25_source", ""))
+    expected_libiio_ref = str(source_values.get("libiio_0_25_ref", ""))
+    if (
+        os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", "") != expected_libiio_commit
+        or os.environ.get("PLUTOSDR_FW_LIBIIO_SOURCE_REF", "") != expected_libiio_ref
+    ):
+        raise QualificationError(
+            "host libiio attestation does not match the candidate source manifest"
         )
     runner_library_sha = os.environ.get("PLUTOSDR_FW_LIBIIO_SHA256", "")
     if re.fullmatch(r"[0-9a-f]{64}", runner_library_sha) is None:
         raise QualificationError("runner did not attest the mapped libiio SHA-256")
     host_libiio = _attest_host_libiio(iio_module)
-    runner_provenance = _attest_runner_provenance()
-    expected_device_lineage = _attest_device_firmware_lineage(
-        ram_boot_receipt_path,
-        repository=pathlib.Path(runner_provenance["host_runner_repository"]),
-    )
+    if host_libiio.get("source_commit") != expected_libiio_commit or host_libiio.get(
+        "protected_source_tag"
+    ) != expected_libiio_ref.removeprefix("refs/tags/"):
+        raise QualificationError("mapped host libiio does not match candidate source")
+    firmware_version = str(expected_device_lineage["firmware_version"])
+    kernel_version = str(expected_device_lineage["kernel_version"])
+    hardware_model = str(expected_device_lineage["hardware_model"])
     report: dict[str, Any] = {
         "schema": SCHEMA,
         "verdict": "running",
@@ -5356,8 +5876,9 @@ def run_hardware(
         "configuration": {
             "serial": serial,
             "firmware_pattern": firmware_pattern,
-            "firmware_version": EXPECTED_FIRMWARE_VERSION,
-            "kernel_version": EXPECTED_KERNEL_VERSION,
+            "firmware_version": firmware_version,
+            "kernel_version": kernel_version,
+            "hardware_model": hardware_model,
             "tx_policy": "fully muted; no DDS/DMA enable and no TX gain increase",
             "normalization_policy": (
                 "under verified mute with zero buffers: common LO, all PHY rates "
@@ -5413,11 +5934,13 @@ def run_hardware(
         except BlockingIOError as error:
             lock.seek(0)
             raise QualificationError(
-                f"R18 process lock is held: {lock.read().strip()}"
+                f"serial-scoped process lock is held: {lock.read().strip()}"
             ) from error
         locked_output_preflight = _prepare_fresh_output_path(output_path)
         if not _json_identical(locked_output_preflight, output_preflight):
-            raise QualificationError("fresh output identity changed after R18 lock")
+            raise QualificationError(
+                "fresh output identity changed after serial-scoped lock"
+            )
         output_parent_descriptor, output_parent_identity = _open_owned_output_parent(
             output_path
         )
@@ -5452,6 +5975,9 @@ def run_hardware(
             serial=serial,
             uri=uri,
             firmware_pattern=firmware_pattern,
+            firmware_version=firmware_version,
+            kernel_version=kernel_version,
+            hardware_model=hardware_model,
         )
         identity_verified = True
         report["preflight"] = _preflight(
@@ -5462,6 +5988,9 @@ def run_hardware(
             serial=serial,
             uri=uri,
             firmware_pattern=firmware_pattern,
+            firmware_version=firmware_version,
+            kernel_version=kernel_version,
+            hardware_model=hardware_model,
             identity=identity,
         )
         report["device_firmware_provenance"] = _observed_device_firmware_provenance(
@@ -5552,10 +6081,12 @@ def run_hardware(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hardware", action="store_true")
-    parser.add_argument("--serial", default=DEFAULT_R18_SERIAL)
-    parser.add_argument("--firmware-pattern", required=True)
+    parser.add_argument("--serial", required=True)
     parser.add_argument("--output", type=pathlib.Path, required=True)
-    parser.add_argument("--ram-boot-receipt", type=pathlib.Path, required=True)
+    parser.add_argument("--source-manifest", type=pathlib.Path, required=True)
+    parser.add_argument("--artifact-index", type=pathlib.Path, required=True)
+    parser.add_argument("--deployment-receipt", type=pathlib.Path, required=True)
+    parser.add_argument("--candidate-dfu", type=pathlib.Path, required=True)
     return parser
 
 
@@ -5569,9 +6100,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         report = run_hardware(
             iio,
             serial=args.serial,
-            firmware_pattern=args.firmware_pattern,
-            output_path=args.output.absolute(),
-            ram_boot_receipt_path=args.ram_boot_receipt.absolute(),
+            output_path=args.output,
+            source_manifest_path=args.source_manifest,
+            artifact_index_path=args.artifact_index,
+            deployment_receipt_path=args.deployment_receipt,
+            candidate_dfu_path=args.candidate_dfu,
         )
     except BaseException as error:
         print(f"FAIL: {type(error).__name__}: {error}", file=sys.stderr)

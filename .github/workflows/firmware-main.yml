@@ -11,12 +11,13 @@ on:
       release_version:
         description: >-
           Exact device-fw string to stamp into /opt/VERSIONS, e.g.
-          v0.38-plutoplus-spf-gain-series-v4. Leave empty for an ordinary build,
-          which derives the string from `git describe`. Set it for anything
-          intended for release: the release tag does not exist while the build
-          runs, so a derived string names the PREVIOUS release. RC17 shipped
-          stamped rc16-7 for exactly this reason. The build fails if the
-          packaged string does not match what is entered here.
+          v0.38-plutoplus-spf-gain-series-v4. Protected RC5 and final-main
+          dispatches require their exact declared identities. Ordinary main
+          push builds derive the string from `git describe`; the release tag
+          does not exist while a release build runs, so that derived value must
+          never authorize publication. RC17 shipped stamped rc16-7 for exactly
+          this reason. The build fails if the packaged string does not match
+          what is entered here.
         required: false
         type: string
         default: ''
@@ -38,6 +39,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc2' ||
@@ -52,6 +54,8 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'tandem-agc-v8-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' &&
+          'tandem-agc-v8-rc5-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' &&
           'tandem-agc-v8-rc4-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' &&
@@ -66,6 +70,8 @@ jobs:
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-tandem-agc-v8' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' &&
+          'plutoplus-spf-tandem-agc-v8-rc5' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' &&
           'plutoplus-spf-tandem-agc-v8-rc4' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' &&
@@ -78,7 +84,9 @@ jobs:
           'plutoplus-spf-tandem-agc-v2' ||
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
       SPF_RELEASE_STATE: >-
-        ${{ github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
+        ${{ github.ref == 'refs/heads/main' &&
+          github.event_name == 'workflow_dispatch' && 'final-release' ||
+          github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
     outputs:
       artifact-name: ${{ steps.names.outputs.artifact_name }}
       bundle-name: ${{ steps.build.outputs.bundle_name }}
@@ -102,6 +110,24 @@ jobs:
         id: names
         run: |
           echo "artifact_name=plutoplus-main-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Require the exact protected candidate identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc5'
+
+      - name: Require the exact final release identity
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/main'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8'
 
       - name: Build, validate, and package
         id: build

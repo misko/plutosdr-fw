@@ -298,9 +298,10 @@ running radio validates before writing only the `mtd3` firmware partition.
 
 ### Obtain `pluto.frm`
 
-A local full build produces `build/pluto.frm`. Releases from this repository
-currently publish `pluto.dfu`; both formats wrap the same FIT image. Convert a
-downloaded DFU without rebuilding:
+A local full build produces `build/pluto.frm`. Tandem AGC v8 releases publish
+the attested `pluto.frm` directly; use that release asset for this method.
+Older DFU-only release assets can be converted without rebuilding because
+`pluto.dfu` and `pluto.frm` wrap the same FIT image:
 
 ```bash
 test -n "${dfu_image:-}" && test -f "$dfu_image"
@@ -356,9 +357,13 @@ This loads `pluto.dfu` through U-Boot's SPI-flash DFU mode. It is equivalent in
 scope to the mass-storage method when—and only when—the selected alternate is
 `firmware.dfu`.
 
-First request SPI-flash mode from the running radio:
+First record the current boot identity, then request SPI-flash mode from the
+running radio:
 
 ```bash
+pre_boot_id="$(ssh root@192.168.2.1 \
+  'cat /proc/sys/kernel/random/boot_id')"
+test -n "$pre_boot_id"
 ssh root@192.168.2.1 '/usr/sbin/device_reboot sf'
 ```
 
@@ -381,10 +386,21 @@ sudo dfu-util \
   -e
 ```
 
-Use DFU detach (`-e`) to jump into the downloaded RAM image. Do not use `-R`
-for this step: on the tested Pluto+ bootloader, USB reset restarted the
-processor from the persistently installed QSPI image and discarded the RAM
-download. Always verify `/opt/VERSIONS` and the boot ID after enumeration.
+Here DFU detach (`-e`) exits DFU mode after `firmware.dfu` has written the
+persistent firmware partition; it is not a RAM boot. Do not substitute `-R`
+for this step. After the radio re-enumerates, require a new boot identity and
+the exact installed release identity:
+
+```bash
+expected_firmware_version='REPLACE_WITH_EXACT_RELEASE_VERSION'
+post_boot_id="$(ssh root@192.168.2.1 \
+  'cat /proc/sys/kernel/random/boot_id')"
+installed_firmware_version="$(ssh root@192.168.2.1 \
+  "awk '\$1 == \"device-fw\" {print \$2; exit}' /opt/VERSIONS")"
+test -n "$post_boot_id"
+test "$post_boot_id" != "$pre_boot_id"
+test "$installed_firmware_version" = "$expected_firmware_version"
+```
 
 If more than one radio is present, do not run an ambiguous command. Disconnect
 the others or select the intended USB path using `dfu-util -p` after checking
@@ -397,18 +413,73 @@ Never select `boot.dfu` or `uboot-env.dfu` during a routine Pluto+ update.
 RAM boot runs a candidate without changing QSPI. A power cycle returns the
 radio to its persistently installed firmware.
 
+Do not use a raw `dfu-util -R` recipe for this transition. The RC4 hardware
+record found that USB reset returned a tested Pluto+ to its persistent image,
+while download followed by DFU detach entered the RAM image. Because the old
+guide and helper disagreed with that result, raw RAM boot is quarantined until
+the transition has a reviewed, exact-serial proof.
+
+Use the guarded deployer. Its default mode is an offline plan: it validates the
+exact candidate index, source manifest, DFU/FIT bytes, harness and evidence
+inventories, requested serial, receipt namespace, and optional captured USB
+inventory without opening USB or running SSH/DFU.
+`candidate_archive` below is the directory containing the candidate index; its
+serial-named receipt directory must already exist and the receipt file itself
+must be absent.
+
 ```bash
-ssh root@192.168.2.1 '/usr/sbin/device_reboot ram'
-dfu-util -l -d 0456:b673,0456:b674
-sudo dfu-util -R \
-  -d 0456:b673,0456:b674 \
-  -a firmware.dfu \
-  -D "$dfu_image"
+scripts/deploy_tandem_agc_ram_hardware.sh \
+  --radio-serial "$serial" \
+  --artifact "$absolute_dfu" \
+  --artifact-sha256 "$dfu_sha256" \
+  --artifact-index "$absolute_candidate_index" \
+  --artifact-index-sha256 "$candidate_index_sha256" \
+  --expected-current-firmware "$current_device_fw" \
+  --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
+  --known-hosts "$absolute_known_hosts" \
+  --known-hosts-sha256 "$known_hosts_sha256"
 ```
 
-The repository also provides `download_and_test.sh` and the `dfu-ram` Make
-target for a locally built `build/pluto.dfu`. They perform this same volatile
-sequence.
+If the `-R` versus `-e` behavior still needs to be reproduced for a radio, add
+`--sequence-experiment-plan`. That output is deliberately non-executable and
+contains the isolated-radio preconditions and required observations, but no
+DFU command.
+
+Actual execution additionally requires a reviewed mode-`0600` transition proof
+and its hash, an owned mode-`0600` known-hosts file, an exact serial-bound
+confirmation, and `--execute`:
+
+```bash
+scripts/deploy_tandem_agc_ram_hardware.sh \
+  --radio-serial "$serial" \
+  --artifact "$absolute_dfu" \
+  --artifact-sha256 "$dfu_sha256" \
+  --artifact-index "$absolute_candidate_index" \
+  --artifact-index-sha256 "$candidate_index_sha256" \
+  --expected-current-firmware "$current_device_fw" \
+  --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
+  --known-hosts "$absolute_known_hosts" \
+  --known-hosts-sha256 "$known_hosts_sha256" \
+  --transition-proof "$absolute_transition_proof" \
+  --transition-proof-sha256 "$transition_proof_sha256" \
+  --operator-confirmation "RAM BOOT $serial" \
+  --execute
+```
+
+The executor permits only `firmware.dfu` download on the serial's unique USB
+topology followed by DFU detach. It rejects USB reset, SPI-flash/QSPI, boot and
+environment alternates, full ZIP/FRM files, and raw MTD targets. It publishes a
+passing receipt only after the same serial returns with a new boot ID, the
+candidate firmware identity, and verified TX/DDS/DAC/tandem safe state.
+Before and after the RAM transition it also reads SHA-256 over the exact
+`qspi-linux` `/dev/mtdblock3` partition. The receipt's `persistent_flash`
+record must identify the same partition/size and equal digests; any change
+blocks receipt publication.
+
+`download_and_test.sh` is now quarantined and points to this guarded entry
+point. The legacy `make dfu-ram` target is not an authorized candidate or
+release procedure because it cannot carry the required serial, artifact-index,
+proof, and receipt bindings.
 
 An important trap: while a RAM image is active, `/opt/VERSIONS` describes that
 RAM image—not the image stored in QSPI. Reboot or power-cycle back to QSPI

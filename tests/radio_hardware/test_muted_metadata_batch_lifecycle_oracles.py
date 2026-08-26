@@ -4,6 +4,7 @@ import fcntl
 import hashlib
 import json
 import pathlib
+import re
 import struct
 import subprocess
 import zlib
@@ -13,6 +14,8 @@ from types import SimpleNamespace
 import pytest
 
 from . import muted_metadata_batch_lifecycle as lifecycle
+from .candidate_binding import REQUIRED_EVIDENCE_ROLES
+from .lifecycle_test_support import build_lifecycle_v5_archive
 from .metadata_abi import (
     FEATURE_HARDWARE_SAMPLE_COUNTER,
     FLAG_SAMPLE_SEQUENCE_VALID,
@@ -29,13 +32,8 @@ from .muted_metadata_batch_lifecycle import (
     BATCH_FRAMES,
     CENTER_FREQUENCY_HZ,
     EXACT_HOLD_METADATA_FLAGS,
-    EXACT_LIBIIO_COMMIT,
     EXACT_METADATA_FEATURES,
     EXPECTED_BATCH_CACHE_BYTES,
-    EXPECTED_FIRMWARE_PATTERN,
-    EXPECTED_FIRMWARE_VERSION,
-    EXPECTED_HARDWARE_MODEL,
-    EXPECTED_KERNEL_VERSION,
     FRAME_SAMPLES,
     HOLD_GAIN_DB,
     RAW_METADATA_BYTES,
@@ -50,16 +48,35 @@ from .muted_metadata_batch_lifecycle import (
     _configure_dual_complex_rx_scan,
     _frame_evidence,
     _reread_exact_report,
+    validate_archived_pass_report,
     validate_durable_pass_report,
     validate_full_drain_frames,
 )
 
-_REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE = lifecycle._attest_device_firmware_lineage
+EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
+EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
+TEST_SERIAL = "1040007c4a94000211000b009186843ef2"
+EXPECTED_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc4"
+EXPECTED_FIRMWARE_PATTERN = rf"\A{re.escape(EXPECTED_FIRMWARE_VERSION)}\Z"
+EXPECTED_KERNEL_VERSION = "5.15.0-g77a1f2352162"
+EXPECTED_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
+_REAL_ATTEST_CANDIDATE_BINDING = lifecycle._attest_candidate_binding
 
 
 @pytest.fixture(autouse=True)
 def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
     """Model committed runner and protected libiio provenance without host paths."""
+
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_REF", f"refs/tags/{EXACT_LIBIIO_TAG}")
+    monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
+
+    def semantic(index_path: pathlib.Path, *, expected_stage: str):
+        value = json.loads(index_path.read_text())
+        normalized = lifecycle.validate_artifact_index(value)
+        assert normalized["stage"] == expected_stage
+        return normalized
+
+    monkeypatch.setattr(lifecycle, "verify_artifact_index_semantics", semantic)
 
     repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
     original = lifecycle._git_bytes
@@ -67,6 +84,7 @@ def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
         "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
         "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
         "tests/radio_hardware/metadata_abi.py",
+        "tests/radio_hardware/candidate_binding.py",
     }
 
     def fake_git(observed_repository, *arguments):
@@ -86,7 +104,7 @@ def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
                 ("rev-parse", "HEAD"),
                 (
                     "rev-parse",
-                    f"refs/tags/{lifecycle.EXACT_LIBIIO_TAG}^{{commit}}",
+                    f"refs/tags/{EXACT_LIBIIO_TAG}^{{commit}}",
                 ),
             }:
                 return f"{EXACT_LIBIIO_COMMIT}\n".encode()
@@ -101,38 +119,99 @@ def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
 
     monkeypatch.setattr(lifecycle, "_git_bytes", fake_git)
 
-    def fake_device_lineage(receipt_path, *, repository=None):
-        del repository
-        receipt_path = pathlib.Path(receipt_path).absolute()
-        image_path = tmp_path / "attested-rc4.dfu"
-        receipt = lifecycle._expected_ram_boot_receipt(
-            receipt_path=receipt_path, image_path=image_path
-        )
+    def fake_candidate_binding(
+        *,
+        source_manifest_path,
+        artifact_index_path,
+        deployment_receipt_path,
+        candidate_dfu_path,
+        serial,
+        runner_provenance,
+        semantic_verify=False,
+    ):
+        del semantic_verify
+        source_manifest_path = pathlib.Path(source_manifest_path).absolute()
+        artifact_index_path = pathlib.Path(artifact_index_path).absolute()
+        deployment_receipt_path = pathlib.Path(deployment_receipt_path).absolute()
+        candidate_dfu_path = pathlib.Path(candidate_dfu_path).absolute()
         return {
             "attestation": (
-                "exact private RAM receipt, DFU/FIT bytes, and protected firmware "
-                "source ancestry verified before radio context"
+                "exact committed source manifest, candidate index, DFU/FIT bytes, "
+                "harness blobs, and serial-scoped RAM receipt verified before radio "
+                "context"
             ),
-            "source_tag": lifecycle.DEVICE_FIRMWARE_SOURCE_TAG,
-            "source_commit": lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT,
-            "build_run_binding": (
-                "exact prior release-candidate audit declaration; the RAM receipt "
-                "does not encode the GitHub Actions run identity"
+            "source_commit": str(
+                runner_provenance.get("host_runner_repository_commit", "a" * 40)
             ),
-            "build_run_id": lifecycle.DEVICE_FIRMWARE_BUILD_RUN_ID,
-            "build_run_attempt": lifecycle.DEVICE_FIRMWARE_BUILD_RUN_ATTEMPT,
-            "dfu_sha256": lifecycle.DEVICE_FIRMWARE_DFU_SHA256,
-            "dfu_bytes": lifecycle.DEVICE_FIRMWARE_DFU_BYTES,
-            "fit_sha256": lifecycle.DEVICE_FIRMWARE_FIT_SHA256,
-            "fit_bytes": lifecycle.DEVICE_FIRMWARE_FIT_BYTES,
-            "ram_boot_receipt_path": str(receipt_path),
-            "ram_boot_receipt_bytes": lifecycle.DEVICE_RAM_BOOT_RECEIPT_BYTES,
-            "ram_boot_receipt_sha256": lifecycle.DEVICE_RAM_BOOT_RECEIPT_SHA256,
-            "ram_boot_receipt": receipt,
+            "source_manifest": {
+                "path": str(source_manifest_path),
+                "relative_path": "manifests/tandem-agc-test-source.yaml",
+                "committed_relative_path": ("manifests/tandem-agc-test-source.yaml"),
+                "bytes": 1,
+                "sha256": "1" * 64,
+                "values": {
+                    "libiio_0_25_source": EXACT_LIBIIO_COMMIT,
+                    "libiio_0_25_ref": f"refs/tags/{EXACT_LIBIIO_TAG}",
+                },
+            },
+            "build_run_id": 1,
+            "build_run_attempt": 1,
+            "artifact_index_path": str(artifact_index_path),
+            "artifact_index_bytes": 1,
+            "artifact_index_sha256": "2" * 64,
+            "artifact_index": {},
+            "evidence_member_count": len(REQUIRED_EVIDENCE_ROLES),
+            "evidence_members_verified": True,
+            "dfu_path": str(candidate_dfu_path),
+            "dfu_bytes": 17,
+            "dfu_sha256": "3" * 64,
+            "fit_bytes": 1,
+            "fit_sha256": "4" * 64,
+            "deployment_receipt_path": str(deployment_receipt_path),
+            "deployment_receipt_bytes": 1,
+            "deployment_receipt_sha256": "5" * 64,
+            "deployment_receipt": {},
+            "serial": serial,
+            "firmware_version": EXPECTED_FIRMWARE_VERSION,
+            "firmware_pattern": EXPECTED_FIRMWARE_PATTERN,
+            "kernel_version": EXPECTED_KERNEL_VERSION,
+            "hardware_model": EXPECTED_HARDWARE_MODEL,
         }
 
+    monkeypatch.setattr(lifecycle, "_attest_candidate_binding", fake_candidate_binding)
+
+
+def _run_hardware(iio_module, **kwargs):
+    receipt_path = pathlib.Path(kwargs.pop("ram_boot_receipt_path")).absolute()
+    output_path = pathlib.Path(kwargs["output_path"]).absolute()
+    return lifecycle.run_hardware(
+        iio_module,
+        source_manifest_path=output_path.parent
+        / "manifests/tandem-agc-test-source.yaml",
+        artifact_index_path=output_path.parent / "candidate-index.json",
+        deployment_receipt_path=receipt_path,
+        candidate_dfu_path=output_path.parent / "candidate.dfu",
+        **kwargs,
+    )
+
+
+def _preflight(*args, **kwargs):
+    kwargs.setdefault("firmware_version", EXPECTED_FIRMWARE_VERSION)
+    kwargs.setdefault("kernel_version", EXPECTED_KERNEL_VERSION)
+    kwargs.setdefault("hardware_model", EXPECTED_HARDWARE_MODEL)
+    return lifecycle._preflight(*args, **kwargs)
+
+
+def _stub_runner_provenance(monkeypatch):
     monkeypatch.setattr(
-        lifecycle, "_attest_device_firmware_lineage", fake_device_lineage
+        lifecycle,
+        "_attest_runner_provenance",
+        lambda: {
+            "host_runner_repository_commit": "a" * 40,
+            "host_runner_repository": str(
+                pathlib.Path(lifecycle.__file__).resolve().parents[2]
+            ),
+        },
     )
 
 
@@ -370,7 +449,7 @@ def _hardware_state(*, tx_gain=-80.0, tx_lo_readback_offset=0):
     context = SimpleNamespace(
         attrs={
             "hw_model": EXPECTED_HARDWARE_MODEL,
-            "hw_serial": lifecycle.DEFAULT_R18_SERIAL,
+            "hw_serial": TEST_SERIAL,
             "fw_version": EXPECTED_FIRMWARE_VERSION,
             "ad9361-phy,model": "ad9361",
             "local,kernel": EXPECTED_KERNEL_VERSION,
@@ -383,12 +462,12 @@ def _hardware_state(*, tx_gain=-80.0, tx_lo_readback_offset=0):
 
 def test_safe_preflight_accepts_cold_rc4_rx_rf_without_writes():
     context, phy, tx, tandem, writes = _hardware_state()
-    result = lifecycle._preflight(
+    result = _preflight(
         context,
         phy,
         tx,
         tandem,
-        serial=lifecycle.DEFAULT_R18_SERIAL,
+        serial=TEST_SERIAL,
         uri="usb:3.21.5",
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
     )
@@ -402,12 +481,12 @@ def test_safe_preflight_accepts_cold_rc4_rx_rf_without_writes():
 def test_safe_preflight_rejects_unmuted_tx_without_writes():
     context, phy, tx, tandem, writes = _hardware_state(tx_gain=-70.0)
     with pytest.raises(QualificationError, match="already muted"):
-        lifecycle._preflight(
+        _preflight(
             context,
             phy,
             tx,
             tandem,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             uri="usb:3.21.5",
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
         )
@@ -418,12 +497,12 @@ def test_safe_preflight_rejects_unmuted_tx_without_writes():
 def test_safe_preflight_rejects_nonfinite_mute_without_writes(gain):
     context, phy, tx, tandem, writes = _hardware_state(tx_gain=gain)
     with pytest.raises(QualificationError, match="already muted"):
-        lifecycle._preflight(
+        _preflight(
             context,
             phy,
             tx,
             tandem,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             uri="usb:3.21.5",
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
         )
@@ -434,12 +513,12 @@ def test_safe_preflight_rejects_nonfinite_dds_without_writes():
     context, phy, tx, tandem, writes = _hardware_state()
     tx.find_channel("altvoltage0", True).attrs["scale"]._value = "nan"
     with pytest.raises(QualificationError, match="already muted"):
-        lifecycle._preflight(
+        _preflight(
             context,
             phy,
             tx,
             tandem,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             uri="usb:3.21.5",
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
         )
@@ -448,12 +527,12 @@ def test_safe_preflight_rejects_nonfinite_dds_without_writes():
 
 def test_force_mute_rejects_nonfinite_write_readback_before_normalization():
     context, phy, tx, tandem, writes = _hardware_state()
-    preflight = lifecycle._preflight(
+    preflight = _preflight(
         context,
         phy,
         tx,
         tandem,
-        serial=lifecycle.DEFAULT_R18_SERIAL,
+        serial=TEST_SERIAL,
         uri="usb:3.21.5",
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
     )
@@ -467,12 +546,12 @@ def test_force_mute_rejects_nonfinite_write_readback_before_normalization():
 
 def test_normalization_is_ordered_after_mute_and_before_any_buffer():
     context, phy, tx, tandem, writes = _hardware_state()
-    preflight = lifecycle._preflight(
+    preflight = _preflight(
         context,
         phy,
         tx,
         tandem,
-        serial=lifecycle.DEFAULT_R18_SERIAL,
+        serial=TEST_SERIAL,
         uri="usb:3.21.5",
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
     )
@@ -494,12 +573,12 @@ def test_normalization_is_ordered_after_mute_and_before_any_buffer():
 
 def test_normalization_rejects_missing_tx_lo_readback():
     context, phy, tx, tandem, _writes = _hardware_state(tx_lo_readback_offset=3)
-    preflight = lifecycle._preflight(
+    preflight = _preflight(
         context,
         phy,
         tx,
         tandem,
-        serial=lifecycle.DEFAULT_R18_SERIAL,
+        serial=TEST_SERIAL,
         uri="usb:3.21.5",
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
     )
@@ -1012,9 +1091,7 @@ class _IntegrationIio:
         self.__file__ = str(pylibiio_path)
 
     def scan_contexts(self):
-        return {
-            "usb:3.21.5": ("R18 offline integration " + lifecycle.DEFAULT_R18_SERIAL)
-        }
+        return {"usb:3.21.5": ("R18 offline integration " + TEST_SERIAL)}
 
     def Context(self, uri):
         if uri != "usb:3.21.5":
@@ -1200,7 +1277,7 @@ def _valid_report(tmp_path):
         returned_iq_sha256_in_process="c" * 64,
         metadata_sha256=hashlib.sha256(_metadata_wire(cancel_metadata)).hexdigest(),
     )
-    serial = lifecycle.DEFAULT_R18_SERIAL
+    serial = TEST_SERIAL
     firmware = EXPECTED_FIRMWARE_VERSION
     final_status = _idle_status()
     cleanup = _mute()
@@ -1239,9 +1316,11 @@ def _valid_report(tmp_path):
     module_relative = "tests/radio_hardware/muted_metadata_batch_lifecycle.py"
     shell_relative = "scripts/run_muted_metadata_batch_lifecycle_hardware.sh"
     abi_relative = "tests/radio_hardware/metadata_abi.py"
+    candidate_binding_relative = "tests/radio_hardware/candidate_binding.py"
     module_sha = blob_sha(module_relative)
     shell_sha = blob_sha(shell_relative)
     abi_sha = blob_sha(abi_relative)
+    candidate_binding_sha = blob_sha(candidate_binding_relative)
     output_path = tmp_path / lifecycle.REPORT_FILENAME
     output_preflight = lifecycle._prepare_fresh_output_path(output_path)
     captures = [
@@ -1262,8 +1341,29 @@ def _valid_report(tmp_path):
     (libiio_build / "CMakeCache.txt").write_text(
         f"CMAKE_HOME_DIRECTORY:INTERNAL={libiio_source}\n", encoding="utf-8"
     )
-    device_lineage = lifecycle._attest_device_firmware_lineage(
-        tmp_path / "ram-boot-receipt.json", repository=repository
+    runner_provenance = {
+        "host_runner_repository_commit": commit,
+        "host_runner_repository": str(repository),
+        "python_module_path": str(repository / module_relative),
+        "python_module_sha256": module_sha,
+        "python_module_head_blob_sha256": module_sha,
+        "shell_runner_path": str(repository / shell_relative),
+        "shell_runner_sha256": shell_sha,
+        "shell_runner_head_blob_sha256": shell_sha,
+        "metadata_abi_path": str(repository / abi_relative),
+        "metadata_abi_sha256": abi_sha,
+        "metadata_abi_head_blob_sha256": abi_sha,
+        "candidate_binding_path": str(repository / candidate_binding_relative),
+        "candidate_binding_sha256": candidate_binding_sha,
+        "candidate_binding_head_blob_sha256": candidate_binding_sha,
+    }
+    device_lineage = lifecycle._attest_candidate_binding(
+        source_manifest_path=tmp_path / "manifests/tandem-agc-test-source.yaml",
+        artifact_index_path=tmp_path / "candidate-index.json",
+        deployment_receipt_path=tmp_path / "ram-boot-receipt.json",
+        candidate_dfu_path=tmp_path / "candidate.dfu",
+        serial=serial,
+        runner_provenance=runner_provenance,
     )
     preflight = {
         "verdict": "GO",
@@ -1298,7 +1398,7 @@ def _valid_report(tmp_path):
         "completed_unix_ns": 2,
         "host_libiio": {
             "source_commit": EXACT_LIBIIO_COMMIT,
-            "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+            "protected_source_tag": EXACT_LIBIIO_TAG,
             "source_directory": str(libiio_source),
             "build_directory": str(libiio_build),
             "mapped_shared_objects": [str(library)],
@@ -1307,19 +1407,7 @@ def _valid_report(tmp_path):
             "runner_shared_object_sha256": library_sha,
             "pylibiio_file": str(libiio_source / "bindings/python/iio.py"),
         },
-        "runner_provenance": {
-            "host_runner_repository_commit": commit,
-            "host_runner_repository": str(repository),
-            "python_module_path": str(repository / module_relative),
-            "python_module_sha256": module_sha,
-            "python_module_head_blob_sha256": module_sha,
-            "shell_runner_path": str(repository / shell_relative),
-            "shell_runner_sha256": shell_sha,
-            "shell_runner_head_blob_sha256": shell_sha,
-            "metadata_abi_path": str(repository / abi_relative),
-            "metadata_abi_sha256": abi_sha,
-            "metadata_abi_head_blob_sha256": abi_sha,
-        },
+        "runner_provenance": runner_provenance,
         "expected_device_firmware_lineage": device_lineage,
         "device_firmware_provenance": (
             lifecycle._observed_device_firmware_provenance(
@@ -1332,6 +1420,7 @@ def _valid_report(tmp_path):
             "firmware_pattern": EXPECTED_FIRMWARE_PATTERN,
             "firmware_version": EXPECTED_FIRMWARE_VERSION,
             "kernel_version": EXPECTED_KERNEL_VERSION,
+            "hardware_model": EXPECTED_HARDWARE_MODEL,
             "tx_policy": "fully muted; no DDS/DMA enable and no TX gain increase",
             "normalization_policy": (
                 "under verified mute with zero buffers: common LO, all PHY rates "
@@ -1472,6 +1561,131 @@ def test_durable_report_validator_accepts_frame_derived_pass(tmp_path):
     validate_durable_pass_report(_valid_report(tmp_path))
 
 
+def _archived_raw_metadata(report):
+    report_path = pathlib.Path(report["output_preflight"]["absolute_report_path"])
+    return {
+        entry["relative_path"]: (
+            report_path.parent / entry["relative_path"]
+        ).read_bytes()
+        for entry in report["metadata_artifacts"]["entries"]
+    }
+
+
+def test_archive_validator_accepts_exact_v5_without_live_paths(tmp_path, monkeypatch):
+    report = _valid_report(tmp_path)
+    raw_metadata = _archived_raw_metadata(report)
+
+    def reject_live_access(*_args, **_kwargs):
+        raise AssertionError("archive validation attempted live provenance access")
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", reject_live_access)
+    monkeypatch.setattr(lifecycle, "_attest_candidate_binding", reject_live_access)
+    monkeypatch.setattr(
+        lifecycle, "_read_bounded_owned_regular_file", reject_live_access
+    )
+    monkeypatch.setattr(
+        lifecycle, "_sha256_bounded_owned_regular_file", reject_live_access
+    )
+    monkeypatch.setattr(lifecycle, "_require_nonsymlink_path", reject_live_access)
+
+    validate_archived_pass_report(report, raw_metadata=raw_metadata)
+
+
+def test_pure_archive_builder_emits_current_valid_v5(tmp_path, monkeypatch):
+    baseline = _valid_report(tmp_path / "baseline")
+    lineage = baseline["expected_device_firmware_lineage"]
+    runner = baseline["runner_provenance"]
+    host = baseline["host_libiio"]
+    configuration = baseline["configuration"]
+
+    def reject_live_access(*_args, **_kwargs):
+        raise AssertionError("pure lifecycle fixture attempted live access")
+
+    monkeypatch.setattr(lifecycle, "_git_bytes", reject_live_access)
+    monkeypatch.setattr(lifecycle, "_attest_candidate_binding", reject_live_access)
+    report, raw_metadata = build_lifecycle_v5_archive(
+        report_path=(tmp_path / "archive" / lifecycle.REPORT_FILENAME),
+        lineage=lineage,
+        runner_provenance=runner,
+        serial=configuration["serial"],
+        runtime={
+            "uri": "usb:test-fixture",
+            "firmware_version": configuration["firmware_version"],
+            "kernel_version": configuration["kernel_version"],
+            "hardware_model": configuration["hardware_model"],
+            "libiio_source_commit": host["source_commit"],
+            "libiio_source_ref": f"refs/tags/{host['protected_source_tag']}",
+            "libiio_sha256": host["mapped_shared_object_sha256"],
+        },
+    )
+
+    assert report["schema"] == lifecycle.SCHEMA
+    assert report["expected_device_firmware_lineage"] == lineage
+    assert report["runner_provenance"] == runner
+    assert len(raw_metadata) == lifecycle.RAW_METADATA_FILE_COUNT
+
+
+@pytest.mark.parametrize(
+    "report",
+    [
+        {
+            "schema": "plutosdr-fw.muted-metadata-batch-lifecycle.v4",
+            "verdict": "PASS",
+        },
+        {
+            "schema": lifecycle.SCHEMA,
+            "verdict": "PASS",
+            "release_claim": "none; muted host-transport lifecycle qualification only",
+            "release_pass_eligible": False,
+            "hardware_qualified": False,
+        },
+    ],
+    ids=("predecessor-v4", "minimal-v5"),
+)
+def test_archive_validator_rejects_old_and_minimal_reports(report):
+    with pytest.raises(QualificationError):
+        validate_archived_pass_report(report, raw_metadata={})
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("configuration", "hold_gain_db"), 39),
+        (("full_drain", "frames", 7, "buffer_sequence"), 6),
+        (("cancel_lifecycle", "second_open_error", "errno"), errno.EIO),
+        (("cleanup", "verified"), False),
+    ],
+)
+def test_archive_validator_rejects_altered_v5_semantics(tmp_path, path, value):
+    report = _valid_report(tmp_path)
+    raw_metadata = _archived_raw_metadata(report)
+    target = report
+    for component in path[:-1]:
+        target = target[component]
+    target[path[-1]] = value
+
+    with pytest.raises(QualificationError):
+        validate_archived_pass_report(report, raw_metadata=raw_metadata)
+
+
+@pytest.mark.parametrize("plant", ["missing", "extra", "changed"])
+def test_archive_validator_rejects_altered_raw_metadata_inventory(tmp_path, plant):
+    report = _valid_report(tmp_path)
+    raw_metadata = _archived_raw_metadata(report)
+    first = next(iter(raw_metadata))
+    if plant == "missing":
+        raw_metadata.pop(first)
+    elif plant == "extra":
+        raw_metadata["raw-metadata/unexpected.metadata.bin"] = b"x" * RAW_METADATA_BYTES
+    else:
+        payload = bytearray(raw_metadata[first])
+        payload[0] ^= 0xFF
+        raw_metadata[first] = bytes(payload)
+
+    with pytest.raises(QualificationError):
+        validate_archived_pass_report(report, raw_metadata=raw_metadata)
+
+
 def test_durable_report_accepts_new_boundary_observation_between_snapshots(tmp_path):
     report = _valid_report(tmp_path)
     first, second = _frames()[:2]
@@ -1545,14 +1759,26 @@ def test_durable_report_rejects_missing_previously_retained_observation(tmp_path
         (("release_pass_eligible",), 0),
         (("hardware_qualified",), True),
         (("hardware_qualified",), 0),
-        (("expected_device_firmware_lineage", "source_tag"), "wrong-tag"),
         (("expected_device_firmware_lineage", "source_commit"), "0" * 40),
+        (
+            ("expected_device_firmware_lineage", "source_manifest", "sha256"),
+            "0" * 64,
+        ),
         (("expected_device_firmware_lineage", "build_run_id"), True),
         (("expected_device_firmware_lineage", "build_run_attempt"), 1.0),
+        (("expected_device_firmware_lineage", "artifact_index_sha256"), "0" * 64),
         (("expected_device_firmware_lineage", "dfu_sha256"), "0" * 64),
         (("expected_device_firmware_lineage", "fit_sha256"), "0" * 64),
         (("expected_device_firmware_lineage", "fit_bytes"), 12_783_050),
-        (("expected_device_firmware_lineage", "ram_boot_receipt_sha256"), "0" * 64),
+        (
+            ("expected_device_firmware_lineage", "deployment_receipt_sha256"),
+            "0" * 64,
+        ),
+        (("expected_device_firmware_lineage", "serial"), "another-radio"),
+        (
+            ("expected_device_firmware_lineage", "firmware_version"),
+            "v0.41-wrong-candidate",
+        ),
         (("configuration", "serial"), "another-radio"),
         (("configuration", "iq_evidence_policy"), "IQ independently retained"),
         (("configuration", "temperature_policy"), "accept arbitrary nulls"),
@@ -1791,7 +2017,7 @@ def test_existing_lock_is_nofollow_regular_and_forced_private(tmp_path, monkeypa
     lock_path.write_text("stale\n", encoding="utf-8")
     lock_path.chmod(0o664)
     monkeypatch.setattr(lifecycle, "_lock_path", lambda _serial: lock_path)
-    lock = lifecycle._open_lock(lifecycle.DEFAULT_R18_SERIAL)
+    lock = lifecycle._open_lock(TEST_SERIAL)
     lock.close()
     assert lock_path.stat().st_mode & 0o777 == 0o600
     lock_path.unlink()
@@ -1799,7 +2025,7 @@ def test_existing_lock_is_nofollow_regular_and_forced_private(tmp_path, monkeypa
     target.write_text("not a lock\n", encoding="utf-8")
     lock_path.symlink_to(target.name)
     with pytest.raises(QualificationError):
-        lifecycle._open_lock(lifecycle.DEFAULT_R18_SERIAL)
+        lifecycle._open_lock(TEST_SERIAL)
 
 
 @pytest.mark.parametrize(
@@ -2309,6 +2535,7 @@ def test_mapped_library_sha_is_computed_in_hardware_process(tmp_path, monkeypatc
 
 
 def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
+    _stub_runner_provenance(monkeypatch)
     source = (tmp_path / "attested-fixture-libiio-source").resolve()
     pylibiio = source / "bindings/python/iio.py"
     pylibiio.parent.mkdir(parents=True)
@@ -2331,7 +2558,7 @@ def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
         "_attest_mapped_libiio",
         lambda: {
             "source_commit": EXACT_LIBIIO_COMMIT,
-            "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+            "protected_source_tag": EXACT_LIBIIO_TAG,
             "source_directory": str(source),
             "build_directory": str(build),
             "mapped_shared_objects": [str(library)],
@@ -2348,9 +2575,9 @@ def test_wrong_pylibiio_fails_before_context_factory(tmp_path, monkeypatch):
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
     output = tmp_path / "private" / lifecycle.REPORT_FILENAME
     with pytest.raises(QualificationError, match="pylibiio"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2363,9 +2590,9 @@ def test_v5_runner_rejects_legacy_report_filename_before_context(tmp_path):
     output = tmp_path / "muted-metadata-batch-lifecycle-v4.json"
     fake_iio = SimpleNamespace(Context=lambda _uri: called.append(True))
     with pytest.raises(QualificationError, match="v5 output filename"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2375,179 +2602,316 @@ def test_v5_runner_rejects_legacy_report_filename_before_context(tmp_path):
     assert not output.parent.joinpath(lifecycle.RAW_METADATA_DIRECTORY).exists()
 
 
-def _hermetic_device_lineage_files(tmp_path, monkeypatch):
-    image_path = tmp_path / "attested-rc4.dfu"
-    image_payload = b"F" * 96 + b"D" * 16
-    image_path.write_bytes(image_payload)
-    monkeypatch.setattr(lifecycle, "DEVICE_FIRMWARE_DFU_BYTES", len(image_payload))
-    monkeypatch.setattr(
-        lifecycle,
-        "DEVICE_FIRMWARE_DFU_SHA256",
-        hashlib.sha256(image_payload).hexdigest(),
-    )
-    monkeypatch.setattr(lifecycle, "DEVICE_FIRMWARE_FIT_BYTES", len(image_payload) - 16)
-    monkeypatch.setattr(
-        lifecycle,
-        "DEVICE_FIRMWARE_FIT_SHA256",
-        hashlib.sha256(image_payload[:-16]).hexdigest(),
-    )
-    receipt_path = tmp_path / "ram-boot-receipt.json"
-    receipt = lifecycle._expected_ram_boot_receipt(
-        receipt_path=receipt_path, image_path=image_path
-    )
-    receipt_payload = json.dumps(
-        receipt, sort_keys=True, separators=(",", ":"), allow_nan=False
+def test_candidate_runner_rejects_relative_identity_path_before_context(tmp_path):
+    called = []
+    fake_iio = SimpleNamespace(Context=lambda _uri: called.append(True))
+    with pytest.raises(QualificationError, match="source manifest path.*absolute"):
+        lifecycle.run_hardware(
+            fake_iio,
+            serial=TEST_SERIAL,
+            output_path=tmp_path / lifecycle.REPORT_FILENAME,
+            source_manifest_path=pathlib.Path("source/candidate.yaml"),
+            artifact_index_path=tmp_path / "candidate-index.json",
+            deployment_receipt_path=tmp_path / "deployment-receipt.json",
+            candidate_dfu_path=tmp_path / "candidate.dfu",
+        )
+    assert called == []
+
+
+def _write_candidate_json(path, value):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), allow_nan=False
     ).encode()
-    receipt_path.write_bytes(receipt_payload)
-    receipt_path.chmod(0o600)
-    monkeypatch.setattr(
-        lifecycle, "DEVICE_RAM_BOOT_RECEIPT_BYTES", len(receipt_payload)
-    )
-    monkeypatch.setattr(
-        lifecycle,
-        "DEVICE_RAM_BOOT_RECEIPT_SHA256",
-        hashlib.sha256(receipt_payload).hexdigest(),
-    )
-    return receipt_path, image_path
+    path.write_bytes(payload)
+    return payload
 
 
-def test_rc4_device_lineage_constants_are_exact():
-    assert lifecycle.SCHEMA == "plutosdr-fw.muted-metadata-batch-lifecycle.v5"
-    assert lifecycle.REPORT_FILENAME == "muted-metadata-batch-lifecycle-v5.json"
-    assert lifecycle.EXPECTED_FIRMWARE_VERSION == (
-        "v0.41-plutoplus-spf-tandem-agc-v8-rc4"
-    )
-    assert lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT == (
-        "557a08749d9c0c34fe8096099b5be9d2b2a1b24f"
-    )
-    assert lifecycle.DEVICE_FIRMWARE_SOURCE_TAG == (
-        "tandem-agc-v8-rc4-source/firmware-v1"
-    )
-    assert lifecycle.DEVICE_FIRMWARE_BUILD_RUN_ID == 32_898_297_518
-    assert lifecycle.DEVICE_FIRMWARE_DFU_SHA256 == (
-        "b18f3fd0590eef13d77a60d9c4e36398b9a40e5c230aa34d96e7c78e7ff46bf6"
-    )
-    assert lifecycle.DEVICE_FIRMWARE_DFU_BYTES == 12_787_327
-    assert lifecycle.DEVICE_FIRMWARE_FIT_SHA256 == (
-        "a3e98393c4ae3caecee53b3b81808b9790f2c7a8bce0cb201005502fd5d02521"
-    )
-    assert lifecycle.DEVICE_FIRMWARE_FIT_BYTES == 12_787_311
-    assert lifecycle.DEVICE_RAM_BOOT_RECEIPT_SHA256 == (
-        "9854b03dc8e0b9ee66b7f26ee8951f8352ec0d6f9fbaa3fae62a8f8d4b0c347e"
-    )
-    assert lifecycle.DEVICE_RAM_BOOT_RECEIPT_BYTES == 2_017
-    assert lifecycle.DEVICE_RAM_BOOT_RECEIPT_ID == ("62155abae0b4408ea77fc3d407e9b8c6")
-    assert lifecycle.DEVICE_RAM_BOOT_PLAN_ID == "cd3c1bdfa41f4463ab91e8f0fe2f34bb"
-    assert lifecycle.DEVICE_RAM_BOOT_KNOWN_HOSTS_SHA256 == (
-        "1b7aa093d3cea62553885bf9e06979c85bb24c8b2e1b6975479d5ff847803726"
-    )
-    assert lifecycle.PREDECESSOR_V4_FAILURE_REPORT_SHA256 == (
-        "5f6be9a751954003e8869d3bed8175bc0b2e0d7aaeb048431262057e8b54e196"
-    )
+def _candidate_binding_files(
+    tmp_path, *, serial=TEST_SERIAL, stage="candidate-pre-hardware"
+):
+    repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
+    commit = subprocess.run(
+        ["git", "-C", str(repository), "rev-parse", "HEAD"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    root = tmp_path / "candidate"
+    source_member = "source/tandem-agc-v8-rc4-source.yaml"
+    source_path = root / source_member
+    source_path.parent.mkdir(parents=True)
+    source_payload = (
+        repository / "manifests/tandem-agc-v8-rc4-source.yaml"
+    ).read_bytes()
+    source_path.write_bytes(source_payload)
+    dfu_path = root / "artifact/firmware.dfu"
+    dfu_path.parent.mkdir(parents=True)
+    fit_payload = b"candidate-fit"
+    dfu_payload = fit_payload + b"D" * 16
+    dfu_path.write_bytes(dfu_payload)
+
+    evidence_members = []
+    for index, role in enumerate(REQUIRED_EVIDENCE_ROLES, 1):
+        path = root / f"evidence/{role}.txt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        payload = f"{role}:{index}\n".encode()
+        path.write_bytes(payload)
+        evidence_members.append(
+            {
+                "role": role,
+                "path": path.relative_to(root).as_posix(),
+                "bytes": len(payload),
+                "sha256": hashlib.sha256(payload).hexdigest(),
+            }
+        )
+
+    harness_files = []
+    for relative in lifecycle.CANDIDATE_HARNESS_PATHS:
+        harness_files.append(
+            {
+                "path": relative,
+                "sha256": hashlib.sha256(
+                    (repository / relative).read_bytes()
+                ).hexdigest(),
+            }
+        )
+    artifact_index = {
+        "schema": "plutosdr-fw.tandem-release-evidence",
+        "schema_version": 1,
+        "stage": stage,
+        "release": {
+            "firmware_version": EXPECTED_FIRMWARE_VERSION,
+            "kernel_version": EXPECTED_KERNEL_VERSION,
+            "hardware_model": EXPECTED_HARDWARE_MODEL,
+            "metadata_abi": "frame-metadata-v5",
+            "tandem_agc": "request-v2",
+        },
+        "source": {
+            "commit": commit,
+            "manifest_path": source_member,
+            "manifest_sha256": hashlib.sha256(source_payload).hexdigest(),
+        },
+        "build": {"run_id": 1234, "run_attempt": 1},
+        "artifact": {
+            "dfu_path": dfu_path.relative_to(root).as_posix(),
+            "dfu_bytes": len(dfu_payload),
+            "dfu_sha256": hashlib.sha256(dfu_payload).hexdigest(),
+            "fit_bytes": len(fit_payload),
+            "fit_sha256": hashlib.sha256(fit_payload).hexdigest(),
+        },
+        "harness": {"files": harness_files},
+        "evidence": {"members": evidence_members},
+    }
+    index_path = root / "candidate-index.json"
+    index_payload = _write_candidate_json(index_path, artifact_index)
+    receipt = {
+        "schema": "plutosdr-fw.tandem-ram-boot-receipt",
+        "schema_version": 1,
+        "verdict": "pass",
+        "boot_mode": "ram-only",
+        "artifact_index_sha256": hashlib.sha256(index_payload).hexdigest(),
+        "radio": {"serial": serial},
+        "artifact": {"dfu_sha256": artifact_index["artifact"]["dfu_sha256"]},
+        "runtime": {"firmware_version": EXPECTED_FIRMWARE_VERSION},
+        "boot": {"pre_id": "boot-before", "post_id": "boot-after"},
+        "persistent_flash": {
+            "partition": "/dev/mtdblock3",
+            "mtd_name": "qspi-linux",
+            "bytes": 32 * 1024 * 1024,
+            "pre_sha256": "7" * 64,
+            "post_sha256": "7" * 64,
+            "unchanged": True,
+        },
+        "safety": {
+            "final_tx_muted": True,
+            "final_dds_disabled": True,
+            "final_dac_selectors_zero": True,
+            "final_tandem_state": "IDLE",
+            "final_fifo_level": 0,
+            "final_fault_flags": 0,
+        },
+        "timestamps": {"started_unix_ns": 100, "completed_unix_ns": 200},
+        "topology": {
+            "usb_port": "3-8",
+            "pre_sysfs_path": "/sys/bus/usb/devices/3-8",
+            "dfu_sysfs_path": "/sys/bus/usb/devices/3-8",
+            "post_sysfs_path": "/sys/bus/usb/devices/3-8",
+            "network_interface": "enx001122334455",
+        },
+        "commands": [
+            {
+                "phase": "request-ram-mode",
+                "argv": [
+                    "ssh",
+                    "-F",
+                    "/dev/null",
+                    "-B",
+                    "enx001122334455",
+                    "-o",
+                    "BatchMode=yes",
+                    "-o",
+                    "StrictHostKeyChecking=yes",
+                    "-o",
+                    f"UserKnownHostsFile={root / 'known_hosts'}",
+                    "-o",
+                    "CheckHostIP=no",
+                    "root@192.168.2.1",
+                    "/usr/sbin/device_reboot ram",
+                ],
+            },
+            {
+                "phase": "download-firmware-to-ram",
+                "argv": [
+                    "dfu-util",
+                    "-d",
+                    "0456:b674",
+                    "-p",
+                    "3-8",
+                    "-a",
+                    "firmware.dfu",
+                    "-D",
+                    "/proc/self/fd/9",
+                ],
+            },
+            {
+                "phase": "detach-into-downloaded-image",
+                "argv": [
+                    "dfu-util",
+                    "-d",
+                    "0456:b674",
+                    "-p",
+                    "3-8",
+                    "-a",
+                    "firmware.dfu",
+                    "-e",
+                ],
+            },
+        ],
+        "transition_proof_sha256": "5" * 64,
+        "known_hosts_sha256": "6" * 64,
+    }
+    receipt_path = root / "deployment-receipt.json"
+    _write_candidate_json(receipt_path, receipt)
+    provenance = {
+        "host_runner_repository_commit": commit,
+        "host_runner_repository": str(repository),
+        "python_module_sha256": harness_files[3]["sha256"],
+        "shell_runner_sha256": harness_files[0]["sha256"],
+        "metadata_abi_sha256": harness_files[2]["sha256"],
+        "candidate_binding_sha256": harness_files[1]["sha256"],
+    }
+    return {
+        "source_manifest_path": source_path,
+        "artifact_index_path": index_path,
+        "deployment_receipt_path": receipt_path,
+        "candidate_dfu_path": dfu_path,
+        "serial": serial,
+        "runner_provenance": provenance,
+    }
 
 
-def test_device_lineage_recomputes_receipt_image_tag_and_ancestry(
+def test_candidate_lineage_binds_arbitrary_serial_and_exact_inputs(
     tmp_path, monkeypatch
 ):
-    receipt_path, image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
-    repository = pathlib.Path(lifecycle.__file__).resolve().parents[2]
-    result = _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(receipt_path, repository=repository)
-    assert result["source_tag"] == lifecycle.DEVICE_FIRMWARE_SOURCE_TAG
-    assert result["source_commit"] == lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT
-    assert result["ram_boot_receipt_path"] == str(receipt_path)
-    assert result["ram_boot_receipt"]["plan"]["image_path"] == str(image_path)
+    monkeypatch.setattr(
+        lifecycle, "_attest_candidate_binding", _REAL_ATTEST_CANDIDATE_BINDING
+    )
+    inputs = _candidate_binding_files(tmp_path, serial="R17-serial")
+    result = _REAL_ATTEST_CANDIDATE_BINDING(**inputs)
+    assert result["serial"] == "R17-serial"
+    assert result["firmware_version"] == EXPECTED_FIRMWARE_VERSION
+    assert result["evidence_member_count"] == len(REQUIRED_EVIDENCE_ROLES)
+    assert result["evidence_members_verified"] is True
+    assert (
+        result["artifact_index_sha256"]
+        == hashlib.sha256(inputs["artifact_index_path"].read_bytes()).hexdigest()
+    )
+    assert (
+        result["deployment_receipt_sha256"]
+        == hashlib.sha256(inputs["deployment_receipt_path"].read_bytes()).hexdigest()
+    )
 
 
-def test_device_lineage_rejects_missing_receipt(tmp_path):
-    with pytest.raises(QualificationError, match="receipt.*opened"):
-        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
-            tmp_path / "missing-receipt.json",
-            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
-        )
+def test_final_artifact_stage_is_accepted_for_full_final_campaign(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        lifecycle, "_attest_candidate_binding", _REAL_ATTEST_CANDIDATE_BINDING
+    )
+    inputs = _candidate_binding_files(tmp_path, stage="final-pre-confirmation")
+    result = _REAL_ATTEST_CANDIDATE_BINDING(**inputs)
+
+    assert result["artifact_index"]["stage"] == "final-pre-confirmation"
 
 
-@pytest.mark.parametrize("plant", ["receipt-bytes", "receipt-semantics", "image"])
-def test_device_lineage_rejects_receipt_or_image_substitution(
+@pytest.mark.parametrize(
+    "plant",
+    [
+        "receipt",
+        "index-receipt-binding",
+        "artifact",
+        "manifest",
+        "source-lock",
+        "harness",
+        "serial",
+        "evidence",
+    ],
+)
+def test_candidate_lineage_rejects_planted_identity_or_byte_failure(
     tmp_path, monkeypatch, plant
 ):
-    receipt_path, image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
-    if plant == "receipt-bytes":
-        receipt_path.write_bytes(receipt_path.read_bytes() + b"x")
-    elif plant == "receipt-semantics":
-        receipt = json.loads(receipt_path.read_bytes())
-        receipt["outcome"] = "failure"
-        payload = json.dumps(
-            receipt, sort_keys=True, separators=(",", ":"), allow_nan=False
-        ).encode()
-        receipt_path.write_bytes(payload)
-        monkeypatch.setattr(lifecycle, "DEVICE_RAM_BOOT_RECEIPT_BYTES", len(payload))
-        monkeypatch.setattr(
-            lifecycle,
-            "DEVICE_RAM_BOOT_RECEIPT_SHA256",
-            hashlib.sha256(payload).hexdigest(),
+    monkeypatch.setattr(
+        lifecycle, "_attest_candidate_binding", _REAL_ATTEST_CANDIDATE_BINDING
+    )
+    inputs = _candidate_binding_files(tmp_path)
+    index_path = inputs["artifact_index_path"]
+    receipt_path = inputs["deployment_receipt_path"]
+    index = json.loads(index_path.read_text())
+    receipt = json.loads(receipt_path.read_text())
+
+    def rewrite_index():
+        payload = _write_candidate_json(index_path, index)
+        receipt["artifact_index_sha256"] = hashlib.sha256(payload).hexdigest()
+        _write_candidate_json(receipt_path, receipt)
+
+    if plant == "receipt":
+        receipt["safety"]["final_tx_muted"] = False
+        _write_candidate_json(receipt_path, receipt)
+    elif plant == "index-receipt-binding":
+        index["build"]["run_attempt"] = 2
+        _write_candidate_json(index_path, index)
+    elif plant == "artifact":
+        inputs["candidate_dfu_path"].write_bytes(
+            inputs["candidate_dfu_path"].read_bytes() + b"x"
         )
+    elif plant == "manifest":
+        inputs["source_manifest_path"].write_bytes(
+            inputs["source_manifest_path"].read_bytes() + b"\n# planted\n"
+        )
+    elif plant == "source-lock":
+        index["source"]["commit"] = "0" * 40
+        rewrite_index()
+    elif plant == "harness":
+        index["harness"]["files"][0]["sha256"] = "0" * 64
+        rewrite_index()
+    elif plant == "serial":
+        inputs["serial"] = "different-serial"
     else:
-        image_path.write_bytes(image_path.read_bytes() + b"x")
-    with pytest.raises(QualificationError, match="receipt|DFU|semantics"):
-        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
-            receipt_path,
-            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
+        member = (
+            inputs["artifact_index_path"].parent
+            / index["evidence"]["members"][0]["path"]
         )
+        member.write_bytes(member.read_bytes() + b"x")
 
-
-def test_device_lineage_rejects_moved_source_tag(tmp_path, monkeypatch):
-    receipt_path, _image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
-    original_git = lifecycle._git_bytes
-
-    def moved_tag(repository, *arguments):
-        if arguments == (
-            "rev-parse",
-            f"refs/tags/{lifecycle.DEVICE_FIRMWARE_SOURCE_TAG}^{{commit}}",
-        ):
-            return ("0" * 40 + "\n").encode()
-        return original_git(repository, *arguments)
-
-    monkeypatch.setattr(lifecycle, "_git_bytes", moved_tag)
-    with pytest.raises(QualificationError, match="source tag moved"):
-        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
-            receipt_path,
-            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
-        )
-
-
-def test_device_lineage_requires_source_ancestor_of_host_runner(tmp_path, monkeypatch):
-    receipt_path, _image_path = _hermetic_device_lineage_files(tmp_path, monkeypatch)
-    original_git = lifecycle._git_bytes
-    observed = []
-
-    def nonancestor(repository, *arguments):
-        if arguments[:2] == ("merge-base", "--is-ancestor"):
-            observed.append(arguments)
-            raise QualificationError("planted non-ancestor source")
-        return original_git(repository, *arguments)
-
-    monkeypatch.setattr(lifecycle, "_git_bytes", nonancestor)
-    with pytest.raises(QualificationError, match="non-ancestor"):
-        _REAL_ATTEST_DEVICE_FIRMWARE_LINEAGE(
-            receipt_path,
-            repository=pathlib.Path(lifecycle.__file__).resolve().parents[2],
-        )
-    assert observed == [
-        (
-            "merge-base",
-            "--is-ancestor",
-            lifecycle.DEVICE_FIRMWARE_SOURCE_COMMIT,
-            subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip(),
-        )
-    ]
+    with pytest.raises(
+        QualificationError, match="candidate|receipt|DFU|manifest|harness|evidence"
+    ):
+        _REAL_ATTEST_CANDIDATE_BINDING(**inputs)
 
 
 def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monkeypatch):
+    _stub_runner_provenance(monkeypatch)
     source = (tmp_path / "attested-fixture-libiio-source").resolve()
     pylibiio = source / "bindings/python/iio.py"
     pylibiio.parent.mkdir(parents=True)
@@ -2571,7 +2935,7 @@ def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monke
         "_attest_mapped_libiio",
         lambda: {
             "source_commit": EXACT_LIBIIO_COMMIT,
-            "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+            "protected_source_tag": EXACT_LIBIIO_TAG,
             "source_directory": str(source),
             "build_directory": str(build),
             "mapped_shared_objects": [str(library)],
@@ -2586,7 +2950,7 @@ def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monke
             return f"{EXACT_LIBIIO_COMMIT}\n".encode()
         if arguments == (
             "rev-parse",
-            f"refs/tags/{lifecycle.EXACT_LIBIIO_TAG}^{{commit}}",
+            f"refs/tags/{EXACT_LIBIIO_TAG}^{{commit}}",
         ):
             return ("0" * 40 + "\n").encode()
         if arguments == ("status", "--porcelain", "--untracked-files=no"):
@@ -2598,9 +2962,9 @@ def test_wrong_protected_libiio_tag_fails_before_context_factory(tmp_path, monke
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", digest)
     output = tmp_path / "private" / lifecycle.REPORT_FILENAME
     with pytest.raises(QualificationError, match="source graph"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2620,6 +2984,7 @@ def _set_integration_runner_environment(monkeypatch):
         "MODULE": repository / "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
         "SHELL": repository / "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
         "METADATA_ABI": repository / "tests/radio_hardware/metadata_abi.py",
+        "CANDIDATE_BINDING": (repository / "tests/radio_hardware/candidate_binding.py"),
     }
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", commit)
     for role, path in paths.items():
@@ -2634,7 +2999,14 @@ def test_tracked_dirty_runner_tree_fails_before_context_factory(tmp_path, monkey
     _set_integration_runner_environment(monkeypatch)
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
-    monkeypatch.setattr(lifecycle, "_attest_host_libiio", lambda _module: {})
+    monkeypatch.setattr(
+        lifecycle,
+        "_attest_host_libiio",
+        lambda _module: {
+            "source_commit": EXACT_LIBIIO_COMMIT,
+            "protected_source_tag": EXACT_LIBIIO_TAG,
+        },
+    )
     original_git = lifecycle._git_bytes
 
     def dirty_runner_tree(repository, *arguments):
@@ -2649,9 +3021,9 @@ def test_tracked_dirty_runner_tree_fails_before_context_factory(tmp_path, monkey
     )
     output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
     with pytest.raises(QualificationError, match="tracked changes"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2674,7 +3046,7 @@ def _integration_run_components(tmp_path, monkeypatch):
     )
     host_libiio = {
         "source_commit": EXACT_LIBIIO_COMMIT,
-        "protected_source_tag": lifecycle.EXACT_LIBIIO_TAG,
+        "protected_source_tag": EXACT_LIBIIO_TAG,
         "source_directory": str(source),
         "build_directory": str(build),
         "mapped_shared_objects": [str(library)],
@@ -2714,9 +3086,9 @@ def test_run_hardware_fake_end_to_end_persists_closed_valid_pass(tmp_path, monke
         tmp_path, monkeypatch
     )
 
-    report = lifecycle.run_hardware(
+    report = _run_hardware(
         fake_iio,
-        serial=lifecycle.DEFAULT_R18_SERIAL,
+        serial=TEST_SERIAL,
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
         output_path=output,
         ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2758,9 +3130,9 @@ def test_cancel_temperature_failure_is_typed_non_authorizing_and_promotes_no_raw
     state.temperature_overrides[(2, 0)] = lifecycle.MAXIMUM_TEMPERATURE_MDEG_C + 1
 
     with pytest.raises(QualificationError, match="cancel_first frame 0"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2790,9 +3162,9 @@ def test_close_drift_is_remuted_before_rx_write_or_next_buffer_open(
     )
     state.flip_tx_on_close = {1, 2, 3}
 
-    report = lifecycle.run_hardware(
+    report = _run_hardware(
         fake_iio,
-        serial=lifecycle.DEFAULT_R18_SERIAL,
+        serial=TEST_SERIAL,
         firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
         output_path=output,
         ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2842,9 +3214,9 @@ def test_second_sidecar_failure_rolls_back_pass_namespace(tmp_path, monkeypatch)
         ),
     )
     with pytest.raises(OSError, match="second sidecar"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2891,9 +3263,9 @@ def test_staging_directory_swap_after_preopen_stat_is_rejected(tmp_path, monkeyp
 
     monkeypatch.setattr(lifecycle.os, "open", swap_staging_before_open)
     with pytest.raises(QualificationError, match="staging claim"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2934,9 +3306,9 @@ def test_final_metadata_directory_promotion_never_clobbers_raced_namespace(
         lifecycle, "_rename_noreplace_at", race_canonical_before_promotion
     )
     with pytest.raises(QualificationError, match="raced or reused"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -2984,9 +3356,9 @@ def test_final_report_swap_preserves_external_and_rolls_back_sidecars(
 
     monkeypatch.setattr(lifecycle, "_atomic_json", swap_before_final_rewrite)
     with pytest.raises(QualificationError, match="rewrite changed|without replacing"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3016,9 +3388,9 @@ def test_late_completed_raw_directory_move_demotes_durable_pass(tmp_path, monkey
         lifecycle, "_verify_claimed_output_namespace", move_raw_during_final_verify
     )
     with pytest.raises(QualificationError, match="metadata artifact ownership"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3066,9 +3438,9 @@ def test_evidence_directory_descriptor_close_failure_demotes_pass(
 
     monkeypatch.setattr(lifecycle.os, "close", fail_selected_directory_close)
     with pytest.raises((OSError, QualificationError), match="descriptor"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3116,9 +3488,9 @@ def test_post_capture_failure_promotes_no_metadata_artifacts(
 
         monkeypatch.setattr(lifecycle, "close_iio_object", fail_context_close)
     with pytest.raises(QualificationError, match="cleanup"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3156,9 +3528,9 @@ def test_output_parent_replacement_cannot_receive_report_or_sidecars(
         replace_parent_before_final_verify,
     )
     with pytest.raises(QualificationError, match="parent pathname"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3197,9 +3569,9 @@ def test_post_context_freshness_race_never_overwrites_evidence(
         lifecycle, "_write_metadata_artifacts", plant_before_first_sidecar
     )
     with pytest.raises(QualificationError, match="owned|raced|claim"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3220,14 +3592,22 @@ def test_post_context_freshness_race_never_overwrites_evidence(
 def _stub_precontext_provenance(monkeypatch):
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SOURCE_COMMIT", EXACT_LIBIIO_COMMIT)
     monkeypatch.setenv("PLUTOSDR_FW_LIBIIO_SHA256", "a" * 64)
-    monkeypatch.setattr(lifecycle, "_attest_host_libiio", lambda _module: {})
+    monkeypatch.setattr(
+        lifecycle,
+        "_attest_host_libiio",
+        lambda _module: {
+            "source_commit": EXACT_LIBIIO_COMMIT,
+            "protected_source_tag": EXACT_LIBIIO_TAG,
+        },
+    )
     monkeypatch.setattr(
         lifecycle,
         "_attest_runner_provenance",
         lambda: {
+            "host_runner_repository_commit": "a" * 40,
             "host_runner_repository": str(
                 pathlib.Path(lifecycle.__file__).resolve().parents[2]
-            )
+            ),
         },
     )
 
@@ -3253,9 +3633,9 @@ def test_report_namespace_is_claimed_before_context_factory(tmp_path, monkeypatc
 
     monkeypatch.setattr(lifecycle, "_atomic_json", race_report_claim)
     with pytest.raises(QualificationError, match="without replacing"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3273,16 +3653,16 @@ def test_receipt_attestation_failure_precedes_context_factory(tmp_path, monkeypa
     )
     monkeypatch.setattr(
         lifecycle,
-        "_attest_device_firmware_lineage",
+        "_attest_candidate_binding",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(
             QualificationError("planted malformed RAM receipt")
         ),
     )
     output = tmp_path / "evidence" / lifecycle.REPORT_FILENAME
     with pytest.raises(QualificationError, match="malformed RAM receipt"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "missing-receipt.json",
@@ -3309,9 +3689,9 @@ def test_post_lock_freshness_recheck_preserves_existing_winner_evidence(
 
     monkeypatch.setattr(lifecycle, "_open_lock", open_after_winner_promotion)
     with pytest.raises(QualificationError, match="fresh"):
-        lifecycle.run_hardware(
+        _run_hardware(
             fake_iio,
-            serial=lifecycle.DEFAULT_R18_SERIAL,
+            serial=TEST_SERIAL,
             firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
             output_path=output,
             ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3340,9 +3720,9 @@ def test_lock_loser_never_writes_requested_evidence(tmp_path, monkeypatch):
     )
     try:
         with pytest.raises(QualificationError, match="lock is held"):
-            lifecycle.run_hardware(
+            _run_hardware(
                 fake_iio,
-                serial=lifecycle.DEFAULT_R18_SERIAL,
+                serial=TEST_SERIAL,
                 firmware_pattern=EXPECTED_FIRMWARE_PATTERN,
                 output_path=output,
                 ram_boot_receipt_path=tmp_path / "ram-boot-receipt.json",
@@ -3361,9 +3741,13 @@ def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch
     repository = module_path.parents[2]
     shell = repository / "scripts/run_muted_metadata_batch_lifecycle_hardware.sh"
     metadata_abi_path = module_path.parent / "metadata_abi.py"
+    candidate_binding_path = module_path.parent / "candidate_binding.py"
     module_sha = hashlib.sha256(module_path.read_bytes()).hexdigest()
     shell_sha = hashlib.sha256(shell.read_bytes()).hexdigest()
     metadata_abi_sha = hashlib.sha256(metadata_abi_path.read_bytes()).hexdigest()
+    candidate_binding_sha = hashlib.sha256(
+        candidate_binding_path.read_bytes()
+    ).hexdigest()
     commit = "a" * 40
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", commit)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_MODULE_SHA256", module_sha)
@@ -3374,6 +3758,15 @@ def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", metadata_abi_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", metadata_abi_sha)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", str(metadata_abi_path))
+    monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_SHA256", candidate_binding_sha
+    )
+    monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_HEAD_SHA256", candidate_binding_sha
+    )
+    monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_PATH", str(candidate_binding_path)
+    )
 
     def fake_git(_repository, *arguments):
         if arguments == ("rev-parse", "HEAD"):
@@ -3390,6 +3783,7 @@ def test_runner_source_sha_is_computed_in_hardware_process(tmp_path, monkeypatch
     assert evidence["python_module_sha256"] == module_sha
     assert evidence["shell_runner_sha256"] == shell_sha
     assert evidence["metadata_abi_sha256"] == metadata_abi_sha
+    assert evidence["candidate_binding_sha256"] == candidate_binding_sha
 
 
 def test_runner_rejects_metadata_abi_mutation(tmp_path, monkeypatch):
@@ -3397,6 +3791,7 @@ def test_runner_rejects_metadata_abi_mutation(tmp_path, monkeypatch):
     repository = module_path.parents[2]
     shell = repository / "scripts/run_muted_metadata_batch_lifecycle_hardware.sh"
     metadata_abi_path = module_path.parent / "metadata_abi.py"
+    candidate_binding_path = module_path.parent / "candidate_binding.py"
     commit = "a" * 40
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_COMMIT", commit)
     monkeypatch.setenv(
@@ -3419,6 +3814,18 @@ def test_runner_rejects_metadata_abi_mutation(tmp_path, monkeypatch):
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_SHA256", "0" * 64)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_HEAD_SHA256", "0" * 64)
     monkeypatch.setenv("PLUTOSDR_FW_RUNNER_METADATA_ABI_PATH", str(metadata_abi_path))
+    candidate_binding_sha = hashlib.sha256(
+        candidate_binding_path.read_bytes()
+    ).hexdigest()
+    monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_SHA256", candidate_binding_sha
+    )
+    monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_HEAD_SHA256", candidate_binding_sha
+    )
+    monkeypatch.setenv(
+        "PLUTOSDR_FW_RUNNER_CANDIDATE_BINDING_PATH", str(candidate_binding_path)
+    )
 
     def fake_git(_repository, *arguments):
         if arguments == ("rev-parse", "HEAD"):
