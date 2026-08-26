@@ -4,18 +4,30 @@
 set -euo pipefail
 PATH=/usr/bin:/bin
 export PATH
+unset BASH_ENV CDPATH ENV GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_COMMON_DIR
+unset GIT_CONFIG_COUNT GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM GIT_DIR GIT_INDEX_FILE
+unset GIT_OBJECT_DIRECTORY GIT_WORK_TREE
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CANONICAL_SETTINGS=/opt/Xilinx/Vivado/2022.2/settings64.sh
 CANONICAL_VIVADO=/opt/Xilinx/Vivado/2022.2/bin/vivado
 CANONICAL_SETUP_ENV=/opt/Xilinx/Vivado/2022.2/bin/setupEnv.sh
 CANONICAL_VIVADO_BINARY=/opt/Xilinx/Vivado/2022.2/bin/unwrapped/lnx64.o/vivado
+CANONICAL_LOADER=/opt/Xilinx/Vivado/2022.2/bin/loader
+CANONICAL_VIVADO_SETTINGS_CHILD=/opt/Xilinx/Vivado/2022.2/.settings64-Vivado.sh
+CANONICAL_HLS_SETTINGS_CHILD=/opt/Xilinx/Vitis_HLS/2022.2/.settings64-Vitis_HLS.sh
+CANONICAL_LIBEDIT=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/libedit.so.0
 CANONICAL_LIBTINFO=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE/libtinfo.so.5
 CANONICAL_PYTHON=/usr/bin/python3
 EXPECTED_SETTINGS_SHA256=9bf3eb45ee64972189ceb1b604d7400c086882e12f5788b3a5fefe4c7269602d
 EXPECTED_VIVADO_SHA256=2924389be0c4297f3e2c4d267e22904a89962575497d0f5fd7eb15dc959e5505
 EXPECTED_SETUP_ENV_SHA256=07553d9d7fb5915d44e9ac29a9c8bd33321b233231a66b5daff10985aa672d38
 EXPECTED_VIVADO_BINARY_SHA256=869fa7c4f4f7256ed386c79db0e479b18d3feb201eb77e1739dba633be6446de
+EXPECTED_LOADER_SHA256=1d0fb72724ad841d577c7ae3a92785966a7d13f7e29632b6c79ebd7129ab6719
+EXPECTED_VIVADO_SETTINGS_CHILD_SHA256=7ae101caddf078b5195bc56be0281cdde733162b59e8f15ebf5edb0a27a248bc
+EXPECTED_HLS_SETTINGS_CHILD_SHA256=982386b218be5a9af14bef824a8d07fbf40683e32db28a80315fa32bc29f68e5
+EXPECTED_LIBEDIT_SHA256=751b6bffc3edcac597ad5e69840ee0832c865d1038baa9b8aefee642125f2742
 EXPECTED_LIBTINFO_SHA256=78a3f1dbaf81f27ba85ee0f0eb0d1176d5664446f42755c1a93d4b510f95fa7f
 VIVADO_SETTINGS="${VIVADO_SETTINGS:-$CANONICAL_SETTINGS}"
 
@@ -26,6 +38,10 @@ fail() {
 
 sha256() {
     sha256sum -- "$1" | awk '{print $1}'
+}
+
+git_exact() {
+    git --no-replace-objects -c core.fsmonitor=false -C "$ROOT" "$@"
 }
 
 [[ $# -eq 1 ]] || fail "usage: $0 <fresh-output-directory>"
@@ -39,6 +55,16 @@ sha256() {
 [[ "$(sha256 "$CANONICAL_VIVADO_BINARY")" == \
     "$EXPECTED_VIVADO_BINARY_SHA256" ]] ||
     fail "Vivado executable binary hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_LOADER")" == "$EXPECTED_LOADER_SHA256" ]] ||
+    fail "Vivado loader hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_VIVADO_SETTINGS_CHILD")" == \
+    "$EXPECTED_VIVADO_SETTINGS_CHILD_SHA256" ]] ||
+    fail "Vivado nested settings hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_HLS_SETTINGS_CHILD")" == \
+    "$EXPECTED_HLS_SETTINGS_CHILD_SHA256" ]] ||
+    fail "Vitis HLS nested settings hash does not match the qualified installation"
+[[ "$(sha256 "$CANONICAL_LIBEDIT")" == "$EXPECTED_LIBEDIT_SHA256" ]] ||
+    fail "Vivado libedit hash does not match the qualified installation"
 [[ -r "$CANONICAL_LIBTINFO" ]] || fail "bundled libtinfo.so.5 is missing"
 [[ "$(sha256 "$CANONICAL_LIBTINFO")" == "$EXPECTED_LIBTINFO_SHA256" ]] ||
     fail "bundled libtinfo.so.5 hash does not match the qualified installation"
@@ -55,9 +81,13 @@ case "$output_dir" in
     "$ROOT" | "$ROOT"/*) fail "output path must be outside the firmware tree" ;;
 esac
 
-commit="$(git -C "$ROOT" rev-parse --verify HEAD)"
+[[ "$(git_exact rev-parse --show-toplevel)" == "$ROOT" ]] ||
+    fail "firmware repository top level is not exact"
+[[ "$(git_exact rev-parse --absolute-git-dir)" == "$ROOT/.git" ]] ||
+    fail "firmware Git directory is not exact"
+commit="$(git_exact rev-parse --verify HEAD)"
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || fail "cannot resolve an exact source commit"
-[[ -z "$(git -C "$ROOT" status --porcelain)" ]] ||
+[[ -z "$(git_exact status --porcelain)" ]] ||
     fail "firmware source tree must be clean"
 
 umask 077
@@ -116,7 +146,7 @@ for index in "${!input_names[@]}"; do
     git_path=${input_git_paths[$index]}
     [[ -f "$source_path" && ! -L "$source_path" ]] ||
         fail "required OOC input is not a regular non-symlink: $source_path"
-    git -C "$ROOT" show "${commit}:${git_path}" | cmp -s - "$source_path" ||
+    git_exact show "${commit}:${git_path}" | cmp -s - "$source_path" ||
         fail "OOC input does not match its committed blob: $git_path"
     install -m 600 -- "$source_path" "$output_dir/input/${input_names[$index]}"
 done
@@ -132,7 +162,8 @@ export LC_ALL=C LANG=C TZ=UTC HOME="$run_dir/home" TMPDIR="$run_dir/tmp"
 export XILINX_LOCAL_USER_DATA=no
 # shellcheck disable=SC1090
 source "$CANONICAL_SETTINGS"
-export LD_LIBRARY_PATH="$(dirname "$CANONICAL_LIBTINFO")${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+vivado_library_root=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o
+export LD_LIBRARY_PATH="${vivado_library_root}:$(dirname "$CANONICAL_LIBTINFO")${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
 PATH=/usr/bin:/bin:/opt/Xilinx/Vivado/2022.2/bin
 export PATH
 [[ "$(realpath -- "$(command -v vivado)")" == "$CANONICAL_VIVADO" ]] ||
@@ -140,8 +171,7 @@ export PATH
 [[ "$(sha256 "$CANONICAL_VIVADO")" == "$EXPECTED_VIVADO_SHA256" ]] ||
     fail "Vivado launcher hash does not match the qualified installation"
 
-ldd /opt/Xilinx/Vivado/2022.2/lib/lnx64.o/librdi_commontasks.so \
-    >"$output_dir/lib-resolution.txt"
+ldd "$CANONICAL_LIBEDIT" >"$output_dir/lib-resolution.txt"
 resolved_libtinfo="$(awk '$1 == "libtinfo.so.5" {print $3}' \
     "$output_dir/lib-resolution.txt")"
 [[ -n "$resolved_libtinfo" ]] || fail "Vivado runtime did not resolve libtinfo.so.5"
@@ -169,7 +199,7 @@ python_version="$(
 printf '%s\n' "$python_version" >"$output_dir/.python-version.tmp"
 mv -- "$output_dir/.python-version.tmp" "$output_dir/python-version.txt"
 
-branch="$(git -C "$ROOT" branch --show-current)"
+branch="$(git_exact branch --show-current)"
 {
     echo "schema=plutosdr-fw.tandem-agc-ooc.v1"
     echo "commit=${commit}"
@@ -183,6 +213,12 @@ branch="$(git -C "$ROOT" branch --show-current)"
     echo "l_clk_period_ns=16.276"
     echo "vivado_settings_sha256=${EXPECTED_SETTINGS_SHA256}"
     echo "vivado_launcher_sha256=${EXPECTED_VIVADO_SHA256}"
+    echo "vivado_setup_env_sha256=${EXPECTED_SETUP_ENV_SHA256}"
+    echo "vivado_binary_sha256=${EXPECTED_VIVADO_BINARY_SHA256}"
+    echo "vivado_loader_sha256=${EXPECTED_LOADER_SHA256}"
+    echo "vivado_nested_settings_sha256=${EXPECTED_VIVADO_SETTINGS_CHILD_SHA256}"
+    echo "vitis_hls_nested_settings_sha256=${EXPECTED_HLS_SETTINGS_CHILD_SHA256}"
+    echo "libedit_sha256=${EXPECTED_LIBEDIT_SHA256}"
     echo "libtinfo_sha256=${EXPECTED_LIBTINFO_SHA256}"
     echo "python=${python_version}"
 } >"$output_dir/.provenance.tmp"
@@ -198,9 +234,9 @@ vivado_status=$?
 set -e
 [[ $vivado_status -eq 0 ]] || fail "Vivado OOC route failed (see $output_dir/vivado.log)"
 
-[[ "$(git -C "$ROOT" rev-parse --verify HEAD)" == "$commit" ]] ||
+[[ "$(git_exact rev-parse --verify HEAD)" == "$commit" ]] ||
     fail "firmware HEAD changed during OOC routing"
-[[ -z "$(git -C "$ROOT" status --porcelain)" ]] ||
+[[ -z "$(git_exact status --porcelain)" ]] ||
     fail "firmware source tree changed during OOC routing"
 for index in "${!input_names[@]}"; do
     cmp -s -- "${input_sources[$index]}" "$output_dir/input/${input_names[$index]}" ||
@@ -312,9 +348,9 @@ manifest_sha256="$(sha256 "$output_ref/evidence-sha256.txt")"
     fail "output path became a symlink or non-directory during final promotion"
 [[ "$(stat -c '%d:%i:%f:%u:%g' "$output_parent")" == "$parent_identity" ]] ||
     fail "output parent identity changed during final promotion"
-[[ "$(git -C "$ROOT" rev-parse --verify HEAD)" == "$commit" ]] ||
+[[ "$(git_exact rev-parse --verify HEAD)" == "$commit" ]] ||
     fail "firmware HEAD changed during final promotion"
-[[ -z "$(git -C "$ROOT" status --porcelain)" ]] ||
+[[ -z "$(git_exact status --porcelain)" ]] ||
     fail "firmware source tree changed during final promotion"
 for index in "${!input_names[@]}"; do
     cmp -s -- "${input_sources[$index]}" \

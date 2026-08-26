@@ -289,7 +289,8 @@ def _validate_vivado_log(text: str) -> None:
     aggregate_lines = [
         line
         for line in text.splitlines()
-        if "Critical Warning" in line and "Errors encountered." in line
+        if re.search(r"critical warnings?", line, flags=re.IGNORECASE)
+        and re.search(r"errors?\s+encountered", line, flags=re.IGNORECASE)
     ]
     if not aggregate_lines:
         _fail("Vivado log has no message-count aggregate")
@@ -691,6 +692,8 @@ def _numeric_row(line: str, *, label: str) -> tuple[Decimal | int, ...]:
                     _fail(f"{label} integer field {index} is malformed")
                 values.append(int(field))
             else:
+                if re.fullmatch(r"-?[0-9]+\.[0-9]{3}", field) is None:
+                    _fail(f"{label} decimal field {index} is noncanonical")
                 values.append(Decimal(field))
         except InvalidOperation as error:
             raise ValidationError(f"{label} has an invalid decimal") from error
@@ -774,12 +777,15 @@ def _validate_timing(text: str) -> dict[str, str]:
     )
     if design_summary.count("All user specified timing constraints are met.") != 1:
         _fail("timing success sentence is not unique and scoped")
-    total_line = _line_after_table_header(
+    design_rows = _table_rows_after_header(
         design_summary,
-        "WNS(ns)      TNS(ns)  TNS Failing Endpoints",
-        "design timing summary",
+        header_fragment="WNS(ns)      TNS(ns)  TNS Failing Endpoints",
+        label="design timing summary",
+        expected_tail=("All user specified timing constraints are met.",),
     )
-    total = _numeric_row(total_line, label="design timing summary")
+    if len(design_rows) != 1:
+        _fail("design timing summary must contain exactly one numeric row")
+    total = _numeric_row(design_rows[0], label="design timing summary")
     if total != TIMING_TOTAL:
         _fail(f"design timing summary is not exact: {total}")
 
@@ -1056,9 +1062,10 @@ def _validate_utilization(text: str) -> None:
     if text.count(black_box_marker) != 1:
         _fail("utilization black-box section is not unique")
     black_box_section = text.split(black_box_marker, 1)[1]
-    if "\n10. Instantiated Netlists\n" not in black_box_section:
-        _fail("utilization black-box section has no exact end boundary")
-    black_box_section = black_box_section.split("\n10. Instantiated Netlists\n", 1)[0]
+    end_marker = "\n10. Instantiated Netlists\n"
+    if black_box_section.count(end_marker) != 1:
+        _fail("utilization black-box section has no unique exact end boundary")
+    black_box_section = black_box_section.split(end_marker, 1)[0]
     black_box_lines = [line.strip() for line in black_box_section.splitlines() if line.strip()]
     if black_box_lines != [
         "+----------+------+",

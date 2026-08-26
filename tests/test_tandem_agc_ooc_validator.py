@@ -846,6 +846,12 @@ def test_vivado_log_anchored_critical_error_and_fatal_reject(tmp_path: Path) -> 
         with pytest.raises(VALIDATOR.ValidationError):
             _validate(tmp_path)
 
+    _valid_reports(tmp_path)
+    with (tmp_path / "vivado.log").open("a", encoding="utf-8") as stream:
+        stream.write("1 Info, 1 Warning, 1 Critical Warning and 0 Error encountered.\n")
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
 
 def test_unstructured_critical_report_message_rejects(tmp_path: Path) -> None:
     _valid_reports(tmp_path)
@@ -877,6 +883,42 @@ def test_spoofed_good_rows_do_not_mask_bad_scoped_rows(tmp_path: Path) -> None:
     with timing.open("a", encoding="utf-8") as stream:
         stream.write("5. checking no_input_delay (137)\n")
 
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+
+def test_timing_rejects_second_total_row_and_noncanonical_zero(tmp_path: Path) -> None:
+    _valid_reports(tmp_path)
+    timing = tmp_path / "timing_summary.rpt"
+    total = (
+        "      3.765        0.000                      0                 1806"
+        "        0.079        0.000                      0                 1806"
+        "        4.500        0.000                       0                   698"
+    )
+    _replace(timing, total, total + "\n" + total.replace("3.765", "-1.000", 1))
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+    _valid_reports(tmp_path)
+    _replace(
+        timing,
+        "3.765        0.000                      0                 1806",
+        "3.765        0E999                      0                 1806",
+    )
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+
+def test_black_box_section_rejects_decoy_end_marker(tmp_path: Path) -> None:
+    _valid_reports(tmp_path)
+    utilization = tmp_path / "utilization.rpt"
+    _replace(
+        utilization,
+        "| Ref Name | Used |\n+----------+------+\n\n\n10. Instantiated Netlists",
+        "| Ref Name | Used |\n+----------+------+\n"
+        "\n10. Instantiated Netlists\n"
+        "| evil_stub | 1 |\n\n10. Instantiated Netlists",
+    )
     with pytest.raises(VALIDATOR.ValidationError):
         _validate(tmp_path)
 
