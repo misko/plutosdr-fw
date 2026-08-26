@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC15 trusted workflow ends after the build job uploads the exact deployment
+- The RC16 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -150,13 +150,18 @@ RC14 locked `2fb96f7a207848e6579293addbaa27fc0a59f5a9`; trusted run
 `32993231088` and candidate index
 `7fb1616eee706350b124a84a053ea2340d25de9fa4a2366c421fc06fc78f306d`
 passed, but utility preflight failed before reboot/DFU and produced no receipt.
-The forward-only RC15 route uses branch
-`codex/firmware-tandem-agc-v8-rc15`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc15`, and source lock
-`refs/tags/tandem-agc-v8-rc15-source/firmware-v1`; it does not move or reuse
-RC12 through RC14's branch, source lock, artifact, or evidence index. RC15 pins
+RC15 then passed trusted run `32998047232` and candidate indexing, but its first
+db696 transaction rejected the real sysfs symlink before candidate download.
+Guarded recovery returned persistent RC1 with unchanged QSPI, safe state, and
+route cleanup. RC15 has no valid deployment receipt and remains immutable.
+
+The forward-only RC16 route uses branch
+`codex/firmware-tandem-agc-v8-rc16`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc16`, and source lock
+`refs/tags/tandem-agc-v8-rc16-source/firmware-v1`; it does not move or reuse
+RC12 through RC15's branch, source lock, artifact, or evidence index. RC16 pins
 `pluto-plus-utils` commit
-`5ab8361211e747387c5dfa854f5ae65a6a4dac87` as the sole live device operator.
+`2654f34eb909904ec65bc0526e0f8977cb30e2ed` as the sole live device operator.
 The firmware repository produces the private candidate plan and validates the
 original utility plan, inventory, operation, and measured receipt. The utility
 uses password-only/no-host-key-checking SSH for ephemeral RAM keys while
@@ -209,7 +214,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC15 workflow has no separate attestation job. An operator may capture GitHub
+The RC16 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

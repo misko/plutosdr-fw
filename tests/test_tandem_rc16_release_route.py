@@ -1,12 +1,12 @@
-"""Offline oracles for the protected tandem AGC v8 RC15 utility route."""
+"""Offline oracles for the protected tandem AGC v8 RC16 recovery route."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RC14_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc14-source.yaml"
 RC15_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc15-source.yaml"
+RC16_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc16-source.yaml"
 FINAL_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 OFFLINE = ROOT / "scripts" / "check_tandem_release_offline.sh"
@@ -30,73 +30,64 @@ def _manifest_values(path: Path) -> dict[str, str]:
     return values
 
 
-def test_rc15_reuses_the_exact_rc14_and_final_external_source_graph() -> None:
-    rc14 = _manifest_values(RC14_MANIFEST)
-    rc15 = _manifest_values(RC15_MANIFEST)
-    final = _manifest_values(FINAL_MANIFEST)
-
-    assert rc15 == rc14 == final
-    assert rc15["release_state"] == "candidate"
-    assert "release_tag" not in rc15
-
-
-def test_rc15_owner_route_maps_branch_manifest_package_and_version_together() -> None:
-    workflow = WORKFLOW.read_text(encoding="utf-8")
-    branch = "refs/heads/codex/firmware-tandem-agc-v8-rc15"
-
-    assert workflow.count(branch) == 4
-    assert workflow.count("'tandem-agc-v8-rc15-source.yaml'") == 1
-    assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc15'") == 1
-    assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc15'") == 1
-    assert "Require the exact protected RC15 reproduction identity" in workflow
-    assert workflow.index(branch) < workflow.index(
-        "refs/heads/codex/firmware-tandem-agc-v8-rc14"
+def test_rc16_reuses_the_exact_rc15_and_final_external_source_graph() -> None:
+    assert (
+        _manifest_values(RC16_MANIFEST)
+        == _manifest_values(RC15_MANIFEST)
+        == _manifest_values(FINAL_MANIFEST)
     )
 
 
-def test_rc15_is_in_every_offline_and_protected_package_gate() -> None:
+def test_rc16_owner_route_maps_branch_manifest_package_and_version() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    branch = "refs/heads/codex/firmware-tandem-agc-v8-rc16"
+    assert workflow.count(branch) == 4
+    assert workflow.count("'tandem-agc-v8-rc16-source.yaml'") == 1
+    assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc16'") == 1
+    assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc16'") == 1
+    assert "Require the exact protected RC16 candidate identity" in workflow
+    assert workflow.index(branch) < workflow.index(
+        "refs/heads/codex/firmware-tandem-agc-v8-rc15"
+    )
+
+
+def test_rc16_is_in_every_offline_and_protected_package_gate() -> None:
     offline = OFFLINE.read_text(encoding="utf-8")
     package = PACKAGE.read_text(encoding="utf-8")
-
-    assert "tests/test_tandem_rc15_release_route.py" in offline
+    assert "tests/test_tandem_rc16_release_route.py" in offline
     assert (
-        "./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc15-source.yaml"
+        "./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc16-source.yaml"
         in offline
     )
-    assert "tandem-agc-v8-rc15-source.yaml:*" in package
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc15" in package
+    assert "tandem-agc-v8-rc16-source.yaml:*" in package
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc16" in package
 
 
-def test_rc15_preserves_its_burned_utility_while_rc16_advances() -> None:
-    expected = "5ab8361211e747387c5dfa854f5ae65a6a4dac87"
-    assert expected in RC15_MANIFEST.read_text(encoding="utf-8")
-    advanced = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
-    for path in (WRAPPER, BINDING):
-        assert advanced in path.read_text(encoding="utf-8")
-    source = BINDING.read_text(encoding="utf-8")
-    assert "pluto-plus-utils.release-candidate-ram-receipt.v1" in source
+def test_rc16_pins_the_recovery_corrected_pushed_utility() -> None:
+    expected = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
+    for path in (WRAPPER, BINDING, RC16_MANIFEST):
+        assert expected in path.read_text(encoding="utf-8")
     assert 'pluto firmware candidate-ram "$@"' in WRAPPER.read_text(encoding="utf-8")
 
 
-def test_rc15_history_is_retained_while_rc16_is_active() -> None:
+def test_rc16_evidence_identity_and_docs_are_active() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
-
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc16" in evidence
     assert "refs/tags/tandem-agc-v8-rc16-source/firmware-v1" in evidence
     for source in sources:
-        assert "RC15" in source
+        assert "RC16" in source
+        assert "2654f34eb909904ec65bc0526e0f8977cb30e2ed" in source
         assert "pluto-plus-utils" in source
     assert "The active candidate is RC16" in sources[0]
-    assert "zero RC14 RAM transitions" in sources[1]
+    assert "RC15" in sources[1]
 
 
-def test_rc15_keeps_single_owner_optional_github_attestation_policy() -> None:
+def test_rc16_keeps_single_owner_optional_github_attestation_policy() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
     assert "The RC16 workflow has no separate attestation job." in runner

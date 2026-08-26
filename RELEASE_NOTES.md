@@ -33,7 +33,8 @@
 | `tandem-agc-v8-rc12` | 2026-08-26 | **successful indexed build; observed RAM boot, no deployment receipt; not hardware-qualified** | paired DFU download/detach succeeded on db696, but the ephemeral RAM SSH host key prevented receipt publication |
 | `tandem-agc-v8-rc13` | 2026-08-26 | **source-locked; trusted run queued without a job; superseded before artifact/hardware** | removed the unsatisfiable retained host-key pin and advanced the measured RAM receipt to v4 |
 | `tandem-agc-v8-rc14` | 2026-08-26 | **successful indexed build; zero RAM transitions; superseded** | native utility ownership was integrated, but live preflight exposed global libiio discovery and capability-name defects before reboot/DFU |
-| `tandem-agc-v8-rc15` | 2026-08-26 | **active development; not hardware-qualified** | pins corrected `pluto-plus-utils` direct exact-USB attestation and preserves the original plan/inventory/operation/receipt chain |
+| `tandem-agc-v8-rc15` | 2026-08-26 | **successful indexed build; zero candidate downloads; superseded** | exact DFU transition reached b674, then failed closed on the real-kernel sysfs symlink before candidate bytes transferred |
+| `tandem-agc-v8-rc16` | 2026-08-26 | **active development; not hardware-qualified** | pins corrected exact-topology DFU resolution and guarded unknown-transition recovery in `pluto-plus-utils` |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -42,9 +43,24 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc15 — 2026-08-26 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc16 — 2026-08-26 — **active development; not hardware-qualified**
 
-RC15 retains RC14's firmware implementation and complete external source graph.
+RC16 retains RC15's firmware implementation and complete external source graph.
+It pins pushed `misko/pluto-plus-utils` main commit
+`2654f34eb909904ec65bc0526e0f8977cb30e2ed`, which accepts the real kernel
+`/sys/bus/usb/devices/<topology>` symlink while still binding the resolved node
+to the exact topology. It also provides a guarded recovery/attestation command
+for an unknown transition, including an already-returned runtime and an explicit
+expected persistent firmware identity. RC16 uses branch
+`codex/firmware-tandem-agc-v8-rc16`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc16`, manifest
+`manifests/tandem-agc-v8-rc16-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc16`, and source lock
+`refs/tags/tandem-agc-v8-rc16-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc15 — 2026-08-26 — **successful indexed build; zero candidate downloads; superseded**
+
+RC15 retained RC14's firmware implementation and complete external source graph.
 It pins pushed `misko/pluto-plus-utils` main commit
 `5ab8361211e747387c5dfa854f5ae65a6a4dac87`, which opens the exact
 topology-bound USB-IIO URI directly, cross-checks the live serial, model, and
@@ -56,6 +72,27 @@ branch `codex/firmware-tandem-agc-v8-rc15`, version
 `manifests/tandem-agc-v8-rc15-source.yaml`, package prefix
 `plutoplus-spf-tandem-agc-v8-rc15`, and source lock
 `refs/tags/tandem-agc-v8-rc15-source/firmware-v1`.
+
+RC15 locked exact commit `5e84a0cdd19f7635e688821d926ee7eca39c7eab`.
+Trusted run `32998047232`, attempt 1, succeeded with artifact ID `9618005590`.
+Bundle SHA-256 is
+`8329a2de2b62815192fc0e2b4fbe5835e6f434ab6c4b1fdbe34ddd409eb5e4d3`;
+DFU SHA-256 is
+`0f431cf97958085d129ca1beebefa4793a9c66df5a7040cdb25f4a7ed74fd6f2`;
+FIT SHA-256 is
+`0a293879252b30101bd76ce830140532e27a843b7856a7bb793c094e620f2cc7`;
+and candidate-index SHA-256 is
+`82838fe2e8d980c6097c80634c890eae30aac678f52708aafe07c112ad9e5dd9`.
+On db696 the guarded execute passed pre-attestation and requested RAM mode, but
+the exact b674 resolver rejected the real kernel sysfs symlink before any
+candidate download. The unknown receipt SHA-256 is
+`1bb16cb1e72a458fcd9a4a6d2b298978de62fa38845483bcbc01c73914abe4a6`.
+Corrected utility recovery returned the same radio to persistent RC1, proved
+the pre-attempt `qspi-linux` digest unchanged and the final safe state, and
+removed the `/32` route; recovery receipt SHA-256 is
+`e82d8ae9aff57ff255aea0347b1bcc60f7f800546d6e3a847a192f65fc10b6ee`.
+RC15 therefore has no candidate download or valid deployment receipt and is
+immutable but superseded by RC16.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc14 — 2026-08-26 — **successful indexed build; zero RAM transitions; superseded**
 
@@ -435,7 +472,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC15 route still requires the complete external paired-behavior,
+active RC16 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

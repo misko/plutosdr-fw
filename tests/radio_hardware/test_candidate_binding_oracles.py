@@ -19,7 +19,7 @@ from .candidate_binding import (
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SERIAL = "104473222a87000abc00123456789def"
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc15"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc16"
 
 
 def _artifact_index() -> dict[str, Any]:
@@ -36,7 +36,7 @@ def _artifact_index() -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc15-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc16-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1234, "run_attempt": 1},

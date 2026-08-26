@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC15, but the
+# The external component graph remains identical from RC4 through RC16, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -35,8 +35,11 @@
 # 9ef137768d59925acf21d5cd3ff71d1cb523dba7 while retaining every operational
 # guard and keeping plutosdr-fw as the release-plan/evidence-policy owner. Its
 # trusted build/index passed, but utility preflight exposed global-discovery and
-# capability-name defects before reboot or DFU. RC15 pins corrected utility
-# commit 5ab8361211e747387c5dfa854f5ae65a6a4dac87 and must pass its new
+# capability-name defects before reboot or DFU. RC15 pinned that correction and
+# passed build/indexing, then failed closed on the real sysfs DFU symlink before
+# candidate download. RC16 pins utility commit
+# 2654f34eb909904ec65bc0526e0f8977cb30e2ed with exact symlink resolution and
+# guarded recovery, and must pass its new
 # source-locked build and full hardware qualification before this final graph is
 # used. The subsequent final build may change only the top-level release identity
 # and packaging, while requiring
