@@ -48,6 +48,7 @@ DFU_PRODUCT = "b674"
 DFU_ALT = "firmware.dfu"
 TRANSITION_METHOD = "download-then-detach-e"
 MAX_JSON_BYTES = 4 * 1024 * 1024
+MAX_PASSWORD_BYTES = 4096
 MAX_DFU_BYTES = 256 * 1024 * 1024
 MAX_HARNESS_BYTES = 32 * 1024 * 1024
 MAX_EVIDENCE_BYTES = 4 * 1024 * 1024 * 1024
@@ -130,6 +131,13 @@ class RuntimeAttestation:
 
 
 @dataclass(frozen=True)
+class HostRoute:
+    destination: str
+    interface: str
+    source: str
+
+
+@dataclass(frozen=True)
 class DeploymentOptions:
     serial: str
     artifact_path: Path
@@ -142,7 +150,7 @@ class DeploymentOptions:
     known_hosts_sha256: str
     ssh_host: str
     ssh_user: str
-    ssh_identity_file: Path | None
+    ssh_password_file: Path | None
     usb_interface: str | None
     operator_confirmation: str | None
     timeout_seconds: float
@@ -150,6 +158,12 @@ class DeploymentOptions:
 
 class HardwareBackend(Protocol):
     def inventory(self) -> tuple[UsbDevice, ...]: ...
+
+    def acquire_host_route(self, *, interface: str, host: str) -> HostRoute: ...
+
+    def ensure_host_route(self, route: HostRoute, *, interface: str) -> None: ...
+
+    def release_host_route(self, route: HostRoute) -> None: ...
 
     def attest_runtime(
         self,
@@ -207,9 +221,12 @@ def _canonical_absolute(path: Path, *, label: str, must_exist: bool = True) -> P
     return resolved
 
 
-def _read_owned_regular(
+OwnedFileIdentity = tuple[int, int, int, int, int]
+
+
+def _read_owned_regular_with_identity(
     path: Path, *, label: str, maximum_bytes: int, required_mode: int | None = None
-) -> bytes:
+) -> tuple[bytes, OwnedFileIdentity]:
     path = _canonical_absolute(path, label=label)
     try:
         before = path.lstat()
@@ -227,10 +244,24 @@ def _read_owned_regular(
     descriptor = os.open(path, flags)
     try:
         opened = os.fstat(descriptor)
-        if (opened.st_dev, opened.st_ino, opened.st_size) != (
+        if (
+            opened.st_dev,
+            opened.st_ino,
+            opened.st_mode,
+            opened.st_uid,
+            opened.st_nlink,
+            opened.st_size,
+            opened.st_mtime_ns,
+            opened.st_ctime_ns,
+        ) != (
             before.st_dev,
             before.st_ino,
+            before.st_mode,
+            before.st_uid,
+            before.st_nlink,
             before.st_size,
+            before.st_mtime_ns,
+            before.st_ctime_ns,
         ):
             raise DeploymentError(f"{label} changed while it was opened")
         chunks: list[bytes] = []
@@ -247,18 +278,63 @@ def _read_owned_regular(
         if (
             after.st_dev,
             after.st_ino,
+            after.st_mode,
+            after.st_uid,
+            after.st_nlink,
             after.st_size,
             after.st_mtime_ns,
+            after.st_ctime_ns,
         ) != (
             opened.st_dev,
             opened.st_ino,
+            opened.st_mode,
+            opened.st_uid,
+            opened.st_nlink,
             opened.st_size,
             opened.st_mtime_ns,
+            opened.st_ctime_ns,
         ):
             raise DeploymentError(f"{label} changed during read")
-        return b"".join(chunks)
+        return b"".join(chunks), (
+            after.st_dev,
+            after.st_ino,
+            after.st_size,
+            after.st_mtime_ns,
+            after.st_ctime_ns,
+        )
     finally:
         os.close(descriptor)
+
+
+def _read_owned_regular(
+    path: Path, *, label: str, maximum_bytes: int, required_mode: int | None = None
+) -> bytes:
+    payload, _identity = _read_owned_regular_with_identity(
+        path,
+        label=label,
+        maximum_bytes=maximum_bytes,
+        required_mode=required_mode,
+    )
+    return payload
+
+
+def _read_password_file(
+    path: Path, *, expected_identity: OwnedFileIdentity | None = None
+) -> OwnedFileIdentity:
+    payload, identity = _read_owned_regular_with_identity(
+        path,
+        label="SSH password file",
+        maximum_bytes=MAX_PASSWORD_BYTES,
+        required_mode=0o600,
+    )
+    password = payload[:-1] if payload.endswith(b"\n") else payload
+    if not password or b"\n" in password or b"\r" in payload or b"\x00" in payload:
+        raise DeploymentError(
+            "SSH password file must contain exactly one nonempty password line"
+        )
+    if expected_identity is not None and identity != expected_identity:
+        raise DeploymentError("SSH password file changed after execution preflight")
+    return identity
 
 
 def _descriptor_sha256(descriptor: int, *, expected_bytes: int) -> str:
@@ -962,28 +1038,49 @@ def select_interface(device: UsbDevice, requested: str | None) -> str:
     return interfaces[0]
 
 
-def _request_ram_argv(options: DeploymentOptions, interface: str) -> list[str]:
-    ssh = [
+def _ssh_base_argv(options: DeploymentOptions, interface: str) -> list[str]:
+    if options.ssh_password_file is None:
+        raise DeploymentError("SSH password file is required for an executable plan")
+    return [
+        "sshpass",
+        "-f",
+        str(options.ssh_password_file),
         "ssh",
         "-F",
         "/dev/null",
         "-B",
         interface,
         "-o",
-        "BatchMode=yes",
+        "BatchMode=no",
+        "-o",
+        "NumberOfPasswordPrompts=1",
+        "-o",
+        "PreferredAuthentications=password",
+        "-o",
+        "PasswordAuthentication=yes",
+        "-o",
+        "PubkeyAuthentication=no",
+        "-o",
+        "KbdInteractiveAuthentication=no",
         "-o",
         "StrictHostKeyChecking=yes",
         "-o",
         f"UserKnownHostsFile={options.known_hosts_path}",
         "-o",
+        "GlobalKnownHostsFile=/dev/null",
+        "-o",
         "CheckHostIP=no",
+        "-o",
+        "UpdateHostKeys=no",
     ]
-    if options.ssh_identity_file is not None:
-        ssh.extend(("-i", str(options.ssh_identity_file)))
-    ssh.extend(
-        (f"{options.ssh_user}@{options.ssh_host}", "/usr/sbin/device_reboot ram")
-    )
-    return ssh
+
+
+def _request_ram_argv(options: DeploymentOptions, interface: str) -> list[str]:
+    return [
+        *_ssh_base_argv(options, interface),
+        f"{options.ssh_user}@{options.ssh_host}",
+        "/usr/sbin/device_reboot ram",
+    ]
 
 
 def build_command_plan(
@@ -1192,6 +1289,50 @@ def _open_radio_lock(serial: str) -> Any:
             os.close(descriptor)
 
 
+def _open_host_route_lock(host: str) -> Any:
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError as error:
+        raise DeploymentError(
+            "host-route lock requires a literal IP address"
+        ) from error
+    if address.version != 4:
+        raise DeploymentError("host-route lock requires a literal IPv4 address")
+    path = Path(f"/tmp/plutosdr-fw-host-route-{str(address).replace('.', '_')}.lock")
+    flags = (
+        os.O_CREAT
+        | os.O_RDWR
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        descriptor = os.open(path, flags, 0o600)
+    except OSError as error:
+        raise DeploymentError(
+            f"global host-route lock cannot be opened safely: {path}"
+        ) from error
+    try:
+        info = os.fstat(descriptor)
+        path_info = path.lstat()
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_nlink != 1
+            or (info.st_dev, info.st_ino) != (path_info.st_dev, path_info.st_ino)
+        ):
+            raise DeploymentError("global host-route lock is not an owned regular file")
+        if stat.S_IMODE(info.st_mode) != 0o600:
+            os.fchmod(descriptor, 0o600)
+            if stat.S_IMODE(os.fstat(descriptor).st_mode) != 0o600:
+                raise DeploymentError("global host-route lock mode is not 0600")
+        lock = os.fdopen(descriptor, "r+", encoding="utf-8")
+        descriptor = -1
+        return lock
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
 def _attestation_is_safe(value: RuntimeAttestation) -> bool:
     return bool(
         value.tx_muted
@@ -1209,6 +1350,17 @@ def execute_deployment(
     artifact = load_candidate_artifact(options)
     if options.operator_confirmation != f"RAM BOOT {options.serial}":
         raise DeploymentError("operator confirmation must be exactly RAM BOOT <serial>")
+    if options.ssh_password_file is None:
+        raise DeploymentError("SSH password file is required for execution")
+    _read_password_file(options.ssh_password_file)
+    try:
+        options.ssh_password_file.relative_to(artifact.index_path.parent)
+    except ValueError:
+        pass
+    else:
+        raise DeploymentError(
+            "SSH password file must be outside the candidate evidence archive"
+        )
     _receipt_output_path(
         options.receipt_path,
         serial=options.serial,
@@ -1223,7 +1375,10 @@ def execute_deployment(
     if _sha256_bytes(known_hosts) != options.known_hosts_sha256:
         raise DeploymentError("known-hosts SHA-256 differs from the requested value")
 
-    with _open_radio_lock(options.serial) as lock:
+    with (
+        _open_radio_lock(options.serial) as lock,
+        _open_host_route_lock(options.ssh_host) as route_lock,
+    ):
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError as error:
@@ -1237,6 +1392,23 @@ def execute_deployment(
             locked_path_info.st_ino,
         ):
             raise DeploymentError("exact-radio lock path changed during acquisition")
+        try:
+            fcntl.flock(route_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as error:
+            raise DeploymentError(
+                "another deployment owns the global SSH host-route lease"
+            ) from error
+        route_lock_info = os.fstat(route_lock.fileno())
+        route_lock_path = Path(
+            f"/tmp/plutosdr-fw-host-route-{options.ssh_host.replace('.', '_')}.lock"
+        ).lstat()
+        if (route_lock_info.st_dev, route_lock_info.st_ino) != (
+            route_lock_path.st_dev,
+            route_lock_path.st_ino,
+        ):
+            raise DeploymentError(
+                "global host-route lock path changed during acquisition"
+            )
         device = resolve_device(
             backend.inventory(), serial=options.serial, product_id=RUNTIME_PRODUCT
         )
@@ -1260,133 +1432,204 @@ def execute_deployment(
             os.close(sealed_dfu)
             raise
 
-        started = time.time_ns()
-        transition_started = False
         try:
-            pre = backend.attest_runtime(
-                device,
-                interface=interface,
-                expected_firmware=options.expected_current_firmware,
-                force_safe=True,
+            route = backend.acquire_host_route(
+                interface=interface, host=options.ssh_host
             )
-            if (
-                pre.serial != options.serial
-                or pre.hardware_model != artifact.hardware_model
-                or pre.firmware_version != options.expected_current_firmware
-                or not pre.boot_id
-                or not _attestation_is_safe(pre)
-            ):
-                raise DeploymentError(
-                    "pre-reboot runtime identity/state is not fail-closed"
-                )
-            attest_candidate_inputs(options, artifact)
-            transition_started = True
-            backend.request_ram_mode(commands[0]["argv"])
-            dfu_device = backend.wait_for_mode(
-                serial=options.serial,
-                topology=device.topology,
-                product_id=DFU_PRODUCT,
-                timeout_seconds=options.timeout_seconds,
-            )
-            resolve_device(
-                (dfu_device,),
-                serial=options.serial,
-                product_id=DFU_PRODUCT,
-                topology=device.topology,
-            )
-            backend.run_dfu(commands[1]["argv"])
-            backend.run_dfu(commands[2]["argv"])
-            returned = backend.wait_for_mode(
-                serial=options.serial,
-                topology=device.topology,
-                product_id=RUNTIME_PRODUCT,
-                timeout_seconds=options.timeout_seconds,
-            )
-            resolve_device(
-                (returned,),
-                serial=options.serial,
-                product_id=RUNTIME_PRODUCT,
-                topology=device.topology,
-            )
-            returned_interface = select_interface(returned, options.usb_interface)
-            post = backend.attest_runtime(
-                returned,
-                interface=returned_interface,
-                expected_firmware=artifact.firmware_version,
-                force_safe=True,
-            )
-            if pre.boot_id == post.boot_id:
-                raise DeploymentError("RAM deployment did not produce a new boot ID")
-            if (
-                post.serial != options.serial
-                or post.hardware_model != artifact.hardware_model
-                or post.firmware_version != artifact.firmware_version
-                or not _attestation_is_safe(post)
-            ):
-                raise DeploymentError(
-                    "returned runtime identity or safety state is invalid"
-                )
-            if (
-                pre.qspi_partition != "/dev/mtdblock3"
-                or post.qspi_partition != pre.qspi_partition
-                or pre.qspi_mtd_name != "qspi-linux"
-                or post.qspi_mtd_name != pre.qspi_mtd_name
-                or pre.qspi_bytes <= 0
-                or post.qspi_bytes != pre.qspi_bytes
-                or HEX_64.fullmatch(pre.qspi_sha256) is None
-                or post.qspi_sha256 != pre.qspi_sha256
-            ):
-                raise DeploymentError(
-                    "RAM deployment did not prove unchanged qspi-linux firmware bytes"
-                )
+            started = time.time_ns()
+            transition_started = False
+            receipt: dict[str, Any] | None = None
+            operation_error: BaseException | None = None
+            try:
+                try:
+                    pre = backend.attest_runtime(
+                        device,
+                        interface=interface,
+                        expected_firmware=options.expected_current_firmware,
+                        force_safe=True,
+                    )
+                    if (
+                        pre.serial != options.serial
+                        or pre.hardware_model != artifact.hardware_model
+                        or pre.firmware_version != options.expected_current_firmware
+                        or not pre.boot_id
+                        or not _attestation_is_safe(pre)
+                    ):
+                        raise DeploymentError(
+                            "pre-reboot runtime identity/state is not fail-closed"
+                        )
+                    attest_candidate_inputs(options, artifact)
+                    transition_started = True
+                    backend.request_ram_mode(commands[0]["argv"])
+                    dfu_device = backend.wait_for_mode(
+                        serial=options.serial,
+                        topology=device.topology,
+                        product_id=DFU_PRODUCT,
+                        timeout_seconds=options.timeout_seconds,
+                    )
+                    resolve_device(
+                        (dfu_device,),
+                        serial=options.serial,
+                        product_id=DFU_PRODUCT,
+                        topology=device.topology,
+                    )
+                    backend.run_dfu(commands[1]["argv"])
+                    backend.run_dfu(commands[2]["argv"])
+                    returned = backend.wait_for_mode(
+                        serial=options.serial,
+                        topology=device.topology,
+                        product_id=RUNTIME_PRODUCT,
+                        timeout_seconds=options.timeout_seconds,
+                    )
+                    resolve_device(
+                        (returned,),
+                        serial=options.serial,
+                        product_id=RUNTIME_PRODUCT,
+                        topology=device.topology,
+                    )
+                    returned_interface = select_interface(
+                        returned, options.usb_interface
+                    )
+                    backend.ensure_host_route(route, interface=returned_interface)
+                    post = backend.attest_runtime(
+                        returned,
+                        interface=returned_interface,
+                        expected_firmware=artifact.firmware_version,
+                        force_safe=True,
+                    )
+                    if pre.boot_id == post.boot_id:
+                        raise DeploymentError(
+                            "RAM deployment did not produce a new boot ID"
+                        )
+                    if (
+                        post.serial != options.serial
+                        or post.hardware_model != artifact.hardware_model
+                        or post.firmware_version != artifact.firmware_version
+                        or not _attestation_is_safe(post)
+                    ):
+                        raise DeploymentError(
+                            "returned runtime identity or safety state is invalid"
+                        )
+                    if (
+                        pre.qspi_partition != "/dev/mtdblock3"
+                        or post.qspi_partition != pre.qspi_partition
+                        or pre.qspi_mtd_name != "qspi-linux"
+                        or post.qspi_mtd_name != pre.qspi_mtd_name
+                        or pre.qspi_bytes <= 0
+                        or post.qspi_bytes != pre.qspi_bytes
+                        or HEX_64.fullmatch(pre.qspi_sha256) is None
+                        or post.qspi_sha256 != pre.qspi_sha256
+                    ):
+                        raise DeploymentError(
+                            "RAM deployment did not prove unchanged qspi-linux firmware bytes"
+                        )
 
-            completed = time.time_ns()
-            receipt: dict[str, Any] = {
-                "schema": RECEIPT_SCHEMA,
-                "schema_version": RAM_BOOT_RECEIPT_SCHEMA_VERSION,
-                "verdict": "pass",
-                "boot_mode": "ram-only",
-                "radio": {"serial": options.serial},
-                "artifact_index_sha256": artifact.index_sha256,
-                "artifact": {"dfu_sha256": artifact.dfu_sha256},
-                "runtime": {
-                    "firmware_version": post.firmware_version,
-                    "hardware_model": post.hardware_model,
-                },
-                "boot": {"pre_id": pre.boot_id, "post_id": post.boot_id},
-                "persistent_flash": {
-                    "partition": pre.qspi_partition,
-                    "mtd_name": pre.qspi_mtd_name,
-                    "bytes": pre.qspi_bytes,
-                    "pre_sha256": pre.qspi_sha256,
-                    "post_sha256": post.qspi_sha256,
-                    "unchanged": True,
-                },
-                "safety": {
-                    "final_tx_muted": post.tx_muted,
-                    "final_dds_disabled": post.dds_disabled,
-                    "final_dac_selectors_zero": post.dac_selectors_zero,
-                    "final_tandem_state": post.tandem_state,
-                    "final_fifo_level": post.fifo_level,
-                    "final_fault_flags": post.fault_flags,
-                },
-                "timestamps": {
-                    "started_unix_ns": started,
-                    "completed_unix_ns": completed,
-                },
-                "topology": {
-                    "usb_port": device.topology,
-                    "pre_sysfs_path": device.sysfs_path,
-                    "dfu_sysfs_path": dfu_device.sysfs_path,
-                    "post_sysfs_path": returned.sysfs_path,
-                    "network_interface": returned_interface,
-                },
-                "commands": [
-                    {"phase": item["phase"], "argv": list(item["argv"])}
-                    for item in commands
-                ],
-                "known_hosts_sha256": options.known_hosts_sha256,
-            }
+                    receipt = {
+                        "schema": RECEIPT_SCHEMA,
+                        "schema_version": RAM_BOOT_RECEIPT_SCHEMA_VERSION,
+                        "verdict": "pass",
+                        "boot_mode": "ram-only",
+                        "radio": {"serial": options.serial},
+                        "artifact_index_sha256": artifact.index_sha256,
+                        "artifact": {"dfu_sha256": artifact.dfu_sha256},
+                        "runtime": {
+                            "firmware_version": post.firmware_version,
+                            "hardware_model": post.hardware_model,
+                        },
+                        "boot": {"pre_id": pre.boot_id, "post_id": post.boot_id},
+                        "persistent_flash": {
+                            "partition": pre.qspi_partition,
+                            "mtd_name": pre.qspi_mtd_name,
+                            "bytes": pre.qspi_bytes,
+                            "pre_sha256": pre.qspi_sha256,
+                            "post_sha256": post.qspi_sha256,
+                            "unchanged": True,
+                        },
+                        "safety": {
+                            "final_tx_muted": post.tx_muted,
+                            "final_dds_disabled": post.dds_disabled,
+                            "final_dac_selectors_zero": post.dac_selectors_zero,
+                            "final_tandem_state": post.tandem_state,
+                            "final_fifo_level": post.fifo_level,
+                            "final_fault_flags": post.fault_flags,
+                        },
+                        "timestamps": {
+                            "started_unix_ns": started,
+                            "completed_unix_ns": started,
+                        },
+                        "topology": {
+                            "usb_port": device.topology,
+                            "pre_sysfs_path": device.sysfs_path,
+                            "dfu_sysfs_path": dfu_device.sysfs_path,
+                            "post_sysfs_path": returned.sysfs_path,
+                            "network_interface": returned_interface,
+                        },
+                        "host_route": {
+                            "destination": route.destination,
+                            "interface": route.interface,
+                            "source": route.source,
+                            "release_verified": False,
+                        },
+                        "commands": [
+                            {"phase": item["phase"], "argv": list(item["argv"])}
+                            for item in commands
+                        ],
+                        "known_hosts_sha256": options.known_hosts_sha256,
+                    }
+                except BaseException as primary:  # noqa: BLE001 - release route lease
+                    if transition_started:
+                        try:
+                            cleanup_device = backend.wait_for_mode(
+                                serial=options.serial,
+                                topology=device.topology,
+                                product_id=RUNTIME_PRODUCT,
+                                timeout_seconds=options.timeout_seconds,
+                            )
+                            cleanup_interface = select_interface(
+                                cleanup_device, options.usb_interface
+                            )
+                            backend.ensure_host_route(
+                                route, interface=cleanup_interface
+                            )
+                            cleanup = backend.attest_runtime(
+                                cleanup_device,
+                                interface=cleanup_interface,
+                                expected_firmware=artifact.firmware_version,
+                                force_safe=True,
+                            )
+                            if (
+                                cleanup.serial != options.serial
+                                or cleanup.hardware_model != artifact.hardware_model
+                                or not _attestation_is_safe(cleanup)
+                            ):
+                                raise DeploymentError(
+                                    "failure cleanup did not prove safe state"
+                                )
+                        except BaseException as cleanup_error:  # noqa: BLE001
+                            primary = DeploymentError(
+                                f"deployment failed ({primary}); safe cleanup also "
+                                f"failed ({cleanup_error})"
+                            )
+                    operation_error = primary
+            finally:
+                try:
+                    backend.release_host_route(route)
+                except BaseException as route_error:  # noqa: BLE001 - lease cleanup
+                    if operation_error is None:
+                        operation_error = DeploymentError(
+                            f"host-route cleanup failed ({route_error})"
+                        )
+                    else:
+                        operation_error = DeploymentError(
+                            f"deployment failed ({operation_error}); host-route cleanup "
+                            f"also failed ({route_error})"
+                        )
+            if operation_error is not None:
+                raise operation_error
+            if receipt is None:
+                raise DeploymentError("deployment completed without a receipt record")
+            receipt["host_route"]["release_verified"] = True
+            receipt["timestamps"]["completed_unix_ns"] = time.time_ns()
             try:
                 validate_deployment_receipt(
                     receipt,
@@ -1400,9 +1643,8 @@ def execute_deployment(
                 raise DeploymentError(
                     f"constructed receipt semantics are invalid: {error}"
                 ) from error
-            # This is the last authorization check before the absent-only receipt
-            # publication.  It repeats semantic, byte, evidence, live-source, and
-            # committed-blob provenance checks after the hardware transition.
+            # Repeat every candidate and committed-runner binding after the
+            # transition and verified route cleanup, immediately before publish.
             attest_candidate_inputs(options, artifact)
             digest = _publish_receipt(
                 options.receipt_path,
@@ -1410,38 +1652,6 @@ def execute_deployment(
                 archive_root=artifact.index_path.parent,
             )
             return receipt, digest
-        except BaseException as primary:
-            if transition_started:
-                try:
-                    cleanup_device = backend.wait_for_mode(
-                        serial=options.serial,
-                        topology=device.topology,
-                        product_id=RUNTIME_PRODUCT,
-                        timeout_seconds=options.timeout_seconds,
-                    )
-                    cleanup_interface = select_interface(
-                        cleanup_device, options.usb_interface
-                    )
-                    cleanup = backend.attest_runtime(
-                        cleanup_device,
-                        interface=cleanup_interface,
-                        expected_firmware=artifact.firmware_version,
-                        force_safe=True,
-                    )
-                    if (
-                        cleanup.serial != options.serial
-                        or cleanup.hardware_model != artifact.hardware_model
-                        or not _attestation_is_safe(cleanup)
-                    ):
-                        raise DeploymentError(
-                            "failure cleanup did not prove safe state"
-                        )
-                except BaseException as cleanup_error:  # noqa: BLE001 - safety cleanup
-                    raise DeploymentError(
-                        f"deployment failed ({primary}); safe cleanup also failed "
-                        f"({cleanup_error})"
-                    ) from primary
-            raise
         finally:
             os.close(sealed_dfu)
 
@@ -1507,8 +1717,14 @@ class SystemBackend:
     ):
         self.options = options
         self.sysfs_root = sysfs_root
+        self._active_route: HostRoute | None = None
+        self._password_identity = (
+            _read_password_file(options.ssh_password_file)
+            if options.ssh_password_file is not None
+            else None
+        )
 
-    def _verify_known_hosts(self) -> None:
+    def _verify_ssh_inputs(self) -> None:
         payload = _read_owned_regular(
             self.options.known_hosts_path,
             label="known-hosts file",
@@ -1517,6 +1733,12 @@ class SystemBackend:
         )
         if _sha256_bytes(payload) != self.options.known_hosts_sha256:
             raise DeploymentError("known-hosts bytes changed before SSH execution")
+        if self.options.ssh_password_file is None or self._password_identity is None:
+            raise DeploymentError("SSH password file is required for execution")
+        _read_password_file(
+            self.options.ssh_password_file,
+            expected_identity=self._password_identity,
+        )
 
     def inventory(self) -> tuple[UsbDevice, ...]:
         devices: list[UsbDevice] = []
@@ -1555,27 +1777,251 @@ class SystemBackend:
             )
         return tuple(devices)
 
+    def _ip_json(self, arguments: Sequence[str], *, label: str) -> list[Any]:
+        try:
+            completed = subprocess.run(
+                ["ip", "-j", "-4", *arguments],
+                check=True,
+                text=True,
+                capture_output=True,
+                timeout=self.options.timeout_seconds,
+            )
+            value = json.loads(
+                completed.stdout,
+                object_pairs_hook=_json_no_duplicates,
+                parse_constant=lambda item: (_ for _ in ()).throw(
+                    DeploymentError(f"{label} contains non-finite value {item}")
+                ),
+            )
+        except (subprocess.SubprocessError, json.JSONDecodeError) as error:
+            raise DeploymentError(f"{label} failed") from error
+        if type(value) is not list:
+            raise DeploymentError(f"{label} did not return a JSON array")
+        return value
+
+    def _interface_source(self, interface: str) -> str:
+        if SAFE_INTERFACE.fullmatch(interface) is None:
+            raise DeploymentError("host-route interface is malformed")
+        records = self._ip_json(
+            ["address", "show", "dev", interface, "scope", "global"],
+            label="host-route source discovery",
+        )
+        sources: list[str] = []
+        for record in records:
+            if not isinstance(record, Mapping) or record.get("ifname") != interface:
+                raise DeploymentError("host-route source interface is not exact")
+            address_records = record.get("addr_info")
+            if not isinstance(address_records, list):
+                raise DeploymentError("host-route address inventory is malformed")
+            for address_record in address_records:
+                if (
+                    isinstance(address_record, Mapping)
+                    and address_record.get("family") == "inet"
+                    and address_record.get("scope") == "global"
+                ):
+                    local = address_record.get("local")
+                    try:
+                        parsed = ipaddress.ip_address(str(local))
+                    except ValueError as error:
+                        raise DeploymentError(
+                            "host-route source is not an IPv4 address"
+                        ) from error
+                    if parsed.version != 4:
+                        raise DeploymentError("host-route source is not IPv4")
+                    sources.append(str(parsed))
+        if len(sources) != 1:
+            raise DeploymentError(
+                f"expected one global IPv4 source on {interface}; found {sources}"
+            )
+        return sources[0]
+
+    def _exact_routes(self, destination: str) -> list[Any]:
+        return self._ip_json(
+            ["route", "show", "table", "all", "exact", destination],
+            label="exact host-route inventory",
+        )
+
+    @staticmethod
+    def _route_record_matches(record: object, route: HostRoute) -> bool:
+        if not isinstance(record, Mapping):
+            return False
+        destination = str(record.get("dst", ""))
+        if "/" not in destination:
+            destination += "/32"
+        try:
+            normalized = str(ipaddress.ip_network(destination, strict=True))
+        except ValueError:
+            return False
+        return bool(
+            normalized == route.destination
+            and record.get("dev") == route.interface
+            and record.get("prefsrc") == route.source
+            and record.get("scope") == "link"
+            and record.get("protocol") == "static"
+            and record.get("table", "main") in {"main", 254}
+            and "gateway" not in record
+            and "metric" not in record
+        )
+
+    def _verify_route_get(self, route: HostRoute) -> None:
+        host = route.destination.rsplit("/", 1)[0]
+        records = self._ip_json(
+            ["route", "get", host], label="selected host-route lookup"
+        )
+        if (
+            len(records) != 1
+            or not isinstance(records[0], Mapping)
+            or records[0].get("dev") != route.interface
+            or records[0].get("prefsrc") != route.source
+        ):
+            raise DeploymentError(
+                "selected SSH host route does not use the exact interface/source"
+            )
+
+    def _add_route(self, route: HostRoute) -> None:
+        try:
+            subprocess.run(
+                [
+                    "sudo",
+                    "-n",
+                    "ip",
+                    "route",
+                    "add",
+                    route.destination,
+                    "dev",
+                    route.interface,
+                    "src",
+                    route.source,
+                    "scope",
+                    "link",
+                    "proto",
+                    "static",
+                ],
+                check=True,
+                text=True,
+                capture_output=True,
+                timeout=self.options.timeout_seconds,
+            )
+        except subprocess.SubprocessError as error:
+            raise DeploymentError("exact host-route add failed") from error
+
+    def acquire_host_route(self, *, interface: str, host: str) -> HostRoute:
+        if self._active_route is not None:
+            raise DeploymentError("a host-route lease is already active")
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError as error:
+            raise DeploymentError("SSH host is not an IP address") from error
+        if address.version != 4:
+            raise DeploymentError("SSH host is not IPv4")
+        destination = f"{address}/32"
+        if self._exact_routes(destination):
+            raise DeploymentError(
+                f"refusing to overwrite preexisting exact route {destination}"
+            )
+        route = HostRoute(
+            destination=destination,
+            interface=interface,
+            source=self._interface_source(interface),
+        )
+        self._active_route = route
+        try:
+            self._add_route(route)
+            self.ensure_host_route(route, interface=interface)
+        except BaseException as primary:
+            try:
+                self.release_host_route(route)
+            except BaseException as cleanup_error:  # noqa: BLE001 - route cleanup
+                raise DeploymentError(
+                    f"host-route acquisition failed ({primary}); cleanup also failed "
+                    f"({cleanup_error})"
+                ) from primary
+            raise
+        return route
+
+    def ensure_host_route(self, route: HostRoute, *, interface: str) -> None:
+        if self._active_route != route or interface != route.interface:
+            raise DeploymentError("host-route lease/interface is not exact")
+        deadline = time.monotonic() + self.options.timeout_seconds
+        last_error: DeploymentError | None = None
+        while time.monotonic() < deadline:
+            try:
+                if self._interface_source(interface) != route.source:
+                    raise DeploymentError("host-route interface source changed")
+                records = self._exact_routes(route.destination)
+                if not records:
+                    # USB DFU re-enumeration may remove the kernel route with the
+                    # netdev. Re-add only the exact tuple owned by this lease.
+                    self._add_route(route)
+                    records = self._exact_routes(route.destination)
+                if len(records) != 1 or not self._route_record_matches(
+                    records[0], route
+                ):
+                    raise DeploymentError(
+                        "exact host-route tuple differs from the active lease"
+                    )
+                self._verify_route_get(route)
+                return
+            except DeploymentError as error:
+                last_error = error
+                records = self._exact_routes(route.destination)
+                if records and (
+                    len(records) != 1
+                    or not self._route_record_matches(records[0], route)
+                ):
+                    raise
+                time.sleep(0.25)
+        raise DeploymentError(
+            f"timed out verifying exact host-route lease: {last_error}"
+        )
+
+    def release_host_route(self, route: HostRoute) -> None:
+        if self._active_route != route:
+            raise DeploymentError("host-route release does not match the active lease")
+        records = self._exact_routes(route.destination)
+        if records:
+            if len(records) != 1 or not self._route_record_matches(records[0], route):
+                raise DeploymentError(
+                    "refusing to delete a host route not owned by this lease"
+                )
+            try:
+                subprocess.run(
+                    [
+                        "sudo",
+                        "-n",
+                        "ip",
+                        "route",
+                        "del",
+                        route.destination,
+                        "dev",
+                        route.interface,
+                        "src",
+                        route.source,
+                        "scope",
+                        "link",
+                        "proto",
+                        "static",
+                    ],
+                    check=True,
+                    text=True,
+                    capture_output=True,
+                    timeout=self.options.timeout_seconds,
+                )
+            except subprocess.SubprocessError as error:
+                raise DeploymentError("exact host-route delete failed") from error
+        if self._exact_routes(route.destination):
+            raise DeploymentError("exact host-route deletion was not verified")
+        self._active_route = None
+
     def _ssh_base(self, interface: str) -> list[str]:
-        self._verify_known_hosts()
-        result = [
-            "ssh",
-            "-F",
-            "/dev/null",
-            "-B",
-            interface,
-            "-o",
-            "BatchMode=yes",
-            "-o",
-            "StrictHostKeyChecking=yes",
-            "-o",
-            f"UserKnownHostsFile={self.options.known_hosts_path}",
-            "-o",
-            "CheckHostIP=no",
+        if self._active_route is None:
+            raise DeploymentError("SSH attempted without an active host-route lease")
+        self.ensure_host_route(self._active_route, interface=interface)
+        self._verify_ssh_inputs()
+        return [
+            *_ssh_base_argv(self.options, interface),
+            f"{self.options.ssh_user}@{self.options.ssh_host}",
         ]
-        if self.options.ssh_identity_file is not None:
-            result.extend(("-i", str(self.options.ssh_identity_file)))
-        result.append(f"{self.options.ssh_user}@{self.options.ssh_host}")
-        return result
 
     def attest_runtime(
         self,
@@ -1783,8 +2229,16 @@ class SystemBackend:
                 gc.collect()
 
     def request_ram_mode(self, argv: Sequence[str]) -> None:
+        if self._active_route is None:
+            raise DeploymentError("RAM-mode SSH attempted without a host-route lease")
+        expected = [
+            *self._ssh_base(self._active_route.interface),
+            "/usr/sbin/device_reboot ram",
+        ]
+        if list(argv) != expected:
+            raise DeploymentError("RAM-mode SSH command differs from the guarded plan")
         completed = subprocess.run(
-            list(argv),
+            expected,
             check=False,
             text=True,
             capture_output=True,
@@ -1865,7 +2319,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--known-hosts-sha256", required=True)
     parser.add_argument("--ssh-host", default="192.168.2.1")
     parser.add_argument("--ssh-user", default="root")
-    parser.add_argument("--ssh-identity-file", type=Path)
+    parser.add_argument("--ssh-password-file", type=Path)
     parser.add_argument("--usb-interface")
     parser.add_argument("--usb-inventory", type=Path)
     parser.add_argument("--operator-confirmation")
@@ -1895,12 +2349,12 @@ def _options(namespace: argparse.Namespace) -> DeploymentOptions:
         raise DeploymentError("SSH host must be one literal IPv4 address")
     if SAFE_USER.fullmatch(namespace.ssh_user) is None:
         raise DeploymentError("SSH user contains unsafe characters")
-    identity = namespace.ssh_identity_file
-    if identity is not None:
-        identity = _canonical_absolute(identity, label="SSH identity file")
-        _read_owned_regular(
-            identity, label="SSH identity file", maximum_bytes=MAX_JSON_BYTES
-        )
+    password_file = namespace.ssh_password_file
+    if password_file is not None:
+        password_file = _canonical_absolute(password_file, label="SSH password file")
+        _read_password_file(password_file)
+    elif namespace.execute:
+        raise DeploymentError("--ssh-password-file is required with --execute")
     return DeploymentOptions(
         serial=serial,
         artifact_path=_canonical_absolute(namespace.artifact, label="requested DFU"),
@@ -1919,7 +2373,7 @@ def _options(namespace: argparse.Namespace) -> DeploymentOptions:
         known_hosts_sha256=namespace.known_hosts_sha256,
         ssh_host=namespace.ssh_host,
         ssh_user=namespace.ssh_user,
-        ssh_identity_file=identity,
+        ssh_password_file=password_file,
         usb_interface=namespace.usb_interface,
         operator_confirmation=namespace.operator_confirmation,
         timeout_seconds=namespace.timeout_seconds,
@@ -1969,6 +2423,13 @@ def _plan_document(
     )
     interface = select_interface(device, options.usb_interface)
     document["usb"] = asdict(device)
+    if options.ssh_password_file is None:
+        document["verdict"] = "blocked"
+        document["blockers"] = [
+            "captured-inventory command planning requires --ssh-password-file",
+            "this offline plan authorizes no device access",
+        ]
+        return document
     document["commands"] = list(build_command_plan(options, device, interface))
     document["verdict"] = "ready-for-review"
     document["blockers"] = [
@@ -2003,7 +2464,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             )
             return 0
-        for command in ("ssh", "dfu-util"):
+        for command in ("sshpass", "ssh", "dfu-util", "ip", "sudo"):
             if shutil.which(command) is None:
                 raise DeploymentError(f"required execution tool is absent: {command}")
         try:

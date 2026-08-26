@@ -19,7 +19,7 @@ from .candidate_binding import (
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SERIAL = "104473222a87000abc00123456789def"
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc9"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc10"
 
 
 def _artifact_index() -> dict[str, Any]:
@@ -36,7 +36,7 @@ def _artifact_index() -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc9-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc10-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1234, "run_attempt": 1},
@@ -73,7 +73,7 @@ def _artifact_index() -> dict[str, Any]:
 def _receipt() -> dict[str, Any]:
     return {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
-        "schema_version": 2,
+        "schema_version": 3,
         "verdict": "pass",
         "boot_mode": "ram-only",
         "artifact_index_sha256": SHA_B,
@@ -108,23 +108,46 @@ def _receipt() -> dict[str, Any]:
             "post_sysfs_path": "/sys/bus/usb/devices/1-2.3",
             "network_interface": "enx001122334455",
         },
+        "host_route": {
+            "destination": "192.168.2.1/32",
+            "interface": "enx001122334455",
+            "source": "192.168.2.10",
+            "release_verified": True,
+        },
         "commands": [
             {
                 "phase": "request-ram-mode",
                 "argv": [
+                    "sshpass",
+                    "-f",
+                    "/private/ssh-password",
                     "ssh",
                     "-F",
                     "/dev/null",
                     "-B",
                     "enx001122334455",
                     "-o",
-                    "BatchMode=yes",
+                    "BatchMode=no",
+                    "-o",
+                    "NumberOfPasswordPrompts=1",
+                    "-o",
+                    "PreferredAuthentications=password",
+                    "-o",
+                    "PasswordAuthentication=yes",
+                    "-o",
+                    "PubkeyAuthentication=no",
+                    "-o",
+                    "KbdInteractiveAuthentication=no",
                     "-o",
                     "StrictHostKeyChecking=yes",
                     "-o",
                     "UserKnownHostsFile=/evidence/known_hosts",
                     "-o",
+                    "GlobalKnownHostsFile=/dev/null",
+                    "-o",
                     "CheckHostIP=no",
+                    "-o",
+                    "UpdateHostKeys=no",
                     "root@192.168.2.1",
                     "/usr/sbin/device_reboot ram",
                 ],
@@ -217,7 +240,7 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
     "mutation",
     [
         lambda value: value.update(extra=True),
-        lambda value: value.update(schema_version=1),
+        lambda value: value.update(schema_version=2),
         lambda value: value.update(verdict="fail"),
         lambda value: value.update(boot_mode="persistent"),
         lambda value: value.update(artifact_index_sha256="0" * 64),
@@ -241,6 +264,10 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
         lambda value: value["topology"].update(
             dfu_sysfs_path="/sys/bus/usb/devices/1-9"
         ),
+        lambda value: value["host_route"].update(destination="192.168.2.1/24"),
+        lambda value: value["host_route"].update(interface="other0"),
+        lambda value: value["host_route"].update(source="not-an-ip"),
+        lambda value: value["host_route"].update(release_verified=False),
         lambda value: value["commands"].reverse(),
         lambda value: value["commands"][0].update(argv=["true"]),
         lambda value: value["commands"][0]["argv"].__setitem__(-2, "root@not-an-ip"),

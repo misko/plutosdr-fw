@@ -19,12 +19,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "tandem_release_evidence.py"
 COMMIT = "1" * 40
 FINAL_COMMIT = "2" * 40
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc9"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc10"
 FINAL_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
 RUN_ID = 123456
 RUN_ATTEMPT = 1
 LIBIIO_COMMIT = "d" * 40
-PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc9-111111111111"
+PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc10-111111111111"
 SOURCE_MANIFEST_PAYLOAD = b"""schema: plutosdr-fw.source-manifest
 schema_version: 1
 release_state: candidate
@@ -66,6 +66,11 @@ _STAGE_INEXACT_SOURCE_LOCK_CASES = (
         "candidate-pre-hardware",
         "refs/tags/tandem-agc-v8-rc99-source/firmware-v1",
         id="candidate-uses-rc99-lock",
+    ),
+    pytest.param(
+        "candidate-pre-hardware",
+        "refs/tags/tandem-agc-v8-rc9-source/firmware-v1",
+        id="candidate-uses-burned-rc9-lock",
     ),
     pytest.param(
         "candidate-pre-hardware",
@@ -248,7 +253,9 @@ def _fixture(
 ) -> tuple[Path, Path]:
     is_candidate = stage == "candidate-pre-hardware"
     manifest_name = (
-        "tandem-agc-v8-rc9-source.yaml" if is_candidate else "tandem-agc-v8-source.yaml"
+        "tandem-agc-v8-rc10-source.yaml"
+        if is_candidate
+        else "tandem-agc-v8-source.yaml"
     )
     if source_lock_ref is None:
         source_lock_ref = (
@@ -257,7 +264,7 @@ def _fixture(
             else EVIDENCE.FINAL_SOURCE_LOCK_REF
         )
     build_ref = (
-        "refs/heads/codex/firmware-tandem-agc-v8-rc9"
+        "refs/heads/codex/firmware-tandem-agc-v8-rc10"
         if is_candidate
         else "refs/heads/main"
     )
@@ -606,7 +613,7 @@ def _receipt_payload(
     ]
     return {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
-        "schema_version": 2,
+        "schema_version": 3,
         "verdict": "pass",
         "boot_mode": "ram-only",
         "artifact_index_sha256": index_sha,
@@ -641,23 +648,46 @@ def _receipt_payload(
             "post_sysfs_path": sysfs_path,
             "network_interface": f"usb{serial[-1]}",
         },
+        "host_route": {
+            "destination": "192.168.2.1/32",
+            "interface": f"usb{serial[-1]}",
+            "source": "192.168.2.10",
+            "release_verified": True,
+        },
         "commands": [
             {
                 "phase": "request-ram-mode",
                 "argv": [
+                    "sshpass",
+                    "-f",
+                    f"/private/ssh-password-{serial}",
                     "ssh",
                     "-F",
                     "/dev/null",
                     "-B",
                     f"usb{serial[-1]}",
                     "-o",
-                    "BatchMode=yes",
+                    "BatchMode=no",
+                    "-o",
+                    "NumberOfPasswordPrompts=1",
+                    "-o",
+                    "PreferredAuthentications=password",
+                    "-o",
+                    "PasswordAuthentication=yes",
+                    "-o",
+                    "PubkeyAuthentication=no",
+                    "-o",
+                    "KbdInteractiveAuthentication=no",
                     "-o",
                     "StrictHostKeyChecking=yes",
                     "-o",
                     f"UserKnownHostsFile={receipt_path.parent}/known_hosts",
                     "-o",
+                    "GlobalKnownHostsFile=/dev/null",
+                    "-o",
                     "CheckHostIP=no",
+                    "-o",
+                    "UpdateHostKeys=no",
                     "root@192.168.2.1",
                     "/usr/sbin/device_reboot ram",
                 ],
@@ -1068,7 +1098,7 @@ def _lineage_fixture(
         stage="candidate-pre-hardware",
     )
     _assemble_campaign(candidate_staging, monkeypatch, artifact_index=candidate)
-    candidate_root = root / "lineage" / "rc9"
+    candidate_root = root / "lineage" / "rc10"
     candidate_root.parent.mkdir(mode=0o755)
     candidate_staging.rename(candidate_root)
     candidate = candidate_root / "candidate-index.json"
@@ -1554,8 +1584,8 @@ def test_assemble_rejects_external_same_basename_source_manifest(
 @pytest.mark.parametrize(
     "version",
     [
-        "v0.41-plutoplus-spf-tandem-agc-v8-rc09",
-        "v0.41-plutoplus-spf-tandem-agc-v8-rc9-1-g1111111",
+        "v0.41-plutoplus-spf-tandem-agc-v8-rc010",
+        "v0.41-plutoplus-spf-tandem-agc-v8-rc10-1-g1111111",
     ],
 )
 def test_assemble_rejects_typo_or_git_describe_candidate_identity(
@@ -1563,7 +1593,7 @@ def test_assemble_rejects_typo_or_git_describe_candidate_identity(
 ) -> None:
     input_path, output = _fixture(tmp_path, version=version)
 
-    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC9"):
+    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC10"):
         EVIDENCE.assemble(
             archive_root=tmp_path,
             input_path=input_path,

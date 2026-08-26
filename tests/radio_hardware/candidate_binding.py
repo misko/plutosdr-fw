@@ -17,7 +17,7 @@ from typing import Any
 ARTIFACT_INDEX_SCHEMA = "plutosdr-fw.tandem-release-evidence"
 RAM_BOOT_RECEIPT_SCHEMA = "plutosdr-fw.tandem-ram-boot-receipt"
 ARTIFACT_INDEX_SCHEMA_VERSION = 1
-RAM_BOOT_RECEIPT_SCHEMA_VERSION = 2
+RAM_BOOT_RECEIPT_SCHEMA_VERSION = 3
 PLUTOPLUS_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
 # Backward-compatible public name used by release-evidence code for the
 # artifact-index schema. Receipt validation has its own version above.
@@ -321,6 +321,7 @@ def validate_deployment_receipt(
             "safety",
             "timestamps",
             "topology",
+            "host_route",
             "commands",
             "known_hosts_sha256",
         },
@@ -498,6 +499,49 @@ def validate_deployment_receipt(
     )
     network_interface = str(topology["network_interface"])
 
+    host_route = _mapping(record["host_route"], name="RAM-boot receipt host route")
+    _exact_keys(
+        host_route,
+        {"destination", "interface", "source", "release_verified"},
+        name="RAM-boot receipt host route",
+    )
+    destination_text = _string(
+        host_route["destination"], name="receipt host-route destination"
+    )
+    try:
+        destination = ipaddress.ip_network(destination_text, strict=True)
+    except ValueError as error:
+        raise CandidateBindingError(
+            "RAM-boot receipt host-route destination is malformed"
+        ) from error
+    if destination.version != 4 or destination.prefixlen != 32:
+        _fail("RAM-boot receipt host-route destination is not one IPv4 /32")
+    if (
+        _string(
+            host_route["interface"],
+            name="receipt host-route interface",
+            pattern=_SAFE_ID,
+            maximum=128,
+        )
+        != network_interface
+    ):
+        _fail("RAM-boot receipt host-route interface differs from USB topology")
+    try:
+        route_source = ipaddress.ip_address(
+            _string(host_route["source"], name="receipt host-route source")
+        )
+    except ValueError as error:
+        raise CandidateBindingError(
+            "RAM-boot receipt host-route source is malformed"
+        ) from error
+    if route_source.version != 4:
+        _fail("RAM-boot receipt host-route source is not IPv4")
+    if not _exact_bool(
+        host_route["release_verified"],
+        name="receipt host-route release verification",
+    ):
+        _fail("RAM-boot receipt did not verify host-route cleanup")
+
     commands = record["commands"]
     if not isinstance(commands, Sequence) or isinstance(commands, (str, bytes)):
         _fail("RAM-boot receipt commands must be an array")
@@ -540,20 +584,41 @@ def validate_deployment_receipt(
 
     request, download, detach = normalized_commands
     request_prefix = [
+        "sshpass",
+        "-f",
+    ]
+    if request[: len(request_prefix)] != request_prefix:
+        _fail("RAM-boot receipt SSH command lacks transparent password transport")
+    if len(request) < 3:
+        _fail("RAM-boot receipt SSH password-file option is incomplete")
+    _absolute_path(request[2], name="receipt SSH password-file path")
+    request_prefix = [
+        *request_prefix,
+        request[2],
         "ssh",
         "-F",
         "/dev/null",
         "-B",
         network_interface,
         "-o",
-        "BatchMode=yes",
+        "BatchMode=no",
+        "-o",
+        "NumberOfPasswordPrompts=1",
+        "-o",
+        "PreferredAuthentications=password",
+        "-o",
+        "PasswordAuthentication=yes",
+        "-o",
+        "PubkeyAuthentication=no",
+        "-o",
+        "KbdInteractiveAuthentication=no",
         "-o",
         "StrictHostKeyChecking=yes",
     ]
     if request[: len(request_prefix)] != request_prefix:
         _fail("RAM-boot receipt SSH command is not the guarded request sequence")
     cursor = len(request_prefix)
-    if cursor + 4 > len(request):
+    if cursor + 8 > len(request):
         _fail("RAM-boot receipt SSH command is incomplete")
     known_hosts_option = request[cursor : cursor + 2]
     if known_hosts_option[0] != "-o" or not known_hosts_option[1].startswith(
@@ -565,14 +630,20 @@ def validate_deployment_receipt(
         name="receipt SSH known-hosts path",
     )
     cursor += 2
-    if request[cursor : cursor + 2] != ["-o", "CheckHostIP=no"]:
-        _fail("RAM-boot receipt SSH host-check policy is not exact")
+    if request[cursor : cursor + 2] != [
+        "-o",
+        "GlobalKnownHostsFile=/dev/null",
+    ]:
+        _fail("RAM-boot receipt global SSH host-check policy is not exact")
     cursor += 2
-    if request[cursor : cursor + 1] == ["-i"]:
-        if cursor + 2 > len(request):
-            _fail("RAM-boot receipt SSH identity option is incomplete")
-        _absolute_path(request[cursor + 1], name="receipt SSH identity path")
-        cursor += 2
+    if request[cursor : cursor + 4] != [
+        "-o",
+        "CheckHostIP=no",
+        "-o",
+        "UpdateHostKeys=no",
+    ]:
+        _fail("RAM-boot receipt SSH host-check policy is not exact")
+    cursor += 4
     if len(request) - cursor != 2:
         _fail("RAM-boot receipt SSH target/command inventory is not exact")
     target, remote_command = request[cursor:]
@@ -587,7 +658,11 @@ def validate_deployment_receipt(
         raise CandidateBindingError(
             "RAM-boot receipt SSH host is not an IP address"
         ) from error
-    if address.version != 4 or remote_command != "/usr/sbin/device_reboot ram":
+    if (
+        address.version != 4
+        or address != destination.network_address
+        or remote_command != "/usr/sbin/device_reboot ram"
+    ):
         _fail("RAM-boot receipt SSH target/remote command is not exact")
 
     dfu_prefix = [

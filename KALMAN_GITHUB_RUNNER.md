@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC9 trusted workflow ends after the build job uploads the exact deployment
+- The RC10 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -40,9 +40,24 @@ and the verifier-accepted candidate-index SHA-256 was
 `d94b9c37a8c6f1e5935df5ae4bdfd03be49b7aba40236a32386382a0f09004a8`.
 No radio was opened or deployed: the RAM deployer still required a redundant
 historical transition-proof input in addition to its live safeguards. RC8's
-source lock, run, bundle, DFU, and index remain immutable reproduction history;
-RC9 removes only that redundant input, versions the receipt, and advances the
-lineage.
+source lock, run, bundle, DFU, and index remain immutable reproduction history.
+
+RC9 removed that redundant input and locked exact source commit
+`9f47ef1746eaf356e53fe52cd9eb608ee8421c62`. Trusted run `32957388515`,
+attempt 1, fully routed 32,908 of 32,908 nets at WNS `+0.645 ns`, WHS
+`+0.022 ns`, and minimum bus skew `+8.606 ns`. Bundle SHA-256 was
+`5f3eb4a772fb808f4598c4cc11d6a10936fecdaf045636d33ddfeaeaa9927dc7`,
+DFU SHA-256 was
+`407c560be90cfdbf459b92f1f76352f83f09cabf9c5f336375bd85868454975f`,
+and the verified candidate-index SHA-256 was
+`d2784863cfb74c34e98a2295a1b7532fc19f7f93ef90045b726055f1f99d3efd`.
+Its first live execute stopped before reboot or DFU: duplicate connected `/24`
+routes selected the wrong serial, then a temporary exact `/32` route exposed
+the factory image's password-only SSH service. No radio changed state and no
+receipt was produced. RC9's source lock, run, artifact, and index remain
+immutable reproduction history. RC10 advances only the guarded host
+route/authentication boundary and receipt schema; firmware behavior is
+unchanged.
 
 ## One-time administrator installation
 
@@ -90,7 +105,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC9 workflow has no separate attestation job. An operator may capture GitHub
+The RC10 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

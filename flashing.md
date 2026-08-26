@@ -35,7 +35,7 @@ The examples use Linux and the GitHub CLI:
 
 ```bash
 sudo apt-get update
-sudo apt-get install --no-install-recommends dfu-util gh openssh-client
+sudo apt-get install --no-install-recommends dfu-util gh iproute2 openssh-client sshpass sudo
 gh auth status
 ```
 
@@ -438,12 +438,21 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
   --expected-current-firmware "$current_device_fw" \
   --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
   --known-hosts "$absolute_known_hosts" \
-  --known-hosts-sha256 "$known_hosts_sha256"
+  --known-hosts-sha256 "$known_hosts_sha256" \
+  --ssh-password-file "$absolute_ssh_password_file"
 ```
 
-Actual execution requires an owned mode-`0600` known-hosts file, an exact
-serial-bound confirmation, and `--execute`; there is no external transition
-proof or other authorization file:
+Actual execution requires owned mode-`0600` known-hosts and password files, an
+exact serial-bound confirmation, and `--execute`. Keep the password file
+outside the candidate/evidence archive; the deployer never prints, hashes, or
+copies its contents. There is no external transition proof or other
+authorization file:
+
+The invoking account must be able to run the narrow route add/delete commands
+with `sudo -n` for the duration of the run. Refresh its sudo ticket immediately
+beforehand or install a narrowly scoped NOPASSWD rule; do not run the whole
+deployer as root, because its owned-input checks deliberately bind to the
+invoking account.
 
 ```bash
 scripts/deploy_tandem_agc_ram_hardware.sh \
@@ -456,17 +465,27 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
   --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
   --known-hosts "$absolute_known_hosts" \
   --known-hosts-sha256 "$known_hosts_sha256" \
+  --ssh-password-file "$absolute_ssh_password_file" \
   --operator-confirmation "RAM BOOT $serial" \
   --execute
 ```
 
 The executor permits only `firmware.dfu` download on the serial's unique USB
-topology followed by DFU detach. It rejects USB reset, SPI-flash/QSPI, boot and
-environment alternates, full ZIP/FRM files, and raw MTD targets. It publishes a
-passing v2 receipt, including the observed hardware model, only after the same
-serial and exact Pluto+ hardware model
-return with a new boot ID, the candidate firmware identity, and verified
-TX/DDS/DAC/tandem safe state.
+topology followed by DFU detach. Because several attached Plutos can all use
+host `192.168.2.10` and target `192.168.2.1`, it serializes deployments with a
+global lease, refuses any pre-existing target `/32`, temporarily adds that
+`/32` through the selected USB interface and source address, verifies the
+kernel route choice before every SSH call, and removes and verifies the route
+before publishing a receipt. It never changes the connected `/24` routes. The
+SSH command uses the supplied password file through `sshpass`, permits one
+password prompt, and pins only the supplied known-hosts file.
+
+The executor rejects USB reset, SPI-flash/QSPI, boot and environment
+alternates, full ZIP/FRM files, and raw MTD targets. It publishes a passing v3
+receipt, including the observed hardware model and verified temporary-route
+cleanup, only after the same serial and exact Pluto+ hardware model return with
+a new boot ID, the candidate firmware identity, and verified TX/DDS/DAC/tandem
+safe state.
 Before and after the RAM transition it also reads SHA-256 over the exact
 `qspi-linux` `/dev/mtdblock3` partition. The receipt's `persistent_flash`
 record must identify the same partition/size and equal digests; any change

@@ -100,10 +100,26 @@ performed zero hardware deployment. RC8's branch and
 `refs/tags/tandem-agc-v8-rc8-source/firmware-v1` remain immutable successful
 build history and must never move.
 
-The active candidate is RC9. It retains RC8's firmware behavior and
-deterministic packaging contract while removing only that redundant historical
-proof input and versioning the measured deployment receipt. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc9-source/firmware-v1`. The later final build uses the
+RC9 then removed the redundant transition-proof input and locked exact commit
+`9f47ef1746eaf356e53fe52cd9eb608ee8421c62`. Trusted run `32957388515`,
+attempt 1, completed the full integrated build; its verified candidate index is
+SHA-256
+`d2784863cfb74c34e98a2295a1b7532fc19f7f93ef90045b726055f1f99d3efd`
+and its DFU is SHA-256
+`407c560be90cfdbf459b92f1f76352f83f09cabf9c5f336375bd85868454975f`.
+The first execute attempt stopped at the initial SSH read, before reboot, DFU,
+or receipt: competing `192.168.2.0/24` routes selected another serial and the
+factory password-only service rejected key-only authentication. The temporary
+diagnostic `/32` route was removed and RC9 performed zero deployments. Its
+branch, lock `refs/tags/tandem-agc-v8-rc9-source/firmware-v1`, run, artifact,
+and candidate index remain immutable successful reproduction history.
+
+The active candidate is RC10. It retains RC9's firmware behavior and
+deterministic packaging contract while adding an exact temporary per-interface
+`192.168.2.1/32` route, private mode-0600 password-file SSH transport, verified
+route release, and the measured deployment receipt v3. Its exact candidate
+source lock is `refs/tags/tandem-agc-v8-rc10-source/firmware-v1`. The later
+final build uses the
 different exact lock `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and
 final evidence must reject a cross-stage substitution of those refs.
 
@@ -112,8 +128,8 @@ The remaining gates, in order, are:
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC9 firmware source lock and explicit trusted build route.
-   Keep RC4 through RC8's external component pins only if source-graph checks
+2. Create the exact RC10 firmware source lock and explicit trusted build route.
+   Keep RC4 through RC9's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
    retain integrated timing, CDC, DRC, methodology, utilization, and build

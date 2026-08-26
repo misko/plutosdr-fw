@@ -1,20 +1,12 @@
-# Immutable source graph for the final tandem AGC v8 build.
-#
-# The external component graph remains identical from RC4 through RC10, but the
-# tracked top-level repository does not. RC5 added post-RC4
-# stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
-# mutually exclusive dwell storage behind an explicit qualification-class tag.
-# RC7 corrected the integrated report policy, RC8 made the bundle/checksum
-# inventories bytewise deterministic, and RC9 removed the host deployer's
-# redundant historical-proof input without changing firmware behavior. RC9's
-# first live execute then stopped before reboot or DFU because duplicate
-# 192.168.2.0/24 routes and password-only factory SSH were not handled by the
-# guarded host transport. RC10 adds an exact temporary /32 route lease, private
-# password-file authentication, and a v3 measured receipt. RC10 must pass its
-# new source-locked build and full hardware qualification before this final
-# graph is used. The subsequent final build may
-# change only the top-level release identity and packaging, while requiring
-# exact component identities in packed /opt/VERSIONS.
+# Immutable source graph for the forward-only tandem AGC v8 RC10 candidate.
+# RC10 retains RC9's successfully built, indexed, fully routed, timing-clean
+# firmware implementation and deterministic package contract. RC9 never
+# crossed the hardware transition boundary: its first execute attempt stopped
+# before reboot or DFU when duplicate 192.168.2.0/24 routes selected the wrong
+# radio and the factory password-only SSH service rejected key-only transport.
+# RC10 adds exact temporary /32 route isolation, private password-file SSH, and
+# a v3 measured receipt without changing firmware behavior or external pins.
+# The separately protected firmware source lock binds the reviewed commit.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1

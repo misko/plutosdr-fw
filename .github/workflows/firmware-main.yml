@@ -39,6 +39,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc8' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc7' ||
@@ -58,6 +59,8 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'tandem-agc-v8-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10' &&
+          'tandem-agc-v8-rc10-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9' &&
           'tandem-agc-v8-rc9-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc8' &&
@@ -82,6 +85,8 @@ jobs:
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-tandem-agc-v8' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10' &&
+          'plutoplus-spf-tandem-agc-v8-rc10' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9' &&
           'plutoplus-spf-tandem-agc-v8-rc9' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc8' &&
@@ -152,13 +157,21 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.41-plutoplus-spf-tandem-agc-v8-rc8'
 
-      - name: Require the exact protected RC9 candidate identity
+      - name: Require the exact protected RC9 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9'
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.41-plutoplus-spf-tandem-agc-v8-rc9'
+
+      - name: Require the exact protected RC10 candidate identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc10'
 
       - name: Require the exact protected RC5 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5'

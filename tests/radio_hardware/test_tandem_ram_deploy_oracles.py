@@ -82,6 +82,7 @@ class Fixture:
     artifact_path: Path
     manifest_path: Path
     known_hosts_path: Path
+    password_path: Path
 
     def rewrite_index(self) -> None:
         payload = (json.dumps(self.index, sort_keys=True) + "\n").encode()
@@ -160,6 +161,8 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
     known_hosts_path = tmp_path / "known_hosts"
     known_hosts_payload = b"192.168.2.1 ssh-ed25519 AAAAtestkey\n"
     _write(known_hosts_path, known_hosts_payload, mode=0o600)
+    password_path = tmp_path / "ssh-password"
+    _write(password_path, b"factory-password\n", mode=0o600)
 
     receipt_parent = archive / SERIAL
     receipt_parent.mkdir()
@@ -175,7 +178,7 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
         known_hosts_sha256=_sha(known_hosts_payload),
         ssh_host="192.168.2.1",
         ssh_user="root",
-        ssh_identity_file=None,
+        ssh_password_file=password_path,
         usb_interface=None,
         operator_confirmation=f"RAM BOOT {SERIAL}",
         timeout_seconds=1.0,
@@ -187,6 +190,7 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
         artifact_path=artifact_path,
         manifest_path=manifest_path,
         known_hosts_path=known_hosts_path,
+        password_path=password_path,
     )
 
 
@@ -252,10 +256,31 @@ class FakeBackend:
         self.attestation_calls: list[tuple[str, str, bool]] = []
         self.ram_requests: list[list[str]] = []
         self.dfu_commands: list[list[str]] = []
+        self.route_events: list[str] = []
+        self.route = deploy.HostRoute(
+            destination="192.168.2.1/32",
+            interface=INTERFACE,
+            source="192.168.2.10",
+        )
 
     def inventory(self) -> tuple[deploy.UsbDevice, ...]:
         self.inventory_calls += 1
         return self.devices
+
+    def acquire_host_route(self, *, interface: str, host: str) -> deploy.HostRoute:
+        assert interface == INTERFACE
+        assert host == "192.168.2.1"
+        self.route_events.append("acquire")
+        return self.route
+
+    def ensure_host_route(self, route: deploy.HostRoute, *, interface: str) -> None:
+        assert route == self.route
+        assert interface == INTERFACE
+        self.route_events.append("ensure")
+
+    def release_host_route(self, route: deploy.HostRoute) -> None:
+        assert route == self.route
+        self.route_events.append("release")
 
     def attest_runtime(
         self,
@@ -287,6 +312,303 @@ class FakeBackend:
 
     def run_dfu(self, argv: Sequence[str]) -> None:
         self.dfu_commands.append(list(argv))
+
+
+class FakeRouteKernel:
+    def __init__(self) -> None:
+        self.route: dict[str, str] | None = None
+        self.calls: list[list[str]] = []
+        self.fail_delete = False
+        self.sticky_delete = False
+        self.wrong_get = False
+        self.address_failures = 0
+
+    def __call__(
+        self, argv: Sequence[str], **_kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        command = list(argv)
+        self.calls.append(command)
+        if command[:4] == ["ip", "-j", "-4", "address"]:
+            if self.address_failures:
+                self.address_failures -= 1
+                return subprocess.CompletedProcess(command, 0, "[]", "")
+            payload: object = [
+                {
+                    "ifname": INTERFACE,
+                    "addr_info": [
+                        {
+                            "family": "inet",
+                            "scope": "global",
+                            "local": "192.168.2.10",
+                        }
+                    ],
+                }
+            ]
+        elif command[:9] == [
+            "ip",
+            "-j",
+            "-4",
+            "route",
+            "show",
+            "table",
+            "all",
+            "exact",
+            "192.168.2.1/32",
+        ]:
+            payload = [] if self.route is None else [self.route]
+        elif command[:6] == [
+            "ip",
+            "-j",
+            "-4",
+            "route",
+            "get",
+            "192.168.2.1",
+        ]:
+            payload = [
+                {
+                    "dst": "192.168.2.1",
+                    "dev": "wrong0" if self.wrong_get else INTERFACE,
+                    "prefsrc": "192.168.2.10",
+                }
+            ]
+        elif command[:5] == ["sudo", "-n", "ip", "route", "add"]:
+            assert command == [
+                "sudo",
+                "-n",
+                "ip",
+                "route",
+                "add",
+                "192.168.2.1/32",
+                "dev",
+                INTERFACE,
+                "src",
+                "192.168.2.10",
+                "scope",
+                "link",
+                "proto",
+                "static",
+            ]
+            self.route = {
+                # iproute2 emits a bare host for a /32 in JSON output.
+                "dst": "192.168.2.1",
+                "dev": INTERFACE,
+                "prefsrc": "192.168.2.10",
+                "scope": "link",
+                "protocol": "static",
+            }
+            payload = ""
+        elif command[:5] == ["sudo", "-n", "ip", "route", "del"]:
+            assert command == [
+                "sudo",
+                "-n",
+                "ip",
+                "route",
+                "del",
+                "192.168.2.1/32",
+                "dev",
+                INTERFACE,
+                "src",
+                "192.168.2.10",
+                "scope",
+                "link",
+                "proto",
+                "static",
+            ]
+            if self.fail_delete:
+                raise subprocess.CalledProcessError(2, command)
+            if not self.sticky_delete:
+                self.route = None
+            payload = ""
+        elif command and command[0] == "sshpass":
+            return subprocess.CompletedProcess(command, 255, "", "")
+        else:
+            raise AssertionError(f"unexpected subprocess: {command}")
+        stdout = json.dumps(payload) if not isinstance(payload, str) else payload
+        return subprocess.CompletedProcess(command, 0, stdout, "")
+
+
+def test_system_backend_leases_exact_host_route_and_accepts_bare_json_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _fixture(tmp_path)
+    kernel = FakeRouteKernel()
+    monkeypatch.setattr(deploy.subprocess, "run", kernel)
+    backend = deploy.SystemBackend(fixture.options)
+
+    route = backend.acquire_host_route(interface=INTERFACE, host="192.168.2.1")
+    assert route == deploy.HostRoute(
+        destination="192.168.2.1/32",
+        interface=INTERFACE,
+        source="192.168.2.10",
+    )
+    backend.release_host_route(route)
+
+    assert kernel.route is None
+    assert (
+        sum(call[:5] == ["sudo", "-n", "ip", "route", "add"] for call in kernel.calls)
+        == 1
+    )
+    assert (
+        sum(call[:5] == ["sudo", "-n", "ip", "route", "del"] for call in kernel.calls)
+        == 1
+    )
+
+
+def test_system_backend_refuses_preexisting_or_wrong_exact_host_route(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _fixture(tmp_path)
+    kernel = FakeRouteKernel()
+    kernel.route = {
+        "dst": "192.168.2.1",
+        "dev": "wrong0",
+        "prefsrc": "192.168.2.10",
+        "scope": "link",
+        "protocol": "static",
+    }
+    monkeypatch.setattr(deploy.subprocess, "run", kernel)
+    backend = deploy.SystemBackend(fixture.options)
+
+    with pytest.raises(deploy.DeploymentError, match="preexisting exact route"):
+        backend.acquire_host_route(interface=INTERFACE, host="192.168.2.1")
+
+    assert not any(
+        call[:5] == ["sudo", "-n", "ip", "route", "add"] for call in kernel.calls
+    )
+    assert not any(
+        call[:5] == ["sudo", "-n", "ip", "route", "del"] for call in kernel.calls
+    )
+
+
+def test_system_backend_readds_only_missing_owned_route_after_reenumeration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _fixture(tmp_path)
+    kernel = FakeRouteKernel()
+    monkeypatch.setattr(deploy.subprocess, "run", kernel)
+    backend = deploy.SystemBackend(fixture.options)
+    route = backend.acquire_host_route(interface=INTERFACE, host="192.168.2.1")
+
+    kernel.route = None
+    kernel.address_failures = 1
+    monkeypatch.setattr(deploy.time, "sleep", lambda _seconds: None)
+    backend.ensure_host_route(route, interface=INTERFACE)
+    assert (
+        sum(call[:5] == ["sudo", "-n", "ip", "route", "add"] for call in kernel.calls)
+        == 2
+    )
+
+    kernel.route = {
+        "dst": "192.168.2.1",
+        "dev": "wrong0",
+        "prefsrc": "192.168.2.10",
+        "scope": "link",
+        "protocol": "static",
+    }
+    with pytest.raises(deploy.DeploymentError, match="differs from the active lease"):
+        backend.ensure_host_route(route, interface=INTERFACE)
+    with pytest.raises(deploy.DeploymentError, match="refusing to delete"):
+        backend.release_host_route(route)
+    assert not any(
+        call[:5] == ["sudo", "-n", "ip", "route", "del"] for call in kernel.calls
+    )
+
+
+def test_system_backend_requires_verified_route_deletion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _fixture(tmp_path)
+    kernel = FakeRouteKernel()
+    monkeypatch.setattr(deploy.subprocess, "run", kernel)
+    backend = deploy.SystemBackend(fixture.options)
+    route = backend.acquire_host_route(interface=INTERFACE, host="192.168.2.1")
+    kernel.sticky_delete = True
+
+    with pytest.raises(deploy.DeploymentError, match="deletion was not verified"):
+        backend.release_host_route(route)
+    assert kernel.route is not None
+
+
+def test_ssh_password_is_revalidated_and_never_appears_in_argv(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _fixture(tmp_path)
+    kernel = FakeRouteKernel()
+    monkeypatch.setattr(deploy.subprocess, "run", kernel)
+    backend = deploy.SystemBackend(fixture.options)
+    route = backend.acquire_host_route(interface=INTERFACE, host="192.168.2.1")
+
+    argv = backend._ssh_base(INTERFACE)
+    assert argv[:3] == ["sshpass", "-f", str(fixture.password_path)]
+    assert "factory-password" not in "\0".join(argv)
+    assert "BatchMode=no" in argv
+    assert "NumberOfPasswordPrompts=1" in argv
+    assert "PreferredAuthentications=password" in argv
+    backend.request_ram_mode([*argv, "/usr/sbin/device_reboot ram"])
+
+    fixture.password_path.write_bytes(b"changed-password\n")
+    fixture.password_path.chmod(0o600)
+    with pytest.raises(
+        deploy.DeploymentError, match="changed after execution preflight"
+    ):
+        backend._ssh_base(INTERFACE)
+    backend.release_host_route(route)
+
+
+def test_route_cleanup_failure_prevents_receipt_publication(tmp_path: Path) -> None:
+    fixture = _fixture(tmp_path)
+
+    class CleanupFailureBackend(FakeBackend):
+        def release_host_route(self, route: deploy.HostRoute) -> None:
+            super().release_host_route(route)
+            raise deploy.DeploymentError("planted route-delete failure")
+
+    with pytest.raises(deploy.DeploymentError, match="host-route cleanup failed"):
+        deploy.execute_deployment(fixture.options, CleanupFailureBackend())
+    assert not fixture.options.receipt_path.exists()
+
+
+def test_password_file_inside_candidate_archive_refuses_before_inventory(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    archived_password = fixture.index_path.parent / "password"
+    _write(archived_password, b"must-not-be-archived\n", mode=0o600)
+    backend = FakeBackend()
+
+    with pytest.raises(deploy.DeploymentError, match="outside the candidate"):
+        deploy.execute_deployment(
+            replace(fixture.options, ssh_password_file=archived_password), backend
+        )
+    assert backend.inventory_calls == 0
+    assert not fixture.options.receipt_path.exists()
+
+
+@pytest.mark.parametrize("case", ["missing", "mode", "multiline", "symlink"])
+def test_password_file_contract_refuses_before_inventory(
+    tmp_path: Path, case: str
+) -> None:
+    fixture = _fixture(tmp_path)
+    password_path: Path | None = fixture.password_path
+    if case == "missing":
+        password_path = None
+    elif case == "mode":
+        fixture.password_path.chmod(0o640)
+    elif case == "multiline":
+        fixture.password_path.write_bytes(b"one\ntwo\n")
+        fixture.password_path.chmod(0o600)
+    else:
+        target = tmp_path / "password-target"
+        _write(target, b"password\n", mode=0o600)
+        fixture.password_path.unlink()
+        fixture.password_path.symlink_to(target)
+    backend = FakeBackend()
+
+    with pytest.raises(deploy.DeploymentError, match="SSH password"):
+        deploy.execute_deployment(
+            replace(fixture.options, ssh_password_file=password_path), backend
+        )
+    assert backend.inventory_calls == 0
 
 
 def test_semantic_evidence_failure_precedes_usb_and_receipt(
@@ -643,7 +965,7 @@ def test_success_publishes_absent_only_private_bound_receipt(tmp_path: Path) -> 
     assert digest == _sha(payload)
     assert stat.S_IMODE(fixture.options.receipt_path.stat().st_mode) == 0o600
     assert receipt == json.loads(payload)
-    assert receipt["schema_version"] == 2
+    assert receipt["schema_version"] == 3
     assert "transition_proof_sha256" not in receipt
     assert receipt["runtime"]["hardware_model"] == deploy.PLUTOPLUS_HARDWARE_MODEL
     validated = validate_deployment_receipt(
@@ -657,7 +979,24 @@ def test_success_publishes_absent_only_private_bound_receipt(tmp_path: Path) -> 
     assert validated == receipt
     assert len(backend.ram_requests) == 1
     assert backend.ram_requests[0][-1] == "/usr/sbin/device_reboot ram"
-    assert backend.ram_requests[0][:5] == ["ssh", "-F", "/dev/null", "-B", INTERFACE]
+    assert backend.ram_requests[0][:8] == [
+        "sshpass",
+        "-f",
+        str(fixture.password_path),
+        "ssh",
+        "-F",
+        "/dev/null",
+        "-B",
+        INTERFACE,
+    ]
+    assert backend.route_events == ["acquire", "ensure", "release"]
+    assert receipt["host_route"] == {
+        "destination": "192.168.2.1/32",
+        "interface": INTERFACE,
+        "source": "192.168.2.10",
+        "release_verified": True,
+    }
+    assert b"factory-password" not in payload
     assert len(backend.dfu_commands) == 2
     assert backend.dfu_commands[0][-2] == "-D"
     assert backend.dfu_commands[0][-1].startswith("/proc/self/fd/")
@@ -880,6 +1219,8 @@ def _cli_arguments(fixture: Fixture) -> list[str]:
         str(options.known_hosts_path),
         "--known-hosts-sha256",
         options.known_hosts_sha256,
+        "--ssh-password-file",
+        str(options.ssh_password_file),
     ]
 
 
@@ -954,6 +1295,14 @@ def test_captured_inventory_plan_is_exact_and_still_hardware_free(
     ]
     assert document["commands"][2]["argv"][-1] == "-e"
     assert "-R" not in json.dumps(document["commands"])
+
+    without_password = _cli_arguments(fixture)[:-2]
+    assert deploy.main([*without_password, "--usb-inventory", str(inventory_path)]) == 0
+    blocked = json.loads(capsys.readouterr().out)
+    assert blocked["verdict"] == "blocked"
+    assert blocked["usb"]["network_interfaces"] == [INTERFACE]
+    assert "commands" not in blocked
+    assert any("--ssh-password-file" in item for item in blocked["blockers"])
 
 
 def test_legacy_downloader_is_quarantined_without_hardware_access() -> None:

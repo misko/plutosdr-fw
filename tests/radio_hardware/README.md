@@ -482,6 +482,20 @@ current firmware, operator phrase, new boot ID, safe state, and equal pre/post
 every DFU alternate except `firmware.dfu`; receipts and all later hardware
 evidence remain exact-serial scoped.
 
+Factory images use password SSH. Execution therefore also requires an owned,
+non-symlinked mode-`0600` `--ssh-password-file` outside the candidate archive.
+The password contents are revalidated before every SSH process and are never
+printed, hashed, or retained; only the absolute file path appears in the exact
+command record. A global lease temporarily adds `192.168.2.1/32` through the
+selected radio's USB interface and `192.168.2.10` source, verifies that choice
+before preflight, reboot, post-boot, and failure-cleanup SSH, then deletes and
+verifies absence before the v3 deployment receipt can be published. Existing
+`/32` routes are refused and connected `/24` routes are untouched.
+The invoking account must keep the exact route add/delete operations available
+through `sudo -n` (a fresh sudo ticket or narrow NOPASSWD rule); the deployer
+itself should remain under the owning user so its private-file checks stay
+meaningful.
+
 The release lifecycle runner consumes an exact candidate artifact index and
 the RAM-only deployment receipt for one immutable radio serial. It does not
 deploy, reboot, or flash the radio. Every path below must be absolute, the
@@ -499,7 +513,7 @@ IIO_SOURCE=../libiio \
 scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc9-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc10-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \
@@ -529,7 +543,7 @@ IIO_SOURCE=../libiio \
 scripts/run_stale_small_adc_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc9-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc10-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \
