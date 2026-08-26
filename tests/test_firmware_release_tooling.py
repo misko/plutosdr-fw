@@ -52,12 +52,25 @@ def test_packaged_dfu_fpga_payload_matches_the_qualified_xsa() -> None:
     assert "sha256sum system_top.bit > system-top-bit.sha256" in package
 
 
+def test_bundle_and_checksum_inventories_use_one_bytewise_order() -> None:
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+
+    # Python's evidence verifier compares canonical ASCII member names in
+    # bytewise order.  The producer must not inherit a runner locale or retain
+    # the hand-authored payload array order.
+    assert package.count("LC_ALL=C sort") == 3
+    assert "mapfile -t payload_files < <(" in package
+    assert "printf '%s\\n' \"${payload_files[@]}\" | LC_ALL=C sort" in package
+    assert "tar --sort=name" in package
+
+
 def test_protected_package_routes_require_exact_declared_identities() -> None:
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     assert "tandem-agc-v8-rc5-source.yaml:*" in package
     assert "tandem-agc-v8-rc6-source.yaml:*" in package
     assert "tandem-agc-v8-rc7-source.yaml:*" in package
+    assert "tandem-agc-v8-rc8-source.yaml:*" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -101,6 +114,7 @@ def test_pr_workflow_uses_the_shared_offline_entry_point() -> None:
         "manifests/tandem-agc-v8-rc5-source.yaml",
         "manifests/tandem-agc-v8-rc6-source.yaml",
         "manifests/tandem-agc-v8-rc7-source.yaml",
+        "manifests/tandem-agc-v8-rc8-source.yaml",
         "./scripts/test_legal_info_network.sh",
     ):
         assert required in checker

@@ -72,10 +72,20 @@ no deployment bundle, candidate index, or DFU. The RC6 branch and
 `refs/tags/tandem-agc-v8-rc6-source/firmware-v1` are therefore immutable failed
 history and must never move.
 
-The active candidate is RC7. It retains RC6's placed, fully routed,
-timing-clean RTL and corrects the report validator rather than changing the
-firmware behavior. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc7-source/firmware-v1`. The later final build uses the
+RC7 then corrected that validator without changing firmware behavior. Trusted
+run `32948720383` completed the build and integrated route and uploaded a
+bundle with SHA-256
+`7f13d6dd3f814af1a1e0d06d65535d2f60499b4bb3c0ab0e5cc4e7b8c8836f34`.
+The bundle was rejected before evidence assembly because its member/checksum
+ordering depended on locale and shell-array order. There was no deployment and
+no hardware use. The RC7 branch and
+`refs/tags/tandem-agc-v8-rc7-source/firmware-v1` are immutable rejected history
+and must never move.
+
+The active candidate is RC8. It retains RC7's successfully built, fully
+routed, timing-clean firmware behavior and makes only the bundle/checksum
+ordering deterministic. Its exact candidate source lock is
+`refs/tags/tandem-agc-v8-rc8-source/firmware-v1`. The later final build uses the
 different exact lock `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and
 final evidence must reject a cross-stage substitution of those refs.
 
@@ -84,9 +94,9 @@ The remaining gates, in order, are:
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC7 firmware source lock and explicit trusted build route.
-   Keep RC4/RC5/RC6's external component pins only if source-graph checks prove
-   they remain exact.
+2. Create the exact RC8 firmware source lock and explicit trusted build route.
+   Keep RC4/RC5/RC6/RC7's external component pins only if source-graph checks
+   prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
    retain integrated timing, CDC, DRC, methodology, utilization, and build
    provenance. Block-level OOC evidence cannot replace this step.

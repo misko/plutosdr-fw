@@ -490,7 +490,7 @@ IIO_SOURCE=../libiio \
 scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc7-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc8-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \
@@ -520,7 +520,7 @@ IIO_SOURCE=../libiio \
 scripts/run_stale_small_adc_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc7-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc8-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \

@@ -17,12 +17,12 @@ fail() {
     exit 1
 }
 
-# RC5, RC6, RC7, and the final v8 route are protected builds and therefore
+# RC5 through RC8 and the final v8 route are protected builds and therefore
 # cannot opt out of the reviewed integrated-route inventory. Other historical
 # source locks retain their original package path unless a waiver inventory is
 # explicitly supplied by their trusted workflow.
 case "$(basename "$MANIFEST")" in
-tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-source.yaml)
+tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-rc8-source.yaml | tandem-agc-v8-source.yaml)
     manifest_name="$(basename -- "$MANIFEST")"
     canonical_manifest="${ROOT}/manifests/${manifest_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$canonical_manifest" ]] ||
@@ -226,6 +226,9 @@ tandem-agc-v8-rc6-source.yaml:*)
 tandem-agc-v8-rc7-source.yaml:*)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8-rc7'
     ;;
+tandem-agc-v8-rc8-source.yaml:*)
+    protected_version='v0.41-plutoplus-spf-tandem-agc-v8-rc8'
+    ;;
 tandem-agc-v8-source.yaml:final-release)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8'
     ;;
@@ -395,6 +398,9 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
     if [[ -n "$INTEGRATED_WAIVERS" ]]; then
         payload_files+=("$(basename "$integrated_verdict")" "$(basename "$waiver_copy")")
     fi
+    mapfile -t payload_files < <(
+        printf '%s\n' "${payload_files[@]}" | LC_ALL=C sort
+    )
     sha256sum "${payload_files[@]}" > PAYLOAD_SHA256SUMS
 )
 
@@ -475,7 +481,7 @@ mapfile -t checksum_files < <(
         ! -name bundle-contents.txt \
         ! -name "$(basename "$bundle")" \
         ! -name "$(basename "$bundle").sha256" \
-        -printf '%f\n' | sort
+        -printf '%f\n' | LC_ALL=C sort
 )
 (
     cd "$ARTIFACT_ROOT"
@@ -489,7 +495,7 @@ mapfile -t checksum_files < <(
         ! -name bundle-contents.txt \
         ! -name "$(basename "$bundle")" \
         ! -name "$(basename "$bundle").sha256" \
-        -printf '%f\n' | sort)
+        -printf '%f\n' | LC_ALL=C sort)
     printf '%s\n' "${bundle_files[@]}" > bundle-contents.txt
     tar --sort=name --mtime="@${SOURCE_DATE_EPOCH:-0}" \
         --owner=0 --group=0 --numeric-owner \
