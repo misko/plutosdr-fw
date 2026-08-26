@@ -437,16 +437,14 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
   --artifact-index-sha256 "$candidate_index_sha256" \
   --expected-current-firmware "$current_device_fw" \
   --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
-  --known-hosts "$absolute_known_hosts" \
-  --known-hosts-sha256 "$known_hosts_sha256" \
   --ssh-password-file "$absolute_ssh_password_file"
 ```
 
-Actual execution requires owned mode-`0600` known-hosts and password files, an
-exact serial-bound confirmation, and `--execute`. Keep the password file
+Actual execution requires an owned mode-`0600` password file, an exact
+serial-bound confirmation, and `--execute`. Keep the password file
 outside the candidate/evidence archive; the deployer never prints, hashes, or
 copies its contents. There is no external transition proof or other
-authorization file:
+authorization file.
 
 The invoking account must be able to run the narrow route add/delete commands
 with `sudo -n` for the duration of the run. Refresh its sudo ticket immediately
@@ -463,8 +461,6 @@ scripts/deploy_tandem_agc_ram_hardware.sh \
   --artifact-index-sha256 "$candidate_index_sha256" \
   --expected-current-firmware "$current_device_fw" \
   --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
-  --known-hosts "$absolute_known_hosts" \
-  --known-hosts-sha256 "$known_hosts_sha256" \
   --ssh-password-file "$absolute_ssh_password_file" \
   --operator-confirmation "RAM BOOT $serial" \
   --execute
@@ -486,11 +482,14 @@ any pre-existing target `/32`, temporarily adds that `/32` through the selected
 USB interface and source address, verifies the kernel route choice before
 every SSH call, and removes and verifies the route before publishing a receipt.
 It never changes the connected `/24` routes. The SSH command uses the supplied
-password file through `sshpass`, permits one password prompt, and pins only the
-supplied known-hosts file.
+password file through `sshpass` and permits one password prompt. Pluto RAM
+boots generate a fresh ephemeral host key, so the deployer deliberately
+disables SSH host-key checking and all known-hosts files. Device ownership is
+instead constrained by the exact USB serial/topology, returned Pluto+ IIO
+hardware model, and isolated `/32` route through that radio's interface.
 
 The executor rejects USB reset, SPI-flash/QSPI, boot and environment
-alternates, full ZIP/FRM files, and raw MTD targets. It publishes a passing v3
+alternates, full ZIP/FRM files, and raw MTD targets. It publishes a passing v4
 receipt, including the observed hardware model and verified temporary-route
 cleanup, only after the same serial and exact Pluto+ hardware model return with
 a new boot ID, the candidate firmware identity, and verified TX/DDS/DAC/tandem

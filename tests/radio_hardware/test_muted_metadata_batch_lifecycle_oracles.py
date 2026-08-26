@@ -2707,7 +2707,7 @@ def _candidate_binding_files(
     index_payload = _write_candidate_json(index_path, artifact_index)
     receipt = {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
-        "schema_version": 3,
+        "schema_version": 4,
         "verdict": "pass",
         "boot_mode": "ram-only",
         "artifact_index_sha256": hashlib.sha256(index_payload).hexdigest(),
@@ -2773,9 +2773,9 @@ def _candidate_binding_files(
                     "-o",
                     "KbdInteractiveAuthentication=no",
                     "-o",
-                    "StrictHostKeyChecking=yes",
+                    "StrictHostKeyChecking=no",
                     "-o",
-                    f"UserKnownHostsFile={root / 'known_hosts'}",
+                    "UserKnownHostsFile=/dev/null",
                     "-o",
                     "GlobalKnownHostsFile=/dev/null",
                     "-o",
@@ -2814,7 +2814,6 @@ def _candidate_binding_files(
                 ],
             },
         ],
-        "known_hosts_sha256": "6" * 64,
     }
     receipt_path = root / "deployment-receipt.json"
     _write_candidate_json(receipt_path, receipt)

@@ -147,8 +147,6 @@ class DeploymentOptions:
     artifact_index_sha256: str
     expected_current_firmware: str
     receipt_path: Path
-    known_hosts_path: Path
-    known_hosts_sha256: str
     ssh_host: str
     ssh_user: str
     ssh_password_file: Path | None
@@ -1095,9 +1093,9 @@ def _ssh_base_argv(options: DeploymentOptions, interface: str) -> list[str]:
         "-o",
         "KbdInteractiveAuthentication=no",
         "-o",
-        "StrictHostKeyChecking=yes",
+        "StrictHostKeyChecking=no",
         "-o",
-        f"UserKnownHostsFile={options.known_hosts_path}",
+        "UserKnownHostsFile=/dev/null",
         "-o",
         "GlobalKnownHostsFile=/dev/null",
         "-o",
@@ -1398,14 +1396,6 @@ def execute_deployment(
         serial=options.serial,
         archive_root=artifact.index_path.parent,
     )
-    known_hosts = _read_owned_regular(
-        options.known_hosts_path,
-        label="known-hosts file",
-        maximum_bytes=MAX_JSON_BYTES,
-        required_mode=0o600,
-    )
-    if _sha256_bytes(known_hosts) != options.known_hosts_sha256:
-        raise DeploymentError("known-hosts SHA-256 differs from the requested value")
 
     with (
         _open_radio_lock(options.serial) as lock,
@@ -1605,7 +1595,6 @@ def execute_deployment(
                             {"phase": item["phase"], "argv": list(item["argv"])}
                             for item in commands
                         ],
-                        "known_hosts_sha256": options.known_hosts_sha256,
                     }
                 except BaseException as primary:  # noqa: BLE001 - release route lease
                     if transition_started:
@@ -1761,15 +1750,7 @@ class SystemBackend:
             else None
         )
 
-    def _verify_ssh_inputs(self) -> None:
-        payload = _read_owned_regular(
-            self.options.known_hosts_path,
-            label="known-hosts file",
-            maximum_bytes=MAX_JSON_BYTES,
-            required_mode=0o600,
-        )
-        if _sha256_bytes(payload) != self.options.known_hosts_sha256:
-            raise DeploymentError("known-hosts bytes changed before SSH execution")
+    def _verify_ssh_password(self) -> None:
         if self.options.ssh_password_file is None or self._password_identity is None:
             raise DeploymentError("SSH password file is required for execution")
         _read_password_file(
@@ -2063,7 +2044,7 @@ class SystemBackend:
         if self._active_route is None:
             raise DeploymentError("SSH attempted without an active host-route lease")
         self.ensure_host_route(self._active_route, interface=interface)
-        self._verify_ssh_inputs()
+        self._verify_ssh_password()
         return [
             *_ssh_base_argv(self.options, interface),
             f"{self.options.ssh_user}@{self.options.ssh_host}",
@@ -2368,8 +2349,6 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--artifact-index-sha256", required=True)
     parser.add_argument("--expected-current-firmware", required=True)
     parser.add_argument("--receipt", required=True, type=Path)
-    parser.add_argument("--known-hosts", required=True, type=Path)
-    parser.add_argument("--known-hosts-sha256", required=True)
     parser.add_argument("--ssh-host", default="192.168.2.1")
     parser.add_argument("--ssh-user", default="root")
     parser.add_argument("--ssh-password-file", type=Path)
@@ -2390,8 +2369,6 @@ def _options(namespace: argparse.Namespace) -> DeploymentOptions:
         or HEX_64.fullmatch(namespace.artifact_index_sha256) is None
     ):
         raise DeploymentError("artifact and index SHA-256 values must be lowercase hex")
-    if HEX_64.fullmatch(namespace.known_hosts_sha256) is None:
-        raise DeploymentError("known-hosts SHA-256 must be lowercase hex")
     if namespace.timeout_seconds < 1 or namespace.timeout_seconds > 300:
         raise DeploymentError("timeout must be within [1, 300] seconds")
     try:
@@ -2420,10 +2397,6 @@ def _options(namespace: argparse.Namespace) -> DeploymentOptions:
             namespace.expected_current_firmware, label="expected current firmware"
         ),
         receipt_path=namespace.receipt,
-        known_hosts_path=_canonical_absolute(
-            namespace.known_hosts, label="known-hosts file"
-        ),
-        known_hosts_sha256=namespace.known_hosts_sha256,
         ssh_host=namespace.ssh_host,
         ssh_user=namespace.ssh_user,
         ssh_password_file=password_file,

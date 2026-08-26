@@ -17,7 +17,7 @@ from typing import Any
 ARTIFACT_INDEX_SCHEMA = "plutosdr-fw.tandem-release-evidence"
 RAM_BOOT_RECEIPT_SCHEMA = "plutosdr-fw.tandem-ram-boot-receipt"
 ARTIFACT_INDEX_SCHEMA_VERSION = 1
-RAM_BOOT_RECEIPT_SCHEMA_VERSION = 3
+RAM_BOOT_RECEIPT_SCHEMA_VERSION = 4
 PLUTOPLUS_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
 # Backward-compatible public name used by release-evidence code for the
 # artifact-index schema. Receipt validation has its own version above.
@@ -323,7 +323,6 @@ def validate_deployment_receipt(
             "topology",
             "host_route",
             "commands",
-            "known_hosts_sha256",
         },
         name="RAM-boot receipt",
     )
@@ -613,37 +612,19 @@ def validate_deployment_receipt(
         "-o",
         "KbdInteractiveAuthentication=no",
         "-o",
-        "StrictHostKeyChecking=yes",
-    ]
-    if request[: len(request_prefix)] != request_prefix:
-        _fail("RAM-boot receipt SSH command is not the guarded request sequence")
-    cursor = len(request_prefix)
-    if cursor + 8 > len(request):
-        _fail("RAM-boot receipt SSH command is incomplete")
-    known_hosts_option = request[cursor : cursor + 2]
-    if known_hosts_option[0] != "-o" or not known_hosts_option[1].startswith(
-        "UserKnownHostsFile="
-    ):
-        _fail("RAM-boot receipt SSH command lacks the pinned known-hosts file")
-    _absolute_path(
-        known_hosts_option[1].split("=", 1)[1],
-        name="receipt SSH known-hosts path",
-    )
-    cursor += 2
-    if request[cursor : cursor + 2] != [
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
         "-o",
         "GlobalKnownHostsFile=/dev/null",
-    ]:
-        _fail("RAM-boot receipt global SSH host-check policy is not exact")
-    cursor += 2
-    if request[cursor : cursor + 4] != [
         "-o",
         "CheckHostIP=no",
         "-o",
         "UpdateHostKeys=no",
-    ]:
-        _fail("RAM-boot receipt SSH host-check policy is not exact")
-    cursor += 4
+    ]
+    if request[: len(request_prefix)] != request_prefix:
+        _fail("RAM-boot receipt SSH command is not the guarded request sequence")
+    cursor = len(request_prefix)
     if len(request) - cursor != 2:
         _fail("RAM-boot receipt SSH target/command inventory is not exact")
     target, remote_command = request[cursor:]
@@ -693,7 +674,5 @@ def validate_deployment_receipt(
         _fail("RAM-boot receipt did not download from a sealed descriptor")
     if detach != [*dfu_prefix, "-e"]:
         _fail("RAM-boot receipt DFU detach command is not exact")
-
-    _sha256(record["known_hosts_sha256"], name="receipt known-hosts SHA-256")
 
     return _normalized(record)

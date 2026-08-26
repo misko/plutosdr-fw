@@ -81,7 +81,6 @@ class Fixture:
     index_path: Path
     artifact_path: Path
     manifest_path: Path
-    known_hosts_path: Path
     password_path: Path
 
     def rewrite_index(self) -> None:
@@ -158,9 +157,6 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
     index_payload = (json.dumps(index, sort_keys=True) + "\n").encode()
     _write(index_path, index_payload)
 
-    known_hosts_path = tmp_path / "known_hosts"
-    known_hosts_payload = b"192.168.2.1 ssh-ed25519 AAAAtestkey\n"
-    _write(known_hosts_path, known_hosts_payload, mode=0o600)
     password_path = tmp_path / "ssh-password"
     _write(password_path, b"factory-password\n", mode=0o600)
 
@@ -174,8 +170,6 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
         artifact_index_sha256=_sha(index_payload),
         expected_current_firmware=CURRENT_VERSION,
         receipt_path=receipt_parent / "ram-receipt.json",
-        known_hosts_path=known_hosts_path,
-        known_hosts_sha256=_sha(known_hosts_payload),
         ssh_host="192.168.2.1",
         ssh_user="root",
         ssh_password_file=password_path,
@@ -189,7 +183,6 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
         index_path=index_path,
         artifact_path=artifact_path,
         manifest_path=manifest_path,
-        known_hosts_path=known_hosts_path,
         password_path=password_path,
     )
 
@@ -692,6 +685,14 @@ def test_ssh_password_is_revalidated_and_never_appears_in_argv(
     assert "BatchMode=no" in argv
     assert "NumberOfPasswordPrompts=1" in argv
     assert "PreferredAuthentications=password" in argv
+    assert "StrictHostKeyChecking=no" in argv
+    assert "UserKnownHostsFile=/dev/null" in argv
+    assert "GlobalKnownHostsFile=/dev/null" in argv
+    assert not any(
+        item.startswith("UserKnownHostsFile=")
+        and item != "UserKnownHostsFile=/dev/null"
+        for item in argv
+    )
     backend.request_ram_mode([*argv, "/usr/sbin/device_reboot ram"])
 
     fixture.password_path.write_bytes(b"changed-password\n")
@@ -877,16 +878,14 @@ def test_runner_provenance_requires_clean_head_blob_and_index_agreement(
         )
 
 
-@pytest.mark.parametrize("which", ["artifact", "index", "known-hosts"])
+@pytest.mark.parametrize("which", ["artifact", "index"])
 def test_exact_hash_mutations_fail_before_inventory(tmp_path: Path, which: str) -> None:
     fixture = _fixture(tmp_path)
     options = fixture.options
     if which == "artifact":
         options = replace(options, artifact_sha256="0" * 64)
-    elif which == "index":
+    else:
         options = replace(options, artifact_index_sha256="0" * 64)
-    elif which == "known-hosts":
-        options = replace(options, known_hosts_sha256="0" * 64)
     backend = FakeBackend()
 
     with pytest.raises(deploy.DeploymentError):
@@ -1101,6 +1100,14 @@ def test_command_plan_uses_paired_runtime_dfu_selector_without_reset_or_serial(
         lambda value: value[1]["argv"].__setitem__(2, "0456:b674"),
         lambda value: value[2]["argv"].__setitem__(2, "0456:b674"),
         lambda value: value[0]["argv"].__setitem__(-1, "/usr/sbin/device_reboot sf"),
+        lambda value: value[0]["argv"].__setitem__(
+            value[0]["argv"].index("StrictHostKeyChecking=no"),
+            "StrictHostKeyChecking=yes",
+        ),
+        lambda value: value[0]["argv"].__setitem__(
+            value[0]["argv"].index("UserKnownHostsFile=/dev/null"),
+            "UserKnownHostsFile=/tmp/pinned",
+        ),
         lambda value: value[1]["argv"].__setitem__(-1, "/tmp/boot.dfu"),
         lambda value: value[1]["argv"].append("/dev/mtd0"),
         lambda value: value[1]["argv"].append("qspi-write"),
@@ -1142,8 +1149,9 @@ def test_success_publishes_absent_only_private_bound_receipt(tmp_path: Path) -> 
     assert digest == _sha(payload)
     assert stat.S_IMODE(fixture.options.receipt_path.stat().st_mode) == 0o600
     assert receipt == json.loads(payload)
-    assert receipt["schema_version"] == 3
+    assert receipt["schema_version"] == 4
     assert "transition_proof_sha256" not in receipt
+    assert "known_hosts_sha256" not in receipt
     assert receipt["runtime"]["hardware_model"] == deploy.PLUTOPLUS_HARDWARE_MODEL
     validated = validate_deployment_receipt(
         receipt,
@@ -1512,10 +1520,6 @@ def _cli_arguments(fixture: Fixture) -> list[str]:
         options.expected_current_firmware,
         "--receipt",
         str(options.receipt_path),
-        "--known-hosts",
-        str(options.known_hosts_path),
-        "--known-hosts-sha256",
-        options.known_hosts_sha256,
         "--ssh-password-file",
         str(options.ssh_password_file),
     ]
@@ -1543,6 +1547,8 @@ def test_cli_has_no_legacy_transition_authorization_inputs() -> None:
     assert "--transition-proof" not in help_text
     assert "--transition-proof-sha256" not in help_text
     assert "--sequence-experiment-plan" not in help_text
+    assert "--known-hosts" not in help_text
+    assert "--known-hosts-sha256" not in help_text
 
 
 def test_captured_inventory_plan_is_exact_and_still_hardware_free(

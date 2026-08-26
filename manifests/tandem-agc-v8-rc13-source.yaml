@@ -1,0 +1,80 @@
+# Immutable source graph for the forward-only tandem AGC v8 RC13 candidate.
+# RC13 retains RC12's firmware implementation, external component graph,
+# deterministic package, paired 0456:b673,0456:b674 DFU selector, exact-topology
+# resolver, per-radio /32 route lease, RAM-only boundary, and safe-state checks.
+# RC12 locked exact commit 12261ed055d4488d64aa7ff5353b680a37c3f93d at
+# refs/tags/tandem-agc-v8-rc12-source/firmware-v1. Trusted workflow_dispatch run
+# 32978460325, attempt 1, retained artifact ID 9611124509 and produced verified
+# candidate-index, bundle, DFU, and FIT SHA-256 values
+# a339c99eb7d16980b33249d5a8a5e8c0693a4d22cbf6333c5ce0b3aa2b0151cd,
+# 789aa4d9e8fc672a2040abeee89a34de5f62dafd9e933628ac09d0aac21444c2,
+# 6ffe6ddf898986b1fd6629db796b6b10422a4e5a00da268e0f63d1d258db52a0,
+# and 5db1c49f954e630e4d2a41860bc6bf3f1a6e58749c5c382398caa30887781957.
+#
+# On winbond-db6968136727402c at topology 3-7, RC12's first attempt stopped
+# before reboot or DFU because the retained RC1 SSH host key was stale. After
+# isolated exact-current key enrollment, the second attempt completed the RAM
+# request, paired-selector -D and -e, and returned the exact b673 runtime at the
+# same topology running RC12 safely. Postboot and cleanup SSH both exited 255:
+# /etc/init.d/S50dropbear starts Dropbear with -R and no persistent host key, so
+# each RAM boot generates a new key. The /32 route was removed; no deploy
+# receipt, retained deploy log, or retained SSH stderr was produced. No QSPI
+# write or persistent target was used. Because no preboot QSPI digest was
+# retained, postboot QSPI equality is not claimed. RC12 therefore has one
+# observed successful RAM deployment, zero valid receipt-authorized
+# deployments, and is not hardware-qualified.
+#
+# RC13 removes known-hosts inputs from the CLI, plan, and receipt and advances
+# the measured RAM-boot receipt schema from v3 to v4. SSH remains password-only
+# through sshpass -f, bound to the exact radio interface, with one password
+# prompt and the preferred password authentication. Host-key checking is
+# deliberately disabled for the ephemeral RAM rootfs with the exact policy
+# StrictHostKeyChecking=no, UserKnownHostsFile=/dev/null, and
+# GlobalKnownHostsFile=/dev/null; PasswordAuthentication=yes,
+# PubkeyAuthentication=no, KbdInteractiveAuthentication=no, CheckHostIP=no,
+# and UpdateHostKeys=no remain exact. Serial/topology/runtime binding, paired
+# selector use without -S or -R, unchanged-QSPI proof in successful receipts,
+# safe-state verification, and guaranteed /32 route cleanup remain mandatory.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: 70739d25ec1fa7b95d9069bd26a3e4192fdb3851
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/tandem-agc-v8-rc3-source/libiio-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: f89eb67b2c0131640ae9c9e0f0be46da000f3e37
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/tandem-agc-v8-rc3-source/buildroot-v1
+
+submodule_hdl: dec1dba5b9563c4c58c39fb76df904e462819ad5
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/tandem-agc-v2-source/hdl-v2
+
+submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc10-source/hdl-quantulum
+
+submodule_linux: 77a1f2352162097bb983402f47c9cb4a28a2f055
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/tandem-agc-v2-source/linux-v11
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: tandem-agc-v2-source/hdl-v2
+versions_buildroot: tandem-agc-v8-rc3-source/buildroot-v1
+versions_linux: tandem-agc-v2-source/linux-v11
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

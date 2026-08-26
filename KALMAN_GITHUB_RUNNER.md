@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC12 trusted workflow ends after the build job uploads the exact deployment
+- The RC13 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -110,14 +110,45 @@ b673 DFU suffix and exited 64 before transferring bytes. Exact-topology
 paired-selector `-e` recovered persistent RC1 in a verified safe state; the
 temporary route is absent. RC11 has zero candidate deployments, no receipt,
 and no QSPI write. Its source lock, trusted run, artifact, index, and
-zero-deployment history remain immutable. RC12 corrects only the paired
+zero-deployment history remain immutable. RC12 corrected only the paired
 normal/DFU selector and lineage.
 
-The forward-only RC12 route uses branch
-`codex/firmware-tandem-agc-v8-rc12`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc12`, and source lock
-`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`; it does not move or reuse
-RC11's branch, source lock, artifact, or evidence index.
+RC12 locked exact commit
+`12261ed055d4488d64aa7ff5353b680a37c3f93d` at source lock
+`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. Owner-dispatched trusted run
+`32978460325`, attempt 1, completed successfully and retained artifact ID
+`9611124509`. Its verified candidate-index SHA-256 is
+`a339c99eb7d16980b33249d5a8a5e8c0693a4d22cbf6333c5ce0b3aa2b0151cd`;
+bundle SHA-256 is
+`789aa4d9e8fc672a2040abeee89a34de5f62dafd9e933628ac09d0aac21444c2`;
+DFU SHA-256 is
+`6ffe6ddf898986b1fd6629db796b6b10422a4e5a00da268e0f63d1d258db52a0`;
+and FIT SHA-256 is
+`5db1c49f954e630e4d2a41860bc6bf3f1a6e58749c5c382398caa30887781957`.
+
+On `winbond-db6968136727402c` at exact topology `3-7`, RC12's first execute
+stopped at the initial SSH request with exit 255 on the stale retained host
+key, before reboot or DFU. After isolated exact-current key enrollment, the
+second execute requested RAM boot, completed paired-selector `-D` and `-e`,
+and returned the exact b673 runtime running RC12 safely. Postboot and cleanup
+SSH both exited 255 because the RAM rootfs starts Dropbear with `-R` and has no
+persistent host key. The route was removed. There is no deployment receipt,
+retained deploy log, or retained SSH stderr, and no persistent target or QSPI
+write command was used. No preboot QSPI digest was retained, so postboot QSPI
+equality is not claimed. RC12 has one observed successful RC12 RAM deployment.
+It has zero valid receipt-authorized deployments and is not hardware-qualified.
+Its source, successful build, artifact, evidence index, and observed incident
+remain immutable.
+
+The forward-only RC13 route uses branch
+`codex/firmware-tandem-agc-v8-rc13`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc13`, and source lock
+`refs/tags/tandem-agc-v8-rc13-source/firmware-v1`; it does not move or reuse
+RC12's branch, source lock, artifact, or evidence index. RC13 removes the
+unsatisfiable known-hosts pin for ephemeral RAM Dropbear keys, uses the exact
+password-only/no-host-key-checking policy, and advances the measured RAM-boot
+receipt from v3 to v4 while retaining every USB, topology, route, IIO/model,
+QSPI-equality, safe-state, and paired-selector guard.
 
 ## One-time administrator installation
 
@@ -165,7 +196,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC12 workflow has no separate attestation job. An operator may capture GitHub
+The RC13 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

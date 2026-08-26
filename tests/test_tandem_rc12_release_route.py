@@ -53,7 +53,7 @@ def test_rc12_owner_only_route_maps_ref_manifest_and_package_together() -> None:
     assert workflow.count("'tandem-agc-v8-rc12-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc12'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc12'") == 1
-    assert "Require the exact protected RC12 candidate identity" in workflow
+    assert "Require the exact protected RC12 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index("tandem-agc-v8-rc11-source.yaml")
 
 
@@ -102,7 +102,7 @@ def test_rc12_bundle_upload_does_not_require_github_attestation() -> None:
     assert "\n  attest:" not in workflow
 
 
-def test_rc12_docs_preserve_exact_rc11_build_and_zero_deployment_history() -> None:
+def test_rc12_docs_preserve_exact_build_and_ram_without_receipt_history() -> None:
     releasing = RELEASING.read_text(encoding="utf-8")
     notes = RELEASE_NOTES.read_text(encoding="utf-8")
     plan = RELEASE_PLAN.read_text(encoding="utf-8")
@@ -110,10 +110,12 @@ def test_rc12_docs_preserve_exact_rc11_build_and_zero_deployment_history() -> No
     sources = (releasing, notes, plan, runner)
     rc11_lock = "refs/tags/tandem-agc-v8-rc11-source/firmware-v1"
     rc12_lock = "refs/tags/tandem-agc-v8-rc12-source/firmware-v1"
+    rc13_lock = "refs/tags/tandem-agc-v8-rc13-source/firmware-v1"
 
-    assert "The active candidate is RC12" in releasing
+    assert "The active candidate is RC13" in releasing
     for source in sources:
         assert rc11_lock in source
+        assert rc12_lock in source
         assert "4c332666ff054e21e10c1a8137fd5f1cbc73b568" in source
         assert "32970312166" in source
         assert (
@@ -123,20 +125,44 @@ def test_rc12_docs_preserve_exact_rc11_build_and_zero_deployment_history() -> No
             "1dd94789dddefb7220caad75fb063ad0fdd2a8f3204f2f4fa48bd1cca2d31481" in source
         )
         assert "zero candidate deployments" in source
+        assert "12261ed055d4488d64aa7ff5353b680a37c3f93d" in source
+        assert "32978460325" in source
+        assert "9611124509" in source
+        assert (
+            "a339c99eb7d16980b33249d5a8a5e8c0693a4d22cbf6333c5ce0b3aa2b0151cd" in source
+        )
+        assert (
+            "789aa4d9e8fc672a2040abeee89a34de5f62dafd9e933628ac09d0aac21444c2" in source
+        )
+        assert (
+            "6ffe6ddf898986b1fd6629db796b6b10422a4e5a00da268e0f63d1d258db52a0" in source
+        )
+        assert (
+            "5db1c49f954e630e4d2a41860bc6bf3f1a6e58749c5c382398caa30887781957" in source
+        )
+        assert "one observed successful RC12 RAM deployment" in source
+        assert "zero valid receipt-authorized deployments" in source
+        assert "not hardware-qualified" in source
     for source in (releasing, notes, plan):
-        assert rc12_lock in source
+        assert rc13_lock in source
 
     assert "non-zero exit status 64 before transferring" in notes
     assert "File ID `0456:b673` does not match device" in notes
     assert "before transferring any candidate bytes" in notes
     assert "no retained selector-failure log" in notes
     assert "persistent RC1" in notes
+    assert "postboot and cleanup SSH" in notes
+    assert "/etc/init.d/S50dropbear" in notes
+    assert "no persistent host key" in notes
+    assert "no deployment receipt" in notes
+    assert "no preboot QSPI digest" in notes
+    assert "postboot QSPI equality is not claimed" in notes
 
 
-def test_kalman_handoff_matches_the_rc12_bundle_checksum_contract() -> None:
+def test_kalman_handoff_matches_the_current_bundle_checksum_contract() -> None:
     runner = KALMAN_RUNNER.read_text(encoding="utf-8")
 
-    assert "The RC12 workflow has no separate attestation job." in runner
+    assert "The RC13 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner
     assert "plutosdr-fw.github-attestation-not-performed.v1" in runner
     assert 'sidecars=("$artifact_dir"/*.tar.gz.sha256)' in runner

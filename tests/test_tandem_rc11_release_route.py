@@ -99,7 +99,7 @@ def test_rc11_bundle_upload_does_not_require_github_attestation() -> None:
 def test_kalman_handoff_keeps_the_shared_bundle_checksum_contract() -> None:
     runner = KALMAN_RUNNER.read_text(encoding="utf-8")
 
-    assert "The RC12 workflow has no separate attestation job." in runner
+    assert "The RC13 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner
     assert "plutosdr-fw.github-attestation-not-performed.v1" in runner
     assert 'sidecars=("$artifact_dir"/*.tar.gz.sha256)' in runner
@@ -115,13 +115,15 @@ def test_rc11_docs_preserve_rc10_incident_and_the_burned_rc11_lock() -> None:
     rc10_lock = "refs/tags/tandem-agc-v8-rc10-source/firmware-v1"
     rc11_lock = "refs/tags/tandem-agc-v8-rc11-source/firmware-v1"
     rc12_lock = "refs/tags/tandem-agc-v8-rc12-source/firmware-v1"
+    rc13_lock = "refs/tags/tandem-agc-v8-rc13-source/firmware-v1"
     final_lock = "refs/tags/tandem-agc-v8-source/firmware-v1"
 
-    assert "The active candidate is RC12" in releasing
+    assert "The active candidate is RC13" in releasing
     for source in (releasing, notes, plan):
         assert rc10_lock in source
         assert rc11_lock in source
         assert rc12_lock in source
+        assert rc13_lock in source
     assert final_lock in releasing
     assert "repeat the full four-radio campaign" in releasing
     assert 'gh attestation verify "$release_work"' not in releasing

@@ -154,15 +154,44 @@ in a verified safe state with the temporary route absent. RC11 has zero
 candidate deployments, no receipt, and no QSPI write; its branch, lock, run,
 artifact, index, and zero-deployment history are immutable.
 
-The active candidate is RC12. It retains RC11's firmware implementation,
+RC12 then aligned both download and detach with the paired selector and locked
+exact commit `12261ed055d4488d64aa7ff5353b680a37c3f93d` at source lock
+`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. Owner-dispatched trusted run
+`32978460325`, attempt 1, completed successfully and retained artifact ID
+`9611124509`. Its verified candidate-index SHA-256 is
+`a339c99eb7d16980b33249d5a8a5e8c0693a4d22cbf6333c5ce0b3aa2b0151cd`;
+bundle SHA-256 is
+`789aa4d9e8fc672a2040abeee89a34de5f62dafd9e933628ac09d0aac21444c2`;
+DFU SHA-256 is
+`6ffe6ddf898986b1fd6629db796b6b10422a4e5a00da268e0f63d1d258db52a0`;
+and FIT SHA-256 is
+`5db1c49f954e630e4d2a41860bc6bf3f1a6e58749c5c382398caa30887781957`.
+
+On `winbond-db6968136727402c` at exact topology `3-7`, the first RC12 execute
+stopped at initial SSH with exit 255 on the stale retained key, before reboot
+or DFU. After isolated exact-current key enrollment, the second execute
+requested RAM boot, completed paired-selector `-D` and `-e`, and returned the
+exact b673 runtime running RC12 safely. Postboot and cleanup SSH both exited
+255 because the RAM rootfs starts Dropbear with `-R` and has no persistent host
+key. The route was removed, no deployment receipt/log/stderr was published,
+and no QSPI write or persistent-target command was issued. No preboot QSPI
+digest was retained, so postboot QSPI equality is not claimed. RC12 has one observed successful RC12 RAM deployment.
+It has zero valid receipt-authorized deployments and is not hardware-qualified.
+The exact RC12 source, successful build, artifact, evidence index, and observed
+incident remain immutable.
+
+The active candidate is RC13. It retains RC12's firmware implementation,
 external source graph, deterministic package, topology-bound serialless-b674
-resolver, route/authentication boundary, and receipt-v3 schema. Its only
-executable correction makes both DFU commands use the paired normal/runtime
-selector `0456:b673,0456:b674`, matching the trusted DFU suffix and live b674
-device. Exact topology remains mandatory; nonempty serial mismatch, ambiguity,
+resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
+route, IIO/model/runtime checks, QSPI equality requirement, and safe-state
+boundary. Its only executable change removes known-hosts CLI/receipt inputs for
+the ephemeral RAM Dropbear key, uses exact password-only SSH with
+`StrictHostKeyChecking=no`, `UserKnownHostsFile=/dev/null`, and
+`GlobalKnownHostsFile=/dev/null`, and advances the measured receipt from v3 to
+v4. Exact topology remains mandatory; nonempty serial mismatch, ambiguity,
 wrong VID/PID, serialless b673, `-S`, `-R`, persistent targets, and
 returned-runtime mismatch remain forbidden or fail closed. Its exact candidate
-source lock is `refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. The later
+source lock is `refs/tags/tandem-agc-v8-rc13-source/firmware-v1`. The later
 final build uses the different exact lock
 `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
 reject a cross-stage substitution of those refs.
@@ -172,8 +201,8 @@ The remaining gates, in order, are:
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC12 firmware source lock and explicit trusted build route.
-   Keep RC4 through RC11's external component pins only if source-graph checks
+2. Create the exact RC13 firmware source lock and explicit trusted build route.
+   Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
    retain integrated timing, CDC, DRC, methodology, utilization, and build

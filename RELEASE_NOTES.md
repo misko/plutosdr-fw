@@ -30,7 +30,8 @@
 | `tandem-agc-v8-rc9` | 2026-08-26 | **successful indexed build; rejected before hardware transition** | removed the redundant transition-proof input; first execute exposed duplicate-IP routing and factory-password transport gaps before reboot or DFU |
 | `tandem-agc-v8-rc10` | 2026-08-26 | **successful indexed build; zero candidate deployments** | trusted build and evidence passed; first execute reached DFU but stopped before candidate download because the selected b674 device omitted its USB serial |
 | `tandem-agc-v8-rc11` | 2026-08-26 | **successful indexed build; zero candidate deployments** | serialless-b674 topology resolution passed, but dfu-util rejected the single-ID selector before transferring the b673-suffixed DFU |
-| `tandem-agc-v8-rc12` | 2026-08-26 | **development; not hardware-authorized** | aligns both DFU download and detach with the paired normal/DFU selector already documented by the flashing procedure |
+| `tandem-agc-v8-rc12` | 2026-08-26 | **successful indexed build; observed RAM boot, no deployment receipt; not hardware-qualified** | paired DFU download/detach succeeded on db696, but the ephemeral RAM SSH host key prevented receipt publication |
+| `tandem-agc-v8-rc13` | 2026-08-26 | **development; not hardware-qualified** | removes the unsatisfiable retained host-key pin, uses password-only SSH, and advances the measured RAM receipt to v4 |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -39,32 +40,96 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc12 — 2026-08-26 — **development; not hardware-authorized**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc13 — 2026-08-26 — **development; not hardware-qualified**
 
-RC12 is the forward-only candidate after RC11's exact source lock, trusted
-integrated build, and candidate evidence index passed but its first guarded DFU
-download exposed a stale selector in both the command planner and receipt
-replay validator. RC12 retains RC11's firmware implementation, external source
-graph, deterministic package policy, serialless-b674 topology resolver,
-per-radio `/32` route lease, password-file SSH transport, measured receipt-v3
-schema, and evidence-index contract. It changes the exact DFU command boundary
-and release lineage only.
+RC13 is the forward-only candidate after RC12 built and indexed successfully
+and completed one observed RAM transition on db696, but could not publish its
+measured receipt. RC13 retains RC12's firmware implementation, external source
+graph, deterministic package, exact serial/topology resolver, paired
+`0456:b673,0456:b674` selector for both `-D` and `-e`, per-radio `/32` route,
+IIO/model checks, QSPI equality check, and final safe-state checks. It changes
+only the SSH host-key boundary, receipt schema, and release lineage.
 
-Both download and detach must use
-`dfu-util -d 0456:b673,0456:b674 -p TOPOLOGY -a firmware.dfu`, followed only by
-`-D` for the inherited sealed candidate descriptor and `-e` for detach. The
-first ID matches the trusted DFU suffix and the second matches the live b674
-runtime. Exact topology remains mandatory; `-S`, `-R`, persistent targets, a
-nonempty wrong serial, wrong topology, ambiguity, wrong VID/PID, serialless
-b673, and returned-runtime mismatch remain forbidden or fail closed.
+Pluto RAM boots generate a fresh Dropbear key. RC13 therefore removes the
+`--known-hosts` and `--known-hosts-sha256` CLI inputs and the
+`known_hosts_sha256` receipt member. Receipt schema v4 requires password-only
+SSH through `sshpass -f`, exact interface binding, one password prompt, and
+these exact options: `StrictHostKeyChecking=no`,
+`UserKnownHostsFile=/dev/null`, and `GlobalKnownHostsFile=/dev/null`, together
+with `PasswordAuthentication=yes`, `PubkeyAuthentication=no`,
+`KbdInteractiveAuthentication=no`, `CheckHostIP=no`, and `UpdateHostKeys=no`.
+The exact USB serial/topology, returned b673 serial, Pluto+ IIO model, isolated
+route, new boot ID, equal pre/post QSPI digest, safe runtime, and paired DFU
+commands remain mandatory.
 
-RC12 has its own manifest, owner-only workflow mapping, package namespace,
-exact version, and required source lock
-`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. RC11's branch, source lock,
-trusted run, artifact, candidate index, and zero-deployment history remain
-immutable. RC12 must pass fresh clean offline and routed OOC gates, a new
-trusted integrated build and evidence index, and the complete external
-four-radio RAM campaign before final v8 promotion.
+The RC13 route uses branch `codex/firmware-tandem-agc-v8-rc13`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc13`, manifest
+`manifests/tandem-agc-v8-rc13-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc13`, and source lock
+`refs/tags/tandem-agc-v8-rc13-source/firmware-v1`. RC12's source lock, trusted
+build, artifact, candidate index, and observed no-receipt incident remain
+immutable. RC13 needs a fresh clean offline/OOC pass, trusted integrated build,
+new evidence index, and the complete external four-radio RAM campaign before
+final v8 promotion.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc12 — 2026-08-26 — **successful indexed build; observed RAM boot, no deployment receipt; not hardware-qualified**
+
+RC12 locked exact commit
+`12261ed055d4488d64aa7ff5353b680a37c3f93d` at source lock
+`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. Owner-dispatched trusted run
+`32978460325`, attempt 1, completed successfully and retained artifact ID
+`9611124509`, named
+`plutoplus-main-12261ed055d4488d64aa7ff5353b680a37c3f93d-32978460325-1`.
+Its outer ZIP SHA-256 is
+`9ceb66dc670811ec7d717788edb3257f1c56db68ad9a035dd8df2b1e43106429`;
+verified candidate-index SHA-256 is
+`a339c99eb7d16980b33249d5a8a5e8c0693a4d22cbf6333c5ce0b3aa2b0151cd`;
+bundle SHA-256 is
+`789aa4d9e8fc672a2040abeee89a34de5f62dafd9e933628ac09d0aac21444c2`;
+DFU SHA-256 is
+`6ffe6ddf898986b1fd6629db796b6b10422a4e5a00da268e0f63d1d258db52a0`;
+and FIT SHA-256 is
+`5db1c49f954e630e4d2a41860bc6bf3f1a6e58749c5c382398caa30887781957`.
+The complete build, artifact, and evidence index passed and remain immutable.
+
+On `winbond-db6968136727402c` at exact topology `3-7`, the first attempt
+stopped at the initial runtime SSH command with exit 255 on the stale retained
+RC1 host key, before reboot or DFU. The temporary `/32` route was removed, no
+deployment receipt was published, and persistent RC1 remained safe. The exact
+current key was then enrolled with the isolated serial-attested utility;
+enrollment receipt
+`/tmp/tandem-agc-v8-rc12-hardware-prep.bqEWh8/enrollment-receipts/65362d728b3144aa9687d7df16502731.json`
+records success and has SHA-256
+`11107591e5c48cd8c335c4e8bf9387f1e92459ac8d09d98383071d5670b1d9d7`.
+
+The second attempt passed the initial checks, sent `device_reboot ram`, and
+found the unique exact-topology serialless b674 device. It completed
+paired-selector `-D` and `-e`, then returned exact `0456:b673` as devnum 29 on
+topology `3-7` running RC12. Both postboot and cleanup SSH calls exited 255. The retained RC1
+ED25519 fingerprint was
+`SHA256:ls0RSRupYX9ZJKe9Kh3t9yJHvt54NZTyA+A91ObNGCU`; the topology-bound,
+serial-attested RC12 RAM fingerprint was
+`SHA256:hihAeih3cGjJhpmjkNkPA3qgv55XlUc4OmnJDWniRc8`. The cause is exact:
+`/etc/init.d/S50dropbear` starts Dropbear with `-R` and has no persistent host key,
+so each RAM boot generates a different key and a preboot pin cannot
+authenticate the postboot image.
+
+No deployment receipt, retained deploy log, or retained SSH stderr was
+published, and the candidate hardware directory is empty. A later exact
+runtime observation found URI `usb:3.29.5`, boot UUID
+`f6977760-dda6-431f-8517-733e8402b3c6`, the exact Pluto+ model, and RC12 in a
+safe state: TX gains `[-80,-80]`, every DDS raw value zero, DAC selectors
+`[3,3,3,3]`, tandem `IDLE`, FIFO level 0, and fault flags 0. Current
+`qspi-linux` is 31,457,280 bytes with SHA-256
+`066487d9d135dd492a75fe04912d0e18efae565b0666ae72c40ee4fbbb31d9b8`,
+but no preboot QSPI digest was retained. Therefore postboot QSPI equality is not claimed.
+The tool issued no QSPI write or persistent-target command. The exact
+`/32` route is absent and every peer NIC was restored.
+
+RC12 has one observed successful RC12 RAM deployment.
+It has zero valid receipt-authorized deployments and is not hardware-qualified.
+RC13 corrects only the unsatisfiable ephemeral-host-key boundary, receipt
+schema, and lineage.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc11 — 2026-08-26 — **successful indexed build; zero candidate deployments**
 
@@ -304,7 +369,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC12 route still requires the complete external paired-behavior,
+active RC13 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

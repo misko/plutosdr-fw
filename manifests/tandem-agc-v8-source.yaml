@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC12, but the
+# The external component graph remains identical from RC4 through RC13, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -19,11 +19,21 @@
 # exposed a stale dfu-util selector: both the planner and receipt validator used
 # only b674 although the trusted DFU suffix identifies b673. dfu-util exited
 # before transferring bytes; paired-selector exact-topology detach recovered
-# persistent RC1 safely with no receipt, deployment, or QSPI write. RC12 aligns
-# both -D and -e with the documented b673,b674 selector. RC12 must pass its new
-# source-locked build and full hardware qualification before this final graph
-# is used. The subsequent final build may change only the top-level release
-# identity and packaging, while requiring
+# persistent RC1 safely with no receipt, deployment, or QSPI write. RC12 aligned
+# both -D and -e with the documented b673,b674 selector, locked exact commit
+# 12261ed055d4488d64aa7ff5353b680a37c3f93d, and passed trusted run
+# 32978460325. Its second db696 execute completed the paired RAM transition and
+# returned exact b673 running RC12, but postboot and cleanup SSH both exited 255:
+# the RAM rootfs starts Dropbear with -R and no persistent host key. No deployment
+# receipt or retained preboot QSPI digest was published, so RC12 has one observed
+# RAM transition but zero valid receipt-authorized deployments and is not
+# hardware-qualified. RC13 removes the unsatisfiable known-hosts pin, uses exact
+# password-only SSH with all known-hosts files disabled, and versions the measured
+# receipt as v4 while retaining serial/topology, isolated /32 route, IIO/model,
+# QSPI equality, safe-state, and paired-selector checks. RC13 must pass its new
+# source-locked build and full hardware qualification before this final graph is
+# used. The subsequent final build may change only the top-level release identity
+# and packaging, while requiring
 # exact component identities in packed /opt/VERSIONS.
 
 schema: plutosdr-fw.source-manifest

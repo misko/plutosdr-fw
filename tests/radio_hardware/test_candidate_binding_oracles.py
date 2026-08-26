@@ -19,7 +19,7 @@ from .candidate_binding import (
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SERIAL = "104473222a87000abc00123456789def"
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc12"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc13"
 
 
 def _artifact_index() -> dict[str, Any]:
@@ -36,7 +36,7 @@ def _artifact_index() -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc12-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc13-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1234, "run_attempt": 1},
@@ -73,7 +73,7 @@ def _artifact_index() -> dict[str, Any]:
 def _receipt() -> dict[str, Any]:
     return {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
-        "schema_version": 3,
+        "schema_version": 4,
         "verdict": "pass",
         "boot_mode": "ram-only",
         "artifact_index_sha256": SHA_B,
@@ -139,9 +139,9 @@ def _receipt() -> dict[str, Any]:
                     "-o",
                     "KbdInteractiveAuthentication=no",
                     "-o",
-                    "StrictHostKeyChecking=yes",
+                    "StrictHostKeyChecking=no",
                     "-o",
-                    "UserKnownHostsFile=/evidence/known_hosts",
+                    "UserKnownHostsFile=/dev/null",
                     "-o",
                     "GlobalKnownHostsFile=/dev/null",
                     "-o",
@@ -180,7 +180,6 @@ def _receipt() -> dict[str, Any]:
                 ],
             },
         ],
-        "known_hosts_sha256": "6" * 64,
     }
 
 
@@ -240,7 +239,7 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
     "mutation",
     [
         lambda value: value.update(extra=True),
-        lambda value: value.update(schema_version=2),
+        lambda value: value.update(schema_version=3),
         lambda value: value.update(verdict="fail"),
         lambda value: value.update(boot_mode="persistent"),
         lambda value: value.update(artifact_index_sha256="0" * 64),
@@ -271,6 +270,14 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
         lambda value: value["commands"].reverse(),
         lambda value: value["commands"][0].update(argv=["true"]),
         lambda value: value["commands"][0]["argv"].__setitem__(-2, "root@not-an-ip"),
+        lambda value: value["commands"][0]["argv"].__setitem__(
+            value["commands"][0]["argv"].index("StrictHostKeyChecking=no"),
+            "StrictHostKeyChecking=yes",
+        ),
+        lambda value: value["commands"][0]["argv"].__setitem__(
+            value["commands"][0]["argv"].index("UserKnownHostsFile=/dev/null"),
+            "UserKnownHostsFile=/evidence/known_hosts",
+        ),
         lambda value: value["commands"][1]["argv"].__setitem__(4, "1-9"),
         lambda value: value["commands"][1]["argv"].__setitem__(2, "0456:b674"),
         lambda value: value["commands"][2]["argv"].__setitem__(2, "0456:b674"),
@@ -282,7 +289,7 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
         lambda value: value["commands"][1]["argv"].extend(["-S", SERIAL]),
         lambda value: value["commands"][1]["argv"].append("--reset"),
         lambda value: value.update(transition_proof_sha256="5" * 64),
-        lambda value: value.update(known_hosts_sha256="short"),
+        lambda value: value.update(known_hosts_sha256="6" * 64),
     ],
 )
 def test_ram_receipt_rejects_wrong_bytes_identity_epoch_or_cleanup(
