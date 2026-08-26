@@ -54,13 +54,16 @@ tree and give it an absent output path:
 
 The launcher records the exact commit, tool version, input hashes, routed
 checkpoint, and reports in that private directory. A strict, bounded offline
-validator accepts only the frozen routed report inventory: CDC directions
+validator accepts only the frozen topology and rule inventory: CDC directions
 112/39 with CDC-3=5, CDC-6=2, and CDC-15=133; OOC-only DRC
-REQP-1839=18 and ZPS7-1=1; methodology TIMING-18=182 and LUTAR-1=1;
-exact timing/route/utilization values; and no unknown rule. The complete
-directory contains the input snapshot and hashes, Vivado and Python versions,
-provenance, log, routed checkpoint, eight reports, normalized timing metrics,
-an evidence checksum manifest, and `status.txt`.
+REQP-1839=18 and ZPS7-1=1; methodology TIMING-18=182 and LUTAR-1=1; exact clock
+and resource capacities; complete route accounting; nonnegative timing slack;
+zero timing failures; and no unknown rule. Volatile endpoint, routed-net, and
+used-resource counts are parsed and cross-checked instead of being copied from
+an older candidate. The complete directory contains the input snapshot and
+hashes, Vivado and Python versions, provenance, log, routed checkpoint, eight
+reports, normalized timing metrics, an evidence checksum manifest, and
+`status.txt`.
 
 `status.txt` is linked with no-replace semantics only after every report,
 inventory, source, tool, and checksum check succeeds; its absence makes an

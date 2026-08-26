@@ -381,13 +381,92 @@ s_axi_aclk          3.765        0.000                      0                  8
     )
 
 
-def _clock_interaction() -> str:
+def _clock_interaction_row(
+    from_clock: str,
+    to_clock: str,
+    *,
+    edges: str,
+    wns: str,
+    tns: str,
+    failing: int,
+    total: int,
+    requirement: str,
+    classification: str,
+    constraints: str,
+) -> str:
+    return (
+        f"{from_clock:<12}  {to_clock:<12}  {edges:<11}  {wns:>7}  {tns:>7}  "
+        f"{failing:>11}  {total:>11}  {requirement:>15}  "
+        f"{classification:<19}  {constraints:<19}  "
+    )
+
+
+def _clock_interaction(
+    *,
+    l_clk_wns: str = "9.13",
+    l_clk_endpoints: int = 1001,
+    l_to_axi_endpoints: int = 39,
+    axi_to_l_endpoints: int = 112,
+    axi_wns: str = "3.76",
+    axi_endpoints: int = 805,
+) -> str:
+    rows = (
+        _clock_interaction_row(
+            "l_clk",
+            "l_clk",
+            edges="rise - rise",
+            wns=l_clk_wns,
+            tns="0.00",
+            failing=0,
+            total=l_clk_endpoints,
+            requirement="16.28",
+            classification="Clean",
+            constraints="Timed",
+        ),
+        _clock_interaction_row(
+            "l_clk",
+            "s_axi_aclk",
+            edges="",
+            wns="",
+            tns="",
+            failing=0,
+            total=l_to_axi_endpoints,
+            requirement="",
+            classification="Ignored",
+            constraints="Asynchronous Groups",
+        ),
+        _clock_interaction_row(
+            "s_axi_aclk",
+            "l_clk",
+            edges="",
+            wns="",
+            tns="",
+            failing=0,
+            total=axi_to_l_endpoints,
+            requirement="",
+            classification="Ignored",
+            constraints="Asynchronous Groups",
+        ),
+        _clock_interaction_row(
+            "s_axi_aclk",
+            "s_axi_aclk",
+            edges="rise - rise",
+            wns=axi_wns,
+            tns="0.00",
+            failing=0,
+            total=axi_endpoints,
+            requirement="10.00",
+            classification="Clean",
+            constraints="Timed",
+        ),
+    )
     return (
         _header(
             "report_clock_interaction -file /evidence/clock_interaction.rpt",
             "7z010-clg400",
         )
-        + """Clock Interaction Report
+        + """
+Clock Interaction Report
 
 Clock Interaction Table
 -----------------------
@@ -395,11 +474,9 @@ Clock Interaction Table
                             WNS                            TNS Failing  TNS Total    WNS Path         Clock-Pair           Inter-Clock
 From Clock    To Clock      Clock Edges  WNS(ns)  TNS(ns)    Endpoints    Endpoints  Requirement(ns)  Classification       Constraints
 ------------  ------------  -----------  -------  -------  -----------  -----------  ---------------  -------------------  -------------------
-l_clk         l_clk         rise - rise     9.13     0.00            0         1001            16.28  Clean                Timed
-l_clk         s_axi_aclk                                             0           39                   Ignored              Asynchronous Groups
-s_axi_aclk    l_clk                                                  0          112                   Ignored              Asynchronous Groups
-s_axi_aclk    s_axi_aclk    rise - rise     3.76     0.00            0          805            10.00  Clean                Timed
 """
+        + "\n".join(rows)
+        + "\n"
     )
 
 
@@ -600,6 +677,20 @@ def _replace(path: Path, old: str, new: str, *, count: int = 1) -> None:
     path.write_text(text.replace(old, new), encoding="utf-8")
 
 
+def _replace_fixed_field(
+    line: str,
+    start: int,
+    end: int,
+    value: str,
+    *,
+    left_aligned: bool = False,
+) -> str:
+    width = end - start
+    assert len(value) <= width
+    replacement = f"{value:<{width}}" if left_aligned else f"{value:>{width}}"
+    return line[:start] + replacement + line[end:]
+
+
 def _validate(directory: Path) -> dict[str, str]:
     return VALIDATOR.validate_ooc_reports(directory)
 
@@ -621,6 +712,116 @@ def test_valid_exact_report_set_passes(tmp_path: Path) -> None:
         "TPWS_ns": "0.000",
         "TPWS_failing_endpoints": "0",
         "TPWS_total_endpoints": "698",
+    }
+
+
+def test_valid_rc6_metric_variant_passes_without_rc5_numeric_baselines(
+    tmp_path: Path,
+) -> None:
+    _valid_reports(tmp_path)
+    interaction = _clock_interaction(
+        l_clk_wns="9.27",
+        l_clk_endpoints=791,
+        axi_wns="3.68",
+        axi_endpoints=805,
+    ).replace("/evidence", str(tmp_path))
+    (tmp_path / "clock_interaction.rpt").write_text(interaction, encoding="utf-8")
+
+    route = (tmp_path / "route_status.rpt").read_text(encoding="utf-8")
+    for old, new in (
+        ("1657", "1529"),
+        ("530", "439"),
+        ("349", "258"),
+        ("1127", "1090"),
+    ):
+        route = route.replace(old, new)
+    (tmp_path / "route_status.rpt").write_text(route, encoding="utf-8")
+
+    timing = tmp_path / "timing_summary.rpt"
+    replacements = (
+        (
+            (
+                "3.765        0.000                      0                 1806"
+                "        0.079        0.000                      0                 1806"
+                "        4.500        0.000                       0"
+                "                   698"
+            ),
+            (
+                "3.684        0.000                      0                 1596"
+                "        0.044        0.000                      0                 1596"
+                "        4.500        0.000                       0"
+                "                   626"
+            ),
+            1,
+        ),
+        (
+            (
+                "l_clk               9.129        0.000                      0"
+                "                 1001        0.079        0.000"
+                "                      0                 1001        7.638"
+                "        0.000                       0                   391"
+            ),
+            (
+                "l_clk               9.270        0.000                      0"
+                "                  791        0.044        0.000"
+                "                      0                  791        7.638"
+                "        0.000                       0                   319"
+            ),
+            1,
+        ),
+        (
+            (
+                "s_axi_aclk          3.765        0.000                      0"
+                "                  805        0.100        0.000"
+                "                      0                  805        4.500"
+                "        0.000                       0                   307"
+            ),
+            (
+                "s_axi_aclk          3.684        0.000                      0"
+                "                  805        0.100        0.000"
+                "                      0                  805        4.500"
+                "        0.000                       0                   307"
+            ),
+            1,
+        ),
+        (
+            "Slack (MET) :             3.765ns",
+            "Slack (MET) :             3.684ns",
+            100,
+        ),
+        (
+            "Slack (MET) :             0.079ns",
+            "Slack (MET) :             0.044ns",
+            100,
+        ),
+    )
+    for old, new, count in replacements:
+        _replace(timing, old, new, count=count)
+
+    utilization = tmp_path / "utilization.rpt"
+    for old, new in (
+        ("| Slice LUTs              |  475 |", "| Slice LUTs              |  456 |"),
+        ("| Slice Registers         |  694 |", "| Slice Registers         |  620 |"),
+        ("| DSPs                    |    0 |", "| DSPs                    |    2 |"),
+        ("|     17600 |  2.70 |", "|     17600 |  2.59 |"),
+        ("|     35200 |  1.97 |", "|     35200 |  1.76 |"),
+        ("|        80 |  0.00 |", "|        80 |  2.50 |"),
+    ):
+        _replace(utilization, old, new)
+
+    assert _validate(tmp_path) == {
+        "WNS_ns": "3.684",
+        "TNS_ns": "0.000",
+        "TNS_failing_endpoints": "0",
+        "TNS_total_endpoints": "1596",
+        "WHS_ns": "0.044",
+        "THS_ns": "0.000",
+        "THS_failing_endpoints": "0",
+        "THS_total_endpoints": "1596",
+        "WPWS_ns": "4.500",
+        "TPWS_ns": "0.000",
+        "TPWS_failing_endpoints": "0",
+        "TPWS_total_endpoints": "626",
     }
 
 
@@ -800,7 +1001,7 @@ def test_public_cli_normalizes_corrupt_dcp_deflate(
         (
             "utilization.rpt",
             "| Slice LUTs              |  475",
-            "| Slice LUTs              |  476",
+            "| Slice LUTs              | 17601",
             1,
         ),
         (
@@ -921,6 +1122,180 @@ def test_cdc_tables_reject_unknown_or_malformed_rows(tmp_path: Path) -> None:
         count=2,
     )
     with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+
+@pytest.mark.parametrize(
+    (
+        "l_clk_wns",
+        "l_clk_endpoints",
+        "l_to_axi_endpoints",
+        "axi_to_l_endpoints",
+        "axi_wns",
+        "axi_endpoints",
+    ),
+    [
+        ("9.13", 1001, 39, 112, "3.76", 805),
+        ("9.27", 791, 39, 112, "3.68", 805),
+        ("0.00", 792, 40, 113, "99.99", 806),
+    ],
+)
+def test_clock_interaction_accepts_clean_dynamic_metrics(
+    l_clk_wns: str,
+    l_clk_endpoints: int,
+    l_to_axi_endpoints: int,
+    axi_to_l_endpoints: int,
+    axi_wns: str,
+    axi_endpoints: int,
+) -> None:
+    VALIDATOR._validate_clock_interaction(
+        _clock_interaction(
+            l_clk_wns=l_clk_wns,
+            l_clk_endpoints=l_clk_endpoints,
+            l_to_axi_endpoints=l_to_axi_endpoints,
+            axi_to_l_endpoints=axi_to_l_endpoints,
+            axi_wns=axi_wns,
+            axi_endpoints=axi_endpoints,
+        )
+    )
+
+
+@pytest.mark.parametrize("mutation", ["missing", "extra", "duplicate", "reordered"])
+def test_clock_interaction_row_inventory_and_order_are_exact(mutation: str) -> None:
+    lines = _clock_interaction().splitlines()
+    row_indices = [
+        index
+        for index, line in enumerate(lines)
+        if line.startswith(("l_clk ", "s_axi_aclk "))
+    ]
+    assert len(row_indices) == 4
+    if mutation == "missing":
+        lines.pop(row_indices[2])
+    elif mutation == "extra":
+        lines.insert(row_indices[-1] + 1, lines[row_indices[-1]])
+    elif mutation == "duplicate":
+        lines[row_indices[2]] = lines[row_indices[1]]
+    else:
+        first, second = row_indices[1:3]
+        lines[first], lines[second] = lines[second], lines[first]
+
+    with pytest.raises(VALIDATOR.ValidationError):
+        VALIDATOR._validate_clock_interaction("\n".join(lines) + "\n")
+
+
+@pytest.mark.parametrize(
+    ("row_index", "start", "end", "value", "left_aligned"),
+    [
+        (0, 0, 12, "rogue_clk", True),
+        (0, 28, 39, "fall - fall", True),
+        (0, 41, 48, "NaN", False),
+        (0, 41, 48, "-0.01", False),
+        (0, 41, 48, "-0.00", False),
+        (0, 50, 57, "0.01", False),
+        (0, 50, 57, "-0.00", False),
+        (0, 59, 70, "1", False),
+        (0, 72, 83, "0", False),
+        (0, 72, 83, "0001", False),
+        (0, 85, 100, "16.27", False),
+        (0, 102, 121, "Ignored", True),
+        (0, 123, 142, "Asynchronous Groups", True),
+        (1, 28, 39, "rise - rise", True),
+        (1, 41, 48, "1.00", False),
+        (1, 50, 57, "0.00", False),
+        (1, 59, 70, "1", False),
+        (1, 72, 83, "0", False),
+        (1, 85, 100, "10.00", False),
+        (1, 102, 121, "Clean", True),
+        (1, 123, 142, "Timed", True),
+    ],
+)
+def test_clock_interaction_semantic_mutations_reject(
+    row_index: int,
+    start: int,
+    end: int,
+    value: str,
+    left_aligned: bool,
+) -> None:
+    lines = _clock_interaction().splitlines()
+    row_indices = [
+        index
+        for index, line in enumerate(lines)
+        if line.startswith(("l_clk ", "s_axi_aclk "))
+    ]
+    target = row_indices[row_index]
+    lines[target] = _replace_fixed_field(
+        lines[target], start, end, value, left_aligned=left_aligned
+    )
+
+    with pytest.raises(VALIDATOR.ValidationError):
+        VALIDATOR._validate_clock_interaction("\n".join(lines) + "\n")
+
+
+def test_clock_interaction_rejects_shifted_columns_and_noncontiguous_rows() -> None:
+    lines = _clock_interaction().splitlines()
+    row_indices = [
+        index
+        for index, line in enumerate(lines)
+        if line.startswith(("l_clk ", "s_axi_aclk "))
+    ]
+    lines[row_indices[0]] = lines[row_indices[0]][:12] + lines[row_indices[0]][13:]
+    with pytest.raises(VALIDATOR.ValidationError):
+        VALIDATOR._validate_clock_interaction("\n".join(lines) + "\n")
+
+    lines = _clock_interaction().splitlines()
+    row_indices = [
+        index
+        for index, line in enumerate(lines)
+        if line.startswith(("l_clk ", "s_axi_aclk "))
+    ]
+    lines.insert(row_indices[2], "")
+    with pytest.raises(VALIDATOR.ValidationError):
+        VALIDATOR._validate_clock_interaction("\n".join(lines) + "\n")
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("Clock Interaction Report", "Clock Relationship Report"),
+        ("Clock Interaction Table", "Clock Relationship Table"),
+        ("Inter-Clock", "Inter.Clock"),
+        ("From Clock    To Clock", "From Clock    At Clock"),
+        (
+            "------------  ------------  -----------",
+            "-----------   ------------  -----------",
+        ),
+    ],
+)
+def test_clock_interaction_title_and_table_headers_are_exact(
+    old: str, new: str
+) -> None:
+    report = _clock_interaction()
+    assert report.count(old) == 1
+    with pytest.raises(VALIDATOR.ValidationError):
+        VALIDATOR._validate_clock_interaction(report.replace(old, new))
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("rise - rise     9.13", "rise - rise     9.14"),
+        ("0         1001            16.28", "0         1000            16.28"),
+        (
+            "0           39                   Ignored",
+            "0           40                   Ignored",
+        ),
+        (
+            "0          112                   Ignored",
+            "0          113                   Ignored",
+        ),
+    ],
+)
+def test_clock_interaction_metrics_cross_bind_timing_and_cdc(
+    tmp_path: Path, old: str, new: str
+) -> None:
+    _valid_reports(tmp_path)
+    _replace(tmp_path / "clock_interaction.rpt", old, new)
+    with pytest.raises(VALIDATOR.ValidationError, match="bind"):
         _validate(tmp_path)
 
 
@@ -1143,6 +1518,80 @@ def test_spoofed_good_rows_do_not_mask_bad_scoped_rows(tmp_path: Path) -> None:
         _validate(tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("old", "new", "count"),
+    [
+        (
+            "3.765        0.000                      0                 1806",
+            "-0.000        0.000                      0                 1806",
+            1,
+        ),
+        (
+            "3.765        0.000                      0                 1806",
+            "3.765       -0.000                      0                 1806",
+            1,
+        ),
+        (
+            "l_clk               9.129        0.000                      0",
+            "l_clk               9.129        0.000                      1",
+            1,
+        ),
+        (
+            (
+                "l_clk               9.129        0.000                      0"
+                "                 1001        0.079        0.000"
+                "                      0                 1001"
+            ),
+            (
+                "l_clk               9.129        0.000                      0"
+                "                    0        0.079        0.000"
+                "                      0                 1001"
+            ),
+            1,
+        ),
+        (
+            (
+                "0                 1806        0.079        0.000"
+                "                      0                 1806"
+            ),
+            (
+                "0                 1805        0.079        0.000"
+                "                      0                 1805"
+            ),
+            1,
+        ),
+        (
+            "3.765        0.000                      0                 1806",
+            "3.766        0.000                      0                 1806",
+            1,
+        ),
+        (
+            (
+                "l_clk               9.129        0.000                      0"
+                "                 1001        0.079        0.000"
+                "                      0                 1001"
+            ),
+            (
+                "l_clk               9.129        0.000                      0"
+                "                 1001        0.079        0.000"
+                "                      0                 1000"
+            ),
+            1,
+        ),
+    ],
+)
+def test_timing_metric_invariant_mutations_reject(
+    tmp_path: Path,
+    old: str,
+    new: str,
+    count: int,
+) -> None:
+    _valid_reports(tmp_path)
+    _replace(tmp_path / "timing_summary.rpt", old, new, count=count)
+    with pytest.raises(VALIDATOR.ValidationError):
+        _validate(tmp_path)
+
+
 def test_timing_rejects_second_total_row_and_noncanonical_zero(tmp_path: Path) -> None:
     _valid_reports(tmp_path)
     timing = tmp_path / "timing_summary.rpt"
@@ -1233,6 +1682,33 @@ def test_utilization_authoritative_body_heading_decoys_reject(
         _validate(tmp_path)
 
 
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        ("| Slice LUTs              |  475 |", "| Slice LUTs              | 17601 |"),
+        ("| Slice LUTs              |  475 |", "| Slice LUTs              |    0 |"),
+        (
+            "| Slice LUTs              |  475 |     0 |",
+            "| Slice LUTs              |  475 |     1 |",
+        ),
+        (
+            "| Slice LUTs              |  475 |     0 |          0 |",
+            "| Slice LUTs              |  475 |     0 |          1 |",
+        ),
+        ("|     17600 |  2.70 |", "|     17601 |  2.70 |"),
+        ("|     17600 |  2.70 |", "|     17600 |  2.71 |"),
+        ("| Block RAM Tile          |    2 |", "| Block RAM Tile          |    0 |"),
+        ("|        60 |  3.33 |", "|        60 |  0.00 |"),
+        ("| DSPs                    |    0 |", "| DSPs                    |   81 |"),
+    ],
+)
+def test_utilization_capacity_invariant_mutations_reject(old: str, new: str) -> None:
+    report = _utilization()
+    assert report.count(old) == 1
+    with pytest.raises(VALIDATOR.ValidationError):
+        VALIDATOR._validate_utilization(report.replace(old, new))
+
+
 @pytest.mark.parametrize("mutation", ["unknown", "duplicate", "missing"])
 def test_route_table_has_an_exact_row_grammar(
     tmp_path: Path,
@@ -1256,6 +1732,34 @@ def test_route_table_has_an_exact_row_grammar(
 
     with pytest.raises(VALIDATOR.ValidationError):
         _validate(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [
+        (
+            "# of internally routed nets........ :         349 :",
+            "# of internally routed nets........ :         348 :",
+        ),
+        (
+            "# of fully routed nets............. :        1127 :",
+            "# of fully routed nets............. :        1126 :",
+        ),
+        (
+            "# of routable nets..................... :        1127 :",
+            "# of routable nets..................... :           0 :",
+        ),
+        (
+            "# of logical nets.......................... :        1657 :",
+            "# of logical nets.......................... :           0 :",
+        ),
+    ],
+)
+def test_route_accounting_and_completion_invariants_reject(old: str, new: str) -> None:
+    report = _route()
+    assert report.count(old) == 1
+    with pytest.raises(VALIDATOR.ValidationError):
+        VALIDATOR._validate_route(report.replace(old, new))
 
 
 def test_missing_symlink_invalid_utf8_and_oversize_reports_reject(

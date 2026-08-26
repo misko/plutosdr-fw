@@ -9,7 +9,7 @@ import sys
 import zipfile
 import zlib
 from collections import Counter
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree
@@ -125,65 +125,22 @@ CHECK_TIMING = {
     "partial_output_delay": 0,
     "latch_loops": 0,
 }
-TIMING_TOTAL = (
-    Decimal("3.765"),
-    Decimal("0.000"),
-    0,
-    1806,
-    Decimal("0.079"),
-    Decimal("0.000"),
-    0,
-    1806,
-    Decimal("4.500"),
-    Decimal("0.000"),
-    0,
-    698,
-)
-TIMING_BY_CLOCK = {
-    "l_clk": (
-        Decimal("9.129"),
-        Decimal("0.000"),
-        0,
-        1001,
-        Decimal("0.079"),
-        Decimal("0.000"),
-        0,
-        1001,
-        Decimal("7.638"),
-        Decimal("0.000"),
-        0,
-        391,
-    ),
-    "s_axi_aclk": (
-        Decimal("3.765"),
-        Decimal("0.000"),
-        0,
-        805,
-        Decimal("0.100"),
-        Decimal("0.000"),
-        0,
-        805,
-        Decimal("4.500"),
-        Decimal("0.000"),
-        0,
-        307,
-    ),
-}
+TIMING_CLOCKS = ("l_clk", "s_axi_aclk")
 TIMING_MET_PATH_COUNT = 200
-ROUTE_COUNTS = {
-    "logical nets": 1657,
-    "nets not needing routing": 530,
-    "internally routed nets": 349,
-    "implicitly routed ports": 181,
-    "routable nets": 1127,
-    "fully routed nets": 1127,
-    "nets with routing errors": 0,
-}
-UTILIZATION = {
-    "Slice LUTs": (475, 17600, Decimal("2.70")),
-    "Slice Registers": (694, 35200, Decimal("1.97")),
-    "Block RAM Tile": (2, 60, Decimal("3.33")),
-    "DSPs": (0, 80, Decimal("0.00")),
+ROUTE_LABELS = (
+    "logical nets",
+    "nets not needing routing",
+    "internally routed nets",
+    "implicitly routed ports",
+    "routable nets",
+    "fully routed nets",
+    "nets with routing errors",
+)
+UTILIZATION_CAPACITY = {
+    "Slice LUTs": (17600, 1, 17600),
+    "Slice Registers": (35200, 1, 35200),
+    "Block RAM Tile": (60, 2, 2),
+    "DSPs": (80, 0, 80),
 }
 HEADED_REPORTS = tuple(name for name in REPORT_LIMITS if name.endswith(".rpt"))
 
@@ -487,7 +444,7 @@ def _validate_vivado_log(text: str) -> None:
             _fail(f"Vivado log has a nonzero critical/error aggregate: {line}")
 
 
-def _validate_cdc_summary(text: str) -> None:
+def _validate_cdc_summary(text: str) -> dict[tuple[str, str], int]:
     _require_header(
         text,
         name="CDC summary",
@@ -550,6 +507,7 @@ def _validate_cdc_summary(text: str) -> None:
         rows[key] = counts
     if rows != CDC_SUMMARY:
         _fail(f"CDC summary is not exact: {rows}")
+    return {(key[1], key[2]): counts[0] for key, counts in rows.items()}
 
 
 def _cdc_rule_summary(text: str) -> dict[str, tuple[str, int, str]]:
@@ -880,6 +838,30 @@ def _numeric_row(line: str, *, label: str) -> tuple[Decimal | int, ...]:
     return tuple(values)
 
 
+def _validate_clean_timing_row(
+    values: tuple[Decimal | int, ...], *, label: str
+) -> None:
+    for slack_index, violation_index, failing_index, total_index in (
+        (0, 1, 2, 3),
+        (4, 5, 6, 7),
+        (8, 9, 10, 11),
+    ):
+        slack = values[slack_index]
+        violation = values[violation_index]
+        failing = values[failing_index]
+        total = values[total_index]
+        if not isinstance(slack, Decimal) or not isinstance(violation, Decimal):
+            _fail(f"{label} slack fields are malformed")
+        if slack < 0 or slack.is_signed():
+            _fail(f"{label} contains negative slack")
+        if violation != 0 or violation.is_signed() or failing != 0:
+            _fail(f"{label} contains a timing violation")
+        if not isinstance(total, int) or total <= 0:
+            _fail(f"{label} endpoint total is not positive")
+    if values[3] != values[7]:
+        _fail(f"{label} setup/hold endpoint totals do not match")
+
+
 def _line_after_table_header(text: str, header_fragment: str, label: str) -> str:
     lines = text.splitlines()
     indices = [index for index, line in enumerate(lines) if header_fragment in line]
@@ -938,7 +920,11 @@ def _table_rows_after_header(
     return rows
 
 
-def _validate_timing(text: str) -> dict[str, str]:
+def _validate_timing(
+    text: str,
+    *,
+    clock_interaction: dict[tuple[str, str], tuple[Decimal | None, int]] | None = None,
+) -> dict[str, str]:
     _require_header(
         text,
         name="timing",
@@ -966,8 +952,7 @@ def _validate_timing(text: str) -> dict[str, str]:
     if len(design_rows) != 1:
         _fail("design timing summary must contain exactly one numeric row")
     total = _numeric_row(design_rows[0], label="design timing summary")
-    if total != TIMING_TOTAL:
-        _fail(f"design timing summary is not exact: {total}")
+    _validate_clean_timing_row(total, label="design timing summary")
 
     intra_section = _unique_section(
         text,
@@ -980,23 +965,39 @@ def _validate_timing(text: str) -> dict[str, str]:
         header_fragment="Clock             WNS(ns)",
         label="timing intra-clock table",
     )
+    if len(intra_rows) != len(TIMING_CLOCKS):
+        _fail(f"timing intra-clock row count is not exact: {len(intra_rows)}")
     clock_rows: dict[str, tuple[Decimal | int, ...]] = {}
-    for line in intra_rows:
+    for line, expected_clock in zip(intra_rows, TIMING_CLOCKS, strict=True):
         fields = line.split(maxsplit=1)
         if len(fields) != 2:
             _fail(f"timing intra-clock row is malformed: {line}")
         clock = fields[0]
-        if clock in clock_rows:
-            _fail(f"timing intra-clock row duplicates {clock}")
-        clock_rows[clock] = _numeric_row(fields[1], label=f"{clock} timing row")
-    if clock_rows != TIMING_BY_CLOCK:
-        _fail(f"per-clock timing inventory is not exact: {clock_rows}")
+        if clock != expected_clock or clock in clock_rows:
+            _fail(f"timing intra-clock row order is not exact: {clock}")
+        row = _numeric_row(fields[1], label=f"{clock} timing row")
+        _validate_clean_timing_row(row, label=f"{clock} timing row")
+        if clock_interaction is not None:
+            interaction_wns, interaction_endpoints = clock_interaction[(clock, clock)]
+            timing_wns = row[0]
+            if not isinstance(timing_wns, Decimal):
+                _fail(f"{clock} timing WNS is malformed")
+            if (
+                interaction_wns
+                != timing_wns.quantize(Decimal("0.01"), rounding=ROUND_HALF_EVEN)
+                or interaction_endpoints != row[3]
+            ):
+                _fail(f"{clock} timing row does not bind clock interaction")
+        clock_rows[clock] = row
     if total[3] != sum(row[3] for row in clock_rows.values()):
         _fail("setup endpoint totals do not cross-bind to the two clocks")
     if total[7] != sum(row[7] for row in clock_rows.values()):
         _fail("hold endpoint totals do not cross-bind to the two clocks")
     if total[11] != sum(row[11] for row in clock_rows.values()):
         _fail("pulse endpoint totals do not cross-bind to the two clocks")
+    for slack_index, label in ((0, "WNS"), (4, "WHS"), (8, "WPWS")):
+        if total[slack_index] != min(row[slack_index] for row in clock_rows.values()):
+            _fail(f"{label} does not cross-bind to the two clocks")
 
     clock_section = _unique_section(
         text,
@@ -1102,7 +1103,7 @@ def _validate_timing(text: str) -> dict[str, str]:
         raise ValidationError("timing detailed path has an invalid slack") from error
     if len(setup_slacks) != 100 or len(hold_slacks) != 100:
         _fail("timing detailed-path setup/hold partition is not 100/100")
-    if min(setup_slacks) != TIMING_TOTAL[0] or min(hold_slacks) != TIMING_TOTAL[4]:
+    if min(setup_slacks) != total[0] or min(hold_slacks) != total[4]:
         _fail("timing detailed-path minima do not cross-bind to WNS/WHS")
     if any(slack < 0 for slack in [*setup_slacks, *hold_slacks]):
         _fail("timing detailed-path inventory contains negative slack")
@@ -1135,7 +1136,7 @@ def _validate_route(text: str) -> None:
             _fail("route-status separator is malformed")
     row_pattern = re.compile(r"^\s*# of ([a-z ]+?)\.*\s*:\s*([0-9]+)\s*:\s*$")
     counts: dict[str, int] = {}
-    for expected_label, line in zip(ROUTE_COUNTS, lines[3:10], strict=True):
+    for expected_label, line in zip(ROUTE_LABELS, lines[3:10], strict=True):
         match = row_pattern.fullmatch(line)
         if match is None:
             _fail(f"route-status row is malformed: {line}")
@@ -1143,8 +1144,6 @@ def _validate_route(text: str) -> None:
         if label != expected_label or label in counts:
             _fail(f"route-status row order or label is not exact: {label}")
         counts[label] = int(count)
-    if counts != ROUTE_COUNTS:
-        _fail(f"route inventory is not exact: {counts}")
     if counts["logical nets"] != (
         counts["nets not needing routing"] + counts["routable nets"]
     ):
@@ -1154,14 +1153,68 @@ def _validate_route(text: str) -> None:
     ):
         _fail("route no-routing equation is inconsistent")
     if (
-        counts["routable nets"] <= 0
+        counts["logical nets"] <= 0
+        or counts["routable nets"] <= 0
         or counts["fully routed nets"] != counts["routable nets"]
         or counts["nets with routing errors"] != 0
     ):
         _fail("route is incomplete or contains routing errors")
 
 
-def _validate_clock_interaction(text: str) -> None:
+def _clock_interaction_fields(line: str) -> tuple[str, ...]:
+    field_ranges = (
+        (0, 12),
+        (14, 26),
+        (28, 39),
+        (41, 48),
+        (50, 57),
+        (59, 70),
+        (72, 83),
+        (85, 100),
+        (102, 121),
+        (123, 142),
+    )
+    gap_ranges = (
+        (12, 14),
+        (26, 28),
+        (39, 41),
+        (48, 50),
+        (57, 59),
+        (70, 72),
+        (83, 85),
+        (100, 102),
+        (121, 123),
+        (142, 144),
+    )
+    if "\t" in line or len(line) > 144:
+        _fail(f"clock-interaction row width is malformed: {line}")
+    padded = line.ljust(144)
+    if any(padded[start:end] != " " * (end - start) for start, end in gap_ranges):
+        _fail(f"clock-interaction row columns are malformed: {line}")
+    return tuple(padded[start:end].strip() for start, end in field_ranges)
+
+
+def _clock_interaction_decimal(field: str, *, label: str) -> Decimal:
+    try:
+        value = Decimal(field)
+    except InvalidOperation as error:
+        raise ValidationError(f"clock-interaction {label} is not a decimal") from error
+    if not value.is_finite():
+        _fail(f"clock-interaction {label} is not finite")
+    if re.fullmatch(r"-?(?:0|[1-9][0-9]*)\.[0-9]{2}", field) is None:
+        _fail(f"clock-interaction {label} is noncanonical")
+    return value
+
+
+def _clock_interaction_integer(field: str, *, label: str) -> int:
+    if re.fullmatch(r"(?:0|[1-9][0-9]*)", field) is None:
+        _fail(f"clock-interaction {label} is not an integer")
+    return int(field)
+
+
+def _validate_clock_interaction(
+    text: str,
+) -> dict[tuple[str, str], tuple[Decimal | None, int]]:
     _require_header(
         text,
         name="clock interaction",
@@ -1171,34 +1224,132 @@ def _validate_clock_interaction(text: str) -> None:
             r".+/clock_interaction\.rpt\s*$"
         ),
     )
-    expected = Counter(
-        {
-            "l_clk l_clk rise - rise 9.13 0.00 0 1001 16.28 Clean Timed": 1,
-            "l_clk s_axi_aclk 0 39 Ignored Asynchronous Groups": 1,
-            "s_axi_aclk l_clk 0 112 Ignored Asynchronous Groups": 1,
-            ("s_axi_aclk s_axi_aclk rise - rise 3.76 0.00 0 805 10.00 Clean Timed"): 1,
-        }
+    lines = text.splitlines()
+    title_indices = [
+        index for index, line in enumerate(lines) if line == "Clock Interaction Report"
+    ]
+    marker_indices = [
+        index for index, line in enumerate(lines) if line == "Clock Interaction Table"
+    ]
+    if len(title_indices) != 1 or len(marker_indices) != 1:
+        _fail("clock-interaction title/table marker inventory is not exact")
+    banner_closing = next(
+        (
+            index
+            for index, line in enumerate(lines[2:], start=2)
+            if re.fullmatch(r"-{20,}", line) is not None
+        ),
+        None,
     )
-    section = text.split("Clock Interaction Table", 1)
-    if len(section) != 2 or "Clock Interaction Table" in section[1]:
-        _fail("clock-interaction table marker is not unique")
-    table_lines = section[1].splitlines()
+    marker_index = marker_indices[0]
+    if banner_closing is None or lines[banner_closing + 1 : marker_index + 1] != [
+        "",
+        "Clock Interaction Report",
+        "",
+        "Clock Interaction Table",
+    ]:
+        _fail("clock-interaction report/table order is not exact")
+    table_lines = lines[marker_index + 1 :]
+    group_header = (
+        "                            WNS                            TNS Failing  "
+        "TNS Total    WNS Path         Clock-Pair           Inter-Clock"
+    )
+    column_header = (
+        "From Clock    To Clock      Clock Edges  WNS(ns)  TNS(ns)    Endpoints"
+        "    Endpoints  Requirement(ns)  Classification       Constraints"
+    )
+    separator = (
+        "------------  ------------  -----------  -------  -------  -----------"
+        "  -----------  ---------------  -------------------  -------------------"
+    )
     header_indices = [
         index
         for index, line in enumerate(table_lines)
-        if line.startswith("From Clock    To Clock")
+        if line.rstrip(" ") == column_header
     ]
     if len(header_indices) != 1:
         _fail("clock-interaction table header is not unique")
     header_index = header_indices[0]
-    if header_index + 1 >= len(table_lines) or not re.fullmatch(
-        r"[- ]+", table_lines[header_index + 1].strip()
+    if [line.rstrip(" ") for line in table_lines[:header_index]] != [
+        "-----------------------",
+        "",
+        group_header,
+    ]:
+        _fail("clock-interaction table preamble is malformed")
+    if (
+        header_index + 1 >= len(table_lines)
+        or table_lines[header_index + 1].rstrip(" ") != separator
     ):
         _fail("clock-interaction table separator is malformed")
-    data_lines = [line for line in table_lines[header_index + 2 :] if line.strip()]
-    rows = Counter(" ".join(line.split()) for line in data_lines)
-    if rows != expected:
-        _fail(f"clock-interaction inventory is not exact: {rows}")
+    row_region = table_lines[header_index + 2 :]
+    if (
+        len(row_region) < 4
+        or any(not line.strip() for line in row_region[:4])
+        or any(line.strip() for line in row_region[4:])
+    ):
+        _fail("clock-interaction row inventory is not four contiguous rows")
+    data_lines = row_region[:4]
+
+    expected_rows = (
+        (("l_clk", "l_clk"), Decimal("16.28")),
+        (("l_clk", "s_axi_aclk"), None),
+        (("s_axi_aclk", "l_clk"), None),
+        (("s_axi_aclk", "s_axi_aclk"), Decimal("10.00")),
+    )
+    seen_pairs: set[tuple[str, str]] = set()
+    parsed_rows: dict[tuple[str, str], tuple[Decimal | None, int]] = {}
+    for line, (expected_pair, expected_requirement) in zip(
+        data_lines, expected_rows, strict=True
+    ):
+        (
+            from_clock,
+            to_clock,
+            edges,
+            wns_field,
+            tns_field,
+            failing_field,
+            total_field,
+            requirement_field,
+            classification,
+            constraints,
+        ) = _clock_interaction_fields(line)
+        pair = (from_clock, to_clock)
+        if pair in seen_pairs:
+            _fail(f"clock-interaction clock pair is duplicated: {pair}")
+        seen_pairs.add(pair)
+        if pair != expected_pair:
+            _fail(f"clock-interaction clock-pair order is not exact: {pair}")
+
+        failing = _clock_interaction_integer(
+            failing_field, label=f"{pair} failing endpoints"
+        )
+        total = _clock_interaction_integer(total_field, label=f"{pair} total endpoints")
+        if failing != 0 or total <= 0:
+            _fail(f"clock-interaction endpoint status is not clean: {pair}")
+
+        if expected_requirement is None:
+            if any((edges, wns_field, tns_field, requirement_field)):
+                _fail(f"clock-interaction asynchronous fields are not blank: {pair}")
+            if classification != "Ignored" or constraints != "Asynchronous Groups":
+                _fail(f"clock-interaction asynchronous classification is wrong: {pair}")
+            parsed_rows[pair] = (None, total)
+            continue
+
+        if edges != "rise - rise":
+            _fail(f"clock-interaction same-clock edges are not exact: {pair}")
+        wns = _clock_interaction_decimal(wns_field, label=f"{pair} WNS")
+        tns = _clock_interaction_decimal(tns_field, label=f"{pair} TNS")
+        requirement = _clock_interaction_decimal(
+            requirement_field, label=f"{pair} requirement"
+        )
+        if wns < 0 or wns.is_signed() or tns != 0 or tns.is_signed():
+            _fail(f"clock-interaction same-clock timing is not clean: {pair}")
+        if requirement != expected_requirement:
+            _fail(f"clock-interaction same-clock requirement is wrong: {pair}")
+        if classification != "Clean" or constraints != "Timed":
+            _fail(f"clock-interaction same-clock classification is wrong: {pair}")
+        parsed_rows[pair] = (wns, total)
+    return parsed_rows
 
 
 def _validate_utilization(text: str) -> None:
@@ -1268,25 +1419,40 @@ def _validate_utilization(text: str) -> None:
         "Block RAM Tile": memory,
         "DSPs": dsp,
     }
-    found: dict[str, tuple[int, int, Decimal]] = {}
-    for label, expected in UTILIZATION.items():
+    found: set[str] = set()
+    for label, (
+        expected_capacity,
+        minimum_used,
+        maximum_used,
+    ) in UTILIZATION_CAPACITY.items():
         matches = list(
             re.finditer(
                 rf"^\|\s*{re.escape(label)}\s*\|\s*([0-9]+)\s*\|\s*"
-                rf"[0-9]+\s*\|\s*[0-9]+\s*\|\s*([0-9]+)\s*\|\s*"
-                rf"([0-9]+\.[0-9]+)\s*\|\s*$",
+                rf"([0-9]+)\s*\|\s*([0-9]+)\s*\|\s*([0-9]+)\s*\|\s*"
+                rf"([0-9]+\.[0-9]{{2}})\s*\|\s*$",
                 scoped_values[label],
                 flags=re.MULTILINE,
             )
         )
-        unique = {
-            (int(match.group(1)), int(match.group(2)), Decimal(match.group(3)))
-            for match in matches
-        }
-        if unique != {expected} or len(matches) != 1:
-            _fail(f"utilization row is not unique and exact for {label}: {unique}")
-        found[label] = expected
-    if found != UTILIZATION:
+        if len(matches) != 1:
+            _fail(f"utilization row is not unique for {label}: {len(matches)}")
+        used, fixed, prohibited, available = (
+            int(matches[0].group(index)) for index in range(1, 5)
+        )
+        percent = Decimal(matches[0].group(5))
+        expected_percent = (Decimal(used) * 100 / expected_capacity).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_EVEN
+        )
+        if (
+            fixed != 0
+            or prohibited != 0
+            or available != expected_capacity
+            or not minimum_used <= used <= maximum_used
+            or percent != expected_percent
+        ):
+            _fail(f"utilization row violates capacity invariants for {label}")
+        found.add(label)
+    if found != set(UTILIZATION_CAPACITY):
         _fail("utilization inventory is incomplete")
     black_box_section = section("9. Black Boxes", "10. Instantiated Netlists")
     black_box_lines = [
@@ -1344,13 +1510,20 @@ def _validate_from_directory_descriptor(
             ):
                 _fail(f"{name} contains an error, fatal, or critical warning")
         _validate_vivado_log(reports["vivado.log"])
-        _validate_cdc_summary(reports["cdc-summary.rpt"])
+        cdc_endpoints = _validate_cdc_summary(reports["cdc-summary.rpt"])
         _validate_cdc_details(reports["cdc-details.rpt"])
-        _validate_clock_interaction(reports["clock_interaction.rpt"])
+        clock_interaction = _validate_clock_interaction(
+            reports["clock_interaction.rpt"]
+        )
+        for pair in (("l_clk", "s_axi_aclk"), ("s_axi_aclk", "l_clk")):
+            if clock_interaction[pair][1] != cdc_endpoints[pair]:
+                _fail(f"clock-interaction endpoints do not bind CDC summary: {pair}")
         _validate_drc(reports["drc.rpt"])
         _validate_methodology(reports["methodology.rpt"])
         _validate_route(reports["route_status.rpt"])
-        metrics = _validate_timing(reports["timing_summary.rpt"])
+        metrics = _validate_timing(
+            reports["timing_summary.rpt"], clock_interaction=clock_interaction
+        )
         _validate_utilization(reports["utilization.rpt"])
     except ValidationError:
         raise
