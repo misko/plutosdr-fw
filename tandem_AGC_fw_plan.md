@@ -947,9 +947,55 @@ python3 scripts/tandem_release_evidence.py assemble \
    release tag on the built main commit:
 
 ```bash
+set -euo pipefail
+umask 0022
+built_main_commit='<40-character-built-main-commit>'
+release_tag=v0.41-plutoplus-spf-tandem-agc-v8
+evidence_root=/absolute/evidence/tandem-agc-v8-final
 git tag -a v0.41-plutoplus-spf-tandem-agc-v8 \
-  <built-main-commit> -m 'Tandem AGC v8'
+  "$built_main_commit" -m 'Tandem AGC v8'
 git push origin v0.41-plutoplus-spf-tandem-agc-v8
+
+# Retain the exact local annotated object and its commit target. This records
+# object identity only; it deliberately makes no signature claim.
+tag_ref="refs/tags/$release_tag"
+tag_object=$(git rev-parse --verify "$tag_ref")
+tag_object_type=$(git cat-file -t "$tag_object")
+tag_target=$(git rev-parse --verify "$tag_ref^{commit}")
+tag_target_type=$(git cat-file -t "$tag_target")
+test "$tag_object_type" = tag
+test "$tag_target_type" = commit
+test "$tag_target" = "$built_main_commit"
+jq -n --arg name "$release_tag" --arg object_id "$tag_object" \
+  --arg target_commit "$tag_target" \
+  '{schema:"plutosdr-fw.annotated-tag-record.v1",name:$name,
+    object_type:"tag",object_id:$object_id,target_type:"commit",
+    target_commit:$target_commit,
+    signature_verification:"not-performed-or-claimed"}' \
+  > "$evidence_root/annotated-tag-record.json"
+
+# Capture the canonical remote tag ref and its annotated-tag peel once, before
+# offline assembly. The retained JSON is hashed by the published index; replay
+# performs no network access.
+remote_repo=https://github.com/misko/plutosdr-fw.git
+remote_peeled_ref="$tag_ref^{}"
+git ls-remote --tags "$remote_repo" "$tag_ref" "$remote_peeled_ref" \
+  > "$evidence_root/github-remote-tag.raw.txt"
+awk -F '\t' 'NF != 2 {exit 1} END {if (NR != 2) exit 1}' \
+  "$evidence_root/github-remote-tag.raw.txt"
+jq -Rn --arg repo "$remote_repo" --arg tag_ref "$tag_ref" \
+  --arg peeled_ref "$remote_peeled_ref" \
+  '[inputs | split("\t") | {object_id:.[0],ref:.[1]}] as $refs |
+   {schema:"plutosdr-fw.git-remote-tag-record.v1",
+    command:["git","ls-remote","--tags",$repo,$tag_ref,$peeled_ref],
+    exit_code:0,refs:$refs}' \
+  < "$evidence_root/github-remote-tag.raw.txt" \
+  > "$evidence_root/github-remote-tag-record.json"
+jq -e --arg object "$tag_object" --arg target "$tag_target" \
+  --arg tag_ref "$tag_ref" --arg peeled_ref "$remote_peeled_ref" \
+  '.refs == [{object_id:$object,ref:$tag_ref},
+             {object_id:$target,ref:$peeled_ref}]' \
+  "$evidence_root/github-remote-tag-record.json"
 ```
 
 9. Publish the exact already-qualified DFU, `pluto.frm`, and bundle as a
@@ -959,6 +1005,8 @@ git push origin v0.41-plutoplus-spf-tandem-agc-v8
    check, not a signature claim:
 
 ```bash
+set -euo pipefail
+umask 0022
 release_tag=v0.41-plutoplus-spf-tandem-agc-v8
 evidence_root=/absolute/evidence/tandem-agc-v8-final
 inventory_endpoint="repos/misko/plutosdr-fw/releases/tags/$release_tag"
@@ -997,23 +1045,49 @@ cmp manifests/tandem-agc-v8.yaml "$evidence_root/tandem-agc-v8.yaml"
     absent `remote-verification-cache/`; `verify_release.sh` downloads from the
     canonical manifest URL because `--image` is deliberately omitted. Retain
     the downloaded DFU and the exact schema-v1 JSON wrapper of the command,
-    manifest digest, exit status, and unmodified `--json` result:
+    indexed verifier digest, manifest digest, exit status, and unmodified
+    `--json` result. The wrapper's `verifier_sha256` is checked against the
+    final artifact's exact harness inventory during offline replay:
 
 ```bash
+set -euo pipefail
+umask 0022
 repo_root=/absolute/path/to/plutosdr-fw
 cd /absolute/evidence/tandem-agc-v8-final
 test ! -e remote-verification-cache
+
+# Bind the program that interprets the manifest/result. The final artifact
+# harness already indexes its archived bytes; publication requires those bytes
+# to equal both the live invocation and the file at the qualified final commit.
+final_commit=$(jq -er '.source.commit' final-artifact-index.json)
+test "$(jq '[.harness.files[] |
+              select(.path == "scripts/verify_release.sh")] | length' \
+              final-artifact-index.json)" -eq 1
+indexed_verifier_sha256=$(jq -er \
+  '.harness.files[] | select(.path == "scripts/verify_release.sh") | .sha256' \
+  final-artifact-index.json)
+archived_verifier_sha256=$(sha256sum scripts/verify_release.sh | awk '{print $1}')
+live_verifier_sha256=$(sha256sum "$repo_root/scripts/verify_release.sh" | \
+  awk '{print $1}')
+committed_verifier_sha256=$(git --no-replace-objects -C "$repo_root" \
+  show "${final_commit}:scripts/verify_release.sh" | sha256sum | awk '{print $1}')
+test "$indexed_verifier_sha256" = "$archived_verifier_sha256"
+test "$indexed_verifier_sha256" = "$live_verifier_sha256"
+test "$indexed_verifier_sha256" = "$committed_verifier_sha256"
+
 env VERIFY_RELEASE_CACHE=remote-verification-cache \
   "$repo_root/scripts/verify_release.sh" tandem-agc-v8.yaml --json \
   > release-verification.raw.json
 # Wrap the successful result without editing it. The record normalizes the
 # committed verifier path to its repository-relative entry point.
 jq -n --slurpfile result release-verification.raw.json \
+  --arg verifier_sha256 "$indexed_verifier_sha256" \
   --arg manifest_sha256 "$(sha256sum tandem-agc-v8.yaml | awk '{print $1}')" \
   '{schema:"plutosdr-fw.release-verification.v1",
     command:["env","VERIFY_RELEASE_CACHE=remote-verification-cache",
              "scripts/verify_release.sh","tandem-agc-v8.yaml","--json"],
-    exit_code:0,manifest_sha256:$manifest_sha256,result:$result[0]}' \
+    exit_code:0,verifier_sha256:$verifier_sha256,
+    manifest_sha256:$manifest_sha256,result:$result[0]}' \
   > release-verification.json
 ```
 
@@ -1023,21 +1097,61 @@ jq -n --slurpfile result release-verification.raw.json \
     annotated tag, canonical release URL, captured GitHub asset inventory,
     release manifest, published asset digests, the separately downloaded DFU,
     and the successful binary-verifier result. `published-input.json` names
-    `release_inventory_path` and `verification_image_path` in addition to the
-    three published asset paths. Record the final detached digest in the release
-    notes. Its annotated-tag record must match the local Git object type, object
-    ID, peeled commit, and exact firmware tag. The v1 record says
+    `remote_tag_record_path`, `release_inventory_path`, and
+    `verification_image_path` in addition to the three published asset paths.
+    Record the final detached digest in the release notes. Its local annotated-
+    tag record and retained remote-tag record must agree on the exact tag object
+    ID, and both the local peel and remote `^{}` ref must equal the qualified
+    final commit. The v1 local record says
     `signature_verification=not-performed-or-claimed`; this tooling verifies an
-    annotated object/target but does not claim signed-tag support.
+    annotated object/target but does not claim signed-tag support. The verifier
+    consumes only retained hash-indexed files during assembly/replay and does
+    not contact GitHub.
 
 ```bash
-python3 scripts/tandem_release_evidence.py assemble \
+set -euo pipefail
+umask 0022
+repo_root=/absolute/path/to/plutosdr-fw
+cd /absolute/evidence/tandem-agc-v8-final
+shopt -s nullglob
+published_dfus=(published/*-pluto.dfu)
+published_frms=(published/*-pluto.frm)
+published_bundles=(published/*.tar.gz)
+test "${#published_dfus[@]}" -eq 1
+test "${#published_frms[@]}" -eq 1
+test "${#published_bundles[@]}" -eq 1
+release_tag=v0.41-plutoplus-spf-tandem-agc-v8
+release_url="https://github.com/misko/plutosdr-fw/releases/download/$release_tag"
+verification_image="remote-verification-cache/${published_dfus[0]##*/}"
+test -f "$verification_image"
+jq -n --arg release_url "$release_url" \
+  --arg tag_record_path annotated-tag-record.json \
+  --arg remote_tag_record_path github-remote-tag-record.json \
+  --arg dfu_path "${published_dfus[0]}" \
+  --arg frm_path "${published_frms[0]}" \
+  --arg bundle_path "${published_bundles[0]}" \
+  --arg release_inventory_path github-release-inventory.json \
+  --arg release_manifest_path tandem-agc-v8.yaml \
+  --arg verification_image_path "$verification_image" \
+  --arg verification_result_path release-verification.json \
+  '{schema:"plutosdr-fw.tandem-published-release-input",
+    schema_version:1,stage:"published-release",release_url:$release_url,
+    tag_record_path:$tag_record_path,
+    remote_tag_record_path:$remote_tag_record_path,
+    dfu_path:$dfu_path,frm_path:$frm_path,bundle_path:$bundle_path,
+    release_inventory_path:$release_inventory_path,
+    release_manifest_path:$release_manifest_path,
+    verification_image_path:$verification_image_path,
+    verification_result_path:$verification_result_path}' \
+  > published-input.json
+
+python3 "$repo_root/scripts/tandem_release_evidence.py" assemble \
   --stage published-release \
   --archive-root /absolute/evidence/tandem-agc-v8-final \
   --parent-index /absolute/evidence/tandem-agc-v8-final/final-qualification-index.json \
   --input /absolute/evidence/tandem-agc-v8-final/published-input.json \
   --output /absolute/evidence/tandem-agc-v8-final/published-release-index.json
-python3 scripts/tandem_release_evidence.py verify \
+python3 "$repo_root/scripts/tandem_release_evidence.py" verify \
   --stage published-release \
   --index /absolute/evidence/tandem-agc-v8-final/published-release-index.json
 ```
@@ -1049,9 +1163,10 @@ python3 scripts/tandem_release_evidence.py verify \
     documentation commit, keep it documentation-only, identify the built/tagged
     commit explicitly, and never move the tag or rebuild the asset.
 
-Gate: the annotated tag, published asset, source commit, `device-fw`, immutable
-manifest, hashes, supporting attestation record, hardware evidence, and release documentation all
-describe the same bytes.
+Gate: the local and canonical-remote annotated tag object/peeled commit,
+published asset, source commit, `device-fw`, immutable manifest, exact binary
+verifier hash, supporting attestation record, hardware evidence, and release
+documentation all describe the same bytes.
 
 ### A11. Persistent deployment after release
 
@@ -1357,9 +1472,10 @@ file, duplicate record, path, hash, version, waiver, and publication state.
 Apply the same pattern to final release verification. Extend the current
 17-field asset verifier with a hash-bound evidence index linking source lock,
 manifest, Actions attestation, routed reports, exact bundle/DFU, four deployment
-receipts, hardware reports, tag, and published asset. Record the index digest in
-an independent immutable location; a self-hash alone does not prevent replacing
-both the index and its members.
+receipts, hardware reports, local and remote tag object/target records, the
+exact live/committed/indexed binary-verifier bytes, and published asset. Record
+the index digest in an independent immutable location; a self-hash alone does
+not prevent replacing both the index and its members.
 
 ### B7. Refactor the hardware harness around pure boundaries
 
@@ -1539,8 +1655,10 @@ For the final artifact, the canonical archived source path is
 `lineage/rc5/{candidate-index,campaign-index,...their complete members...}`,
 `candidate-to-final-diff.json`, `final-artifact-index.json`,
 `final-qualification-policy.json`, `final-qualification-index.json`, the exact
-four-radio selected final evidence, annotated-tag record, published DFU/FRM and
-bundle, release manifest, verifier-result wrapper, and
+four-radio selected final evidence, local annotated-tag record,
+`github-remote-tag-record.json`, published DFU/FRM and bundle, release manifest,
+the indexed `scripts/verify_release.sh`, verifier-result wrapper (including the
+same verifier SHA-256), and
 `published-release-index.json`, with every index's detached `.sha256` sidecar.
 
 `actions-run.json` is the exact normalized `gh api` result shown in A6,
@@ -1560,7 +1678,9 @@ artifact, harness, evidence}` consumed by the A6 command. `release` has exactly
 `tandem_agc`; `source` has `commit` and the canonical `manifest_path`; `build`
 has integer `run_id` and `run_attempt`; `artifact` has `dfu_path` and integer
 `fit_bytes`; `harness.paths` is exactly the sorted
-`ARTIFACT_HARNESS_PATHS` constant; and `evidence.members` contains exactly one
+`ARTIFACT_HARNESS_PATHS` constant, including both
+`scripts/tandem_release_evidence.py` and `scripts/verify_release.sh`; and
+`evidence.members` contains exactly one
 `{role,path}` for each sorted `REQUIRED_EVIDENCE_ROLES` entry. The
 planted-success `_fixture()` in `tests/test_tandem_release_evidence.py` is the
 executable descriptor template and the offline gate keeps it contract-equal.
@@ -1696,14 +1816,18 @@ The release is complete only when all of the following are true:
 - the final build's machine-readable candidate-to-final diff is reviewed and
   any functional change resets the candidate;
 - the final exact bytes pass the full four-radio campaign;
-- the annotated tag and immutable manifest describe the published bytes;
+- the local annotated tag object and the retained canonical-remote tag/peel
+  record agree and target the qualified final commit, and the immutable manifest
+  describes the published bytes;
 - `scripts/verify_release.sh manifests/tandem-agc-v8.yaml` passes against the
-  published asset with the mandatory DFU-suffix dependency;
+  published asset with the mandatory DFU-suffix dependency, and the recorded
+  verifier digest equals its indexed, live, and qualified-commit bytes;
 - the published-stage invocation of `scripts/tandem_release_evidence.py verify`
   with `--index` set to
   `/absolute/evidence/tandem-agc-v8-final/published-release-index.json` passes
   and binds the source, attestation, routed evidence, candidate/campaign/final
-  parent indexes, deployment receipts, four-radio reports, tag, and publication;
+  parent indexes, deployment receipts, four-radio reports, both tag records,
+  exact binary verifier, and publication;
   and
 - `RELEASE_NOTES.md` and operator/build/test documentation record the final
   identity, evidence, installation, rollback, and known limitations.

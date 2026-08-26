@@ -51,9 +51,39 @@ def _load_module() -> ModuleType:
 
 EVIDENCE = _load_module()
 
+_STAGE_INEXACT_SOURCE_LOCK_CASES = (
+    pytest.param(
+        "candidate-pre-hardware",
+        EVIDENCE.FINAL_SOURCE_LOCK_REF,
+        id="candidate-uses-final-cross-stage-lock",
+    ),
+    pytest.param(
+        "final-pre-confirmation",
+        EVIDENCE.CANDIDATE_SOURCE_LOCK_REF,
+        id="final-uses-candidate-cross-stage-lock",
+    ),
+    pytest.param(
+        "candidate-pre-hardware",
+        "refs/tags/tandem-agc-v8-rc99-source/firmware-v1",
+        id="candidate-uses-rc99-lock",
+    ),
+    pytest.param(
+        "candidate-pre-hardware",
+        "refs/tags/tandem-agc-v8-rc4-source/firmware-v1",
+        id="candidate-uses-wrong-rc-lock",
+    ),
+)
+
 
 @pytest.fixture(autouse=True)
 def _git_evidence_boundaries(monkeypatch: pytest.MonkeyPatch) -> None:
+    def committed_file_sha256(_commit: str, relative: str) -> str:
+        if relative == EVIDENCE.SEMANTIC_VERIFIER_HARNESS_PATH:
+            return _digest(SCRIPT.read_bytes())
+        if relative == EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH:
+            return _digest((ROOT / relative).read_bytes())
+        return _digest(SOURCE_MANIFEST_PAYLOAD)
+
     monkeypatch.setattr(
         EVIDENCE,
         "_resolve_local_source_lock",
@@ -72,11 +102,7 @@ def _git_evidence_boundaries(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         EVIDENCE,
         "_committed_file_sha256",
-        lambda _commit, relative: _digest(
-            SCRIPT.read_bytes()
-            if relative == EVIDENCE.SEMANTIC_VERIFIER_HARNESS_PATH
-            else SOURCE_MANIFEST_PAYLOAD
-        ),
+        committed_file_sha256,
     )
 
 
@@ -198,16 +224,18 @@ def _fixture(
     stage: str = "candidate-pre-hardware",
     package_stem: str = PACKAGE_STEM,
     captured_attestation: bool = False,
+    source_lock_ref: str | None = None,
 ) -> tuple[Path, Path]:
     is_candidate = stage == "candidate-pre-hardware"
     manifest_name = (
         "tandem-agc-v8-rc5-source.yaml" if is_candidate else "tandem-agc-v8-source.yaml"
     )
-    source_lock_ref = (
-        "refs/tags/tandem-agc-v8-rc5-source/firmware-v1"
-        if is_candidate
-        else "refs/tags/tandem-agc-v8-source/firmware-v1"
-    )
+    if source_lock_ref is None:
+        source_lock_ref = (
+            EVIDENCE.CANDIDATE_SOURCE_LOCK_REF
+            if is_candidate
+            else EVIDENCE.FINAL_SOURCE_LOCK_REF
+        )
     build_ref = (
         "refs/heads/codex/firmware-tandem-agc-v8-rc5"
         if is_candidate
@@ -223,11 +251,12 @@ def _fixture(
 
     harness_paths = EVIDENCE.ARTIFACT_HARNESS_PATHS
     for index, relative in enumerate(harness_paths):
-        payload = (
-            SCRIPT.read_bytes()
-            if relative == EVIDENCE.SEMANTIC_VERIFIER_HARNESS_PATH
-            else f"harness-{index}\n"
-        )
+        if relative == EVIDENCE.SEMANTIC_VERIFIER_HARNESS_PATH:
+            payload = SCRIPT.read_bytes()
+        elif relative == EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH:
+            payload = (ROOT / relative).read_bytes()
+        else:
+            payload = f"harness-{index}\n"
         _write(root / relative, payload)
 
     role_names = {
@@ -512,6 +541,30 @@ def _assemble(root: Path) -> Path:
         stage="candidate-pre-hardware",
     )
     return output
+
+
+def _rewrite_indexed_source_lock(index_path: Path, source_lock_ref: str) -> None:
+    index = json.loads(index_path.read_text())
+    member = next(
+        item for item in index["evidence"]["members"] if item["role"] == "source-lock"
+    )
+    source_lock_path = index_path.parent / member["path"]
+    payload = "\n".join(
+        (
+            f"schema={EVIDENCE.SOURCE_LOCK_SCHEMA}",
+            f"ref={source_lock_ref}",
+            f"commit={index['source']['commit']}",
+            "",
+        )
+    )
+    _write(source_lock_path, payload)
+    member["bytes"] = source_lock_path.stat().st_size
+    member["sha256"] = _sha(source_lock_path)
+    _write(index_path, _json_bytes(index))
+    _write(
+        index_path.with_suffix(index_path.suffix + ".sha256"),
+        f"{_sha(index_path)}  {index_path.name}\n",
+    )
 
 
 def _receipt_payload(
@@ -1204,6 +1257,30 @@ def _published_fixture(
             }
         ),
     )
+    remote_tag_record = root / "github-remote-tag-record.json"
+    tag_ref = f"refs/tags/{FINAL_VERSION}"
+    peeled_ref = f"{tag_ref}^{{}}"
+    _write(
+        remote_tag_record,
+        _json_bytes(
+            {
+                "schema": EVIDENCE.REMOTE_TAG_RECORD_SCHEMA,
+                "command": [
+                    "git",
+                    "ls-remote",
+                    "--tags",
+                    EVIDENCE.RELEASE_GIT_REMOTE_URL,
+                    tag_ref,
+                    peeled_ref,
+                ],
+                "exit_code": 0,
+                "refs": [
+                    {"object_id": "7" * 40, "ref": tag_ref},
+                    {"object_id": FINAL_COMMIT, "ref": peeled_ref},
+                ],
+            }
+        ),
+    )
     manifest = root / "tandem-agc-v8.yaml"
     dfu_relative = dfu.relative_to(root).as_posix()
     frm_relative = frm.relative_to(root).as_posix()
@@ -1285,6 +1362,7 @@ hardware_qualified: true
                     "--json",
                 ],
                 "exit_code": 0,
+                "verifier_sha256": _sha(root / EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH),
                 "manifest_sha256": _sha(manifest),
                 "result": {
                     "release_verified": True,
@@ -1310,6 +1388,9 @@ hardware_qualified: true
                 "stage": "published-release",
                 "release_url": release_url,
                 "tag_record_path": tag_record.relative_to(root).as_posix(),
+                "remote_tag_record_path": remote_tag_record.relative_to(
+                    root
+                ).as_posix(),
                 "dfu_path": dfu_relative,
                 "frm_path": frm_relative,
                 "bundle_path": bundle_relative,
@@ -1470,6 +1551,63 @@ def test_assemble_rejects_typo_or_git_describe_candidate_identity(
     assert not output.exists()
 
 
+@pytest.mark.parametrize(("stage", "source_lock_ref"), _STAGE_INEXACT_SOURCE_LOCK_CASES)
+def test_assemble_rejects_stage_inexact_source_lock_before_publish(
+    tmp_path: Path, stage: str, source_lock_ref: str
+) -> None:
+    identity = (
+        {}
+        if stage == "candidate-pre-hardware"
+        else {
+            "commit": FINAL_COMMIT,
+            "version": FINAL_VERSION,
+            "package_stem": "plutoplus-spf-tandem-agc-v8-222222222222",
+        }
+    )
+    input_path, output = _fixture(
+        tmp_path,
+        stage=stage,
+        source_lock_ref=source_lock_ref,
+        **identity,
+    )
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="source lock ref is not exact"):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=input_path,
+            output_path=output,
+            stage=stage,
+        )
+
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(("stage", "source_lock_ref"), _STAGE_INEXACT_SOURCE_LOCK_CASES)
+def test_semantic_verify_rejects_stage_inexact_indexed_source_lock(
+    tmp_path: Path, stage: str, source_lock_ref: str
+) -> None:
+    identity = (
+        {}
+        if stage == "candidate-pre-hardware"
+        else {
+            "commit": FINAL_COMMIT,
+            "version": FINAL_VERSION,
+            "package_stem": "plutoplus-spf-tandem-agc-v8-222222222222",
+        }
+    )
+    input_path, output = _fixture(tmp_path, stage=stage, **identity)
+    EVIDENCE.assemble(
+        archive_root=tmp_path,
+        input_path=input_path,
+        output_path=output,
+        stage=stage,
+    )
+    _rewrite_indexed_source_lock(output, source_lock_ref)
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="source lock ref is not exact"):
+        EVIDENCE.verify_artifact_index_semantics(output, expected_stage=stage)
+
+
 @pytest.mark.parametrize(
     "role",
     [
@@ -1539,6 +1677,37 @@ def test_assemble_rejects_missing_or_substituted_semantic_verifier_before_publis
     _write(
         tmp_path / EVIDENCE.SEMANTIC_VERIFIER_HARNESS_PATH,
         "substituted verifier\n",
+    )
+    with pytest.raises(EVIDENCE.EvidenceError, match="exact live committed"):
+        EVIDENCE.assemble(
+            input_path=input_path,
+            archive_root=tmp_path,
+            output_path=output,
+            stage="candidate-pre-hardware",
+        )
+    assert not output.exists()
+
+
+def test_assemble_rejects_missing_or_substituted_binary_verifier_before_publish(
+    tmp_path: Path,
+) -> None:
+    input_path, output = _fixture(tmp_path)
+    descriptor = json.loads(input_path.read_text())
+    descriptor["harness"]["paths"].remove(EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH)
+    _write(input_path, _json_bytes(descriptor))
+    with pytest.raises(EVIDENCE.EvidenceError, match="omits the binary release"):
+        EVIDENCE.assemble(
+            input_path=input_path,
+            archive_root=tmp_path,
+            output_path=output,
+            stage="candidate-pre-hardware",
+        )
+    assert not output.exists()
+
+    input_path, output = _fixture(tmp_path)
+    _write(
+        tmp_path / EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH,
+        "substituted binary verifier\n",
     )
     with pytest.raises(EVIDENCE.EvidenceError, match="exact live committed"):
         EVIDENCE.assemble(
@@ -2167,6 +2336,47 @@ def test_published_release_binds_tag_final_qualification_and_exact_assets(
     assert record["tag_record"]["sha256"] == _sha(
         tmp_path / "annotated-tag-record.json"
     )
+    assert record["remote_tag_record"]["sha256"] == _sha(
+        tmp_path / "github-remote-tag-record.json"
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "failure"),
+    [
+        pytest.param("absent", "remote annotated tag record is absent", id="absent"),
+        pytest.param(
+            "wrong-object", "differs from the exact local tag object", id="wrong-object"
+        ),
+        pytest.param(
+            "wrong-target", "differs from the qualified commit", id="wrong-target"
+        ),
+    ],
+)
+def test_published_release_rejects_absent_or_mismatched_remote_tag_binding(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mutation: str,
+    failure: str,
+) -> None:
+    qualification, descriptor = _published_fixture(tmp_path, monkeypatch)
+    remote_tag = tmp_path / "github-remote-tag-record.json"
+    if mutation == "absent":
+        remote_tag.unlink()
+    else:
+        record = json.loads(remote_tag.read_text())
+        position = 0 if mutation == "wrong-object" else 1
+        record["refs"][position]["object_id"] = "6" * 40
+        _write(remote_tag, _json_bytes(record))
+
+    with pytest.raises(EVIDENCE.EvidenceError, match=failure):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=descriptor,
+            output_path=tmp_path / "published-release-index.json",
+            stage="published-release",
+            parent_index_path=qualification,
+        )
 
 
 def test_published_release_rejects_frm_with_different_fit_bytes(
@@ -2251,6 +2461,81 @@ def test_published_release_rejects_local_only_binary_verification(
         )
 
 
+def test_published_release_rejects_changed_indexed_binary_verifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    qualification, descriptor = _published_fixture(tmp_path, monkeypatch)
+    _write(
+        tmp_path / EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH,
+        "changed after qualification\n",
+    )
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="harness file changed"):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=descriptor,
+            output_path=tmp_path / "published-release-index.json",
+            stage="published-release",
+            parent_index_path=qualification,
+        )
+
+
+def test_published_release_rejects_modified_live_binary_verifier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    qualification, descriptor = _published_fixture(tmp_path, monkeypatch)
+    live_root = tmp_path / "live-checkout"
+    _write(
+        live_root / EVIDENCE.SEMANTIC_VERIFIER_HARNESS_PATH,
+        SCRIPT.read_bytes(),
+    )
+    _write(
+        live_root / EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH,
+        "modified live binary verifier\n",
+    )
+    monkeypatch.setattr(EVIDENCE, "ROOT", live_root)
+
+    with pytest.raises(
+        EVIDENCE.EvidenceError,
+        match="binary release verifier is not exact live committed indexed",
+    ):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=descriptor,
+            output_path=tmp_path / "published-release-index.json",
+            stage="published-release",
+            parent_index_path=qualification,
+        )
+
+
+def test_published_release_rejects_binary_verifier_not_at_qualified_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    qualification, descriptor = _published_fixture(tmp_path, monkeypatch)
+    committed_file_sha256 = EVIDENCE._committed_file_sha256
+    monkeypatch.setattr(
+        EVIDENCE,
+        "_committed_file_sha256",
+        lambda commit, relative: (
+            "6" * 64
+            if relative == EVIDENCE.RELEASE_VERIFIER_HARNESS_PATH
+            else committed_file_sha256(commit, relative)
+        ),
+    )
+
+    with pytest.raises(
+        EVIDENCE.EvidenceError,
+        match="binary release verifier is not exact live committed indexed",
+    ):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=descriptor,
+            output_path=tmp_path / "published-release-index.json",
+            stage="published-release",
+            parent_index_path=qualification,
+        )
+
+
 @pytest.mark.parametrize("mutation", ["extra-asset", "wrong-digest"])
 def test_published_release_rejects_ambiguous_or_wrong_remote_inventory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutation: str
@@ -2309,6 +2594,25 @@ def test_published_release_rejects_failed_or_unbound_verifier_result(
     verification = tmp_path / "release-verification.json"
     record = json.loads(verification.read_text())
     record["result"]["release_verified"] = False
+    _write(verification, _json_bytes(record))
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="not exact and successful"):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=descriptor,
+            output_path=tmp_path / "published-release-index.json",
+            stage="published-release",
+            parent_index_path=qualification,
+        )
+
+
+def test_published_release_rejects_verifier_result_with_wrong_verifier_digest(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    qualification, descriptor = _published_fixture(tmp_path, monkeypatch)
+    verification = tmp_path / "release-verification.json"
+    record = json.loads(verification.read_text())
+    record["verifier_sha256"] = "0" * 64
     _write(verification, _json_bytes(record))
 
     with pytest.raises(EVIDENCE.EvidenceError, match="not exact and successful"):

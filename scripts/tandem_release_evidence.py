@@ -44,6 +44,7 @@ PUBLISHED_INPUT_SCHEMA = "plutosdr-fw.tandem-published-release-input"
 TAG_RECORD_SCHEMA = "plutosdr-fw.annotated-tag-record.v1"
 RELEASE_VERIFICATION_SCHEMA = "plutosdr-fw.release-verification.v1"
 RELEASE_INVENTORY_SCHEMA = "plutosdr-fw.github-release-inventory.v1"
+REMOTE_TAG_RECORD_SCHEMA = "plutosdr-fw.git-remote-tag-record.v1"
 RELEASE_INVENTORY_JQ = (
     "{tagName:.tag_name,isDraft:.draft,isPrerelease:.prerelease,url:.html_url,"
     "assets:[.assets[]|{name,size,state,url:.browser_download_url,digest}]}"
@@ -51,8 +52,16 @@ RELEASE_INVENTORY_JQ = (
 FINAL_CONFIRMATION_SCHEMA = "plutosdr-fw.tandem-agc-final-confirmation.v1"
 FINAL_CONFIRMATION_INDEX_SCHEMA = "plutosdr-fw.tandem-agc-final-confirmation-index.v1"
 SEMANTIC_VERIFIER_HARNESS_PATH = "scripts/tandem_release_evidence.py"
+RELEASE_VERIFIER_HARNESS_PATH = "scripts/verify_release.sh"
+RELEASE_GIT_REMOTE_URL = "https://github.com/misko/plutosdr-fw.git"
 CANDIDATE_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc5"
 FINAL_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
+CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc5-source/firmware-v1"
+FINAL_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-source/firmware-v1"
+PRE_HARDWARE_SOURCE_LOCK_REFS = {
+    "candidate-pre-hardware": CANDIDATE_SOURCE_LOCK_REF,
+    "final-pre-confirmation": FINAL_SOURCE_LOCK_REF,
+}
 INDEX_FILENAMES = {
     "candidate-pre-hardware": "candidate-index.json",
     "candidate-qualified": "campaign-index.json",
@@ -69,10 +78,6 @@ _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 _SAFE_ID = re.compile(r"[A-Za-z0-9_.-]+")
 _TAG = re.compile(r"v[0-9]+(?:[.][0-9]+)+(?:-[A-Za-z0-9_.-]+)*")
-_SOURCE_LOCK_REF = re.compile(
-    r"refs/tags/tandem-agc-v8-(?:rc[0-9]+-)?source/firmware-v[1-9][0-9]*"
-)
-
 _BUNDLE_FIXED_ROLE_NAMES = {
     "bundle-inner-checksums": "SHA256SUMS",
     "dfu-suffix-check": "dfu-suffix-check.txt",
@@ -133,6 +138,7 @@ ARTIFACT_HARNESS_PATHS = tuple(
     sorted(
         {
             *RELEASE_HARDWARE_HARNESS_PATHS,
+            RELEASE_VERIFIER_HARNESS_PATH,
             "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
             "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
         }
@@ -955,7 +961,7 @@ def _verify_committed_source_manifest(
         _fail("source manifest differs from the exact indexed Git commit")
 
 
-def _verify_source_lock(payload: bytes, *, commit: str) -> None:
+def _verify_source_lock(payload: bytes, *, commit: str, expected_ref: str) -> None:
     try:
         lines = payload.decode("utf-8", errors="strict").splitlines()
     except UnicodeDecodeError as error:
@@ -966,8 +972,8 @@ def _verify_source_lock(payload: bytes, *, commit: str) -> None:
     fields = dict(line.split("=", 1) for line in lines[1:] if "=" in line)
     if set(fields) != {"ref", "commit"} or fields["commit"] != commit:
         _fail("source lock does not bind the indexed commit")
-    if _SOURCE_LOCK_REF.fullmatch(fields["ref"]) is None:
-        _fail("source lock ref is not an immutable tandem v8 firmware lock")
+    if fields["ref"] != expected_ref:
+        _fail(f"source lock ref is not exact: expected {expected_ref}")
     _object_type, resolved_commit = _resolve_local_source_lock(fields["ref"])
     if resolved_commit != commit:
         _fail("local protected source tag resolves to a different commit")
@@ -1266,7 +1272,9 @@ def _verify_attestation_record(
         _fail("attestation record is not an exact successful verification")
 
 
-def _verify_artifact_index(index_path: Path, *, expected_stage: str) -> dict[str, Any]:
+def _verify_artifact_index(
+    index_path: Path, *, expected_stage: str, expected_source_lock_ref: str
+) -> dict[str, Any]:
     index_path = index_path.absolute()
     if not index_path.is_file() or index_path.is_symlink():
         _fail("candidate index must be a regular nonsymlink file")
@@ -1354,6 +1362,22 @@ def _verify_artifact_index(index_path: Path, *, expected_stage: str) -> dict[str
     )
     if semantic_digest != live_digest or semantic_digest != committed_digest:
         _fail("semantic release-evidence verifier is not exact live committed source")
+    release_verifier_digest = harness_digests.get(RELEASE_VERIFIER_HARNESS_PATH)
+    if release_verifier_digest is None:
+        _fail("artifact index omits the binary release verifier")
+    _live_bytes, live_release_verifier_digest, _prefix = _hash_regular(
+        ROOT / RELEASE_VERIFIER_HARNESS_PATH,
+        name="live binary release verifier",
+        maximum=MAX_JSON_BYTES,
+    )
+    committed_release_verifier_digest = _committed_file_sha256(
+        source["commit"], RELEASE_VERIFIER_HARNESS_PATH
+    )
+    if (
+        release_verifier_digest != live_release_verifier_digest
+        or release_verifier_digest != committed_release_verifier_digest
+    ):
+        _fail("binary release verifier is not exact live committed indexed source")
 
     roles = _role_map(index)
     role_payloads: dict[str, bytes] = {}
@@ -1378,7 +1402,11 @@ def _verify_artifact_index(index_path: Path, *, expected_stage: str) -> dict[str
 
     commit = source["commit"]
     build = index["build"]
-    _verify_source_lock(role_payloads["source-lock"], commit=commit)
+    _verify_source_lock(
+        role_payloads["source-lock"],
+        commit=commit,
+        expected_ref=expected_source_lock_ref,
+    )
     _verify_actions_run(
         role_payloads["actions-run"],
         commit=commit,
@@ -3379,6 +3407,81 @@ def _verify_tag_record(
     return expected
 
 
+def _verify_remote_tag_record(
+    payload: bytes,
+    *,
+    tag_name: str,
+    local_tag_object: str,
+    source_commit: str,
+) -> dict[str, object]:
+    record = _mapping(
+        _decode_json(payload, name="remote annotated tag record"),
+        name="remote annotated tag record",
+    )
+    _exact_keys(
+        record,
+        {"schema", "command", "exit_code", "refs"},
+        name="remote annotated tag record",
+    )
+    tag_ref = f"refs/tags/{tag_name}"
+    peeled_ref = f"{tag_ref}^{{}}"
+    expected_command = [
+        "git",
+        "ls-remote",
+        "--tags",
+        RELEASE_GIT_REMOTE_URL,
+        tag_ref,
+        peeled_ref,
+    ]
+    if (
+        record["schema"] != REMOTE_TAG_RECORD_SCHEMA
+        or record["command"] != expected_command
+        or type(record["exit_code"]) is not int
+        or record["exit_code"] != 0
+    ):
+        _fail("remote annotated tag capture command/result is not exact")
+    raw_refs = record["refs"]
+    if type(raw_refs) is not list or len(raw_refs) != 2:
+        _fail("remote annotated tag record must contain exactly tag and peeled refs")
+    refs: list[dict[str, str]] = []
+    for position, raw_ref in enumerate(raw_refs):
+        ref = _mapping(raw_ref, name=f"remote annotated tag ref {position}")
+        _exact_keys(
+            ref,
+            {"object_id", "ref"},
+            name=f"remote annotated tag ref {position}",
+        )
+        object_id = _string(
+            ref["object_id"],
+            name=f"remote annotated tag ref {position} object",
+            maximum=40,
+        )
+        if _COMMIT.fullmatch(object_id) is None:
+            _fail(f"remote annotated tag ref {position} object is not a Git object ID")
+        refs.append(
+            {
+                "object_id": object_id,
+                "ref": _string(
+                    ref["ref"],
+                    name=f"remote annotated tag ref {position} name",
+                    maximum=512,
+                ),
+            }
+        )
+    if [ref["ref"] for ref in refs] != [tag_ref, peeled_ref]:
+        _fail("remote annotated tag ref inventory/order is not exact")
+    if refs[0]["object_id"] != local_tag_object:
+        _fail("remote annotated tag object differs from the exact local tag object")
+    if refs[1]["object_id"] != source_commit:
+        _fail("remote annotated tag peeled target differs from the qualified commit")
+    return {
+        "schema": REMOTE_TAG_RECORD_SCHEMA,
+        "command": expected_command,
+        "exit_code": 0,
+        "refs": refs,
+    }
+
+
 def _verify_frm(
     path: Path, *, fit_bytes: int, fit_sha256: str, expected_sha256: str
 ) -> tuple[int, str]:
@@ -3610,6 +3713,7 @@ def _verify_release_manifest(
 def _verify_release_result(
     payload: bytes,
     *,
+    verifier_sha256: str,
     manifest_path: str,
     manifest_sha256: str,
     verification_image_path: str,
@@ -3629,6 +3733,7 @@ def _verify_release_result(
             "schema",
             "command",
             "exit_code",
+            "verifier_sha256",
             "manifest_sha256",
             "result",
         },
@@ -3644,6 +3749,9 @@ def _verify_release_result(
     ]
     if record["command"] != expected_command:
         _fail("published verification command is not exact")
+    recorded_verifier_sha256 = _sha(
+        record["verifier_sha256"], name="published binary verifier SHA-256"
+    )
     result = _mapping(record["result"], name="verify_release JSON result")
     _exact_keys(
         result,
@@ -3664,6 +3772,7 @@ def _verify_release_result(
         record["schema"] != RELEASE_VERIFICATION_SCHEMA
         or record["exit_code"] != 0
         or type(record["exit_code"]) is not int
+        or recorded_verifier_sha256 != verifier_sha256
         or record["manifest_sha256"] != manifest_sha256
         or result.get("release_verified") is not True
         or result.get("release_tag") != tag_name
@@ -3709,6 +3818,7 @@ def _assemble_published_release(
             "stage",
             "release_url",
             "tag_record_path",
+            "remote_tag_record_path",
             "dfu_path",
             "frm_path",
             "bundle_path",
@@ -3740,6 +3850,21 @@ def _assemble_published_release(
             name="annotated tag record",
         ),
         firmware_version=final_artifact["release"]["firmware_version"],
+        source_commit=final_artifact["source"]["commit"],
+    )
+    remote_tag_relative = _relative(
+        raw["remote_tag_record_path"], name="remote annotated tag record path"
+    )
+    remote_tag_member = _capture_member(
+        root, remote_tag_relative, name="remote annotated tag record"
+    )
+    _verify_remote_tag_record(
+        _read_small(
+            _member_path(root, remote_tag_relative, name="remote annotated tag record"),
+            name="remote annotated tag record",
+        ),
+        tag_name=str(tag_record["name"]),
+        local_tag_object=str(tag_record["object_id"]),
         source_commit=final_artifact["source"]["commit"],
     )
     dfu = _published_asset(root, raw["dfu_path"], release_url=release_url, name="DFU")
@@ -3827,6 +3952,11 @@ def _assemble_published_release(
             ),
             name="published verification result",
         ),
+        verifier_sha256=next(
+            str(member["sha256"])
+            for member in final_artifact["harness"]["files"]
+            if member["path"] == RELEASE_VERIFIER_HARNESS_PATH
+        ),
         manifest_path=manifest_relative,
         manifest_sha256=str(manifest_member["sha256"]),
         verification_image_path=verification_image_relative,
@@ -3844,6 +3974,7 @@ def _assemble_published_release(
         "release_url": release_url,
         "parent": parent,
         "tag_record": tag_member,
+        "remote_tag_record": remote_tag_member,
         "assets": {"dfu": dfu, "frm": frm, "bundle": bundle},
         "release_inventory": inventory_member,
         "release_manifest": manifest_member,
@@ -3866,6 +3997,7 @@ def _verify_published_release(index_path: Path) -> dict[str, Any]:
             "release_url",
             "parent",
             "tag_record",
+            "remote_tag_record",
             "assets",
             "release_inventory",
             "release_manifest",
@@ -3908,6 +4040,15 @@ def _verify_published_release(index_path: Path) -> dict[str, Any]:
     tag_record = _verify_tag_record(
         _read_small(tag_path, name="annotated tag record"),
         firmware_version=final_artifact["release"]["firmware_version"],
+        source_commit=final_artifact["source"]["commit"],
+    )
+    _remote_tag_member, remote_tag_path = _verify_member(
+        root, raw["remote_tag_record"], name="published remote annotated tag record"
+    )
+    _verify_remote_tag_record(
+        _read_small(remote_tag_path, name="remote annotated tag record"),
+        tag_name=str(tag_record["name"]),
+        local_tag_object=str(tag_record["object_id"]),
         source_commit=final_artifact["source"]["commit"],
     )
     assets = _mapping(raw["assets"], name="published assets")
@@ -3973,6 +4114,11 @@ def _verify_published_release(index_path: Path) -> dict[str, Any]:
     del verification_member
     _verify_release_result(
         _read_small(verification_path, name="published verification result"),
+        verifier_sha256=next(
+            str(member["sha256"])
+            for member in final_artifact["harness"]["files"]
+            if member["path"] == RELEASE_VERIFIER_HARNESS_PATH
+        ),
         manifest_path=str(manifest_member["path"]),
         manifest_sha256=str(manifest_member["sha256"]),
         verification_image_path=str(verification_image["path"]),
@@ -3985,7 +4131,12 @@ def _verify_published_release(index_path: Path) -> dict[str, Any]:
     return dict(raw)
 
 
-def _assemble_input(input_path: Path, archive_root: Path) -> dict[str, Any]:
+def _assemble_input(
+    input_path: Path,
+    archive_root: Path,
+    *,
+    expected_source_lock_ref: str,
+) -> dict[str, Any]:
     raw = _mapping(
         _decode_json(
             _read_small(input_path, name="evidence input"), name="evidence input"
@@ -4087,6 +4238,20 @@ def _assemble_input(input_path: Path, archive_root: Path) -> dict[str, Any]:
         != _committed_file_sha256(commit, SEMANTIC_VERIFIER_HARNESS_PATH)
     ):
         _fail("evidence harness semantic verifier is not exact live committed source")
+    release_verifier_digest = harness_digest_map.get(RELEASE_VERIFIER_HARNESS_PATH)
+    if release_verifier_digest is None:
+        _fail("evidence harness omits the binary release verifier")
+    _live_size, live_release_verifier_digest, _live_prefix = _hash_regular(
+        ROOT / RELEASE_VERIFIER_HARNESS_PATH,
+        name="live binary release verifier",
+        maximum=MAX_JSON_BYTES,
+    )
+    if (
+        release_verifier_digest != live_release_verifier_digest
+        or release_verifier_digest
+        != _committed_file_sha256(commit, RELEASE_VERIFIER_HARNESS_PATH)
+    ):
+        _fail("evidence harness binary verifier is not exact live committed source")
 
     evidence_input = _mapping(raw["evidence"], name="evidence input members")
     _exact_keys(evidence_input, {"members"}, name="evidence input members")
@@ -4162,7 +4327,11 @@ def _assemble_input(input_path: Path, archive_root: Path) -> dict[str, Any]:
             "source-lock",
         )
     }
-    _verify_source_lock(semantic_payloads["source-lock"], commit=commit)
+    _verify_source_lock(
+        semantic_payloads["source-lock"],
+        commit=commit,
+        expected_ref=expected_source_lock_ref,
+    )
     _verify_actions_run(
         semantic_payloads["actions-run"],
         commit=commit,
@@ -4208,7 +4377,11 @@ def _assemble_input(input_path: Path, archive_root: Path) -> dict[str, Any]:
 
 def verify_index(index_path: Path, *, expected_stage: str) -> dict[str, Any]:
     if expected_stage in {"candidate-pre-hardware", "final-pre-confirmation"}:
-        return _verify_artifact_index(index_path, expected_stage=expected_stage)
+        return _verify_artifact_index(
+            index_path,
+            expected_stage=expected_stage,
+            expected_source_lock_ref=PRE_HARDWARE_SOURCE_LOCK_REFS[expected_stage],
+        )
     if expected_stage == "candidate-qualified":
         return _verify_candidate_qualified(index_path)
     if expected_stage == "final-qualification-policy":
@@ -4273,7 +4446,11 @@ def assemble(
             or diff_path is not None
         ):
             _fail("artifact-index assembly requires only --input")
-        candidate = _assemble_input(input_path, root)
+        candidate = _assemble_input(
+            input_path,
+            root,
+            expected_source_lock_ref=PRE_HARDWARE_SOURCE_LOCK_REFS[stage],
+        )
         if candidate["stage"] != stage:
             _fail("evidence input stage differs from requested assembly stage")
     elif stage == "candidate-qualified":
