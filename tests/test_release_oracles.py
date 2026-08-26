@@ -335,7 +335,10 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
         '"TIMING-18": ("Warning", "Missing input or output delay", 182)',
         '"no_input_delay": 137',
         '"no_output_delay": 45',
-        '"Slice LUTs": (475, 17600, Decimal("2.70"))',
+        '"Slice LUTs": (17600, 1, 17600)',
+        '"Slice Registers": (35200, 1, 35200)',
+        '"Block RAM Tile": (60, 2, 2)',
+        '"DSPs": (80, 0, 80)',
     ):
         assert exact_inventory in validator
 
