@@ -259,6 +259,9 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
         "EXPECTED_VIVADO_SHA256=",
         "EXPECTED_SETUP_ENV_SHA256=",
         "EXPECTED_VIVADO_BINARY_SHA256=",
+        "EXPECTED_LOADER_SHA256=",
+        "EXPECTED_RDI_ARGS_SHA256=",
+        "EXPECTED_LDLIBPATH_SHA256=",
         "EXPECTED_LIBEDIT_SHA256=",
         "EXPECTED_LIBTINFO_SHA256=",
         "git_exact show",
@@ -277,9 +280,14 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
         "evidence-sha256.txt"
     )
     final_status_claim = (
-        'ln -- "$run_dir/status.txt" "/proc/$$/fd/$output_fd/status.txt"'
+        'ln -- "$run_ref/status.txt" "/proc/$$/fd/$output_fd/status.txt"'
     )
     assert launcher.count(final_status_claim) == 1
+    assert '"$output_ref/status.txt"' not in launcher
+    assert '"$output_dir/status.txt"' not in launcher
+    assert launcher.count("$run_ref/status.txt") == 3
+    assert launcher.count('"/proc/$$/fd/$output_fd/status.txt"') == 1
+    assert launcher.count("status.txt") == 5
     assert launcher.count("/usr/bin/python3 -I -B") == 2
     assert launcher.count('"$output_ref/input/validate_tandem_agc_ooc.py"') == 2
     assert launcher.count('--directory-fd "$output_fd"') == 2
