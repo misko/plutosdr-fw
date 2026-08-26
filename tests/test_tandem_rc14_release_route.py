@@ -42,7 +42,7 @@ def test_rc14_reuses_the_exact_rc13_and_final_external_source_graph() -> None:
     assert "release_tag" not in rc14
 
 
-def test_rc14_owner_route_maps_branch_manifest_package_and_version_together() -> None:
+def test_rc14_reproduction_route_remains_exact() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     branch = "refs/heads/codex/firmware-tandem-agc-v8-rc14"
 
@@ -50,7 +50,7 @@ def test_rc14_owner_route_maps_branch_manifest_package_and_version_together() ->
     assert workflow.count("'tandem-agc-v8-rc14-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc14'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc14'") == 1
-    assert "Require the exact protected RC14 candidate identity" in workflow
+    assert "Require the exact protected RC14 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
         "refs/heads/codex/firmware-tandem-agc-v8-rc13"
     )
@@ -70,14 +70,15 @@ def test_rc14_is_in_every_offline_and_protected_package_gate() -> None:
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc14" in package
 
 
-def test_rc14_pins_the_pushed_native_utility_and_original_receipt_contract() -> None:
+def test_rc14_preserves_the_original_utility_identity() -> None:
     expected_commit = "9ef137768d59925acf21d5cd3ff71d1cb523dba7"
     wrapper = DEPLOY_WRAPPER.read_text(encoding="utf-8")
     producer = DEVICE_PLAN.read_text(encoding="utf-8")
     binding = UTILITY_BINDING.read_text(encoding="utf-8")
 
-    for source in (wrapper, binding):
-        assert expected_commit in source
+    assert expected_commit in RC14_MANIFEST.read_text(encoding="utf-8")
+    assert expected_commit not in wrapper
+    assert expected_commit not in binding
     assert "PLUTO_PLUS_UTILS_SOURCE_COMMIT" in producer
     assert "verify_artifact_index_semantics" in producer
     assert "misko/pluto-plus-utils" in binding
@@ -104,17 +105,17 @@ def test_rc14_active_harness_uses_utility_adapter_not_retired_deployer() -> None
     assert "validate_release_candidate_receipt" in runner
 
 
-def test_rc14_docs_name_the_active_utility_owned_handoff_and_rc13_history() -> None:
+def test_rc14_docs_preserve_the_indexed_build_and_pretransition_failure() -> None:
     sources = tuple(
         path.read_text(encoding="utf-8")
         for path in (RELEASING, RELEASE_NOTES, RELEASE_PLAN, KALMAN)
     )
     for source in sources:
         assert "RC14" in source
-        assert "9ef137768d59925acf21d5cd3ff71d1cb523dba7" in source
         assert "pluto-plus-utils" in source
-    assert "The active candidate is RC14" in sources[0]
-    assert "refs/tags/tandem-agc-v8-rc14-source/firmware-v1" in sources[0]
+    assert "9ef137768d59925acf21d5cd3ff71d1cb523dba7" in sources[1]
+    assert "The active candidate is RC15" in sources[0]
+    assert "refs/tags/tandem-agc-v8-rc14-source/firmware-v1" in sources[1]
     assert "RC13" in sources[1]
     assert "3361acb3446b517854ca1cfc144d28c4dd853743" in sources[1]
 
@@ -125,5 +126,5 @@ def test_rc14_keeps_single_owner_optional_github_attestation_policy() -> None:
 
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC14 workflow has no separate attestation job." in runner
+    assert "The RC15 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner

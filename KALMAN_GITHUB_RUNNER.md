@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC14 trusted workflow ends after the build job uploads the exact deployment
+- The RC15 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -146,13 +146,17 @@ and source lock `refs/tags/tandem-agc-v8-rc13-source/firmware-v1`. Owner dispatc
 superseded for hardware authorization; it produced no artifact or candidate
 index and opened no radio.
 
-The forward-only RC14 route uses branch
-`codex/firmware-tandem-agc-v8-rc14`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc14`, and source lock
-`refs/tags/tandem-agc-v8-rc14-source/firmware-v1`; it does not move or reuse
-RC12's or RC13's branch, source lock, artifact, or evidence index. RC14 pins
+RC14 locked `2fb96f7a207848e6579293addbaa27fc0a59f5a9`; trusted run
+`32993231088` and candidate index
+`7fb1616eee706350b124a84a053ea2340d25de9fa4a2366c421fc06fc78f306d`
+passed, but utility preflight failed before reboot/DFU and produced no receipt.
+The forward-only RC15 route uses branch
+`codex/firmware-tandem-agc-v8-rc15`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc15`, and source lock
+`refs/tags/tandem-agc-v8-rc15-source/firmware-v1`; it does not move or reuse
+RC12 through RC14's branch, source lock, artifact, or evidence index. RC15 pins
 `pluto-plus-utils` commit
-`9ef137768d59925acf21d5cd3ff71d1cb523dba7` as the sole live device operator.
+`5ab8361211e747387c5dfa854f5ae65a6a4dac87` as the sole live device operator.
 The firmware repository produces the private candidate plan and validates the
 original utility plan, inventory, operation, and measured receipt. The utility
 uses password-only/no-host-key-checking SSH for ephemeral RAM keys while
@@ -205,7 +209,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC14 workflow has no separate attestation job. An operator may capture GitHub
+The RC15 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

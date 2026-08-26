@@ -22,7 +22,7 @@ from .pluto_plus_candidate import (
 )
 
 SERIAL = "winbond-db6968136727402c"
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc14"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc15"
 INDEX_SHA = "a" * 64
 DFU_SHA = "b" * 64
 FIT_SHA = "c" * 64
@@ -57,7 +57,7 @@ def _artifact_index() -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc14-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc15-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1234, "run_attempt": 1},
@@ -107,12 +107,12 @@ def _candidate() -> dict[str, Any]:
         "device_tool_version": PLUTO_PLUS_UTILS_VERSION,
         "device_tool_source_commit": PLUTO_PLUS_UTILS_SOURCE_COMMIT,
         "artifact_index": {
-            "path": "/private/rc14/candidate-index.json",
+            "path": "/private/rc15/candidate-index.json",
             "bytes": INDEX_BYTES,
             "sha256": INDEX_SHA,
         },
         "dfu": {
-            "path": "/private/rc14/artifact/firmware.dfu",
+            "path": "/private/rc15/artifact/firmware.dfu",
             "bytes": 8_388_624,
             "sha256": DFU_SHA,
         },
@@ -164,16 +164,16 @@ def _operation(candidate: object, inventory: object) -> dict[str, Any]:
         "plan_id": "6" * 32,
         "created_at": NOW,
         "candidate_plan": _identity(
-            f"/private/rc14/hardware/deploy/{SERIAL}/release-candidate-plan.json",
+            f"/private/rc15/hardware/deploy/{SERIAL}/release-candidate-plan.json",
             candidate,
         ),
         "usb_inventory": _identity(
-            f"/private/rc14/hardware/deploy/{SERIAL}/usb-inventory.json", inventory
+            f"/private/rc15/hardware/deploy/{SERIAL}/usb-inventory.json", inventory
         ),
         "target": _target(),
         "expected_current_firmware": "v0.41-plutoplus-spf-tandem-agc-v8-rc12",
         "ssh_host": "192.168.2.1",
-        "receipt_path": f"/private/rc14/hardware/deploy/{SERIAL}/ram-boot-receipt.json",
+        "receipt_path": f"/private/rc15/hardware/deploy/{SERIAL}/ram-boot-receipt.json",
         "confirmation_phrase": f"RAM BOOT RELEASE CANDIDATE {SERIAL}",
         "hardware_accessed": False,
     }
@@ -223,10 +223,10 @@ def _receipt(candidate: object, operation: object) -> dict[str, Any]:
         "tool_version": PLUTO_PLUS_UTILS_VERSION,
         "tool_source_commit": PLUTO_PLUS_UTILS_SOURCE_COMMIT,
         "operation_plan": _identity(
-            f"/private/rc14/hardware/deploy/{SERIAL}/operation-plan.json", operation
+            f"/private/rc15/hardware/deploy/{SERIAL}/operation-plan.json", operation
         ),
         "candidate_plan": _identity(
-            f"/private/rc14/hardware/deploy/{SERIAL}/release-candidate-plan.json",
+            f"/private/rc15/hardware/deploy/{SERIAL}/release-candidate-plan.json",
             candidate,
         ),
         "candidate_dfu": {"bytes": 8_388_624, "sha256": DFU_SHA},

@@ -77,6 +77,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "tandem-agc-v8-rc12-source.yaml:*" in package
     assert "tandem-agc-v8-rc13-source.yaml:*" in package
     assert "tandem-agc-v8-rc14-source.yaml:*" in package
+    assert "tandem-agc-v8-rc15-source.yaml:*" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -129,6 +130,7 @@ def test_pr_workflow_uses_the_shared_offline_entry_point() -> None:
         "manifests/tandem-agc-v8-rc12-source.yaml",
         "manifests/tandem-agc-v8-rc13-source.yaml",
         "manifests/tandem-agc-v8-rc14-source.yaml",
+        "manifests/tandem-agc-v8-rc15-source.yaml",
         "./scripts/test_legal_info_network.sh",
     ):
         assert required in checker

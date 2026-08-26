@@ -32,7 +32,8 @@
 | `tandem-agc-v8-rc11` | 2026-08-26 | **successful indexed build; zero candidate deployments** | serialless-b674 topology resolution passed, but dfu-util rejected the single-ID selector before transferring the b673-suffixed DFU |
 | `tandem-agc-v8-rc12` | 2026-08-26 | **successful indexed build; observed RAM boot, no deployment receipt; not hardware-qualified** | paired DFU download/detach succeeded on db696, but the ephemeral RAM SSH host key prevented receipt publication |
 | `tandem-agc-v8-rc13` | 2026-08-26 | **source-locked; trusted run queued without a job; superseded before artifact/hardware** | removed the unsatisfiable retained host-key pin and advanced the measured RAM receipt to v4 |
-| `tandem-agc-v8-rc14` | 2026-08-26 | **active development; not hardware-qualified** | makes exact pushed `pluto-plus-utils` the sole device operator and archives its original plan/inventory/operation/receipt chain |
+| `tandem-agc-v8-rc14` | 2026-08-26 | **successful indexed build; zero RAM transitions; superseded** | native utility ownership was integrated, but live preflight exposed global libiio discovery and capability-name defects before reboot/DFU |
+| `tandem-agc-v8-rc15` | 2026-08-26 | **active development; not hardware-qualified** | pins corrected `pluto-plus-utils` direct exact-USB attestation and preserves the original plan/inventory/operation/receipt chain |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -41,9 +42,24 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc14 — 2026-08-26 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc15 — 2026-08-26 — **active development; not hardware-qualified**
 
-RC14 retains RC13's firmware implementation and complete external source graph.
+RC15 retains RC14's firmware implementation and complete external source graph.
+It pins pushed `misko/pluto-plus-utils` main commit
+`5ab8361211e747387c5dfa854f5ae65a6a4dac87`, which opens the exact
+topology-bound USB-IIO URI directly, cross-checks the live serial, model, and
+firmware, preserves the already-found tandem capability, and defaults execution
+to its own clean source checkout. Every route, password-only SSH, paired DFU,
+sealed-input, QSPI-equality, and safe-state guard remains unchanged. RC15 uses
+branch `codex/firmware-tandem-agc-v8-rc15`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc15`, manifest
+`manifests/tandem-agc-v8-rc15-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc15`, and source lock
+`refs/tags/tandem-agc-v8-rc15-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc14 — 2026-08-26 — **successful indexed build; zero RAM transitions; superseded**
+
+RC14 retained RC13's firmware implementation and complete external source graph.
 Its release-process change makes pushed `misko/pluto-plus-utils` main commit
 `9ef137768d59925acf21d5cd3ff71d1cb523dba7` the sole live device operator.
 `plutosdr-fw` produces a private release-candidate plan pinned to that repository,
@@ -55,12 +71,38 @@ password-only SSH with host-key files disabled for ephemeral RAM keys, owned
 `192.168.2.1/32` route lease, paired `0456:b673,0456:b674` selector, sealed DFU
 input, new boot identity, equal pre/post `qspi-linux` digest, full final safe
 state, and verified route cleanup. It authorizes no `-S`, `-R`, persistent
-target, or QSPI write. RC14 uses branch
+target, or QSPI write. RC14 used branch
 `codex/firmware-tandem-agc-v8-rc14`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc14`, manifest
 `manifests/tandem-agc-v8-rc14-source.yaml`, package prefix
 `plutoplus-spf-tandem-agc-v8-rc14`, and source lock
 `refs/tags/tandem-agc-v8-rc14-source/firmware-v1`.
+
+RC14 locked exact commit `2fb96f7a207848e6579293addbaa27fc0a59f5a9`.
+Trusted run `32993231088`, attempt 1, succeeded and uploaded artifact ID
+`9616104711`. The outer ZIP SHA-256 is
+`bb3f9e0ddaea5b3d4ced996379da97caa1c743ac6349a34e7f5e9df671b4ed21`;
+bundle SHA-256 is
+`90d4833a74fcad8c0f183d6bc6ff4ea7e32844bfbe27f2869fc2ac6b57ee1804`;
+DFU SHA-256 is
+`3baa589e7eba8ea763b4f84b966163614cf9f7274f898a2e181168ca72d88ce7`;
+FIT SHA-256 is
+`2e9b7485b4bdb19d2c4f88316a899f92afc0ba424e61493e7c0179e6f1c6f358`;
+and candidate-index SHA-256 is
+`7fb1616eee706350b124a84a053ea2340d25de9fa4a2366c421fc06fc78f306d`.
+The exact index passed live and detached semantic replay.
+
+The first db696 execute failed before I/O because the tool-repository default
+resolved to the firmware working directory. With the explicit repository, the
+utility's libiio 0.26 global discovery returned errno 26 on an unrelated
+backend. With the release-pinned libiio runtime, preflight then found the exact
+tandem device but incorrectly derived an empty capability set from numeric IIO
+ids. All failures occurred before `device_reboot ram`, DFU, or receipt
+publication; routes were removed and db696 remained exact RC12 and safe.
+A bounded patched-code preflight later proved direct `usb:3.29.5` attestation,
+unchanged QSPI, full mute/IDLE state, and route cleanup, but cannot authorize the
+immutable RC14 tool identity. Therefore RC14 has zero RC14 RAM transitions and
+zero valid receipts; RC15 advances the corrected tool commit.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc13 — 2026-08-26 — **source-locked; trusted run queued without a job; superseded before artifact/hardware**
 
@@ -93,7 +135,7 @@ or hardware access. The RC13 route uses branch `codex/firmware-tandem-agc-v8-rc1
 `plutoplus-spf-tandem-agc-v8-rc13`, and source lock
 `refs/tags/tandem-agc-v8-rc13-source/firmware-v1`. RC12's source lock, trusted
 build, artifact, candidate index, and observed no-receipt incident remain
-immutable. RC13's host-key correction remains historical; RC14 replaces its
+immutable. RC13's host-key correction remains historical; RC15 replaces its
 device-operation/evidence harness before any four-radio campaign.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc12 — 2026-08-26 — **successful indexed build; observed RAM boot, no deployment receipt; not hardware-qualified**
@@ -393,7 +435,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC14 route still requires the complete external paired-behavior,
+active RC15 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

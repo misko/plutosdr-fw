@@ -15,7 +15,7 @@ from .candidate_binding import CandidateBindingError, validate_artifact_index
 
 PLUTO_PLUS_UTILS_REPOSITORY = "misko/pluto-plus-utils"
 PLUTO_PLUS_UTILS_VERSION = "0.1.0"
-PLUTO_PLUS_UTILS_SOURCE_COMMIT = "9ef137768d59925acf21d5cd3ff71d1cb523dba7"
+PLUTO_PLUS_UTILS_SOURCE_COMMIT = "5ab8361211e747387c5dfa854f5ae65a6a4dac87"
 CANDIDATE_PLAN_SCHEMA = "pluto-plus-utils.release-candidate-plan.v1"
 USB_INVENTORY_SCHEMA = "pluto-plus-utils.release-usb-inventory.v1"
 OPERATION_PLAN_SCHEMA = "pluto-plus-utils.release-candidate-operation-plan.v1"

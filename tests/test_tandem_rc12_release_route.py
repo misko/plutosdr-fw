@@ -112,7 +112,7 @@ def test_rc12_docs_preserve_exact_build_and_ram_without_receipt_history() -> Non
     rc12_lock = "refs/tags/tandem-agc-v8-rc12-source/firmware-v1"
     rc13_lock = "refs/tags/tandem-agc-v8-rc13-source/firmware-v1"
 
-    assert "The active candidate is RC14" in releasing
+    assert "The active candidate is RC15" in releasing
     for source in sources:
         assert rc11_lock in source
         assert rc12_lock in source
@@ -162,7 +162,7 @@ def test_rc12_docs_preserve_exact_build_and_ram_without_receipt_history() -> Non
 def test_kalman_handoff_matches_the_current_bundle_checksum_contract() -> None:
     runner = KALMAN_RUNNER.read_text(encoding="utf-8")
 
-    assert "The RC14 workflow has no separate attestation job." in runner
+    assert "The RC15 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner
     assert "plutosdr-fw.github-attestation-not-performed.v1" in runner
     assert 'sidecars=("$artifact_dir"/*.tar.gz.sha256)' in runner
