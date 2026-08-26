@@ -27,6 +27,7 @@ from tests.radio_hardware.candidate_binding import (
 )
 from tests.radio_hardware.pluto_plus_candidate import (
     CANDIDATE_PLAN_SCHEMA,
+    PLUTO_IIO_BUFFER_METADATA_ABI,
     PLUTO_PLUS_UTILS_REPOSITORY,
     PLUTO_PLUS_UTILS_SOURCE_COMMIT,
     PLUTO_PLUS_UTILS_VERSION,
@@ -203,7 +204,10 @@ def build_plan(index_path: Path, *, created_at: str | None = None) -> dict[str, 
         "expected_runtime": {
             "firmware_version": index["release"]["firmware_version"],
             "hardware_model": index["release"]["hardware_model"],
-            "metadata_abi": index["release"]["metadata_abi"],
+            # The release index names the v5 durable frame/report schema.  The
+            # live IIO context independently exposes buffer ABI 2; they are
+            # intentionally different contracts.
+            "metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
             "capabilities": ["tandem-agc"],
         },
         "dfu_identity": {

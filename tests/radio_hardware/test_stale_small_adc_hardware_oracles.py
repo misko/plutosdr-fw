@@ -412,7 +412,7 @@ def test_blocked_report_structure_accepts_exact_nonauthorizing_evidence(tmp_path
         (("schema_version",), True),
         (("verdict",), "PASS"),
         (("phase_status",), "qualified"),
-        (("release_claim",), "RC16 qualified"),
+        (("release_claim",), "RC17 qualified"),
         (("release_pass_eligible",), True),
         (("hardware_qualified",), True),
         (("candidate_lineage", "serial"), "other-radio"),
@@ -439,7 +439,7 @@ def test_blocked_report_structure_accepts_exact_nonauthorizing_evidence(tmp_path
         (("cleanup", "tx_mute", "dds", "altvoltage0", "raw"), 1.0),
         (("cleanup", "tandem_status", "state"), 3),
         (("cleanup", "tandem_status", "fifo_level"), 1),
-        (("operator_action",), "promote RC16"),
+        (("operator_action",), "promote RC17"),
     ],
 )
 def test_blocked_report_rejects_planted_authority_identity_and_cleanup_failures(

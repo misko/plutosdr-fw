@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from .pluto_plus_candidate import (
+    PLUTO_IIO_BUFFER_METADATA_ABI,
     PLUTO_PLUS_UTILS_REPOSITORY,
     PLUTO_PLUS_UTILS_SOURCE_COMMIT,
     PLUTO_PLUS_UTILS_VERSION,
@@ -94,7 +95,7 @@ def build_utility_deployment_bundle(
         "expected_runtime": {
             "firmware_version": artifact_index["release"]["firmware_version"],
             "hardware_model": artifact_index["release"]["hardware_model"],
-            "metadata_abi": artifact_index["release"]["metadata_abi"],
+            "metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
             "capabilities": ["tandem-agc"],
         },
         "dfu_identity": {
@@ -167,7 +168,7 @@ def build_utility_deployment_bundle(
             "usb_uri": f"usb:{bus_number}.{device_number}.5",
             "hardware_model": artifact_index["release"]["hardware_model"],
             "firmware_version": firmware,
-            "metadata_abi": artifact_index["release"]["metadata_abi"],
+            "metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
             "capabilities": ["tandem-agc"],
             "boot_id": boot_id,
             "qspi": {
@@ -210,7 +211,7 @@ def build_utility_deployment_bundle(
         "target": target,
         "expected_firmware": artifact_index["release"]["firmware_version"],
         "expected_hardware_model": artifact_index["release"]["hardware_model"],
-        "expected_metadata_abi": artifact_index["release"]["metadata_abi"],
+        "expected_metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
         "required_capabilities": ["tandem-agc"],
         "pre_runtime": runtime(
             expected_current_firmware,

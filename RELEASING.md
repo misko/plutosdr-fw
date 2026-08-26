@@ -202,7 +202,20 @@ sysfs symlink before candidate bytes were downloaded. Guarded recovery returned
 the board to persistent RC1, proved QSPI unchanged and the safe state, and
 released the route. RC15 has no valid deployment receipt and is immutable.
 
-The active candidate is RC16. It retains RC15's firmware implementation,
+RC16 locked exact commit `8ad724edad93cb81cb0647fb202a17b9e8c0a95d`,
+passed trusted run `33002865124`, artifact `9619942296`, and candidate index
+`781a34867dc27c336e75d59b3444f4e84bd958f088d679775eaa9ea7366d0f23`.
+Its db696 transition completed the sealed paired-selector RAM download/detach
+and returned exact RC16 with a new boot ID, unchanged `qspi-linux`, and the
+verified safe state. Publication of a passing receipt failed closed because the
+bridge treated release/evidence schema `frame-metadata-v5` as the live IIO
+buffer ABI; the radio correctly reported `frame-metadata-v2`. Unknown receipt
+SHA-256 is
+`470cd86373fecd65c0464d995880418317fb8c089feb4a0eb802791dd791010f`.
+The `/32` route was removed. RC16 has one observed safe RAM deployment, zero
+valid passing receipts, no persistent write, and is not hardware-qualified.
+
+The active candidate is RC17. It retains RC16's firmware implementation,
 external source graph, deterministic package, topology-bound serialless-b674
 resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
 route, IIO/model/runtime checks, QSPI equality requirement, and safe-state
@@ -210,12 +223,14 @@ boundary. Exact pushed `pluto-plus-utils` commit
 `2654f34eb909904ec65bc0526e0f8977cb30e2ed` is now the sole live device
 operator. `plutosdr-fw` emits the private release-candidate plan and validates
 the original utility plan, USB inventory, per-radio operation plan, and
-measured receipt without translating them. Ephemeral RAM host keys are accepted
+measured receipt without translating them. Its plan explicitly keeps the v5
+release/evidence frame schema distinct from the v2 live IIO buffer ABI.
+Ephemeral RAM host keys are accepted
 with password-only SSH and host-key files disabled. Exact topology remains
 mandatory; nonempty serial mismatch, ambiguity, wrong VID/PID, serialless b673,
 `-S`, `-R`, persistent targets, and returned-runtime mismatch remain forbidden
 or fail closed. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc16-source/firmware-v1`. The later
+`refs/tags/tandem-agc-v8-rc17-source/firmware-v1`. The later
 final build uses the different exact lock
 `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
 reject a cross-stage substitution of those refs.
@@ -225,7 +240,7 @@ The remaining gates, in order, are:
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC16 firmware source lock and explicit trusted build route.
+2. Create the exact RC17 firmware source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;

@@ -16,6 +16,8 @@ from .candidate_binding import CandidateBindingError, validate_artifact_index
 PLUTO_PLUS_UTILS_REPOSITORY = "misko/pluto-plus-utils"
 PLUTO_PLUS_UTILS_VERSION = "0.1.0"
 PLUTO_PLUS_UTILS_SOURCE_COMMIT = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
+PLUTO_IIO_BUFFER_METADATA_ABI = "frame-metadata-v2"
+RELEASE_FRAME_METADATA_SCHEMA = "frame-metadata-v5"
 CANDIDATE_PLAN_SCHEMA = "pluto-plus-utils.release-candidate-plan.v1"
 USB_INVENTORY_SCHEMA = "pluto-plus-utils.release-usb-inventory.v1"
 OPERATION_PLAN_SCHEMA = "pluto-plus-utils.release-candidate-operation-plan.v1"
@@ -321,7 +323,8 @@ def validate_release_candidate_plan(
     if (
         expected_runtime["firmware_version"] != artifact["release"]["firmware_version"]
         or expected_runtime["hardware_model"] != artifact["release"]["hardware_model"]
-        or expected_runtime["metadata_abi"] != artifact["release"]["metadata_abi"]
+        or artifact["release"]["metadata_abi"] != RELEASE_FRAME_METADATA_SCHEMA
+        or expected_runtime["metadata_abi"] != PLUTO_IIO_BUFFER_METADATA_ABI
         or _capabilities(expected_runtime["capabilities"], name="expected capabilities")
         != ("tandem-agc",)
     ):

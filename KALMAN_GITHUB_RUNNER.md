@@ -155,15 +155,25 @@ db696 transaction rejected the real sysfs symlink before candidate download.
 Guarded recovery returned persistent RC1 with unchanged QSPI, safe state, and
 route cleanup. RC15 has no valid deployment receipt and remains immutable.
 
-The forward-only RC16 route uses branch
-`codex/firmware-tandem-agc-v8-rc16`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc16`, and source lock
-`refs/tags/tandem-agc-v8-rc16-source/firmware-v1`; it does not move or reuse
-RC12 through RC15's branch, source lock, artifact, or evidence index. RC16 pins
+RC16 locked `8ad724edad93cb81cb0647fb202a17b9e8c0a95d`; trusted run
+`33002865124`, artifact `9619942296`, and candidate index
+`781a34867dc27c336e75d59b3444f4e84bd958f088d679775eaa9ea7366d0f23`
+passed. Its first db696 attempt completed the exact RAM transition and returned
+RC16 with a new boot ID, unchanged QSPI, and the safe state. Passing-receipt
+publication failed because the bridge compared release/evidence schema
+`frame-metadata-v5` to the correctly observed IIO buffer ABI
+`frame-metadata-v2`. The route was released and no persistent write occurred.
+
+The forward-only RC17 route uses branch
+`codex/firmware-tandem-agc-v8-rc17`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc17`, and source lock
+`refs/tags/tandem-agc-v8-rc17-source/firmware-v1`; it does not move or reuse
+RC12 through RC16's branch, source lock, artifact, or evidence index. RC17 pins
 `pluto-plus-utils` commit
 `2654f34eb909904ec65bc0526e0f8977cb30e2ed` as the sole live device operator.
 The firmware repository produces the private candidate plan and validates the
-original utility plan, inventory, operation, and measured receipt. The utility
+original utility plan, inventory, operation, and measured receipt. The bridge
+keeps the v5 release frame schema distinct from the v2 live buffer ABI. The utility
 uses password-only/no-host-key-checking SSH for ephemeral RAM keys while
 retaining every USB, topology, route, IIO/model, QSPI-equality, safe-state, and
 paired-selector guard.
@@ -214,7 +224,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC16 workflow has no separate attestation job. An operator may capture GitHub
+The RC17 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

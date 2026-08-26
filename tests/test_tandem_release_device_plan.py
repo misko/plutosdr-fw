@@ -17,6 +17,7 @@ from tests.radio_hardware.candidate_binding import (
     validate_artifact_index,
 )
 from tests.radio_hardware.pluto_plus_candidate import (
+    PLUTO_IIO_BUFFER_METADATA_ABI,
     PLUTO_PLUS_UTILS_SOURCE_COMMIT,
     validate_release_candidate_plan,
 )
@@ -32,7 +33,7 @@ def _index(dfu: bytes) -> dict[str, Any]:
         "schema_version": 1,
         "stage": "candidate-pre-hardware",
         "release": {
-            "firmware_version": "v0.41-plutoplus-spf-tandem-agc-v8-rc16",
+            "firmware_version": "v0.41-plutoplus-spf-tandem-agc-v8-rc17",
             "kernel_version": "5.15.0-g77a1f2352162",
             "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
             "metadata_abi": "frame-metadata-v5",
@@ -40,7 +41,7 @@ def _index(dfu: bytes) -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc16-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc17-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1, "run_attempt": 1},
@@ -101,6 +102,8 @@ def test_plan_builder_binds_exact_artifact_and_pushed_utility(tmp_path: Path) ->
 
     assert plan["device_tool_source_commit"] == PLUTO_PLUS_UTILS_SOURCE_COMMIT
     assert plan["allowed_operation"] == "ram-only"
+    assert plan["expected_runtime"]["metadata_abi"] == PLUTO_IIO_BUFFER_METADATA_ABI
+    assert index["release"]["metadata_abi"] == "frame-metadata-v5"
     assert plan["dfu_identity"]["selector"] == "0456:b673,0456:b674"
     assert plan["artifact_index"]["sha256"] == hashlib.sha256(index_payload).hexdigest()
     validate_release_candidate_plan(

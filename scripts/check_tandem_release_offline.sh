@@ -51,6 +51,7 @@ run_oracles() {
         tests/test_tandem_rc14_release_route.py \
         tests/test_tandem_rc15_release_route.py \
         tests/test_tandem_rc16_release_route.py \
+        tests/test_tandem_rc17_release_route.py \
         tests/test_tandem_release_device_plan.py \
         tests/test_tandem_release_evidence.py \
         tests/test_tandem_agc_ooc_validator.py \
@@ -77,6 +78,7 @@ run_source_graph() {
     ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc14-source.yaml
     ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc15-source.yaml
     ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc16-source.yaml
+    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc17-source.yaml
     ./scripts/check_source_graph.sh manifests/tandem-agc-v8-source.yaml
     ./scripts/test_legal_info_network.sh
 }

@@ -34,7 +34,8 @@
 | `tandem-agc-v8-rc13` | 2026-08-26 | **source-locked; trusted run queued without a job; superseded before artifact/hardware** | removed the unsatisfiable retained host-key pin and advanced the measured RAM receipt to v4 |
 | `tandem-agc-v8-rc14` | 2026-08-26 | **successful indexed build; zero RAM transitions; superseded** | native utility ownership was integrated, but live preflight exposed global libiio discovery and capability-name defects before reboot/DFU |
 | `tandem-agc-v8-rc15` | 2026-08-26 | **successful indexed build; zero candidate downloads; superseded** | exact DFU transition reached b674, then failed closed on the real-kernel sysfs symlink before candidate bytes transferred |
-| `tandem-agc-v8-rc16` | 2026-08-26 | **active development; not hardware-qualified** | pins corrected exact-topology DFU resolution and guarded unknown-transition recovery in `pluto-plus-utils` |
+| `tandem-agc-v8-rc16` | 2026-08-26 | **successful indexed build; observed safe RAM boot, no valid deployment receipt; superseded** | RAM boot and containment checks passed, but the device-plan bridge confused release frame schema v5 with live IIO buffer ABI v2 |
+| `tandem-agc-v8-rc17` | 2026-08-26 | **active development; not hardware-qualified** | separates the v5 release/evidence frame schema from the measured v2 IIO buffer ABI |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -43,7 +44,21 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc16 — 2026-08-26 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc17 — 2026-08-26 — **active development; not hardware-qualified**
+
+RC17 retains RC16's firmware implementation, external source graph, and pushed
+`pluto-plus-utils` main commit
+`2654f34eb909904ec65bc0526e0f8977cb30e2ed`. The firmware-to-utility bridge
+now keeps two exact contracts distinct: the release index remains
+`frame-metadata-v5`, while the live IIO context and utility receipt require
+`frame-metadata-v2`. RC17 uses branch
+`codex/firmware-tandem-agc-v8-rc17`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc17`, manifest
+`manifests/tandem-agc-v8-rc17-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc17`, and source lock
+`refs/tags/tandem-agc-v8-rc17-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc16 — 2026-08-26 — **successful indexed build; observed safe RAM boot, no valid deployment receipt; superseded**
 
 RC16 retains RC15's firmware implementation and complete external source graph.
 It pins pushed `misko/pluto-plus-utils` main commit
@@ -51,12 +66,36 @@ It pins pushed `misko/pluto-plus-utils` main commit
 `/sys/bus/usb/devices/<topology>` symlink while still binding the resolved node
 to the exact topology. It also provides a guarded recovery/attestation command
 for an unknown transition, including an already-returned runtime and an explicit
-expected persistent firmware identity. RC16 uses branch
+expected persistent firmware identity. RC16 used branch
 `codex/firmware-tandem-agc-v8-rc16`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc16`, manifest
 `manifests/tandem-agc-v8-rc16-source.yaml`, package prefix
 `plutoplus-spf-tandem-agc-v8-rc16`, and source lock
 `refs/tags/tandem-agc-v8-rc16-source/firmware-v1`.
+
+RC16 locked exact commit `8ad724edad93cb81cb0647fb202a17b9e8c0a95d`.
+Trusted run `33002865124`, attempt 1, succeeded with artifact ID `9619942296`.
+The outer ZIP SHA-256 is
+`2dc53d08c72cd0aa35286333474521406d25b4fd4b3f8207bbf5dda2795e4a9f`;
+bundle SHA-256 is
+`4260ef263ed5167ddaf6f2394e8db3527871e8376199dd384c1713a88142344a`;
+DFU SHA-256 is
+`42f95fc67949069c7d24fe61bbf6043103e66326760dc1a1ca475c65306daa20`;
+and candidate-index SHA-256 is
+`781a34867dc27c336e75d59b3444f4e84bd958f088d679775eaa9ea7366d0f23`.
+
+On db696 the utility completed the exact sealed paired-selector RAM download
+and detach. The same topology/serial returned with a new boot ID and exact RC16
+firmware; `qspi-linux` remained SHA-256
+`066487d9d135dd492a75fe04912d0e18efae565b0666ae72c40ee4fbbb31d9b8`,
+and the measured final state was TX gains `[-80,-80]`, all DDS values zero,
+selectors `[3,3,3,3]`, tandem `IDLE`, FIFO 0, and faults 0. The temporary `/32`
+route was removed. Receipt publication failed closed because the plan expected
+the v5 release/evidence frame schema as the live IIO buffer ABI, while the
+device correctly exposed ABI 2. The durable unknown-receipt SHA-256 is
+`470cd86373fecd65c0464d995880418317fb8c089feb4a0eb802791dd791010f`.
+RC16 therefore has one observed safe RAM deployment, zero valid passing
+deployment receipts, no persistent write, and no hardware qualification.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc15 — 2026-08-26 — **successful indexed build; zero candidate downloads; superseded**
 
@@ -472,7 +511,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC16 route still requires the complete external paired-behavior,
+active RC17 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 
