@@ -29,7 +29,8 @@
 | `tandem-agc-v8-rc8` | 2026-08-26 | **successful indexed build; not deployed** | deterministic bundle and verified candidate index; hardware transition blocked by an over-scoped serial-specific proof |
 | `tandem-agc-v8-rc9` | 2026-08-26 | **successful indexed build; rejected before hardware transition** | removed the redundant transition-proof input; first execute exposed duplicate-IP routing and factory-password transport gaps before reboot or DFU |
 | `tandem-agc-v8-rc10` | 2026-08-26 | **successful indexed build; zero candidate deployments** | trusted build and evidence passed; first execute reached DFU but stopped before candidate download because the selected b674 device omitted its USB serial |
-| `tandem-agc-v8-rc11` | 2026-08-26 | **development; not hardware-authorized** | retains RC10 firmware bytes/behavior and permits a serialless b674 transition only on the exact pre-attested USB topology |
+| `tandem-agc-v8-rc11` | 2026-08-26 | **successful indexed build; zero candidate deployments** | serialless-b674 topology resolution passed, but dfu-util rejected the single-ID selector before transferring the b673-suffixed DFU |
+| `tandem-agc-v8-rc12` | 2026-08-26 | **development; not hardware-authorized** | aligns both DFU download and detach with the paired normal/DFU selector already documented by the flashing procedure |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -38,35 +39,91 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc11 — 2026-08-26 — **development; not hardware-authorized**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc12 — 2026-08-26 — **development; not hardware-authorized**
 
-RC11 is the forward-only candidate after RC10's trusted build and evidence
-index passed but the first guarded live transition exposed a legitimate Pluto
-DFU enumeration detail: the exact radio can re-enumerate as `0456:b674`
-without publishing a USB serial. RC11 retains RC10's firmware behavior,
-external source graph, integrated result policy, deterministic package,
-per-radio `/32` route lease, private password-file SSH transport, command plan,
-receipt-v3 schema, and evidence-index contract.
+RC12 is the forward-only candidate after RC11's exact source lock, trusted
+integrated build, and candidate evidence index passed but its first guarded DFU
+download exposed a stale selector in both the command planner and receipt
+replay validator. RC12 retains RC11's firmware implementation, external source
+graph, deterministic package policy, serialless-b674 topology resolver,
+per-radio `/32` route lease, password-file SSH transport, measured receipt-v3
+schema, and evidence-index contract. It changes the exact DFU command boundary
+and release lineage only.
 
-The only transition change is a tightly bounded resolver rule. The deployer
-first attests the selected radio's exact serial and USB topology while it is in
-the `0456:b673` runtime. After the dedicated RAM-reboot command, a serialless
-`0456:b674` is acceptable only when it is the unique device on that same
-pre-attested topology. A nonempty wrong serial, wrong topology, ambiguous or
-unstable inventory, wrong VID/PID, and every serialless `b673` runtime path
-still fail closed. Returned-runtime and cleanup checks still require the exact
-serial. The allowed candidate transition remains only exact `dfu-util -D`
-followed by `-e`; persistent writes and `-R` remain forbidden.
+Both download and detach must use
+`dfu-util -d 0456:b673,0456:b674 -p TOPOLOGY -a firmware.dfu`, followed only by
+`-D` for the inherited sealed candidate descriptor and `-e` for detach. The
+first ID matches the trusted DFU suffix and the second matches the live b674
+runtime. Exact topology remains mandatory; `-S`, `-R`, persistent targets, a
+nonempty wrong serial, wrong topology, ambiguity, wrong VID/PID, serialless
+b673, and returned-runtime mismatch remain forbidden or fail closed.
 
-RC11 has its own manifest, owner-only workflow mapping, artifact namespace,
-exact firmware identity, and required source lock
-`refs/tags/tandem-agc-v8-rc11-source/firmware-v1`. RC5 through RC10 branches,
-source locks, runs, artifacts, and indexes remain immutable reproduction
-history and are not moved. GitHub attestation remains optional supporting
-metadata, not a release requirement. RC11 must pass the complete hardware-free
-gate, commit-bound routed OOC gate, fresh trusted integrated build, exact
-evidence indexing, and full external four-radio RAM campaign before final v8
-promotion.
+RC12 has its own manifest, owner-only workflow mapping, package namespace,
+exact version, and required source lock
+`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. RC11's branch, source lock,
+trusted run, artifact, candidate index, and zero-deployment history remain
+immutable. RC12 must pass fresh clean offline and routed OOC gates, a new
+trusted integrated build and evidence index, and the complete external
+four-radio RAM campaign before final v8 promotion.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc11 — 2026-08-26 — **successful indexed build; zero candidate deployments**
+
+RC11 locked exact source commit
+`4c332666ff054e21e10c1a8137fd5f1cbc73b568` and source ref
+`refs/tags/tandem-agc-v8-rc11-source/firmware-v1`. Trusted run `32970312166`,
+attempt 1, routed all 32,908 nets, used 74 of 80 DSPs, and closed timing at WNS
+`+0.645 ns`, WHS `+0.022 ns`, and minimum bus skew `+8.606 ns`. Artifact ID
+`9607927415` was retained as
+`plutoplus-main-4c332666ff054e21e10c1a8137fd5f1cbc73b568-32970312166-1`.
+
+Its outer ZIP SHA-256 is
+`583c52462725c037ba73aca32d78472ea6784b43764e13ab92996b322ee5b3d3`;
+bundle SHA-256 is
+`91410b15e458eac1a2190dd0fa40ee540b6f7e6bde9e71c70125a9f86dc05c09`;
+DFU SHA-256 is
+`1dd94789dddefb7220caad75fb063ad0fdd2a8f3204f2f4fa48bd1cca2d31481`;
+FIT SHA-256 is
+`50e1544eef70715ac523485391602cbff541596947c9f0a93f17685286bccb34`;
+source-manifest SHA-256 is
+`31693bca03606742978351a1e920c917ad8c0337dba33081666f754fe530eb60`;
+and verified candidate-index SHA-256 is
+`ef8017c539f42d936bcde054e85864e331d4b383167201573c30419d98100831`.
+The immutable RC11 index/archive binds the defective deployer at SHA-256
+`bb17001e7b65d34a71363de4240d8e771c8b3fd1d1229a5e0d14e7bf677bf44e`
+and receipt replay binder at SHA-256
+`299afafb3d08c68a4a3a282164b2f1411e71d508e60cbfbbc1007c1569c927dd`.
+
+On `winbond-db6968136727402c` at pre-attested topology `3-7`, the guarded
+execute passed its runtime and QSPI baseline, sent `/usr/sbin/device_reboot ram`,
+and reached unique exact serialless `0456:b674`. The RC11 planner invoked
+`dfu-util -d 0456:b674 -p 3-7 -a firmware.dfu -D /proc/self/fd/5`; it returned
+non-zero exit status 64 before transferring any candidate bytes because the
+trusted DFU suffix identifies b673. The reproduced diagnostic said File ID `0456:b673` does not match device `(0000:0000 or 0456:b674)`; in full:
+
+```text
+Error: File ID 0456:b673 does not match device (0000:0000 or 0456:b674)
+```
+
+The wrapper's complete terminal error was:
+
+```text
+ERROR: deployment failed (Command '['dfu-util', '-d', '0456:b674', '-p', '3-7', '-a', 'firmware.dfu', '-D', '/proc/self/fd/5']' returned non-zero exit status 64.); safe cleanup also failed (timed out waiting for 0456:b673 on 3-7: expected exactly one 0456:b673 USB device for serial 'winbond-db6968136727402c'; found [])
+```
+
+Cleanup timed out waiting for b673 because the radio remained in b674.
+
+Exact-topology recovery with the paired `0456:b673,0456:b674` selector and
+`-e` returned exact-serial b673, persistent RC1, devnum 27, in a verified safe
+IIO state with the temporary `/32` route absent. Zero candidate bytes were
+transferred, RC11 has zero candidate deployments, no receipt was produced, and
+no QSPI write occurred. There is no retained selector-failure log, so no log
+digest is claimed. The existing
+`/tmp/tandem-agc-v8-rc11-deploy-db696.log` SHA-256
+`55140cc3f1058fd62dd0178d35bcc7fef905eb46d65e5bac69ebdd9c644a38ee`
+belongs to the earlier pre-enrollment SSH stop, not this selector failure.
+RC11's commit, branch, lock, run, artifact, candidate index, and
+zero-deployment history remain immutable. RC12 changes only the paired
+normal/DFU selector boundary and lineage.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc10 — 2026-08-26 — **successful indexed build; zero candidate deployments**
 
@@ -247,7 +304,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC11 route still requires the complete external paired-behavior,
+active RC12 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

@@ -1066,11 +1066,40 @@ def test_wrong_serial_stops_before_any_mutation(tmp_path: Path) -> None:
     assert not backend.ram_requests and not backend.dfu_commands
 
 
+def test_command_plan_uses_paired_runtime_dfu_selector_without_reset_or_serial(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    plan = deploy.build_command_plan(
+        fixture.options, _device(deploy.RUNTIME_PRODUCT), INTERFACE
+    )
+    dfu_commands = [list(item["argv"]) for item in plan[1:]]
+
+    assert [command[:3] for command in dfu_commands] == [
+        ["dfu-util", "-d", "0456:b673,0456:b674"],
+        ["dfu-util", "-d", "0456:b673,0456:b674"],
+    ]
+    assert all("-R" not in command for command in dfu_commands)
+    assert all("-S" not in command for command in dfu_commands)
+
+    def fake_dfu_util_0_11_accepts(command: Sequence[str]) -> bool:
+        selector = command[command.index("-d") + 1].split(",")
+        return selector == ["0456:b673", "0456:b674"]
+
+    assert all(fake_dfu_util_0_11_accepts(command) for command in dfu_commands)
+    old_single_id_command = [*dfu_commands[0]]
+    old_single_id_command[2] = "0456:b674"
+    assert not fake_dfu_util_0_11_accepts(old_single_id_command)
+
+
 @pytest.mark.parametrize(
     "mutation",
     [
         lambda value: value[2]["argv"].append("-R"),
+        lambda value: value[2]["argv"].extend(["-S", SERIAL]),
         lambda value: value[2]["argv"].append("--reset"),
+        lambda value: value[1]["argv"].__setitem__(2, "0456:b674"),
+        lambda value: value[2]["argv"].__setitem__(2, "0456:b674"),
         lambda value: value[0]["argv"].__setitem__(-1, "/usr/sbin/device_reboot sf"),
         lambda value: value[1]["argv"].__setitem__(-1, "/tmp/boot.dfu"),
         lambda value: value[1]["argv"].append("/dev/mtd0"),
@@ -1146,6 +1175,17 @@ def test_success_publishes_absent_only_private_bound_receipt(tmp_path: Path) -> 
     }
     assert b"factory-password" not in payload
     assert len(backend.dfu_commands) == 2
+    expected_dfu_prefix = [
+        "dfu-util",
+        "-d",
+        "0456:b673,0456:b674",
+        "-p",
+        TOPOLOGY,
+        "-a",
+        "firmware.dfu",
+    ]
+    assert backend.dfu_commands[0][:-2] == expected_dfu_prefix
+    assert backend.dfu_commands[1][:-1] == expected_dfu_prefix
     assert backend.dfu_commands[0][-2] == "-D"
     assert backend.dfu_commands[0][-1].startswith("/proc/self/fd/")
     assert backend.dfu_commands[1][-1] == "-e"

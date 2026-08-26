@@ -18,6 +18,7 @@ RC8_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc8-source.yaml"
 RC9_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc9-source.yaml"
 RC10_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc10-source.yaml"
 RC11_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc11-source.yaml"
+RC12_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc12-source.yaml"
 FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
@@ -141,6 +142,7 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
     rc9 = _manifest_values(RC9_SOURCE_MANIFEST)
     rc10 = _manifest_values(RC10_SOURCE_MANIFEST)
     rc11 = _manifest_values(RC11_SOURCE_MANIFEST)
+    rc12 = _manifest_values(RC12_SOURCE_MANIFEST)
     final = _manifest_values(FINAL_SOURCE_MANIFEST)
     tandem_v2 = _manifest_values(TANDEM_V2_SOURCE_MANIFEST)
     changed_component_keys = {
@@ -164,8 +166,10 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
         key for key, value in rc2.items() if rc3[key] != value
     } == changed_component_keys
 
-    assert rc3 == rc4 == rc5 == rc6 == rc7 == rc8 == rc9 == rc10 == rc11 == final
-    for values in (rc3, rc4, rc5, rc6, rc7, rc8, rc9, rc10, rc11, final):
+    assert (
+        rc3 == rc4 == rc5 == rc6 == rc7 == rc8 == rc9 == rc10 == rc11 == rc12 == final
+    )
+    for values in (rc3, rc4, rc5, rc6, rc7, rc8, rc9, rc10, rc11, rc12, final):
         assert "release_tag" not in values
         assert values["libiio_0_25_source"] == RC3_LIBIIO_SOURCE
         assert values["libiio_0_25_ref"] == RC3_LIBIIO_REF
@@ -182,6 +186,7 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
         rc9,
         rc10,
         rc11,
+        rc12,
         final,
         tandem_v2,
     ):
@@ -223,6 +228,7 @@ def test_historical_routes_and_all_v8_source_graphs_are_explicit() -> None:
         "manifests/tandem-agc-v8-rc9-source.yaml",
         "manifests/tandem-agc-v8-rc10-source.yaml",
         "manifests/tandem-agc-v8-rc11-source.yaml",
+        "manifests/tandem-agc-v8-rc12-source.yaml",
         "manifests/tandem-agc-v8-source.yaml",
     ):
         assert f"./scripts/check_source_graph.sh {manifest}" in offline_check

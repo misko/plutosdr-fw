@@ -138,25 +138,42 @@ recovered the persistent RC1 safe runtime, and the temporary
 `192.168.2.1/32` route is absent. RC10's branch, lock, run, artifact, candidate
 index, and zero-deployment history are immutable.
 
-The active candidate is RC11. It retains RC10's firmware bytes, external
-source graph, package, command plan, and receipt-v3 schema, and changes only
-DFU transition resolution. A serialless device is acceptable only when it is
-the unique exact `0456:b674` on the USB topology pre-attested while the same
-serial was in b673 runtime. Nonempty serial mismatch, wrong topology,
-ambiguity, wrong VID/PID, serialless b673, and returned-runtime mismatch still
-fail closed. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc11-source/firmware-v1`. The later final build uses
-the different exact lock `refs/tags/tandem-agc-v8-source/firmware-v1`;
-candidate and final evidence must reject a cross-stage substitution of those
-refs.
+RC11 then retained RC10's firmware behavior and corrected only serialless-b674
+topology resolution. Exact commit
+`4c332666ff054e21e10c1a8137fd5f1cbc73b568` and source lock
+`refs/tags/tandem-agc-v8-rc11-source/firmware-v1` passed trusted run
+`32970312166`, attempt 1. Its DFU SHA-256 is
+`1dd94789dddefb7220caad75fb063ad0fdd2a8f3204f2f4fa48bd1cca2d31481`
+and its verified candidate-index SHA-256 is
+`ef8017c539f42d936bcde054e85864e331d4b383167201573c30419d98100831`.
+The first guarded download reached unique exact serialless `0456:b674`, but
+both the command planner and receipt validator selected only b674 while the
+trusted DFU suffix identifies b673. dfu-util exited 64 before transferring any
+candidate bytes. Paired-selector exact-topology `-e` recovered persistent RC1
+in a verified safe state with the temporary route absent. RC11 has zero
+candidate deployments, no receipt, and no QSPI write; its branch, lock, run,
+artifact, index, and zero-deployment history are immutable.
+
+The active candidate is RC12. It retains RC11's firmware implementation,
+external source graph, deterministic package, topology-bound serialless-b674
+resolver, route/authentication boundary, and receipt-v3 schema. Its only
+executable correction makes both DFU commands use the paired normal/runtime
+selector `0456:b673,0456:b674`, matching the trusted DFU suffix and live b674
+device. Exact topology remains mandatory; nonempty serial mismatch, ambiguity,
+wrong VID/PID, serialless b673, `-S`, `-R`, persistent targets, and
+returned-runtime mismatch remain forbidden or fail closed. Its exact candidate
+source lock is `refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. The later
+final build uses the different exact lock
+`refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
+reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC11 firmware source lock and explicit trusted build route.
-   Keep RC4 through RC10's external component pins only if source-graph checks
+2. Create the exact RC12 firmware source lock and explicit trusted build route.
+   Keep RC4 through RC11's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
    retain integrated timing, CDC, DRC, methodology, utilization, and build

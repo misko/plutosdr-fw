@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC11, but the
+# The external component graph remains identical from RC4 through RC12, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -15,10 +15,15 @@
 # before any candidate download; exact-topology detach recovered persistent RC1
 # safely with no receipt or QSPI write and with the route absent. RC11 permits
 # an absent/empty serial only for exact b674 on the pre-attested topology while
-# keeping all runtime b673 paths exact-serial. RC11 must pass its new
+# keeping all runtime b673 paths exact-serial. Its first guarded execute then
+# exposed a stale dfu-util selector: both the planner and receipt validator used
+# only b674 although the trusted DFU suffix identifies b673. dfu-util exited
+# before transferring bytes; paired-selector exact-topology detach recovered
+# persistent RC1 safely with no receipt, deployment, or QSPI write. RC12 aligns
+# both -D and -e with the documented b673,b674 selector. RC12 must pass its new
 # source-locked build and full hardware qualification before this final graph
-# is used. The subsequent final build may
-# change only the top-level release identity and packaging, while requiring
+# is used. The subsequent final build may change only the top-level release
+# identity and packaging, while requiring
 # exact component identities in packed /opt/VERSIONS.
 
 schema: plutosdr-fw.source-manifest

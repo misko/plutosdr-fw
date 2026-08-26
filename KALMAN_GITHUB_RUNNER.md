@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC11 trusted workflow ends after the build job uploads the exact deployment
+- The RC12 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -87,9 +87,37 @@ no receipt was published, and no QSPI write occurred.
 Exact-topology `dfu-util -e` recovered the persistent RC1 safe runtime. The
 temporary `192.168.2.1/32` route is absent. RC10's source lock, trusted run,
 artifact, candidate index, and zero-deployment history remain immutable. RC11
-advances only the serialless-b674 resolver boundary: only a unique exact
+advanced only the serialless-b674 resolver boundary: only a unique exact
 `0456:b674` on the pre-attested topology may omit its serial; all b673 paths
 and returned-runtime checks remain exact-serial.
+
+RC11 locked exact commit
+`4c332666ff054e21e10c1a8137fd5f1cbc73b568` and source lock
+`refs/tags/tandem-agc-v8-rc11-source/firmware-v1`. Trusted run `32970312166`,
+attempt 1, fully routed the design and retained artifact ID `9607927415`. Its
+outer ZIP SHA-256 is
+`583c52462725c037ba73aca32d78472ea6784b43764e13ab92996b322ee5b3d3`,
+bundle SHA-256 is
+`91410b15e458eac1a2190dd0fa40ee540b6f7e6bde9e71c70125a9f86dc05c09`,
+DFU SHA-256 is
+`1dd94789dddefb7220caad75fb063ad0fdd2a8f3204f2f4fa48bd1cca2d31481`,
+and verified candidate-index SHA-256 is
+`ef8017c539f42d936bcde054e85864e331d4b383167201573c30419d98100831`.
+
+The guarded execute reached unique exact serialless b674 on topology `3-7`,
+then dfu-util rejected the single `0456:b674` selector against the trusted
+b673 DFU suffix and exited 64 before transferring bytes. Exact-topology
+paired-selector `-e` recovered persistent RC1 in a verified safe state; the
+temporary route is absent. RC11 has zero candidate deployments, no receipt,
+and no QSPI write. Its source lock, trusted run, artifact, index, and
+zero-deployment history remain immutable. RC12 corrects only the paired
+normal/DFU selector and lineage.
+
+The forward-only RC12 route uses branch
+`codex/firmware-tandem-agc-v8-rc12`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc12`, and source lock
+`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`; it does not move or reuse
+RC11's branch, source lock, artifact, or evidence index.
 
 ## One-time administrator installation
 
@@ -137,7 +165,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC11 workflow has no separate attestation job. An operator may capture GitHub
+The RC12 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

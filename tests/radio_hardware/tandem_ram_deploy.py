@@ -45,6 +45,7 @@ USB_INVENTORY_SCHEMA = "plutosdr-fw.usb-inventory"
 USB_VENDOR = "0456"
 RUNTIME_PRODUCT = "b673"
 DFU_PRODUCT = "b674"
+DFU_DEVICE_SELECTOR = f"{USB_VENDOR}:{RUNTIME_PRODUCT},{USB_VENDOR}:{DFU_PRODUCT}"
 DFU_ALT = "firmware.dfu"
 TRANSITION_METHOD = "download-then-detach-e"
 MAX_JSON_BYTES = 4 * 1024 * 1024
@@ -1127,7 +1128,7 @@ def build_command_plan(
     request = _request_ram_argv(options, interface)
     selector = [
         "-d",
-        f"{USB_VENDOR}:{DFU_PRODUCT}",
+        DFU_DEVICE_SELECTOR,
         "-p",
         device.topology,
         "-a",
@@ -1204,7 +1205,7 @@ def validate_command_plan(
     expected_prefix = [
         "dfu-util",
         "-d",
-        f"{USB_VENDOR}:{DFU_PRODUCT}",
+        DFU_DEVICE_SELECTOR,
         "-p",
         topology,
         "-a",

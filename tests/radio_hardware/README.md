@@ -478,9 +478,11 @@ RC4 record explains why the fixed command plan uses firmware download followed
 by DFU detach (`-e`), but it does not authorize a run. Each run instead binds
 the exact candidate and Pluto+ runtime model, USB serial/topology, SSH host key,
 current firmware, operator phrase, new boot ID, safe state, and equal pre/post
-`qspi-linux` digests. The command validator forbids `-R`, flash targets, and
-every DFU alternate except `firmware.dfu`; receipts and all later hardware
-evidence remain exact-serial scoped.
+`qspi-linux` digests. The command validator requires the paired
+`0456:b673,0456:b674` selector for both download (`-D`) and detach (`-e`), and
+forbids `-S`, `-R`, flash targets, and every DFU alternate except
+`firmware.dfu`; receipts and all later hardware evidence remain exact-serial
+scoped.
 
 The requested serial must first resolve to one exact `0456:b673` runtime
 device and USB topology. During the dedicated RAM transition only, a
@@ -521,7 +523,7 @@ IIO_SOURCE=../libiio \
 scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc11-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc12-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \
@@ -551,7 +553,7 @@ IIO_SOURCE=../libiio \
 scripts/run_stale_small_adc_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc11-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc12-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
   --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
   --candidate-dfu /absolute/candidate/pluto.dfu \

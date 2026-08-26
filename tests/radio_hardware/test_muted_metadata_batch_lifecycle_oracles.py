@@ -2791,7 +2791,7 @@ def _candidate_binding_files(
                 "argv": [
                     "dfu-util",
                     "-d",
-                    "0456:b674",
+                    "0456:b673,0456:b674",
                     "-p",
                     "3-8",
                     "-a",
@@ -2805,7 +2805,7 @@ def _candidate_binding_files(
                 "argv": [
                     "dfu-util",
                     "-d",
-                    "0456:b674",
+                    "0456:b673,0456:b674",
                     "-p",
                     "3-8",
                     "-a",

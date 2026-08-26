@@ -668,7 +668,7 @@ def validate_deployment_receipt(
     dfu_prefix = [
         "dfu-util",
         "-d",
-        "0456:b674",
+        "0456:b673,0456:b674",
         "-p",
         usb_port,
         "-a",

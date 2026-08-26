@@ -19,7 +19,7 @@ from .candidate_binding import (
 SHA_A = "a" * 64
 SHA_B = "b" * 64
 SERIAL = "104473222a87000abc00123456789def"
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc11"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc12"
 
 
 def _artifact_index() -> dict[str, Any]:
@@ -36,7 +36,7 @@ def _artifact_index() -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc11-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc12-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1234, "run_attempt": 1},
@@ -157,7 +157,7 @@ def _receipt() -> dict[str, Any]:
                 "argv": [
                     "dfu-util",
                     "-d",
-                    "0456:b674",
+                    "0456:b673,0456:b674",
                     "-p",
                     "1-2.3",
                     "-a",
@@ -171,7 +171,7 @@ def _receipt() -> dict[str, Any]:
                 "argv": [
                     "dfu-util",
                     "-d",
-                    "0456:b674",
+                    "0456:b673,0456:b674",
                     "-p",
                     "1-2.3",
                     "-a",
@@ -272,11 +272,14 @@ def test_artifact_index_rejects_identity_and_shape_mutations(
         lambda value: value["commands"][0].update(argv=["true"]),
         lambda value: value["commands"][0]["argv"].__setitem__(-2, "root@not-an-ip"),
         lambda value: value["commands"][1]["argv"].__setitem__(4, "1-9"),
+        lambda value: value["commands"][1]["argv"].__setitem__(2, "0456:b674"),
+        lambda value: value["commands"][2]["argv"].__setitem__(2, "0456:b674"),
         lambda value: value["commands"][1]["argv"].__setitem__(
             -1, "/evidence/firmware.dfu"
         ),
         lambda value: value["commands"][2].update(argv=["dfu-util", "-e"]),
         lambda value: value["commands"][1]["argv"].append("-R"),
+        lambda value: value["commands"][1]["argv"].extend(["-S", SERIAL]),
         lambda value: value["commands"][1]["argv"].append("--reset"),
         lambda value: value.update(transition_proof_sha256="5" * 64),
         lambda value: value.update(known_hosts_sha256="short"),
