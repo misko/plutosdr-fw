@@ -1220,7 +1220,7 @@ def _validate_host_libiio_runtime(value: Mapping[str, Any]) -> dict[str, Any]:
     private_root = PurePosixPath(normalized_paths["private_root_path"])
     source = PurePosixPath(normalized_paths["source_path"])
     build = PurePosixPath(normalized_paths["build_path"])
-    repository = PurePosixPath(normalized_paths["repository_path"])
+    wrapper_repository = PurePosixPath(normalized_wrapper["repository_path"])
     if (
         source != private_root / "source"
         or build != private_root / "build"
@@ -1228,7 +1228,7 @@ def _validate_host_libiio_runtime(value: Mapping[str, Any]) -> dict[str, Any]:
         or PurePosixPath(cache["path"]) != build / "CMakeCache.txt"
         or build not in PurePosixPath(library["path"]).parents
         or PurePosixPath(normalized_wrapper["path"])
-        != repository / "scripts/run_tandem_agc_release_hardware.sh"
+        != wrapper_repository / "scripts/run_tandem_agc_release_hardware.sh"
     ):
         raise ReleaseCliError("host libiio runtime paths are internally inconsistent")
     return {

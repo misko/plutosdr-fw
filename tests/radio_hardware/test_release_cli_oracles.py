@@ -1329,6 +1329,13 @@ def test_imported_libiio_requires_clean_source_fresh_build_and_exact_bytes(
         attestation["cmake_cache"]["sha256"]
         == environment["PLUTOSDR_FW_LIBIIO_CMAKE_CACHE_SHA256"]
     )
+    # The pinned libiio repository and firmware runner repository are
+    # intentionally distinct.  The durable validator must bind the wrapper to
+    # the latter rather than accidentally resolving it beneath the former.
+    assert (
+        release_cli_module._validate_host_libiio_runtime(attestation)["wrapper"]
+        == attestation["wrapper"]
+    )
 
     files["library"].write_bytes(b"substituted library\n")
     with pytest.raises(ReleaseCliError, match="bytes changed"):

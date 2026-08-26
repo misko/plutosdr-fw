@@ -785,7 +785,7 @@ def _validate_output(value: object) -> pathlib.Path:
 
 
 def _validate_report_structure(value: object) -> None:
-    """Reject any mutation that could make the blocked observer authorize RC17."""
+    """Reject any mutation that could make the blocked observer authorize RC18."""
 
     try:
         lifecycle._validate_strict_json_domain(value)
@@ -1388,7 +1388,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     artifact = args.output.absolute()
     print(f"BLOCKED: {artifact}")
     print(f"SHA256: {hashlib.sha256(artifact.read_bytes()).hexdigest()}")
-    print("Optional diagnostic only; this report does not gate RC17")
+    print("Optional diagnostic only; this report does not gate RC18")
     if report.get("hardware_qualified") is not False:
         raise AssertionError("blocked observer gained hardware authority")
     return 2

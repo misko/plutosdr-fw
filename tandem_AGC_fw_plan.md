@@ -165,7 +165,18 @@ schema `frame-metadata-v5` with the correctly observed IIO buffer ABI
 `470cd86373fecd65c0464d995880418317fb8c089feb4a0eb802791dd791010f`;
 the `/32` route was removed and no persistent write occurred. RC16 has one
 observed safe RAM deployment, zero valid passing receipts, and is immutable.
-The active candidate is RC17.
+
+RC17 locked exact commit `f74d082e789564f0adc81c62b82e924e3e913eb1`,
+passed trusted run `33006829961`, and produced candidate index
+`25b9f0b33fae40ebc1c09cb4f27051e1664d9ec85d6929de2903f765427b74cc`.
+All four exact radios completed guarded RAM-only deployment with unchanged QSPI
+and the verified safe state, then passed the 64-frame muted metadata lifecycle,
+cancel, and reopen checks. The first full comparison stopped before opening USB
+because durable host-libiio replay resolved the committed firmware wrapper
+beneath the distinct libiio repository. No RF phase ran; RC17 has no full or
+soak report and is immutable.
+
+The active candidate is RC18.
 
 RC6 introduced one deliberately narrow, behavior-preserving fit refactor. The
 mapping replaces three mutually exclusive dwell counters with one
@@ -196,8 +207,10 @@ known-hosts pin for the ephemeral RAM key, and advanced the measured receipt
 from v3 to v4. RC14 moved the transaction into the native utility. RC15 fixed
 exact USB-IIO attestation but exposed the kernel sysfs symlink defect during its
 first DFU transition. RC16 then completed the safe RAM transition but exposed
-the bridge's v5-release-schema versus v2-buffer-ABI mismatch. RC17 retains the
-firmware and every guardrail while
+the bridge's v5-release-schema versus v2-buffer-ABI mismatch. RC17 separated
+those contracts, completed four deployments and lifecycle runs, then exposed
+the host-libiio firmware-wrapper repository-domain error before the first RF
+phase. RC18 retains the firmware and every guardrail while
 pinning corrected exact pushed
 `pluto-plus-utils` commit
 `2654f34eb909904ec65bc0526e0f8977cb30e2ed`; `plutosdr-fw` now emits the pinned
@@ -247,7 +260,7 @@ held hostage by cleanup, and cleanup is not rushed under a release deadline.
   validator expected stale report-state, DSP, and CDC details. It uploaded
   diagnostics only and produced no deployment bundle, candidate index, or
   DFU. The implementation numbers de-risk RC5's capacity failure but do not
-  authorize RC17 or replace its clean offline/OOC and trusted build gates.
+  authorize RC18 or replace its clean offline/OOC and trusted build gates.
 - RC7 trusted run `32948720383`, attempt 1, completed its full firmware build,
   integrated route, and report validation and uploaded bundle SHA-256
   `7f13d6dd3f814af1a1e0d06d65535d2f60499b4bb3c0ab0e5cc4e7b8c8836f34`.
@@ -325,7 +338,7 @@ held hostage by cleanup, and cleanup is not rushed under a release deadline.
   hardware-qualified.
 - RC13 removed known-hosts inputs, used exact password-only SSH with all
   known-hosts files disabled, and advanced the measured receipt from v3 to v4.
-  RC17 uses those same USB/topology, route, IIO/model, QSPI, safe-state, and
+  RC18 uses those same USB/topology, route, IIO/model, QSPI, safe-state, and
   paired-selector requirements into the native utility lifecycle and consumes
   its original records.
 - The full hardware-free release gate on RC5 commit
@@ -420,12 +433,12 @@ source tag `refs/tags/tandem-agc-v8-rc13-source/firmware-v1`. Its owner dispatch
 `32985347441`, attempt 1, remained queued without a job and was superseded before
 artifact or hardware authorization.
 
-The RC5 through RC16 build branches and source tags are immutable. RC17 is a
+The RC5 through RC17 build branches and source tags are immutable. RC18 is a
 new source identity retaining RC13's firmware implementation, integrated
 validation policy, deterministic package, paired normal/DFU selector,
 serialless-b674 resolver, exact route/identity/safety checks, and RAM-only
 boundary. Only the device-lifecycle ownership, utility plan/receipt contract,
-indexed harness, and lineage change. RC17 has a new manifest and exact trusted-route
+indexed harness, and lineage change. RC18 has a new manifest and exact trusted-route
 mapping; its source lock, trusted build, evidence archive, and hardware campaign
 must still be created and completed in that order.
 
@@ -481,10 +494,10 @@ The implementation also carries avoidable reasoning cost:
 
 | ID | Blocker | Exit condition |
 |---|---|---|
-| A-01 | RC17 source and lineage are not frozen | Shared tagged-dwell behavior, paired DFU selector, separated v5 release schema/v2 live buffer ABI, deterministic bytewise packaging, and ephemeral-host-key policy tests pass; all intended changes are reviewed, committed, and clean |
-| A-02 | RC17 has no protected firmware source lock | Exact clean RC17 commit passes full offline and routed OOC gates; new branch and `refs/tags/tandem-agc-v8-rc17-source/firmware-v1` are pushed without changing RC5 through RC16 |
-| A-03 | RC17 has no integrated artifact | Trusted RC17 build fully places/routes, passes integrated report and deterministic-package policy, and uploads the exact deployment bundle |
-| A-04 | RC17 exact bytes have not run on hardware | Exact-serial runtime plus topology-bound b674 RAM receipts and full, lifecycle, transient/modulated, and soak reports pass on all four required radios |
+| A-01 | RC18 source and lineage are not frozen | Shared tagged-dwell behavior, paired DFU selector, separated v5 release schema/v2 live buffer ABI, deterministic bytewise packaging, and ephemeral-host-key policy tests pass; all intended changes are reviewed, committed, and clean |
+| A-02 | RC18 has no protected firmware source lock | Exact clean RC18 commit passes full offline and routed OOC gates; new branch and `refs/tags/tandem-agc-v8-rc18-source/firmware-v1` are pushed without changing RC5 through RC17 |
+| A-03 | RC18 has no integrated artifact | Trusted RC18 build fully places/routes, passes integrated report and deterministic-package policy, and uploads the exact deployment bundle |
+| A-04 | RC18 exact bytes have not run on hardware | Exact-serial runtime plus topology-bound b674 RAM receipts and full, lifecycle, transient/modulated, and soak reports pass on all four required radios |
 | A-05 | Final identity and publication are incomplete | Main build is confirmed, annotated tag and immutable manifest exist, and the exact published asset verifies |
 
 ## 3. Non-negotiable engineering rules
@@ -529,7 +542,7 @@ Deliverables:
 - A decision on every current uncommitted file: include through a reviewed
   commit, or leave it out without destructive worktree operations.
 - An unused candidate identity, expected to be
-  `v0.41-plutoplus-spf-tandem-agc-v8-rc17`.
+  `v0.41-plutoplus-spf-tandem-agc-v8-rc18`.
 - A release requirements checklist copied into the candidate issue/milestone.
 
 Freeze the following contracts before qualification:
@@ -552,8 +565,8 @@ passes; all later evidence names that commit's 40-character SHA.
 This phase may change test/deployment tooling, but it must not change controller
 behavior. If a test exposes a behavioral defect, restart at A0 and rerun all
 evidence. RC10 through RC12 are burned by their immutable locks, artifacts,
-indexes, and live transition records; RC17 may retain its name only until an
-RC17 lock or artifact exists, after which any affected fix advances to a new
+indexes, and live transition records; RC18 may retain its name only until an
+RC18 lock or artifact exists, after which any affected fix advances to a new
 immutable identity.
 
 #### A1.1 Generalize muted metadata lifecycle qualification
@@ -561,7 +574,7 @@ immutable identity.
 `tests/radio_hardware/muted_metadata_batch_lifecycle.py` was originally frozen
 to RC4, one exact R18 serial, one source commit, and one RAM-boot receipt. The
 generalized runner now consumes an immutable, validated candidate description;
-RC17 must exercise that interface with its own source/evidence manifest.
+RC18 must exercise that interface with its own source/evidence manifest.
 
 Required properties:
 
@@ -660,24 +673,24 @@ Bind the resulting receipt and expected DFU SHA to every candidate hardware
 report. An exact version string alone is insufficient because different bytes
 can carry the same string.
 
-#### A1.4 Prepare the RC17 manifest and trusted route
+#### A1.4 Prepare the RC18 manifest and trusted route
 
 All repository changes needed to build the candidate must precede the clean
 offline/OOC commit. Before A2:
 
-1. add `manifests/tandem-agc-v8-rc17-source.yaml` with the reviewed external
+1. add `manifests/tandem-agc-v8-rc18-source.yaml` with the reviewed external
    component pins;
-2. add `codex/firmware-tandem-agc-v8-rc17` to the owner-only dispatch allowlist
+2. add `codex/firmware-tandem-agc-v8-rc18` to the owner-only dispatch allowlist
    in `.github/workflows/firmware-main.yml`;
 3. update all three workflow decisions together: allowed ref, source-manifest
    mapping, and package-stem mapping, with no fall-through to an unrelated
    default manifest;
-4. add the RC17 manifest to source-graph CI while retaining RC16 as immutable
+4. add the RC18 manifest to source-graph CI while retaining RC17 as immutable
    reproduction history; and
 5. update `tests/test_release_oracles.py` so the full trusted-route mapping is
    enforced.
 
-The protected RC17 firmware source lock is created later, after the exact clean
+The protected RC18 firmware source lock is created later, after the exact clean
 commit passes A2 and A3. Preparing the route does not authorize a build by
 itself.
 
@@ -713,14 +726,14 @@ also be committed before A2/A3. In this phase:
   describe that same bundle but cannot gate it.
 
 These changes need planted-failure tests. Do not change an acceptance parser or
-waiver policy after it has accepted RC17 and continue to claim the earlier
+waiver policy after it has accepted RC18 and continue to claim the earlier
 result; either preserve the original verifier with the evidence or rerun the
 affected gate under a new candidate commit.
 
 #### A1.6 Defer reduced final confirmation until it has a real runner
 
 A reduced final confirmation is intentionally deferred because no current
-repository command emits that verdict. It is not a v8 release path: RC17 and the
+repository command emits that verdict. It is not a v8 release path: RC18 and the
 final identity both run the full four-radio campaign. A future Track-B change
 may add a guarded `scripts/run_tandem_agc_final_confirmation_hardware.sh` (or an
 explicit `release_cli` confirmation mode) with offline planted-failure oracles.
@@ -787,11 +800,11 @@ Also run the candidate-relevant checks used by the trusted builder:
 buildroot/board/pluto/test_pluto_mute_tx.sh
 buildroot/board/pluto/test_pluto_boot_safety.sh
 buildroot/board/pluto/test_pluto_read_identity.sh
-SPF_GAIN_SERIES_MANIFEST="$PWD/manifests/tandem-agc-v8-rc17-source.yaml" \
+SPF_GAIN_SERIES_MANIFEST="$PWD/manifests/tandem-agc-v8-rc18-source.yaml" \
   ./scripts/build_gain_series_candidate.sh source-check
-SPF_GAIN_SERIES_MANIFEST="$PWD/manifests/tandem-agc-v8-rc17-source.yaml" \
+SPF_GAIN_SERIES_MANIFEST="$PWD/manifests/tandem-agc-v8-rc18-source.yaml" \
   ./scripts/build_gain_series_candidate.sh preflight
-SPF_GAIN_SERIES_MANIFEST="$PWD/manifests/tandem-agc-v8-rc17-source.yaml" \
+SPF_GAIN_SERIES_MANIFEST="$PWD/manifests/tandem-agc-v8-rc18-source.yaml" \
   ./scripts/test_gain_series_hdl.sh
 git diff --check
 ```
@@ -811,7 +824,7 @@ justifies it in advance.
 The diagnostic RC4-top replacement result in section 2.1 is a capacity result,
 not A3 or A5 evidence. It cannot populate `status.txt`, authorize a source
 lock, or substitute for the clean commit-bound OOC run and subsequent trusted
-RC17 integrated build required below.
+RC18 integrated build required below.
 
 Use Vivado 2022.2, a completely clean committed tree, and an absent output path
 outside the checkout under an existing non-symlink parent:
@@ -855,17 +868,17 @@ Gate:
 - the evidence hash is recorded in the candidate index with the explicit scope
   `ooc_pass_nonauthorizing`.
 
-### A4. Protect the RC17 source lock and dispatch the trusted build
+### A4. Protect the RC18 source lock and dispatch the trusted build
 
 Only after A0–A3 pass:
 
 1. Verify that the already committed
-   `manifests/tandem-agc-v8-rc17-source.yaml` and trusted workflow mapping still
+   `manifests/tandem-agc-v8-rc18-source.yaml` and trusted workflow mapping still
    name the exact graph and candidate branch qualified in A2/A3.
-2. Create/push `codex/firmware-tandem-agc-v8-rc17` at the nominated commit and
+2. Create/push `codex/firmware-tandem-agc-v8-rc18` at the nominated commit and
    freeze it for the candidate build; never force-push it after evidence begins.
 3. Create and protect the exact candidate firmware source lock
-   `refs/tags/tandem-agc-v8-rc17-source/firmware-v1` at the exact candidate
+   `refs/tags/tandem-agc-v8-rc18-source/firmware-v1` at the exact candidate
    commit. Candidate evidence rejects every other ref, including the burned
    RC5 and RC10 locks and the final lock.
 4. Reuse RC4's external dependency pins only after source-graph checks prove
@@ -874,7 +887,7 @@ Only after A0–A3 pass:
    changing the candidate commit.
 
 The source lock is not the annotated candidate/release tag. Do not create an
-annotated RC17 release tag until the exact indexed bundle has completed the
+annotated RC18 release tag until the exact indexed bundle has completed the
 required hardware qualification, and never move either kind of ref.
 
 Dispatch the candidate build only after the protected refs are remotely
@@ -883,8 +896,8 @@ resolvable:
 ```bash
 gh workflow run firmware-main.yml \
   --repo misko/plutosdr-fw \
-  --ref codex/firmware-tandem-agc-v8-rc17 \
-  -f release_version=v0.41-plutoplus-spf-tandem-agc-v8-rc17
+  --ref codex/firmware-tandem-agc-v8-rc18 \
+  -f release_version=v0.41-plutoplus-spf-tandem-agc-v8-rc18
 ```
 
 The trusted local entry point used by CI remains:
@@ -938,7 +951,7 @@ candidate_attempt=<attempt>
 candidate_artifact="plutoplus-main-${candidate_commit}-${candidate_run_id}-${candidate_attempt}"
 candidate_work=$(mktemp -d)
 
-candidate_ref=refs/heads/codex/firmware-tandem-agc-v8-rc17
+candidate_ref=refs/heads/codex/firmware-tandem-agc-v8-rc18
 gh api "repos/misko/plutosdr-fw/actions/runs/$candidate_run_id" \
   --jq '{schema:"plutosdr-fw.github-actions-run.v1",
          repository:"misko/plutosdr-fw",
@@ -1016,16 +1029,16 @@ mkdir "$candidate_extracted/rootfs"
 # Curate the three external source/OOC roles required by the candidate index.
 # tandem_release_evidence.py intentionally verifies a pre-populated immutable
 # archive; it does not invent these operator records itself.
-candidate_evidence_root=/absolute/evidence/tandem-agc-v8-rc17
+candidate_evidence_root=/absolute/evidence/tandem-agc-v8-rc18
 candidate_ooc=/absolute/path/to/tandem-agc-$candidate_commit
-candidate_source_lock=refs/tags/tandem-agc-v8-rc17-source/firmware-v1
+candidate_source_lock=refs/tags/tandem-agc-v8-rc18-source/firmware-v1
 test -d "$candidate_ooc"
 test "$(git rev-parse "$candidate_source_lock^{commit}")" = "$candidate_commit"
 mkdir -p "$candidate_evidence_root/source" "$candidate_evidence_root/evidence"
 test ! -e "$candidate_evidence_root/evidence/ooc"
 cp -a -- "$candidate_ooc" "$candidate_evidence_root/evidence/ooc"
-install -m 0644 manifests/tandem-agc-v8-rc17-source.yaml \
-  "$candidate_evidence_root/source/tandem-agc-v8-rc17-source.yaml"
+install -m 0644 manifests/tandem-agc-v8-rc18-source.yaml \
+  "$candidate_evidence_root/source/tandem-agc-v8-rc18-source.yaml"
 install -m 0644 "$candidate_ooc/evidence-sha256.txt" \
   "$candidate_evidence_root/evidence/evidence-sha256.txt"
 install -m 0644 "$candidate_ooc/status.txt" \
@@ -1051,8 +1064,8 @@ install -m 0644 "$candidate_ooc/status.txt" \
   cat "$candidate_ooc/provenance.txt"
 } > "$candidate_evidence_root/evidence/source-and-tool-hashes.txt"
 
-cmp manifests/tandem-agc-v8-rc17-source.yaml \
-  "$candidate_evidence_root/source/tandem-agc-v8-rc17-source.yaml"
+cmp manifests/tandem-agc-v8-rc18-source.yaml \
+  "$candidate_evidence_root/source/tandem-agc-v8-rc18-source.yaml"
 test "$(wc -l < "$candidate_evidence_root/evidence/source-lock.txt")" -eq 3
 ```
 
@@ -1076,12 +1089,12 @@ offline validation. The authorizing check is:
 ```bash
 python3 scripts/tandem_release_evidence.py assemble \
   --stage candidate-pre-hardware \
-  --archive-root /absolute/evidence/tandem-agc-v8-rc17 \
-  --input /absolute/evidence/tandem-agc-v8-rc17/candidate-index-input.json \
-  --output /absolute/evidence/tandem-agc-v8-rc17/candidate-index.json
+  --archive-root /absolute/evidence/tandem-agc-v8-rc18 \
+  --input /absolute/evidence/tandem-agc-v8-rc18/candidate-index-input.json \
+  --output /absolute/evidence/tandem-agc-v8-rc18/candidate-index.json
 python3 scripts/tandem_release_evidence.py verify \
   --stage candidate-pre-hardware \
-  --index /absolute/evidence/tandem-agc-v8-rc17/candidate-index.json
+  --index /absolute/evidence/tandem-agc-v8-rc18/candidate-index.json
 ```
 
 `assemble` also writes the detached `.sha256` sidecar. Both commands refuse an
@@ -1153,11 +1166,11 @@ the utility plan is also file-only. Only `execute` may touch the selected radio.
 Use an owned mode-0700 serial directory and retain all four exact utility files:
 
 ```bash
-deploy_root=/absolute/evidence/tandem-agc-v8-rc17/hardware/deploy/SERIAL
+deploy_root=/absolute/evidence/tandem-agc-v8-rc18/hardware/deploy/SERIAL
 install -d -m 0700 "$deploy_root"
 
 python3 scripts/tandem_release_device_plan.py \
-  --artifact-index /absolute/evidence/tandem-agc-v8-rc17/candidate-index.json \
+  --artifact-index /absolute/evidence/tandem-agc-v8-rc18/candidate-index.json \
   --output "$deploy_root/release-candidate-plan.json"
 
 scripts/deploy_tandem_agc_ram_hardware.sh inventory \
@@ -1213,17 +1226,17 @@ regular expression. Its existing `--artifact-index` and
 review the fully expanded plan without opening USB:
 
 ```bash
-IIO_MANIFEST=manifests/tandem-agc-v8-rc17-source.yaml \
+IIO_MANIFEST=manifests/tandem-agc-v8-rc18-source.yaml \
 IIO_SOURCE=../libiio \
 PYTHON=.venv-radio-hardware/bin/python \
 scripts/run_tandem_agc_release_hardware.sh \
   --authorize-tx2-loopback \
   --radio-serial SERIAL \
-  --firmware-version v0.41-plutoplus-spf-tandem-agc-v8-rc17 \
-  --artifact-index /absolute/evidence/tandem-agc-v8-rc17/candidate-index.json \
-  --deployment-receipt /absolute/evidence/tandem-agc-v8-rc17/hardware/deploy/SERIAL/ram-boot-receipt.json \
+  --firmware-version v0.41-plutoplus-spf-tandem-agc-v8-rc18 \
+  --artifact-index /absolute/evidence/tandem-agc-v8-rc18/candidate-index.json \
+  --deployment-receipt /absolute/evidence/tandem-agc-v8-rc18/hardware/deploy/SERIAL/ram-boot-receipt.json \
   --physical-attenuation-db ATTENUATION \
-  --output /absolute/evidence/tandem-agc-v8-rc17/hardware/full \
+  --output /absolute/evidence/tandem-agc-v8-rc18/hardware/full \
   --plan-only
 ```
 
@@ -1238,17 +1251,17 @@ Run the baseline repeatability soak in a different output root; reusing the
 full-characterization root correctly fails checkpoint fingerprint validation:
 
 ```bash
-IIO_MANIFEST=manifests/tandem-agc-v8-rc17-source.yaml \
+IIO_MANIFEST=manifests/tandem-agc-v8-rc18-source.yaml \
 IIO_SOURCE=../libiio \
 PYTHON=.venv-radio-hardware/bin/python \
 scripts/run_tandem_agc_release_hardware.sh \
   --authorize-tx2-loopback \
   --radio-serial SERIAL \
-  --firmware-version v0.41-plutoplus-spf-tandem-agc-v8-rc17 \
-  --artifact-index /absolute/evidence/tandem-agc-v8-rc17/candidate-index.json \
-  --deployment-receipt /absolute/evidence/tandem-agc-v8-rc17/hardware/deploy/SERIAL/ram-boot-receipt.json \
+  --firmware-version v0.41-plutoplus-spf-tandem-agc-v8-rc18 \
+  --artifact-index /absolute/evidence/tandem-agc-v8-rc18/candidate-index.json \
+  --deployment-receipt /absolute/evidence/tandem-agc-v8-rc18/hardware/deploy/SERIAL/ram-boot-receipt.json \
   --physical-attenuation-db ATTENUATION \
-  --output /absolute/evidence/tandem-agc-v8-rc17/hardware/soak \
+  --output /absolute/evidence/tandem-agc-v8-rc18/hardware/soak \
   --phase steady \
   --policy-set baseline
 ```
@@ -1260,7 +1273,7 @@ no existing checkpoint.
 
 The executable gate matrix is:
 
-| Gate | Entry point/status before A1 | RC17 output | Required on RC17 |
+| Gate | Entry point/status before A1 | RC18 output | Required on RC18 |
 |---|---|---|---|
 | Full steady/transient/modulated characterization | Existing candidate-bound `scripts/run_tandem_agc_release_hardware.sh` | `hardware/full/SERIAL/release-hardware-report.json` plus phase sidecars | All four radios |
 | Baseline repeatability soak | Existing release runner with `--phase steady --policy-set baseline` | `hardware/soak/SERIAL/release-hardware-report.json` | All four radios |
@@ -1276,12 +1289,12 @@ IIO_SOURCE=../libiio \
 PYTHON=.venv-radio-hardware/bin/python \
 scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
   --hardware \
-  --source-manifest /absolute/evidence/tandem-agc-v8-rc17/source/tandem-agc-v8-rc17-source.yaml \
-  --artifact-index /absolute/evidence/tandem-agc-v8-rc17/candidate-index.json \
-  --deployment-receipt /absolute/evidence/tandem-agc-v8-rc17/hardware/deploy/SERIAL/ram-boot-receipt.json \
-  --candidate-dfu /absolute/evidence/tandem-agc-v8-rc17/artifact/plutoplus-spf-tandem-agc-v8-rc17-COMMIT-pluto.dfu \
+  --source-manifest /absolute/evidence/tandem-agc-v8-rc18/source/tandem-agc-v8-rc18-source.yaml \
+  --artifact-index /absolute/evidence/tandem-agc-v8-rc18/candidate-index.json \
+  --deployment-receipt /absolute/evidence/tandem-agc-v8-rc18/hardware/deploy/SERIAL/ram-boot-receipt.json \
+  --candidate-dfu /absolute/evidence/tandem-agc-v8-rc18/artifact/plutoplus-spf-tandem-agc-v8-rc18-COMMIT-pluto.dfu \
   --serial SERIAL \
-  --output /absolute/evidence/tandem-agc-v8-rc17/hardware/lifecycle/SERIAL/muted-metadata-batch-lifecycle-v5.json
+  --output /absolute/evidence/tandem-agc-v8-rc18/hardware/lifecycle/SERIAL/muted-metadata-batch-lifecycle-v5.json
 ```
 
 The stale-latch observer may be improved later as a diagnostic, but release
@@ -1297,7 +1310,7 @@ Do not claim separate hardware evidence for them unless a guarded phase and
 durable report actually exist. Host `SIGKILL`, cable/device loss, ENSM
 disturbance, watchdog/iiOD restart, and deliberate hardware FIFO-pressure
 injection remain valuable post-v8 fault-campaign work; promote any of them into
-RC17 only by implementing its runner/oracles before A2 and adding it explicitly
+RC18 only by implementing its runner/oracles before A2 and adding it explicitly
 to this matrix.
 
 Gate: every serial's durable aggregate report says `verdict=pass`; every
@@ -1327,12 +1340,12 @@ After all four serials pass, assemble and verify the immutable promotion layer:
 ```bash
 python3 scripts/tandem_release_evidence.py assemble \
   --stage candidate-qualified \
-  --archive-root /absolute/evidence/tandem-agc-v8-rc17 \
-  --parent-index /absolute/evidence/tandem-agc-v8-rc17/candidate-index.json \
-  --output /absolute/evidence/tandem-agc-v8-rc17/campaign-index.json
+  --archive-root /absolute/evidence/tandem-agc-v8-rc18 \
+  --parent-index /absolute/evidence/tandem-agc-v8-rc18/candidate-index.json \
+  --output /absolute/evidence/tandem-agc-v8-rc18/campaign-index.json
 python3 scripts/tandem_release_evidence.py verify \
   --stage candidate-qualified \
-  --index /absolute/evidence/tandem-agc-v8-rc17/campaign-index.json
+  --index /absolute/evidence/tandem-agc-v8-rc18/campaign-index.json
 ```
 
 Promote only when `campaign-index.json` covers all four deployment receipts,
@@ -1350,8 +1363,8 @@ report is an optional diagnostic raw member and cannot affect promotion.
    functional change. Before dispatching the final build, create and push the
    exact immutable final firmware source lock
    `refs/tags/tandem-agc-v8-source/firmware-v1` at that exact main commit—even
-   when a fast-forward makes it the same object as RC17. Final evidence rejects
-   the RC17 candidate ref:
+   when a fast-forward makes it the same object as RC18. Final evidence rejects
+   the RC18 candidate ref:
 
 ```bash
 set -euo pipefail
@@ -1364,7 +1377,7 @@ test "$(git rev-parse refs/tags/tandem-agc-v8-source/firmware-v1^{commit})" = \
 ```
 
    Do not move or reuse
-   `refs/tags/tandem-agc-v8-rc17-source/firmware-v1`. The burned RC16 lock
+   `refs/tags/tandem-agc-v8-rc18-source/firmware-v1`. The burned RC16 lock
    `refs/tags/tandem-agc-v8-rc16-source/firmware-v1` and earlier locks also
    remain immutable.
    `source-lock.txt` for the
@@ -1403,7 +1416,7 @@ python3 scripts/tandem_release_evidence.py assemble \
   --stage final-qualification-policy \
   --archive-root /absolute/evidence/tandem-agc-v8-final \
   --parent-index /absolute/evidence/tandem-agc-v8-final/final-artifact-index.json \
-  --candidate-qualified-index /absolute/evidence/tandem-agc-v8-final/lineage/rc17/campaign-index.json \
+  --candidate-qualified-index /absolute/evidence/tandem-agc-v8-final/lineage/rc18/campaign-index.json \
   --diff /absolute/evidence/tandem-agc-v8-final/candidate-to-final-diff.json \
   --output /absolute/evidence/tandem-agc-v8-final/final-qualification-policy.json
 python3 scripts/tandem_release_evidence.py verify \
@@ -1411,7 +1424,7 @@ python3 scripts/tandem_release_evidence.py verify \
   --index /absolute/evidence/tandem-agc-v8-final/final-qualification-policy.json
 ```
 
-   Copy the complete immutable RC17 archive beneath `lineage/rc17/`; copying only
+   Copy the complete immutable RC18 archive beneath `lineage/rc18/`; copying only
    its campaign index is insufficient because recursive verification rehashes
    its parent artifact, reports, receipts, and raw members.
 6. Repeat the full A7/A8 campaign on the final bytes. Pass
@@ -1667,7 +1680,7 @@ Persistent rollout is distinct from publishing the release and is blocked until
 the exact-serial persistent installer/receipt work in P2-3 is implemented and
 reviewed in `pluto-plus-utils`. Its existing `pluto firmware flash` lifecycle is
 the device-operation owner to extend with the published-release/index binding
-and exact persistent-install receipt; the RC17 `candidate-ram` lifecycle must
+and exact persistent-install receipt; the RC18 `candidate-ram` lifecycle must
 not be repurposed to authorize a QSPI write. Until that release adapter exists,
 [flashing.md](flashing.md) is suitable only as a manual procedure with exactly
 one isolated radio; it is not an auditable fleet rollout.
@@ -2020,7 +2033,7 @@ gate.
 
 ### 6.1 Testing pyramid
 
-The table below is the RC17 requirement using capabilities that exist now or are
+The table below is the RC18 requirement using capabilities that exist now or are
 explicit P0 deliverables in A1. Post-v8 generated-file and formal checks become
 mandatory only when B3/B4 land; they do not retroactively block v8.
 
@@ -2092,14 +2105,14 @@ waiver records. The final archive follows the same pattern with
 outputs are preserved under their real names rather than renamed:
 
 ```text
-tandem-agc-v8-rc17/
+tandem-agc-v8-rc18/
   candidate-index-input.json
   candidate-index.json
   candidate-index.json.sha256
   campaign-index.json
   campaign-index.json.sha256
   source/
-    tandem-agc-v8-rc17-source.yaml
+    tandem-agc-v8-rc18-source.yaml
   evidence/
     source-lock.txt
     source-and-tool-hashes.txt
@@ -2148,7 +2161,7 @@ tandem-agc-v8-rc17/
 For the final artifact, the canonical archived source path is
 `source/tandem-agc-v8-source.yaml`, and the same descriptor shape is stored as
 `final-index-input.json`. The final root additionally retains
-`lineage/rc17/{candidate-index,campaign-index,...their complete members...}`,
+`lineage/rc18/{candidate-index,campaign-index,...their complete members...}`,
 `candidate-to-final-diff.json`, `final-artifact-index.json`,
 `final-qualification-policy.json`, `final-qualification-index.json`, the exact
 four-radio selected final evidence, local annotated-tag record,
@@ -2195,7 +2208,7 @@ pass.
 
 | Risk | Consequence | Control |
 |---|---|---|
-| Broad refactor mixed into RC17 | Release evidence reset and schedule expansion | Retain RC16 firmware behavior, packaging, paired selector, topology resolver, route/identity/safety checks; change only the release-schema/live-buffer-ABI bridge and lineage, and defer architecture work until after v8 |
+| Broad refactor mixed into RC18 | Release evidence reset and schedule expansion | Retain RC16 firmware behavior, packaging, paired selector, topology resolver, route/identity/safety checks; change only the release-schema/live-buffer-ABI bridge and lineage, and defer architecture work until after v8 |
 | RC4 evidence reused | Unqualified post-RC4 RTL ships | New source lock, route, artifact, and four-radio campaign |
 | Wrong version baked into image | Fleet audit reports previous release | Explicit `RELEASE_VERSION`; package-time exact check; read packed `/opt/VERSIONS` |
 | Workflow branch falls through to wrong manifest | Trusted build uses unrelated source graph | Test allowlist, manifest, and package prefix as one mapping |
@@ -2219,9 +2232,9 @@ pass.
 
 ## 10. Suggested issue breakdown and order
 
-### Must complete for RC17/v8
+### Must complete for RC18/v8
 
-- **P0-1 — RC16 indexed build and safe RAM transition complete; RC17 ABI bridge correction implemented.**
+- **P0-1 — RC16 indexed build and safe RAM transition complete; RC18 ABI bridge correction implemented.**
   RC12 proved full fit, route, timing, integrated validation, deterministic
   packaging, candidate indexing, route isolation, paired DFU selection, and
   unique serialless-b674 topology resolution. Its second guarded execute
@@ -2237,34 +2250,34 @@ pass.
   but its plan bridge confused the v5 release frame schema with the live v2 IIO
   buffer ABI and therefore published only an unknown receipt. QSPI was unchanged,
   the final state was safe, and the route was removed.
-  RC17 preserves all firmware/package/selector/identity/QSPI/safety
+  RC18 preserves all firmware/package/selector/identity/QSPI/safety
   behavior and makes exact pushed `pluto-plus-utils` commit
   `2654f34eb909904ec65bc0526e0f8977cb30e2ed` the sole live device operator.
-  Every build gate must replay on the RC17 commit.
-- **P0-2 — Completed before RC17: generalize candidate lineage.** Muted lifecycle
+  Every build gate must replay on the RC18 commit.
+- **P0-2 — Completed before RC18: generalize candidate lineage.** Muted lifecycle
   qualification consumes validated manifest/receipt inputs instead of RC4/R18
-  constants; RC17 updates the exact identity fixtures.
-- **P0-3 — Completed on RC6; mandatory replay on RC17: lock deterministic
+  constants; RC18 updates the exact identity fixtures.
+- **P0-3 — Completed on RC6; mandatory replay on RC18: lock deterministic
   shared-dwell/stale-latch RTL proof.** Keep the re-arm, one-pulse-per-episode,
   bounded-clear, HOLD, and failure cases mandatory at
   both supported clock ratios. Add direct increase/conflict/re-arm class-change
   regressions proving no dwell credit transfers. Retain the BLOCKED hardware
   observer only as an optional diagnostic.
-- **P0-4 — Native utility lifecycle corrected; RC17 live use pending:
+- **P0-4 — Native utility lifecycle corrected; RC18 live use pending:
   topology-bound RAM deployment.** `pluto-plus-utils` uses paired
   `0456:b673,0456:b674` for both `-D` and `-e` and
   authorizes no `-S`, `-R`, or persistent-write path. Execution and the
   original utility receipt remains bound to the selected serial, exact commands,
   candidate bytes, new boot identity, unchanged persistent-flash digest,
   verified safe state, exact host-route lease, and verified route release.
-- **P0-5 — Implemented; qualification pending: prepare the RC17 source graph and
-  trusted route.** Add the RC17 manifest, source-graph checks, immutable version
+- **P0-5 — Implemented; qualification pending: prepare the RC18 source graph and
+  trusted route.** Add the RC18 manifest, source-graph checks, immutable version
   name, tested workflow
   allowlist, manifest mapping, package prefix, fail-closed integrated report
   policy, release-wide evidence verifier, and executable final-identity
   confirmation gate.
 - **P0-6 — Freeze and qualify the exact source.** Run the complete offline suite
-  and clean routed OOC, then create/protect the RC17 firmware source lock without
+  and clean routed OOC, then create/protect the RC18 firmware source lock without
   changing the commit.
 - **P0-7 — Build and route exact bytes.** Exercise route, timing, unconstrained
   paths, CDC, skew, DRC, methodology, utilization, warning, and DCP gates.
@@ -2322,7 +2335,7 @@ P0-1 with a new candidate identity.
 
 The release is complete only when all of the following are true:
 
-- the exact source is clean, reviewed, committed, and protected by a new RC17
+- the exact source is clean, reviewed, committed, and protected by a new RC18
   source lock;
 - offline, RTL, source-graph, kernel, and candidate-specific harness gates pass;
 - fresh OOC and full integrated Pluto implementations pass their correctly

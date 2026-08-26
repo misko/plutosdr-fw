@@ -164,11 +164,18 @@ publication failed because the bridge compared release/evidence schema
 `frame-metadata-v5` to the correctly observed IIO buffer ABI
 `frame-metadata-v2`. The route was released and no persistent write occurred.
 
-The forward-only RC17 route uses branch
-`codex/firmware-tandem-agc-v8-rc17`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc17`, and source lock
-`refs/tags/tandem-agc-v8-rc17-source/firmware-v1`; it does not move or reuse
-RC12 through RC16's branch, source lock, artifact, or evidence index. RC17 pins
+RC17 locked exact commit `f74d082e789564f0adc81c62b82e924e3e913eb1`,
+passed trusted run `33006829961`, produced candidate index
+`25b9f0b33fae40ebc1c09cb4f27051e1664d9ec85d6929de2903f765427b74cc`,
+and completed safe RAM deployment plus lifecycle on all four radios. Its first
+full campaign stopped before USB because host-libiio replay compared the
+firmware wrapper against the separate libiio repository.
+
+The forward-only RC18 route uses branch
+`codex/firmware-tandem-agc-v8-rc18`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc18`, and source lock
+`refs/tags/tandem-agc-v8-rc18-source/firmware-v1`; it does not move or reuse
+RC12 through RC17's branch, source lock, artifact, or evidence index. RC18 pins
 `pluto-plus-utils` commit
 `2654f34eb909904ec65bc0526e0f8977cb30e2ed` as the sole live device operator.
 The firmware repository produces the private candidate plan and validates the
@@ -224,7 +231,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC17 workflow has no separate attestation job. An operator may capture GitHub
+The RC18 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

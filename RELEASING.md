@@ -215,7 +215,15 @@ SHA-256 is
 The `/32` route was removed. RC16 has one observed safe RAM deployment, zero
 valid passing receipts, no persistent write, and is not hardware-qualified.
 
-The active candidate is RC17. It retains RC16's firmware implementation,
+RC17 locked `f74d082e789564f0adc81c62b82e924e3e913eb1`, passed trusted
+run `33006829961`, and produced candidate index
+`25b9f0b33fae40ebc1c09cb4f27051e1664d9ec85d6929de2903f765427b74cc`.
+All four radios passed RAM-only deployment and the muted metadata lifecycle.
+The first full comparison stopped before USB because durable host-libiio replay
+resolved the firmware wrapper beneath the distinct libiio repository. RC17 has
+no full or soak result and is not hardware-qualified.
+
+The active candidate is RC18. It retains RC17's firmware implementation,
 external source graph, deterministic package, topology-bound serialless-b674
 resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
 route, IIO/model/runtime checks, QSPI equality requirement, and safe-state
@@ -230,7 +238,7 @@ with password-only SSH and host-key files disabled. Exact topology remains
 mandatory; nonempty serial mismatch, ambiguity, wrong VID/PID, serialless b673,
 `-S`, `-R`, persistent targets, and returned-runtime mismatch remain forbidden
 or fail closed. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc17-source/firmware-v1`. The later
+`refs/tags/tandem-agc-v8-rc18-source/firmware-v1`. The later
 final build uses the different exact lock
 `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
 reject a cross-stage substitution of those refs.
@@ -240,7 +248,7 @@ The remaining gates, in order, are:
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC17 firmware source lock and explicit trusted build route.
+2. Create the exact RC18 firmware source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
