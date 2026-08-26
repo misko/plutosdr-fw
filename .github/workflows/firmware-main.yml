@@ -11,13 +11,13 @@ on:
       release_version:
         description: >-
           Exact device-fw string to stamp into /opt/VERSIONS, e.g.
-          v0.38-plutoplus-spf-gain-series-v4. Protected RC5 and final-main
-          dispatches require their exact declared identities. Ordinary main
-          push builds derive the string from `git describe`; the release tag
-          does not exist while a release build runs, so that derived value must
-          never authorize publication. RC17 shipped stamped rc16-7 for exactly
-          this reason. The build fails if the packaged string does not match
-          what is entered here.
+          v0.38-plutoplus-spf-gain-series-v4. Protected tandem candidates and
+          final-main dispatches require their exact declared identities.
+          Ordinary main push builds derive the string from `git describe`; the
+          release tag does not exist while a release build runs, so that
+          derived value must never authorize publication. RC17 shipped stamped
+          rc16-7 for exactly this reason. The build fails if the packaged
+          string does not match what is entered here.
         required: false
         type: string
         default: ''
@@ -39,6 +39,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' ||
@@ -54,6 +55,8 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'tandem-agc-v8-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6' &&
+          'tandem-agc-v8-rc6-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' &&
           'tandem-agc-v8-rc5-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' &&
@@ -70,6 +73,8 @@ jobs:
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-tandem-agc-v8' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6' &&
+          'plutoplus-spf-tandem-agc-v8-rc6' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' &&
           'plutoplus-spf-tandem-agc-v8-rc5' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' &&
@@ -87,9 +92,6 @@ jobs:
         ${{ github.ref == 'refs/heads/main' &&
           github.event_name == 'workflow_dispatch' && 'final-release' ||
           github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
-    outputs:
-      artifact-name: ${{ steps.names.outputs.artifact_name }}
-      bundle-name: ${{ steps.build.outputs.bundle_name }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -111,7 +113,15 @@ jobs:
         run: |
           echo "artifact_name=plutoplus-main-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
 
-      - name: Require the exact protected candidate identity
+      - name: Require the exact protected RC6 candidate identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc6'
+
+      - name: Require the exact protected RC5 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5'
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
@@ -196,29 +206,3 @@ jobs:
             echo "- device-fw: \`${PACKED_VERSION:-unknown}\`"
             echo '- Status: offline validated; hardware untested'
           } >> "$GITHUB_STEP_SUMMARY"
-
-  attest:
-    name: verify and attest deployment bundle
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      attestations: write
-      contents: read
-      id-token: write
-    steps:
-      - name: Download the exact Kalman artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ${{ needs.build.outputs.artifact-name }}
-          path: downloaded
-      - name: Verify the downloaded bundle
-        run: |
-          cd downloaded
-          checksum=$(find . -maxdepth 1 -type f -name '*.tar.gz.sha256' -print -quit)
-          test -n "$checksum"
-          sha256sum -c "$checksum"
-      - name: Attest build provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
-        with:
-          subject-path: downloaded/${{ needs.build.outputs.bundle-name }}

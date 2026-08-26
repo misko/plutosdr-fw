@@ -19,12 +19,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "tandem_release_evidence.py"
 COMMIT = "1" * 40
 FINAL_COMMIT = "2" * 40
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc5"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc6"
 FINAL_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
 RUN_ID = 123456
 RUN_ATTEMPT = 1
 LIBIIO_COMMIT = "d" * 40
-PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc5-111111111111"
+PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc6-111111111111"
 SOURCE_MANIFEST_PAYLOAD = b"""schema: plutosdr-fw.source-manifest
 schema_version: 1
 release_state: candidate
@@ -66,6 +66,11 @@ _STAGE_INEXACT_SOURCE_LOCK_CASES = (
         "candidate-pre-hardware",
         "refs/tags/tandem-agc-v8-rc99-source/firmware-v1",
         id="candidate-uses-rc99-lock",
+    ),
+    pytest.param(
+        "candidate-pre-hardware",
+        "refs/tags/tandem-agc-v8-rc5-source/firmware-v1",
+        id="candidate-uses-burned-rc5-lock",
     ),
     pytest.param(
         "candidate-pre-hardware",
@@ -228,7 +233,7 @@ def _fixture(
 ) -> tuple[Path, Path]:
     is_candidate = stage == "candidate-pre-hardware"
     manifest_name = (
-        "tandem-agc-v8-rc5-source.yaml" if is_candidate else "tandem-agc-v8-source.yaml"
+        "tandem-agc-v8-rc6-source.yaml" if is_candidate else "tandem-agc-v8-source.yaml"
     )
     if source_lock_ref is None:
         source_lock_ref = (
@@ -237,7 +242,7 @@ def _fixture(
             else EVIDENCE.FINAL_SOURCE_LOCK_REF
         )
     build_ref = (
-        "refs/heads/codex/firmware-tandem-agc-v8-rc5"
+        "refs/heads/codex/firmware-tandem-agc-v8-rc6"
         if is_candidate
         else "refs/heads/main"
     )
@@ -1046,7 +1051,7 @@ def _lineage_fixture(
         stage="candidate-pre-hardware",
     )
     _assemble_campaign(candidate_staging, monkeypatch, artifact_index=candidate)
-    candidate_root = root / "lineage" / "rc5"
+    candidate_root = root / "lineage" / "rc6"
     candidate_root.parent.mkdir(mode=0o755)
     candidate_staging.rename(candidate_root)
     candidate = candidate_root / "candidate-index.json"
@@ -1532,8 +1537,8 @@ def test_assemble_rejects_external_same_basename_source_manifest(
 @pytest.mark.parametrize(
     "version",
     [
-        "v0.41-plutoplus-spf-tandem-agc-v8-rc05",
-        "v0.41-plutoplus-spf-tandem-agc-v8-rc5-1-g1111111",
+        "v0.41-plutoplus-spf-tandem-agc-v8-rc06",
+        "v0.41-plutoplus-spf-tandem-agc-v8-rc6-1-g1111111",
     ],
 )
 def test_assemble_rejects_typo_or_git_describe_candidate_identity(
@@ -1541,7 +1546,7 @@ def test_assemble_rejects_typo_or_git_describe_candidate_identity(
 ) -> None:
     input_path, output = _fixture(tmp_path, version=version)
 
-    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC5"):
+    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC6"):
         EVIDENCE.assemble(
             archive_root=tmp_path,
             input_path=input_path,

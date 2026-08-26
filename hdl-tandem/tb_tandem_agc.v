@@ -295,8 +295,9 @@ module tb_tandem_agc;
                 "stale small-ADC recovery event carries SMALL_ADC_INHIBIT reason");
           check(core.req_dir == 2'd2,
                 "stale small-ADC recovery first moves gain in the safe direction");
-          check(core.event_index == idx0 - 8'd1,
-                "stale small-ADC recovery is exactly one index down");
+          check(core.evt_wdata[127:120] == idx0 - 8'd1 &&
+                core.evt_wdata[119:112] == idx0 - 8'd1,
+                "stale small-ADC event records one paired index down");
         end
       end
       check(saw_clear && cnt_trans == t0 + 32'd1,
@@ -334,8 +335,9 @@ module tb_tandem_agc;
           saw_recovery = 1'b1;
           check(core.evt_reason == 4'd3 && core.req_dir == 2'd1,
                 "first post-clear transition is an ordinary low-power increase");
-          check(core.event_index == idx0,
-                "first post-clear increase returns the pre-clear endpoint");
+          check(core.evt_wdata[127:120] == idx0 &&
+                core.evt_wdata[119:112] == idx0,
+                "post-clear event records the paired pre-clear endpoint");
         end
       end
       check(saw_recovery, "clean both-low dwell recovers after the clear edge");
@@ -776,6 +778,175 @@ module tb_tandem_agc;
       release model.samp_lp1;
       release model.samp_lp2;
       disable_tandem;
+    end
+
+    // -- 19. shared dwell timer never carries credit across evidence kinds --
+    // The implementation shares one counter between three mutually-exclusive
+    // proofs to save area.  Exercise direct kind changes on a power tick so a
+    // nearly mature ordinary/re-arm dwell can never shorten the safety dwell
+    // for a newly observed stale-latch conflict.
+    begin : shared_dwell_kind_transitions
+      reg [7:0] forced_det;
+      reg [7:0] t0;
+
+      cfg_cooldown = 8'd0;
+      cfg_dwell = 8'd3;
+      rx1_level = -16'sd60; rx2_level = -16'sd60;
+      enable_tandem(2'd2);
+      wait (!core.blanked && !cooldown_active && !core.pulse_pending);
+
+      // Nearly mature ordinary both-low evidence must be discarded when a
+      // small-ADC latch appears in the same power-measurement cycle.
+      forced_det = 8'h88;
+      force core.det_stable = forced_det;
+      force core.pwr_tick = 1'b1;
+      while (!(core.dwell_kind == 2'd1 &&
+               core.dwell_cnt == cfg_dwell - 8'd1)) begin
+        @(posedge l_clk); #1;
+      end
+      t0 = cnt_trans;
+      @(negedge l_clk); forced_det = 8'h99;
+      @(posedge l_clk); #1;
+      check(core.dwell_kind == 2'd2 && core.dwell_cnt == 8'd1 &&
+            core.small_latch_dwell_cnt == 8'd1 && cnt_trans == t0 &&
+            !core.evt_push && fault == 8'd0,
+            "normal-to-conflict starts a fresh tagged dwell at one");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == 8'd2 && cnt_trans == t0 && !core.evt_push,
+            "normal credit cannot satisfy the second conflict tick");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == cfg_dwell && cnt_trans == t0 && !core.evt_push,
+            "normal credit cannot satisfy the full conflict dwell");
+      @(posedge l_clk); #1;
+      check(core.evt_push && core.evt_reason == 4'd2 &&
+            cnt_trans == t0 + 8'd1,
+            "fresh conflict dwell alone authorizes the conservative edge");
+
+      release core.pwr_tick;
+      release core.det_stable;
+      mode_req = 2'd0; armed = 1'b0; tick(8);
+      l_resetn = 1'b0; tick(6); l_resetn = 1'b1; tick(8);
+
+      // The reverse boundary protects gain safety: stale-conflict history may
+      // not authorize an immediate increase when the latch disappears.  Make
+      // this switch between power ticks as an additional zero-seed boundary.
+      rx1_level = -16'sd60; rx2_level = -16'sd60;
+      enable_tandem(2'd2);
+      wait (!core.blanked && !cooldown_active && !core.pulse_pending);
+      forced_det = 8'h99;
+      force core.det_stable = forced_det;
+      force core.pwr_tick = 1'b1;
+      while (!(core.dwell_kind == 2'd2 &&
+               core.dwell_cnt == cfg_dwell - 8'd1)) begin
+        @(posedge l_clk); #1;
+      end
+      t0 = cnt_trans;
+      @(negedge l_clk);
+      forced_det = 8'h88;
+      release core.pwr_tick;
+      force core.pwr_tick = 1'b0;
+      @(posedge l_clk); #1;
+      check(core.dwell_kind == 2'd1 && core.dwell_cnt == 8'd0 &&
+            cnt_trans == t0 && !core.evt_push,
+            "conflict-to-normal between ticks seeds no increase credit");
+      @(negedge l_clk);
+      release core.pwr_tick;
+      force core.pwr_tick = 1'b1;
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == 8'd1 && cnt_trans == t0 && !core.evt_push,
+            "first fresh normal tick cannot reuse conflict credit");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == 8'd2 && cnt_trans == t0 && !core.evt_push,
+            "second fresh normal tick cannot reuse conflict credit");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == cfg_dwell && cnt_trans == t0 && !core.evt_push,
+            "third fresh normal tick matures without an early increase");
+      @(posedge l_clk); #1;
+      check(core.evt_push && core.evt_reason == 4'd3 &&
+            cnt_trans == t0 + 8'd1,
+            "only a full fresh normal dwell authorizes the increase");
+
+      release core.pwr_tick;
+      release core.det_stable;
+      mode_req = 2'd0; armed = 1'b0; tick(8);
+      l_resetn = 1'b0; tick(6); l_resetn = 1'b1; tick(8);
+
+      // A conflict can also disappear into the strong-signal evidence used to
+      // re-arm a consumed clear.  Its prior count must not shorten that proof.
+      rx1_level = -16'sd60; rx2_level = -16'sd60;
+      enable_tandem(2'd2);
+      wait (!core.blanked && !cooldown_active && !core.pulse_pending);
+      forced_det = 8'h99;
+      force core.det_stable = forced_det;
+      force core.pwr_tick = 1'b1;
+      force core.small_latch_clear_attempted = 1'b1;
+      force core.small_latch_rearm_pending = 1'b1;
+      while (!(core.dwell_kind == 2'd2 &&
+               core.dwell_cnt == cfg_dwell - 8'd1)) begin
+        @(posedge l_clk); #1;
+      end
+      t0 = cnt_trans;
+      @(negedge l_clk); forced_det = 8'h00;
+      @(posedge l_clk); #1;
+      check(core.dwell_kind == 2'd3 && core.dwell_cnt == 8'd1 &&
+            cnt_trans == t0 && fault == 8'd0 && !core.evt_push,
+            "conflict-to-rearm starts a fresh tagged dwell at one");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == 8'd2 && fault == 8'd0,
+            "conflict credit cannot satisfy the second re-arm tick");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == cfg_dwell && fault == 8'd0,
+            "conflict credit cannot mature re-arm early");
+      @(posedge l_clk); #1;
+      check(core.dwell_kind == 2'd0 && core.dwell_cnt == 8'd0 &&
+            cnt_trans == t0 && fault == 8'd0 && !core.evt_push,
+            "re-arm completes only after its own full fresh dwell");
+
+      release core.small_latch_clear_attempted;
+      release core.small_latch_rearm_pending;
+      release core.pwr_tick;
+      release core.det_stable;
+      mode_req = 2'd0; armed = 1'b0; tick(8);
+      l_resetn = 1'b0; tick(6); l_resetn = 1'b1; tick(8);
+
+      // Nearly mature re-arm evidence is particularly sensitive: carrying it
+      // into a conflict would make a consumed clear fault too early.  Hold the
+      // episode tokens only to isolate this counter-class boundary.
+      rx1_level = -16'sd60; rx2_level = -16'sd60;
+      enable_tandem(2'd2);
+      wait (!core.blanked && !cooldown_active && !core.pulse_pending);
+      forced_det = 8'h00;
+      force core.det_stable = forced_det;
+      force core.pwr_tick = 1'b1;
+      force core.small_latch_clear_attempted = 1'b1;
+      force core.small_latch_rearm_pending = 1'b1;
+      while (!(core.dwell_kind == 2'd3 &&
+               core.dwell_cnt == cfg_dwell - 8'd1)) begin
+        @(posedge l_clk); #1;
+      end
+      t0 = cnt_trans;
+      @(negedge l_clk); forced_det = 8'h99;
+      @(posedge l_clk); #1;
+      check(core.dwell_kind == 2'd2 && core.dwell_cnt == 8'd1 &&
+            cnt_trans == t0 && fault == 8'd0 && !core.evt_push,
+            "rearm-to-conflict starts a fresh tagged dwell at one");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == 8'd2 && fault == 8'd0,
+            "re-arm credit cannot satisfy the second conflict tick");
+      @(posedge l_clk); #1;
+      check(core.dwell_cnt == cfg_dwell && fault == 8'd0,
+            "re-arm credit cannot mature the conflict early");
+      @(posedge l_clk); #1;
+      check(fault == 8'h08 && cnt_trans == t0 && !core.evt_push,
+            "consumed conflict faults only after its own full fresh dwell");
+
+      release core.small_latch_clear_attempted;
+      release core.small_latch_rearm_pending;
+      release core.pwr_tick;
+      release core.det_stable;
+      mode_req = 2'd0; armed = 1'b0; tick(8);
+      l_resetn = 1'b0; tick(6); l_resetn = 1'b1; tick(8);
+      cfg_cooldown = 8'd2;
     end
 
     // ---- summary -----------------------------------------------------------

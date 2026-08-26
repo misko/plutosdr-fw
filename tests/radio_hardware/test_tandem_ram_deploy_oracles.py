@@ -25,7 +25,7 @@ from .candidate_binding import (
 
 SERIAL = "104473222a87000abc00123456789def"
 CURRENT_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc4"
-CANDIDATE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc5"
+CANDIDATE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc6"
 TOPOLOGY = "3-8"
 INTERFACE = "enx001122334455"
 ROOT = Path(__file__).resolve().parents[2]

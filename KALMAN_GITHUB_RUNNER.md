@@ -13,7 +13,10 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- Artifact attestation occurs in a separate GitHub-hosted job.
+- The RC6 trusted workflow ends after the build job uploads the exact deployment
+  bundle and its detached SHA-256 sidecar.
+- GitHub provenance attestation is optional operator-owned supporting metadata;
+  it is not a required workflow job and cannot authorize deployment.
 - Successful CI means offline validated and deployment-ready; it does not mean
   hardware-tested, QSPI-approved, or production-promoted.
 
@@ -60,8 +63,13 @@ allowed maintainer source-lock branch. It:
 4. rebuilds the FPGA using Vivado 2022.2;
 5. builds the DFU and validates its FIT, XSA, rootfs, gadget binaries, timing,
    bus skew, CDC report, legal page, and checksums;
-6. uploads a commit-addressed deployment bundle for 90 days; and
-7. downloads, verifies, and attests that bundle on a GitHub-hosted runner.
+6. uploads the commit-addressed deployment bundle and its detached checksum for
+   90 days.
+
+The RC6 workflow has no separate attestation job. An operator may capture GitHub
+provenance later as optional supporting metadata, but its presence or absence
+does not change the trusted build result and cannot replace source-lock,
+checksum, evidence-index, routed-design, or hardware checks.
 
 The workflow never flashes a radio and never connects to the QNAP.
 
@@ -112,15 +120,40 @@ rewriting an existing artifact or tag.
 ## Deployment handoff
 
 Download the Actions artifact named
-`plutoplus-main-<full-commit>-<run>-<attempt>`, verify the adjacent `.sha256`
-file, extract the bundle, and run `sha256sum -c SHA256SUMS` inside it. Then
-verify the GitHub attestation against the extracted `*.tar.gz` before using the
+`plutoplus-main-<full-commit>-<run>-<attempt>`. Require exactly one deployment
+bundle and its adjacent detached checksum, verify that sidecar, extract the
+bundle, and verify its complete inner `SHA256SUMS` inventory before using the
 DFU:
 
 ```bash
-gh attestation verify plutoplus-spf-*-<short-commit>.tar.gz \
-  --repo misko/plutosdr-fw
+set -euo pipefail
+shopt -s nullglob
+artifact_dir=/absolute/path/to/downloaded-artifact
+bundles=("$artifact_dir"/*.tar.gz)
+sidecars=("$artifact_dir"/*.tar.gz.sha256)
+test "${#bundles[@]}" -eq 1
+test "${#sidecars[@]}" -eq 1
+bundle=${bundles[0]}
+sidecar=${sidecars[0]}
+test "$sidecar" = "$bundle.sha256"
+(
+  cd "$artifact_dir"
+  sha256sum -c "$(basename "$sidecar")"
+)
+extracted=$(mktemp -d)
+tar -xzf "$bundle" -C "$extracted"
+(
+  cd "$extracted"
+  sha256sum -c SHA256SUMS
+)
 ```
+
+GitHub attestation is not required for this handoff. The v1 evidence archive
+still retains a supporting-attestation role: the normal single-owner route uses
+the exact `plutosdr-fw.github-attestation-not-performed.v1` record documented in
+the tandem release plan, while an operator may instead retain an optional
+captured GitHub-provenance record. Neither form replaces the checks above or
+grants hardware authority by itself.
 
 The hardware agent must RAM-boot and complete the promotion campaign before
 any QSPI or rover-production change.

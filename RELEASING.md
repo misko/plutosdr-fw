@@ -56,36 +56,46 @@ top-level RTL.
 
 RC4 is no longer promotable as the final v8 source. After its protected
 firmware source lock at `557a08749d9c0c34fe8096099b5be9d2b2a1b24f`, the
-release branch added stale-small-ADC-latch recovery. That is another top-level
-RTL change, so neither the RC4 source lock nor RC4 hardware evidence covers the
-current branch. The next image must be treated as a new candidate (RC5 unless a
-different name is deliberately chosen); never move or reuse the RC4 source
-lock.
+release branch added stale-small-ADC-latch recovery. RC5 locked that recovery
+at `af2e1821436996188fd32cc1cf8a0f8a41f31fc1`, but its trusted integrated
+build failed placement by 17 slices before producing an artifact. The RC5
+branch and `refs/tags/tandem-agc-v8-rc5-source/firmware-v1` are immutable failed
+history and must never move.
+
+The active candidate is RC6. It retains RC5 behavior while replacing the three
+mutually exclusive dwell counters with one eight-bit counter and an explicit
+two-bit qualification-class tag. Its exact candidate source lock is
+`refs/tags/tandem-agc-v8-rc6-source/firmware-v1`. The later final build uses the
+different exact lock `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and
+final evidence must reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create a new protected firmware source lock and an explicit trusted build
-   route for the new candidate. Keep RC4's external component pins only if the
-   source-graph checks prove they remain exact.
+2. Create the exact RC6 firmware source lock and explicit trusted build route.
+   Keep RC4/RC5's external component pins only if source-graph checks prove they
+   remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
    retain integrated timing, CDC, DRC, methodology, utilization, and build
    provenance. Block-level OOC evidence cannot replace this step.
 4. Build the candidate firmware with its exact `device-fw` string, verify the
-   attested artifact and packed component identities, and RAM-boot those exact
-   bytes on all four release-gate radios.
-5. Run the full release campaign, including the targeted stale-latch recovery,
-   muted metadata lifecycle, transient transport, signal-quality, teardown,
-   and cleanup gates. No RC4 result transfers across the new RTL.
+   indexed bundle, checksums, and packed component identities, and RAM-boot
+   those exact bytes on all four release-gate radios.
+5. Run the full external release campaign, including muted metadata lifecycle,
+   transient transport, signal quality, teardown, and cleanup. The internal
+   stale-small-ADC clear/re-arm property is qualified by deterministic RTL at
+   both supported clock ratios. Its release-image observer is optional,
+   deliberately emits only `BLOCKED`, and cannot authorize promotion.
 6. Only after the candidate passes, merge the exact qualified source to `main`,
-   build the final v8 identity, perform the confirmation pass described below,
-   then tag, publish, and write the immutable release manifest.
+   create `refs/tags/tandem-agc-v8-source/firmware-v1`, build the final v8
+   identity, repeat the full four-radio campaign, then tag, publish, and write
+   the immutable release manifest.
 
 Protected dependency source locks must exist before the build so CI can resolve
 and pack them. They are not release tags. Do not create the annotated
-candidate release tag until the exact attested artifact completes the full
+candidate release tag until the exact indexed bundle completes the full
 four-radio RAM qualification. Never move or reuse a failed source lock, an
 existing candidate lock, or a release tag.
 
@@ -96,21 +106,26 @@ existing candidate lock, or a release tag.
    exists. For the current tandem promotion the exact name is
    `v0.41-plutoplus-spf-tandem-agc-v8`.
 
-2. **Dispatch the build** from `main` with `release_version` set to the exact
-   name. Do not tag first — if the build or its testing fails you would have to
-   move a version tag, and tagging is not what makes the string correct.
+2. **Protect the final source and dispatch the build.** Create and push the
+   lightweight source lock `refs/tags/tandem-agc-v8-source/firmware-v1` at the
+   exact `main` commit, then dispatch `main` with `release_version` set to the
+   exact name. This source lock is not the annotated release tag. Do not create
+   the release tag first—if the build or testing fails, advance the source
+   commit rather than moving any existing ref.
 
 3. **Download and verify the Actions artifact.** No GitHub release exists yet;
    qualification must use the artifact from the exact workflow run in step 2,
    never `gh release download`. Record the intended 40-character `main` commit,
    the run ID, and the run attempt. Confirm that the run's `headSha` is that
-   commit, then verify the bundle sidecar, internal checksums, attestation, and
-   packed `/opt/VERSIONS`:
+   commit, then verify the bundle sidecar, internal checksums, and packed
+   `/opt/VERSIONS`:
 
-   ```sh
-   release_run_id=<run-id>
-   release_commit=<40-character-main-commit>
-   release_attempt=<attempt>
+   ```bash
+   set -euo pipefail
+   shopt -s nullglob
+   release_run_id='<run-id>'
+   release_commit='<40-character-main-commit>'
+   release_attempt='<attempt>'
    release_artifact="plutoplus-main-${release_commit}-${release_run_id}-${release_attempt}"
    release_work=$(mktemp -d)
 
@@ -118,6 +133,10 @@ existing candidate lock, or a release tag.
      --json headSha --jq .headSha)" = "$release_commit"
    gh run download "$release_run_id" --repo misko/plutosdr-fw \
      --name "$release_artifact" --dir "$release_work"
+   release_bundles=("$release_work"/*.tar.gz)
+   test "${#release_bundles[@]}" -eq 1
+   release_bundle=${release_bundles[0]}
+   release_bundle_sha=$(sha256sum "$release_bundle" | awk '{print $1}')
    (
      cd "$release_work"
      sha256sum -c ./*.tar.gz.sha256
@@ -130,25 +149,36 @@ existing candidate lock, or a release tag.
      gzip -dc ../*-rootfs.cpio.gz | cpio -idm --quiet opt/VERSIONS
      cat opt/VERSIONS
    )
-   gh attestation verify "$release_work"/*.tar.gz \
-     --repo misko/plutosdr-fw
+   jq -n --arg repository misko/plutosdr-fw \
+     --arg head_sha "$release_commit" \
+     --argjson run_id "$release_run_id" \
+     --argjson run_attempt "$release_attempt" \
+     --arg bundle "$(basename "$release_bundle")" \
+     --arg bundle_sha "$release_bundle_sha" \
+     '{schema:"plutosdr-fw.github-attestation-not-performed.v1",
+       repository:$repository,head_sha:$head_sha,run_id:$run_id,
+       run_attempt:$run_attempt,bundle_sha256:$bundle_sha,
+       subject:{name:$bundle,sha256:$bundle_sha},
+       verification_performed:false,
+       reason:"single-owner-operator-trust-model"}' \
+     > "$release_work/attestation-verification.json"
    ```
 
    The printed `device-fw` must equal the requested release name. The four
    packed component identities must equal the `versions_*` values in the source
-   manifest.
+   manifest. The exact not-performed record preserves the v1 evidence role
+   without making a cryptographic claim. An operator may capture GitHub
+   provenance as optional supporting metadata, but it cannot gate the build or
+   replace any source-lock, checksum, routed, or hardware check.
 
-4. **Hardware-qualify these exact bytes.** A rebuild for the name change is
-   byte-different from the RC that was qualified, so the RC's campaign does not
-   transfer literally. When the only delta from a fully qualified RC is the
-   version string, a confirmation pass — boot, TX2 loopback on every
-   release-gate radio, and one protocol-v3 stream run — covers the real risk,
-   which is build-environment drift. The post-RC4 candidate is not such a
-   candidate: it carries the stale-small-ADC-latch recovery in addition to
-   RC3's Linux cleanup, libiio batch transport, and request/pulse correction,
-   so it requires the full campaign before merge. Only the subsequent final
-   build may use the reduced confirmation pass if its sole functional delta
-   from the newly qualified candidate is the stamped version.
+4. **Hardware-qualify these exact bytes with the full campaign.** A rebuild for
+   the final name is byte-different from the qualified RC, so the RC campaign
+   does not transfer literally. The repository has no guarded reduced-
+   confirmation runner or durable reduced verdict. Tandem v8 therefore repeats
+   the complete four-radio RAM deployment, full/soak/lifecycle matrix, cleanup,
+   and evidence-index assembly on the final bytes. A future release may use a
+   reduced confirmation only after implementing and testing that executable
+   gate.
 
 5. **Tag, annotated, on the built commit.** Annotated, not lightweight: `rc16`
    is lightweight and `rc17` is not, and the inconsistency is worth ending.

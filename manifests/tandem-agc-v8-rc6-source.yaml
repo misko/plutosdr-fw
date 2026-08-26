@@ -1,13 +1,10 @@
-# Immutable source graph for the final tandem AGC v8 build.
-#
-# The external component graph remains identical across RC4, RC5, and RC6, but
-# the tracked top-level firmware does not. RC5 added post-RC4
-# stale-small-ADC-latch recovery; RC6 retains that behavior while sharing the
-# mutually exclusive dwell storage behind an explicit qualification-class tag.
-# RC6 must pass its newly locked candidate build and full hardware qualification
-# before this final graph is used. The subsequent final build may change only
-# the top-level release identity and packaging, while requiring exact component
-# identities in packed /opt/VERSIONS.
+# Immutable source graph for the forward-only tandem AGC v8 RC6 candidate.
+# RC6 retains RC5's stale-small-ADC-latch recovery while replacing three
+# mutually exclusive dwell timers with one class-tagged timer so qualification
+# credit cannot cross between increase, conflict, and re-arm evidence. External
+# component pins remain byte-identical to RC4 and RC5; the separately protected
+# firmware source lock binds the final reviewed firmware commit after all
+# candidate tooling and offline gates pass.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1

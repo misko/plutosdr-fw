@@ -23,7 +23,8 @@
 | **`tandem-agc-v7`** | 2026-08-19 | **current hardware-qualified** | paired RX1/RX2 AGC, ABI-2 metadata control, synchronous close, and four-board persistent qualification |
 | `tandem-agc-v8-rc1` | 2026-08-21 | **hardware-qualified persistent prerelease** | device-side cached AD9361 temperature in each fresh metadata frame |
 | `tandem-agc-v8-rc2` – `rc4` | 2026-08-22 – 2026-08-25 | superseded candidates | bounded batch lifecycle, Linux cleanup, and corrected request/pulse handoff; RC4 was invalidated by the later stale-small-ADC recovery change |
-| `tandem-agc-v8-rc5` | 2026-08-26 | **development; no release artifact** | forward-only candidate route and exact-byte build/deploy/evidence gates for the post-RC4 RTL |
+| `tandem-agc-v8-rc5` | 2026-08-26 | **rejected; no release artifact** | complete candidate route reached the trusted build, but integrated placement was 17 slices over the available device capacity |
+| `tandem-agc-v8-rc6` | 2026-08-26 | **development; no release artifact** | preserves RC5 behavior while sharing mutually exclusive dwell storage with an explicit qualification-class tag |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -32,40 +33,74 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc5 — 2026-08-26 — **development; not hardware-authorized**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc6 — 2026-08-26 — **development; not hardware-authorized**
 
-RC5 is the forward-only candidate for the stale-small-ADC-latch recovery added
-after RC4. RC4's protected source lock, routed build, artifact, and hardware
-reports therefore cannot authorize the current RTL and will not be moved or
-relabelled.
+RC6 is the forward-only candidate after RC5's integrated placement failure. It
+keeps RC5's stale-small-ADC-latch recovery and external source graph, but
+replaces three mutually exclusive eight-bit dwell counters with one shared
+eight-bit counter and a two-bit qualification-class tag. A two-bit binary token
+replaces the former stale-latch episode booleans, and the redundant eight-bit
+`event_index` shadow is removed. Only the wide `pwr_div` and `evt_seq`
+accumulators carry `use_dsp = "yes"`. The tag prevents ordinary increase,
+stale-conflict, and re-arm qualification from inheriting one another's partial
+dwell credit when the live evidence class changes.
 
-The release route now has an RC5 source manifest plus owner-only build mapping,
-an exact candidate/evidence index, a guarded exact-serial RAM deployer, and
-candidate-bound release and muted-64-frame lifecycle harnesses. The trusted
-package regenerates timing, route, DRC, methodology, CDC, bus-skew, and
-utilization reports from the packaged routed DCP and checks their complete
-inventory and reviewed resource ceilings against a committed policy. It also
-builds, verifies, checksums, and attests a
-`pluto.frm` whose FIT bytes must exactly match the candidate DFU. The final
-release verifier no longer treats a missing `dfu-suffix` tool as a successful
-skipped check.
+All current HDL benches pass at both supported clock ratios. A diagnostic
+full-design capacity run using the exact RC4 top-level design with only the
+retained RC6 core replacement placed 4,399 of 4,400 slices, used 74 of 80 DSPs,
+and routed all 32,908 nets with no routing errors. Global timing closed at WNS
+`+0.645 ns` and WHS `+0.022 ns`; the worst paths were outside the tandem block.
+DSP-local setup/hold margins were `+12.444 ns`/`+0.248 ns` for `evt_seq` and
+`+9.028 ns`/`+0.949 ns` for `pwr_div`. These results are diagnostic and
+non-authorizing: they de-risk RC5's capacity failure but do not replace a clean
+committed RC6 offline/OOC run or the trusted source-locked RC6 integrated build.
+
+RC6 has its own manifest, trusted workflow mapping, artifact namespace,
+firmware identity, and required source lock
+`refs/tags/tandem-agc-v8-rc6-source/firmware-v1`. The RC5 branch/tag remain
+immutable and are not moved to RC6. RC6 must pass direct class-transition RTL
+regressions at both supported clock ratios, a clean commit-bound routed OOC
+gate, and a fresh fully integrated build before any radio deployment. No RC6
+DFU has been built or deployed as of this entry.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc5 — 2026-08-26 — **rejected; integrated placement failed**
+
+RC5 was the first forward-only candidate for the stale-small-ADC-latch recovery
+added after RC4. RC4's protected source lock, routed build, artifact, and
+hardware reports could not authorize that RTL and were not moved or relabelled.
+
+RC5 introduced a source manifest, owner-only build mapping, exact evidence-index
+tooling, a guarded exact-serial RAM deployer, and candidate-bound release and
+muted-64-frame lifecycle harnesses. The trusted package regenerates timing,
+route, DRC, methodology, CDC, bus-skew, and utilization reports from the
+packaged routed DCP and checks their complete inventory and reviewed resource
+ceilings against a committed policy. After a successful integrated route, it
+would also build, verify, and checksum a `pluto.frm` whose FIT bytes exactly
+match the candidate DFU. The final release verifier no longer treats a missing
+`dfu-suffix` tool as a successful skipped check.
 The RAM receipt additionally requires equal pre/post SHA-256 readback of the
 exact `qspi-linux` `/dev/mtdblock3` partition, so a candidate transition cannot
 claim unchanged persistent firmware from command intent alone.
 
-Earlier scoped OOC evidence for firmware commit `2d15b897e` validates at WNS
-`+3.765 ns` and WHS `+0.079 ns`, with zero failing endpoints. That evidence is
-explicitly nonauthorizing for firmware and predates the final RC5 tooling
-commit, so clean OOC and integrated routes must be rerun on the eventual
-protected RC5 source lock.
+The final RC5 source commit and immutable source lock resolve to
+`af2e1821436996188fd32cc1cf8a0f8a41f31fc1`. Its full hardware-free gate passed
+1,093 tests with five hardware tests explicitly deselected, and its clean
+commit-bound routed OOC implementation passed at WNS `+3.765 ns` and WHS
+`+0.079 ns`, with zero failing endpoints. Trusted Actions run `32933327011`,
+attempt 1, accepted the exact RC5 identity and source graph, but the integrated
+Vivado build failed placement before artifact upload: 2,357 remaining instances
+needed the 2,340 slices available after fixed and macro placement, a 17-slice
+shortfall. RC4 had already occupied 4,399 of the device's 4,400 slices, so the
+failure is retained as a genuine device-capacity result.
 
-No RC5 DFU has been built, deployed, or tested on radio hardware as of this
-entry, and no QSPI write is authorized. The current exact-release ABI does not
-expose enough internal detector/latch state for a deterministic stale-latch RF
-test without adding release-only debug interfaces. RC5 therefore uses the
-deterministic RTL suite at both clock ratios as the authority for that internal
-FSM and keeps the guarded `BLOCKED` observer as optional diagnostic evidence.
-Hardware promotion still requires the complete external paired-behavior,
+No RC5 DFU, deployment bundle, or candidate evidence index was produced,
+deployed, or tested on radio hardware, and no QSPI write was authorized. The
+current exact-release ABI does not expose enough internal detector/latch state
+for a deterministic stale-latch RF test without adding release-only debug
+interfaces. RC5's internal FSM qualification therefore relied on the
+deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
+optional diagnostic evidence only. RC5 stopped at integrated placement. The
+active RC6 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

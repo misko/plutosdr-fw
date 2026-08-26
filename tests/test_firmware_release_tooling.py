@@ -56,6 +56,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     assert "tandem-agc-v8-rc5-source.yaml:*" in package
+    assert "tandem-agc-v8-rc6-source.yaml:*" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -97,6 +98,7 @@ def test_pr_workflow_uses_the_shared_offline_entry_point() -> None:
         "tests/radio_hardware",
         "./hdl-tandem/run_tests.sh",
         "manifests/tandem-agc-v8-rc5-source.yaml",
+        "manifests/tandem-agc-v8-rc6-source.yaml",
         "./scripts/test_legal_info_network.sh",
     ):
         assert required in checker

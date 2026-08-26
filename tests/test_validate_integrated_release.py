@@ -392,10 +392,14 @@ def test_symlink_report_is_rejected(tmp_path: Path) -> None:
         VALIDATOR.run(args)
 
 
-def test_rc5_and_final_packaging_cannot_bypass_integrated_gate() -> None:
+def test_rc5_rc6_and_final_packaging_cannot_bypass_integrated_gate() -> None:
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     assert (
-        package.count("tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-source.yaml") == 1
+        package.count(
+            "tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | "
+            "tandem-agc-v8-source.yaml"
+        )
+        == 1
     )
     assert package.count("python3 scripts/validate_integrated_release.py") == 1
     assert (

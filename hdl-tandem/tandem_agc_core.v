@@ -165,7 +165,10 @@ module tandem_agc_core #(
   // ---------------------------------------------------------------------------
   // power-measurement tick, D-10
   // ---------------------------------------------------------------------------
-  reg [19:0] pwr_div;
+  // The XC7Z010 image is slice-limited but has spare DSP48s.  Keep this wide
+  // accumulator in a DSP so a release build does not depend on a five-slice
+  // fabric carry chain at the device's placement limit.
+  (* use_dsp = "yes" *) reg [19:0] pwr_div;
   reg        pwr_tick;
   always @(posedge l_clk) begin
     if (!l_resetn) begin
@@ -246,21 +249,39 @@ module tandem_agc_core #(
   // stale latch left by an earlier strong signal, not a current overload.
   wire small_latch_conflict = both_lp && inhibit && !want_decrease;
 
-  reg [7:0] cooldown_cnt, dwell_cnt, small_latch_dwell_cnt;
-  reg [7:0] small_latch_rearm_dwell_cnt;
-  reg       small_latch_clear_attempted;
-  reg       small_latch_rearm_pending;
+  // Increase, stale-latch-clear, and re-arm evidence are mutually exclusive:
+  // they require both-low/no-small, both-low/small, and neither-low
+  // respectively.  One saturating timer is therefore sufficient for all
+  // three proofs.  Sharing it avoids three parallel counters/comparators in
+  // the already dense Zynq-7010 design without weakening any dwell boundary.
+  reg [7:0] cooldown_cnt, dwell_cnt;
+  localparam DWELL_NONE     = 2'd0;
+  localparam DWELL_INCREASE = 2'd1;
+  localparam DWELL_CONFLICT = 2'd2;
+  localparam DWELL_REARM    = 2'd3;
+  reg [1:0] dwell_kind;
+  localparam EPISODE_READY    = 2'b00;
+  localparam EPISODE_CONSUMED = 2'b10;
+  localparam EPISODE_REARM    = 2'b11;
+  // These three states are the only legal combinations of the former two
+  // episode booleans.  Updating one token keeps their invariant structural and
+  // gives both state bits the same enable/reset behavior for denser packing.
+  reg [1:0] small_latch_episode;
+  wire small_latch_clear_attempted = small_latch_episode[1];
+  wire small_latch_rearm_pending = small_latch_episode[0];
   wire cooldown_active = (cooldown_cnt != 8'd0);
 
   reg [7:0]  expected_index;
   wire at_min = (expected_index <= cfg_idx_min);
   wire at_max = (expected_index >= cfg_idx_max);
 
-  // 16 bits is ample for diagnostics and halves the flip-flops these cost
+  // Eight bits is ample for diagnostics and bounds the flip-flops these cost
   // both here and in the status crossing.
   reg [7:0] cnt_trans, cnt_inhib, cnt_clamp, cnt_stale;
-  reg [31:0] evt_seq;
-  reg [7:0]  event_index;
+  // This monotonic ABI counter is another natural DSP accumulator.  Mapping it
+  // explicitly leaves the event format unchanged while removing its eight
+  // fabric carry-chain slices from the full XC7Z010 image.
+  (* use_dsp = "yes" *) reg [31:0] evt_seq;
   reg [3:0]  evt_reason;
   reg        evt_push;
 
@@ -273,15 +294,30 @@ module tandem_agc_core #(
   wire may_decide = (state == ST_ACTIVE) && (mode_req == 2'd2)
                     && !blanked && !cooldown_active && !pulse_pending
                     && (fault == 8'd0);
+  wire small_latch_rearm_evidence = small_latch_clear_attempted
+                                  && small_latch_rearm_pending
+                                  && !ch1_lp && !ch2_lp && !want_decrease;
+  wire [1:0] dwell_kind_live = small_latch_conflict ? DWELL_CONFLICT :
+                               small_latch_rearm_evidence ? DWELL_REARM :
+                               (both_lp && !inhibit) ? DWELL_INCREASE :
+                               DWELL_NONE;
+  // Simulation-visible aliases keep each proof independently observable while
+  // synthesizing to the single shared counter used by the policy below.
+  wire [7:0] small_latch_dwell_cnt =
+      (small_latch_conflict && dwell_kind == DWELL_CONFLICT) ?
+      dwell_cnt : 8'd0;
+  wire [7:0] small_latch_rearm_dwell_cnt =
+      (small_latch_rearm_evidence && dwell_kind == DWELL_REARM) ?
+      dwell_cnt : 8'd0;
   wire small_latch_conflict_ready = small_latch_conflict
-                                  && (small_latch_dwell_cnt != 8'd0)
-                                  && (small_latch_dwell_cnt >= cfg_dwell);
+                                  && dwell_kind == DWELL_CONFLICT
+                                  && (dwell_cnt != 8'd0)
+                                  && (dwell_cnt >= cfg_dwell);
   wire small_latch_rearm_ready = may_decide
-                               && small_latch_clear_attempted
-                               && small_latch_rearm_pending
-                               && !ch1_lp && !ch2_lp && !want_decrease
-                               && (small_latch_rearm_dwell_cnt != 8'd0)
-                               && (small_latch_rearm_dwell_cnt >= cfg_dwell);
+                               && small_latch_rearm_evidence
+                               && dwell_kind == DWELL_REARM
+                               && (dwell_cnt != 8'd0)
+                               && (dwell_cnt >= cfg_dwell);
   wire small_latch_conflict_fatal = may_decide
                                   && small_latch_conflict_ready
                                   && (at_min || small_latch_clear_attempted);
@@ -289,23 +325,19 @@ module tandem_agc_core #(
   always @(posedge l_clk) begin
     if (!l_resetn) begin
       expected_index <= 8'd0; cooldown_cnt <= 8'd0; dwell_cnt <= 8'd0;
-      small_latch_dwell_cnt <= 8'd0;
-      small_latch_rearm_dwell_cnt <= 8'd0;
-      small_latch_clear_attempted <= 1'b0;
-      small_latch_rearm_pending <= 1'b0;
+      dwell_kind <= DWELL_NONE;
+      small_latch_episode <= EPISODE_READY;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
-      evt_seq <= 32'd0; event_index <= 8'd0;
+      evt_seq <= 32'd0;
       evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else if (fault_clear && state != ST_ACTIVE) begin
       expected_index <= cfg_idx_init;
       cooldown_cnt <= 8'd0; dwell_cnt <= 8'd0;
-      small_latch_dwell_cnt <= 8'd0;
-      small_latch_rearm_dwell_cnt <= 8'd0;
-      small_latch_clear_attempted <= 1'b0;
-      small_latch_rearm_pending <= 1'b0;
+      dwell_kind <= DWELL_NONE;
+      small_latch_episode <= EPISODE_READY;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
-      evt_seq <= 32'd0; event_index <= cfg_idx_init;
+      evt_seq <= 32'd0;
       evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else begin
@@ -316,11 +348,9 @@ module tandem_agc_core #(
       if (state == ST_ARMING) begin
         expected_index <= cfg_idx_init;
         dwell_cnt      <= 8'd0;
+        dwell_kind     <= DWELL_NONE;
         cooldown_cnt   <= 8'd0;
-        small_latch_dwell_cnt <= 8'd0;
-        small_latch_rearm_dwell_cnt <= 8'd0;
-        small_latch_clear_attempted <= 1'b0;
-        small_latch_rearm_pending <= 1'b0;
+        small_latch_episode <= EPISODE_READY;
       end
 
       // Cooldown advances on the power-measurement tick, D-10.
@@ -331,43 +361,23 @@ module tandem_agc_core #(
       // Dwell evidence is fresh only while a decision could otherwise be
       // accepted.  Pulse handoff, AD9361 blanking, cooldown, HOLD, and faults
       // all reset it; cfg_dwell=0 still requires one eligible power tick.
-      if (!may_decide) begin
+      if (!may_decide || dwell_kind_live == DWELL_NONE) begin
         dwell_cnt <= 8'd0;
-        small_latch_dwell_cnt <= 8'd0;
-        small_latch_rearm_dwell_cnt <= 8'd0;
-      end else begin
-        if (!both_lp || inhibit)
-          dwell_cnt <= 8'd0;
-        else if (pwr_tick)
-          dwell_cnt <= (dwell_cnt == 8'hFF) ? dwell_cnt : dwell_cnt + 8'd1;
-
-        // A stale small-ADC latch is acted on only after its own full,
-        // consecutive dwell.  Clean both-low history never credits this path.
-        if (!small_latch_conflict)
-          small_latch_dwell_cnt <= 8'd0;
-        else if (pwr_tick)
-          small_latch_dwell_cnt <= (small_latch_dwell_cnt == 8'hFF) ?
-                                   small_latch_dwell_cnt :
-                                   small_latch_dwell_cnt + 8'd1;
-
-        // A consumed clear can be re-armed only by a later ordinary large-
-        // overload decrease followed, after its pulse/guard/cooldown, by a
-        // separate full dwell with neither low-power bit asserted.  Further
-        // large decreases reset this proof window in the decision block.
-        if (!(small_latch_clear_attempted && small_latch_rearm_pending &&
-              !ch1_lp && !ch2_lp && !want_decrease))
-          small_latch_rearm_dwell_cnt <= 8'd0;
-        else if (pwr_tick)
-          small_latch_rearm_dwell_cnt <=
-              (small_latch_rearm_dwell_cnt == 8'hFF) ?
-              small_latch_rearm_dwell_cnt :
-              small_latch_rearm_dwell_cnt + 8'd1;
+        dwell_kind <= DWELL_NONE;
+      end else if (dwell_kind != dwell_kind_live) begin
+        // Detector classes can change directly on a power tick.  Tagging the
+        // shared counter prevents ordinary-increase or re-arm history from
+        // being mistaken for a mature stale-latch conflict (and vice versa).
+        dwell_kind <= dwell_kind_live;
+        dwell_cnt <= pwr_tick ? 8'd1 : 8'd0;
+      end else if (pwr_tick) begin
+        dwell_cnt <= (dwell_cnt == 8'hFF) ? dwell_cnt : dwell_cnt + 8'd1;
       end
 
       if (small_latch_rearm_ready) begin
-        small_latch_clear_attempted <= 1'b0;
-        small_latch_rearm_pending <= 1'b0;
-        small_latch_rearm_dwell_cnt <= 8'd0;
+        small_latch_episode <= EPISODE_READY;
+        dwell_cnt <= 8'd0;
+        dwell_kind <= DWELL_NONE;
       end
 
       if (may_decide) begin
@@ -378,17 +388,15 @@ module tandem_agc_core #(
             req_dir        <= 2'd2;
             fire_req       <= 1'b1;
             expected_index <= expected_index - 8'd1;
-            event_index     <= expected_index - 8'd1;
             evt_reason     <= (ch1_lglmt | ch2_lglmt) ? R_LG_LMT : R_LG_ADC;
             evt_push       <= 1'b1;
             evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
-            small_latch_dwell_cnt <= 8'd0;
+            dwell_kind     <= DWELL_NONE;
             if (small_latch_clear_attempted) begin
-              small_latch_rearm_pending <= 1'b1;
-              small_latch_rearm_dwell_cnt <= 8'd0;
+              small_latch_episode <= EPISODE_REARM;
             end
           end
         end else if (small_latch_conflict_ready) begin
@@ -400,27 +408,25 @@ module tandem_agc_core #(
             if (at_min)
               cnt_clamp <= (cnt_clamp == 8'hFF) ? cnt_clamp : cnt_clamp + 8'd1;
             dwell_cnt <= 8'd0;
-            small_latch_dwell_cnt <= 8'd0;
+            dwell_kind <= DWELL_NONE;
           end else begin
             req_dir        <= 2'd2;
             fire_req       <= 1'b1;
             expected_index <= expected_index - 8'd1;
-            event_index     <= expected_index - 8'd1;
             evt_reason     <= R_SM_INHIB;
             evt_push       <= 1'b1;
             evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
-            small_latch_dwell_cnt <= 8'd0;
-            small_latch_clear_attempted <= 1'b1;
-            small_latch_rearm_pending <= 1'b0;
-            small_latch_rearm_dwell_cnt <= 8'd0;
+            dwell_kind     <= DWELL_NONE;
+            small_latch_episode <= EPISODE_CONSUMED;
           end
         end else if (inhibit) begin
           if (both_lp)
             cnt_inhib <= (cnt_inhib == 8'hFF) ? cnt_inhib : cnt_inhib + 8'd1;
-        end else if (both_lp && (dwell_cnt != 8'd0) &&
+        end else if (both_lp && dwell_kind == DWELL_INCREASE &&
+                     (dwell_cnt != 8'd0) &&
                      (dwell_cnt >= cfg_dwell)) begin
           if (at_max) begin
             cnt_clamp <= (cnt_clamp == 8'hFF) ? cnt_clamp : cnt_clamp + 8'd1;
@@ -428,13 +434,13 @@ module tandem_agc_core #(
             req_dir        <= 2'd1;
             fire_req       <= 1'b1;
             expected_index <= expected_index + 8'd1;
-            event_index     <= expected_index + 8'd1;
             evt_reason     <= R_BOTH_LP;
             evt_push       <= 1'b1;
             evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
+            dwell_kind     <= DWELL_NONE;
           end
         end else if (one_lp) begin
           cnt_inhib <= (cnt_inhib == 8'hFF) ? cnt_inhib : cnt_inhib + 8'd1;        // starvation case, §5.4
@@ -471,9 +477,11 @@ module tandem_agc_core #(
   // write side stays in l_clk while software reads from the processor domain.
   // ---------------------------------------------------------------------------
   wire [15:0] evt_flags = {8'd0, 2'd0, req_dir, evt_reason};
+  // `evt_push` reaches the FIFO one cycle after a decision.  By that handoff
+  // edge expected_index already contains the accepted post-change index, so a
+  // separate eight-flop shadow register would only duplicate the same value.
   wire [EVT_DW-1:0] evt_wdata = {
-      event_index, event_index, evt_flags, evt_seq, sample_counter };
-
+      expected_index, expected_index, evt_flags, evt_seq, sample_counter };
   wire fifo_full;
   generate if (EVENTS) begin : g_events
     tandem_async_fifo #(.W(EVT_DW), .AW(EVT_AW)) u_evt_fifo (
