@@ -291,6 +291,13 @@ for report in "${required[@]}"; do
     [[ -f "$output_ref/$report" && ! -L "$output_ref/$report" &&
        -s "$output_ref/$report" ]] || fail "missing safe OOC evidence: $report"
 done
+dcp_size="$(stat -Lc '%s' "$output_ref/tandem_agc_axi_routed.dcp")"
+[[ "$dcp_size" =~ ^[0-9]+$ && "$dcp_size" -ge 524288 && \
+   "$dcp_size" -le 16777216 ]] ||
+    fail "routed checkpoint size is outside the bounded 512 KiB..16 MiB range"
+dcp_magic="$(od -An -tx1 -N4 "$output_ref/tandem_agc_axi_routed.dcp" | xargs)"
+[[ "$dcp_magic" == "50 4b 03 04" ]] ||
+    fail "routed checkpoint does not have the expected ZIP container magic"
 
 grep -Fq "=== TANDEM AXI ROUTE COMPLETE ===" "$output_ref/vivado.log" ||
     fail "Vivado log lacks the nonauthorizing route-complete marker"

@@ -271,6 +271,8 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
         "verdict=PASS",
         "firmware_release_eligible=false",
         "integrated_route_required=true",
+        "routed checkpoint size is outside the bounded 512 KiB..16 MiB range",
+        'dcp_magic" == "50 4b 03 04"',
     ):
         assert binding in launcher
     assert launcher.index("=== TANDEM AXI ROUTE COMPLETE ===") < launcher.index(
