@@ -13,6 +13,7 @@ RC3_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc3-source.yaml"
 RC4_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc4-source.yaml"
 RC5_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc5-source.yaml"
 RC6_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc6-source.yaml"
+RC7_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc7-source.yaml"
 FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
@@ -131,6 +132,7 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
     rc4 = _manifest_values(RC4_SOURCE_MANIFEST)
     rc5 = _manifest_values(RC5_SOURCE_MANIFEST)
     rc6 = _manifest_values(RC6_SOURCE_MANIFEST)
+    rc7 = _manifest_values(RC7_SOURCE_MANIFEST)
     final = _manifest_values(FINAL_SOURCE_MANIFEST)
     tandem_v2 = _manifest_values(TANDEM_V2_SOURCE_MANIFEST)
     changed_component_keys = {
@@ -154,15 +156,15 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
         key for key, value in rc2.items() if rc3[key] != value
     } == changed_component_keys
 
-    assert rc3 == rc4 == rc5 == rc6 == final
-    for values in (rc3, rc4, rc5, rc6, final):
+    assert rc3 == rc4 == rc5 == rc6 == rc7 == final
+    for values in (rc3, rc4, rc5, rc6, rc7, final):
         assert "release_tag" not in values
         assert values["libiio_0_25_source"] == RC3_LIBIIO_SOURCE
         assert values["libiio_0_25_ref"] == RC3_LIBIIO_REF
         assert values["submodule_buildroot"] == RC3_BUILDROOT_SOURCE
         assert values["submodule_buildroot_ref"] == RC3_BUILDROOT_REF
         assert values["versions_buildroot"] == RC3_BUILDROOT_IDENTITY
-    for values in (rc3, rc4, rc5, rc6, final, tandem_v2):
+    for values in (rc3, rc4, rc5, rc6, rc7, final, tandem_v2):
         assert values["submodule_linux"] == RC3_LINUX_SOURCE
         assert values["submodule_linux_ref"] == RC3_LINUX_REF
     assert rc3["versions_linux"] == RC3_LINUX_IDENTITY
@@ -196,6 +198,7 @@ def test_historical_routes_and_all_v8_source_graphs_are_explicit() -> None:
         "manifests/tandem-agc-v8-rc4-source.yaml",
         "manifests/tandem-agc-v8-rc5-source.yaml",
         "manifests/tandem-agc-v8-rc6-source.yaml",
+        "manifests/tandem-agc-v8-rc7-source.yaml",
         "manifests/tandem-agc-v8-source.yaml",
     ):
         assert f"./scripts/check_source_graph.sh {manifest}" in offline_check

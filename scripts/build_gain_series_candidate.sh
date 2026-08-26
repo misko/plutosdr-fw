@@ -60,7 +60,7 @@ cd "$ROOT"
 [[ -f "$MANIFEST" ]] || fail "manifest not found: ${MANIFEST}"
 manifest_name="$(basename -- "$MANIFEST")"
 case "$manifest_name" in
-tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-source.yaml)
+tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-source.yaml)
     canonical_manifest="${ROOT}/manifests/${manifest_name}"
     [[ "$(realpath -- "$MANIFEST")" == "$canonical_manifest" ]] ||
         fail "protected manifest must use the canonical repository path: ${canonical_manifest}"

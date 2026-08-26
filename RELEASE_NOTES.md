@@ -24,7 +24,8 @@
 | `tandem-agc-v8-rc1` | 2026-08-21 | **hardware-qualified persistent prerelease** | device-side cached AD9361 temperature in each fresh metadata frame |
 | `tandem-agc-v8-rc2` – `rc4` | 2026-08-22 – 2026-08-25 | superseded candidates | bounded batch lifecycle, Linux cleanup, and corrected request/pulse handoff; RC4 was invalidated by the later stale-small-ADC recovery change |
 | `tandem-agc-v8-rc5` | 2026-08-26 | **rejected; no release artifact** | complete candidate route reached the trusted build, but integrated placement was 17 slices over the available device capacity |
-| `tandem-agc-v8-rc6` | 2026-08-26 | **development; no release artifact** | preserves RC5 behavior while sharing mutually exclusive dwell storage with an explicit qualification-class tag |
+| `tandem-agc-v8-rc6` | 2026-08-26 | **rejected; diagnostics only** | fully routed and timing-clean, then rejected by stale post-route report policy before packaging |
+| `tandem-agc-v8-rc7` | 2026-08-26 | **development; no release artifact** | retains RC6 RTL and corrects the integrated report-state, DSP, and CDC validation contract |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -33,9 +34,26 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc6 — 2026-08-26 — **development; not hardware-authorized**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc7 — 2026-08-26 — **development; not hardware-authorized**
 
-RC6 is the forward-only candidate after RC5's integrated placement failure. It
+RC7 is the forward-only candidate after RC6's trusted build completed FPGA
+implementation but was rejected by obsolete post-route report assumptions. It
+retains RC6's external source graph and firmware RTL; the candidate change is
+the fail-closed validator correction needed to recognize Vivado's legitimate
+routed report state and the reviewed DSP/CDC inventory without accepting
+missing, malformed, unrouted, or unsafe reports.
+
+RC7 has its own manifest, owner-only workflow mapping, artifact namespace,
+exact firmware identity, and required source lock
+`refs/tags/tandem-agc-v8-rc7-source/firmware-v1`. The RC5 and RC6 branches and
+source locks remain immutable failed-build history and are not moved. RC7 must
+pass the complete hardware-free gate, commit-bound routed OOC gate, and fresh
+trusted integrated build before any radio deployment. It then requires the
+full external four-radio RAM campaign before any final v8 promotion.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc6 — 2026-08-26 — **rejected; post-route policy failed**
+
+RC6 was the forward-only candidate after RC5's integrated placement failure. It
 keeps RC5's stale-small-ADC-latch recovery and external source graph, but
 replaces three mutually exclusive eight-bit dwell counters with one shared
 eight-bit counter and a two-bit qualification-class tag. A two-bit binary token
@@ -45,23 +63,21 @@ accumulators carry `use_dsp = "yes"`. The tag prevents ordinary increase,
 stale-conflict, and re-arm qualification from inheriting one another's partial
 dwell credit when the live evidence class changes.
 
-All current HDL benches pass at both supported clock ratios. A diagnostic
-full-design capacity run using the exact RC4 top-level design with only the
-retained RC6 core replacement placed 4,399 of 4,400 slices, used 74 of 80 DSPs,
-and routed all 32,908 nets with no routing errors. Global timing closed at WNS
-`+0.645 ns` and WHS `+0.022 ns`; the worst paths were outside the tandem block.
-DSP-local setup/hold margins were `+12.444 ns`/`+0.248 ns` for `evt_seq` and
-`+9.028 ns`/`+0.949 ns` for `pwr_div`. These results are diagnostic and
-non-authorizing: they de-risk RC5's capacity failure but do not replace a clean
-committed RC6 offline/OOC run or the trusted source-locked RC6 integrated build.
+The final RC6 source commit and immutable lock resolve to
+`fb1cb04085fda4854f964481d5d5427b6934d58b`. Trusted Actions run
+`32944830787`, attempt 1, accepted that exact source and completed integrated
+implementation: Vivado routed 32,908 of 32,908 nets. It placed 4,399 of 4,400
+slices, used 74 of 80 DSPs, and closed timing at WNS `+0.645 ns`, WHS
+`+0.022 ns`, and the bus-skew minimum was `+8.606 ns`.
 
-RC6 has its own manifest, trusted workflow mapping, artifact namespace,
-firmware identity, and required source lock
-`refs/tags/tandem-agc-v8-rc6-source/firmware-v1`. The RC5 branch/tag remain
-immutable and are not moved to RC6. RC6 must pass direct class-transition RTL
-regressions at both supported clock ratios, a clean commit-bound routed OOC
-gate, and a fresh fully integrated build before any radio deployment. No RC6
-DFU has been built or deployed as of this entry.
+Packaging then failed closed because the committed integrated validator still
+expected stale report-state, DSP, and CDC policy details. The run uploaded
+diagnostics only. It produced no deployment bundle, candidate index, or DFU,
+and nothing from RC6 was deployed to a radio. Its branch, manifest, exact
+firmware identity, and
+`refs/tags/tandem-agc-v8-rc6-source/firmware-v1` remain immutable reproduction
+history. RC7 advances the validator and release lineage without changing the
+RC6 RTL implementation.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc5 — 2026-08-26 — **rejected; integrated placement failed**
 
@@ -100,7 +116,7 @@ for a deterministic stale-latch RF test without adding release-only debug
 interfaces. RC5's internal FSM qualification therefore relied on the
 deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
 optional diagnostic evidence only. RC5 stopped at integrated placement. The
-active RC6 route still requires the complete external paired-behavior,
+active RC7 route still requires the complete external paired-behavior,
 lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
 radios.
 

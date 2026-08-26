@@ -17,12 +17,12 @@ fail() {
     exit 1
 }
 
-# RC5, RC6, and the final v8 route are protected builds and therefore
+# RC5, RC6, RC7, and the final v8 route are protected builds and therefore
 # cannot opt out of the reviewed integrated-route inventory. Other historical
 # source locks retain their original package path unless a waiver inventory is
 # explicitly supplied by their trusted workflow.
 case "$(basename "$MANIFEST")" in
-tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-source.yaml)
+tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-source.yaml)
     manifest_name="$(basename -- "$MANIFEST")"
     canonical_manifest="${ROOT}/manifests/${manifest_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$canonical_manifest" ]] ||
@@ -222,6 +222,9 @@ tandem-agc-v8-rc5-source.yaml:*)
     ;;
 tandem-agc-v8-rc6-source.yaml:*)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8-rc6'
+    ;;
+tandem-agc-v8-rc7-source.yaml:*)
+    protected_version='v0.41-plutoplus-spf-tandem-agc-v8-rc7'
     ;;
 tandem-agc-v8-source.yaml:final-release)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8'

@@ -62,10 +62,20 @@ build failed placement by 17 slices before producing an artifact. The RC5
 branch and `refs/tags/tandem-agc-v8-rc5-source/firmware-v1` are immutable failed
 history and must never move.
 
-The active candidate is RC6. It retains RC5 behavior while replacing the three
-mutually exclusive dwell counters with one eight-bit counter and an explicit
-two-bit qualification-class tag. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc6-source/firmware-v1`. The later final build uses the
+RC6 locked that fit refactor at
+`fb1cb04085fda4854f964481d5d5427b6934d58b`. Trusted run `32944830787`
+placed 4,399 of 4,400 slices, used 74 of 80 DSPs, routed all 32,908 nets, and
+closed timing at WNS `+0.645 ns`, WHS `+0.022 ns`, and minimum bus skew
+`+8.606 ns`. The post-route validator then rejected stale report-state, DSP,
+and CDC policy assumptions. Only failure diagnostics were uploaded: there was
+no deployment bundle, candidate index, or DFU. The RC6 branch and
+`refs/tags/tandem-agc-v8-rc6-source/firmware-v1` are therefore immutable failed
+history and must never move.
+
+The active candidate is RC7. It retains RC6's placed, fully routed,
+timing-clean RTL and corrects the report validator rather than changing the
+firmware behavior. Its exact candidate source lock is
+`refs/tags/tandem-agc-v8-rc7-source/firmware-v1`. The later final build uses the
 different exact lock `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and
 final evidence must reject a cross-stage substitution of those refs.
 
@@ -74,9 +84,9 @@ The remaining gates, in order, are:
 1. Commit the complete source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC6 firmware source lock and explicit trusted build route.
-   Keep RC4/RC5's external component pins only if source-graph checks prove they
-   remain exact.
+2. Create the exact RC7 firmware source lock and explicit trusted build route.
+   Keep RC4/RC5/RC6's external component pins only if source-graph checks prove
+   they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
    retain integrated timing, CDC, DRC, methodology, utilization, and build
    provenance. Block-level OOC evidence cannot replace this step.

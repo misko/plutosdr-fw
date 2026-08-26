@@ -68,7 +68,9 @@ def _write_dcp(path: Path) -> None:
     path.chmod(0o644)
 
 
-def _header(command: str, *, state: bool = False, device: str = "7z010-clg400") -> str:
+def _header(
+    command: str, *, state: str | None = None, device: str = "7z010-clg400"
+) -> str:
     lines = [
         "Copyright 1986-2022 Xilinx, Inc. All Rights Reserved.",
         "-" * 100,
@@ -83,8 +85,8 @@ def _header(command: str, *, state: bool = False, device: str = "7z010-clg400") 
         f"| Device       : {device}",
         "| Speed File   : -1  PRODUCTION 1.12 2019-11-22",
     ]
-    if state:
-        lines.append("| Design State : Fully Routed")
+    if state is not None:
+        lines.append(f"| Design State : {state}")
     lines.extend(["-" * 100, ""])
     return "\n".join(lines)
 
@@ -127,7 +129,7 @@ def _utilization(policy: dict[str, object]) -> str:
                 "Slice LUTs": 13502,
                 "Slice Registers": 23120,
                 "Block RAM Tile": 8,
-                "DSPs": 72,
+                "DSPs": 74,
                 "Bonded IOB": 53,
                 "BUFGCTRL": 3,
             }[entry["resource"]]
@@ -141,7 +143,7 @@ def _utilization(policy: dict[str, object]) -> str:
             "+--- fixture table ---+\n" + "\n".join(rows) + "\n"
         )
     return (
-        _header("report_utilization", state=True, device="xc7z010clg400-1")
+        _header("report_utilization", state="Routed", device="xc7z010clg400-1")
         + "Utilization Design Information\n\nTable of Contents\n-----------------\n"
         + "\n".join(entry["section"] for entry in entries)
         + "\n\n"
@@ -164,7 +166,7 @@ def _rule_report(policy: dict[str, object], key: str) -> str:
                 f"{entry['rule']}#{index} {entry['severity']}\nReviewed fixture detail\nRelated violations: <none>"
             )
     return (
-        _header(f"report_{key}", state=True, device="xc7z010clg400-1")
+        _header(f"report_{key}", state="Fully Routed", device="xc7z010clg400-1")
         + f"{title}\n\nTable of Contents\n-----------------\n1. REPORT SUMMARY\n2. REPORT DETAILS\n\n"
         + "1. REPORT SUMMARY\n-----------------\n"
         + f"             Violations found: {sum(entry['count'] for entry in entries)}\n"
@@ -250,7 +252,11 @@ def _fixture(root: Path) -> argparse.Namespace:
     _write(paths["timing_report"], _timing(policy))
     _write(
         paths["route_status_report"],
-        _header("report_route_status", state=True, device="xc7z010clg400-1")
+        _header(
+            "report_route_status",
+            state="Fully Routed",
+            device="xc7z010clg400-1",
+        )
         + """Design Route Status
  : # nets :
  # of logical nets.......................... : 100 :
@@ -306,6 +312,126 @@ def test_valid_integrated_evidence_emits_exact_release_verdict(tmp_path: Path) -
     }
 
 
+def test_policy_records_reviewed_rc6_dsp_and_cdc_inventory() -> None:
+    policy = json.loads(POLICY_PATH.read_text())
+    dsp = next(entry for entry in policy["utilization"] if entry["resource"] == "DSPs")
+    assert dsp == {
+        "section": "4. DSP",
+        "resource": "DSPs",
+        "available": 80,
+        "max_used": 74,
+        "max_utilization_percent": 92.5,
+        "rationale": (
+            "The reviewed tandem pwr_div and evt_seq DSP48 mappings raise use to "
+            "seventy-four blocks while reserving the remaining six blocks for "
+            "placement margin."
+        ),
+    }
+    cdc15 = next(
+        entry for entry in policy["cdc"]["summary"] if entry["rule"] == "CDC-15"
+    )
+    assert cdc15 == {
+        "rule": "CDC-15",
+        "severity": "Warning",
+        "count": 2085,
+        "rationale": (
+            "The exact inventory covers inherited ADI clock-enable controlled "
+            "false-path crossings plus the added coherent tandem "
+            "fault[3]/F_ILLEGAL snapshot crossing."
+        ),
+    }
+
+
+@pytest.mark.parametrize(
+    ("used", "percent", "accepted"),
+    ((73, "91.25", True), (75, "93.75", False)),
+)
+def test_dsp_guardrail_accepts_headroom_and_rejects_excess(
+    tmp_path: Path, used: int, percent: str, accepted: bool
+) -> None:
+    args = _fixture(tmp_path)
+    _replace(
+        args.utilization_report,
+        "| DSPs | 74 | 0 | 0 | 80 | 92.50 |",
+        f"| DSPs | {used} | 0 | 0 | 80 | {percent} |",
+    )
+    if accepted:
+        assert VALIDATOR.run(args)["verdict"] == "PASS"
+        assert args.output.exists()
+    else:
+        with pytest.raises(VALIDATOR.ValidationError, match="guardrail exceeded"):
+            VALIDATOR.run(args)
+        assert not args.output.exists()
+
+
+@pytest.mark.parametrize("count", (2084, 2086))
+def test_cdc15_old_and_extra_counts_are_rejected(tmp_path: Path, count: int) -> None:
+    args = _fixture(tmp_path)
+    _replace(
+        args.cdc_report,
+        "CDC-15  Warning  2085  reviewed",
+        f"CDC-15  Warning  {count}  reviewed",
+    )
+    with pytest.raises(VALIDATOR.ValidationError, match="CDC summary"):
+        VALIDATOR.run(args)
+    assert not args.output.exists()
+
+
+@pytest.mark.parametrize(
+    ("field", "old", "new"),
+    (
+        (
+            "utilization_report",
+            "| Design State : Routed\n",
+            "| Design State : Fully Routed\n",
+        ),
+        ("route_status_report", "| Design State : Fully Routed\n", ""),
+        (
+            "drc_report",
+            "| Design State : Fully Routed\n",
+            "| Design State : Fully Routed\n| Design State : Fully Routed\n",
+        ),
+        (
+            "methodology_report",
+            "| Design State : Fully Routed\n",
+            "| Design State : Routed\n",
+        ),
+        (
+            "timing_report",
+            "| Speed File   : -1  PRODUCTION 1.12 2019-11-22\n",
+            (
+                "| Speed File   : -1  PRODUCTION 1.12 2019-11-22\n"
+                "| Design State : Fully Routed\n"
+            ),
+        ),
+        (
+            "cdc_report",
+            "| Speed File   : -1  PRODUCTION 1.12 2019-11-22\n",
+            (
+                "| Speed File   : -1  PRODUCTION 1.12 2019-11-22\n"
+                "| Design State : Fully Routed\n"
+            ),
+        ),
+        (
+            "bus_skew_report",
+            "| Speed File   : -1  PRODUCTION 1.12 2019-11-22\n",
+            (
+                "| Speed File   : -1  PRODUCTION 1.12 2019-11-22\n"
+                "| Design State : Fully Routed\n"
+            ),
+        ),
+    ),
+)
+def test_report_state_contract_is_exact(
+    tmp_path: Path, field: str, old: str, new: str
+) -> None:
+    args = _fixture(tmp_path)
+    _replace(getattr(args, field), old, new)
+    with pytest.raises(VALIDATOR.ValidationError, match="design state"):
+        VALIDATOR.run(args)
+    assert not args.output.exists()
+
+
 @pytest.mark.parametrize(
     ("field", "old", "new"),
     (
@@ -326,7 +452,6 @@ def test_valid_integrated_evidence_emits_exact_release_verdict(tmp_path: Path) -
         ),
         ("timing_report", "0.603 0.000 0 53788", "-0.001 0.001 1 53788"),
         ("timing_report", "checking no_clock (0)", "checking no_clock (1)"),
-        ("utilization_report", "| DSPs | 72 |", "| DSPs | 73 |"),
         (
             "utilization_report",
             "| Slice LUTs | 13502 | 0 | 0 | 17600 | 76.72 |",
@@ -392,12 +517,12 @@ def test_symlink_report_is_rejected(tmp_path: Path) -> None:
         VALIDATOR.run(args)
 
 
-def test_rc5_rc6_and_final_packaging_cannot_bypass_integrated_gate() -> None:
+def test_rc5_rc6_rc7_and_final_packaging_cannot_bypass_integrated_gate() -> None:
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     assert (
         package.count(
             "tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | "
-            "tandem-agc-v8-source.yaml"
+            "tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-source.yaml"
         )
         == 1
     )

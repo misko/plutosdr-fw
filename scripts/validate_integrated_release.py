@@ -380,7 +380,7 @@ def parse_policy(path: Path) -> tuple[dict[str, Any], bytes]:
 
 
 def validate_metadata(
-    text: str, policy: dict[str, Any], name: str, *, require_routed: bool
+    text: str, policy: dict[str, Any], name: str, *, expected_state: str | None
 ) -> None:
     version_matches = re.findall(
         r"^\| Tool Version : Vivado v\.([0-9.]+) \(lin64\) Build ([0-9]+) ",
@@ -396,10 +396,10 @@ def validate_metadata(
     if len(device_matches) != 1 or device_matches[0] not in policy["design"]["devices"]:
         fail(f"{name} device identity is not qualified")
     state_matches = re.findall(r"^\| Design State : (.+?)\s*$", text, re.MULTILINE)
-    if require_routed and state_matches != ["Fully Routed"]:
-        fail(f"{name} does not uniquely attest Fully Routed state")
-    if not require_routed and state_matches:
-        fail(f"{name} contains an unexpected design-state field")
+    expected_states = [] if expected_state is None else [expected_state]
+    if state_matches != expected_states:
+        expected = "no design-state field" if expected_state is None else expected_state
+        fail(f"{name} design state is not exactly {expected}")
 
 
 def validate_route(text: str) -> dict[str, int]:
@@ -436,7 +436,7 @@ def validate_route(text: str) -> dict[str, int]:
 def validate_utilization(
     text: str, policy: dict[str, Any]
 ) -> dict[str, dict[str, float | int]]:
-    validate_metadata(text, policy, "utilization report", require_routed=True)
+    validate_metadata(text, policy, "utilization report", expected_state="Routed")
     result: dict[str, dict[str, float | int]] = {}
     for entry in policy["utilization"]:
         section_marker = f"{entry['section']}\n{'-' * len(entry['section'])}\n"
@@ -558,7 +558,7 @@ def validate_dcp(payload: bytes) -> None:
 
 
 def validate_timing(text: str, policy: dict[str, Any]) -> dict[str, float | int]:
-    validate_metadata(text, policy, "timing report", require_routed=False)
+    validate_metadata(text, policy, "timing report", expected_state=None)
     if text.count("All user specified timing constraints are met.") != 1:
         fail("timing constraints-met statement is not unique")
     for entry in policy["check_timing"]:
@@ -630,7 +630,7 @@ def summary_body(text: str, name: str) -> str:
 def validate_rule_report(
     text: str, policy: dict[str, Any], name: str, expected: list[dict[str, Any]]
 ) -> None:
-    validate_metadata(text, policy, name, require_routed=True)
+    validate_metadata(text, policy, name, expected_state="Fully Routed")
     body = summary_body(text, name)
     total_matches = re.findall(
         r"^\s*Violations found:\s*([0-9]+)\s*$", body, re.MULTILINE
@@ -666,7 +666,7 @@ def validate_rule_report(
 
 
 def validate_cdc(text: str, policy: dict[str, Any]) -> None:
-    validate_metadata(text, policy, "CDC report", require_routed=False)
+    validate_metadata(text, policy, "CDC report", expected_state=None)
     if text.count("CDC Report\n") != 1:
         fail("CDC report heading is not unique")
     rows = re.findall(
@@ -710,7 +710,7 @@ def validate_cdc(text: str, policy: dict[str, Any]) -> None:
 
 
 def validate_bus_skew(text: str, policy: dict[str, Any]) -> dict[str, float | int]:
-    validate_metadata(text, policy, "bus-skew report", require_routed=False)
+    validate_metadata(text, policy, "bus-skew report", expected_state=None)
     if text.count("Bus Skew Report\n") != 1 or "Slack (VIOLATED)" in text:
         fail("bus-skew report is malformed or contains a violation")
     blocks = re.split(r"(?m)^Id: ([0-9]+)\n", text)
@@ -845,7 +845,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         args.bus_skew_report, limit=32 * 1024 * 1024, name="bus-skew report"
     )
 
-    validate_metadata(route, policy, "route-status report", require_routed=True)
+    validate_metadata(
+        route, policy, "route-status report", expected_state="Fully Routed"
+    )
     route_metrics = validate_route(route)
     utilization_metrics = validate_utilization(utilization, policy)
     timing_metrics = validate_timing(timing, policy)

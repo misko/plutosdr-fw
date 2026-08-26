@@ -47,9 +47,9 @@
       "section": "4. DSP",
       "resource": "DSPs",
       "available": 80,
-      "max_used": 72,
-      "max_utilization_percent": 90.0,
-      "rationale": "The current design already uses seventy-two DSP blocks; any increase requires explicit architectural review."
+      "max_used": 74,
+      "max_utilization_percent": 92.5,
+      "rationale": "The reviewed tandem pwr_div and evt_seq DSP48 mappings raise use to seventy-four blocks while reserving the remaining six blocks for placement margin."
     },
     {
       "section": "5. IO and GT Specific",
@@ -108,7 +108,7 @@
       {"rule": "CDC-4", "severity": "Critical", "count": 1, "rationale": "Reviewed coherent multi-bit timestamp snapshot crossing named in critical_paths."},
       {"rule": "CDC-6", "severity": "Warning", "count": 5, "rationale": "Recognized ASYNC_REG multi-bit synchronizers."},
       {"rule": "CDC-9", "severity": "Info", "count": 4, "rationale": "Recognized ASYNC_REG reset synchronizers."},
-      {"rule": "CDC-15", "severity": "Warning", "count": 2084, "rationale": "Inherited ADI clock-enable controlled false-path crossings; exact inventory is frozen."},
+      {"rule": "CDC-15", "severity": "Warning", "count": 2085, "rationale": "The exact inventory covers inherited ADI clock-enable controlled false-path crossings plus the added coherent tandem fault[3]/F_ILLEGAL snapshot crossing."},
       {"rule": "CDC-17", "severity": "Warning", "count": 18, "rationale": "Inherited ADI MUX-hold controlled false-path crossings; exact inventory is frozen."}
     ],
     "critical_paths": [

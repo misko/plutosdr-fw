@@ -1,7 +1,8 @@
-"""Offline oracles for the protected tandem AGC v8 RC6 build route."""
+"""Offline oracles for the immutable tandem AGC v8 RC6 reproduction route."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -12,10 +13,7 @@ FINAL_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
 OFFLINE_CHECK = ROOT / "scripts" / "check_tandem_release_offline.sh"
-RELEASING = ROOT / "RELEASING.md"
-RELEASE_PLAN = ROOT / "tandem_AGC_fw_plan.md"
-KALMAN_RUNNER = ROOT / "KALMAN_GITHUB_RUNNER.md"
-TANDEM_CORE = ROOT / "hdl-tandem" / "tandem_agc_core.v"
+RELEASE_NOTES = ROOT / "RELEASE_NOTES.md"
 
 
 def _manifest_values(path: Path) -> dict[str, str]:
@@ -51,7 +49,7 @@ def test_rc6_owner_only_route_maps_ref_manifest_and_package_together() -> None:
     assert workflow.count("'tandem-agc-v8-rc6-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc6'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc6'") == 1
-    assert "Require the exact protected RC6 candidate identity" in workflow
+    assert "Require the exact protected RC6 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index("tandem-agc-v8-rc5-source.yaml")
 
 
@@ -65,58 +63,14 @@ def test_rc6_source_graph_is_a_required_pr_check() -> None:
     ) in checker
 
 
-def test_rc6_keeps_the_two_reviewed_slice_relief_mappings() -> None:
-    core = TANDEM_CORE.read_text(encoding="utf-8")
+def test_rc6_failure_is_retained_as_exact_non_artifact_history() -> None:
+    notes = RELEASE_NOTES.read_text(encoding="utf-8")
 
-    # The XC7Z010 image is slice-limited and has spare DSP48s.  Removing either
-    # mapping silently returns the trusted build to the placement cliff, so the
-    # inexpensive offline route oracle guards the two measured accumulators.
-    assert '(* use_dsp = "yes" *) reg [19:0] pwr_div;' in core
-    assert '(* use_dsp = "yes" *) reg [31:0] evt_seq;' in core
-    assert core.count('(* use_dsp = "yes" *)') == 2
-
-
-def test_rc6_bundle_upload_does_not_require_github_attestation() -> None:
-    workflow = MAIN_WORKFLOW.read_text(encoding="utf-8")
-
-    # The build job itself uploads the exact bundle and detached checksum.
-    # Supporting provenance attestation is an optional operator action and
-    # cannot turn a successful single-owner firmware build into a failed run.
-    assert "Upload deployment bundle and verification sidecars" in workflow
-    assert "${{ steps.build.outputs.bundle_path }}" in workflow
-    assert "${{ steps.build.outputs.bundle_path }}.sha256" in workflow
-    assert "if-no-files-found: error" in workflow
-    assert "actions/attest@" not in workflow
-    assert "\n  attest:" not in workflow
-
-
-def test_kalman_handoff_matches_the_rc6_bundle_checksum_contract() -> None:
-    runner = KALMAN_RUNNER.read_text(encoding="utf-8")
-
-    assert "The RC6 workflow has no separate attestation job." in runner
-    assert "GitHub attestation is not required for this handoff." in runner
-    assert "plutosdr-fw.github-attestation-not-performed.v1" in runner
-    assert 'sidecars=("$artifact_dir"/*.tar.gz.sha256)' in runner
-    assert 'sha256sum -c "$(basename "$sidecar")"' in runner
-    assert "sha256sum -c SHA256SUMS" in runner
-    assert "gh attestation verify" not in runner
-    assert "downloads, verifies, and attests" not in runner
-
-
-def test_rc6_release_docs_bind_exact_stage_locks_and_full_final_campaign() -> None:
-    releasing = RELEASING.read_text(encoding="utf-8")
-    plan = RELEASE_PLAN.read_text(encoding="utf-8")
-    candidate_lock = "refs/tags/tandem-agc-v8-rc6-source/firmware-v1"
-    final_lock = "refs/tags/tandem-agc-v8-source/firmware-v1"
-
-    assert "The active candidate is RC6" in releasing
-    assert candidate_lock in releasing
-    assert final_lock in releasing
-    assert "repeat the full four-radio campaign" in releasing
-    assert 'gh attestation verify "$release_work"' not in releasing
-
-    assert candidate_lock in plan
-    assert final_lock in plan
-    assert "exact_main_commit='<40-character-exact-main-commit>'" in plan
-    assert 'git tag tandem-agc-v8-source/firmware-v1 "$exact_main_commit"' in plan
-    assert "The v8 policy always\nselects `full-campaign`." in plan
+    assert "32944830787" in notes
+    assert "32,908 of 32,908" in notes
+    assert re.search(r"4,399 of 4,400\s+slices", notes)
+    assert "74 of 80 DSPs" in notes
+    assert "WNS `+0.645 ns`" in notes
+    assert re.search(r"WHS\s+`\+0\.022 ns`", notes)
+    assert "bus-skew minimum was `+8.606 ns`" in notes
+    assert "no deployment bundle, candidate index, or DFU" in notes
