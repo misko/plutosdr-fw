@@ -25,18 +25,20 @@ runner_commit=$(git -C "${ROOT}" rev-parse HEAD)
 runner_paths=(
   scripts/deploy_tandem_agc_ram_hardware.sh
   scripts/run_tandem_agc_release_hardware.sh
+  scripts/tandem_release_device_plan.py
   scripts/tandem_release_evidence.py
   tests/radio_hardware/candidate_binding.py
+  tests/radio_hardware/pluto_plus_candidate.py
   tests/radio_hardware/release_cli.py
-  tests/radio_hardware/tandem_ram_deploy.py
 )
 runner_stems=(
   DEPLOY_SHELL
   SHELL
+  DEVICE_PLAN
   SEMANTIC_EVIDENCE
   CANDIDATE_BINDING
+  PLUTO_PLUS_CANDIDATE
   RELEASE_CLI
-  TANDEM_RAM_DEPLOY
 )
 export PLUTOSDR_FW_RUNNER_REPOSITORY="$(realpath -- "${ROOT}")"
 export PLUTOSDR_FW_RUNNER_COMMIT="${runner_commit}"

@@ -39,7 +39,6 @@ from .candidate_binding import (
     REQUIRED_EVIDENCE_ROLES,
     CandidateBindingError,
     validate_artifact_index,
-    validate_deployment_receipt,
 )
 from .experiment import TX_MUTE_DB, Issue46Options, Issue46Radio
 from .metadata_abi import (
@@ -65,6 +64,12 @@ from .modulated_hardware import (
     modulated_mode_evidence_policy,
     run_modulated_hardware_campaign,
     validate_modulated_hardware_options,
+)
+from .pluto_plus_candidate import (
+    validate_release_candidate_plan,
+    validate_release_candidate_receipt,
+    validate_release_operation_plan,
+    validate_release_usb_inventory,
 )
 from .release_campaign import (
     BandCase,
@@ -104,6 +109,7 @@ BASELINE_POLICY = PolicyCase("baseline", "baseline")
 HARNESS_SOURCE_NAMES = (
     "scripts/deploy_tandem_agc_ram_hardware.sh",
     "scripts/run_tandem_agc_release_hardware.sh",
+    "scripts/tandem_release_device_plan.py",
     "scripts/tandem_release_evidence.py",
     "tests/radio_hardware/candidate_binding.py",
     "tests/radio_hardware/experiment.py",
@@ -112,8 +118,8 @@ HARNESS_SOURCE_NAMES = (
     "tests/radio_hardware/modulated_quality.py",
     "tests/radio_hardware/release_campaign.py",
     "tests/radio_hardware/release_cli.py",
+    "tests/radio_hardware/pluto_plus_candidate.py",
     "tests/radio_hardware/tandem_quality.py",
-    "tests/radio_hardware/tandem_ram_deploy.py",
     "tests/radio_hardware/tone_quality.py",
     "tests/radio_hardware/transient_hardware.py",
     "tests/radio_hardware/transient_quality.py",
@@ -124,10 +130,11 @@ HOST_LIBIIO_WRAPPER_MARKER = "tandem-release-host-libiio-v1"
 RUNNER_PROVENANCE_PATHS = (
     "scripts/deploy_tandem_agc_ram_hardware.sh",
     "scripts/run_tandem_agc_release_hardware.sh",
+    "scripts/tandem_release_device_plan.py",
     "scripts/tandem_release_evidence.py",
     "tests/radio_hardware/candidate_binding.py",
+    "tests/radio_hardware/pluto_plus_candidate.py",
     "tests/radio_hardware/release_cli.py",
-    "tests/radio_hardware/tandem_ram_deploy.py",
 )
 MAXIMUM_ARTIFACT_INDEX_BYTES = 8 * 1024 * 1024
 MAXIMUM_DEPLOYMENT_RECEIPT_BYTES = 8 * 1024 * 1024
@@ -531,16 +538,22 @@ def _strict_json(payload: bytes, *, name: str) -> dict[str, Any]:
             result[key] = value
         return result
 
-    def reject_number(token: str) -> Any:
-        raise ValueError(f"non-integer JSON number: {token}")
+    def finite_float(token: str) -> float:
+        value = float(token)
+        if not math.isfinite(value):
+            raise ValueError(f"non-finite JSON number: {token}")
+        return value
+
+    def reject_constant(token: str) -> Any:
+        raise ValueError(f"non-finite JSON constant: {token}")
 
     try:
         decoded = payload.decode("utf-8", errors="strict")
         value = json.loads(
             decoded,
             object_pairs_hook=pairs_hook,
-            parse_float=reject_number,
-            parse_constant=reject_number,
+            parse_float=finite_float,
+            parse_constant=reject_constant,
         )
     except (
         UnicodeDecodeError,
@@ -600,10 +613,11 @@ def _runner_source_environment_name(relative: str, field_name: str) -> str:
     stem = {
         "scripts/deploy_tandem_agc_ram_hardware.sh": "DEPLOY_SHELL",
         "scripts/run_tandem_agc_release_hardware.sh": "SHELL",
+        "scripts/tandem_release_device_plan.py": "DEVICE_PLAN",
         "scripts/tandem_release_evidence.py": "SEMANTIC_EVIDENCE",
         "tests/radio_hardware/candidate_binding.py": "CANDIDATE_BINDING",
+        "tests/radio_hardware/pluto_plus_candidate.py": "PLUTO_PLUS_CANDIDATE",
         "tests/radio_hardware/release_cli.py": "RELEASE_CLI",
-        "tests/radio_hardware/tandem_ram_deploy.py": "TANDEM_RAM_DEPLOY",
     }[relative]
     return f"PLUTOSDR_FW_RUNNER_{stem}_{field_name}"
 
@@ -1277,6 +1291,20 @@ def _attest_candidate_binding(
     index_relative = artifact_index_path.name
     if deployment_receipt_path == artifact_index_path:
         raise ReleaseCliError("artifact index and deployment receipt must differ")
+    receipt_member = PurePosixPath(receipt_relative)
+    if (
+        len(receipt_member.parts) != 4
+        or receipt_member.parts[:2] != ("hardware", "deploy")
+        or receipt_member.parts[2] != serial
+        or receipt_member.name != "ram-boot-receipt.json"
+    ):
+        raise ReleaseCliError(
+            "deployment receipt path is not the exact serial-scoped member"
+        )
+    deploy_root = receipt_member.parent
+    candidate_plan_relative = str(deploy_root / "release-candidate-plan.json")
+    inventory_relative = str(deploy_root / "usb-inventory.json")
+    operation_relative = str(deploy_root / "operation-plan.json")
 
     with _open_candidate_root(root) as root_descriptor:
         index_payload, index_file, _prefix = _read_candidate_member(
@@ -1477,6 +1505,30 @@ def _attest_candidate_binding(
             snapshot["role"] = expected_role
             evidence_files.append(snapshot)
 
+        candidate_plan_payload, candidate_plan_file, _prefix = _read_candidate_member(
+            root_descriptor,
+            root,
+            candidate_plan_relative,
+            maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+            exact_mode=0o600,
+            name="release candidate plan",
+        )
+        inventory_payload, inventory_file, _prefix = _read_candidate_member(
+            root_descriptor,
+            root,
+            inventory_relative,
+            maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+            exact_mode=0o600,
+            name="release USB inventory",
+        )
+        operation_payload, operation_file, _prefix = _read_candidate_member(
+            root_descriptor,
+            root,
+            operation_relative,
+            maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+            exact_mode=0o600,
+            name="release operation plan",
+        )
         receipt_payload, receipt_file, _prefix = _read_candidate_member(
             root_descriptor,
             root,
@@ -1485,15 +1537,39 @@ def _attest_candidate_binding(
             exact_mode=0o600,
             name="deployment receipt",
         )
+        assert candidate_plan_payload is not None
+        assert inventory_payload is not None
+        assert operation_payload is not None
         assert receipt_payload is not None
         try:
-            deployment_receipt = validate_deployment_receipt(
-                _strict_json(receipt_payload, name="deployment receipt"),
+            candidate_plan = validate_release_candidate_plan(
+                _strict_json(candidate_plan_payload, name="release candidate plan"),
+                artifact_index=artifact_index,
+                artifact_index_bytes=index_file["bytes"],
                 artifact_index_sha256=artifact_index_sha256,
+            )
+            inventory = validate_release_usb_inventory(
+                _strict_json(inventory_payload, name="release USB inventory")
+            )
+            operation = validate_release_operation_plan(
+                _strict_json(operation_payload, name="release operation plan"),
+                candidate_plan=candidate_plan,
+                candidate_plan_bytes=candidate_plan_file["bytes"],
+                candidate_plan_sha256=candidate_plan_file["sha256"],
+                usb_inventory=inventory,
+                usb_inventory_bytes=inventory_file["bytes"],
+                usb_inventory_sha256=inventory_file["sha256"],
                 serial=serial,
-                firmware_version=firmware_version,
-                hardware_model=artifact_index["release"]["hardware_model"],
-                dfu_sha256=dfu_file["sha256"],
+            )
+            deployment_receipt = validate_release_candidate_receipt(
+                _strict_json(receipt_payload, name="deployment receipt"),
+                candidate_plan=candidate_plan,
+                candidate_plan_bytes=candidate_plan_file["bytes"],
+                candidate_plan_sha256=candidate_plan_file["sha256"],
+                operation_plan=operation,
+                operation_plan_bytes=operation_file["bytes"],
+                operation_plan_sha256=operation_file["sha256"],
+                serial=serial,
             )
         except CandidateBindingError as error:
             raise ReleaseCliError(f"deployment receipt is invalid: {error}") from error
@@ -1509,8 +1585,8 @@ def _attest_candidate_binding(
         "dfu_sha256": dfu_file["sha256"],
         "fit_sha256": fit_sha256,
         "deployment_receipt_sha256": receipt_file["sha256"],
-        "deployment_boot_pre_id": deployment_receipt["boot"]["pre_id"],
-        "deployment_boot_post_id": deployment_receipt["boot"]["post_id"],
+        "deployment_boot_pre_id": deployment_receipt["pre_runtime"]["boot_id"],
+        "deployment_boot_post_id": deployment_receipt["post_runtime"]["boot_id"],
         "artifact_root": str(root),
         "runner_provenance": runner,
         "artifact_index_file": index_file,

@@ -15,16 +15,20 @@ from typing import Any
 
 import pytest
 
+from tests.radio_hardware.pluto_plus_candidate_test_support import (
+    build_utility_deployment_bundle,
+)
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "tandem_release_evidence.py"
 COMMIT = "1" * 40
 FINAL_COMMIT = "2" * 40
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc13"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc14"
 FINAL_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
 RUN_ID = 123456
 RUN_ATTEMPT = 1
 LIBIIO_COMMIT = "d" * 40
-PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc13-111111111111"
+PACKAGE_STEM = "plutoplus-spf-tandem-agc-v8-rc14-111111111111"
 SOURCE_MANIFEST_PAYLOAD = b"""schema: plutosdr-fw.source-manifest
 schema_version: 1
 release_state: candidate
@@ -66,6 +70,11 @@ _STAGE_INEXACT_SOURCE_LOCK_CASES = (
         "candidate-pre-hardware",
         "refs/tags/tandem-agc-v8-rc99-source/firmware-v1",
         id="candidate-uses-rc99-lock",
+    ),
+    pytest.param(
+        "candidate-pre-hardware",
+        "refs/tags/tandem-agc-v8-rc13-source/firmware-v1",
+        id="candidate-uses-burned-rc13-lock",
     ),
     pytest.param(
         "candidate-pre-hardware",
@@ -263,7 +272,7 @@ def _fixture(
 ) -> tuple[Path, Path]:
     is_candidate = stage == "candidate-pre-hardware"
     manifest_name = (
-        "tandem-agc-v8-rc13-source.yaml"
+        "tandem-agc-v8-rc14-source.yaml"
         if is_candidate
         else "tandem-agc-v8-source.yaml"
     )
@@ -274,7 +283,7 @@ def _fixture(
             else EVIDENCE.FINAL_SOURCE_LOCK_REF
         )
     build_ref = (
-        "refs/heads/codex/firmware-tandem-agc-v8-rc13"
+        "refs/heads/codex/firmware-tandem-agc-v8-rc14"
         if is_candidate
         else "refs/heads/main"
     )
@@ -1006,16 +1015,18 @@ def _lifecycle_report(
 
 
 def _write_campaign_hardware(root: Path, artifact_index: Path) -> None:
+    index_payload = artifact_index.read_bytes()
+    index = json.loads(index_payload)
     for position in range(1, 5):
         serial = f"RADIO{position}"
-        receipt = root / f"hardware/deploy/{serial}/ram-boot-receipt.json"
-        _write(
-            receipt,
-            _json_bytes(
-                _receipt_payload(artifact_index, serial=serial, receipt_path=receipt)
-            ),
-        )
-        receipt.chmod(0o600)
+        receipt = build_utility_deployment_bundle(
+            root=root,
+            artifact_index_path=artifact_index,
+            artifact_index=index,
+            artifact_index_payload=index_payload,
+            serial=serial,
+            expected_current_firmware="v0.41-plutoplus-spf-tandem-agc-v8-rc12",
+        )["receipt"]
         for phase, policy, phases in (
             ("full", "full", ["steady", "transient", "modulated"]),
             ("soak", "baseline", ["steady"]),
@@ -1107,7 +1118,7 @@ def _lineage_fixture(
         stage="candidate-pre-hardware",
     )
     _assemble_campaign(candidate_staging, monkeypatch, artifact_index=candidate)
-    candidate_root = root / "lineage" / "rc13"
+    candidate_root = root / "lineage" / "rc14"
     candidate_root.parent.mkdir(mode=0o755)
     candidate_staging.rename(candidate_root)
     candidate = candidate_root / "candidate-index.json"
@@ -1185,18 +1196,19 @@ def _descriptor(root: Path, path: Path) -> dict[str, object]:
 
 
 def _write_reduced_hardware(root: Path, final_artifact: Path, policy: Path) -> None:
-    index = json.loads(final_artifact.read_text())
+    index_payload = final_artifact.read_bytes()
+    index = json.loads(index_payload)
     radios: list[dict[str, object]] = []
     for position in range(1, 5):
         serial = f"RADIO{position}"
-        receipt = root / f"hardware/deploy/{serial}/ram-boot-receipt.json"
-        _write(
-            receipt,
-            _json_bytes(
-                _receipt_payload(final_artifact, serial=serial, receipt_path=receipt)
-            ),
-        )
-        receipt.chmod(0o600)
+        receipt = build_utility_deployment_bundle(
+            root=root,
+            artifact_index_path=final_artifact,
+            artifact_index=index,
+            artifact_index_payload=index_payload,
+            serial=serial,
+            expected_current_firmware="v0.41-plutoplus-spf-tandem-agc-v8-rc13",
+        )["receipt"]
         report = (
             root
             / f"hardware/final-confirmation/{serial}/final-confirmation-report.json"
@@ -1594,7 +1606,7 @@ def test_assemble_rejects_external_same_basename_source_manifest(
     "version",
     [
         "v0.41-plutoplus-spf-tandem-agc-v8-rc013",
-        "v0.41-plutoplus-spf-tandem-agc-v8-rc13-1-g1111111",
+        "v0.41-plutoplus-spf-tandem-agc-v8-rc14-1-g1111111",
     ],
 )
 def test_assemble_rejects_typo_or_git_describe_candidate_identity(
@@ -1602,7 +1614,7 @@ def test_assemble_rejects_typo_or_git_describe_candidate_identity(
 ) -> None:
     input_path, output = _fixture(tmp_path, version=version)
 
-    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC13"):
+    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC14"):
         EVIDENCE.assemble(
             archive_root=tmp_path,
             input_path=input_path,
@@ -2081,6 +2093,24 @@ def test_candidate_qualification_accepts_exact_operator_owned_campaign(
     assert len(record["radios"]) == 4
 
 
+def test_candidate_qualification_rejects_missing_utility_companion(
+    tmp_path: Path,
+) -> None:
+    candidate = _assemble(tmp_path)
+    _write_campaign_hardware(tmp_path, candidate)
+    (tmp_path / "hardware/deploy/RADIO1/operation-plan.json").unlink()
+
+    with pytest.raises(
+        EVIDENCE.EvidenceError, match="operation plan cannot be inspected"
+    ):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            output_path=tmp_path / "campaign-index.json",
+            stage="candidate-qualified",
+            parent_index_path=candidate,
+        )
+
+
 @pytest.mark.parametrize(
     "mutation",
     ["old-summary", "host-libiio", "harness", "one-band", "one-soak-cycle"],
@@ -2183,9 +2213,10 @@ def test_candidate_qualified_binds_four_serials_and_every_raw_member(
         "RADIO4",
     ]
     assert set(index["radios"][0]) == {"serial", "deploy", "full", "soak", "lifecycle"}
-    # Per radio: five phase logs, eight full/soak phase reports, and the
-    # lifecycle runner's 65 retained metadata records.
-    assert len(index["raw_members"]) == 4 * (5 + 8 + 65)
+    # Per radio: the three utility plan/inventory records preceding the receipt,
+    # five phase logs, eight full/soak phase reports, and the lifecycle runner's
+    # 65 retained metadata records.
+    assert len(index["raw_members"]) == 4 * (3 + 5 + 8 + 65)
     assert any(
         member["path"].endswith("stale-latch-report.json")
         for member in index["raw_members"]

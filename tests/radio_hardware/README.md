@@ -473,7 +473,10 @@ acceptance boundary.
 
 ## Candidate-bound lifecycle and stale-small-ADC phases
 
-The guarded RAM deployer has no external transition-proof input. The retained
+The pinned `pluto-plus-utils` candidate RAM lifecycle has no external
+transition-proof input. `plutosdr-fw` emits a private candidate plan and
+validates the original utility inventory, operation plan, and receipt without
+translation. The retained
 RC4 record explains why the fixed command plan uses firmware download followed
 by DFU detach (`-e`), but it does not authorize a run. Each run instead binds
 the exact candidate and Pluto+ runtime model, USB serial/topology, current
@@ -502,7 +505,7 @@ The exact USB serial/topology, returned Pluto+ IIO hardware model, and isolated
 route bind operations to the selected radio. A global lease temporarily adds
 `192.168.2.1/32` through that radio's USB interface and `192.168.2.10` source,
 verifies the choice before preflight, reboot, post-boot, and failure-cleanup
-SSH, then deletes and verifies absence before the v4 deployment receipt can be
+SSH, then deletes and verifies absence before the original utility receipt can be
 published. Existing `/32` routes are refused and connected `/24` routes are
 untouched.
 The invoking account must keep the exact route add/delete operations available
@@ -527,11 +530,11 @@ IIO_SOURCE=../libiio \
 scripts/run_muted_metadata_batch_lifecycle_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc13-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc14-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
-  --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
-  --candidate-dfu /absolute/candidate/pluto.dfu \
-  --output /absolute/evidence/SERIAL/muted-metadata-batch-lifecycle-v5.json
+  --deployment-receipt /absolute/candidate/hardware/deploy/SERIAL/ram-boot-receipt.json \
+  --candidate-dfu /absolute/candidate/artifact/EXACT-RC14-pluto.dfu \
+  --output /absolute/candidate/hardware/lifecycle/SERIAL/muted-metadata-batch-lifecycle-v5.json
 ```
 
 The v5 report can authorize only the muted lifecycle claim. It reopens the
@@ -539,9 +542,9 @@ candidate inputs and every retained metadata sidecar, revalidates close/FIFO/
 fault/overflow and final mute state, and remains serial-scoped. Use a new
 output namespace for every attempt.
 
-The shared RAM deployment receipt also carries a `persistent_flash` proof:
-the exact `qspi-linux` `/dev/mtdblock3` size and SHA-256 must match before and
-after RAM boot. Release and lifecycle consumers validate that proof as part of
+The shared RAM deployment receipt carries exact pre/post runtime QSPI records:
+the `qspi-linux` `/dev/mtdblock3` size and SHA-256 must match before and after
+RAM boot. Release and lifecycle consumers validate those records as part of
 their candidate binding.
 
 The A1.2 release-image interface observer has an intentionally different
@@ -557,11 +560,11 @@ IIO_SOURCE=../libiio \
 scripts/run_stale_small_adc_hardware.sh \
   --hardware \
   --serial SERIAL \
-  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc13-source.yaml \
+  --source-manifest /absolute/candidate/source/tandem-agc-v8-rc14-source.yaml \
   --artifact-index /absolute/candidate/candidate-index.json \
-  --deployment-receipt /absolute/candidate/ram-boot-receipt.json \
-  --candidate-dfu /absolute/candidate/pluto.dfu \
-  --output /absolute/evidence/SERIAL/stale-latch-report.json
+  --deployment-receipt /absolute/candidate/hardware/deploy/SERIAL/ram-boot-receipt.json \
+  --candidate-dfu /absolute/candidate/artifact/EXACT-RC14-pluto.dfu \
+  --output /absolute/candidate/hardware/stale-latch/SERIAL/stale-latch-report.json
 ```
 
 A successful observer run writes a mode-0600

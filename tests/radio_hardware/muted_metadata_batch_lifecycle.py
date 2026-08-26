@@ -40,7 +40,6 @@ from typing import Any
 from .candidate_binding import (
     CandidateBindingError,
     validate_artifact_index,
-    validate_deployment_receipt,
 )
 from .metadata_abi import (
     FEATURE_AD9361_TEMPERATURE,
@@ -61,6 +60,12 @@ from .metadata_abi import (
     close_iio_object,
     create_metadata_buffer,
     parse_tandem_frame_metadata,
+)
+from .pluto_plus_candidate import (
+    validate_release_candidate_plan,
+    validate_release_candidate_receipt,
+    validate_release_operation_plan,
+    validate_release_usb_inventory,
 )
 
 SCHEMA = "plutosdr-fw.muted-metadata-batch-lifecycle.v5"
@@ -200,6 +205,7 @@ CANDIDATE_HARNESS_PATHS = (
     "tests/radio_hardware/candidate_binding.py",
     "tests/radio_hardware/metadata_abi.py",
     "tests/radio_hardware/muted_metadata_batch_lifecycle.py",
+    "tests/radio_hardware/pluto_plus_candidate.py",
 )
 SOURCE_MANIFEST_FIELDS = frozenset(
     {
@@ -1880,19 +1886,86 @@ def _attest_candidate_binding(
         raise QualificationError(
             "candidate metadata/tandem ABI is not the qualified lifecycle contract"
         )
+    try:
+        receipt_relative = deployment_receipt_path.absolute().relative_to(
+            artifact_index_path.absolute().parent
+        )
+    except ValueError as error:
+        raise QualificationError(
+            "candidate RAM deployment receipt is outside the archive root"
+        ) from error
+    if (
+        len(receipt_relative.parts) != 4
+        or receipt_relative.parts[:2] != ("hardware", "deploy")
+        or receipt_relative.parts[2] != serial
+        or receipt_relative.name != "ram-boot-receipt.json"
+    ):
+        raise QualificationError(
+            "candidate RAM deployment receipt is not the exact serial-scoped member"
+        )
+    deploy_root = deployment_receipt_path.absolute().parent
+    candidate_plan_path = deploy_root / "release-candidate-plan.json"
+    inventory_path = deploy_root / "usb-inventory.json"
+    operation_path = deploy_root / "operation-plan.json"
+    for companion, name in (
+        (candidate_plan_path, "release candidate plan"),
+        (inventory_path, "release USB inventory"),
+        (operation_path, "release operation plan"),
+        (deployment_receipt_path.absolute(), "candidate RAM deployment receipt"),
+    ):
+        try:
+            companion_mode = stat.S_IMODE(companion.stat(follow_symlinks=False).st_mode)
+        except OSError as error:
+            raise QualificationError(f"{name} cannot be inspected: {error}") from error
+        if companion_mode != 0o600:
+            raise QualificationError(f"{name} mode must be exactly 0600")
+    candidate_plan_payload, candidate_plan_raw = _read_candidate_json(
+        candidate_plan_path,
+        maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+        name="release candidate plan",
+    )
+    inventory_payload, inventory_raw = _read_candidate_json(
+        inventory_path,
+        maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+        name="release USB inventory",
+    )
+    operation_payload, operation_raw = _read_candidate_json(
+        operation_path,
+        maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
+        name="release operation plan",
+    )
     receipt_payload, receipt_raw = _read_candidate_json(
         deployment_receipt_path.absolute(),
         maximum_bytes=MAXIMUM_DEPLOYMENT_RECEIPT_BYTES,
         name="candidate RAM deployment receipt",
     )
     try:
-        deployment_receipt = validate_deployment_receipt(
-            receipt_raw,
+        candidate_plan = validate_release_candidate_plan(
+            candidate_plan_raw,
+            artifact_index=artifact_index,
+            artifact_index_bytes=len(artifact_payload),
             artifact_index_sha256=artifact_index_sha256,
+        )
+        inventory = validate_release_usb_inventory(inventory_raw)
+        operation = validate_release_operation_plan(
+            operation_raw,
+            candidate_plan=candidate_plan,
+            candidate_plan_bytes=len(candidate_plan_payload),
+            candidate_plan_sha256=hashlib.sha256(candidate_plan_payload).hexdigest(),
+            usb_inventory=inventory,
+            usb_inventory_bytes=len(inventory_payload),
+            usb_inventory_sha256=hashlib.sha256(inventory_payload).hexdigest(),
             serial=serial,
-            firmware_version=firmware_version,
-            hardware_model=release["hardware_model"],
-            dfu_sha256=dfu_sha256,
+        )
+        deployment_receipt = validate_release_candidate_receipt(
+            receipt_raw,
+            candidate_plan=candidate_plan,
+            candidate_plan_bytes=len(candidate_plan_payload),
+            candidate_plan_sha256=hashlib.sha256(candidate_plan_payload).hexdigest(),
+            operation_plan=operation,
+            operation_plan_bytes=len(operation_payload),
+            operation_plan_sha256=hashlib.sha256(operation_payload).hexdigest(),
+            serial=serial,
         )
     except CandidateBindingError as error:
         raise QualificationError(

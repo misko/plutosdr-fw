@@ -29,6 +29,7 @@ from .modulated_hardware import (
     evaluate_modulated_hardware_report,
     modulated_mode_evidence_policy,
 )
+from .pluto_plus_candidate_test_support import build_utility_deployment_bundle
 from .release_campaign import build_release_plan
 from .release_cli import (
     AGGREGATE_CHECKPOINT,
@@ -419,6 +420,14 @@ def _candidate_binding_files(tmp_path: Path) -> dict[str, Any]:
         ],
     }
     _write_binding_json(receipt_path, receipt, mode=0o600)
+    build_utility_deployment_bundle(
+        root=root,
+        artifact_index_path=index_path,
+        artifact_index=artifact_index,
+        artifact_index_payload=index_payload,
+        serial="radio-a",
+        expected_current_firmware="v0.41-plutoplus-spf-tandem-agc-v8-rc12",
+    )
     return {
         "root": root,
         "index": index_path,
@@ -577,7 +586,7 @@ def test_parser_rejects_mismatched_candidate_and_receipt_bindings(
     index = json.loads(index_path.read_text(encoding="utf-8"))
     receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
     if plant == "serial":
-        receipt["radio"]["serial"] = "radio-b"
+        receipt["target"]["serial"] = "radio-b"
         _write_binding_json(receipt_path, receipt, mode=0o600)
     elif plant == "firmware":
         index["release"]["firmware_version"] = f"{FIRMWARE_VERSION}-decoy"
@@ -588,8 +597,10 @@ def test_parser_rejects_mismatched_candidate_and_receipt_bindings(
         payload[0] ^= 0xFF
         _write_binding_file(dfu_path, bytes(payload))
     elif plant == "index-receipt":
-        receipt["artifact_index_sha256"] = "0" * 64
-        _write_binding_json(receipt_path, receipt, mode=0o600)
+        candidate_path = receipt_path.parent / "release-candidate-plan.json"
+        candidate = json.loads(candidate_path.read_text(encoding="utf-8"))
+        candidate["artifact_index"]["sha256"] = "0" * 64
+        _write_binding_json(candidate_path, candidate, mode=0o600)
     else:
         index["source"]["commit"] = "0" * 40
         _write_binding_json(index_path, index)
@@ -878,8 +889,8 @@ def test_binding_hashes_and_ids_reach_plan_checkpoint_report_and_fingerprint(
         binding["deployment_receipt_sha256"]
         == hashlib.sha256(options.deployment_receipt_path.read_bytes()).hexdigest()
     )
-    assert binding["deployment_boot_pre_id"] == "boot-before"
-    assert binding["deployment_boot_post_id"] == "boot-after"
+    assert binding["deployment_boot_pre_id"] == "11111111-1111-4111-8111-111111111111"
+    assert binding["deployment_boot_post_id"] == "22222222-2222-4222-8222-222222222222"
     assert len(binding["evidence_files"]) == len(REQUIRED_EVIDENCE_ROLES)
     assert (
         tuple(member["role"] for member in binding["evidence_files"])
@@ -1470,10 +1481,11 @@ def test_production_runner_attestor_requires_exact_committed_clean_sources(
     stems = {
         "scripts/deploy_tandem_agc_ram_hardware.sh": "DEPLOY_SHELL",
         "scripts/run_tandem_agc_release_hardware.sh": "SHELL",
+        "scripts/tandem_release_device_plan.py": "DEVICE_PLAN",
         "scripts/tandem_release_evidence.py": "SEMANTIC_EVIDENCE",
         "tests/radio_hardware/candidate_binding.py": "CANDIDATE_BINDING",
+        "tests/radio_hardware/pluto_plus_candidate.py": "PLUTO_PLUS_CANDIDATE",
         "tests/radio_hardware/release_cli.py": "RELEASE_CLI",
-        "tests/radio_hardware/tandem_ram_deploy.py": "TANDEM_RAM_DEPLOY",
     }
     for relative, path in source_paths.items():
         digest = hashlib.sha256(path.read_bytes()).hexdigest()

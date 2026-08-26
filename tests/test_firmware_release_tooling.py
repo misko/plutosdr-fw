@@ -76,6 +76,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "tandem-agc-v8-rc11-source.yaml:*" in package
     assert "tandem-agc-v8-rc12-source.yaml:*" in package
     assert "tandem-agc-v8-rc13-source.yaml:*" in package
+    assert "tandem-agc-v8-rc14-source.yaml:*" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -91,11 +92,13 @@ def test_release_authorizing_entry_points_require_owner_review() -> None:
         "/scripts/validate_tandem_agc_ooc.py @misko",
         "/scripts/validate_integrated_release.py @misko",
         "/scripts/tandem_release_evidence.py @misko",
+        "/scripts/tandem_release_device_plan.py @misko",
         "/scripts/deploy_tandem_agc_ram_hardware.sh @misko",
         "/scripts/run_tandem_agc_release_hardware.sh @misko",
         "/scripts/run_muted_metadata_batch_lifecycle_hardware.sh @misko",
         "/scripts/run_stale_small_adc_hardware.sh @misko",
         "/tests/radio_hardware/candidate_binding.py @misko",
+        "/tests/radio_hardware/pluto_plus_candidate.py @misko",
         "/tests/radio_hardware/tandem_ram_deploy.py @misko",
         "/tests/radio_hardware/release_cli.py @misko",
         "/tests/radio_hardware/muted_metadata_batch_lifecycle.py @misko",
@@ -125,6 +128,7 @@ def test_pr_workflow_uses_the_shared_offline_entry_point() -> None:
         "manifests/tandem-agc-v8-rc11-source.yaml",
         "manifests/tandem-agc-v8-rc12-source.yaml",
         "manifests/tandem-agc-v8-rc13-source.yaml",
+        "manifests/tandem-agc-v8-rc14-source.yaml",
         "./scripts/test_legal_info_network.sh",
     ):
         assert required in checker

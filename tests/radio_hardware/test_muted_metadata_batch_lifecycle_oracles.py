@@ -52,6 +52,11 @@ from .muted_metadata_batch_lifecycle import (
     validate_durable_pass_report,
     validate_full_drain_frames,
 )
+from .pluto_plus_candidate_test_support import (
+    build_utility_deployment_bundle,
+    identity,
+    write_private,
+)
 
 EXACT_LIBIIO_COMMIT = "70739d25ec1fa7b95d9069bd26a3e4192fdb3851"
 EXACT_LIBIIO_TAG = "tandem-agc-v8-rc3-source/libiio-v1"
@@ -85,6 +90,7 @@ def _attested_in_progress_runner_tree(monkeypatch, tmp_path):
         "scripts/run_muted_metadata_batch_lifecycle_hardware.sh",
         "tests/radio_hardware/metadata_abi.py",
         "tests/radio_hardware/candidate_binding.py",
+        "tests/radio_hardware/pluto_plus_candidate.py",
     }
 
     def fake_git(observed_repository, *arguments):
@@ -2703,7 +2709,11 @@ def _candidate_binding_files(
         "harness": {"files": harness_files},
         "evidence": {"members": evidence_members},
     }
-    index_path = root / "candidate-index.json"
+    index_path = root / (
+        "candidate-index.json"
+        if stage == "candidate-pre-hardware"
+        else "final-artifact-index.json"
+    )
     index_payload = _write_candidate_json(index_path, artifact_index)
     receipt = {
         "schema": "plutosdr-fw.tandem-ram-boot-receipt",
@@ -2815,8 +2825,17 @@ def _candidate_binding_files(
             },
         ],
     }
-    receipt_path = root / "deployment-receipt.json"
-    _write_candidate_json(receipt_path, receipt)
+    legacy_receipt_path = root / "deployment-receipt.json"
+    _write_candidate_json(legacy_receipt_path, receipt)
+    utility = build_utility_deployment_bundle(
+        root=root,
+        artifact_index_path=index_path,
+        artifact_index=artifact_index,
+        artifact_index_payload=index_payload,
+        serial=serial,
+        expected_current_firmware="v0.41-plutoplus-spf-tandem-agc-v8-rc3",
+    )
+    receipt_path = utility["receipt"]
     provenance = {
         "host_runner_repository_commit": commit,
         "host_runner_repository": str(repository),
@@ -2896,12 +2915,25 @@ def test_candidate_lineage_rejects_planted_identity_or_byte_failure(
 
     def rewrite_index():
         payload = _write_candidate_json(index_path, index)
-        receipt["artifact_index_sha256"] = hashlib.sha256(payload).hexdigest()
-        _write_candidate_json(receipt_path, receipt)
+        candidate_path = receipt_path.parent / "release-candidate-plan.json"
+        operation_path = receipt_path.parent / "operation-plan.json"
+        candidate = json.loads(candidate_path.read_text())
+        candidate["artifact_index"] = {
+            "path": str(index_path.absolute()),
+            "bytes": len(payload),
+            "sha256": hashlib.sha256(payload).hexdigest(),
+        }
+        write_private(candidate_path, candidate)
+        operation = json.loads(operation_path.read_text())
+        operation["candidate_plan"] = identity(candidate_path, candidate)
+        write_private(operation_path, operation)
+        receipt["candidate_plan"] = identity(candidate_path, candidate)
+        receipt["operation_plan"] = identity(operation_path, operation)
+        write_private(receipt_path, receipt)
 
     if plant == "receipt":
-        receipt["safety"]["final_tx_muted"] = False
-        _write_candidate_json(receipt_path, receipt)
+        receipt["post_runtime"]["safe_state"]["tx_gain_db"][0] = 0.0
+        write_private(receipt_path, receipt)
     elif plant == "index-receipt-binding":
         index["build"]["run_attempt"] = 2
         _write_candidate_json(index_path, index)

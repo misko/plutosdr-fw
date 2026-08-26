@@ -27,7 +27,12 @@ from tests.radio_hardware.candidate_binding import (
     SCHEMA_VERSION,
     CandidateBindingError,
     validate_artifact_index,
-    validate_deployment_receipt,
+)
+from tests.radio_hardware.pluto_plus_candidate import (
+    validate_release_candidate_plan,
+    validate_release_candidate_receipt,
+    validate_release_operation_plan,
+    validate_release_usb_inventory,
 )
 
 INPUT_SCHEMA = "plutosdr-fw.tandem-release-evidence-input"
@@ -54,9 +59,9 @@ FINAL_CONFIRMATION_INDEX_SCHEMA = "plutosdr-fw.tandem-agc-final-confirmation-ind
 SEMANTIC_VERIFIER_HARNESS_PATH = "scripts/tandem_release_evidence.py"
 RELEASE_VERIFIER_HARNESS_PATH = "scripts/verify_release.sh"
 RELEASE_GIT_REMOTE_URL = "https://github.com/misko/plutosdr-fw.git"
-CANDIDATE_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc13"
+CANDIDATE_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc14"
 FINAL_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
-CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc13-source/firmware-v1"
+CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc14-source/firmware-v1"
 FINAL_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-source/firmware-v1"
 PRE_HARDWARE_SOURCE_LOCK_REFS = {
     "candidate-pre-hardware": CANDIDATE_SOURCE_LOCK_REF,
@@ -120,6 +125,7 @@ _CAMPAIGN_FILENAMES = {
 RELEASE_HARDWARE_HARNESS_PATHS = (
     "scripts/deploy_tandem_agc_ram_hardware.sh",
     "scripts/run_tandem_agc_release_hardware.sh",
+    "scripts/tandem_release_device_plan.py",
     "scripts/tandem_release_evidence.py",
     "tests/radio_hardware/candidate_binding.py",
     "tests/radio_hardware/experiment.py",
@@ -128,8 +134,8 @@ RELEASE_HARDWARE_HARNESS_PATHS = (
     "tests/radio_hardware/modulated_quality.py",
     "tests/radio_hardware/release_campaign.py",
     "tests/radio_hardware/release_cli.py",
+    "tests/radio_hardware/pluto_plus_candidate.py",
     "tests/radio_hardware/tandem_quality.py",
-    "tests/radio_hardware/tandem_ram_deploy.py",
     "tests/radio_hardware/tone_quality.py",
     "tests/radio_hardware/transient_hardware.py",
     "tests/radio_hardware/transient_quality.py",
@@ -147,10 +153,11 @@ ARTIFACT_HARNESS_PATHS = tuple(
 RELEASE_RUNNER_PROVENANCE_PATHS = (
     "scripts/deploy_tandem_agc_ram_hardware.sh",
     "scripts/run_tandem_agc_release_hardware.sh",
+    "scripts/tandem_release_device_plan.py",
     "scripts/tandem_release_evidence.py",
     "tests/radio_hardware/candidate_binding.py",
+    "tests/radio_hardware/pluto_plus_candidate.py",
     "tests/radio_hardware/release_cli.py",
-    "tests/radio_hardware/tandem_ram_deploy.py",
 )
 RELEASE_BINDING_SCHEMA = "plutosdr-fw.tandem-release-candidate-binding.v1"
 RELEASE_RUNNER_SCHEMA = "plutosdr-fw.tandem-release-runner-provenance.v1"
@@ -946,8 +953,8 @@ def _verify_committed_source_manifest(
 ) -> None:
     if stage == "candidate-pre-hardware":
         if firmware_version != CANDIDATE_FIRMWARE_VERSION:
-            _fail("candidate pre-hardware firmware identity is not exact RC13")
-        basename = "tandem-agc-v8-rc13-source.yaml"
+            _fail("candidate pre-hardware firmware identity is not exact RC14")
+        basename = "tandem-agc-v8-rc14-source.yaml"
     elif stage == "final-pre-confirmation":
         if firmware_version != FINAL_FIRMWARE_VERSION:
             _fail("final pre-confirmation firmware identity is not exact v8")
@@ -1650,18 +1657,80 @@ def _verify_receipt_report(
     artifact_index_sha256: str,
     serial: str,
 ) -> str:
-    mode = stat.S_IMODE(path.stat(follow_symlinks=False).st_mode)
+    try:
+        mode = stat.S_IMODE(path.stat(follow_symlinks=False).st_mode)
+    except OSError as error:
+        raise EvidenceError(
+            f"RAM deployment receipt cannot be inspected: {error}"
+        ) from error
     if mode != 0o600:
         _fail("RAM deployment receipt mode must be exactly 0600")
+    root = path.parents[3]
+    deploy_root = path.parent
+    candidate_plan_path = deploy_root / "release-candidate-plan.json"
+    inventory_path = deploy_root / "usb-inventory.json"
+    operation_path = deploy_root / "operation-plan.json"
+    stage = str(artifact_index.get("stage", ""))
+    index_name = {
+        "candidate-pre-hardware": "candidate-index.json",
+        "final-pre-confirmation": "final-artifact-index.json",
+    }.get(stage)
+    if index_name is None:
+        _fail("RAM receipt parent artifact stage is not deployable")
+    index_path = root / index_name
+    for companion, name in (
+        (candidate_plan_path, "release candidate plan"),
+        (inventory_path, "release USB inventory"),
+        (operation_path, "release operation plan"),
+    ):
+        try:
+            companion_mode = stat.S_IMODE(companion.stat(follow_symlinks=False).st_mode)
+        except OSError as error:
+            raise EvidenceError(f"{name} cannot be inspected: {error}") from error
+        if companion_mode != 0o600:
+            _fail(f"{name} mode must be exactly 0600")
+    index_payload = _read_small(index_path, name="candidate artifact index")
+    candidate_plan_payload = _read_small(
+        candidate_plan_path, name=f"release candidate plan {serial}"
+    )
+    inventory_payload = _read_small(
+        inventory_path, name=f"release USB inventory {serial}"
+    )
+    operation_payload = _read_small(
+        operation_path, name=f"release operation plan {serial}"
+    )
     payload = _read_small(path, name=f"RAM receipt {serial}")
     try:
-        validate_deployment_receipt(
-            _decode_json(payload, name=f"RAM receipt {serial}"),
+        candidate_plan = validate_release_candidate_plan(
+            _decode_json(
+                candidate_plan_payload, name=f"release candidate plan {serial}"
+            ),
+            artifact_index=artifact_index,
+            artifact_index_bytes=len(index_payload),
             artifact_index_sha256=artifact_index_sha256,
+        )
+        inventory = validate_release_usb_inventory(
+            _decode_json(inventory_payload, name=f"release USB inventory {serial}")
+        )
+        operation = validate_release_operation_plan(
+            _decode_json(operation_payload, name=f"release operation plan {serial}"),
+            candidate_plan=candidate_plan,
+            candidate_plan_bytes=len(candidate_plan_payload),
+            candidate_plan_sha256=hashlib.sha256(candidate_plan_payload).hexdigest(),
+            usb_inventory=inventory,
+            usb_inventory_bytes=len(inventory_payload),
+            usb_inventory_sha256=hashlib.sha256(inventory_payload).hexdigest(),
             serial=serial,
-            firmware_version=artifact_index["release"]["firmware_version"],
-            hardware_model=artifact_index["release"]["hardware_model"],
-            dfu_sha256=artifact_index["artifact"]["dfu_sha256"],
+        )
+        validate_release_candidate_receipt(
+            _decode_json(payload, name=f"RAM receipt {serial}"),
+            candidate_plan=candidate_plan,
+            candidate_plan_bytes=len(candidate_plan_payload),
+            candidate_plan_sha256=hashlib.sha256(candidate_plan_payload).hexdigest(),
+            operation_plan=operation,
+            operation_plan_bytes=len(operation_payload),
+            operation_plan_sha256=hashlib.sha256(operation_payload).hexdigest(),
+            serial=serial,
         )
     except CandidateBindingError as error:
         raise EvidenceError(f"RAM receipt {serial} is invalid: {error}") from error

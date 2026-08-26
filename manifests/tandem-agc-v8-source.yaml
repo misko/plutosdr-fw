@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC13, but the
+# The external component graph remains identical from RC4 through RC14, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -30,7 +30,11 @@
 # hardware-qualified. RC13 removes the unsatisfiable known-hosts pin, uses exact
 # password-only SSH with all known-hosts files disabled, and versions the measured
 # receipt as v4 while retaining serial/topology, isolated /32 route, IIO/model,
-# QSPI equality, safe-state, and paired-selector checks. RC13 must pass its new
+# QSPI equality, safe-state, and paired-selector checks. RC14 moves the live
+# device transaction and original receipt to exact pluto-plus-utils commit
+# 9ef137768d59925acf21d5cd3ff71d1cb523dba7 while retaining every operational
+# guard and keeping plutosdr-fw as the release-plan/evidence-policy owner. RC14
+# must pass its new
 # source-locked build and full hardware qualification before this final graph is
 # used. The subsequent final build may change only the top-level release identity
 # and packaging, while requiring

@@ -13,7 +13,7 @@ so pull-request-controlled work must never target Kalman.
 - The runner has no QNAP credentials, SSH keys, or deployment secrets.
 - The trusted workflow has read-only repository permissions.
 - Self-hosted jobs require the triggering GitHub actor to be `misko`.
-- The RC13 trusted workflow ends after the build job uploads the exact deployment
+- The RC14 trusted workflow ends after the build job uploads the exact deployment
   bundle and its detached SHA-256 sidecar.
 - GitHub provenance attestation is optional operator-owned supporting metadata;
   it is not a required workflow job and cannot authorize deployment.
@@ -140,15 +140,24 @@ It has zero valid receipt-authorized deployments and is not hardware-qualified.
 Its source, successful build, artifact, evidence index, and observed incident
 remain immutable.
 
-The forward-only RC13 route uses branch
-`codex/firmware-tandem-agc-v8-rc13`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc13`, and source lock
-`refs/tags/tandem-agc-v8-rc13-source/firmware-v1`; it does not move or reuse
-RC12's branch, source lock, artifact, or evidence index. RC13 removes the
-unsatisfiable known-hosts pin for ephemeral RAM Dropbear keys, uses the exact
-password-only/no-host-key-checking policy, and advances the measured RAM-boot
-receipt from v3 to v4 while retaining every USB, topology, route, IIO/model,
-QSPI-equality, safe-state, and paired-selector guard.
+RC13 locked exact commit `3361acb3446b517854ca1cfc144d28c4dd853743`
+and source lock `refs/tags/tandem-agc-v8-rc13-source/firmware-v1`. Owner dispatch
+`32985347441`, attempt 1, remained queued with no allocated job and is
+superseded for hardware authorization; it produced no artifact or candidate
+index and opened no radio.
+
+The forward-only RC14 route uses branch
+`codex/firmware-tandem-agc-v8-rc14`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc14`, and source lock
+`refs/tags/tandem-agc-v8-rc14-source/firmware-v1`; it does not move or reuse
+RC12's or RC13's branch, source lock, artifact, or evidence index. RC14 pins
+`pluto-plus-utils` commit
+`9ef137768d59925acf21d5cd3ff71d1cb523dba7` as the sole live device operator.
+The firmware repository produces the private candidate plan and validates the
+original utility plan, inventory, operation, and measured receipt. The utility
+uses password-only/no-host-key-checking SSH for ephemeral RAM keys while
+retaining every USB, topology, route, IIO/model, QSPI-equality, safe-state, and
+paired-selector guard.
 
 ## One-time administrator installation
 
@@ -196,7 +205,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC13 workflow has no separate attestation job. An operator may capture GitHub
+The RC14 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

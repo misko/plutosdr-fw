@@ -295,6 +295,11 @@ different native library.
 
 This is the preferred normal Pluto+ method. It uses `pluto.frm`, which the
 running radio validates before writing only the `mtd3` firmware partition.
+For the controlled tandem-v8 rollout, `pluto-plus-utils` remains the required
+device interface: extend its existing `pluto firmware flash` workflow with the
+published-release/index binding and durable per-serial receipt described in the
+release plan before installing the final image. The manual steps in this
+section are reference/recovery procedures, not authorization for that rollout.
 
 ### Obtain `pluto.frm`
 
@@ -356,6 +361,10 @@ Pluto volume, wait for the copy to finish, and safely eject the volume.
 This loads `pluto.dfu` through U-Boot's SPI-flash DFU mode. It is equivalent in
 scope to the mass-storage method when—and only when—the selected alternate is
 `firmware.dfu`.
+
+The tandem-v8 controlled rollout must use the reviewed `pluto-plus-utils`
+persistent lifecycle, not these raw commands. Keep this recipe for a single
+physically isolated recovery radio only.
 
 First record the current boot identity, then request SPI-flash mode from the
 running radio:
@@ -420,28 +429,32 @@ described `-R` result or that no QSPI write occurred, so it is historical
 support for selecting `-e`, not a deployment authorization artifact. The
 guarded deployer proves the safety-relevant facts directly on every run.
 
-Use the guarded deployer. Its default mode is an offline plan: it validates the
-exact candidate index, source manifest, DFU/FIT bytes, harness and evidence
-inventories, requested serial, receipt namespace, and optional captured USB
-inventory without opening USB or running SSH/DFU.
-`candidate_archive` below is the directory containing the candidate index; its
-serial-named receipt directory must already exist and the receipt file itself
-must be absent.
+Use the native `pluto-plus-utils` release-candidate lifecycle through the pinned
+firmware wrapper. `plutosdr-fw` first produces a private candidate plan from the
+exact artifact index; the utility then creates a read-only USB inventory and a
+file-only per-radio operation plan. Only the final execute command opens IIO,
+SSH, or DFU. Retain the original four files together in the serial-scoped
+candidate archive; the firmware evidence consumer validates them directly.
 
 ```bash
-scripts/deploy_tandem_agc_ram_hardware.sh \
-  --radio-serial "$serial" \
-  --artifact "$absolute_dfu" \
-  --artifact-sha256 "$dfu_sha256" \
+deploy_root="$candidate_archive/hardware/deploy/$serial"
+install -d -m 0700 "$deploy_root"
+python3 scripts/tandem_release_device_plan.py \
   --artifact-index "$absolute_candidate_index" \
-  --artifact-index-sha256 "$candidate_index_sha256" \
+  --output "$deploy_root/release-candidate-plan.json"
+scripts/deploy_tandem_agc_ram_hardware.sh inventory \
+  --output "$deploy_root/usb-inventory.json"
+scripts/deploy_tandem_agc_ram_hardware.sh plan \
+  --candidate-plan "$deploy_root/release-candidate-plan.json" \
+  --usb-inventory "$deploy_root/usb-inventory.json" \
+  --serial "$serial" \
   --expected-current-firmware "$current_device_fw" \
-  --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
-  --ssh-password-file "$absolute_ssh_password_file"
+  --receipt "$deploy_root/ram-boot-receipt.json" \
+  --output "$deploy_root/operation-plan.json"
 ```
 
-Actual execution requires an owned mode-`0600` password file, an exact
-serial-bound confirmation, and `--execute`. Keep the password file
+Actual execution requires an owned mode-`0600` password file and the exact
+serial-bound confirmation printed in the operation plan. Keep the password file
 outside the candidate/evidence archive; the deployer never prints, hashes, or
 copies its contents. There is no external transition proof or other
 authorization file.
@@ -453,17 +466,12 @@ deployer as root, because its owned-input checks deliberately bind to the
 invoking account.
 
 ```bash
-scripts/deploy_tandem_agc_ram_hardware.sh \
-  --radio-serial "$serial" \
-  --artifact "$absolute_dfu" \
-  --artifact-sha256 "$dfu_sha256" \
-  --artifact-index "$absolute_candidate_index" \
-  --artifact-index-sha256 "$candidate_index_sha256" \
-  --expected-current-firmware "$current_device_fw" \
-  --receipt "$candidate_archive/$serial/ram-boot-receipt.json" \
+scripts/deploy_tandem_agc_ram_hardware.sh execute \
+  --operation-plan "$deploy_root/operation-plan.json" \
   --ssh-password-file "$absolute_ssh_password_file" \
-  --operator-confirmation "RAM BOOT $serial" \
-  --execute
+  --confirm "RAM BOOT RELEASE CANDIDATE $serial"
+scripts/deploy_tandem_agc_ram_hardware.sh receipt-verify \
+  "$deploy_root/ram-boot-receipt.json"
 ```
 
 The executor permits only `firmware.dfu` download on the selected radio's
@@ -489,14 +497,14 @@ instead constrained by the exact USB serial/topology, returned Pluto+ IIO
 hardware model, and isolated `/32` route through that radio's interface.
 
 The executor rejects USB reset, SPI-flash/QSPI, boot and environment
-alternates, full ZIP/FRM files, and raw MTD targets. It publishes a passing v4
-receipt, including the observed hardware model and verified temporary-route
-cleanup, only after the same serial and exact Pluto+ hardware model return with
+alternates, full ZIP/FRM files, and raw MTD targets. It publishes the original
+utility receipt, including the observed hardware model and verified
+temporary-route cleanup, only after the same serial and exact Pluto+ hardware model return with
 a new boot ID, the candidate firmware identity, and verified TX/DDS/DAC/tandem
 safe state.
 Before and after the RAM transition it also reads SHA-256 over the exact
-`qspi-linux` `/dev/mtdblock3` partition. The receipt's `persistent_flash`
-record must identify the same partition/size and equal digests; any change
+`qspi-linux` `/dev/mtdblock3` partition. The receipt's pre/post runtime QSPI
+records must identify the same partition, size, and digest; any change
 blocks receipt publication.
 
 `download_and_test.sh` is now quarantined and points to this guarded entry
