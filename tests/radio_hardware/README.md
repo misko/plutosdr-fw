@@ -95,6 +95,16 @@ remain diagnostic, and even a passing cell is not release-eligible evidence of
 autonomous gain control. This same policy applies when hybrid is explicitly
 selected in the generic modulated-signal harness.
 
+In release modulated matrices, native fast attack is mandatory report-only
+performance evidence. Its desired-only and blocker cells execute normally and
+retain absolute-quality, degradation, and per-mode observed pass/fail fields,
+but a completed native-fast RF-performance failure does not fail the phase.
+Manual, native slow attack, and tandem-auto performance remain binding.
+Missing/malformed cells, inconsistent IQ convention, configuration or identity
+mismatch, capture continuity or raw-IQ provenance defects, TX-safety failure,
+and cleanup failure remain fatal. This exception is specific to native fast;
+an explicitly requested hybrid cell still keeps its configured quality gate.
+
 The common RX/TX LO defaults to 915 MHz. Set an explicit frequency with
 `--tandem-quality-center-frequency-hz HZ`. Both LO writes are read back, the
 requested and observed values are retained under `rf`, and tandem metadata
