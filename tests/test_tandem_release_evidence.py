@@ -1669,7 +1669,7 @@ def test_assemble_rejects_typo_or_git_describe_candidate_identity(
 ) -> None:
     input_path, output = _fixture(tmp_path, version=version)
 
-    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC20"):
+    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC21"):
         EVIDENCE.assemble(
             archive_root=tmp_path,
             input_path=input_path,
