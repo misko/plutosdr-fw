@@ -12,6 +12,7 @@ import pytest
 from .release_campaign import (
     BandCase,
     CampaignConfigurationError,
+    COOLDOWN_ZERO_MINIMUM_KERNEL_BUFFERS,
     PolicyCase,
     ReleaseCampaignConfig,
     build_release_plan,
@@ -187,7 +188,7 @@ def test_default_plan_is_full_autonomous_native_all_band_all_radio_and_determini
         BandCase("lnb-low-1050mhz", 1_050_000_000),
         BandCase("lnb-mid-1550mhz", 1_550_000_000),
         BandCase("lnb-high-2050mhz", 2_050_000_000),
-        BandCase("table3-sentinel-5800mhz", 5_800_000_000),
+        BandCase("table3-sentinel-4200mhz", 4_200_000_000),
     )
     assert {run.options.profile for run in first.runs} == {"full"}
     assert {run.options.native_gain_control_modes for run in first.runs} == {
@@ -233,6 +234,22 @@ def test_default_policy_cases_change_exactly_one_declared_factor(
         "low_power_dwell": 2,
         "cooldown": 2,
     }
+
+    cooldown_zero = [
+        run
+        for run in plan.runs
+        if run.policy.factor == "cooldown"
+        and run.options.tandem_cooldown_periods == 0
+    ]
+    assert cooldown_zero
+    assert {
+        run.options.kernel_buffers for run in cooldown_zero
+    } == {COOLDOWN_ZERO_MINIMUM_KERNEL_BUFFERS}
+    assert {
+        run.options.kernel_buffers
+        for run in plan.runs
+        if run not in cooldown_zero
+    } == {_base(tmp_path).kernel_buffers}
 
 
 @pytest.mark.parametrize(

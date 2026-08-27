@@ -77,7 +77,7 @@ def test_rc24_keeps_four_authorizing_bands_and_nonbinding_2450() -> None:
         "1_050_000_000",
         "1_550_000_000",
         "2_050_000_000",
-        "5_800_000_000",
+        "4_200_000_000",
     ):
         assert center in campaign
         assert center in evidence
@@ -116,15 +116,15 @@ def test_rc24_docs_preserve_truthful_rc23_and_rc24_hardware_results() -> None:
     assert "RC24" in notes and "manual, native-slow, and native-fast" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC29" in text or "forward-only RC29" in text
+        assert "The active candidate is RC30" in text or "forward-only RC30" in text
 
 
-def test_rc24_route_remains_reproducible_while_rc29_is_active() -> None:
+def test_rc24_route_remains_reproducible_while_rc30_is_active() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc29" in evidence
-    assert "refs/tags/tandem-agc-v8-rc29-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc30" in evidence
+    assert "refs/tags/tandem-agc-v8-rc30-source/firmware-v1" in evidence
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc24" in workflow
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow

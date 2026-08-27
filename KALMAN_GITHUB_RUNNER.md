@@ -233,17 +233,21 @@ all four transient comparison phases on db696. Its first 1.05-GHz modulated
 phase stopped before opening a TX buffer because the no-FIR AD9361 image
 rejected 1,024,000 S/s with EINVAL. A cleanup-verified 2.5-MS/s, eight-samples
 per-symbol, 390.625-kHz-blocker, sixteen-buffer diagnostic passed all eight
-modulated cells. RC28 is immutable and not hardware-qualified. The forward-only RC29
-route uses branch `codex/firmware-tandem-agc-v8-rc29`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc29`, and source lock
-`refs/tags/tandem-agc-v8-rc29-source/firmware-v1`. It retains RC28's exact
-device firmware and strict release policy, but uses the proven AD9361 modulated
-configuration and rejects unsupported sub-2.5-MS/s input before hardware. It
-requires strict RF quality in each exact event-free eight-frame steady suffix
-and uses fixed authorizing centers
-1.05/1.55/2.05/5.8 GHz, and records a mandatory nonauthorizing 2.45-GHz
-diagnostic. It does not move or reuse RC22 or RC23's branch, source lock,
-artifacts, or failed campaign evidence.
+modulated cells. RC28 is immutable and not hardware-qualified. RC29 passed
+trusted run `33080376518`, indexed evidence, four exact-serial RAM deployments,
+and four lifecycle reports. Its cleanup-verified fleet attempts failed closed
+on late native-fast settling, cooldown-zero transport loss, and an unreliable
+5.8-GHz native-fast weak endpoint. Nonauthorizing replays proved eight stable
+settle frames, a 48-buffer cooldown-zero reserve, and an exact 4.2-GHz table-3
+sentinel. RC29 is immutable and not hardware-qualified. The forward-only RC30
+route uses branch `codex/firmware-tandem-agc-v8-rc30`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc30`, and source lock
+`refs/tags/tandem-agc-v8-rc30-source/firmware-v1`. It retains RC29's exact
+device firmware and strict release policy, requires eight stable settle frames,
+uses 48 buffers only for cooldown-zero captures, and uses fixed authorizing
+centers 1.05/1.55/2.05/4.2 GHz. It records the complete mandatory
+nonauthorizing 2.45-GHz diagnostic. It does not move or reuse any earlier
+candidate branch, source lock, artifacts, or failed campaign evidence.
 
 The historical forward-only RC20 route uses branch
 `codex/firmware-tandem-agc-v8-rc20`, exact version
@@ -314,7 +318,8 @@ The RC25 workflow has no separate attestation job.
 The RC26 workflow has no separate attestation job.
 The RC27 workflow has no separate attestation job.
 The RC28 workflow has no separate attestation job.
-The RC29 workflow has no separate attestation job. An operator may capture GitHub
+The RC29 workflow has no separate attestation job.
+The RC30 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

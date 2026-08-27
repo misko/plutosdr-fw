@@ -47,7 +47,7 @@ def test_rc22_owner_route_maps_branch_manifest_package_and_version() -> None:
     assert workflow.count("'tandem-agc-v8-rc22-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc22'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc22'") == 1
-    assert "Require the exact protected RC29 candidate identity" in workflow
+    assert "Require the exact protected RC30 candidate identity" in workflow
     assert "Require the exact protected RC22 reproduction identity" in workflow
     assert "Require the exact protected RC21 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
@@ -71,7 +71,7 @@ def test_rc22_keeps_four_authorizing_bands_and_nonbinding_2450() -> None:
     campaign = CAMPAIGN.read_text(encoding="utf-8")
     evidence = EVIDENCE.read_text(encoding="utf-8")
     cli = CLI.read_text(encoding="utf-8")
-    for center in ("1_050_000_000", "1_550_000_000", "2_050_000_000", "5_800_000_000"):
+    for center in ("1_050_000_000", "1_550_000_000", "2_050_000_000", "4_200_000_000"):
         assert center in campaign
         assert center in evidence
     assert 'DIAGNOSTIC_PHASE = "diagnostic-2450"' in cli
@@ -98,7 +98,7 @@ def test_rc22_docs_preserve_truthful_rc21_hardware_failure() -> None:
     assert "RC21" in notes and "not hardware-qualified" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC29" in text or "forward-only RC29" in text
+        assert "The active candidate is RC30" in text or "forward-only RC30" in text
 
 
 def test_rc22_reproduction_identity_and_attestation_policy_are_exact() -> None:

@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC29, but the
+# The external component graph remains identical from RC4 through RC30, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -103,11 +103,16 @@
 # phases. Its first modulated phase then stopped before opening a TX buffer
 # because the no-FIR AD9361 image rejected the 1,024,000-S/s request. A bounded
 # 2,500,000-S/s, eight-samples/symbol, 390,625-Hz-blocker, sixteen-buffer
-# diagnostic passed all eight modulated cells with cleanup verified. RC29 uses
-# that proven host configuration and rejects sub-2.5-MS/s release input before
-# hardware. Hidden transitions remain unproven and every release gate stays
-# strict. RC29 must
-# pass its source-locked build and full hardware qualification
+# diagnostic passed all eight modulated cells with cleanup verified. RC29 used
+# that proven host configuration, passed trusted run 33080376518, indexed
+# evidence, all four RAM deployments, and all four lifecycle reports. Its four
+# cleanup-verified fleet attempts failed closed on late native-fast settling,
+# cooldown-zero transport loss, and an unreliable 5.8-GHz weak endpoint. RC30
+# changes only the host qualification policy to eight stable settle frames, a
+# 48-buffer reserve only for cooldown-zero captures, and the exact passing
+# 4.2-GHz table-3 sentinel. Hidden transitions remain unproven and every
+# identity, RF, event, safety, and cleanup gate stays strict. RC30 must pass its
+# source-locked build and full four-radio hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release
 # identity and packaging, while requiring exact component identities in packed

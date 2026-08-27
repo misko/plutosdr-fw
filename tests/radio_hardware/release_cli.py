@@ -188,12 +188,12 @@ _TANDEM_BATCH_SAMPLE_FORMAT = 1
 _TANDEM_BATCH_SIZE_T_BYTES = 8
 _TANDEM_BATCH_MAX_TARGET_OVERSHOOT_SAMPLES = 16_384
 _TANDEM_BATCH_MAX_CAUSAL_UNCERTAINTY_SAMPLES = 16_384
-# The authorizing steady matrix needs enough queued DMA buffers to retain fast
-# AUTO events while host-side FFT analysis is running.  RC27's two-buffer
-# 1.55-GHz cooldown-0 run gap-hid every DECREASE event; the exact 16-buffer
-# replay directly retained both directions.  Hidden transitions remain
-# unproven, so this improves observation without weakening the event oracle.
+# The ordinary steady matrix uses a 16-buffer DMA queue. The release campaign
+# raises only cooldown=0 to its separately proven 48-buffer transport reserve.
+# Eight stable frames prevent a late native-AGC relock from crossing the
+# settle/measurement boundary; no transition or gain-span gate is relaxed.
 _STEADY_MATRIX_KERNEL_BUFFERS = 16
+_STEADY_MATRIX_STABLE_FRAMES = 8
 _TANDEM_BATCH_MAX_OBSERVATIONS_PER_FRAME = 5
 _TANDEM_BATCH_MAX_EVENTS_PER_FRAME = 4
 _TANDEM_BATCH_MINIMUM_EVENT_SPACING_SAMPLES = 17_408
@@ -1856,6 +1856,7 @@ def _base_quality(
         sample_rate_hz=options.sample_rate_hz,
         samples_per_channel=options.samples_per_channel,
         native_gain_control_modes=AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
+        stable_frames=_STEADY_MATRIX_STABLE_FRAMES,
         max_seconds=options.phase_max_seconds,
         output_dir=output_dir,
         profile="full",

@@ -47,7 +47,8 @@
 | `tandem-agc-v8-rc26` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | replay alignment passed, but two db696 full attempts stopped on metadata-provider ENODATA in the same 1.05-GHz low-power matrix |
 | `tandem-agc-v8-rc27` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | passed all 1.05-GHz steady policies; two-buffer capture omitted every louder-TX DECREASE event in the authorizing 1.55-GHz cooldown-0 matrix |
 | `tandem-agc-v8-rc28` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | all 44 steady and four transient pilot phases passed; unsupported 1.024-MS/s no-FIR modulated rate failed before TX buffer creation |
-| `tandem-agc-v8-rc29` | 2026-08-27 | **active development; not hardware-qualified** | retains RC28 firmware and strict gates; uses the proven 2.5-MS/s, 8-SPS, 390.625-kHz-blocker, 16-buffer modulated configuration |
+| `tandem-agc-v8-rc29` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded** | fixed the modulated configuration; fleet attempts exposed late native-AGC settling, cooldown-zero transport loss, and an unreliable 5.8-GHz endpoint |
+| `tandem-agc-v8-rc30` | 2026-08-27 | **active development; not hardware-qualified** | retains RC29 firmware and strict gates; uses eight stable settle frames, 48 buffers only for cooldown zero, and the proven 4.2-GHz table-3 sentinel |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -56,7 +57,39 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc29 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc30 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC29 locked exact commit `02a8cf18b8b81fd6a8a3e6725bb9d483e88e464b`,
+passed owner-dispatched trusted run `33080376518`, candidate indexing, all four
+exact-serial RAM deployments with unchanged QSPI, and all four lifecycle
+reports. Its four fleet campaign attempts all cleaned up safely but failed
+closed: db696's native-fast gain relocked during the 2.05-GHz measurement;
+db620 and R17 gap-hid cooldown-zero transition bursts; and R18's native-fast
+weak endpoint was unreliable at 5.8 GHz. RC29 is immutable and not
+hardware-qualified.
+
+Controlled, nonauthorizing replays isolated the host-qualification remedies.
+Eight stable settle frames passed the db696 2.05-GHz case using the ordinary
+16-buffer queue. A 48-buffer queue retained all cooldown-zero frames and all
+18 exact transition events on the slower R17 USB path. The exact 4.2-GHz
+table-3 sentinel passed manual, native-slow, native-fast, and tandem modes with
+weak-endpoint SNR around 13--15 dB; unlike 5.8 GHz, native-fast had useful gain
+span. These replays did not require an RF threshold, event proof, identity,
+safety, or cleanup relaxation.
+
+RC30 retains RC29's exact device firmware and external source graph. It changes
+only the authorizing host policy: steady matrices require eight stable settle
+frames, only cooldown-zero matrices reserve 48 DMA buffers, and 4.2 GHz
+replaces 5.8 GHz as the table-3 sentinel. Exact authorizing centers are now
+1.05, 1.55, 2.05, and 4.2 GHz. The complete 2.45-GHz matrix remains mandatory;
+only an isolated cleanup-verified RF-quality failure there is nonbinding.
+RC30 uses branch `codex/firmware-tandem-agc-v8-rc30`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc30`, manifest
+`manifests/tandem-agc-v8-rc30-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc30`, and source lock
+`refs/tags/tandem-agc-v8-rc30-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc29 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded**
 
 RC28 locked exact commit `2ed9faa136ab3c79298b6d20d9b2060d9ce19831`
 and passed owner-dispatched trusted run `33072902542`, candidate indexing, four

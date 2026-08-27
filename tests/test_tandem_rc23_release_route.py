@@ -49,7 +49,7 @@ def test_rc23_owner_route_maps_branch_manifest_package_and_version() -> None:
     assert workflow.count("'tandem-agc-v8-rc23-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc23'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc23'") == 1
-    assert "Require the exact protected RC29 candidate identity" in workflow
+    assert "Require the exact protected RC30 candidate identity" in workflow
     assert "Require the exact protected RC23 reproduction identity" in workflow
     assert "Require the exact protected RC22 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
@@ -77,7 +77,7 @@ def test_rc23_keeps_four_authorizing_bands_and_nonbinding_2450() -> None:
         "1_050_000_000",
         "1_550_000_000",
         "2_050_000_000",
-        "5_800_000_000",
+        "4_200_000_000",
     ):
         assert center in campaign
         assert center in evidence
@@ -104,7 +104,7 @@ def test_rc23_docs_preserve_truthful_rc22_hardware_results() -> None:
     assert "RC22" in notes and "not hardware-qualified" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC29" in text or "forward-only RC29" in text
+        assert "The active candidate is RC30" in text or "forward-only RC30" in text
 
 
 def test_rc23_reproduction_identity_and_attestation_policy_are_exact() -> None:

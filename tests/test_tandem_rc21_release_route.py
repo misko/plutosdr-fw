@@ -71,7 +71,7 @@ def test_rc21_four_band_authorization_and_2450_diagnostic_are_exact() -> None:
     campaign = CAMPAIGN.read_text(encoding="utf-8")
     evidence = EVIDENCE.read_text(encoding="utf-8")
     cli = CLI.read_text(encoding="utf-8")
-    exact_centers = ("1_050_000_000", "1_550_000_000", "2_050_000_000", "5_800_000_000")
+    exact_centers = ("1_050_000_000", "1_550_000_000", "2_050_000_000", "4_200_000_000")
     for center in exact_centers:
         assert center in campaign
         assert center in evidence
@@ -89,7 +89,7 @@ def test_rc21_hardware_failure_is_immutable_and_docs_name_rc29_active() -> None:
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc21" in deploy_plan
     assert "16,400" in notes and "17,408" in notes
     assert "not hardware-qualified" in notes
-    assert "The active candidate is RC29" in releasing
+    assert "The active candidate is RC30" in releasing
 
 
 def test_rc21_reproduction_keeps_single_owner_attestation_policy() -> None:

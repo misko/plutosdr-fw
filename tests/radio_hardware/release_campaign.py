@@ -43,8 +43,16 @@ DEFAULT_BANDS = (
     BandCase("lnb-low-1050mhz", 1_050_000_000),
     BandCase("lnb-mid-1550mhz", 1_550_000_000),
     BandCase("lnb-high-2050mhz", 2_050_000_000),
-    BandCase("table3-sentinel-5800mhz", 5_800_000_000),
+    BandCase("table3-sentinel-4200mhz", 4_200_000_000),
 )
+
+# Zero cooldown can place every commanded AUTO transition into a short burst.
+# Fleet hardware proved that the ordinary 16-buffer queue can then omit the
+# complete burst even though paired endpoints move correctly.  Forty-eight
+# buffers retained a contiguous stream and every exact +/-1 event on the
+# slowest local USB path while remaining inside the existing 64-frame settle
+# bound.  This is a transport reservation, not a policy-factor override.
+COOLDOWN_ZERO_MINIMUM_KERNEL_BUFFERS = 48
 
 
 @dataclass(frozen=True)
@@ -354,6 +362,17 @@ def build_release_plan(
                         center_frequency_hz=band.center_frequency_hz,
                         **policy.kwargs(),
                     )
+                    if (
+                        policy.factor == "cooldown"
+                        and candidate.tandem_cooldown_periods == 0
+                    ):
+                        candidate = replace(
+                            candidate,
+                            kernel_buffers=max(
+                                candidate.kernel_buffers,
+                                COOLDOWN_ZERO_MINIMUM_KERNEL_BUFFERS,
+                            ),
+                        )
                     validate_options(candidate)
                     run_payload = {
                         "campaign_fingerprint": campaign_fingerprint,

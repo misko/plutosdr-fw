@@ -848,6 +848,13 @@ def test_characterization_and_baseline_soak_are_distinct_plans(
     assert soak_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
     assert full_base.kernel_buffers == 16
     assert soak_base.kernel_buffers == 16
+    assert full_base.stable_frames == 8
+    assert soak_base.stable_frames == 8
+    assert {
+        run.options.kernel_buffers
+        for run in build_release_plan(full_config, full_base).runs
+        if run.policy.name == "cooldown-0"
+    } == {48}
     modulated = ModulatedHardwareOptions(physical_attenuation_db=0.0)
     assert modulated.sample_rate_hz == 2_500_000
     assert modulated.samples_per_symbol == 8
@@ -867,7 +874,7 @@ def test_default_full_plan_keeps_2450_diagnostic_non_authorizing_and_last(
         ("lnb-low-1050mhz", 1_050_000_000),
         ("lnb-mid-1550mhz", 1_550_000_000),
         ("lnb-high-2050mhz", 2_050_000_000),
-        ("table3-sentinel-5800mhz", 5_800_000_000),
+        ("table3-sentinel-4200mhz", 4_200_000_000),
     ]
     specs = phase_specs(full)
     assert len(specs) == 10

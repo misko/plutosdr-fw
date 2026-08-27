@@ -4,6 +4,31 @@ Status: active
 
 Owner: single release operator
 
+## Current execution update — RC30
+
+RC21 through RC29 are immutable history. The active forward-only candidate is
+RC30: `v0.41-plutoplus-spf-tandem-agc-v8-rc30` on branch
+`codex/firmware-tandem-agc-v8-rc30`, manifest
+`manifests/tandem-agc-v8-rc30-source.yaml`, and source lock
+`refs/tags/tandem-agc-v8-rc30-source/firmware-v1`.
+
+RC29 passed trusted build `33080376518`, indexing, four exact-serial RAM
+deployments, and four lifecycle checks, but every fleet campaign attempt failed
+closed and cleaned up safely. Read-only diagnostics proved three host-policy
+corrections for RC30: eight stable settle frames, 48 DMA buffers only for
+cooldown-zero captures, and an exact 4.2-GHz table-3 sentinel in place of the
+unreliable 5.8-GHz endpoint. Binding centers are therefore 1.05, 1.55, 2.05,
+and 4.2 GHz; the complete 2.45-GHz diagnostic remains mandatory with only an
+isolated cleanup-verified RF-quality failure nonbinding. No device firmware,
+RF threshold, transition proof, identity, safety, or cleanup gate is relaxed.
+
+Radio `1040007c4a94000211000b009186843ef2` at USB topology `3-8` is temporarily
+released for other testing in a verified muted/idle state. RC30 work may use
+the other three local radios now. Before the final four-radio authorizing
+campaign, the released radio must be returned, freshly inventoried, RAM-booted
+with the exact CI-minted RC30 artifact, and requalified from a clean evidence
+root. Final hardware qualification remains serial and one-radio-at-a-time.
+
 Base revision: tandem AGC v8 RC20, commit
 `63108b832a3618631386afdf530f19acb7905bca`
 
