@@ -18,17 +18,18 @@ size_t spf_radio_frame_v3_header_bytes(
 	return bytes <= UINT16_MAX ? bytes : 0;
 }
 
-bool spf_radio_frame_v3_build(
+static bool spf_radio_frame_build_common(
 	void *destination,
 	size_t destination_bytes,
-	const spf_radio_frame_v3_args_t *args)
+	const spf_radio_frame_v3_args_t *args,
+	uint16_t version,
+	uint8_t channel_count,
+	uint32_t required_features,
+	uint64_t missing_samples_before)
 {
 	if (destination == NULL || args == NULL || args->stream_id == 0 ||
 		args->samples_per_channel == 0 ||
-		args->iq_payload_bytes != args->samples_per_channel * UINT32_C(8) ||
-		args->enabled_scan_mask != UINT32_C(0x0f) ||
-		(args->metadata_features & SPF_META_REQUIRED_FEATURES_V3) !=
-			SPF_META_REQUIRED_FEATURES_V3 ||
+		(args->metadata_features & required_features) != required_features ||
 		args->gain_observation_interval_samples == 0 ||
 		args->gain_observation_count == 0 ||
 		args->gain_observation_count > args->gain_observation_capacity ||
@@ -87,7 +88,7 @@ bool spf_radio_frame_v3_build(
 	spf_radio_meta_v3_prefix_t *header =
 		(spf_radio_meta_v3_prefix_t *)destination;
 	header->magic = SPF_GAIN_META_MAGIC;
-	header->version = SPF_GAIN_META_VERSION_V3;
+	header->version = version;
 	header->header_bytes = (uint16_t)header_bytes;
 	header->features = args->metadata_features;
 	header->flags = flags;
@@ -98,7 +99,7 @@ bool spf_radio_frame_v3_build(
 	header->iq_payload_bytes = args->iq_payload_bytes;
 	header->enabled_scan_mask = args->enabled_scan_mask;
 	header->sample_format = SPF_SAMPLE_FORMAT_CS16_LE_TIME_INTERLEAVED;
-	header->channel_count = 2;
+	header->channel_count = channel_count;
 	header->rx1_gain_db_start = first->rx1_gain_db;
 	header->rx2_gain_db_start = first->rx2_gain_db;
 	header->rx1_gain_db_end = last->rx1_gain_db;
@@ -124,6 +125,12 @@ bool spf_radio_frame_v3_build(
 	header->gain_observation_overflow_count =
 		args->gain_observation_overflow_count;
 	header->gain_event_overflow_count = args->gain_event_overflow_count;
+	if (version == SPF_GAIN_META_VERSION_V6) {
+		header->reserved1 = (uint32_t)missing_samples_before;
+		header->reserved2 = (uint32_t)(missing_samples_before >> 32);
+		if (missing_samples_before != 0)
+			header->flags |= SPF_META_SAMPLE_GAP_BEFORE;
+	}
 
 	uint8_t *cursor = (uint8_t *)destination + sizeof(*header);
 	memcpy(cursor,
@@ -139,4 +146,52 @@ bool spf_radio_frame_v3_build(
 		header_bytes - sizeof(uint32_t));
 	*crc = spf_gain_meta_crc32(destination, header_bytes);
 	return true;
+}
+
+bool spf_radio_frame_v3_build(
+	void *destination,
+	size_t destination_bytes,
+	const spf_radio_frame_v3_args_t *args)
+{
+	if (!args || args->samples_per_channel > UINT32_MAX / UINT32_C(8) ||
+		args->iq_payload_bytes != args->samples_per_channel * UINT32_C(8) ||
+		args->enabled_scan_mask != UINT32_C(0x0f))
+		return false;
+	return spf_radio_frame_build_common(destination, destination_bytes, args,
+		SPF_GAIN_META_VERSION_V3, UINT8_C(2),
+		SPF_META_REQUIRED_FEATURES_V3, 0);
+}
+
+bool spf_radio_frame_v6_base_build(
+	void *destination,
+	size_t destination_bytes,
+	const spf_radio_frame_v3_args_t *args,
+	uint64_t missing_samples_before)
+{
+	uint8_t channel_count;
+	uint32_t bytes_per_sample;
+
+	if (!args)
+		return false;
+	switch (args->enabled_scan_mask) {
+	case UINT32_C(0x03):
+	case UINT32_C(0x0c):
+		channel_count = UINT8_C(1);
+		bytes_per_sample = UINT32_C(4);
+		if ((args->samples_per_channel & UINT32_C(1)) != 0)
+			return false;
+		break;
+	case UINT32_C(0x0f):
+		channel_count = UINT8_C(2);
+		bytes_per_sample = UINT32_C(8);
+		break;
+	default:
+		return false;
+	}
+	if (args->samples_per_channel > UINT32_MAX / bytes_per_sample ||
+		args->iq_payload_bytes != args->samples_per_channel * bytes_per_sample)
+		return false;
+	return spf_radio_frame_build_common(destination, destination_bytes, args,
+		SPF_GAIN_META_VERSION_V6, channel_count,
+		SPF_META_REQUIRED_FEATURES_V6_BASE, missing_samples_before);
 }

@@ -51,4 +51,15 @@ bool spf_radio_frame_v3_build(
 	size_t destination_bytes,
 	const spf_radio_frame_v3_args_t *args);
 
+/*
+ * Build the common V6 base. The caller may insert a reviewed extension before
+ * the variable observation/event arrays and must then recompute the CRC.
+ * V3 remains strict dual-RX; V6 admits only complete RX0, RX1, or dual layouts.
+ */
+bool spf_radio_frame_v6_base_build(
+	void *destination,
+	size_t destination_bytes,
+	const spf_radio_frame_v3_args_t *args,
+	uint64_t missing_samples_before);
+
 #endif

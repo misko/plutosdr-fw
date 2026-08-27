@@ -8,6 +8,7 @@
 #define SPF_GAIN_META_VERSION_V1 UINT16_C(1)
 #define SPF_GAIN_META_VERSION_V2 UINT16_C(2)
 #define SPF_GAIN_META_VERSION_V3 UINT16_C(3)
+#define SPF_GAIN_META_VERSION_V6 UINT16_C(6)
 #define SPF_GAIN_META_VERSION SPF_GAIN_META_VERSION_V1
 #define SPF_GAIN_META_HEADER_BYTES_V1 UINT16_C(80)
 #define SPF_GAIN_META_HEADER_BYTES_V2 UINT16_C(96)
@@ -25,6 +26,8 @@
 #define SPF_META_FEATURE_RSSI_ENDPOINT_SNAPSHOTS  (UINT32_C(1) << 5)
 #define SPF_META_FEATURE_GAIN_OBSERVATION_SERIES   (UINT32_C(1) << 6)
 #define SPF_META_FEATURE_HARDWARE_SAMPLE_COUNTER   (UINT32_C(1) << 7)
+#define SPF_META_FEATURE_CANONICAL_RX_LAYOUT       (UINT32_C(1) << 10)
+#define SPF_META_FEATURE_EXACT_GAP_ACCOUNTING      (UINT32_C(1) << 11)
 
 #define SPF_META_REQUIRED_FEATURES_V1 ( \
 	SPF_META_FEATURE_GAIN_ENDPOINT_SNAPSHOTS | \
@@ -38,6 +41,10 @@
 	SPF_META_REQUIRED_FEATURES_V2 | \
 	SPF_META_FEATURE_GAIN_OBSERVATION_SERIES | \
 	SPF_META_FEATURE_HARDWARE_SAMPLE_COUNTER)
+#define SPF_META_REQUIRED_FEATURES_V6_BASE ( \
+	SPF_META_REQUIRED_FEATURES_V3 | \
+	SPF_META_FEATURE_CANONICAL_RX_LAYOUT | \
+	SPF_META_FEATURE_EXACT_GAP_ACCOUNTING)
 
 #define SPF_META_START_VALID                 (UINT32_C(1) << 0)
 #define SPF_META_END_VALID                   (UINT32_C(1) << 1)
@@ -61,6 +68,7 @@
 #define SPF_META_GAIN_OBSERVATIONS_VALID       (UINT32_C(1) << 19)
 #define SPF_META_GAIN_OBSERVATION_OVERFLOW     (UINT32_C(1) << 20)
 #define SPF_META_HARDWARE_SAMPLE_COUNTER_VALID (UINT32_C(1) << 21)
+#define SPF_META_SAMPLE_GAP_BEFORE              (UINT32_C(1) << 23)
 
 #define SPF_GAIN_OBSERVATION_VALID                 (UINT16_C(1) << 0)
 #define SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID (UINT16_C(1) << 1)
@@ -242,6 +250,16 @@ _Static_assert(sizeof(spf_radio_meta_v3_prefix_t) ==
 _Static_assert(offsetof(spf_radio_meta_v3_prefix_t,
 	gain_observation_interval_samples) == 92,
 	"unexpected v3 extension offset");
+_Static_assert(offsetof(spf_radio_meta_v3_prefix_t, reserved1) == 116,
+	"unexpected v3 reserved-word offset");
+
+/* V6 assigns the two V3 reserved words to one little-endian exact gap count. */
+static inline uint64_t spf_radio_meta_v6_missing_samples_before(
+	const spf_radio_meta_v3_prefix_t *header)
+{
+	return (uint64_t)header->reserved1 |
+		((uint64_t)header->reserved2 << 32);
+}
 
 /*
  * CRC-32/ISO-HDLC (the zlib.crc32 variant). Call this with header_crc32 set to
