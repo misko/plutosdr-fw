@@ -176,7 +176,13 @@ module tandem_agc_core #(
     end else begin
       pwr_tick <= 1'b0;
       if (sample_valid) begin
-        if (pwr_div >= cfg_pwr_period) begin
+        // cfg_pwr_period names the number of valid samples between ticks.
+        // Count the first valid sample as period element zero, so a programmed
+        // period of N produces a tick every N samples rather than N+1.  Treat
+        // zero as the minimum one-sample period instead of underflowing the
+        // subtraction below.
+        if ((cfg_pwr_period <= 20'd1)
+            || (pwr_div >= (cfg_pwr_period - 20'd1))) begin
           pwr_div <= 20'd0; pwr_tick <= 1'b1;
         end else begin
           pwr_div <= pwr_div + 20'd1;
@@ -291,9 +297,14 @@ module tandem_agc_core #(
   // index twice, and still emit only the first physical AD9361 pulse.  Gate on
   // the live AUTO request as well, so the edge withdrawing AUTO cannot accept
   // a final command before the lifecycle state catches up.
-  wire may_decide = (state == ST_ACTIVE) && (mode_req == 2'd2)
-                    && !blanked && !cooldown_active && !pulse_pending
-                    && (fault == 8'd0);
+  wire decision_eligible = (state == ST_ACTIVE) && (mode_req == 2'd2)
+                           && !blanked && !cooldown_active && !pulse_pending
+                           && (fault == 8'd0);
+  // D-10 decisions are sampled only on a power-measurement boundary.  Keeping
+  // this gate here (rather than merely advancing cooldown on pwr_tick) ensures
+  // cfg_cooldown=N means N complete quiet power periods followed by a decision
+  // on the next period: minimum event spacing is (N+1)*cfg_pwr_period samples.
+  wire may_decide = decision_eligible && pwr_tick;
   wire small_latch_rearm_evidence = small_latch_clear_attempted
                                   && small_latch_rearm_pending
                                   && !ch1_lp && !ch2_lp && !want_decrease;
@@ -361,7 +372,7 @@ module tandem_agc_core #(
       // Dwell evidence is fresh only while a decision could otherwise be
       // accepted.  Pulse handoff, AD9361 blanking, cooldown, HOLD, and faults
       // all reset it; cfg_dwell=0 still requires one eligible power tick.
-      if (!may_decide || dwell_kind_live == DWELL_NONE) begin
+      if (!decision_eligible || dwell_kind_live == DWELL_NONE) begin
         dwell_cnt <= 8'd0;
         dwell_kind <= DWELL_NONE;
       end else if (dwell_kind != dwell_kind_live) begin
