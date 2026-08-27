@@ -38,7 +38,8 @@
 | `tandem-agc-v8-rc17` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; full campaign blocked before USB; superseded** | host-libiio replay resolved the firmware wrapper beneath the distinct libiio repository |
 | `tandem-agc-v8-rc18` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; one marginal full-test result; superseded** | trusted build/evidence and muted lifecycle passed on all four; db696 steady characterization found one native-fast-attack cell 0.27332 dB above its quality ceiling, then canonical checkpoint key ordering blocked the authorized retry before USB |
 | `tandem-agc-v8-rc19` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; full steady policy rejected; superseded** | resume passed; native-fast cells reached -2.47 dBFS without clipping against the shared -3.0 dBFS ceiling |
-| `tandem-agc-v8-rc20` | 2026-08-26 | **active development; not hardware-qualified** | fixed -2.0 dBFS native-fast ceiling; manual, native slow, tandem AUTO, clipping, and all other gates unchanged |
+| `tandem-agc-v8-rc20` | 2026-08-26 | **trusted build and four RAM/lifecycle passes; full campaign failed; superseded** | 2.45-GHz weak-SNR contamination plus two settle/measurement-boundary oracle failures; no passing full/soak campaign |
+| `tandem-agc-v8-rc21` | 2026-08-27 | **active development; not hardware-qualified** | hardens measurement-boundary evidence, authorizes fixed 1.05/1.55/2.05/5.8-GHz bands, and records nonbinding 2.45-GHz diagnostics |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -47,7 +48,26 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc20 — 2026-08-26 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc21 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC21 retains the exact RC20 firmware and external source graph. It fixes the
+settle-to-measurement evidence boundary with continuous metadata accounting,
+one bounded full-attempt restart, atomic retained failure evidence, and a
+128 MiB write-on-failure IQ ledger. Its authorizing hardware matrix uses exact
+ordered centers 1.05, 1.55, 2.05, and 5.8 GHz. Every radio also runs the same
+full manual/native-slow/native-fast/tandem matrix at fixed 2.45 GHz. A complete,
+cleanup-verified RF-quality-only failure there is recorded as
+`diagnostic_failed` and does not enter the release denominator; any identity,
+metadata, missing-evidence, fault/FIFO/overflow, or cleanup failure is fatal.
+RC21 makes no 2.4-GHz RF-performance claim.
+
+RC21 uses branch `codex/firmware-tandem-agc-v8-rc21`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc21`, manifest
+`manifests/tandem-agc-v8-rc21-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc21`, and source lock
+`refs/tags/tandem-agc-v8-rc21-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc20 — 2026-08-26 — **trusted build and four RAM/lifecycle passes; full campaign failed; superseded**
 
 RC20 retains RC19's firmware implementation, external source graph,
 deterministic package, native `pluto-plus-utils` device lifecycle, and every
@@ -63,6 +83,15 @@ RC20 uses branch `codex/firmware-tandem-agc-v8-rc20`, version
 `manifests/tandem-agc-v8-rc20-source.yaml`, package prefix
 `plutoplus-spf-tandem-agc-v8-rc20`, and source lock
 `refs/tags/tandem-agc-v8-rc20-source/firmware-v1`.
+
+RC20 locked commit `63108b832a3618631386afdf530f19acb7905bca`,
+passed trusted workflow run `33020653933`, and produced candidate index
+`326d1c985665fb20f69a5bf00351c833971a15240c6c8c7d187811d4fe96d397`.
+All four radios passed RAM-only deployment and lifecycle. The full campaign
+never qualified: attempt 1 recorded weak-rung SNR failures at 2.45 GHz without
+raw IQ, and attempts 2/3 stopped on settle/measurement-boundary assertions that
+discarded the offending frame. RC20 has no passing transient, modulated, soak,
+campaign-qualified index, or promotion evidence.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc19 — 2026-08-26 — **four safe RAM deployments and lifecycle passes; full steady policy rejected; superseded**
 

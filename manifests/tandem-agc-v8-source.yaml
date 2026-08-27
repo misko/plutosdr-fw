@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC20, but the
+# The external component graph remains identical from RC4 through RC21, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -54,12 +54,17 @@
 # deployments, and four lifecycle reports, then reached the full RF campaign.
 # Native fast attack repeatedly measured between -3.00 and -2.47 dBFS with zero
 # clipping, strong SNR, and coherent dual-RX capture, so the shared -3.0 dBFS
-# amplitude ceiling rejected otherwise valid cells. RC20 retains every firmware
-# and external-source byte while fixing only that release oracle: native fast
-# uses a fixed -2.0 dBFS ceiling; manual, native slow attack, tandem AUTO, zero
-# clipping, and every other quality/safety gate remain unchanged. RC20 must pass
-# its source-locked build and full hardware qualification before this final graph
-# is used. The subsequent final build may change only the top-level release
+# amplitude ceiling rejected otherwise valid cells. RC20 retained every firmware
+# and external-source byte while fixing only that release oracle. Its trusted
+# build, four RAM deployments, and lifecycle checks passed, but its full campaign
+# did not qualify: one 2.45-GHz run had weak-rung SNR contamination and two
+# 915-MHz runs exposed a settle/measurement-boundary evidence defect. RC21 keeps
+# all firmware/external pins, hardens that boundary and failure-IQ evidence,
+# qualifies at fixed 1.05/1.55/2.05/5.8-GHz authorizing centers, and records a
+# nonauthorizing full 2.45-GHz diagnostic whose safety/integrity failures remain
+# fatal. RC21 must pass its source-locked build and full hardware qualification
+# before this final graph is used. The subsequent final build may change only
+# the top-level release
 # identity and packaging, while requiring exact component identities in packed
 # /opt/VERSIONS.
 

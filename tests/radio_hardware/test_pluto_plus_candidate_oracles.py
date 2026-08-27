@@ -23,7 +23,7 @@ from .pluto_plus_candidate import (
 )
 
 SERIAL = "winbond-db6968136727402c"
-VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc20"
+VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc21"
 INDEX_SHA = "a" * 64
 DFU_SHA = "b" * 64
 FIT_SHA = "c" * 64
@@ -58,7 +58,7 @@ def _artifact_index() -> dict[str, Any]:
         },
         "source": {
             "commit": "1" * 40,
-            "manifest_path": "source/tandem-agc-v8-rc20-source.yaml",
+            "manifest_path": "source/tandem-agc-v8-rc21-source.yaml",
             "manifest_sha256": "2" * 64,
         },
         "build": {"run_id": 1234, "run_attempt": 1},

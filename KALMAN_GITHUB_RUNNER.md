@@ -188,7 +188,20 @@ campaign then found native-fast captures up to `-2.47 dBFS` with zero clipping
 against the shared `-3.0 dBFS` ceiling. RC19 remains immutable and is not
 hardware-qualified.
 
-The forward-only RC20 route uses branch
+RC20 is immutable and not hardware-qualified: its trusted build, four RAM-only
+deployments, and lifecycle checks passed, but it has no passing full/soak
+campaign or campaign-qualified index.
+
+The forward-only RC21 route uses branch
+`codex/firmware-tandem-agc-v8-rc21`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc21`, and source lock
+`refs/tags/tandem-agc-v8-rc21-source/firmware-v1`. It retains RC20 firmware
+bytes, hardens measurement-boundary evidence, uses fixed authorizing centers
+1.05/1.55/2.05/5.8 GHz, and records a mandatory nonauthorizing 2.45-GHz
+diagnostic. It does not move or reuse RC20's branch, source lock, artifacts, or
+failed campaign evidence.
+
+The historical forward-only RC20 route uses branch
 `codex/firmware-tandem-agc-v8-rc20`, exact version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc20`, and source lock
 `refs/tags/tandem-agc-v8-rc20-source/firmware-v1`; it does not move or reuse
@@ -250,7 +263,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC20 workflow has no separate attestation job. An operator may capture GitHub
+The RC21 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

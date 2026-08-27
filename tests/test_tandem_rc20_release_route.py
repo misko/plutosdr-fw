@@ -45,7 +45,7 @@ def test_rc20_owner_route_maps_branch_manifest_package_and_version() -> None:
     assert workflow.count("'tandem-agc-v8-rc20-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc20'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc20'") == 1
-    assert "Require the exact protected RC20 candidate identity" in workflow
+    assert "Require the exact protected RC20 reproduction identity" in workflow
     assert "Require the exact protected RC19 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
         "refs/heads/codex/firmware-tandem-agc-v8-rc19"
@@ -77,18 +77,16 @@ def test_rc20_quality_policy_is_narrow_fixed_and_fail_closed() -> None:
     )
 
 
-def test_rc20_evidence_identity_and_docs_are_active() -> None:
-    evidence = EVIDENCE.read_text(encoding="utf-8")
+def test_rc20_evidence_identity_is_immutable_and_docs_name_rc21_active() -> None:
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc20" in evidence
-    assert "refs/tags/tandem-agc-v8-rc20-source/firmware-v1" in evidence
     for source in sources:
         assert "RC20" in source
         assert "RC19" in source
         assert "-2.0 dBFS" in source
-    assert "The active candidate is RC20" in sources[0]
+    assert "The active candidate is RC21" in sources[0]
+    assert "RC20 is immutable" in sources[3]
 
 
 def test_rc20_keeps_single_owner_optional_github_attestation_policy() -> None:
@@ -96,5 +94,5 @@ def test_rc20_keeps_single_owner_optional_github_attestation_policy() -> None:
     runner = KALMAN.read_text(encoding="utf-8")
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC20 workflow has no separate attestation job." in runner
+    assert "The RC21 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner
