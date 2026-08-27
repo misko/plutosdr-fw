@@ -50,7 +50,7 @@
 | `tandem-agc-v8-rc29` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded** | fixed the modulated configuration; fleet attempts exposed late native-AGC settling, cooldown-zero transport loss, and an unreliable 5.8-GHz endpoint |
 | `tandem-agc-v8-rc30` | 2026-08-27 | **trusted indexed build; zero candidate deployments; superseded** | all software/build gates passed; mixed ordinary-Pluto/Pluto+ USB inventory failed closed before hardware |
 | `tandem-agc-v8-rc31` | 2026-08-27 | **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded** | native fast AGC intermittently held one RX chain at the 4.2-GHz strong-signal step |
-| `tandem-agc-v8-rc32` | 2026-08-27 | **active development; not hardware-qualified** | binds native-fast entry conditioning and the exact three-radio authorized promotion scope; v1 was canceled pre-artifact when its stale four-radio policy was found |
+| `tandem-agc-v8-rc32` | 2026-08-27 | **final release; trusted build passed; hardware campaign failed** | db696 passed RAM boot, lifecycle, 44 steady cases, four transient bands, and 1.05-GHz modulation; 1.55-GHz native-fast RX1 gain degradation was 3.595 dB and binding |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -59,7 +59,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc32 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc32 — 2026-08-27 — **final release; trusted build passed; hardware campaign failed**
 
 RC31 passed trusted integrated build `33101253206`, candidate indexing, and
 exact-serial RAM deployment/lifecycle on the three authorized radios. Its one
@@ -88,6 +88,35 @@ could not represent the operator-authorized three-radio scope. The immutable
 v1 tag is retained as failed pre-hardware history. RC32 `firmware-v2` replaces
 the count-only rule with the exact three permitted serials and rejects the
 excluded 3-8 serial or any substituted radio.
+
+RC32 `firmware-v2` passed 1,482 selected offline tests, all required RTL/CDC,
+stress, AXI, source-graph, legal-info, routed OOC, integrated-release, and
+trusted build gates. Trusted run `33114655961` produced the published bundle
+with SHA-256 `f2cfce1da93e7b8fbd09da58c66fd227f946ba402526b22d3e02ed11e1901b8f`
+and DFU with SHA-256
+`36ade44da992afa27b3c74a53626cf364f35f99e6548a6acefef5762bcd27744`.
+
+On `winbond-db6968136727402c`, exact-serial RAM boot and the 64-frame muted
+metadata lifecycle passed with unchanged QSPI and verified cleanup. The full
+campaign then passed all 44 steady-characterization cases, all four transient
+bands, and the 1.05-GHz modulated manual/native-slow/native-fast/tandem matrix.
+The 1.55-GHz matrix failed its binding native-fast RX1 gain-degradation limit:
+the desired-gain change was -3.595 dB against a 3 dB limit. Manual,
+native-slow, and tandem-auto passed the same comparison, and final cleanup
+verified TX muted, DDS zero, and safe selectors. The failed evidence is
+retained; no hardware retry was authorized. The remaining two modulation
+bands, 2.45-GHz diagnostic, soaks, and other two radios were not run, so RC32
+must not be described as hardware-qualified.
+
+Five host-only setup failures were also retained and did not change device or
+RF state: the first RAM launch loaded an incompatible system libiio; two
+lifecycle preflights used a mismatched cached source and then a Python
+environment without setuptools; the first full-run preflight rejected an
+untracked-file-dirty shared libiio worktree; and plan-only validation rejected
+group-writable evidence directories until they were hardened. PR CI later
+exposed a separate checkout defect: Linux source-audit tests ran without the
+pinned `linux` submodule. The PR workflow now initializes both required HDL
+and Linux oracle sources.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc31 — 2026-08-27 — **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded**
 

@@ -22,8 +22,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Check out the PNXX HDL source
-        run: git submodule update --init --depth 1 hdl
+      - name: Check out the PNXX HDL and Linux oracle sources
+        run: git submodule update --init --depth 1 hdl linux
       - name: Run release, metadata, continuity, quality, and RTL oracles
         run: |
           sudo apt-get update
