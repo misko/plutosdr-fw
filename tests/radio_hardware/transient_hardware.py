@@ -4758,7 +4758,7 @@ def _run_tandem_batch_mode_body(
         _attest_tandem_evidence_reservation(record, frames)
         return record
     except BaseException as error:
-        if frames and not record["batch_frames"]:
+        if frames:
             partial_records: list[dict[str, Any]] = []
             for frame in frames:
                 partial = frame.record

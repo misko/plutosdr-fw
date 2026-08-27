@@ -78,15 +78,15 @@ def test_rc18_evidence_identity_is_immutable_and_docs_advance_to_rc20() -> None:
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc24" in evidence
-    assert "refs/tags/tandem-agc-v8-rc24-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc25" in evidence
+    assert "refs/tags/tandem-agc-v8-rc25-source/firmware-v1" in evidence
     for source in sources:
         assert "RC19" in source
         assert "RC18" in source
         assert "RC17" in source
         assert "host-libiio" in source
     assert any("v0.41-plutoplus-spf-tandem-agc-v8-rc18" in source for source in sources)
-    assert "The active candidate is RC24" in sources[0]
+    assert "The active candidate is RC25" in sources[0]
 
 
 def test_rc18_history_keeps_single_owner_optional_github_attestation_policy() -> None:

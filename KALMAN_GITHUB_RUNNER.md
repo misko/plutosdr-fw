@@ -205,13 +205,19 @@ trusted build, indexed evidence, db696 RAM-only deployment, and lifecycle. Its
 transient pilot retained exact-cadence paired `large_adc` response events and
 stable eight-frame suffixes, but the old host oracle demanded zero clipping and
 full RF quality during the deliberately overloaded response outside the narrow
-command-write bracket. RC23 is immutable and not hardware-qualified. The
-forward-only RC24 route uses branch `codex/firmware-tandem-agc-v8-rc24`, exact
-version `v0.41-plutoplus-spf-tandem-agc-v8-rc24`, and source lock
-`refs/tags/tandem-agc-v8-rc24-source/firmware-v1`. It retains RC23's exact
-firmware, treats conditioning and commanded-response windows as diagnostic
-only, and requires strict RF quality in each exact event-free eight-frame
-steady suffix. It uses fixed authorizing centers
+command-write bracket. RC23 is immutable and not hardware-qualified. RC24 then
+passed trusted run `33053594379`, indexed evidence, db696 RAM-only deployment,
+and lifecycle. Its 1.05-GHz transient pilot passed manual, native-slow, and
+native-fast, then tandem invalidated because separate sysfs status reads
+straddled a legitimate AUTO transition and manufactured a mixed host snapshot.
+Cleanup passed; RC24 is immutable and not hardware-qualified. The
+forward-only RC25 route uses branch `codex/firmware-tandem-agc-v8-rc25`, exact
+version `v0.41-plutoplus-spf-tandem-agc-v8-rc25`, and source lock
+`refs/tags/tandem-agc-v8-rc25-source/firmware-v1`. It retains RC24's exact
+firmware, reads transition count and paired gain endpoints as one bounded
+coherent host snapshot, treats conditioning and commanded-response windows as
+diagnostic only, and requires strict RF quality in each exact event-free
+eight-frame steady suffix. It uses fixed authorizing centers
 1.05/1.55/2.05/5.8 GHz, and records a mandatory nonauthorizing 2.45-GHz
 diagnostic. It does not move or reuse RC22 or RC23's branch, source lock,
 artifacts, or failed campaign evidence.
@@ -280,7 +286,8 @@ allowed maintainer source-lock branch. It:
 
 The RC22 workflow has no separate attestation job.
 The RC23 workflow has no separate attestation job.
-The RC24 workflow has no separate attestation job. An operator may capture GitHub
+The RC24 workflow has no separate attestation job.
+The RC25 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

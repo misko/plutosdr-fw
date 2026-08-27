@@ -247,7 +247,7 @@ cells. R18 also saw one strict tandem transition-continuity rejection; that
 rule remains mandatory. RC19 has no passing full or soak result and is not
 hardware-qualified.
 
-The active candidate is RC24. RC20's trusted build and four RAM/lifecycle
+The active candidate is RC25. RC20's trusted build and four RAM/lifecycle
 passes remain immutable context; it is not hardware-qualified. RC21's trusted
 build and db696 RAM/lifecycle
 passed, but its 1.05-GHz campaign measured 16,400-sample paired-event spacing
@@ -263,8 +263,14 @@ lifecycle. Its transient pilot retained exact-cadence paired response events
 and stable suffixes, but the old host oracle demanded zero clipping and full RF
 quality during the deliberately overloaded response outside the command-write
 bracket. RC23 has no passing full/soak campaign and is immutable and not
-hardware-qualified. RC24 retains its exact firmware, external source graph,
-deterministic
+hardware-qualified. RC24 then passed trusted run `33053594379`, indexed
+candidate evidence, db696 RAM-only deployment with unchanged QSPI, and
+lifecycle. Its 1.05-GHz transient pilot passed manual, native-slow, and
+native-fast. Tandem invalidated because separate sysfs reads of transition count
+and paired gain endpoints straddled a legitimate AUTO transition and
+manufactured a mixed host snapshot. Cleanup and safe state passed; RC24 has no
+passing full/soak campaign and is immutable and not hardware-qualified. RC25
+retains its exact firmware, external source graph, deterministic
 package, topology-bound serialless-b674
 resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
 route, IIO/model/runtime checks, QSPI equality requirement, and safe-state
@@ -278,7 +284,7 @@ Ephemeral RAM host keys are accepted
 with password-only SSH and host-key files disabled. Exact topology remains
 mandatory; nonempty serial mismatch, ambiguity, wrong VID/PID, serialless b673,
 `-S`, `-R`, persistent targets, and returned-runtime mismatch remain forbidden
-or fail closed. RC24 retains RC23's exact power-period/tick-gated firmware and
+or fail closed. RC25 retains RC24's exact power-period/tick-gated firmware and
 keeps the native-fast `-2.0 dBFS`
 ceiling, hardened settle/measurement boundary and failure-IQ evidence, and exact
 ordered centers 1.05, 1.55, 2.05, and 5.8 GHz. In transient AUTO evidence,
@@ -287,19 +293,19 @@ quality is required in the exact event-free eight-frame suffix of each steady
 partition. Its full aggregate always runs
 the fixed 2.45-GHz matrix last. Only a complete cleanup-verified RF-quality
 failure there may be recorded as nonauthorizing `diagnostic_failed`; all
-identity, metadata, evidence, fault, or cleanup failures remain fatal. RC24
+identity, metadata, evidence, fault, or cleanup failures remain fatal. RC25
 makes no 2.4-GHz RF-performance claim. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc24-source/firmware-v1`. The later
+`refs/tags/tandem-agc-v8-rc25-source/firmware-v1`. The later
 final build uses the different exact lock
 `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
 reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
-1. Commit the complete RC24 source and run the routed block-level OOC gate from a
+1. Commit the complete RC25 source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC24 firmware source lock and explicit trusted build route.
+2. Create the exact RC25 firmware source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;

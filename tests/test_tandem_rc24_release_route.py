@@ -50,7 +50,7 @@ def test_rc24_owner_route_maps_branch_manifest_package_and_version() -> None:
     assert workflow.count("'tandem-agc-v8-rc24-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc24'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc24'") == 1
-    assert "Require the exact protected RC24 candidate identity" in workflow
+    assert "Require the exact protected RC24 reproduction identity" in workflow
     assert "Require the exact protected RC23 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
         "refs/heads/codex/firmware-tandem-agc-v8-rc23"
@@ -107,22 +107,25 @@ def test_rc24_authorizes_transient_rf_quality_only_from_stable_suffixes() -> Non
     )
 
 
-def test_rc24_docs_preserve_truthful_rc23_hardware_results() -> None:
+def test_rc24_docs_preserve_truthful_rc23_and_rc24_hardware_results() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert "33049331161" in notes
+    assert "33053594379" in notes
     assert "exact-cadence paired" in notes
     assert "RC23" in notes and "not hardware-qualified" in notes
+    assert "RC24" in notes and "manual, native-slow, and native-fast" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC24" in text or "forward-only RC24" in text
+        assert "The active candidate is RC25" in text or "forward-only RC25" in text
 
 
-def test_rc24_evidence_identity_and_attestation_policy_are_exact() -> None:
+def test_rc24_route_remains_reproducible_while_rc25_is_active() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc24" in evidence
-    assert "refs/tags/tandem-agc-v8-rc24-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc25" in evidence
+    assert "refs/tags/tandem-agc-v8-rc25-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc24" in workflow
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
     assert "The RC24 workflow has no separate attestation job." in runner

@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC24, but the
+# The external component graph remains identical from RC4 through RC25, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -72,10 +72,15 @@
 # db696 RAM deployment, and lifecycle, then exposed a second host-oracle defect:
 # the oracle demanded zero clipping during the deliberately overloaded response
 # outside the narrow command-write bracket despite exact-cadence paired events
-# and stable suffixes. RC24 retains all such response windows as diagnostic and
-# requires strict RF quality only in exact event-free eight-frame steady
-# suffixes; gaps, hidden events, and all identity/metadata/safety/fault/cleanup
-# failures remain fatal. RC24 must pass
+# and stable suffixes. RC24 retained all such response windows as diagnostic,
+# passed its trusted build, db696 RAM deployment, and lifecycle, then passed
+# manual, native-slow, and native-fast at 1.05 GHz. Tandem invalidated because
+# separate sysfs reads of one coherent FPGA status bundle straddled a legitimate
+# AUTO transition and manufactured a mixed transition-count/gain snapshot.
+# RC25 brackets both endpoint reads with the transition count and accepts only a
+# stable paired snapshot, while retaining final metadata on close-ledger errors.
+# Gaps, hidden events, and all identity/metadata/safety/fault/cleanup failures
+# remain fatal. RC25 must pass
 # its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release

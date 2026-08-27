@@ -112,7 +112,7 @@ def test_rc12_docs_preserve_exact_build_and_ram_without_receipt_history() -> Non
     rc12_lock = "refs/tags/tandem-agc-v8-rc12-source/firmware-v1"
     rc13_lock = "refs/tags/tandem-agc-v8-rc13-source/firmware-v1"
 
-    assert "The active candidate is RC24" in releasing
+    assert "The active candidate is RC25" in releasing
     for source in sources:
         assert rc11_lock in source
         assert rc12_lock in source

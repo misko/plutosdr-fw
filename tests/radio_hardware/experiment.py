@@ -52,6 +52,7 @@ DAC_SELECT_PNXX = 0x9
 RX_SAMPLE_COUNTER_LOW_REGISTER = 0x800000B8
 MIN_COMMON_CENTER_FREQUENCY_HZ = 70_000_000
 MAX_COMMON_CENTER_FREQUENCY_HZ = 6_000_000_000
+TANDEM_STATUS_SNAPSHOT_ATTEMPTS = 16
 
 
 def DAC_SELECTOR_REGISTER(channel: int) -> int:
@@ -1019,11 +1020,37 @@ class Issue46Radio:
             "overflow_count",
             "fifo_level",
             "ownership_epoch",
-            "transition_count",
-            "rx1_gain_index",
-            "rx2_gain_index",
         )
-        return {name: int(self._read_attr(tandem, name)) for name in names}
+        values = {name: int(self._read_attr(tandem, name)) for name in names}
+
+        # The FPGA presents transition count and expected gain in one coherent
+        # CDC snapshot, but sysfs exposes them as separate attributes.  A live
+        # AUTO transition between those USB reads must not manufacture a torn
+        # host-side status.  Bracket both gain reads with the transition count;
+        # equality proves that the three values came from one stable snapshot.
+        # The bounded retry is read-only and normally completes on its first
+        # attempt; after TX mute it also lets the last in-flight transition
+        # settle without relying on a timing sleep.
+        for _attempt in range(TANDEM_STATUS_SNAPSHOT_ATTEMPTS):
+            transition_before = int(self._read_attr(tandem, "transition_count"))
+            rx1_gain_index = int(self._read_attr(tandem, "rx1_gain_index"))
+            rx2_gain_index = int(self._read_attr(tandem, "rx2_gain_index"))
+            transition_after = int(self._read_attr(tandem, "transition_count"))
+            if (
+                transition_before == transition_after
+                and rx1_gain_index == rx2_gain_index
+            ):
+                values.update(
+                    {
+                        "transition_count": transition_after,
+                        "rx1_gain_index": rx1_gain_index,
+                        "rx2_gain_index": rx2_gain_index,
+                    }
+                )
+                return values
+        raise FixtureSafetyError(
+            "tandem transition/gain status did not produce a coherent snapshot"
+        )
 
     def capture_iq(
         self, buffer: Any, *, metadata: bool, samples_per_channel: int

@@ -19,7 +19,7 @@ from typing import Any
 import pytest
 
 from . import transient_hardware as transient_hardware_module
-from .experiment import EvidenceInvalid, Issue46Radio
+from .experiment import EvidenceInvalid, FixtureSafetyError, Issue46Radio
 from .metadata_abi import (
     FEATURE_AD9361_TEMPERATURE,
     FEATURE_FPGA_GAIN_EVENTS,
@@ -1367,6 +1367,109 @@ def test_tandem_close_counter_ledger_preserves_bounded_forward_deltas(
     assert ledger["exact_retired_tail_count_claim"] is None
 
 
+def test_live_tandem_status_retries_a_cross_attribute_transition() -> None:
+    class _Attr:
+        def __init__(self, values: list[int]):
+            self.values = values
+            self.reads = 0
+
+        @property
+        def value(self) -> str:
+            value = self.values[min(self.reads, len(self.values) - 1)]
+            self.reads += 1
+            return str(value)
+
+    class _Device:
+        id = "tandem-agc"
+
+        def __init__(self) -> None:
+            self.attrs = {
+                "state": _Attr([3]),
+                "fault_flags": _Attr([0]),
+                "overflow_count": _Attr([0]),
+                "fifo_level": _Attr([5]),
+                "ownership_epoch": _Attr([4]),
+                # Attempt zero brackets a real 35 -> 36 transition.  Attempt
+                # one sees the coherent post-transition gain/count snapshot.
+                "transition_count": _Attr([35, 36, 36, 36]),
+                "rx1_gain_index": _Attr([64, 65]),
+                "rx2_gain_index": _Attr([64, 65]),
+            }
+
+    class _Context:
+        def __init__(self, device: _Device) -> None:
+            self.device = device
+
+        def find_device(self, name: str) -> _Device | None:
+            return self.device if name == "tandem-agc" else None
+
+    device = _Device()
+    radio = object.__new__(Issue46Radio)
+    radio.context = _Context(device)
+
+    status = radio.tandem_status()
+
+    assert status == {
+        "state": 3,
+        "fault_flags": 0,
+        "overflow_count": 0,
+        "fifo_level": 5,
+        "ownership_epoch": 4,
+        "transition_count": 36,
+        "rx1_gain_index": 65,
+        "rx2_gain_index": 65,
+    }
+    assert device.attrs["transition_count"].reads == 4
+
+
+def test_live_tandem_status_rejects_permanent_cross_attribute_churn() -> None:
+    class _ChangingAttr:
+        def __init__(self) -> None:
+            self.value_int = 0
+
+        @property
+        def value(self) -> str:
+            self.value_int += 1
+            return str(self.value_int)
+
+    class _ConstantAttr:
+        def __init__(self, value: int):
+            self.constant = value
+
+        @property
+        def value(self) -> str:
+            return str(self.constant)
+
+    class _Device:
+        id = "tandem-agc"
+
+        def __init__(self) -> None:
+            self.attrs = {
+                "state": _ConstantAttr(3),
+                "fault_flags": _ConstantAttr(0),
+                "overflow_count": _ConstantAttr(0),
+                "fifo_level": _ConstantAttr(5),
+                "ownership_epoch": _ConstantAttr(4),
+                "transition_count": _ChangingAttr(),
+                "rx1_gain_index": _ConstantAttr(64),
+                "rx2_gain_index": _ConstantAttr(64),
+            }
+
+    class _Context:
+        @staticmethod
+        def find_device(name: str) -> _Device | None:
+            return _Device() if name == "tandem-agc" else None
+
+    radio = object.__new__(Issue46Radio)
+    radio.context = _Context()
+
+    with pytest.raises(
+        FixtureSafetyError,
+        match="did not produce a coherent snapshot",
+    ):
+        radio.tandem_status()
+
+
 @pytest.mark.parametrize(
     ("transition_delta", "endpoint_delta", "message"),
     (
@@ -1383,6 +1486,15 @@ def test_tandem_close_counter_ledger_rejects_reset_or_endpoint_substitution(
 
     with pytest.raises(EvidenceInvalid, match=message):
         _run_fake(radio, _quality(tmp_path))
+
+    persisted = json.loads(
+        (
+            tmp_path / radio.options.serial / "tandem-agc-transient-report.json"
+        ).read_text(encoding="utf-8")
+    )
+    final_frame = persisted["failure_evidence"]["batch_frames"][-1]
+    assert final_frame["metadata"]["buffer_sequence"] == 63
+    assert final_frame["metadata"]["tandem_transition_count"] >= 0
 
 
 def test_tandem_deferred_readback_failure_preserves_progressive_schedule(

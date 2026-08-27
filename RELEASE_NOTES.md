@@ -42,7 +42,8 @@
 | `tandem-agc-v8-rc21` | 2026-08-27 | **successful indexed build and pilot RAM/lifecycle; 1.05-GHz campaign failed; superseded** | exposed FPGA power-period/event-spacing mismatch: 16,400 samples observed where the contract requires 17,408 |
 | `tandem-agc-v8-rc22` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle and 11/11 steady policies passed; transient oracle invalid; superseded** | fixed exact power periods/event spacing; the transient harness rejected a fully retained startup convergence before its stable pre-attack suffix |
 | `tandem-agc-v8-rc23` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle passed; transient response oracle invalid; superseded** | retained exact-cadence paired response events, but the host oracle demanded zero clipping during a deliberately overloaded AUTO response |
-| `tandem-agc-v8-rc24` | 2026-08-27 | **active development; not hardware-qualified** | retains RC23 firmware; only exact event-free steady suffixes authorize transient RF quality, while response windows remain diagnostic |
+| `tandem-agc-v8-rc24` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; three transient comparison modes passed; tandem invalid; superseded** | separate host sysfs reads straddled one AUTO transition and manufactured a mixed transition-count/gain snapshot |
+| `tandem-agc-v8-rc25` | 2026-08-27 | **active development; not hardware-qualified** | retains RC24 firmware; reads tandem transition count and paired gain endpoints as one bounded coherent host snapshot and preserves final failure metadata |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -51,7 +52,28 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc24 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc25 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC25 retains RC24's exact firmware and external source graph. It fixes the host
+status-read defect exposed by the RC24 transient pilot: transition count and
+the two gain endpoints are separate sysfs attributes even though the FPGA
+publishes one coherent status bundle. The host now brackets both endpoint reads
+with transition-count reads, accepts only a stable paired snapshot, and fails
+closed after a bounded read-only retry. Close-ledger failures also retain every
+parsed batch frame so the exact final metadata remains replayable.
+
+RC25 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
+evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+RC25 uses branch `codex/firmware-tandem-agc-v8-rc25`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc25`, manifest
+`manifests/tandem-agc-v8-rc25-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc25`, and source lock
+`refs/tags/tandem-agc-v8-rc25-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc24 — 2026-08-27 — **successful indexed build and db696 RAM/lifecycle; transient tandem invalid; superseded**
 
 RC24 retains RC23's exact firmware and external source graph. It corrects the
 transient evidence policy exposed by RC23 hardware. Conditioning and commanded
@@ -66,6 +88,22 @@ RC24 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
 2.45-GHz matrix still runs and retains complete evidence, but an isolated
 cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
 evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+RC24 locked exact commit `88505f12a2d518fc6b8681db184437dc7c646141`.
+Owner-dispatched trusted run `33053594379`, attempt 1, completed successfully
+and retained artifact ID `9639287887`. Candidate index SHA-256
+`d7b1e9ffdaf65b1e2cf024ad916149f646890515704ad32fc53a159ce6301c17`
+passed independent semantic replay. On db696, RAM receipt SHA-256
+`b82cb747ca9773c379bf76d64e5dd4eb068be8a8b1a4c0ac0372ad20123c268b`
+proved a new RC24 boot with unchanged QSPI and final safe state; lifecycle
+report SHA-256
+`9e532b2d2edf3fcf95c71f81cc442e80a3c24326fdd574b3cd96dc716926a66e`
+passed all 64 frames and cleanup checks. The 1.05-GHz transient pilot then
+passed manual, native-slow, and native-fast. Tandem invalidated because the host
+read transition count and the two gain endpoints separately while AUTO was
+live, producing an impossible mixed snapshot across one legitimate transition.
+Cleanup passed, the exact route was removed, and no persistent write occurred.
+RC24 has no passing full or soak result and is not hardware-qualified.
 
 RC24 uses branch `codex/firmware-tandem-agc-v8-rc24`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc24`, manifest
