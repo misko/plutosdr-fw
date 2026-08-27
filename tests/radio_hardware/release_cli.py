@@ -82,6 +82,7 @@ from .release_campaign import (
 )
 from .tandem_quality import (
     AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
+    MODE_NATIVE_FAST,
     TandemQualityOptions,
     default_tx_trajectory,
     evaluate_matrix,
@@ -3887,6 +3888,7 @@ def _transient_ordinary_errors(
                 command: StimulusCommand,
                 reference: tuple[float, float],
                 sign: int,
+                require_all_channels: bool = True,
             ) -> list[dict[str, Any]]:
                 assert command.sample_sequence_before is not None
                 assert command.sample_sequence_after is not None
@@ -3929,7 +3931,9 @@ def _transient_ordinary_errors(
                             }
                             break
                     if found is None:
-                        raise ValueError("native gain change is not represented")
+                        if require_all_channels:
+                            raise ValueError("native gain change is not represented")
+                        continue
                     results.append(found)
                 return results
 
@@ -3945,6 +3949,7 @@ def _transient_ordinary_errors(
                     command=release_command,
                     reference=strong,
                     sign=1,
+                    require_all_channels=mode_name != MODE_NATIVE_FAST,
                 )
             except ValueError as error:
                 errors.append(f"{context} gain evidence cannot be recomputed: {error}")
@@ -3962,6 +3967,16 @@ def _transient_ordinary_errors(
                 ],
                 "release_gain_change_db": [
                     returned[index] - strong[index] for index in (0, 1)
+                ],
+                "release_response_required": mode_name != MODE_NATIVE_FAST,
+                "release_response_policy": (
+                    "diagnostic_after_fast_attack_gain_lock"
+                    if mode_name == MODE_NATIVE_FAST
+                    else "required_autonomous_recovery"
+                ),
+                "release_response_observed_by_rx": [
+                    any(bound["rx_channel"] == channel for bound in release_bounds)
+                    for channel in (0, 1)
                 ],
                 "attack_returned_iq_observation_bounds": attack_bounds,
                 "release_returned_iq_observation_bounds": release_bounds,

@@ -244,10 +244,12 @@ offline oracles, routed OOC, trusted integrated build `33097467689`, packaging,
 checksum verification, and candidate indexing. Its first read-only inventory
 failed closed before hardware because an unrelated ordinary ADALM-Pluto was
 attached beside the four Pluto+ targets. RC30 has zero candidate deployments
-and is immutable. The forward-only RC31 route uses branch
-`codex/firmware-tandem-agc-v8-rc31`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc31`, and source lock
-`refs/tags/tandem-agc-v8-rc31-source/firmware-v1`. It retains RC30's exact
+and is immutable. RC31 subsequently passed trusted build `33101253206`,
+indexing, and RAM deployment/lifecycle on the three authorized radios, but its
+db696 retry stopped at 4.2 GHz on intermittent native fast gain lock. The
+forward-only RC32 route uses branch `codex/firmware-tandem-agc-v8-rc32`, exact
+version `v0.41-plutoplus-spf-tandem-agc-v8-rc32`, and source lock
+`refs/tags/tandem-agc-v8-rc32-source/firmware-v1`. It retains RC31's exact
 device firmware and strict release policy and pins `pluto-plus-utils` commit
 `b2b3113c2e8724453179f09d357b4917c0f14c77`, whose read-only inventory scans
 the full bus while selecting exactly one requested serial. Absence, duplicates,
@@ -325,7 +327,8 @@ The RC27 workflow has no separate attestation job.
 The RC28 workflow has no separate attestation job.
 The RC29 workflow has no separate attestation job.
 The RC30 workflow has no separate attestation job.
-The RC31 workflow has no separate attestation job. An operator may capture GitHub
+The RC31 workflow has no separate attestation job.
+The RC32 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

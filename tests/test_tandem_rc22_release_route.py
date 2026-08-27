@@ -47,7 +47,7 @@ def test_rc22_owner_route_maps_branch_manifest_package_and_version() -> None:
     assert workflow.count("'tandem-agc-v8-rc22-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc22'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc22'") == 1
-    assert "Require the exact protected RC31 candidate identity" in workflow
+    assert "Require the exact protected RC32 candidate identity" in workflow
     assert "Require the exact protected RC22 reproduction identity" in workflow
     assert "Require the exact protected RC21 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
@@ -98,7 +98,7 @@ def test_rc22_docs_preserve_truthful_rc21_hardware_failure() -> None:
     assert "RC21" in notes and "not hardware-qualified" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC31" in text or "forward-only RC31" in text
+        assert "The active candidate is RC32" in text or "forward-only RC32" in text
 
 
 def test_rc22_reproduction_identity_and_attestation_policy_are_exact() -> None:

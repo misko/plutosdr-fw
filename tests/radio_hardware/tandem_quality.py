@@ -19,6 +19,7 @@ from typing import Any
 from .experiment import (
     MAX_COMMON_CENTER_FREQUENCY_HZ,
     MIN_COMMON_CENTER_FREQUENCY_HZ,
+    NATIVE_FAST_ENTRY_MANUAL_GAIN_DB,
     TX_MUTE_DB,
     EvidenceInvalid,
     Issue46Radio,
@@ -2227,11 +2228,25 @@ def _run_mode(
         raise ValueError(f"unknown quality mode {mode!r}")
 
     first_readback = radio.set_tx2_gain(options.tx_gain_trajectory_db[0])
+    native_entry_conditioning: dict[str, Any] | None = None
     if native_iio_mode is not None:
         # Enter autonomous native AGC with the real weakest-rung stimulus
         # already present.  Fast attack may retain its prior lock level and
         # disallow gain increases after lock; entering it while TX2 is still
         # muted therefore makes later cells depend on earlier campaign runs.
+        if native_iio_mode == "fast_attack":
+            state_before = radio.read_rx_state()
+            radio.configure_rx(
+                "manual", manual_gain_db=NATIVE_FAST_ENTRY_MANUAL_GAIN_DB
+            )
+            state_after = radio.read_rx_state()
+            native_entry_conditioning = {
+                "policy": "weak-stimulus-manual-ceiling-before-fast-attack",
+                "stimulus_tx2_gain_db": first_readback,
+                "manual_seed_gain_db": NATIVE_FAST_ENTRY_MANUAL_GAIN_DB,
+                "rx_state_before": state_before,
+                "rx_state_after": state_after,
+            }
         radio.configure_rx(native_iio_mode)
     mode_record: dict[str, Any] = {
         "mode": mode,
@@ -2239,6 +2254,8 @@ def _run_mode(
         "initial_tx2_readback_db": first_readback,
         "cells": [],
     }
+    if native_entry_conditioning is not None:
+        mode_record["native_entry_conditioning"] = native_entry_conditioning
     report["modes"].append(mode_record)
     _atomic_json(report_path, report)
     tandem_session = (
@@ -3219,6 +3236,18 @@ def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
         mode: _observed_native_gain_response(cells)
         for mode, cells in native_cells.items()
     }
+    for native_mode, evidence in native_gain_evidence_by_mode.items():
+        return_required = native_mode != MODE_NATIVE_FAST
+        evidence["return_response_required"] = return_required
+        evidence["return_response_policy"] = (
+            "required_autonomous_recovery"
+            if return_required
+            else "diagnostic_after_fast_attack_gain_lock"
+        )
+        evidence["return_response_observed_by_rx"] = [
+            response > 0.0
+            for response in evidence["return_weak_minus_strong_gain_db"]
+        ]
     native_gain_evidence = native_gain_evidence_by_mode[primary_native_mode]
     failures: list[str] = []
     if not manual_reference or not all(
@@ -3253,6 +3282,8 @@ def evaluate_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
             ("outbound", "outbound_weak_minus_strong_gain_db"),
             ("return", "return_weak_minus_strong_gain_db"),
         ):
+            if native_mode == MODE_NATIVE_FAST and leg == "return":
+                continue
             wrong_native_channels = [
                 channel
                 for channel, response in enumerate(evidence[evidence_name])

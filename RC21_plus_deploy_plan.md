@@ -4,13 +4,27 @@ Status: active
 
 Owner: single release operator
 
-## Current execution update — RC31
+## Current execution update — RC32
 
-RC21 through RC30 are immutable history. The active forward-only candidate is
-RC31: `v0.41-plutoplus-spf-tandem-agc-v8-rc31` on branch
-`codex/firmware-tandem-agc-v8-rc31`, manifest
-`manifests/tandem-agc-v8-rc31-source.yaml`, and source lock
-`refs/tags/tandem-agc-v8-rc31-source/firmware-v1`.
+RC21 through RC31 are immutable history. RC31 passed trusted CI build
+`33101253206`, indexing, exact-serial RAM deployment, and lifecycle on the
+three currently authorized Pluto+ radios. Its one authorized db696 campaign
+retry was closed invalid at 4.2 GHz when native fast attack intermittently
+held one RX chain's gain. Improved failure evidence and ten nonauthorizing
+reproductions isolated the behavior: live-waveform 62 dB manual entry
+conditioning made the mandatory fast strong-signal attack deterministic in
+all ten runs, while one chain in one run did not increase gain after the
+signal weakened. Local AD9361 documentation confirms that fast gain is held
+after lock until a configured unlock condition fires. This is native fast-AGC
+semantics, not tandem firmware behavior or a 2.4 GHz interference finding.
+
+The active forward-only candidate is RC32. It retains the exact RC31 firmware
+logic and RF plan, seeds both RX chains at 62 dB manual gain under the real
+weak waveform before native fast entry, requires native fast's strong-signal
+gain decrease on both receivers, and records its post-lock weak-signal gain
+increase per receiver as diagnostic. Manual fixed-gain stability, slow-AGC
+bidirectional response, tandem bidirectional response/event proof, every RF
+quality threshold, identity, safety, and cleanup remain binding.
 
 RC29 passed trusted build `33080376518`, indexing, four exact-serial RAM
 deployments, and four lifecycle checks, but every fleet campaign attempt failed
@@ -27,19 +41,19 @@ RC30 passed all 1,465 offline oracles, routed OOC, trusted integrated build
 indexing at exact commit `aa9c56c664d5cd5f74d2c70b4e271682593f08a4`.
 Its fleet-wide inventory failed closed before reboot or DFU because an
 unrelated ordinary ADALM-Pluto was attached beside the four Pluto+ targets.
-RC30 has zero candidate deployments and is immutable. RC31 retains the exact
+RC30 has zero candidate deployments and is immutable. RC31 retained the exact
 RC30 firmware and RF policy and advances only the identity and pinned
 `pluto-plus-utils` commit to
 `b2b3113c2e8724453179f09d357b4917c0f14c77`, whose read-only inventory selects
 one exact serial from a full mixed USB scan and fails closed for absence,
 duplication, non-Plus selection, or incomplete identity.
 
-Radio `1040007c4a94000211000b009186843ef2` at USB topology `3-8` is temporarily
-released for other testing in a verified muted/idle state. RC31 work may use
-the other three local radios now. Before the final four-radio authorizing
-campaign, the released radio must be returned, freshly inventoried, RAM-booted
-with the exact CI-minted RC31 artifact, and requalified from a clean evidence
-root. Final hardware qualification remains serial and one-radio-at-a-time.
+Radio `1040007c4a94000211000b009186843ef2` at USB topology `3-8` is explicitly
+excluded by operator authorization and must not be accessed, deployed, tested,
+or counted. RC32 qualification scope is the other three local radios:
+`winbond-db6968136727402c` (`3-7`), `winbond-db620818a328172c` (`5-1`), and
+`104000bac4950008230026001b440a003a` (`5-2`). Final hardware qualification
+remains exact-serial and one-radio-at-a-time.
 
 Base revision: tandem AGC v8 RC20, commit
 `63108b832a3618631386afdf530f19acb7905bca`

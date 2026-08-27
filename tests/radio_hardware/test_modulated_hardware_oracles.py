@@ -317,6 +317,7 @@ class _FakeCampaignRadio:
         self.active: Any = None
         self.active_case = ""
         self.mode = "manual"
+        self.manual_gain_db = 40.0
         self.in_metadata = False
         self.in_buffer = False
         self.case_count = 0
@@ -327,6 +328,7 @@ class _FakeCampaignRadio:
         self.mute_count = 0
         self.close_count = 0
         self.tx_gain_log: list[float] = []
+        self.rx_config_log: list[tuple[str, float | None]] = []
         self.tx_mutes_inside_buffer: list[bool] = []
         self.cleanup_verified = False
         self._last_mute_evidence: dict[str, Any] = {}
@@ -369,12 +371,14 @@ class _FakeCampaignRadio:
             }
 
     def configure_rx(self, mode: str, *, manual_gain_db: float | None = None) -> None:
-        del manual_gain_db
+        self.rx_config_log.append((mode, manual_gain_db))
         self.mode = mode
+        if mode == "manual" and manual_gain_db is not None:
+            self.manual_gain_db = float(manual_gain_db)
 
     def read_rx_state(self) -> dict[str, list[Any]]:
         gains = {
-            "manual": 40.0,
+            "manual": self.manual_gain_db,
             "slow_attack": 32.0,
             "fast_attack": 31.0,
             "hybrid": 30.0,
@@ -814,6 +818,25 @@ def test_fake_radio_runs_release_modes_and_blocker_oracles_atomically(
     assert radio.mute_count >= 2
     assert radio.tx_gain_log.count(TX_MUTE_DB) == len(report["runs"])
     assert radio.tx_mutes_inside_buffer == [True] * len(report["runs"])
+    assert radio.rx_config_log.count(("manual", 62.0)) == 2
+    fast_runs = [run for run in report["runs"] if run["mode"] == MODE_NATIVE_FAST]
+    assert len(fast_runs) == 2
+    assert all(
+        run["native_entry_conditioning"] == {
+            "policy": "live-waveform-manual-ceiling-before-fast-attack",
+            "stimulus_tx2_gain_db": options.tx2_gain_db,
+            "manual_seed_gain_db": 62.0,
+            "rx_state_before": {
+                "modes": ["manual", "manual"],
+                "gains_db": [40.0, 40.0],
+            },
+            "rx_state_after": {
+                "modes": ["manual", "manual"],
+                "gains_db": [62.0, 62.0],
+            },
+        }
+        for run in fast_runs
+    )
     tandem_runs = [run for run in report["runs"] if run["mode"] == MODE_TANDEM]
     assert tandem_runs
     assert all(run["metadata_abi"] == 2 for run in tandem_runs)

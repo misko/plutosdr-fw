@@ -78,14 +78,14 @@ def test_rc17_history_is_retained_while_rc20_is_active() -> None:
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
-    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in evidence
+    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v1" in evidence
     for source in sources:
         assert "RC17" in source
         assert "RC19" in source
         assert "frame-metadata-v5" in source
         assert "frame-metadata-v2" in source
-    assert "The active candidate is RC31" in sources[0]
+    assert "The active candidate is RC32" in sources[0]
 
 
 def test_rc17_keeps_single_owner_optional_github_attestation_policy() -> None:

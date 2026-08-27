@@ -1,12 +1,12 @@
-"""Offline oracles for the protected tandem AGC v8 RC31 release route."""
+"""Offline oracles for the protected tandem AGC v8 RC32 release route."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-RC30_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc30-source.yaml"
 RC31_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc31-source.yaml"
+RC32_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc32-source.yaml"
 FINAL_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 OFFLINE = ROOT / "scripts" / "check_tandem_release_offline.sh"
@@ -30,61 +30,57 @@ def _manifest_values(path: Path) -> dict[str, str]:
     return values
 
 
-def test_rc31_reuses_the_exact_rc30_and_final_external_source_graph() -> None:
+def test_rc32_reuses_the_exact_rc31_and_final_external_source_graph() -> None:
     assert (
-        _manifest_values(RC31_MANIFEST)
-        == _manifest_values(RC30_MANIFEST)
+        _manifest_values(RC32_MANIFEST)
+        == _manifest_values(RC31_MANIFEST)
         == _manifest_values(FINAL_MANIFEST)
     )
 
 
-def test_rc31_owner_route_maps_branch_manifest_package_and_version() -> None:
+def test_rc32_owner_route_maps_branch_manifest_package_and_version() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
-    branch = "refs/heads/codex/firmware-tandem-agc-v8-rc31"
+    branch = "refs/heads/codex/firmware-tandem-agc-v8-rc32"
     assert workflow.count(branch) == 4
-    assert workflow.count("'tandem-agc-v8-rc31-source.yaml'") == 1
-    assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc31'") == 1
-    assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc31'") == 1
+    assert workflow.count("'tandem-agc-v8-rc32-source.yaml'") == 1
+    assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc32'") == 1
+    assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc32'") == 1
+    assert "Require the exact protected RC32 candidate identity" in workflow
     assert "Require the exact protected RC31 reproduction identity" in workflow
-    assert "Require the exact protected RC30 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
-        "refs/heads/codex/firmware-tandem-agc-v8-rc30"
+        "refs/heads/codex/firmware-tandem-agc-v8-rc31"
     )
 
 
-def test_rc31_is_in_every_offline_and_protected_package_gate() -> None:
+def test_rc32_is_in_every_offline_and_protected_package_gate() -> None:
     offline = OFFLINE.read_text(encoding="utf-8")
     package = PACKAGE.read_text(encoding="utf-8")
-    assert "tests/test_tandem_rc31_release_route.py" in offline
+    assert "tests/test_tandem_rc32_release_route.py" in offline
     assert (
-        "./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc31-source.yaml"
+        "./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc32-source.yaml"
         in offline
     )
-    assert "tandem-agc-v8-rc31-source.yaml:*" in package
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in package
+    assert "tandem-agc-v8-rc32-source.yaml:*" in package
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in package
 
 
-def test_rc31_pins_the_target_scoped_mixed_usb_inventory_tool() -> None:
+def test_rc32_pins_the_same_target_scoped_mixed_usb_inventory_tool() -> None:
     expected = "b2b3113c2e8724453179f09d357b4917c0f14c77"
     assert expected in WRAPPER.read_text(encoding="utf-8")
     assert expected in BINDING.read_text(encoding="utf-8")
-    manifest = RC31_MANIFEST.read_text(encoding="utf-8")
-    assert expected in manifest
-    assert "exact serial from a mixed USB scan" in manifest
-    assert "absence, duplicate serial, non-Plus selection" in manifest
+    assert expected in RC32_MANIFEST.read_text(encoding="utf-8")
 
 
-def test_rc31_docs_preserve_truthful_rc30_result_and_rc32_active_identity() -> None:
+def test_rc32_docs_preserve_rc31_result_and_active_identity() -> None:
     notes = NOTES.read_text(encoding="utf-8")
-    assert "33097467689" in notes
-    assert "RC30" in notes and "zero candidate deployments" in notes
-    assert "b2b3113c2e8724453179f09d357b4917c0f14c77" in notes
+    assert "33101253206" in notes
+    assert "RC31" in notes and "4.2 GHz" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
         assert "The active candidate is RC32" in text or "forward-only RC32" in text
 
 
-def test_rc31_route_is_preserved_while_evidence_advances_to_rc32() -> None:
+def test_rc32_evidence_identity_and_attestation_policy_are_exact() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")

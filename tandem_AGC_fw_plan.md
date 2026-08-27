@@ -20,7 +20,7 @@ Work proceeds on two deliberately separate tracks.
 
 ### Track A: close the tandem AGC v8 release
 
-The active candidate is RC31. RC20 through RC30 remain immutable and not
+The active candidate is RC32. RC20 through RC31 remain immutable and not
 hardware-qualified.
 
 RC5, RC6, and RC7 are immutable failed/rejected attempts; RC8 through RC10 are
@@ -543,14 +543,19 @@ closed before reboot or DFU because an unrelated ordinary ADALM-Pluto was
 attached beside the four Pluto+ targets. RC30 therefore has zero candidate
 deployments, is immutable, and is not hardware-qualified.
 
-RC31 retains RC30's exact device firmware, RF policy, thresholds, and every
+RC31 retained RC30's exact device firmware, RF policy, thresholds, and every
 identity, event, safety, and cleanup gate. It advances only the candidate
 identity and the pinned `pluto-plus-utils` commit to
 `b2b3113c2e8724453179f09d357b4917c0f14c77`. The new read-only inventory scans
 the full USB bus but selects exactly one requested serial and still fails
 closed for absence, duplication, non-Plus selection, or incomplete identity.
-RC31's source lock, trusted build, evidence archive, and four-radio hardware
-campaign must be created and completed in that order.
+RC31 passed trusted build `33101253206`, indexing, and RAM deployment/lifecycle
+on the three authorized radios, but its db696 campaign retry stopped at 4.2 GHz
+on intermittent native fast gain lock. RC32 retains the exact device firmware,
+seeds fast attack from 62 dB manual gain under the live weak waveform, requires
+its per-channel strong-signal response, and records post-lock weak recovery as
+diagnostic. Its source lock, trusted build, evidence archive, and three-radio
+campaign must be created and completed in that order; topology 3-8 is excluded.
 
 ### 2.3 What has been causing trouble
 

@@ -58,7 +58,28 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc31 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc32 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC31 passed trusted integrated build `33101253206`, candidate indexing, and
+exact-serial RAM deployment/lifecycle on the three authorized radios. Its one
+db696 campaign retry stopped at 4.2 GHz when native fast attack intermittently
+held one RX chain's gain. Improved failure evidence and ten nonauthorizing
+reproductions showed that a 62 dB manual seed under the live weak waveform made
+the strong-signal attack deterministic in all ten runs, while one post-lock
+weak recovery remained dependent on the AD9361 fast-AGC unlock conditions.
+
+RC32 retains the exact RC31 device firmware, external graph, RF plan, pinned
+device tool, thresholds, and safety policy. It makes native fast's per-channel
+strong-signal response binding and records post-lock weak recovery as
+diagnostic; manual, slow AGC, and tandem keep their binding contracts. RC32
+uses branch `codex/firmware-tandem-agc-v8-rc32`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc32`, manifest
+`manifests/tandem-agc-v8-rc32-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc32`, and source lock
+`refs/tags/tandem-agc-v8-rc32-source/firmware-v1`. Topology 3-8 is excluded by
+operator authorization; the other three radios remain one-at-a-time.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc31 — 2026-08-27 — **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded**
 
 RC30 locked exact commit `aa9c56c664d5cd5f74d2c70b4e271682593f08a4`,
 passed all 1,465 offline oracles, routed OOC, trusted integrated build

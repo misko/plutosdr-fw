@@ -1577,6 +1577,87 @@ def test_tandem_final_wrapper_mute_failure_preserves_full_invalid_mode(
     assert persisted["modes"][-1] == failure
 
 
+def test_native_gain_failure_preserves_complete_failed_mode(tmp_path: Path) -> None:
+    class OneChannelStuckFastRadio(_FakeRadio):
+        def read_rx_state(self) -> dict[str, list[Any]]:
+            gains = [self.rx_gain_db, self.rx_gain_db]
+            if self.mode == "fast_attack":
+                gains[0] = 40.0
+            return {"modes": [self.mode, self.mode], "gains_db": gains}
+
+    radio = OneChannelStuckFastRadio(tmp_path)
+    with pytest.raises(EvidenceInvalid, match="RX0 lacks a 1 dB native gain response"):
+        _run_fake(radio, _quality(tmp_path))
+
+    persisted = json.loads(
+        (
+            tmp_path / radio.options.serial / "tandem-agc-transient-report.json"
+        ).read_text(encoding="utf-8")
+    )
+    failure = persisted["failure_evidence"]
+    assert persisted["verdict"] == "invalid"
+    assert [mode["mode"] for mode in persisted["modes"]] == [
+        "manual_fixed",
+        "native_slow_attack",
+        "native_fast_attack",
+    ]
+    assert failure == persisted["modes"][-1]
+    assert failure["mode"] == "native_fast_attack"
+    assert failure["verdict"] == "invalid"
+    assert failure["fatal_error"].endswith(
+        "RX0 lacks a 1 dB native gain response"
+    )
+    assert len(failure["preconditioning"]["trace"]) >= 2
+    assert len(failure["baseline_frames"]) == 1
+    assert len(failure["attack_frames"]) == 2
+    assert len(failure["release_frames"]) == 2
+    assert [
+        frame["rx_state_after"]["gains_db"]
+        for frame in failure["attack_frames"]
+    ] == [[40.0, 20.0], [40.0, 20.0]]
+    assert radio.tx_gain_db == -89.75
+
+
+def test_fast_attack_release_gain_unlock_is_recorded_but_not_required(
+    tmp_path: Path,
+) -> None:
+    class FastGainLockRadio(_FakeRadio):
+        def set_tx2_gain(self, gain_db: float) -> float:
+            prior_gain = self.rx_gain_db
+            readback = super().set_tx2_gain(gain_db)
+            if self.mode == "fast_attack" and gain_db <= -45.0:
+                self.rx_gain_db = prior_gain
+            return readback
+
+    report, _path = _run_fake(FastGainLockRadio(tmp_path), _quality(tmp_path))
+
+    fast = next(
+        mode for mode in report["modes"] if mode["mode"] == "native_fast_attack"
+    )
+    gain = fast["gain_evidence"]
+    assert gain["evidence_valid"] is True
+    assert gain["release_response_required"] is False
+    assert gain["release_response_policy"] == (
+        "diagnostic_after_fast_attack_gain_lock"
+    )
+    assert gain["release_response_observed_by_rx"] == [False, False]
+    assert gain["release_returned_iq_observation_bounds"] == []
+    assert len(gain["attack_returned_iq_observation_bounds"]) == 2
+
+
+def test_slow_attack_release_gain_response_remains_required(tmp_path: Path) -> None:
+    class SlowGainLockRadio(_FakeRadio):
+        def set_tx2_gain(self, gain_db: float) -> float:
+            prior_gain = self.rx_gain_db
+            readback = super().set_tx2_gain(gain_db)
+            if self.mode == "slow_attack" and gain_db <= -45.0:
+                self.rx_gain_db = prior_gain
+            return readback
+
+    with pytest.raises(EvidenceInvalid, match="native gain response"):
+        _run_fake(SlowGainLockRadio(tmp_path), _quality(tmp_path))
+
+
 def test_tandem_memory_ledger_measures_and_gates_finished_evidence(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1797,11 +1878,32 @@ def test_native_transient_preloads_weak_stimulus_before_agc_entry(
 ) -> None:
     radio = _FakeRadio(tmp_path)
 
-    _run_fake(radio, _quality(tmp_path))
+    report, _path = _run_fake(radio, _quality(tmp_path))
 
     for native_mode in AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES:
         entry = radio.operations.index(("configure_rx", native_mode, None))
-        assert radio.operations[entry - 1] == ("set_tx2_gain", -60.0)
+        weak = radio.operations.index(("set_tx2_gain", -60.0), 0, entry)
+        assert weak < entry
+    fast_entry = radio.operations.index(("configure_rx", "fast_attack", None))
+    assert radio.operations[fast_entry - 1] == (
+        "configure_rx",
+        "manual",
+        62.0,
+    )
+    fast = next(mode for mode in report["modes"] if mode["mode"] == "native_fast_attack")
+    assert fast["native_entry_conditioning"] == {
+        "policy": "weak-stimulus-manual-ceiling-before-fast-attack",
+        "stimulus_tx2_gain_db": -60.0,
+        "manual_seed_gain_db": 62.0,
+        "rx_state_before": {
+            "modes": ["manual", "manual"],
+            "gains_db": [40.0, 40.0],
+        },
+        "rx_state_after": {
+            "modes": ["manual", "manual"],
+            "gains_db": [62.0, 62.0],
+        },
+    }
 
 
 def test_host_writes_have_bounded_sample_intervals_and_initial_is_unanchored(

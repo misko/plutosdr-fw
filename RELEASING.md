@@ -247,7 +247,7 @@ cells. R18 also saw one strict tandem transition-continuity rejection; that
 rule remains mandatory. RC19 has no passing full or soak result and is not
 hardware-qualified.
 
-The active candidate is RC31. RC20's trusted build and four RAM/lifecycle
+The active candidate is RC32. RC20's trusted build and four RAM/lifecycle
 passes remain immutable context; it is not hardware-qualified. RC21's trusted
 build and db696 RAM/lifecycle
 passed, but its 1.05-GHz campaign measured 16,400-sample paired-event spacing

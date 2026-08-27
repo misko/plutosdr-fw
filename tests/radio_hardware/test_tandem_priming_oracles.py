@@ -21,12 +21,23 @@ class _FakeRadio:
     def __init__(self) -> None:
         self.operations: list[tuple[object, ...]] = []
         self.current_tx2_gain_db = -89.75
+        self.rx_mode = "manual"
+        self.rx_gain_db = 40.0
 
     def mute_all(self) -> None:
         self.operations.append(("mute_all",))
 
     def configure_rx(self, mode: str, *, manual_gain_db: float | None = None) -> None:
+        self.rx_mode = mode
+        if manual_gain_db is not None:
+            self.rx_gain_db = float(manual_gain_db)
         self.operations.append(("configure_rx", mode, manual_gain_db))
+
+    def read_rx_state(self) -> dict[str, list[object]]:
+        return {
+            "modes": [self.rx_mode, self.rx_mode],
+            "gains_db": [self.rx_gain_db, self.rx_gain_db],
+        }
 
     def arm_tx2_tone(self, *, tone_hz: int, scale: float) -> None:
         self.operations.append(("arm_tx2_tone", tone_hz, scale))

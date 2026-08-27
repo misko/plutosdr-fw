@@ -84,12 +84,12 @@ def test_rc15_history_is_retained_while_rc16_is_active() -> None:
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
 
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
-    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in evidence
+    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v1" in evidence
     for source in sources:
         assert "RC15" in source
         assert "pluto-plus-utils" in source
-    assert "The active candidate is RC31" in sources[0]
+    assert "The active candidate is RC32" in sources[0]
     assert "zero RC14 RAM transitions" in sources[1]
 
 

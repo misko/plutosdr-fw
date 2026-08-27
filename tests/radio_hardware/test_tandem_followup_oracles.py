@@ -19,6 +19,7 @@ from .tandem_quality import (
     DEFAULT_NATIVE_GAIN_CONTROL_MODES,
     MODE_MANUAL,
     MODE_NATIVE,
+    MODE_NATIVE_FAST,
     MODE_TANDEM,
     MODES,
     TandemQualityOptions,
@@ -320,11 +321,12 @@ def test_run_mode_programs_each_selected_native_iio_mode(
         lambda _measurements: {"quality_valid": True},
     )
 
+    report: dict[str, object] = {"modes": []}
     _run_mode(
         radio,
         mode=native_mode_name(iio_mode),
         options=_options(output_dir=tmp_path),
-        report={"modes": []},
+        report=report,
         report_path=tmp_path / "report.json",
         check_deadline=lambda: None,
     )
@@ -332,10 +334,25 @@ def test_run_mode_programs_each_selected_native_iio_mode(
     configured = [
         operation[1] for operation in radio.operations if operation[0] == "configure_rx"
     ]
-    assert configured == ["manual", iio_mode, "manual"]
+    expected = ["manual"]
+    if iio_mode == "fast_attack":
+        expected.append("manual")
+    expected.extend((iio_mode, "manual"))
+    assert configured == expected
     weakest_command = radio.operations.index(("set_tx2_gain", -60.0))
     native_entry = radio.operations.index(("configure_rx", iio_mode, None))
     assert weakest_command < native_entry
+    mode_record = report["modes"][0]
+    if iio_mode == "fast_attack":
+        assert radio.operations[native_entry - 1] == (
+            "configure_rx",
+            "manual",
+            62.0,
+        )
+        assert mode_record["native_entry_conditioning"]["manual_seed_gain_db"] == 62.0
+        assert mode_record["native_entry_conditioning"]["stimulus_tx2_gain_db"] == -60.0
+    else:
+        assert "native_entry_conditioning" not in mode_record
 
 
 def test_multi_native_evaluator_reports_every_mode_and_keeps_legacy_reference() -> None:
@@ -396,6 +413,33 @@ def test_one_bad_extra_native_cell_cannot_hide_behind_slow_attack(
 
     assert evaluation["verdict"] == "fail"
     assert any(failed_mode in failure for failure in evaluation["failures"])
+
+
+def test_fast_attack_return_unlock_is_diagnostic_but_attack_remains_required(
+) -> None:
+    report = _passing_report()
+    slow = report["modes"][1]
+    tandem = report["modes"].pop()
+    fast = copy.deepcopy(slow)
+    fast["mode"] = MODE_NATIVE_FAST
+    for frame in fast["cells"][-1]["measurements"]:
+        frame["rx_state_after"]["gains_db"] = [25.0, 24.5]
+    report["modes"].extend((fast, tandem))
+
+    evaluation = evaluate_matrix(report)
+
+    assert evaluation["verdict"] == "pass"
+    evidence = evaluation["native_gain_evidence_by_mode"][MODE_NATIVE_FAST]
+    assert evidence["outbound_weak_minus_strong_gain_db"] == [30.0, 30.0]
+    assert evidence["return_weak_minus_strong_gain_db"] == [0.0, 0.0]
+    assert evidence["return_response_required"] is False
+    assert evidence["return_response_observed_by_rx"] == [False, False]
+
+    for frame in fast["cells"][1]["measurements"]:
+        frame["rx_state_after"]["gains_db"] = [55.0, 54.5]
+    failed = evaluate_matrix(report)
+    assert failed["verdict"] == "fail"
+    assert any("outbound leg" in reason for reason in failed["failures"])
 
 
 @pytest.mark.parametrize(

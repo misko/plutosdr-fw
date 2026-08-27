@@ -113,12 +113,15 @@
 # 4.2-GHz table-3 sentinel. RC30 then passed all offline, OOC, trusted build,
 # package, checksum, and candidate-index gates, but its fleet-wide release
 # inventory failed closed before hardware when it encountered an unrelated
-# ordinary ADALM-Pluto. RC31 retains all device/RF policy and advances only the
+# ordinary ADALM-Pluto. RC31 retained all device/RF policy and advanced only the
 # pinned device tool to b2b3113c2e8724453179f09d357b4917c0f14c77, whose
 # read-only inventory scans the full bus while requiring exactly one matching
 # requested serial. Hidden transitions remain unproven and every identity, RF,
-# event, safety, and cleanup gate stays strict. RC31 must pass its source-locked
-# build and full four-radio hardware qualification
+# event, safety, and cleanup gate stays strict. RC31 passed its source-locked
+# build and three-radio RAM/lifecycle scope but stopped at 4.2-GHz native-fast
+# gain-lock evidence. RC32 retains the device graph and makes fast attack
+# binding while retaining post-lock weak recovery diagnostically. RC32 must
+# pass its source-locked build and full three-radio hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release
 # identity and packaging, while requiring exact component identities in packed

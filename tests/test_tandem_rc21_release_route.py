@@ -89,7 +89,7 @@ def test_rc21_hardware_failure_is_immutable_and_docs_name_rc29_active() -> None:
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc21" in deploy_plan
     assert "16,400" in notes and "17,408" in notes
     assert "not hardware-qualified" in notes
-    assert "The active candidate is RC31" in releasing
+    assert "The active candidate is RC32" in releasing
 
 
 def test_rc21_reproduction_keeps_single_owner_attestation_policy() -> None:

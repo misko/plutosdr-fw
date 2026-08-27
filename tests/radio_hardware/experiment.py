@@ -44,6 +44,10 @@ TX_DEVICE = "cf-ad9361-dds-core-lpc"
 PHY_DEVICE = "ad9361-phy"
 
 TX_MUTE_DB = -89.75
+# Fast AGC can retain a gain-lock state when its control mode changes without
+# leaving RX.  Seed both chains at the common, frequency-safe manual ceiling
+# while the real stimulus is present before entering fast attack.
+NATIVE_FAST_ENTRY_MANUAL_GAIN_DB = 62.0
 DAC_SYNC_REGISTER = 0x0044
 DAC_SELECT_DDS = 0x0
 DAC_SELECT_DMA = 0x2

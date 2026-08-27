@@ -63,7 +63,11 @@ sessions. The compatibility default is the original three-cell matrix:
 Select additional independent AD9361 comparison cells with
 `--tandem-quality-native-modes slow_attack,fast_attack,hybrid`. The order is
 retained in the report; every selected native mode must independently pass the
-absolute quality and bidirectional gain-response gates. The legacy
+absolute quality and strong-signal gain-response gates. Slow attack and the
+explicit exploratory hybrid mode must also pass the bidirectional
+gain-response gate. Fast attack's later weak-signal gain increase is retained
+per receiver as diagnostic evidence because the AD9361 holds fast gain after
+lock until a configured unlock condition fires. The legacy
 `native_minus_manual`, `tandem_minus_native`, and `native_gain_evidence` report
 fields continue to use `slow_attack` when it is selected, while `*_by_mode`
 fields contain every requested native cell.
@@ -75,8 +79,11 @@ modulated matrices therefore contain manual, native slow-attack, native
 fast-attack, and tandem-auto cells; they deliberately exclude native hybrid.
 Before entering either native mode, the runner arms the tone and applies and
 reads back the weakest authorized TX2 rung while RX remains in manual mode.
-This prevents fast attack from locking on a muted input and carrying a prior
-run's retained lock level into the new trajectory.
+Before fast attack specifically, it also seeds both receivers at 62 dB manual
+gain under that live waveform. This prevents fast attack from locking on a
+muted input or carrying a prior run's retained lock level into the new
+trajectory without pretending that its post-lock weak-signal recovery is a
+slow-AGC contract.
 
 Selecting `hybrid` explicitly remains supported for exploratory comparisons,
 but its result is **quality-only evidence**, not an autonomous AGC or release

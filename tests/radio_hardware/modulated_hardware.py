@@ -21,6 +21,7 @@ from typing import Any
 from .experiment import (
     MAX_COMMON_CENTER_FREQUENCY_HZ,
     MIN_COMMON_CENTER_FREQUENCY_HZ,
+    NATIVE_FAST_ENTRY_MANUAL_GAIN_DB,
     TX_MUTE_DB,
     EvidenceInvalid,
     FixtureSafetyError,
@@ -1260,8 +1261,42 @@ def _run_case_mode(
     radio.configure_rx("manual", manual_gain_db=options.manual_gain_db)
     metadata = mode == MODE_TANDEM
     request: bytes | None = None
+    preloaded_tx_readback: float | None = None
+    native_entry_conditioning: dict[str, Any] | None = None
     if mode in _NATIVE_IIO_MODES:
         expected_mode = _NATIVE_IIO_MODES[mode]
+        # Native AGC must see the real waveform before mode entry.  In
+        # particular, fast attack can otherwise lock on the muted state.  Seed
+        # fast attack at the common manual ceiling so a retained lock cannot
+        # strand one RX chain below the weak-signal endpoint.
+        preloaded_tx_readback = float(radio.set_tx2_gain(options.tx2_gain_db))
+        if (
+            not math.isfinite(preloaded_tx_readback)
+            or abs(preloaded_tx_readback - options.tx2_gain_db)
+            > TX2_GAIN_READBACK_TOLERANCE_DB
+        ):
+            raise FixtureSafetyError(
+                "TX2 gain readback differs from the planned campaign value: "
+                f"requested {options.tx2_gain_db:.2f} dB, "
+                f"read back {preloaded_tx_readback!r} dB"
+            )
+        if options.physical_attenuation_db - preloaded_tx_readback < 30.0:
+            raise FixtureSafetyError(
+                "TX2 readback violates the 30 dB effective safety boundary"
+            )
+        if expected_mode == "fast_attack":
+            state_before = radio.read_rx_state()
+            radio.configure_rx(
+                "manual", manual_gain_db=NATIVE_FAST_ENTRY_MANUAL_GAIN_DB
+            )
+            state_after = radio.read_rx_state()
+            native_entry_conditioning = {
+                "policy": "live-waveform-manual-ceiling-before-fast-attack",
+                "stimulus_tx2_gain_db": preloaded_tx_readback,
+                "manual_seed_gain_db": NATIVE_FAST_ENTRY_MANUAL_GAIN_DB,
+                "rx_state_before": state_before,
+                "rx_state_after": state_after,
+            }
         radio.configure_rx(expected_mode)
     elif mode == MODE_MANUAL:
         expected_mode = "manual"
@@ -1287,6 +1322,8 @@ def _run_case_mode(
         "mode": mode,
         "tandem_status_before": status_before,
     }
+    if native_entry_conditioning is not None:
+        record["native_entry_conditioning"] = native_entry_conditioning
     body_error: BaseException | None = None
     try:
         with radio.buffer(
@@ -1303,7 +1340,11 @@ def _run_case_mode(
                     raise EvidenceInvalid(
                         f"tandem capture requires metadata ABI 2, got {metadata_abi}"
                     )
-                tx_readback = float(radio.set_tx2_gain(options.tx2_gain_db))
+                tx_readback = (
+                    float(radio.set_tx2_gain(options.tx2_gain_db))
+                    if preloaded_tx_readback is None
+                    else preloaded_tx_readback
+                )
                 if (
                     not math.isfinite(tx_readback)
                     or abs(tx_readback - options.tx2_gain_db)

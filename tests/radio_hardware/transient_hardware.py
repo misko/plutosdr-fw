@@ -33,7 +33,13 @@ from itertools import pairwise
 from pathlib import Path
 from typing import Any, Protocol
 
-from .experiment import TX_MUTE_DB, EvidenceInvalid, FixtureSafetyError, Issue46Radio
+from .experiment import (
+    NATIVE_FAST_ENTRY_MANUAL_GAIN_DB,
+    TX_MUTE_DB,
+    EvidenceInvalid,
+    FixtureSafetyError,
+    Issue46Radio,
+)
 from .metadata_abi import (
     FEATURE_AD9361_TEMPERATURE,
     FEATURE_FPGA_GAIN_EVENTS,
@@ -301,6 +307,12 @@ def transient_evidence_policy(
         "initial_condition": (
             "pre-session weak write remains sample-unbounded; retained stable IQ "
             "is an explicitly labelled conditioning anchor"
+        ),
+        "native_fast_policy": (
+            "enter fast attack from 62 dB manual gain under the live weak "
+            "stimulus; require a per-channel strong-signal gain decrease; retain "
+            "the weak-release gain increase as diagnostic because AD9361 fast "
+            "gain remains locked until a configured unlock condition fires"
         ),
         "stimulus": {
             "weak_tx_gain_db": capture.weak_stimulus_tx_gain_db,
@@ -3282,6 +3294,7 @@ def _gain_transition_bounds(
     reference_gain_db: tuple[float, float],
     expected_sign: int,
     minimum_change_db: float,
+    require_all_channels: bool = True,
 ) -> list[dict[str, Any]]:
     assert command.sample_sequence_before is not None
     assert command.sample_sequence_after is not None
@@ -3322,9 +3335,12 @@ def _gain_transition_bounds(
                 }
                 break
         if found is None:
-            raise EvidenceInvalid(
-                f"RX{channel} lacks a {minimum_change_db:g} dB native gain response"
-            )
+            if require_all_channels:
+                raise EvidenceInvalid(
+                    f"RX{channel} lacks a {minimum_change_db:g} dB native gain "
+                    "response"
+                )
+            continue
         found["hardware_latency_qualified"] = False
         results.append(found)
     return results
@@ -3338,6 +3354,7 @@ def _native_gain_evidence(
     attack_command: StimulusCommand,
     release_command: StimulusCommand,
     minimum_change_db: float,
+    require_release_response: bool,
 ) -> dict[str, Any]:
     weak = _gain_at_end(baseline)
     strong = _gain_at_end(attack)
@@ -3355,7 +3372,12 @@ def _native_gain_evidence(
         reference_gain_db=strong,
         expected_sign=1,
         minimum_change_db=minimum_change_db,
+        require_all_channels=require_release_response,
     )
+    release_observed = [
+        any(bound["rx_channel"] == channel for bound in release_bounds)
+        for channel in (0, 1)
+    ]
     return {
         "evidence_valid": True,
         "timing_qualification": "returned_iq_observation_only",
@@ -3366,6 +3388,13 @@ def _native_gain_evidence(
         "returned_weak_gain_db": list(returned),
         "attack_gain_change_db": [strong[index] - weak[index] for index in (0, 1)],
         "release_gain_change_db": [returned[index] - strong[index] for index in (0, 1)],
+        "release_response_required": require_release_response,
+        "release_response_policy": (
+            "required_autonomous_recovery"
+            if require_release_response
+            else "diagnostic_after_fast_attack_gain_lock"
+        ),
+        "release_response_observed_by_rx": release_observed,
         "attack_returned_iq_observation_bounds": attack_bounds,
         "release_returned_iq_observation_bounds": release_bounds,
     }
@@ -4851,10 +4880,24 @@ def _run_mode_body(
     )
     initial_effective = _check_effective_attenuation(quality, initial_unanchored)
     initial_gain_state_after = _rx_state(radio, expected_mode="manual")
+    native_entry_conditioning: dict[str, Any] | None = None
     if native_iio_mode is not None:
         # Preload the actual weak stimulus before entering native AGC.  Fast
         # attack may otherwise lock on the muted state and retain a prior run's
         # lock level through this trajectory.
+        if native_iio_mode == "fast_attack":
+            state_before = _rx_state(radio, expected_mode="manual")
+            radio.configure_rx(
+                "manual", manual_gain_db=NATIVE_FAST_ENTRY_MANUAL_GAIN_DB
+            )
+            state_after = _rx_state(radio, expected_mode="manual")
+            native_entry_conditioning = {
+                "policy": "weak-stimulus-manual-ceiling-before-fast-attack",
+                "stimulus_tx2_gain_db": initial_unanchored.applied_level_db,
+                "manual_seed_gain_db": NATIVE_FAST_ENTRY_MANUAL_GAIN_DB,
+                "rx_state_before": state_before,
+                "rx_state_after": state_after,
+            }
         radio.configure_rx(native_iio_mode)
         expected_iio_mode = native_iio_mode
     else:
@@ -4872,6 +4915,8 @@ def _run_mode_body(
         "attack_frames": [],
         "release_frames": [],
     }
+    if native_entry_conditioning is not None:
+        record["native_entry_conditioning"] = native_entry_conditioning
     state = _CaptureState()
     iq_dir = output_dir / mode
     metadata_abi = None
@@ -5266,6 +5311,7 @@ def _run_mode_body(
                 attack_command=attack,
                 release_command=release,
                 minimum_change_db=capture.minimum_native_gain_change_db,
+                require_release_response=native_iio_mode != "fast_attack",
             )
         elif mode == MODE_MANUAL:
             record["gain_evidence"] = _manual_gain_evidence(
@@ -5302,15 +5348,25 @@ def _run_mode_body(
         radio.mute_all()
     except BaseException as error:  # noqa: BLE001 - mute is mandatory on every exit
         mute_error = error
+    failure: BaseException | None = None
     if mode_body_error is not None and mute_error is not None:
-        raise BaseExceptionGroup(
+        failure = BaseExceptionGroup(
             f"transient mode {mode!r} failed and its mute request also failed",
             [mode_body_error, mute_error],
         )
-    if mode_body_error is not None:
-        raise mode_body_error.with_traceback(mode_body_error.__traceback__)
-    if mute_error is not None:
-        raise mute_error.with_traceback(mute_error.__traceback__)
+    elif mode_body_error is not None:
+        failure = mode_body_error
+    elif mute_error is not None:
+        failure = mute_error
+    if failure is not None:
+        record["metadata_abi"] = metadata_abi
+        record["verdict"] = "invalid"
+        record["fatal_error"] = _exception_text(failure)
+        if mute_error is not None:
+            record["cleanup_request_error"] = _exception_text(mute_error)
+        if failure_sink is not None:
+            failure_sink(record)
+        raise failure.with_traceback(failure.__traceback__)
 
     record["metadata_abi"] = metadata_abi
     record["tandem_status_after"] = _wait_for_idle(
@@ -5593,9 +5649,7 @@ def run_transient_hardware(
                     sleep=sleep,
                     metadata_parser=metadata_parser,
                     output_dir=report_path.parent / "transient-iq",
-                    failure_sink=(
-                        preserve_failed_mode if mode == MODE_TANDEM else None
-                    ),
+                    failure_sink=preserve_failed_mode,
                 )
             except BaseException:
                 if failed_mode:

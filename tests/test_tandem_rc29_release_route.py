@@ -87,16 +87,16 @@ def test_rc29_docs_preserve_truthful_result_while_rc31_is_active() -> None:
     assert "RC28" in notes and "not hardware-qualified" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC31" in text or "forward-only RC31" in text
+        assert "The active candidate is RC32" in text or "forward-only RC32" in text
 
 
 def test_rc29_evidence_identity_and_attestation_policy_are_exact() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
-    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in evidence
+    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v1" in evidence
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC31 workflow has no separate attestation job." in runner
+    assert "The RC32 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner
