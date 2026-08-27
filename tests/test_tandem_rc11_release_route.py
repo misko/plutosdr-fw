@@ -125,7 +125,7 @@ def test_rc11_docs_preserve_rc10_incident_and_the_burned_rc11_lock() -> None:
         assert rc12_lock in source
         assert rc13_lock in source
     assert final_lock in releasing
-    assert "repeat the full four-radio campaign" in releasing
+    assert "repeat the full three-radio campaign" in releasing
     assert 'gh attestation verify "$release_work"' not in releasing
 
     assert "32964460396" in notes

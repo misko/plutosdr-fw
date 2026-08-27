@@ -111,7 +111,7 @@ def test_rc7_release_docs_preserve_failed_candidate_lineage() -> None:
     assert "no deployment" in releasing.lower()
     assert candidate_lock in releasing
     assert final_lock in releasing
-    assert "repeat the full four-radio campaign" in releasing
+    assert "repeat the full three-radio campaign" in releasing
     assert 'gh attestation verify "$release_work"' not in releasing
 
     assert candidate_lock in plan

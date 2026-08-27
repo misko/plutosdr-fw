@@ -105,7 +105,7 @@ def test_release_docs_preserve_rc9_lock_and_bind_full_final_campaign() -> None:
     assert "The active candidate is RC32" in releasing
     assert candidate_lock in releasing
     assert final_lock in releasing
-    assert "repeat the full four-radio campaign" in releasing
+    assert "repeat the full three-radio campaign" in releasing
     assert 'gh attestation verify "$release_work"' not in releasing
 
     assert candidate_lock in plan
