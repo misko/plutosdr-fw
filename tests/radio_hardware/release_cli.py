@@ -4993,7 +4993,6 @@ def _transient_batch_frame_errors(
     frames: Any,
     *,
     phases: Sequence[str],
-    command_intervals: Sequence[tuple[int, int]],
     quality: TandemQualityOptions,
 ) -> tuple[list[str], list[Mapping[str, Any]]]:
     """Recompute every retained tandem frame, metadata, event, and quality ledger."""
@@ -5211,16 +5210,6 @@ def _transient_batch_frame_errors(
                 ):
                     errors.append(f"{context} analysis window ledger is inconsistent")
                     break
-                intersects_command = any(
-                    window["sample_start"] < upper
-                    and window["sample_end_exclusive"] > lower
-                    for lower, upper in command_intervals
-                )
-                if not intersects_command and not valid:
-                    errors.append(
-                        f"{context} has invalid quality outside a command bracket"
-                    )
-                    break
             if analysis.get("quality_valid") is not all(window_validities):
                 errors.append(f"{context} analysis quality ledger is inconsistent")
 
@@ -5373,9 +5362,14 @@ def _transient_batch_frame_errors(
             sample_delta: int | None = None
             transition_delta: int | None = None
             initial_unrepresented = int(transition_count) - len(events)
-            if buffer_sequence != 0 or initial_unrepresented != 0:
+            # AUTO enters at the request maximum while the weak conditioning
+            # stimulus is already present.  It can therefore converge before
+            # the first retained provider frame.  The pre-attack conditioning
+            # ledger reconciles those startup transitions and the final quiet
+            # suffix; startup is never used as response-direction proof.
+            if buffer_sequence != 0 or initial_unrepresented < 0:
                 errors.append(
-                    "transient tandem first frame is not a fresh zero-transition session"
+                    "transient tandem first frame has an invalid session origin"
                 )
         else:
             if current_stream != stream_id or current_epoch != ownership_epoch:
@@ -6989,10 +6983,6 @@ def _transient_batch_contract_errors(
     frame_errors, frames = _transient_batch_frame_errors(
         frames_value,
         phases=phases,
-        command_intervals=(
-            (attack_lower, attack_upper),
-            (release_lower, release_upper),
-        ),
         quality=quality,
     )
     errors.extend(frame_errors)

@@ -2099,6 +2099,9 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
 
 def _generated_v2_transient_fixture(
     tmp_path: Path,
+    *,
+    startup_hidden_transition: bool = False,
+    diagnostic_overload_frame: int | None = None,
 ) -> tuple[ReleaseHardwareOptions, PhaseSpec, Path, Path, dict[str, Any]]:
     options = _parse(
         tmp_path,
@@ -2131,6 +2134,10 @@ def _generated_v2_transient_fixture(
             return raw, None, 1_000 + len(self.operations)
 
     radio = ReleaseFakeRadio(work_dir)
+    if startup_hidden_transition:
+        radio.hidden_transition_capture_index = 0
+    if diagnostic_overload_frame is not None:
+        radio.metadata_amplitude_overrides[diagnostic_overload_frame] = 2_300.0
     radio.options.serial = options.serial
     radio.options.sample_rate_hz = quality.sample_rate_hz
     radio.options.center_frequency_hz = quality.center_frequency_hz
@@ -2432,6 +2439,32 @@ def test_runtime_generated_v2_transient_passes_production_validator(
     assert validated.verdict == "pass"
     assert validated.cleanup_verified is True
     assert validated.summary["mode_count"] == len(TRANSIENT_MODES)
+
+
+def test_production_validator_accepts_startup_conditioning_and_diagnostic_rf(
+    tmp_path: Path,
+) -> None:
+    options, spec, work_dir, report_path, report = _generated_v2_transient_fixture(
+        tmp_path,
+        startup_hidden_transition=True,
+        diagnostic_overload_frame=17,
+    )
+    tandem = _tandem_mode(report)
+    conditioning = tandem["partition"]["pre_attack_conditioning"]
+    policy = tandem["partition"]["rf_quality_policy"]
+
+    assert conditioning["startup_initial_unrepresented_transition_count"] == 1
+    assert conditioning["startup_is_conditioning_only"] is True
+    assert conditioning["startup_is_response_direction_proof"] is False
+    assert tandem["batch_frames"][17]["analysis"]["quality_valid"] is False
+    assert 17 in policy["diagnostic_frame_indices"]
+    assert 17 not in policy["strict_frame_indices"]
+    assert policy["diagnostic_windows_authorize_pass"] is False
+
+    validated = production_validator(options)(spec, report_path, work_dir)
+
+    assert validated.verdict == "pass"
+    assert validated.cleanup_verified is True
 
 
 def test_production_validator_accepts_only_leading_temperature_omissions(

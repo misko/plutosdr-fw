@@ -174,7 +174,7 @@ def test_rc13_docs_preserve_exact_rc12_build_and_ram_incident() -> None:
         "postboot QSPI equality is not claimed",
     )
 
-    assert "The active candidate is RC25" in releasing
+    assert "The active candidate is RC26" in releasing
     for source in sources:
         for exact_value in exact_history:
             assert exact_value in source
@@ -188,7 +188,7 @@ def test_rc13_docs_preserve_exact_rc12_build_and_ram_incident() -> None:
     assert "paired-selector `-D` and `-e`" in notes
     assert "returned exact `0456:b673`" in notes
     assert "exited 255" in notes
-    assert "The active candidate is RC25" in plan
+    assert "The active candidate is RC26" in plan
     assert "refs/tags/tandem-agc-v8-rc22-source/firmware-v1" in releasing
     assert "refs/tags/tandem-agc-v8-rc22-source/firmware-v1" in notes
     assert "refs/tags/tandem-agc-v8-rc22-source/firmware-v1" in plan

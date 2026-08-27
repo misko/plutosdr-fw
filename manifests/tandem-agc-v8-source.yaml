@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC25, but the
+# The external component graph remains identical from RC4 through RC26, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -79,8 +79,13 @@
 # AUTO transition and manufactured a mixed transition-count/gain snapshot.
 # RC25 brackets both endpoint reads with the transition count and accepts only a
 # stable paired snapshot, while retaining final metadata on close-ledger errors.
-# Gaps, hidden events, and all identity/metadata/safety/fault/cleanup failures
-# remain fatal. RC25 must pass
+# Its inner 1.05-GHz transient report passed all four comparison modes, but the
+# outer release replay contradicted the frozen producer contract by rejecting
+# startup conditioning and diagnostic-only commanded-response RF windows. RC26
+# aligns semantic replay with the exact producer policy while preserving strict
+# RF quality in all three contiguous event-free suffixes. Event/count
+# continuity, paired endpoints, the 10-dB threshold, and every
+# identity/metadata/evidence/safety/fault/cleanup failure remain fatal. RC26 must pass
 # its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release

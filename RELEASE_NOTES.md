@@ -43,7 +43,8 @@
 | `tandem-agc-v8-rc22` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle and 11/11 steady policies passed; transient oracle invalid; superseded** | fixed exact power periods/event spacing; the transient harness rejected a fully retained startup convergence before its stable pre-attack suffix |
 | `tandem-agc-v8-rc23` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle passed; transient response oracle invalid; superseded** | retained exact-cadence paired response events, but the host oracle demanded zero clipping during a deliberately overloaded AUTO response |
 | `tandem-agc-v8-rc24` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; three transient comparison modes passed; tandem invalid; superseded** | separate host sysfs reads straddled one AUTO transition and manufactured a mixed transition-count/gain snapshot |
-| `tandem-agc-v8-rc25` | 2026-08-27 | **active development; not hardware-qualified** | retains RC24 firmware; reads tandem transition count and paired gain endpoints as one bounded coherent host snapshot and preserves final failure metadata |
+| `tandem-agc-v8-rc25` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; all four inner transient modes passed; outer replay invalid; superseded** | fixed coherent host status reads; outer replay contradicted the frozen producer policy for startup conditioning and diagnostic response windows |
+| `tandem-agc-v8-rc26` | 2026-08-27 | **active development; not hardware-qualified** | retains RC25 firmware; aligns release replay with the frozen transient producer window policy without relaxing suffix quality or safety gates |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -52,7 +53,28 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc25 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc26 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC26 retains RC25's exact firmware implementation and external source graph.
+It removes two contradictory outer-replay assumptions exposed by the retained
+RC25 transient pilot: startup AUTO convergence may contain a bounded hidden
+transition and commanded-response frames may be RF-invalid while the AGC is
+responding. Neither window supplies steady-state response proof. Strict RF
+quality remains mandatory in each exact contiguous event-free eight-frame
+suffix, including the unchanged 10-dB per-capture threshold. Event/count
+continuity, paired endpoints, identity, metadata, evidence completeness,
+fault/FIFO/overflow, safe state, and cleanup remain fatal.
+
+RC26 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure remains nonbinding. RC26 uses branch
+`codex/firmware-tandem-agc-v8-rc26`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc26`, manifest
+`manifests/tandem-agc-v8-rc26-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc26`, and source lock
+`refs/tags/tandem-agc-v8-rc26-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc25 — 2026-08-27 — **successful indexed build and db696 RAM/lifecycle; all four inner transient modes passed; outer replay invalid; superseded**
 
 RC25 retains RC24's exact firmware and external source graph. It fixes the host
 status-read defect exposed by the RC24 transient pilot: transition count and
@@ -66,6 +88,20 @@ RC25 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
 2.45-GHz matrix still runs and retains complete evidence, but an isolated
 cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
 evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+The exact RC25 commit `687aaf442658db5388880535f4d1f4efd944374c`
+passed owner-dispatched trusted run `33058150539`, candidate assembly, db696
+RAM deployment, and lifecycle. Deployment receipt SHA-256 was
+`5109e07bd8354dd704f6d8b394c0c7bb061a6eba6362fd9ace356909200f50c2`;
+lifecycle report SHA-256 was
+`72639603bc6ee28c1446de8e869e344bcf7ca8432daf3a0032eeb5d7aaf523a1`.
+The retained 1.05-GHz inner transient report passed all four comparison modes:
+manual, native-slow, native-fast, and tandem AUTO, with cleanup verified. The
+outer release replay nevertheless marked the phase invalid because it demanded
+zero startup-hidden transitions and rejected diagnostic response-frame RF
+invalidity outside narrow host command brackets. That contradicted the frozen
+producer policy; RC25 has no passing outer full/soak campaign and is immutable
+and not hardware-qualified.
 
 RC25 uses branch `codex/firmware-tandem-agc-v8-rc25`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc25`, manifest
