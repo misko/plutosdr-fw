@@ -36,7 +36,9 @@ from .modulated_hardware import (
     MODE_MANUAL,
     MODE_NATIVE_FAST,
     MODE_NATIVE_HYBRID,
+    MODE_NATIVE_SLOW,
     MODE_TANDEM,
+    RELEASE_MODULATED_BINDING_MODES,
     RELEASE_MODULATED_MODES,
     SUPPORTED_MODULATED_MODES,
     BlockerPoint,
@@ -809,6 +811,12 @@ def test_fake_radio_runs_release_modes_and_blocker_oracles_atomically(
     assert len(report["runs"]) == 2 * len(options.modes)
     assert {run["mode"] for run in report["runs"]} == set(options.modes)
     assert report["mode_evidence_policy"] == modulated_mode_evidence_policy()
+    assert report["mode_evidence_policy"]["release_binding_modes"] == list(
+        RELEASE_MODULATED_BINDING_MODES
+    )
+    assert report["mode_evidence_policy"][MODE_NATIVE_FAST]["classification"] == (
+        "report_only"
+    )
     assert all(run["summary"]["quality_valid"] for run in report["runs"])
     assert report["evaluation"]["degradation_valid"]
     assert report["stimulus_topology"]["active_transmitters"] == ["TX2"]
@@ -994,6 +1002,20 @@ def test_explicit_hybrid_campaign_remains_exploratory_quality_only(
     assert policy["ctrl_in2_guarded"] is False
 
 
+def test_explicit_hybrid_quality_failure_remains_binding(tmp_path: Path) -> None:
+    options = replace(_campaign_options(tmp_path), modes=SUPPORTED_MODULATED_MODES)
+    report, _path = run_modulated_hardware_campaign(
+        _FakeCampaignRadio(options, clip=("desired_only", MODE_NATIVE_HYBRID)),
+        options,
+    )
+
+    assert report["verdict"] == "fail"
+    assert any(
+        MODE_NATIVE_HYBRID in reason and "clipping" in reason
+        for reason in report["evaluation"]["failure_reasons"]
+    )
+
+
 def test_tandem_refuses_legacy_metadata_abi_before_unmuting(tmp_path: Path) -> None:
     options = _campaign_options(tmp_path)
     radio = _FakeCampaignRadio(options, metadata_abi=1)
@@ -1015,18 +1037,46 @@ def test_campaign_rejects_tx_gain_readback_that_differs_from_plan(
     assert radio.tx_mutes_inside_buffer == [True]
 
 
-def test_planted_clipping_returns_fail_report_not_false_green(tmp_path: Path) -> None:
+def test_planted_fast_clipping_is_reported_without_gating_release(
+    tmp_path: Path,
+) -> None:
     options = _campaign_options(tmp_path)
     radio = _FakeCampaignRadio(options, clip=("desired_only", MODE_NATIVE_FAST))
     report, _path = run_modulated_hardware_campaign(radio, options)
-    assert report["verdict"] == "fail"
+    evaluation = report["evaluation"]
+    assert report["verdict"] == "pass"
+    assert evaluation["valid"] is True
+    assert evaluation["absolute_quality_valid"] is False
+    assert evaluation["binding_absolute_quality_valid"] is True
+    fast = next(
+        result
+        for result in evaluation["mode_results"]
+        if result["mode"] == MODE_NATIVE_FAST
+    )
+    assert fast["release_gate"] == "report_only"
+    assert fast["observed_valid"] is False
     assert any(
         "absolute quality failed" in reason
         and MODE_NATIVE_FAST in reason
         and "clipping" in reason
+        for reason in evaluation["report_only_failures"]
+    )
+    assert evaluation["failure_reasons"] == []
+    assert radio.mute_count >= 2
+
+
+def test_planted_slow_clipping_remains_binding(tmp_path: Path) -> None:
+    options = _campaign_options(tmp_path)
+    radio = _FakeCampaignRadio(options, clip=("desired_only", MODE_NATIVE_SLOW))
+    report, _path = run_modulated_hardware_campaign(radio, options)
+    assert report["verdict"] == "fail"
+    assert report["evaluation"]["binding_absolute_quality_valid"] is False
+    assert any(
+        "absolute quality failed" in reason
+        and MODE_NATIVE_SLOW in reason
+        and "clipping" in reason
         for reason in report["evaluation"]["failure_reasons"]
     )
-    assert radio.mute_count >= 2
 
 
 def test_invalid_manual_reference_fails_closed_before_adaptive_tx(
@@ -1070,39 +1120,90 @@ def test_invalid_manual_reference_fails_closed_before_adaptive_tx(
     assert durable["final_mute"]["verified"] is True
 
 
-def test_planted_blocker_degradation_fails_relative_gate(tmp_path: Path) -> None:
-    quality = ModulatedQualityThresholds(
-        max_evm_percent=80.0,
-        min_mer_db=0.0,
-        max_ser=1.0,
-        max_ber=1.0,
-        max_clipping_fraction=0.0,
-        min_cross_channel_coherence=0.0,
-        max_timing_disagreement_samples=0,
-        max_abs_cfo_hz=5_000.0,
-    )
-    degradation = ModulatedDegradationThresholds(
-        max_evm_increase_percentage_points=1.0,
-        max_mer_loss_db=1.0,
-        max_ser_increase=1.0,
-        max_ber_increase=1.0,
-        max_desired_gain_loss_db=20.0,
-    )
-    options = replace(
-        _campaign_options(tmp_path),
-        quality_thresholds=quality,
-        degradation_thresholds=degradation,
-    )
-    radio = _FakeCampaignRadio(options, noisy=("blocker_00", MODE_NATIVE_FAST, 35.0))
+def test_planted_fast_blocker_degradation_is_reported_without_gating(
+    tmp_path: Path,
+) -> None:
+    options = _campaign_options(tmp_path)
+    radio = _FakeCampaignRadio(options)
     report, _path = run_modulated_hardware_campaign(radio, options)
-    assert report["verdict"] == "fail"
+    blocked = next(
+        run
+        for run in report["runs"]
+        if run["mode"] == MODE_NATIVE_FAST and run["case_id"] == "blocker_00"
+    )
+    blocked["summary"]["desired_gain_linear"][0] *= 0.5
+    evaluation = evaluate_modulated_hardware_report(
+        report,
+        options.degradation_thresholds,
+        expected_modes=options.modes,
+    )
+    assert evaluation["valid"] is True
+    assert evaluation["degradation_valid"] is False
+    assert evaluation["binding_degradation_valid"] is True
     row = next(
         item
-        for item in report["evaluation"]["degradation"]
+        for item in evaluation["degradation"]
         if item["mode"] == MODE_NATIVE_FAST
     )
     assert not row["valid"]
-    assert "evm_degradation" in row["failure_reasons"]
+    assert row["release_gate"] == "report_only"
+    assert "rx0_gain_degradation" in row["failure_reasons"]
+    assert evaluation["failure_reasons"] == []
+    assert any(
+        MODE_NATIVE_FAST in reason and "rx0_gain_degradation" in reason
+        for reason in evaluation["report_only_failures"]
+    )
+
+
+def test_planted_slow_blocker_degradation_remains_binding(tmp_path: Path) -> None:
+    options = _campaign_options(tmp_path)
+    radio = _FakeCampaignRadio(options)
+    report, _path = run_modulated_hardware_campaign(radio, options)
+    blocked = next(
+        run
+        for run in report["runs"]
+        if run["mode"] == MODE_NATIVE_SLOW and run["case_id"] == "blocker_00"
+    )
+    blocked["summary"]["desired_gain_linear"][0] *= 0.5
+    evaluation = evaluate_modulated_hardware_report(
+        report,
+        options.degradation_thresholds,
+        expected_modes=options.modes,
+    )
+    assert evaluation["valid"] is False
+    assert evaluation["binding_degradation_valid"] is False
+    row = next(
+        item
+        for item in evaluation["degradation"]
+        if item["mode"] == MODE_NATIVE_SLOW
+    )
+    assert row["release_gate"] == "binding"
+    assert "rx0_gain_degradation" in row["failure_reasons"]
+
+
+def test_missing_fast_run_remains_a_binding_evidence_failure(tmp_path: Path) -> None:
+    options = _campaign_options(tmp_path)
+    report, _path = run_modulated_hardware_campaign(
+        _FakeCampaignRadio(options), options
+    )
+    report["runs"] = [
+        run
+        for run in report["runs"]
+        if not (
+            run["mode"] == MODE_NATIVE_FAST and run["case_id"] == "blocker_00"
+        )
+    ]
+    evaluation = evaluate_modulated_hardware_report(
+        report,
+        options.degradation_thresholds,
+        expected_modes=options.modes,
+    )
+
+    assert evaluation["valid"] is False
+    assert any(
+        reason == f"missing blocker run {MODE_NATIVE_FAST}/blocker_00"
+        for reason in evaluation["failure_reasons"]
+    )
 
 
 def test_serial_lifecycle_closes_after_invalid_tandem_evidence(tmp_path: Path) -> None:

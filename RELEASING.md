@@ -374,6 +374,15 @@ final build uses the different exact lock
 `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
 reject a cross-stage substitution of those refs.
 
+The immutable RC32 campaign and its binding policy remain historical. For the
+next source-locked candidate, native fast attack still runs in every modulated
+matrix, but completed native-fast RF-quality and blocker-degradation outcomes
+are report-only. The report must retain their observed pass/fail state and
+reasons. Manual, native slow, tandem, evidence completeness, identity,
+continuity, raw-IQ provenance, TX safety, and cleanup remain release gates.
+This host-policy change cannot be used with RC32's artifact index because that
+index binds the previous harness bytes.
+
 The remaining gates, in order, are:
 
 1. Commit the complete RC32 source and run the routed block-level OOC gate from a

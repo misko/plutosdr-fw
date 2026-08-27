@@ -145,6 +145,29 @@ authorizing modulation bands, 2.45-GHz diagnostic, full three-radio campaigns,
 and soaks were not completed, so the focused repetitions do not convert RC32
 into a hardware-qualified release.
 
+### Post-RC32 native-fast qualification policy
+
+After reviewing the 30-run repetition study, the operator changed the host
+qualification policy on `main` for future source-locked candidates. Native
+fast attack remains a mandatory executed mode in every release modulated
+matrix, and its absolute-quality and blocker-degradation pass/fail result is
+retained per mode. A completed native-fast RF-performance failure is now
+report-only: it does not fail the modulated phase. Manual fixed gain, native
+slow attack, tandem auto, and their RF-quality/degradation limits remain
+binding. Missing or malformed mode evidence, inconsistent IQ convention,
+wrong configuration or identity, raw-IQ/continuity defects, unsafe TX state,
+and cleanup failure also remain binding.
+
+A read-only replay of all 30 retained 1.55-GHz reports under this policy gives
+30/30 passing qualification verdicts while still reporting native fast attack
+as 26 observed passes and four observed failures. This is a policy
+reinterpretation, not new hardware evidence: the immutable RC32 artifact,
+reports, tag, and published release outcome remain unchanged, and the unrun
+2.05/4.2-GHz modulation phases, 2.45-GHz diagnostic, full fleet campaigns,
+and soaks remain incomplete. Live use of the revised committed harness
+requires a newly source-locked candidate because the RC32 artifact index binds
+the previous harness bytes.
+
 Five host-only setup failures were also retained and did not change device or
 RF state: the first RAM launch loaded an incompatible system libiio; two
 lifecycle preflights used a mismatched cached source and then a Python

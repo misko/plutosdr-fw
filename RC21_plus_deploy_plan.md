@@ -40,6 +40,17 @@ and both channels; it does not implicate tandem control logic. Full fleet and
 soak qualification remain incomplete, so the release status stays failed and
 not hardware-qualified.
 
+Post-RC32 operator decision: for future source-locked candidates, a completed
+native-fast RF-quality or blocker-degradation failure in the modulated matrix
+is report-only. Native fast remains mandatory to execute and retains an
+explicit observed pass/fail result and reasons. Manual, native slow, tandem,
+evidence completeness, configuration/identity, continuity, raw-IQ provenance,
+TX safety, and cleanup remain binding. Read-only replay of the 30 retained
+1.55-GHz reports produces 30/30 qualification passes while preserving the
+native-fast observation as 26 passes and four failures. This does not rewrite
+RC32 or fill the unrun bands, fleet campaigns, or soaks; live use requires a
+new source-locked candidate containing the revised harness.
+
 RC32 source lock `firmware-v1` was stopped during trusted build
 `33112960920`, before artifact publication or hardware use, because its
 promotion assembler still encoded the superseded four-radio count. The

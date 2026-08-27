@@ -69,6 +69,12 @@ RELEASE_MODULATED_MODES = (
     MODE_NATIVE_FAST,
     MODE_TANDEM,
 )
+RELEASE_MODULATED_BINDING_MODES = (
+    MODE_MANUAL,
+    MODE_NATIVE_SLOW,
+    MODE_TANDEM,
+)
+REPORT_ONLY_MODULATED_MODES = frozenset((MODE_NATIVE_FAST,))
 # Backward-compatible name for callers that explicitly request every supported
 # mode.  Execution and evaluation use ``ModulatedHardwareOptions.modes``.
 MODULATED_MODES = SUPPORTED_MODULATED_MODES
@@ -100,6 +106,20 @@ def modulated_mode_evidence_policy() -> dict[str, Any]:
 
     return {
         "release_default_modes": list(RELEASE_MODULATED_MODES),
+        "release_binding_modes": list(RELEASE_MODULATED_BINDING_MODES),
+        "native_fast_attack": {
+            "classification": "report_only",
+            "autonomous_agc_claim": True,
+            "release_qualification_claim": False,
+            "result_reporting": "observed_pass_fail",
+            "evidence_completeness_binding": True,
+            "identity_safety_cleanup_binding": True,
+            "reason": (
+                "independent AD9361 native-fast loops exhibit intermittent "
+                "blocker-sensitive lock-state variability across radios and "
+                "receive channels"
+            ),
+        },
         "native_hybrid": {
             "classification": "exploratory_quality_only",
             "autonomous_agc_claim": False,
@@ -1483,6 +1503,13 @@ def evaluate_modulated_hardware_report(
     indexed: dict[str, dict[str, Mapping[str, Any]]] = {
         mode: {} for mode in active_modes
     }
+    report_only_failures: list[str] = []
+    absolute_quality_failures: dict[str, list[str]] = {
+        mode: [] for mode in active_modes
+    }
+    degradation_failures: dict[str, list[str]] = {
+        mode: [] for mode in active_modes
+    }
     observed_iq_conventions: set[str] = set()
     for run in report.get("runs", []):
         mode = str(run.get("mode"))
@@ -1502,7 +1529,12 @@ def evaluate_modulated_hardware_report(
             observed_iq_conventions.add(str(iq_convention))
         if not bool(summary.get("quality_valid", False)):
             reasons = ",".join(summary.get("quality_reasons", ())) or "invalid"
-            failures.append(f"absolute quality failed for {mode}/{case_id}: {reasons}")
+            message = f"absolute quality failed for {mode}/{case_id}: {reasons}"
+            absolute_quality_failures[mode].append(message)
+            if mode in REPORT_ONLY_MODULATED_MODES:
+                report_only_failures.append(message)
+            else:
+                failures.append(message)
     if len(observed_iq_conventions) > 1:
         failures.append("modulated runs use mixed IQ conventions")
 
@@ -1545,23 +1577,79 @@ def evaluate_modulated_hardware_report(
                     row_failures.append(f"{channel['channel']}_gain_degradation")
             row["valid"] = not row_failures
             row["failure_reasons"] = sorted(set(row_failures))
-            failures.extend(
-                f"{mode}/{case_id}: {reason}" for reason in row["failure_reasons"]
+            row["release_gate"] = (
+                "report_only" if mode in REPORT_ONLY_MODULATED_MODES else "binding"
             )
+            row_messages = [
+                f"{mode}/{case_id}: {reason}"
+                for reason in row["failure_reasons"]
+            ]
+            degradation_failures[mode].extend(row_messages)
+            if mode in REPORT_ONLY_MODULATED_MODES:
+                report_only_failures.extend(row_messages)
+            else:
+                failures.extend(row_messages)
             degradation_rows.append(row)
     expected_runs = len(active_modes) * (1 + len(blocker_ids))
     if len(report.get("runs", [])) != expected_runs:
         failures.append(
             f"report has {len(report.get('runs', []))} runs, expected {expected_runs}"
         )
+    mode_results = []
+    for mode in active_modes:
+        mode_rows = [row for row in degradation_rows if row["mode"] == mode]
+        mode_absolute_valid = not absolute_quality_failures[mode]
+        mode_degradation_valid = (
+            len(mode_rows) == len(blocker_ids)
+            and all(row["valid"] for row in mode_rows)
+        )
+        mode_failures = [
+            *absolute_quality_failures[mode],
+            *degradation_failures[mode],
+        ]
+        mode_results.append(
+            {
+                "mode": mode,
+                "release_gate": (
+                    "report_only"
+                    if mode in REPORT_ONLY_MODULATED_MODES
+                    else "binding"
+                ),
+                "absolute_quality_valid": mode_absolute_valid,
+                "degradation_valid": mode_degradation_valid,
+                "observed_valid": (
+                    mode_absolute_valid and mode_degradation_valid
+                ),
+                "failure_reasons": mode_failures,
+            }
+        )
+    binding_rows = [
+        row
+        for row in degradation_rows
+        if row["mode"] not in REPORT_ONLY_MODULATED_MODES
+    ]
+    expected_binding_rows = sum(
+        len(blocker_ids)
+        for mode in active_modes
+        if mode not in REPORT_ONLY_MODULATED_MODES
+    )
     return {
         "valid": not failures,
         "absolute_quality_valid": not any(
-            failure.startswith("absolute quality") for failure in failures
+            absolute_quality_failures[mode] for mode in active_modes
+        ),
+        "binding_absolute_quality_valid": not any(
+            absolute_quality_failures[mode]
+            for mode in active_modes
+            if mode not in REPORT_ONLY_MODULATED_MODES
         ),
         "degradation_valid": all(row["valid"] for row in degradation_rows)
         and len(degradation_rows) == len(active_modes) * len(blocker_ids),
+        "binding_degradation_valid": all(row["valid"] for row in binding_rows)
+        and len(binding_rows) == expected_binding_rows,
         "failure_reasons": failures,
+        "report_only_failures": report_only_failures,
+        "mode_results": mode_results,
         "degradation": degradation_rows,
     }
 

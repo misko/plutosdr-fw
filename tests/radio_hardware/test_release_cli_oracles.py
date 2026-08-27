@@ -22,6 +22,7 @@ from .metadata_abi import (
 )
 from .modulated_hardware import (
     DEFAULT_MODULATED_TX2_GAIN_DB,
+    MODE_NATIVE_FAST,
     MODE_NATIVE_HYBRID,
     MODE_TANDEM,
     RELEASE_MODULATED_MODES,
@@ -1992,6 +1993,31 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
     valid_report = json.loads(json.dumps(report))
     assert modulated.modes == RELEASE_MODULATED_MODES
     assert MODE_NATIVE_HYBRID not in {run["mode"] for run in valid_report["runs"]}
+
+    report = json.loads(json.dumps(valid_report))
+    fast_blocker = next(
+        run
+        for run in report["runs"]
+        if run["case_id"] == "blocker_00" and run["mode"] == MODE_NATIVE_FAST
+    )
+    fast_blocker["summary"]["desired_gain_linear"][0] = 0.5
+    report["evaluation"] = evaluate_modulated_hardware_report(
+        report,
+        modulated.degradation_thresholds,
+        expected_modes=modulated.modes,
+    )
+    assert report["evaluation"]["valid"] is True
+    assert report["evaluation"]["degradation_valid"] is False
+    assert report["evaluation"]["binding_degradation_valid"] is True
+    assert any(
+        MODE_NATIVE_FAST in reason and "rx0_gain_degradation" in reason
+        for reason in report["evaluation"]["report_only_failures"]
+    )
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+    validated = production_validator(options)(spec, report_path, work_dir)
+    assert validated.verdict == "pass"
+
+    report = json.loads(json.dumps(valid_report))
     report["evaluation"]["degradation_valid"] = False
     report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
     with pytest.raises(ReleaseCliError, match="differs from recomputation"):
