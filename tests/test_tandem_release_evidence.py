@@ -1068,8 +1068,7 @@ def _lifecycle_report(
 def _write_campaign_hardware(root: Path, artifact_index: Path) -> None:
     index_payload = artifact_index.read_bytes()
     index = json.loads(index_payload)
-    for position in range(1, 5):
-        serial = f"RADIO{position}"
+    for serial in EVIDENCE.RELEASE_RADIO_SERIALS:
         receipt = build_utility_deployment_bundle(
             root=root,
             artifact_index_path=artifact_index,
@@ -1254,8 +1253,7 @@ def _write_reduced_hardware(root: Path, final_artifact: Path, policy: Path) -> N
     index_payload = final_artifact.read_bytes()
     index = json.loads(index_payload)
     radios: list[dict[str, object]] = []
-    for position in range(1, 5):
-        serial = f"RADIO{position}"
+    for serial in EVIDENCE.RELEASE_RADIO_SERIALS:
         receipt = build_utility_deployment_bundle(
             root=root,
             artifact_index_path=final_artifact,
@@ -2145,7 +2143,7 @@ def test_candidate_qualification_accepts_exact_operator_owned_campaign(
     )
 
     record = EVIDENCE.verify_index(campaign, expected_stage="candidate-qualified")
-    assert len(record["radios"]) == 4
+    assert len(record["radios"]) == len(EVIDENCE.RELEASE_RADIO_SERIALS)
 
 
 def test_release_campaign_and_promotion_use_one_exact_ordered_band_policy() -> None:
@@ -2175,7 +2173,7 @@ def test_candidate_qualification_accepts_recorded_nonbinding_2450_quality_failur
 ) -> None:
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
-    aggregate_path = tmp_path / "hardware/full/RADIO1/release-hardware-report.json"
+    aggregate_path = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
     aggregate = json.loads(aggregate_path.read_text())
     record = aggregate["phases"]["diagnostic_2450mhz"]
     diagnostic_path = Path(record["report_path"])
@@ -2226,7 +2224,7 @@ def test_candidate_qualification_rejects_non_quality_2450_failures(
 ) -> None:
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
-    aggregate_path = tmp_path / "hardware/full/RADIO1/release-hardware-report.json"
+    aggregate_path = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
     aggregate = json.loads(aggregate_path.read_text())
     record = aggregate["phases"]["diagnostic_2450mhz"]
     diagnostic_path = Path(record["report_path"])
@@ -2271,7 +2269,7 @@ def test_candidate_qualification_rejects_missing_utility_companion(
 ) -> None:
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
-    (tmp_path / "hardware/deploy/RADIO1/operation-plan.json").unlink()
+    (tmp_path / "hardware/deploy/104000bac4950008230026001b440a003a/operation-plan.json").unlink()
 
     with pytest.raises(
         EVIDENCE.EvidenceError, match="operation plan cannot be inspected"
@@ -2294,9 +2292,9 @@ def test_candidate_qualification_rejects_stale_or_unbound_release_report(
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
     report_path = tmp_path / (
-        "hardware/soak/RADIO1/release-hardware-report.json"
+        "hardware/soak/104000bac4950008230026001b440a003a/release-hardware-report.json"
         if mutation == "one-soak-cycle"
-        else "hardware/full/RADIO1/release-hardware-report.json"
+        else "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
     )
     report = json.loads(report_path.read_text())
     if mutation == "old-summary":
@@ -2338,7 +2336,7 @@ def test_candidate_qualification_reuses_the_lifecycle_producer_oracle(
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
     report_path = (
-        tmp_path / "hardware/lifecycle/RADIO1/muted-metadata-batch-lifecycle-v5.json"
+        tmp_path / "hardware/lifecycle/104000bac4950008230026001b440a003a/muted-metadata-batch-lifecycle-v5.json"
     )
     report = json.loads(report_path.read_text())
     if mutation == "empty-preflight":
@@ -2371,7 +2369,7 @@ def test_candidate_qualification_reuses_the_lifecycle_producer_oracle(
         )
 
 
-def test_candidate_qualified_binds_four_serials_and_every_raw_member(
+def test_candidate_qualified_binds_exact_rc32_serials_and_every_raw_member(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     candidate = _assemble(tmp_path)
@@ -2379,17 +2377,14 @@ def test_candidate_qualified_binds_four_serials_and_every_raw_member(
 
     index = EVIDENCE.verify_index(campaign, expected_stage="candidate-qualified")
 
-    assert [radio["serial"] for radio in index["radios"]] == [
-        "RADIO1",
-        "RADIO2",
-        "RADIO3",
-        "RADIO4",
-    ]
+    assert tuple(radio["serial"] for radio in index["radios"]) == (
+        EVIDENCE.RELEASE_RADIO_SERIALS
+    )
     assert set(index["radios"][0]) == {"serial", "deploy", "full", "soak", "lifecycle"}
     # Per radio: the three utility plan/inventory records preceding the receipt,
     # five phase logs, eleven full/soak/diagnostic phase reports, and the
     # lifecycle runner's 65 retained metadata records.
-    assert len(index["raw_members"]) == 4 * (3 + 5 + 11 + 65)
+    assert len(index["raw_members"]) == 3 * (3 + 5 + 11 + 65)
     assert any(
         member["path"].endswith("stale-latch-report.json")
         for member in index["raw_members"]
@@ -2397,12 +2392,38 @@ def test_candidate_qualified_binds_four_serials_and_every_raw_member(
     assert index["parent"]["sha256"] == _sha(candidate)
 
 
+def test_candidate_qualified_rejects_excluded_radio_substitution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    candidate = _assemble(tmp_path)
+    _write_campaign_hardware(tmp_path, candidate)
+    permitted = EVIDENCE.RELEASE_RADIO_SERIALS[0]
+    excluded = "1040007c4a94000211000b009186843ef2"
+    for phase in EVIDENCE._CAMPAIGN_PHASES:
+        (tmp_path / "hardware" / phase / permitted).rename(
+            tmp_path / "hardware" / phase / excluded
+        )
+    monkeypatch.setattr(
+        EVIDENCE,
+        "_validate_campaign_archive_for_promotion",
+        lambda *_args, **_kwargs: None,
+    )
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="exact RC32 scope"):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            output_path=tmp_path / "campaign-index.json",
+            stage="candidate-qualified",
+            parent_index_path=candidate,
+        )
+
+
 def test_candidate_qualified_rejects_unindexed_extra_raw_member(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     candidate = _assemble(tmp_path)
     campaign = _assemble_campaign(tmp_path, monkeypatch, artifact_index=candidate)
-    _write(tmp_path / "hardware/full/RADIO1/late-unindexed.log", "late\n")
+    _write(tmp_path / "hardware/full/104000bac4950008230026001b440a003a/late-unindexed.log", "late\n")
 
     with pytest.raises(EVIDENCE.EvidenceError, match="every raw"):
         EVIDENCE.verify_index(campaign, expected_stage="candidate-qualified")
@@ -2413,7 +2434,7 @@ def test_candidate_qualified_rejects_report_receipt_substitution(
 ) -> None:
     candidate = _assemble(tmp_path)
     campaign = _assemble_campaign(tmp_path, monkeypatch, artifact_index=candidate)
-    report = tmp_path / "hardware/full/RADIO1/release-hardware-report.json"
+    report = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
     value = json.loads(report.read_text())
     value["configuration"]["candidate_binding"]["deployment_receipt_sha256"] = "0" * 64
     _write(report, _json_bytes(value))
@@ -2562,7 +2583,7 @@ def test_final_qualified_binds_exact_full_campaign_set(
     assert record["selected_evidence"]["mode"] == "full-campaign"
     assert record["final_artifact"]["sha256"] == _sha(final_artifact)
     assert record["policy"]["sha256"] == _sha(policy)
-    assert len(record["radios"]) == 4
+    assert len(record["radios"]) == len(EVIDENCE.RELEASE_RADIO_SERIALS)
 
 
 def test_final_qualified_rejects_mutated_full_campaign_evidence(
@@ -2571,7 +2592,7 @@ def test_final_qualified_rejects_mutated_full_campaign_evidence(
     _final_artifact, _policy, qualification = _assemble_final_qualification(
         tmp_path, monkeypatch
     )
-    report = tmp_path / "hardware/full/RADIO1/release-hardware-report.json"
+    report = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
     value = json.loads(report.read_text())
     value["all_host_libiio_verified"] = False
     _write(report, _json_bytes(value))

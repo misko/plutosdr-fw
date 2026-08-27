@@ -94,7 +94,7 @@ def test_rc30_route_is_preserved_while_evidence_advances_to_rc31() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in evidence
-    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v1" in evidence
+    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v2" in evidence
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
     assert "The RC30 workflow has no separate attestation job." in runner

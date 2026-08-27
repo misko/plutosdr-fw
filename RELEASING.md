@@ -344,8 +344,26 @@ eight-samples/symbol, 390.625-kHz-blocker, sixteen-buffer modulated
 configuration. Sub-2.5-MS/s release input is rejected before hardware. Steady
 matrices require eight stable settle frames, and only cooldown-zero matrices
 reserve 48 DMA buffers so their burst of exact AUTO transitions stays
-observable. Hidden transitions remain unproven. Its exact candidate source lock
-is `refs/tags/tandem-agc-v8-rc31-source/firmware-v1`. The immutable RC30 lock is
+observable. Hidden transitions remain unproven. RC31's exact candidate source
+lock is `refs/tags/tandem-agc-v8-rc31-source/firmware-v1`. RC31 passed its
+trusted build, candidate index, and three authorized RAM deployment/lifecycle
+gates, but its db696 campaign was invalidated by intermittent native fast gain
+lock at 4.2 GHz and it is superseded.
+
+RC32 is the active candidate. It retains the exact RC31 device firmware and RF
+plan, seeds both RX channels at 62 dB manual gain under the live weak waveform
+before native-fast entry, makes the native-fast strong-signal gain decrease
+binding on both RX channels, and records post-lock weak recovery as diagnostic.
+Manual, native slow, tandem, RF quality, identity, safety, and cleanup contracts
+remain binding. RC32 qualification requires exactly the three operator-authorized
+serials `104000bac4950008230026001b440a003a`, `winbond-db620818a328172c`, and
+`winbond-db6968136727402c`; serial `1040007c4a94000211000b009186843ef2` at
+topology 3-8 is excluded and must not be accessed or counted. RC32 source-lock
+attempt `firmware-v1` was canceled during trusted build `33112960920`, before
+artifact publication or hardware access, after review found its promotion
+assembler still required four serials. The immutable v1 lock is failed history;
+the active exact source lock is
+`refs/tags/tandem-agc-v8-rc32-source/firmware-v2`. The immutable RC30 lock is
 `refs/tags/tandem-agc-v8-rc30-source/firmware-v1`. The immutable RC29 lock is
 `refs/tags/tandem-agc-v8-rc29-source/firmware-v1`. The immutable RC28 lock is
 `refs/tags/tandem-agc-v8-rc28-source/firmware-v1`. The immutable RC27 lock is
@@ -358,10 +376,10 @@ reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
-1. Commit the complete RC31 source and run the routed block-level OOC gate from a
+1. Commit the complete RC32 source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC31 firmware source lock and explicit trusted build route.
+2. Create the exact RC32 `firmware-v2` source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;
@@ -369,7 +387,7 @@ The remaining gates, in order, are:
    provenance. Block-level OOC evidence cannot replace this step.
 4. Build the candidate firmware with its exact `device-fw` string, verify the
    indexed bundle, checksums, and packed component identities, and RAM-boot
-   those exact bytes on all four release-gate radios.
+   those exact bytes on all three release-gate radios.
 5. Run the full external release campaign, including muted metadata lifecycle,
    transient transport, signal quality, teardown, and cleanup. The internal
    stale-small-ADC clear/re-arm property is qualified by deterministic RTL at
@@ -377,13 +395,13 @@ The remaining gates, in order, are:
    deliberately emits only `BLOCKED`, and cannot authorize promotion.
 6. Only after the candidate passes, merge the exact qualified source to `main`,
    create `refs/tags/tandem-agc-v8-source/firmware-v1`, build the final v8
-   identity, repeat the full four-radio campaign, then tag, publish, and write
+   identity, repeat the full three-radio campaign, then tag, publish, and write
    the immutable release manifest.
 
 Protected dependency source locks must exist before the build so CI can resolve
 and pack them. They are not release tags. Do not create the annotated
 candidate release tag until the exact indexed bundle completes the full
-four-radio RAM qualification. Never move or reuse a failed source lock, an
+three-radio RAM qualification. Never move or reuse a failed source lock, an
 existing candidate lock, or a release tag.
 
 ## Procedure

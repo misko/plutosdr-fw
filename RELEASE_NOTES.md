@@ -49,7 +49,8 @@
 | `tandem-agc-v8-rc28` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | all 44 steady and four transient pilot phases passed; unsupported 1.024-MS/s no-FIR modulated rate failed before TX buffer creation |
 | `tandem-agc-v8-rc29` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded** | fixed the modulated configuration; fleet attempts exposed late native-AGC settling, cooldown-zero transport loss, and an unreliable 5.8-GHz endpoint |
 | `tandem-agc-v8-rc30` | 2026-08-27 | **trusted indexed build; zero candidate deployments; superseded** | all software/build gates passed; mixed ordinary-Pluto/Pluto+ USB inventory failed closed before hardware |
-| `tandem-agc-v8-rc31` | 2026-08-27 | **active development; not hardware-qualified** | retains RC30 firmware/RF policy and pins target-scoped, fail-closed mixed-USB release inventory |
+| `tandem-agc-v8-rc31` | 2026-08-27 | **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded** | native fast AGC intermittently held one RX chain at the 4.2-GHz strong-signal step |
+| `tandem-agc-v8-rc32` | 2026-08-27 | **active development; not hardware-qualified** | binds native-fast entry conditioning and the exact three-radio authorized promotion scope; v1 was canceled pre-artifact when its stale four-radio policy was found |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -76,8 +77,17 @@ uses branch `codex/firmware-tandem-agc-v8-rc32`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc32`, manifest
 `manifests/tandem-agc-v8-rc32-source.yaml`, package prefix
 `plutoplus-spf-tandem-agc-v8-rc32`, and source lock
-`refs/tags/tandem-agc-v8-rc32-source/firmware-v1`. Topology 3-8 is excluded by
+`refs/tags/tandem-agc-v8-rc32-source/firmware-v2`. Topology 3-8 is excluded by
 operator authorization; the other three radios remain one-at-a-time.
+
+RC32 source-lock attempt `firmware-v1` passed all 1,481 offline oracles and was
+dispatched as trusted run `33112960920`. It was cancelled during the build,
+before artifact publication or hardware use, when review found that the
+promotion-index assembler still required exactly four serials and therefore
+could not represent the operator-authorized three-radio scope. The immutable
+v1 tag is retained as failed pre-hardware history. RC32 `firmware-v2` replaces
+the count-only rule with the exact three permitted serials and rejects the
+excluded 3-8 serial or any substituted radio.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc31 — 2026-08-27 — **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded**
 

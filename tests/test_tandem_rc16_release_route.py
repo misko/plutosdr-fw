@@ -78,7 +78,7 @@ def test_rc16_history_is_retained_while_rc20_is_active() -> None:
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in evidence
-    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v1" in evidence
+    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v2" in evidence
     for source in sources:
         assert "RC16" in source
         assert "pluto-plus-utils" in source

@@ -249,7 +249,7 @@ indexing, and RAM deployment/lifecycle on the three authorized radios, but its
 db696 retry stopped at 4.2 GHz on intermittent native fast gain lock. The
 forward-only RC32 route uses branch `codex/firmware-tandem-agc-v8-rc32`, exact
 version `v0.41-plutoplus-spf-tandem-agc-v8-rc32`, and source lock
-`refs/tags/tandem-agc-v8-rc32-source/firmware-v1`. It retains RC31's exact
+`refs/tags/tandem-agc-v8-rc32-source/firmware-v2`. It retains RC31's exact
 device firmware and strict release policy and pins `pluto-plus-utils` commit
 `b2b3113c2e8724453179f09d357b4917c0f14c77`, whose read-only inventory scans
 the full bus while selecting exactly one requested serial. Absence, duplicates,

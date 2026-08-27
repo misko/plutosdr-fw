@@ -26,6 +26,13 @@ increase per receiver as diagnostic. Manual fixed-gain stability, slow-AGC
 bidirectional response, tandem bidirectional response/event proof, every RF
 quality threshold, identity, safety, and cleanup remain binding.
 
+RC32 source lock `firmware-v1` was stopped during trusted build
+`33112960920`, before artifact publication or hardware use, because its
+promotion assembler still encoded the superseded four-radio count. The
+forward route preserves that tag and advances to `firmware-v2`, whose
+promotion contract names the exact three authorized serials and rejects the
+excluded 3-8 radio or any substitution.
+
 RC29 passed trusted build `33080376518`, indexing, four exact-serial RAM
 deployments, and four lifecycle checks, but every fleet campaign attempt failed
 closed and cleaned up safely. Read-only diagnostics proved three host-policy
@@ -63,7 +70,7 @@ Current frequency-independent RC21 development revision:
 write-on-failure evidence hardening only). The canonical frequency plan,
 campaign contract, and RC21 release lineage are intentionally not yet frozen.
 
-Target candidate identity:
+Historical RC21 target identity (superseded by the RC32 identity above):
 
 - firmware version: `v0.41-plutoplus-spf-tandem-agc-v8-rc21`
 - build branch: `codex/firmware-tandem-agc-v8-rc21`
@@ -73,7 +80,7 @@ Target candidate identity:
 
 ## 1. Objective
 
-Implement and qualify an RC21 release that:
+The original RC21 objective was to implement and qualify a release that:
 
 1. preserves the complete immutable RC20 failure record;
 2. qualifies the intended LNB intermediate-frequency range rather than relying

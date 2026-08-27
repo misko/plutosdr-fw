@@ -61,8 +61,13 @@ RELEASE_VERIFIER_HARNESS_PATH = "scripts/verify_release.sh"
 RELEASE_GIT_REMOTE_URL = "https://github.com/misko/plutosdr-fw.git"
 CANDIDATE_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc32"
 FINAL_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
-CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc32-source/firmware-v1"
+CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc32-source/firmware-v2"
 FINAL_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-source/firmware-v1"
+RELEASE_RADIO_SERIALS = (
+    "104000bac4950008230026001b440a003a",
+    "winbond-db620818a328172c",
+    "winbond-db6968136727402c",
+)
 PRE_HARDWARE_SOURCE_LOCK_REFS = {
     "candidate-pre-hardware": CANDIDATE_SOURCE_LOCK_REF,
     "final-pre-confirmation": FINAL_SOURCE_LOCK_REF,
@@ -1658,8 +1663,8 @@ def _phase_serials(root: Path, phases: Sequence[str]) -> tuple[str, ...]:
     if not serial_sets or any(values != serial_sets[0] for values in serial_sets[1:]):
         _fail("hardware evidence phases cover different radio serials")
     serials = tuple(sorted(serial_sets[0]))
-    if len(serials) != 4:
-        _fail("hardware qualification requires exactly four immutable serials")
+    if serials != RELEASE_RADIO_SERIALS:
+        _fail("hardware qualification serials differ from the exact RC32 scope")
     return serials
 
 
@@ -2578,8 +2583,8 @@ def _verify_campaign_hardware(
             receipt_sha256=receipt_sha,
             serial=serial,
         )
-    if observed_serials != sorted(observed_serials) or len(set(observed_serials)) != 4:
-        _fail("qualification must contain exactly four unique sorted serials")
+    if tuple(observed_serials) != RELEASE_RADIO_SERIALS:
+        _fail("qualification serials differ from the exact RC32 scope")
     raw_paths: list[str] = []
     for position, value in enumerate(raw_members_value):
         member, _path = _verify_member(root, value, name=f"raw member {position}")
@@ -3211,9 +3216,9 @@ def _reduced_serials(root: Path) -> tuple[str, ...]:
     if (
         not aggregate_seen
         or deploy_serials != confirmation_serials
-        or len(serials) != 4
+        or serials != RELEASE_RADIO_SERIALS
     ):
-        _fail("reduced confirmation requires one aggregate and exactly four serials")
+        _fail("reduced confirmation differs from the exact RC32 serial scope")
     return serials
 
 
@@ -3365,8 +3370,8 @@ def _verify_reduced_hardware(
             serial=serial,
         )
         radios.append({"serial": serial, "deploy": receipt, "confirmation": report})
-    if serials != sorted(serials) or len(set(serials)) != 4:
-        _fail("reduced confirmation requires exactly four sorted serials")
+    if tuple(serials) != RELEASE_RADIO_SERIALS:
+        _fail("reduced confirmation serials differ from the exact RC32 scope")
     aggregate, aggregate_path = _verify_member(
         root, aggregate_value, name="final confirmation aggregate"
     )

@@ -119,7 +119,7 @@ def test_rc25_route_remains_reproducible_while_rc31_is_active() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in evidence
-    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v1" in evidence
+    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v2" in evidence
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc25" in workflow
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow

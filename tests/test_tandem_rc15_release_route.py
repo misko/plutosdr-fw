@@ -85,7 +85,7 @@ def test_rc15_history_is_retained_while_rc16_is_active() -> None:
     )
 
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in evidence
-    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v1" in evidence
+    assert "refs/tags/tandem-agc-v8-rc32-source/firmware-v2" in evidence
     for source in sources:
         assert "RC15" in source
         assert "pluto-plus-utils" in source

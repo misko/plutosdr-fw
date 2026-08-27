@@ -11,7 +11,11 @@
 # only the source-locked host evidence policy: fast strong-signal response is
 # binding on both receivers and weak recovery is retained diagnostically;
 # manual, slow AGC, and tandem retain their binding contracts. Candidate use
-# remains RAM-only and topology 3-8 is explicitly outside this campaign.
+# remains RAM-only and topology 3-8 is explicitly outside this campaign. The
+# immutable firmware-v1 source lock was stopped during its trusted build before
+# artifact publication when review found the promotion verifier still required
+# four radios. Firmware-v2 adds the exact three-serial promotion contract; no
+# firmware-v1 bytes reached hardware.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1
