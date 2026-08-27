@@ -247,12 +247,18 @@ cells. R18 also saw one strict tandem transition-continuity rejection; that
 rule remains mandatory. RC19 has no passing full or soak result and is not
 hardware-qualified.
 
-The active candidate is RC22. RC20's trusted build and four RAM/lifecycle
+The active candidate is RC23. RC20's trusted build and four RAM/lifecycle
 passes remain immutable context; it is not hardware-qualified. RC21's trusted
 build and db696 RAM/lifecycle
 passed, but its 1.05-GHz campaign measured 16,400-sample paired-event spacing
 where the release contract requires 17,408; RC21 is immutable and not
-hardware-qualified. RC22 retains its external source graph, deterministic
+hardware-qualified. RC22's trusted build, db696 RAM/lifecycle, and all eleven
+1.05-GHz steady policy matrices passed. Its transient phase retained an initial
+AUTO convergence followed by a contiguous stable pre-attack suffix, but the
+old host oracle rejected any startup transition; RC22 has no passing full/soak
+campaign and is immutable and not hardware-qualified. Its source lock
+`refs/tags/tandem-agc-v8-rc22-source/firmware-v1` remains immutable. RC23
+retains its exact firmware, external source graph, deterministic
 package, topology-bound serialless-b674
 resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
 route, IIO/model/runtime checks, QSPI equality requirement, and safe-state
@@ -266,25 +272,25 @@ Ephemeral RAM host keys are accepted
 with password-only SSH and host-key files disabled. Exact topology remains
 mandatory; nonempty serial mismatch, ambiguity, wrong VID/PID, serialless b673,
 `-S`, `-R`, persistent targets, and returned-runtime mismatch remain forbidden
-or fail closed. RC22 makes the programmed power period exact and accepts tandem
-gain decisions only on a power tick. It keeps the native-fast `-2.0 dBFS`
+or fail closed. RC23 retains RC22's exact power-period/tick-gated firmware and
+keeps the native-fast `-2.0 dBFS`
 ceiling, hardened settle/measurement boundary and failure-IQ evidence, and exact
 ordered centers 1.05, 1.55, 2.05, and 5.8 GHz. Its full aggregate always runs
 the fixed 2.45-GHz matrix last. Only a complete cleanup-verified RF-quality
 failure there may be recorded as nonauthorizing `diagnostic_failed`; all
-identity, metadata, evidence, fault, or cleanup failures remain fatal. RC22
+identity, metadata, evidence, fault, or cleanup failures remain fatal. RC23
 makes no 2.4-GHz RF-performance claim. Its exact candidate source lock is
-`refs/tags/tandem-agc-v8-rc22-source/firmware-v1`. The later
+`refs/tags/tandem-agc-v8-rc23-source/firmware-v1`. The later
 final build uses the different exact lock
 `refs/tags/tandem-agc-v8-source/firmware-v1`; candidate and final evidence must
 reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
-1. Commit the complete RC22 source and run the routed block-level OOC gate from a
+1. Commit the complete RC23 source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC22 firmware source lock and explicit trusted build route.
+2. Create the exact RC23 firmware source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;

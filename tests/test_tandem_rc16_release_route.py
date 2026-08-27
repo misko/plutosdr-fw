@@ -75,13 +75,13 @@ def test_rc16_history_is_retained_while_rc20_is_active() -> None:
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc22" in evidence
-    assert "refs/tags/tandem-agc-v8-rc22-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc23" in evidence
+    assert "refs/tags/tandem-agc-v8-rc23-source/firmware-v1" in evidence
     for source in sources:
         assert "RC16" in source
         assert "2654f34eb909904ec65bc0526e0f8977cb30e2ed" in source
         assert "pluto-plus-utils" in source
-    assert "The active candidate is RC22" in sources[0]
+    assert "The active candidate is RC23" in sources[0]
     assert "RC15" in sources[1]
 
 

@@ -103,7 +103,7 @@ def test_release_docs_preserve_rc10_lock_and_bind_full_final_campaign() -> None:
     candidate_lock = "refs/tags/tandem-agc-v8-rc10-source/firmware-v1"
     final_lock = "refs/tags/tandem-agc-v8-source/firmware-v1"
 
-    assert "The active candidate is RC22" in releasing
+    assert "The active candidate is RC23" in releasing
     assert candidate_lock in releasing
     assert final_lock in releasing
     assert "repeat the full four-radio campaign" in releasing

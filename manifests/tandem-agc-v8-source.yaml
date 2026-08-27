@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC22, but the
+# The external component graph remains identical from RC4 through RC23, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -64,7 +64,13 @@
 # full 2.45-GHz diagnostic. Its trusted build and db696 RAM/lifecycle passed,
 # but 1.05-GHz hardware measured 16,400-sample paired-event spacing where the
 # contract requires 17,408. RC22 corrects the N+1 power divider and permits
-# tandem gain decisions only on exact power-measurement ticks. RC22 must pass
+# tandem gain decisions only on exact power-measurement ticks. Its build,
+# db696 RAM/lifecycle, and all eleven 1.05-GHz steady policy matrices passed.
+# The transient oracle then rejected a fully retained startup AUTO convergence
+# even though a later contiguous event-free eight-frame suffix was stable before
+# the scheduled attack. RC23 retains startup as conditioning only and permits
+# that exact quiet suffix to anchor response timing; gaps, hidden events, and all
+# identity/metadata/safety/fault/cleanup failures remain fatal. RC23 must pass
 # its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release

@@ -197,11 +197,15 @@ candidate evidence, and the db696 RAM/lifecycle pilot passed. Its first
 authorizing 1.05-GHz campaign exposed a real FPGA timing-contract mismatch:
 paired events were 16,400 samples apart where the contract requires 17,408.
 
-The forward-only RC22 route uses branch
-`codex/firmware-tandem-agc-v8-rc22`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc22`, and source lock
-`refs/tags/tandem-agc-v8-rc22-source/firmware-v1`. It corrects the power divider
-and tick-gates tandem decisions, retains hardened measurement-boundary evidence,
+RC22's trusted build, db696 RAM/lifecycle, and all eleven 1.05-GHz steady
+policies passed. Its transient phase retained startup convergence followed by a
+quiet pre-attack suffix, but the host oracle rejected any startup transition;
+RC22 is immutable and not hardware-qualified. The forward-only RC23 route uses
+branch `codex/firmware-tandem-agc-v8-rc23`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc23`, and source lock
+`refs/tags/tandem-agc-v8-rc23-source/firmware-v1`. It retains RC22's corrected
+power divider/tick-gated decisions and requires a contiguous event-free
+eight-frame suffix after fully retained startup conditioning,
 uses fixed authorizing centers
 1.05/1.55/2.05/5.8 GHz, and records a mandatory nonauthorizing 2.45-GHz
 diagnostic. It does not move or reuse RC21's branch, source lock, artifacts, or
@@ -269,7 +273,8 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC22 workflow has no separate attestation job. An operator may capture GitHub
+The RC22 workflow has no separate attestation job.
+The RC23 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.
