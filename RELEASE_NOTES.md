@@ -50,7 +50,7 @@
 | `tandem-agc-v8-rc29` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded** | fixed the modulated configuration; fleet attempts exposed late native-AGC settling, cooldown-zero transport loss, and an unreliable 5.8-GHz endpoint |
 | `tandem-agc-v8-rc30` | 2026-08-27 | **trusted indexed build; zero candidate deployments; superseded** | all software/build gates passed; mixed ordinary-Pluto/Pluto+ USB inventory failed closed before hardware |
 | `tandem-agc-v8-rc31` | 2026-08-27 | **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded** | native fast AGC intermittently held one RX chain at the 4.2-GHz strong-signal step |
-| `tandem-agc-v8-rc32` | 2026-08-27 | **final release; trusted build passed; hardware campaign failed** | db696 passed RAM boot, lifecycle, 44 steady cases, four transient bands, and 1.05-GHz modulation; 1.55-GHz native-fast RX1 gain degradation was 3.595 dB and binding |
+| `tandem-agc-v8-rc32` | 2026-08-27 | **final release; trusted build passed; hardware campaign failed** | the original db696 campaign failed a binding 1.55-GHz native-fast comparison; a later 30-run, three-radio repetition reproduced four native-fast gain-degradation failures on two radios |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -104,9 +104,46 @@ The 1.55-GHz matrix failed its binding native-fast RX1 gain-degradation limit:
 the desired-gain change was -3.595 dB against a 3 dB limit. Manual,
 native-slow, and tandem-auto passed the same comparison, and final cleanup
 verified TX muted, DDS zero, and safe selectors. The failed evidence is
-retained; no hardware retry was authorized. The remaining two modulation
-bands, 2.45-GHz diagnostic, soaks, and other two radios were not run, so RC32
-must not be described as hardware-qualified.
+retained.
+
+The operator subsequently authorized a focused repetition of that exact
+1.55-GHz modulated matrix. Ten independent top-level runner invocations were
+completed on each of the three authorized radios, one radio at a time. Each
+invocation ran desired-only and -20 dB adjacent-blocker cells in manual fixed,
+native slow attack, native fast attack, and tandem-auto modes. The binding
+native-fast limit permits no channel's desired-carrier amplitude to degrade by
+more than 3 dB when the blocker is added.
+
+| Radio | Matrix result | Binding native-fast failures |
+|---|---:|---|
+| `winbond-db6968136727402c` | 10/10 pass | none; RX0 changes ranged -1.723 to +1.373 dB and RX1 ranged -2.651 to +3.209 dB |
+| `winbond-db620818a328172c` | 7/10 pass | RX0 -4.071 dB once; RX1 -4.970 and -5.127 dB |
+| `104000bac4950008230026001b440a003a` | 9/10 pass | RX0 -7.878 dB once |
+
+The focused total is 26/30 passing matrices and four binding failures. All
+four failures are `native_fast_attack/blocker_00` gain degradation, split two
+on RX0 and two on RX1. Manual fixed, native slow attack, and tandem-auto passed
+all 30 repetitions. Every desired and blocked cell retained valid absolute RF
+quality, the blocker was detected at the commanded offset and power, and every
+raw phase report verified final TX/DDS/selector cleanup. A failing outer
+aggregate remains intentionally `invalid` even though its inner phase cleanup
+record is true.
+
+This is not isolated to one defective radio or one receive chain. The stable
+gain readbacks show that the independent AD9361 native-fast loops sometimes
+settle to a lower gain when the adjacent blocker is present; the affected
+channel and occurrence vary by board and run. RC32 has the same device
+firmware as RC31, and tandem-auto, manual, slow attack, modulation quality, and
+cleanup did not reproduce the fault. The evidence therefore isolates the
+behavior to native fast-AGC blocker sensitivity/lock-state variability rather
+than tandem-AGC control logic or a general link-quality failure. The exact
+silicon/register-level trigger is not yet proven, so this is a behavioral root
+cause, not a completed microscopic root cause.
+
+The original full campaign still stopped at 1.55 GHz. The remaining two
+authorizing modulation bands, 2.45-GHz diagnostic, full three-radio campaigns,
+and soaks were not completed, so the focused repetitions do not convert RC32
+into a hardware-qualified release.
 
 Five host-only setup failures were also retained and did not change device or
 RF state: the first RAM launch loaded an incompatible system libiio; two

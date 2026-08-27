@@ -18,13 +18,27 @@ signal weakened. Local AD9361 documentation confirms that fast gain is held
 after lock until a configured unlock condition fires. This is native fast-AGC
 semantics, not tandem firmware behavior or a 2.4 GHz interference finding.
 
-The active forward-only candidate is RC32. It retains the exact RC31 firmware
+RC32 is now the published final release, but it is not hardware-qualified. It
+retains the exact RC31 firmware
 logic and RF plan, seeds both RX chains at 62 dB manual gain under the real
 weak waveform before native fast entry, requires native fast's strong-signal
 gain decrease on both receivers, and records its post-lock weak-signal gain
 increase per receiver as diagnostic. Manual fixed-gain stability, slow-AGC
 bidirectional response, tandem bidirectional response/event proof, every RF
 quality threshold, identity, safety, and cleanup remain binding.
+
+After the original db696 full campaign failed the binding 1.55-GHz
+native-fast RX1 blocker-degradation comparison at -3.595 dB, the operator
+authorized ten independent repetitions of that exact modulated matrix on each
+authorized radio. db696 passed 10/10, db620 passed 7/10, and the topology-5-2
+Micron radio passed 9/10. All four failures were native-fast gain degradation
+with verified raw-report cleanup: db620 RX0 -4.071 dB, db620 RX1 -4.970 and
+-5.127 dB, and Micron RX0 -7.878 dB. Manual, native slow, tandem, absolute RF
+quality, blocker detection, and cleanup passed in all 30 runs. This reproduces
+native fast-AGC blocker sensitivity/lock-state variability across two radios
+and both channels; it does not implicate tandem control logic. Full fleet and
+soak qualification remain incomplete, so the release status stays failed and
+not hardware-qualified.
 
 RC32 source lock `firmware-v1` was stopped during trusted build
 `33112960920`, before artifact publication or hardware use, because its
