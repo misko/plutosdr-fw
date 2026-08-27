@@ -102,6 +102,21 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
         assert "protected manifest differs from its committed HEAD blob" in source
 
 
+def test_single_rx_metadata_candidate_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/issue-50-single-rx-metadata"
+
+    assert workflow.count(branch) == 4
+    assert workflow.count("'single-rx-metadata-rc1-source.yaml'") == 1
+    assert workflow.count("'plutoplus-spf-single-rx-metadata-rc1'") == 1
+    assert workflow.count("'v0.42-plutoplus-spf-single-rx-metadata-rc1'") == 1
+    assert "Require the exact single-RX metadata candidate identity" in workflow
+    for source in (builder, package):
+        assert "single-rx-metadata-rc1-source.yaml" in source
+
+
 def test_release_authorizing_entry_points_require_owner_review() -> None:
     owners = (ROOT / ".github" / "CODEOWNERS").read_text().splitlines()
     required = {
