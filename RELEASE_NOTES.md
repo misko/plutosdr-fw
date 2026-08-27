@@ -45,7 +45,8 @@
 | `tandem-agc-v8-rc24` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; three transient comparison modes passed; tandem invalid; superseded** | separate host sysfs reads straddled one AUTO transition and manufactured a mixed transition-count/gain snapshot |
 | `tandem-agc-v8-rc25` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; all four inner transient modes passed; outer replay invalid; superseded** | fixed coherent host status reads; outer replay contradicted the frozen producer policy for startup conditioning and diagnostic response windows |
 | `tandem-agc-v8-rc26` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | replay alignment passed, but two db696 full attempts stopped on metadata-provider ENODATA in the same 1.05-GHz low-power matrix |
-| `tandem-agc-v8-rc27` | 2026-08-27 | **active development; not hardware-qualified** | retains RC26 device firmware; boundedly treats metadata-only ENODATA as an omitted frame while preserving strict continuity and all release gates |
+| `tandem-agc-v8-rc27` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | passed all 1.05-GHz steady policies; two-buffer capture omitted every louder-TX DECREASE event in the authorizing 1.55-GHz cooldown-0 matrix |
+| `tandem-agc-v8-rc28` | 2026-08-27 | **active development; not hardware-qualified** | retains RC27 firmware and strict event proof; raises the steady quality DMA queue from 2 to 16 buffers based on the exact passing diagnostic replay |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -54,7 +55,36 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc27 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc28 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC28 retains RC27's exact device firmware, external source graph, RF thresholds,
+and strict event/count/continuity policy. RC27 passed owner-dispatched trusted
+run `33067056765`, indexed evidence, four exact-serial RAM deployments, four
+lifecycle reports, and all eleven 1.05-GHz steady matrices. Its db696 full
+campaign then stopped at the authorizing 1.55-GHz cooldown-0 matrix. With two
+kernel DMA buffers, 47 producer frames were omitted and every louder-TX
+DECREASE transition was gap-hidden. The paired gain endpoints reconciled, but
+the fail-closed oracle correctly refused to treat hidden transitions as proof.
+RC27 is immutable and not hardware-qualified.
+
+The exact nonauthorizing replay changed only `kernel_buffers=2` to `16`. It
+passed in 36.77 seconds with complete safe cleanup, only five missing frames,
+17 explicit DECREASE events, 16 explicit INCREASE events, and both directions
+proven. RC28 therefore changes only the steady quality harness default to 16
+buffers. Hidden transitions remain unproven; the 10-dB per-capture threshold
+and every paired-event, identity, metadata, evidence, QSPI, safe-state,
+FIFO/fault/overflow, and cleanup gate remain unchanged.
+
+RC28 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix remains mandatory and evidence-complete, while an isolated
+cleanup-verified RF-quality failure there remains nonbinding. RC28 uses branch
+`codex/firmware-tandem-agc-v8-rc28`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc28`, manifest
+`manifests/tandem-agc-v8-rc28-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc28`, and source lock
+`refs/tags/tandem-agc-v8-rc28-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc27 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded**
 
 RC27 retains RC26's exact device firmware and external source graph. It changes
 only the host qualification refill policy exposed by the two retained RC26

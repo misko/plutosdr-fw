@@ -247,7 +247,7 @@ cells. R18 also saw one strict tandem transition-continuity rejection; that
 rule remains mandatory. RC19 has no passing full or soak result and is not
 hardware-qualified.
 
-The active candidate is RC27. RC20's trusted build and four RAM/lifecycle
+The active candidate is RC28. RC20's trusted build and four RAM/lifecycle
 passes remain immutable context; it is not hardware-qualified. RC21's trusted
 build and db696 RAM/lifecycle
 passed, but its 1.05-GHz campaign measured 16,400-sample paired-event spacing
@@ -282,7 +282,14 @@ then stopped in low-power-16 tandem AUTO when the metadata provider returned
 ENODATA after consuming a frame without a complete gain/RSSI observation. Both
 attempts retained failure IQ and proved complete safe cleanup. RC26 has no
 passing full/soak campaign, no further retry is authorized, and it is immutable
-and not hardware-qualified. RC27 retains RC26's exact device firmware,
+and not hardware-qualified. RC27 passed trusted run `33067056765`, indexed
+evidence, four exact-serial RAM deployments, four lifecycle reports, and all
+eleven 1.05-GHz steady matrices. Its db696 campaign stopped at authorizing
+1.55-GHz cooldown-0 because the two-buffer DMA queue gap-hid every louder-TX
+DECREASE event. The strict oracle correctly refused endpoint-only proof. An
+exact nonauthorizing 16-buffer replay retained 17 DECREASE and 16 INCREASE
+events, missed only five frames, and passed complete safe cleanup. RC27 is
+immutable and not hardware-qualified. RC28 retains RC27's exact device firmware,
 external source graph, deterministic
 package, topology-bound serialless-b674
 resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
@@ -297,7 +304,7 @@ Ephemeral RAM host keys are accepted
 with password-only SSH and host-key files disabled. Exact topology remains
 mandatory; nonempty serial mismatch, ambiguity, wrong VID/PID, serialless b673,
 `-S`, `-R`, persistent targets, and returned-runtime mismatch remain forbidden
-or fail closed. RC27 retains RC26's exact power-period/tick-gated firmware and
+or fail closed. RC28 retains RC27's exact power-period/tick-gated firmware and
 keeps the native-fast `-2.0 dBFS`
 ceiling, hardened settle/measurement boundary and failure-IQ evidence, and exact
 ordered centers 1.05, 1.55, 2.05, and 5.8 GHz. In transient AUTO evidence,
@@ -306,11 +313,14 @@ quality is required in the exact event-free eight-frame suffix of each steady
 partition. Its full aggregate always runs
 the fixed 2.45-GHz matrix last. Only a complete cleanup-verified RF-quality
 failure there may be recorded as nonauthorizing `diagnostic_failed`; all
-identity, metadata, evidence, fault, or cleanup failures remain fatal. RC27
-makes no 2.4-GHz RF-performance claim. It boundedly retries only metadata-buffer
+identity, metadata, evidence, fault, or cleanup failures remain fatal. RC28
+makes no 2.4-GHz RF-performance claim. It retains RC27's bounded metadata-buffer
 ENODATA under the existing 65-refill limit; ordinary IIO ENODATA remains fatal,
 and the next accepted frame must pass the unchanged sequence/count continuity
-oracle. Its exact candidate source lock is
+oracle. It changes only the steady quality DMA queue from two to sixteen buffers
+so fast AUTO events remain directly observable; hidden transitions remain
+unproven. Its exact candidate source lock is
+`refs/tags/tandem-agc-v8-rc28-source/firmware-v1`. The immutable RC27 lock is
 `refs/tags/tandem-agc-v8-rc27-source/firmware-v1`. The immutable RC26 lock is
 `refs/tags/tandem-agc-v8-rc26-source/firmware-v1`; the immutable RC25 lock is
 `refs/tags/tandem-agc-v8-rc25-source/firmware-v1`. The later
@@ -320,10 +330,10 @@ reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
-1. Commit the complete RC27 source and run the routed block-level OOC gate from a
+1. Commit the complete RC28 source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC27 firmware source lock and explicit trusted build route.
+2. Create the exact RC28 firmware source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;

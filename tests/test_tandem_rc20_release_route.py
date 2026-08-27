@@ -85,7 +85,7 @@ def test_rc20_evidence_identity_is_immutable_and_docs_name_rc22_active() -> None
         assert "RC20" in source
         assert "RC19" in source
         assert "-2.0 dBFS" in source
-    assert "The active candidate is RC27" in sources[0]
+    assert "The active candidate is RC28" in sources[0]
     assert "RC20 is immutable" in sources[3]
 
 

@@ -221,13 +221,19 @@ evidence, four exact-serial RAM deployments, and four lifecycle reports. Its
 db696 full campaign stopped twice in the same 1.05-GHz low-power-16 matrix when
 the metadata provider returned ENODATA after consuming a frame without complete
 gain/RSSI observation. Both attempts retained failure IQ and cleanup passed;
-RC26 is immutable and not hardware-qualified. The forward-only RC27 route uses
-branch `codex/firmware-tandem-agc-v8-rc27`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc27`, and source lock
-`refs/tags/tandem-agc-v8-rc27-source/firmware-v1`. It retains RC26's exact
-device firmware, boundedly retries metadata-only ENODATA under the existing
-refill limit, and requires the next accepted frame to pass the unchanged
-sequence/count continuity oracle. Ordinary IIO ENODATA remains fatal. It still
+RC26 is immutable and not hardware-qualified. RC27 passed trusted run
+`33067056765`, indexed evidence, four RAM deployments, four lifecycle reports,
+and every 1.05-GHz steady matrix. Its authorizing 1.55-GHz cooldown-0 matrix
+then gap-hid every louder-TX DECREASE event with two host DMA buffers. The exact
+16-buffer replay passed with 17 explicit DECREASE and 16 explicit INCREASE
+events and complete safe cleanup. RC27 is immutable and not hardware-qualified.
+The forward-only RC28 route uses branch
+`codex/firmware-tandem-agc-v8-rc28`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc28`, and source lock
+`refs/tags/tandem-agc-v8-rc28-source/firmware-v1`. It retains RC27's exact
+device firmware and bounded metadata-only ENODATA policy, but changes the
+steady quality DMA queue from two to sixteen buffers. Hidden transitions remain
+unproven and ordinary IIO ENODATA remains fatal. It still
 requires strict RF quality in each exact event-free eight-frame steady suffix
 and uses fixed authorizing centers
 1.05/1.55/2.05/5.8 GHz, and records a mandatory nonauthorizing 2.45-GHz
@@ -301,7 +307,8 @@ The RC23 workflow has no separate attestation job.
 The RC24 workflow has no separate attestation job.
 The RC25 workflow has no separate attestation job.
 The RC26 workflow has no separate attestation job.
-The RC27 workflow has no separate attestation job. An operator may capture GitHub
+The RC27 workflow has no separate attestation job.
+The RC28 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

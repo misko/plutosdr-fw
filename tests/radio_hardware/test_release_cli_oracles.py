@@ -845,6 +845,8 @@ def test_characterization_and_baseline_soak_are_distinct_plans(
     assert soak_config.policy_cases[0].factor == "baseline"
     assert full_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
     assert soak_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
+    assert full_base.kernel_buffers == 16
+    assert soak_base.kernel_buffers == 16
 
 
 def test_default_full_plan_keeps_2450_diagnostic_non_authorizing_and_last(

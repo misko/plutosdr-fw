@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC27, but the
+# The external component graph remains identical from RC4 through RC28, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -91,7 +91,15 @@
 # accepted frame to expose the omission through the unchanged continuity oracle;
 # ordinary IIO ENODATA remains fatal. Event/count continuity, paired endpoints,
 # the 10-dB threshold, and every identity/metadata/evidence/safety/fault/cleanup
-# failure remain fatal. RC27 must pass its source-locked build and full hardware qualification
+# failure remain fatal. RC27 passed its trusted build, indexed evidence, four RAM
+# deployments, four lifecycle reports, and every 1.05-GHz steady matrix. Its
+# 1.55-GHz cooldown-0 matrix then omitted all louder-TX DECREASE events with the
+# two-buffer host DMA queue, so the strict oracle correctly refused to infer
+# direction from gap-hidden transitions. The exact nonauthorizing replay passed
+# with 16 buffers and directly retained 17 DECREASE plus 16 INCREASE events.
+# RC28 changes only the steady quality harness default to 16 buffers; hidden
+# transitions remain unproven and every release gate stays strict. RC28 must
+# pass its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release
 # identity and packaging, while requiring exact component identities in packed
