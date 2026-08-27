@@ -174,15 +174,17 @@ no PKI or external signing service is required.
 This enabling gate is complete in production commit
 `ca7c6ac9189dc3ef3bb7ab0105d170568392b777`, with cross-version test-only
 follow-up `a04ac53d84849978d58a5d4c1e80c310db60530d` and stable physical-USB
-inventory fix `083a077a5dfb5e2936b1300ce8ce65dbc2ec4824`;
-`pluto-plus-utils` `main` resolves to the latter and that is the required
-execution pin. Its exact local gates are 682 passing tests with 10 explicit
-browser/hardware opt-in skips on Python 3.11, the 12 focused inventory tests on
-Python 3.11/3.12/3.13, Ruff clean, mypy clean across 55 source files, and
-`git diff --check` clean. GitHub CI run `33037674476` completed successfully at
-exact head `083a077a5dfb5e2936b1300ce8ce65dbc2ec4824`, including browser and
-offline Python 3.11, 3.12, and 3.13 jobs. Independent review found no P0/P1
-blocker. The inventory snapshot rejects duplicate-class-token undercount,
+inventory fix `083a077a5dfb5e2936b1300ce8ce65dbc2ec4824`. The native comparator-RAM
+follow-up `7e194f66f10167954baa0dc1c8b41079edb3db03` is a direct successor;
+`pluto-plus-utils` `main` resolves to that commit and it is the required
+execution pin for both survey and comparator operations. Its exact local gates
+are 706 passing tests with 10 explicit browser/hardware opt-in skips on Python
+3.11, focused comparator tests on Python 3.11/3.12/3.13, Ruff clean, mypy clean
+across 56 source files, and `git diff --check` clean. GitHub CI run
+`33038655140` completed successfully at exact head
+`7e194f66f10167954baa0dc1c8b41079edb3db03`, including browser and offline
+Python 3.11, 3.12, and 3.13 jobs. Independent review found no P0/P1 blocker.
+The inventory snapshot rejects duplicate-class-token undercount,
 foreign interface symlinks, candidate-alias retargeting, and same-port device
 replacement after identity capture. The implementation additionally binds the
 approved plan SHA-256 at execute time, binds the imported package to the
@@ -191,9 +193,9 @@ lifecycle, retains pre/post shared-PHY temperature and exposed RX-attribute
 provenance, restores exact settable per-RX state, atomically publishes each
 center, and rejects undeclared result-tree entries. Hardware use must come from
 the clean detached checkout at
-`/home/mouse9911/release-evidence/tooling/pluto-plus-utils-083a077a5dfb`
+`/home/mouse9911/release-evidence/tooling/pluto-plus-utils-7e194f66f101`
 with its external environment at
-`/home/mouse9911/release-evidence/tooling/venv-pluto-plus-utils-083a077a5dfb`;
+`/home/mouse9911/release-evidence/tooling/venv-pluto-plus-utils-7e194f66f101`;
 the shared worktree remains untouched.
 
 Freeze the survey algorithm before the first capture:
@@ -749,35 +751,43 @@ trust model.
 
 ### 10.1 Required comparator-RAM utility gate
 
-The Stage-1 survey pin
-`083a077a5dfb5e2936b1300ce8ce65dbc2ec4824` does **not** implement the
-comparator-specific RAM plan, execute, or receipt contracts below. It may not
-be represented as doing so, and the legacy release-candidate command/receipt
-may not be relabeled or translated into comparator evidence. Before any Stage-6
-comparator hardware operation:
+This gate is complete in native `pluto-plus-utils` production commit
+`7e194f66f10167954baa0dc1c8b41079edb3db03`. The legacy release-candidate
+command/receipt is not relabeled or translated into comparator evidence. The
+released implementation:
 
-- implement `firmware comparator-ram plan`, `execute`, and `receipt-verify` in
-  an isolated clean `pluto-plus-utils` checkout, using the existing guarded RAM
-  lifecycle only as reviewed implementation substrate;
-- implement and semantically replay exact
-  `pluto-plus-utils.comparator-ram-plan.v1` and
-  `pluto-plus-utils.comparator-ram-receipt.v1` records and the exact execution
-  confirmation `COMPARATOR RAM BOOT <serial>`;
-- bind the retained approved-v7 DFU/FIT/profile, exact pilot
+- provides `firmware comparator-ram plan`, `execute`, and `receipt-verify` with
+  exact `pluto-plus-utils.comparator-ram-plan.v1` and
+  `pluto-plus-utils.comparator-ram-receipt.v1` contracts and confirmation
+  `COMPARATOR RAM BOOT <serial>`;
+- binds the retained approved-v7 DFU/FIT/profile, exact pilot
   serial/topology/interface, expected current runtime, shared per-serial lock,
   sealed DFU bytes, paired selector, owned `/32` route, boot identities, QSPI
   equality, and complete cleanup/safe state, while rejecting `-R`, `-S`, and
   every persistent target;
-- plant success, mutation, wrong-radio, stale-plan, QSPI-change, route/lock,
-  cleanup, and no-receipt failure tests; run the complete utility suite, Ruff,
-  mypy, build, and multi-version CI; and obtain independent P0/P1 review; then
-- commit, push to `pluto-plus-utils` `main`, require green CI, create a fresh
-  clean detached checkout, and update this plan's Stage-6 utility commit,
-  source-tree hash, wrapper hash, and paths before producing a comparator plan.
+- rechecks the exact operator-approved plan and absent receipt under the shared
+  radio lock, then rechecks the plan at the sealed-DFU mutation boundary, so a
+  changed plan or queued duplicate exits before target/route/hardware access;
+- passed success, mutation, wrong-radio, stale-plan, duplicate-executor,
+  QSPI-change, route/lock, cleanup, and no-receipt planted tests; and
+- is pushed to `pluto-plus-utils` `main`; GitHub CI run `33038655140` passed
+  browser and offline Python 3.11/3.12/3.13 jobs at that exact head.
 
-This is a hard pre-Stage-6 gate, not implied work. Until its exact remote commit
-and green CI are recorded here, comparator deployment and all later hardware
-steps remain blocked.
+The final local gate is 706 passing tests with 10 explicit browser/hardware
+opt-in skips, focused multi-version comparator tests, Ruff, formatting, mypy
+across 56 source files, clean-checkout source attestation, and independent
+P0/P1 review. The execution pin is the clean detached checkout
+`/home/mouse9911/release-evidence/tooling/pluto-plus-utils-7e194f66f101`
+with external environment
+`/home/mouse9911/release-evidence/tooling/venv-pluto-plus-utils-7e194f66f101`.
+Its clean source attestation binds source-tree SHA-256
+`81588a219ad8c50e720acfb9a00c771ab65ace5c09d42292ad8ca0f4126fb751`
+and wrapper
+`/home/mouse9911/release-evidence/tooling/pluto-plus-utils-7e194f66f101/src/pluto_plus/comparator_ram.py`
+(45,913 bytes, SHA-256
+`d99cd28f025c924f64b4b7bc4775f3ae06404a4463db8441a5e1b8afb9041590`).
+No comparator plan has yet been generated and no comparator hardware operation
+has occurred.
 
 - [ ] Reserve one pilot and, before any RC21 receipt exists, run the exact
       approved-v7 artifact/tag comparison in a separate nonauthorizing root,
