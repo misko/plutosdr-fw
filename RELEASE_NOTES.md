@@ -48,7 +48,8 @@
 | `tandem-agc-v8-rc27` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | passed all 1.05-GHz steady policies; two-buffer capture omitted every louder-TX DECREASE event in the authorizing 1.55-GHz cooldown-0 matrix |
 | `tandem-agc-v8-rc28` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | all 44 steady and four transient pilot phases passed; unsupported 1.024-MS/s no-FIR modulated rate failed before TX buffer creation |
 | `tandem-agc-v8-rc29` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded** | fixed the modulated configuration; fleet attempts exposed late native-AGC settling, cooldown-zero transport loss, and an unreliable 5.8-GHz endpoint |
-| `tandem-agc-v8-rc30` | 2026-08-27 | **active development; not hardware-qualified** | retains RC29 firmware and strict gates; uses eight stable settle frames, 48 buffers only for cooldown zero, and the proven 4.2-GHz table-3 sentinel |
+| `tandem-agc-v8-rc30` | 2026-08-27 | **trusted indexed build; zero candidate deployments; superseded** | all software/build gates passed; mixed ordinary-Pluto/Pluto+ USB inventory failed closed before hardware |
+| `tandem-agc-v8-rc31` | 2026-08-27 | **active development; not hardware-qualified** | retains RC30 firmware/RF policy and pins target-scoped, fail-closed mixed-USB release inventory |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -57,7 +58,36 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc30 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc31 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC30 locked exact commit `aa9c56c664d5cd5f74d2c70b4e271682593f08a4`,
+passed all 1,465 offline oracles, routed OOC, trusted integrated build
+`33097467689`, deterministic packaging, independent checksum verification, and
+candidate-index verification. Its candidate index SHA-256 is
+`51b9ba05f1e1309a6724565d038c63b945126ac9406cd1a3cc0b1fb9f21e6999`.
+Before any reboot or DFU transfer, the pinned device tool correctly failed
+closed because its fleet-wide inventory encountered an unrelated ordinary
+ADALM-Pluto beside the four Pluto+ targets. RC30 has zero candidate deployments,
+is immutable, and is not hardware-qualified.
+
+`pluto-plus-utils` commit `b2b3113c2e8724453179f09d357b4917c0f14c77`
+adds an explicit read-only `candidate-ram inventory --serial` boundary. It still
+scans the full USB bus, requires exactly one matching runtime, and applies every
+strict Pluto+, stable-serial, topology, interface, and source-address check to
+that target. An absent or duplicate serial, or selecting the ordinary Pluto,
+fails closed. Its focused tests passed 52/52 and full suite passed 725 with ten
+explicit opt-in hardware/browser skips.
+
+RC31 retains RC30's exact device firmware, external source graph, four-band RF
+policy, mandatory 2.45-GHz diagnostic, thresholds, and strict event, identity,
+safety, and cleanup gates. It changes only the pinned device-tool commit and
+candidate identity. RC31 uses branch `codex/firmware-tandem-agc-v8-rc31`,
+version `v0.41-plutoplus-spf-tandem-agc-v8-rc31`, manifest
+`manifests/tandem-agc-v8-rc31-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc31`, and source lock
+`refs/tags/tandem-agc-v8-rc31-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc30 — 2026-08-27 — **trusted indexed build; zero candidate deployments; superseded**
 
 RC29 locked exact commit `02a8cf18b8b81fd6a8a3e6725bb9d483e88e464b`,
 passed owner-dispatched trusted run `33080376518`, candidate indexing, all four

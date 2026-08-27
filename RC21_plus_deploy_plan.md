@@ -4,29 +4,41 @@ Status: active
 
 Owner: single release operator
 
-## Current execution update — RC30
+## Current execution update — RC31
 
-RC21 through RC29 are immutable history. The active forward-only candidate is
-RC30: `v0.41-plutoplus-spf-tandem-agc-v8-rc30` on branch
-`codex/firmware-tandem-agc-v8-rc30`, manifest
-`manifests/tandem-agc-v8-rc30-source.yaml`, and source lock
-`refs/tags/tandem-agc-v8-rc30-source/firmware-v1`.
+RC21 through RC30 are immutable history. The active forward-only candidate is
+RC31: `v0.41-plutoplus-spf-tandem-agc-v8-rc31` on branch
+`codex/firmware-tandem-agc-v8-rc31`, manifest
+`manifests/tandem-agc-v8-rc31-source.yaml`, and source lock
+`refs/tags/tandem-agc-v8-rc31-source/firmware-v1`.
 
 RC29 passed trusted build `33080376518`, indexing, four exact-serial RAM
 deployments, and four lifecycle checks, but every fleet campaign attempt failed
 closed and cleaned up safely. Read-only diagnostics proved three host-policy
-corrections for RC30: eight stable settle frames, 48 DMA buffers only for
+corrections incorporated into RC30: eight stable settle frames, 48 DMA buffers only for
 cooldown-zero captures, and an exact 4.2-GHz table-3 sentinel in place of the
 unreliable 5.8-GHz endpoint. Binding centers are therefore 1.05, 1.55, 2.05,
 and 4.2 GHz; the complete 2.45-GHz diagnostic remains mandatory with only an
 isolated cleanup-verified RF-quality failure nonbinding. No device firmware,
 RF threshold, transition proof, identity, safety, or cleanup gate is relaxed.
 
+RC30 passed all 1,465 offline oracles, routed OOC, trusted integrated build
+`33097467689`, deterministic packaging, checksum verification, and candidate
+indexing at exact commit `aa9c56c664d5cd5f74d2c70b4e271682593f08a4`.
+Its fleet-wide inventory failed closed before reboot or DFU because an
+unrelated ordinary ADALM-Pluto was attached beside the four Pluto+ targets.
+RC30 has zero candidate deployments and is immutable. RC31 retains the exact
+RC30 firmware and RF policy and advances only the identity and pinned
+`pluto-plus-utils` commit to
+`b2b3113c2e8724453179f09d357b4917c0f14c77`, whose read-only inventory selects
+one exact serial from a full mixed USB scan and fails closed for absence,
+duplication, non-Plus selection, or incomplete identity.
+
 Radio `1040007c4a94000211000b009186843ef2` at USB topology `3-8` is temporarily
-released for other testing in a verified muted/idle state. RC30 work may use
+released for other testing in a verified muted/idle state. RC31 work may use
 the other three local radios now. Before the final four-radio authorizing
 campaign, the released radio must be returned, freshly inventoried, RAM-booted
-with the exact CI-minted RC30 artifact, and requalified from a clean evidence
+with the exact CI-minted RC31 artifact, and requalified from a clean evidence
 root. Final hardware qualification remains serial and one-radio-at-a-time.
 
 Base revision: tandem AGC v8 RC20, commit
@@ -201,8 +213,9 @@ This enabling gate is complete in production commit
 follow-up `a04ac53d84849978d58a5d4c1e80c310db60530d` and stable physical-USB
 inventory fix `083a077a5dfb5e2936b1300ce8ce65dbc2ec4824`. The native comparator-RAM
 follow-up `7e194f66f10167954baa0dc1c8b41079edb3db03` is a direct successor;
-`pluto-plus-utils` `main` resolves to that commit and it is the required
-execution pin for both survey and comparator operations. Its exact local gates
+`pluto-plus-utils` `main` resolved to that commit when it was qualified, and it
+remains the required immutable execution pin for both survey and comparator
+operations. Its exact local gates
 are 706 passing tests with 10 explicit browser/hardware opt-in skips on Python
 3.11, focused comparator tests on Python 3.11/3.12/3.13, Ruff clean, mypy clean
 across 56 source files, and `git diff --check` clean. GitHub CI run

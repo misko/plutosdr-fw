@@ -46,7 +46,7 @@ def test_rc30_owner_route_maps_branch_manifest_package_and_version() -> None:
     assert workflow.count("'tandem-agc-v8-rc30-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc30'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc30'") == 1
-    assert "Require the exact protected RC30 candidate identity" in workflow
+    assert "Require the exact protected RC30 reproduction identity" in workflow
     assert "Require the exact protected RC29 reproduction identity" in workflow
     assert workflow.index(branch) < workflow.index(
         "refs/heads/codex/firmware-tandem-agc-v8-rc29"
@@ -78,7 +78,7 @@ def test_rc30_qualification_policy_matches_non_authorizing_replays() -> None:
     assert '"center_frequency_hz": 4_200_000_000' in evidence
 
 
-def test_rc30_docs_preserve_truthful_rc29_failure_and_active_identity() -> None:
+def test_rc30_docs_preserve_truthful_rc29_failure_and_rc31_active_identity() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert "33080376518" in notes
     assert "RC29" in notes and "not hardware-qualified" in notes
@@ -86,15 +86,15 @@ def test_rc30_docs_preserve_truthful_rc29_failure_and_active_identity() -> None:
     assert "4.2-GHz" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC30" in text or "forward-only RC30" in text
+        assert "The active candidate is RC31" in text or "forward-only RC31" in text
 
 
-def test_rc30_evidence_identity_and_attestation_policy_are_exact() -> None:
+def test_rc30_route_is_preserved_while_evidence_advances_to_rc31() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc30" in evidence
-    assert "refs/tags/tandem-agc-v8-rc30-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
+    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
     assert "The RC30 workflow has no separate attestation job." in runner

@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
 PLUTO_PLUS_UTILS=${PLUTO_PLUS_UTILS:-$(cd -- "${ROOT}/.." && pwd)/pluto-plus-utils}
-EXPECTED_TOOL_COMMIT=2654f34eb909904ec65bc0526e0f8977cb30e2ed
+EXPECTED_TOOL_COMMIT=b2b3113c2e8724453179f09d357b4917c0f14c77
 
 printf '%s\n' \
   'INFO: device operations are owned by the pinned pluto-plus-utils candidate-ram command.' \

@@ -98,7 +98,7 @@ def test_rc26_replay_matches_the_frozen_transient_window_policy() -> None:
     assert "diagnostic_overload_frame=17" in oracles
 
 
-def test_rc26_docs_preserve_truthful_results_while_rc30_is_active() -> None:
+def test_rc26_docs_preserve_truthful_results_while_rc31_is_active() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert "33062658275" in notes
     assert "four exact-serial RAM deployments" in notes
@@ -106,15 +106,15 @@ def test_rc26_docs_preserve_truthful_results_while_rc30_is_active() -> None:
     assert "RC26" in notes and "not hardware-qualified" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC30" in text or "forward-only RC30" in text
+        assert "The active candidate is RC31" in text or "forward-only RC31" in text
 
 
-def test_rc26_route_remains_reproducible_while_rc30_is_active() -> None:
+def test_rc26_route_remains_reproducible_while_rc31_is_active() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc30" in evidence
-    assert "refs/tags/tandem-agc-v8-rc30-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
+    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
     assert "The RC26 workflow has no separate attestation job." in runner

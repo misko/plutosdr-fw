@@ -70,7 +70,7 @@ def test_rc15_is_in_every_offline_and_protected_package_gate() -> None:
 def test_rc15_preserves_its_burned_utility_while_rc16_advances() -> None:
     expected = "5ab8361211e747387c5dfa854f5ae65a6a4dac87"
     assert expected in RC15_MANIFEST.read_text(encoding="utf-8")
-    advanced = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
+    advanced = "b2b3113c2e8724453179f09d357b4917c0f14c77"
     for path in (WRAPPER, BINDING):
         assert advanced in path.read_text(encoding="utf-8")
     source = BINDING.read_text(encoding="utf-8")
@@ -84,12 +84,12 @@ def test_rc15_history_is_retained_while_rc16_is_active() -> None:
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
 
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc30" in evidence
-    assert "refs/tags/tandem-agc-v8-rc30-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
+    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
     for source in sources:
         assert "RC15" in source
         assert "pluto-plus-utils" in source
-    assert "The active candidate is RC30" in sources[0]
+    assert "The active candidate is RC31" in sources[0]
     assert "zero RC14 RAM transitions" in sources[1]
 
 

@@ -78,7 +78,7 @@ def test_rc29_uses_the_proven_ad9361_modulated_configuration() -> None:
     assert "offset_hz=390_625.0" in oracles
 
 
-def test_rc29_docs_preserve_truthful_result_while_rc30_is_active() -> None:
+def test_rc29_docs_preserve_truthful_result_while_rc31_is_active() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     assert "33072902542" in notes
     assert "all 44 authorizing steady matrices" in notes
@@ -87,16 +87,16 @@ def test_rc29_docs_preserve_truthful_result_while_rc30_is_active() -> None:
     assert "RC28" in notes and "not hardware-qualified" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC30" in text or "forward-only RC30" in text
+        assert "The active candidate is RC31" in text or "forward-only RC31" in text
 
 
 def test_rc29_evidence_identity_and_attestation_policy_are_exact() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc30" in evidence
-    assert "refs/tags/tandem-agc-v8-rc30-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
+    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC30 workflow has no separate attestation job." in runner
+    assert "The RC31 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner

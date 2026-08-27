@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC30, but the
+# The external component graph remains identical from RC4 through RC31, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -110,9 +110,15 @@
 # cooldown-zero transport loss, and an unreliable 5.8-GHz weak endpoint. RC30
 # changes only the host qualification policy to eight stable settle frames, a
 # 48-buffer reserve only for cooldown-zero captures, and the exact passing
-# 4.2-GHz table-3 sentinel. Hidden transitions remain unproven and every
-# identity, RF, event, safety, and cleanup gate stays strict. RC30 must pass its
-# source-locked build and full four-radio hardware qualification
+# 4.2-GHz table-3 sentinel. RC30 then passed all offline, OOC, trusted build,
+# package, checksum, and candidate-index gates, but its fleet-wide release
+# inventory failed closed before hardware when it encountered an unrelated
+# ordinary ADALM-Pluto. RC31 retains all device/RF policy and advances only the
+# pinned device tool to b2b3113c2e8724453179f09d357b4917c0f14c77, whose
+# read-only inventory scans the full bus while requiring exactly one matching
+# requested serial. Hidden transitions remain unproven and every identity, RF,
+# event, safety, and cleanup gate stays strict. RC31 must pass its source-locked
+# build and full four-radio hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release
 # identity and packaging, while requiring exact component identities in packed

@@ -111,15 +111,15 @@ def test_rc25_docs_preserve_truthful_rc24_and_rc25_hardware_results() -> None:
     assert "outer release replay" in notes
     for source in (RELEASING, PLAN, KALMAN):
         text = source.read_text(encoding="utf-8")
-        assert "The active candidate is RC30" in text or "forward-only RC30" in text
+        assert "The active candidate is RC31" in text or "forward-only RC31" in text
 
 
-def test_rc25_route_remains_reproducible_while_rc30_is_active() -> None:
+def test_rc25_route_remains_reproducible_while_rc31_is_active() -> None:
     evidence = EVIDENCE.read_text(encoding="utf-8")
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc30" in evidence
-    assert "refs/tags/tandem-agc-v8-rc30-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
+    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc25" in workflow
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow

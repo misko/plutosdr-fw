@@ -247,7 +247,7 @@ cells. R18 also saw one strict tandem transition-continuity rejection; that
 rule remains mandatory. RC19 has no passing full or soak result and is not
 hardware-qualified.
 
-The active candidate is RC30. RC20's trusted build and four RAM/lifecycle
+The active candidate is RC31. RC20's trusted build and four RAM/lifecycle
 passes remain immutable context; it is not hardware-qualified. RC21's trusted
 build and db696 RAM/lifecycle
 passed, but its 1.05-GHz campaign measured 16,400-sample paired-event spacing
@@ -304,14 +304,21 @@ a late native-fast settle boundary, two cooldown-zero transition bursts hidden
 by the 16-buffer queue, and one unreliable native-fast weak endpoint at
 5.8 GHz. Nonauthorizing replays proved eight stable settle frames, a 48-buffer
 cooldown-zero reserve, and an exact 4.2-GHz table-3 sentinel. RC29 is immutable
-and not hardware-qualified. RC30 retains RC29's exact device firmware,
+and not hardware-qualified. RC30 passed all 1,465 offline oracles, routed OOC,
+trusted integrated build `33097467689`, deterministic packaging, checksum
+verification, and candidate indexing. Before reboot or DFU, its fleet-wide
+device inventory failed closed on an unrelated ordinary ADALM-Pluto attached
+beside the four Pluto+ targets. RC30 has zero candidate deployments, is
+immutable, and is not hardware-qualified. RC31 retains RC30's exact device firmware,
 external source graph, deterministic
 package, topology-bound serialless-b674
 resolver, paired `0456:b673,0456:b674` download/detach commands, exact `/32`
 route, IIO/model/runtime checks, QSPI equality requirement, and safe-state
 boundary. Exact pushed `pluto-plus-utils` commit
-`2654f34eb909904ec65bc0526e0f8977cb30e2ed` is now the sole live device
-operator. `plutosdr-fw` emits the private release-candidate plan and validates
+`b2b3113c2e8724453179f09d357b4917c0f14c77` is now the sole live device
+operator. Its read-only inventory scans the full USB bus but may retain one
+exact requested serial; absence, duplicate serial, non-Plus selection, or an
+incomplete target fails closed. `plutosdr-fw` emits the private release-candidate plan and validates
 the original utility plan, USB inventory, per-radio operation plan, and
 measured receipt without translating them. Its plan explicitly keeps the v5
 release/evidence frame schema distinct from the v2 live IIO buffer ABI.
@@ -319,7 +326,7 @@ Ephemeral RAM host keys are accepted
 with password-only SSH and host-key files disabled. Exact topology remains
 mandatory; nonempty serial mismatch, ambiguity, wrong VID/PID, serialless b673,
 `-S`, `-R`, persistent targets, and returned-runtime mismatch remain forbidden
-or fail closed. RC30 retains RC29's exact power-period/tick-gated firmware and
+or fail closed. RC31 retains RC30's exact power-period/tick-gated firmware and
 keeps the native-fast `-2.0 dBFS`
 ceiling, hardened settle/measurement boundary and failure-IQ evidence, and exact
 ordered centers 1.05, 1.55, 2.05, and 4.2 GHz. In transient AUTO evidence,
@@ -328,7 +335,7 @@ quality is required in the exact event-free eight-frame suffix of each steady
 partition. Its full aggregate always runs
 the fixed 2.45-GHz matrix last. Only a complete cleanup-verified RF-quality
 failure there may be recorded as nonauthorizing `diagnostic_failed`; all
-identity, metadata, evidence, fault, or cleanup failures remain fatal. RC30
+identity, metadata, evidence, fault, or cleanup failures remain fatal. RC31
 makes no 2.4-GHz RF-performance claim. It retains RC27's bounded metadata-buffer
 ENODATA under the existing 65-refill limit; ordinary IIO ENODATA remains fatal,
 and the next accepted frame must pass the unchanged sequence/count continuity
@@ -338,7 +345,8 @@ configuration. Sub-2.5-MS/s release input is rejected before hardware. Steady
 matrices require eight stable settle frames, and only cooldown-zero matrices
 reserve 48 DMA buffers so their burst of exact AUTO transitions stays
 observable. Hidden transitions remain unproven. Its exact candidate source lock
-is `refs/tags/tandem-agc-v8-rc30-source/firmware-v1`. The immutable RC29 lock is
+is `refs/tags/tandem-agc-v8-rc31-source/firmware-v1`. The immutable RC30 lock is
+`refs/tags/tandem-agc-v8-rc30-source/firmware-v1`. The immutable RC29 lock is
 `refs/tags/tandem-agc-v8-rc29-source/firmware-v1`. The immutable RC28 lock is
 `refs/tags/tandem-agc-v8-rc28-source/firmware-v1`. The immutable RC27 lock is
 `refs/tags/tandem-agc-v8-rc27-source/firmware-v1`. The immutable RC26 lock is
@@ -350,10 +358,10 @@ reject a cross-stage substitution of those refs.
 
 The remaining gates, in order, are:
 
-1. Commit the complete RC30 source and run the routed block-level OOC gate from a
+1. Commit the complete RC31 source and run the routed block-level OOC gate from a
    clean tree. Its PASS is useful fit/timing/CDC evidence but explicitly records
    `firmware_release_eligible=false`.
-2. Create the exact RC30 firmware source lock and explicit trusted build route.
+2. Create the exact RC31 firmware source lock and explicit trusted build route.
    Keep RC4 through RC12's external component pins only if source-graph checks
    prove they remain exact.
 3. Build and route the complete Pluto FPGA design from that exact candidate;

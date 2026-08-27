@@ -239,23 +239,28 @@ and four lifecycle reports. Its cleanup-verified fleet attempts failed closed
 on late native-fast settling, cooldown-zero transport loss, and an unreliable
 5.8-GHz native-fast weak endpoint. Nonauthorizing replays proved eight stable
 settle frames, a 48-buffer cooldown-zero reserve, and an exact 4.2-GHz table-3
-sentinel. RC29 is immutable and not hardware-qualified. The forward-only RC30
-route uses branch `codex/firmware-tandem-agc-v8-rc30`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc30`, and source lock
-`refs/tags/tandem-agc-v8-rc30-source/firmware-v1`. It retains RC29's exact
-device firmware and strict release policy, requires eight stable settle frames,
-uses 48 buffers only for cooldown-zero captures, and uses fixed authorizing
-centers 1.05/1.55/2.05/4.2 GHz. It records the complete mandatory
-nonauthorizing 2.45-GHz diagnostic. It does not move or reuse any earlier
-candidate branch, source lock, artifacts, or failed campaign evidence.
+sentinel. RC29 is immutable and not hardware-qualified. RC30 passed all 1,465
+offline oracles, routed OOC, trusted integrated build `33097467689`, packaging,
+checksum verification, and candidate indexing. Its first read-only inventory
+failed closed before hardware because an unrelated ordinary ADALM-Pluto was
+attached beside the four Pluto+ targets. RC30 has zero candidate deployments
+and is immutable. The forward-only RC31 route uses branch
+`codex/firmware-tandem-agc-v8-rc31`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc31`, and source lock
+`refs/tags/tandem-agc-v8-rc31-source/firmware-v1`. It retains RC30's exact
+device firmware and strict release policy and pins `pluto-plus-utils` commit
+`b2b3113c2e8724453179f09d357b4917c0f14c77`, whose read-only inventory scans
+the full bus while selecting exactly one requested serial. Absence, duplicates,
+or a non-Plus match fail closed. It does not move or reuse any earlier candidate
+branch, source lock, artifact, or failed evidence.
 
 The historical forward-only RC20 route uses branch
 `codex/firmware-tandem-agc-v8-rc20`, exact version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc20`, and source lock
 `refs/tags/tandem-agc-v8-rc20-source/firmware-v1`; it does not move or reuse
-RC12 through RC19's branch, source lock, artifact, or evidence index. RC20 pins
+RC12 through RC19's branch, source lock, artifact, or evidence index. RC20 pinned
 `pluto-plus-utils` commit
-`2654f34eb909904ec65bc0526e0f8977cb30e2ed` as the sole live device operator.
+`2654f34eb909904ec65bc0526e0f8977cb30e2ed` as its live device operator.
 The firmware repository produces the private candidate plan and validates the
 original utility plan, inventory, operation, and measured receipt. The bridge
 keeps the v5 release frame schema distinct from the v2 live buffer ABI. The utility
@@ -319,7 +324,8 @@ The RC26 workflow has no separate attestation job.
 The RC27 workflow has no separate attestation job.
 The RC28 workflow has no separate attestation job.
 The RC29 workflow has no separate attestation job.
-The RC30 workflow has no separate attestation job. An operator may capture GitHub
+The RC30 workflow has no separate attestation job.
+The RC31 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

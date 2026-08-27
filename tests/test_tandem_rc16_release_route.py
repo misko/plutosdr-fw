@@ -64,9 +64,11 @@ def test_rc16_is_in_every_offline_and_protected_package_gate() -> None:
 
 
 def test_rc16_pins_the_recovery_corrected_pushed_utility() -> None:
-    expected = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
-    for path in (WRAPPER, BINDING, RC16_MANIFEST):
-        assert expected in path.read_text(encoding="utf-8")
+    historical = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
+    assert historical in RC16_MANIFEST.read_text(encoding="utf-8")
+    current = "b2b3113c2e8724453179f09d357b4917c0f14c77"
+    for path in (WRAPPER, BINDING):
+        assert current in path.read_text(encoding="utf-8")
     assert 'pluto firmware candidate-ram "$@"' in WRAPPER.read_text(encoding="utf-8")
 
 
@@ -75,13 +77,15 @@ def test_rc16_history_is_retained_while_rc20_is_active() -> None:
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc30" in evidence
-    assert "refs/tags/tandem-agc-v8-rc30-source/firmware-v1" in evidence
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc31" in evidence
+    assert "refs/tags/tandem-agc-v8-rc31-source/firmware-v1" in evidence
     for source in sources:
         assert "RC16" in source
-        assert "2654f34eb909904ec65bc0526e0f8977cb30e2ed" in source
         assert "pluto-plus-utils" in source
-    assert "The active candidate is RC30" in sources[0]
+    assert "2654f34eb909904ec65bc0526e0f8977cb30e2ed" in RC16_MANIFEST.read_text(
+        encoding="utf-8"
+    )
+    assert "The active candidate is RC31" in sources[0]
     assert "RC15" in sources[1]
 
 
