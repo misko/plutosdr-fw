@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC26, but the
+# The external component graph remains identical from RC4 through RC27, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -82,11 +82,16 @@
 # Its inner 1.05-GHz transient report passed all four comparison modes, but the
 # outer release replay contradicted the frozen producer contract by rejecting
 # startup conditioning and diagnostic-only commanded-response RF windows. RC26
-# aligns semantic replay with the exact producer policy while preserving strict
-# RF quality in all three contiguous event-free suffixes. Event/count
-# continuity, paired endpoints, the 10-dB threshold, and every
-# identity/metadata/evidence/safety/fault/cleanup failure remain fatal. RC26 must pass
-# its source-locked build and full hardware qualification
+# aligned semantic replay with the exact producer policy, passed its trusted
+# build, indexed evidence, four RAM deployments, and four lifecycle reports.
+# Two db696 full attempts then stopped in the same 1.05-GHz low-power matrix when
+# the host metadata provider returned ENODATA after consuming a frame without
+# complete gain/RSSI observation. Both retained failure IQ and safe cleanup.
+# RC27 boundedly retries only metadata-buffer ENODATA and requires the next
+# accepted frame to expose the omission through the unchanged continuity oracle;
+# ordinary IIO ENODATA remains fatal. Event/count continuity, paired endpoints,
+# the 10-dB threshold, and every identity/metadata/evidence/safety/fault/cleanup
+# failure remain fatal. RC27 must pass its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release
 # identity and packaging, while requiring exact component identities in packed

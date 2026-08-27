@@ -39,6 +39,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc25' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc24' ||
@@ -75,6 +76,8 @@ jobs:
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
           'tandem-agc-v8-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27' &&
+          'tandem-agc-v8-rc27-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26' &&
           'tandem-agc-v8-rc26-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc25' &&
@@ -133,6 +136,8 @@ jobs:
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-tandem-agc-v8' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27' &&
+          'plutoplus-spf-tandem-agc-v8-rc27' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26' &&
           'plutoplus-spf-tandem-agc-v8-rc26' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc25' &&
@@ -261,7 +266,15 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.41-plutoplus-spf-tandem-agc-v8-rc11'
 
-      - name: Require the exact protected RC26 candidate identity
+      - name: Require the exact protected RC27 candidate identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc27'
+
+      - name: Require the exact protected RC26 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26'
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}

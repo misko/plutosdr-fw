@@ -44,7 +44,8 @@
 | `tandem-agc-v8-rc23` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle passed; transient response oracle invalid; superseded** | retained exact-cadence paired response events, but the host oracle demanded zero clipping during a deliberately overloaded AUTO response |
 | `tandem-agc-v8-rc24` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; three transient comparison modes passed; tandem invalid; superseded** | separate host sysfs reads straddled one AUTO transition and manufactured a mixed transition-count/gain snapshot |
 | `tandem-agc-v8-rc25` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; all four inner transient modes passed; outer replay invalid; superseded** | fixed coherent host status reads; outer replay contradicted the frozen producer policy for startup conditioning and diagnostic response windows |
-| `tandem-agc-v8-rc26` | 2026-08-27 | **active development; not hardware-qualified** | retains RC25 firmware; aligns release replay with the frozen transient producer window policy without relaxing suffix quality or safety gates |
+| `tandem-agc-v8-rc26` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | replay alignment passed, but two db696 full attempts stopped on metadata-provider ENODATA in the same 1.05-GHz low-power matrix |
+| `tandem-agc-v8-rc27` | 2026-08-27 | **active development; not hardware-qualified** | retains RC26 device firmware; boundedly treats metadata-only ENODATA as an omitted frame while preserving strict continuity and all release gates |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -53,7 +54,30 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc26 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc27 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC27 retains RC26's exact device firmware and external source graph. It changes
+only the host qualification refill policy exposed by the two retained RC26
+failures: the metadata provider reports ENODATA after consuming a post-startup
+DMA frame when that frame has no complete gain/RSSI observation. RC27 treats
+metadata-buffer ENODATA like the already bounded startup EAGAIN omission under
+the existing 65-refill limit. The next accepted frame must expose the sequence
+gap to the unchanged continuity oracle. Ordinary IIO ENODATA remains fatal;
+hidden transitions remain unproven settling evidence and never prove direction.
+The 10-dB per-capture threshold, paired-event/count rules, RF-quality criteria,
+identity, metadata, evidence, QSPI, safe-state, FIFO/fault/overflow, and cleanup
+gates are unchanged.
+
+RC27 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure remains nonbinding. RC27 uses branch
+`codex/firmware-tandem-agc-v8-rc27`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc27`, manifest
+`manifests/tandem-agc-v8-rc27-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc27`, and source lock
+`refs/tags/tandem-agc-v8-rc27-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc26 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded**
 
 RC26 retains RC25's exact firmware implementation and external source graph.
 It removes two contradictory outer-replay assumptions exposed by the retained
@@ -67,7 +91,21 @@ fault/FIFO/overflow, safe state, and cleanup remain fatal.
 
 RC26 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
 2.45-GHz matrix still runs and retains complete evidence, but an isolated
-cleanup-verified RF-quality failure remains nonbinding. RC26 uses branch
+cleanup-verified RF-quality failure remains nonbinding.
+
+Exact RC26 commit `5b65c62e00920f32dac994fbc7df7a31a2e7019e` passed
+owner-dispatched trusted run `33062658275`, candidate assembly, four exact-serial RAM deployments, and four lifecycle reports. On db696, full
+attempt 1 and the one explicitly authorized fresh retry both passed the
+1.05-GHz baseline and then stopped in low-power-16 tandem AUTO when the host
+metadata provider returned ENODATA after consuming a frame without complete
+gain/RSSI observation. Both attempts retained 117 accepted IQ frames plus the
+offending capture; both cleanup records prove TX muted, DDS zero, selectors
+ZERO, tandem IDLE, and FIFO/overflow/fault zero. This was not an RF-quality or
+controller verdict, but RC26 had no policy to preserve the omission and
+continue. No further RC26 retry is authorized; RC26 is immutable and not
+hardware-qualified.
+
+RC26 uses branch
 `codex/firmware-tandem-agc-v8-rc26`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc26`, manifest
 `manifests/tandem-agc-v8-rc26-source.yaml`, package prefix

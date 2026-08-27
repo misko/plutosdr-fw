@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import errno
 import hashlib
 import json
 from dataclasses import replace
@@ -41,6 +42,50 @@ def _options(**overrides) -> TandemQualityOptions:
         physical_attenuation_db=0.0,
         **overrides,
     )
+
+
+class _RefillSequence:
+    def __init__(self, values: list[bytes | OSError]) -> None:
+        self.values = list(values)
+        self.calls = 0
+
+    def refill(self) -> bytes:
+        self.calls += 1
+        value = self.values.pop(0)
+        if isinstance(value, OSError):
+            raise value
+        return value
+
+
+@pytest.mark.parametrize("retry_errno", [errno.EAGAIN, errno.ENODATA])
+def test_metadata_refill_boundedly_discards_provider_omissions(
+    retry_errno: int,
+) -> None:
+    expected = b"accepted-metadata"
+    buffer = _RefillSequence(
+        [OSError(retry_errno, "planted omitted metadata frame"), expected]
+    )
+
+    assert Issue46Radio._refill(buffer, metadata=True) == expected
+    assert buffer.calls == 2
+
+
+def test_ordinary_refill_keeps_enodata_fatal() -> None:
+    buffer = _RefillSequence([OSError(errno.ENODATA, "planted ordinary failure")])
+
+    with pytest.raises(OSError, match="planted ordinary failure"):
+        Issue46Radio._refill(buffer, metadata=False)
+    assert buffer.calls == 1
+
+
+def test_metadata_refill_enodata_retry_is_strictly_bounded() -> None:
+    buffer = _RefillSequence(
+        [OSError(errno.ENODATA, "planted persistent omission") for _ in range(65)]
+    )
+
+    with pytest.raises(OSError, match="planted persistent omission"):
+        Issue46Radio._refill(buffer, metadata=True)
+    assert buffer.calls == 65
 
 
 @pytest.mark.parametrize(

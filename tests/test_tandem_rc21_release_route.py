@@ -82,14 +82,14 @@ def test_rc21_four_band_authorization_and_2450_diagnostic_are_exact() -> None:
     assert "rf_quality_only_failure_is_recorded_and_nonbinding" in evidence
 
 
-def test_rc21_hardware_failure_is_immutable_and_docs_name_rc26_active() -> None:
+def test_rc21_hardware_failure_is_immutable_and_docs_name_rc27_active() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     releasing = RELEASING.read_text(encoding="utf-8")
     deploy_plan = DEPLOY_PLAN.read_text(encoding="utf-8")
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc21" in deploy_plan
     assert "16,400" in notes and "17,408" in notes
     assert "not hardware-qualified" in notes
-    assert "The active candidate is RC26" in releasing
+    assert "The active candidate is RC27" in releasing
 
 
 def test_rc21_reproduction_keeps_single_owner_attestation_policy() -> None:

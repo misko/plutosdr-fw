@@ -118,7 +118,7 @@ def test_rc11_docs_preserve_rc10_incident_and_the_burned_rc11_lock() -> None:
     rc13_lock = "refs/tags/tandem-agc-v8-rc13-source/firmware-v1"
     final_lock = "refs/tags/tandem-agc-v8-source/firmware-v1"
 
-    assert "The active candidate is RC26" in releasing
+    assert "The active candidate is RC27" in releasing
     for source in (releasing, notes, plan):
         assert rc10_lock in source
         assert rc11_lock in source

@@ -1091,7 +1091,18 @@ class Issue46Radio:
                     raise EvidenceInvalid("metadata refill returned no metadata")
                 return bytes(value)
             except OSError as error:
-                if error.errno != errno.EAGAIN or attempt == 64:
+                # The metadata provider uses EAGAIN for a bounded startup
+                # discard and ENODATA when a later DMA frame has no complete
+                # gain/RSSI observation.  Both frames have already been
+                # consumed by the provider.  Treat metadata-only ENODATA as
+                # another bounded omitted frame so the next accepted frame's
+                # buffer/sample sequence exposes the gap to the continuity
+                # oracle.  Ordinary IIO has no such metadata contract and
+                # therefore keeps ENODATA fatal.
+                retryable = error.errno == errno.EAGAIN or (
+                    metadata and error.errno == errno.ENODATA
+                )
+                if not retryable or attempt == 64:
                     raise
         raise AssertionError("refill retry loop did not terminate")
 
