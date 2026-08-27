@@ -4277,6 +4277,93 @@ def _tandem_batch_stable_suffix(
     }
 
 
+def _tandem_batch_pre_attack_conditioning(
+    frames: Sequence[Mapping[str, Any]],
+    frame_indices: Sequence[int],
+) -> dict[str, Any]:
+    """Recompute the exact startup-conditioning and quiet-suffix ledger."""
+
+    pre_indices = list(frame_indices)
+    quiet_indices = pre_indices[-_TANDEM_BATCH_MINIMUM_PARTITION_FRAMES:]
+    startup_indices = pre_indices[:-_TANDEM_BATCH_MINIMUM_PARTITION_FRAMES]
+    if len(quiet_indices) != _TANDEM_BATCH_MINIMUM_PARTITION_FRAMES:
+        raise ValueError("pre-attack conditioning lacks eight quiet frames")
+    quiet_metadata: list[Mapping[str, Any]] = []
+    for index in quiet_indices:
+        frame = frames[index]
+        metadata = frame.get("metadata")
+        continuity = frame.get("continuity")
+        if not isinstance(metadata, Mapping) or not isinstance(continuity, Mapping):
+            raise TypeError("pre-attack quiet suffix lacks metadata continuity")
+        if (
+            metadata.get("gain_events") != []
+            or continuity.get("buffer_delta") != 1
+            or continuity.get("sample_delta") != _TANDEM_BATCH_PROVIDER_FRAME_SAMPLES
+            or continuity.get("missing_frame_count") != 0
+            or continuity.get("provider_gap_accepted") is not False
+            or continuity.get("transition_count_delta") != 0
+            or continuity.get("visible_event_count") != 0
+            or continuity.get("hidden_transition_count") != 0
+            or continuity.get("initial_unrepresented_transition_count") != 0
+        ):
+            raise ValueError("pre-attack quiet suffix contains a transition or gap")
+        quiet_metadata.append(metadata)
+    transition_counts = {
+        metadata.get("tandem_transition_count") for metadata in quiet_metadata
+    }
+    endpoints = {
+        tuple(metadata.get("bench_gain_indices", [])) for metadata in quiet_metadata
+    }
+    if (
+        len(transition_counts) != 1
+        or any(not _release_exact_int(value) for value in transition_counts)
+        or len(endpoints) != 1
+        or any(
+            len(endpoint) != 2
+            or endpoint[0] != endpoint[1]
+            or any(not _release_exact_int(value) for value in endpoint)
+            for endpoint in endpoints
+        )
+    ):
+        raise ValueError("pre-attack quiet suffix changed endpoint or count")
+    first_continuity = frames[pre_indices[0]].get("continuity")
+    if not isinstance(first_continuity, Mapping):
+        raise TypeError("pre-attack first frame lacks continuity")
+    initial_unrepresented = first_continuity.get(
+        "initial_unrepresented_transition_count"
+    )
+    if not _release_exact_int(initial_unrepresented):
+        raise ValueError("pre-attack startup count is malformed")
+    visible_events = 0
+    for index in pre_indices:
+        metadata = frames[index].get("metadata")
+        events = metadata.get("gain_events") if isinstance(metadata, Mapping) else None
+        if not isinstance(events, list):
+            raise TypeError("pre-attack startup events are malformed")
+        visible_events += len(events)
+    transition_count = next(iter(transition_counts))
+    if transition_count != initial_unrepresented + visible_events:
+        raise ValueError("pre-attack startup transition ledger is inconsistent")
+    endpoint = next(iter(endpoints))
+    return {
+        "policy": (
+            "retain every fully-pre-attack frame as conditioning; use only the "
+            "final contiguous event-free eight-frame suffix as the response anchor"
+        ),
+        "startup_prefix_frame_indices": startup_indices,
+        "startup_prefix_frame_count": len(startup_indices),
+        "quiet_suffix_frame_indices": quiet_indices,
+        "quiet_suffix_frame_count": len(quiet_indices),
+        "startup_initial_unrepresented_transition_count": initial_unrepresented,
+        "startup_visible_event_count": visible_events,
+        "startup_transition_count": transition_count,
+        "quiet_suffix_transition_count": transition_count,
+        "quiet_suffix_bench_gain_indices": [endpoint[0], endpoint[1]],
+        "startup_is_conditioning_only": True,
+        "startup_is_response_direction_proof": False,
+    }
+
+
 def _transient_batch_schedule_errors(
     value: Any,
     command: Mapping[str, Any],
@@ -6053,12 +6140,29 @@ def _transient_batch_analysis_summary_errors(
             + groups["fully_post_release"]["frame_indices"]
         )
     ]
+    try:
+        startup_conditioning = _tandem_batch_pre_attack_conditioning(
+            frames, pre_indices
+        )
+        pre_attack_suffix = _tandem_batch_stable_suffix(
+            frames,
+            pre_indices,
+            tolerance_db=capture.settling_tolerance_db,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as error:
+        errors.append(f"transient tandem pre-attack conditioning is invalid: {error}")
+        startup_conditioning = {}
+        pre_attack_suffix = {}
     expected_preconditioning = {
         "frame_count": len(pre_indices),
         "trace_frame_indices": pre_indices,
-        "retained_baseline_frame_indices": [pre_indices[-1]],
+        "retained_baseline_frame_indices": pre_indices[
+            -_TANDEM_BATCH_MINIMUM_PARTITION_FRAMES:
+        ],
+        "response_anchor_frame_index": pre_indices[-1],
         "auto_initial_gain_db": 62,
-        "startup_transition_count": 0,
+        **startup_conditioning,
+        "quiet_suffix": pre_attack_suffix,
     }
     if (
         not _release_json_identical(
@@ -6720,6 +6824,7 @@ def _transient_batch_contract_errors(
     partition = mode.get("partition")
     stable_suffixes: dict[str, Any] = {}
     for phase in (
+        "fully_pre_attack",
         "fully_post_attack_pre_release",
         "fully_post_release",
     ):
@@ -6731,6 +6836,14 @@ def _transient_batch_contract_errors(
             )
         except (IndexError, KeyError, TypeError, ValueError) as error:
             errors.append(f"transient tandem {phase} stable suffix is invalid: {error}")
+    try:
+        pre_attack_conditioning = _tandem_batch_pre_attack_conditioning(
+            [frame for frame in frames_value if isinstance(frame, Mapping)],
+            expected_groups["fully_pre_attack"]["frame_indices"],
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as error:
+        errors.append(f"transient tandem pre-attack conditioning is invalid: {error}")
+        pre_attack_conditioning = {}
     expected_partition = {
         "phase_order": list(_TANDEM_BATCH_PHASE_ORDER),
         "phase_by_frame": phases,
@@ -6745,21 +6858,13 @@ def _transient_batch_contract_errors(
             _TANDEM_BATCH_MINIMUM_PARTITION_FRAMES
         ),
         "frame_count": _TANDEM_BATCH_FRAMES,
+        "pre_attack_conditioning": pre_attack_conditioning,
         "stable_suffixes": stable_suffixes,
     }
     if not _release_json_identical(partition, expected_partition):
         errors.append("transient tandem five-way partition differs from recomputation")
-    pre_attack_indices = expected_groups["fully_pre_attack"]["frame_indices"]
-    pre_attack_metadata = (
-        frames_value[pre_attack_indices[-1]].get("metadata")
-        if pre_attack_indices
-        and isinstance(frames_value[pre_attack_indices[-1]], Mapping)
-        else None
-    )
-    pre_attack_endpoint = (
-        pre_attack_metadata.get("bench_gain_indices")
-        if isinstance(pre_attack_metadata, Mapping)
-        else None
+    pre_attack_endpoint = stable_suffixes.get("fully_pre_attack", {}).get(
+        "bench_gain_indices"
     )
     middle_endpoint = stable_suffixes.get("fully_post_attack_pre_release", {}).get(
         "bench_gain_indices"
@@ -6924,25 +7029,6 @@ def _transient_batch_contract_errors(
         or acquisition.get("artifact_manifest") != artifact_manifest
     ):
         errors.append("transient tandem aggregate artifact manifest changed")
-    if frames:
-        for index in expected_groups["fully_pre_attack"]["frame_indices"]:
-            frame = frames[index]
-            metadata = frame.get("metadata")
-            if not isinstance(metadata, Mapping):
-                continue
-            endpoint = metadata.get("bench_gain_indices")
-            index_range = metadata.get("gain_index_range")
-            if (
-                metadata.get("tandem_transition_count") != 0
-                or metadata.get("gain_events") != []
-                or not isinstance(index_range, list)
-                or endpoint != [index_range[1], index_range[1]]
-            ):
-                errors.append(
-                    "transient tandem fully-pre-attack AUTO state is not stable at max"
-                )
-                break
-
     if (
         acquisition.get("initiating_batch_refill_calls") != 1
         or acquisition.get("public_refill_calls") != _TANDEM_BATCH_FRAMES

@@ -1274,6 +1274,63 @@ def test_tandem_stable_suffix_requires_rf_and_event_stability(
         _run_fake(radio, _quality(tmp_path))
 
 
+@pytest.mark.parametrize("startup_kind", ("visible", "initial_unrepresented"))
+def test_tandem_startup_convergence_is_retained_but_not_response_proof(
+    tmp_path: Path,
+    startup_kind: str,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    if startup_kind == "visible":
+        radio.planted_suffix_event_capture_index = 0
+        expected_visible = 1
+        expected_unrepresented = 0
+    else:
+        radio.hidden_transition_capture_index = 0
+        expected_visible = 0
+        expected_unrepresented = 1
+
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
+    conditioning = tandem["partition"]["pre_attack_conditioning"]
+    preconditioning = tandem["preconditioning"]
+
+    assert conditioning == {
+        **conditioning,
+        "startup_prefix_frame_indices": list(range(8)),
+        "startup_prefix_frame_count": 8,
+        "quiet_suffix_frame_indices": list(range(8, 16)),
+        "quiet_suffix_frame_count": 8,
+        "startup_initial_unrepresented_transition_count": expected_unrepresented,
+        "startup_visible_event_count": expected_visible,
+        "startup_transition_count": 1,
+        "quiet_suffix_transition_count": 1,
+        "quiet_suffix_bench_gain_indices": [64, 64],
+        "startup_is_conditioning_only": True,
+        "startup_is_response_direction_proof": False,
+    }
+    assert preconditioning["retained_baseline_frame_indices"] == list(range(8, 16))
+    assert preconditioning["response_anchor_frame_index"] == 15
+    assert preconditioning["quiet_suffix"]["transition_count"] == 1
+    assert preconditioning["quiet_suffix"]["bench_gain_indices"] == [64, 64]
+    assert [
+        transition["response_kind"]
+        for transition in tandem["gain_evidence"]["transitions"]
+    ] == ["attack", "release"]
+
+
+def test_tandem_pre_attack_quiet_suffix_rejects_a_late_startup_transition(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.planted_suffix_event_capture_index = 8
+
+    with pytest.raises(
+        EvidenceInvalid,
+        match="pre-attack quiet suffix contains a transition or gap",
+    ):
+        _run_fake(radio, _quality(tmp_path))
+
+
 @pytest.mark.parametrize(
     ("phase", "endpoint"),
     (

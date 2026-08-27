@@ -57,6 +57,7 @@ from .release_cli import (
     _release_tandem_metadata_dict,
     _soak_temperature_errors,
     _steady_inputs,
+    _tandem_batch_pre_attack_conditioning,
     _tandem_batch_stable_suffix,
     main,
     parse_cli_args,
@@ -69,6 +70,7 @@ from .tandem_quality import AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
 from .test_transient_hardware_oracles import (
     _FakeRadio,
     _metadata_wire,
+    _quality,
     _run_fake,
     _tone_raw,
 )
@@ -2355,6 +2357,7 @@ def _plant_tandem_directional_undo(
             tolerance_db=1.0,
         )
         for phase in (
+            "fully_pre_attack",
             "fully_post_attack_pre_release",
             "fully_post_release",
         )
@@ -2487,6 +2490,26 @@ def test_release_validator_recomputes_whole_window_stable_suffix(
 
     with pytest.raises(ValueError, match="exceeds its RF tolerance"):
         _tandem_batch_stable_suffix(frames, indices, tolerance_db=1.0)
+
+
+def test_release_validator_recomputes_startup_conditioning_and_quiet_suffix(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeRadio(tmp_path)
+    radio.planted_suffix_event_capture_index = 0
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    tandem = _tandem_mode(report)
+    frames = tandem["batch_frames"]
+    pre_indices = tandem["partition"]["groups"]["fully_pre_attack"]["frame_indices"]
+
+    recomputed = _tandem_batch_pre_attack_conditioning(frames, pre_indices)
+
+    assert recomputed == tandem["partition"]["pre_attack_conditioning"]
+    assert recomputed["startup_transition_count"] == 1
+    assert recomputed["startup_is_response_direction_proof"] is False
+    frames[pre_indices[-1]]["continuity"]["transition_count_delta"] = 1
+    with pytest.raises(ValueError, match="quiet suffix contains a transition"):
+        _tandem_batch_pre_attack_conditioning(frames, pre_indices)
 
 
 @pytest.mark.parametrize("response", ("attack", "release"))

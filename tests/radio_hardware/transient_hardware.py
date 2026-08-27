@@ -2233,23 +2233,89 @@ def _partition_tandem_batch(
     if not groups["attack_bracket"] or not groups["release_bracket"]:
         raise EvidenceInvalid("tandem command bracket lacks a retained frame")
 
-    # AUTO starts at the request maximum specifically to preclude an
-    # unobserved low-power startup ramp before the attack.
-    for frame in frames:
-        if frame.record["batch_phase"] != "fully_pre_attack":
-            continue
+    # Entering AUTO at the request maximum is a safe, deterministic starting
+    # request, but the already-present weak stimulus can legitimately make the
+    # controller converge before the scheduled attack.  Retain that startup
+    # trajectory as conditioning evidence and require the final eight
+    # fully-pre-attack frames to be one exact, contiguous, event-free endpoint.
+    # Only that quiet suffix is allowed to anchor response timing.
+    pre_attack_indices = groups["fully_pre_attack"]
+    quiet_suffix_indices = pre_attack_indices[-_TANDEM_REQUIRED_PARTITION_FRAMES:]
+    startup_prefix_indices = pre_attack_indices[:-_TANDEM_REQUIRED_PARTITION_FRAMES]
+    quiet_metadata: list[Any] = []
+    for index in quiet_suffix_indices:
+        frame = frames[index]
         metadata = frame.metadata
-        if metadata is None:
-            raise EvidenceInvalid("tandem pre-attack frame lacks metadata")
+        continuity = frame.record.get("continuity")
+        if metadata is None or not isinstance(continuity, dict):
+            raise EvidenceInvalid(
+                "tandem pre-attack quiet suffix lacks metadata continuity"
+            )
         if (
-            metadata.tandem_transition_count != 0
-            or metadata.gain_events
-            or metadata.bench_gain_indices
-            != (metadata.maximum_gain_index, metadata.maximum_gain_index)
+            metadata.gain_events
+            or continuity.get("buffer_delta") != 1
+            or continuity.get("sample_delta") != _TANDEM_FRAME_SAMPLES
+            or continuity.get("missing_frame_count") != 0
+            or continuity.get("provider_gap_accepted") is not False
+            or continuity.get("transition_count_delta") != 0
+            or continuity.get("visible_event_count") != 0
+            or continuity.get("hidden_transition_count") != 0
+            or continuity.get("initial_unrepresented_transition_count") != 0
         ):
             raise EvidenceInvalid(
-                "tandem pre-attack AUTO evidence contains a startup transition"
+                "tandem pre-attack quiet suffix contains a transition or gap"
             )
+        quiet_metadata.append(metadata)
+    quiet_transition_counts = {
+        metadata.tandem_transition_count for metadata in quiet_metadata
+    }
+    quiet_endpoints = {metadata.bench_gain_indices for metadata in quiet_metadata}
+    if len(quiet_transition_counts) != 1 or len(quiet_endpoints) != 1:
+        raise EvidenceInvalid(
+            "tandem pre-attack quiet suffix changed endpoint or transition count"
+        )
+
+    pre_attack_frames = [frames[index] for index in pre_attack_indices]
+    first_continuity = pre_attack_frames[0].record.get("continuity")
+    if not isinstance(first_continuity, dict):
+        raise EvidenceInvalid("tandem pre-attack first frame lacks continuity")
+    initial_unrepresented = first_continuity.get(
+        "initial_unrepresented_transition_count"
+    )
+    if isinstance(initial_unrepresented, bool) or not isinstance(
+        initial_unrepresented, int
+    ):
+        raise EvidenceInvalid(
+            "tandem pre-attack startup transition evidence is malformed"
+        )
+    visible_startup_events = sum(
+        len(frame.metadata.gain_events)
+        for frame in pre_attack_frames
+        if frame.metadata is not None
+    )
+    startup_transition_count = next(iter(quiet_transition_counts))
+    if startup_transition_count != initial_unrepresented + visible_startup_events:
+        raise EvidenceInvalid(
+            "tandem pre-attack startup transition ledger is inconsistent"
+        )
+    quiet_endpoint = next(iter(quiet_endpoints))
+    pre_attack_conditioning = {
+        "policy": (
+            "retain every fully-pre-attack frame as conditioning; use only the "
+            "final contiguous event-free eight-frame suffix as the response anchor"
+        ),
+        "startup_prefix_frame_indices": startup_prefix_indices,
+        "startup_prefix_frame_count": len(startup_prefix_indices),
+        "quiet_suffix_frame_indices": quiet_suffix_indices,
+        "quiet_suffix_frame_count": len(quiet_suffix_indices),
+        "startup_initial_unrepresented_transition_count": initial_unrepresented,
+        "startup_visible_event_count": visible_startup_events,
+        "startup_transition_count": startup_transition_count,
+        "quiet_suffix_transition_count": startup_transition_count,
+        "quiet_suffix_bench_gain_indices": [quiet_endpoint[0], quiet_endpoint[1]],
+        "startup_is_conditioning_only": True,
+        "startup_is_response_direction_proof": False,
+    }
 
     return {
         "phase_order": list(_TANDEM_PARTITION_PHASES),
@@ -2268,6 +2334,7 @@ def _partition_tandem_batch(
             _TANDEM_REQUIRED_PARTITION_FRAMES
         ),
         "frame_count": len(frames),
+        "pre_attack_conditioning": pre_attack_conditioning,
     }
 
 
@@ -4544,16 +4611,14 @@ def _run_tandem_batch_mode_body(
                 tolerance_db=capture.settling_tolerance_db,
             )
             for phase in (
+                "fully_pre_attack",
                 "fully_post_attack_pre_release",
                 "fully_post_release",
             )
         }
-        pre_attack_metadata = frames[
-            groups["fully_pre_attack"]["frame_indices"][-1]
-        ].metadata
-        if pre_attack_metadata is None:
-            raise EvidenceInvalid("tandem pre-attack endpoint evidence is missing")
-        pre_attack_endpoint = pre_attack_metadata.bench_gain_indices[0]
+        pre_attack_endpoint = partition["stable_suffixes"]["fully_pre_attack"][
+            "bench_gain_indices"
+        ][0]
         middle_endpoint = partition["stable_suffixes"][
             "fully_post_attack_pre_release"
         ]["bench_gain_indices"][0]
@@ -4649,9 +4714,13 @@ def _run_tandem_batch_mode_body(
         record["preconditioning"] = {
             "frame_count": groups["fully_pre_attack"]["count"],
             "trace_frame_indices": groups["fully_pre_attack"]["frame_indices"],
-            "retained_baseline_frame_indices": [anchor_index],
+            "retained_baseline_frame_indices": partition["stable_suffixes"][
+                "fully_pre_attack"
+            ]["frame_indices"],
+            "response_anchor_frame_index": anchor_index,
             "auto_initial_gain_db": _TANDEM_INITIAL_GAIN_DB,
-            "startup_transition_count": 0,
+            **partition["pre_attack_conditioning"],
+            "quiet_suffix": partition["stable_suffixes"]["fully_pre_attack"],
         }
 
         response_kwargs = {
