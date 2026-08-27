@@ -39,7 +39,8 @@
 | `tandem-agc-v8-rc18` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; one marginal full-test result; superseded** | trusted build/evidence and muted lifecycle passed on all four; db696 steady characterization found one native-fast-attack cell 0.27332 dB above its quality ceiling, then canonical checkpoint key ordering blocked the authorized retry before USB |
 | `tandem-agc-v8-rc19` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; full steady policy rejected; superseded** | resume passed; native-fast cells reached -2.47 dBFS without clipping against the shared -3.0 dBFS ceiling |
 | `tandem-agc-v8-rc20` | 2026-08-26 | **trusted build and four RAM/lifecycle passes; full campaign failed; superseded** | 2.45-GHz weak-SNR contamination plus two settle/measurement-boundary oracle failures; no passing full/soak campaign |
-| `tandem-agc-v8-rc21` | 2026-08-27 | **active development; not hardware-qualified** | hardens measurement-boundary evidence, authorizes fixed 1.05/1.55/2.05/5.8-GHz bands, and records nonbinding 2.45-GHz diagnostics |
+| `tandem-agc-v8-rc21` | 2026-08-27 | **successful indexed build and pilot RAM/lifecycle; 1.05-GHz campaign failed; superseded** | exposed FPGA power-period/event-spacing mismatch: 16,400 samples observed where the contract requires 17,408 |
+| `tandem-agc-v8-rc22` | 2026-08-27 | **active development; not hardware-qualified** | makes power periods exact, gates decisions to measurement ticks, and retains RC21's four authorizing bands plus nonbinding 2.45-GHz diagnostic |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -48,9 +49,32 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc21 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc22 — 2026-08-27 — **active development; not hardware-qualified**
 
-RC21 retains the exact RC20 firmware and external source graph. It fixes the
+RC22 is the forward-only correction for the timing-contract defect measured on
+RC21. The power divider now emits a tick every programmed `N` valid samples,
+not `N+1`, and the tandem controller can accept a gain decision only on that
+tick. With cooldown `N`, consecutive accepted events are therefore separated
+by at least `(N+1) * power_measurement_samples`, exactly matching the provider
+and release oracle. Cycle-accurate stress tests independently prove a 12-sample
+tick and a `17 * 12 = 204` sample cooldown/event interval so either half of the
+fix fails closed.
+
+RC22 retains the exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The
+full 2.45-GHz matrix still runs last and retains complete evidence, but an
+isolated cleanup-verified RF-quality failure is nonbinding. Identity, metadata,
+missing evidence, fault/FIFO/overflow, and cleanup failures remain fatal; RC22
+makes no 2.4-GHz RF-performance claim.
+
+RC22 uses branch `codex/firmware-tandem-agc-v8-rc22`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc22`, manifest
+`manifests/tandem-agc-v8-rc22-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc22`, and source lock
+`refs/tags/tandem-agc-v8-rc22-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc21 — 2026-08-27 — **successful indexed build and pilot RAM/lifecycle; 1.05-GHz campaign failed; superseded**
+
+RC21 retained the exact RC20 firmware and external source graph. It fixed the
 settle-to-measurement evidence boundary with continuous metadata accounting,
 one bounded full-attempt restart, atomic retained failure evidence, and a
 128 MiB write-on-failure IQ ledger. Its authorizing hardware matrix uses exact
@@ -59,7 +83,16 @@ full manual/native-slow/native-fast/tandem matrix at fixed 2.45 GHz. A complete,
 cleanup-verified RF-quality-only failure there is recorded as
 `diagnostic_failed` and does not enter the release denominator; any identity,
 metadata, missing-evidence, fault/FIFO/overflow, or cleanup failure is fatal.
-RC21 makes no 2.4-GHz RF-performance claim.
+RC21 made no 2.4-GHz RF-performance claim. Its trusted workflow run
+`33041851068` and candidate index passed. The db696 pilot passed RAM-only
+deployment, unchanged-QSPI attestation, final safe state, and the full v5 muted
+metadata lifecycle. Its 1.05-GHz full steady campaign then stopped at the
+zero-cooldown policy because the provider could not prove both AUTO directions
+from the retained cadence. A separate instrumented transient diagnostic made
+the underlying firmware defect exact: paired events arrived every **16,400**
+samples while the published cooldown contract requires **17,408**. The RTL
+counted `N+1` samples per power period and allowed decisions between ticks.
+RC21 has no passing full or soak campaign and is not hardware-qualified.
 
 RC21 uses branch `codex/firmware-tandem-agc-v8-rc21`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc21`, manifest

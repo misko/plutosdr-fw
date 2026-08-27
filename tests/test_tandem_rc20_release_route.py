@@ -77,7 +77,7 @@ def test_rc20_quality_policy_is_narrow_fixed_and_fail_closed() -> None:
     )
 
 
-def test_rc20_evidence_identity_is_immutable_and_docs_name_rc21_active() -> None:
+def test_rc20_evidence_identity_is_immutable_and_docs_name_rc22_active() -> None:
     sources = tuple(
         path.read_text(encoding="utf-8") for path in (RELEASING, NOTES, PLAN, KALMAN)
     )
@@ -85,7 +85,7 @@ def test_rc20_evidence_identity_is_immutable_and_docs_name_rc21_active() -> None
         assert "RC20" in source
         assert "RC19" in source
         assert "-2.0 dBFS" in source
-    assert "The active candidate is RC21" in sources[0]
+    assert "The active candidate is RC22" in sources[0]
     assert "RC20 is immutable" in sources[3]
 
 
@@ -94,5 +94,5 @@ def test_rc20_keeps_single_owner_optional_github_attestation_policy() -> None:
     runner = KALMAN.read_text(encoding="utf-8")
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC21 workflow has no separate attestation job." in runner
+    assert "The RC22 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner

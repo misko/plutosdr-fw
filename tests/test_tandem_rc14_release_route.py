@@ -114,7 +114,7 @@ def test_rc14_docs_preserve_the_indexed_build_and_pretransition_failure() -> Non
         assert "RC14" in source
         assert "pluto-plus-utils" in source
     assert "9ef137768d59925acf21d5cd3ff71d1cb523dba7" in sources[1]
-    assert "The active candidate is RC21" in sources[0]
+    assert "The active candidate is RC22" in sources[0]
     assert "refs/tags/tandem-agc-v8-rc14-source/firmware-v1" in sources[1]
     assert "RC13" in sources[1]
     assert "3361acb3446b517854ca1cfc144d28c4dd853743" in sources[1]
@@ -126,5 +126,5 @@ def test_rc14_keeps_single_owner_optional_github_attestation_policy() -> None:
 
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC21 workflow has no separate attestation job." in runner
+    assert "The RC22 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner

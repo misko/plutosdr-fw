@@ -17,12 +17,12 @@ fail() {
     exit 1
 }
 
-# RC5 through RC21 and the final v8 route are protected builds and therefore
+# RC5 through RC22 and the final v8 route are protected builds and therefore
 # cannot opt out of the reviewed integrated-route inventory. Other historical
 # source locks retain their original package path unless a waiver inventory is
 # explicitly supplied by their trusted workflow.
 case "$(basename "$MANIFEST")" in
-tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-rc8-source.yaml | tandem-agc-v8-rc9-source.yaml | tandem-agc-v8-rc10-source.yaml | tandem-agc-v8-rc11-source.yaml | tandem-agc-v8-rc12-source.yaml | tandem-agc-v8-rc13-source.yaml | tandem-agc-v8-rc14-source.yaml | tandem-agc-v8-rc15-source.yaml | tandem-agc-v8-rc16-source.yaml | tandem-agc-v8-rc17-source.yaml | tandem-agc-v8-rc18-source.yaml | tandem-agc-v8-rc19-source.yaml | tandem-agc-v8-rc20-source.yaml | tandem-agc-v8-rc21-source.yaml | tandem-agc-v8-source.yaml)
+tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-rc8-source.yaml | tandem-agc-v8-rc9-source.yaml | tandem-agc-v8-rc10-source.yaml | tandem-agc-v8-rc11-source.yaml | tandem-agc-v8-rc12-source.yaml | tandem-agc-v8-rc13-source.yaml | tandem-agc-v8-rc14-source.yaml | tandem-agc-v8-rc15-source.yaml | tandem-agc-v8-rc16-source.yaml | tandem-agc-v8-rc17-source.yaml | tandem-agc-v8-rc18-source.yaml | tandem-agc-v8-rc19-source.yaml | tandem-agc-v8-rc20-source.yaml | tandem-agc-v8-rc21-source.yaml | tandem-agc-v8-rc22-source.yaml | tandem-agc-v8-source.yaml)
     manifest_name="$(basename -- "$MANIFEST")"
     canonical_manifest="${ROOT}/manifests/${manifest_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$canonical_manifest" ]] ||
@@ -267,6 +267,9 @@ tandem-agc-v8-rc20-source.yaml:*)
     ;;
 tandem-agc-v8-rc21-source.yaml:*)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8-rc21'
+    ;;
+tandem-agc-v8-rc22-source.yaml:*)
+    protected_version='v0.41-plutoplus-spf-tandem-agc-v8-rc22'
     ;;
 tandem-agc-v8-source.yaml:final-release)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8'

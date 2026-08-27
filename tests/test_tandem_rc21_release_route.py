@@ -38,15 +38,18 @@ def test_rc21_reuses_the_exact_rc20_and_final_external_source_graph() -> None:
     )
 
 
-def test_rc21_owner_route_maps_branch_manifest_package_and_version() -> None:
+def test_rc21_owner_route_remains_an_exact_reproduction_mapping() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     branch = "refs/heads/codex/firmware-tandem-agc-v8-rc21"
     assert workflow.count(branch) == 4
     assert workflow.count("'tandem-agc-v8-rc21-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc21'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc21'") == 1
-    assert "Require the exact protected RC21 candidate identity" in workflow
+    assert "Require the exact protected RC21 reproduction identity" in workflow
     assert "Require the exact protected RC20 reproduction identity" in workflow
+    assert workflow.index("refs/heads/codex/firmware-tandem-agc-v8-rc22") < workflow.index(
+        branch
+    )
     assert workflow.index(branch) < workflow.index(
         "refs/heads/codex/firmware-tandem-agc-v8-rc20"
     )
@@ -79,24 +82,20 @@ def test_rc21_four_band_authorization_and_2450_diagnostic_are_exact() -> None:
     assert "rf_quality_only_failure_is_recorded_and_nonbinding" in evidence
 
 
-def test_rc21_evidence_identity_and_docs_are_active() -> None:
-    evidence = EVIDENCE.read_text(encoding="utf-8")
-    sources = tuple(
-        path.read_text(encoding="utf-8")
-        for path in (RELEASING, NOTES, DEPLOY_PLAN, KALMAN)
-    )
-    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc21" in evidence
-    assert "refs/tags/tandem-agc-v8-rc21-source/firmware-v1" in evidence
-    for source in sources:
-        assert "RC21" in source
-        assert "RC20" in source
-    assert "The active candidate is RC21" in sources[0]
+def test_rc21_hardware_failure_is_immutable_and_docs_name_rc22_active() -> None:
+    notes = NOTES.read_text(encoding="utf-8")
+    releasing = RELEASING.read_text(encoding="utf-8")
+    deploy_plan = DEPLOY_PLAN.read_text(encoding="utf-8")
+    assert "v0.41-plutoplus-spf-tandem-agc-v8-rc21" in deploy_plan
+    assert "16,400" in notes and "17,408" in notes
+    assert "not hardware-qualified" in notes
+    assert "The active candidate is RC22" in releasing
 
 
-def test_rc21_keeps_single_owner_optional_github_attestation_policy() -> None:
+def test_rc21_reproduction_keeps_single_owner_attestation_policy() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     runner = KALMAN.read_text(encoding="utf-8")
     assert "actions/attest@" not in workflow
     assert "\n  attest:" not in workflow
-    assert "The RC21 workflow has no separate attestation job." in runner
+    assert "The RC22 workflow has no separate attestation job." in runner
     assert "GitHub attestation is not required for this handoff." in runner

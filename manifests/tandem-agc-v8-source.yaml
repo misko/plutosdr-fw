@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC21, but the
+# The external component graph remains identical from RC4 through RC22, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -58,11 +58,14 @@
 # and external-source byte while fixing only that release oracle. Its trusted
 # build, four RAM deployments, and lifecycle checks passed, but its full campaign
 # did not qualify: one 2.45-GHz run had weak-rung SNR contamination and two
-# 915-MHz runs exposed a settle/measurement-boundary evidence defect. RC21 keeps
-# all firmware/external pins, hardens that boundary and failure-IQ evidence,
-# qualifies at fixed 1.05/1.55/2.05/5.8-GHz authorizing centers, and records a
-# nonauthorizing full 2.45-GHz diagnostic whose safety/integrity failures remain
-# fatal. RC21 must pass its source-locked build and full hardware qualification
+# 915-MHz runs exposed a settle/measurement-boundary evidence defect. RC21 kept
+# all external pins, hardened that boundary and failure-IQ evidence, and moved
+# authorization to fixed 1.05/1.55/2.05/5.8-GHz centers with a nonauthorizing
+# full 2.45-GHz diagnostic. Its trusted build and db696 RAM/lifecycle passed,
+# but 1.05-GHz hardware measured 16,400-sample paired-event spacing where the
+# contract requires 17,408. RC22 corrects the N+1 power divider and permits
+# tandem gain decisions only on exact power-measurement ticks. RC22 must pass
+# its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release
 # identity and packaging, while requiring exact component identities in packed

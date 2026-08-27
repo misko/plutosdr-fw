@@ -192,13 +192,19 @@ RC20 is immutable and not hardware-qualified: its trusted build, four RAM-only
 deployments, and lifecycle checks passed, but it has no passing full/soak
 campaign or campaign-qualified index.
 
-The forward-only RC21 route uses branch
-`codex/firmware-tandem-agc-v8-rc21`, exact version
-`v0.41-plutoplus-spf-tandem-agc-v8-rc21`, and source lock
-`refs/tags/tandem-agc-v8-rc21-source/firmware-v1`. It retains RC20 firmware
-bytes, hardens measurement-boundary evidence, uses fixed authorizing centers
+RC21 is also immutable and not hardware-qualified. Trusted run `33041851068`,
+candidate evidence, and the db696 RAM/lifecycle pilot passed. Its first
+authorizing 1.05-GHz campaign exposed a real FPGA timing-contract mismatch:
+paired events were 16,400 samples apart where the contract requires 17,408.
+
+The forward-only RC22 route uses branch
+`codex/firmware-tandem-agc-v8-rc22`, exact version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc22`, and source lock
+`refs/tags/tandem-agc-v8-rc22-source/firmware-v1`. It corrects the power divider
+and tick-gates tandem decisions, retains hardened measurement-boundary evidence,
+uses fixed authorizing centers
 1.05/1.55/2.05/5.8 GHz, and records a mandatory nonauthorizing 2.45-GHz
-diagnostic. It does not move or reuse RC20's branch, source lock, artifacts, or
+diagnostic. It does not move or reuse RC21's branch, source lock, artifacts, or
 failed campaign evidence.
 
 The historical forward-only RC20 route uses branch
@@ -263,7 +269,7 @@ allowed maintainer source-lock branch. It:
 6. uploads the commit-addressed deployment bundle and its detached checksum for
    90 days.
 
-The RC21 workflow has no separate attestation job. An operator may capture GitHub
+The RC22 workflow has no separate attestation job. An operator may capture GitHub
 provenance later as optional supporting metadata, but its presence or absence
 does not change the trusted build result and cannot replace source-lock,
 checksum, evidence-index, routed-design, or hardware checks.

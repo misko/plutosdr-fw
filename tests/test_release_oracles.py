@@ -28,6 +28,7 @@ RC18_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc18-source.yaml"
 RC19_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc19-source.yaml"
 RC20_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc20-source.yaml"
 RC21_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc21-source.yaml"
+RC22_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc22-source.yaml"
 FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
@@ -161,6 +162,7 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
     rc19 = _manifest_values(RC19_SOURCE_MANIFEST)
     rc20 = _manifest_values(RC20_SOURCE_MANIFEST)
     rc21 = _manifest_values(RC21_SOURCE_MANIFEST)
+    rc22 = _manifest_values(RC22_SOURCE_MANIFEST)
     final = _manifest_values(FINAL_SOURCE_MANIFEST)
     tandem_v2 = _manifest_values(TANDEM_V2_SOURCE_MANIFEST)
     changed_component_keys = {
@@ -204,6 +206,7 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
         == rc19
         == rc20
         == rc21
+        == rc22
         == final
     )
     for values in (
@@ -226,6 +229,7 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
         rc19,
         rc20,
         rc21,
+        rc22,
         final,
     ):
         assert "release_tag" not in values
@@ -254,6 +258,7 @@ def test_rc3_advances_dependencies_and_rc4_reuses_them_for_top_rtl_fix() -> None
         rc19,
         rc20,
         rc21,
+        rc22,
         final,
         tandem_v2,
     ):
@@ -305,6 +310,7 @@ def test_historical_routes_and_all_v8_source_graphs_are_explicit() -> None:
         "manifests/tandem-agc-v8-rc19-source.yaml",
         "manifests/tandem-agc-v8-rc20-source.yaml",
         "manifests/tandem-agc-v8-rc21-source.yaml",
+        "manifests/tandem-agc-v8-rc22-source.yaml",
         "manifests/tandem-agc-v8-source.yaml",
     ):
         assert f"./scripts/check_source_graph.sh {manifest}" in offline_check
