@@ -92,9 +92,7 @@ _TANDEM_WEAK_FIRST_COMMAND_ID = "weak_reassertion_16f"
 _TANDEM_WEAK_SECOND_COMMAND_ID = "weak_reassertion_40f"
 _TANDEM_WEAK_COMMAND_LEVEL_DB = -45.0
 _TANDEM_WEAK_ARTIFACT_DIRECTORY = "weak_dual_target"
-_TANDEM_WEAK_ARTIFACT_POLICY = (
-    "mandatory_exact_weak_dual_target_preflight_sidecars"
-)
+_TANDEM_WEAK_ARTIFACT_POLICY = "mandatory_exact_weak_dual_target_preflight_sidecars"
 _TANDEM_REQUIRED_PARTITION_FRAMES = 8
 _TANDEM_CONDITIONING_TAIL_SAMPLES = 8_192
 _TANDEM_WINDOW_SAMPLES = 1_024
@@ -109,9 +107,7 @@ _TANDEM_BATCH_CACHE_BYTES = _TANDEM_BATCH_FRAMES * (
     + _TANDEM_METADATA_CAPACITY_BYTES
     + 2 * ctypes.sizeof(ctypes.c_size_t)
 )
-_TANDEM_MAXIMUM_PYTHON_RAW_BYTES = (
-    _TANDEM_BATCH_FRAMES * _TANDEM_FRAME_IQ_BYTES
-)
+_TANDEM_MAXIMUM_PYTHON_RAW_BYTES = _TANDEM_BATCH_FRAMES * _TANDEM_FRAME_IQ_BYTES
 _TANDEM_MAXIMUM_PYTHON_RAW_METADATA_BYTES = (
     _TANDEM_BATCH_FRAMES * _TANDEM_METADATA_CAPACITY_BYTES
 )
@@ -345,9 +341,7 @@ def transient_evidence_policy(
         "tandem_analysis_window_samples": _TANDEM_WINDOW_SAMPLES,
         "tandem_batch_cache_bytes": _TANDEM_BATCH_CACHE_BYTES,
         "tandem_aggregate_resident_bytes": _TANDEM_AGGREGATE_RESIDENT_BYTES,
-        "tandem_success_close": (
-            "full 1+63 replay; normal close; no cancel"
-        ),
+        "tandem_success_close": ("full 1+63 replay; normal close; no cancel"),
         "tandem_post_close": (
             "IDLE/fault0/overflow0/FIFO0/unowned; retain pre-close diagnostics "
             "without exact retired-tail claim"
@@ -564,10 +558,7 @@ def _wait_for_idle(
             raise EvidenceInvalid(
                 "tandem IDLE endpoint is not a paired 7-bit gain index"
             )
-        if (
-            status["fault_flags"]
-            or status["overflow_count"]
-        ):
+        if status["fault_flags"] or status["overflow_count"]:
             raise EvidenceInvalid(f"tandem controller status is unsafe: {status}")
         if (
             status.get("state") == int(TandemState.IDLE)
@@ -761,9 +752,7 @@ def _validate_tandem_metadata(
         raise EvidenceInvalid("tandem transient metadata capacity overflowed")
     if metadata.observation_capacity != 64 or metadata.event_capacity != 64:
         raise EvidenceInvalid("tandem transient metadata capacity changed")
-    maximum_observations = (
-        capture.frame_samples // (capture.frame_samples // 4) + 1
-    )
+    maximum_observations = capture.frame_samples // (capture.frame_samples // 4) + 1
     if not 1 <= metadata.observation_count <= maximum_observations:
         raise EvidenceInvalid(
             "tandem transient observation count exceeds the overlap-safe bound"
@@ -1504,9 +1493,7 @@ def _tandem_memory_ledger() -> dict[str, Any]:
         "within_cap": calculated <= _TANDEM_MAXIMUM_AGGREGATE_BYTES,
         "measured_finished_mode_and_parsed_metadata_bytes": None,
         "measured_evidence_within_reservation": None,
-        "canonical_evidence_projection_method": (
-            _TANDEM_EVIDENCE_PROJECTION_METHOD
-        ),
+        "canonical_evidence_projection_method": (_TANDEM_EVIDENCE_PROJECTION_METHOD),
         "canonical_evidence_projection_bytes": None,
         "canonical_evidence_projection_sha256": None,
         "accounting_scope": (
@@ -1612,9 +1599,7 @@ def _attest_tandem_evidence_reservation(
     measured = 0
     for _ in range(4):
         ledger["measured_finished_mode_and_parsed_metadata_bytes"] = measured
-        ledger["measured_evidence_within_reservation"] = (
-            measured <= reservation
-        )
+        ledger["measured_evidence_within_reservation"] = measured <= reservation
         updated = _recursive_resident_bytes((record, parsed_metadata))
         if updated == measured:
             break
@@ -1825,8 +1810,7 @@ def _schedule_tandem_batch_command(
             target.get("s0_raw") != s0_raw
             or target.get("offset_frames") != target_frames
             or target.get("offset_samples") != target_samples
-            or target.get("target_raw")
-            != (s0_raw + target_samples) % _UINT32_MODULUS
+            or target.get("target_raw") != (s0_raw + target_samples) % _UINT32_MODULUS
         ):
             raise EvidenceInvalid("tandem command diagnostic target changed")
         if not 0 < target_samples < _UINT32_MODULUS // 2:
@@ -1967,9 +1951,7 @@ def _schedule_tandem_batch_command(
                 raw_bracket["raw_c_causal_advance"] = raw_c
                 raw_bracket["c_from_b_samples"] = c_delta
                 raw_bracket["causal_uncertainty_samples"] = uncertainty
-                raw_bracket["causal_uncertainty_limit_samples"] = (
-                    max_sample_uncertainty
-                )
+                raw_bracket["causal_uncertainty_limit_samples"] = max_sample_uncertainty
                 break
         if raw_b is None or raw_c is None:
             raise EvidenceInvalid(
@@ -2079,11 +2061,8 @@ def _bind_tandem_batch_command(
     b_delta = (raw_b - raw_initial) % _UINT32_MODULUS
     c_delta = (raw_c - raw_b) % _UINT32_MODULUS
     if any(
-        value >= _UINT32_MODULUS // 2
-        for value in (p_delta, a_delta, initial_delta)
-    ) or any(
-        not 0 < value < _UINT32_MODULUS // 2 for value in (b_delta, c_delta)
-    ):
+        value >= _UINT32_MODULUS // 2 for value in (p_delta, a_delta, initial_delta)
+    ) or any(not 0 < value < _UINT32_MODULUS // 2 for value in (b_delta, c_delta)):
         raise EvidenceInvalid("tandem command counter extension is ambiguous")
     extended_p = s0 + p_delta
     extended_a = s0 + a_delta
@@ -2108,8 +2087,7 @@ def _bind_tandem_batch_command(
     if (
         target.get("target_raw") != target_sample % _UINT32_MODULUS
         or target.get("overshoot_samples") != overshoot
-        or target.get("overshoot_limit_samples")
-        != _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES
+        or target.get("overshoot_limit_samples") != _TANDEM_MAX_TARGET_OVERSHOOT_SAMPLES
         or raw_bracket.get("raw_a_prewrite") != raw_a
         or raw_bracket.get("initial_from_a_samples") != initial_delta
         or raw_bracket.get("b_from_initial_samples") != b_delta
@@ -2324,9 +2302,7 @@ def _partition_tandem_batch(
             name: {"count": len(indices), "frame_indices": indices}
             for name, indices in groups.items()
         },
-        "minimum_required_fully_pre_attack_frames": (
-            _TANDEM_REQUIRED_PARTITION_FRAMES
-        ),
+        "minimum_required_fully_pre_attack_frames": (_TANDEM_REQUIRED_PARTITION_FRAMES),
         "minimum_required_fully_post_attack_pre_release_frames": (
             _TANDEM_REQUIRED_PARTITION_FRAMES
         ),
@@ -2358,9 +2334,7 @@ def _partition_weak_tandem_batch(
         raise EvidenceInvalid("weak dual-target command brackets overlap or reorder")
 
     phase_by_frame: list[str] = []
-    groups: dict[str, list[int]] = {
-        name: [] for name in _TANDEM_WEAK_PARTITION_PHASES
-    }
+    groups: dict[str, list[int]] = {name: [] for name in _TANDEM_WEAK_PARTITION_PHASES}
     for frame in frames:
         start = int(frame.record["first_sample_sequence"])
         end = int(frame.record["sample_end_exclusive"])
@@ -2386,9 +2360,7 @@ def _partition_weak_tandem_batch(
         phase_by_frame.append(phase)
         groups[phase].append(int(frame.record["frame_index"]))
 
-    order = {
-        name: index for index, name in enumerate(_TANDEM_WEAK_PARTITION_PHASES)
-    }
+    order = {name: index for index, name in enumerate(_TANDEM_WEAK_PARTITION_PHASES)}
     if phase_by_frame != sorted(phase_by_frame, key=order.__getitem__):
         raise EvidenceInvalid("weak dual-target five-way partition is not ordered")
     required = {
@@ -2402,12 +2374,8 @@ def _partition_weak_tandem_batch(
                 f"weak dual-target partition {phase!r} has "
                 f"{len(groups[phase])} frames; requires {minimum}"
             )
-    if not groups["first_command_bracket"] or not groups[
-        "second_command_bracket"
-    ]:
-        raise EvidenceInvalid(
-            "weak dual-target command bracket lacks a retained frame"
-        )
+    if not groups["first_command_bracket"] or not groups["second_command_bracket"]:
+        raise EvidenceInvalid("weak dual-target command bracket lacks a retained frame")
 
     for index, frame in enumerate(frames):
         metadata = frame.metadata
@@ -2440,9 +2408,7 @@ def _partition_weak_tandem_batch(
             name: {"count": len(indices), "frame_indices": indices}
             for name, indices in groups.items()
         },
-        "minimum_required_fully_pre_first_frames": (
-            _TANDEM_REQUIRED_PARTITION_FRAMES
-        ),
+        "minimum_required_fully_pre_first_frames": (_TANDEM_REQUIRED_PARTITION_FRAMES),
         "minimum_required_fully_between_commands_frames": (
             _TANDEM_REQUIRED_PARTITION_FRAMES
         ),
@@ -2615,10 +2581,7 @@ def _preflight_transient_output_paths(
             )
     if sidecar_inventory_policy == "empty" and observed:
         raise EvidenceInvalid("tandem sidecar directory is not empty before RF")
-    if (
-        sidecar_inventory_policy == "complete"
-        and observed != allowed_sidecar_names
-    ):
+    if sidecar_inventory_policy == "complete" and observed != allowed_sidecar_names:
         raise EvidenceInvalid(
             "tandem sidecar directory does not contain the exact 128-file inventory"
         )
@@ -2647,10 +2610,10 @@ def _prepare_tandem_artifact_inventory(
         raise EvidenceInvalid(
             "tandem sidecar directory escapes the configured output directory"
         ) from error
-    if (
-        len(relative_directory.parts) != 4
-        or relative_directory.parts[1:]
-        != ("transient-iq", artifact_directory, "batch")
+    if len(relative_directory.parts) != 4 or relative_directory.parts[1:] != (
+        "transient-iq",
+        artifact_directory,
+        "batch",
     ):
         raise EvidenceInvalid(
             "tandem sidecar directory does not use the exact serial-scoped layout"
@@ -2684,9 +2647,7 @@ def _prepare_tandem_artifact_inventory(
                 "iq_path": iq_relative.as_posix(),
                 "raw_metadata_path": metadata_relative.as_posix(),
                 "raw_metadata_bytes": len(frame.raw_metadata),
-                "raw_metadata_sha256": hashlib.sha256(
-                    frame.raw_metadata
-                ).hexdigest(),
+                "raw_metadata_sha256": hashlib.sha256(frame.raw_metadata).hexdigest(),
                 "artifact_policy": artifact_policy,
                 "artifact_write_status": {
                     "iq_write_completed": False,
@@ -2730,9 +2691,7 @@ def _materialize_tandem_batch(
         _atomic_bytes(iq_path, frame.raw)
         frame.record["artifact_write_status"]["iq_write_completed"] = True
         _atomic_bytes(metadata_path, frame.raw_metadata)
-        frame.record["artifact_write_status"][
-            "raw_metadata_write_completed"
-        ] = True
+        frame.record["artifact_write_status"]["raw_metadata_write_completed"] = True
 
 
 def _tandem_artifact_manifest(frames: Sequence[_DeferredFrame]) -> dict[str, Any]:
@@ -2756,21 +2715,16 @@ def _tandem_artifact_manifest(frames: Sequence[_DeferredFrame]) -> dict[str, Any
     ).encode("utf-8")
     return {
         "path_root": "quality.output_dir",
-        "relative_directory": (
-            f"{frames[0].record['iq_path'].rsplit('/', 1)[0]}"
-        ),
+        "relative_directory": (f"{frames[0].record['iq_path'].rsplit('/', 1)[0]}"),
         "frame_count": len(entries),
         "file_count": 2 * len(entries),
         "iq_total_bytes": sum(item["iq_bytes"] for item in entries),
-        "raw_metadata_total_bytes": sum(
-            item["raw_metadata_bytes"] for item in entries
-        ),
+        "raw_metadata_total_bytes": sum(item["raw_metadata_bytes"] for item in entries),
         "completed_iq_files": sum(
             item["write_status"]["iq_write_completed"] for item in entries
         ),
         "completed_raw_metadata_files": sum(
-            item["write_status"]["raw_metadata_write_completed"]
-            for item in entries
+            item["write_status"]["raw_metadata_write_completed"] for item in entries
         ),
         "write_complete": all(
             item["write_status"]["iq_write_completed"]
@@ -2782,33 +2736,98 @@ def _tandem_artifact_manifest(frames: Sequence[_DeferredFrame]) -> dict[str, Any
     }
 
 
-def _require_tandem_batch_window_quality(
+def _tandem_partition_rf_quality_evidence(
     frames: Sequence[_DeferredFrame],
     *,
-    commands: Sequence[StimulusCommand],
-) -> None:
-    brackets: list[tuple[int, int]] = []
-    for command in commands:
+    partition: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind strict steady-state quality without rejecting the AGC transient.
+
+    Clipping and low SNR are expected while the deliberately overloaded AUTO
+    path is stepping gain down.  Those windows remain retained diagnostic
+    evidence, but they cannot authorize PASS.  Authorization comes only from
+    the exact event-free eight-frame suffix of each commanded steady phase,
+    which :func:`_stable_tandem_partition_suffix` has already validated.
+    """
+
+    stable_suffixes = partition.get("stable_suffixes")
+    if not isinstance(stable_suffixes, Mapping):
+        raise EvidenceInvalid("tandem RF policy lacks stable suffix evidence")
+    phases = (
+        "fully_pre_attack",
+        "fully_post_attack_pre_release",
+        "fully_post_release",
+    )
+    stable_indices: list[int] = []
+    for phase in phases:
+        suffix = stable_suffixes.get(phase)
+        indices = suffix.get("frame_indices") if isinstance(suffix, Mapping) else None
         if (
-            command.sample_sequence_before is None
-            or command.sample_sequence_after is None
-        ):
-            raise EvidenceInvalid("tandem quality gate command lacks a bracket")
-        brackets.append(
-            (command.sample_sequence_before, command.sample_sequence_after)
-        )
-    for frame in frames:
-        for window in frame.record["analysis"]["windows"]:
-            start = int(window["sample_start"])
-            end = int(window["sample_end_exclusive"])
-            intersects_command = any(
-                start < upper and end > lower for lower, upper in brackets
+            not isinstance(indices, list)
+            or len(indices) != _TANDEM_REQUIRED_PARTITION_FRAMES
+            or any(
+                isinstance(index, bool) or not isinstance(index, int)
+                for index in indices
             )
-            if not intersects_command and window.get("quality_valid") is not True:
+        ):
+            raise EvidenceInvalid(f"tandem {phase} RF suffix evidence is malformed")
+        stable_indices.extend(indices)
+    if len(set(stable_indices)) != len(stable_indices) or any(
+        index < 0 or index >= len(frames) for index in stable_indices
+    ):
+        raise EvidenceInvalid("tandem RF suffix frame inventory is invalid")
+
+    strict_indices = set(stable_indices)
+    transition_indices = [
+        index for index in range(len(frames)) if index not in strict_indices
+    ]
+    diagnostic_invalid_window_count = 0
+    diagnostic_reason_counts: dict[str, int] = {}
+    for index, frame in enumerate(frames):
+        analysis = frame.record.get("analysis")
+        windows = analysis.get("windows") if isinstance(analysis, Mapping) else None
+        if not isinstance(windows, list) or not windows:
+            raise EvidenceInvalid("tandem RF policy encountered malformed analysis")
+        for window in windows:
+            if not isinstance(window, Mapping):
+                raise EvidenceInvalid("tandem RF policy encountered malformed window")
+            valid = window.get("quality_valid") is True
+            if index in strict_indices and not valid:
                 raise EvidenceInvalid(
-                    "tandem returned-IQ window outside both command brackets "
-                    f"failed quality gates: {window.get('quality_reasons')!r}"
+                    "tandem stable RF suffix contains an invalid returned-IQ window"
                 )
+            if index in strict_indices or valid:
+                continue
+            diagnostic_invalid_window_count += 1
+            reasons = window.get("quality_reasons")
+            if not isinstance(reasons, list) or not all(
+                isinstance(reason, str) and reason for reason in reasons
+            ):
+                raise EvidenceInvalid(
+                    "tandem diagnostic RF window has malformed quality reasons"
+                )
+            for reason in reasons:
+                diagnostic_reason_counts[reason] = (
+                    diagnostic_reason_counts.get(reason, 0) + 1
+                )
+    return {
+        "policy": (
+            "strict RF quality is required only in each exact event-free "
+            "eight-frame steady suffix; conditioning and commanded-response "
+            "windows are retained diagnostic evidence and cannot authorize PASS"
+        ),
+        "strict_phase_order": list(phases),
+        "strict_frame_indices": stable_indices,
+        "strict_frame_count": len(stable_indices),
+        "strict_window_quality_valid": True,
+        "diagnostic_frame_indices": transition_indices,
+        "diagnostic_frame_count": len(transition_indices),
+        "diagnostic_invalid_window_count": diagnostic_invalid_window_count,
+        "diagnostic_quality_reason_counts": dict(
+            sorted(diagnostic_reason_counts.items())
+        ),
+        "diagnostic_windows_authorize_pass": False,
+    }
 
 
 def _analyze_tandem_frame_slice(
@@ -2886,11 +2905,11 @@ def _stable_tandem_partition_suffix(
             f"tandem {label} eight-frame suffix is not event/endpoint stable"
         )
     windows = [
-        window
-        for frame in selected
-        for window in frame.record["analysis"]["windows"]
+        window for frame in selected for window in frame.record["analysis"]["windows"]
     ]
-    if not windows or any(window.get("quality_valid") is not True for window in windows):
+    if not windows or any(
+        window.get("quality_valid") is not True for window in windows
+    ):
         raise EvidenceInvalid(f"tandem {label} stable suffix failed RF quality")
     frame_channel_medians = [
         [
@@ -2906,9 +2925,7 @@ def _stable_tandem_partition_suffix(
     ]
     suffix_channel_medians = [
         float(
-            statistics.median(
-                float(window["tone_dbfs"][channel]) for window in windows
-            )
+            statistics.median(float(window["tone_dbfs"][channel]) for window in windows)
         )
         for channel in (0, 1)
     ]
@@ -2927,9 +2944,7 @@ def _stable_tandem_partition_suffix(
         for channel in (0, 1)
     ]
     if any(value > tolerance_db for value in maximum_window_deviations):
-        raise EvidenceInvalid(
-            f"tandem {label} stable suffix exceeds its RF tolerance"
-        )
+        raise EvidenceInvalid(f"tandem {label} stable suffix exceeds its RF tolerance")
     endpoint = typed[-1].bench_gain_indices
     return {
         "frame_indices": selected_indices,
@@ -3003,18 +3018,13 @@ def _weak_cross_suffix_stability(
         medians.append([float(value) for value in raw_medians])
         endpoints.append([int(value) for value in raw_endpoint])
     spans = [
-        max(row[channel] for row in medians)
-        - min(row[channel] for row in medians)
+        max(row[channel] for row in medians) - min(row[channel] for row in medians)
         for channel in (0, 1)
     ]
     if any(value > tolerance_db for value in spans):
-        raise EvidenceInvalid(
-            "weak dual-target pre/middle/post RF suffixes disagree"
-        )
+        raise EvidenceInvalid("weak dual-target pre/middle/post RF suffixes disagree")
     if len({tuple(endpoint) for endpoint in endpoints}) != 1:
-        raise EvidenceInvalid(
-            "weak dual-target pre/middle/post endpoints disagree"
-        )
+        raise EvidenceInvalid("weak dual-target pre/middle/post endpoints disagree")
     return {
         "phase_order": list(phase_order),
         "suffix_channel_median_tone_dbfs": medians,
@@ -3660,9 +3670,7 @@ def _batch_command_record(
         "effective_attenuation_db": effective_attenuation_db,
         "rx_state_before": None,
         "rx_state_after": None,
-        "timing_role": (
-            "s0_targeted_one_write_bracketed_by_coherent_fpga_counter"
-        ),
+        "timing_role": ("s0_targeted_one_write_bracketed_by_coherent_fpga_counter"),
         "sample_timing_basis": _TANDEM_TIMING_BASIS,
         "sample_anchor_policy": (
             "post-open S0 plus frozen target; exact one-TX2-write interval is "
@@ -3779,9 +3787,7 @@ def _run_tandem_batch_mode_body(
     metadata_parser: Callable[[bytes], TandemFrameMetadata],
     output_dir: Path,
     failure_sink: Callable[[Mapping[str, Any]], None] | None,
-    profile: _TandemBatchProfile = (
-        _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE
-    ),
+    profile: _TandemBatchProfile = (_TandemBatchProfile.PRODUCTION_ATTACK_RELEASE),
 ) -> dict[str, Any]:
     """Run the closed production or weak qualification batch profile."""
 
@@ -3803,12 +3809,8 @@ def _run_tandem_batch_mode_body(
         artifact_directory = MODE_TANDEM
         artifact_policy = "mandatory_exact_release_sidecars"
     else:
-        if float(capture.weak_stimulus_tx_gain_db) != (
-            _TANDEM_WEAK_COMMAND_LEVEL_DB
-        ):
-            raise ValueError(
-                "weak dual-target profile is hard-capped at -45 dB TX2"
-            )
+        if float(capture.weak_stimulus_tx_gain_db) != (_TANDEM_WEAK_COMMAND_LEVEL_DB):
+            raise ValueError("weak dual-target profile is hard-capped at -45 dB TX2")
         selected_specs = (
             (
                 _TANDEM_WEAK_FIRST_COMMAND_ID,
@@ -3830,31 +3832,33 @@ def _run_tandem_batch_mode_body(
     )
     expected_specs = (
         (
-            "strong_attack",
-            float(capture.strong_stimulus_tx_gain_db),
-            _TANDEM_ATTACK_TARGET_FRAMES,
-        ),
-        (
-            "weak_release",
-            float(capture.weak_stimulus_tx_gain_db),
-            _TANDEM_RELEASE_TARGET_FRAMES,
-        ),
-    ) if profile is _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE else (
-        (
-            _TANDEM_WEAK_FIRST_COMMAND_ID,
-            _TANDEM_WEAK_COMMAND_LEVEL_DB,
-            _TANDEM_ATTACK_TARGET_FRAMES,
-        ),
-        (
-            _TANDEM_WEAK_SECOND_COMMAND_ID,
-            _TANDEM_WEAK_COMMAND_LEVEL_DB,
-            _TANDEM_RELEASE_TARGET_FRAMES,
-        ),
+            (
+                "strong_attack",
+                float(capture.strong_stimulus_tx_gain_db),
+                _TANDEM_ATTACK_TARGET_FRAMES,
+            ),
+            (
+                "weak_release",
+                float(capture.weak_stimulus_tx_gain_db),
+                _TANDEM_RELEASE_TARGET_FRAMES,
+            ),
+        )
+        if profile is _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE
+        else (
+            (
+                _TANDEM_WEAK_FIRST_COMMAND_ID,
+                _TANDEM_WEAK_COMMAND_LEVEL_DB,
+                _TANDEM_ATTACK_TARGET_FRAMES,
+            ),
+            (
+                _TANDEM_WEAK_SECOND_COMMAND_ID,
+                _TANDEM_WEAK_COMMAND_LEVEL_DB,
+                _TANDEM_RELEASE_TARGET_FRAMES,
+            ),
+        )
     )
     if normalized_specs != expected_specs:
-        raise ValueError(
-            "tandem batch commands differ from their closed profile"
-        )
+        raise ValueError("tandem batch commands differ from their closed profile")
 
     memory_ledger = _tandem_memory_ledger()
     if memory_ledger["within_cap"] is not True:
@@ -4054,9 +4058,7 @@ def _run_tandem_batch_mode_body(
                     s0_read["host_before_ns"] = _schedule_timestamp(
                         clock_ns, name="post-open S0 read start"
                     )
-                    s0_raw = _strict_low32_counter(
-                        radio.read_rx_sample_counter_low32()
-                    )
+                    s0_raw = _strict_low32_counter(radio.read_rx_sample_counter_low32())
                     s0_read["host_after_ns"] = _schedule_timestamp(
                         clock_ns, name="post-open S0 read completion"
                     )
@@ -4076,9 +4078,7 @@ def _run_tandem_batch_mode_body(
                             state=state,
                             metadata_parser=metadata_parser,
                             gap_context=_GAP_CONTEXT_ACQUISITION,
-                            expected_tandem_initial_gain_db=(
-                                _TANDEM_INITIAL_GAIN_DB
-                            ),
+                            expected_tandem_initial_gain_db=(_TANDEM_INITIAL_GAIN_DB),
                         )
 
                     worker = _TandemBatchWorker(acquire_one)
@@ -4096,15 +4096,11 @@ def _run_tandem_batch_mode_body(
                         acquisition["schedule_diagnostics"][command_id] = diagnostics
                         acquisition["targets"][command_id] = {
                             "offset_frames": target_frames,
-                            "offset_samples": (
-                                target_frames * _TANDEM_FRAME_SAMPLES
-                            ),
+                            "offset_samples": (target_frames * _TANDEM_FRAME_SAMPLES),
                             "target_raw": diagnostics["target"]["target_raw"],
                         }
                     schedule_plan = acquisition["schedule_plan"]
-                    schedule_plan["s0_read_host_after_ns"] = s0_read[
-                        "host_after_ns"
-                    ]
+                    schedule_plan["s0_read_host_after_ns"] = s0_read["host_after_ns"]
                     schedule_plan["commands"] = [
                         {
                             "command_id": command_id,
@@ -4194,9 +4190,7 @@ def _run_tandem_batch_mode_body(
                             ),
                         }
                     )
-                    _require_tandem_temperature_session(
-                        state, frame_count=len(frames)
-                    )
+                    _require_tandem_temperature_session(state, frame_count=len(frames))
                     _validate_exact_tandem_batch(frames)
                     record["batch_frames"] = [frame.record for frame in frames]
                     for command_id, _level_db, _target_frames in selected_specs:
@@ -4255,17 +4249,14 @@ def _run_tandem_batch_mode_body(
                     if (
                         initial_unanchored.host_after_ns
                         > acquisition["s0_read"]["host_before_ns"]
-                        or acquisition["schedule_plan"][
-                            "worker_start_returned_ns"
-                        ]
+                        or acquisition["schedule_plan"]["worker_start_returned_ns"]
                         > first_pre["host_before_ns"]
                         or first_command.sample_sequence_after is None
                         or second_command.sample_sequence_before is None
                         or first_command.sample_sequence_after
                         > second_command.sample_sequence_before
                         or first_command.host_after_ns > second_command.host_before_ns
-                        or first_post["host_after_ns"]
-                        > second_pre["host_before_ns"]
+                        or first_post["host_after_ns"] > second_pre["host_before_ns"]
                     ):
                         raise EvidenceInvalid(
                             "tandem first/second command chronology overlaps or "
@@ -4293,10 +4284,8 @@ def _run_tandem_batch_mode_body(
                 preclose_status_error: BaseException | None = None
                 if session_error is None and mute_error is None:
                     try:
-                        acquisition["pre_close_tandem_status"] = (
-                            _strict_tandem_status(
-                                radio, owned=True, label="pre-close after mute"
-                            )
+                        acquisition["pre_close_tandem_status"] = _strict_tandem_status(
+                            radio, owned=True, label="pre-close after mute"
                         )
                     except BaseException as error:  # noqa: BLE001
                         preclose_status_error = error
@@ -4414,12 +4403,9 @@ def _run_tandem_batch_mode_body(
         )
         if frame_to_pre_delta > 64 or transition_delta > 64:
             raise EvidenceInvalid(
-                "tandem close transition diagnostics exceed the FIFO retirement "
-                "bound"
+                "tandem close transition diagnostics exceed the FIFO retirement bound"
             )
-        if pre_close_status["ownership_epoch"] != (
-            last_frame_metadata.ownership_epoch
-        ):
+        if pre_close_status["ownership_epoch"] != (last_frame_metadata.ownership_epoch):
             raise EvidenceInvalid(
                 "tandem pre-close ownership epoch differs from retained batch"
             )
@@ -4519,15 +4505,7 @@ def _run_tandem_batch_mode_body(
             )
         finally:
             acquisition["artifact_manifest"] = _tandem_artifact_manifest(frames)
-        if profile is _TandemBatchProfile.PRODUCTION_ATTACK_RELEASE:
-            _require_tandem_batch_window_quality(
-                frames,
-                commands=[
-                    bound_commands[selected_specs[0][0]],
-                    bound_commands[selected_specs[1][0]],
-                ],
-            )
-        else:
+        if profile is _TandemBatchProfile.WEAK_DUAL_TARGET_TRANSPORT:
             _require_weak_tandem_batch_window_quality(frames)
         record["batch_frames"] = [frame.record for frame in frames]
 
@@ -4588,13 +4566,9 @@ def _run_tandem_batch_mode_body(
                 "cross_suffix_stability": cross_suffix,
             }
             record["metadata_abi"] = acquisition["metadata_abi"]
-            record["tandem_status_after"] = acquisition[
-                "post_close_tandem_status"
-            ]
+            record["tandem_status_after"] = acquisition["post_close_tandem_status"]
             radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
-            record["final_rx_state"] = _rx_state(
-                radio, expected_mode="manual"
-            )
+            record["final_rx_state"] = _rx_state(radio, expected_mode="manual")
             record["verdict"] = "qualified_transport"
             _attest_tandem_evidence_reservation(record, frames)
             return record
@@ -4616,18 +4590,20 @@ def _run_tandem_batch_mode_body(
                 "fully_post_release",
             )
         }
+        partition["rf_quality_policy"] = _tandem_partition_rf_quality_evidence(
+            frames, partition=partition
+        )
         pre_attack_endpoint = partition["stable_suffixes"]["fully_pre_attack"][
             "bench_gain_indices"
         ][0]
-        middle_endpoint = partition["stable_suffixes"][
-            "fully_post_attack_pre_release"
-        ]["bench_gain_indices"][0]
+        middle_endpoint = partition["stable_suffixes"]["fully_post_attack_pre_release"][
+            "bench_gain_indices"
+        ][0]
         final_endpoint = partition["stable_suffixes"]["fully_post_release"][
             "bench_gain_indices"
         ][0]
         if not (
-            middle_endpoint < pre_attack_endpoint
-            and final_endpoint > middle_endpoint
+            middle_endpoint < pre_attack_endpoint and final_endpoint > middle_endpoint
         ):
             raise EvidenceInvalid(
                 "tandem stable endpoints do not prove the commanded "
@@ -4637,9 +4613,7 @@ def _run_tandem_batch_mode_body(
         anchor_frame = frames[anchor_index]
         anchor_observation = _analyze_tandem_frame_slice(
             anchor_frame,
-            offset_samples=(
-                _TANDEM_FRAME_SAMPLES - _TANDEM_CONDITIONING_TAIL_SAMPLES
-            ),
+            offset_samples=(_TANDEM_FRAME_SAMPLES - _TANDEM_CONDITIONING_TAIL_SAMPLES),
             sample_count=_TANDEM_CONDITIONING_TAIL_SAMPLES,
             role="weak_conditioning_tail",
             quality=quality,
@@ -4662,14 +4636,12 @@ def _run_tandem_batch_mode_body(
             "source": anchor_observation,
         }
 
-        release_baseline_index = groups[
-            "fully_post_attack_pre_release"
-        ]["frame_indices"][-1]
+        release_baseline_index = groups["fully_post_attack_pre_release"][
+            "frame_indices"
+        ][-1]
         release_baseline = _analyze_tandem_frame_slice(
             frames[release_baseline_index],
-            offset_samples=(
-                _TANDEM_FRAME_SAMPLES - _TANDEM_CONDITIONING_TAIL_SAMPLES
-            ),
+            offset_samples=(_TANDEM_FRAME_SAMPLES - _TANDEM_CONDITIONING_TAIL_SAMPLES),
             sample_count=_TANDEM_CONDITIONING_TAIL_SAMPLES,
             role="strong_pre_release_tail",
             quality=quality,
@@ -4779,9 +4751,7 @@ def _run_tandem_batch_mode_body(
             }
         )
         record["metadata_abi"] = acquisition["metadata_abi"]
-        record["tandem_status_after"] = acquisition[
-            "post_close_tandem_status"
-        ]
+        record["tandem_status_after"] = acquisition["post_close_tandem_status"]
         radio.configure_rx("manual", manual_gain_db=quality.manual_gain_db)
         record["final_rx_state"] = _rx_state(radio, expected_mode="manual")
         record["verdict"] = "pass"

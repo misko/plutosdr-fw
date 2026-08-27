@@ -97,11 +97,7 @@ def _tone_raw(
     for channel, phase in enumerate((0.3, -0.2)):
         noise = rng.normal(size=samples) + 1j * rng.normal(size=samples)
         signal.append(
-            amplitudes
-            * (1.0 - 0.05 * channel)
-            * carrier
-            * np.exp(1j * phase)
-            + noise
+            amplitudes * (1.0 - 0.05 * channel) * carrier * np.exp(1j * phase) + noise
         )
     matrix = np.asarray(signal)
     words = np.empty((samples, 4), dtype="<i2")
@@ -113,9 +109,9 @@ def _tone_raw(
 
 
 def _metadata_wire(metadata: Any) -> bytes:
-    header_bytes = V5_PREFIX_BYTES + 64 * (
-        GAIN_OBSERVATION_BYTES + GAIN_EVENT_BYTES
-    ) + 4
+    header_bytes = (
+        V5_PREFIX_BYTES + 64 * (GAIN_OBSERVATION_BYTES + GAIN_EVENT_BYTES) + 4
+    )
     payload = bytearray(header_bytes)
     struct.pack_into(
         "<IHHIIQQQIIIHB",
@@ -185,9 +181,7 @@ def _metadata_wire(metadata: Any) -> bytes:
             event.rx2_gain_index,
         )
     struct.pack_into("<I", payload, len(payload) - 4, 0)
-    struct.pack_into(
-        "<I", payload, len(payload) - 4, zlib.crc32(payload) & 0xFFFFFFFF
-    )
+    struct.pack_into("<I", payload, len(payload) - 4, zlib.crc32(payload) & 0xFFFFFFFF)
     return bytes(payload)
 
 
@@ -346,9 +340,9 @@ class _FakeRadio:
         transition_count = self.metadata_transition_count
         gain_index = self.metadata_gain_index
         if self.metadata_open and self.metadata_capture_count >= 64:
-            transition_count = (
-                transition_count + self.preclose_transition_delta
-            ) % (1 << 32)
+            transition_count = (transition_count + self.preclose_transition_delta) % (
+                1 << 32
+            )
             gain_index += self.preclose_endpoint_delta
         elif self.metadata_session_closed:
             transition_count = (
@@ -407,8 +401,7 @@ class _FakeRadio:
                         cancel=self.cancel_buffer,
                         batch_frames=batch_frames,
                         batch_cache_bytes=(
-                            batch_frames
-                            * (samples_per_channel * 8 + 64 * 1_024 + 16)
+                            batch_frames * (samples_per_channel * 8 + 64 * 1_024 + 16)
                         ),
                     ),
                     (2 if self.metadata_open else None),
@@ -823,15 +816,15 @@ def test_tandem_batch_schedule_partition_and_exact_command_contract(
             plan["worker_start_returned_ns"],
         ]
     )
-    assert [(item["command_id"], item["requested_level_db"]) for item in plan["commands"]] == [
+    assert [
+        (item["command_id"], item["requested_level_db"]) for item in plan["commands"]
+    ] == [
         ("strong_attack", -30.0),
         ("weak_release", -60.0),
     ]
 
     assert len(tandem["batch_frames"]) == 64
-    assert [frame["frame_index"] for frame in tandem["batch_frames"]] == list(
-        range(64)
-    )
+    assert [frame["frame_index"] for frame in tandem["batch_frames"]] == list(range(64))
     assert [
         frame["metadata"]["buffer_sequence"] for frame in tandem["batch_frames"]
     ] == list(range(64))
@@ -930,8 +923,8 @@ def test_tandem_mandatory_sidecar_inventory_is_exact_and_reparseable(
         assert len(iq) == 524_288
         assert hashlib.sha256(iq).hexdigest() == frame["sha256"]
         assert len(raw_metadata) == 3_256
-        assert hashlib.sha256(raw_metadata).hexdigest() == (
-            frame["raw_metadata_sha256"]
+        assert (
+            hashlib.sha256(raw_metadata).hexdigest() == (frame["raw_metadata_sha256"])
         )
         parsed = parse_tandem_frame_metadata(raw_metadata)
         assert parsed.buffer_sequence == index
@@ -978,15 +971,10 @@ def test_tandem_partial_sidecar_failure_retains_predeclared_inventory(
         "iq_write_completed": True,
         "raw_metadata_write_completed": False,
     }
+    assert (tmp_path / failure["batch_frames"][0]["iq_path"]).is_file()
+    assert not (tmp_path / failure["batch_frames"][0]["raw_metadata_path"]).exists()
     assert (
-        tmp_path / failure["batch_frames"][0]["iq_path"]
-    ).is_file()
-    assert not (
-        tmp_path / failure["batch_frames"][0]["raw_metadata_path"]
-    ).exists()
-    assert (
-        tmp_path
-        / (failure["batch_frames"][0]["raw_metadata_path"] + ".tmp")
+        tmp_path / (failure["batch_frames"][0]["raw_metadata_path"] + ".tmp")
     ).read_bytes() == b"partial"
 
 
@@ -1156,9 +1144,7 @@ def test_tandem_metadata_flags_features_and_physics_are_live_gates(
             tmp_path / radio.options.serial / "tandem-agc-transient-report.json"
         ).read_text(encoding="utf-8")
     )
-    physics = persisted["failure_evidence"]["acquisition"][
-        "metadata_physics_policy"
-    ]
+    physics = persisted["failure_evidence"]["acquisition"]["metadata_physics_policy"]
     assert physics == {
         "protocol_version": 5,
         "header_bytes": 3_256,
@@ -1187,8 +1173,7 @@ def test_tandem_temperature_allows_only_a_leading_startup_omission(
 
     tandem = next(mode for mode in report["modes"] if mode["mode"] == "tandem_auto")
     temperatures = [
-        frame["metadata"]["temperature_mdeg_c"]
-        for frame in tandem["batch_frames"]
+        frame["metadata"]["temperature_mdeg_c"] for frame in tandem["batch_frames"]
     ]
     assert temperatures[:3] == [None, None, 35_000]
     assert temperatures.count(None) == 2
@@ -1513,16 +1498,20 @@ def test_tandem_memory_ledger_measures_and_gates_finished_evidence(
         tandem, reparsed
     )
     assert len(canonical) == canonical_bytes
-    assert hashlib.sha256(canonical).hexdigest() == (
-        ledger["canonical_evidence_projection_sha256"]
+    assert (
+        hashlib.sha256(canonical).hexdigest()
+        == (ledger["canonical_evidence_projection_sha256"])
     )
     substituted_live_diagnostic = json.loads(json.dumps(tandem))
     substituted_live_diagnostic["acquisition"]["memory_ledger"][
         "measured_finished_mode_and_parsed_metadata_bytes"
     ] = 1
-    assert transient_hardware_module._canonical_tandem_evidence_bytes(
-        substituted_live_diagnostic, reparsed
-    ) == canonical
+    assert (
+        transient_hardware_module._canonical_tandem_evidence_bytes(
+            substituted_live_diagnostic, reparsed
+        )
+        == canonical
+    )
     assert canonical_bytes > 1
 
     fake_frames = [
@@ -1724,9 +1713,7 @@ def test_host_writes_have_bounded_sample_intervals_and_initial_is_unanchored(
         anchor = mode["conditioning_anchor"]
         if mode["mode"] == "tandem_auto":
             assert anchor["timing_role"] == "exact_retained_pre_attack_tail"
-            assert anchor["sample_anchor_policy"].startswith(
-                "exact final 8192 samples"
-            )
+            assert anchor["sample_anchor_policy"].startswith("exact final 8192 samples")
             assert anchor["sample_uncertainty"] == 8_192
         else:
             assert anchor["timing_role"] == "observed_stable_conditioning_interval"
@@ -2047,7 +2034,9 @@ def test_blocked_tandem_refill_is_muted_cancelled_and_joined_before_close(
     radio = _FakeRadio(tmp_path)
     radio.block_metadata_refill = True
 
-    with pytest.raises(EvidenceInvalid, match="returned no cached frame before timeout"):
+    with pytest.raises(
+        EvidenceInvalid, match="returned no cached frame before timeout"
+    ):
         _run_fake(radio, _quality(tmp_path))
 
     assert radio.blocked_refill_waiting.is_set()
@@ -2119,7 +2108,9 @@ def test_tandem_cancel_failure_is_preserved_with_acquisition_failure(
         return [error]
 
     messages = [str(error) for error in leaves(raised.value)]
-    assert any("returned no cached frame before timeout" in message for message in messages)
+    assert any(
+        "returned no cached frame before timeout" in message for message in messages
+    )
     assert any("planted buffer cancel failure" in message for message in messages)
     assert radio.mute_while_buffer_open_count >= 1
     assert not any(
@@ -2257,3 +2248,76 @@ def test_release_default_uses_the_characterized_minus_45_db_weak_rung() -> None:
     assert capture.weak_stimulus_tx_gain_db == -45.0
     assert capture.strong_stimulus_tx_gain_db == -30.0
     assert capture.strong_stimulus_tx_gain_db - capture.weak_stimulus_tx_gain_db == 15.0
+
+
+def test_tandem_rf_policy_retains_transient_clipping_as_diagnostic_only() -> None:
+    valid = {
+        "quality_valid": True,
+        "quality_reasons": [],
+        "sample_start": 0,
+        "sample_end_exclusive": 1_024,
+    }
+    overloaded = {
+        "quality_valid": False,
+        "quality_reasons": ["rx1_tone_snr_low", "rx1_clipping"],
+        "sample_start": 1_024,
+        "sample_end_exclusive": 2_048,
+    }
+    frames = [
+        SimpleNamespace(record={"analysis": {"windows": [dict(valid)]}})
+        for _ in range(25)
+    ]
+    frames[8].record["analysis"]["windows"] = [overloaded]
+    partition = {
+        "stable_suffixes": {
+            "fully_pre_attack": {"frame_indices": list(range(8))},
+            "fully_post_attack_pre_release": {"frame_indices": list(range(9, 17))},
+            "fully_post_release": {"frame_indices": list(range(17, 25))},
+        }
+    }
+
+    evidence = transient_hardware_module._tandem_partition_rf_quality_evidence(
+        frames, partition=partition
+    )
+
+    assert evidence["strict_frame_count"] == 24
+    assert evidence["diagnostic_frame_indices"] == [8]
+    assert evidence["diagnostic_invalid_window_count"] == 1
+    assert evidence["diagnostic_quality_reason_counts"] == {
+        "rx1_clipping": 1,
+        "rx1_tone_snr_low": 1,
+    }
+    assert evidence["diagnostic_windows_authorize_pass"] is False
+
+
+def test_tandem_rf_policy_rejects_invalid_stable_suffix_window() -> None:
+    valid = {
+        "quality_valid": True,
+        "quality_reasons": [],
+        "sample_start": 0,
+        "sample_end_exclusive": 1_024,
+    }
+    frames = [
+        SimpleNamespace(record={"analysis": {"windows": [dict(valid)]}})
+        for _ in range(24)
+    ]
+    frames[23].record["analysis"]["windows"] = [
+        {
+            "quality_valid": False,
+            "quality_reasons": ["rx1_clipping"],
+            "sample_start": 1_024,
+            "sample_end_exclusive": 2_048,
+        }
+    ]
+    partition = {
+        "stable_suffixes": {
+            "fully_pre_attack": {"frame_indices": list(range(8))},
+            "fully_post_attack_pre_release": {"frame_indices": list(range(8, 16))},
+            "fully_post_release": {"frame_indices": list(range(16, 24))},
+        }
+    }
+
+    with pytest.raises(EvidenceInvalid, match="stable RF suffix"):
+        transient_hardware_module._tandem_partition_rf_quality_evidence(
+            frames, partition=partition
+        )
