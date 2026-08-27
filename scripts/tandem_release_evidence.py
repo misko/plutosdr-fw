@@ -163,10 +163,30 @@ RELEASE_BINDING_SCHEMA = "plutosdr-fw.tandem-release-candidate-binding.v1"
 RELEASE_RUNNER_SCHEMA = "plutosdr-fw.tandem-release-runner-provenance.v1"
 RELEASE_HOST_LIBIIO_SCHEMA = "plutosdr-fw.tandem-release-host-libiio-runtime.v1"
 RELEASE_BANDS = (
-    {"name": "low-915mhz", "center_frequency_hz": 915_000_000},
-    {"name": "mid-2450mhz", "center_frequency_hz": 2_450_000_000},
-    {"name": "high-5800mhz", "center_frequency_hz": 5_800_000_000},
+    {"name": "lnb-low-1050mhz", "center_frequency_hz": 1_050_000_000},
+    {"name": "lnb-mid-1550mhz", "center_frequency_hz": 1_550_000_000},
+    {"name": "lnb-high-2050mhz", "center_frequency_hz": 2_050_000_000},
+    {
+        "name": "table3-sentinel-5800mhz",
+        "center_frequency_hz": 5_800_000_000,
+    },
 )
+RELEASE_DIAGNOSTIC_2450 = {
+    "phase": "diagnostic-2450",
+    "band": {
+        "name": "diagnostic-2450mhz",
+        "center_frequency_hz": 2_450_000_000,
+    },
+    "modes": [
+        "manual_fixed",
+        "native_slow_attack",
+        "native_fast_attack",
+        "tandem_auto",
+    ],
+    "continuation_policy": "rf_quality_only_failure_is_recorded_and_nonbinding",
+    "fatal_policy": "identity_metadata_evidence_safety_fault_or_cleanup_failure",
+    "release_claim": "none_at_2_4_ghz",
+}
 RELEASE_COMMON_CONFIGURATION = {
     "sample_rate_hz": 2_500_000,
     "samples_per_channel": 65_536,
@@ -1888,6 +1908,73 @@ def _verify_release_candidate_binding(
     return binding
 
 
+def _verify_release_2450_diagnostic(
+    path: Path,
+    *,
+    record: Mapping[str, object],
+    configuration: Mapping[str, object],
+    name: str,
+) -> None:
+    report = _read_json_member(path, name=f"{name} 2.45 GHz diagnostic")
+    outcome = record.get("phase_verdict")
+    expected_report_verdict = {
+        "diagnostic_passed": "pass",
+        "diagnostic_failed": "fail",
+    }.get(outcome)
+    identity = _mapping(report.get("identity"), name=f"{name} diagnostic identity")
+    context_attrs = _mapping(
+        identity.get("context_attrs"), name=f"{name} diagnostic context"
+    )
+    rf = _mapping(report.get("rf"), name=f"{name} diagnostic RF")
+    evaluation = _mapping(
+        report.get("evaluation"), name=f"{name} diagnostic evaluation"
+    )
+    cleanup = _mapping(report.get("cleanup"), name=f"{name} diagnostic cleanup")
+    if (
+        expected_report_verdict is None
+        or report.get("schema") != "plutosdr-fw.tandem-agc-quality.v1"
+        or report.get("verdict") != expected_report_verdict
+        or evaluation.get("verdict") != expected_report_verdict
+        or "fatal_error" in report
+        or "cleanup_error" in report
+        or identity.get("serial") != configuration.get("serial")
+        or context_attrs.get("fw_version") != configuration.get("firmware_version")
+        or identity.get("libiio_source_commit")
+        != configuration.get("libiio_source_commit")
+        or not str(identity.get("uri", "")).startswith("usb:")
+        or rf.get("center_frequency_hz_requested") != 2_450_000_000
+        or rf.get("expected_tandem_gain_table_id") != 2
+        or cleanup.get("verified") is not True
+        or cleanup.get("failures") != []
+    ):
+        _fail(f"{name} 2.45 GHz diagnostic is not exact safe evidence")
+    summary = _mapping(record.get("summary"), name=f"{name} diagnostic summary")
+    raw_failures = evaluation.get("failures")
+    if not isinstance(raw_failures, Sequence) or isinstance(raw_failures, (str, bytes)):
+        _fail(f"{name} diagnostic failure list is malformed")
+    failure_evidence = report.get("failure_evidence")
+    expected_manifest_sha: str | None = None
+    if outcome == "diagnostic_failed":
+        evidence = _mapping(
+            failure_evidence, name=f"{name} diagnostic failure evidence"
+        )
+        ledger = _mapping(
+            evidence.get("iq_ledger"), name=f"{name} diagnostic IQ ledger"
+        )
+        expected_manifest_sha = _sha(
+            ledger.get("manifest_sha256"), name=f"{name} diagnostic IQ manifest"
+        )
+    if summary != {
+        "role": "non_authorizing_rf_quality_diagnostic",
+        "center_frequency_hz": 2_450_000_000,
+        "outcome": outcome,
+        "rf_quality_failures": list(raw_failures),
+        "failure_iq_manifest_sha256": expected_manifest_sha,
+        "release_claim": "none_at_2_4_ghz",
+    }:
+        _fail(f"{name} 2.45 GHz diagnostic summary changed")
+
+
 def _verify_release_host_and_phases(
     report: Mapping[str, object],
     *,
@@ -1975,16 +2062,33 @@ def _verify_release_host_and_phases(
         raw_descriptor = _capture_member(
             phase_root, raw_relative, name=f"{name} raw phase {key} report"
         )
+        kind = next(item["kind"] for item in normalized_plan if item["key"] == key)
+        expected_verdicts = (
+            {"diagnostic_passed", "diagnostic_failed"}
+            if kind == "diagnostic"
+            else {"pass"}
+        )
         if (
             record.get("status") != "complete"
-            or record.get("phase_verdict") != "pass"
+            or record.get("phase_verdict") not in expected_verdicts
             or record.get("cleanup_verified") is not True
             or record.get("host_libiio_before_phase") != host
             or record.get("host_libiio_after_cleanup") != host
             or record.get("report_sha256") != raw_descriptor["sha256"]
             or not isinstance(record.get("summary"), Mapping)
         ):
-            _fail(f"{name} phase {key} is not a current PASS with cleanup")
+            _fail(f"{name} phase {key} is not a current accepted result with cleanup")
+        if kind == "diagnostic":
+            _verify_release_2450_diagnostic(
+                _member_path(
+                    phase_root,
+                    raw_relative,
+                    name=f"{name} 2.45 GHz diagnostic report",
+                ),
+                record=record,
+                configuration=configuration,
+                name=name,
+            )
     counts = _mapping(report.get("counts"), name=f"{name} phase counts")
     if counts != {
         "pending": 0,
@@ -2006,7 +2110,7 @@ def _verify_release_hardware_report(
 ) -> None:
     report = _read_json_member(path, name=f"{phase} report {serial}")
     if (
-        report.get("schema") != "plutosdr-fw.tandem-agc-release-hardware.v1"
+        report.get("schema") != "plutosdr-fw.tandem-agc-release-hardware.v2"
         or report.get("verdict") != "pass"
         or report.get("all_requested_phases_complete") is not True
         or report.get("all_cleanup_verified") is not True
@@ -2018,7 +2122,9 @@ def _verify_release_hardware_report(
     )
     expected_policy = "full" if phase == "full" else "baseline"
     expected_phases = (
-        ["steady", "transient", "modulated"] if phase == "full" else ["steady"]
+        ["steady", "transient", "modulated", "diagnostic-2450"]
+        if phase == "full"
+        else ["steady"]
     )
     expected_plan: list[dict[str, object]] = [
         {
@@ -2037,6 +2143,13 @@ def _verify_release_hardware_report(
                 }
                 for band in RELEASE_BANDS
             )
+        expected_plan.append(
+            {
+                "key": "diagnostic_2450mhz",
+                "kind": "diagnostic",
+                "band": dict(RELEASE_DIAGNOSTIC_2450["band"]),
+            }
+        )
     expected_campaign = {
         "steady_campaign_kind": (
             "one_factor_characterization"
@@ -2055,11 +2168,27 @@ def _verify_release_hardware_report(
         or configuration.get("policy_set") != expected_policy
         or configuration.get("requested_phases") != expected_phases
         or configuration.get("bands") != list(RELEASE_BANDS)
+        or configuration.get("non_authorizing_diagnostic") != RELEASE_DIAGNOSTIC_2450
         or any(
             configuration.get(key) != value for key, value in expected_campaign.items()
         )
     ):
         _fail(f"{phase} report {serial} configuration is not exact")
+    report_phases = _mapping(report.get("phases"), name=f"{phase} report phase records")
+    expected_diagnostics: dict[str, object] = {}
+    if phase == "full":
+        diagnostic_record = _mapping(
+            report_phases.get("diagnostic_2450mhz"),
+            name=f"{phase} report 2.45 GHz diagnostic phase",
+        )
+        expected_diagnostics["diagnostic_2450mhz"] = diagnostic_record.get(
+            "phase_verdict"
+        )
+    if (
+        report.get("authorizing_bands") != list(RELEASE_BANDS)
+        or report.get("diagnostics") != expected_diagnostics
+    ):
+        _fail(f"{phase} report {serial} release scope is not exact")
     _verify_release_candidate_binding(
         configuration.get("candidate_binding"),
         configuration=configuration,

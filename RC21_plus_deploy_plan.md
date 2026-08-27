@@ -30,8 +30,9 @@ Implement and qualify an RC21 release that:
    with in-chamber interference (raw IQ was not retained, so the emitter or
    protocol is not proven);
 3. retains physical coverage of all three AD9361 full gain tables;
-4. retains a fixed, measured 2.4 GHz environmental control without allowing it
-   to hide or waive an authorizing failure;
+4. runs the historical 2.45 GHz matrix as required nonauthorizing diagnostic
+   evidence without allowing an RF-quality failure there to stop or waive the
+   binding campaign;
 5. fixes the RC20 measurement-boundary false-classification risk and retains
    enough failure evidence for deterministic replay;
 6. is built from an exact protected source lock, deployed to RAM with
@@ -82,26 +83,22 @@ The 1.05 and 2.05 GHz points retain approximately 100 MHz of nominal margin
 from the assumed LNB passband edges. The 1.55 GHz point is its midpoint. Avoid
 the exact 1.3 GHz gain-table/calibration boundary.
 
-Add one mandatory diagnostic control:
+Add one mandatory diagnostic frequency:
 
 | Ordered key | Center | Role |
 |---|---:|---|
-| `control-24xxmhz` | selected once by Stage 1 | mandatory nonauthorizing 2.4 GHz environmental control |
+| `diagnostic-2450mhz` | 2,450,000,000 Hz | mandatory nonauthorizing RF-quality diagnostic |
 
-The control's final name must contain its exact frozen integer MHz value, not
-the word `quiet`. Quietness is an observation, not a permanent property of a
-frequency. A provisional candidate is 2.484 GHz only if the chamber survey and
-internal emitter configuration prove that it is the least contaminated
-usable point. The control frequency cannot vary by radio, phase, retry, or
-campaign.
-
-The 2.4 GHz control cannot authorize firmware, satisfy middle-table coverage,
-compensate for an authorizing failure, or enter a pass denominator. Missing or
-malformed control evidence, unsafe state, clipping/overflow, cleanup failure,
-or environmental drift beyond a frozen limit is still fatal to the campaign.
-If a future release needs an explicit 2.4 GHz product-performance claim, that
-frequency must become a full authorizing band under a controlled emitter state
-in a later source-locked candidate.
+Run the same manual/native-slow/native-fast/tandem comparison at 2.45 GHz on
+every radio and retain its complete report plus write-on-failure IQ evidence.
+An RF-quality-only failure there is recorded as `diagnostic_failed` and the
+remaining binding work continues. It cannot authorize firmware, satisfy
+middle-table coverage, compensate for an authorizing failure, or enter a pass
+denominator. Missing/malformed diagnostic evidence, wrong-radio or wrong-band
+identity, metadata/protocol corruption, fault/FIFO/overflow, unsafe TX state,
+or cleanup failure remains fatal. If a future release needs an explicit 2.4
+GHz product-performance claim, that frequency must become a full authorizing
+band under a controlled emitter state in a later source-locked candidate.
 
 ## 4. Stage 0 -- preserve and close the RC20 record
 
@@ -135,15 +132,18 @@ and confirms that the forward work starts from immutable committed RC20. The
 live repository is thereafter an explicitly active RC21 development tree and
 must not be described as clean until its changes are committed.
 
-## 5. Stage 1 -- characterize and freeze the chamber RF environment
+## 5. Stage 1 -- optional chamber RF characterization
 
-Run the same complete survey sequentially on all four exclusively reserved
-radios. Selection is fleet-wide: one control center must be eligible and quiet
-enough across both receiver paths of every radio. A pilot-only sweep followed
-by selected-point spot checks is not sufficient because it gives the selector
-no full-band evidence for the other three radios.
+Operator decision on 2026-08-27: RC21 does not make 2.4 GHz RF quality binding
+and does not require an emitter inventory or quiet-frequency selection before
+the release campaign. The four authorizing centers are fixed in Section 3 and
+the required nonauthorizing diagnostic is fixed at 2.45 GHz. Therefore the
+complete survey protocol retained below is optional supporting work only: it
+cannot block, authorize, rescore, or waive RC21, and it is not a prerequisite
+for Stage 3 or the source lock. No survey result may dynamically change the
+2.45 GHz diagnostic frequency within RC21.
 
-### 5.1 Required `pluto-plus-utils` enabling gate
+### 5.1 Available `pluto-plus-utils` survey capability
 
 The reviewed pinned utility currently has a dual-RX power sweep, but that sweep
 does not retain raw IQ/full PSD, ordinary scan/capture lacks a shared
@@ -353,8 +353,10 @@ Exact Stage-1 contracts and artifacts:
   already completed frequency-independent Stage-2 boundary hardening predates
   this review and is recorded as such; it is never backdated.
 
-Exit criterion: one exact 2.4 control and all authorizing centers are frozen.
-Any subsequent change requires a new release candidate identity.
+Exit criterion: the four authorizing centers and fixed 2.45 GHz diagnostic are
+accepted exactly as Section 3 records. The optional survey may be skipped. Any
+subsequent frequency or authorization-role change requires a new release
+candidate identity.
 
 ## 6. Stage 2 -- harden the measurement oracle
 
@@ -426,9 +428,40 @@ unchanged.
 
 ## 7. Stage 3 -- implement the RC21 campaign and evidence contract
 
-Model band roles structurally rather than inferring them from labels.
+Operator decision on 2026-08-27 supersedes the earlier binding-environment
+control design retained later in this section. RC21 keeps campaign schema v1,
+uses release-hardware aggregate schema v2 to express a typed nonauthorizing
+diagnostic outcome, and changes the exact default band vector to the four
+authorizing centers in Section 3. The fixed 2.45 GHz work is outside that pass
+denominator but remains inside the serial/candidate/host-libiio-bound full
+aggregate and its complete archived evidence tree.
 
-Freeze these report contracts rather than extending v1 records ambiguously:
+Implement the active RC21 contract as follows:
+
+- full characterization, transient, modulated, and four-cycle baseline soak
+  run at all four authorizing centers on every radio;
+- a standalone full-profile 2.45 GHz manual/native-slow/native-fast/tandem
+  matrix runs on every radio and retains its complete report and Stage-2
+  failure-IQ ledger;
+- an RF-quality-only 2.45 GHz FAIL is recorded as `diagnostic_failed`, includes
+  exact failed cells/reasons/artifact hashes, and does not stop or rescore the
+  authorizing campaign;
+- missing/malformed diagnostic evidence, a fatal execution/metadata error,
+  wrong serial/firmware/LO/gain-table readback, QSPI or boot-lineage mismatch,
+  fault/FIFO/overflow, unsafe TX/DDS/selectors, or cleanup failure is not an RF
+  quality exception and remains fatal;
+- promotion computes PASS only from the four authorizing bands, but requires
+  the attempted 2.45 GHz diagnostic and indexes its result verbatim; and
+- reports and release notes state explicitly that RC21 makes no 2.4 GHz RF
+  performance claim.
+
+The emitter inventory, 91-center survey, selected-frequency control, pre/post
+environment brackets, and their proposed schema-v2 envelope are optional
+future work. They are not RC21 inputs, gates, or promotion evidence. The
+following detailed design record is retained for a future release that makes
+2.4 GHz binding; none of its “must” language applies to RC21.
+
+Deferred binding-2.4 design record:
 
 - `plutosdr-fw.tandem-agc-release-campaign.v2`;
 - `plutosdr-fw.tandem-agc-release-hardware.v2`;
@@ -450,7 +483,9 @@ artifact hashes, safe-state result, containment limit/calibration, and the
 cross-contract hashes before validating a campaign. A matching 64-character
 hash without semantic replay is insufficient.
 
-The existing candidate artifact-index and top-level
+For clarity, everything from “Deferred binding-2.4 design record” through the
+end of that design record is non-normative for RC21 and is not an execution
+checklist. The existing candidate artifact-index and top-level
 `plutosdr-fw.tandem-release-qualification` schema/version remain unchanged if
 their exact top-level shape is unchanged, but their RC21 verifier must require
 and replay the v2 hardware/campaign records and every v1 control, attenuation,
@@ -679,7 +714,8 @@ Cardinality for four radios:
 - transient: 4 authorizing band reports per radio;
 - modulated: 4 authorizing band reports per radio;
 - lifecycle remains separate; and
-- 2.4 controls are additional mandatory diagnostic records, not authorizing
+- one fixed 2.45 GHz full-profile diagnostic matrix per radio is mandatory,
+  archived, and nonauthorizing; it is not one of the 176 authorizing steady
   matrices.
 
 Budget assumptions and hard ceilings:
@@ -694,19 +730,21 @@ Budget assumptions and hard ceilings:
   retry-inclusive ceiling is 44 hours before deployment/lifecycle/control
   overhead. Run strictly one radio at a time and report actual elapsed time
   against both figures;
-- the environment survey requires the exact 5 GiB preflight from Stage 1, and
-  every campaign root requires a source-computed upper bound plus 512 MiB free
-  reserve before capture; and
+- the optional environment survey, if separately requested later, retains its
+  exact 5 GiB preflight; every active campaign root requires a source-computed
+  upper bound plus 512 MiB free reserve before capture; and
 - tandem diagnostic/save-IQ deferred writes share one 32 MiB bound per tandem
   capture session/mode, while the matrix-wide write-on-failure ledger is capped
   at 128 MiB; both are implemented by Stage 2 and neither may be used as an
   unbounded logging path.
 
-Exit criterion: exact plan/replay oracles reject every planted frequency,
-ordering, role, missing-control, control-as-authorization, and per-radio
-substitution mutation, plus attenuation inflation/substitution, stale/reused
-controls, missing attempts, attempt reordering, unbound retries, and
-selected-success histories.
+Exit criterion: exact plan/replay oracles require the ordered four-band
+authorizing vector, reject any missing/reordered/substituted authorizing band,
+require one serial/firmware-bound fixed-2.45 diagnostic per radio, prove that
+an RF-quality-only diagnostic failure does not enter the pass denominator, and
+prove that missing evidence or any diagnostic safety/integrity failure remains
+fatal. Attenuation inflation/substitution, missing attempts, attempt
+reordering, unbound retries, and selected-success histories remain rejected.
 
 ## 8. Stage 4 -- advance immutable lineage to RC21
 
@@ -791,8 +829,9 @@ has occurred.
 
 - [ ] Reserve one pilot and, before any RC21 receipt exists, run the exact
       approved-v7 artifact/tag comparison in a separate nonauthorizing root,
-      inside the comparator envelope defined in Stage 3. The comparator matrix
-      is exactly the historical `radio qualify-tandem` operation at ordered
+      after the comparator RAM receipt and before the final RC21 deployment.
+      The comparator matrix is exactly the historical `radio qualify-tandem`
+      operation at ordered
       centers 915,000,000, 2,450,000,000, and 5,800,000,000 Hz, profile
       `tandem-agc-v7-release-ram`, strong TX gain -10 dB, weak TX gain -60 dB,
       and the conservative scalar attenuation credit defined in Stage 1. Its
@@ -821,7 +860,7 @@ has occurred.
       <sealed-fd>` followed by the same selector/topology/alternate with `-e`,
       and never `-R`, `-S`, or a QSPI/persistent target.
 - [ ] Require `pluto-plus-utils.comparator-ram-receipt.v1` PASS before the
-      comparator pre-control. It binds the plan/profile/DFU/FIT hashes, exact
+      comparator matrix. It binds the plan/profile/DFU/FIT hashes, exact
       current clean plus-utils commit and source-tree hash, exact comparator
       wrapper path/bytes/hash,
       serial/model/topology/interface, distinct pre/post boot IDs, expected v7
@@ -830,8 +869,7 @@ has occurred.
       failed or missing receipt blocks the comparator and no RC21 evidence may
       reuse its boot epoch. The plan binds the same current utility/wrapper
       identities before execution. Index and semantically replay these exact
-      executable identities and the receipt with the two comparator controls
-      and comparator report.
+      executable identities, receipt, and comparator report.
 - [ ] State explicitly that this same-board run is fresh A/B context, not a
       replay or extension of approved-v7 qualification, and that unsupported
       RC21-era oracle/schema differences are non-equivalent.
@@ -858,31 +896,31 @@ comparator boot, firmware deployment, or qualification operation in Stage 6.
 
 ## 11. Stage 7 -- pilot comparison and qualification
 
-Use fresh roots and a fixed Wi-Fi state.
+Use fresh immutable roots. The in-chamber Wi-Fi state is recorded as context,
+not used to select a frequency or rescore a result.
 
 1. Revalidate the RC21 receipt and boot identity without rebooting.
 2. Run RC21 all-frequency smoke.
 3. Run RC21 lifecycle.
-4. Invoke one full envelope. The release CLI internally and atomically orders
-   its pre-full control, complete RC21 full campaign, post-full control, drift
-   evaluation, and cleanup under the one shared serial lease; do not invoke a
-   promotable control separately.
-5. Invoke one soak envelope. It internally and atomically orders its pre-soak
-   control, four-cycle baseline soak, post-soak control, drift evaluation, and
-   cleanup under that lease.
+4. Invoke the full aggregate once. It runs all four authorizing bands for
+   steady/transient/modulated work, then the fixed full-profile 2.45 GHz
+   diagnostic last. A safe `diagnostic_failed` result is complete and does not
+   stop the aggregate; any other diagnostic failure is fatal.
+5. Invoke the four-cycle, four-authorizing-band baseline soak once. It contains
+   no 2.45 GHz diagnostic and does not consume any prior phase evidence.
 6. Verify teardown, TX mute, DDS zero, selectors safe, tandem IDLE, FIFO empty,
    faults clear, exact runtime identity, and no host `/32` route.
 
 Do not rerun an individual cell or choose a new frequency after a failure.
-Resume an interruption only inside its exact unchanged envelope checkpoint.
-One fresh full-envelope retry and one fresh soak-envelope retry are the
-respective absolute caps and each requires the bound remediation record defined
-in Stage 3; a retry starts at its own pre-control and reuses no prior phase.
-Environmental-control drift yields `invalid_environment` for its mapped
-interval; it never changes a firmware failure into a pass.
+Resume only an explicitly incomplete steady checkpoint whose exact fingerprint
+and artifacts revalidate. A failed authorizing phase stops for RCA and explicit
+operator direction; no automatic retry is part of RC21. The sole continuation
+exception is the typed, safe, fully retained 2.45 GHz `diagnostic_failed`
+outcome.
 
-Exit criterion: the pilot passes every authorizing phase and control-integrity
-gate, and independent review finds no measurement/evidence ambiguity.
+Exit criterion: the pilot passes every authorizing phase, completes and indexes
+the 2.45 GHz diagnostic under the policy above, and independent review finds no
+measurement/evidence ambiguity.
 
 ## 12. Stage 8 -- all-four-radio campaign
 
@@ -900,22 +938,23 @@ and:
 
 - plan and RAM-deploy with `pluto-plus-utils`;
 - validate the exact receipt;
-- run lifecycle, then one full-envelope invocation and one soak-envelope
-  invocation; each invocation internally owns its controls, authorizing phases,
-  drift evaluation, and safe cleanup;
+- run lifecycle, then one full aggregate and one soak aggregate; the full
+  aggregate owns all authorizing phases plus the fixed nonauthorizing 2.45 GHz
+  diagnostic, and both aggregates own safe cleanup;
 - preserve every attempt and checkpoint; and
 - independently audit runtime identity, route absence, and safe state before
   moving to the next serial.
 
-Exit criterion: all four exact serials pass the identical frozen matrix, every
-required control is present and stable, every receipt validates, and no radio
-has a persistent candidate write.
+Exit criterion: all four exact serials pass the identical four-band authorizing
+matrix, each has a complete indexed 2.45 GHz diagnostic, every receipt
+validates, and no radio has a persistent candidate write.
 
 ## 13. Stage 9 -- final evidence and promotion decision
 
 - [ ] Assemble the candidate-qualified campaign index from the verified
       candidate parent and exact hardware tree.
-- [ ] Verify every indexed file, receipt, phase report, control record, harness
+- [ ] Verify every indexed file, receipt, authorizing phase report, 2.45 GHz
+      diagnostic report/IQ ledger, harness
       byte, source lock, and candidate identity.
 - [ ] Replay verification from a clean detached exact-commit checkout.
 - [ ] Compare RC21 against the approved v7 physical evidence and RC20 failures,
@@ -924,7 +963,9 @@ has a persistent candidate write.
       AD9361/AGC evidence, not LNB bias, LO, DiSEqC, satellite-link, or antenna
       qualification unless those elements are explicitly added.
 - [ ] Promote only if every authorizing requirement passes and no evidence,
-      safety, containment, or reproducibility blocker remains.
+      safety, identity, or reproducibility blocker remains. A typed
+      `diagnostic_failed` at 2.45 GHz does not block; it must be disclosed and
+      excludes any 2.4 GHz RF-performance claim.
 
 Final success statement must identify the exact commit, source lock, workflow
 run, bundle/DFU/FIT/index hashes, four serials, frequency plan, campaign-index
@@ -936,10 +977,6 @@ Stop before build, deployment, or promotion when any of these occurs:
 
 - frequency or role is still undecided;
 - LNB passband or fixture loss is not reviewed;
-- the operator-declared emitter inventory or its ordered 2.4-GHz span
-  projection, survey analyzer, drift limits, or deterministic fleet selector
-  differs from the source-locked plan;
-- the calibrated containment receipt or its numeric leakage limit is absent;
 - required free-space or bounded-evidence preflight fails;
 - shared `pluto-plus-utils` state is dirty/unowned and no clean pinned clone is
   available;
@@ -949,9 +986,12 @@ Stop before build, deployment, or promotion when any of these occurs:
 - a target serial/topology/model is ambiguous;
 - a route, lock, prior receipt, or competing hardware process is present;
 - QSPI equality or final safe state cannot be proved;
-- environmental-control evidence is missing or materially drifts;
-- attempt history is missing/reordered, the one-retry cap is exhausted, or a
-  retry lacks its exact remediation record;
+- attempt history is missing/reordered or a failed authorizing attempt is
+  silently retried/replaced;
+- the 2.45 GHz diagnostic is missing, malformed, loses its required failure-IQ
+  evidence, or fails for anything other than a cleanup-verified RF-quality
+  evaluation; an isolated typed `diagnostic_failed` is explicitly not a stop
+  condition;
 - an authorizing phase fails without completed root-cause analysis; or
 - independent verification disagrees with the producing tool.
 

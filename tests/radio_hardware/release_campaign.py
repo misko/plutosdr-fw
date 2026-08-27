@@ -40,9 +40,10 @@ class BandCase:
 
 
 DEFAULT_BANDS = (
-    BandCase("low-915mhz", 915_000_000),
-    BandCase("mid-2450mhz", 2_450_000_000),
-    BandCase("high-5800mhz", 5_800_000_000),
+    BandCase("lnb-low-1050mhz", 1_050_000_000),
+    BandCase("lnb-mid-1550mhz", 1_550_000_000),
+    BandCase("lnb-high-2050mhz", 2_050_000_000),
+    BandCase("table3-sentinel-5800mhz", 5_800_000_000),
 )
 
 

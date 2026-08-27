@@ -9,6 +9,7 @@ import json
 import re
 import tarfile
 import zipfile
+from dataclasses import asdict
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -837,6 +838,14 @@ def _release_report(
                     "band": None,
                 }
             )
+        elif phase == "diagnostic-2450":
+            plan.append(
+                {
+                    "key": "diagnostic_2450mhz",
+                    "kind": "diagnostic",
+                    "band": dict(EVIDENCE.RELEASE_DIAGNOSTIC_2450["band"]),
+                }
+            )
         else:
             plan.extend(
                 {
@@ -856,20 +865,50 @@ def _release_report(
             / "attempt-0001"
             / "phase-report.json"
         ).absolute()
-        _write(raw_report, _json_bytes({"verdict": "pass", "phase": key}))
+        if item["kind"] == "diagnostic":
+            phase_payload = {
+                "schema": "plutosdr-fw.tandem-agc-quality.v1",
+                "verdict": "pass",
+                "evaluation": {"verdict": "pass", "failures": []},
+                "identity": {
+                    "serial": serial,
+                    "uri": "usb:3.17.5",
+                    "libiio_source_commit": LIBIIO_COMMIT,
+                    "context_attrs": {"fw_version": binding["firmware_version"]},
+                },
+                "rf": {
+                    "center_frequency_hz_requested": 2_450_000_000,
+                    "expected_tandem_gain_table_id": 2,
+                },
+                "cleanup": {"verified": True, "failures": []},
+            }
+            phase_verdict = "diagnostic_passed"
+            summary = {
+                "role": "non_authorizing_rf_quality_diagnostic",
+                "center_frequency_hz": 2_450_000_000,
+                "outcome": phase_verdict,
+                "rf_quality_failures": [],
+                "failure_iq_manifest_sha256": None,
+                "release_claim": "none_at_2_4_ghz",
+            }
+        else:
+            phase_payload = {"verdict": "pass", "phase": key}
+            phase_verdict = "pass"
+            summary = {"verdict": "pass"}
+        _write(raw_report, _json_bytes(phase_payload))
         phase_records[key] = {
             "status": "complete",
-            "phase_verdict": "pass",
+            "phase_verdict": phase_verdict,
             "cleanup_verified": True,
             "host_libiio_before_phase": host,
             "host_libiio_after_cleanup": host,
             "report_path": str(raw_report),
             "report_sha256": _sha(raw_report),
-            "summary": {"verdict": "pass"},
+            "summary": summary,
         }
     is_full = policy == "full"
     return {
-        "schema": "plutosdr-fw.tandem-agc-release-hardware.v1",
+        "schema": "plutosdr-fw.tandem-agc-release-hardware.v2",
         "verdict": "pass",
         "all_requested_phases_complete": True,
         "all_cleanup_verified": True,
@@ -883,6 +922,7 @@ def _release_report(
             "policy_set": policy,
             "requested_phases": requested_phases,
             "bands": [dict(band) for band in EVIDENCE.RELEASE_BANDS],
+            "non_authorizing_diagnostic": dict(EVIDENCE.RELEASE_DIAGNOSTIC_2450),
             "steady_campaign_kind": (
                 "one_factor_characterization"
                 if is_full
@@ -897,6 +937,12 @@ def _release_report(
             "candidate_binding": binding,
         },
         "host_libiio_invocations": [{"started_unix_ns": 1, "provenance": host}],
+        "authorizing_bands": [dict(band) for band in EVIDENCE.RELEASE_BANDS],
+        "diagnostics": {
+            key: record["phase_verdict"]
+            for key, record in phase_records.items()
+            if key == "diagnostic_2450mhz"
+        },
         "plan": plan,
         "counts": {
             "pending": 0,
@@ -1033,7 +1079,11 @@ def _write_campaign_hardware(root: Path, artifact_index: Path) -> None:
             expected_current_firmware="v0.41-plutoplus-spf-tandem-agc-v8-rc12",
         )["receipt"]
         for phase, policy, phases in (
-            ("full", "full", ["steady", "transient", "modulated"]),
+            (
+                "full",
+                "full",
+                ["steady", "transient", "modulated", "diagnostic-2450"],
+            ),
             ("soak", "baseline", ["steady"]),
         ):
             aggregate_path = (
@@ -2098,6 +2148,124 @@ def test_candidate_qualification_accepts_exact_operator_owned_campaign(
     assert len(record["radios"]) == 4
 
 
+def test_release_campaign_and_promotion_use_one_exact_ordered_band_policy() -> None:
+    from tests.radio_hardware.release_campaign import DEFAULT_BANDS
+
+    assert [asdict(band) for band in DEFAULT_BANDS] == list(EVIDENCE.RELEASE_BANDS)
+    assert EVIDENCE.RELEASE_DIAGNOSTIC_2450 == {
+        "phase": "diagnostic-2450",
+        "band": {
+            "name": "diagnostic-2450mhz",
+            "center_frequency_hz": 2_450_000_000,
+        },
+        "modes": [
+            "manual_fixed",
+            "native_slow_attack",
+            "native_fast_attack",
+            "tandem_auto",
+        ],
+        "continuation_policy": ("rf_quality_only_failure_is_recorded_and_nonbinding"),
+        "fatal_policy": "identity_metadata_evidence_safety_fault_or_cleanup_failure",
+        "release_claim": "none_at_2_4_ghz",
+    }
+
+
+def test_candidate_qualification_accepts_recorded_nonbinding_2450_quality_failure(
+    tmp_path: Path,
+) -> None:
+    candidate = _assemble(tmp_path)
+    _write_campaign_hardware(tmp_path, candidate)
+    aggregate_path = tmp_path / "hardware/full/RADIO1/release-hardware-report.json"
+    aggregate = json.loads(aggregate_path.read_text())
+    record = aggregate["phases"]["diagnostic_2450mhz"]
+    diagnostic_path = Path(record["report_path"])
+    diagnostic = json.loads(diagnostic_path.read_text())
+    diagnostic["verdict"] = "fail"
+    diagnostic["evaluation"] = {
+        "verdict": "fail",
+        "failures": ["native_slow_attack failed absolute quality at levels [0]"],
+    }
+    diagnostic["failure_evidence"] = {
+        "kind": "matrix_evaluation_failed",
+        "iq_ledger": {"manifest_sha256": "a" * 64},
+    }
+    _write(diagnostic_path, _json_bytes(diagnostic))
+    record["phase_verdict"] = "diagnostic_failed"
+    record["report_sha256"] = _sha(diagnostic_path)
+    record["summary"] = {
+        "role": "non_authorizing_rf_quality_diagnostic",
+        "center_frequency_hz": 2_450_000_000,
+        "outcome": "diagnostic_failed",
+        "rf_quality_failures": diagnostic["evaluation"]["failures"],
+        "failure_iq_manifest_sha256": "a" * 64,
+        "release_claim": "none_at_2_4_ghz",
+    }
+    aggregate["diagnostics"]["diagnostic_2450mhz"] = "diagnostic_failed"
+    _write(aggregate_path, _json_bytes(aggregate))
+
+    EVIDENCE.assemble(
+        archive_root=tmp_path,
+        output_path=tmp_path / "campaign-index.json",
+        stage="candidate-qualified",
+        parent_index_path=candidate,
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ("invalid-verdict", "safe evidence"),
+        ("unsafe-cleanup", "safe evidence"),
+        ("missing-iq", "failure evidence"),
+    ],
+)
+def test_candidate_qualification_rejects_non_quality_2450_failures(
+    tmp_path: Path,
+    mutation: str,
+    message: str,
+) -> None:
+    candidate = _assemble(tmp_path)
+    _write_campaign_hardware(tmp_path, candidate)
+    aggregate_path = tmp_path / "hardware/full/RADIO1/release-hardware-report.json"
+    aggregate = json.loads(aggregate_path.read_text())
+    record = aggregate["phases"]["diagnostic_2450mhz"]
+    diagnostic_path = Path(record["report_path"])
+    diagnostic = json.loads(diagnostic_path.read_text())
+    record["phase_verdict"] = "diagnostic_failed"
+    aggregate["diagnostics"]["diagnostic_2450mhz"] = "diagnostic_failed"
+    diagnostic["verdict"] = "fail"
+    diagnostic["evaluation"] = {"verdict": "fail", "failures": ["RF quality"]}
+    diagnostic["failure_evidence"] = {
+        "kind": "matrix_evaluation_failed",
+        "iq_ledger": {"manifest_sha256": "a" * 64},
+    }
+    record["summary"] = {
+        "role": "non_authorizing_rf_quality_diagnostic",
+        "center_frequency_hz": 2_450_000_000,
+        "outcome": "diagnostic_failed",
+        "rf_quality_failures": ["RF quality"],
+        "failure_iq_manifest_sha256": "a" * 64,
+        "release_claim": "none_at_2_4_ghz",
+    }
+    if mutation == "invalid-verdict":
+        diagnostic["verdict"] = "invalid"
+    elif mutation == "unsafe-cleanup":
+        diagnostic["cleanup"]["verified"] = False
+    else:
+        diagnostic.pop("failure_evidence")
+    _write(diagnostic_path, _json_bytes(diagnostic))
+    record["report_sha256"] = _sha(diagnostic_path)
+    _write(aggregate_path, _json_bytes(aggregate))
+
+    with pytest.raises(EVIDENCE.EvidenceError, match=message):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            output_path=tmp_path / "campaign-index.json",
+            stage="candidate-qualified",
+            parent_index_path=candidate,
+        )
+
+
 def test_candidate_qualification_rejects_missing_utility_companion(
     tmp_path: Path,
 ) -> None:
@@ -2219,9 +2387,9 @@ def test_candidate_qualified_binds_four_serials_and_every_raw_member(
     ]
     assert set(index["radios"][0]) == {"serial", "deploy", "full", "soak", "lifecycle"}
     # Per radio: the three utility plan/inventory records preceding the receipt,
-    # five phase logs, eight full/soak phase reports, and the lifecycle runner's
-    # 65 retained metadata records.
-    assert len(index["raw_members"]) == 4 * (3 + 5 + 8 + 65)
+    # five phase logs, eleven full/soak/diagnostic phase reports, and the
+    # lifecycle runner's 65 retained metadata records.
+    assert len(index["raw_members"]) == 4 * (3 + 5 + 11 + 65)
     assert any(
         member["path"].endswith("stale-latch-report.json")
         for member in index["raw_members"]

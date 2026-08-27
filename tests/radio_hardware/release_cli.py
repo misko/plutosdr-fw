@@ -84,7 +84,10 @@ from .tandem_quality import (
     AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES,
     TandemQualityOptions,
     default_tx_trajectory,
+    evaluate_matrix,
     expected_tandem_gain_table,
+    quality_modes,
+    run_tandem_quality_matrix,
     validate_options,
 )
 from .transient_hardware import (
@@ -101,10 +104,14 @@ from .transient_quality import (
     reconcile_tandem_events,
 )
 
-AGGREGATE_SCHEMA = "plutosdr-fw.tandem-agc-release-hardware.v1"
+AGGREGATE_SCHEMA = "plutosdr-fw.tandem-agc-release-hardware.v2"
 AGGREGATE_CHECKPOINT = "release-hardware-checkpoint.json"
 AGGREGATE_REPORT = "release-hardware-report.json"
-DEFAULT_PHASES = ("steady", "transient", "modulated")
+DIAGNOSTIC_PHASE = "diagnostic-2450"
+DIAGNOSTIC_BAND = BandCase("diagnostic-2450mhz", 2_450_000_000)
+DIAGNOSTIC_PASS = "diagnostic_passed"
+DIAGNOSTIC_FAIL = "diagnostic_failed"
+DEFAULT_PHASES = ("steady", "transient", "modulated", DIAGNOSTIC_PHASE)
 BASELINE_POLICY = PolicyCase("baseline", "baseline")
 HARNESS_SOURCE_NAMES = (
     "scripts/deploy_tandem_agc_ram_hardware.sh",
@@ -1749,7 +1756,8 @@ def parse_cli_args(
         )
     except ReleaseCliError as error:
         parser.error(str(error))
-    requested_phases = tuple(namespace.phase or DEFAULT_PHASES)
+    default_phases = DEFAULT_PHASES if namespace.policy_set == "full" else ("steady",)
+    requested_phases = tuple(namespace.phase or default_phases)
     if len(set(requested_phases)) != len(requested_phases):
         parser.error("--phase values cannot be duplicated")
     phases = tuple(phase for phase in DEFAULT_PHASES if phase in requested_phases)
@@ -1835,7 +1843,9 @@ def _base_quality(
         tx_gain_trajectory_db=default_tx_trajectory("full"),
         physical_attenuation_db=options.physical_attenuation_db,
         center_frequency_hz=(
-            band.center_frequency_hz if band is not None else 915_000_000
+            band.center_frequency_hz
+            if band is not None
+            else options.bands[0].center_frequency_hz
         ),
         sample_rate_hz=options.sample_rate_hz,
         samples_per_channel=options.samples_per_channel,
@@ -1871,6 +1881,10 @@ def phase_specs(options: ReleaseHardwareOptions) -> tuple[PhaseSpec, ...]:
     for phase in options.phases:
         if phase == "steady":
             result.append(PhaseSpec(options.steady_key, "steady"))
+        elif phase == DIAGNOSTIC_PHASE:
+            result.append(
+                PhaseSpec("diagnostic_2450mhz", "diagnostic", DIAGNOSTIC_BAND)
+            )
         else:
             result.extend(
                 PhaseSpec(f"{phase}_{band.name}", phase, band) for band in options.bands
@@ -1932,6 +1946,8 @@ def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
         raise ValueError("at least one supported phase is required")
     if options.policy_set not in ("full", "baseline"):
         raise ValueError("policy set must be full or baseline")
+    if DIAGNOSTIC_PHASE in options.phases and options.policy_set != "full":
+        raise ValueError("the 2.45 GHz diagnostic belongs only to a full campaign")
     if options.repeat_cycles <= 0:
         raise ValueError("repeat cycles must be positive")
     if options.cycle_interval_seconds < 0 or not math.isfinite(
@@ -1964,6 +1980,12 @@ def validate_release_hardware_options(options: ReleaseHardwareOptions) -> None:
                     output_dir=options.output_dir / "preflight-modulated",
                 )
             )
+    if DIAGNOSTIC_PHASE in options.phases:
+        _base_quality(
+            options,
+            output_dir=options.output_dir / "preflight-diagnostic-2450",
+            band=DIAGNOSTIC_BAND,
+        )
 
 
 def _assert_harness_unchanged(options: ReleaseHardwareOptions) -> None:
@@ -2005,6 +2027,26 @@ def _configuration(options: ReleaseHardwareOptions) -> dict[str, Any]:
         "output_dir": str(options.output_dir),
         "requested_phases": list(options.phases),
         "bands": [asdict(band) for band in options.bands],
+        "non_authorizing_diagnostic": {
+            "phase": DIAGNOSTIC_PHASE,
+            "band": asdict(DIAGNOSTIC_BAND),
+            "modes": list(
+                quality_modes(
+                    _base_quality(
+                        options,
+                        output_dir=options.output_dir / "configuration-diagnostic",
+                        band=DIAGNOSTIC_BAND,
+                    )
+                )
+            ),
+            "continuation_policy": (
+                "rf_quality_only_failure_is_recorded_and_nonbinding"
+            ),
+            "fatal_policy": (
+                "identity_metadata_evidence_safety_fault_or_cleanup_failure"
+            ),
+            "release_claim": "none_at_2_4_ghz",
+        },
         "policy_set": options.policy_set,
         "steady_campaign_kind": (
             "one_factor_characterization"
@@ -2119,7 +2161,12 @@ def _aggregate_report(
     elif (
         not all_cleanup
         or not all_host_libiio
-        or any(record.get("phase_verdict") != "pass" for record in complete)
+        or any(
+            not _phase_verdict_is_acceptable(
+                spec, phases[spec.key].get("phase_verdict")
+            )
+            for spec in specs
+        )
     ):
         verdict = "fail"
     else:
@@ -2131,6 +2178,12 @@ def _aggregate_report(
         "all_requested_phases_complete": len(complete) == len(specs),
         "all_cleanup_verified": all_cleanup,
         "all_host_libiio_verified": all_host_libiio,
+        "authorizing_bands": list(checkpoint["configuration"]["bands"]),
+        "diagnostics": {
+            spec.key: phases[spec.key].get("phase_verdict", phases[spec.key]["status"])
+            for spec in specs
+            if spec.kind == "diagnostic"
+        },
         "configuration": checkpoint["configuration"],
         "host_libiio_invocations": checkpoint["host_libiio_invocations"],
         "plan": [spec.to_dict() for spec in specs],
@@ -2142,6 +2195,12 @@ def _aggregate_report(
         "started_unix_ns": checkpoint["started_unix_ns"],
         "updated_unix_ns": checkpoint["updated_unix_ns"],
     }
+
+
+def _phase_verdict_is_acceptable(spec: PhaseSpec, verdict: object) -> bool:
+    if spec.kind == "diagnostic":
+        return verdict in {DIAGNOSTIC_PASS, DIAGNOSTIC_FAIL}
+    return verdict == "pass"
 
 
 def _load_checkpoint(
@@ -2305,7 +2364,7 @@ def _verify_completed(
             raise ReleaseCliError(f"completed {spec.key} artifact changed")
         validated = validator(spec, report_path, work_dir)
         if (
-            validated.verdict != "pass"
+            not _phase_verdict_is_acceptable(spec, validated.verdict)
             or not validated.cleanup_verified
             or _json_safe(validated.summary) != record.get("summary")
         ):
@@ -2422,7 +2481,10 @@ def _run_aggregate_locked(
                         "summary": _json_safe(validated.summary),
                     }
                 )
-            elif validated.verdict != "pass" or not validated.cleanup_verified:
+            elif (
+                not _phase_verdict_is_acceptable(spec, validated.verdict)
+                or not validated.cleanup_verified
+            ):
                 raise ReleaseCliError(
                     f"{spec.key} did not prove PASS plus durable cleanup"
                 )
@@ -2580,6 +2642,17 @@ def production_executor(
             del report
             return path
         assert spec.band is not None
+        if spec.kind == "diagnostic":
+            quality = _base_quality(options, output_dir=work_dir, band=spec.band)
+            with _radio_lifecycle(
+                iio_module,
+                _issue_options(
+                    options, quality, namespace="tandem-agc-release-diagnostic-2450"
+                ),
+                radio_factory,
+            ) as radio:
+                _report, path = run_tandem_quality_matrix(radio, quality)
+            return path
         if spec.kind == "transient":
             quality = _base_quality(options, output_dir=work_dir, band=spec.band)
             with _radio_lifecycle(
@@ -7162,6 +7235,121 @@ def _soak_temperature_errors(
     return errors
 
 
+def _diagnostic_failure_iq_errors(
+    report: Mapping[str, Any],
+    *,
+    work_dir: Path,
+    expected_options: TandemQualityOptions,
+) -> tuple[list[str], dict[str, Any] | None]:
+    """Replay the bounded write-on-failure IQ ledger for the 2.45 GHz diagnostic."""
+
+    errors: list[str] = []
+    raw_evidence = report.get("failure_evidence")
+    if not isinstance(raw_evidence, Mapping):
+        return ["failed diagnostic lacks failure evidence"], None
+    raw_ledger = raw_evidence.get("iq_ledger")
+    if not isinstance(raw_ledger, Mapping):
+        return ["failed diagnostic lacks its IQ ledger"], None
+    ledger = dict(raw_ledger)
+    manifest_relative = ledger.get("manifest_relative_path")
+    manifest_sha256 = ledger.get("manifest_sha256")
+    if (
+        manifest_relative != "failure-iq-manifest.json"
+        or not isinstance(manifest_sha256, str)
+        or re.fullmatch(r"[0-9a-f]{64}", manifest_sha256) is None
+    ):
+        errors.append("diagnostic IQ manifest identity is malformed")
+        return errors, ledger
+    manifest_path = work_dir / manifest_relative
+    try:
+        _require_nonsymlink_descendant(
+            manifest_path, work_dir, label="diagnostic IQ manifest"
+        )
+        manifest_bytes = manifest_path.read_bytes()
+        manifest = json.loads(manifest_bytes)
+    except (OSError, UnicodeError, json.JSONDecodeError, ReleaseCliError) as error:
+        errors.append(f"diagnostic IQ manifest cannot be read safely: {error}")
+        return errors, ledger
+    expected_manifest = {
+        key: value
+        for key, value in ledger.items()
+        if key not in {"manifest_relative_path", "manifest_sha256"}
+    }
+    if (
+        hashlib.sha256(manifest_bytes).hexdigest() != manifest_sha256
+        or manifest != expected_manifest
+        or ledger.get("schema") != "plutosdr-fw.tandem-agc-failure-iq.v1"
+        or ledger.get("maximum_bytes") != 128 * 1024 * 1024
+        or ledger.get("tandem_detail_maximum_bytes") != 32 * 1024 * 1024
+    ):
+        errors.append("diagnostic IQ manifest bytes or bounds differ from its ledger")
+    planned_frames = (
+        len(quality_modes(expected_options))
+        * len(expected_options.tx_gain_trajectory_db)
+        * expected_options.measurement_frames
+    )
+    expected_frame_bytes = expected_options.samples_per_channel * 8
+    if ledger.get("preflight") != {
+        "planned_accepted_frames": planned_frames,
+        "reserved_offending_frames": 1,
+        "expected_frame_bytes": expected_frame_bytes,
+        "required_bytes": (planned_frames + 1) * expected_frame_bytes,
+    }:
+        errors.append("diagnostic IQ preflight differs from the exact matrix")
+    evaluation = report.get("evaluation")
+    expected_failures = (
+        list(evaluation.get("failures", [])) if isinstance(evaluation, Mapping) else []
+    )
+    if ledger.get("trigger") != {
+        "kind": "matrix_evaluation_failed",
+        "failures": expected_failures,
+    }:
+        errors.append("diagnostic IQ trigger differs from the RF-quality failure")
+    entries = ledger.get("entries")
+    if not isinstance(entries, list) or len(entries) != planned_frames:
+        errors.append("diagnostic IQ ledger does not cover every accepted frame")
+        return errors, ledger
+    seen_paths: set[str] = set()
+    retained_bytes = 0
+    for ordinal, raw_entry in enumerate(entries):
+        if not isinstance(raw_entry, Mapping):
+            errors.append("diagnostic IQ ledger contains a non-record entry")
+            continue
+        relative = raw_entry.get("relative_path")
+        digest = raw_entry.get("sha256")
+        if (
+            raw_entry.get("ordinal") != ordinal
+            or raw_entry.get("role") != "accepted_measurement"
+            or raw_entry.get("bytes") != expected_frame_bytes
+            or not isinstance(relative, str)
+            or not relative.startswith("failure-iq/accepted-")
+            or relative in seen_paths
+            or not isinstance(digest, str)
+            or re.fullmatch(r"[0-9a-f]{64}", digest) is None
+        ):
+            errors.append(f"diagnostic IQ entry {ordinal} is malformed")
+            continue
+        seen_paths.add(relative)
+        path = work_dir / relative
+        try:
+            _require_nonsymlink_descendant(
+                path, work_dir, label=f"diagnostic IQ entry {ordinal}"
+            )
+            payload = path.read_bytes()
+        except (OSError, ReleaseCliError) as error:
+            errors.append(f"diagnostic IQ entry {ordinal} is unsafe: {error}")
+            continue
+        if (
+            len(payload) != expected_frame_bytes
+            or hashlib.sha256(payload).hexdigest() != digest
+        ):
+            errors.append(f"diagnostic IQ entry {ordinal} bytes changed")
+        retained_bytes += len(payload)
+    if ledger.get("retained_bytes") != retained_bytes:
+        errors.append("diagnostic IQ retained-byte total is inconsistent")
+    return errors, ledger
+
+
 def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
     def validate(spec: PhaseSpec, path: Path, work_dir: Path) -> ValidatedPhase:
         _assert_harness_unchanged(options)
@@ -7235,6 +7423,100 @@ def production_validator(options: ReleaseHardwareOptions) -> PhaseValidator:
                     "planned_runs": len(plan.runs),
                     "temperature": disk.get("temperature"),
                     "repeatability": disk.get("repeatability"),
+                },
+            )
+        if spec.kind == "diagnostic":
+            assert spec.band == DIAGNOSTIC_BAND
+            expected_options = _base_quality(
+                options, output_dir=work_dir, band=DIAGNOSTIC_BAND
+            )
+            expected_path = (
+                work_dir / options.serial / "tandem-agc-quality-report.json"
+            ).resolve()
+            errors: list[str] = []
+            if path != expected_path or path.parent.is_symlink():
+                errors.append("2.45 GHz diagnostic report path differs from plan")
+            if (
+                disk.get("schema") != "plutosdr-fw.tandem-agc-quality.v1"
+                or disk.get("verdict") not in {"pass", "fail"}
+                or "fatal_error" in disk
+                or "cleanup_error" in disk
+            ):
+                errors.append(
+                    "2.45 GHz diagnostic is not a completed RF-quality report"
+                )
+            errors.extend(_identity_errors(disk, options))
+            errors.extend(_cleanup_errors(disk))
+            rf = disk.get("rf")
+            if (
+                not isinstance(rf, Mapping)
+                or rf.get("center_frequency_hz_requested")
+                != DIAGNOSTIC_BAND.center_frequency_hz
+                or rf.get("expected_tandem_gain_table_id") != 2
+            ):
+                errors.append("2.45 GHz diagnostic RF identity differs from plan")
+            expected_configuration = _json_safe(
+                {
+                    **asdict(expected_options),
+                    "output_dir": str(work_dir),
+                    "thresholds": asdict(expected_options.thresholds),
+                    "minimum_effective_attenuation_db": (
+                        expected_options.minimum_effective_attenuation_db
+                    ),
+                }
+            )
+            if disk.get("configuration") != expected_configuration:
+                errors.append("2.45 GHz diagnostic configuration differs from plan")
+            observed_modes = [
+                item.get("mode")
+                for item in disk.get("modes", [])
+                if isinstance(item, Mapping)
+            ]
+            if observed_modes != list(quality_modes(expected_options)):
+                errors.append("2.45 GHz diagnostic mode coverage differs from plan")
+            preflight = disk.get("manual_fixture_preflight")
+            if not isinstance(preflight, Mapping) or preflight.get("valid") is not True:
+                errors.append("2.45 GHz diagnostic did not pass fixture preflight")
+            try:
+                recomputed = _json_safe(evaluate_matrix(disk))
+            except (KeyError, TypeError, ValueError, RuntimeError) as error:
+                errors.append(f"2.45 GHz diagnostic cannot be recomputed: {error}")
+                recomputed = None
+            if recomputed is not None and disk.get("evaluation") != recomputed:
+                errors.append(
+                    "2.45 GHz diagnostic evaluation differs from recomputation"
+                )
+            report_verdict = disk.get("verdict")
+            if isinstance(recomputed, Mapping) and report_verdict != recomputed.get(
+                "verdict"
+            ):
+                errors.append("2.45 GHz diagnostic verdict differs from evaluation")
+            iq_ledger: dict[str, Any] | None = None
+            if report_verdict == "fail":
+                iq_errors, iq_ledger = _diagnostic_failure_iq_errors(
+                    disk, work_dir=work_dir, expected_options=expected_options
+                )
+                errors.extend(iq_errors)
+            elif (work_dir / "failure-iq-manifest.json").exists():
+                errors.append("passing 2.45 GHz diagnostic retained failure-only IQ")
+            if errors:
+                raise ReleaseCliError("; ".join(errors))
+            phase_verdict = (
+                DIAGNOSTIC_PASS if report_verdict == "pass" else DIAGNOSTIC_FAIL
+            )
+            evaluation = disk["evaluation"]
+            return ValidatedPhase(
+                phase_verdict,
+                True,
+                {
+                    "role": "non_authorizing_rf_quality_diagnostic",
+                    "center_frequency_hz": DIAGNOSTIC_BAND.center_frequency_hz,
+                    "outcome": phase_verdict,
+                    "rf_quality_failures": list(evaluation.get("failures", [])),
+                    "failure_iq_manifest_sha256": (
+                        None if iq_ledger is None else iq_ledger["manifest_sha256"]
+                    ),
+                    "release_claim": "none_at_2_4_ghz",
                 },
             )
         expected_schema = {

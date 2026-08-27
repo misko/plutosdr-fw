@@ -33,6 +33,9 @@ from .pluto_plus_candidate_test_support import build_utility_deployment_bundle
 from .release_campaign import build_release_plan
 from .release_cli import (
     AGGREGATE_CHECKPOINT,
+    DIAGNOSTIC_BAND,
+    DIAGNOSTIC_FAIL,
+    DIAGNOSTIC_PASS,
     HARNESS_SOURCE_NAMES,
     HOST_LIBIIO_CMAKE_CONFIGURATION,
     HOST_LIBIIO_RUNTIME_SCHEMA,
@@ -840,6 +843,65 @@ def test_characterization_and_baseline_soak_are_distinct_plans(
     assert soak_config.policy_cases[0].factor == "baseline"
     assert full_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
     assert soak_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
+
+
+def test_default_full_plan_keeps_2450_diagnostic_non_authorizing_and_last(
+    tmp_path: Path,
+) -> None:
+    full = _parse(tmp_path / "full")
+    soak = _parse(tmp_path / "soak", "--policy-set", "baseline")
+
+    assert [(band.name, band.center_frequency_hz) for band in full.bands] == [
+        ("lnb-low-1050mhz", 1_050_000_000),
+        ("lnb-mid-1550mhz", 1_550_000_000),
+        ("lnb-high-2050mhz", 2_050_000_000),
+        ("table3-sentinel-5800mhz", 5_800_000_000),
+    ]
+    specs = phase_specs(full)
+    assert len(specs) == 10
+    assert specs[-1] == PhaseSpec("diagnostic_2450mhz", "diagnostic", DIAGNOSTIC_BAND)
+    assert soak.phases == ("steady",)
+    assert phase_specs(soak) == (PhaseSpec("steady_soak", "steady"),)
+
+
+@pytest.mark.parametrize("outcome", [DIAGNOSTIC_PASS, DIAGNOSTIC_FAIL])
+def test_safe_2450_outcome_completes_without_changing_authorizing_verdict(
+    tmp_path: Path,
+    outcome: str,
+) -> None:
+    options = _parse(tmp_path, "--phase", "diagnostic-2450")
+    calls: list[tuple[str, str]] = []
+
+    def execute(spec: PhaseSpec, work_dir: Path) -> Path:
+        calls.append((spec.key, work_dir.name))
+        path = work_dir / "diagnostic.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
+        return path
+
+    def validate(_spec: PhaseSpec, _path: Path, _work_dir: Path) -> ValidatedPhase:
+        return ValidatedPhase(outcome, True, {"outcome": outcome})
+
+    report, _path = run_aggregate(options, execute, validate)
+
+    assert report["verdict"] == "pass"
+    assert report["diagnostics"] == {"diagnostic_2450mhz": outcome}
+    assert report["phases"]["diagnostic_2450mhz"]["phase_verdict"] == outcome
+    assert calls == [("diagnostic_2450mhz", "attempt-0001")]
+
+
+def test_2450_cleanup_failure_remains_fatal(tmp_path: Path) -> None:
+    options = _parse(tmp_path, "--phase", "diagnostic-2450")
+    calls: list[tuple[str, str]] = []
+    execute, _validator = _fake_boundaries(calls)
+
+    def unsafe(_spec: PhaseSpec, _path: Path, _work_dir: Path) -> ValidatedPhase:
+        return ValidatedPhase(DIAGNOSTIC_FAIL, False, {})
+
+    report, _path = run_aggregate(options, execute, unsafe)
+
+    assert report["verdict"] == "invalid"
+    assert report["phases"]["diagnostic_2450mhz"]["status"] == "failed"
 
 
 def _fake_boundaries(calls: list[tuple[str, str]]):

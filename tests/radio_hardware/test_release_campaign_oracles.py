@@ -182,12 +182,13 @@ def test_default_plan_is_full_autonomous_native_all_band_all_radio_and_determini
 
     assert first.fingerprint == second.fingerprint
     assert [run.run_id for run in first.runs] == [run.run_id for run in second.runs]
-    assert len(first.runs) == 2 * 2 * 3 * 11
-    assert {run.band.center_frequency_hz for run in first.runs} == {
-        915_000_000,
-        2_450_000_000,
-        5_800_000_000,
-    }
+    assert len(first.runs) == 2 * 2 * 4 * 11
+    assert tuple(dict.fromkeys(run.band for run in first.runs)) == (
+        BandCase("lnb-low-1050mhz", 1_050_000_000),
+        BandCase("lnb-mid-1550mhz", 1_550_000_000),
+        BandCase("lnb-high-2050mhz", 2_050_000_000),
+        BandCase("table3-sentinel-5800mhz", 5_800_000_000),
+    )
     assert {run.options.profile for run in first.runs} == {"full"}
     assert {run.options.native_gain_control_modes for run in first.runs} == {
         AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
