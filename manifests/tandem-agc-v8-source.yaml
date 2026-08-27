@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC23, but the
+# The external component graph remains identical from RC4 through RC24, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -68,9 +68,14 @@
 # db696 RAM/lifecycle, and all eleven 1.05-GHz steady policy matrices passed.
 # The transient oracle then rejected a fully retained startup AUTO convergence
 # even though a later contiguous event-free eight-frame suffix was stable before
-# the scheduled attack. RC23 retains startup as conditioning only and permits
-# that exact quiet suffix to anchor response timing; gaps, hidden events, and all
-# identity/metadata/safety/fault/cleanup failures remain fatal. RC23 must pass
+# the scheduled attack. RC23 corrected that boundary, passed its trusted build,
+# db696 RAM deployment, and lifecycle, then exposed a second host-oracle defect:
+# the oracle demanded zero clipping during the deliberately overloaded response
+# outside the narrow command-write bracket despite exact-cadence paired events
+# and stable suffixes. RC24 retains all such response windows as diagnostic and
+# requires strict RF quality only in exact event-free eight-frame steady
+# suffixes; gaps, hidden events, and all identity/metadata/safety/fault/cleanup
+# failures remain fatal. RC24 must pass
 # its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release

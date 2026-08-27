@@ -47,9 +47,9 @@ def test_rc21_owner_route_remains_an_exact_reproduction_mapping() -> None:
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc21'") == 1
     assert "Require the exact protected RC21 reproduction identity" in workflow
     assert "Require the exact protected RC20 reproduction identity" in workflow
-    assert workflow.index("refs/heads/codex/firmware-tandem-agc-v8-rc22") < workflow.index(
-        branch
-    )
+    assert workflow.index(
+        "refs/heads/codex/firmware-tandem-agc-v8-rc22"
+    ) < workflow.index(branch)
     assert workflow.index(branch) < workflow.index(
         "refs/heads/codex/firmware-tandem-agc-v8-rc20"
     )
@@ -82,14 +82,14 @@ def test_rc21_four_band_authorization_and_2450_diagnostic_are_exact() -> None:
     assert "rf_quality_only_failure_is_recorded_and_nonbinding" in evidence
 
 
-def test_rc21_hardware_failure_is_immutable_and_docs_name_rc23_active() -> None:
+def test_rc21_hardware_failure_is_immutable_and_docs_name_rc24_active() -> None:
     notes = NOTES.read_text(encoding="utf-8")
     releasing = RELEASING.read_text(encoding="utf-8")
     deploy_plan = DEPLOY_PLAN.read_text(encoding="utf-8")
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc21" in deploy_plan
     assert "16,400" in notes and "17,408" in notes
     assert "not hardware-qualified" in notes
-    assert "The active candidate is RC23" in releasing
+    assert "The active candidate is RC24" in releasing
 
 
 def test_rc21_reproduction_keeps_single_owner_attestation_policy() -> None:

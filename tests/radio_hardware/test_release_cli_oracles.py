@@ -2512,6 +2512,23 @@ def test_release_validator_recomputes_startup_conditioning_and_quiet_suffix(
         _tandem_batch_pre_attack_conditioning(frames, pre_indices)
 
 
+def test_release_validator_recomputes_transient_rf_quality_policy(
+    tmp_path: Path,
+) -> None:
+    options, spec, work_dir, report_path, report = _generated_v2_transient_fixture(
+        tmp_path
+    )
+    policy = _tandem_mode(report)["partition"]["rf_quality_policy"]
+    policy["diagnostic_windows_authorize_pass"] = True
+    report_path.write_text(json.dumps(report) + "\n", encoding="utf-8")
+
+    with pytest.raises(
+        ReleaseCliError,
+        match="five-way partition differs from recomputation",
+    ):
+        production_validator(options)(spec, report_path, work_dir)
+
+
 @pytest.mark.parametrize("response", ("attack", "release"))
 def test_production_validator_rejects_self_consistent_directional_undo(
     tmp_path: Path, response: str

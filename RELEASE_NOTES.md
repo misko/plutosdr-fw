@@ -41,7 +41,8 @@
 | `tandem-agc-v8-rc20` | 2026-08-26 | **trusted build and four RAM/lifecycle passes; full campaign failed; superseded** | 2.45-GHz weak-SNR contamination plus two settle/measurement-boundary oracle failures; no passing full/soak campaign |
 | `tandem-agc-v8-rc21` | 2026-08-27 | **successful indexed build and pilot RAM/lifecycle; 1.05-GHz campaign failed; superseded** | exposed FPGA power-period/event-spacing mismatch: 16,400 samples observed where the contract requires 17,408 |
 | `tandem-agc-v8-rc22` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle and 11/11 steady policies passed; transient oracle invalid; superseded** | fixed exact power periods/event spacing; the transient harness rejected a fully retained startup convergence before its stable pre-attack suffix |
-| `tandem-agc-v8-rc23` | 2026-08-27 | **active development; not hardware-qualified** | retains RC22 firmware and treats fully accounted startup AUTO convergence as conditioning only, requiring an exact quiet suffix before response timing |
+| `tandem-agc-v8-rc23` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle passed; transient response oracle invalid; superseded** | retained exact-cadence paired response events, but the host oracle demanded zero clipping during a deliberately overloaded AUTO response |
+| `tandem-agc-v8-rc24` | 2026-08-27 | **active development; not hardware-qualified** | retains RC23 firmware; only exact event-free steady suffixes authorize transient RF quality, while response windows remain diagnostic |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -50,7 +51,29 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc23 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc24 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC24 retains RC23's exact firmware and external source graph. It corrects the
+transient evidence policy exposed by RC23 hardware. Conditioning and commanded
+overload/response windows remain fully retained diagnostic evidence and cannot
+authorize PASS. Strict RF-quality gates apply to the exact contiguous,
+event-free eight-frame suffix of each pre-attack, attack, and release steady
+partition. Any RF-quality failure in those suffixes remains fatal; metadata,
+event cadence, direction proof, transport continuity, safety, and cleanup gates
+remain unchanged.
+
+RC24 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
+evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+RC24 uses branch `codex/firmware-tandem-agc-v8-rc24`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc24`, manifest
+`manifests/tandem-agc-v8-rc24-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc24`, and source lock
+`refs/tags/tandem-agc-v8-rc24-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc23 — 2026-08-27 — **successful indexed build; db696 RAM/lifecycle passed; transient response oracle invalid; superseded**
 
 RC23 retains RC22's exact firmware and external source graph. It corrects the
 transient evidence policy exposed by RC22 hardware: startup AUTO convergence is
@@ -65,6 +88,17 @@ RC23 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
 2.45-GHz matrix still runs and retains complete evidence, but an isolated
 cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
 evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+Trusted run `33049331161` passed and produced exact candidate evidence. The
+db696 pilot passed RAM-only deployment, unchanged-QSPI and safe-state checks,
+and the full v5 muted metadata lifecycle. Its 1.05-GHz transient pilot retained
+startup conditioning, exact-cadence paired `large_adc` decrease events through
+the deliberate overload response, and strict stable suffix evidence. The old
+host oracle nevertheless demanded zero clipping and full RF quality during the
+deliberately overloaded response outside the narrow command-write bracket.
+That assumption—not the RC23 firmware—invalidated the phase. RC23 has no
+passing full/soak campaign and is not hardware-qualified. The earlier 11/11
+steady-policy pass belongs to immutable RC22 evidence.
 
 RC23 uses branch `codex/firmware-tandem-agc-v8-rc23`, version
 `v0.41-plutoplus-spf-tandem-agc-v8-rc23`, manifest

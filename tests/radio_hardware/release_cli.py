@@ -4277,6 +4277,82 @@ def _tandem_batch_stable_suffix(
     }
 
 
+def _tandem_batch_rf_quality_policy(
+    frames: Sequence[Mapping[str, Any]],
+    stable_suffixes: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Independently replay the transient steady-suffix RF policy."""
+
+    phases = (
+        "fully_pre_attack",
+        "fully_post_attack_pre_release",
+        "fully_post_release",
+    )
+    stable_indices: list[int] = []
+    for phase in phases:
+        suffix = stable_suffixes.get(phase)
+        indices = suffix.get("frame_indices") if isinstance(suffix, Mapping) else None
+        if (
+            not isinstance(indices, list)
+            or len(indices) != _TANDEM_BATCH_MINIMUM_PARTITION_FRAMES
+            or any(not _release_exact_int(index) for index in indices)
+        ):
+            raise ValueError(f"{phase} RF suffix evidence is malformed")
+        stable_indices.extend(indices)
+    if len(set(stable_indices)) != len(stable_indices) or any(
+        index < 0 or index >= len(frames) for index in stable_indices
+    ):
+        raise ValueError("RF suffix frame inventory is invalid")
+
+    strict_indices = set(stable_indices)
+    diagnostic_indices = [
+        index for index in range(len(frames)) if index not in strict_indices
+    ]
+    diagnostic_invalid_window_count = 0
+    diagnostic_reason_counts: dict[str, int] = {}
+    for index, frame in enumerate(frames):
+        analysis = frame.get("analysis")
+        windows = analysis.get("windows") if isinstance(analysis, Mapping) else None
+        if not isinstance(windows, list) or not windows:
+            raise ValueError("RF policy encountered malformed analysis")
+        for window in windows:
+            if not isinstance(window, Mapping):
+                raise ValueError("RF policy encountered malformed window")
+            valid = window.get("quality_valid") is True
+            if index in strict_indices and not valid:
+                raise ValueError("stable RF suffix contains an invalid window")
+            if index in strict_indices or valid:
+                continue
+            reasons = window.get("quality_reasons")
+            if not isinstance(reasons, list) or not all(
+                isinstance(reason, str) and reason for reason in reasons
+            ):
+                raise ValueError("diagnostic RF window has malformed quality reasons")
+            diagnostic_invalid_window_count += 1
+            for reason in reasons:
+                diagnostic_reason_counts[reason] = (
+                    diagnostic_reason_counts.get(reason, 0) + 1
+                )
+    return {
+        "policy": (
+            "strict RF quality is required only in each exact event-free "
+            "eight-frame steady suffix; conditioning and commanded-response "
+            "windows are retained diagnostic evidence and cannot authorize PASS"
+        ),
+        "strict_phase_order": list(phases),
+        "strict_frame_indices": stable_indices,
+        "strict_frame_count": len(stable_indices),
+        "strict_window_quality_valid": True,
+        "diagnostic_frame_indices": diagnostic_indices,
+        "diagnostic_frame_count": len(diagnostic_indices),
+        "diagnostic_invalid_window_count": diagnostic_invalid_window_count,
+        "diagnostic_quality_reason_counts": dict(
+            sorted(diagnostic_reason_counts.items())
+        ),
+        "diagnostic_windows_authorize_pass": False,
+    }
+
+
 def _tandem_batch_pre_attack_conditioning(
     frames: Sequence[Mapping[str, Any]],
     frame_indices: Sequence[int],
@@ -6844,6 +6920,14 @@ def _transient_batch_contract_errors(
     except (IndexError, KeyError, TypeError, ValueError) as error:
         errors.append(f"transient tandem pre-attack conditioning is invalid: {error}")
         pre_attack_conditioning = {}
+    try:
+        rf_quality_policy = _tandem_batch_rf_quality_policy(
+            [frame for frame in frames_value if isinstance(frame, Mapping)],
+            stable_suffixes,
+        )
+    except (IndexError, KeyError, TypeError, ValueError) as error:
+        errors.append(f"transient tandem RF quality policy is invalid: {error}")
+        rf_quality_policy = {}
     expected_partition = {
         "phase_order": list(_TANDEM_BATCH_PHASE_ORDER),
         "phase_by_frame": phases,
@@ -6860,6 +6944,7 @@ def _transient_batch_contract_errors(
         "frame_count": _TANDEM_BATCH_FRAMES,
         "pre_attack_conditioning": pre_attack_conditioning,
         "stable_suffixes": stable_suffixes,
+        "rf_quality_policy": rf_quality_policy,
     }
     if not _release_json_identical(partition, expected_partition):
         errors.append("transient tandem five-way partition differs from recomputation")
