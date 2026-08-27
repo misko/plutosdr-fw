@@ -58,6 +58,6 @@ vvp "${work}/tx_pipeline_debug_tb"
 # hdl-quantulum source lock above.  Run its complete directed, randomized, CDC,
 # and AXI suite in the packaged build so the deployment evidence covers the
 # exact tandem implementation that Vivado consumes.
-if [[ "$(basename "$MANIFEST")" == "tandem-agc-v2-source.yaml" ]]; then
+if [[ "$(basename "$MANIFEST")" == tandem-agc-*-source.yaml ]]; then
     "${ROOT}/hdl-tandem/run_tests.sh"
 fi

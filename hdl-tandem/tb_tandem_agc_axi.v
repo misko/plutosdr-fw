@@ -138,6 +138,32 @@ module tb_tandem_agc_axi;
     end
   endtask
 
+  // Mirror the kernel's bounded release-time retirement over the real AXI
+  // event-pop surface. AUTO must already be quiescent, so every pop decreases
+  // the synchronized occupancy by exactly one and no more than DEPTH can occur.
+  task retire_fifo(output integer retired);
+    reg [31:0] level, previous;
+    reg [31:0] w0, w1, w2, w3;
+    reg converged;
+    begin
+      retired = 0;
+      converged = 1'b1;
+      axi_read(8'h38, level);
+      while (level != 0 && retired < 64) begin
+        previous = level;
+        axi_read(8'h44, w0); axi_read(8'h48, w1);
+        axi_read(8'h4C, w2); axi_read(8'h50, w3);
+        tick(10);
+        axi_read(8'h38, level);
+        if (level != previous - 1) converged = 1'b0;
+        retired = retired + 1;
+      end
+      check(converged,
+            "every quiescent release pop converges by exactly one entry");
+      check(level == 0, "bounded release retirement proves FIFO empty");
+    end
+  endtask
+
   reg [31:0] v;
 
   initial begin
@@ -227,17 +253,45 @@ module tb_tandem_agc_axi;
     // tandem invariant still holds with the domains truly asynchronous
     check(m_rx1 == m_rx2, "RX1 == RX2 with processor and receive clocks async");
 
-    // Kernel teardown: AUTO -> HOLD-low -> AD9361 disarm -> mux release.
+    // Kernel teardown: AUTO -> HOLD-low -> retire events -> AD9361 disarm ->
+    // mux release. Retirement must not erase session diagnostics.
     axi_write(8'h0C, 32'd1); tick(600);
     axi_read(8'h10, v);
     check(v[2:0] == 3'd2, "teardown first reaches ARMED_HOLD");
     check(ctl_t == 4'd0 && ctl_o == 4'd0,
           "HOLD retains ownership and actively drives every CTRL_IN low");
-    armed = 1'b0;
-    axi_write(8'h0C, 32'd0); tick(600);
+    begin : normal_release_retirement
+      reg [31:0] transitions_before, transitions_after;
+      reg [31:0] overflows_before, overflows_after;
+      reg [31:0] faults_before, faults_after;
+      reg [31:0] gain_before, gain_after;
+      integer retired;
+      axi_read(8'h40, transitions_before);
+      axi_read(8'h3C, overflows_before);
+      axi_read(8'h34, faults_before);
+      axi_read(8'h1C, gain_before);
+      retire_fifo(retired);
+      check(retired > 0, "normal release retires queued AUTO events");
+      armed = 1'b0;
+      axi_write(8'h0C, 32'd0); tick(600);
+      axi_read(8'h40, transitions_after);
+      axi_read(8'h3C, overflows_after);
+      axi_read(8'h34, faults_after);
+      axi_read(8'h1C, gain_after);
+      check(transitions_after == transitions_before,
+            "release retirement preserves transition diagnostics");
+      check(overflows_after == overflows_before,
+            "release retirement preserves overflow diagnostics");
+      check(faults_after == faults_before,
+            "release retirement preserves fault diagnostics");
+      check(gain_after == gain_before,
+            "release retirement preserves the final tandem gain endpoint");
+    end
     axi_read(8'h10, v);
     check(v[2:0] == 3'd0, "release returns to public IDLE");
     check(ctl_t  == 4'hF, "pins tri-stated back to the legacy path");
+    axi_read(8'h38, v);
+    check(v == 32'd0, "normal release leaves no inaccessible FIFO records");
 
     // Reproduce the hardware recovery path end-to-end: fill the asynchronous
     // event FIFO, observe fail-closed, then hold CLEAR across the configuration
@@ -255,7 +309,40 @@ module tb_tandem_agc_axi;
     check(v[0] == 1'b1, "undrained event FIFO raises the sticky overflow fault");
     axi_read(8'h10, v);
     check(v[2:0] == 3'd4, "FIFO overflow enters public FAULTED state");
-    armed = 1'b0;
+    check(dut.pulse_busy == 1'b0,
+          "public FAULTED is reached only after the active pulse completes");
+    axi_write(8'h0C, 32'd1); tick(600);
+    axi_read(8'h10, v);
+    check(v[2:0] == 3'd4,
+          "AUTO suppression retains pulse-quiescent FAULTED diagnostics");
+    begin : fault_release_retirement
+      reg [31:0] transitions_before, transitions_after;
+      reg [31:0] overflows_before, overflows_after;
+      reg [31:0] faults_before, faults_after;
+      reg [31:0] gain_before, gain_after;
+      integer retired;
+      axi_read(8'h40, transitions_before);
+      axi_read(8'h3C, overflows_before);
+      axi_read(8'h34, faults_before);
+      axi_read(8'h1C, gain_before);
+      retire_fifo(retired);
+      check(retired == 64,
+            "faulted release retires a full asynchronous FIFO within depth");
+      armed = 1'b0;
+      axi_write(8'h0C, 32'd0); tick(600);
+      axi_read(8'h40, transitions_after);
+      axi_read(8'h3C, overflows_after);
+      axi_read(8'h34, faults_after);
+      axi_read(8'h1C, gain_after);
+      check(transitions_after == transitions_before,
+            "full-depth retirement preserves transition diagnostics");
+      check(overflows_after == overflows_before && overflows_after > 0,
+            "full-depth retirement preserves nonzero overflow diagnostics");
+      check(faults_after == faults_before && faults_after[0] == 1'b1,
+            "full-depth retirement preserves the sticky FIFO fault");
+      check(gain_after == gain_before,
+            "faulted release preserves the final tandem gain endpoint");
+    end
     axi_write(8'h0C, 32'h0000_0100); tick(600);
     axi_read(8'h34, v);
     check(v == 32'd0, "level-held AXI clear reaches the receive-domain fault");

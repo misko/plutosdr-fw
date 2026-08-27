@@ -1,0 +1,51 @@
+# Immutable source graph for the forward-only tandem AGC v8 RC8 candidate.
+# RC8 retains RC7's successful build, fully routed timing-clean image, and
+# integrated-report verdict. RC7 was rejected before evidence assembly or
+# hardware deployment because bundle member/checksum ordering depended on the
+# runner locale and shell array order. External component pins remain
+# byte-identical to RC4 through RC7; the separately protected firmware source
+# lock binds the final reviewed firmware commit after all candidate tooling and
+# offline gates pass.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: 70739d25ec1fa7b95d9069bd26a3e4192fdb3851
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/tandem-agc-v8-rc3-source/libiio-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: f89eb67b2c0131640ae9c9e0f0be46da000f3e37
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/tandem-agc-v8-rc3-source/buildroot-v1
+
+submodule_hdl: dec1dba5b9563c4c58c39fb76df904e462819ad5
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/tandem-agc-v2-source/hdl-v2
+
+submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc10-source/hdl-quantulum
+
+submodule_linux: 77a1f2352162097bb983402f47c9cb4a28a2f055
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/tandem-agc-v2-source/linux-v11
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: tandem-agc-v2-source/hdl-v2
+versions_buildroot: tandem-agc-v8-rc3-source/buildroot-v1
+versions_linux: tandem-agc-v2-source/linux-v11
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

@@ -365,13 +365,21 @@ The strongest tandem-specific conclusion is therefore:
 
 > Tandem AUTO can make synchronized, bidirectional RX0/RX1 gain decisions over the tested TX2 loudness range without clipping, while keeping tone quality and cross-channel coherence within the stated envelope.
 
+## Release-mode policy after this campaign
+
+The release-candidate automation treats native `slow_attack` and `fast_attack` as the autonomous release-native modes. Its default steady-state, transient, and modulated matrices contain manual, native slow-attack, native fast-attack, and tandem-auto cells. Native `hybrid` is excluded from all three release-default matrices because entering hybrid can re-arm the external CTRL_IN2 control path, while the current bench/HDL ownership path does not guard an inactive CTRL_IN2 against a high-impedance state.
+
+The generic comparison harnesses retain explicit hybrid selection for exploratory work. Any resulting hybrid measurements are classified as **quality-only evidence**: they do not establish autonomous AGC behavior and are not a release claim. Explicit selection does not waive or weaken an existing absolute-quality or gain-response gate; hybrid gain observations remain diagnostic even when the selected test passes. A future autonomous hybrid claim requires a deliberately driven and guarded CTRL_IN2 path plus its own control-response qualification.
+
+This policy does not retroactively add measurements to the campaign reported above. The published numerical results contain native `slow_attack` only; release qualification of `fast_attack` requires a new hardware run.
+
 ## Limitations and non-claims
 
 This is a bounded hardware qualification, not a complete RF characterization:
 
 - The loopback results are relative, not calibrated RF input-power measurements. Inter-radio level differences include fixture, splitter/cable, and analog-path variation.
 - Only one 100 kHz CW tone, one sample rate, one firmware image, and one host libiio revision were tested.
-- Native coverage is limited to `slow_attack`; `fast_attack` and `hybrid` were not compared.
+- Native measurements in this published campaign are limited to `slow_attack`; `fast_attack` still requires release hardware qualification, and hybrid is intentionally outside the autonomous release claim under the policy above.
 - Measurements are steady-state after settling and do not characterize attack/release latency or transient distortion.
 - No modulated-signal EVM/BER, blocker, intermodulation, THD, SFDR, or adjacent-channel test was performed.
 - No RF-frequency, temperature, supply-voltage, or long-duration soak sweep was performed.
@@ -387,7 +395,7 @@ This is a bounded hardware qualification, not a complete RF characterization:
 1. Land the reusable hardware harness and offline oracles as a separately reviewable change.
 2. Run the full 13-rung profile on all four radios.
 3. Add center-frequency coverage at representative low, mid, and high RF bands.
-4. Add native `fast_attack` and `hybrid` comparison cells.
+4. Qualify native `fast_attack` as an autonomous release comparison; keep hybrid opt-in and exploratory until CTRL_IN2 is deliberately driven, guarded, and separately validated.
 5. Add controlled threshold, dwell, and cooldown sweeps for tandem policy tuning.
 6. Add transient attack/release measurements around each TX step.
 7. Add modulated-signal EVM and blocker/coexistence tests.

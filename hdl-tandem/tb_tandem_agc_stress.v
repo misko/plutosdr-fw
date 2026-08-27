@@ -222,7 +222,11 @@ module tb_tandem_agc_stress;
       for (k = 0; k < 2000; k = k + 1) begin
         rx1_level = (k[0]) ? -16'sd25 : -16'sd95;
         rx2_level = (k[0]) ? -16'sd25 : -16'sd95;
-        tick(12);
+        // Hold each detector class across several exact power ticks.  The
+        // controller now samples decisions only at those boundaries, so a
+        // faster alternating stimulus would exercise debounce rejection
+        // instead of filling the event FIFO.
+        tick(80);
         if (evt_ovf != 32'd0) k = 2000;     // stop as soon as it overflows
       end
       check(evt_ovf > 32'd0,      "FIFO overflow is counted");
@@ -271,7 +275,109 @@ module tb_tandem_agc_stress;
       stop;
     end
 
-    // -- 9. software/FPGA index mismatch under the quiescence rule ---------
+    // -- 9. zero cooldown must still issue exactly one decision per pulse ---
+    begin : zero_cooldown
+      reg [7:0] transitions0;
+      reg [31:0] accepted0;
+      reg [63:0] tick_sample0, tick_sample1;
+      reg [63:0] event_sample0, event_sample1;
+      integer event_samples_seen;
+
+      // D-10 programs a sample count, not a terminal divider value.  Observe
+      // consecutive internal ticks directly so an N+1 divider regression is
+      // caught independently of the detector and pulse paths.
+      cfg_pwr_period = 20'd12;
+      while (core.pwr_tick) begin @(posedge l_clk); #1; end
+      while (!core.pwr_tick) begin @(posedge l_clk); #1; end
+      tick_sample0 = sample_counter;
+      @(posedge l_clk); #1;
+      while (!core.pwr_tick) begin @(posedge l_clk); #1; end
+      tick_sample1 = sample_counter;
+      check((tick_sample1 - tick_sample0) == 64'd12,
+            "power-measurement tick period equals cfg_pwr_period exactly");
+
+      // Reproduce the release oracle's cooldown contract at a short period.
+      // A cooldown of 16 permits the next decision only on the seventeenth
+      // measurement boundary, for an exact 17*12 sample event spacing here.
+      cfg_cooldown = 8'd16;
+      cfg_dwell = 8'd0;
+      cfg_idx_min = 8'd0;
+      rx1_level = -16'sd25; rx2_level = -16'sd25;
+      go(2'd2);
+      event_samples_seen = 0;
+      event_sample0 = 64'd0;
+      event_sample1 = 64'd0;
+      while (event_samples_seen < 2) begin
+        @(posedge l_clk); #1;
+        if (core.evt_push) begin
+          if (event_samples_seen == 0)
+            event_sample0 = core.evt_wdata[63:0];
+          else
+            event_sample1 = core.evt_wdata[63:0];
+          event_samples_seen = event_samples_seen + 1;
+        end
+      end
+      check((event_sample1 - event_sample0) == 64'd204,
+            "cooldown decisions obey exact (cooldown+1)*power-period spacing");
+      stop;
+
+      cfg_cooldown = 8'd0;
+      cfg_dwell = 8'd2;
+      cfg_idx_min = 8'd30;
+      rx1_level = -16'sd62; rx2_level = -16'sd62;
+      go(2'd2);
+      tick(40);
+      transitions0 = cnt_trans;
+      accepted0 = m_acc;
+      rx1_level = -16'sd25; rx2_level = -16'sd25;
+      tick(300);
+      check(expected_index == m_rx1 && expected_index == m_rx2,
+            "zero cooldown keeps the expected and physical indices equal");
+      check((cnt_trans - transitions0) == (m_acc - accepted0),
+            "zero cooldown accepts exactly one transition per physical pulse");
+      stop;
+
+      // Linux uses HOLD as the pulse-quiescence barrier before comparing the
+      // FPGA's expected index with the two AD9361 SPI readbacks.  Request it in
+      // the registered fire-request handoff cycle and prove it is not exposed
+      // until the physical pulse has completed.
+      cfg_idx_min = 8'd0;
+      rx1_level = -16'sd62; rx2_level = -16'sd62;
+      go(2'd2);
+      rx1_level = -16'sd25; rx2_level = -16'sd25;
+      wait (core.fire_req);
+      mode_req = 2'd1;
+      @(posedge l_clk); #1;
+      check(state == 3'd3 && pulse_busy,
+            "HOLD remains ACTIVE while a queued pulse starts");
+      wait (!core.fire_req && !pulse_busy);
+      tick(2);
+      check(state == 3'd2,
+            "HOLD becomes visible only after the queued pulse completes");
+      stop;
+
+      // A mode request can change in the cycle before the lifecycle FSM leaves
+      // ACTIVE.  Once AUTO is withdrawn, that edge must not accept a new gain
+      // decision even if a detector remains asserted.
+      rx1_level = -16'sd62; rx2_level = -16'sd62;
+      go(2'd2);
+      rx1_level = -16'sd25; rx2_level = -16'sd25;
+      wait (core.want_decrease && !core.pulse_pending && !core.blanked);
+      @(negedge l_clk);
+      transitions0 = cnt_trans;
+      mode_req = 2'd1;
+      @(posedge l_clk); #1;
+      check(cnt_trans == transitions0 && !core.fire_req && !pulse_busy,
+            "withdrawing AUTO cannot accept a final unrequested pulse");
+      tick(2);
+      check(state == 3'd2, "withdrawn AUTO reaches quiescent HOLD");
+      stop;
+      cfg_cooldown = 8'd2;
+      cfg_idx_min = 8'd0;
+      tick(4);
+    end
+
+    // -- 10. software/FPGA index mismatch under the quiescence rule --------
     begin : mismatch
       go(2'd2);
       rx1_level = -16'sd62; rx2_level = -16'sd62;   // hold band, so it is quiet

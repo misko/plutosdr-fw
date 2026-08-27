@@ -1,0 +1,171 @@
+# Immutable source graph for the final tandem AGC v8 build.
+#
+# The external component graph remains identical from RC4 through RC31, but the
+# tracked top-level repository does not. RC5 added post-RC4
+# stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
+# mutually exclusive dwell storage behind an explicit qualification-class tag.
+# RC7 corrected the integrated report policy, RC8 made the bundle/checksum
+# inventories bytewise deterministic, and RC9 removed the host deployer's
+# redundant historical-proof input without changing firmware behavior. RC9's
+# first live execute then stopped before reboot or DFU because duplicate
+# 192.168.2.0/24 routes and password-only factory SSH were not handled by the
+# guarded host transport. RC10 added an exact temporary /32 route lease,
+# private password-file authentication, and a v3 measured receipt. Its first
+# execute transitioned db696 to serial-less 0456:b674 DFU and failed closed
+# before any candidate download; exact-topology detach recovered persistent RC1
+# safely with no receipt or QSPI write and with the route absent. RC11 permits
+# an absent/empty serial only for exact b674 on the pre-attested topology while
+# keeping all runtime b673 paths exact-serial. Its first guarded execute then
+# exposed a stale dfu-util selector: both the planner and receipt validator used
+# only b674 although the trusted DFU suffix identifies b673. dfu-util exited
+# before transferring bytes; paired-selector exact-topology detach recovered
+# persistent RC1 safely with no receipt, deployment, or QSPI write. RC12 aligned
+# both -D and -e with the documented b673,b674 selector, locked exact commit
+# 12261ed055d4488d64aa7ff5353b680a37c3f93d, and passed trusted run
+# 32978460325. Its second db696 execute completed the paired RAM transition and
+# returned exact b673 running RC12, but postboot and cleanup SSH both exited 255:
+# the RAM rootfs starts Dropbear with -R and no persistent host key. No deployment
+# receipt or retained preboot QSPI digest was published, so RC12 has one observed
+# RAM transition but zero valid receipt-authorized deployments and is not
+# hardware-qualified. RC13 removes the unsatisfiable known-hosts pin, uses exact
+# password-only SSH with all known-hosts files disabled, and versions the measured
+# receipt as v4 while retaining serial/topology, isolated /32 route, IIO/model,
+# QSPI equality, safe-state, and paired-selector checks. RC14 moved the live
+# device transaction and original receipt to exact pluto-plus-utils commit
+# 9ef137768d59925acf21d5cd3ff71d1cb523dba7 while retaining every operational
+# guard and keeping plutosdr-fw as the release-plan/evidence-policy owner. Its
+# trusted build/index passed, but utility preflight exposed global-discovery and
+# capability-name defects before reboot or DFU. RC15 pinned that correction and
+# passed build/indexing, then failed closed on the real sysfs DFU symlink before
+# candidate download. RC16 pinned utility commit
+# 2654f34eb909904ec65bc0526e0f8977cb30e2ed with exact symlink resolution and
+# completed a safe db696 RAM boot with unchanged QSPI. Its passing receipt was
+# rejected because the bridge confused release frame schema v5 with the live
+# IIO buffer ABI v2. RC17 kept those contracts separate; its trusted build,
+# candidate evidence, four RAM deployments, and four lifecycle reports passed.
+# The first full comparison then failed closed before USB because the durable
+# host-libiio validator resolved the firmware wrapper beneath the distinct
+# libiio repository. RC18 corrected that binding, then passed its trusted build,
+# evidence, four RAM deployments, and four lifecycle reports. Its first db696
+# full comparison recorded one marginal native-fast-attack cell and cleaned up;
+# the authorized retry stopped before USB because canonical JSON sorted phase
+# keys while the resume loader required execution order. RC19 corrected that
+# comparison, passed its source-locked build, candidate evidence, four RAM-only
+# deployments, and four lifecycle reports, then reached the full RF campaign.
+# Native fast attack repeatedly measured between -3.00 and -2.47 dBFS with zero
+# clipping, strong SNR, and coherent dual-RX capture, so the shared -3.0 dBFS
+# amplitude ceiling rejected otherwise valid cells. RC20 retained every firmware
+# and external-source byte while fixing only that release oracle. Its trusted
+# build, four RAM deployments, and lifecycle checks passed, but its full campaign
+# did not qualify: one 2.45-GHz run had weak-rung SNR contamination and two
+# 915-MHz runs exposed a settle/measurement-boundary evidence defect. RC21 kept
+# all external pins, hardened that boundary and failure-IQ evidence, and moved
+# authorization to fixed 1.05/1.55/2.05/5.8-GHz centers with a nonauthorizing
+# full 2.45-GHz diagnostic. Its trusted build and db696 RAM/lifecycle passed,
+# but 1.05-GHz hardware measured 16,400-sample paired-event spacing where the
+# contract requires 17,408. RC22 corrects the N+1 power divider and permits
+# tandem gain decisions only on exact power-measurement ticks. Its build,
+# db696 RAM/lifecycle, and all eleven 1.05-GHz steady policy matrices passed.
+# The transient oracle then rejected a fully retained startup AUTO convergence
+# even though a later contiguous event-free eight-frame suffix was stable before
+# the scheduled attack. RC23 corrected that boundary, passed its trusted build,
+# db696 RAM deployment, and lifecycle, then exposed a second host-oracle defect:
+# the oracle demanded zero clipping during the deliberately overloaded response
+# outside the narrow command-write bracket despite exact-cadence paired events
+# and stable suffixes. RC24 retained all such response windows as diagnostic,
+# passed its trusted build, db696 RAM deployment, and lifecycle, then passed
+# manual, native-slow, and native-fast at 1.05 GHz. Tandem invalidated because
+# separate sysfs reads of one coherent FPGA status bundle straddled a legitimate
+# AUTO transition and manufactured a mixed transition-count/gain snapshot.
+# RC25 brackets both endpoint reads with the transition count and accepts only a
+# stable paired snapshot, while retaining final metadata on close-ledger errors.
+# Its inner 1.05-GHz transient report passed all four comparison modes, but the
+# outer release replay contradicted the frozen producer contract by rejecting
+# startup conditioning and diagnostic-only commanded-response RF windows. RC26
+# aligned semantic replay with the exact producer policy, passed its trusted
+# build, indexed evidence, four RAM deployments, and four lifecycle reports.
+# Two db696 full attempts then stopped in the same 1.05-GHz low-power matrix when
+# the host metadata provider returned ENODATA after consuming a frame without
+# complete gain/RSSI observation. Both retained failure IQ and safe cleanup.
+# RC27 boundedly retries only metadata-buffer ENODATA and requires the next
+# accepted frame to expose the omission through the unchanged continuity oracle;
+# ordinary IIO ENODATA remains fatal. Event/count continuity, paired endpoints,
+# the 10-dB threshold, and every identity/metadata/evidence/safety/fault/cleanup
+# failure remain fatal. RC27 passed its trusted build, indexed evidence, four RAM
+# deployments, four lifecycle reports, and every 1.05-GHz steady matrix. Its
+# 1.55-GHz cooldown-0 matrix then omitted all louder-TX DECREASE events with the
+# two-buffer host DMA queue, so the strict oracle correctly refused to infer
+# direction from gap-hidden transitions. The exact nonauthorizing replay passed
+# with 16 buffers and directly retained 17 DECREASE plus 16 INCREASE events.
+# RC28 changed only the steady quality harness default to 16 buffers. It passed
+# its trusted build, indexed evidence, four RAM deployments, four lifecycle
+# reports, all 44 authorizing steady matrices, and all four db696 transient
+# phases. Its first modulated phase then stopped before opening a TX buffer
+# because the no-FIR AD9361 image rejected the 1,024,000-S/s request. A bounded
+# 2,500,000-S/s, eight-samples/symbol, 390,625-Hz-blocker, sixteen-buffer
+# diagnostic passed all eight modulated cells with cleanup verified. RC29 used
+# that proven host configuration, passed trusted run 33080376518, indexed
+# evidence, all four RAM deployments, and all four lifecycle reports. Its four
+# cleanup-verified fleet attempts failed closed on late native-fast settling,
+# cooldown-zero transport loss, and an unreliable 5.8-GHz weak endpoint. RC30
+# changes only the host qualification policy to eight stable settle frames, a
+# 48-buffer reserve only for cooldown-zero captures, and the exact passing
+# 4.2-GHz table-3 sentinel. RC30 then passed all offline, OOC, trusted build,
+# package, checksum, and candidate-index gates, but its fleet-wide release
+# inventory failed closed before hardware when it encountered an unrelated
+# ordinary ADALM-Pluto. RC31 retained all device/RF policy and advanced only the
+# pinned device tool to b2b3113c2e8724453179f09d357b4917c0f14c77, whose
+# read-only inventory scans the full bus while requiring exactly one matching
+# requested serial. Hidden transitions remain unproven and every identity, RF,
+# event, safety, and cleanup gate stays strict. RC31 passed its source-locked
+# build and three-radio RAM/lifecycle scope but stopped at 4.2-GHz native-fast
+# gain-lock evidence. RC32 retains the device graph and makes fast attack
+# binding while retaining post-lock weak recovery diagnostically. RC32 must
+# pass its source-locked build and full three-radio hardware qualification
+# before this final graph is used. The subsequent final build may change only
+# the top-level release
+# identity and packaging, while requiring exact component identities in packed
+# /opt/VERSIONS.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: 70739d25ec1fa7b95d9069bd26a3e4192fdb3851
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/tandem-agc-v8-rc3-source/libiio-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: f89eb67b2c0131640ae9c9e0f0be46da000f3e37
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/tandem-agc-v8-rc3-source/buildroot-v1
+
+submodule_hdl: dec1dba5b9563c4c58c39fb76df904e462819ad5
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/tandem-agc-v2-source/hdl-v2
+
+submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/gain-series-v4-rc10-source/hdl-quantulum
+
+submodule_linux: 77a1f2352162097bb983402f47c9cb4a28a2f055
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/tandem-agc-v2-source/linux-v11
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: tandem-agc-v2-source/hdl-v2
+versions_buildroot: tandem-agc-v8-rc3-source/buildroot-v1
+versions_linux: tandem-agc-v2-source/linux-v11
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

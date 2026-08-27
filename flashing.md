@@ -35,7 +35,7 @@ The examples use Linux and the GitHub CLI:
 
 ```bash
 sudo apt-get update
-sudo apt-get install --no-install-recommends dfu-util gh openssh-client
+sudo apt-get install --no-install-recommends dfu-util gh iproute2 openssh-client sshpass sudo
 gh auth status
 ```
 
@@ -295,12 +295,18 @@ different native library.
 
 This is the preferred normal Pluto+ method. It uses `pluto.frm`, which the
 running radio validates before writing only the `mtd3` firmware partition.
+For the controlled tandem-v8 rollout, `pluto-plus-utils` remains the required
+device interface: extend its existing `pluto firmware flash` workflow with the
+published-release/index binding and durable per-serial receipt described in the
+release plan before installing the final image. The manual steps in this
+section are reference/recovery procedures, not authorization for that rollout.
 
 ### Obtain `pluto.frm`
 
-A local full build produces `build/pluto.frm`. Releases from this repository
-currently publish `pluto.dfu`; both formats wrap the same FIT image. Convert a
-downloaded DFU without rebuilding:
+A local full build produces `build/pluto.frm`. Tandem AGC v8 releases publish
+the attested `pluto.frm` directly; use that release asset for this method.
+Older DFU-only release assets can be converted without rebuilding because
+`pluto.dfu` and `pluto.frm` wrap the same FIT image:
 
 ```bash
 test -n "${dfu_image:-}" && test -f "$dfu_image"
@@ -356,9 +362,17 @@ This loads `pluto.dfu` through U-Boot's SPI-flash DFU mode. It is equivalent in
 scope to the mass-storage method when—and only when—the selected alternate is
 `firmware.dfu`.
 
-First request SPI-flash mode from the running radio:
+The tandem-v8 controlled rollout must use the reviewed `pluto-plus-utils`
+persistent lifecycle, not these raw commands. Keep this recipe for a single
+physically isolated recovery radio only.
+
+First record the current boot identity, then request SPI-flash mode from the
+running radio:
 
 ```bash
+pre_boot_id="$(ssh root@192.168.2.1 \
+  'cat /proc/sys/kernel/random/boot_id')"
+test -n "$pre_boot_id"
 ssh root@192.168.2.1 '/usr/sbin/device_reboot sf'
 ```
 
@@ -381,10 +395,21 @@ sudo dfu-util \
   -e
 ```
 
-Use DFU detach (`-e`) to jump into the downloaded RAM image. Do not use `-R`
-for this step: on the tested Pluto+ bootloader, USB reset restarted the
-processor from the persistently installed QSPI image and discarded the RAM
-download. Always verify `/opt/VERSIONS` and the boot ID after enumeration.
+Here DFU detach (`-e`) exits DFU mode after `firmware.dfu` has written the
+persistent firmware partition; it is not a RAM boot. Do not substitute `-R`
+for this step. After the radio re-enumerates, require a new boot identity and
+the exact installed release identity:
+
+```bash
+expected_firmware_version='REPLACE_WITH_EXACT_RELEASE_VERSION'
+post_boot_id="$(ssh root@192.168.2.1 \
+  'cat /proc/sys/kernel/random/boot_id')"
+installed_firmware_version="$(ssh root@192.168.2.1 \
+  "awk '\$1 == \"device-fw\" {print \$2; exit}' /opt/VERSIONS")"
+test -n "$post_boot_id"
+test "$post_boot_id" != "$pre_boot_id"
+test "$installed_firmware_version" = "$expected_firmware_version"
+```
 
 If more than one radio is present, do not run an ambiguous command. Disconnect
 the others or select the intended USB path using `dfu-util -p` after checking
@@ -397,18 +422,95 @@ Never select `boot.dfu` or `uboot-env.dfu` during a routine Pluto+ update.
 RAM boot runs a candidate without changing QSPI. A power cycle returns the
 radio to its persistently installed firmware.
 
+Do not use a raw `dfu-util -R` recipe for this transition. The retained RC4
+record directly shows a successful firmware download followed by DFU detach
+into the candidate image. It does not independently prove the previously
+described `-R` result or that no QSPI write occurred, so it is historical
+support for selecting `-e`, not a deployment authorization artifact. The
+guarded deployer proves the safety-relevant facts directly on every run.
+
+Use the native `pluto-plus-utils` release-candidate lifecycle through the pinned
+firmware wrapper. `plutosdr-fw` first produces a private candidate plan from the
+exact artifact index; the utility then creates a read-only USB inventory and a
+file-only per-radio operation plan. Only the final execute command opens IIO,
+SSH, or DFU. Retain the original four files together in the serial-scoped
+candidate archive; the firmware evidence consumer validates them directly.
+
 ```bash
-ssh root@192.168.2.1 '/usr/sbin/device_reboot ram'
-dfu-util -l -d 0456:b673,0456:b674
-sudo dfu-util -R \
-  -d 0456:b673,0456:b674 \
-  -a firmware.dfu \
-  -D "$dfu_image"
+deploy_root="$candidate_archive/hardware/deploy/$serial"
+install -d -m 0700 "$deploy_root"
+python3 scripts/tandem_release_device_plan.py \
+  --artifact-index "$absolute_candidate_index" \
+  --output "$deploy_root/release-candidate-plan.json"
+scripts/deploy_tandem_agc_ram_hardware.sh inventory \
+  --output "$deploy_root/usb-inventory.json"
+scripts/deploy_tandem_agc_ram_hardware.sh plan \
+  --candidate-plan "$deploy_root/release-candidate-plan.json" \
+  --usb-inventory "$deploy_root/usb-inventory.json" \
+  --serial "$serial" \
+  --expected-current-firmware "$current_device_fw" \
+  --receipt "$deploy_root/ram-boot-receipt.json" \
+  --output "$deploy_root/operation-plan.json"
 ```
 
-The repository also provides `download_and_test.sh` and the `dfu-ram` Make
-target for a locally built `build/pluto.dfu`. They perform this same volatile
-sequence.
+Actual execution requires an owned mode-`0600` password file and the exact
+serial-bound confirmation printed in the operation plan. Keep the password file
+outside the candidate/evidence archive; the deployer never prints, hashes, or
+copies its contents. There is no external transition proof or other
+authorization file.
+
+The invoking account must be able to run the narrow route add/delete commands
+with `sudo -n` for the duration of the run. Refresh its sudo ticket immediately
+beforehand or install a narrowly scoped NOPASSWD rule; do not run the whole
+deployer as root, because its owned-input checks deliberately bind to the
+invoking account.
+
+```bash
+scripts/deploy_tandem_agc_ram_hardware.sh execute \
+  --operation-plan "$deploy_root/operation-plan.json" \
+  --ssh-password-file "$absolute_ssh_password_file" \
+  --confirm "RAM BOOT RELEASE CANDIDATE $serial"
+scripts/deploy_tandem_agc_ram_hardware.sh receipt-verify \
+  "$deploy_root/ram-boot-receipt.json"
+```
+
+The executor permits only `firmware.dfu` download on the selected radio's
+unique USB topology followed by DFU detach. It first binds the requested serial
+to an exact `0456:b673` runtime device and topology. During the dedicated DFU
+transition, Pluto firmware may expose the same topology as `0456:b674` without
+a sysfs serial; that one missing value is acceptable only when the b674 device
+is unique on the pre-attested topology. A nonempty mismatching serial, wrong
+topology, ambiguous or unstable inventory, wrong VID/PID, or serialless b673
+runtime still fails closed. The returning runtime and all cleanup decisions
+again require the exact requested serial.
+
+Because several attached Plutos can all use host `192.168.2.10` and target
+`192.168.2.1`, the executor serializes deployments with a global lease, refuses
+any pre-existing target `/32`, temporarily adds that `/32` through the selected
+USB interface and source address, verifies the kernel route choice before
+every SSH call, and removes and verifies the route before publishing a receipt.
+It never changes the connected `/24` routes. The SSH command uses the supplied
+password file through `sshpass` and permits one password prompt. Pluto RAM
+boots generate a fresh ephemeral host key, so the deployer deliberately
+disables SSH host-key checking and all known-hosts files. Device ownership is
+instead constrained by the exact USB serial/topology, returned Pluto+ IIO
+hardware model, and isolated `/32` route through that radio's interface.
+
+The executor rejects USB reset, SPI-flash/QSPI, boot and environment
+alternates, full ZIP/FRM files, and raw MTD targets. It publishes the original
+utility receipt, including the observed hardware model and verified
+temporary-route cleanup, only after the same serial and exact Pluto+ hardware model return with
+a new boot ID, the candidate firmware identity, and verified TX/DDS/DAC/tandem
+safe state.
+Before and after the RAM transition it also reads SHA-256 over the exact
+`qspi-linux` `/dev/mtdblock3` partition. The receipt's pre/post runtime QSPI
+records must identify the same partition, size, and digest; any change
+blocks receipt publication.
+
+`download_and_test.sh` is now quarantined and points to this guarded entry
+point. The legacy `make dfu-ram` target is not an authorized candidate or
+release procedure because it cannot carry the required serial, artifact-index,
+and receipt bindings or perform the measured pre/post checks.
 
 An important trap: while a RAM image is active, `/opt/VERSIONS` describes that
 RAM image—not the image stored in QSPI. Reboot or power-cycle back to QSPI

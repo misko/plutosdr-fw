@@ -1,9 +1,26 @@
 # Changes that can alter what the trusted Kalman runner executes or packages.
+/.github/CODEOWNERS @misko
 /.github/workflows/ @misko
 /scripts/ci/ @misko
 /scripts/build_gain_series_candidate.sh @misko
 /scripts/check_source_graph.sh @misko
 /scripts/test_gain_series_hdl.sh @misko
+/scripts/check_tandem_release_offline.sh @misko
+/scripts/run_tandem_agc_ooc.sh @misko
+/scripts/validate_tandem_agc_ooc.py @misko
+/scripts/validate_integrated_release.py @misko
+/scripts/tandem_release_evidence.py @misko
+/scripts/tandem_release_device_plan.py @misko
+/scripts/deploy_tandem_agc_ram_hardware.sh @misko
+/scripts/run_tandem_agc_release_hardware.sh @misko
+/scripts/run_muted_metadata_batch_lifecycle_hardware.sh @misko
+/scripts/run_stale_small_adc_hardware.sh @misko
+/tests/radio_hardware/candidate_binding.py @misko
+/tests/radio_hardware/pluto_plus_candidate.py @misko
+/tests/radio_hardware/tandem_ram_deploy.py @misko
+/tests/radio_hardware/release_cli.py @misko
+/tests/radio_hardware/muted_metadata_batch_lifecycle.py @misko
+/tests/radio_hardware/stale_small_adc_hardware.py @misko
 /manifests/ @misko
 /.gitmodules @misko
 /Makefile @misko

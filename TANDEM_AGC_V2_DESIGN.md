@@ -207,7 +207,9 @@ decimation settings.
 | Condition | Decision |
 | --- | --- |
 | Either channel reports large overload | Decrease both gains by one index |
-| Either channel reports small-ADC inhibit | Hold |
+| Both channels remain below low threshold and a small-ADC latch remains asserted, with no large overload | After a separate full dwell, decrease both gains by one index once, with reason `SMALL_ADC_INHIBIT`, to clear the stale latch |
+| The same contradiction reaches the configured minimum or survives/reappears after its one clear attempt | Set the sticky illegal-condition fault and leave auto; never issue a second clear decrease |
+| Either channel reports small-ADC inhibit in every other state | Hold |
 | Both channels remain below low threshold for the full dwell | Increase both gains by one index |
 | Otherwise | Hold |
 
@@ -215,6 +217,26 @@ An accepted change requires auto mode, completed cooldown, no active fault,
 consumer readiness, synchronized modeled/hardware indices, and room in the
 event FIFO. Limits clamp both channels as a pair. One accepted transition emits
 exactly one event.
+
+The small-ADC exception is deliberately a conservative decrease, not a
+low-power override. UG-570 specifies that small-ADC overload remains latched
+until a gain change, while MGC low-power follows the current average. A prior
+strong signal can therefore leave both indications asserted after the signal
+falls. Allowing an increase in that combination would be unsafe when a current
+peak has arrived before the next low-power update; one paired decrease is safe
+in both interpretations and clears the stale latch.
+
+Clean both-low dwell and small-latch-conflict dwell are independent and accrue
+only on power ticks for which auto could accept a decision. Pulse handoff,
+detector blanking, cooldown, HOLD, or a fault resets both, and even a configured
+zero dwell requires one fresh eligible tick. The clear attempt remains consumed
+through detector flicker, clean low-power increases, and HOLD. It is re-armed
+only after a later accepted ordinary large-overload decrease, that edge's
+pulse/blank/cooldown, and a separate full eligible dwell with neither low-power
+bit nor a large overload asserted. Every further large decrease restarts that
+proof. This prevents high-PAPR traffic from ratcheting the pair toward minimum.
+A new ownership acquisition resets the clear budget; a HOLD-to-AUTO toggle
+inside the same ownership epoch does not.
 
 The complete AXI configuration bundle crosses clock domains through a snapshot
 handshake. The AXI write channels apply backpressure while a prior snapshot is
@@ -260,6 +282,8 @@ The following suppress pulses immediately and end auto mode:
 - consumer lease loss;
 - FIFO overflow or event-sequence loss;
 - illegal ownership transition;
+- an at-minimum small-ADC/low-power contradiction, or one that persists after
+  its single conservative clear attempt;
 - MMIO or SPI failure;
 - AD9361 reset/reinitialize attempt;
 - controller watchdog expiry.

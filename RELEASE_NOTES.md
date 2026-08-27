@@ -21,6 +21,36 @@
 | `libiio-metadata-v6-rc4` | 2026-08-17 | **hardware-qualified, persistent prerelease** | fail-closed TX boot state, recoverable identity diagnostics, and W25Q256FV support for #34/#33 |
 | `libiio-metadata-v6` | 2026-08-17 | superseded | final RC4 graph, exact release identity, four-board persistent qualification |
 | **`tandem-agc-v7`** | 2026-08-19 | **current hardware-qualified** | paired RX1/RX2 AGC, ABI-2 metadata control, synchronous close, and four-board persistent qualification |
+| `tandem-agc-v8-rc1` | 2026-08-21 | **hardware-qualified persistent prerelease** | device-side cached AD9361 temperature in each fresh metadata frame |
+| `tandem-agc-v8-rc2` – `rc4` | 2026-08-22 – 2026-08-25 | superseded candidates | bounded batch lifecycle, Linux cleanup, and corrected request/pulse handoff; RC4 was invalidated by the later stale-small-ADC recovery change |
+| `tandem-agc-v8-rc5` | 2026-08-26 | **rejected; no release artifact** | complete candidate route reached the trusted build, but integrated placement was 17 slices over the available device capacity |
+| `tandem-agc-v8-rc6` | 2026-08-26 | **rejected; diagnostics only** | fully routed and timing-clean, then rejected by stale post-route report policy before packaging |
+| `tandem-agc-v8-rc7` | 2026-08-26 | **rejected before evidence/hardware** | successful integrated build; bundle rejected because checksum/member order depended on locale and shell-array order |
+| `tandem-agc-v8-rc8` | 2026-08-26 | **successful indexed build; not deployed** | deterministic bundle and verified candidate index; hardware transition blocked by an over-scoped serial-specific proof |
+| `tandem-agc-v8-rc9` | 2026-08-26 | **successful indexed build; rejected before hardware transition** | removed the redundant transition-proof input; first execute exposed duplicate-IP routing and factory-password transport gaps before reboot or DFU |
+| `tandem-agc-v8-rc10` | 2026-08-26 | **successful indexed build; zero candidate deployments** | trusted build and evidence passed; first execute reached DFU but stopped before candidate download because the selected b674 device omitted its USB serial |
+| `tandem-agc-v8-rc11` | 2026-08-26 | **successful indexed build; zero candidate deployments** | serialless-b674 topology resolution passed, but dfu-util rejected the single-ID selector before transferring the b673-suffixed DFU |
+| `tandem-agc-v8-rc12` | 2026-08-26 | **successful indexed build; observed RAM boot, no deployment receipt; not hardware-qualified** | paired DFU download/detach succeeded on db696, but the ephemeral RAM SSH host key prevented receipt publication |
+| `tandem-agc-v8-rc13` | 2026-08-26 | **source-locked; trusted run queued without a job; superseded before artifact/hardware** | removed the unsatisfiable retained host-key pin and advanced the measured RAM receipt to v4 |
+| `tandem-agc-v8-rc14` | 2026-08-26 | **successful indexed build; zero RAM transitions; superseded** | native utility ownership was integrated, but live preflight exposed global libiio discovery and capability-name defects before reboot/DFU |
+| `tandem-agc-v8-rc15` | 2026-08-26 | **successful indexed build; zero candidate downloads; superseded** | exact DFU transition reached b674, then failed closed on the real-kernel sysfs symlink before candidate bytes transferred |
+| `tandem-agc-v8-rc16` | 2026-08-26 | **successful indexed build; observed safe RAM boot, no valid deployment receipt; superseded** | RAM boot and containment checks passed, but the device-plan bridge confused release frame schema v5 with live IIO buffer ABI v2 |
+| `tandem-agc-v8-rc17` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; full campaign blocked before USB; superseded** | host-libiio replay resolved the firmware wrapper beneath the distinct libiio repository |
+| `tandem-agc-v8-rc18` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; one marginal full-test result; superseded** | trusted build/evidence and muted lifecycle passed on all four; db696 steady characterization found one native-fast-attack cell 0.27332 dB above its quality ceiling, then canonical checkpoint key ordering blocked the authorized retry before USB |
+| `tandem-agc-v8-rc19` | 2026-08-26 | **four safe RAM deployments and lifecycle passes; full steady policy rejected; superseded** | resume passed; native-fast cells reached -2.47 dBFS without clipping against the shared -3.0 dBFS ceiling |
+| `tandem-agc-v8-rc20` | 2026-08-26 | **trusted build and four RAM/lifecycle passes; full campaign failed; superseded** | 2.45-GHz weak-SNR contamination plus two settle/measurement-boundary oracle failures; no passing full/soak campaign |
+| `tandem-agc-v8-rc21` | 2026-08-27 | **successful indexed build and pilot RAM/lifecycle; 1.05-GHz campaign failed; superseded** | exposed FPGA power-period/event-spacing mismatch: 16,400 samples observed where the contract requires 17,408 |
+| `tandem-agc-v8-rc22` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle and 11/11 steady policies passed; transient oracle invalid; superseded** | fixed exact power periods/event spacing; the transient harness rejected a fully retained startup convergence before its stable pre-attack suffix |
+| `tandem-agc-v8-rc23` | 2026-08-27 | **successful indexed build; db696 RAM/lifecycle passed; transient response oracle invalid; superseded** | retained exact-cadence paired response events, but the host oracle demanded zero clipping during a deliberately overloaded AUTO response |
+| `tandem-agc-v8-rc24` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; three transient comparison modes passed; tandem invalid; superseded** | separate host sysfs reads straddled one AUTO transition and manufactured a mixed transition-count/gain snapshot |
+| `tandem-agc-v8-rc25` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; all four inner transient modes passed; outer replay invalid; superseded** | fixed coherent host status reads; outer replay contradicted the frozen producer policy for startup conditioning and diagnostic response windows |
+| `tandem-agc-v8-rc26` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | replay alignment passed, but two db696 full attempts stopped on metadata-provider ENODATA in the same 1.05-GHz low-power matrix |
+| `tandem-agc-v8-rc27` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | passed all 1.05-GHz steady policies; two-buffer capture omitted every louder-TX DECREASE event in the authorizing 1.55-GHz cooldown-0 matrix |
+| `tandem-agc-v8-rc28` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | all 44 steady and four transient pilot phases passed; unsupported 1.024-MS/s no-FIR modulated rate failed before TX buffer creation |
+| `tandem-agc-v8-rc29` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded** | fixed the modulated configuration; fleet attempts exposed late native-AGC settling, cooldown-zero transport loss, and an unreliable 5.8-GHz endpoint |
+| `tandem-agc-v8-rc30` | 2026-08-27 | **trusted indexed build; zero candidate deployments; superseded** | all software/build gates passed; mixed ordinary-Pluto/Pluto+ USB inventory failed closed before hardware |
+| `tandem-agc-v8-rc31` | 2026-08-27 | **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded** | native fast AGC intermittently held one RX chain at the 4.2-GHz strong-signal step |
+| `tandem-agc-v8-rc32` | 2026-08-27 | **final release; trusted build passed; hardware campaign failed** | db696 passed RAM boot, lifecycle, 44 steady cases, four transient bands, and 1.05-GHz modulation; 1.55-GHz native-fast RX1 gain degradation was 3.595 dB and binding |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -28,6 +58,1026 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc32 — 2026-08-27 — **final release; trusted build passed; hardware campaign failed**
+
+RC31 passed trusted integrated build `33101253206`, candidate indexing, and
+exact-serial RAM deployment/lifecycle on the three authorized radios. Its one
+db696 campaign retry stopped at 4.2 GHz when native fast attack intermittently
+held one RX chain's gain. Improved failure evidence and ten nonauthorizing
+reproductions showed that a 62 dB manual seed under the live weak waveform made
+the strong-signal attack deterministic in all ten runs, while one post-lock
+weak recovery remained dependent on the AD9361 fast-AGC unlock conditions.
+
+RC32 retains the exact RC31 device firmware, external graph, RF plan, pinned
+device tool, thresholds, and safety policy. It makes native fast's per-channel
+strong-signal response binding and records post-lock weak recovery as
+diagnostic; manual, slow AGC, and tandem keep their binding contracts. RC32
+uses branch `codex/firmware-tandem-agc-v8-rc32`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc32`, manifest
+`manifests/tandem-agc-v8-rc32-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc32`, and source lock
+`refs/tags/tandem-agc-v8-rc32-source/firmware-v2`. Topology 3-8 is excluded by
+operator authorization; the other three radios remain one-at-a-time.
+
+RC32 source-lock attempt `firmware-v1` passed all 1,481 offline oracles and was
+dispatched as trusted run `33112960920`. It was cancelled during the build,
+before artifact publication or hardware use, when review found that the
+promotion-index assembler still required exactly four serials and therefore
+could not represent the operator-authorized three-radio scope. The immutable
+v1 tag is retained as failed pre-hardware history. RC32 `firmware-v2` replaces
+the count-only rule with the exact three permitted serials and rejects the
+excluded 3-8 serial or any substituted radio.
+
+RC32 `firmware-v2` passed 1,482 selected offline tests, all required RTL/CDC,
+stress, AXI, source-graph, legal-info, routed OOC, integrated-release, and
+trusted build gates. Trusted run `33114655961` produced the published bundle
+with SHA-256 `f2cfce1da93e7b8fbd09da58c66fd227f946ba402526b22d3e02ed11e1901b8f`
+and DFU with SHA-256
+`36ade44da992afa27b3c74a53626cf364f35f99e6548a6acefef5762bcd27744`.
+
+On `winbond-db6968136727402c`, exact-serial RAM boot and the 64-frame muted
+metadata lifecycle passed with unchanged QSPI and verified cleanup. The full
+campaign then passed all 44 steady-characterization cases, all four transient
+bands, and the 1.05-GHz modulated manual/native-slow/native-fast/tandem matrix.
+The 1.55-GHz matrix failed its binding native-fast RX1 gain-degradation limit:
+the desired-gain change was -3.595 dB against a 3 dB limit. Manual,
+native-slow, and tandem-auto passed the same comparison, and final cleanup
+verified TX muted, DDS zero, and safe selectors. The failed evidence is
+retained; no hardware retry was authorized. The remaining two modulation
+bands, 2.45-GHz diagnostic, soaks, and other two radios were not run, so RC32
+must not be described as hardware-qualified.
+
+Five host-only setup failures were also retained and did not change device or
+RF state: the first RAM launch loaded an incompatible system libiio; two
+lifecycle preflights used a mismatched cached source and then a Python
+environment without setuptools; the first full-run preflight rejected an
+untracked-file-dirty shared libiio worktree; and plan-only validation rejected
+group-writable evidence directories until they were hardened. PR CI later
+exposed a separate checkout defect: Linux source-audit tests ran without the
+pinned `linux` submodule. The PR workflow now initializes both required HDL
+and Linux oracle sources.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc31 — 2026-08-27 — **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded**
+
+RC30 locked exact commit `aa9c56c664d5cd5f74d2c70b4e271682593f08a4`,
+passed all 1,465 offline oracles, routed OOC, trusted integrated build
+`33097467689`, deterministic packaging, independent checksum verification, and
+candidate-index verification. Its candidate index SHA-256 is
+`51b9ba05f1e1309a6724565d038c63b945126ac9406cd1a3cc0b1fb9f21e6999`.
+Before any reboot or DFU transfer, the pinned device tool correctly failed
+closed because its fleet-wide inventory encountered an unrelated ordinary
+ADALM-Pluto beside the four Pluto+ targets. RC30 has zero candidate deployments,
+is immutable, and is not hardware-qualified.
+
+`pluto-plus-utils` commit `b2b3113c2e8724453179f09d357b4917c0f14c77`
+adds an explicit read-only `candidate-ram inventory --serial` boundary. It still
+scans the full USB bus, requires exactly one matching runtime, and applies every
+strict Pluto+, stable-serial, topology, interface, and source-address check to
+that target. An absent or duplicate serial, or selecting the ordinary Pluto,
+fails closed. Its focused tests passed 52/52 and full suite passed 725 with ten
+explicit opt-in hardware/browser skips.
+
+RC31 retains RC30's exact device firmware, external source graph, four-band RF
+policy, mandatory 2.45-GHz diagnostic, thresholds, and strict event, identity,
+safety, and cleanup gates. It changes only the pinned device-tool commit and
+candidate identity. RC31 uses branch `codex/firmware-tandem-agc-v8-rc31`,
+version `v0.41-plutoplus-spf-tandem-agc-v8-rc31`, manifest
+`manifests/tandem-agc-v8-rc31-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc31`, and source lock
+`refs/tags/tandem-agc-v8-rc31-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc30 — 2026-08-27 — **trusted indexed build; zero candidate deployments; superseded**
+
+RC29 locked exact commit `02a8cf18b8b81fd6a8a3e6725bb9d483e88e464b`,
+passed owner-dispatched trusted run `33080376518`, candidate indexing, all four
+exact-serial RAM deployments with unchanged QSPI, and all four lifecycle
+reports. Its four fleet campaign attempts all cleaned up safely but failed
+closed: db696's native-fast gain relocked during the 2.05-GHz measurement;
+db620 and R17 gap-hid cooldown-zero transition bursts; and R18's native-fast
+weak endpoint was unreliable at 5.8 GHz. RC29 is immutable and not
+hardware-qualified.
+
+Controlled, nonauthorizing replays isolated the host-qualification remedies.
+Eight stable settle frames passed the db696 2.05-GHz case using the ordinary
+16-buffer queue. A 48-buffer queue retained all cooldown-zero frames and all
+18 exact transition events on the slower R17 USB path. The exact 4.2-GHz
+table-3 sentinel passed manual, native-slow, native-fast, and tandem modes with
+weak-endpoint SNR around 13--15 dB; unlike 5.8 GHz, native-fast had useful gain
+span. These replays did not require an RF threshold, event proof, identity,
+safety, or cleanup relaxation.
+
+RC30 retains RC29's exact device firmware and external source graph. It changes
+only the authorizing host policy: steady matrices require eight stable settle
+frames, only cooldown-zero matrices reserve 48 DMA buffers, and 4.2 GHz
+replaces 5.8 GHz as the table-3 sentinel. Exact authorizing centers are now
+1.05, 1.55, 2.05, and 4.2 GHz. The complete 2.45-GHz matrix remains mandatory;
+only an isolated cleanup-verified RF-quality failure there is nonbinding.
+RC30 uses branch `codex/firmware-tandem-agc-v8-rc30`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc30`, manifest
+`manifests/tandem-agc-v8-rc30-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc30`, and source lock
+`refs/tags/tandem-agc-v8-rc30-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc29 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; fleet campaign invalid; superseded**
+
+RC28 locked exact commit `2ed9faa136ab3c79298b6d20d9b2060d9ce19831`
+and passed owner-dispatched trusted run `33072902542`, candidate indexing, four
+exact-serial RAM deployments, four lifecycle reports, all 44 authorizing steady matrices,
+and all four transient comparison phases on db696. Its first
+1.05-GHz modulated phase then stopped before opening a TX buffer: the no-FIR
+AD9361 image rejected the harness's 1,024,000-S/s sampling-frequency write with
+EINVAL. Safe cleanup passed. A bounded diagnostic changed only the dimensionally
+linked modulated configuration to 2,500,000 S/s, eight samples/symbol, a
+390,625-Hz blocker, and 16 kernel DMA buffers; all eight manual, native-slow,
+native-fast, and tandem desired/blocked cells passed with cleanup verified.
+RC28 is immutable and not hardware-qualified.
+
+RC29 retains RC28's exact device firmware, external source graph, RF thresholds,
+four authorizing centers, mandatory nonbinding 2.45-GHz matrix, and every strict
+identity, metadata, event/count/continuity, evidence, QSPI, safe-state,
+FIFO/fault/overflow, and cleanup gate. It changes only the host modulated
+configuration to the exact passing diagnostic values and rejects release input
+below 2.5 MS/s before hardware. RC29 uses branch
+`codex/firmware-tandem-agc-v8-rc29`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc29`, manifest
+`manifests/tandem-agc-v8-rc29-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc29`, and source lock
+`refs/tags/tandem-agc-v8-rc29-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc28 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded**
+
+RC28 retains RC27's exact device firmware, external source graph, RF thresholds,
+and strict event/count/continuity policy. RC27 passed owner-dispatched trusted
+run `33067056765`, indexed evidence, four exact-serial RAM deployments, four
+lifecycle reports, and all eleven 1.05-GHz steady matrices. Its db696 full
+campaign then stopped at the authorizing 1.55-GHz cooldown-0 matrix. With two
+kernel DMA buffers, 47 producer frames were omitted and every louder-TX
+DECREASE transition was gap-hidden. The paired gain endpoints reconciled, but
+the fail-closed oracle correctly refused to treat hidden transitions as proof.
+RC27 is immutable and not hardware-qualified.
+
+The exact nonauthorizing replay changed only `kernel_buffers=2` to `16`. It
+passed in 36.77 seconds with complete safe cleanup, only five missing frames,
+17 explicit DECREASE events, 16 explicit INCREASE events, and both directions
+proven. RC28 therefore changes only the steady quality harness default to 16
+buffers. Hidden transitions remain unproven; the 10-dB per-capture threshold
+and every paired-event, identity, metadata, evidence, QSPI, safe-state,
+FIFO/fault/overflow, and cleanup gate remain unchanged.
+
+RC28 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix remains mandatory and evidence-complete, while an isolated
+cleanup-verified RF-quality failure there remains nonbinding. RC28 uses branch
+`codex/firmware-tandem-agc-v8-rc28`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc28`, manifest
+`manifests/tandem-agc-v8-rc28-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc28`, and source lock
+`refs/tags/tandem-agc-v8-rc28-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc27 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded**
+
+RC27 retains RC26's exact device firmware and external source graph. It changes
+only the host qualification refill policy exposed by the two retained RC26
+failures: the metadata provider reports ENODATA after consuming a post-startup
+DMA frame when that frame has no complete gain/RSSI observation. RC27 treats
+metadata-buffer ENODATA like the already bounded startup EAGAIN omission under
+the existing 65-refill limit. The next accepted frame must expose the sequence
+gap to the unchanged continuity oracle. Ordinary IIO ENODATA remains fatal;
+hidden transitions remain unproven settling evidence and never prove direction.
+The 10-dB per-capture threshold, paired-event/count rules, RF-quality criteria,
+identity, metadata, evidence, QSPI, safe-state, FIFO/fault/overflow, and cleanup
+gates are unchanged.
+
+RC27 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure remains nonbinding. RC27 uses branch
+`codex/firmware-tandem-agc-v8-rc27`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc27`, manifest
+`manifests/tandem-agc-v8-rc27-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc27`, and source lock
+`refs/tags/tandem-agc-v8-rc27-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc26 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded**
+
+RC26 retains RC25's exact firmware implementation and external source graph.
+It removes two contradictory outer-replay assumptions exposed by the retained
+RC25 transient pilot: startup AUTO convergence may contain a bounded hidden
+transition and commanded-response frames may be RF-invalid while the AGC is
+responding. Neither window supplies steady-state response proof. Strict RF
+quality remains mandatory in each exact contiguous event-free eight-frame
+suffix, including the unchanged 10-dB per-capture threshold. Event/count
+continuity, paired endpoints, identity, metadata, evidence completeness,
+fault/FIFO/overflow, safe state, and cleanup remain fatal.
+
+RC26 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure remains nonbinding.
+
+Exact RC26 commit `5b65c62e00920f32dac994fbc7df7a31a2e7019e` passed
+owner-dispatched trusted run `33062658275`, candidate assembly, four exact-serial RAM deployments, and four lifecycle reports. On db696, full
+attempt 1 and the one explicitly authorized fresh retry both passed the
+1.05-GHz baseline and then stopped in low-power-16 tandem AUTO when the host
+metadata provider returned ENODATA after consuming a frame without complete
+gain/RSSI observation. Both attempts retained 117 accepted IQ frames plus the
+offending capture; both cleanup records prove TX muted, DDS zero, selectors
+ZERO, tandem IDLE, and FIFO/overflow/fault zero. This was not an RF-quality or
+controller verdict, but RC26 had no policy to preserve the omission and
+continue. No further RC26 retry is authorized; RC26 is immutable and not
+hardware-qualified.
+
+RC26 uses branch
+`codex/firmware-tandem-agc-v8-rc26`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc26`, manifest
+`manifests/tandem-agc-v8-rc26-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc26`, and source lock
+`refs/tags/tandem-agc-v8-rc26-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc25 — 2026-08-27 — **successful indexed build and db696 RAM/lifecycle; all four inner transient modes passed; outer replay invalid; superseded**
+
+RC25 retains RC24's exact firmware and external source graph. It fixes the host
+status-read defect exposed by the RC24 transient pilot: transition count and
+the two gain endpoints are separate sysfs attributes even though the FPGA
+publishes one coherent status bundle. The host now brackets both endpoint reads
+with transition-count reads, accepts only a stable paired snapshot, and fails
+closed after a bounded read-only retry. Close-ledger failures also retain every
+parsed batch frame so the exact final metadata remains replayable.
+
+RC25 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
+evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+The exact RC25 commit `687aaf442658db5388880535f4d1f4efd944374c`
+passed owner-dispatched trusted run `33058150539`, candidate assembly, db696
+RAM deployment, and lifecycle. Deployment receipt SHA-256 was
+`5109e07bd8354dd704f6d8b394c0c7bb061a6eba6362fd9ace356909200f50c2`;
+lifecycle report SHA-256 was
+`72639603bc6ee28c1446de8e869e344bcf7ca8432daf3a0032eeb5d7aaf523a1`.
+The retained 1.05-GHz inner transient report passed all four comparison modes:
+manual, native-slow, native-fast, and tandem AUTO, with cleanup verified. The
+outer release replay nevertheless marked the phase invalid because it demanded
+zero startup-hidden transitions and rejected diagnostic response-frame RF
+invalidity outside narrow host command brackets. That contradicted the frozen
+producer policy; RC25 has no passing outer full/soak campaign and is immutable
+and not hardware-qualified.
+
+RC25 uses branch `codex/firmware-tandem-agc-v8-rc25`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc25`, manifest
+`manifests/tandem-agc-v8-rc25-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc25`, and source lock
+`refs/tags/tandem-agc-v8-rc25-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc24 — 2026-08-27 — **successful indexed build and db696 RAM/lifecycle; transient tandem invalid; superseded**
+
+RC24 retains RC23's exact firmware and external source graph. It corrects the
+transient evidence policy exposed by RC23 hardware. Conditioning and commanded
+overload/response windows remain fully retained diagnostic evidence and cannot
+authorize PASS. Strict RF-quality gates apply to the exact contiguous,
+event-free eight-frame suffix of each pre-attack, attack, and release steady
+partition. Any RF-quality failure in those suffixes remains fatal; metadata,
+event cadence, direction proof, transport continuity, safety, and cleanup gates
+remain unchanged.
+
+RC24 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
+evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+RC24 locked exact commit `88505f12a2d518fc6b8681db184437dc7c646141`.
+Owner-dispatched trusted run `33053594379`, attempt 1, completed successfully
+and retained artifact ID `9639287887`. Candidate index SHA-256
+`d7b1e9ffdaf65b1e2cf024ad916149f646890515704ad32fc53a159ce6301c17`
+passed independent semantic replay. On db696, RAM receipt SHA-256
+`b82cb747ca9773c379bf76d64e5dd4eb068be8a8b1a4c0ac0372ad20123c268b`
+proved a new RC24 boot with unchanged QSPI and final safe state; lifecycle
+report SHA-256
+`9e532b2d2edf3fcf95c71f81cc442e80a3c24326fdd574b3cd96dc716926a66e`
+passed all 64 frames and cleanup checks. The 1.05-GHz transient pilot then
+passed manual, native-slow, and native-fast. Tandem invalidated because the host
+read transition count and the two gain endpoints separately while AUTO was
+live, producing an impossible mixed snapshot across one legitimate transition.
+Cleanup passed, the exact route was removed, and no persistent write occurred.
+RC24 has no passing full or soak result and is not hardware-qualified.
+
+RC24 uses branch `codex/firmware-tandem-agc-v8-rc24`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc24`, manifest
+`manifests/tandem-agc-v8-rc24-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc24`, and source lock
+`refs/tags/tandem-agc-v8-rc24-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc23 — 2026-08-27 — **successful indexed build; db696 RAM/lifecycle passed; transient response oracle invalid; superseded**
+
+RC23 retains RC22's exact firmware and external source graph. It corrects the
+transient evidence policy exposed by RC22 hardware: startup AUTO convergence is
+retained and validated as conditioning, but can never prove attack or release
+direction. Only the final eight fully-pre-attack frames may anchor timing, and
+they must be contiguous, event-free, gap-free, endpoint-stable, RF-stable, and
+constant in cumulative transition count. Any transition or hidden evidence in
+that suffix remains fatal; the attack/release events and direction proof remain
+unchanged.
+
+RC23 keeps exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The full
+2.45-GHz matrix still runs and retains complete evidence, but an isolated
+cleanup-verified RF-quality failure is nonbinding. Identity, metadata, missing
+evidence, fault/FIFO/overflow, and cleanup failures remain fatal.
+
+Trusted run `33049331161` passed and produced exact candidate evidence. The
+db696 pilot passed RAM-only deployment, unchanged-QSPI and safe-state checks,
+and the full v5 muted metadata lifecycle. Its 1.05-GHz transient pilot retained
+startup conditioning, exact-cadence paired `large_adc` decrease events through
+the deliberate overload response, and strict stable suffix evidence. The old
+host oracle nevertheless demanded zero clipping and full RF quality during the
+deliberately overloaded response outside the narrow command-write bracket.
+That assumption—not the RC23 firmware—invalidated the phase. RC23 has no
+passing full/soak campaign and is not hardware-qualified. The earlier 11/11
+steady-policy pass belongs to immutable RC22 evidence.
+
+RC23 uses branch `codex/firmware-tandem-agc-v8-rc23`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc23`, manifest
+`manifests/tandem-agc-v8-rc23-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc23`, and source lock
+`refs/tags/tandem-agc-v8-rc23-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc22 — 2026-08-27 — **successful indexed build; db696 RAM/lifecycle and 11/11 steady policies passed; transient oracle invalid; superseded**
+
+RC22 is the forward-only correction for the timing-contract defect measured on
+RC21. The power divider now emits a tick every programmed `N` valid samples,
+not `N+1`, and the tandem controller can accept a gain decision only on that
+tick. With cooldown `N`, consecutive accepted events are therefore separated
+by at least `(N+1) * power_measurement_samples`, exactly matching the provider
+and release oracle. Cycle-accurate stress tests independently prove a 12-sample
+tick and a `17 * 12 = 204` sample cooldown/event interval so either half of the
+fix fails closed.
+
+RC22 retains the exact authorizing centers 1.05, 1.55, 2.05, and 5.8 GHz. The
+full 2.45-GHz matrix still runs last and retains complete evidence, but an
+isolated cleanup-verified RF-quality failure is nonbinding. Identity, metadata,
+missing evidence, fault/FIFO/overflow, and cleanup failures remain fatal; RC22
+makes no 2.4-GHz RF-performance claim.
+
+Trusted run `33045015785` passed and produced exact candidate evidence. The
+db696 pilot passed RAM-only deployment, unchanged-QSPI and safe-state checks,
+and the full v5 muted metadata lifecycle. All eleven 1.05-GHz steady policies
+then passed across manual fixed gain, native slow attack, native fast attack,
+and tandem AUTO, directly proving the RC21 event-spacing defect fixed. The
+transient campaign retained a startup AUTO convergence followed by more than
+eight contiguous quiet pre-attack frames, but the RC22 host oracle required
+every pre-attack frame to remain at transition count zero. That assumption—not
+the RC22 firmware—invalidated the phase. RC22 has no passing full/soak campaign
+and is not hardware-qualified.
+
+RC22 uses branch `codex/firmware-tandem-agc-v8-rc22`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc22`, manifest
+`manifests/tandem-agc-v8-rc22-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc22`, and source lock
+`refs/tags/tandem-agc-v8-rc22-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc21 — 2026-08-27 — **successful indexed build and pilot RAM/lifecycle; 1.05-GHz campaign failed; superseded**
+
+RC21 retained the exact RC20 firmware and external source graph. It fixed the
+settle-to-measurement evidence boundary with continuous metadata accounting,
+one bounded full-attempt restart, atomic retained failure evidence, and a
+128 MiB write-on-failure IQ ledger. Its authorizing hardware matrix uses exact
+ordered centers 1.05, 1.55, 2.05, and 5.8 GHz. Every radio also runs the same
+full manual/native-slow/native-fast/tandem matrix at fixed 2.45 GHz. A complete,
+cleanup-verified RF-quality-only failure there is recorded as
+`diagnostic_failed` and does not enter the release denominator; any identity,
+metadata, missing-evidence, fault/FIFO/overflow, or cleanup failure is fatal.
+RC21 made no 2.4-GHz RF-performance claim. Its trusted workflow run
+`33041851068` and candidate index passed. The db696 pilot passed RAM-only
+deployment, unchanged-QSPI attestation, final safe state, and the full v5 muted
+metadata lifecycle. Its 1.05-GHz full steady campaign then stopped at the
+zero-cooldown policy because the provider could not prove both AUTO directions
+from the retained cadence. A separate instrumented transient diagnostic made
+the underlying firmware defect exact: paired events arrived every **16,400**
+samples while the published cooldown contract requires **17,408**. The RTL
+counted `N+1` samples per power period and allowed decisions between ticks.
+RC21 has no passing full or soak campaign and is not hardware-qualified.
+
+RC21 uses branch `codex/firmware-tandem-agc-v8-rc21`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc21`, manifest
+`manifests/tandem-agc-v8-rc21-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc21`, and source lock
+`refs/tags/tandem-agc-v8-rc21-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc20 — 2026-08-26 — **trusted build and four RAM/lifecycle passes; full campaign failed; superseded**
+
+RC20 retains RC19's firmware implementation, external source graph,
+deterministic package, native `pluto-plus-utils` device lifecycle, and every
+release safety/evidence guard. It changes one fixed RF-quality policy only:
+native fast attack accepts a maximum tone of `-2.0 dBFS`; manual fixed gain,
+native slow attack, and tandem AUTO retain `-3.0 dBFS`. Zero clipping remains
+mandatory, and SNR, coherence, phase stability, frequency, gain behavior,
+metadata continuity, QSPI equality, cleanup, and all TX/fixture limits are
+unchanged. The limit is not exposed as an operator-tunable CLI option.
+
+RC20 uses branch `codex/firmware-tandem-agc-v8-rc20`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc20`, manifest
+`manifests/tandem-agc-v8-rc20-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc20`, and source lock
+`refs/tags/tandem-agc-v8-rc20-source/firmware-v1`.
+
+RC20 locked commit `63108b832a3618631386afdf530f19acb7905bca`,
+passed trusted workflow run `33020653933`, and produced candidate index
+`326d1c985665fb20f69a5bf00351c833971a15240c6c8c7d187811d4fe96d397`.
+All four radios passed RAM-only deployment and lifecycle. The full campaign
+never qualified: attempt 1 recorded weak-rung SNR failures at 2.45 GHz without
+raw IQ, and attempts 2/3 stopped on settle/measurement-boundary assertions that
+discarded the offending frame. RC20 has no passing transient, modulated, soak,
+campaign-qualified index, or promotion evidence.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc19 — 2026-08-26 — **four safe RAM deployments and lifecycle passes; full steady policy rejected; superseded**
+
+RC19 retains RC18's firmware implementation, external source graph,
+deterministic package, device operator, and release guardrails. It changes only
+multi-phase checkpoint replay: canonical JSON is allowed to sort phase-object
+keys, while resume requires the exact phase-key set and revalidates each stored
+phase specification against the current requested plan. RC19 uses branch
+`codex/firmware-tandem-agc-v8-rc19`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc19`, manifest
+`manifests/tandem-agc-v8-rc19-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc19`, and source lock
+`refs/tags/tandem-agc-v8-rc19-source/firmware-v1`.
+
+RC19 locked exact commit `70949a18a7f42d99fdd5356b128f37b7c7fa2b7e`.
+Trusted run `33015979913`, attempt 1, succeeded with artifact ID `9625051298`.
+Its verified candidate-index SHA-256 is
+`f099bdfba1e529730b7012d6a75c995d73165994daaa00501eb2e5bcbca57e81`;
+bundle SHA-256 is
+`48bc63f64db25352323687f8fa8e2fa8c244a6fff99b7f97344208d83f757919`;
+DFU SHA-256 is
+`a786dbc78b72e43474485d9af73765fda7e0fd4f9a47a3fadfd98fc1152b3242`;
+and FIT SHA-256 is
+`cb9d7027b775443bcc99535c96cf38effce132727827c2ba1bc796bf579f9283`.
+All four exact radios completed RAM-only deployment with unchanged QSPI and
+verified safe state, then passed the 64-frame muted metadata lifecycle plus
+cancel/reopen checks.
+
+The full steady campaign then exposed a policy mismatch, not clipping or
+signal corruption. Native fast attack produced zero-clipping, high-SNR,
+coherent dual-RX captures between `-3.00` and `-2.47 dBFS`; the shared
+`-3.0 dBFS` maximum rejected those cells on db696, db620, and R17. Cleanup
+passed after every stop. R18 separately saw one strict tandem transition-count
+continuity rejection; that rule is unchanged and must pass on retry. RC19 has
+no passing full campaign, no soak result, and is not hardware-qualified.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc18 — 2026-08-26 — **four safe RAM deployments and lifecycle passes; one marginal full-test result; superseded**
+
+RC18 retains RC17's firmware bytes, external source graph, deterministic
+packaging, v5 release/evidence schema, v2 live buffer ABI, and pushed
+`pluto-plus-utils` commit
+`2654f34eb909904ec65bc0526e0f8977cb30e2ed`. It corrects the durable
+host-libiio replay validator to resolve the indexed release wrapper beneath the
+firmware runner repository rather than the separate pinned libiio repository.
+RC18 uses branch `codex/firmware-tandem-agc-v8-rc18`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc18`, manifest
+`manifests/tandem-agc-v8-rc18-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc18`, and source lock
+`refs/tags/tandem-agc-v8-rc18-source/firmware-v1`.
+
+RC18 locked exact commit `ac7bbfebe7f0a2d639c8e68bc0efe493f950d389`.
+Trusted run `33011655732` succeeded with artifact ID `9623402489`, bundle
+SHA-256 `fe4bce0e3d2bc06d1fb814d1f05263e1b6482453957a003b42e03bafddc0f90d`,
+DFU SHA-256 `6379598f554c33622b817fd28a5ff34b1bf74b0519d8e4608b315fa0699b105a`,
+FIT SHA-256 `e354aedae7c229e3372c1b2799c91c8966dff48f0375af6fccb372b7cdafe012`,
+and candidate-index SHA-256
+`8eea002ab8267ed4a53cad38cdc926cb961904baea83bb3ec9c3d136ed3360ee`.
+All four exact radios completed RAM-only deployment with unchanged QSPI and
+the verified safe state, then passed the 64-frame muted metadata lifecycle and
+cancel/reopen checks. The first db696 full comparison reached the steady
+characterization: every cell except one passed, with zero clipping and strong
+coherence/SNR. Native fast attack at level 5 and TX -35 dB measured -2.72668
+dBFS against a -3.0 dBFS maximum. Cleanup passed. The explicitly authorized
+retry stopped before USB because canonical JSON sorted phase-object keys while
+the loader required execution-order iteration. RC18 therefore has no passing
+full campaign or soak result and is not hardware-qualified.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc17 — 2026-08-26 — **four safe RAM deployments and lifecycle passes; full campaign blocked before USB; superseded**
+
+RC17 retains RC16's firmware implementation, external source graph, and pushed
+`pluto-plus-utils` main commit
+`2654f34eb909904ec65bc0526e0f8977cb30e2ed`. The firmware-to-utility bridge
+now keeps two exact contracts distinct: the release index remains
+`frame-metadata-v5`, while the live IIO context and utility receipt require
+`frame-metadata-v2`. RC17 uses branch
+`codex/firmware-tandem-agc-v8-rc17`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc17`, manifest
+`manifests/tandem-agc-v8-rc17-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc17`, and source lock
+`refs/tags/tandem-agc-v8-rc17-source/firmware-v1`.
+
+RC17 locked exact commit `f74d082e789564f0adc81c62b82e924e3e913eb1`.
+Trusted run `33006829961` succeeded with artifact ID `9621479267`, bundle
+SHA-256 `52c30ab1131cbe60e2ed891041e7832d9f914e07a86ff47a6072bf5b1d3ead51`,
+DFU SHA-256 `be9df081618df4879a037f6b6b949fc755f12bbaf07540d3c8c4654c6d06ea93`,
+and candidate-index SHA-256
+`25b9f0b33fae40ebc1c09cb4f27051e1664d9ec85d6929de2903f765427b74cc`.
+All four exact radios completed RAM-only deployment with unchanged QSPI and the
+verified safe state, then passed the 64-frame muted metadata lifecycle plus
+cancel/reopen checks. The first full comparison stopped before opening USB:
+the durable host-libiio validator compared the committed firmware wrapper path
+against the distinct libiio repository path. No RF phase ran. RC17 therefore
+has four valid deployment receipts and four lifecycle passes, but no full or
+soak qualification and no persistent write.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc16 — 2026-08-26 — **successful indexed build; observed safe RAM boot, no valid deployment receipt; superseded**
+
+RC16 retains RC15's firmware implementation and complete external source graph.
+It pins pushed `misko/pluto-plus-utils` main commit
+`2654f34eb909904ec65bc0526e0f8977cb30e2ed`, which accepts the real kernel
+`/sys/bus/usb/devices/<topology>` symlink while still binding the resolved node
+to the exact topology. It also provides a guarded recovery/attestation command
+for an unknown transition, including an already-returned runtime and an explicit
+expected persistent firmware identity. RC16 used branch
+`codex/firmware-tandem-agc-v8-rc16`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc16`, manifest
+`manifests/tandem-agc-v8-rc16-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc16`, and source lock
+`refs/tags/tandem-agc-v8-rc16-source/firmware-v1`.
+
+RC16 locked exact commit `8ad724edad93cb81cb0647fb202a17b9e8c0a95d`.
+Trusted run `33002865124`, attempt 1, succeeded with artifact ID `9619942296`.
+The outer ZIP SHA-256 is
+`2dc53d08c72cd0aa35286333474521406d25b4fd4b3f8207bbf5dda2795e4a9f`;
+bundle SHA-256 is
+`4260ef263ed5167ddaf6f2394e8db3527871e8376199dd384c1713a88142344a`;
+DFU SHA-256 is
+`42f95fc67949069c7d24fe61bbf6043103e66326760dc1a1ca475c65306daa20`;
+and candidate-index SHA-256 is
+`781a34867dc27c336e75d59b3444f4e84bd958f088d679775eaa9ea7366d0f23`.
+
+On db696 the utility completed the exact sealed paired-selector RAM download
+and detach. The same topology/serial returned with a new boot ID and exact RC16
+firmware; `qspi-linux` remained SHA-256
+`066487d9d135dd492a75fe04912d0e18efae565b0666ae72c40ee4fbbb31d9b8`,
+and the measured final state was TX gains `[-80,-80]`, all DDS values zero,
+selectors `[3,3,3,3]`, tandem `IDLE`, FIFO 0, and faults 0. The temporary `/32`
+route was removed. Receipt publication failed closed because the plan expected
+the v5 release/evidence frame schema as the live IIO buffer ABI, while the
+device correctly exposed ABI 2. The durable unknown-receipt SHA-256 is
+`470cd86373fecd65c0464d995880418317fb8c089feb4a0eb802791dd791010f`.
+RC16 therefore has one observed safe RAM deployment, zero valid passing
+deployment receipts, no persistent write, and no hardware qualification.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc15 — 2026-08-26 — **successful indexed build; zero candidate downloads; superseded**
+
+RC15 retained RC14's firmware implementation and complete external source graph.
+It pins pushed `misko/pluto-plus-utils` main commit
+`5ab8361211e747387c5dfa854f5ae65a6a4dac87`, which opens the exact
+topology-bound USB-IIO URI directly, cross-checks the live serial, model, and
+firmware, preserves the already-found tandem capability, and defaults execution
+to its own clean source checkout. Every route, password-only SSH, paired DFU,
+sealed-input, QSPI-equality, and safe-state guard remains unchanged. RC15 uses
+branch `codex/firmware-tandem-agc-v8-rc15`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc15`, manifest
+`manifests/tandem-agc-v8-rc15-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc15`, and source lock
+`refs/tags/tandem-agc-v8-rc15-source/firmware-v1`.
+
+RC15 locked exact commit `5e84a0cdd19f7635e688821d926ee7eca39c7eab`.
+Trusted run `32998047232`, attempt 1, succeeded with artifact ID `9618005590`.
+Bundle SHA-256 is
+`8329a2de2b62815192fc0e2b4fbe5835e6f434ab6c4b1fdbe34ddd409eb5e4d3`;
+DFU SHA-256 is
+`0f431cf97958085d129ca1beebefa4793a9c66df5a7040cdb25f4a7ed74fd6f2`;
+FIT SHA-256 is
+`0a293879252b30101bd76ce830140532e27a843b7856a7bb793c094e620f2cc7`;
+and candidate-index SHA-256 is
+`82838fe2e8d980c6097c80634c890eae30aac678f52708aafe07c112ad9e5dd9`.
+On db696 the guarded execute passed pre-attestation and requested RAM mode, but
+the exact b674 resolver rejected the real kernel sysfs symlink before any
+candidate download. The unknown receipt SHA-256 is
+`1bb16cb1e72a458fcd9a4a6d2b298978de62fa38845483bcbc01c73914abe4a6`.
+Corrected utility recovery returned the same radio to persistent RC1, proved
+the pre-attempt `qspi-linux` digest unchanged and the final safe state, and
+removed the `/32` route; recovery receipt SHA-256 is
+`e82d8ae9aff57ff255aea0347b1bcc60f7f800546d6e3a847a192f65fc10b6ee`.
+RC15 therefore has no candidate download or valid deployment receipt and is
+immutable but superseded by RC16.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc14 — 2026-08-26 — **successful indexed build; zero RAM transitions; superseded**
+
+RC14 retained RC13's firmware implementation and complete external source graph.
+Its release-process change makes pushed `misko/pluto-plus-utils` main commit
+`9ef137768d59925acf21d5cd3ff71d1cb523dba7` the sole live device operator.
+`plutosdr-fw` produces a private release-candidate plan pinned to that repository,
+version, and commit, and validates the original utility USB inventory, per-radio
+operation plan, and measured RAM receipt without translating them.
+
+The utility transaction retains the exact serial/topology resolver, private
+password-only SSH with host-key files disabled for ephemeral RAM keys, owned
+`192.168.2.1/32` route lease, paired `0456:b673,0456:b674` selector, sealed DFU
+input, new boot identity, equal pre/post `qspi-linux` digest, full final safe
+state, and verified route cleanup. It authorizes no `-S`, `-R`, persistent
+target, or QSPI write. RC14 used branch
+`codex/firmware-tandem-agc-v8-rc14`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc14`, manifest
+`manifests/tandem-agc-v8-rc14-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc14`, and source lock
+`refs/tags/tandem-agc-v8-rc14-source/firmware-v1`.
+
+RC14 locked exact commit `2fb96f7a207848e6579293addbaa27fc0a59f5a9`.
+Trusted run `32993231088`, attempt 1, succeeded and uploaded artifact ID
+`9616104711`. The outer ZIP SHA-256 is
+`bb3f9e0ddaea5b3d4ced996379da97caa1c743ac6349a34e7f5e9df671b4ed21`;
+bundle SHA-256 is
+`90d4833a74fcad8c0f183d6bc6ff4ea7e32844bfbe27f2869fc2ac6b57ee1804`;
+DFU SHA-256 is
+`3baa589e7eba8ea763b4f84b966163614cf9f7274f898a2e181168ca72d88ce7`;
+FIT SHA-256 is
+`2e9b7485b4bdb19d2c4f88316a899f92afc0ba424e61493e7c0179e6f1c6f358`;
+and candidate-index SHA-256 is
+`7fb1616eee706350b124a84a053ea2340d25de9fa4a2366c421fc06fc78f306d`.
+The exact index passed live and detached semantic replay.
+
+The first db696 execute failed before I/O because the tool-repository default
+resolved to the firmware working directory. With the explicit repository, the
+utility's libiio 0.26 global discovery returned errno 26 on an unrelated
+backend. With the release-pinned libiio runtime, preflight then found the exact
+tandem device but incorrectly derived an empty capability set from numeric IIO
+ids. All failures occurred before `device_reboot ram`, DFU, or receipt
+publication; routes were removed and db696 remained exact RC12 and safe.
+A bounded patched-code preflight later proved direct `usb:3.29.5` attestation,
+unchanged QSPI, full mute/IDLE state, and route cleanup, but cannot authorize the
+immutable RC14 tool identity. Therefore RC14 has zero RC14 RAM transitions and
+zero valid receipts; RC15 advances the corrected tool commit.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc13 — 2026-08-26 — **source-locked; trusted run queued without a job; superseded before artifact/hardware**
+
+RC13 was the forward-only candidate after RC12 built and indexed successfully
+and completed one observed RAM transition on db696, but could not publish its
+measured receipt. RC13 retains RC12's firmware implementation, external source
+graph, deterministic package, exact serial/topology resolver, paired
+`0456:b673,0456:b674` selector for both `-D` and `-e`, per-radio `/32` route,
+IIO/model checks, QSPI equality check, and final safe-state checks. It changes
+only the SSH host-key boundary, receipt schema, and release lineage.
+
+Pluto RAM boots generate a fresh Dropbear key. RC13 therefore removes the
+`--known-hosts` and `--known-hosts-sha256` CLI inputs and the
+`known_hosts_sha256` receipt member. Receipt schema v4 requires password-only
+SSH through `sshpass -f`, exact interface binding, one password prompt, and
+these exact options: `StrictHostKeyChecking=no`,
+`UserKnownHostsFile=/dev/null`, and `GlobalKnownHostsFile=/dev/null`, together
+with `PasswordAuthentication=yes`, `PubkeyAuthentication=no`,
+`KbdInteractiveAuthentication=no`, `CheckHostIP=no`, and `UpdateHostKeys=no`.
+The exact USB serial/topology, returned b673 serial, Pluto+ IIO model, isolated
+route, new boot ID, equal pre/post QSPI digest, safe runtime, and paired DFU
+commands remain mandatory.
+
+RC13 locked exact commit `3361acb3446b517854ca1cfc144d28c4dd853743`.
+Owner dispatch `32985347441`, attempt 1, remained queued without an allocated
+job and was superseded before it produced an artifact, candidate index, receipt,
+or hardware access. The RC13 route uses branch `codex/firmware-tandem-agc-v8-rc13`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc13`, manifest
+`manifests/tandem-agc-v8-rc13-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc13`, and source lock
+`refs/tags/tandem-agc-v8-rc13-source/firmware-v1`. RC12's source lock, trusted
+build, artifact, candidate index, and observed no-receipt incident remain
+immutable. RC13's host-key correction remains historical; RC15 replaces its
+device-operation/evidence harness before any four-radio campaign.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc12 — 2026-08-26 — **successful indexed build; observed RAM boot, no deployment receipt; not hardware-qualified**
+
+RC12 locked exact commit
+`12261ed055d4488d64aa7ff5353b680a37c3f93d` at source lock
+`refs/tags/tandem-agc-v8-rc12-source/firmware-v1`. Owner-dispatched trusted run
+`32978460325`, attempt 1, completed successfully and retained artifact ID
+`9611124509`, named
+`plutoplus-main-12261ed055d4488d64aa7ff5353b680a37c3f93d-32978460325-1`.
+Its outer ZIP SHA-256 is
+`9ceb66dc670811ec7d717788edb3257f1c56db68ad9a035dd8df2b1e43106429`;
+verified candidate-index SHA-256 is
+`a339c99eb7d16980b33249d5a8a5e8c0693a4d22cbf6333c5ce0b3aa2b0151cd`;
+bundle SHA-256 is
+`789aa4d9e8fc672a2040abeee89a34de5f62dafd9e933628ac09d0aac21444c2`;
+DFU SHA-256 is
+`6ffe6ddf898986b1fd6629db796b6b10422a4e5a00da268e0f63d1d258db52a0`;
+and FIT SHA-256 is
+`5db1c49f954e630e4d2a41860bc6bf3f1a6e58749c5c382398caa30887781957`.
+The complete build, artifact, and evidence index passed and remain immutable.
+
+On `winbond-db6968136727402c` at exact topology `3-7`, the first attempt
+stopped at the initial runtime SSH command with exit 255 on the stale retained
+RC1 host key, before reboot or DFU. The temporary `/32` route was removed, no
+deployment receipt was published, and persistent RC1 remained safe. The exact
+current key was then enrolled with the isolated serial-attested utility;
+enrollment receipt
+`/tmp/tandem-agc-v8-rc12-hardware-prep.bqEWh8/enrollment-receipts/65362d728b3144aa9687d7df16502731.json`
+records success and has SHA-256
+`11107591e5c48cd8c335c4e8bf9387f1e92459ac8d09d98383071d5670b1d9d7`.
+
+The second attempt passed the initial checks, sent `device_reboot ram`, and
+found the unique exact-topology serialless b674 device. It completed
+paired-selector `-D` and `-e`, then returned exact `0456:b673` as devnum 29 on
+topology `3-7` running RC12. Both postboot and cleanup SSH calls exited 255. The retained RC1
+ED25519 fingerprint was
+`SHA256:ls0RSRupYX9ZJKe9Kh3t9yJHvt54NZTyA+A91ObNGCU`; the topology-bound,
+serial-attested RC12 RAM fingerprint was
+`SHA256:hihAeih3cGjJhpmjkNkPA3qgv55XlUc4OmnJDWniRc8`. The cause is exact:
+`/etc/init.d/S50dropbear` starts Dropbear with `-R` and has no persistent host key,
+so each RAM boot generates a different key and a preboot pin cannot
+authenticate the postboot image.
+
+No deployment receipt, retained deploy log, or retained SSH stderr was
+published, and the candidate hardware directory is empty. A later exact
+runtime observation found URI `usb:3.29.5`, boot UUID
+`f6977760-dda6-431f-8517-733e8402b3c6`, the exact Pluto+ model, and RC12 in a
+safe state: TX gains `[-80,-80]`, every DDS raw value zero, DAC selectors
+`[3,3,3,3]`, tandem `IDLE`, FIFO level 0, and fault flags 0. Current
+`qspi-linux` is 31,457,280 bytes with SHA-256
+`066487d9d135dd492a75fe04912d0e18efae565b0666ae72c40ee4fbbb31d9b8`,
+but no preboot QSPI digest was retained. Therefore postboot QSPI equality is not claimed.
+The tool issued no QSPI write or persistent-target command. The exact
+`/32` route is absent and every peer NIC was restored.
+
+RC12 has one observed successful RC12 RAM deployment.
+It has zero valid receipt-authorized deployments and is not hardware-qualified.
+RC13 corrects only the unsatisfiable ephemeral-host-key boundary, receipt
+schema, and lineage.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc11 — 2026-08-26 — **successful indexed build; zero candidate deployments**
+
+RC11 locked exact source commit
+`4c332666ff054e21e10c1a8137fd5f1cbc73b568` and source ref
+`refs/tags/tandem-agc-v8-rc11-source/firmware-v1`. Trusted run `32970312166`,
+attempt 1, routed all 32,908 nets, used 74 of 80 DSPs, and closed timing at WNS
+`+0.645 ns`, WHS `+0.022 ns`, and minimum bus skew `+8.606 ns`. Artifact ID
+`9607927415` was retained as
+`plutoplus-main-4c332666ff054e21e10c1a8137fd5f1cbc73b568-32970312166-1`.
+
+Its outer ZIP SHA-256 is
+`583c52462725c037ba73aca32d78472ea6784b43764e13ab92996b322ee5b3d3`;
+bundle SHA-256 is
+`91410b15e458eac1a2190dd0fa40ee540b6f7e6bde9e71c70125a9f86dc05c09`;
+DFU SHA-256 is
+`1dd94789dddefb7220caad75fb063ad0fdd2a8f3204f2f4fa48bd1cca2d31481`;
+FIT SHA-256 is
+`50e1544eef70715ac523485391602cbff541596947c9f0a93f17685286bccb34`;
+source-manifest SHA-256 is
+`31693bca03606742978351a1e920c917ad8c0337dba33081666f754fe530eb60`;
+and verified candidate-index SHA-256 is
+`ef8017c539f42d936bcde054e85864e331d4b383167201573c30419d98100831`.
+The immutable RC11 index/archive binds the defective deployer at SHA-256
+`bb17001e7b65d34a71363de4240d8e771c8b3fd1d1229a5e0d14e7bf677bf44e`
+and receipt replay binder at SHA-256
+`299afafb3d08c68a4a3a282164b2f1411e71d508e60cbfbbc1007c1569c927dd`.
+
+On `winbond-db6968136727402c` at pre-attested topology `3-7`, the guarded
+execute passed its runtime and QSPI baseline, sent `/usr/sbin/device_reboot ram`,
+and reached unique exact serialless `0456:b674`. The RC11 planner invoked
+`dfu-util -d 0456:b674 -p 3-7 -a firmware.dfu -D /proc/self/fd/5`; it returned
+non-zero exit status 64 before transferring any candidate bytes because the
+trusted DFU suffix identifies b673. The reproduced diagnostic said File ID `0456:b673` does not match device `(0000:0000 or 0456:b674)`; in full:
+
+```text
+Error: File ID 0456:b673 does not match device (0000:0000 or 0456:b674)
+```
+
+The wrapper's complete terminal error was:
+
+```text
+ERROR: deployment failed (Command '['dfu-util', '-d', '0456:b674', '-p', '3-7', '-a', 'firmware.dfu', '-D', '/proc/self/fd/5']' returned non-zero exit status 64.); safe cleanup also failed (timed out waiting for 0456:b673 on 3-7: expected exactly one 0456:b673 USB device for serial 'winbond-db6968136727402c'; found [])
+```
+
+Cleanup timed out waiting for b673 because the radio remained in b674.
+
+Exact-topology recovery with the paired `0456:b673,0456:b674` selector and
+`-e` returned exact-serial b673, persistent RC1, devnum 27, in a verified safe
+IIO state with the temporary `/32` route absent. Zero candidate bytes were
+transferred, RC11 has zero candidate deployments, no receipt was produced, and
+no QSPI write occurred. There is no retained selector-failure log, so no log
+digest is claimed. The existing
+`/tmp/tandem-agc-v8-rc11-deploy-db696.log` SHA-256
+`55140cc3f1058fd62dd0178d35bcc7fef905eb46d65e5bac69ebdd9c644a38ee`
+belongs to the earlier pre-enrollment SSH stop, not this selector failure.
+RC11's commit, branch, lock, run, artifact, candidate index, and
+zero-deployment history remain immutable. RC12 changes only the paired
+normal/DFU selector boundary and lineage.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc10 — 2026-08-26 — **successful indexed build; zero candidate deployments**
+
+RC10 locked exact source commit
+`1b3ba3dbe942b9880f21ca99dda1de5227794c3d` and source ref
+`refs/tags/tandem-agc-v8-rc10-source/firmware-v1`. Trusted run `32964460396`,
+attempt 1, routed all 32,908 nets, used 74 of 80 DSPs, and closed timing at WNS
+`+0.645 ns`, WHS `+0.022 ns`, and minimum bus skew `+8.606 ns`. Artifact ID
+`9605679961` was retained as
+`plutoplus-main-1b3ba3dbe942b9880f21ca99dda1de5227794c3d-32964460396-1`.
+
+Its outer ZIP SHA-256 is
+`273f4b02cf7438c1c5983ea3b87140000d947cc3dc30c7d0631847c5d934ba2c`;
+bundle SHA-256 is
+`144aaef4ebab18e7b859f0855421060bcaae8031db3acc1d3b195561f1a2047d`;
+DFU SHA-256 is
+`c0a086eb945d27f728a7fb2504de85ef648fc1dcc1d70a928f9d8c999e523913`;
+FIT SHA-256 is
+`7e725f5094f224126f98d923e2cb8668af69d2d79132a81f3ee5a74ff75d48cd`;
+source-manifest SHA-256 is
+`5c04a354075ef7ce98958b82ab8ef03277461f24621b88f4a4d2bda5b6d0931f`;
+and verified candidate-index SHA-256 is
+`827cc1e6d5d36a7a7f6b61b5238dae7df986d0708eef4c2f4a2e41f2f2461b58`.
+
+On radio `winbond-db6968136727402c` at pre-attested topology `3-7`, route,
+authentication, runtime, and QSPI baseline checks passed and
+`/usr/sbin/device_reboot ram` transitioned the device to exact `0456:b674`.
+That DFU device omitted its USB serial, so RC10's exact-serial resolver failed
+closed before any `dfu-util -D`. Consequently zero candidate bytes were
+downloaded, RC10 has zero candidate deployments, no receipt was published, and
+there was no QSPI write. Exact-topology `dfu-util -e` recovered the persistent RC1
+safe runtime, and the temporary `192.168.2.1/32` route was removed and is
+absent. RC10's commit, branch, lock, run, artifact, candidate index, and zero-
+deployment history remain immutable. RC11 changes only the serialless-b674
+transition boundary.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc9 — 2026-08-26 — **successful indexed build; rejected before hardware transition**
+
+RC9 removed RC8's redundant historical transition-proof input without
+changing firmware behavior or the deterministic package contract. Exact source
+commit `9f47ef1746eaf356e53fe52cd9eb608ee8421c62` passed the complete offline and
+routed OOC gates. Trusted Actions run `32957388515`, attempt 1, fully routed
+32,908 of 32,908 nets and closed timing at WNS `+0.645 ns`, WHS `+0.022 ns`,
+and minimum bus skew `+8.606 ns`.
+
+The trusted run produced bundle SHA-256
+`5f3eb4a772fb808f4598c4cc11d6a10936fecdaf045636d33ddfeaeaa9927dc7`,
+DFU SHA-256
+`407c560be90cfdbf459b92f1f76352f83f09cabf9c5f336375bd85868454975`,
+FIT SHA-256
+`19e85e9b1c6ca12e41f8566fcff609a781aedfc9f0135b7c042aa25872a60115`,
+and verified candidate-index SHA-256
+`d2784863cfb74c34e98a2295a1b7532fc19f7f93ef90045b726055f1f99d3efd`.
+
+The first live execute stopped during its initial SSH read, before
+`device_reboot ram`, DFU download, detach, reboot, or receipt publication.
+Competing `192.168.2.0/24` routes selected another attached serial and strict
+known-hosts verification caught the mismatch. A temporary exact `/32` route
+then selected the intended radio, but the key-only SSH policy could not
+authenticate to the factory password-only image. The diagnostic route was
+removed. No radio changed state and RC9 had zero deployments. Its branch,
+source lock `refs/tags/tandem-agc-v8-rc9-source/firmware-v1`, run, artifact,
+and candidate index remain immutable successful reproduction history. RC10
+changes only the host route/authentication boundary and measured receipt.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc8 — 2026-08-26 — **successful indexed build; not deployed**
+
+RC8 was the forward-only candidate after RC7's successful trusted build exposed
+a reproducibility defect at the packaging boundary. It retained RC7's external
+source graph, firmware RTL, placed-and-routed behavior, and integrated
+validation policy. The candidate-only change made archive inventories,
+checksum inputs, and bundle members use one explicit bytewise order independent
+of runner locale and shell-array discovery order.
+
+Trusted Actions run `32952343526`, attempt 1, built exact source commit
+`cc62b65ea8082aad0625a891f0b79b81c78e78c7`. Vivado routed 32,908 of 32,908
+nets, placed 4,399 of 4,400 slices, used 74 of 80 DSPs, and closed timing at
+WNS `+0.645 ns`, WHS `+0.022 ns`, and bus-skew minimum `+8.606 ns`. The run
+produced deterministic bundle SHA-256
+`d55b58e489a58c3c8868f4bfcec4a7901c229a25e801c172bf2dd1fa08965c77`,
+DFU SHA-256
+`2c74f06bff072d9c3250e5e028e18ddda4f700f5960cd07153432f1a081a8f49`,
+and FIT SHA-256
+`30f7816ea2f1b66aff928613b95748f952cafbb35bc7320a05bfdd5e3075b9d8`.
+The verified candidate index SHA-256 is
+`d94b9c37a8c6f1e5935df5ae4bdfd03be49b7aba40236a32386382a0f09004a8`.
+
+No radio was touched. The deployer still required a redundant historical
+transition-proof input, so RC8 stopped with zero hardware deployment. Its
+branch, exact source lock
+`refs/tags/tandem-agc-v8-rc8-source/firmware-v1`, run, artifact, and candidate
+index remain immutable successful reproduction history. RC9 removes only that
+redundant host-side input and versions the receipt accordingly; firmware
+behavior and deterministic package implementation are unchanged.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc7 — 2026-08-26 — **rejected before evidence or hardware**
+
+RC7 is the forward-only candidate after RC6's trusted build completed FPGA
+implementation but was rejected by obsolete post-route report assumptions. It
+retains RC6's external source graph and firmware RTL; the candidate change is
+the fail-closed validator correction needed to recognize Vivado's legitimate
+routed report state and the reviewed DSP/CDC inventory without accepting
+missing, malformed, unrouted, or unsafe reports.
+
+RC7's exact source lock is
+`refs/tags/tandem-agc-v8-rc7-source/firmware-v1`. Trusted Actions run
+`32948720383` successfully built and fully routed that source and passed the
+integrated report gate. It uploaded a bundle with SHA-256
+`7f13d6dd3f814af1a1e0d06d65535d2f60499b4bb3c0ab0e5cc4e7b8c8836f34`.
+Before evidence assembly, review found that archive/checksum ordering depended
+on locale and shell-array order, so those bytes were rejected. There was no
+deployment, no hardware use, and no candidate evidence index. RC7's branch,
+source lock, run, and bundle are immutable reproduction history. RC8 advanced
+only the deterministic packaging boundary.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc6 — 2026-08-26 — **rejected; post-route policy failed**
+
+RC6 was the forward-only candidate after RC5's integrated placement failure. It
+keeps RC5's stale-small-ADC-latch recovery and external source graph, but
+replaces three mutually exclusive eight-bit dwell counters with one shared
+eight-bit counter and a two-bit qualification-class tag. A two-bit binary token
+replaces the former stale-latch episode booleans, and the redundant eight-bit
+`event_index` shadow is removed. Only the wide `pwr_div` and `evt_seq`
+accumulators carry `use_dsp = "yes"`. The tag prevents ordinary increase,
+stale-conflict, and re-arm qualification from inheriting one another's partial
+dwell credit when the live evidence class changes.
+
+The final RC6 source commit and immutable lock resolve to
+`fb1cb04085fda4854f964481d5d5427b6934d58b`. Trusted Actions run
+`32944830787`, attempt 1, accepted that exact source and completed integrated
+implementation: Vivado routed 32,908 of 32,908 nets. It placed 4,399 of 4,400
+slices, used 74 of 80 DSPs, and closed timing at WNS `+0.645 ns`, WHS
+`+0.022 ns`, and the bus-skew minimum was `+8.606 ns`.
+
+Packaging then failed closed because the committed integrated validator still
+expected stale report-state, DSP, and CDC policy details. The run uploaded
+diagnostics only. It produced no deployment bundle, candidate index, or DFU,
+and nothing from RC6 was deployed to a radio. Its branch, manifest, exact
+firmware identity, and
+`refs/tags/tandem-agc-v8-rc6-source/firmware-v1` remain immutable reproduction
+history. RC7 advances the validator and release lineage without changing the
+RC6 RTL implementation.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc5 — 2026-08-26 — **rejected; integrated placement failed**
+
+RC5 was the first forward-only candidate for the stale-small-ADC-latch recovery
+added after RC4. RC4's protected source lock, routed build, artifact, and
+hardware reports could not authorize that RTL and were not moved or relabelled.
+
+RC5 introduced a source manifest, owner-only build mapping, exact evidence-index
+tooling, a guarded exact-serial RAM deployer, and candidate-bound release and
+muted-64-frame lifecycle harnesses. The trusted package regenerates timing,
+route, DRC, methodology, CDC, bus-skew, and utilization reports from the
+packaged routed DCP and checks their complete inventory and reviewed resource
+ceilings against a committed policy. After a successful integrated route, it
+would also build, verify, and checksum a `pluto.frm` whose FIT bytes exactly
+match the candidate DFU. The final release verifier no longer treats a missing
+`dfu-suffix` tool as a successful skipped check.
+The RAM receipt additionally requires equal pre/post SHA-256 readback of the
+exact `qspi-linux` `/dev/mtdblock3` partition, so a candidate transition cannot
+claim unchanged persistent firmware from command intent alone.
+
+The final RC5 source commit and immutable source lock resolve to
+`af2e1821436996188fd32cc1cf8a0f8a41f31fc1`. Its full hardware-free gate passed
+1,093 tests with five hardware tests explicitly deselected, and its clean
+commit-bound routed OOC implementation passed at WNS `+3.765 ns` and WHS
+`+0.079 ns`, with zero failing endpoints. Trusted Actions run `32933327011`,
+attempt 1, accepted the exact RC5 identity and source graph, but the integrated
+Vivado build failed placement before artifact upload: 2,357 remaining instances
+needed the 2,340 slices available after fixed and macro placement, a 17-slice
+shortfall. RC4 had already occupied 4,399 of the device's 4,400 slices, so the
+failure is retained as a genuine device-capacity result.
+
+No RC5 DFU, deployment bundle, or candidate evidence index was produced,
+deployed, or tested on radio hardware, and no QSPI write was authorized. The
+current exact-release ABI does not expose enough internal detector/latch state
+for a deterministic stale-latch RF test without adding release-only debug
+interfaces. RC5's internal FSM qualification therefore relied on the
+deterministic RTL suite at both clock ratios; the guarded `BLOCKED` observer was
+optional diagnostic evidence only. RC5 stopped at integrated placement. The
+active RC20 route still requires the complete external paired-behavior,
+lifecycle, transient/modulated, soak, teardown, and safety campaign on all four
+radios.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc1 — 2026-08-21 — **hardware-qualified persistent prerelease**
+
+RC1 adds AD9361 temperature to standard-libiio ABI-2 frame metadata without
+changing the 56-byte extension or adding another USB/TCP transaction. A
+device-side iiOD worker samples `ad9361-phy/temp0/input` at most once per
+second. Each frame copies the cached millidegree-Celsius value when its last
+successful sample is no more than ten seconds old; otherwise the one field is
+omitted/invalid. Frame capture never performs a temperature IIO read.
+
+The exact release is firmware commit
+[`62a5c228a992a286869266ba884979656df82b5d`](https://github.com/misko/plutosdr-fw/commit/62a5c228a992a286869266ba884979656df82b5d),
+built and attested by
+[run `32533280971`](https://github.com/misko/plutosdr-fw/actions/runs/32533280971).
+Its DFU SHA-256 is
+`9e88b2bcf28416528bfcf4c92bf10aa59dd01ddab6a6741dc6d78ae7325d9cd3`,
+FIT-body SHA-256 is
+`ca4cf900d9c52d8da89681d311267c6f114425144369cea522c42487da2b88d1`,
+and bundle SHA-256 is
+`8918ef4422a897dd32b4778db1c8086c8c7ed3663345227748248117f3bbd96b`.
+Routed timing closed at WNS `0.770 ns` and WHS `0.027 ns` with zero failing
+endpoints.
+
+The byte-identical artifact was RAM-booted and then persistently installed on
+both attached Winbond Pluto+ radios. USB and TCP tandem-HOLD captures reported
+temperature on both units. In the 64-frame RAM lifecycle test, 62 frames had a
+valid temperature; the first frame from each cold worker correctly omitted it.
+Mean metadata capture time was 33.0 and 33.2 ms, synchronous close was 19.2 and
+11.1 ms, and ordinary receive handoff was 132.7 and 120.7 ms. A focused cache
+trace produced one initial invalid frame followed by five frames with the same
+cached value, as designed.
+
+Guarded persistent promotion verified the staged image hash, QSPI FIT bytes,
+reboot return identity, exact firmware version, and safe TX state on both
+radios. The final command-line readings were 35.965 C and 40.351 C. A host-side
+USB return-attestation compatibility bug found during the first RAM run was
+fixed in pluto-plus-utils commit `c89fb7a`; the device itself remained on the
+expected v8 image and TX-safe state.
+
+This remains an RC prerelease because only the two attached Winbond units were
+available. The prior release's four-board, attenuated physical-loopback,
+three-band AUTO/event matrix was not repeated for this temperature-only change.
 
 ## v0.40-plutoplus-spf-tandem-agc-v7 — 2026-08-19 — **hardware-qualified release**
 

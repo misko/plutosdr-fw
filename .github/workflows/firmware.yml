@@ -14,6 +14,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  radio-hardware-oracles:
+    name: radio hardware offline oracles
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the PNXX HDL and Linux oracle sources
+        run: git submodule update --init --depth 1 hdl linux
+      - name: Run release, metadata, continuity, quality, and RTL oracles
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            iverilog python3-numpy python3-pytest
+          PYTHON=python3 ./scripts/check_tandem_release_offline.sh oracles
+
   source-graph:
     name: source graph
     runs-on: ubuntu-latest
@@ -26,8 +43,7 @@ jobs:
         run: git submodule update --init --depth 1 buildroot
       - name: Verify pins, URLs, refs, and overrides
         run: |
-          ./scripts/check_source_graph.sh manifests/tandem-agc-v2-source.yaml
-          ./scripts/test_legal_info_network.sh
+          ./scripts/check_tandem_release_offline.sh source-graph
 
   gadget-tests:
     name: USB and IP gadget unit tests
@@ -37,7 +53,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-fw
-          ref: ab270f9e3128187372f27de887be65353f9e195d
+          ref: 1bbe9f0ee4a70374964804de09b7503da260b059
           path: usb-gadget
           persist-credentials: false
       - name: Check out pinned IP gadget source
@@ -61,7 +77,7 @@ jobs:
           ctest --test-dir usb-gadget/build-tests --output-on-failure
           count=$(ctest --test-dir usb-gadget/build-tests -N |
             sed -n 's/^Total Tests: //p')
-          test "${count:-0}" -eq 15
+          test "${count:-0}" -eq 16
           cmake --install usb-gadget/build-tests
       - name: Build and test the direct-IP implementation
         run: |
@@ -83,7 +99,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-hdl-quantulum
-          ref: 8897cfaaa7c6d923d3509738dc5a7552fd857d35
+          ref: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
           path: hdl-quantulum
           persist-credentials: false
       - name: Simulate the closed-loop counter crossing
@@ -104,3 +120,4 @@ jobs:
           vvp "$RUNNER_TEMP/tx-pipeline-debug-tb"
           cd ../test
           ./run_discard_disabled.sh
+          ./run_timestamp_check_pipeline.sh

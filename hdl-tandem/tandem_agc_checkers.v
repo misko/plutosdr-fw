@@ -69,7 +69,7 @@ module tandem_agc_checkers #(
   initial begin
     a_err = 0; hi_run = 0; lo_run = 0; was_high = 0;
     cd_d = 0; blank_d = 0; fault_d = 0;
-    last_seq = 32'd0; last_epoch = 32'd0; seq_seen = 0;
+    last_seq = 32'd0; last_epoch = 32'd0; seq_seen = 0; evt_push_d = 0;
   end
 
   always @(posedge l_clk) begin
@@ -84,6 +84,7 @@ module tandem_agc_checkers #(
     fault_d    <= fault;
 
     if (!l_resetn) begin
+      evt_push_d  <= 1'b0;
       seq_seen   <= 1'b0;          // history is void across a reset
       last_seq   <= 32'd0;
       last_epoch <= 32'd0;
@@ -129,6 +130,8 @@ module tandem_agc_checkers #(
 
       // A-5/A-6: an event is pushed exactly when a transition is accepted.
       // Enforced structurally in the core; checked here as index-moved <=> event.
+      if (evt_push && evt_push_d)
+        fail("A-5 second decision accepted before the prior pulse launched");
       if (evt_push && (expected_index == exp_idx_d) && (exp_idx_d != 8'd0))
         fail("A-6 event pushed without an index change");
 
@@ -160,9 +163,10 @@ module tandem_agc_checkers #(
       end
 
       // A-11: no transition is ACCEPTED while cooling down or faulted.
-      // Checked at the decision, not at the pulse edge: the core sets cooldown
-      // in the same cycle it accepts, so the pulse always rises with cooldown
-      // active by construction.
+      // Checked at the decision, not at the pulse edge: a nonzero configured
+      // cooldown is loaded in the same cycle as acceptance.  A zero cooldown
+      // deliberately remains inactive; the request/pulse-busy interlock still
+      // prevents a second decision during the registered pulse handoff.
       if (evt_push && cd_d) fail("A-11 decision taken during cooldown");
       if (evt_push && (fault_d != 8'd0)) fail("A-11 decision taken while faulted");
 

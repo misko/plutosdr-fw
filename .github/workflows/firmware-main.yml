@@ -1,7 +1,8 @@
 name: Kalman main firmware build
 
-# Security boundary: this workflow never runs for pull requests. Manual runs
-# are restricted to main and explicitly named maintainer source-lock branches.
+# Security boundary: this workflow never runs for pull requests. Self-hosted
+# work is restricted to pushes and manual runs initiated by the repository
+# owner; manual runs also require an explicitly allowed source-lock branch.
 on:
   push:
     branches: [main]
@@ -10,12 +11,13 @@ on:
       release_version:
         description: >-
           Exact device-fw string to stamp into /opt/VERSIONS, e.g.
-          v0.38-plutoplus-spf-gain-series-v4. Leave empty for an ordinary build,
-          which derives the string from `git describe`. Set it for anything
-          intended for release: the release tag does not exist while the build
-          runs, so a derived string names the PREVIOUS release. RC17 shipped
-          stamped rc16-7 for exactly this reason. The build fails if the
-          packaged string does not match what is entered here.
+          v0.38-plutoplus-spf-gain-series-v4. Protected tandem candidates and
+          final-main dispatches require their exact declared identities.
+          Ordinary main push builds derive the string from `git describe`; the
+          release tag does not exist while a release build runs, so that
+          derived value must never authorize publication. RC17 shipped stamped
+          rc16-7 for exactly this reason. The build fails if the packaged
+          string does not match what is entered here.
         required: false
         type: string
         default: ''
@@ -31,34 +33,195 @@ jobs:
   build:
     name: build and package on Kalman
     if: >-
-      github.ref == 'refs/heads/main' ||
-      (github.event_name == 'workflow_dispatch' &&
-       (github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
-        github.ref == 'refs/heads/feature/tandem-agc-v2'))
+      github.actor == 'misko' &&
+      ((github.event_name == 'push' &&
+        github.ref == 'refs/heads/main') ||
+       (github.event_name == 'workflow_dispatch' &&
+        (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc30' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc28' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc25' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc24' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc23' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc22' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc21' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc20' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc19' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc18' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc17' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc16' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc15' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc14' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc13' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc12' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc11' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc8' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc7' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc2' ||
+         github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc1' ||
+         github.ref == 'refs/heads/feature/tandem-agc-v2')))
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
-      # Main carries the forward-only tandem graph. The named legacy branch
-      # remains usable only for reproducing the independently locked v6 RC4
-      # candidate graph.
+      # Main carries the final v8 source graph. Named legacy branches remain
+      # usable only for reproducing independently locked candidates.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'tandem-agc-v2-source.yaml' ||
+          'tandem-agc-v8-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
+          'tandem-agc-v8-rc32-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' &&
+          'tandem-agc-v8-rc31-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc30' &&
+          'tandem-agc-v8-rc30-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29' &&
+          'tandem-agc-v8-rc29-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc28' &&
+          'tandem-agc-v8-rc28-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27' &&
+          'tandem-agc-v8-rc27-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26' &&
+          'tandem-agc-v8-rc26-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc25' &&
+          'tandem-agc-v8-rc25-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc24' &&
+          'tandem-agc-v8-rc24-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc23' &&
+          'tandem-agc-v8-rc23-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc22' &&
+          'tandem-agc-v8-rc22-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc21' &&
+          'tandem-agc-v8-rc21-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc20' &&
+          'tandem-agc-v8-rc20-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc19' &&
+          'tandem-agc-v8-rc19-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc18' &&
+          'tandem-agc-v8-rc18-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc17' &&
+          'tandem-agc-v8-rc17-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc16' &&
+          'tandem-agc-v8-rc16-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc15' &&
+          'tandem-agc-v8-rc15-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc14' &&
+          'tandem-agc-v8-rc14-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc13' &&
+          'tandem-agc-v8-rc13-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc12' &&
+          'tandem-agc-v8-rc12-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc11' &&
+          'tandem-agc-v8-rc11-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10' &&
+          'tandem-agc-v8-rc10-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9' &&
+          'tandem-agc-v8-rc9-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc8' &&
+          'tandem-agc-v8-rc8-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc7' &&
+          'tandem-agc-v8-rc7-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6' &&
+          'tandem-agc-v8-rc6-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' &&
+          'tandem-agc-v8-rc5-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' &&
+          'tandem-agc-v8-rc4-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' &&
+          'tandem-agc-v8-rc3-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc2' &&
+          'tandem-agc-v8-rc2-source.yaml' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc1' &&
+          'tandem-agc-v8-rc1-source.yaml' ||
           github.ref == 'refs/heads/feature/tandem-agc-v2' &&
           'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-tandem-agc-v2' ||
+          'plutoplus-spf-tandem-agc-v8' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
+          'plutoplus-spf-tandem-agc-v8-rc32' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' &&
+          'plutoplus-spf-tandem-agc-v8-rc31' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc30' &&
+          'plutoplus-spf-tandem-agc-v8-rc30' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29' &&
+          'plutoplus-spf-tandem-agc-v8-rc29' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc28' &&
+          'plutoplus-spf-tandem-agc-v8-rc28' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27' &&
+          'plutoplus-spf-tandem-agc-v8-rc27' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26' &&
+          'plutoplus-spf-tandem-agc-v8-rc26' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc25' &&
+          'plutoplus-spf-tandem-agc-v8-rc25' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc24' &&
+          'plutoplus-spf-tandem-agc-v8-rc24' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc23' &&
+          'plutoplus-spf-tandem-agc-v8-rc23' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc22' &&
+          'plutoplus-spf-tandem-agc-v8-rc22' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc21' &&
+          'plutoplus-spf-tandem-agc-v8-rc21' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc20' &&
+          'plutoplus-spf-tandem-agc-v8-rc20' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc19' &&
+          'plutoplus-spf-tandem-agc-v8-rc19' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc18' &&
+          'plutoplus-spf-tandem-agc-v8-rc18' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc17' &&
+          'plutoplus-spf-tandem-agc-v8-rc17' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc16' &&
+          'plutoplus-spf-tandem-agc-v8-rc16' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc15' &&
+          'plutoplus-spf-tandem-agc-v8-rc15' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc14' &&
+          'plutoplus-spf-tandem-agc-v8-rc14' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc13' &&
+          'plutoplus-spf-tandem-agc-v8-rc13' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc12' &&
+          'plutoplus-spf-tandem-agc-v8-rc12' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc11' &&
+          'plutoplus-spf-tandem-agc-v8-rc11' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10' &&
+          'plutoplus-spf-tandem-agc-v8-rc10' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9' &&
+          'plutoplus-spf-tandem-agc-v8-rc9' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc8' &&
+          'plutoplus-spf-tandem-agc-v8-rc8' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc7' &&
+          'plutoplus-spf-tandem-agc-v8-rc7' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6' &&
+          'plutoplus-spf-tandem-agc-v8-rc6' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5' &&
+          'plutoplus-spf-tandem-agc-v8-rc5' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc4' &&
+          'plutoplus-spf-tandem-agc-v8-rc4' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc3' &&
+          'plutoplus-spf-tandem-agc-v8-rc3' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc2' &&
+          'plutoplus-spf-tandem-agc-v8-rc2' ||
+          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc1' &&
+          'plutoplus-spf-tandem-agc-v8-rc1' ||
           github.ref == 'refs/heads/feature/tandem-agc-v2' &&
           'plutoplus-spf-tandem-agc-v2' ||
           'plutoplus-spf-libiio-metadata-v6-rc4' }}
       SPF_RELEASE_STATE: >-
-        ${{ github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
-    outputs:
-      artifact-name: ${{ steps.names.outputs.artifact_name }}
-      bundle-name: ${{ steps.build.outputs.bundle_name }}
+        ${{ github.ref == 'refs/heads/main' &&
+          github.event_name == 'workflow_dispatch' && 'final-release' ||
+          github.ref == 'refs/heads/main' && 'main-ci' || 'candidate' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -79,6 +242,240 @@ jobs:
         id: names
         run: |
           echo "artifact_name=plutoplus-main-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Require the exact protected RC6 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc6'
+
+      - name: Require the exact protected RC7 candidate identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc7'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc7'
+
+      - name: Require the exact protected RC8 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc8'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc8'
+
+      - name: Require the exact protected RC9 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc9'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc9'
+
+      - name: Require the exact protected RC10 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc10'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc10'
+
+      - name: Require the exact protected RC11 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc11'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc11'
+
+      - name: Require the exact protected RC32 candidate identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc32'
+
+      - name: Require the exact protected RC31 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc31'
+
+      - name: Require the exact protected RC30 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc30'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc30'
+
+      - name: Require the exact protected RC29 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc29'
+
+      - name: Require the exact protected RC28 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc28'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc28'
+
+      - name: Require the exact protected RC27 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc27'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc27'
+
+      - name: Require the exact protected RC26 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc26'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc26'
+
+      - name: Require the exact protected RC25 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc25'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc25'
+
+      - name: Require the exact protected RC24 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc24'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc24'
+
+      - name: Require the exact protected RC23 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc23'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc23'
+
+      - name: Require the exact protected RC22 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc22'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc22'
+
+      - name: Require the exact protected RC21 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc21'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc21'
+
+      - name: Require the exact protected RC20 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc20'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc20'
+
+      - name: Require the exact protected RC19 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc19'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc19'
+
+      - name: Require the exact protected RC18 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc18'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc18'
+
+      - name: Require the exact protected RC17 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc17'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc17'
+
+      - name: Require the exact protected RC16 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc16'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc16'
+
+      - name: Require the exact protected RC15 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc15'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc15'
+
+      - name: Require the exact protected RC14 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc14'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc14'
+
+      - name: Require the exact protected RC13 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc13'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc13'
+
+      - name: Require the exact protected RC12 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc12'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc12'
+
+      - name: Require the exact protected RC5 reproduction identity
+        if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc5'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8-rc5'
+
+      - name: Require the exact final release identity
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          github.ref == 'refs/heads/main'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.41-plutoplus-spf-tandem-agc-v8'
 
       - name: Build, validate, and package
         id: build
@@ -147,29 +544,3 @@ jobs:
             echo "- device-fw: \`${PACKED_VERSION:-unknown}\`"
             echo '- Status: offline validated; hardware untested'
           } >> "$GITHUB_STEP_SUMMARY"
-
-  attest:
-    name: verify and attest deployment bundle
-    needs: build
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      attestations: write
-      contents: read
-      id-token: write
-    steps:
-      - name: Download the exact Kalman artifact
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: ${{ needs.build.outputs.artifact-name }}
-          path: downloaded
-      - name: Verify the downloaded bundle
-        run: |
-          cd downloaded
-          checksum=$(find . -maxdepth 1 -type f -name '*.tar.gz.sha256' -print -quit)
-          test -n "$checksum"
-          sha256sum -c "$checksum"
-      - name: Attest build provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
-        with:
-          subject-path: downloaded/${{ needs.build.outputs.bundle-name }}

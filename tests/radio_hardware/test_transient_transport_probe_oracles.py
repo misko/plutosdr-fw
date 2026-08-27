@@ -1,0 +1,3374 @@
+"""Offline acceptance and rejection oracles for the weak transport probe."""
+
+from __future__ import annotations
+
+import ast
+import copy
+import errno
+import hashlib
+import json
+import struct
+import subprocess
+import threading
+import zlib
+from builtins import BaseExceptionGroup
+from collections.abc import Mapping
+from contextlib import contextmanager
+from dataclasses import replace
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+
+from . import (
+    transient_transport_dual_target_validator as dual_target_validator_module,
+)
+from . import transient_transport_probe as probe_module
+from .experiment import EvidenceInvalid, FixtureSafetyError
+from .metadata_abi import (
+    FEATURE_AD9361_TEMPERATURE,
+    FEATURE_FPGA_GAIN_EVENTS,
+    FEATURE_HARDWARE_SAMPLE_COUNTER,
+    FEATURE_TANDEM_METADATA,
+    FLAG_HARDWARE_SAMPLE_COUNTER_VALID,
+    FLAG_SAMPLE_SEQUENCE_VALID,
+    FLAG_TANDEM_METADATA_VALID,
+    GAIN_EVENT_BYTES,
+    GAIN_OBSERVATION_BYTES,
+    METADATA_MAGIC,
+    TANDEM_GAIN_EVENT,
+    TANDEM_REQUEST,
+    TANDEM_V5_EXTENSION,
+    V5_PREFIX_BYTES,
+    TandemEventDirection,
+    TandemEventReason,
+    TandemGainEvent,
+    TandemGainTable,
+    TandemMode,
+    TandemState,
+)
+from .tandem_quality import TandemQualityOptions
+from .transient_transport_probe import (
+    DUAL_TARGET_PROBE_PENDING_VERDICT,
+    DUAL_TARGET_PROBE_SCHEMA,
+    PROBE_PENDING_VERDICT,
+    PROBE_THREAD_NAME,
+    TransientTransportProbeOptions,
+    run_dual_target_transient_transport_probe,
+    run_serial_dual_target_transient_transport_probe,
+    run_serial_transient_transport_probe,
+    run_transient_transport_probe,
+    validate_dual_target_transient_transport_probe_report,
+    validate_transient_transport_probe_report,
+)
+
+_REQUIRED_FEATURES = (
+    FEATURE_AD9361_TEMPERATURE
+    | FEATURE_FPGA_GAIN_EVENTS
+    | FEATURE_HARDWARE_SAMPLE_COUNTER
+    | FEATURE_TANDEM_METADATA
+)
+_REQUIRED_FLAGS = (
+    FLAG_SAMPLE_SEQUENCE_VALID
+    | FLAG_HARDWARE_SAMPLE_COUNTER_VALID
+    | FLAG_TANDEM_METADATA_VALID
+)
+_REAL_METADATA_FEATURES = _REQUIRED_FEATURES | 0x77
+_REAL_METADATA_FLAGS = (
+    _REQUIRED_FLAGS
+    | (1 << 0)  # start endpoint valid
+    | (1 << 1)  # end endpoint valid
+    | (1 << 10)  # full gain table
+    | (1 << 15)  # start RSSI valid
+    | (1 << 16)  # end RSSI valid
+    | (1 << 18)  # gain dB endpoints valid
+    | (1 << 19)  # gain observation series valid
+)
+_GAIN_OBSERVATION = struct.Struct("<QQIHBBbbHI")
+assert _GAIN_OBSERVATION.size == GAIN_OBSERVATION_BYTES
+
+
+@pytest.fixture(autouse=True)
+def _protected_libiio_source_fixture(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    real_git_bytes = probe_module._git_bytes
+    firmware_repository = (tmp_path / ".probe-provenance/firmware").resolve()
+
+    def git_bytes(repository: Path, *arguments: str) -> bytes:
+        if (
+            repository.name == "libiio-source"
+            and repository.parent.name == ".probe-provenance"
+        ):
+            if arguments in {
+                ("rev-parse", "HEAD"),
+                (
+                    "rev-parse",
+                    f"{probe_module.PROBE_EXACT_LIBIIO_REF}^{{commit}}",
+                ),
+            }:
+                return f"{probe_module.PROBE_EXACT_LIBIIO_COMMIT}\n".encode()
+            if arguments == ("status", "--porcelain", "--untracked-files=no"):
+                return b""
+            if arguments == (
+                "show",
+                f"{probe_module.PROBE_EXACT_LIBIIO_COMMIT}:bindings/python/iio.py",
+            ):
+                return b"# offline pinned pylibiio fixture\n"
+            raise AssertionError(f"unexpected fake libiio git query: {arguments}")
+        return real_git_bytes(repository, *arguments)
+
+    monkeypatch.setattr(probe_module, "_git_bytes", git_bytes)
+    monkeypatch.setattr(
+        probe_module, "_firmware_repository", lambda: firmware_repository
+    )
+    monkeypatch.setattr(dual_target_validator_module, "_git_bytes", git_bytes)
+    monkeypatch.setattr(
+        dual_target_validator_module,
+        "_firmware_repository",
+        lambda: firmware_repository,
+    )
+
+
+def _digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _fake_runtime_provenance(root: Path) -> dict[str, Any]:
+    provenance_root = root / ".probe-provenance"
+    firmware = provenance_root / "firmware"
+    source = provenance_root / "libiio-source"
+    build = provenance_root / "libiio-build"
+    if not (firmware / ".git").exists():
+        firmware.mkdir(parents=True)
+        for relative_path in probe_module._PROBE_LOCAL_RUNTIME_DEPENDENCIES:
+            path = firmware / relative_path
+            path.parent.mkdir(parents=True, exist_ok=True)
+            if relative_path == probe_module._PROBE_MANIFEST_PATH:
+                content = (
+                    "libiio_0_25_source: "
+                    f"{probe_module.PROBE_EXACT_LIBIIO_COMMIT}\n"
+                    "libiio_0_25_ref: "
+                    f"{probe_module.PROBE_EXACT_LIBIIO_REF}\n"
+                )
+            else:
+                content = f"offline runtime dependency {relative_path}\n"
+            path.write_text(content, encoding="utf-8")
+        subprocess.run(("git", "init", "-q", str(firmware)), check=True)
+        subprocess.run(
+            ("git", "-C", str(firmware), "config", "user.name", "Probe Oracle"),
+            check=True,
+        )
+        subprocess.run(
+            (
+                "git",
+                "-C",
+                str(firmware),
+                "config",
+                "user.email",
+                "probe-oracle@example.invalid",
+            ),
+            check=True,
+        )
+        subprocess.run(("git", "-C", str(firmware), "add", "."), check=True)
+        subprocess.run(
+            (
+                "git",
+                "-C",
+                str(firmware),
+                "commit",
+                "-q",
+                "-m",
+                "offline provenance fixture",
+            ),
+            check=True,
+        )
+    pylibiio = source / "bindings/python/iio.py"
+    pylibiio.parent.mkdir(parents=True, exist_ok=True)
+    if not pylibiio.exists():
+        pylibiio.write_text("# offline pinned pylibiio fixture\n", encoding="utf-8")
+    build.mkdir(parents=True, exist_ok=True)
+    shared_object = build / "libiio.so.0.25"
+    if not shared_object.exists():
+        shared_object.write_bytes(b"offline mapped libiio fixture\n")
+    cmake_cache = build / "CMakeCache.txt"
+    cmake_cache.write_text(
+        f"CMAKE_HOME_DIRECTORY:INTERNAL={source.resolve()}\n", encoding="utf-8"
+    )
+    pylibiio_sha256 = _digest(pylibiio)
+    return {
+        "host_libiio": {
+            "source_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+            "protected_source_tag": probe_module.PROBE_EXACT_LIBIIO_TAG,
+            "protected_source_ref": probe_module.PROBE_EXACT_LIBIIO_REF,
+            "source_directory": str(source.resolve()),
+            "source_head_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+            "protected_tag_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+            "source_tracked_clean": True,
+            "build_directory": str(build.resolve()),
+            "cmake_cache_path": str(cmake_cache.resolve()),
+            "cmake_source_directory": str(source.resolve()),
+            "mapped_shared_objects": [str(shared_object.resolve())],
+            "mapped_shared_object": str(shared_object.resolve()),
+            "mapped_shared_object_sha256": _digest(shared_object),
+            "pylibiio_path": str(pylibiio.resolve()),
+            "pylibiio_sha256": pylibiio_sha256,
+            "pylibiio_commit_blob_sha256": pylibiio_sha256,
+        },
+        "firmware_runner": probe_module._attest_firmware_runner(firmware),
+    }
+
+
+def _tone_raw(
+    samples: int, *, rx0_amplitude: float = 600.0, rx1_amplitude: float = 570.0
+) -> bytes:
+    np = pytest.importorskip("numpy")
+    indexes = np.arange(samples, dtype=np.float64)
+    carrier = np.exp(2j * np.pi * 100_000.0 * indexes / 2_500_000.0)
+    words = np.empty((samples, 4), dtype="<i2")
+    words[:, 0] = np.rint(rx0_amplitude * carrier.real).astype("<i2")
+    words[:, 1] = np.rint(rx0_amplitude * carrier.imag).astype("<i2")
+    words[:, 2] = np.rint(rx1_amplitude * carrier.real).astype("<i2")
+    words[:, 3] = np.rint(rx1_amplitude * carrier.imag).astype("<i2")
+    return words.tobytes()
+
+
+def _alternating_window_tone_raw(samples: int) -> bytes:
+    np = pytest.importorskip("numpy")
+    indexes = np.arange(samples, dtype=np.float64)
+    carrier = np.exp(2j * np.pi * 100_000.0 * indexes / 2_500_000.0)
+    high_window = ((indexes // 1_024).astype(np.int64) % 2) == 0
+    rx0_amplitude = np.where(high_window, 600.0, 300.0)
+    rx1_amplitude = np.where(high_window, 570.0, 285.0)
+    words = np.empty((samples, 4), dtype="<i2")
+    words[:, 0] = np.rint(rx0_amplitude * carrier.real).astype("<i2")
+    words[:, 1] = np.rint(rx0_amplitude * carrier.imag).astype("<i2")
+    words[:, 2] = np.rint(rx1_amplitude * carrier.real).astype("<i2")
+    words[:, 3] = np.rint(rx1_amplitude * carrier.imag).astype("<i2")
+    return words.tobytes()
+
+
+def _real_metadata_wire(metadata: Any) -> bytes:
+    header_bytes = V5_PREFIX_BYTES + 64 * (
+        GAIN_OBSERVATION_BYTES + GAIN_EVENT_BYTES
+    ) + 4
+    payload = bytearray(header_bytes)
+    struct.pack_into(
+        "<IHHIIQQQIIIHB",
+        payload,
+        0,
+        METADATA_MAGIC,
+        5,
+        header_bytes,
+        metadata.features,
+        metadata.flags,
+        metadata.stream_id,
+        metadata.buffer_sequence,
+        metadata.first_sample_sequence,
+        metadata.samples_per_channel,
+        metadata.iq_payload_bytes,
+        metadata.enabled_scan_mask,
+        metadata.sample_format,
+        metadata.channel_count,
+    )
+    struct.pack_into(
+        "<bbbbB",
+        payload,
+        55,
+        metadata.maximum_gain_db,
+        metadata.maximum_gain_db,
+        metadata.maximum_gain_db,
+        metadata.maximum_gain_db,
+        0,
+    )
+    struct.pack_into("<IIII", payload, 60, 1_000, 1_000, 0xFFFFFFFF, 0xFFFFFFFF)
+    struct.pack_into("<HHHH", payload, 76, 100, 100, 100, 100)
+    struct.pack_into("<III", payload, 84, 1_000, 1_000, 16_384)
+    struct.pack_into(
+        "<HHHHHHII",
+        payload,
+        96,
+        metadata.observation_count,
+        metadata.observation_capacity,
+        GAIN_OBSERVATION_BYTES,
+        metadata.event_count,
+        metadata.event_capacity,
+        GAIN_EVENT_BYTES,
+        metadata.observation_overflow_count,
+        metadata.event_overflow_count,
+    )
+    TANDEM_V5_EXTENSION.pack_into(
+        payload,
+        124,
+        metadata.ownership_epoch,
+        int(metadata.tandem_state),
+        metadata.tandem_fault_flags,
+        metadata.tandem_transition_count,
+        int(metadata.gain_table_id),
+        metadata.threshold_provenance,
+        metadata.minimum_gain_db,
+        metadata.maximum_gain_db,
+        metadata.initial_gain_db,
+        metadata.minimum_gain_index,
+        metadata.maximum_gain_index,
+        metadata.rx1_gain_index,
+        metadata.rx2_gain_index,
+        metadata.ad9361_temperature_mdeg_c,
+        0,
+        0,
+        0,
+    )
+    for index in range(metadata.observation_count):
+        sample_before = metadata.first_sample_sequence + index * 16_384
+        _GAIN_OBSERVATION.pack_into(
+            payload,
+            V5_PREFIX_BYTES + index * GAIN_OBSERVATION_BYTES,
+            sample_before,
+            sample_before + 1,
+            1_000,
+            0x0003,
+            metadata.maximum_gain_index,
+            metadata.maximum_gain_index,
+            metadata.maximum_gain_db,
+            metadata.maximum_gain_db,
+            0,
+            0,
+        )
+    event_offset = V5_PREFIX_BYTES + 64 * GAIN_OBSERVATION_BYTES
+    for index, event in enumerate(metadata.gain_events):
+        TANDEM_GAIN_EVENT.pack_into(
+            payload,
+            event_offset + index * GAIN_EVENT_BYTES,
+            event.sample_sequence,
+            event.event_sequence,
+            event.flags,
+            event.rx1_gain_index,
+            event.rx2_gain_index,
+        )
+    struct.pack_into("<I", payload, len(payload) - 4, 0)
+    struct.pack_into(
+        "<I", payload, len(payload) - 4, zlib.crc32(payload) & 0xFFFFFFFF
+    )
+    return bytes(payload)
+
+
+class _Clock:
+    def __init__(self) -> None:
+        self.value = 10_000
+
+    def __call__(self) -> int:
+        self.value += 100
+        return self.value
+
+
+class _FakeBuffer:
+    def __init__(self, radio: _FakeProbeRadio, *, batch_frames: int) -> None:
+        self.radio = radio
+        self.batch_frames = batch_frames + radio.batch_frames_readback_offset
+        self.batch_cache_bytes = (
+            0
+            if batch_frames == 1
+            else batch_frames * (65_536 * 8 + 64 * 1024 + 16)
+        ) + radio.batch_cache_readback_offset
+        self.poisoned = False
+
+    def cancel(self) -> None:
+        self.radio.operations.append(("buffer_cancel",))
+        self.radio.cancel_calls += 1
+        self.radio.cleanup_cancel_calls += 1
+        self.radio.cancelled.set()
+        if self.radio.batch_inflight.is_set() and not (
+            self.radio.batch_completed.is_set()
+        ):
+            self.poisoned = True
+        if self.radio.cancel_failures:
+            self.radio.cancel_failures -= 1
+            raise RuntimeError("planted cancel failure")
+
+
+class _FakeProbeRadio:
+    def __init__(self, output_dir: Path) -> None:
+        self.runtime_provenance = _fake_runtime_provenance(output_dir)
+        self.options = SimpleNamespace(
+            serial=probe_module.PROBE_EXACT_SERIAL,
+            uri=None,
+            allow_non_usb=False,
+            firmware_pattern=probe_module.PROBE_EXACT_FIRMWARE_PATTERN,
+            libiio_source_commit=probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+            sample_rate_hz=2_500_000,
+            samples_per_channel=65_536,
+            tx_gain_db=-45.0,
+            center_frequency_hz=915_000_000,
+            attenuation_db=0.0,
+            output_dir=output_dir,
+        )
+        pylibiio_path = self.runtime_provenance["host_libiio"]["pylibiio_path"]
+        self.identity = {
+            "serial": self.options.serial,
+            "uri": "usb:offline.fixture.0",
+            "context_name": "usb",
+            "context_description": "offline transport probe fixture",
+            "context_version": [0, 25, "v0.25"],
+            "context_attrs": {
+                "hw_serial": self.options.serial,
+                "usb,serial": self.options.serial,
+                "fw_version": probe_module.PROBE_EXACT_FIRMWARE_VERSION,
+                "iio,buffer-metadata": "2",
+                "uri": "usb:offline.fixture.0",
+            },
+            "pylibiio_file": pylibiio_path,
+            "libiio_source_commit": probe_module.PROBE_EXACT_LIBIIO_COMMIT,
+        }
+        self._report_path: Path | None = None
+        self.operations: list[tuple[Any, ...]] = []
+        self.mode = "manual"
+        self.rx_gain_db = 40.0
+        self.tx_gain_db = -89.75
+        self.tx1_gain_db = -89.75
+        self.buffer_open = False
+        self.active_buffer: _FakeBuffer | None = None
+        self.cancelled = threading.Event()
+        self.blocked_refill = threading.Event()
+        self.batch_inflight = threading.Event()
+        self.batch_completed = threading.Event()
+        self.command_reasserted = threading.Event()
+        self.cancel_calls = 0
+        self.core_cancel_calls = 0
+        self.cleanup_cancel_calls = 0
+        self.mute_failures = 0
+        self.buffer_mute_failures = 0
+        self.cancel_failures = 0
+        self.buffer_close_failures = 0
+        self.hold_open_failures = 0
+        self.hold_close_failures = 0
+        self.hold_fifo_after_clear = 0
+        self.hold_fifo_after_close: int | None = None
+        self.hold_active = False
+        self.close_failures = 0
+        self.cleanup_verified = False
+        self.capture_count = 0
+        self.capture_attempts = 0
+        self.core_batch_initiations = 0
+        self.cached_replays = 0
+        self.batch_frames_readback_offset = 0
+        self.batch_cache_readback_offset = 0
+        self.partial_batch_failure = False
+        self.future_poison_refills = 0
+        self.startup_eagain_attempts = 0
+        self.startup_eagain_remaining = 0
+        self.block_capture_at: int | None = None
+        self.worker_error_at: int | None = None
+        self.gap_at: int | None = None
+        self.buffer_gap_frames = 1
+        self.sample_gap_frames = 1
+        self.hidden_transition_at: int | None = None
+        self.visible_event_at: set[int] = set()
+        self.bad_event_sequence_at: int | None = None
+        self.bad_event_step_at: int | None = None
+        self.bad_event_range_at: int | None = None
+        self.bad_event_sample_at: int | None = None
+        self.bad_event_flags_at: int | None = None
+        self.regressed_event_samples_at: int | None = None
+        self.dense_events_at: int | None = None
+        self.dense_event_count = 2
+        self.dense_event_spacing_samples = 1
+        self.stream_change_at: int | None = None
+        self.zero_epoch_at: int | None = None
+        self.missing_feature_at: int | None = None
+        self.missing_valid_flag_at: int | None = None
+        self.unsafe_flag_at: int | None = None
+        self.overflow_at: int | None = None
+        self.excess_observations_at: int | None = None
+        self.bad_sample_format_at: int | None = None
+        self.bad_threshold_provenance_at: int | None = None
+        self.bad_initial_gain_at: int | None = None
+        self.auto_initial_endpoint_offset = 0
+        self.nonmax_endpoint_without_event_at: int | None = None
+        self.first_unrepresented_transitions = 0
+        self.readback_offset_db = 0.0
+        self.deferred_readback_offset_db = 0.0
+        self.exact_write_failures = 0
+        self.deferred_readback_failures = 0
+        self.freeze_counter_after_exact_write = False
+        self.mutate_tx1_after_exact_write_db: float | None = None
+        self.first_sample = 10_000_000
+        self.buffer_sequence = 0
+        self.transition_count = 0
+        self.event_sequence = 100
+        self.gain_index = 40
+        self.fifo_level = 0
+        self.auto_request_initial_gain_db: int | None = None
+        self.hold_request_initial_gain_db: int | None = None
+        self.sample_counter = self.first_sample
+        self.counter_read_step = 4_096
+        self.precapture_baseline_offset_samples = 0
+        self.precapture_baseline_reads = 0
+        self.sleep_advances_counter = True
+        self.refill_ns = 1_000_000
+        self.metadata_by_token: dict[bytes, Any] = {}
+        self.capture_thread_names: list[str] = []
+        self.raw = _tone_raw(self.options.samples_per_channel)
+        self.closed = False
+
+    def _mute_evidence(self) -> dict[str, Any]:
+        return {
+            "verified": True,
+            "tx1_gain_db": -89.75,
+            "tx2_gain_db": -89.75,
+            "selectors": [3, 3, 3, 3],
+            "dds": {
+                f"altvoltage{index}": {
+                    "present": True,
+                    "raw": 0.0,
+                    "scale": 0.0,
+                }
+                for index in range(8)
+            },
+            "failures": [],
+        }
+
+    def mute_all(self) -> dict[str, Any]:
+        self.operations.append(("mute", self.buffer_open))
+        self.tx_gain_db = -89.75
+        if self.mute_failures:
+            self.mute_failures -= 1
+            raise RuntimeError("planted mute failure")
+        if self.buffer_open and self.buffer_mute_failures:
+            self.buffer_mute_failures -= 1
+            raise RuntimeError("planted mute failure")
+        return self._mute_evidence()
+
+    def arm_tx2_tone(self, *, tone_hz: int, scale: float) -> None:
+        self.operations.append(("arm_tone", tone_hz, scale))
+
+    def set_tx2_gain(self, gain_db: float) -> float:
+        if gain_db > self.options.tx_gain_db:
+            raise FixtureSafetyError("planted radio rejected strong TX")
+        self.tx_gain_db = float(gain_db)
+        self.operations.append(("set_tx2_gain", self.tx_gain_db))
+        if sum(
+            operation[0] == "set_tx2_gain" for operation in self.operations
+        ) >= 2:
+            self.command_reasserted.set()
+        return self.tx_gain_db + self.readback_offset_db
+
+    def write_tx2_gain_exact(self, gain_db: float) -> None:
+        if gain_db > self.options.tx_gain_db:
+            raise FixtureSafetyError("planted radio rejected strong exact TX write")
+        self.operations.append(("write_tx2_gain_exact", float(gain_db)))
+        if self.exact_write_failures:
+            self.exact_write_failures -= 1
+            raise OSError("planted exact TX2 write failure")
+        self.tx_gain_db = float(gain_db)
+        if self.mutate_tx1_after_exact_write_db is not None:
+            self.tx1_gain_db = self.mutate_tx1_after_exact_write_db
+        self.command_reasserted.set()
+
+    def read_tx2_gain(self) -> float:
+        self.operations.append(("read_tx2_gain",))
+        if self.deferred_readback_failures:
+            self.deferred_readback_failures -= 1
+            raise OSError("planted deferred TX2 readback failure")
+        return self.tx_gain_db + self.deferred_readback_offset_db
+
+    def attest_tx1_muted(self) -> float:
+        self.operations.append(("attest_tx1_muted", self.tx1_gain_db))
+        if abs(self.tx1_gain_db + 89.75) > 0.26:
+            raise FixtureSafetyError("planted TX1 mute assurance failure")
+        return self.tx1_gain_db
+
+    def configure_rx(self, mode: str, *, manual_gain_db: float | None = None) -> None:
+        self.mode = mode
+        if manual_gain_db is not None:
+            self.rx_gain_db = float(manual_gain_db)
+        self.operations.append(("configure_rx", mode, manual_gain_db))
+
+    def read_rx_state(self) -> dict[str, list[Any]]:
+        return {
+            "modes": [self.mode, self.mode],
+            "gains_db": [self.rx_gain_db, self.rx_gain_db],
+        }
+
+    def read_center_frequency(self) -> dict[str, int]:
+        return {"rx_lo_hz": 915_000_000, "tx_lo_hz": 915_000_000}
+
+    def tandem_status(self) -> dict[str, int]:
+        return {
+            "state": int(
+                TandemState.ARMED_HOLD if self.hold_active else TandemState.IDLE
+            ),
+            "fault_flags": 0,
+            "overflow_count": 0,
+            "fifo_level": self.fifo_level,
+            "ownership_epoch": 7 if self.hold_active else 0,
+            "transition_count": self.transition_count,
+            "rx1_gain_index": self.gain_index,
+            "rx2_gain_index": self.gain_index,
+        }
+
+    def buffer(
+        self,
+        api: str,
+        kernel_buffers: int,
+        samples_per_channel: int,
+        *,
+        tandem_request: bytes | None,
+        batch_frames: int = 1,
+    ):
+        @contextmanager
+        def opened():
+            assert api == "metadata"
+            assert samples_per_channel == 65_536
+            assert (
+                tandem_request is not None
+                and len(tandem_request) == TANDEM_REQUEST.size
+            )
+            unpacked_request = TANDEM_REQUEST.unpack(tandem_request)
+            request_mode = TandemMode(unpacked_request[4])
+            request_initial_gain_db = int(unpacked_request[9])
+            is_hold = request_mode is TandemMode.HOLD
+            if is_hold:
+                self.hold_request_initial_gain_db = request_initial_gain_db
+            else:
+                self.auto_request_initial_gain_db = request_initial_gain_db
+            assert kernel_buffers == (1 if is_hold else 8)
+            assert batch_frames == (1 if is_hold else 64)
+            operation_prefix = "hold_buffer" if is_hold else "buffer"
+            self.operations.append((f"{operation_prefix}_enter", api, kernel_buffers))
+            if is_hold and self.hold_open_failures:
+                self.hold_open_failures -= 1
+                raise RuntimeError("planted HOLD FIFO clear open failure")
+            self.buffer_open = True
+            self.cancelled.clear()
+            self.batch_inflight.clear()
+            self.batch_completed.clear()
+            self.command_reasserted.clear()
+            if is_hold:
+                self.hold_active = True
+                self.fifo_level = self.hold_fifo_after_clear
+                self.transition_count = 0
+                self.event_sequence = 0
+            else:
+                self.gain_index = 65 + self.auto_initial_endpoint_offset
+                self.transition_count = 0
+                self.event_sequence = 0
+            buffer = _FakeBuffer(self, batch_frames=batch_frames)
+            self.active_buffer = buffer
+            body_error: BaseException | None = None
+            try:
+                yield buffer, 2
+            except BaseException as error:  # noqa: BLE001
+                body_error = error
+            close_error: BaseException | None = None
+            self.buffer_open = False
+            self.hold_active = False
+            self.active_buffer = None
+            if is_hold and self.hold_fifo_after_close is not None:
+                self.fifo_level = self.hold_fifo_after_close
+            self.operations.append((f"{operation_prefix}_close",))
+            if not is_hold:
+                self.operations.append(
+                    (
+                        "data_pipe_teardown"
+                        if buffer.poisoned or self.cancelled.is_set()
+                        else "wire_close",
+                    )
+                )
+            if is_hold and self.hold_close_failures:
+                self.hold_close_failures -= 1
+                close_error = RuntimeError("planted HOLD FIFO clear close failure")
+            elif not is_hold and self.buffer_close_failures:
+                self.buffer_close_failures -= 1
+                close_error = RuntimeError("planted buffer close failure")
+            if body_error is not None and close_error is not None:
+                raise BaseExceptionGroup(
+                    "planted buffer body and close failure", [body_error, close_error]
+                )
+            if body_error is not None:
+                raise body_error.with_traceback(body_error.__traceback__)
+            if close_error is not None:
+                raise close_error
+
+        return opened()
+
+    def _metadata(self, samples: int) -> Any:
+        index = self.capture_count
+        first_sample = self.first_sample
+        buffer_sequence = self.buffer_sequence
+        if self.gap_at == index:
+            first_sample += samples * self.sample_gap_frames
+            buffer_sequence += self.buffer_gap_frames
+
+        events: tuple[TandemGainEvent, ...] = ()
+        if self.dense_events_at == index:
+            built_events = []
+            for event_index in range(self.dense_event_count):
+                direction = (
+                    TandemEventDirection.DECREASE
+                    if event_index % 2 == 0
+                    else TandemEventDirection.INCREASE
+                )
+                reason = (
+                    TandemEventReason.BOTH_LOW_POWER
+                    if direction is TandemEventDirection.INCREASE
+                    else TandemEventReason.LARGE_ADC_OVERLOAD
+                )
+                self.gain_index += (
+                    1 if direction is TandemEventDirection.INCREASE else -1
+                )
+                built_events.append(
+                    TandemGainEvent(
+                        sample_sequence=(
+                            first_sample
+                            + 1
+                            + event_index * self.dense_event_spacing_samples
+                        ),
+                        event_sequence=self.event_sequence + event_index,
+                        flags=(int(direction) << 4) | int(reason),
+                        rx1_gain_index=self.gain_index,
+                        rx2_gain_index=self.gain_index,
+                    )
+                )
+            events = tuple(built_events)
+            self.transition_count += self.dense_event_count
+            self.event_sequence += self.dense_event_count
+        elif self.regressed_event_samples_at == index:
+            direction = TandemEventDirection.DECREASE
+            event_flags = (int(direction) << 4) | int(
+                TandemEventReason.LARGE_ADC_OVERLOAD
+            )
+            events = (
+                TandemGainEvent(
+                    sample_sequence=first_sample + 512,
+                    event_sequence=self.event_sequence,
+                    flags=event_flags,
+                    rx1_gain_index=self.gain_index - 1,
+                    rx2_gain_index=self.gain_index - 1,
+                ),
+                TandemGainEvent(
+                    sample_sequence=first_sample + 256,
+                    event_sequence=self.event_sequence + 1,
+                    flags=event_flags,
+                    rx1_gain_index=self.gain_index - 2,
+                    rx2_gain_index=self.gain_index - 2,
+                ),
+            )
+            self.gain_index -= 2
+            self.transition_count += 2
+            self.event_sequence += 2
+        elif index in self.visible_event_at:
+            direction = TandemEventDirection.DECREASE
+            next_gain = self.gain_index - 1
+            if self.bad_event_step_at == index:
+                next_gain -= 1
+            event_sequence = self.event_sequence
+            if self.bad_event_sequence_at == index:
+                event_sequence += 1
+            event_sample = first_sample + 256
+            if self.bad_event_sample_at == index:
+                event_sample = first_sample + samples
+            flags = (int(direction) << 4) | int(TandemEventReason.LARGE_ADC_OVERLOAD)
+            if self.bad_event_flags_at == index:
+                flags |= 1 << 8
+            event_gain = next_gain
+            if self.bad_event_range_at == index:
+                event_gain = 66
+            events = (
+                TandemGainEvent(
+                    sample_sequence=event_sample,
+                    event_sequence=event_sequence,
+                    flags=flags,
+                    rx1_gain_index=event_gain,
+                    rx2_gain_index=event_gain,
+                ),
+            )
+            self.gain_index = event_gain
+            self.transition_count += 1
+            self.event_sequence += 1
+        if self.hidden_transition_at == index:
+            self.gain_index -= 1
+            self.transition_count += 1
+        if self.nonmax_endpoint_without_event_at == index:
+            self.gain_index = 64
+
+        features = _REAL_METADATA_FEATURES
+        flags = _REAL_METADATA_FLAGS
+        stream_id = 9
+        ownership_epoch = 5
+        observation_overflow = 0
+        observation_count = 4
+        if self.missing_feature_at == index:
+            features &= ~FEATURE_TANDEM_METADATA
+        if self.missing_valid_flag_at == index:
+            flags &= ~FLAG_TANDEM_METADATA_VALID
+        if self.unsafe_flag_at == index:
+            flags |= 1 << 11
+        if self.stream_change_at == index:
+            stream_id += 1
+        if self.zero_epoch_at == index:
+            ownership_epoch = 0
+        if self.overflow_at == index:
+            observation_overflow = 1
+        if self.excess_observations_at == index:
+            observation_count = 6
+        sample_format = 0 if self.bad_sample_format_at == index else 1
+        threshold_provenance = (
+            1 if self.bad_threshold_provenance_at == index else 572_733_972
+        )
+        transition_count = self.transition_count
+        if index == 0:
+            transition_count += self.first_unrepresented_transitions
+
+        metadata = SimpleNamespace(
+            version=5,
+            header_bytes=3_256,
+            features=features,
+            flags=flags,
+            stream_id=stream_id,
+            buffer_sequence=buffer_sequence,
+            first_sample_sequence=first_sample,
+            samples_per_channel=samples,
+            iq_payload_bytes=samples * 8,
+            enabled_scan_mask=0x0F,
+            sample_format=sample_format,
+            channel_count=2,
+            observation_count=observation_count,
+            observation_capacity=64,
+            event_count=len(events),
+            event_capacity=64,
+            observation_overflow_count=observation_overflow,
+            event_overflow_count=0,
+            ownership_epoch=ownership_epoch,
+            tandem_state=TandemState.ARMED_AUTO,
+            tandem_fault_flags=0,
+            tandem_transition_count=transition_count,
+            gain_table_id=TandemGainTable.MHZ_200_1300,
+            threshold_provenance=threshold_provenance,
+            minimum_gain_db=0,
+            maximum_gain_db=62,
+            initial_gain_db=(
+                40
+                if self.bad_initial_gain_at == index
+                else self.auto_request_initial_gain_db
+            ),
+            minimum_gain_index=3,
+            maximum_gain_index=65,
+            rx1_gain_index=self.gain_index,
+            rx2_gain_index=self.gain_index,
+            bench_gain_indices=(self.gain_index, self.gain_index),
+            ad9361_temperature_mdeg_c=35_000,
+            gain_events=events,
+        )
+        self.first_sample = first_sample + samples
+        self.buffer_sequence = buffer_sequence + 1
+        self.capture_count += 1
+        return metadata
+
+    def capture_iq(
+        self, _buffer: Any, *, metadata: bool, samples_per_channel: int
+    ) -> tuple[bytes, bytes | None, int]:
+        assert metadata is True
+        assert isinstance(_buffer, _FakeBuffer)
+        self.capture_thread_names.append(threading.current_thread().name)
+        self.capture_attempts += 1
+        if _buffer.poisoned:
+            self.future_poison_refills += 1
+            self.operations.append(("poison_refill_ebadf",))
+            raise OSError(errno.EBADF, "planted poisoned metadata batch")
+        for attempt in range(65):
+            if not self.startup_eagain_remaining:
+                break
+            self.startup_eagain_remaining -= 1
+            self.startup_eagain_attempts += 1
+            if attempt == 64:
+                raise OSError(errno.EAGAIN, "planted bounded startup EAGAIN")
+        if self.block_capture_at == self.capture_count:
+            self.blocked_refill.set()
+            if not self.cancelled.wait(timeout=2.0):
+                raise EvidenceInvalid("planted blocked refill was not cancelled")
+            raise OSError(errno.EBADF, "planted cancelled refill")
+        if self.worker_error_at == self.capture_count:
+            raise EvidenceInvalid("planted acquisition worker failure")
+        if _buffer.batch_frames == 64 and self.capture_count == 0:
+            self.core_batch_initiations += 1
+            self.batch_inflight.set()
+            if self.partial_batch_failure:
+                _buffer.poisoned = True
+                self.core_cancel_calls += 1
+                self.operations.append(("core_batch_cancel",))
+                self.batch_completed.set()
+                raise OSError(errno.EIO, "planted partial metadata batch failure")
+            for _ in range(200):
+                if self.command_reasserted.wait(timeout=0.01):
+                    break
+                if self.cancelled.is_set():
+                    raise OSError(errno.EBADF, "planted cancelled metadata batch")
+            else:
+                raise EvidenceInvalid(
+                    "planted batch refill did not overlap the same-level command"
+                )
+            self.batch_completed.set()
+        elif _buffer.batch_frames == 64:
+            self.cached_replays += 1
+        parsed = self._metadata(samples_per_channel)
+        token_prefix = f"metadata-{self.capture_count}".encode()
+        token = token_prefix.ljust(
+            probe_module._PROBE_METADATA_HEADER_BYTES, b"\0"
+        )
+        self.metadata_by_token[token] = parsed
+        self.refill_ns += 1_000_000
+        return self.raw, token, self.refill_ns
+
+    def parse_metadata(self, token: bytes) -> Any:
+        return self.metadata_by_token[token]
+
+    def read_rx_sample_counter_low32(self) -> int:
+        if self.freeze_counter_after_exact_write and self.command_reasserted.is_set():
+            return max(self.sample_counter, self.first_sample) % (1 << 32)
+        if (
+            self.precapture_baseline_offset_samples
+            and not self.batch_inflight.is_set()
+            and self.precapture_baseline_reads == 0
+        ):
+            current = self.first_sample - self.precapture_baseline_offset_samples
+            self.precapture_baseline_reads += 1
+            self.sample_counter = current + self.counter_read_step
+            return current % (1 << 32)
+        current = max(self.sample_counter, self.first_sample)
+        self.sample_counter = current + self.counter_read_step
+        return current % (1 << 32)
+
+    def paced_sleep(self, seconds: float) -> None:
+        self.operations.append(("paced_sleep", seconds))
+        if self.sleep_advances_counter:
+            self.sample_counter += round(seconds * self.options.sample_rate_hz)
+
+    def close(self) -> None:
+        self.closed = True
+        self.cleanup_verified = self.close_failures == 0
+        cleanup = {
+            **self._mute_evidence(),
+            "verified": self.cleanup_verified,
+        }
+        if self._report_path is not None and self._report_path.is_file():
+            report = json.loads(self._report_path.read_text(encoding="utf-8"))
+            report["cleanup"] = cleanup
+            self._report_path.write_text(
+                json.dumps(report, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        if self.close_failures:
+            self.close_failures -= 1
+            raise RuntimeError("planted radio close failure")
+
+
+class _DualTargetFakeRadio(_FakeProbeRadio):
+    """Keep the initiating fake refill in flight through both exact writes."""
+
+    def __init__(self, output_dir: Path) -> None:
+        super().__init__(output_dir)
+        self.dual_target_exact_write_count = 0
+        self.lo_readback_offset_hz = 0
+        self.frame_raw_overrides: dict[int, bytes] = {}
+        self.mute_call_count = 0
+        self.fail_mute_call: int | None = None
+
+    def read_center_frequency(self) -> dict[str, int]:
+        frequency = 915_000_000 + self.lo_readback_offset_hz
+        return {"rx_lo_hz": frequency, "tx_lo_hz": frequency}
+
+    def tandem_status(self) -> dict[str, int]:
+        status = super().tandem_status()
+        if self.buffer_open and not self.hold_active:
+            status["state"] = int(TandemState.ARMED_AUTO)
+            status["ownership_epoch"] = 5
+        return status
+
+    def mute_all(self) -> dict[str, Any]:
+        self.mute_call_count += 1
+        if self.mute_call_count == self.fail_mute_call:
+            self.mute_failures += 1
+        return super().mute_all()
+
+    def write_tx2_gain_exact(self, gain_db: float) -> None:
+        if gain_db > self.options.tx_gain_db:
+            raise FixtureSafetyError("planted radio rejected strong exact TX write")
+        self.operations.append(("write_tx2_gain_exact", float(gain_db)))
+        if self.exact_write_failures:
+            self.exact_write_failures -= 1
+            raise OSError("planted exact TX2 write failure")
+        self.tx_gain_db = float(gain_db)
+        self.dual_target_exact_write_count += 1
+        if self.mutate_tx1_after_exact_write_db is not None:
+            self.tx1_gain_db = self.mutate_tx1_after_exact_write_db
+        if self.dual_target_exact_write_count >= 2:
+            self.command_reasserted.set()
+
+    def capture_iq(
+        self, buffer: Any, *, metadata: bool, samples_per_channel: int
+    ) -> tuple[bytes, bytes | None, int]:
+        frame_index = self.capture_count
+        raw, token, refill_ns = super().capture_iq(
+            buffer,
+            metadata=metadata,
+            samples_per_channel=samples_per_channel,
+        )
+        assert token is not None
+        parsed = self.metadata_by_token.pop(token)
+        wire = _real_metadata_wire(parsed)
+        self.metadata_by_token[wire] = parsed
+        return self.frame_raw_overrides.get(frame_index, raw), wire, refill_ns
+
+
+def _quality(output_dir: Path) -> TandemQualityOptions:
+    return TandemQualityOptions(
+        tx_gain_trajectory_db=(-61.0, -45.0, -30.0, -45.0, -61.0),
+        physical_attenuation_db=0.0,
+        sample_rate_hz=2_500_000,
+        samples_per_channel=65_536,
+        max_seconds=30.0,
+        output_dir=output_dir,
+    )
+
+
+def _run_fake(
+    radio: _FakeProbeRadio,
+    quality: TandemQualityOptions,
+) -> tuple[dict[str, Any], Path]:
+    return run_transient_transport_probe(
+        radio,
+        quality,
+        clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
+        metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
+    )
+
+
+def _run_dual_target_fake(
+    radio: _DualTargetFakeRadio,
+    quality: TandemQualityOptions,
+) -> tuple[dict[str, Any], Path]:
+    return run_dual_target_transient_transport_probe(
+        radio,
+        quality,
+        clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
+        metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
+    )
+
+
+def _failure_report(radio: _FakeProbeRadio) -> dict[str, Any]:
+    assert radio._report_path is not None and radio._report_path.is_file()
+    return json.loads(radio._report_path.read_text(encoding="utf-8"))
+
+
+def _assert_failed_schedule_diagnostics(
+    radio: _FakeProbeRadio, *, failure_stage: str
+) -> dict[str, Any]:
+    report = _failure_report(radio)
+    acquisition = report["acquisition"]
+    diagnostics = acquisition["prebind_schedule_diagnostics"]
+    assert report["schema"] == probe_module.PROBE_SCHEMA
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert diagnostics["status"] == "failed"
+    assert diagnostics["qualified"] is False
+    assert diagnostics["failure_stage"] == failure_stage
+    assert diagnostics["failure_error"]
+    assert acquisition["prebind_unbound_command"] is None
+    assert acquisition["prebind_raw_counter_schedule"] is None
+    shutdown = diagnostics["shutdown"]
+    assert shutdown["cancel_required"] is True
+    assert shutdown["cancel_called"] is True
+    assert shutdown["cancel_succeeded"] is True
+    events = [item["event"] for item in shutdown["events"]]
+    assert events == [
+        "prejoin_mute_start",
+        "prejoin_mute_complete",
+        "cancel_start",
+        "cancel_complete",
+        "worker_stop_start",
+        "worker_stop_complete",
+    ]
+    json.dumps(report, allow_nan=False)
+    with pytest.raises(EvidenceInvalid, match="report is not qualified"):
+        validate_transient_transport_probe_report(
+            report, _quality(Path(radio.options.output_dir))
+        )
+    return diagnostics
+
+
+def _forge_mid_session_event_excursion(
+    report: dict[str, Any], *, spacing_samples: int
+) -> dict[str, Any]:
+    forged = copy.deepcopy(report)
+    frames = forged["frames"]
+    event_frame_index = 10
+    event_frame = frames[event_frame_index]
+    first_sample = event_frame["first_sample_sequence"]
+    directions = (
+        TandemEventDirection.DECREASE,
+        TandemEventDirection.INCREASE,
+    )
+    reasons = (
+        TandemEventReason.LARGE_ADC_OVERLOAD,
+        TandemEventReason.BOTH_LOW_POWER,
+    )
+    gains = (64, 65)
+    events = []
+    for index, (direction, reason, gain) in enumerate(
+        zip(directions, reasons, gains, strict=True)
+    ):
+        events.append(
+            {
+                "sample_sequence": first_sample + 256 + index * spacing_samples,
+                "event_sequence": index,
+                "flags": (int(direction) << 4) | int(reason),
+                "direction": int(direction),
+                "direction_name": direction.name.lower(),
+                "reason": int(reason),
+                "reason_name": reason.name.lower(),
+                "rx1_gain_index": gain,
+                "rx2_gain_index": gain,
+            }
+        )
+    for index, frame in enumerate(frames[event_frame_index:], start=event_frame_index):
+        frame["metadata"].update(
+            tandem_transition_count=2,
+            event_count=2 if index == event_frame_index else 0,
+            gain_events=events if index == event_frame_index else [],
+        )
+        frame["continuity"].update(
+            transition_count_delta=2 if index == event_frame_index else 0,
+            visible_event_count=2 if index == event_frame_index else 0,
+        )
+    for name in ("initial_stable_suffix", "final_stable_suffix"):
+        forged[name]["transition_count"] = 2
+    return forged
+
+
+def test_probe_accepts_exact_weak_continuous_transport(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.startup_eagain_remaining = 3
+    report, path = _run_fake(radio, _quality(tmp_path))
+
+    assert path.is_file()
+    assert report["verdict"] == PROBE_PENDING_VERDICT
+    assert report["release_pass_eligible"] is False
+    assert radio.auto_request_initial_gain_db == 62
+    assert report["configuration"]["probe"]["auto_initial_gain_db"] == 62
+    assert report["metadata_request"]["decoded"]["initial_gain_db"] == 62
+    assert report["evidence_policy"]["auto_initial_gain_db"] == 62
+    assert all(frame["metadata"]["initial_gain_db"] == 62 for frame in report["frames"])
+    assert all(
+        frame["metadata"]["tandem_transition_count"] == 0
+        and frame["metadata"]["event_count"] == 0
+        and frame["metadata"]["bench_gain_indices"]
+        == [frame["metadata"]["gain_index_range"][1]] * 2
+        for frame in report["frames"]
+    )
+    assert report["stale_fifo_normalization"]["action"] == "not_required"
+    assert report["stale_fifo_normalization"]["stale_fifo_events"] == 0
+    assert report["stale_fifo_normalization"]["hold_session"] is None
+    assert not any(
+        operation[0] == "hold_buffer_enter" for operation in radio.operations
+    )
+    assert len(report["frames"]) == 64
+    assert report["frames"][31]["probe_phase"] == "fully_pre_command"
+    assert report["command_contention"]["command"]["requested_level_db"] == -45.0
+    partition = report["command_contention"]["partition"]
+    assert partition["fully_pre_command_frames"] >= 32
+    assert partition["fully_post_command_frames"] >= 8
+    bracket = report["command_contention"]["command"]["sample_counter_bracket"]
+    assert bracket["target_offset_frames"] == 40
+    assert bracket["worker_in_flight_at_command"] is True
+    assert bracket["post_open_baseline_sample"] + 40 * 65_536 == bracket[
+        "target_sample"
+    ]
+    assert bracket["last_below_sample"] < bracket["target_sample"] <= bracket[
+        "a_prewrite_sample"
+    ]
+    assert bracket["a_prewrite_sample"] < bracket["c_causal_advance_sample"]
+    assert 2 <= bracket["target_poll_read_count"] <= 64
+    assert any(
+        observation["phase"] == "coarse_sleep"
+        for observation in bracket["target_poll_observations"]
+    )
+    assert bracket["target_total_requested_sleep_samples"] > 0
+    assert report["conditioning_anchor_candidate"]["sample_count"] == 8_192
+    assert report["conditioning_anchor_candidate"]["byte_count"] == 65_536
+    assert len(report["conditioning_anchor_candidate"]["tail_sha256"]) == 64
+    assert radio.batch_inflight.is_set() and radio.batch_completed.is_set()
+    assert radio.core_batch_initiations == 1
+    assert radio.cached_replays == 63
+    assert radio.cancel_calls == 0
+    assert radio.startup_eagain_attempts == 3
+    assert set(radio.capture_thread_names) == {PROBE_THREAD_NAME}
+    assert all(
+        operation[1] <= -45.0
+        for operation in radio.operations
+        if operation[0] in {"set_tx2_gain", "write_tx2_gain_exact"}
+    )
+    assert [
+        operation
+        for operation in radio.operations
+        if operation[0] == "write_tx2_gain_exact"
+    ] == [("write_tx2_gain_exact", -45.0)]
+    command_operations = [
+        operation
+        for operation in radio.operations
+        if operation[0]
+        in {"attest_tx1_muted", "write_tx2_gain_exact", "read_tx2_gain"}
+    ]
+    assert command_operations == [
+        ("attest_tx1_muted", -89.75),
+        ("write_tx2_gain_exact", -45.0),
+        ("read_tx2_gain",),
+        ("attest_tx1_muted", -89.75),
+    ]
+    diagnostics = report["acquisition"]["prebind_schedule_diagnostics"]
+    assert diagnostics["status"] == "complete"
+    assert diagnostics["qualified"] is True
+    assert diagnostics["command"]["write_ack"]["attempt_count"] == 1
+    assert diagnostics["command"]["deferred_tx2_readback"]["attempt_count"] == 1
+    assert diagnostics["command"]["deferred_tx2_readback"]["passed"] is True
+    assert diagnostics["command"]["tx1_mute_assurance"]["pre"]["passed"] is True
+    assert diagnostics["command"]["tx1_mute_assurance"]["post"]["passed"] is True
+    assert radio.tx1_gain_db == -89.75
+    close_index = radio.operations.index(("buffer_close",))
+    assert any(
+        operation == ("mute", True) for operation in radio.operations[:close_index]
+    )
+    assert ("wire_close",) in radio.operations
+    assert ("data_pipe_teardown",) not in radio.operations
+    assert report["acquisition"]["configured_batch_frames"] == 64
+    assert report["acquisition"]["configured_batch_cache_bytes"] == 37_749_760
+    assert report["acquisition"][
+        "initiating_refill_completion_monotonic_ns"
+    ] == report["frames"][0]["refill_monotonic_ns"]
+    assert (
+        report["weak_conditioning_command"]["host_after_ns"]
+        <= report["command_contention"]["command"]["host_before_ns"]
+    )
+    assert (
+        report["command_contention"]["command"]["host_after_ns"]
+        <= report["frames"][0]["refill_monotonic_ns"]
+    )
+    assert report["acquisition"]["shutdown_path"] == (
+        "normal_close_after_full_cache_replay"
+    )
+    assert report["memory_policy"]["python_raw"]["maximum_bytes"] == 33_554_432
+    assert report["memory_policy"]["aggregate"][
+        "conservative_capture_upper_bound_bytes"
+    ] == 80_872_448
+    assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
+    validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_accepts_v4_precapture_s0_with_target_inside_exact_batch(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.precapture_baseline_offset_samples = 22_043
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    frames = report["frames"]
+    contention = report["command_contention"]
+    bracket = contention["command"]["sample_counter_bracket"]
+    partition = contention["partition"]
+    assert frames[0]["first_sample_sequence"] - bracket[
+        "post_open_baseline_sample"
+    ] == 22_043
+    assert bracket["post_open_baseline_sample"] < frames[0]["first_sample_sequence"]
+    assert (
+        frames[0]["first_sample_sequence"]
+        <= bracket["target_sample"]
+        < frames[-1]["sample_end_exclusive"]
+    )
+    assert frames[39]["first_sample_sequence"] < bracket["target_sample"] < (
+        frames[39]["sample_end_exclusive"]
+    )
+    assert partition["fully_pre_command_frames"] == 39
+    assert partition["fully_post_command_frames"] == 24
+    acquisition = report["acquisition"]
+    assert acquisition["prebind_unbound_command"]["sample_sequence_before"] is None
+    assert acquisition["prebind_unbound_command"]["sample_sequence_after"] is None
+    assert acquisition["prebind_raw_counter_schedule"] == {
+        field: bracket[field] for field in probe_module._PROBE_RAW_SCHEDULE_FIELDS
+    }
+    validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_rejects_qualified_schedule_diagnostic_mutations(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    mutations: list[tuple[str, Any]] = []
+
+    middle_raw = copy.deepcopy(report)
+    middle_reads = middle_raw["acquisition"]["prebind_schedule_diagnostics"][
+        "counter_reads"
+    ]
+    middle_b = next(
+        item for item in middle_reads if item["role"] == "raw_b_first_advance"
+    )
+    middle_b["raw"] = (middle_b["raw"] + 1) % (1 << 32)
+    mutations.append(("B/C counter diagnostics changed", middle_raw))
+
+    host_order = copy.deepcopy(report)
+    host_reads = host_order["acquisition"]["prebind_schedule_diagnostics"][
+        "counter_reads"
+    ]
+    host_reads[1]["host_before_ns"] = host_reads[0]["host_after_ns"] - 1
+    mutations.append(("counter diagnostic is invalid", host_order))
+
+    write_count = copy.deepcopy(report)
+    write_count["acquisition"]["prebind_schedule_diagnostics"]["command"][
+        "write_ack"
+    ]["attempt_count"] = 2
+    mutations.append(("exact TX2 write diagnostic is invalid", write_count))
+
+    shutdown_order = copy.deepcopy(report)
+    shutdown_events = shutdown_order["acquisition"][
+        "prebind_schedule_diagnostics"
+    ]["shutdown"]["events"]
+    shutdown_events[1], shutdown_events[2] = shutdown_events[2], shutdown_events[1]
+    mutations.append(("shutdown chronology is invalid", shutdown_order))
+
+    cancel_cross_bind = copy.deepcopy(report)
+    cancel_shutdown = cancel_cross_bind["acquisition"][
+        "prebind_schedule_diagnostics"
+    ]["shutdown"]
+    cancel_shutdown["cancel_required"] = True
+    cancel_shutdown["cancel_called"] = True
+    cancel_shutdown["cancel_succeeded"] = True
+    mutations.append(("shutdown chronology is invalid", cancel_cross_bind))
+
+    partial = copy.deepcopy(report)
+    partial_diagnostics = partial["acquisition"]["prebind_schedule_diagnostics"]
+    partial_diagnostics["status"] = "failed"
+    partial_diagnostics["qualified"] = False
+    partial_diagnostics["failure_stage"] = "planted_partial"
+    mutations.append(("schedule diagnostic is not qualified", partial))
+
+    for expected, forged in mutations:
+        with pytest.raises(EvidenceInvalid, match=expected):
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_probe_rejects_target_outside_batch_and_insufficient_partition(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.precapture_baseline_offset_samples = 22_043
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    acquisition = report["acquisition"]
+    unbound = acquisition["prebind_unbound_command"]
+    command = probe_module.StimulusCommand(
+        command_id=unbound["command_id"],
+        requested_level_db=unbound["requested_level_db"],
+        applied_level_db=unbound["applied_level_db"],
+        host_before_ns=unbound["host_before_ns"],
+        host_after_ns=unbound["host_after_ns"],
+        sample_sequence_before=None,
+        sample_sequence_after=None,
+    )
+    raw_schedule = acquisition["prebind_raw_counter_schedule"]
+    target = report["command_contention"]["command"]["sample_counter_bracket"][
+        "target_sample"
+    ]
+    shifted_frames = [SimpleNamespace(record=copy.deepcopy(frame)) for frame in report["frames"]]
+    shift = target - shifted_frames[-1].record["sample_end_exclusive"]
+    for frame in shifted_frames:
+        frame.record["first_sample_sequence"] += shift
+        frame.record["sample_end_exclusive"] += shift
+    with pytest.raises(EvidenceInvalid, match="target is outside the batch"):
+        probe_module._bind_batch_counter_schedule(
+            shifted_frames,
+            command,
+            raw_schedule,
+            TransientTransportProbeOptions(),
+        )
+
+    frames = [SimpleNamespace(record=copy.deepcopy(frame)) for frame in report["frames"]]
+    lower = frames[30].record["sample_end_exclusive"]
+    insufficient = replace(
+        command,
+        sample_sequence_before=lower,
+        sample_sequence_after=lower + 4_096,
+    )
+    with pytest.raises(EvidenceInvalid, match="retained 31 fully pre-command"):
+        probe_module._probe_command_partition(
+            frames,
+            insufficient,
+            required_fully_pre_frames=32,
+            required_fully_post_frames=8,
+        )
+
+
+def test_probe_persists_prebind_diagnostics_on_posthoc_bind_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+
+    def fail_bind(*_args: Any, **_kwargs: Any) -> Any:
+        raise EvidenceInvalid("planted posthoc bind failure")
+
+    monkeypatch.setattr(probe_module, "_bind_batch_counter_schedule", fail_bind)
+    with pytest.raises(EvidenceInvalid, match="planted posthoc bind failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    acquisition = report["acquisition"]
+    assert report["verdict"] == "invalid"
+    assert len(report["frames"]) == 64
+    assert acquisition["single_core_batch_initiated"] is True
+    assert acquisition["initiating_batch_refill_calls"] == 1
+    assert acquisition["public_refill_calls"] == 64
+    assert acquisition["cached_replay_refill_calls"] == 63
+    assert acquisition["batch_cache_fully_replayed"] is True
+    assert acquisition["initiating_refill_completion_monotonic_ns"] == (
+        report["frames"][0]["refill_monotonic_ns"]
+    )
+    assert acquisition["prebind_unbound_command"]["command_id"] == (
+        "weak_control_reassertion"
+    )
+    assert set(acquisition["prebind_raw_counter_schedule"]) == (
+        probe_module._PROBE_RAW_SCHEDULE_FIELDS
+    )
+    with pytest.raises(EvidenceInvalid, match="report is not qualified"):
+        validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_precapture_s0_does_not_relax_first_transition_gate(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.precapture_baseline_offset_samples = 22_043
+    radio.first_unrepresented_transitions = 1
+    with pytest.raises(EvidenceInvalid, match="unrepresented prior transitions"):
+        _run_fake(radio, _quality(tmp_path))
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_attests_complete_exact_runtime_provenance(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    provenance = report["runtime_provenance"]
+    host = provenance["host_libiio"]
+    runner = provenance["firmware_runner"]
+    assert host["source_commit"] == probe_module.PROBE_EXACT_LIBIIO_COMMIT
+    assert host["protected_source_tag"] == probe_module.PROBE_EXACT_LIBIIO_TAG
+    assert host["protected_source_ref"] == probe_module.PROBE_EXACT_LIBIIO_REF
+    assert host["source_head_commit"] == probe_module.PROBE_EXACT_LIBIIO_COMMIT
+    assert host["protected_tag_commit"] == probe_module.PROBE_EXACT_LIBIIO_COMMIT
+    assert host["mapped_shared_objects"] == [host["mapped_shared_object"]]
+    assert host["cmake_source_directory"] == host["source_directory"]
+    assert host["pylibiio_sha256"] == host["pylibiio_commit_blob_sha256"]
+    assert [
+        dependency["relative_path"] for dependency in runner["local_dependencies"]
+    ] == list(probe_module._PROBE_LOCAL_RUNTIME_DEPENDENCIES)
+    assert all(
+        dependency["observed_sha256"] == dependency["commit_blob_sha256"]
+        for dependency in runner["local_dependencies"]
+    )
+    assert report["identity"]["serial"] == probe_module.PROBE_EXACT_SERIAL
+    assert (
+        report["identity"]["context_attrs"]["fw_version"]
+        == probe_module.PROBE_EXACT_FIRMWARE_VERSION
+    )
+    validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_runtime_dependency_inventory_covers_relative_import_closure() -> None:
+    repository = Path(__file__).resolve().parents[2]
+    radio_hardware = repository / "tests/radio_hardware"
+    pending = {
+        "conftest.py",
+        "test_transient_transport_dual_target_probe.py",
+        "test_transient_transport_probe.py",
+        "transient_transport_probe.py",
+    }
+    closure: set[str] = set()
+    while pending:
+        relative_name = pending.pop()
+        if relative_name in closure:
+            continue
+        closure.add(relative_name)
+        tree = ast.parse(
+            (radio_hardware / relative_name).read_text(encoding="utf-8"),
+            filename=relative_name,
+        )
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.ImportFrom) or node.level != 1:
+                continue
+            modules = [node.module] if node.module else [item.name for item in node.names]
+            for module in modules:
+                candidate = f"{module.replace('.', '/')}.py"
+                if (radio_hardware / candidate).is_file():
+                    pending.add(candidate)
+
+    expected = {
+        "pytest.ini",
+        "scripts/run_tandem_agc_quality_hardware.sh",
+        probe_module._PROBE_MANIFEST_PATH,
+        "tests/__init__.py",
+        "tests/radio_hardware/__init__.py",
+        "tests/radio_hardware/requirements.txt",
+        *(f"tests/radio_hardware/{name}" for name in closure),
+    }
+    assert set(probe_module._PROBE_LOCAL_RUNTIME_DEPENDENCIES) == expected
+
+
+def test_probe_validator_rejects_provenance_and_identity_substitutions(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    alternate_repository = tmp_path / "alternate-firmware-clone"
+    subprocess.run(
+        (
+            "git",
+            "clone",
+            "-q",
+            report["runtime_provenance"]["firmware_runner"]["repository"],
+            str(alternate_repository),
+        ),
+        check=True,
+    )
+
+    def mutation(name: str, apply: Any) -> tuple[str, dict[str, Any]]:
+        forged = copy.deepcopy(report)
+        apply(forged)
+        return name, forged
+
+    def dependency_zero(value: dict[str, Any]) -> None:
+        value["runtime_provenance"]["firmware_runner"]["local_dependencies"][
+            0
+        ].update(
+            observed_sha256="0" * 64,
+            commit_blob_sha256="0" * 64,
+        )
+
+    def alternate_runner_clone(value: dict[str, Any]) -> None:
+        runner = value["runtime_provenance"]["firmware_runner"]
+        runner["repository"] = str(alternate_repository.resolve())
+        for dependency in runner["local_dependencies"]:
+            dependency["absolute_path"] = str(
+                (alternate_repository / dependency["relative_path"]).resolve()
+            )
+
+    cases = [
+        mutation("serial", lambda value: value["identity"].update(serial="R17")),
+        mutation(
+            "firmware",
+            lambda value: value["identity"]["context_attrs"].update(
+                fw_version="v0.41-plutoplus-spf-tandem-agc-v8-rc3"
+            ),
+        ),
+        mutation(
+            "identity libiio commit",
+            lambda value: value["identity"].update(libiio_source_commit="0" * 40),
+        ),
+        mutation(
+            "identity pylibiio path",
+            lambda value: value["identity"].update(
+                pylibiio_file=str(
+                    Path(value["identity"]["pylibiio_file"]).parent
+                    / ".."
+                    / "python"
+                    / "iio.py"
+                )
+            ),
+        ),
+        mutation(
+            "context numeric alias",
+            lambda value: value["identity"]["context_version"].__setitem__(0, False),
+        ),
+        mutation(
+            "protected commit",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                source_commit="0" * 40
+            ),
+        ),
+        mutation(
+            "protected tag",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                protected_source_tag="tandem-agc-v8-rc3-source/libiio-v2"
+            ),
+        ),
+        mutation(
+            "clean bool alias",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                source_tracked_clean=1
+            ),
+        ),
+        mutation(
+            "mapped digest",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                mapped_shared_object_sha256="0" * 64
+            ),
+        ),
+        mutation(
+            "mapped path",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                mapped_shared_object=value["runtime_provenance"]["host_libiio"][
+                    "pylibiio_path"
+                ]
+            ),
+        ),
+        mutation(
+            "pylibiio digests",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                pylibiio_sha256="0" * 64,
+                pylibiio_commit_blob_sha256="0" * 64,
+            ),
+        ),
+        mutation(
+            "pylibiio path",
+            lambda value: value["runtime_provenance"]["host_libiio"].update(
+                pylibiio_path=value["runtime_provenance"]["host_libiio"][
+                    "mapped_shared_object"
+                ]
+            ),
+        ),
+        mutation(
+            "runner commit",
+            lambda value: value["runtime_provenance"]["firmware_runner"].update(
+                commit="0" * 40
+            ),
+        ),
+        mutation(
+            "runner repository",
+            lambda value: value["runtime_provenance"]["firmware_runner"].update(
+                repository=(
+                    value["runtime_provenance"]["firmware_runner"]["repository"]
+                    + "/."
+                )
+            ),
+        ),
+        mutation("alternate valid runner clone", alternate_runner_clone),
+        mutation("dependency digests", dependency_zero),
+        mutation(
+            "dependency path",
+            lambda value: value["runtime_provenance"]["firmware_runner"][
+                "local_dependencies"
+            ][0].update(
+                absolute_path=value["runtime_provenance"]["firmware_runner"][
+                    "local_dependencies"
+                ][1]["absolute_path"]
+            ),
+        ),
+        mutation(
+            "manifest commit",
+            lambda value: value["runtime_provenance"]["firmware_runner"][
+                "manifest_libiio_identity"
+            ].update(libiio_0_25_source="0" * 40),
+        ),
+    ]
+    for name, forged in cases:
+        with pytest.raises(EvidenceInvalid) as caught:
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+        assert name and "transport probe" in str(caught.value)
+
+
+def test_probe_validator_rejects_pylibiio_mutation_with_coordinated_digests(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    forged = copy.deepcopy(report)
+    pylibiio = Path(forged["runtime_provenance"]["host_libiio"]["pylibiio_path"])
+    pylibiio.write_text("# forged but valid source-shaped pylibiio\n", encoding="utf-8")
+    forged_digest = _digest(pylibiio)
+    forged["runtime_provenance"]["host_libiio"].update(
+        pylibiio_sha256=forged_digest,
+        pylibiio_commit_blob_sha256=forged_digest,
+    )
+
+    with pytest.raises(EvidenceInvalid, match="pylibiio digest changed"):
+        validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+@pytest.mark.parametrize(
+    ("status_update", "expected"),
+    (
+        ({"ownership_epoch": 999}, "ownership_epoch"),
+        ({"transition_count": 123}, "transition count"),
+        ({"rx1_gain_index": 1, "rx2_gain_index": 99}, "paired 7-bit"),
+        ({"rx1_gain_index": 128, "rx2_gain_index": 128}, "paired 7-bit"),
+        ({"unexpected_status_field": 1}, "fields are incomplete"),
+    ),
+)
+def test_probe_rejects_unsafe_live_post_close_status(
+    tmp_path: Path, status_update: dict[str, int], expected: str
+) -> None:
+    class UnsafeReleaseRadio(_FakeProbeRadio):
+        def tandem_status(self) -> dict[str, int]:
+            status = super().tandem_status()
+            if ("buffer_close",) in self.operations:
+                status.update(status_update)
+            return status
+
+    radio = UnsafeReleaseRadio(tmp_path)
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+
+    failure = _failure_report(radio)
+    assert failure["verdict"] == "invalid"
+    assert failure["release_pass_eligible"] is False
+
+
+def test_probe_rejects_live_host_chronology_outside_initiating_refill(
+    tmp_path: Path,
+) -> None:
+    class LateClock:
+        def __init__(self) -> None:
+            self.value = 100_000_000
+
+        def __call__(self) -> int:
+            self.value += 100
+            return self.value
+
+    radio = _FakeProbeRadio(tmp_path)
+    with pytest.raises(BaseException, match="did not complete while"):
+        run_transient_transport_probe(
+            radio,
+            _quality(tmp_path),
+            clock_ns=LateClock(),
+            sleep=radio.paced_sleep,
+            metadata_parser=radio.parse_metadata,
+            runtime_provenance=radio.runtime_provenance,
+        )
+
+    assert _failure_report(radio)["verdict"] == "invalid"
+    assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
+
+
+def test_probe_rejects_live_command_that_predates_initial_conditioning(
+    tmp_path: Path,
+) -> None:
+    del tmp_path
+    with pytest.raises(EvidenceInvalid, match="predates initial conditioning"):
+        probe_module._validate_batch_host_chronology(
+            initial_host_after_ns=20_100,
+            command_host_before_ns=10_000,
+            command_host_after_ns=10_100,
+            initiating_refill_completion_ns=1_000_000,
+        )
+
+
+def test_probe_clears_stale_fifo_in_muted_hold_before_tx(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    normalization = report["stale_fifo_normalization"]
+    assert normalization["stale_fifo_events"] == 8
+    assert normalization["action"] == "muted_hold_session_acquire_clear"
+    hold = normalization["hold_session"]
+    assert hold["metadata_request"]["decoded"]["mode"] == int(TandemMode.HOLD)
+    assert hold["metadata_request"]["decoded"]["initial_gain_db"] == 40
+    assert report["metadata_request"]["decoded"]["initial_gain_db"] == 62
+    assert hold["metadata_abi"] == 2
+    assert hold["refill_count"] == 0
+    assert hold["opened"] is True and hold["closed"] is True
+    assert hold["status_while_open"]["state"] == int(TandemState.ARMED_HOLD)
+    assert hold["status_while_open"]["ownership_epoch"] > 0
+    assert hold["status_while_open"]["fifo_level"] == 0
+    assert normalization["status_after"]["state"] == int(TandemState.IDLE)
+    assert normalization["status_after"]["ownership_epoch"] == 0
+    assert normalization["status_after"]["fifo_level"] == 0
+    assert normalization["rx_state_before"] == normalization["rx_state_after"]
+
+    mute_index = radio.operations.index(("mute", False))
+    hold_enter = radio.operations.index(("hold_buffer_enter", "metadata", 1))
+    hold_close = radio.operations.index(("hold_buffer_close",))
+    arm_index = next(
+        index
+        for index, operation in enumerate(radio.operations)
+        if operation[0] == "arm_tone"
+    )
+    tx_index = next(
+        index
+        for index, operation in enumerate(radio.operations)
+        if operation[0] == "set_tx2_gain"
+    )
+    assert mute_index < hold_enter < hold_close < arm_index < tx_index
+    validate_transient_transport_probe_report(report, _quality(tmp_path))
+
+
+def test_probe_fifo_clear_open_failure_never_arms_tx(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    radio.hold_open_failures = 1
+
+    with pytest.raises(BaseException, match="HOLD FIFO clear open failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0] in {"arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
+        for operation in radio.operations
+    )
+    hold_enter = radio.operations.index(("hold_buffer_enter", "metadata", 1))
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[:hold_enter]
+    )
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[hold_enter + 1 :]
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_rejects_impossible_stale_fifo_level_before_tx(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 65
+
+    with pytest.raises(BaseException, match="FIFO level is invalid"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0]
+        in {"hold_buffer_enter", "arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
+        for operation in radio.operations
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_rejects_fifo_remaining_after_hold_close_before_tx(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    radio.hold_fifo_after_close = 8
+
+    with pytest.raises(BaseException, match="FIFO remains nonempty"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0] in {"arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
+        for operation in radio.operations
+    )
+    hold_close = radio.operations.index(("hold_buffer_close",))
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[hold_close + 1 :]
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_hold_close_failure_is_muted_and_never_arms_tx(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    radio.hold_close_failures = 1
+
+    with pytest.raises(BaseException, match="HOLD FIFO clear close failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert not any(
+        operation[0] in {"arm_tone", "set_tx2_gain", "write_tx2_gain_exact"}
+        for operation in radio.operations
+    )
+    hold_close = radio.operations.index(("hold_buffer_close",))
+    assert any(
+        operation == ("mute", False) for operation in radio.operations[hold_close + 1 :]
+    )
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected"),
+    (
+        (lambda radio: setattr(radio, "gap_at", 39), "provider gap"),
+        (
+            lambda radio: (
+                setattr(radio, "gap_at", 20),
+                setattr(radio, "buffer_gap_frames", 2),
+                setattr(radio, "sample_gap_frames", 1),
+            ),
+            "buffer/sample deltas disagree",
+        ),
+        (lambda radio: setattr(radio, "hidden_transition_at", 12), "lost gain-event"),
+        (
+            lambda radio: setattr(radio, "first_unrepresented_transitions", 1),
+            "unrepresented prior transitions",
+        ),
+        (
+            lambda radio: radio.visible_event_at.add(0),
+            "represented startup transition",
+        ),
+        (
+            lambda radio: setattr(radio, "auto_initial_endpoint_offset", -1),
+            "maximum-gain endpoint",
+        ),
+        (lambda radio: setattr(radio, "stream_change_at", 8), "stream or ownership"),
+        (lambda radio: setattr(radio, "zero_epoch_at", 8), "stream or ownership"),
+        (lambda radio: setattr(radio, "missing_feature_at", 8), "wire provenance"),
+        (lambda radio: setattr(radio, "missing_valid_flag_at", 8), "valid flags"),
+        (lambda radio: setattr(radio, "unsafe_flag_at", 8), "unsafe"),
+        (lambda radio: setattr(radio, "overflow_at", 8), "overflow"),
+        (
+            lambda radio: setattr(radio, "excess_observations_at", 8),
+            "overlap-safe bound",
+        ),
+        (
+            lambda radio: setattr(radio, "bad_sample_format_at", 8),
+            "wire provenance",
+        ),
+        (
+            lambda radio: setattr(radio, "bad_threshold_provenance_at", 8),
+            "threshold provenance",
+        ),
+        (
+            lambda radio: setattr(radio, "bad_initial_gain_at", 8),
+            "differs from its request",
+        ),
+        (lambda radio: setattr(radio, "worker_error_at", 31), "worker failure"),
+        (lambda radio: setattr(radio, "readback_offset_db", 0.5), "readback"),
+    ),
+)
+def test_probe_rejects_runtime_evidence_mutations(
+    tmp_path: Path,
+    mutation: Any,
+    expected: str,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    mutation(radio)
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
+
+
+@pytest.mark.parametrize(
+    ("frame_index", "visible_event", "expected", "expected_tx_writes"),
+    (
+        (10, True, "AUTO session contains a gain transition", 2),
+        (32, True, "AUTO session contains a gain transition", 2),
+        (10, False, "endpoint changed without a visible event", 2),
+        (32, False, "endpoint changed without a visible event", 2),
+    ),
+)
+def test_probe_rejects_nonstable_mid_and_command_phase_gain_state(
+    tmp_path: Path,
+    frame_index: int,
+    visible_event: bool,
+    expected: str,
+    expected_tx_writes: int,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    if visible_event:
+        radio.visible_event_at.add(frame_index)
+    else:
+        radio.nonmax_endpoint_without_event_at = frame_index
+
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+
+    tx_writes = [
+        operation
+        for operation in radio.operations
+        if operation[0] in {"set_tx2_gain", "write_tx2_gain_exact"}
+    ]
+    assert len(tx_writes) == expected_tx_writes
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_never_commands_after_batch_fails_before_counter_target(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.partial_batch_failure = True
+
+    with pytest.raises(OSError, match="partial metadata batch"):
+        _run_fake(radio, _quality(tmp_path))
+
+    tx_writes = [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ]
+    assert tx_writes == [("set_tx2_gain", -45.0)]
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert "partial metadata batch" in report["fatal_error"]
+    assert "command_contention" not in report
+    assert report["acquisition"]["single_core_batch_initiated"] is False
+    assert report["acquisition"]["initiating_batch_refill_calls"] == 0
+    assert report["acquisition"]["public_refill_calls"] == 0
+    assert report["acquisition"]["cached_replay_refill_calls"] == 0
+    assert report["acquisition"]["batch_cache_fully_replayed"] is False
+    assert report["acquisition"]["initiating_refill_completion_monotonic_ns"] is None
+    assert radio.cancel_calls == 1
+    assert radio.core_cancel_calls == 1
+    assert radio.cleanup_cancel_calls == 1
+    assert radio.operations.index(("core_batch_cancel",)) < radio.operations.index(
+        ("buffer_cancel",)
+    ) < radio.operations.index(("buffer_close",))
+    assert ("data_pipe_teardown",) in radio.operations
+    assert ("wire_close",) not in radio.operations
+
+
+@pytest.mark.parametrize(
+    "field",
+    ("batch_frames_readback_offset", "batch_cache_readback_offset"),
+)
+def test_probe_rejects_batch_configuration_attestation_mismatch(
+    tmp_path: Path, field: str
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    setattr(radio, field, 1)
+
+    with pytest.raises(BaseException, match="batch64 cache attestation"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    assert radio.operations.index(("buffer_cancel",)) < radio.operations.index(
+        ("buffer_close",)
+    )
+
+
+def test_fake_batch_poison_is_ebadf_and_fresh_session_recovers(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    quality = _quality(tmp_path)
+    request = probe_module._probe_auto_request(
+        quality, TransientTransportProbeOptions()
+    )
+    radio.partial_batch_failure = True
+    with radio.buffer(
+        "metadata",
+        8,
+        65_536,
+        tandem_request=request,
+        batch_frames=64,
+    ) as (buffer, metadata_abi):
+        assert metadata_abi == 2
+        assert buffer.batch_frames == 64
+        assert buffer.batch_cache_bytes == 37_749_760
+        with pytest.raises(OSError) as initiating:
+            radio.capture_iq(buffer, metadata=True, samples_per_channel=65_536)
+        assert initiating.value.errno == errno.EIO
+        with pytest.raises(OSError) as future:
+            radio.capture_iq(buffer, metadata=True, samples_per_channel=65_536)
+        assert future.value.errno == errno.EBADF
+        buffer.cancel()
+
+    radio.partial_batch_failure = False
+    with radio.buffer(
+        "metadata",
+        8,
+        65_536,
+        tandem_request=request,
+        batch_frames=64,
+    ) as (fresh, metadata_abi):
+        assert metadata_abi == 2
+        radio.command_reasserted.set()
+        for _ in range(64):
+            raw, token, _refill_ns = radio.capture_iq(
+                fresh, metadata=True, samples_per_channel=65_536
+            )
+            assert len(raw) == 65_536 * 8
+            assert token is not None
+
+    assert radio.future_poison_refills == 1
+    assert radio.core_batch_initiations == 2
+    assert radio.cached_replays == 63
+    assert radio.core_cancel_calls == 1
+    assert radio.cleanup_cancel_calls == 1
+    assert radio.operations.index(("core_batch_cancel",)) < radio.operations.index(
+        ("poison_refill_ebadf",)
+    ) < radio.operations.index(("buffer_cancel",)) < radio.operations.index(
+        ("buffer_close",)
+    )
+
+
+def test_probe_rejects_counter_target_overshoot_before_same_level_write(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.counter_read_step = 50_000
+
+    with pytest.raises(BaseException, match="target overshoot"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    assert radio.cancel_calls == 1
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="target_overshoot_validation"
+    )
+    assert diagnostics["raw_schedule"]["target_overshoot_samples"] > 16_384
+    assert not any(
+        operation[0] == "write_tx2_gain_exact" for operation in radio.operations
+    )
+
+
+def test_probe_persists_exact_write_failure_before_any_post_write_read(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.exact_write_failures = 1
+
+    with pytest.raises(OSError, match="exact TX2 write failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="exact_tx2_write"
+    )
+    raw = diagnostics["raw_schedule"]
+    write_ack = diagnostics["command"]["write_ack"]
+    assert raw["raw_a_prewrite"] is not None
+    assert raw["raw_post_write_initial"] is None
+    assert write_ack["attempt_count"] == 1
+    assert write_ack["acknowledged"] is False
+    assert write_ack["host_after_ns"] >= write_ack["host_before_ns"]
+    assert "planted exact TX2 write failure" in write_ack["error"]
+    assert ("read_tx2_gain",) not in radio.operations
+
+
+def test_probe_persists_deferred_readback_mismatch_after_complete_raw_bracket(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.deferred_readback_offset_db = 0.5
+
+    with pytest.raises(EvidenceInvalid, match="deferred TX2 readback differs"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="deferred_tx2_readback"
+    )
+    raw = diagnostics["raw_schedule"]
+    readback = diagnostics["command"]["deferred_tx2_readback"]
+    assert all(
+        raw[field] is not None
+        for field in (
+            "raw_a_prewrite",
+            "raw_post_write_initial",
+            "raw_b_first_advance",
+            "raw_c_causal_advance",
+            "initial_from_a_samples",
+            "b_from_initial_samples",
+            "c_from_b_samples",
+            "causal_uncertainty_samples",
+        )
+    )
+    assert readback["observed_level_db"] == -44.5
+    assert readback["passed"] is False
+    assert diagnostics["command"]["applied_level_db"] is None
+
+
+@pytest.mark.parametrize(
+    ("failure_count", "offset", "expected"),
+    (
+        (1, 0.0, "planted deferred TX2 readback failure"),
+        (0, float("nan"), "deferred TX2 readback is non-finite"),
+    ),
+)
+def test_probe_persists_unavailable_or_nonfinite_deferred_readback(
+    tmp_path: Path, failure_count: int, offset: float, expected: str
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.deferred_readback_failures = failure_count
+    radio.deferred_readback_offset_db = offset
+
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="deferred_tx2_readback"
+    )
+    readback = diagnostics["command"]["deferred_tx2_readback"]
+    assert readback["attempt_count"] == 1
+    assert readback["observed_level_db"] is None
+    assert readback["passed"] is False
+    assert readback["error"]
+
+
+def test_probe_persists_partial_deltas_when_b_and_c_never_advance(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.freeze_counter_after_exact_write = True
+
+    with pytest.raises(EvidenceInvalid, match="did not observe causal B and C"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="causal_counter_advances"
+    )
+    raw = diagnostics["raw_schedule"]
+    assert raw["raw_post_write_initial"] is not None
+    assert raw["initial_from_a_samples"] is not None
+    assert raw["raw_b_first_advance"] is None
+    assert raw["b_from_initial_samples"] is None
+    assert raw["raw_c_causal_advance"] is None
+    assert raw["causal_uncertainty_samples"] is None
+    assert raw["post_write_read_count"] == 9
+    assert ("read_tx2_gain",) not in radio.operations
+
+
+def test_probe_persists_deferred_readback_before_strict_causal_limit_failure(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.counter_read_step = 6_000
+
+    with pytest.raises(EvidenceInvalid, match="causal uncertainty 18000 exceeds 16384"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="schedule_validation"
+    )
+    raw = diagnostics["raw_schedule"]
+    assert raw["target_overshoot_samples"] <= 16_384
+    assert raw["initial_from_a_samples"] == 6_000
+    assert raw["b_from_initial_samples"] == 6_000
+    assert raw["c_from_b_samples"] == 6_000
+    assert raw["causal_uncertainty_samples"] == 18_000
+    assert raw["causal_uncertainty_limit_samples"] == 16_384
+    assert diagnostics["command"]["deferred_tx2_readback"]["passed"] is True
+    assert diagnostics["command"]["tx1_mute_assurance"]["post"]["passed"] is True
+
+
+def test_probe_detects_tx1_mutation_after_exact_tx2_write(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.mutate_tx1_after_exact_write_db = -40.0
+
+    with pytest.raises(FixtureSafetyError, match="TX1 mute assurance failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="post_tx1_mute_assurance"
+    )
+    post = diagnostics["command"]["tx1_mute_assurance"]["post"]
+    assert post["attempt_count"] == 1
+    assert post["passed"] is False
+    assert "TX1 mute assurance failure" in post["error"]
+    assert [
+        operation
+        for operation in radio.operations
+        if operation[0] == "write_tx2_gain_exact"
+    ] == [("write_tx2_gain_exact", -45.0)]
+
+
+def test_probe_rejects_excessive_target_polling_without_command(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.counter_read_step = 1
+    radio.sleep_advances_counter = False
+
+    with pytest.raises(BaseException, match="64-read polling budget"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    assert radio.cancel_calls == 1
+    diagnostics = _assert_failed_schedule_diagnostics(
+        radio, failure_stage="target_poll"
+    )
+    assert diagnostics["raw_schedule"]["target_poll_read_count"] == 64
+    assert diagnostics["raw_schedule"]["raw_a_prewrite"] is None
+
+
+def test_probe_requires_eight_fully_post_frames_in_the_same_batch(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.sample_counter = radio.first_sample + 20 * 65_536
+
+    with pytest.raises(BaseException, match="fully post-command frames"):
+        _run_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    assert len(report["frames"]) == 64
+    assert report["verdict"] == "invalid"
+
+
+def test_probe_max_gain_start_keeps_first_frame_transition_gate_fatal(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.first_unrepresented_transitions = 2
+
+    with pytest.raises(BaseException, match="unrepresented prior transitions"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert radio.auto_request_initial_gain_db == 62
+    assert [
+        operation
+        for operation in radio.operations
+        if operation[0] in {"set_tx2_gain", "write_tx2_gain_exact"}
+    ] == [("set_tx2_gain", -45.0), ("write_tx2_gain_exact", -45.0)]
+    failure = _failure_report(radio)
+    assert failure["frames"] == []
+    assert "unrepresented prior transitions" in failure["fatal_error"]
+    assert "command_contention" not in failure
+
+
+def test_probe_fails_closed_after_bounded_startup_eagain_retries(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.startup_eagain_remaining = 65
+
+    with pytest.raises(BaseException, match="bounded startup EAGAIN"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert radio.startup_eagain_attempts == 65
+    assert radio.capture_count == 0
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+@pytest.mark.parametrize(
+    "field",
+    (
+        "bad_event_sequence_at",
+        "bad_event_step_at",
+        "bad_event_range_at",
+        "bad_event_sample_at",
+        "bad_event_flags_at",
+    ),
+)
+def test_probe_rejects_corrupt_visible_events(tmp_path: Path, field: str) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.visible_event_at.update({9, 10} if field == "bad_event_sequence_at" else {10})
+    setattr(radio, field, 10)
+    with pytest.raises((EvidenceInvalid, ValueError, BaseExceptionGroup)):
+        _run_fake(radio, _quality(tmp_path))
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_probe_rejects_regressing_event_sample_order(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.regressed_event_samples_at = 10
+
+    with pytest.raises(BaseException, match="sample ordered|samples regressed"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+@pytest.mark.parametrize(
+    ("event_count", "spacing", "expected"),
+    (
+        (5, 1, "physics bound"),
+        (2, 1, "cooldown spacing"),
+    ),
+)
+def test_probe_rejects_physically_impossible_event_density(
+    tmp_path: Path,
+    event_count: int,
+    spacing: int,
+    expected: str,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.dense_events_at = 10
+    radio.dense_event_count = event_count
+    radio.dense_event_spacing_samples = spacing
+
+    with pytest.raises(BaseException, match=expected):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert _failure_report(radio)["verdict"] == "invalid"
+
+
+def test_report_validator_rejects_forged_event_cooldown_spacing(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    forged = _forge_mid_session_event_excursion(report, spacing_samples=1)
+    with pytest.raises(EvidenceInvalid, match="cooldown spacing"):
+        validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_report_validator_rejects_self_consistent_visible_event_excursion(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    forged = _forge_mid_session_event_excursion(report, spacing_samples=17_408)
+
+    with pytest.raises(
+        EvidenceInvalid, match="AUTO session contains a gain transition"
+    ):
+        validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_report_validator_rejects_self_consistent_nonmax_stable_suffix(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    forged = copy.deepcopy(report)
+    frames = forged["frames"]
+    direction = TandemEventDirection.DECREASE
+    reason = TandemEventReason.LARGE_ADC_OVERLOAD
+    event_frame = frames[1]
+    event_sample = event_frame["first_sample_sequence"] + 256
+    event = {
+        "sample_sequence": event_sample,
+        "event_sequence": 0,
+        "flags": (int(direction) << 4) | int(reason),
+        "direction": int(direction),
+        "direction_name": direction.name.lower(),
+        "reason": int(reason),
+        "reason_name": reason.name.lower(),
+        "rx1_gain_index": 64,
+        "rx2_gain_index": 64,
+    }
+    for index, frame in enumerate(frames[1:], start=1):
+        metadata = frame["metadata"]
+        metadata.update(
+            tandem_transition_count=1,
+            rx1_gain_index=64,
+            rx2_gain_index=64,
+            bench_gain_indices=[64, 64],
+            event_count=1 if index == 1 else 0,
+            gain_events=[event] if index == 1 else [],
+        )
+        frame["continuity"].update(
+            transition_count_delta=1 if index == 1 else 0,
+            visible_event_count=1 if index == 1 else 0,
+        )
+    for name in ("initial_stable_suffix", "final_stable_suffix"):
+        forged[name].update(
+            transition_count=1,
+            bench_gain_indices=[64, 64],
+        )
+
+    with pytest.raises(EvidenceInvalid, match="maximum-gain endpoint"):
+        validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_probe_rejects_tone_below_configured_level_gate(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.raw = _tone_raw(
+        radio.options.samples_per_channel,
+        rx0_amplitude=100.0,
+        rx1_amplitude=95.0,
+    )
+    quality = _quality(tmp_path)
+    quality = replace(
+        quality,
+        thresholds=replace(quality.thresholds, min_tone_dbfs=-20.0),
+    )
+
+    with pytest.raises(BaseException, match="tone_too_weak"):
+        _run_fake(radio, quality)
+
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert len(report["frames"]) == 64
+    assert ("buffer_cancel",) not in radio.operations
+    assert ("wire_close",) in radio.operations
+
+
+def test_probe_groups_acquisition_mute_cancel_and_close_failures(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.worker_error_at = 5
+    radio.buffer_mute_failures = 1
+    radio.cancel_failures = 1
+    radio.buffer_close_failures = 1
+
+    with pytest.raises(BaseExceptionGroup) as caught:
+        _run_fake(radio, _quality(tmp_path))
+
+    rendered = repr(caught.value)
+    assert "worker failure" in rendered
+    assert "mute failure" in rendered
+    assert "cancel failure" in rendered
+    assert "buffer close failure" in rendered
+    failure = _failure_report(radio)
+    assert failure["verdict"] == "invalid"
+    assert all(
+        detail in failure["fatal_error"]
+        for detail in (
+            "worker failure",
+            "mute failure",
+            "cancel failure",
+            "buffer close failure",
+        )
+    )
+
+
+def test_probe_worker_error_after_final_frame_is_not_discarded(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.worker_error_at = 63
+    with pytest.raises(BaseException, match="worker failure"):
+        _run_fake(radio, _quality(tmp_path))
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert len(report["frames"]) == 63
+    assert report["acquisition"]["single_core_batch_initiated"] is False
+    assert report["acquisition"]["initiating_batch_refill_calls"] == 0
+    assert report["acquisition"]["public_refill_calls"] == 0
+    assert report["acquisition"]["cached_replay_refill_calls"] == 0
+    assert report["acquisition"]["batch_cache_fully_replayed"] is False
+    assert report["acquisition"]["initiating_refill_completion_monotonic_ns"] is None
+
+
+def test_probe_radio_authorization_forbids_strong_write(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    with pytest.raises(FixtureSafetyError, match="strong TX"):
+        radio.set_tx2_gain(-30.0)
+
+
+@pytest.mark.parametrize(
+    ("update", "expected"),
+    (
+        ({"serial": "R17"}, "exact R18"),
+        (
+            {"firmware_pattern": r"^v0[.]41-.*$"},
+            "exact anchored RC2",
+        ),
+        ({"libiio_source_commit": "0" * 40}, "exact host libiio"),
+        ({"uri": "usb:offline.fixture.0"}, "serial-resolved local USB"),
+        ({"allow_non_usb": True}, "serial-resolved local USB"),
+        ({"tx_gain_db": -30.0}, "-45 dB probe level"),
+    ),
+)
+def test_serial_probe_rejects_nonexact_authorization_before_radio_factory(
+    tmp_path: Path, update: dict[str, Any], expected: str
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    options = SimpleNamespace(**vars(radio.options))
+    for field, value in update.items():
+        setattr(options, field, value)
+    factory_calls = 0
+
+    def radio_factory(_iio: Any, _options: Any) -> _FakeProbeRadio:
+        nonlocal factory_calls
+        factory_calls += 1
+        return radio
+
+    with pytest.raises(ValueError, match=expected):
+        run_serial_transient_transport_probe(
+            object(),
+            options,
+            _quality(tmp_path),
+            radio_factory=radio_factory,
+            runtime_provenance=radio.runtime_provenance,
+        )
+    assert factory_calls == 0
+    assert radio.operations == []
+
+
+def test_serial_probe_rejects_existing_artifact_before_radio_factory(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    artifact = (
+        tmp_path
+        / probe_module.PROBE_EXACT_SERIAL
+        / "tandem-agc-transient-transport-probe.json"
+    )
+    artifact.parent.mkdir(parents=True)
+    artifact.write_text("{}\n", encoding="utf-8")
+    factory_calls = 0
+
+    def radio_factory(_iio: Any, _options: Any) -> _FakeProbeRadio:
+        nonlocal factory_calls
+        factory_calls += 1
+        return radio
+
+    with pytest.raises(EvidenceInvalid, match="refuses to overwrite"):
+        run_serial_transient_transport_probe(
+            object(),
+            radio.options,
+            _quality(tmp_path),
+            radio_factory=radio_factory,
+            runtime_provenance=radio.runtime_provenance,
+        )
+    assert factory_calls == 0
+    assert radio.operations == []
+
+
+def test_serial_probe_persists_verified_cleanup(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = run_serial_transient_transport_probe(
+        object(),
+        radio.options,
+        _quality(tmp_path),
+        radio_factory=lambda _iio, _options: radio,
+        clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
+        metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
+    )
+    assert report["cleanup"]["verified"] is True
+    assert report["cleanup"]["selectors"] == [3, 3, 3, 3]
+    assert radio.closed is True
+
+
+def test_serial_close_failure_invalidates_durable_qualification(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.close_failures = 1
+    with pytest.raises(FixtureSafetyError, match="radio close failed"):
+        run_serial_transient_transport_probe(
+            object(),
+            radio.options,
+            _quality(tmp_path),
+            radio_factory=lambda _iio, _options: radio,
+            clock_ns=_Clock(),
+            sleep=radio.paced_sleep,
+            metadata_parser=radio.parse_metadata,
+            runtime_provenance=radio.runtime_provenance,
+        )
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert report["cleanup"]["verified"] is False
+
+
+def test_report_validator_rejects_planted_mutations(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    mutations = []
+
+    def mutated(apply: Any) -> dict[str, Any]:
+        value = copy.deepcopy(report)
+        apply(value)
+        return value
+
+    mutations.extend(
+        (
+            mutated(lambda value: value.update(release_pass_eligible=True)),
+            mutated(lambda value: value["frames"].pop()),
+            mutated(
+                lambda value: value["frames"][12]["continuity"].update(buffer_delta=2)
+            ),
+            mutated(
+                lambda value: value["frames"][12]["metadata"].update(
+                    tandem_transition_count=1
+                )
+            ),
+            mutated(
+                lambda value: value["frames"][12]["metadata"].update(sample_format=0)
+            ),
+            mutated(
+                lambda value: value["frames"][12]["metadata"].update(
+                    threshold_provenance=0
+                )
+            ),
+            mutated(
+                lambda value: value["frames"][12]["metadata"].update(initial_gain_db=40)
+            ),
+            mutated(
+                lambda value: value["frames"][0]["metadata"].update(
+                    bench_gain_indices=[64, 64]
+                )
+            ),
+            mutated(
+                lambda value: value["metadata_request"]["decoded"].update(
+                    initial_gain_db=40
+                )
+            ),
+            mutated(
+                lambda value: value["evidence_policy"].update(auto_initial_gain_db=40)
+            ),
+            mutated(lambda value: value["frames"][12].update(sample_gap_before=None)),
+            mutated(
+                lambda value: value["conditioning_anchor_candidate"].update(
+                    byte_count=1
+                )
+            ),
+            mutated(
+                lambda value: value["command_contention"]["command"][
+                    "sample_counter_bracket"
+                ].update(raw_c_causal_advance=-1)
+            ),
+            mutated(
+                lambda value: value["command_contention"]["command"][
+                    "sample_counter_bracket"
+                ].update(target_sample=0)
+            ),
+            mutated(
+                lambda value: value["command_contention"]["partition"].update(
+                    fully_pre_command_frames=31
+                )
+            ),
+            mutated(
+                lambda value: value["command_contention"]["command"].update(
+                    sample_anchor_policy="forged"
+                )
+            ),
+            mutated(
+                lambda value: value["safety"].update(strong_tx_write_permitted=True)
+            ),
+            mutated(lambda value: value["acquisition"].update(discarded_tail_frames=6)),
+            mutated(
+                lambda value: value["acquisition"].update(
+                    configured_batch_cache_bytes=1
+                )
+            ),
+            mutated(
+                lambda value: value["acquisition"][
+                    "prebind_unbound_command"
+                ].update(host_before_ns=0)
+            ),
+            mutated(
+                lambda value: value["acquisition"][
+                    "prebind_raw_counter_schedule"
+                ].update(target_raw=0)
+            ),
+            mutated(
+                lambda value: value["memory_policy"]["aggregate"].update(
+                    conservative_capture_upper_bound_bytes=1
+                )
+            ),
+            mutated(
+                lambda value: value["weak_signal_quality"]["conditioning_anchor"][
+                    "analysis"
+                ]["windows"][0]["tone_dbfs"].__setitem__(0, -90.0)
+            ),
+            mutated(
+                lambda value: value["weak_signal_quality"]["final_stable_suffix"][0][
+                    "analysis"
+                ]["windows"][0]["clipping_fraction"].__setitem__(0, -1.0)
+            ),
+            mutated(
+                lambda value: value["weak_signal_quality"]["final_stable_suffix"][
+                    0
+                ].update(source_frame_sha256="0" * 64)
+            ),
+        )
+    )
+    for forged in mutations:
+        with pytest.raises(EvidenceInvalid):
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_report_validator_binds_command_to_initiating_refill_chronology(
+    tmp_path: Path,
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    after_refill = copy.deepcopy(report)
+    refill_completion = max(
+        int(frame["refill_monotonic_ns"]) for frame in after_refill["frames"]
+    )
+    command = after_refill["command_contention"]["command"]
+    command.update(
+        host_before_ns=refill_completion + 100,
+        host_after_ns=refill_completion + 200,
+        host_jitter_ns=100,
+    )
+    with pytest.raises(EvidenceInvalid, match="did not complete while"):
+        validate_transient_transport_probe_report(after_refill, _quality(tmp_path))
+
+    reordered_initial = copy.deepcopy(report)
+    command_start = reordered_initial["command_contention"]["command"][
+        "host_before_ns"
+    ]
+    reordered_initial["weak_conditioning_command"].update(
+        host_before_ns=command_start + 100,
+        host_after_ns=command_start + 200,
+        host_jitter_ns=100,
+    )
+    with pytest.raises(EvidenceInvalid, match="predates initial conditioning"):
+        validate_transient_transport_probe_report(
+            reordered_initial, _quality(tmp_path)
+        )
+
+    forged_completion = copy.deepcopy(report)
+    forged_completion["acquisition"][
+        "initiating_refill_completion_monotonic_ns"
+    ] += 1
+    with pytest.raises(EvidenceInvalid, match="acquisition ledger"):
+        validate_transient_transport_probe_report(
+            forged_completion, _quality(tmp_path)
+        )
+
+
+def test_report_validator_rejects_unsafe_post_close_status(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = _run_fake(radio, _quality(tmp_path))
+    mutations = (
+        ({"ownership_epoch": 999}, "ownership_epoch"),
+        ({"transition_count": 123}, "transition count"),
+        ({"rx1_gain_index": 1, "rx2_gain_index": 99}, "paired 7-bit"),
+        ({"rx1_gain_index": 128, "rx2_gain_index": 128}, "paired 7-bit"),
+    )
+    for status_update, expected in mutations:
+        forged = copy.deepcopy(report)
+        forged["tandem_status_after"].update(status_update)
+        with pytest.raises(EvidenceInvalid, match=expected):
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+    missing_field = copy.deepcopy(report)
+    missing_field["tandem_status_after"].pop("ownership_epoch")
+    with pytest.raises(EvidenceInvalid, match="fields are incomplete"):
+        validate_transient_transport_probe_report(missing_field, _quality(tmp_path))
+
+
+def test_report_validator_binds_stale_fifo_hold_normalization(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    radio.fifo_level = 8
+    report, _path = _run_fake(radio, _quality(tmp_path))
+
+    mutations = []
+    for mutation in (
+        lambda value: value["stale_fifo_normalization"]["hold_session"].update(
+            refill_count=1
+        ),
+        lambda value: value["stale_fifo_normalization"]["hold_session"][
+            "metadata_request"
+        ]["decoded"].update(mode=int(TandemMode.AUTO)),
+        lambda value: value["stale_fifo_normalization"]["hold_session"][
+            "metadata_request"
+        ]["decoded"].update(initial_gain_db=62),
+        lambda value: value["stale_fifo_normalization"]["hold_session"][
+            "status_while_open"
+        ].update(ownership_epoch=0),
+        lambda value: value["stale_fifo_normalization"]["mute_evidence_before"].update(
+            tx2_gain_db=-70.0
+        ),
+        lambda value: value["stale_fifo_normalization"]["rx_state_after"][
+            "gains_db"
+        ].__setitem__(0, 39.0),
+        lambda value: (
+            value["stale_fifo_normalization"]["status_before"].update(fifo_level=65),
+            value["stale_fifo_normalization"].update(stale_fifo_events=65),
+        ),
+    ):
+        forged = copy.deepcopy(report)
+        mutation(forged)
+        mutations.append(forged)
+
+    for forged in mutations:
+        with pytest.raises((EvidenceInvalid, FixtureSafetyError)):
+            validate_transient_transport_probe_report(forged, _quality(tmp_path))
+
+
+def test_cleanup_validator_rejects_unsafe_durable_readbacks(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    report, _path = run_serial_transient_transport_probe(
+        object(),
+        radio.options,
+        _quality(tmp_path),
+        radio_factory=lambda _iio, _options: radio,
+        clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
+        metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
+    )
+    forged = copy.deepcopy(report)
+    forged["cleanup"]["selectors"][0] = 0
+    with pytest.raises(FixtureSafetyError):
+        validate_transient_transport_probe_report(
+            forged, _quality(tmp_path), require_cleanup=True
+        )
+
+
+def test_report_write_failure_never_starts_rf(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+
+    def fail_write(_path: Path, _report: Any) -> None:
+        raise OSError("planted report write failure")
+
+    with pytest.raises(BaseException) as caught:
+        run_transient_transport_probe(
+            radio,
+            _quality(tmp_path),
+            clock_ns=_Clock(),
+            metadata_parser=radio.parse_metadata,
+            report_writer=fail_write,
+            runtime_provenance=radio.runtime_provenance,
+        )
+    assert "report write failure" in repr(caught.value)
+    assert not any(operation[0] == "arm_tone" for operation in radio.operations)
+
+
+def test_probe_setup_failure_mutes_and_cancels_before_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+
+    class FailingPump:
+        def __init__(self, *_args: Any, **_kwargs: Any) -> None:
+            raise RuntimeError("planted pump construction failure")
+
+    monkeypatch.setattr(probe_module, "_ProbeBatchCaptureWorker", FailingPump)
+    with pytest.raises(BaseException, match="pump construction failure"):
+        _run_fake(radio, _quality(tmp_path))
+    cancel_index = radio.operations.index(("buffer_cancel",))
+    close_index = radio.operations.index(("buffer_close",))
+    assert any(
+        operation == ("mute", True) for operation in radio.operations[:cancel_index]
+    )
+    assert cancel_index < close_index
+
+
+def test_probe_start_failure_mutes_and_cancels_before_close(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    base_pump = probe_module._ProbeBatchCaptureWorker
+
+    class FailingStartPump(base_pump):
+        def start(self) -> None:
+            raise RuntimeError("planted pump start failure")
+
+    monkeypatch.setattr(probe_module, "_ProbeBatchCaptureWorker", FailingStartPump)
+    with pytest.raises(BaseException, match="pump start failure"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    cancel_index = radio.operations.index(("buffer_cancel",))
+    close_index = radio.operations.index(("buffer_close",))
+    assert any(
+        operation == ("mute", True) for operation in radio.operations[:cancel_index]
+    )
+    assert cancel_index < close_index
+
+
+def test_probe_binds_live_worker_queue_to_exact_python_memory_ledger(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    base_pump = probe_module._ProbeBatchCaptureWorker
+
+    class WrongQueueCapacityPump(base_pump):
+        @property
+        def queue_capacity_frames(self) -> int:
+            return 3
+
+    monkeypatch.setattr(
+        probe_module, "_ProbeBatchCaptureWorker", WrongQueueCapacityPump
+    )
+    with pytest.raises(BaseException, match="exact Python memory ledger"):
+        _run_fake(radio, _quality(tmp_path))
+
+    assert [
+        operation for operation in radio.operations if operation[0] == "set_tx2_gain"
+    ] == [("set_tx2_gain", -45.0)]
+    cancel_index = radio.operations.index(("buffer_cancel",))
+    close_index = radio.operations.index(("buffer_close",))
+    assert any(
+        operation == ("mute", True) for operation in radio.operations[:cancel_index]
+    )
+    assert cancel_index < close_index
+    assert not any(thread.name == PROBE_THREAD_NAME for thread in threading.enumerate())
+
+
+def test_probe_options_are_not_relaxable(tmp_path: Path) -> None:
+    radio = _FakeProbeRadio(tmp_path)
+    relaxed = TransientTransportProbeOptions(fully_pre_command_frames=31)
+    with pytest.raises(ValueError, match="frozen"):
+        run_transient_transport_probe(radio, _quality(tmp_path), probe=relaxed)
+    unstable_start = TransientTransportProbeOptions(auto_initial_gain_db=40)
+    with pytest.raises(ValueError, match="frozen"):
+        run_transient_transport_probe(radio, _quality(tmp_path), probe=unstable_start)
+    noninteger_start = TransientTransportProbeOptions(auto_initial_gain_db=62.0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="exact integer"):
+        run_transient_transport_probe(radio, _quality(tmp_path), probe=noninteger_start)
+    assert radio.operations == []
+
+
+def test_dual_target_v4_executes_one_full_weak_batch_and_is_non_authorizing(
+    tmp_path: Path,
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    radio.lo_readback_offset_hz = 2
+    report, report_path = _run_dual_target_fake(radio, _quality(tmp_path))
+
+    assert report_path.is_file()
+    assert report["schema"] == DUAL_TARGET_PROBE_SCHEMA
+    assert report["verdict"] == DUAL_TARGET_PROBE_PENDING_VERDICT
+    assert report["release_pass_eligible"] is False
+    assert report["strong_tx_write_permitted"] is False
+    validate_dual_target_transient_transport_probe_report(
+        report, _quality(tmp_path), require_cleanup=False
+    )
+
+    mode = report["mode_evidence"]
+    assert mode["batch_profile"] == "weak_dual_target_transport"
+    assert mode["verdict"] == "qualified_transport"
+    assert mode["release_pass_eligible"] is False
+    assert mode["gain_transient_exercised"] is False
+    assert "responses" not in mode
+    assert "response_observations" not in mode
+    assert "gain_evidence" not in mode
+    assert [command["command_id"] for command in mode["commands"]] == [
+        "weak_initial",
+        "weak_reassertion_16f",
+        "weak_reassertion_40f",
+    ]
+
+    acquisition = mode["acquisition"]
+    assert acquisition["initiating_batch_refill_calls"] == 1
+    assert acquisition["cached_replay_refill_calls"] == 63
+    assert acquisition["produced_frames"] == 64
+    assert acquisition["consumed_frames"] == 64
+    assert acquisition["discarded_tail_frames"] == 0
+    assert acquisition["shutdown"]["cancel_called"] is False
+    assert (
+        acquisition["shutdown"]["shutdown_path"]
+        == "normal_close_after_full_cache_replay"
+    )
+    assert acquisition["pre_close_tandem_status"]["transition_count"] == 0
+    assert acquisition["post_close_tandem_status"]["transition_count"] == 0
+    manifest = acquisition["artifact_manifest"]
+    assert manifest["frame_count"] == 64
+    assert manifest["file_count"] == 128
+    assert manifest["completed_iq_files"] == 64
+    assert manifest["completed_raw_metadata_files"] == 64
+    assert manifest["relative_directory"].endswith(
+        "/transient-iq/weak_dual_target/batch"
+    )
+    assert len(list((tmp_path / manifest["relative_directory"]).iterdir())) == 128
+
+    exact_writes = [
+        operation
+        for operation in radio.operations
+        if operation[0] == "write_tx2_gain_exact"
+    ]
+    assert exact_writes == [
+        ("write_tx2_gain_exact", -45.0),
+        ("write_tx2_gain_exact", -45.0),
+    ]
+    assert sum(operation[0] == "read_tx2_gain" for operation in radio.operations) == 2
+    assert sum(
+        operation[0] == "attest_tx1_muted" for operation in radio.operations
+    ) == 4
+    assert radio.core_batch_initiations == 1
+    assert radio.cached_replays == 63
+    assert radio.cancel_calls == 0
+    assert ("wire_close",) in radio.operations
+    assert not any(operation[0] == "data_pipe_teardown" for operation in radio.operations)
+
+    typed_mutations = (
+        (
+            lambda value: value["configuration"]["quality"].__setitem__(
+                "dds_scale", True
+            ),
+            "configuration",
+        ),
+        (
+            lambda value: value["rf"].__setitem__("dds_scale", True),
+            "RF ledger",
+        ),
+        (
+            lambda value: value["evidence_policy"].__setitem__(
+                "targets_frozen_before_initiating_refill", 1
+            ),
+            "evidence policy",
+        ),
+        (
+            lambda value: value["cleanup"].__setitem__("verified", 0),
+            "pending cleanup",
+        ),
+    )
+    for mutate, expected_error in typed_mutations:
+        forged = copy.deepcopy(report)
+        mutate(forged)
+        with pytest.raises(EvidenceInvalid, match=expected_error):
+            validate_dual_target_transient_transport_probe_report(
+                forged, _quality(tmp_path), require_cleanup=False
+            )
+
+
+def test_dual_target_v4_serial_close_promotes_only_verified_cleanup(
+    tmp_path: Path,
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    report, report_path = run_serial_dual_target_transient_transport_probe(
+        object(),
+        radio.options,
+        _quality(tmp_path),
+        radio_factory=lambda _iio, _options: radio,
+        clock_ns=_Clock(),
+        sleep=radio.paced_sleep,
+        metadata_parser=radio.parse_metadata,
+        runtime_provenance=radio.runtime_provenance,
+    )
+
+    assert report_path.is_file()
+    assert report["verdict"] == probe_module.DUAL_TARGET_PROBE_VERDICT
+    assert report["cleanup"]["verified"] is True
+    assert radio.closed is True
+    validate_dual_target_transient_transport_probe_report(
+        report, _quality(tmp_path), require_cleanup=True
+    )
+
+    extra_cleanup = copy.deepcopy(report)
+    extra_cleanup["cleanup"]["unknown"] = 0
+    with pytest.raises(EvidenceInvalid, match="cleanup fields"):
+        validate_dual_target_transient_transport_probe_report(
+            extra_cleanup, _quality(tmp_path), require_cleanup=True
+        )
+    extra_dds = copy.deepcopy(report)
+    extra_dds["cleanup"]["dds"]["altvoltage0"]["unknown"] = 0
+    with pytest.raises(EvidenceInvalid, match="DDS altvoltage0 fields"):
+        validate_dual_target_transient_transport_probe_report(
+            extra_dds, _quality(tmp_path), require_cleanup=True
+        )
+
+
+def test_dual_target_v4_rejects_lo_outside_exact_two_hz_before_rf(
+    tmp_path: Path,
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    radio.lo_readback_offset_hz = 3
+    with pytest.raises(EvidenceInvalid, match="live RX/TX LO"):
+        _run_dual_target_fake(radio, _quality(tmp_path))
+    assert not any(operation[0] == "arm_tone" for operation in radio.operations)
+    assert not any(operation[0] == "set_tx2_gain" for operation in radio.operations)
+
+
+def test_dual_target_v4_rejects_serial_symlink_before_radio_factory(
+    tmp_path: Path,
+) -> None:
+    escaped = tmp_path / "escaped"
+    escaped.mkdir()
+    (tmp_path / probe_module.PROBE_EXACT_SERIAL).symlink_to(
+        escaped, target_is_directory=True
+    )
+    radio = _DualTargetFakeRadio(tmp_path / "fixture")
+    radio.options.output_dir = tmp_path
+    factory_called = False
+
+    def factory(_iio: Any, _options: Any) -> _DualTargetFakeRadio:
+        nonlocal factory_called
+        factory_called = True
+        return radio
+
+    with pytest.raises(EvidenceInvalid, match="symlink"):
+        run_serial_dual_target_transient_transport_probe(
+            object(),
+            radio.options,
+            _quality(tmp_path),
+            radio_factory=factory,
+            runtime_provenance=radio.runtime_provenance,
+        )
+    assert factory_called is False
+    assert radio.operations == []
+
+
+def test_dual_target_v4_tail_transition_is_fatal_and_cancels(
+    tmp_path: Path,
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    radio.hidden_transition_at = 63
+    with pytest.raises(BaseException, match="transition"):
+        _run_dual_target_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    assert report["schema"] == DUAL_TARGET_PROBE_SCHEMA
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert report["strong_tx_write_permitted"] is False
+    assert report["failure_evidence"]["verdict"] == "invalid"
+    cancel_index = radio.operations.index(("buffer_cancel",))
+    close_index = radio.operations.index(("buffer_close",))
+    assert cancel_index < close_index
+
+
+@pytest.mark.parametrize("failure_kind", ["gap", "exact_write"])
+def test_dual_target_v4_runtime_failure_mutes_cancels_and_preserves_evidence(
+    tmp_path: Path, failure_kind: str
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    if failure_kind == "gap":
+        radio.gap_at = 20
+    else:
+        radio.exact_write_failures = 1
+
+    with pytest.raises((BaseExceptionGroup, EvidenceInvalid, OSError)):
+        _run_dual_target_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    mode = report["failure_evidence"]
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert mode["verdict"] == "invalid"
+    assert mode["acquisition"]["shutdown"]["cancel_called"] is True
+    cancel_index = radio.operations.index(("buffer_cancel",))
+    close_index = radio.operations.index(("buffer_close",))
+    assert any(
+        operation == ("mute", True)
+        for operation in radio.operations[:cancel_index]
+    )
+    assert cancel_index < close_index
+    if failure_kind == "gap":
+        assert 0 < len(mode["batch_frames"]) < 64
+        assert mode["acquisition"]["produced_frames"] >= len(
+            mode["batch_frames"]
+        )
+    else:
+        assert [
+            operation
+            for operation in radio.operations
+            if operation[0] == "write_tx2_gain_exact"
+        ] == [("write_tx2_gain_exact", -45.0)]
+        assert not any(
+            operation[0] == "read_tx2_gain" for operation in radio.operations
+        )
+
+
+def test_dual_target_v4_rejects_within_frame_suffix_oscillation(
+    tmp_path: Path,
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    radio.frame_raw_overrides[63] = _alternating_window_tone_raw(65_536)
+
+    with pytest.raises(EvidenceInvalid, match="stable suffix exceeds"):
+        _run_dual_target_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert len(report["failure_evidence"]["batch_frames"]) == 64
+    assert (
+        report["failure_evidence"]["acquisition"]["artifact_manifest"][
+            "file_count"
+        ]
+        == 128
+    )
+
+
+def test_dual_target_v4_rejects_cross_suffix_level_change(tmp_path: Path) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    shifted = _tone_raw(65_536, rx0_amplitude=420.0, rx1_amplitude=399.0)
+    radio.frame_raw_overrides.update({index: shifted for index in range(32, 40)})
+
+    with pytest.raises(EvidenceInvalid, match="pre/middle/post RF suffixes disagree"):
+        _run_dual_target_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert len(report["failure_evidence"]["batch_frames"]) == 64
+
+
+def test_dual_target_v4_final_wrapper_mute_failure_retains_complete_mode(
+    tmp_path: Path,
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    radio.fail_mute_call = 4
+
+    with pytest.raises(RuntimeError, match="planted mute failure"):
+        _run_dual_target_fake(radio, _quality(tmp_path))
+
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert report["strong_tx_write_permitted"] is False
+    assert report["mode_evidence"]["verdict"] == "qualified_transport"
+    assert len(report["mode_evidence"]["batch_frames"]) == 64
+    assert report["mode_evidence"]["acquisition"]["artifact_manifest"][
+        "file_count"
+    ] == 128
+
+
+@pytest.mark.parametrize("existing_kind", ["sidecar", "report_tmp"])
+def test_dual_target_v4_requires_fresh_artifacts_before_rf(
+    tmp_path: Path, existing_kind: str
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+    serial_directory = tmp_path / probe_module.PROBE_EXACT_SERIAL
+    if existing_kind == "sidecar":
+        batch = serial_directory / "transient-iq/weak_dual_target/batch"
+        batch.mkdir(parents=True)
+        (batch / "frame-0000.cs16").write_bytes(b"stale")
+    else:
+        serial_directory.mkdir(parents=True)
+        report_path = serial_directory / probe_module.DUAL_TARGET_PROBE_REPORT_NAME
+        report_path.with_suffix(report_path.suffix + ".tmp").write_text(
+            "stale", encoding="utf-8"
+        )
+
+    with pytest.raises(EvidenceInvalid):
+        _run_dual_target_fake(radio, _quality(tmp_path))
+    assert not any(operation[0] == "arm_tone" for operation in radio.operations)
+    assert not any(operation[0] == "set_tx2_gain" for operation in radio.operations)
+
+
+@pytest.mark.parametrize("mutation", ["delete_sidecar", "report_tmp", "extra"])
+def test_dual_target_v4_failed_final_promotion_is_durably_demoted(
+    tmp_path: Path, mutation: str
+) -> None:
+    radio = _DualTargetFakeRadio(tmp_path)
+
+    def planted_writer(path: Path, value: Mapping[str, Any]) -> None:
+        probe_module._atomic_json(path, value)
+        if value.get("verdict") != probe_module.DUAL_TARGET_PROBE_VERDICT:
+            return
+        batch = path.parent / "transient-iq/weak_dual_target/batch"
+        if mutation == "delete_sidecar":
+            (batch / "frame-0000.cs16").unlink()
+        elif mutation == "report_tmp":
+            path.with_suffix(path.suffix + ".tmp").write_text(
+                "planted", encoding="utf-8"
+            )
+        else:
+            (batch / "unexpected").write_bytes(b"planted")
+
+    with pytest.raises((BaseExceptionGroup, EvidenceInvalid, OSError)):
+        run_serial_dual_target_transient_transport_probe(
+            object(),
+            radio.options,
+            _quality(tmp_path),
+            radio_factory=lambda _iio, _options: radio,
+            clock_ns=_Clock(),
+            sleep=radio.paced_sleep,
+            metadata_parser=radio.parse_metadata,
+            report_writer=planted_writer,
+            runtime_provenance=radio.runtime_provenance,
+        )
+
+    report = _failure_report(radio)
+    assert report["verdict"] == "invalid"
+    assert report["release_pass_eligible"] is False
+    assert report["strong_tx_write_permitted"] is False
+    assert isinstance(report["fatal_error"], str) and report["fatal_error"]
+    assert radio._report_path is not None
+    assert not radio._report_path.with_suffix(
+        radio._report_path.suffix + ".tmp"
+    ).exists()
+
+
+def test_dual_target_v4_has_a_distinct_guarded_hardware_entry() -> None:
+    repository = Path(__file__).resolve().parents[2]
+    legacy_test = (
+        repository / "tests/radio_hardware/test_transient_transport_probe.py"
+    ).read_text(encoding="utf-8")
+    dual_test = (
+        repository
+        / "tests/radio_hardware/test_transient_transport_dual_target_probe.py"
+    ).read_text(encoding="utf-8")
+    runner = (
+        repository / "scripts/run_tandem_agc_quality_hardware.sh"
+    ).read_text(encoding="utf-8")
+    markers = (repository / "pytest.ini").read_text(encoding="utf-8")
+
+    assert "run_serial_transient_transport_probe" in legacy_test
+    assert "run_serial_dual_target_transient_transport_probe" not in legacy_test
+    assert "run_serial_dual_target_transient_transport_probe" in dual_test
+    assert "tandem_transient_dual_target_probe" in dual_test
+    assert "--tandem-transient-dual-target-probe" in runner
+    assert "test_transient_transport_dual_target_probe.py" in runner
+    assert "tandem_transient_dual_target_probe:" in markers

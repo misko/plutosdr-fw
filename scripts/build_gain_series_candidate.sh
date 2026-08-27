@@ -38,7 +38,7 @@ Modes:
   preflight     Verify an x86-64 checkout and all build prerequisites.
   rootfs        Run preflight, then build build/rootfs.cpio.gz.
   image         Run preflight, rebuild the pinned FPGA XSA, then build
-                build/pluto.dfu.
+                build/pluto.dfu and build/pluto.frm from the same FIT image.
 
 The script never flashes a radio. RAM boot and promotion are separate,
 explicit hardware gates.
@@ -58,14 +58,25 @@ esac
 
 cd "$ROOT"
 [[ -f "$MANIFEST" ]] || fail "manifest not found: ${MANIFEST}"
+manifest_name="$(basename -- "$MANIFEST")"
+case "$manifest_name" in
+tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-rc8-source.yaml | tandem-agc-v8-rc9-source.yaml | tandem-agc-v8-rc10-source.yaml | tandem-agc-v8-rc11-source.yaml | tandem-agc-v8-rc12-source.yaml | tandem-agc-v8-rc13-source.yaml | tandem-agc-v8-rc14-source.yaml | tandem-agc-v8-rc15-source.yaml | tandem-agc-v8-rc16-source.yaml | tandem-agc-v8-rc17-source.yaml | tandem-agc-v8-rc18-source.yaml | tandem-agc-v8-rc19-source.yaml | tandem-agc-v8-rc20-source.yaml | tandem-agc-v8-rc21-source.yaml | tandem-agc-v8-rc22-source.yaml | tandem-agc-v8-rc23-source.yaml | tandem-agc-v8-rc24-source.yaml | tandem-agc-v8-rc25-source.yaml | tandem-agc-v8-rc26-source.yaml | tandem-agc-v8-rc27-source.yaml | tandem-agc-v8-rc28-source.yaml | tandem-agc-v8-rc29-source.yaml | tandem-agc-v8-rc30-source.yaml | tandem-agc-v8-rc31-source.yaml | tandem-agc-v8-rc32-source.yaml | tandem-agc-v8-source.yaml)
+    canonical_manifest="${ROOT}/manifests/${manifest_name}"
+    [[ "$(realpath -- "$MANIFEST")" == "$canonical_manifest" ]] ||
+        fail "protected manifest must use the canonical repository path: ${canonical_manifest}"
+    git --no-replace-objects show "HEAD:manifests/${manifest_name}" |
+        cmp -s - "$canonical_manifest" ||
+        fail "protected manifest differs from its committed HEAD blob"
+    ;;
+esac
 scripts/check_source_graph.sh "$MANIFEST"
 [[ "$MODE" == source-check ]] && exit 0
 
 [[ "$(uname -m)" == x86_64 ]] ||
     fail "firmware builds require x86-64 (this host is $(uname -m))"
 
-dirty="$(git status --porcelain --untracked-files=no)"
-[[ -z "$dirty" ]] || fail "tracked firmware checkout is dirty"
+dirty="$(git status --porcelain --untracked-files=all)"
+[[ -z "$dirty" ]] || fail "firmware checkout has tracked or untracked source changes"
 
 submodule_error=0
 while IFS= read -r line; do
@@ -142,4 +153,5 @@ sha256sum "$ROOT/build/system_top.xsa"
 # wants; a release build sets it. See the RELEASE_VERSION comment in Makefile.
 exec make "${buildroot_make_args[@]}" \
     RELEASE_VERSION="${RELEASE_VERSION:-}" \
-    VIVADO_SETTINGS="$VIVADO_SETTINGS" build/pluto.dfu
+    VIVADO_SETTINGS="$VIVADO_SETTINGS" \
+    build/pluto.dfu build/pluto.frm
