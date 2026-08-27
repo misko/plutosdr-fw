@@ -530,11 +530,11 @@ class _FakeCampaignRadio:
 def _campaign_options(output_dir: Path) -> ModulatedHardwareOptions:
     return ModulatedHardwareOptions(
         physical_attenuation_db=0.0,
-        sample_rate_hz=1_024_000,
+        sample_rate_hz=2_500_000,
         symbol_count=64,
-        samples_per_symbol=4,
+        samples_per_symbol=8,
         capture_samples=8_192,
-        blocker_points=(BlockerPoint(320_000.0, -20.0, 47),),
+        blocker_points=(BlockerPoint(390_625.0, -20.0, 47),),
         kernel_buffers=1,
         stable_frames=2,
         measurement_frames=1,
@@ -871,8 +871,8 @@ def test_only_first_blocker_gets_a_bounded_raw_iq_artifact(tmp_path: Path) -> No
     options = replace(
         _campaign_options(tmp_path),
         blocker_points=(
-            BlockerPoint(320_000.0, -20.0, 47),
-            BlockerPoint(64_000.0, -20.0, 48),
+            BlockerPoint(390_625.0, -20.0, 47),
+            BlockerPoint(195_312.5, -20.0, 48),
         ),
     )
     report, _path = run_modulated_hardware_campaign(
@@ -1153,6 +1153,7 @@ def test_serial_wrapper_rejects_verified_cleanup_with_failures(tmp_path: Path) -
 @pytest.mark.parametrize(
     "options",
     [
+        ModulatedHardwareOptions(physical_attenuation_db=0.0, sample_rate_hz=1_024_000),
         ModulatedHardwareOptions(physical_attenuation_db=0.0, tx2_gain_db=-29.0),
         ModulatedHardwareOptions(physical_attenuation_db=0.0, capture_samples=4_097),
         ModulatedHardwareOptions(physical_attenuation_db=0.0, capture_samples=9_216),

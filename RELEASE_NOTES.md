@@ -46,7 +46,8 @@
 | `tandem-agc-v8-rc25` | 2026-08-27 | **successful indexed build and db696 RAM/lifecycle; all four inner transient modes passed; outer replay invalid; superseded** | fixed coherent host status reads; outer replay contradicted the frozen producer policy for startup conditioning and diagnostic response windows |
 | `tandem-agc-v8-rc26` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | replay alignment passed, but two db696 full attempts stopped on metadata-provider ENODATA in the same 1.05-GHz low-power matrix |
 | `tandem-agc-v8-rc27` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | passed all 1.05-GHz steady policies; two-buffer capture omitted every louder-TX DECREASE event in the authorizing 1.55-GHz cooldown-0 matrix |
-| `tandem-agc-v8-rc28` | 2026-08-27 | **active development; not hardware-qualified** | retains RC27 firmware and strict event proof; raises the steady quality DMA queue from 2 to 16 buffers based on the exact passing diagnostic replay |
+| `tandem-agc-v8-rc28` | 2026-08-27 | **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded** | all 44 steady and four transient pilot phases passed; unsupported 1.024-MS/s no-FIR modulated rate failed before TX buffer creation |
+| `tandem-agc-v8-rc29` | 2026-08-27 | **active development; not hardware-qualified** | retains RC28 firmware and strict gates; uses the proven 2.5-MS/s, 8-SPS, 390.625-kHz-blocker, 16-buffer modulated configuration |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -55,7 +56,33 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.41-plutoplus-spf-tandem-agc-v8-rc28 — 2026-08-27 — **active development; not hardware-qualified**
+## v0.41-plutoplus-spf-tandem-agc-v8-rc29 — 2026-08-27 — **active development; not hardware-qualified**
+
+RC28 locked exact commit `2ed9faa136ab3c79298b6d20d9b2060d9ce19831`
+and passed owner-dispatched trusted run `33072902542`, candidate indexing, four
+exact-serial RAM deployments, four lifecycle reports, all 44 authorizing steady matrices,
+and all four transient comparison phases on db696. Its first
+1.05-GHz modulated phase then stopped before opening a TX buffer: the no-FIR
+AD9361 image rejected the harness's 1,024,000-S/s sampling-frequency write with
+EINVAL. Safe cleanup passed. A bounded diagnostic changed only the dimensionally
+linked modulated configuration to 2,500,000 S/s, eight samples/symbol, a
+390,625-Hz blocker, and 16 kernel DMA buffers; all eight manual, native-slow,
+native-fast, and tandem desired/blocked cells passed with cleanup verified.
+RC28 is immutable and not hardware-qualified.
+
+RC29 retains RC28's exact device firmware, external source graph, RF thresholds,
+four authorizing centers, mandatory nonbinding 2.45-GHz matrix, and every strict
+identity, metadata, event/count/continuity, evidence, QSPI, safe-state,
+FIFO/fault/overflow, and cleanup gate. It changes only the host modulated
+configuration to the exact passing diagnostic values and rejects release input
+below 2.5 MS/s before hardware. RC29 uses branch
+`codex/firmware-tandem-agc-v8-rc29`, version
+`v0.41-plutoplus-spf-tandem-agc-v8-rc29`, manifest
+`manifests/tandem-agc-v8-rc29-source.yaml`, package prefix
+`plutoplus-spf-tandem-agc-v8-rc29`, and source lock
+`refs/tags/tandem-agc-v8-rc29-source/firmware-v1`.
+
+## v0.41-plutoplus-spf-tandem-agc-v8-rc28 — 2026-08-27 — **successful indexed build and four RAM/lifecycle passes; full campaign invalid; superseded**
 
 RC28 retains RC27's exact device firmware, external source graph, RF thresholds,
 and strict event/count/continuity policy. RC27 passed owner-dispatched trusted

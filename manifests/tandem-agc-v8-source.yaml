@@ -1,6 +1,6 @@
 # Immutable source graph for the final tandem AGC v8 build.
 #
-# The external component graph remains identical from RC4 through RC28, but the
+# The external component graph remains identical from RC4 through RC29, but the
 # tracked top-level repository does not. RC5 added post-RC4
 # stale-small-ADC-latch recovery; RC6 retained that behavior while sharing the
 # mutually exclusive dwell storage behind an explicit qualification-class tag.
@@ -97,8 +97,16 @@
 # two-buffer host DMA queue, so the strict oracle correctly refused to infer
 # direction from gap-hidden transitions. The exact nonauthorizing replay passed
 # with 16 buffers and directly retained 17 DECREASE plus 16 INCREASE events.
-# RC28 changes only the steady quality harness default to 16 buffers; hidden
-# transitions remain unproven and every release gate stays strict. RC28 must
+# RC28 changed only the steady quality harness default to 16 buffers. It passed
+# its trusted build, indexed evidence, four RAM deployments, four lifecycle
+# reports, all 44 authorizing steady matrices, and all four db696 transient
+# phases. Its first modulated phase then stopped before opening a TX buffer
+# because the no-FIR AD9361 image rejected the 1,024,000-S/s request. A bounded
+# 2,500,000-S/s, eight-samples/symbol, 390,625-Hz-blocker, sixteen-buffer
+# diagnostic passed all eight modulated cells with cleanup verified. RC29 uses
+# that proven host configuration and rejects sub-2.5-MS/s release input before
+# hardware. Hidden transitions remain unproven and every release gate stays
+# strict. RC29 must
 # pass its source-locked build and full hardware qualification
 # before this final graph is used. The subsequent final build may change only
 # the top-level release

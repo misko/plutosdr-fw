@@ -137,10 +137,14 @@ class ModulatedHardwareOptions:
     """All safety, waveform, capture, and oracle inputs for one campaign."""
 
     physical_attenuation_db: float
-    sample_rate_hz: int = 1_024_000
+    # The Pluto AD9361 rejects the earlier 1.024-MS/s request with EINVAL in
+    # this no-FIR release configuration.  Use the already-qualified 2.5-MS/s
+    # clock and preserve the waveform's normalized geometry with eight
+    # samples/symbol and the proportionally scaled blocker below.
+    sample_rate_hz: int = 2_500_000
     center_frequency_hz: int = 915_000_000
     symbol_count: int = 256
-    samples_per_symbol: int = 4
+    samples_per_symbol: int = 8
     rolloff: float = 0.25
     span_symbols: int = 10
     desired_seed: int = 46
@@ -151,9 +155,9 @@ class ModulatedHardwareOptions:
     manual_gain_db: float = 40.0
     modes: tuple[str, ...] = RELEASE_MODULATED_MODES
     blocker_points: tuple[BlockerPoint, ...] = (
-        BlockerPoint(offset_hz=320_000.0, power_db=-20.0, seed=47),
+        BlockerPoint(offset_hz=390_625.0, power_db=-20.0, seed=47),
     )
-    kernel_buffers: int = 2
+    kernel_buffers: int = 16
     stable_frames: int = 3
     measurement_frames: int = 3
     max_settle_frames: int = 64
@@ -348,6 +352,11 @@ def validate_modulated_hardware_options(options: ModulatedHardwareOptions) -> No
     if not isinstance(options.quality_thresholds, ModulatedQualityThresholds):
         raise TypeError("quality_thresholds has the wrong type")
     _positive_integer("sample_rate_hz", options.sample_rate_hz)
+    if options.sample_rate_hz < 2_500_000:
+        raise ValueError(
+            "modulated hardware sample_rate_hz must be at least 2500000 "
+            "for the release AD9361 no-FIR configuration"
+        )
     _positive_integer("capture_samples", options.capture_samples)
     if options.capture_samples < 8_192:
         raise ValueError("capture_samples must satisfy the radio's 8192-sample floor")

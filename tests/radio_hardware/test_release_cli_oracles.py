@@ -25,6 +25,7 @@ from .modulated_hardware import (
     MODE_NATIVE_HYBRID,
     MODE_TANDEM,
     RELEASE_MODULATED_MODES,
+    BlockerPoint,
     ModulatedHardwareOptions,
     evaluate_modulated_hardware_report,
     modulated_mode_evidence_policy,
@@ -847,6 +848,13 @@ def test_characterization_and_baseline_soak_are_distinct_plans(
     assert soak_base.native_gain_control_modes == AUTONOMOUS_NATIVE_GAIN_CONTROL_MODES
     assert full_base.kernel_buffers == 16
     assert soak_base.kernel_buffers == 16
+    modulated = ModulatedHardwareOptions(physical_attenuation_db=0.0)
+    assert modulated.sample_rate_hz == 2_500_000
+    assert modulated.samples_per_symbol == 8
+    assert modulated.kernel_buffers == 16
+    assert modulated.blocker_points == (
+        BlockerPoint(offset_hz=390_625.0, power_db=-20.0, seed=47),
+    )
 
 
 def test_default_full_plan_keeps_2450_diagnostic_non_authorizing_and_last(
@@ -1836,7 +1844,9 @@ def test_production_validator_compares_modulated_configuration_in_json_domain(
             "ser": [0.0, 0.0],
             "ber": [0.0, 0.0],
             "desired_gain_linear": [1.0, 1.0],
-            "blocker_offset_hz": 320_000.0 if blocked else None,
+            "blocker_offset_hz": (
+                modulated.blocker_points[0].offset_hz if blocked else None
+            ),
             "blocker_power_db": -20.0 if blocked else None,
         }
 
