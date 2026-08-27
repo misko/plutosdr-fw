@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -582,7 +584,14 @@ def test_full_runner_persists_structured_gain_band_failure_evidence(
     persisted = json.loads(report_path.read_text(encoding="utf-8"))
     assert persisted["verdict"] == "invalid"
     assert persisted["fatal_error"].startswith("EvidenceInvalid:")
-    assert persisted["failure_evidence"] == failure_evidence
+    assert {
+        key: value
+        for key, value in persisted["failure_evidence"].items()
+        if key != "iq_ledger"
+    } == failure_evidence
+    iq_ledger = persisted["failure_evidence"]["iq_ledger"]
+    assert iq_ledger["schema"] == "plutosdr-fw.tandem-agc-failure-iq.v1"
+    assert iq_ledger["entries"] == []
 
 
 def test_full_runner_rejects_a_planted_live_lo_drift_before_transmit(tmp_path) -> None:
@@ -590,3 +599,368 @@ def test_full_runner_rejects_a_planted_live_lo_drift_before_transmit(tmp_path) -
 
     with pytest.raises(EvidenceInvalid, match="live RX/TX LO readback"):
         run_tandem_quality_matrix(_MatrixRadio(options, readback_offset=10), options)
+
+
+@pytest.mark.parametrize(
+    ("evaluation_verdict", "expects_iq"), [("pass", False), ("fail", True)]
+)
+def test_matrix_iq_ledger_materializes_only_for_an_authorizing_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    evaluation_verdict: str,
+    expects_iq: bool,
+) -> None:
+    options = _options(
+        output_dir=tmp_path,
+        samples_per_channel=8_192,
+        measurement_frames=1,
+    )
+    capture_ordinal = 0
+
+    def fake_run_mode(_radio, *, mode, report, **_kwargs) -> None:
+        nonlocal capture_ordinal
+        report["modes"].append({"mode": mode, "cells": []})
+        ledger = tandem_quality._ACTIVE_MATRIX_FAILURE_IQ.get()
+        assert ledger is not None
+        for level_index in range(len(options.tx_gain_trajectory_db)):
+            raw = bytes([capture_ordinal]) * (options.samples_per_channel * 8)
+            frame = {
+                "sha256": hashlib.sha256(raw).hexdigest(),
+                "iq_bytes": len(raw),
+            }
+            ledger.set_context(
+                mode=mode,
+                stage="measurement",
+                level_index=level_index,
+                frame_index=0,
+            )
+            ledger.observe(raw, frame)
+            ledger.accept_current()
+            capture_ordinal += 1
+
+    monkeypatch.setattr(tandem_quality, "_run_mode", fake_run_mode)
+    monkeypatch.setattr(
+        tandem_quality,
+        "_mode_cells",
+        lambda *_args: [
+            {
+                "tx2_gain_requested_db": options.strongest_tx_gain_db,
+                "summary": {"quality_valid": True},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        tandem_quality,
+        "_manual_tone_response",
+        lambda *_args: {"valid": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        tandem_quality,
+        "evaluate_matrix",
+        lambda *_args: {
+            "verdict": evaluation_verdict,
+            "failures": ([] if evaluation_verdict == "pass" else ["planted"]),
+        },
+    )
+
+    report, _path = run_tandem_quality_matrix(_MatrixRadio(options), options)
+
+    manifest_path = tmp_path / "failure-iq-manifest.json"
+    assert manifest_path.exists() is expects_iq
+    assert (tmp_path / "failure-iq").exists() is expects_iq
+    if not expects_iq:
+        assert "failure_evidence" not in report
+        return
+    ledger = report["failure_evidence"]["iq_ledger"]
+    assert ledger["maximum_bytes"] == 134_217_728
+    assert ledger["preflight"] == {
+        "planned_accepted_frames": 9,
+        "reserved_offending_frames": 1,
+        "expected_frame_bytes": 65_536,
+        "required_bytes": 655_360,
+    }
+    assert len(ledger["entries"]) == 9
+    assert all(item["role"] == "accepted_measurement" for item in ledger["entries"])
+    assert all(
+        not Path(item["relative_path"]).is_absolute() for item in ledger["entries"]
+    )
+    for item in ledger["entries"]:
+        raw_path = tmp_path / item["relative_path"]
+        assert hashlib.sha256(raw_path.read_bytes()).hexdigest() == item["sha256"]
+    assert (
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+        == ledger["manifest_sha256"]
+    )
+
+
+def test_matrix_iq_preflight_fails_before_live_frequency_readback(tmp_path) -> None:
+    options = _options(output_dir=tmp_path, samples_per_channel=1_000_000)
+
+    class PreflightRadio(_MatrixRadio):
+        def read_center_frequency(self) -> dict[str, int]:
+            raise AssertionError("preflight reached a live radio read")
+
+    with pytest.raises(ValueError, match="128 MiB bound"):
+        run_tandem_quality_matrix(PreflightRadio(options), options)
+
+
+def test_matrix_iq_runtime_cap_is_exact_and_fail_closed(tmp_path) -> None:
+    ledger = tandem_quality._MatrixFailureIqLedger(
+        output_dir=tmp_path,
+        planned_accepted_frames=1,
+        expected_frame_bytes=4,
+        maximum_bytes=8,
+    )
+    assert ledger.preflight_bytes == 8
+    ledger.set_context(
+        mode=MODE_MANUAL,
+        stage="measurement",
+        level_index=0,
+        frame_index=0,
+    )
+    ledger.observe(b"1234", {"sha256": hashlib.sha256(b"1234").hexdigest()})
+    ledger.accept_current()
+    ledger.observe(b"5678", {"sha256": hashlib.sha256(b"5678").hexdigest()})
+    assert ledger.accepted_bytes == 8
+    assert not (tmp_path / "failure-iq").exists()
+
+    with pytest.raises(
+        tandem_quality._EvidenceInvalidWithDetails,
+        match="in-memory bound",
+    ) as caught:
+        ledger.observe(b"abcde", {"sha256": hashlib.sha256(b"abcde").hexdigest()})
+
+    assert caught.value.failure_evidence == {
+        "kind": "matrix_failure_iq_bound_exceeded",
+        "maximum_bytes": 8,
+        "retained_bytes": 8,
+        "replaced_current_bytes": 4,
+        "requested_bytes": 5,
+        "mode": MODE_MANUAL,
+        "capture_stage": "measurement",
+        "level_index": 0,
+        "frame_index": 0,
+        "captured_frame": {"sha256": hashlib.sha256(b"abcde").hexdigest()},
+    }
+    assert ledger.accepted_bytes == 8
+    assert not (tmp_path / "failure-iq").exists()
+
+
+def test_matrix_artifact_writer_rejects_intermediate_symlink(tmp_path) -> None:
+    root = tmp_path / "matrix-root"
+    outside = tmp_path / "outside"
+    root.mkdir()
+    outside.mkdir()
+    (root / "failure-iq").symlink_to(outside, target_is_directory=True)
+    raw = b"matrix-evidence"
+    ledger = tandem_quality._MatrixFailureIqLedger(
+        output_dir=root,
+        planned_accepted_frames=1,
+        expected_frame_bytes=len(raw),
+    )
+    ledger.set_context(
+        mode=MODE_MANUAL,
+        stage="measurement",
+        level_index=0,
+        frame_index=0,
+    )
+    frame = {"sha256": hashlib.sha256(raw).hexdigest()}
+    ledger.observe(raw, frame)
+    ledger.accept_current()
+
+    with pytest.raises(tandem_quality._EvidenceInvalidWithDetails) as caught:
+        ledger.flush_failure(trigger={"kind": "planted"})
+
+    assert caught.value.failure_evidence["kind"] == "unsafe_artifact_path"
+    assert "failure_iq_path" not in frame
+    assert list(outside.iterdir()) == []
+    assert not (root / "failure-iq-manifest.json").exists()
+
+
+def _plant_matrix_iq(
+    options: TandemQualityOptions,
+    *,
+    mode: str,
+    report: dict[str, object],
+    accept: bool,
+) -> None:
+    report["modes"].append({"mode": mode, "cells": []})  # type: ignore[union-attr]
+    ledger = tandem_quality._ACTIVE_MATRIX_FAILURE_IQ.get()
+    assert ledger is not None
+    raw = mode.encode("ascii") * 64
+    frame = {"sha256": hashlib.sha256(raw).hexdigest(), "iq_bytes": len(raw)}
+    ledger.set_context(
+        mode=mode,
+        stage="measurement",
+        level_index=0,
+        frame_index=0,
+    )
+    ledger.observe(raw, frame)
+    if accept:
+        ledger.accept_current()
+
+
+def _install_matrix_pass_stubs(
+    monkeypatch: pytest.MonkeyPatch, options: TandemQualityOptions
+) -> None:
+    monkeypatch.setattr(
+        tandem_quality,
+        "_mode_cells",
+        lambda *_args: [
+            {
+                "tx2_gain_requested_db": options.strongest_tx_gain_db,
+                "summary": {"quality_valid": True},
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        tandem_quality,
+        "_manual_tone_response",
+        lambda *_args: {"valid": True, "reasons": []},
+    )
+    monkeypatch.setattr(
+        tandem_quality,
+        "evaluate_matrix",
+        lambda *_args: {"verdict": "pass", "failures": []},
+    )
+
+
+def test_matrix_cleanup_only_failure_flushes_iq_after_cleanup(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    options = _options(output_dir=tmp_path, samples_per_channel=8_192)
+
+    class CleanupFailureRadio(_MatrixRadio):
+        @staticmethod
+        def mute_all() -> None:
+            raise RuntimeError("planted cleanup failure")
+
+    monkeypatch.setattr(
+        tandem_quality,
+        "_run_mode",
+        lambda _radio, *, mode, report, **_kwargs: _plant_matrix_iq(
+            options, mode=mode, report=report, accept=True
+        ),
+    )
+    _install_matrix_pass_stubs(monkeypatch, options)
+
+    with pytest.raises(RuntimeError, match="planted cleanup failure"):
+        run_tandem_quality_matrix(CleanupFailureRadio(options), options)
+
+    report_path = tmp_path / "offline-radio" / "tandem-agc-quality-report.json"
+    persisted = json.loads(report_path.read_text(encoding="utf-8"))
+    assert persisted["verdict"] == "invalid"
+    assert persisted["fatal_error"].startswith("RuntimeError:")
+    assert persisted["cleanup_error"] == persisted["fatal_error"]
+    ledger = persisted["failure_evidence"]["iq_ledger"]
+    assert ledger["trigger"]["kind"] == "matrix_cleanup_failed"
+    assert len(ledger["entries"]) == len(quality_modes(options))
+    assert all(item["role"] == "accepted_measurement" for item in ledger["entries"])
+
+
+def test_matrix_body_and_cleanup_failures_are_both_durable(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    options = _options(output_dir=tmp_path, samples_per_channel=8_192)
+
+    class CleanupFailureRadio(_MatrixRadio):
+        @staticmethod
+        def mute_all() -> None:
+            raise RuntimeError("planted cleanup failure")
+
+    def fake_run_mode(_radio, *, mode, report, **_kwargs) -> None:
+        _plant_matrix_iq(
+            options,
+            mode=mode,
+            report=report,
+            accept=mode == MODE_MANUAL,
+        )
+        if mode != MODE_MANUAL:
+            raise EvidenceInvalid("planted execution failure")
+
+    monkeypatch.setattr(tandem_quality, "_run_mode", fake_run_mode)
+    _install_matrix_pass_stubs(monkeypatch, options)
+
+    with pytest.raises(RuntimeError, match="planted cleanup failure"):
+        run_tandem_quality_matrix(CleanupFailureRadio(options), options)
+
+    report_path = tmp_path / "offline-radio" / "tandem-agc-quality-report.json"
+    persisted = json.loads(report_path.read_text(encoding="utf-8"))
+    assert persisted["fatal_error"].startswith("EvidenceInvalid:")
+    assert persisted["cleanup_error"].startswith("RuntimeError:")
+    ledger = persisted["failure_evidence"]["iq_ledger"]
+    assert ledger["trigger"] == {
+        "kind": "matrix_cleanup_failed",
+        "error": "RuntimeError: planted cleanup failure",
+        "prior_execution_error": "EvidenceInvalid: planted execution failure",
+    }
+    assert [item["role"] for item in ledger["entries"]] == [
+        "accepted_measurement",
+        "offending_capture",
+    ]
+
+
+def test_analyzer_exception_retains_current_frame_as_offending_iq(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    options = _options(
+        output_dir=tmp_path,
+        samples_per_channel=8_192,
+        measurement_frames=1,
+    )
+    raw = b"\x01\x02\x03\x04" * (options.samples_per_channel * 2)
+
+    class CaptureRadio:
+        @staticmethod
+        def capture_iq(
+            _buffer, *, metadata: bool, samples_per_channel: int
+        ) -> tuple[bytes, None, int]:
+            assert not metadata
+            assert samples_per_channel == options.samples_per_channel
+            return raw, None, 123
+
+        @staticmethod
+        def read_rx_state() -> dict[str, list[object]]:
+            return {"modes": ["manual", "manual"], "gains_db": [40.0, 40.0]}
+
+    monkeypatch.setattr(
+        tandem_quality,
+        "analyze_common_tone",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            EvidenceInvalid("planted analyzer failure")
+        ),
+    )
+    ledger = tandem_quality._MatrixFailureIqLedger(
+        output_dir=tmp_path,
+        planned_accepted_frames=1,
+        expected_frame_bytes=len(raw),
+    )
+    settled = tandem_quality._OrdinaryGainBand(
+        mode="manual",
+        minimum_db=(40.0, 40.0),
+        maximum_db=(40.0, 40.0),
+        reference_db=(40.0, 40.0),
+        frame_count=3,
+    )
+    token = tandem_quality._ACTIVE_MATRIX_FAILURE_IQ.set(ledger)
+    try:
+        with pytest.raises(EvidenceInvalid, match="planted analyzer failure"):
+            tandem_quality._measure_ordinary(
+                CaptureRadio(),  # type: ignore[arg-type]
+                object(),
+                mode=MODE_MANUAL,
+                options=options,
+                output_dir=tmp_path,
+                level_index=0,
+                settled=settled,
+            )
+    finally:
+        tandem_quality._ACTIVE_MATRIX_FAILURE_IQ.reset(token)
+
+    assert not (tmp_path / "failure-iq").exists()
+    evidence = ledger.flush_failure(trigger={"kind": "planted_analyzer_failure"})
+    assert len(evidence["entries"]) == 1
+    entry = evidence["entries"][0]
+    assert entry["role"] == "offending_capture"
+    assert entry["sha256"] == hashlib.sha256(raw).hexdigest()
+    assert (tmp_path / entry["relative_path"]).read_bytes() == raw

@@ -5,9 +5,12 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
+import stat
 import statistics
 import time
 from collections.abc import Callable, Mapping, Sequence
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field, replace
 from itertools import pairwise
 from pathlib import Path
@@ -45,6 +48,10 @@ MANUAL_TONE_TRACKING_TOLERANCE_DB = 3.0
 MANUAL_TONE_RETRACE_TOLERANCE_DB = 3.0
 NATIVE_MIN_GAIN_SPAN_DB = 1.0
 NATIVE_FAST_MAX_TONE_DBFS = -2.0
+_TANDEM_MEASUREMENT_RESTART_LIMIT = 1
+_TANDEM_DEFERRED_IQ_LIMIT_BYTES = 32 * 1024 * 1024
+_MATRIX_FAILURE_IQ_LIMIT_BYTES = 128 * 1024 * 1024
+_MATRIX_FAILURE_IQ_SCHEMA = "plutosdr-fw.tandem-agc-failure-iq.v1"
 
 
 class _EvidenceInvalidWithDetails(EvidenceInvalid):
@@ -53,6 +60,618 @@ class _EvidenceInvalidWithDetails(EvidenceInvalid):
     def __init__(self, message: str, failure_evidence: Mapping[str, Any]) -> None:
         super().__init__(message)
         self.failure_evidence = dict(failure_evidence)
+
+
+class _CapturedFrameInvalid(EvidenceInvalid):
+    """A rejected capture whose raw bytes remain available until session exit."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        raw: bytes,
+        frame: dict[str, Any],
+    ) -> None:
+        super().__init__(message)
+        self.raw = bytes(raw)
+        self.frame = frame
+
+
+def _artifact_path_error(
+    message: str,
+    *,
+    root: Path,
+    path: Path,
+    cause: BaseException | None = None,
+) -> _EvidenceInvalidWithDetails:
+    evidence: dict[str, Any] = {
+        "kind": "unsafe_artifact_path",
+        "artifact_root": str(root),
+        "artifact_path": str(path),
+    }
+    if cause is not None:
+        evidence["cause"] = _exception_text(cause)
+    return _EvidenceInvalidWithDetails(message, evidence)
+
+
+def _open_safe_artifact_parent(root: Path, path: Path) -> tuple[int, str, str]:
+    """Open an owned in-root parent without following any in-root symlink."""
+
+    root = Path(os.path.abspath(root))
+    path = Path(os.path.abspath(path))
+    try:
+        relative = path.relative_to(root)
+    except ValueError as error:
+        raise _artifact_path_error(
+            "artifact path escapes its output root",
+            root=root,
+            path=path,
+            cause=error,
+        ) from error
+    if relative == Path(".") or relative.name in {"", ".", ".."}:
+        raise _artifact_path_error(
+            "artifact path does not name a file",
+            root=root,
+            path=path,
+        )
+
+    try:
+        root.mkdir(mode=0o700, parents=True, exist_ok=True)
+        root_lstat = root.lstat()
+    except OSError as error:
+        raise _artifact_path_error(
+            "artifact root could not be created safely",
+            root=root,
+            path=path,
+            cause=error,
+        ) from error
+    if (
+        stat.S_ISLNK(root_lstat.st_mode)
+        or not stat.S_ISDIR(root_lstat.st_mode)
+        or root_lstat.st_uid != os.geteuid()
+    ):
+        raise _artifact_path_error(
+            "artifact root is not an owned real directory",
+            root=root,
+            path=path,
+        )
+
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        directory_fd = os.open(root, directory_flags)
+    except OSError as error:
+        raise _artifact_path_error(
+            "artifact root could not be opened without following symlinks",
+            root=root,
+            path=path,
+            cause=error,
+        ) from error
+    try:
+        for component in relative.parent.parts:
+            if component in {"", ".", ".."}:
+                raise _artifact_path_error(
+                    "artifact path contains an unsafe directory component",
+                    root=root,
+                    path=path,
+                )
+            try:
+                child_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+            except FileNotFoundError:
+                try:
+                    os.mkdir(component, mode=0o700, dir_fd=directory_fd)
+                    child_fd = os.open(component, directory_flags, dir_fd=directory_fd)
+                except OSError as error:
+                    raise _artifact_path_error(
+                        "artifact directory could not be created safely",
+                        root=root,
+                        path=path,
+                        cause=error,
+                    ) from error
+            except OSError as error:
+                raise _artifact_path_error(
+                    "artifact directory is a symlink or special file",
+                    root=root,
+                    path=path,
+                    cause=error,
+                ) from error
+            child_stat = os.fstat(child_fd)
+            if (
+                not stat.S_ISDIR(child_stat.st_mode)
+                or child_stat.st_uid != os.geteuid()
+            ):
+                os.close(child_fd)
+                raise _artifact_path_error(
+                    "artifact directory is not owned by the current user",
+                    root=root,
+                    path=path,
+                )
+            os.close(directory_fd)
+            directory_fd = child_fd
+        return directory_fd, relative.name, relative.as_posix()
+    except BaseException:
+        os.close(directory_fd)
+        raise
+
+
+def _validate_safe_artifact_destination(root: Path, path: Path) -> str:
+    directory_fd, filename, relative_path = _open_safe_artifact_parent(root, path)
+    try:
+        try:
+            destination = os.stat(
+                filename,
+                dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            return relative_path
+        if not stat.S_ISREG(destination.st_mode) or destination.st_uid != os.geteuid():
+            raise _artifact_path_error(
+                "artifact destination is a symlink, special file, or is not owned",
+                root=Path(os.path.abspath(root)),
+                path=Path(os.path.abspath(path)),
+            )
+        return relative_path
+    finally:
+        os.close(directory_fd)
+
+
+def _safe_atomic_artifact_write(root: Path, path: Path, payload: bytes) -> str:
+    """Atomically replace an owned regular artifact without following symlinks."""
+
+    directory_fd, filename, relative_path = _open_safe_artifact_parent(root, path)
+    temporary_name: str | None = None
+    temporary_fd: int | None = None
+    try:
+        try:
+            destination = os.stat(
+                filename,
+                dir_fd=directory_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            destination = None
+        if destination is not None and (
+            not stat.S_ISREG(destination.st_mode) or destination.st_uid != os.geteuid()
+        ):
+            raise _artifact_path_error(
+                "artifact destination is a symlink, special file, or is not owned",
+                root=Path(os.path.abspath(root)),
+                path=Path(os.path.abspath(path)),
+            )
+
+        open_flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+        for suffix in range(1_000):
+            candidate = f".{filename}.tmp-{os.getpid()}-{suffix}"
+            try:
+                temporary_fd = os.open(
+                    candidate,
+                    open_flags,
+                    0o600,
+                    dir_fd=directory_fd,
+                )
+            except FileExistsError:
+                continue
+            temporary_name = candidate
+            break
+        if temporary_fd is None or temporary_name is None:
+            raise _artifact_path_error(
+                "artifact writer could not reserve an owned temporary file",
+                root=Path(os.path.abspath(root)),
+                path=Path(os.path.abspath(path)),
+            )
+        temporary_stat = os.fstat(temporary_fd)
+        if (
+            not stat.S_ISREG(temporary_stat.st_mode)
+            or temporary_stat.st_uid != os.geteuid()
+        ):
+            raise _artifact_path_error(
+                "artifact temporary file is not an owned regular file",
+                root=Path(os.path.abspath(root)),
+                path=Path(os.path.abspath(path)),
+            )
+        remaining = memoryview(payload)
+        while remaining:
+            written = os.write(temporary_fd, remaining)
+            if written <= 0:
+                raise OSError("artifact write made no forward progress")
+            remaining = remaining[written:]
+        os.fsync(temporary_fd)
+        os.close(temporary_fd)
+        temporary_fd = None
+
+        # Recheck immediately before the atomic replace.  os.replace itself
+        # replaces a directory entry and never follows the destination.
+        _validate_safe_artifact_destination(root, path)
+        os.replace(
+            temporary_name,
+            filename,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        temporary_name = None
+        os.fsync(directory_fd)
+        final_stat = os.stat(
+            filename,
+            dir_fd=directory_fd,
+            follow_symlinks=False,
+        )
+        if not stat.S_ISREG(final_stat.st_mode) or final_stat.st_uid != os.geteuid():
+            raise _artifact_path_error(
+                "materialized artifact is not an owned regular file",
+                root=Path(os.path.abspath(root)),
+                path=Path(os.path.abspath(path)),
+            )
+        return relative_path
+    except _EvidenceInvalidWithDetails:
+        raise
+    except OSError as error:
+        raise _artifact_path_error(
+            "artifact could not be written safely",
+            root=Path(os.path.abspath(root)),
+            path=Path(os.path.abspath(path)),
+            cause=error,
+        ) from error
+    finally:
+        if temporary_fd is not None:
+            os.close(temporary_fd)
+        if temporary_name is not None:
+            try:
+                os.unlink(temporary_name, dir_fd=directory_fd)
+            except FileNotFoundError:
+                pass
+        os.close(directory_fd)
+
+
+@dataclass
+class _TandemContinuity:
+    """Chronological AUTO evidence state for one metadata-buffer session."""
+
+    previous: TandemFrameMetadata | None = None
+    previous_frame: dict[str, Any] | None = None
+    penultimate_frame: dict[str, Any] | None = None
+    last_event_sequence: int | None = None
+    last_event_sample_sequence: int | None = None
+    last_event_gain_index: int | None = None
+    unrepresented_since_event: int = 0
+    missing_frame_count: int = 0
+    hidden_transition_count: int = 0
+    event_sequence_hole_count: int = 0
+    next_capture_ordinal: int = 0
+    last_frame_evidence: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class _DeferredIqWrite:
+    path: Path
+    raw: bytes
+    frame: dict[str, Any]
+    path_field: str
+    failure_only: bool
+
+
+@dataclass
+class _DeferredTandemWrites:
+    """Bound raw-IQ retention until the metadata buffer has closed."""
+
+    maximum_bytes: int = _TANDEM_DEFERRED_IQ_LIMIT_BYTES
+    pending: list[_DeferredIqWrite] = field(default_factory=list)
+    pending_bytes: int = 0
+    report_root: Path | None = None
+
+    def queue(
+        self,
+        raw: bytes,
+        frame: dict[str, Any],
+        path: Path,
+        *,
+        path_field: str,
+        failure_only: bool = True,
+    ) -> None:
+        self.queue_batch(
+            (
+                _DeferredIqWrite(
+                    path=path,
+                    raw=raw,
+                    frame=frame,
+                    path_field=path_field,
+                    failure_only=failure_only,
+                ),
+            )
+        )
+
+    def queue_batch(self, writes: Sequence[_DeferredIqWrite]) -> None:
+        """Atomically retain a complete logical detail batch or none of it."""
+
+        requested_bytes = sum(len(item.raw) for item in writes)
+        if self.pending_bytes + requested_bytes > self.maximum_bytes:
+            raise _EvidenceInvalidWithDetails(
+                "tandem deferred IQ evidence exceeded its in-memory bound",
+                {
+                    "kind": "tandem_deferred_iq_bound_exceeded",
+                    "maximum_bytes": self.maximum_bytes,
+                    "pending_bytes": self.pending_bytes,
+                    "requested_bytes": requested_bytes,
+                    "requested_items": len(writes),
+                    "captured_frames": [item.frame for item in writes],
+                },
+            )
+        prepared = [
+            _DeferredIqWrite(
+                path=item.path,
+                raw=bytes(item.raw),
+                frame=item.frame,
+                path_field=item.path_field,
+                failure_only=item.failure_only,
+            )
+            for item in writes
+        ]
+        self.pending.extend(prepared)
+        self.pending_bytes += requested_bytes
+
+    def _flush_items(self, items: Sequence[_DeferredIqWrite]) -> None:
+        if self.report_root is None:
+            raise _EvidenceInvalidWithDetails(
+                "tandem artifact writer lacks an output root",
+                {"kind": "tandem_artifact_root_missing"},
+            )
+        for item in items:
+            _validate_safe_artifact_destination(self.report_root, item.path)
+        materialized: list[tuple[_DeferredIqWrite, str]] = []
+        for item in items:
+            relative_path = _safe_atomic_artifact_write(
+                self.report_root,
+                item.path,
+                item.raw,
+            )
+            materialized.append((item, relative_path))
+        for item, relative_path in materialized:
+            item.frame[item.path_field] = relative_path
+
+    def flush_unconditional(self) -> None:
+        unconditional = [item for item in self.pending if not item.failure_only]
+        self._flush_items(unconditional)
+        self.pending = [item for item in self.pending if item.failure_only]
+        self.pending_bytes = sum(len(item.raw) for item in self.pending)
+
+    def flush(self) -> None:
+        self._flush_items(self.pending)
+        self.discard()
+
+    def discard(self) -> None:
+        self.pending.clear()
+        self.pending_bytes = 0
+
+
+@dataclass
+class _MatrixFailureIqCapture:
+    raw: bytes
+    frame: dict[str, Any]
+    role: str
+    mode: str
+    stage: str
+    level_index: int | None
+    frame_index: int | None
+    ordinal: int | None = None
+
+
+@dataclass
+class _MatrixFailureIqLedger:
+    """Bound accepted matrix IQ in RAM and materialize it only on failure."""
+
+    output_dir: Path
+    planned_accepted_frames: int
+    expected_frame_bytes: int
+    maximum_bytes: int = _MATRIX_FAILURE_IQ_LIMIT_BYTES
+    accepted: list[_MatrixFailureIqCapture] = field(default_factory=list)
+    current: _MatrixFailureIqCapture | None = None
+    accepted_bytes: int = 0
+    next_ordinal: int = 0
+    mode: str = "unassigned"
+    stage: str = "unassigned"
+    level_index: int | None = None
+    frame_index: int | None = None
+    finalized: bool = False
+
+    def __post_init__(self) -> None:
+        self.output_dir = Path(os.path.abspath(self.output_dir))
+
+    @property
+    def preflight_bytes(self) -> int:
+        return (self.planned_accepted_frames + 1) * self.expected_frame_bytes
+
+    def set_context(
+        self,
+        *,
+        mode: str,
+        stage: str,
+        level_index: int | None,
+        frame_index: int | None,
+    ) -> None:
+        self.mode = mode
+        self.stage = stage
+        self.level_index = level_index
+        self.frame_index = frame_index
+
+    def observe(self, raw: bytes, frame: dict[str, Any]) -> None:
+        """Hold the latest capture as the single possible offending frame."""
+
+        if self.finalized:
+            raise RuntimeError("matrix failure-IQ ledger is already finalized")
+        payload_bytes = len(raw)
+        prior_bytes = len(self.current.raw) if self.current is not None else 0
+        projected = self.accepted_bytes - prior_bytes + payload_bytes
+        if projected > self.maximum_bytes:
+            raise _EvidenceInvalidWithDetails(
+                "matrix failure IQ evidence exceeded its in-memory bound",
+                {
+                    "kind": "matrix_failure_iq_bound_exceeded",
+                    "maximum_bytes": self.maximum_bytes,
+                    "retained_bytes": self.accepted_bytes,
+                    "replaced_current_bytes": prior_bytes,
+                    "requested_bytes": payload_bytes,
+                    "mode": self.mode,
+                    "capture_stage": self.stage,
+                    "level_index": self.level_index,
+                    "frame_index": self.frame_index,
+                    "captured_frame": frame,
+                },
+            )
+        payload = bytes(raw)
+        self.accepted_bytes = projected
+        self.current = _MatrixFailureIqCapture(
+            raw=payload,
+            frame=frame,
+            role="offending_capture",
+            mode=self.mode,
+            stage=self.stage,
+            level_index=self.level_index,
+            frame_index=self.frame_index,
+        )
+
+    def accept_current(self) -> None:
+        if self.current is None:
+            raise RuntimeError("matrix failure-IQ ledger has no current capture")
+        self.current.role = "accepted_measurement"
+        self.current.ordinal = self.next_ordinal
+        self.next_ordinal += 1
+        self.accepted.append(self.current)
+        self.current = None
+
+    def discard_current(self) -> None:
+        if self.current is not None:
+            self.accepted_bytes -= len(self.current.raw)
+            self.current = None
+
+    def release_accepted_frames(self, frames: Sequence[Mapping[str, Any]]) -> None:
+        identities = {id(frame) for frame in frames}
+        retained: list[_MatrixFailureIqCapture] = []
+        for item in self.accepted:
+            if id(item.frame) in identities:
+                self.accepted_bytes -= len(item.raw)
+            else:
+                retained.append(item)
+        self.accepted = retained
+
+    def _capture_path(self, item: _MatrixFailureIqCapture) -> Path:
+        role = "accepted" if item.role == "accepted_measurement" else "offending"
+        ordinal = item.ordinal if item.ordinal is not None else self.next_ordinal
+        level = "none" if item.level_index is None else f"{item.level_index:03d}"
+        frame = "none" if item.frame_index is None else f"{item.frame_index:03d}"
+        return (
+            self.output_dir
+            / "failure-iq"
+            / (f"{role}-{ordinal:04d}-{item.mode}-level{level}-frame{frame}.cs16")
+        )
+
+    def flush_failure(self, *, trigger: Mapping[str, Any]) -> dict[str, Any]:
+        if self.finalized:
+            raise RuntimeError("matrix failure-IQ ledger was finalized twice")
+        captures = [*self.accepted]
+        if self.current is not None:
+            captures.append(self.current)
+        capture_paths = [self._capture_path(item) for item in captures]
+        manifest_path = self.output_dir / "failure-iq-manifest.json"
+        for path in (*capture_paths, manifest_path):
+            _validate_safe_artifact_destination(self.output_dir, path)
+        entries: list[dict[str, Any]] = []
+        materialized: list[tuple[_MatrixFailureIqCapture, str]] = []
+        for item, path in zip(captures, capture_paths, strict=True):
+            relative_path = _safe_atomic_artifact_write(
+                self.output_dir,
+                path,
+                item.raw,
+            )
+            materialized.append((item, relative_path))
+            entries.append(
+                {
+                    "ordinal": len(entries),
+                    "role": item.role,
+                    "mode": item.mode,
+                    "capture_stage": item.stage,
+                    "level_index": item.level_index,
+                    "frame_index": item.frame_index,
+                    "relative_path": relative_path,
+                    "bytes": len(item.raw),
+                    "sha256": hashlib.sha256(item.raw).hexdigest(),
+                }
+            )
+        for item, relative_path in materialized:
+            item.frame["failure_iq_path"] = relative_path
+        manifest = {
+            "schema": _MATRIX_FAILURE_IQ_SCHEMA,
+            "maximum_bytes": self.maximum_bytes,
+            "tandem_detail_maximum_bytes": _TANDEM_DEFERRED_IQ_LIMIT_BYTES,
+            "preflight": {
+                "planned_accepted_frames": self.planned_accepted_frames,
+                "reserved_offending_frames": 1,
+                "expected_frame_bytes": self.expected_frame_bytes,
+                "required_bytes": self.preflight_bytes,
+            },
+            "trigger": dict(trigger),
+            "retained_bytes": sum(int(item["bytes"]) for item in entries),
+            "entries": entries,
+        }
+        manifest_payload = (
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        manifest_relative_path = _safe_atomic_artifact_write(
+            self.output_dir,
+            manifest_path,
+            manifest_payload,
+        )
+        manifest_sha256 = hashlib.sha256(manifest_payload).hexdigest()
+        self.finalized = True
+        return {
+            **manifest,
+            "manifest_relative_path": manifest_relative_path,
+            "manifest_sha256": manifest_sha256,
+        }
+
+    def discard(self) -> None:
+        self.accepted.clear()
+        self.current = None
+        self.accepted_bytes = 0
+        self.finalized = True
+
+
+@dataclass
+class _TandemCaptureSession:
+    """Mutable execution state shared by priming, settling, and measurement."""
+
+    output_dir: Path
+    continuity: _TandemContinuity = field(default_factory=_TandemContinuity)
+    deferred: _DeferredTandemWrites = field(default_factory=_DeferredTandemWrites)
+    stage: str = "priming_settle"
+    level_index: int | None = None
+    measurement_attempt: int | None = None
+    measurement_frame_index: int | None = None
+    minimum_drain_override: int | None = None
+    pending_cell: dict[str, Any] | None = None
+    cell_capture_trace: list[dict[str, Any]] = field(default_factory=list)
+    recovery_settle_trace: list[dict[str, Any]] = field(default_factory=list)
+    measurement_attempts: list[dict[str, Any]] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        self.deferred.report_root = self.output_dir
+
+    def begin_cell(self, level_index: int, cell: dict[str, Any]) -> None:
+        self.stage = "cell_settle"
+        self.level_index = level_index
+        self.measurement_attempt = None
+        self.measurement_frame_index = None
+        self.minimum_drain_override = None
+        self.pending_cell = cell
+        self.cell_capture_trace = []
+        self.recovery_settle_trace = []
+        self.measurement_attempts = []
+
+
+_ACTIVE_TANDEM_SESSION: ContextVar[_TandemCaptureSession | None] = ContextVar(
+    "tandem_quality_capture_session", default=None
+)
+_ACTIVE_MATRIX_FAILURE_IQ: ContextVar[_MatrixFailureIqLedger | None] = ContextVar(
+    "tandem_quality_matrix_failure_iq", default=None
+)
 
 
 @dataclass(frozen=True)
@@ -494,6 +1113,513 @@ def _metadata_dict(metadata: TandemFrameMetadata) -> dict[str, Any]:
     }
 
 
+def _gain_endpoint_is_reachable(
+    start: int,
+    end: int,
+    transitions: int,
+    *,
+    minimum: int,
+    maximum: int,
+) -> bool:
+    """Return whether exact paired +/-1 steps can join two known endpoints."""
+
+    if transitions < 0 or not minimum <= start <= maximum:
+        return False
+    if not minimum <= end <= maximum:
+        return False
+    distance = abs(end - start)
+    return distance <= transitions and (transitions - distance) % 2 == 0
+
+
+def _tandem_continuity_projection(
+    metadata: TandemFrameMetadata,
+    continuity: _TandemContinuity,
+) -> dict[str, int | None]:
+    """Project replayable deltas without hiding an ensuing validation failure."""
+
+    previous = continuity.previous
+    visible_events = len(metadata.gain_events)
+    evidence: dict[str, int | None] = {
+        "buffer_delta": None,
+        "sample_delta": None,
+        "missing_frame_count": 0,
+        "transition_count_delta": None,
+        "visible_event_count": visible_events,
+        "hidden_transition_count": 0,
+        "initial_unrepresented_transition_count": 0,
+    }
+    if previous is None:
+        if 0 <= metadata.tandem_transition_count < _UINT32_MODULUS:
+            evidence["initial_unrepresented_transition_count"] = (
+                metadata.tandem_transition_count - visible_events
+            )
+        return evidence
+
+    buffer_delta = metadata.buffer_sequence - previous.buffer_sequence
+    sample_delta = metadata.first_sample_sequence - previous.first_sample_sequence
+    evidence["buffer_delta"] = buffer_delta
+    evidence["sample_delta"] = sample_delta
+    evidence["missing_frame_count"] = max(0, buffer_delta - 1)
+    if (
+        0 <= metadata.tandem_transition_count < _UINT32_MODULUS
+        and 0 <= previous.tandem_transition_count < _UINT32_MODULUS
+    ):
+        transition_delta = (
+            metadata.tandem_transition_count - previous.tandem_transition_count
+        ) % _UINT32_MODULUS
+        if transition_delta < _UINT32_HALF_RANGE:
+            evidence["transition_count_delta"] = transition_delta
+            evidence["hidden_transition_count"] = transition_delta - visible_events
+    return evidence
+
+
+def _validate_tandem_continuity(
+    metadata: TandemFrameMetadata,
+    frame: dict[str, Any],
+    *,
+    options: TandemQualityOptions,
+    continuity: _TandemContinuity,
+) -> None:
+    """Reconcile one frame against every earlier frame in this AUTO session."""
+
+    frame["continuity"] = _tandem_continuity_projection(metadata, continuity)
+    if metadata.tandem_state is not TandemState.ARMED_AUTO:
+        raise EvidenceInvalid("tandem metadata does not prove an AUTO lease")
+    if metadata.tandem_fault_flags:
+        raise EvidenceInvalid("tandem metadata reports a controller fault")
+    if metadata.event_count != len(metadata.gain_events):
+        raise EvidenceInvalid("tandem event count differs from decoded events")
+    if metadata.rx1_gain_index != metadata.rx2_gain_index:
+        raise EvidenceInvalid("tandem endpoint gains are not paired")
+    if not 0 <= metadata.tandem_transition_count < _UINT32_MODULUS:
+        raise EvidenceInvalid("tandem transition count is outside uint32")
+    if (
+        metadata.minimum_gain_index > metadata.maximum_gain_index
+        or not metadata.minimum_gain_index
+        <= metadata.rx1_gain_index
+        <= metadata.maximum_gain_index
+    ):
+        raise EvidenceInvalid("tandem endpoint lies outside its session gain range")
+
+    previous = continuity.previous
+    buffer_delta: int | None = None
+    sample_delta: int | None = None
+    missing_frames = 0
+    transition_delta: int | None = None
+    hidden_transitions = 0
+    initial_unrepresented_transitions = 0
+    if previous is not None:
+        if metadata.stream_id != previous.stream_id:
+            raise EvidenceInvalid("tandem stream changed inside one session")
+        if metadata.ownership_epoch != previous.ownership_epoch:
+            raise EvidenceInvalid("tandem ownership changed inside one session")
+        if metadata.samples_per_channel != previous.samples_per_channel:
+            raise EvidenceInvalid("tandem sample count changed inside one session")
+        if metadata.gain_table_id is not previous.gain_table_id:
+            raise EvidenceInvalid("tandem gain table changed inside one session")
+        if metadata.threshold_provenance != previous.threshold_provenance:
+            raise EvidenceInvalid(
+                "tandem threshold provenance changed inside one session"
+            )
+        if (
+            metadata.minimum_gain_db != previous.minimum_gain_db
+            or metadata.maximum_gain_db != previous.maximum_gain_db
+            or metadata.initial_gain_db != previous.initial_gain_db
+        ):
+            raise EvidenceInvalid("tandem gain request changed inside one session")
+        if (
+            metadata.minimum_gain_index != previous.minimum_gain_index
+            or metadata.maximum_gain_index != previous.maximum_gain_index
+        ):
+            raise EvidenceInvalid("tandem gain-index range changed inside one session")
+        buffer_delta = metadata.buffer_sequence - previous.buffer_sequence
+        sample_delta = metadata.first_sample_sequence - previous.first_sample_sequence
+        if buffer_delta <= 0 or sample_delta <= 0:
+            raise EvidenceInvalid("tandem frame counters did not advance")
+        if sample_delta % previous.samples_per_channel:
+            raise EvidenceInvalid(
+                "tandem sample sequence did not advance by whole frames"
+            )
+        if buffer_delta != sample_delta // previous.samples_per_channel:
+            raise EvidenceInvalid("tandem buffer and sample sequence deltas disagree")
+        missing_frames = buffer_delta - 1
+        transition_delta = _forward_u32_delta(
+            metadata.tandem_transition_count,
+            previous.tandem_transition_count,
+            context="tandem transition count",
+        )
+        if transition_delta < len(metadata.gain_events):
+            raise EvidenceInvalid(
+                "tandem frame has more events than its transition-count delta"
+            )
+        hidden_transitions = transition_delta - len(metadata.gain_events)
+        if missing_frames == 0 and hidden_transitions:
+            raise EvidenceInvalid(
+                "adjacent tandem frames lost transition event evidence"
+            )
+        maximum_hidden = missing_frames * maximum_tandem_events_per_frame(
+            mode=TandemMode.AUTO,
+            samples_per_channel=options.samples_per_channel,
+            power_measurement_samples=options.tandem_power_measurement_samples,
+            cooldown_periods=options.tandem_cooldown_periods,
+        )
+        if hidden_transitions > maximum_hidden:
+            raise EvidenceInvalid(
+                "tandem gap contains more hidden transitions than omitted frames "
+                "can hold"
+            )
+    elif metadata.tandem_transition_count < len(metadata.gain_events):
+        raise EvidenceInvalid("first tandem frame has more events than transitions")
+    else:
+        # This is a baseline preceding our first returned IQ frame. It cannot
+        # later pay for an event-sequence hole or stimulus response.
+        initial_unrepresented_transitions = metadata.tandem_transition_count - len(
+            metadata.gain_events
+        )
+
+    last_event_sequence = continuity.last_event_sequence
+    last_event_sample = continuity.last_event_sample_sequence
+    last_event_gain = continuity.last_event_gain_index
+    unrepresented_since_event = continuity.unrepresented_since_event
+    if previous is not None:
+        unrepresented_since_event += hidden_transitions
+    frame_start = metadata.first_sample_sequence
+    frame_end = frame_start + metadata.samples_per_channel
+    event_sequence_holes = 0
+
+    for event_index, event in enumerate(metadata.gain_events):
+        context = f"tandem event {event_index}"
+        integers = (
+            event.sample_sequence,
+            event.event_sequence,
+            event.flags,
+            event.rx1_gain_index,
+            event.rx2_gain_index,
+        )
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) for value in integers
+        ):
+            raise EvidenceInvalid(f"{context} fields must be integers")
+        if not frame_start <= event.sample_sequence < frame_end:
+            raise EvidenceInvalid(f"{context} lies outside its IQ frame")
+        if not 0 <= event.event_sequence < _UINT32_MODULUS:
+            raise EvidenceInvalid(f"{context} sequence is outside uint32")
+        if event.rx1_gain_index != event.rx2_gain_index:
+            raise EvidenceInvalid(f"{context} endpoint gains are not paired")
+        if not (
+            metadata.minimum_gain_index
+            <= event.rx1_gain_index
+            <= metadata.maximum_gain_index
+        ):
+            raise EvidenceInvalid(f"{context} gain lies outside the session range")
+        try:
+            direction = event.direction
+            _reason = event.reason
+        except ValueError as error:
+            raise EvidenceInvalid(f"{context} has invalid flags") from error
+        if direction not in (
+            TandemEventDirection.INCREASE,
+            TandemEventDirection.DECREASE,
+        ):
+            raise EvidenceInvalid(f"{context} has an invalid direction")
+        step = 1 if direction is TandemEventDirection.INCREASE else -1
+        if last_event_sequence is not None:
+            sequence_delta = _forward_u32_delta(
+                event.event_sequence,
+                last_event_sequence,
+                context="tandem event sequence",
+            )
+            if sequence_delta == 0:
+                raise EvidenceInvalid("tandem event sequence did not advance")
+            sequence_hole = sequence_delta - 1
+            if sequence_hole != unrepresented_since_event:
+                raise EvidenceInvalid(
+                    "tandem event-sequence hole does not match locally hidden "
+                    "transitions"
+                )
+            if sequence_hole:
+                event_sequence_holes += 1
+        if last_event_sample is not None and event.sample_sequence < last_event_sample:
+            raise EvidenceInvalid("tandem events are not globally sample ordered")
+
+        anchor_gain: int | None = None
+        transitions_to_event = 0
+        if last_event_gain is not None:
+            anchor_gain = last_event_gain
+            transitions_to_event = unrepresented_since_event
+        elif previous is not None:
+            anchor_gain = previous.rx1_gain_index
+            transitions_to_event = hidden_transitions
+        if anchor_gain is not None:
+            gain_before_event = event.rx1_gain_index - step
+            if not _gain_endpoint_is_reachable(
+                anchor_gain,
+                gain_before_event,
+                transitions_to_event,
+                minimum=metadata.minimum_gain_index,
+                maximum=metadata.maximum_gain_index,
+            ):
+                qualifier = (
+                    "exact paired +/-1 endpoint"
+                    if transitions_to_event == 0
+                    else "gap-accounted paired +/-1 endpoint"
+                )
+                raise EvidenceInvalid(f"tandem event did not reconcile an {qualifier}")
+        unrepresented_since_event = 0
+        last_event_gain = event.rx1_gain_index
+        last_event_sequence = event.event_sequence
+        last_event_sample = event.sample_sequence
+
+    if metadata.gain_events:
+        if metadata.bench_gain_indices != (last_event_gain, last_event_gain):
+            raise EvidenceInvalid("tandem endpoint differs from its final event")
+    elif previous is not None:
+        assert transition_delta is not None
+        if not _gain_endpoint_is_reachable(
+            previous.rx1_gain_index,
+            metadata.rx1_gain_index,
+            transition_delta,
+            minimum=metadata.minimum_gain_index,
+            maximum=metadata.maximum_gain_index,
+        ):
+            raise EvidenceInvalid("tandem endpoint cannot reconcile its transitions")
+
+    evidence = {
+        "buffer_delta": buffer_delta,
+        "sample_delta": sample_delta,
+        "missing_frame_count": missing_frames,
+        "transition_count_delta": transition_delta,
+        "visible_event_count": len(metadata.gain_events),
+        "hidden_transition_count": hidden_transitions,
+        "initial_unrepresented_transition_count": (initial_unrepresented_transitions),
+        "cumulative_missing_frame_count": (
+            continuity.missing_frame_count + missing_frames
+        ),
+        "cumulative_hidden_transition_count": (
+            continuity.hidden_transition_count + hidden_transitions
+        ),
+        "cumulative_event_sequence_hole_count": (
+            continuity.event_sequence_hole_count + event_sequence_holes
+        ),
+    }
+    frame["continuity"] = evidence
+    continuity.penultimate_frame = continuity.previous_frame
+    continuity.previous_frame = frame
+    continuity.previous = metadata
+    continuity.last_event_sequence = last_event_sequence
+    continuity.last_event_sample_sequence = last_event_sample
+    continuity.last_event_gain_index = last_event_gain
+    continuity.unrepresented_since_event = unrepresented_since_event
+    continuity.missing_frame_count += missing_frames
+    continuity.hidden_transition_count += hidden_transitions
+    continuity.event_sequence_hole_count += event_sequence_holes
+    continuity.last_frame_evidence = evidence
+
+
+def _tag_tandem_frame(
+    frame: dict[str, Any],
+    *,
+    session: _TandemCaptureSession,
+) -> int:
+    ordinal = session.continuity.next_capture_ordinal
+    session.continuity.next_capture_ordinal += 1
+    frame["capture_ordinal"] = ordinal
+    frame["capture_stage"] = session.stage
+    if session.level_index is not None:
+        frame["level_index"] = session.level_index
+    if session.measurement_attempt is not None:
+        frame["measurement_attempt"] = session.measurement_attempt
+    if session.measurement_frame_index is not None:
+        frame["measurement_frame_index"] = session.measurement_frame_index
+    return ordinal
+
+
+def _queue_invalid_tandem_capture(
+    raw: bytes,
+    frame: dict[str, Any],
+    *,
+    session: _TandemCaptureSession,
+    ordinal: int,
+) -> None:
+    scope = "priming" if session.level_index is None else f"level{session.level_index}"
+    path = session.output_dir / (
+        f"{MODE_TANDEM}-{scope}-capture{ordinal}-continuity-invalid.cs16"
+    )
+    session.deferred.queue(
+        raw,
+        frame,
+        path,
+        path_field="diagnostic_iq_path",
+    )
+    if session.level_index is not None:
+        session.cell_capture_trace.append(frame)
+
+
+def _queue_abandoned_tandem_measurements(
+    accepted_raw: Sequence[bytes],
+    accepted_frames: Sequence[dict[str, Any]],
+    *,
+    output_dir: Path,
+    level_index: int,
+    attempt_index: int,
+    session: _TandemCaptureSession,
+) -> None:
+    """Retain every earlier IQ frame when its whole attempt is abandoned."""
+
+    writes = [
+        _DeferredIqWrite(
+            path=(
+                output_dir
+                / (
+                    f"{MODE_TANDEM}-level{level_index}-attempt{attempt_index}-"
+                    f"frame{frame_index}-abandoned.cs16"
+                )
+            ),
+            raw=payload,
+            frame=frame,
+            path_field="diagnostic_iq_path",
+            failure_only=True,
+        )
+        for frame_index, (payload, frame) in enumerate(
+            zip(accepted_raw, accepted_frames, strict=True)
+        )
+    ]
+    session.deferred.queue_batch(writes)
+
+
+def _queue_transition_tandem_detail(
+    accepted_raw: Sequence[bytes],
+    accepted_frames: Sequence[dict[str, Any]],
+    *,
+    offending_raw: bytes,
+    offending_frame: dict[str, Any],
+    output_dir: Path,
+    level_index: int,
+    attempt_index: int,
+    frame_index: int,
+    session: _TandemCaptureSession,
+) -> None:
+    """Atomically transfer a rejected attempt, including its current frame."""
+
+    writes = [
+        _DeferredIqWrite(
+            path=(
+                output_dir
+                / (
+                    f"{MODE_TANDEM}-level{level_index}-attempt{attempt_index}-"
+                    f"frame{accepted_index}-abandoned.cs16"
+                )
+            ),
+            raw=payload,
+            frame=accepted_frame,
+            path_field="diagnostic_iq_path",
+            failure_only=True,
+        )
+        for accepted_index, (payload, accepted_frame) in enumerate(
+            zip(accepted_raw, accepted_frames, strict=True)
+        )
+    ]
+    writes.append(
+        _DeferredIqWrite(
+            path=(
+                output_dir
+                / (
+                    f"{MODE_TANDEM}-level{level_index}-attempt{attempt_index}-"
+                    f"frame{frame_index}-rejected.cs16"
+                )
+            ),
+            raw=offending_raw,
+            frame=offending_frame,
+            path_field="diagnostic_iq_path",
+            failure_only=True,
+        )
+    )
+    session.deferred.queue_batch(writes)
+
+
+def _capture_tandem(
+    radio: Issue46Radio,
+    buffer: Any,
+    *,
+    options: TandemQualityOptions,
+    session: _TandemCaptureSession,
+) -> tuple[bytes, TandemFrameMetadata, dict[str, Any]]:
+    """Capture and chronologically bind one tandem frame to the active session."""
+
+    matrix_ledger = _ACTIVE_MATRIX_FAILURE_IQ.get()
+    if matrix_ledger is not None:
+        matrix_ledger.set_context(
+            mode=MODE_TANDEM,
+            stage=session.stage,
+            level_index=session.level_index,
+            frame_index=session.measurement_frame_index,
+        )
+    try:
+        raw, parsed, frame = _capture(
+            radio,
+            buffer,
+            options=options,
+            metadata=True,
+        )
+    except _CapturedFrameInvalid as error:
+        frame = error.frame
+        ordinal = _tag_tandem_frame(frame, session=session)
+        frame["continuity_error"] = _exception_text(error)
+        _queue_invalid_tandem_capture(
+            error.raw,
+            frame,
+            session=session,
+            ordinal=ordinal,
+        )
+        raise _EvidenceInvalidWithDetails(
+            str(error),
+            {
+                "kind": "tandem_capture_invalid",
+                "mode": MODE_TANDEM,
+                "level_index": session.level_index,
+                "capture_stage": session.stage,
+                "prior_frame": session.continuity.previous_frame,
+                "current_frame": frame,
+                "pending_cell": session.pending_cell,
+                "capture_trace": list(session.cell_capture_trace),
+            },
+        ) from error
+    assert parsed is not None
+    ordinal = _tag_tandem_frame(frame, session=session)
+    prior = session.continuity.previous_frame
+    try:
+        _validate_tandem_continuity(
+            parsed,
+            frame,
+            options=options,
+            continuity=session.continuity,
+        )
+    except EvidenceInvalid as error:
+        frame["continuity_error"] = _exception_text(error)
+        _queue_invalid_tandem_capture(
+            raw,
+            frame,
+            session=session,
+            ordinal=ordinal,
+        )
+        raise _EvidenceInvalidWithDetails(
+            str(error),
+            {
+                "kind": "tandem_metadata_continuity_invalid",
+                "mode": MODE_TANDEM,
+                "level_index": session.level_index,
+                "capture_stage": session.stage,
+                "prior_frame": prior,
+                "current_frame": frame,
+                "pending_cell": session.pending_cell,
+                "capture_trace": list(session.cell_capture_trace),
+            },
+        ) from error
+    if session.level_index is not None:
+        session.cell_capture_trace.append(frame)
+    return raw, parsed, frame
+
+
 def _capture(
     radio: Issue46Radio,
     buffer: Any,
@@ -506,47 +1632,77 @@ def _capture(
         metadata=metadata,
         samples_per_channel=options.samples_per_channel,
     )
-    parsed = (
-        parse_tandem_frame_metadata(raw_metadata) if raw_metadata is not None else None
-    )
-    if parsed is not None:
-        if parsed.samples_per_channel != options.samples_per_channel:
-            raise EvidenceInvalid("tandem metadata sample count differs from IQ")
-        if parsed.iq_payload_bytes != len(raw):
-            raise EvidenceInvalid("tandem metadata IQ byte count differs from payload")
-        if parsed.enabled_scan_mask != 0x0F or parsed.channel_count != 2:
-            raise EvidenceInvalid("tandem metadata does not describe dual complex RX")
-        unsafe_flags = parsed.flags & TANDEM_UNSAFE_FLAGS
-        if unsafe_flags:
-            raise EvidenceInvalid(
-                f"tandem metadata reports unsafe flags 0x{unsafe_flags:08x}"
-            )
-        if parsed.observation_overflow_count or parsed.event_overflow_count:
-            raise EvidenceInvalid("tandem metadata record capacity overflowed")
-        expected_gain_table = expected_tandem_gain_table(options.center_frequency_hz)
-        if parsed.gain_table_id is not expected_gain_table:
-            raise EvidenceInvalid(
-                f"{options.center_frequency_hz} Hz tandem session selected gain "
-                f"table {int(parsed.gain_table_id)}, expected "
-                f"{int(expected_gain_table)}"
-            )
-        if (
-            parsed.minimum_gain_db != 0
-            or parsed.maximum_gain_db != 62
-            or parsed.initial_gain_db != int(options.manual_gain_db)
-        ):
-            raise EvidenceInvalid("tandem metadata differs from requested gain range")
-        if parsed.ad9361_temperature_mdeg_c is not None and not (
-            -40_000 <= parsed.ad9361_temperature_mdeg_c <= 125_000
-        ):
-            raise EvidenceInvalid("AD9361 temperature is outside its physical range")
-    frame = {
+    frame: dict[str, Any] = {
         "sha256": hashlib.sha256(raw).hexdigest(),
         "iq_bytes": len(raw),
         "refill_monotonic_ns": refill_ns,
     }
-    if parsed is not None:
-        frame["metadata"] = _metadata_dict(parsed)
+    matrix_ledger = _ACTIVE_MATRIX_FAILURE_IQ.get()
+    if matrix_ledger is not None:
+        matrix_ledger.observe(raw, frame)
+    parsed: TandemFrameMetadata | None = None
+    try:
+        parsed = (
+            raw_metadata
+            if isinstance(raw_metadata, TandemFrameMetadata)
+            else (
+                parse_tandem_frame_metadata(raw_metadata)
+                if raw_metadata is not None
+                else None
+            )
+        )
+        if metadata and parsed is None:
+            raise EvidenceInvalid("tandem capture returned no metadata")
+        if parsed is not None:
+            if parsed.samples_per_channel != options.samples_per_channel:
+                raise EvidenceInvalid("tandem metadata sample count differs from IQ")
+            if parsed.iq_payload_bytes != len(raw):
+                raise EvidenceInvalid(
+                    "tandem metadata IQ byte count differs from payload"
+                )
+            if parsed.enabled_scan_mask != 0x0F or parsed.channel_count != 2:
+                raise EvidenceInvalid(
+                    "tandem metadata does not describe dual complex RX"
+                )
+            unsafe_flags = parsed.flags & TANDEM_UNSAFE_FLAGS
+            if unsafe_flags:
+                raise EvidenceInvalid(
+                    f"tandem metadata reports unsafe flags 0x{unsafe_flags:08x}"
+                )
+            if parsed.observation_overflow_count or parsed.event_overflow_count:
+                raise EvidenceInvalid("tandem metadata record capacity overflowed")
+            expected_gain_table = expected_tandem_gain_table(
+                options.center_frequency_hz
+            )
+            if parsed.gain_table_id is not expected_gain_table:
+                raise EvidenceInvalid(
+                    f"{options.center_frequency_hz} Hz tandem session selected gain "
+                    f"table {int(parsed.gain_table_id)}, expected "
+                    f"{int(expected_gain_table)}"
+                )
+            if (
+                parsed.minimum_gain_db != 0
+                or parsed.maximum_gain_db != 62
+                or parsed.initial_gain_db != int(options.manual_gain_db)
+            ):
+                raise EvidenceInvalid(
+                    "tandem metadata differs from requested gain range"
+                )
+            if parsed.ad9361_temperature_mdeg_c is not None and not (
+                -40_000 <= parsed.ad9361_temperature_mdeg_c <= 125_000
+            ):
+                raise EvidenceInvalid(
+                    "AD9361 temperature is outside its physical range"
+                )
+            frame["metadata"] = _metadata_dict(parsed)
+    except Exception as error:
+        if isinstance(parsed, TandemFrameMetadata):
+            frame.setdefault("metadata", _metadata_dict(parsed))
+        raise _CapturedFrameInvalid(
+            str(error),
+            raw=raw,
+            frame=frame,
+        ) from error
     return raw, parsed, frame
 
 
@@ -564,6 +1720,14 @@ def _settle_ordinary(
     deadline = time.monotonic() + options.settle_timeout_seconds
     minimum_drain = options.kernel_buffers + 1
     for attempt in range(1, options.max_settle_frames + 1):
+        matrix_ledger = _ACTIVE_MATRIX_FAILURE_IQ.get()
+        if matrix_ledger is not None:
+            matrix_ledger.set_context(
+                mode=mode,
+                stage="cell_settle",
+                level_index=matrix_ledger.level_index,
+                frame_index=attempt - 1,
+            )
         before = radio.read_rx_state()
         _raw, _metadata, frame = _capture(
             radio, buffer, options=options, metadata=False
@@ -618,35 +1782,37 @@ def _settle_tandem(
     *,
     options: TandemQualityOptions,
 ) -> tuple[list[dict[str, Any]], TandemFrameMetadata]:
+    session = _ACTIVE_TANDEM_SESSION.get()
+    if session is None:
+        session = _TandemCaptureSession(output_dir=options.output_dir)
     trace: list[dict[str, Any]] = []
     stable = 0
-    previous: TandemFrameMetadata | None = None
-    ownership_epoch: int | None = None
     deadline = time.monotonic() + options.settle_timeout_seconds
-    minimum_drain = options.kernel_buffers + 1
+    minimum_drain = (
+        options.kernel_buffers + 1
+        if session.minimum_drain_override is None
+        else session.minimum_drain_override
+    )
     for attempt in range(1, options.max_settle_frames + 1):
-        _raw, parsed, frame = _capture(radio, buffer, options=options, metadata=True)
-        assert parsed is not None
-        if ownership_epoch is None:
-            ownership_epoch = parsed.ownership_epoch
-        if parsed.ownership_epoch != ownership_epoch:
-            raise EvidenceInvalid("tandem ownership epoch changed inside one session")
+        previous = session.continuity.previous
+        _raw, parsed, frame = _capture_tandem(
+            radio,
+            buffer,
+            options=options,
+            session=session,
+        )
+        continuity = frame["continuity"]
         is_stable = bool(
-            parsed.tandem_state is TandemState.ARMED_AUTO
+            previous is not None
+            and parsed.tandem_state is TandemState.ARMED_AUTO
             and not parsed.gain_events
             and parsed.rx1_gain_index == parsed.rx2_gain_index
-            and (
-                previous is None
-                or parsed.tandem_transition_count == previous.tandem_transition_count
-            )
-            and (
-                previous is None
-                or parsed.bench_gain_indices == previous.bench_gain_indices
-            )
+            and continuity["missing_frame_count"] == 0
+            and continuity["transition_count_delta"] == 0
+            and parsed.bench_gain_indices == previous.bench_gain_indices
         )
         stable = stable + 1 if attempt > minimum_drain and is_stable else 0
         trace.append({"attempt": attempt, "stable_run": stable, **frame})
-        previous = parsed
         if stable >= options.stable_frames:
             return trace, parsed
         if time.monotonic() >= deadline:
@@ -671,6 +1837,14 @@ def _measure_ordinary(
     measurements: list[dict[str, Any]] = []
     gain_band = settled
     for frame_index in range(options.measurement_frames):
+        matrix_ledger = _ACTIVE_MATRIX_FAILURE_IQ.get()
+        if matrix_ledger is not None:
+            matrix_ledger.set_context(
+                mode=mode,
+                stage="measurement",
+                level_index=level_index,
+                frame_index=frame_index,
+            )
         before = radio.read_rx_state()
         raw, _metadata, frame = _capture(radio, buffer, options=options, metadata=False)
         after = radio.read_rx_state()
@@ -709,6 +1883,8 @@ def _measure_ordinary(
                 thresholds=tone_quality_thresholds_for_mode(options, mode),
             )
         )
+        if matrix_ledger is not None:
+            matrix_ledger.accept_current()
         if options.save_iq:
             path = output_dir / f"{mode}-level{level_index}-frame{frame_index}.cs16"
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -727,39 +1903,199 @@ def _measure_tandem(
     level_index: int,
     settled: TandemFrameMetadata,
 ) -> list[dict[str, Any]]:
-    measurements: list[dict[str, Any]] = []
-    previous = settled
-    for frame_index in range(options.measurement_frames):
-        raw, parsed, frame = _capture(radio, buffer, options=options, metadata=True)
-        assert parsed is not None
-        if parsed.tandem_state is not TandemState.ARMED_AUTO:
-            raise EvidenceInvalid("tandem left AUTO during a measurement frame")
-        if parsed.ownership_epoch != previous.ownership_epoch:
-            raise EvidenceInvalid("tandem ownership changed during measurement")
-        if parsed.gain_events:
-            raise EvidenceInvalid("tandem changed gain during a measurement frame")
-        if parsed.tandem_transition_count != previous.tandem_transition_count:
-            raise EvidenceInvalid("tandem transition count changed without an event")
-        if parsed.bench_gain_indices != previous.bench_gain_indices:
-            raise EvidenceInvalid("tandem endpoint gain changed without an event")
-        frame["quality"] = dict(
-            analyze_common_tone(
-                raw,
-                sample_rate_hz=options.sample_rate_hz,
-                expected_tone_hz=options.tone_hz,
-                thresholds=options.thresholds,
-            )
-        )
-        if options.save_iq:
-            path = (
-                output_dir / f"{MODE_TANDEM}-level{level_index}-frame{frame_index}.cs16"
-            )
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(raw)
-            frame["iq_path"] = str(path)
-        measurements.append(frame)
-        previous = parsed
-    return measurements
+    session = _ACTIVE_TANDEM_SESSION.get()
+    matrix_ledger = _ACTIVE_MATRIX_FAILURE_IQ.get()
+    owns_session = session is None
+    if session is None:
+        session = _TandemCaptureSession(output_dir=output_dir)
+        session.begin_cell(level_index, {"level_index": level_index})
+        session.continuity.previous = settled
+
+    settled_endpoint = settled
+    try:
+        for attempt_index in range(_TANDEM_MEASUREMENT_RESTART_LIMIT + 1):
+            session.stage = "measurement"
+            session.measurement_attempt = attempt_index
+            session.minimum_drain_override = None
+            attempt_measurements: list[dict[str, Any]] = []
+            accepted_raw: list[bytes] = []
+            transitioned = False
+            for frame_index in range(options.measurement_frames):
+                session.measurement_frame_index = frame_index
+                prior_frame = session.continuity.previous_frame
+                try:
+                    raw, parsed, frame = _capture_tandem(
+                        radio,
+                        buffer,
+                        options=options,
+                        session=session,
+                    )
+                except BaseException:
+                    _queue_abandoned_tandem_measurements(
+                        accepted_raw,
+                        attempt_measurements,
+                        output_dir=output_dir,
+                        level_index=level_index,
+                        attempt_index=attempt_index,
+                        session=session,
+                    )
+                    if matrix_ledger is not None:
+                        matrix_ledger.release_accepted_frames(attempt_measurements)
+                    raise
+                continuity = frame["continuity"]
+                transition_delta = continuity["transition_count_delta"]
+                if transition_delta is None:
+                    raise EvidenceInvalid(
+                        "tandem measurement lacks a settled continuity boundary"
+                    )
+                if transition_delta > 0:
+                    _queue_transition_tandem_detail(
+                        accepted_raw,
+                        attempt_measurements,
+                        offending_raw=raw,
+                        offending_frame=frame,
+                        output_dir=output_dir,
+                        level_index=level_index,
+                        attempt_index=attempt_index,
+                        frame_index=frame_index,
+                        session=session,
+                    )
+                    if matrix_ledger is not None:
+                        matrix_ledger.release_accepted_frames(attempt_measurements)
+                    rejection = {
+                        "attempt_index": attempt_index,
+                        "status": "rejected_transition",
+                        "accepted_frames_before_transition": list(attempt_measurements),
+                        "prior_frame": prior_frame,
+                        "offending_frame": frame,
+                        "visible_event_count": continuity["visible_event_count"],
+                        "hidden_transition_count": continuity[
+                            "hidden_transition_count"
+                        ],
+                        "transition_count_delta": transition_delta,
+                    }
+                    session.measurement_attempts.append(rejection)
+                    if attempt_index >= _TANDEM_MEASUREMENT_RESTART_LIMIT:
+                        raise _EvidenceInvalidWithDetails(
+                            "tandem measurement transition recovery was exhausted",
+                            {
+                                "kind": (
+                                    "tandem_measurement_transition_retry_exhausted"
+                                ),
+                                "mode": MODE_TANDEM,
+                                "level_index": level_index,
+                                "tx2_gain_requested_db": (
+                                    options.tx_gain_trajectory_db[level_index]
+                                ),
+                                "measurement_attempt": attempt_index,
+                                "measurement_frame_index": frame_index,
+                                "prior_frame": prior_frame,
+                                "current_frame": frame,
+                                "pending_cell": session.pending_cell,
+                                "measurement_attempts": list(
+                                    session.measurement_attempts
+                                ),
+                                "capture_trace": list(session.cell_capture_trace),
+                            },
+                        )
+                    if matrix_ledger is not None:
+                        matrix_ledger.discard_current()
+
+                    session.stage = "measurement_recovery_settle"
+                    session.measurement_frame_index = None
+                    session.minimum_drain_override = 0
+                    recovery_trace, settled_endpoint = _settle_tandem(
+                        radio,
+                        buffer,
+                        options=options,
+                    )
+                    session.recovery_settle_trace.extend(recovery_trace)
+                    if session.pending_cell is not None:
+                        settling_record = session.pending_cell.setdefault(
+                            "settling",
+                            {"frames": 0, "trace": []},
+                        )
+                        retained_trace = settling_record.setdefault("trace", [])
+                        retained_trace.extend(recovery_trace)
+                        settling_record["frames"] = len(retained_trace)
+                        settling_record["recovery_frames"] = len(
+                            session.recovery_settle_trace
+                        )
+                    rejection["recovery_settling"] = {
+                        "frames": len(recovery_trace),
+                        "capture_ordinals": [
+                            int(item["capture_ordinal"])
+                            for item in recovery_trace
+                            if "capture_ordinal" in item
+                        ],
+                    }
+                    transitioned = True
+                    break
+
+                if parsed.bench_gain_indices != settled_endpoint.bench_gain_indices:
+                    raise _EvidenceInvalidWithDetails(
+                        "tandem endpoint changed without a transition",
+                        {
+                            "kind": "tandem_measurement_endpoint_mismatch",
+                            "mode": MODE_TANDEM,
+                            "level_index": level_index,
+                            "measurement_attempt": attempt_index,
+                            "measurement_frame_index": frame_index,
+                            "prior_frame": prior_frame,
+                            "current_frame": frame,
+                            "pending_cell": session.pending_cell,
+                            "capture_trace": list(session.cell_capture_trace),
+                        },
+                    )
+                frame["quality"] = dict(
+                    analyze_common_tone(
+                        raw,
+                        sample_rate_hz=options.sample_rate_hz,
+                        expected_tone_hz=options.tone_hz,
+                        thresholds=options.thresholds,
+                    )
+                )
+                if matrix_ledger is not None:
+                    matrix_ledger.accept_current()
+                attempt_measurements.append(frame)
+                accepted_raw.append(raw)
+
+            if transitioned:
+                continue
+
+            if session.measurement_attempts:
+                session.measurement_attempts.append(
+                    {
+                        "attempt_index": attempt_index,
+                        "status": "accepted",
+                        "accepted_capture_ordinals": [
+                            int(frame["capture_ordinal"])
+                            for frame in attempt_measurements
+                            if "capture_ordinal" in frame
+                        ],
+                    }
+                )
+            if options.save_iq:
+                for frame_index, (raw, frame) in enumerate(
+                    zip(accepted_raw, attempt_measurements, strict=True)
+                ):
+                    path = output_dir / (
+                        f"{MODE_TANDEM}-level{level_index}-frame{frame_index}.cs16"
+                    )
+                    session.deferred.queue(
+                        raw,
+                        frame,
+                        path,
+                        path_field="iq_path",
+                        failure_only=False,
+                    )
+            return attempt_measurements
+        raise AssertionError("bounded tandem measurement loop did not terminate")
+    finally:
+        session.measurement_frame_index = None
+        session.minimum_drain_override = None
+        if owns_session:
+            session.deferred.flush()
 
 
 def summarize_measurements(measurements: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
@@ -821,6 +2157,34 @@ def _wait_for_idle(
         time.sleep(0.01)
 
 
+def _augment_tandem_failure(
+    error: BaseException,
+    session: _TandemCaptureSession,
+) -> _EvidenceInvalidWithDetails:
+    """Attach the last complete boundary and pending cell to any session failure."""
+
+    details = (
+        dict(error.failure_evidence)
+        if isinstance(error, _EvidenceInvalidWithDetails)
+        else {
+            "kind": "tandem_capture_session_invalid",
+            "cause": _exception_text(error),
+        }
+    )
+    details.setdefault("mode", MODE_TANDEM)
+    details.setdefault("level_index", session.level_index)
+    details.setdefault("capture_stage", session.stage)
+    details.setdefault("prior_frame", session.continuity.penultimate_frame)
+    details.setdefault("current_frame", session.continuity.previous_frame)
+    details.setdefault("pending_cell", session.pending_cell)
+    details.setdefault("measurement_attempts", list(session.measurement_attempts))
+    details.setdefault("capture_trace", list(session.cell_capture_trace))
+    if isinstance(error, _EvidenceInvalidWithDetails):
+        error.failure_evidence = details
+        return error
+    return _EvidenceInvalidWithDetails(str(error), details)
+
+
 def _run_mode(
     radio: Issue46Radio,
     *,
@@ -830,6 +2194,14 @@ def _run_mode(
     report_path: Path,
     check_deadline: Callable[[], None],
 ) -> None:
+    matrix_ledger = _ACTIVE_MATRIX_FAILURE_IQ.get()
+    if matrix_ledger is not None:
+        matrix_ledger.set_context(
+            mode=mode,
+            stage="mode_setup",
+            level_index=None,
+            frame_index=None,
+        )
     radio.mute_all()
     before = _wait_for_idle(radio)
     radio.configure_rx("manual", manual_gain_db=options.manual_gain_db)
@@ -869,136 +2241,198 @@ def _run_mode(
     }
     report["modes"].append(mode_record)
     _atomic_json(report_path, report)
+    tandem_session = (
+        _TandemCaptureSession(output_dir=options.output_dir) if metadata else None
+    )
+    session_token = (
+        _ACTIVE_TANDEM_SESSION.set(tandem_session) if tandem_session else None
+    )
     try:
-        with radio.buffer(
-            "metadata" if metadata else "ordinary",
-            options.kernel_buffers,
-            options.samples_per_channel,
-            tandem_request=request,
-        ) as (buffer, metadata_abi):
-            mode_record["metadata_abi"] = metadata_abi
-            if metadata:
-                check_deadline()
-                priming_gain_db, distinct_levels = _select_tandem_priming_gain(
-                    options.tx_gain_trajectory_db
-                )
-                if not TX_MUTE_DB <= priming_gain_db <= options.strongest_tx_gain_db:
-                    raise EvidenceInvalid(
-                        "tandem priming gain exceeds the authorized TX trajectory"
-                    )
-                priming_readback = radio.set_tx2_gain(priming_gain_db)
-                priming_effective_attenuation = (
-                    options.physical_attenuation_db - priming_readback
-                )
-                if priming_effective_attenuation < 30.0:
-                    raise EvidenceInvalid(
-                        "tandem priming readback violates the 30 dB effective "
-                        "safety boundary"
-                    )
-                priming_trace, priming_settled = _settle_tandem(
-                    radio, buffer, options=options
-                )
-                priming_metadata = [
-                    frame["metadata"] for frame in priming_trace if "metadata" in frame
-                ]
-                priming_events = [
-                    event
-                    for frame_metadata in priming_metadata
-                    for event in frame_metadata["gain_events"]
-                ]
-                priming_reached_max = bool(
-                    priming_settled.rx1_gain_index == priming_settled.maximum_gain_index
-                    and priming_settled.rx2_gain_index
-                    == priming_settled.maximum_gain_index
-                )
-                mode_record["priming"] = {
-                    "selection": {
-                        "method": "median_of_sorted_distinct_trajectory_gains",
-                        "distinct_trajectory_gains_db": distinct_levels,
-                        "authorized_strongest_tx2_gain_db": (
-                            options.strongest_tx_gain_db
-                        ),
-                    },
-                    "tx2_gain_requested_db": priming_gain_db,
-                    "tx2_gain_readback_db": priming_readback,
-                    "effective_attenuation_db": priming_effective_attenuation,
-                    "quality_gate_applied": False,
-                    "settling": {
-                        "frames": len(priming_trace),
-                        "trace": priming_trace,
-                    },
-                    "summary": {
-                        "event_count": len(priming_events),
-                        "increase_event_count": sum(
-                            int(event["direction"])
-                            == int(TandemEventDirection.INCREASE)
-                            for event in priming_events
-                        ),
-                        "decrease_event_count": sum(
-                            int(event["direction"])
-                            == int(TandemEventDirection.DECREASE)
-                            for event in priming_events
-                        ),
-                        "final_gain_indices": list(priming_settled.bench_gain_indices),
-                        "maximum_gain_index": priming_settled.maximum_gain_index,
-                        "reached_maximum_gain": priming_reached_max,
-                    },
-                    "final_metadata": _metadata_dict(priming_settled),
-                }
-                _atomic_json(report_path, report)
-            for index, tx_gain_db in enumerate(options.tx_gain_trajectory_db):
-                check_deadline()
-                tx_readback = radio.set_tx2_gain(tx_gain_db)
-                cell: dict[str, Any] = {
-                    "level_index": index,
-                    "direction": _direction(options.tx_gain_trajectory_db, index),
-                    "tx2_gain_requested_db": tx_gain_db,
-                    "tx2_gain_readback_db": tx_readback,
-                    "effective_attenuation_db": (
-                        options.physical_attenuation_db - tx_readback
-                    ),
-                }
-                if cell["effective_attenuation_db"] < 30.0:
-                    raise EvidenceInvalid(
-                        "TX2 readback violates the 30 dB effective safety boundary"
-                    )
+        try:
+            with radio.buffer(
+                "metadata" if metadata else "ordinary",
+                options.kernel_buffers,
+                options.samples_per_channel,
+                tandem_request=request,
+            ) as (buffer, metadata_abi):
+                mode_record["metadata_abi"] = metadata_abi
                 if metadata:
-                    settle_trace, settled = _settle_tandem(
+                    assert tandem_session is not None
+                    tandem_session.stage = "priming_settle"
+                    check_deadline()
+                    priming_gain_db, distinct_levels = _select_tandem_priming_gain(
+                        options.tx_gain_trajectory_db
+                    )
+                    if not (
+                        TX_MUTE_DB <= priming_gain_db <= options.strongest_tx_gain_db
+                    ):
+                        raise EvidenceInvalid(
+                            "tandem priming gain exceeds the authorized TX trajectory"
+                        )
+                    priming_readback = radio.set_tx2_gain(priming_gain_db)
+                    priming_effective_attenuation = (
+                        options.physical_attenuation_db - priming_readback
+                    )
+                    if priming_effective_attenuation < 30.0:
+                        raise EvidenceInvalid(
+                            "tandem priming readback violates the 30 dB effective "
+                            "safety boundary"
+                        )
+                    priming_trace, priming_settled = _settle_tandem(
                         radio, buffer, options=options
                     )
-                    measurements = _measure_tandem(
-                        radio,
-                        buffer,
-                        options=options,
-                        output_dir=options.output_dir,
-                        level_index=index,
-                        settled=settled,
+                    priming_metadata = [
+                        frame["metadata"]
+                        for frame in priming_trace
+                        if "metadata" in frame
+                    ]
+                    priming_events = [
+                        event
+                        for frame_metadata in priming_metadata
+                        for event in frame_metadata["gain_events"]
+                    ]
+                    priming_reached_max = bool(
+                        priming_settled.rx1_gain_index
+                        == priming_settled.maximum_gain_index
+                        and priming_settled.rx2_gain_index
+                        == priming_settled.maximum_gain_index
                     )
-                else:
-                    settle_trace, settled_gain_band = _settle_ordinary(
-                        radio, buffer, mode=mode, options=options
-                    )
-                    measurements = _measure_ordinary(
-                        radio,
-                        buffer,
-                        mode=mode,
-                        options=options,
-                        output_dir=options.output_dir,
-                        level_index=index,
-                        settled=settled_gain_band,
-                    )
-                cell["settling"] = {
-                    "frames": len(settle_trace),
-                    "trace": settle_trace,
-                }
-                if not metadata:
-                    cell["settling"]["settled_gain_band"] = settled_gain_band.to_dict()
-                cell["measurements"] = measurements
-                cell["summary"] = summarize_measurements(measurements)
-                mode_record["cells"].append(cell)
-                _atomic_json(report_path, report)
+                    mode_record["priming"] = {
+                        "selection": {
+                            "method": "median_of_sorted_distinct_trajectory_gains",
+                            "distinct_trajectory_gains_db": distinct_levels,
+                            "authorized_strongest_tx2_gain_db": (
+                                options.strongest_tx_gain_db
+                            ),
+                        },
+                        "tx2_gain_requested_db": priming_gain_db,
+                        "tx2_gain_readback_db": priming_readback,
+                        "effective_attenuation_db": priming_effective_attenuation,
+                        "quality_gate_applied": False,
+                        "settling": {
+                            "frames": len(priming_trace),
+                            "trace": priming_trace,
+                        },
+                        "summary": {
+                            "event_count": len(priming_events),
+                            "increase_event_count": sum(
+                                int(event["direction"])
+                                == int(TandemEventDirection.INCREASE)
+                                for event in priming_events
+                            ),
+                            "decrease_event_count": sum(
+                                int(event["direction"])
+                                == int(TandemEventDirection.DECREASE)
+                                for event in priming_events
+                            ),
+                            "final_gain_indices": list(
+                                priming_settled.bench_gain_indices
+                            ),
+                            "maximum_gain_index": priming_settled.maximum_gain_index,
+                            "reached_maximum_gain": priming_reached_max,
+                        },
+                        "final_metadata": _metadata_dict(priming_settled),
+                    }
+                for index, tx_gain_db in enumerate(options.tx_gain_trajectory_db):
+                    check_deadline()
+                    if matrix_ledger is not None:
+                        matrix_ledger.set_context(
+                            mode=mode,
+                            stage="cell_setup",
+                            level_index=index,
+                            frame_index=None,
+                        )
+                    tx_readback = radio.set_tx2_gain(tx_gain_db)
+                    cell: dict[str, Any] = {
+                        "level_index": index,
+                        "direction": _direction(options.tx_gain_trajectory_db, index),
+                        "tx2_gain_requested_db": tx_gain_db,
+                        "tx2_gain_readback_db": tx_readback,
+                        "effective_attenuation_db": (
+                            options.physical_attenuation_db - tx_readback
+                        ),
+                    }
+                    if cell["effective_attenuation_db"] < 30.0:
+                        raise EvidenceInvalid(
+                            "TX2 readback violates the 30 dB effective safety boundary"
+                        )
+                    if metadata:
+                        assert tandem_session is not None
+                        tandem_session.begin_cell(index, cell)
+                        settle_trace, settled = _settle_tandem(
+                            radio, buffer, options=options
+                        )
+                        cell["settling"] = {
+                            "frames": len(settle_trace),
+                            "trace": settle_trace,
+                        }
+                        measurements = _measure_tandem(
+                            radio,
+                            buffer,
+                            options=options,
+                            output_dir=options.output_dir,
+                            level_index=index,
+                            settled=settled,
+                        )
+                    else:
+                        settle_trace, settled_gain_band = _settle_ordinary(
+                            radio, buffer, mode=mode, options=options
+                        )
+                        measurements = _measure_ordinary(
+                            radio,
+                            buffer,
+                            mode=mode,
+                            options=options,
+                            output_dir=options.output_dir,
+                            level_index=index,
+                            settled=settled_gain_band,
+                        )
+                    if metadata:
+                        assert tandem_session is not None
+                        if tandem_session.cell_capture_trace:
+                            cell["capture_trace"] = list(
+                                tandem_session.cell_capture_trace
+                            )
+                        if tandem_session.measurement_attempts:
+                            cell["measurement_attempts"] = list(
+                                tandem_session.measurement_attempts
+                            )
+                    else:
+                        cell["settling"] = {
+                            "frames": len(settle_trace),
+                            "trace": settle_trace,
+                        }
+                        cell["settling"]["settled_gain_band"] = (
+                            settled_gain_band.to_dict()
+                        )
+                    cell["measurements"] = measurements
+                    cell["summary"] = summarize_measurements(measurements)
+                    mode_record["cells"].append(cell)
+                    if metadata:
+                        assert tandem_session is not None
+                        tandem_session.pending_cell = None
+                    else:
+                        _atomic_json(report_path, report)
+        except BaseException as error:
+            if not metadata:
+                raise
+            assert tandem_session is not None
+            augmented = _augment_tandem_failure(error, tandem_session)
+            if augmented is error:
+                raise
+            raise augmented from error
     finally:
-        radio.mute_all()
+        try:
+            radio.mute_all()
+        finally:
+            if session_token is not None:
+                _ACTIVE_TANDEM_SESSION.reset(session_token)
+            if tandem_session is not None:
+                # Abandoned tandem measurement attempts remain independently
+                # authorizing continuity evidence even when recovery succeeds.
+                # They are bounded separately and materialized only after this
+                # metadata buffer has closed.
+                tandem_session.deferred.flush()
     after = _wait_for_idle(radio)
     mode_record["tandem_status_after"] = after
     radio.configure_rx("manual", manual_gain_db=options.manual_gain_db)
@@ -1010,6 +2444,39 @@ def _mode_cells(report: Mapping[str, Any], mode: str) -> list[Mapping[str, Any]]
     if len(matches) != 1:
         raise EvidenceInvalid(f"report contains {len(matches)} records for {mode}")
     return list(matches[0]["cells"])
+
+
+def _cell_tandem_frames(cell: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Return each captured frame once, preferring the RC21 chronology ledger."""
+
+    capture_trace = cell.get("capture_trace")
+    if capture_trace is None:
+        return [
+            frame
+            for section in (cell["settling"]["trace"], cell["measurements"])
+            for frame in section
+        ]
+    if not isinstance(capture_trace, Sequence) or isinstance(
+        capture_trace, (str, bytes, bytearray)
+    ):
+        raise EvidenceInvalid("tandem cell capture_trace is not a sequence")
+    frames: list[Mapping[str, Any]] = []
+    previous_ordinal: int | None = None
+    for item in capture_trace:
+        if not isinstance(item, Mapping):
+            raise EvidenceInvalid("tandem cell capture_trace contains a non-record")
+        ordinal = _required_int(
+            item,
+            "capture_ordinal",
+            context="tandem cell capture trace",
+        )
+        if previous_ordinal is not None and ordinal <= previous_ordinal:
+            raise EvidenceInvalid(
+                "tandem cell capture ordinals did not advance chronologically"
+            )
+        previous_ordinal = ordinal
+        frames.append(item)
+    return frames
 
 
 _UINT32_MODULUS = 1 << 32
@@ -1044,11 +2511,7 @@ def _tandem_stimulus_response(
     response: list[dict[str, Any]] = []
     previous_settled: Mapping[str, Any] | None = None
     for index, cell in enumerate(cells):
-        frames = [
-            frame["metadata"]
-            for section in (cell["settling"]["trace"], cell["measurements"])
-            for frame in section
-        ]
+        frames = [frame["metadata"] for frame in _cell_tandem_frames(cell)]
         if not frames:
             raise EvidenceInvalid(f"tandem cell {index} has no metadata frames")
         cell_events = [event for frame in frames for event in frame["gain_events"]]
@@ -1199,13 +2662,15 @@ def _tandem_stimulus_response(
                     if matching_events:
                         evidence_source = "explicit_event"
                     elif missing_frames > 0 and hidden_transitions > 0:
-                        evidence_source = "gap_accounted_endpoint"
+                        # A provider-accounted gap can prove that the endpoint
+                        # is internally possible. It cannot prove which hidden
+                        # transition responded to this commanded TX step.
+                        evidence_source = "gap_accounted_unproven"
                     else:
                         raise EvidenceInvalid(
-                            f"tandem {direction} TX step lacks a matching visible "
-                            "event or a gap-accounted hidden transition"
+                            f"tandem {direction} TX step lacks a matching visible event"
                         )
-                    direction_proven = True
+                    direction_proven = bool(matching_events)
         response.append(
             {
                 "level_index": int(cell["level_index"]),
@@ -1232,14 +2697,11 @@ def _tandem_stimulus_response(
 def _observed_tandem_evidence(cells: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     metadata_records: list[Mapping[str, Any]] = []
     for cell in cells:
-        for section in (cell["settling"]["trace"], cell["measurements"]):
-            for frame in section:
-                metadata = frame.get("metadata")
-                if not isinstance(metadata, Mapping):
-                    raise EvidenceInvalid(
-                        "tandem capture lacks frame-associated metadata"
-                    )
-                metadata_records.append(metadata)
+        for frame in _cell_tandem_frames(cell):
+            metadata = frame.get("metadata")
+            if not isinstance(metadata, Mapping):
+                raise EvidenceInvalid("tandem capture lacks frame-associated metadata")
+            metadata_records.append(metadata)
     if not metadata_records:
         raise EvidenceInvalid("tandem session contains no metadata frames")
 
@@ -1851,6 +3313,23 @@ def run_tandem_quality_matrix(
     if radio.options.center_frequency_hz != options.center_frequency_hz:
         raise ValueError("radio and quality center frequencies differ")
 
+    planned_failure_iq_frames = (
+        len(quality_modes(options))
+        * len(options.tx_gain_trajectory_db)
+        * options.measurement_frames
+    )
+    failure_iq_ledger = _MatrixFailureIqLedger(
+        output_dir=options.output_dir,
+        planned_accepted_frames=planned_failure_iq_frames,
+        expected_frame_bytes=options.samples_per_channel * 8,
+    )
+    if failure_iq_ledger.preflight_bytes > failure_iq_ledger.maximum_bytes:
+        raise ValueError(
+            "matrix failure-IQ preflight exceeds its 128 MiB bound: "
+            f"{failure_iq_ledger.preflight_bytes} > "
+            f"{failure_iq_ledger.maximum_bytes} bytes"
+        )
+
     center_frequency_readback = radio.read_center_frequency()
     if any(
         abs(int(value) - options.center_frequency_hz) > 2
@@ -1913,6 +3392,8 @@ def run_tandem_quality_matrix(
         "verdict": "running",
     }
     _atomic_json(report_path, report)
+    ledger_token = _ACTIVE_MATRIX_FAILURE_IQ.set(failure_iq_ledger)
+    failure_error: BaseException | None = None
     try:
         for mode in quality_modes(options):
             _run_mode(
@@ -1952,6 +3433,7 @@ def run_tandem_quality_matrix(
         report["evaluation"] = evaluation
         report["verdict"] = evaluation["verdict"]
     except BaseException as error:
+        failure_error = error
         report["verdict"] = "invalid"
         report["fatal_error"] = _exception_text(error)
         if isinstance(error, _EvidenceInvalidWithDetails):
@@ -1959,11 +3441,63 @@ def run_tandem_quality_matrix(
         _atomic_json(report_path, report)
         raise
     finally:
-        radio.mute_all()
-        report["final_tandem_status"] = _wait_for_idle(radio)
-        radio.configure_rx("manual", manual_gain_db=options.manual_gain_db)
-        report["final_rx_state"] = radio.read_rx_state()
-        report["elapsed_seconds"] = time.monotonic() - started
-        report["completed_unix_ns"] = time.time_ns()
-        _atomic_json(report_path, report)
+        cleanup_error: BaseException | None = None
+        try:
+            radio.mute_all()
+            report["final_tandem_status"] = _wait_for_idle(radio)
+            radio.configure_rx("manual", manual_gain_db=options.manual_gain_db)
+            report["final_rx_state"] = radio.read_rx_state()
+        except BaseException as error:
+            cleanup_error = error
+            report["cleanup_error"] = _exception_text(error)
+            if failure_error is None:
+                report["verdict"] = "invalid"
+                report["fatal_error"] = _exception_text(error)
+            raise
+        finally:
+            try:
+                if (
+                    report.get("verdict") != "pass"
+                    or failure_error is not None
+                    or cleanup_error is not None
+                ):
+                    if cleanup_error is not None:
+                        trigger = {
+                            "kind": "matrix_cleanup_failed",
+                            "error": _exception_text(cleanup_error),
+                        }
+                        if failure_error is not None:
+                            trigger["prior_execution_error"] = _exception_text(
+                                failure_error
+                            )
+                    elif failure_error is not None:
+                        trigger = {
+                            "kind": "matrix_execution_failed",
+                            "error": _exception_text(failure_error),
+                        }
+                    else:
+                        evaluation = report.get("evaluation", {})
+                        trigger = {
+                            "kind": "matrix_evaluation_failed",
+                            "failures": (
+                                list(evaluation.get("failures", []))
+                                if isinstance(evaluation, Mapping)
+                                else []
+                            ),
+                        }
+                    iq_evidence = failure_iq_ledger.flush_failure(trigger=trigger)
+                    existing = report.get("failure_evidence")
+                    failure_evidence = (
+                        dict(existing) if isinstance(existing, Mapping) else {}
+                    )
+                    failure_evidence.setdefault("kind", trigger["kind"])
+                    failure_evidence["iq_ledger"] = iq_evidence
+                    report["failure_evidence"] = failure_evidence
+                else:
+                    failure_iq_ledger.discard()
+            finally:
+                _ACTIVE_MATRIX_FAILURE_IQ.reset(ledger_token)
+            report["elapsed_seconds"] = time.monotonic() - started
+            report["completed_unix_ns"] = time.time_ns()
+            _atomic_json(report_path, report)
     return report, report_path

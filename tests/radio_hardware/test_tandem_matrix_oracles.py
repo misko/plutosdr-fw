@@ -261,21 +261,22 @@ def test_matrix_verdict_requires_absolute_quality_and_bidirectional_control() ->
     assert any("native_slow_attack" in item for item in evaluation["failures"])
 
 
-def test_provider_gap_uses_endpoint_accounting_and_allows_deadband_and_clamp() -> None:
+def test_provider_gap_is_accounted_but_cannot_prove_stimulus_direction() -> None:
     evaluation = evaluate_matrix(_provider_gap_report())
 
-    assert evaluation["verdict"] == "pass"
+    assert evaluation["verdict"] == "fail"
+    assert any(
+        "did not prove a louder-TX decrease" in failure
+        for failure in evaluation["failures"]
+    )
     tandem = evaluation["tandem_evidence"]
     assert tandem["directions"] == [int(TandemEventDirection.INCREASE)]
-    assert tandem["proven_directions"] == [
-        int(TandemEventDirection.INCREASE),
-        int(TandemEventDirection.DECREASE),
-    ]
+    assert tandem["proven_directions"] == [int(TandemEventDirection.INCREASE)]
     response = tandem["stimulus_response"]
     assert [item["evidence_source"] for item in response] == [
         "explicit_event",
         "deadband",
-        "gap_accounted_endpoint",
+        "gap_accounted_unproven",
         "explicit_event",
         "clamp",
     ]
@@ -283,6 +284,7 @@ def test_provider_gap_uses_endpoint_accounting_and_allows_deadband_and_clamp() -
     assert response[2]["transition_count_delta"] == 2
     assert response[2]["missing_frame_count"] == 2
     assert response[2]["hidden_transition_count"] == 2
+    assert response[2]["direction_proven"] is False
     assert response[3]["settled_gain_delta"] == 2
     assert response[3]["transition_count_delta"] == 2
     assert response[3]["hidden_transition_count"] == 1
@@ -296,7 +298,9 @@ def test_primed_initial_weak_clamp_needs_no_visible_increase() -> None:
 
     evaluation = evaluate_matrix(report)
 
-    assert evaluation["verdict"] == "pass"
+    # The initial clamp remains valid; the independent hidden DECREASE later
+    # in this planted report is now deliberately non-authorizing.
+    assert evaluation["verdict"] == "fail"
     initial = evaluation["tandem_evidence"]["stimulus_response"][0]
     assert initial["evidence_source"] == "clamp"
     assert not initial["direction_proven"]
