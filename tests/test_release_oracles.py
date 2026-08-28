@@ -413,6 +413,7 @@ def test_required_pr_gate_runs_root_tandem_rtl_suite() -> None:
     offline_check = TANDEM_OFFLINE_CHECK.read_text(encoding="utf-8")
 
     assert "iverilog python3-numpy python3-pytest" in workflow
+    assert "git submodule update --init --depth 1 hdl hdl-quantulum linux" in workflow
     assert "./scripts/check_tandem_release_offline.sh oracles" in workflow
     assert "tests/test_tandem_agc_ooc_validator.py" in offline_check
     assert "./hdl-tandem/run_tests.sh" in offline_check
