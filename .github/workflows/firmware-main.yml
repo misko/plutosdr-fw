@@ -38,6 +38,7 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/ddr-burst-v2' ||
          github.ref == 'refs/heads/codex/ddr-burst' ||
          github.ref == 'refs/heads/codex/issue-50-single-rx-metadata' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
@@ -82,7 +83,9 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'ddr-burst-v1-rc5-source.yaml' ||
+          'ddr-burst-v2-rc3-source.yaml' ||
+          github.ref == 'refs/heads/codex/ddr-burst-v2' &&
+          'ddr-burst-v2-rc3-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-burst' &&
           'ddr-burst-v1-rc5-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
@@ -156,7 +159,9 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-ddr-burst-v1' ||
+          'plutoplus-spf-ddr-burst-v2' ||
+          github.ref == 'refs/heads/codex/ddr-burst-v2' &&
+          'plutoplus-spf-ddr-burst-v2-rc3' ||
           github.ref == 'refs/heads/codex/ddr-burst' &&
           'plutoplus-spf-ddr-burst-v1-rc5' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
@@ -341,6 +346,14 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.42-plutoplus-spf-ddr-burst-v1-rc5'
 
+      - name: Require the exact DDR burst v2 RC3 candidate identity
+        if: github.ref == 'refs/heads/codex/ddr-burst-v2'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.42-plutoplus-spf-ddr-burst-v2-rc3'
+
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'
         env:
@@ -501,7 +514,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.42-plutoplus-spf-ddr-burst-v1'
+            'v0.42-plutoplus-spf-ddr-burst-v2'
 
       - name: Build, validate, and package
         id: build

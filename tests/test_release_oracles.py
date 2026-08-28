@@ -43,6 +43,15 @@ FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 DDR_BURST_RC5_SOURCE_MANIFEST = (
     ROOT / "manifests" / "ddr-burst-v1-rc5-source.yaml"
 )
+DDR_BURST_V2_RC1_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "ddr-burst-v2-rc1-source.yaml"
+)
+DDR_BURST_V2_RC2_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "ddr-burst-v2-rc2-source.yaml"
+)
+DDR_BURST_V2_RC3_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "ddr-burst-v2-rc3-source.yaml"
+)
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 FIRMWARE_PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
@@ -330,6 +339,69 @@ def test_tandem_v2_preserves_historical_transport_but_prevents_linux_rollback() 
     assert tandem_v2["submodule_linux_ref"] == RC3_LINUX_REF
 
 
+def test_ddr_burst_v2_advances_only_libiio_and_buildroot() -> None:
+    previous = _manifest_values(DDR_BURST_RC5_SOURCE_MANIFEST)
+    current = _manifest_values(DDR_BURST_V2_RC1_SOURCE_MANIFEST)
+    changed = {key for key, value in previous.items() if current[key] != value}
+
+    assert changed == {
+        "libiio_0_25_source",
+        "libiio_0_25_ref",
+        "submodule_buildroot",
+        "submodule_buildroot_ref",
+        "versions_buildroot",
+    }
+    assert current["libiio_0_25_source"] == (
+        "45a760d4000a044fc3709b5d89bceec5d0883be5"
+    )
+    assert current["submodule_buildroot"] == (
+        "707a0fd23ad6551db5a91a79c4e61de55bec798f"
+    )
+    assert "release_tag" not in current
+
+
+def test_ddr_burst_v2_rc2_advances_only_libiio_and_buildroot() -> None:
+    previous = _manifest_values(DDR_BURST_V2_RC1_SOURCE_MANIFEST)
+    current = _manifest_values(DDR_BURST_V2_RC2_SOURCE_MANIFEST)
+    changed = {key for key, value in previous.items() if current[key] != value}
+
+    assert changed == {
+        "libiio_0_25_source",
+        "libiio_0_25_ref",
+        "submodule_buildroot",
+        "submodule_buildroot_ref",
+        "versions_buildroot",
+    }
+    assert current["libiio_0_25_source"] == (
+        "79419a85f5fa239dc1cb54a5122292d9876b1b1a"
+    )
+    assert current["submodule_buildroot"] == (
+        "9211a3a642df608b2556eebb2e7a63b1d7e71cab"
+    )
+    assert "release_tag" not in current
+
+
+def test_ddr_burst_v2_rc3_advances_only_libiio_and_buildroot() -> None:
+    previous = _manifest_values(DDR_BURST_V2_RC2_SOURCE_MANIFEST)
+    current = _manifest_values(DDR_BURST_V2_RC3_SOURCE_MANIFEST)
+    changed = {key for key, value in previous.items() if current[key] != value}
+
+    assert changed == {
+        "libiio_0_25_source",
+        "libiio_0_25_ref",
+        "submodule_buildroot",
+        "submodule_buildroot_ref",
+        "versions_buildroot",
+    }
+    assert current["libiio_0_25_source"] == (
+        "4b32cd6a5f922e5d275fad52e71e89e2c0ff0f9c"
+    )
+    assert current["submodule_buildroot"] == (
+        "0e97416c103e5fee0611cc94f0b3935757da943d"
+    )
+    assert "release_tag" not in current
+
+
 def test_historical_routes_and_all_v8_source_graphs_are_explicit() -> None:
     main_workflow = FIRMWARE_MAIN_WORKFLOW.read_text(encoding="utf-8")
     pr_workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
@@ -418,6 +490,14 @@ def test_required_pr_gate_runs_root_tandem_rtl_suite() -> None:
     assert "./scripts/check_tandem_release_offline.sh oracles" in workflow
     assert "tests/test_tandem_agc_ooc_validator.py" in offline_check
     assert "./hdl-tandem/run_tests.sh" in offline_check
+
+
+def test_source_graph_gate_runs_pinned_iiod_supervisor_test() -> None:
+    workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
+    offline_check = TANDEM_OFFLINE_CHECK.read_text(encoding="utf-8")
+
+    assert "git submodule update --init --depth 1 buildroot" in workflow
+    assert "./buildroot/board/pluto/test_iiod_supervisor.sh" in offline_check
 
 
 def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
