@@ -95,11 +95,18 @@ jobs:
     name: coherent RX counter CDC simulation
     runs-on: ubuntu-latest
     steps:
-      - name: Check out pinned timestamp IP
+      - name: Check out released timestamp IP
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: misko/plutosdr-hdl-quantulum
           ref: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
+          path: hdl-quantulum-final
+          persist-credentials: false
+      - name: Check out DDR burst RC4 timestamp IP
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: misko/plutosdr-hdl-quantulum
+          ref: ddac7d4f8577a881c9e367a55fbc6ee105f77b18
           path: hdl-quantulum
           persist-credentials: false
       - name: Simulate the closed-loop counter crossing
@@ -111,6 +118,9 @@ jobs:
             cdc_sync_bits.v cdc_sync_data_closed.v \
             cdc_sync_data_closed_tb.v
           vvp "$RUNNER_TEMP/cdc-counter-tb"
+          iverilog -g2012 -Wall -o "$RUNNER_TEMP/rx-fifo-reset-tb" \
+            rx_fifo_reset.v rx_fifo_reset_tb.v
+          vvp "$RUNNER_TEMP/rx-fifo-reset-tb"
           cd ../../util_upack2_timestamp/src
           iverilog -g2012 -Wall -o "$RUNNER_TEMP/tx-fifo-reset-tb" \
             cdc_sync_bits.v fifo_reset_sync.v fifo_reset_sync_tb.v
@@ -120,4 +130,8 @@ jobs:
           vvp "$RUNNER_TEMP/tx-pipeline-debug-tb"
           cd ../test
           ./run_discard_disabled.sh
+          ./run_timestamp_check_pipeline.sh
+      - name: Reproduce the released timestamp pipeline
+        run: |
+          cd hdl-quantulum-final/util_upack2_timestamp/test
           ./run_timestamp_check_pipeline.sh
