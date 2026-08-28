@@ -149,8 +149,8 @@ def test_ddr_burst_v2_has_exact_rc3_candidate_and_main_routes() -> None:
     branch = "refs/heads/codex/ddr-burst-v2"
 
     assert workflow.count(branch) == 4
-    assert workflow.count("'ddr-burst-v2-rc1-source.yaml'") == 1
-    assert workflow.count("'ddr-burst-v2-rc3-source.yaml'") == 1
+    assert workflow.count("'ddr-burst-v2-rc1-source.yaml'") == 0
+    assert workflow.count("'ddr-burst-v2-rc3-source.yaml'") == 2
     assert workflow.count("'plutoplus-spf-ddr-burst-v2'") == 1
     assert workflow.count("'plutoplus-spf-ddr-burst-v2-rc3'") == 1
     assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v2'") == 1
