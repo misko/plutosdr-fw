@@ -75,12 +75,12 @@ jobs:
     runs-on: [self-hosted, Linux, X64, kalman, vivado-2022.2, plutosdr-fw]
     timeout-minutes: 240
     env:
-      # Main carries the final v8 source graph. Named legacy branches remain
+      # Main carries the current integrated source graph. Named legacy branches remain
       # usable only for reproducing independently locked candidates.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'tandem-agc-v8-source.yaml' ||
+          'metadata-timeout-main-v1-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
           'tandem-agc-v8-rc32-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' &&

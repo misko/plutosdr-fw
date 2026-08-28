@@ -79,37 +79,38 @@ run_oracles() {
 }
 
 run_source_graph() {
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc3-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc4-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc5-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc6-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc7-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc8-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc9-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc10-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc11-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc12-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc13-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc14-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc15-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc16-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc17-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc18-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc19-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc20-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc21-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc22-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc23-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc24-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc25-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc26-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc27-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc28-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc29-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc30-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc31-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc32-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc3-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc4-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc5-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc6-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc7-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc8-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc9-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc10-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc11-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc12-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc13-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc14-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc15-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc16-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc17-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc18-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc19-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc20-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc21-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc22-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc23-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc24-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc25-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc26-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc27-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc28-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc29-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc30-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc31-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc32-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-source.yaml
+    ./scripts/check_source_graph.sh manifests/metadata-timeout-main-v1-source.yaml
     ./scripts/test_legal_info_network.sh
 }
 
