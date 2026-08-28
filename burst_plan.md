@@ -18,18 +18,18 @@ one receiver and is rounded down to a whole number of existing IIO frames.
 
 The immutable source graph is:
 
-- firmware `c74a451c699a6a291db0298dce8fd16ef9606222`;
+- firmware `fdbe3ffaed604cc83f89252a10d2ec8b51b5be58`;
 - libiio `6591aa335ee124c32d9ef500f728068d299af71a`;
 - Buildroot `9439e15a61ebb5a3a1b2d5a0144876ad80a181e1`;
 - unchanged ABI-3 metadata provider `6e2362c0e149bd2a76f7777115a36fb65da80b58`;
-- Pluto Plus Utils client/profile `d4b7843`.
+- Pluto Plus Utils client/profile `983e1f8`.
 
-The trusted Kalman build is GitHub Actions run `33143027687`. Its complete
+The trusted rebased Kalman build is GitHub Actions run `33145187461`. Its complete
 bundle and both nested checksum manifests verify. The RAM-qualified DFU is
-`plutoplus-spf-ddr-burst-v1-rc1-c74a451c699a-pluto.dfu`, 12,796,207 bytes,
-SHA-256 `92f3a2a037019b4ab083f609a2051e03a09af0cd51a09ca69cb1660441dff7f7`.
-The FIT body is 12,796,191 bytes, SHA-256
-`bcf0c8c21c77e6a602f5d8fb03ea39c5954577fb8f1a2a55d42ef5eb83a152a1`.
+`plutoplus-spf-ddr-burst-v1-rc1-fdbe3ffaed60-pluto.dfu`, 12,796,147 bytes,
+SHA-256 `9024ed3c0ce38efeaf2e30dd71f903e2d65a234b90e7af175d3c196042dc6591`.
+The FIT body is 12,796,131 bytes, SHA-256
+`b9ceebdbadf144e91be78c2b87aad30691f3ade068f91ad8ab61c72b1b4035d4`.
 
 On 2026-08-28, Pluto Plus Utils loaded those exact bytes into RAM on radio
 `104473b80a16000de6ff2000f8a6beca79`; QSPI was not written. The returned
@@ -37,27 +37,36 @@ serial, AD9363A PHY, firmware string, metadata ABI 3, tandem device, DDR
 capability, 200,000,000-byte ceiling, TX-safe state, and unchanged USB path were
 all attested before testing.
 
-| Final-CI hardware gate | Result |
+| Rebased final-CI hardware gate | Result |
 |---|---|
 | USB, RX0, 25 MS/s, 200,000,000 bytes / 50,000,000 samples / 2.000 s | 100% counter coverage, 0 gaps, 0 overflow |
-| wired IP `192.168.1.179`, same maximum burst | 100% counter coverage, 0 gaps, 0 overflow |
+| physical Ethernet `enp132s0` to `192.168.1.186`, same maximum burst | 100% counter coverage, 0 gaps, 0 overflow |
 | IP, RX1, 25 MS/s, 24,000,000 bytes after forced disconnect | 100% counter coverage, 0 gaps, 0 overflow |
-| USB and IP, five successive sizes from 4.8 to 24 MB | all ten cells passed; no leak or IIOD restart |
 | ordinary dual RX, 5 MS/s after burst testing | 100% counter coverage, 0 gaps, 0 overflow |
 | client killed during a 200-MB capture | arena and CMA released; next burst passed; IIOD generation stayed 1 |
-| 200,000,256-byte request | rejected before capture as above the advertised limit |
+
+The immediately preceding CI build used the same libiio, Buildroot, metadata,
+kernel, HDL, and U-Boot component graph. Its broader matrix also passed five
+successive sizes from 4.8 to 24 MB over both USB and IP, rejected a
+200,000,256-byte request before capture, and completed a 200-MB capture on both
+transports without a leak or IIOD restart. The final rebased artifact repeated
+the maximum, forced-disconnect/reuse, RX1, and ordinary-path gates above.
 
 The useful A/B at 25 MS/s is explicit: ordinary USB delivered 60% with two
 counter gaps and ordinary IP delivered 85.7% with one gap, while burst mode
 delivered 100% over both transports. This proves the result comes from the
 radio-side DDR stage rather than optimistic host byte accounting.
 
-Pluto Plus Utils measured 519,036,928 bytes of Linux RAM. `MemAvailable` was
-about 450 MB before the maximum capture, 225,644,544 bytes while the 200-MB
-arena and DMA queue were active, and about 450 MB after teardown. CMA moved
+Pluto Plus Utils measured 519,036,928 bytes of Linux RAM on both CI images.
+On the source-identical first CI image, `MemAvailable` was about 450 MB before
+the maximum capture, 225,644,544 bytes while the 200-MB arena and DMA queue
+were active, and about 450 MB after teardown. CMA moved
 from 66,826,240 bytes free to 41,820,160 bytes during capture and recovered to
-66,826,240 bytes. The 128-MiB ordinary-memory reserve and 16-MiB CMA reserve
-were therefore retained at the tested ceiling.
+66,826,240 bytes. After the forced disconnect on the final rebased image,
+`MemAvailable` was 449,527,808 bytes, CMA free was 66,822,144 bytes, active RX
+buffers were zero, and IIOD remained PID 218, generation 1. The 128-MiB
+ordinary-memory reserve and 16-MiB CMA reserve were therefore retained at the
+tested ceiling.
 
 ## Objective
 
