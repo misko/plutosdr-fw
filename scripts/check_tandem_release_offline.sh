@@ -110,7 +110,10 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc31-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc32-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/tandem-agc-v8-source.yaml
-    ./scripts/check_source_graph.sh manifests/metadata-timeout-main-v1-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/metadata-timeout-main-v1-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/single-rx-metadata-rc1-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-burst-v1-rc1-source.yaml
+    ./scripts/check_source_graph.sh manifests/ddr-burst-v1-rc2-source.yaml
     ./scripts/test_legal_info_network.sh
 }
 
