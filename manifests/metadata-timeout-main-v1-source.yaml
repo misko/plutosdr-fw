@@ -1,7 +1,6 @@
-# Immutable source graph for the forward-only tandem AGC v8 RC3 candidate.
-# RC3 advances the bounded libiio batch transport, its Buildroot recipe pin,
-# and the Linux tandem-session cleanup. Every unchanged dependency continues
-# to use its existing protected source lock.
+# Immutable source graph for the metadata refill timeout and maximum-frame RX
+# DMA integration on current main. The existing tandem AGC v8 release manifests
+# remain unchanged so every historical candidate stays reproducible.
 
 schema: plutosdr-fw.source-manifest
 schema_version: 1
@@ -9,9 +8,9 @@ release_state: candidate
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
-libiio_0_25_source: 70739d25ec1fa7b95d9069bd26a3e4192fdb3851
+libiio_0_25_source: 34954106fb98a548753c003628b977f4a583c6b1
 libiio_0_25_repo: https://github.com/misko/libiio.git
-libiio_0_25_ref: refs/tags/tandem-agc-v8-rc3-source/libiio-v1
+libiio_0_25_ref: refs/tags/metadata-timeout-main-v1-source/libiio
 
 gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
 gadget_repo: https://github.com/misko/plutosdr-fw.git
@@ -21,13 +20,13 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: f89eb67b2c0131640ae9c9e0f0be46da000f3e37
+submodule_buildroot: c7815d0cca101af305b4d1ddcf288b7314fd88df
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/tandem-agc-v8-rc3-source/buildroot-v1
+submodule_buildroot_ref: refs/tags/metadata-timeout-main-v1-source/buildroot
 
-submodule_hdl: dec1dba5b9563c4c58c39fb76df904e462819ad5
+submodule_hdl: 81ce3c3b9addd380ed5d39c840bb7cddd66e0461
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
-submodule_hdl_ref: refs/tags/tandem-agc-v2-source/hdl-v2
+submodule_hdl_ref: refs/tags/metadata-timeout-main-v1-source/hdl
 
 submodule_hdl_quantulum: 55803cd3d7f74dccd7bf43dc713f832d1eeaf2e6
 submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
@@ -41,7 +40,7 @@ submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
 submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
 submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
 
-versions_hdl: tandem-agc-v2-source/hdl-v2
-versions_buildroot: tandem-agc-v8-rc3-source/buildroot-v1
+versions_hdl: metadata-timeout-main-v1-source/hdl
+versions_buildroot: metadata-timeout-main-v1-source/buildroot
 versions_linux: tandem-agc-v2-source/linux-v11
 versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

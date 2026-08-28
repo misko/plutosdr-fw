@@ -20,11 +20,19 @@
 # Both are invisible to a compile test on a machine that already has the source.
 #
 # Usage: scripts/check_source_graph.sh [manifests/fingerprint-v3.yaml]
+#
+# SOURCE_GRAPH_CHECK_WORKTREE=0 validates an immutable historical manifest's
+# remote refs and identities without comparing it to the current checkout.
 
 set -uo pipefail
 
 MANIFEST="${1:-manifests/fingerprint-v3.yaml}"
 [[ -f "$MANIFEST" ]] || { echo "FAIL: manifest not found: $MANIFEST" >&2; exit 1; }
+CHECK_WORKTREE="${SOURCE_GRAPH_CHECK_WORKTREE:-1}"
+[[ "$CHECK_WORKTREE" == 0 || "$CHECK_WORKTREE" == 1 ]] || {
+    echo "FAIL: SOURCE_GRAPH_CHECK_WORKTREE must be 0 or 1" >&2
+    exit 1
+}
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/ci/source_manifest_lib.sh
@@ -147,7 +155,7 @@ else
     warn ".gitmodules not present (not a firmware checkout?)"
 fi
 
-if [[ "$(m release_state)" == "candidate" ]] && \
+if [[ "$CHECK_WORKTREE" == 1 && "$(m release_state)" == "candidate" ]] && \
     git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     for entry in "buildroot:submodule_buildroot" "hdl:submodule_hdl" \
         "hdl-quantulum:submodule_hdl_quantulum" \
@@ -177,6 +185,8 @@ if [[ "$(m release_state)" == "candidate" ]] && \
     elif [[ -n "$expected_libiio" ]]; then
         bad "Buildroot libiio recipe not found: ${recipe}"
     fi
+elif [[ "$CHECK_WORKTREE" == 0 ]]; then
+    warn "historical manifest: current-worktree closure intentionally skipped"
 fi
 
 echo
