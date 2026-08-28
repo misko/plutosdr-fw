@@ -16,7 +16,7 @@
 [submodule "buildroot"]
 	path = buildroot
 	url = https://github.com/misko/plutosdr-fw.git
-	branch = codex/buildroot-gain-series-v4-rc14-dma-handoff
+	branch = codex/buildroot-metadata-timeout-max-dma-v1
 
 [submodule "linux"]
 	path = linux
@@ -26,7 +26,7 @@
 [submodule "hdl"]
 	path = hdl
 	url = https://github.com/misko/plutosdr-hdl.git
-	branch = codex/hdl-sample-counter-v3
+	branch = codex/metadata-max-dma-v1
 [submodule "hdl-quantulum"]
 	path = hdl-quantulum
 	url = https://github.com/misko/plutosdr-hdl-quantulum
