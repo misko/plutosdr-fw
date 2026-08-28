@@ -117,6 +117,7 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-burst-v1-rc3-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-burst-v1-rc4-source.yaml
     ./scripts/check_source_graph.sh manifests/ddr-burst-v1-rc5-source.yaml
+    ./scripts/check_source_graph.sh manifests/ddr-burst-v2-rc1-source.yaml
     ./scripts/test_legal_info_network.sh
 }
 

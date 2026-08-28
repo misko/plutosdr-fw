@@ -43,6 +43,9 @@ FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
 DDR_BURST_RC5_SOURCE_MANIFEST = (
     ROOT / "manifests" / "ddr-burst-v1-rc5-source.yaml"
 )
+DDR_BURST_V2_RC1_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "ddr-burst-v2-rc1-source.yaml"
+)
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 FIRMWARE_PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
@@ -328,6 +331,27 @@ def test_tandem_v2_preserves_historical_transport_but_prevents_linux_rollback() 
     assert tandem_v2["submodule_buildroot_ref"] == TANDEM_V2_BUILDROOT_REF
     assert tandem_v2["submodule_linux"] == RC3_LINUX_SOURCE
     assert tandem_v2["submodule_linux_ref"] == RC3_LINUX_REF
+
+
+def test_ddr_burst_v2_advances_only_libiio_and_buildroot() -> None:
+    previous = _manifest_values(DDR_BURST_RC5_SOURCE_MANIFEST)
+    current = _manifest_values(DDR_BURST_V2_RC1_SOURCE_MANIFEST)
+    changed = {key for key, value in previous.items() if current[key] != value}
+
+    assert changed == {
+        "libiio_0_25_source",
+        "libiio_0_25_ref",
+        "submodule_buildroot",
+        "submodule_buildroot_ref",
+        "versions_buildroot",
+    }
+    assert current["libiio_0_25_source"] == (
+        "45a760d4000a044fc3709b5d89bceec5d0883be5"
+    )
+    assert current["submodule_buildroot"] == (
+        "707a0fd23ad6551db5a91a79c4e61de55bec798f"
+    )
+    assert "release_tag" not in current
 
 
 def test_historical_routes_and_all_v8_source_graphs_are_explicit() -> None:
