@@ -52,6 +52,9 @@
 | `tandem-agc-v8-rc31` | 2026-08-27 | **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded** | native fast AGC intermittently held one RX chain at the 4.2-GHz strong-signal step |
 | `tandem-agc-v8-rc32` | 2026-08-27 | **final release; trusted build passed; hardware campaign failed** | the original db696 campaign failed a binding 1.55-GHz native-fast comparison; a later 30-run, three-radio repetition reproduced four native-fast gain-degradation failures on two radios |
 | **`ddr-burst-v1`** | 2026-08-28 | **current hardware-qualified release** | counter-observable single RX plus optional, default-off, two-second device-DDR burst capture through standard libiio; five-board RAM and persistent qualification |
+| `ddr-burst-v2-rc1` | 2026-08-28 | **rejected; RAM only** | wrap-safe 8-bit FIFO event accounting and two-frame admission; hardware found deterministic whole-frame loss at 5 ms |
+| `ddr-burst-v2-rc2` | 2026-08-28 | **rejected; RAM only** | added an 8 ms pre-hardware floor; cross-device qualification reproduced intermittent loss at that exact boundary |
+| `ddr-burst-v2-rc3` | 2026-08-28 | **source-locked candidate; RAM only** | raises the pre-hardware floor to 12 ms, retaining 50% margin over the demonstrated 8 ms failure boundary |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -59,6 +62,36 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.42-plutoplus-spf-ddr-burst-v2-rc3 — 2026-08-28 — **source-locked candidate; RAM only**
+
+DDR burst v2 fixes three independent failures found while extending #50's
+single-RX capture path. First, the FPGA exposes an 8-bit FIFO event counter
+while iiOD originally compared it as a cumulative 32-bit value; v2 extends it
+modulo 256 without changing the cumulative metadata contract. Second, the
+first armed capture retains two spans while the original client budgeted one;
+v2 makes the client request two-frame capacity and makes the server reject an
+insufficient window before touching hardware. Third, short high-rate frames
+can outrun the per-refill metadata/copy schedule even when total DDR capacity
+is ample; v2 rejects unsafe frame periods before timestamp, sampler, DMA, or
+DDR acquisition.
+
+RC1's full-image test found exact one-frame loss with a 5 ms frame. RC2 added
+an 8 ms admission floor and passed the primary AD9363A USB/IP matrices plus 20
+alternating abrupt-client recovery cycles. Cross-device qualification then
+found the exact 8 ms boundary was intermittent: one AD9363A run failed, and an
+AD9361 stress campaign failed 1 of 20 fresh contexts with `EOVERFLOW`. On the
+same AD9361, 10 ms and 12 ms each passed 20 of 20 contexts and 1,280 complete
+frames across RX0 and RX1. RC2 is therefore rejected and immutable.
+
+RC3 retains the complete RC2 FPGA, Linux, metadata, gadget, and diagnostic
+graph. It advances only libiio and Buildroot, setting the deterministic floor
+to 12 ms: 50% headroom over the demonstrated 8 ms failure boundary and 20%
+over the first passing 10 ms point. The intended one- and two-second captures
+are unaffected. DDR burst remains disabled by default; unsupported requests
+return before hardware acquisition; ordinary IIO buffers are unchanged. RC3
+must pass protected CI and exact-byte RAM qualification on both AD9363A and
+AD9361 hardware before any persistent flash or release promotion.
 
 ## v0.42-plutoplus-spf-ddr-burst-v1 — 2026-08-28 — **current hardware-qualified release**
 
