@@ -19,12 +19,17 @@
 #
 # Both are invisible to a compile test on a machine that already has the source.
 #
-# Usage: scripts/check_source_graph.sh [manifests/fingerprint-v3.yaml]
+# Usage: scripts/check_source_graph.sh [manifest] [working-tree|refs-only]
 
 set -uo pipefail
 
 MANIFEST="${1:-manifests/fingerprint-v3.yaml}"
+CHECK_MODE="${2:-working-tree}"
 [[ -f "$MANIFEST" ]] || { echo "FAIL: manifest not found: $MANIFEST" >&2; exit 1; }
+case "$CHECK_MODE" in
+working-tree | refs-only) ;;
+*) echo "FAIL: source graph mode must be working-tree or refs-only" >&2; exit 1 ;;
+esac
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=scripts/ci/source_manifest_lib.sh
@@ -151,7 +156,9 @@ else
     warn ".gitmodules not present (not a firmware checkout?)"
 fi
 
-if [[ "$(m release_state)" == "candidate" ]] && \
+if [[ "$CHECK_MODE" == "refs-only" ]]; then
+    warn "archived graph: current gitlinks and Buildroot recipes are checked by the active manifest"
+elif [[ "$(m release_state)" == "candidate" ]] && \
     git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     for entry in "buildroot:submodule_buildroot" "hdl:submodule_hdl" \
         "hdl-quantulum:submodule_hdl_quantulum" \

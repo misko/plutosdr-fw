@@ -79,37 +79,45 @@ run_oracles() {
 }
 
 run_source_graph() {
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc3-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc4-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc5-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc6-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc7-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc8-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc9-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc10-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc11-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc12-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc13-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc14-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc15-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc16-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc17-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc18-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc19-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc20-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc21-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc22-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc23-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc24-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc25-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc26-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc27-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc28-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc29-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc30-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc31-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-rc32-source.yaml
-    ./scripts/check_source_graph.sh manifests/tandem-agc-v8-source.yaml
+    local manifest
+    local historical_manifests=(
+        manifests/tandem-agc-v8-rc3-source.yaml
+        manifests/tandem-agc-v8-rc4-source.yaml
+        manifests/tandem-agc-v8-rc5-source.yaml
+        manifests/tandem-agc-v8-rc6-source.yaml
+        manifests/tandem-agc-v8-rc7-source.yaml
+        manifests/tandem-agc-v8-rc8-source.yaml
+        manifests/tandem-agc-v8-rc9-source.yaml
+        manifests/tandem-agc-v8-rc10-source.yaml
+        manifests/tandem-agc-v8-rc11-source.yaml
+        manifests/tandem-agc-v8-rc12-source.yaml
+        manifests/tandem-agc-v8-rc13-source.yaml
+        manifests/tandem-agc-v8-rc14-source.yaml
+        manifests/tandem-agc-v8-rc15-source.yaml
+        manifests/tandem-agc-v8-rc16-source.yaml
+        manifests/tandem-agc-v8-rc17-source.yaml
+        manifests/tandem-agc-v8-rc18-source.yaml
+        manifests/tandem-agc-v8-rc19-source.yaml
+        manifests/tandem-agc-v8-rc20-source.yaml
+        manifests/tandem-agc-v8-rc21-source.yaml
+        manifests/tandem-agc-v8-rc22-source.yaml
+        manifests/tandem-agc-v8-rc23-source.yaml
+        manifests/tandem-agc-v8-rc24-source.yaml
+        manifests/tandem-agc-v8-rc25-source.yaml
+        manifests/tandem-agc-v8-rc26-source.yaml
+        manifests/tandem-agc-v8-rc27-source.yaml
+        manifests/tandem-agc-v8-rc28-source.yaml
+        manifests/tandem-agc-v8-rc29-source.yaml
+        manifests/tandem-agc-v8-rc30-source.yaml
+        manifests/tandem-agc-v8-rc31-source.yaml
+        manifests/tandem-agc-v8-rc32-source.yaml
+        manifests/tandem-agc-v8-source.yaml
+        manifests/single-rx-metadata-rc1-source.yaml
+    )
+    for manifest in "${historical_manifests[@]}"; do
+        ./scripts/check_source_graph.sh "$manifest" refs-only
+    done
+    ./scripts/check_source_graph.sh manifests/ddr-burst-v1-rc1-source.yaml working-tree
     ./scripts/test_legal_info_network.sh
 }
 

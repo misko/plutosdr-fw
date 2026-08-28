@@ -180,6 +180,17 @@ def test_pr_workflow_uses_the_shared_offline_entry_point() -> None:
         "manifests/tandem-agc-v8-rc30-source.yaml",
         "manifests/tandem-agc-v8-rc31-source.yaml",
         "manifests/tandem-agc-v8-rc32-source.yaml",
+        "manifests/single-rx-metadata-rc1-source.yaml",
+        "manifests/ddr-burst-v1-rc1-source.yaml",
         "./scripts/test_legal_info_network.sh",
     ):
         assert required in checker
+
+    source_graph = (ROOT / "scripts" / "check_source_graph.sh").read_text()
+    assert 'CHECK_MODE="${2:-working-tree}"' in source_graph
+    assert 'working-tree | refs-only' in source_graph
+    assert './scripts/check_source_graph.sh "$manifest" refs-only' in checker
+    assert (
+        "./scripts/check_source_graph.sh "
+        "manifests/ddr-burst-v1-rc1-source.yaml working-tree"
+    ) in checker
