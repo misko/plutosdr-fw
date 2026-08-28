@@ -1,14 +1,59 @@
 # Pluto+ bounded DDR burst-capture plan
 
-Status: **implemented, source-locked, CI-built, and RAM-qualified on the
-designated radio; persistent promotion remains disabled**
+Status: **published, hardware-qualified, and persistently promoted on all five
+USB-recoverable radios; the feature remains disabled by default**
 
 This note preserves the design and the resulting qualification evidence for
-buffering single-receiver captures in ordinary Pluto+ DDR. The feature remains
-outside the published single-RX metadata RC1 release. It has its own source
-lock and RAM-only identity; QSPI promotion requires a separate reviewed policy.
+buffering single-receiver captures in ordinary Pluto+ DDR. The final release
+combines the previously published single-RX metadata ABI with the reviewed DDR
+extension. Pluto Plus Utils keeps separate immutable RAM-only and persistent
+profiles; only the exact hardware-qualified release profile permits QSPI
+promotion.
 
-## Implemented candidate and qualification result
+## Final release and promotion result
+
+Release `v0.42-plutoplus-spf-ddr-burst-v1` is the source-locked firmware commit
+`a6b78df100f67c1bcd2528e2fbc0c86b2a8ee2ba`. Protected GitHub Actions run
+`33174605592` produced the published DFU with SHA-256
+`47bb23ff1d498a5899c4503de33bc818aa908c567eab4e0fc535602ffa296877`,
+FIT-body SHA-256
+`f40542a7b1a53f4f1b06a5733f068e7b69f1eddff7ab0eb46c0f37f9f37d295a`,
+and evidence-bundle SHA-256
+`d4bce8fb200cac685d5acbeb0631b6fb0ed214f3d2c7fb5d06e3b36fd62aafd6`.
+Both nested checksum manifests and the integrated routed-design verdict pass.
+All five release assets were downloaded after publication and compared
+byte-for-byte with the qualified CI material.
+
+Pluto Plus Utils merge `daa24ef7a1d170ed1779ae175232660c0d885c09`
+binds those exact bytes. Profile `ddr-burst-v1-release-ram` remains explicitly
+RAM-only. Profile `ddr-burst-v1-release-persistent-promotion` is the distinct
+hardware-qualified mutation policy and guarded upgrade target. The utility
+attests the selected serial, direct USB topology, DFU and FIT hashes, metadata
+ABI 3, DDR limits, returned identity, and safe TX state around each operation.
+
+The exact release was RAM-booted and persistently written on five local
+USB-recoverable radios. The fleet passed 28 RAM-mode and ten post-flash
+abrupt-client recovery cycles. Each cycle killed a live 200-MB, 25-MS/s client
+and then proved both fresh DDR and ordinary-buffer reuse. All 38 cycles passed
+on alternating RX0/RX1 with zero counter gaps, missing samples, or overflow;
+unchanged boot and iiOD identity; restored settings; zero live buffers; DDS
+off; and both TX channels at -80 dB.
+
+The designated AD9363A radio also completed four full two-second, 25-MS/s,
+200-MB captures: RX0 and RX1 over both physical Ethernet and USB. Every capture
+reported all 50,000,000 sample times with zero counter gaps, missing samples,
+or overflow. Ordinary dual-RX controls passed over both transports with burst
+mode disabled. Three additional LAN-only radios passed identity-bound dual-RX
+IP ladders at 1, 2.5, and 5 MS/s, but were intentionally not flashed because
+no local USB/DFU recovery path was attached.
+
+The 200-MB ceiling, 128-MiB ordinary-memory reserve, 64-MiB CMA pool, one-RX
+geometry, provider-owned request extension, sealed-cache refill behavior, and
+default-off compatibility contract described below are the released design.
+DDR burst is a bounded recorder; it does not increase sustained USB or Ethernet
+throughput.
+
+## Historical first candidate and qualification result
 
 The first candidate implements the anonymous-DDR cache in IIOD while retaining
 the existing ABI-3 metadata provider, Linux DMA driver, FPGA design, 64-MiB CMA
