@@ -98,6 +98,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "ddr-burst-v1-rc2-source.yaml:candidate" in package
     assert "ddr-burst-v1-rc3-source.yaml:candidate" in package
     assert "ddr-burst-v1-rc4-source.yaml:candidate" in package
+    assert "ddr-burst-v1-rc5-source.yaml:candidate" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -120,23 +121,23 @@ def test_single_rx_metadata_candidate_has_an_exact_protected_route() -> None:
         assert "single-rx-metadata-rc1-source.yaml" in source
 
 
-def test_ddr_burst_rc4_has_exact_candidate_and_main_routes() -> None:
+def test_ddr_burst_rc5_has_exact_candidate_and_main_routes() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     branch = "refs/heads/codex/ddr-burst"
 
     assert workflow.count(branch) == 4
-    assert workflow.count("'ddr-burst-v1-rc4-source.yaml'") == 2
+    assert workflow.count("'ddr-burst-v1-rc5-source.yaml'") == 2
     assert workflow.count("'plutoplus-spf-ddr-burst-v1'") == 1
-    assert workflow.count("'plutoplus-spf-ddr-burst-v1-rc4'") == 1
+    assert workflow.count("'plutoplus-spf-ddr-burst-v1-rc5'") == 1
     assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v1'") == 1
-    assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v1-rc4'") == 1
-    assert "Require the exact DDR burst RC4 RAM candidate identity" in workflow
-    assert "ddr-burst-v1-rc4-source.yaml:candidate" in package
-    assert "v0.42-plutoplus-spf-ddr-burst-v1-rc4" in package
+    assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v1-rc5'") == 1
+    assert "Require the exact DDR burst RC5 RAM candidate identity" in workflow
+    assert "ddr-burst-v1-rc5-source.yaml:candidate" in package
+    assert "v0.42-plutoplus-spf-ddr-burst-v1-rc5" in package
     for source in (builder, package):
-        assert "ddr-burst-v1-rc4-source.yaml" in source
+        assert "ddr-burst-v1-rc5-source.yaml" in source
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
@@ -162,6 +163,11 @@ def test_rx_timestamp_fifo_resets_with_the_reconfigurable_adc_clock() -> None:
     assert ".rst(fifo_reset)" in timestamp
     assert ".rst('b0)" not in timestamp
     assert "if (!timestamp_en || fifo_rd_rst_busy)" in timestamp
+    reset_hold = (
+        ROOT / "hdl-quantulum" / "util_cpack2_timestamp" / "src" / "rx_fifo_reset.v"
+    ).read_text()
+    assert 'shreg_extract = "yes", srl_style = "srl"' in reset_hold
+    assert "reset_delay <= {reset_delay[3:0], reset}" in reset_hold
 
 
 def test_release_authorizing_entry_points_require_owner_review() -> None:

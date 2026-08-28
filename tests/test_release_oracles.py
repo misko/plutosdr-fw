@@ -40,8 +40,8 @@ RC30_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc30-source.yaml"
 RC31_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc31-source.yaml"
 RC32_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-rc32-source.yaml"
 FINAL_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v8-source.yaml"
-DDR_BURST_RC4_SOURCE_MANIFEST = (
-    ROOT / "manifests" / "ddr-burst-v1-rc4-source.yaml"
+DDR_BURST_RC5_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "ddr-burst-v1-rc5-source.yaml"
 )
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
@@ -394,8 +394,8 @@ def test_required_hdl_simulation_uses_final_timestamp_source() -> None:
     assert "./run_timestamp_check_pipeline.sh" in workflow
 
 
-def test_required_hdl_simulation_uses_ddr_burst_rc4_timestamp_source() -> None:
-    values = _manifest_values(DDR_BURST_RC4_SOURCE_MANIFEST)
+def test_required_hdl_simulation_uses_ddr_burst_rc5_timestamp_source() -> None:
+    values = _manifest_values(DDR_BURST_RC5_SOURCE_MANIFEST)
     workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
     checkouts = re.findall(
         r"repository:\s*misko/plutosdr-hdl-quantulum\s*\n\s*"
@@ -406,6 +406,7 @@ def test_required_hdl_simulation_uses_ddr_burst_rc4_timestamp_source() -> None:
     assert values["submodule_hdl_quantulum"] in checkouts
     assert "cd hdl-quantulum/util_cpack2_timestamp/src" in workflow
     assert "rx_fifo_reset.v rx_fifo_reset_tb.v" in workflow
+    assert "grep -F 'srl_style = \"srl\"' rx_fifo_reset.v" in workflow
 
 
 def test_required_pr_gate_runs_root_tandem_rtl_suite() -> None:
