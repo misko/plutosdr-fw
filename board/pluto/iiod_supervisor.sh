@@ -7,6 +7,7 @@ LOGGER=${SPF_IIOD_LOGGER:-logger}
 PMSG=${SPF_IIOD_PMSG_PATH:-/dev/pmsg0}
 GENERATION_FILE=${SPF_IIOD_GENERATION_FILE:-/run/iiod-generation}
 CHILD_PID_FILE=${SPF_IIOD_CHILD_PID_FILE:-/var/run/iiod-child.pid}
+ERROR_LOG=${SPF_IIOD_ERROR_LOG:-/dev/kmsg}
 CHILD_PID=
 STOPPING=0
 RESTART_COUNT=0
@@ -37,7 +38,14 @@ while [ "$STOPPING" -eq 0 ]; do
 	GENERATION=$((RESTART_COUNT + 1))
 	printf '%s\n' "$GENERATION" > "$GENERATION_FILE"
 	record_event "starting generation=$GENERATION restart=$RESTART_COUNT"
-	"$IIOD_BIN" "$@" &
+	# iiOD emits sparse, actionable capture-admission and continuity failures on
+	# stderr. Preserve them in the bounded kernel ring instead of inheriting the
+	# background launcher's /dev/null; tests may substitute a regular file.
+	if [ -w "$ERROR_LOG" ]; then
+		"$IIOD_BIN" "$@" 2>> "$ERROR_LOG" &
+	else
+		"$IIOD_BIN" "$@" 2>/dev/null &
+	fi
 	CHILD_PID=$!
 	printf '%s\n' "$CHILD_PID" > "$CHILD_PID_FILE"
 	wait "$CHILD_PID"

@@ -9,18 +9,21 @@ trap 'rm -rf "$TEST_DIR"' EXIT INT TERM
 
 printf '%s\n' '#!/bin/sh' \
 	'printf "start:%s:%s\\n" "$1" "$2" >> "$SPF_IIOD_TEST_EVENTS"' \
+	'printf "SPF test capture diagnostic\\n" >&2' \
 	'exit 70' > "$TEST_DIR/fake_iiod"
 chmod +x "$TEST_DIR/fake_iiod"
 printf '%s\n' '#!/bin/sh' \
 	'printf "%s\\n" "$*" >> "$SPF_IIOD_TEST_LOG"' > "$TEST_DIR/fake_logger"
 chmod +x "$TEST_DIR/fake_logger"
 : > "$TEST_DIR/pmsg"
+: > "$TEST_DIR/error-log"
 
 export SPF_IIOD_BIN="$TEST_DIR/fake_iiod"
 export SPF_IIOD_LOGGER="$TEST_DIR/fake_logger"
 export SPF_IIOD_PMSG_PATH="$TEST_DIR/pmsg"
 export SPF_IIOD_GENERATION_FILE="$TEST_DIR/generation"
 export SPF_IIOD_CHILD_PID_FILE="$TEST_DIR/child.pid"
+export SPF_IIOD_ERROR_LOG="$TEST_DIR/error-log"
 export SPF_IIOD_RESTART_DELAY_SECONDS=0
 export SPF_IIOD_MAX_RESTARTS=3
 export SPF_IIOD_TEST_EVENTS="$TEST_DIR/events"
@@ -35,6 +38,7 @@ set -e
 [ "$(cat "$TEST_DIR/generation")" -eq 3 ]
 [ "$(grep -c 'child exited status=70' "$TEST_DIR/log")" -eq 3 ]
 [ "$(grep -c 'child exited status=70' "$TEST_DIR/pmsg")" -eq 1 ]
+[ "$(grep -c 'SPF test capture diagnostic' "$TEST_DIR/error-log")" -eq 3 ]
 [ ! -e "$TEST_DIR/child.pid" ]
 
 printf 'PASS: iiOD supervised restart red/green cases\n'
