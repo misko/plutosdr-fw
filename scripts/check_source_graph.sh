@@ -62,6 +62,10 @@ COMPONENTS=(
     "ip-gadget:ip_gadget_source:ip_gadget_repo:ip_gadget_ref"
 )
 
+if [[ -n "$(m metadata_source)$(m metadata_repo)$(m metadata_ref)" ]]; then
+    COMPONENTS+=("metadata:metadata_source:metadata_repo:metadata_ref")
+fi
+
 # Host compatibility sources are optional because historical firmware
 # manifests predate the frame-metadata extension.  When a candidate declares
 # either supported libiio line, require the complete immutable source lock.
@@ -184,6 +188,18 @@ if [[ "$CHECK_WORKTREE" == 1 && "$(m release_state)" == "candidate" ]] && \
         fi
     elif [[ -n "$expected_libiio" ]]; then
         bad "Buildroot libiio recipe not found: ${recipe}"
+    fi
+    expected_metadata="$(m metadata_source)"
+    metadata_recipe="buildroot/package/spf_metadata_source/spf_metadata_source.mk"
+    if [[ -n "$expected_metadata" && -f "$metadata_recipe" ]]; then
+        recipe_metadata="$(sed -n 's/^SPF_METADATA_SOURCE_VERSION[[:space:]]*=[[:space:]]*//p' "$metadata_recipe" | head -1)"
+        if [[ "$recipe_metadata" == "$expected_metadata" ]]; then
+            ok "Buildroot metadata recipe ${recipe_metadata:0:12}"
+        else
+            bad "Buildroot metadata recipe is ${recipe_metadata:0:12}, manifest pins ${expected_metadata:0:12}"
+        fi
+    elif [[ -n "$expected_metadata" ]]; then
+        bad "Buildroot metadata recipe not found: ${metadata_recipe}"
     fi
 elif [[ "$CHECK_WORKTREE" == 0 ]]; then
     warn "historical manifest: current-worktree closure intentionally skipped"

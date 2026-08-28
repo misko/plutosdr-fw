@@ -38,6 +38,8 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/ddr-burst' ||
+         github.ref == 'refs/heads/codex/issue-50-single-rx-metadata' ||
          github.ref == 'refs/heads/codex/firmware-v6-rc4-boot-safety' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' ||
          github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' ||
@@ -80,11 +82,15 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'metadata-timeout-main-v1-source.yaml' ||
+          'ddr-burst-v1-rc5-source.yaml' ||
+          github.ref == 'refs/heads/codex/ddr-burst' &&
+          'ddr-burst-v1-rc5-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
           'tandem-agc-v8-rc32-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' &&
           'tandem-agc-v8-rc31-source.yaml' ||
+          github.ref == 'refs/heads/codex/issue-50-single-rx-metadata' &&
+          'single-rx-metadata-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc30' &&
           'tandem-agc-v8-rc30-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29' &&
@@ -150,11 +156,15 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-tandem-agc-v8' ||
+          'plutoplus-spf-ddr-burst-v1' ||
+          github.ref == 'refs/heads/codex/ddr-burst' &&
+          'plutoplus-spf-ddr-burst-v1-rc5' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
           'plutoplus-spf-tandem-agc-v8-rc32' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' &&
           'plutoplus-spf-tandem-agc-v8-rc31' ||
+          github.ref == 'refs/heads/codex/issue-50-single-rx-metadata' &&
+          'plutoplus-spf-single-rx-metadata-rc1' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc30' &&
           'plutoplus-spf-tandem-agc-v8-rc30' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29' &&
@@ -314,6 +324,22 @@ jobs:
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.41-plutoplus-spf-tandem-agc-v8-rc30'
+
+      - name: Require the exact single-RX metadata candidate identity
+        if: github.ref == 'refs/heads/codex/issue-50-single-rx-metadata'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.42-plutoplus-spf-single-rx-metadata-rc1'
+
+      - name: Require the exact DDR burst RC5 RAM candidate identity
+        if: github.ref == 'refs/heads/codex/ddr-burst'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.42-plutoplus-spf-ddr-burst-v1-rc5'
 
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'
@@ -475,7 +501,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.41-plutoplus-spf-tandem-agc-v8'
+            'v0.42-plutoplus-spf-ddr-burst-v1'
 
       - name: Build, validate, and package
         id: build
