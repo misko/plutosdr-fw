@@ -162,7 +162,8 @@ def test_ddr_burst_v2_has_exact_candidate_and_main_routes() -> None:
         "manifests/ddr-burst-v1-rc5-source.yaml"
     ) in checker
     assert (
-        "./scripts/check_source_graph.sh manifests/ddr-burst-v2-rc1-source.yaml"
+        "SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh "
+        "manifests/ddr-burst-v2-rc1-source.yaml"
     ) in checker
     assert (
         "./scripts/check_source_graph.sh manifests/ddr-burst-v2-rc2-source.yaml"
