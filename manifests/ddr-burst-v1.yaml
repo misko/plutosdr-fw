@@ -1,0 +1,95 @@
+# Immutable build manifest for the hardware-qualified Pluto+ DDR burst v1
+# release. Values were read from the exact protected-CI artifact deployed to
+# five USB-recoverable radios. A later release gets a new file; do not revise
+# this one in place.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+
+release_tag: v0.42-plutoplus-spf-ddr-burst-v1
+release_url: https://github.com/misko/plutosdr-fw/releases/tag/v0.42-plutoplus-spf-ddr-burst-v1
+asset_name: plutoplus-spf-ddr-burst-v1-a6b78df100f6-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.42-plutoplus-spf-ddr-burst-v1/plutoplus-spf-ddr-burst-v1-a6b78df100f6-pluto.dfu
+image_sha256: 47bb23ff1d498a5899c4503de33bc818aa908c567eab4e0fc535602ffa296877
+image_size: 12793411
+fit_body_sha256: f40542a7b1a53f4f1b06a5733f068e7b69f1eddff7ab0eb46c0f37f9f37d295a
+fit_body_size: 12793395
+device_fw: v0.42-plutoplus-spf-ddr-burst-v1
+
+bundle_name: plutoplus-spf-ddr-burst-v1-a6b78df100f6.tar.gz
+bundle_sha256: d4bce8fb200cac685d5acbeb0631b6fb0ed214f3d2c7fb5d06e3b36fd62aafd6
+ci_run_id: 33174605592
+ci_artifact_id: 9688284133
+ci_artifact_name: plutoplus-main-a6b78df100f67c1bcd2528e2fbc0c86b2a8ee2ba-33174605592-1
+
+firmware_source: a6b78df100f67c1bcd2528e2fbc0c86b2a8ee2ba
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_ref: refs/tags/ddr-burst-v1-source/firmware-v1
+
+libiio_0_25_source: f72a72602e4ac0173bc7dd5842d831007baa3582
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/ddr-burst-v1-rc2-source/libiio-v1
+
+metadata_source: 6e2362c0e149bd2a76f7777115a36fb65da80b58
+metadata_repo: https://github.com/misko/plutosdr-fw.git
+metadata_ref: refs/tags/single-rx-metadata-rc1-source/metadata-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: 9551706ceb8e6b633188484e908d59c9559bf339
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/ddr-burst-v1-rc2-source/buildroot-v1
+
+submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/ddr-burst-v1-rc4-source/hdl-v1
+
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum.git
+submodule_hdl_quantulum_ref: refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+
+submodule_linux: 93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/ddr-burst-v1-rc3-source/linux-v1
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
+versions_buildroot: ddr-burst-v1-rc2-source/buildroot-v1
+versions_linux: ddr-burst-v1-rc3-source/linux-v1
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+
+fpga_bitstream_md5: 271c71c54d69b532a19e2c6a2e1ccdbb
+fpga_bitstream_sha256: d9be0d9ee42486b7a379552837a36b82610848a2de14d621f5d9dfcc1025dd99
+ramdisk_md5: 913d259cb15275e8d55fe9103f1f6c2e
+rootfs_sha256: e69f65ee8ef75e3cdb2ae1a5c602a02cd950fac742e05a19a06930c849274409
+fit_description: Configuration to load fpga before Kernel
+
+hardware_qualified: true
+hardware_qualified_date: 2026-08-28
+hardware_units: 5
+radio_libiio: 0.25
+metadata_abi: 3
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_commit: daa24ef7a1d170ed1779ae175232660c0d885c09
+qualification_ram_boots: 5
+qualification_persistent_flashes: 5
+qualification_ram_recovery_cycles: 28
+qualification_persistent_recovery_cycles: 10
+qualification_total_recovery_cycles: 38
+qualification_max_burst_captures: 4
+qualification_max_burst_rate_hz: 25000000
+qualification_max_burst_iq_bytes: 200000000
+qualification_max_burst_sample_times: 50000000
+qualification_ddr_reserve_bytes: 134217728
+qualification_lan_only_units: 3
+qualification_lan_only_max_rate_hz: 5000000
+qualification_lan_only_mutated: false

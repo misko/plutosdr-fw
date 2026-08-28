@@ -51,6 +51,7 @@
 | `tandem-agc-v8-rc30` | 2026-08-27 | **trusted indexed build; zero candidate deployments; superseded** | all software/build gates passed; mixed ordinary-Pluto/Pluto+ USB inventory failed closed before hardware |
 | `tandem-agc-v8-rc31` | 2026-08-27 | **trusted indexed build and three RAM/lifecycle passes; campaign invalid; superseded** | native fast AGC intermittently held one RX chain at the 4.2-GHz strong-signal step |
 | `tandem-agc-v8-rc32` | 2026-08-27 | **final release; trusted build passed; hardware campaign failed** | the original db696 campaign failed a binding 1.55-GHz native-fast comparison; a later 30-run, three-radio repetition reproduced four native-fast gain-degradation failures on two radios |
+| **`ddr-burst-v1`** | 2026-08-28 | **current hardware-qualified release** | counter-observable single RX plus optional, default-off, two-second device-DDR burst capture through standard libiio; five-board RAM and persistent qualification |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -58,6 +59,66 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.42-plutoplus-spf-ddr-burst-v1 — 2026-08-28 — **current hardware-qualified release**
+
+This release resolves #50 with standard-libiio metadata ABI 3 for exactly one
+canonical receiver. Each frame carries authoritative FPGA sample-counter
+continuity while retaining the ordinary CI16 IQ layout. It also adds an
+optional, default-off device-DDR stage behind the same IIO buffer calls. A
+positive byte budget opts in; an omitted or zero budget follows the ordinary
+path. The admitted ceiling is 200,000,000 IQ bytes: 50,000,000 complex sample
+times, or two seconds at 25 MS/s, for RX0 or RX1. Dual RX remains an ordinary
+streaming mode.
+
+Exact firmware commit `a6b78df100f67c1bcd2528e2fbc0c86b2a8ee2ba`
+passed protected build `33174605592`, nested checksum verification, source
+lock verification, and the integrated routed-design gate. The published DFU
+SHA-256 is
+`47bb23ff1d498a5899c4503de33bc818aa908c567eab4e0fc535602ffa296877`,
+its FIT-body SHA-256 is
+`f40542a7b1a53f4f1b06a5733f068e7b69f1eddff7ab0eb46c0f37f9f37d295a`,
+and the complete evidence bundle SHA-256 is
+`d4bce8fb200cac685d5acbeb0631b6fb0ed214f3d2c7fb5d06e3b36fd62aafd6`.
+Routed timing closed with WNS 0.767 ns, WHS 0.019 ns, and zero failing
+endpoints. The five published assets were downloaded into a fresh private
+directory after publication and proved byte-identical to the qualified CI
+material.
+
+The exact DFU was RAM-booted and then persistently written to all five local
+USB-recoverable Pluto+ radios. Five RAM receipts and five persistent receipts
+bind the expected DFU/FIT hashes, exact serial and USB topology, metadata ABI,
+DDR capability, and safe TX state. Four persistent flashes returned normally.
+One radio disappeared just after the original fixed 30-second lifecycle wait;
+read-only reconciliation later proved the expected returned firmware and
+serial, safe TX, and the exact FIT SHA-256 in QSPI `mtd3`. It was not retried.
+
+The fleet completed 28 RAM-mode and ten post-flash abrupt-client recovery
+cycles. Every cycle killed a live 200-MB, 25-MS/s burst client, then proved
+fresh DDR and ordinary-buffer reuse. All 38 passed on alternating RX0/RX1 with
+zero counter gaps, missing samples, or overflow; unchanged boot and iiOD
+identity; restored settings; zero leaked buffers; DDS disabled; and both TX
+channels at -80 dB. On the designated AD9363A radio, complete two-second,
+25-MS/s, 200-MB captures passed on RX0 and RX1 over both physical Ethernet and
+USB. Ordinary dual-RX controls passed over both transports with DDR disabled.
+
+Three additional LAN-only Pluto+ radios completed identity-bound dual-RX IP
+ladders at 1, 2.5, and 5 MS/s. All nine rungs kept pace and restored settings.
+They remain on their prior firmware because no local USB/DFU recovery path was
+attached; the release campaign intentionally did not mutate them.
+
+DDR burst proves bounded capture continuity; it does not raise continuous
+host-link throughput. In the final ordinary-stream ladder, IP single RX kept
+pace at 12.5 MS/s and delivered about 52% at 25 MS/s. USB and dual-RX
+continuous delivery were lower. Use DDR burst when the required bounded
+single-RX acquisition exceeds sustained host transport capacity.
+
+Pluto Plus Utils merge `daa24ef7a1d170ed1779ae175232660c0d885c09`
+binds these exact bytes, separates RAM-only qualification from the
+hardware-qualified persistent profile, selects the release as the guarded
+upgrade target, exposes the recovery qualifier, and applies the operator
+return timeout to the full flash disappearance/return lifecycle. Its merged
+tree passed 801 tests, Ruff, mypy, Python 3.11--3.13 CI, and browser CI.
 
 ## v0.41-plutoplus-spf-tandem-agc-v8-rc32 — 2026-08-27 — **final release; trusted build passed; hardware campaign failed**
 
