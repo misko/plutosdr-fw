@@ -1,11 +1,11 @@
 # Pluto+ bounded DDR burst-capture plan
 
-Status: **parked design; no implementation authorized**
+Status: **detailed design investigation; no behavioral implementation started**
 
 This note preserves the investigation into buffering single-receiver captures
-in ordinary Pluto+ DDR. It is intentionally outside the single-RX metadata RC1
-release. Resume this work only as a separately reviewed feature after the RC1
-release and issue #50 stabilization work.
+in ordinary Pluto+ DDR. It remains intentionally outside the published
+single-RX metadata RC1 release and must have its own source lock, RAM-only
+candidate, and qualification campaign.
 
 ## Objective
 
@@ -79,11 +79,246 @@ The missing capability is therefore not a larger IIO frame. It is a bounded,
 preallocated, normal-DDR capture stage with explicit continuity and ownership
 semantics.
 
-## Proposed architecture
+The exact source path establishes four important facts:
 
-Prefer an opt-in IIOD/libiio burst operation with a matching Pluto Plus Utils
-command. Keeping the operation inside the existing radio data owner avoids a
-second local process racing IIOD for the same IIO buffer.
+- `libiio/local.c` allocates four coherent CMA blocks by default. Every local
+  refill re-enqueues the previously dequeued block and dequeues the next
+  completed block.
+- `libiio/iiod/ops.c` performs metadata fencing, one local refill, metadata
+  construction, and a synchronous transport write in that order.
+- the current libiio metadata batch option accumulates responses in **host**
+  memory only after the bytes cross USB or IP. It cannot solve a device-side
+  transport deficit.
+- ABI 3 already provides the required single-RX geometry, a stream generation,
+  first-sample counters, exact gap counts, payload length, and header CRC. A
+  successful burst does not need a new IQ layout.
+
+## Recommended first architecture
+
+Implement the first version entirely in IIOD and its existing SPF metadata
+provider. Keep the qualified Linux DMA driver, FPGA design, CMA reservation,
+and four-block kernel queue unchanged. IIOD remains the only owner of the local
+IIO buffer and adds one preallocated anonymous-DDR cache behind it.
+
+The feature is a one-shot metadata-buffer policy, not a new streaming backend:
+
+1. Pluto Plus Utils adds one user-visible `--ddr-burst`/`ddr_burst=true` flag.
+2. The utility derives the exact frame count from the already requested sample
+   count or duration and appends a required burst extension to the existing
+   opaque metadata-session request.
+3. A legacy 104-byte request has no extension and follows the current path
+   without allocation or changed behavior.
+4. IIOD validates and prefaults the complete cache before enabling the physical
+   IIO buffer.
+5. After the physical buffer is ready, IIOD acknowledges `OPENM` promptly and
+   its existing per-device RX worker immediately enters a burst-capture phase.
+   It proactively drains consecutive local refills into the cache without
+   sending network or USB data.
+6. Every accepted refill is fenced by the existing metadata provider. IIOD
+   builds and stores the matching ABI-3 metadata and copies only that frame's
+   CI16 IQ bytes from the mapped CMA block into normal DDR.
+7. IIOD sends no IQ until all requested frames pass. Any error discards the
+   whole cache; a partial burst is never presented as success.
+8. After the final frame, IIOD disables and destroys the physical IIO buffer,
+   closes the metadata provider, restores its timestamp/tandem state, and marks
+   the cache immutable.
+9. The application's existing `iio_buffer_refill_with_metadata()` calls are
+   then satisfied one frame at a time from the sealed cache. Buffer start/end,
+   channel iteration, IQ layout, metadata decoding, and artifact writing are
+   unchanged.
+10. The last delivered frame releases the arena. An additional refill returns
+    `-ENODATA`; close remains idempotent.
+
+Starting capture at buffer-open, rather than waiting for the first `READBUFM`,
+avoids filling and stalling the four-block DMA queue while host-side setup is
+still running. The open acknowledgement remains prompt; the first host refill
+waits for the worker to reach `SEALED`. Pluto Plus Utils must take its initial
+sample-clock anchors before opening a burst buffer and issue that refill
+immediately after the open returns.
+
+This design deliberately performs one ARM `memcpy` per frame. It is the
+smallest change that reuses the qualified DMA path. A direct FPGA DDR writer,
+scatter-gather kernel arena, larger CMA pool, and separate radio-side capture
+process all add substantially more ownership and teardown risk.
+
+The live measurements establish capacity, not copy-path feasibility. This
+architecture remains contingent on the B1/B2 tests proving that the ARM can
+copy every frame with adequate refill and scheduler margin.
+
+## Opt-in wire and capability contract
+
+Do not add a new IIOD command and do not reinterpret the existing host-side
+metadata batch option. Retain `OPENM`, `READBUFM`, and the current refill
+response byte layout.
+
+Append a fixed-size provider-owned extension to the valid tandem request. The
+extension should contain only:
+
+- magic, version, and total size;
+- required-feature bits, initially only `DEVICE_DDR_BURST`;
+- the exact number of fixed-size frames to capture; and
+- zeroed reserved words.
+
+The provider accepts the original exact request length as ordinary mode. It
+accepts the extended length only when every required bit and reserved field is
+valid. It decodes the first 104 bytes with the unchanged tandem decoder and
+decodes the tail separately; the tandem ABI itself is not weakened. An old
+firmware therefore rejects the flag instead of silently streaming normally.
+
+Keep the burst schema provider-owned. Extend the internal metadata-provider
+open contract to return a provider-neutral capture plan containing only mode
+and exact frame count. The IIOD core consumes that plan but does not parse SPF
+wire fields. The no-metadata provider and legacy requests return ordinary mode.
+This is an internal firmware interface, not a new public libiio API.
+
+Keep `iio,buffer-metadata=3` because the metadata and IQ ABI do not change. Add
+separate read-only context attributes such as:
+
+- `iio,buffer-ddr-burst=1`;
+- `iio,buffer-ddr-burst-max-bytes=200000000`;
+- `iio,buffer-ddr-burst-max-frames=64`;
+- `iio,buffer-ddr-burst-max-duration-ns=2000000000`;
+- `iio,buffer-ddr-burst-reserve-bytes=134217728`.
+
+Pluto Plus Utils must attest these exact values before adding the request
+extension. The raw extension is internal; the operator supplies only the
+boolean flag alongside the existing bounded duration/sample-count request.
+
+## Initial geometry and bounds
+
+The first release must require metadata ABI 3 and exactly one canonical
+receiver, RX0 or RX1. It must reject ordinary buffers, dual RX, cyclic mode,
+unbounded captures, and unknown scan masks for this path. Pluto Plus Utils must
+force the existing host metadata batch size to one; device DDR burst is the
+only batching layer for this mode.
+
+At 25 MS/s, use 1,000,000 sample times per frame:
+
+| Quantity | One second | Two seconds |
+|---|---:|---:|
+| frames | 25 | 50 |
+| CI16 IQ bytes | 100,000,000 | 200,000,000 |
+| ABI-3 metadata at 3,256 bytes/frame | 81,400 | 162,800 |
+| capture duration per frame | 40 ms | 40 ms |
+
+Each physical single-RX DMA block is 4,000,008 bytes: 4,000,000 IQ bytes plus
+the eight-byte counter prefix represented as two extra single-RX scan samples.
+Four blocks require 16,000,032 bytes, below the validated 16-MiB aggregate
+queue ceiling. The complete two-second IQ, metadata, and descriptor cache is
+about 190.9 MiB.
+
+For other exact bounded requests, Pluto Plus Utils selects a fixed frame size
+by searching at most 64 frames for the largest exact divisor of the requested
+sample count that also satisfies the advertised layout multiple, per-frame
+limit, and 16-MiB kernel-queue limit. It fails closed when exact framing is not
+possible; it must not silently capture and trim an extra partial frame.
+
+Enforce both a 200,000,000-IQ-byte limit and a two-second device-time limit in
+the first release. The provider snapshots the hardware sample-rate readback for
+duration admission; Pluto Plus Utils independently verifies that sample rate
+and the rest of the RX snapshot after the job. All multiplications and
+additions must be checked before allocation.
+
+## Memory admission
+
+Use one anonymous private mapping owned by IIOD, not `/tmp`, `/dev/shm`, a
+shell helper, or a persistent file. Acquire a process-global burst reservation
+so two clients cannot simultaneously prefault competing arenas.
+
+Perform admission and prefaulting in the existing per-device R/W worker,
+outside IIOD's global device-list mutex. The metadata provider's open callback
+must only validate the request and return the capture plan; it must not perform
+the large allocation while unrelated device opens are serialized.
+
+Admission is fail-closed:
+
+1. validate the request and compute IQ, metadata, descriptor, and four-block
+   CMA requirements with checked arithmetic;
+2. require sufficient `MemAvailable` and `CmaFree` before allocation;
+3. `mmap()` without overcommit-oriented flags, mark the mapping non-dumpable,
+   and write-fault every page before the IIO buffer is enabled;
+4. re-read memory facts and retain at least 128 MiB of system-memory headroom;
+5. require the complete safe CMA queue plus a CMA reserve; and
+6. free the mapping and global reservation on every terminal path.
+
+There is no allocation, compression, conversion, filesystem write, or whole
+burst hash in the hot capture loop. Header construction and the unavoidable
+CI16 copy are the only per-frame work beyond the current path. Each arena frame
+contains fixed IQ and maximum-metadata slots plus actual lengths, so the worker
+passes the metadata slot directly to the provider rather than using the
+current `send_data()` allocation.
+
+## Lifecycle and failure semantics
+
+Use an explicit fail-closed state machine:
+
+| State | Meaning | Allowed next states |
+|---|---|---|
+| `OFF` | ordinary request; current code path | ordinary close |
+| `RESERVED` | request admitted and arena prefaulted | `CAPTURING`, `POISONED` |
+| `CAPTURING` | local DMA refills are copied; no transport writes | `SEALED`, `POISONED` |
+| `SEALED` | complete immutable burst; physical IIO buffer is closed | `DRAINING`, `EXPIRED` |
+| `DRAINING` | ordinary metadata refills replay cached frames | `DRAINED`, `POISONED`, `EXPIRED` |
+| `DRAINED` | all frames delivered and arena released | close |
+| `POISONED`/`EXPIRED` | no IQ may be returned; resources released | close |
+
+The cache becomes visible only after every frame is present and verified.
+Reject a counter gap, regression, stream change, provider overflow, short raw
+refill, metadata failure, mask/length mismatch, deadline expiry, or cancel. A
+burst failure returns one typed error and destroys every retained byte.
+The arena is append-only while capturing and read-only while draining; it never
+wraps and never overwrites an older frame.
+
+Bound startup metadata discards and bound total capture wall time separately
+from the requested device duration. Continue to heartbeat the tandem lease on
+every physical refill. Client disconnect or `iio_buffer_cancel()` must wake a
+blocked local dequeue, close the physical buffer, restore provider state, and
+discard the arena.
+
+Sealing requires a fallible provider-finalize operation: tandem release,
+timestamp-register restoration, and relevant readback verification must all
+succeed before `SEALED`. The current best-effort `void` close behavior is
+insufficient for this path. Ordinary close may continue to ignore a finalize
+error during cleanup, but a burst must become `POISONED` and expose no IQ.
+
+Once sealed, an idle-drain deadline uses the existing IIOD worker condition
+variable with a timed wait; expiry frees the arena even if the client remains
+connected but sends no further reads. Successful frame delivery advances the
+cache cursor only after the complete frame write returns. Add a burst-specific
+monotonic write deadline so a client that requests a frame and stops receiving
+cannot pin the arena indefinitely; timeout or transport error discards the
+remainder. This deadline must work for the enabled socket/AIO/USB IIOD path,
+not rely solely on a cooperative host. Pluto Plus Utils must also install a
+calculated finite host IIO timeout that covers admission plus the bounded
+capture and restore it afterward. Its stream-stop path must cancel the blocked
+host refill and immediately destroy the buffer, causing socket teardown to
+cancel the radio-side dequeue.
+
+## Pluto Plus Utils behavior
+
+The flag should select an internal path while preserving the existing artifact
+and `SampleBlockV2` contracts:
+
+- require a bounded persistent capture, ABI 3, the burst capability, and one
+  selected receiver;
+- compute and report the exact auto-selected frame size/count;
+- collect time anchors before burst-buffer open, then avoid control-plane reads
+  while device capture is active;
+- construct the extended request and continue using `MetadataBuffer` with
+  ordinary one-frame refills;
+- independently verify every metadata record, require zero
+  `missing_samples_before`, and close on the first disagreement;
+- distinguish device capture time, cache drain time, and total job time in the
+  receipt; and
+- cancel the underlying IIO buffer from the stop/shutdown path rather than
+  waiting for the complete burst.
+
+The application, API client, and stored IQ see the same channel ordering and
+sample blocks as an ordinary metadata capture. The only intentional observable
+difference is that the first refill waits for the bounded device capture and
+later refills drain faster than real time.
+
+## Operation sequence
 
 The operation should:
 
@@ -93,23 +328,53 @@ The operation should:
 4. Compute the requested byte count with checked arithmetic.
 5. Enforce single RX and an initial duration ceiling of two seconds.
 6. Reserve a fixed system-memory safety margin of at least 128 MiB.
-7. Allocate, prefault, and retain a 95.4- or 190.7-MiB anonymous/memfd ring.
+7. Allocate, prefault, and retain a 95.4- or 190.9-MiB anonymous arena.
 8. Keep the validated four-by-4-MiB CMA staging queue.
-9. Capture exact local refills into the DDR ring without concurrent network
+9. Capture exact local refills into the DDR arena without concurrent network
    transmission.
 10. Retain ABI-3 metadata per refill, including first-sample sequence, stream
     generation, flags, receiver mask, payload size, and CRC.
 11. Reject any counter gap, regression, overflow ambiguity, short refill,
     layout mismatch, or terminal-state failure. Do not silently rebase time.
 12. Stop after exactly 25,000,000 or 50,000,000 sample times.
-13. Restore and verify the exact original RX settings before making the burst
-    downloadable.
-14. Return a durable capture receipt, then transfer the frozen burst to the
-    host and release the radio-side memory deterministically.
+13. Destroy the physical buffer and close the metadata provider, verifying
+    restoration of provider-owned timestamp and tandem state before sealing.
+14. Transfer the frozen burst using ordinary metadata refills and release the
+    radio-side memory deterministically.
+15. On every terminal job path, have Pluto Plus Utils exact-restore and verify
+    the complete RX snapshot, then return the durable capture receipt.
 
 Hashing and optional format conversion should occur after capture, not in the
 real-time ingestion loop. The first implementation should retain raw CI16 and
 must not add compression, resampling, or quantization.
+
+## Concrete implementation seams
+
+Keep the change narrow and preserve one owner for each resource:
+
+- `iiod/buffer-metadata.h` gains a provider-neutral internal capture-plan
+  result. Ordinary providers and the original request return `OFF`.
+- `iiod/spf-buffer-metadata.c` validates and splits the extended request,
+  passes the unchanged 104-byte prefix to the tandem decoder, and returns the
+  exact bounded plan. It continues to own metadata production and restoration
+  of timestamp/tandem state.
+- `iiod/ops.c` owns the arena and all state transitions in the existing
+  per-device R/W thread. Its burst branch performs admission, local refills,
+  fixed-slot metadata construction, sealing, cached replay, timeout, cancel,
+  and teardown. The ordinary branch remains unchanged.
+- `iiod/iiod.c` advertises the five read-only burst capability attributes only
+  in a firmware build that includes the complete implementation.
+- `libiio/local.c`, the Linux IIO/DMA drivers, HDL, CMA reservation, and public
+  libiio buffer API do not change in the first version.
+- Pluto Plus Utils adds the flag to `StreamRequest`, performs capability and
+  geometry admission around `IioMetadataCaptureSession`, and keeps using the
+  current `MetadataBuffer`/`SampleBlockV2` path. It adds diagnostics and tests
+  as normal package commands and modules, never as side scripts.
+
+The worker must have an explicit cached-replay branch before the current local
+refill and `send_data()` path. Once `SEALED`, `entry->buf` may be destroyed, so
+no replay code may dereference it or call the closed provider. Cached IQ and
+metadata lengths are authoritative only after the frame table is sealed.
 
 ## Why not enlarge CMA or the kernel queue
 
@@ -143,22 +408,49 @@ contract must explicitly be capture, stop, verify, then transfer.
 
 ## Qualification gates before implementation is promotable
 
+Use three test layers and require all lower layers before a RAM candidate:
+
+1. **libiio host tests:** preserve every legacy metadata test byte-for-byte;
+   add table-driven extension decoding, required-bit/reserved-field rejection,
+   checked geometry arithmetic, state transitions, and cleanup idempotence.
+2. **IIOD fake-device integration:** exercise prompt open followed by a blocked
+   first refill, proactive multi-frame capture, immutable replay, `-ENODATA`,
+   startup discard, counter gap, short frame, timeout, disconnect, cancel, and
+   allocation failure without depending on radio hardware.
+3. **Pluto Plus Utils tests:** prove the new flag defaults false, capability
+   mismatch fails without fallback, exact geometry is deterministic, host
+   batching is one, anchors precede open, cancellation calls cancel then close,
+   metadata is revalidated, receipts separate capture/drain time, and every
+   terminal path restores settings.
+
+Only then build a source-locked RAM image and run B1--B7 on the attached radio.
+The utility should land its default-off, capability-gated client support first;
+it remains inert on old firmware. Build the complete firmware path as a
+source-locked RAM-only candidate, advertise it only in that complete candidate,
+and run the hardware campaign. Merge the production capability and cut a
+separate release candidate only after those gates pass. Never advertise the
+capability from a partial implementation.
+
 ### B1: local sink throughput
 
-Using an exact-restore harness, prove RX0 local capture to `/dev/null` at
-25 MS/s for at least two seconds. Require at least 120 MB/s measured ingestion
-headroom and zero counter gaps or device overflows.
+Using a non-advertised instrumentation build of the same IIOD worker path,
+orchestrated and receipted by Pluto Plus Utils, prove RX0 and RX1 local capture
+into one repeatedly reused scratch frame at 25 MS/s for at least two seconds.
+Require p99 complete four-megabyte ingestion below 20 ms, providing at least a
+two-times timing margin against the 40-ms refill cadence, and require zero
+counter gaps or device overflows.
 
 ### B2: prefaulted DDR throughput
 
-Repeat into a prefaulted 200-MB normal-RAM ring. Measure CPU, memory bandwidth,
+Repeat into a prefaulted 200-MB normal-RAM arena. Measure CPU, memory bandwidth,
 CMA, scheduler latency, refill cadence, and continuity. The complete two-second
-capture must finish without allocation during the hot path.
+capture must finish without allocation during the hot path and with the
+128-MiB system reserve intact.
 
 ### B3: failure atomicity
 
 Inject client disconnect, timeout, cancellation, allocation refusal, metadata
-error, and insufficient-memory conditions. Every path must release the ring,
+   error, and insufficient-memory conditions. Every path must release the arena,
 close the buffer, restore the exact RX configuration, and leave the data plane
 immediately reusable without reboot.
 
@@ -189,25 +481,21 @@ burst.
 
 ## Decisions deliberately deferred
 
-- exact wire command and capability-advertisement version;
-- whether the retained burst is held only by a memfd or exposed through a
-  private tmpfs object;
 - whether downloading may resume after a host reconnect;
-- exact retention timeout and secure erasure behavior;
-- whether RX1 is enabled in the first burst release or follows RX0 validation;
+- the exact sealed-cache idle timeout after the failure-injection campaign;
+- whether explicit memory zeroing is warranted beyond anonymous-page release
+  for the deployment trust model;
 - whether a later FPGA-assisted DDR writer is warranted if the ARM copy path
   cannot sustain the B1/B2 margin.
 
-## Resume criteria
+## Implementation preconditions
 
-Resume only when all of the following are true:
+Begin behavioral implementation only when all of the following are true:
 
-- single-RX metadata RC1 has been released and its issue #50 ABI is stable;
 - the work is scoped as a separate feature with its own source lock and release
   identity;
 - Pluto Plus Utils owns the host command, validation, and receipts;
 - no shell sidecar or unbounded rootfs file is proposed as the production
   mechanism; and
-- B1 and B2 are authorized as diagnostic-only tests before behavioral code is
-  written.
-
+- B1 and B2 are implemented as first-class Pluto Plus Utils diagnostics and
+  pass on RAM-booted firmware before the feature can be promoted.
