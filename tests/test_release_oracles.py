@@ -468,6 +468,14 @@ def test_required_pr_gate_runs_root_tandem_rtl_suite() -> None:
     assert "./hdl-tandem/run_tests.sh" in offline_check
 
 
+def test_source_graph_gate_runs_pinned_iiod_supervisor_test() -> None:
+    workflow = FIRMWARE_PR_WORKFLOW.read_text(encoding="utf-8")
+    offline_check = TANDEM_OFFLINE_CHECK.read_text(encoding="utf-8")
+
+    assert "git submodule update --init --depth 1 buildroot" in workflow
+    assert "./buildroot/board/pluto/test_iiod_supervisor.sh" in offline_check
+
+
 def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
     launcher = TANDEM_OOC_LAUNCHER.read_text(encoding="utf-8")
     tcl = TANDEM_OOC_TCL.read_text(encoding="utf-8")
