@@ -100,6 +100,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "ddr-burst-v1-rc4-source.yaml:candidate" in package
     assert "ddr-burst-v1-rc5-source.yaml:candidate" in package
     assert "ddr-burst-v2-rc1-source.yaml:candidate" in package
+    assert "ddr-burst-v2-rc2-source.yaml:candidate" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -147,13 +148,15 @@ def test_ddr_burst_v2_has_exact_candidate_and_main_routes() -> None:
     branch = "refs/heads/codex/ddr-burst-v2"
 
     assert workflow.count(branch) == 4
-    assert workflow.count("'ddr-burst-v2-rc1-source.yaml'") == 2
+    assert workflow.count("'ddr-burst-v2-rc1-source.yaml'") == 1
+    assert workflow.count("'ddr-burst-v2-rc2-source.yaml'") == 1
     assert workflow.count("'plutoplus-spf-ddr-burst-v2'") == 1
-    assert workflow.count("'plutoplus-spf-ddr-burst-v2-rc1'") == 1
+    assert workflow.count("'plutoplus-spf-ddr-burst-v2-rc2'") == 1
     assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v2'") == 1
-    assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v2-rc1'") == 1
-    assert "Require the exact DDR burst v2 RC1 candidate identity" in workflow
+    assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v2-rc2'") == 1
+    assert "Require the exact DDR burst v2 RC2 candidate identity" in workflow
     assert "ddr-burst-v2-rc1-source.yaml:candidate" in package
+    assert "ddr-burst-v2-rc2-source.yaml:candidate" in package
     assert (
         "SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh "
         "manifests/ddr-burst-v1-rc5-source.yaml"
@@ -161,8 +164,12 @@ def test_ddr_burst_v2_has_exact_candidate_and_main_routes() -> None:
     assert (
         "./scripts/check_source_graph.sh manifests/ddr-burst-v2-rc1-source.yaml"
     ) in checker
+    assert (
+        "./scripts/check_source_graph.sh manifests/ddr-burst-v2-rc2-source.yaml"
+    ) in checker
     for source in (builder, package, checker):
         assert "ddr-burst-v2-rc1-source.yaml" in source
+        assert "ddr-burst-v2-rc2-source.yaml" in source
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
