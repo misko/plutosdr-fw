@@ -82,9 +82,9 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'ddr-burst-v1-rc2-source.yaml' ||
+          'ddr-burst-v1-rc3-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-burst' &&
-          'ddr-burst-v1-rc2-source.yaml' ||
+          'ddr-burst-v1-rc3-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
           'tandem-agc-v8-rc32-source.yaml' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' &&
@@ -158,7 +158,7 @@ jobs:
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-ddr-burst-v1' ||
           github.ref == 'refs/heads/codex/ddr-burst' &&
-          'plutoplus-spf-ddr-burst-v1-rc2' ||
+          'plutoplus-spf-ddr-burst-v1-rc3' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc32' &&
           'plutoplus-spf-tandem-agc-v8-rc32' ||
           github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc31' &&
@@ -333,13 +333,13 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.42-plutoplus-spf-single-rx-metadata-rc1'
 
-      - name: Require the exact DDR burst RC2 RAM candidate identity
+      - name: Require the exact DDR burst RC3 RAM candidate identity
         if: github.ref == 'refs/heads/codex/ddr-burst'
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.42-plutoplus-spf-ddr-burst-v1-rc2'
+            'v0.42-plutoplus-spf-ddr-burst-v1-rc3'
 
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'

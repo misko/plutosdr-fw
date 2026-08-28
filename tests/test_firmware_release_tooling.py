@@ -96,6 +96,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "tandem-agc-v8-rc31-source.yaml:*" in package
     assert "tandem-agc-v8-rc32-source.yaml:*" in package
     assert "ddr-burst-v1-rc2-source.yaml:candidate" in package
+    assert "ddr-burst-v1-rc3-source.yaml:candidate" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -118,23 +119,23 @@ def test_single_rx_metadata_candidate_has_an_exact_protected_route() -> None:
         assert "single-rx-metadata-rc1-source.yaml" in source
 
 
-def test_ddr_burst_rc2_has_exact_candidate_and_main_routes() -> None:
+def test_ddr_burst_rc3_has_exact_candidate_and_main_routes() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     branch = "refs/heads/codex/ddr-burst"
 
     assert workflow.count(branch) == 4
-    assert workflow.count("'ddr-burst-v1-rc2-source.yaml'") == 2
+    assert workflow.count("'ddr-burst-v1-rc3-source.yaml'") == 2
     assert workflow.count("'plutoplus-spf-ddr-burst-v1'") == 1
-    assert workflow.count("'plutoplus-spf-ddr-burst-v1-rc2'") == 1
+    assert workflow.count("'plutoplus-spf-ddr-burst-v1-rc3'") == 1
     assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v1'") == 1
-    assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v1-rc2'") == 1
-    assert "Require the exact DDR burst RC2 RAM candidate identity" in workflow
-    assert "ddr-burst-v1-rc2-source.yaml:candidate" in package
-    assert "v0.42-plutoplus-spf-ddr-burst-v1-rc2" in package
+    assert workflow.count("'v0.42-plutoplus-spf-ddr-burst-v1-rc3'") == 1
+    assert "Require the exact DDR burst RC3 RAM candidate identity" in workflow
+    assert "ddr-burst-v1-rc3-source.yaml:candidate" in package
+    assert "v0.42-plutoplus-spf-ddr-burst-v1-rc3" in package
     for source in (builder, package):
-        assert "ddr-burst-v1-rc2-source.yaml" in source
+        assert "ddr-burst-v1-rc3-source.yaml" in source
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
