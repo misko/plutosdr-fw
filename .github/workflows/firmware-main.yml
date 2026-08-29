@@ -39,6 +39,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
+         github.ref == 'refs/heads/codex/issue-63-ddr-prefill' ||
          github.ref == 'refs/heads/codex/ddr-ring-v1' ||
          github.ref == 'refs/heads/codex/ddr-burst-v2' ||
          github.ref == 'refs/heads/codex/ddr-burst' ||
@@ -88,6 +89,8 @@ jobs:
           'ddr-ring-v1-rc2-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/issue-63-ddr-prefill' &&
+          'ddr-ring-prefill-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-ring-v1' &&
           'ddr-ring-v1-rc2-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-burst-v2' &&
@@ -168,6 +171,8 @@ jobs:
           'plutoplus-spf-ddr-ring-v1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
+          github.ref == 'refs/heads/codex/issue-63-ddr-prefill' &&
+          'plutoplus-spf-ddr-ring-prefill-v1-rc1' ||
           github.ref == 'refs/heads/codex/ddr-ring-v1' &&
           'plutoplus-spf-ddr-ring-v1-rc2' ||
           github.ref == 'refs/heads/codex/ddr-burst-v2' &&
@@ -379,6 +384,14 @@ jobs:
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.43-plutoplus-spf-ddr-ring-v1-rc2'
+
+      - name: Require the exact DDR ring prefill v1 RC1 candidate identity
+        if: github.ref == 'refs/heads/codex/issue-63-ddr-prefill'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1'
 
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'

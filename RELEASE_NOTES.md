@@ -57,6 +57,7 @@
 | `ddr-burst-v2-rc3` | 2026-08-28 | **hardware-qualified release source; final bytes pending** | 12 ms floor passed two-PHY USB/IP, maximum-burst, repeated fresh-context, and abrupt-client recovery gates |
 | `ddr-ring-v1-rc1` | 2026-08-29 | **implementation candidate; superseded** | introduced the optional streaming Pluto DDR ring behind ordinary metadata-buffer refills |
 | `ddr-ring-v1-rc2` | 2026-08-29 | **hardware-qualified release source; final bytes pending** | fixes the exclusive status boundary; exact candidate passed direct USB, physical Ethernet, wrap, recovery, and ordinary-IIO gates on AD9361 and AD9363A hardware |
+| `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **implementation complete; CI and hardware pending** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -64,6 +65,35 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1 — 2026-08-29 — **implementation complete; CI and hardware pending**
+
+This candidate fixes the two coupled failures exposed by 20 MS/s physical-IP
+capture. The v0.43 ring consumer started after the first committed frame, so
+Ethernet copy and IRQ work competed with DMA throughout capture; the nominal
+200 MB allocation never became an initial burst reserve. When transport fell
+behind, the metadata provider then treated the first FPGA counter gap as a
+terminal `EOVERFLOW`. The ordinary path already had the information required
+to describe that pressure gap, but the ring path failed instead of extending
+the ordinary buffer behavior.
+
+RC1 now withholds the consumer until the complete admitted ring is committed
+(or until a smaller finite target is complete). That prefix remains strict:
+any counter gap prevents it from being claimed as contiguous. During a longer
+capture, the consumer retains a low-water reserve and later source-pressure
+gaps are encoded by ABI 3's exact missing-sample count plus device-overflow
+flag. The capture still delivers every requested host frame and reaches clean
+`target_complete`; status freezes the last contiguous and first unavailable
+sample boundary at the first later gap. Sealed DDR burst behavior is unchanged.
+
+The matching Pluto Plus Utils transport gate defaults tandem AGC to HOLD,
+scales the IIO timeout to cover the entire prefill at low rates, and separately
+proves target closure, full high-water, contiguous prefix bytes, later gap
+count, and delivery fraction. The binding contract is a 20 MS/s, 20-second,
+single-RX physical-IP comparison with and without a 200 MB ring. The ring must
+prove its first 200,000,000 IQ bytes contiguous; both modes must finish without
+a transport-pressure exception. CI image construction, guarded RAM boot, and
+the paired hardware run remain release gates.
 
 ## v0.43-plutoplus-spf-ddr-ring-v1-rc2 — 2026-08-29 — **hardware-qualified release source; final bytes pending**
 
