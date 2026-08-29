@@ -10,6 +10,61 @@ extension. Pluto Plus Utils keeps separate immutable RAM-only and persistent
 profiles; only the exact hardware-qualified release profile permits QSPI
 promotion.
 
+## Optional streaming ring extension (issue #61)
+
+The next additive candidate keeps the qualified sealed burst above intact and
+adds a second, independently negotiated mode. Its logical queue is:
+
+```text
+FPGA sample counter / AXI DMAC
+        -> bounded kernel CMA buffers
+        -> prefaulted normal-DDR whole-frame ring
+        -> ordinary iiOD USB or IP response
+        -> existing libiio metadata refill
+```
+
+This is a natural extension of the DMA queue, not a second capture file and not
+a claim that 200 MB can be allocated as coherent DMA. The kernel continues to
+own the qualified CMA blocks; a dedicated iiOD producer refills those blocks
+and commits paired metadata plus IQ into normal DDR while the existing reader
+drains committed slots. Producer, committed, consumer and free ownership are
+explicit. A slot cannot be overwritten until its complete wire response has
+been delivered.
+
+The mode is omitted by default. A versioned `SFRR` suffix requests a capacity
+of at most 200,000,000 IQ bytes and exactly one of:
+
+- a positive finite frame target; or
+- explicit continuous capture until buffer close.
+
+Capacity rounds down to complete existing IIO frames. Single-RX layout, the
+12-ms safe frame-period floor, 128-MiB ordinary-memory reserve, 16-MiB CMA
+reserve, and shared one-arena reservation are enforced before capture starts.
+Legacy sealed burst, host metadata batching and the streaming ring are mutually
+exclusive. Ordinary buffers and dual RX remain unchanged.
+
+Full-ring behavior is backpressure: iiOD stops requesting the next DMA block
+until the consumer releases a slot. The already-queued kernel blocks absorb a
+short transport stall. If that window is exceeded, the authoritative FPGA
+counter detects the first discontinuity; no synthetic continuity or silent
+overwrite is permitted. Committed frames drain in order, then the original
+producer error is returned. Disconnect cancels DMA, joins the producer, frees
+the arena and reservation, and preserves immediate ordinary/ring reuse.
+
+The ordinary IIO buffer also exposes a non-consuming 128-byte `SFRS` snapshot:
+state, terminal reason/error, requested and admitted capacity, finite target,
+produced/consumed frames, high-water mark, wraps, producer/consumer positions,
+and valid last-contiguous/first-unavailable sample boundaries. Python selects
+the mode with `ddr_ring_bytes`, `ddr_ring_frames`, and the explicit
+`ddr_ring_continuous` flag, then reads status with `ddr_ring_status()`.
+
+Implementation source is locked at libiio
+`739a250b92610184b12d773f6a367e549f0dfe29` and Buildroot
+`879afd8facb69519ed2328b39d80d6905e416247`. Native stock/SPF/sanitized builds,
+portable unit tests, Python contract tests, and a live attached-Pluto proxy
+test pass. Firmware CI, RAM deployment, transport ladders, forced disconnect,
+memory recovery and ordinary-path regression remain promotion gates.
+
 ## Final release and promotion result
 
 Release `v0.42-plutoplus-spf-ddr-burst-v1` is the source-locked firmware commit

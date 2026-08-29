@@ -52,6 +52,9 @@ DDR_BURST_V2_RC2_SOURCE_MANIFEST = (
 DDR_BURST_V2_RC3_SOURCE_MANIFEST = (
     ROOT / "manifests" / "ddr-burst-v2-rc3-source.yaml"
 )
+DDR_RING_V1_RC1_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "ddr-ring-v1-rc1-source.yaml"
+)
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 FIRMWARE_PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
@@ -398,6 +401,27 @@ def test_ddr_burst_v2_rc3_advances_only_libiio_and_buildroot() -> None:
     )
     assert current["submodule_buildroot"] == (
         "0e97416c103e5fee0611cc94f0b3935757da943d"
+    )
+    assert "release_tag" not in current
+
+
+def test_ddr_ring_v1_rc1_advances_only_libiio_and_buildroot() -> None:
+    previous = _manifest_values(DDR_BURST_V2_RC3_SOURCE_MANIFEST)
+    current = _manifest_values(DDR_RING_V1_RC1_SOURCE_MANIFEST)
+    changed = {key for key, value in previous.items() if current[key] != value}
+
+    assert changed == {
+        "libiio_0_25_source",
+        "libiio_0_25_ref",
+        "submodule_buildroot",
+        "submodule_buildroot_ref",
+        "versions_buildroot",
+    }
+    assert current["libiio_0_25_source"] == (
+        "739a250b92610184b12d773f6a367e549f0dfe29"
+    )
+    assert current["submodule_buildroot"] == (
+        "879afd8facb69519ed2328b39d80d6905e416247"
     )
     assert "release_tag" not in current
 
