@@ -57,7 +57,8 @@
 | `ddr-burst-v2-rc3` | 2026-08-28 | **hardware-qualified release source; final bytes pending** | 12 ms floor passed two-PHY USB/IP, maximum-burst, repeated fresh-context, and abrupt-client recovery gates |
 | `ddr-ring-v1-rc1` | 2026-08-29 | **implementation candidate; superseded** | introduced the optional streaming Pluto DDR ring behind ordinary metadata-buffer refills |
 | `ddr-ring-v1-rc2` | 2026-08-29 | **hardware-qualified release source; final bytes pending** | fixes the exclusive status boundary; exact candidate passed direct USB, physical Ethernet, wrap, recovery, and ordinary-IIO gates on AD9361 and AD9363A hardware |
-| `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; final bytes pending** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
+| `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
+| **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -66,7 +67,35 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1 — 2026-08-29 — **hardware-qualified release source; final bytes pending**
+## v0.44-plutoplus-spf-ddr-ring-prefill-v1 — 2026-08-29 — **current hardware-qualified release**
+
+This final release promotes the RC1 source after rebasing it onto the current
+main trajectory. Pull request #65 merged as exact source commit
+`0c49d6837847cefba9b139106dcffb1942f0ee22`. Protected build `33268280819`
+passed all source-lock, routed timing, packaging, version, payload, and
+provenance gates. The release DFU SHA-256 is
+`eb7d39f2f456d79f005239ddcff204166c9c607cd3647f1dd90464f99f439925`;
+the FIT-body SHA-256 is
+`589a33b865161ac5820031ae0666d7b04b5346f0aad56fc422dd94a50f43c24d`.
+
+The exact final bytes first passed guarded RAM boot on local AD9363A serial
+`104000bac4950008230026001b440a003a` over its physical `192.168.1.17`
+Ethernet endpoint. A ring-disabled 20 MS/s, 20-second capture returned all
+400 frames without a terminal error. Two independent 200 MB ring runs each
+returned 400/400 frames, reached `target_complete` with error zero and eight
+wraps, and proved a 50-frame, 200,000,000-byte contiguous initial prefix.
+Later source-pressure gaps were reported exactly through ABI 3 metadata.
+
+The same guarded qualification then flashed the final image to QSPI over the
+network. Following a cold persistent boot, both the ring-disabled test and the
+200 MB ring test again returned 400/400 frames; the ring retained the exact
+50-frame contiguous prefix, `target_complete`, error zero, and eight wraps.
+iiOD recovered with no active buffers, about 450 MB available memory, about
+66 MB free CMA, and zero tandem or FIFO faults. The public release, firmware,
+provenance, checksums, and qualification reports are attached to
+[v0.44-plutoplus-spf-ddr-ring-prefill-v1](https://github.com/misko/plutosdr-fw/releases/tag/v0.44-plutoplus-spf-ddr-ring-prefill-v1).
+
+## v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1 — 2026-08-29 — **hardware-qualified release source; promoted**
 
 This candidate fixes the two coupled failures exposed by 20 MS/s physical-IP
 capture. The v0.43 ring consumer started after the first committed frame, so
@@ -114,8 +143,8 @@ frames beyond the required prefix, before the first transport-pressure gap.
 After the two long ring captures, iiOD remained in generation 1 with no active
 RX buffers, about 450 MB of available ordinary memory, about 66 MB of free CMA,
 and zero tandem faults or FIFO overflow. An immediate ring-disabled recovery
-capture completed and restored settings. The final version-stamped bytes must
-repeat the focused RAM gate before persistent promotion or publication.
+capture completed and restored settings. The final version-stamped bytes
+repeated this focused RAM gate and persistent promotion as recorded above.
 
 ## v0.43-plutoplus-spf-ddr-ring-v1-rc2 — 2026-08-29 — **hardware-qualified release source; final bytes pending**
 
