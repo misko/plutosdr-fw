@@ -23,7 +23,7 @@ fail() {
 # source locks retain their original package path unless a waiver inventory is
 # explicitly supplied by their trusted workflow.
 case "$(basename "$MANIFEST")" in
-ddr-burst-v2-rc3-source.yaml | ddr-burst-v2-rc2-source.yaml | ddr-burst-v2-rc1-source.yaml | ddr-burst-v1-rc5-source.yaml | ddr-burst-v1-rc4-source.yaml | ddr-burst-v1-rc3-source.yaml | \
+ddr-ring-v1-rc2-source.yaml | ddr-ring-v1-rc1-source.yaml | ddr-burst-v2-rc3-source.yaml | ddr-burst-v2-rc2-source.yaml | ddr-burst-v2-rc1-source.yaml | ddr-burst-v1-rc5-source.yaml | ddr-burst-v1-rc4-source.yaml | ddr-burst-v1-rc3-source.yaml | \
 tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc7-source.yaml | tandem-agc-v8-rc8-source.yaml | tandem-agc-v8-rc9-source.yaml | tandem-agc-v8-rc10-source.yaml | tandem-agc-v8-rc11-source.yaml | tandem-agc-v8-rc12-source.yaml | tandem-agc-v8-rc13-source.yaml | tandem-agc-v8-rc14-source.yaml | tandem-agc-v8-rc15-source.yaml | tandem-agc-v8-rc16-source.yaml | tandem-agc-v8-rc17-source.yaml | tandem-agc-v8-rc18-source.yaml | tandem-agc-v8-rc19-source.yaml | tandem-agc-v8-rc20-source.yaml | tandem-agc-v8-rc21-source.yaml | tandem-agc-v8-rc22-source.yaml | tandem-agc-v8-rc23-source.yaml | tandem-agc-v8-rc24-source.yaml | tandem-agc-v8-rc25-source.yaml | tandem-agc-v8-rc26-source.yaml | tandem-agc-v8-rc27-source.yaml | tandem-agc-v8-rc28-source.yaml | tandem-agc-v8-rc29-source.yaml | tandem-agc-v8-rc30-source.yaml | tandem-agc-v8-rc31-source.yaml | tandem-agc-v8-rc32-source.yaml | tandem-agc-v8-source.yaml | metadata-timeout-main-v1-source.yaml | single-rx-metadata-rc1-source.yaml | ddr-burst-v1-rc1-source.yaml | ddr-burst-v1-rc2-source.yaml)
     manifest_name="$(basename -- "$MANIFEST")"
     canonical_manifest="${ROOT}/manifests/${manifest_name}"
@@ -329,6 +329,15 @@ ddr-burst-v2-rc2-source.yaml:candidate)
     ;;
 ddr-burst-v2-rc3-source.yaml:candidate)
     protected_version='v0.42-plutoplus-spf-ddr-burst-v2-rc3'
+    ;;
+ddr-ring-v1-rc1-source.yaml:candidate)
+    protected_version='v0.43-plutoplus-spf-ddr-ring-v1-rc1'
+    ;;
+ddr-ring-v1-rc2-source.yaml:candidate)
+    protected_version='v0.43-plutoplus-spf-ddr-ring-v1-rc2'
+    ;;
+ddr-ring-v1-rc2-source.yaml:final-release)
+    protected_version='v0.43-plutoplus-spf-ddr-ring-v1'
     ;;
 tandem-agc-v8-source.yaml:final-release)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8'
