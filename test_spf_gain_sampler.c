@@ -42,6 +42,20 @@ int main(void)
 	atomic_init(&sampler.idle, false);
 	atomic_init(&sampler.failed, false);
 	atomic_init(&sampler.stop_requested, false);
+	atomic_init(&sampler.force_observation, false);
+	sampler.interval_samples = UINT32_C(250000);
+	assert(!spf_gain_sampler_observation_due(
+		&sampler, UINT32_C(1000), UINT32_C(900)));
+	atomic_store(&sampler.force_observation, true);
+	assert(spf_gain_sampler_observation_due(
+		&sampler, UINT32_C(1000), UINT32_C(900)));
+	assert(!atomic_load(&sampler.force_observation));
+	assert(spf_gain_sampler_observation_due(
+		&sampler, UINT32_C(251000), UINT32_C(1000)));
+	sampler.interval_samples = UINT32_C(512);
+	assert(spf_gain_sampler_observation_due(
+		&sampler, UINT32_C(256), UINT32_C(0xFFFFFF00)));
+	sampler.interval_samples = UINT32_C(250000);
 	spf_gain_sampler_limit(&sampler, UINT64_C(4096));
 	assert(sampler.bounded);
 	assert(sampler.sample_credit == UINT64_C(4096));
@@ -51,11 +65,14 @@ int main(void)
 	assert(pthread_create(&announcer, NULL, announce_observation, &sampler) == 0);
 	assert(spf_gain_sampler_limit_and_wait_started(
 		&sampler, UINT64_C(2048), UINT32_C(100)));
+	assert(atomic_load(&sampler.force_observation));
+	atomic_store(&sampler.force_observation, false);
 	assert(spf_gain_sampler_finish_capture(&sampler, UINT32_C(100)));
 	assert(pthread_join(announcer, NULL) == 0);
 	assert(sampler.sample_credit == UINT64_C(2048));
 	assert(!spf_gain_sampler_limit_and_wait_started(
 		&sampler, UINT64_C(2048), UINT32_C(1)));
+	assert(!atomic_load(&sampler.force_observation));
 	assert(!spf_gain_sampler_is_idle(&sampler));
 	sampler.count = 2;
 	sampler.records[0] = (spf_gain_observation_v3_t){

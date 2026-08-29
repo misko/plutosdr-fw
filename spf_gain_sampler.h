@@ -40,6 +40,7 @@ typedef struct
 	atomic_bool ready;
 	atomic_bool failed;
 	atomic_bool idle;
+	atomic_bool force_observation;
 	bool bounded;
 	uint64_t sample_credit;
 	uint64_t capture_requested;
@@ -93,6 +94,14 @@ void spf_gain_sampler_add_credit(
 
 /* True while a bounded sampler is asleep with no capture credit. */
 bool spf_gain_sampler_is_idle(const spf_gain_sampler_t *sampler);
+
+/* Consume a refill fence's immediate-observation request, or apply the
+ * ordinary counter interval. This keeps refill admission independent of a
+ * deliberately sparse HOLD observation cadence. */
+bool spf_gain_sampler_observation_due(
+	spf_gain_sampler_t *sampler,
+	uint32_t current_sample,
+	uint32_t last_sampled);
 
 /*
  * Copy ordered observations overlapping [frame_start, frame_start+samples).

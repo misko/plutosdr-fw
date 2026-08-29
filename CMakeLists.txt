@@ -109,7 +109,8 @@ if (BUILD_HOST_TESTS)
         test_spf_gain_sampler.c
         spf_gain_sampler.c
 		spf_gain_read.c
-		spf_rssi_read.c)
+		spf_rssi_read.c
+		spf_thread_join.c)
     target_link_libraries(test_spf_gain_sampler iio pthread)
     add_test(NAME spf_gain_sampler COMMAND test_spf_gain_sampler)
 

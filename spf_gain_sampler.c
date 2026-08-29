@@ -145,7 +145,8 @@ static void *sampler_thread(void *opaque)
 			atomic_store(&sampler->failed, true);
 			break;
 		}
-		if ((uint32_t)(current - last_sampled) < sampler->interval_samples)
+		if (!spf_gain_sampler_observation_due(
+				sampler, current, last_sampled))
 		{
 			nanosleep(&poll_delay, NULL);
 			continue;
@@ -162,6 +163,8 @@ static void *sampler_thread(void *opaque)
 		{
 			capture_generation = sampler->capture_requested;
 			sampler->capture_started = capture_generation;
+			atomic_store_explicit(&sampler->force_observation, false,
+				memory_order_release);
 		}
 		pthread_cond_broadcast(&sampler->credit_cond);
 		pthread_mutex_unlock(&sampler->mutex);
@@ -273,6 +276,7 @@ bool spf_gain_sampler_start(
 	atomic_init(&sampler->ready, false);
 	atomic_init(&sampler->failed, false);
 	atomic_init(&sampler->idle, false);
+	atomic_init(&sampler->force_observation, false);
 	if (pthread_mutex_init(&sampler->mutex, NULL) != 0)
 		return false;
 	sampler->mutex_initialized = true;
@@ -381,6 +385,8 @@ bool spf_gain_sampler_limit_and_wait_started(
 	const uint64_t target = ++sampler->capture_requested;
 	sampler->bounded = true;
 	sampler->sample_credit = samples;
+	atomic_store_explicit(
+		&sampler->force_observation, true, memory_order_release);
 	pthread_cond_broadcast(&sampler->credit_cond);
 	int wait_result = 0;
 	while (sampler->capture_started < target &&
@@ -396,6 +402,8 @@ bool spf_gain_sampler_limit_and_wait_started(
 	const bool started = sampler->capture_started >= target;
 	if (!started)
 	{
+		atomic_store_explicit(
+			&sampler->force_observation, false, memory_order_release);
 		sampler->capture_finished = target;
 		pthread_cond_broadcast(&sampler->credit_cond);
 	}
@@ -462,6 +470,20 @@ bool spf_gain_sampler_is_idle(const spf_gain_sampler_t *sampler)
 {
 	return sampler && atomic_load_explicit(
 		&sampler->idle, memory_order_acquire);
+}
+
+bool spf_gain_sampler_observation_due(
+	spf_gain_sampler_t *sampler,
+	uint32_t current_sample,
+	uint32_t last_sampled)
+{
+	if (!sampler || !sampler->interval_samples)
+		return false;
+	if (atomic_exchange_explicit(
+			&sampler->force_observation, false, memory_order_acq_rel))
+		return true;
+	return (uint32_t)(current_sample - last_sampled) >=
+		sampler->interval_samples;
 }
 
 uint16_t spf_gain_sampler_collect(
