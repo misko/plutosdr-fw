@@ -86,7 +86,7 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'ddr-ring-v1-rc2-source.yaml' ||
+          'ddr-ring-prefill-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-63-ddr-prefill' &&
@@ -168,7 +168,7 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-ddr-ring-v1' ||
+          'plutoplus-spf-ddr-ring-prefill-v1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
           github.ref == 'refs/heads/codex/issue-63-ddr-prefill' &&
@@ -553,7 +553,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.43-plutoplus-spf-ddr-ring-v1'
+            'v0.44-plutoplus-spf-ddr-ring-prefill-v1'
 
       - name: Build, validate, and package
         id: build

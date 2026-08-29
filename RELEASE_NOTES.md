@@ -57,7 +57,7 @@
 | `ddr-burst-v2-rc3` | 2026-08-28 | **hardware-qualified release source; final bytes pending** | 12 ms floor passed two-PHY USB/IP, maximum-burst, repeated fresh-context, and abrupt-client recovery gates |
 | `ddr-ring-v1-rc1` | 2026-08-29 | **implementation candidate; superseded** | introduced the optional streaming Pluto DDR ring behind ordinary metadata-buffer refills |
 | `ddr-ring-v1-rc2` | 2026-08-29 | **hardware-qualified release source; final bytes pending** | fixes the exclusive status boundary; exact candidate passed direct USB, physical Ethernet, wrap, recovery, and ordinary-IIO gates on AD9361 and AD9363A hardware |
-| `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **implementation complete; CI and hardware pending** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
+| `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; final bytes pending** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -66,7 +66,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1 — 2026-08-29 — **implementation complete; CI and hardware pending**
+## v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1 — 2026-08-29 — **hardware-qualified release source; final bytes pending**
 
 This candidate fixes the two coupled failures exposed by 20 MS/s physical-IP
 capture. The v0.43 ring consumer started after the first committed frame, so
@@ -92,8 +92,30 @@ proves target closure, full high-water, contiguous prefix bytes, later gap
 count, and delivery fraction. The binding contract is a 20 MS/s, 20-second,
 single-RX physical-IP comparison with and without a 200 MB ring. The ring must
 prove its first 200,000,000 IQ bytes contiguous; both modes must finish without
-a transport-pressure exception. CI image construction, guarded RAM boot, and
-the paired hardware run remain release gates.
+a transport-pressure exception.
+
+Protected build `33265953071` for exact source commit
+`ac100b76ec7577f74df92bdca678ef6a4ccc664b` passed source-lock, build, routed
+timing, packaging, and version gates. Its exact DFU SHA-256 is
+`0107fb1d57be2ade703bc6950ff64a20c9cf6efb06f3eb4ea71dabecbb4343fa`;
+the FIT-body SHA-256 is
+`ee61df2729cfd5e8f4b8f5c8b24994a56ae5f7b280f0a2ea7044372c0721e78e`.
+
+Those bytes passed guarded RAM boot on the local AD9363A radio with serial
+`104000bac4950008230026001b440a003a`, followed only through its physical
+`192.168.1.17` Ethernet endpoint. The ring-disabled 20 MS/s, 20-second capture
+returned all 400 one-million-sample frames without a terminal error and
+accounted for every source-pressure gap in ABI 3 metadata. Two independent
+200 MB ring runs also returned 400/400 frames with `target_complete`, error
+zero, a 50-frame high-water mark, eight wraps, and an exactly contiguous
+200,000,000-byte prefix. Both runs remained contiguous through 55 frames, five
+frames beyond the required prefix, before the first transport-pressure gap.
+
+After the two long ring captures, iiOD remained in generation 1 with no active
+RX buffers, about 450 MB of available ordinary memory, about 66 MB of free CMA,
+and zero tandem faults or FIFO overflow. An immediate ring-disabled recovery
+capture completed and restored settings. The final version-stamped bytes must
+repeat the focused RAM gate before persistent promotion or publication.
 
 ## v0.43-plutoplus-spf-ddr-ring-v1-rc2 — 2026-08-29 — **hardware-qualified release source; final bytes pending**
 
