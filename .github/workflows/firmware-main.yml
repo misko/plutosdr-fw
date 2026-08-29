@@ -39,6 +39,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
+         github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' ||
          github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' ||
          github.ref == 'refs/heads/codex/iio-throughput-prototype' ||
          github.ref == 'refs/heads/codex/issue-63-ddr-prefill' ||
@@ -91,6 +92,8 @@ jobs:
           'ddr-ring-prefill-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' &&
+          'iio-throughput-timing-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' &&
           'iio-throughput-hold-v2-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-prototype' &&
@@ -177,6 +180,8 @@ jobs:
           'plutoplus-spf-ddr-ring-prefill-v1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' &&
+          'plutoplus-spf-iio-throughput-timing-v1-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' &&
           'plutoplus-spf-iio-throughput-hold-v2-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-prototype' &&
@@ -418,6 +423,14 @@ jobs:
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.45-plutoplus-spf-iio-throughput-hold-v2-rc1'
+
+      - name: Require the exact IIO throughput timing v1 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-timing-v1-rc1'
 
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'
