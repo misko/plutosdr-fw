@@ -106,6 +106,8 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "ddr-ring-v1-rc1-source.yaml:candidate" in package
     assert "ddr-ring-v1-rc2-source.yaml:candidate" in package
     assert "ddr-ring-v1-rc2-source.yaml:final-release" in package
+    assert "ddr-ring-prefill-v1-rc1-source.yaml:candidate" in package
+    assert "ddr-ring-prefill-v1-rc1-source.yaml:final-release" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -207,7 +209,7 @@ def test_ddr_capacity_candidate_has_an_exact_protected_route() -> None:
         assert "ddr-capacity-test-rc1-source.yaml" in source
 
 
-def test_ddr_ring_v1_has_exact_rc2_candidate_and_main_routes() -> None:
+def test_ddr_ring_v1_keeps_its_exact_historical_rc2_candidate_route() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
@@ -216,10 +218,10 @@ def test_ddr_ring_v1_has_exact_rc2_candidate_and_main_routes() -> None:
 
     assert workflow.count(branch) == 4
     assert workflow.count("'ddr-ring-v1-rc1-source.yaml'") == 0
-    assert workflow.count("'ddr-ring-v1-rc2-source.yaml'") == 2
-    assert workflow.count("'plutoplus-spf-ddr-ring-v1'") == 1
+    assert workflow.count("'ddr-ring-v1-rc2-source.yaml'") == 1
+    assert workflow.count("'plutoplus-spf-ddr-ring-v1'") == 0
     assert workflow.count("'plutoplus-spf-ddr-ring-v1-rc2'") == 1
-    assert workflow.count("'v0.43-plutoplus-spf-ddr-ring-v1'") == 1
+    assert workflow.count("'v0.43-plutoplus-spf-ddr-ring-v1'") == 0
     assert workflow.count("'v0.43-plutoplus-spf-ddr-ring-v1-rc2'") == 1
     assert "Require the exact DDR ring v1 RC2 candidate identity" in workflow
     assert "ddr-ring-v1-rc1-source.yaml:candidate" in package
@@ -230,11 +232,36 @@ def test_ddr_ring_v1_has_exact_rc2_candidate_and_main_routes() -> None:
         "manifests/ddr-ring-v1-rc1-source.yaml"
     ) in checker
     assert (
-        "./scripts/check_source_graph.sh manifests/ddr-ring-v1-rc2-source.yaml"
+        "SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh "
+        "manifests/ddr-ring-v1-rc2-source.yaml"
     ) in checker
     for source in (builder, package, checker):
         assert "ddr-ring-v1-rc1-source.yaml" in source
         assert "ddr-ring-v1-rc2-source.yaml" in source
+
+
+def test_ddr_ring_prefill_v1_has_exact_rc1_candidate_and_main_routes() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    checker = (ROOT / "scripts" / "check_tandem_release_offline.sh").read_text()
+    branch = "refs/heads/codex/issue-63-ddr-prefill"
+
+    assert workflow.count(branch) == 4
+    assert workflow.count("'ddr-ring-prefill-v1-rc1-source.yaml'") == 2
+    assert workflow.count("'plutoplus-spf-ddr-ring-prefill-v1'") == 1
+    assert workflow.count("'plutoplus-spf-ddr-ring-prefill-v1-rc1'") == 1
+    assert workflow.count("'v0.44-plutoplus-spf-ddr-ring-prefill-v1'") == 1
+    assert workflow.count("'v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1'") == 1
+    assert "Require the exact DDR ring prefill v1 RC1 candidate identity" in workflow
+    assert "Require the exact final release identity" in workflow
+    assert "ddr-ring-prefill-v1-rc1-source.yaml:candidate" in package
+    assert "ddr-ring-prefill-v1-rc1-source.yaml:final-release" in package
+    assert (
+        "./scripts/check_source_graph.sh manifests/ddr-ring-prefill-v1-rc1-source.yaml"
+    ) in checker
+    for source in (builder, package, checker):
+        assert "ddr-ring-prefill-v1-rc1-source.yaml" in source
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
