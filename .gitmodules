@@ -16,7 +16,7 @@
 [submodule "buildroot"]
 	path = buildroot
 	url = https://github.com/misko/plutosdr-fw.git
-	branch = codex/ddr-burst-rc2-buildroot
+	branch = codex/ddr-ring-v1-buildroot
 
 [submodule "linux"]
 	path = linux

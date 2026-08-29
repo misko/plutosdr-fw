@@ -10,6 +10,101 @@ extension. Pluto Plus Utils keeps separate immutable RAM-only and persistent
 profiles; only the exact hardware-qualified release profile permits QSPI
 promotion.
 
+## Optional streaming ring extension (issue #61)
+
+The next additive candidate keeps the qualified sealed burst above intact and
+adds a second, independently negotiated mode. Its logical queue is:
+
+```text
+FPGA sample counter / AXI DMAC
+        -> bounded kernel CMA buffers
+        -> prefaulted normal-DDR whole-frame ring
+        -> ordinary iiOD USB or IP response
+        -> existing libiio metadata refill
+```
+
+This is a natural extension of the DMA queue, not a second capture file and not
+a claim that 200 MB can be allocated as coherent DMA. The kernel continues to
+own the qualified CMA blocks; a dedicated iiOD producer refills those blocks
+and commits paired metadata plus IQ into normal DDR while the existing reader
+drains committed slots. Producer, committed, consumer and free ownership are
+explicit. A slot cannot be overwritten until its complete wire response has
+been delivered.
+
+The mode is omitted by default. A versioned `SFRR` suffix requests a capacity
+of at most 200,000,000 IQ bytes and exactly one of:
+
+- a positive finite frame target; or
+- explicit continuous capture until buffer close.
+
+Capacity rounds down to complete existing IIO frames. Single-RX layout, the
+12-ms safe frame-period floor, 128-MiB ordinary-memory reserve, 16-MiB CMA
+reserve, and shared one-arena reservation are enforced before capture starts.
+Legacy sealed burst, host metadata batching and the streaming ring are mutually
+exclusive. Ordinary buffers and dual RX remain unchanged.
+
+Full-ring behavior is backpressure: iiOD stops requesting the next DMA block
+until the consumer releases a slot. The already-queued kernel blocks absorb a
+short transport stall. If that window is exceeded, the authoritative FPGA
+counter detects the first discontinuity; no synthetic continuity or silent
+overwrite is permitted. Committed frames drain in order, then the original
+producer error is returned. Disconnect cancels DMA, joins the producer, frees
+the arena and reservation, and preserves immediate ordinary/ring reuse.
+
+The ordinary IIO buffer also exposes a non-consuming 128-byte `SFRS` snapshot:
+state, terminal reason/error, requested and admitted capacity, finite target,
+produced/consumed frames, high-water mark, wraps, producer/consumer positions,
+and valid last-contiguous/first-unavailable sample boundaries. Python selects
+the mode with `ddr_ring_bytes`, `ddr_ring_frames`, and the explicit
+`ddr_ring_continuous` flag, then reads status with `ddr_ring_status()`.
+
+RC2 implementation source is locked at firmware
+`33fe77ca631961d5230e678fddc0d802f1522d68`, libiio
+`1e5002702f3033f5bc741da315dfe5d5558ef394`, and Buildroot
+`afe53e01c2356125227bd58b5551ad9a6aae1121`. Protected build run
+`33230249900` passed the complete nested checksum inventory, integrated-route
+verdict, and timing (WNS +0.767 ns, WHS +0.019 ns). Its RAM-qualified DFU is
+12,809,971 bytes with SHA-256
+`0da8fc12ac8677b18b17f203903cd3e65dca171d31d65f6ba25c6d5702066f91`;
+the FIT body is 12,809,955 bytes with SHA-256
+`19476b9f88e80cff1bfc34f42ad78a090eb35b6dd08ebc8339b855db5380462e`.
+
+The exact bytes were RAM-booted on one AD9361 and one AD9363A Pluto+. QSPI was
+not written. Both PHY variants and both receivers passed physical-Ethernet
+captures of 25,000,000 sample times (1.000 s at 25 MS/s) with a 200-MB ring,
+12 kernel buffers, exact counter closure, zero gaps/overflow, clean terminal
+status, and exact settings restoration. Both variants and receivers then
+passed 64-frame, 256-MB targets at 15 MS/s: the 50-slot ring wrapped once,
+high-water was 18--19 slots, and all 64,000,000 sample times remained
+contiguous. On the AD9363A, both receivers also passed 150-frame, 600-MB
+physical-Ethernet targets at 5 MS/s: exactly three wraps, 150,000,000
+contiguous sample times, and high-water one slot.
+
+Direct USB on the AD9361 passed RX0 and RX1 64-frame wraps at 25 MS/s. Two
+alternating abrupt-client ring recovery cycles passed: the killed client was
+followed immediately by clean ring and ordinary probes, with unchanged boot
+ID/iiOD PID/generation, zero live buffers, zero tandem faults/overflow, safe TX,
+and restored settings. Ordinary dual-RX controls pass after ring operation.
+
+The measured concurrent-IP limit is explicit rather than hidden. A 50-frame,
+2.000-s 25-MS/s physical-Ethernet target fails closed before DDR exhaustion:
+with four kernel buffers the terminal snapshot reports 9 produced/consumed
+frames and high-water 5/50; with 12 buffers it reaches 42 frames and high-water
+23/50. The first unavailable counter boundary is reported, unread slots are
+never overwritten, tandem fault/overflow remains zero, resources recover, and
+ordinary capture works immediately. Therefore this release qualifies 1.000 s
+at 25 MS/s over IP, longer wrapped IP captures at rates the transport/service
+envelope sustains, and truthful overflow outside that envelope; it does not
+promise a 2-second 25-MS/s concurrent-IP stream.
+
+Pluto Plus Utils `main` merge `3d3f086` provides the immutable RC2 profile,
+exact host runtime, constant-memory long ladders, terminal failure snapshots,
+route isolation, recovery qualification, and read-only tandem runtime health.
+Its local gate is 894 passed / 11 explicit opt-in skips with Ruff and mypy
+clean; all Python 3.11--3.13 and browser CI checks passed. Final source merge,
+protected-main rebuild, focused exact-byte RAM recheck, persistent profile,
+and release publication remain promotion gates.
+
 ## Final release and promotion result
 
 Release `v0.42-plutoplus-spf-ddr-burst-v1` is the source-locked firmware commit
