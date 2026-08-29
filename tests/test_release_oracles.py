@@ -503,7 +503,7 @@ def test_ddr_ring_prefill_v1_rc1_advances_only_libiio_and_buildroot() -> None:
         "361c77ec1cf40e36c43598d025c7bf24bfb1c271"
     )
     assert current["submodule_buildroot"] == (
-        "337f71c866e440c69e51720b9f5c43233e960a99"
+        "dd1bf9e2ea775bcb047edf4c80eb68fb27d486c0"
     )
     assert "release_tag" not in current
 
