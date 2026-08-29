@@ -86,7 +86,7 @@ jobs:
           github.ref == 'refs/heads/main' &&
           'ddr-burst-v2-rc3-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-ring-v1' &&
-          'ddr-ring-v1-rc1-source.yaml' ||
+          'ddr-ring-v1-rc2-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-burst-v2' &&
           'ddr-burst-v2-rc3-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-burst' &&
@@ -164,7 +164,7 @@ jobs:
         ${{ github.ref == 'refs/heads/main' &&
           'plutoplus-spf-ddr-burst-v2' ||
           github.ref == 'refs/heads/codex/ddr-ring-v1' &&
-          'plutoplus-spf-ddr-ring-v1-rc1' ||
+          'plutoplus-spf-ddr-ring-v1-rc2' ||
           github.ref == 'refs/heads/codex/ddr-burst-v2' &&
           'plutoplus-spf-ddr-burst-v2-rc3' ||
           github.ref == 'refs/heads/codex/ddr-burst' &&
@@ -359,13 +359,13 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.42-plutoplus-spf-ddr-burst-v2-rc3'
 
-      - name: Require the exact DDR ring v1 RC1 candidate identity
+      - name: Require the exact DDR ring v1 RC2 candidate identity
         if: github.ref == 'refs/heads/codex/ddr-ring-v1'
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.43-plutoplus-spf-ddr-ring-v1-rc1'
+            'v0.43-plutoplus-spf-ddr-ring-v1-rc2'
 
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'
