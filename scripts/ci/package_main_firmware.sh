@@ -336,6 +336,9 @@ ddr-ring-v1-rc1-source.yaml:candidate)
 ddr-ring-v1-rc2-source.yaml:candidate)
     protected_version='v0.43-plutoplus-spf-ddr-ring-v1-rc2'
     ;;
+ddr-ring-v1-rc2-source.yaml:final-release)
+    protected_version='v0.43-plutoplus-spf-ddr-ring-v1'
+    ;;
 tandem-agc-v8-source.yaml:final-release)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8'
     ;;

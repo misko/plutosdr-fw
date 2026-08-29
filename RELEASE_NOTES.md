@@ -55,7 +55,8 @@
 | `ddr-burst-v2-rc1` | 2026-08-28 | **rejected; RAM only** | wrap-safe 8-bit FIFO event accounting and two-frame admission; hardware found deterministic whole-frame loss at 5 ms |
 | `ddr-burst-v2-rc2` | 2026-08-28 | **rejected; RAM only** | added an 8 ms pre-hardware floor; cross-device qualification reproduced intermittent loss at that exact boundary |
 | `ddr-burst-v2-rc3` | 2026-08-28 | **hardware-qualified release source; final bytes pending** | 12 ms floor passed two-PHY USB/IP, maximum-burst, repeated fresh-context, and abrupt-client recovery gates |
-| `ddr-ring-v1-rc1` | 2026-08-29 | **implementation candidate; not yet deployed** | optional streaming Pluto DDR ring behind ordinary metadata-buffer refills, with finite/continuous modes and live status |
+| `ddr-ring-v1-rc1` | 2026-08-29 | **implementation candidate; superseded** | introduced the optional streaming Pluto DDR ring behind ordinary metadata-buffer refills |
+| `ddr-ring-v1-rc2` | 2026-08-29 | **hardware-qualified release source; final bytes pending** | fixes the exclusive status boundary; exact candidate passed direct USB, physical Ethernet, wrap, recovery, and ordinary-IIO gates on AD9361 and AD9363A hardware |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -64,9 +65,9 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.43-plutoplus-spf-ddr-ring-v1-rc1 — 2026-08-29 — **implementation candidate; not yet deployed**
+## v0.43-plutoplus-spf-ddr-ring-v1-rc2 — 2026-08-29 — **hardware-qualified release source; final bytes pending**
 
-This candidate adds a separately negotiated, default-off DDR ring extension to
+RC1 added a separately negotiated, default-off DDR ring extension to
 the released RC32 / DDR burst v2 source graph. The existing sealed burst path
 is unchanged. The new path runs an iiOD DMA producer concurrently with the
 ordinary USB/IP reader and copies complete IQ-plus-metadata frames into a
@@ -86,14 +87,32 @@ frames, high-water mark, wraps, positions, and valid contiguous/unavailable
 sample boundaries. Python opts in with `ddr_ring_bytes` plus either a positive
 finite `ddr_ring_frames` target or explicit `ddr_ring_continuous=True`.
 Ambiguous burst/ring/batch combinations are rejected before opening hardware.
+RC2 changes only libiio/iiOD and fixes the status ABI's final-sample boundary
+to remain exclusive after a wrapped capture.
 
-Native stock, SPF-provider and sanitized builds pass, along with 26 Python
-contract tests and the protocol/state-machine regressions. A live USB-backed
-iiOD proxy against an attached Pluto passed ordinary metadata, legacy burst,
-finite two-slot wrap, ordered producer failure, continuous cancellation,
-interleaved status, teardown, and immediate reopen. Full firmware CI, RAM boot,
-USB/IP throughput ladders and recovery qualification remain required before
-promotion.
+Protected build `33230249900` for exact source commit
+`33fe77ca631961d5230e678fddc0d802f1522d68` passed source-lock, build, timing,
+packaging, and version gates. Its exact DFU SHA-256 is
+`0da8fc12ac8677b18b17f203903cd3e65dca171d31d65f6ba25c6d5702066f91`;
+the FIT-body SHA-256 is
+`19476b9f88e80cff1bfc34f42ad78a090eb35b6dd08ebc8339b855db5380462e`.
+
+Those bytes passed guarded RAM boot on one AD9361 and one AD9363A. Direct USB
+passed both single-RX paths at 25 MS/s through a complete 200 MB ring wrap with
+zero gaps or overflow. Physical Ethernet passed both paths on both radios at
+25 MS/s for exactly one second (100 MB) with 12 kernel buffers, and passed
+256 MB one-wrap captures at 15 MS/s. A 5 MS/s, 600 MB capture completed three
+full ring wraps with contiguous sample counters. Alternating RX recovery,
+ordinary dual-RX postflight, teardown, and immediate reuse all passed.
+
+The sustained-transport limit remains explicit: a two-second 25 MS/s Ethernet
+request outruns the current data path even though unread ring space remains.
+It fails closed with `EOVERFLOW`, retains the exact terminal boundary, and
+restores the ordinary IIO state. The supported 25 MS/s Ethernet claim is
+therefore one second; multi-wrap streaming is qualified only at the measured
+sustainable rates. RC2 is the qualified source graph for the final build. The
+final version-stamped bytes must repeat the focused RAM gate before persistent
+flash or publication.
 
 ## v0.42-plutoplus-spf-ddr-burst-v2-rc3 — 2026-08-28 — **hardware-qualified release source; final bytes pending**
 
