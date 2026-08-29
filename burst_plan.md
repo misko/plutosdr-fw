@@ -58,12 +58,52 @@ and valid last-contiguous/first-unavailable sample boundaries. Python selects
 the mode with `ddr_ring_bytes`, `ddr_ring_frames`, and the explicit
 `ddr_ring_continuous` flag, then reads status with `ddr_ring_status()`.
 
-Implementation source is locked at libiio
-`739a250b92610184b12d773f6a367e549f0dfe29` and Buildroot
-`879afd8facb69519ed2328b39d80d6905e416247`. Native stock/SPF/sanitized builds,
-portable unit tests, Python contract tests, and a live attached-Pluto proxy
-test pass. Firmware CI, RAM deployment, transport ladders, forced disconnect,
-memory recovery and ordinary-path regression remain promotion gates.
+RC2 implementation source is locked at firmware
+`33fe77ca631961d5230e678fddc0d802f1522d68`, libiio
+`1e5002702f3033f5bc741da315dfe5d5558ef394`, and Buildroot
+`afe53e01c2356125227bd58b5551ad9a6aae1121`. Protected build run
+`33230249900` passed the complete nested checksum inventory, integrated-route
+verdict, and timing (WNS +0.767 ns, WHS +0.019 ns). Its RAM-qualified DFU is
+12,809,971 bytes with SHA-256
+`0da8fc12ac8677b18b17f203903cd3e65dca171d31d65f6ba25c6d5702066f91`;
+the FIT body is 12,809,955 bytes with SHA-256
+`19476b9f88e80cff1bfc34f42ad78a090eb35b6dd08ebc8339b855db5380462e`.
+
+The exact bytes were RAM-booted on one AD9361 and one AD9363A Pluto+. QSPI was
+not written. Both PHY variants and both receivers passed physical-Ethernet
+captures of 25,000,000 sample times (1.000 s at 25 MS/s) with a 200-MB ring,
+12 kernel buffers, exact counter closure, zero gaps/overflow, clean terminal
+status, and exact settings restoration. Both variants and receivers then
+passed 64-frame, 256-MB targets at 15 MS/s: the 50-slot ring wrapped once,
+high-water was 18--19 slots, and all 64,000,000 sample times remained
+contiguous. On the AD9363A, both receivers also passed 150-frame, 600-MB
+physical-Ethernet targets at 5 MS/s: exactly three wraps, 150,000,000
+contiguous sample times, and high-water one slot.
+
+Direct USB on the AD9361 passed RX0 and RX1 64-frame wraps at 25 MS/s. Two
+alternating abrupt-client ring recovery cycles passed: the killed client was
+followed immediately by clean ring and ordinary probes, with unchanged boot
+ID/iiOD PID/generation, zero live buffers, zero tandem faults/overflow, safe TX,
+and restored settings. Ordinary dual-RX controls pass after ring operation.
+
+The measured concurrent-IP limit is explicit rather than hidden. A 50-frame,
+2.000-s 25-MS/s physical-Ethernet target fails closed before DDR exhaustion:
+with four kernel buffers the terminal snapshot reports 9 produced/consumed
+frames and high-water 5/50; with 12 buffers it reaches 42 frames and high-water
+23/50. The first unavailable counter boundary is reported, unread slots are
+never overwritten, tandem fault/overflow remains zero, resources recover, and
+ordinary capture works immediately. Therefore this release qualifies 1.000 s
+at 25 MS/s over IP, longer wrapped IP captures at rates the transport/service
+envelope sustains, and truthful overflow outside that envelope; it does not
+promise a 2-second 25-MS/s concurrent-IP stream.
+
+Pluto Plus Utils `main` merge `3d3f086` provides the immutable RC2 profile,
+exact host runtime, constant-memory long ladders, terminal failure snapshots,
+route isolation, recovery qualification, and read-only tandem runtime health.
+Its local gate is 894 passed / 11 explicit opt-in skips with Ruff and mypy
+clean; all Python 3.11--3.13 and browser CI checks passed. Final source merge,
+protected-main rebuild, focused exact-byte RAM recheck, persistent profile,
+and release publication remain promotion gates.
 
 ## Final release and promotion result
 
