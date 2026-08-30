@@ -101,15 +101,16 @@ def _public_iio() -> dict:
     values = {
         "abi_version": 1,
         "fault_flags": 0,
-        "features": 7,
+        "features": 15,
         "fifo_depth": 256,
         "fifo_level": 0,
-        "fpga_abi": 1,
+        "fpga_abi": 2,
         "fpga_identity": 0x54414732,
         "overflow_count": 0,
         "ownership_epoch": 0,
         "rx1_gain_index": 43,
         "rx2_gain_index": 43,
+        "sample_counter_fence_low": 0x12345678,
         "state": 0,
         "transition_count": 0,
     }
@@ -117,6 +118,33 @@ def _public_iio() -> dict:
         "attribute_names": list(stale.EXPECTED_IIO_ATTRIBUTES),
         "attribute_values": values,
     }
+
+
+@pytest.mark.parametrize("fence", (0, 0x12345678, 0xFFFFFFFF))
+def test_live_public_iio_inventory_accepts_the_full_u32_fence_domain(fence):
+    values = _public_iio()["attribute_values"] | {"sample_counter_fence_low": fence}
+    tandem = SimpleNamespace(
+        attrs={
+            name: SimpleNamespace(value=str(value)) for name, value in values.items()
+        }
+    )
+
+    observed = stale._inventory_public_iio(tandem)
+
+    assert observed["attribute_values"]["sample_counter_fence_low"] == fence
+
+
+@pytest.mark.parametrize("fence", (-1, 2**32))
+def test_live_public_iio_inventory_rejects_an_out_of_range_fence(fence):
+    values = _public_iio()["attribute_values"] | {"sample_counter_fence_low": fence}
+    tandem = SimpleNamespace(
+        attrs={
+            name: SimpleNamespace(value=str(value)) for name, value in values.items()
+        }
+    )
+
+    with pytest.raises(stale.StaleLatchQualificationError, match="capacity/index"):
+        stale._inventory_public_iio(tandem)
 
 
 def _mute() -> dict:
@@ -178,7 +206,10 @@ def _report(tmp_path: pathlib.Path) -> dict:
                 "fw_version": FIRMWARE,
                 "ad9361-phy,model": "ad9361",
                 "local,kernel": KERNEL,
-                "iio,buffer-metadata": "2",
+                "iio,buffer-metadata": "3",
+                "iio,buffer-metadata-abi-versions": "1,2,3,4",
+                "iio,buffer-metadata-status": "1",
+                "iio,buffer-metadata-status-versions": "1,2",
                 "uri": "usb:3.17.5",
             },
             "public_iio": _public_iio(),
@@ -281,7 +312,7 @@ def test_release_source_audit_proves_concrete_missing_interfaces():
     assert audit["qualification_possible"] is False
     assert audit["public_iio"]["attributes"] == list(stale.EXPECTED_IIO_ATTRIBUTES)
     assert audit["session_abi"]["ioctls"] == list(stale.EXPECTED_IOCTLS)
-    assert audit["session_abi"]["same_epoch_mode_control"] is False
+    assert audit["session_abi"]["same_epoch_mode_control"] is True
     assert audit["metadata_abi"]["detector_state_fields"] == []
     assert [item["id"] for item in audit["missing_interfaces"]] == [
         item["id"] for item in stale.MISSING_INTERFACES
@@ -421,7 +452,8 @@ def test_blocked_report_structure_accepts_exact_nonauthorizing_evidence(tmp_path
         (("interface_audit", "qualification_possible"), True),
         (("interface_audit", "public_iio", "all_attributes_read_only"), False),
         (("interface_audit", "public_iio", "arbitrary_register_access"), True),
-        (("interface_audit", "session_abi", "same_epoch_mode_control"), True),
+        (("interface_audit", "session_abi", "mode_selected_only_at_acquire"), True),
+        (("interface_audit", "session_abi", "same_epoch_mode_control"), False),
         (("interface_audit", "session_abi", "detector_injection"), True),
         (("interface_audit", "metadata_abi", "detector_state_fields"), ["small"]),
         (("observation", "session_opened"), True),
@@ -430,6 +462,24 @@ def test_blocked_report_structure_accepts_exact_nonauthorizing_evidence(tmp_path
         (("observation", "context_attrs", "local,kernel"), "wrong-kernel"),
         (("observation", "public_iio", "extra"), True),
         (("observation", "public_iio", "attribute_values", "fault_flags"), 1),
+        (
+            (
+                "observation",
+                "public_iio",
+                "attribute_values",
+                "sample_counter_fence_low",
+            ),
+            -1,
+        ),
+        (
+            (
+                "observation",
+                "public_iio",
+                "attribute_values",
+                "sample_counter_fence_low",
+            ),
+            2**32,
+        ),
         (("cleanup", "verified"), False),
         (("cleanup", "context_closed"), False),
         (("cleanup", "lock_released"), False),
@@ -581,7 +631,10 @@ def _stub_hardware_run(tmp_path, monkeypatch, *, inventory_error=None):
                 "fw_version": FIRMWARE,
                 "ad9361-phy,model": "ad9361",
                 "local,kernel": KERNEL,
-                "iio,buffer-metadata": "2",
+                "iio,buffer-metadata": "3",
+                "iio,buffer-metadata-abi-versions": "1,2,3,4",
+                "iio,buffer-metadata-status": "1",
+                "iio,buffer-metadata-status-versions": "1,2",
                 "uri": "usb:3.17.5",
             }
         },

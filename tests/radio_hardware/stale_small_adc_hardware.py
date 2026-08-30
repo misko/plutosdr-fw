@@ -56,10 +56,11 @@ EXPECTED_IIO_ATTRIBUTES = (
     "ownership_epoch",
     "rx1_gain_index",
     "rx2_gain_index",
+    "sample_counter_fence_low",
     "state",
     "transition_count",
 )
-EXPECTED_IOCTLS = ("ACQUIRE", "GET_CAPS", "GET_STATUS", "RELEASE")
+EXPECTED_IOCTLS = ("ACQUIRE", "GET_CAPS", "GET_STATUS", "RELEASE", "START_AUTO")
 EXPECTED_REQUEST_FIELDS = (
     "magic",
     "version",
@@ -103,6 +104,7 @@ EXPECTED_STATUS_FIELDS = (
     "rx2_gain_index",
     "gain_table_id",
     "threshold_provenance",
+    "sample_counter_fence_low",
     "reserved",
 )
 EXPECTED_EVENT_FIELDS = (
@@ -142,15 +144,6 @@ MISSING_INTERFACES = (
             "neutral-dwell re-arm state"
         ),
         "current_gap": "neither status nor metadata exposes the stale episode FSM",
-    },
-    {
-        "id": "same-epoch-mode-control",
-        "required_evidence": (
-            "guarded HOLD-to-AUTO transitions without closing the owning session"
-        ),
-        "current_gap": (
-            "mode is immutable in ACQUIRE and close/reacquire starts a new epoch"
-        ),
     },
     {
         "id": "deterministic-detector-fixture",
@@ -449,8 +442,8 @@ def audit_release_interfaces(provenance: Mapping[str, Any]) -> dict[str, Any]:
             "request_fields": list(request_fields),
             "status_fields": list(status_fields),
             "event_fields": list(event_fields),
-            "mode_selected_only_at_acquire": True,
-            "same_epoch_mode_control": False,
+            "mode_selected_only_at_acquire": False,
+            "same_epoch_mode_control": True,
             "detector_injection": False,
         },
         "metadata_abi": {
@@ -461,7 +454,7 @@ def audit_release_interfaces(provenance: Mapping[str, Any]) -> dict[str, Any]:
         },
         "supported_observations": [
             "accepted event sample/event sequence, direction, reason, and paired indexes",
-            "state, ownership epoch, faults, FIFO, paired indexes, transitions, and overflow",
+            "state, ownership epoch, faults, FIFO, paired indexes, transitions, overflow, and sample fence",
             "post-close TX mute, DDS disable, selector ZERO, tandem IDLE, and FIFO drain",
         ],
         "missing_interfaces": [dict(item) for item in MISSING_INTERFACES],
@@ -473,7 +466,7 @@ def assess_public_trace(value: object) -> dict[str, Any]:
 
     This analyzer deliberately returns a blocked assessment even for a perfect
     trace.  Accepted event reasons prove the controller's selected reason, but
-    the absent detector/episode/mode/pulse interfaces prevent the A1.2 claim.
+    the absent detector/episode/fixture/pulse interfaces prevent the A1.2 claim.
     """
 
     try:
@@ -692,8 +685,8 @@ def _inventory_public_iio(tandem: Any) -> dict[str, Any]:
             ) from error
     exact = {
         "abi_version": 1,
-        "features": 7,
-        "fpga_abi": 1,
+        "features": 15,
+        "fpga_abi": 2,
         "fpga_identity": 0x54414732,
         "state": int(TandemState.IDLE),
         "ownership_epoch": 0,
@@ -708,6 +701,7 @@ def _inventory_public_iio(tandem: Any) -> dict[str, Any]:
         values["fifo_depth"] <= 0
         or values["rx1_gain_index"] != values["rx2_gain_index"]
         or not 0 <= values["rx1_gain_index"] <= 0x7F
+        or not 0 <= values["sample_counter_fence_low"] <= 0xFFFFFFFF
     ):
         _fail(f"live tandem IIO capacity/index evidence is invalid: {values}")
     return {"attribute_names": list(names), "attribute_values": values}
@@ -930,7 +924,8 @@ def _validate_report_structure(value: object) -> None:
         or public_iio.get("all_attributes_read_only") is not True
         or public_iio.get("arbitrary_register_access") is not False
         or session_abi.get("ioctls") != list(EXPECTED_IOCTLS)
-        or session_abi.get("same_epoch_mode_control") is not False
+        or session_abi.get("mode_selected_only_at_acquire") is not False
+        or session_abi.get("same_epoch_mode_control") is not True
         or session_abi.get("detector_injection") is not False
         or metadata_abi.get("small_adc_inhibit_reason") != 2
         or metadata_abi.get("detector_state_fields") != []
@@ -977,8 +972,8 @@ def _validate_report_structure(value: object) -> None:
         _fail("live public IIO value set changed")
     exact_live = {
         "abi_version": 1,
-        "features": 7,
-        "fpga_abi": 1,
+        "features": 15,
+        "fpga_abi": 2,
         "fpga_identity": 0x54414732,
         "state": int(TandemState.IDLE),
         "ownership_epoch": 0,
@@ -993,6 +988,7 @@ def _validate_report_structure(value: object) -> None:
         or values.get("fifo_depth", 0) <= 0
         or values.get("rx1_gain_index") != values.get("rx2_gain_index")
         or not 0 <= values.get("rx1_gain_index", -1) <= 0x7F
+        or not 0 <= values.get("sample_counter_fence_low", -1) <= 0xFFFFFFFF
     ):
         _fail("live public IIO values are not clean release IDLE")
     context_attrs = _mapping(
@@ -1004,7 +1000,10 @@ def _validate_report_structure(value: object) -> None:
         "fw_version": firmware_version,
         "ad9361-phy,model": "ad9361",
         "local,kernel": kernel_version,
-        "iio,buffer-metadata": "2",
+        "iio,buffer-metadata": "3",
+        "iio,buffer-metadata-abi-versions": "1,2,3,4",
+        "iio,buffer-metadata-status": "1",
+        "iio,buffer-metadata-status-versions": "1,2",
     }
     if any(
         context_attrs.get(name) != expected
