@@ -22,10 +22,12 @@ size_t spf_radio_frame_v7_header_bytes(
 	uint16_t gain_observation_capacity,
 	uint16_t gain_event_capacity)
 {
-	if (gain_observation_capacity > SPF_MAX_GAIN_OBSERVATIONS ||
+	if (gain_observation_capacity == 0 ||
+		gain_event_capacity == 0 ||
+		gain_observation_capacity > SPF_MAX_GAIN_OBSERVATIONS ||
 		gain_event_capacity > SPF_MAX_GAIN_EVENTS)
 		return 0;
-	const size_t bytes = sizeof(spf_radio_meta_v3_prefix_t) +
+	const size_t bytes = SPF_RADIO_META_V7_PREFIX_BYTES +
 		(size_t)gain_observation_capacity * sizeof(spf_gain_observation_v3_t) +
 		(size_t)gain_event_capacity * sizeof(spf_gain_event_v7_t) +
 		sizeof(uint32_t);
@@ -242,7 +244,7 @@ static bool spf_radio_frame_v7_events_valid(
 	const uint64_t frame_end =
 		args->first_sample_sequence + args->samples_per_channel;
 	uint64_t previous_sample = 0;
-	uint32_t expected_sequence = 0;
+	uint32_t expected_sequence = args->event_sequence_start;
 
 	if (frame_end < args->first_sample_sequence)
 		return false;
@@ -252,7 +254,7 @@ static bool spf_radio_frame_v7_events_valid(
 		if (event->sample_sequence < args->first_sample_sequence ||
 			event->sample_sequence >= frame_end ||
 			(index != 0 && event->sample_sequence < previous_sample) ||
-			(index != 0 && event->event_sequence != expected_sequence) ||
+			event->event_sequence != expected_sequence ||
 			!spf_gain_event_v7_flags_valid(event->flags) ||
 			!spf_gain_event_v7_pair_valid(event))
 			return false;
@@ -260,6 +262,77 @@ static bool spf_radio_frame_v7_events_valid(
 		expected_sequence = event->event_sequence + UINT32_C(1);
 	}
 	return true;
+}
+
+static bool spf_radio_frame_v7_tandem_valid(
+	const spf_radio_frame_v7_args_t *args)
+{
+	uint8_t current_gain;
+	uint16_t index = 0;
+
+	if (!args->ownership_epoch || args->tandem_fault_flags ||
+		(args->tandem_state != SPF_TANDEM_STATE_ARMED_HOLD &&
+		 args->tandem_state != SPF_TANDEM_STATE_ARMED_AUTO) ||
+		args->gain_table_id < SPF_TANDEM_GAIN_TABLE_MIN ||
+		args->gain_table_id > SPF_TANDEM_GAIN_TABLE_MAX ||
+		args->minimum_gain_db < 0 ||
+		args->minimum_gain_db > args->initial_gain_db ||
+		args->initial_gain_db > args->maximum_gain_db ||
+		args->maximum_gain_db > SPF_TANDEM_GAIN_DB_MAX ||
+		args->minimum_gain_index > args->maximum_gain_index ||
+		args->maximum_gain_index > UINT8_C(0x7F) ||
+		args->rx1_gain_index_start != args->rx2_gain_index_start ||
+		args->rx1_gain_index_end != args->rx2_gain_index_end ||
+		args->rx1_gain_index_start < args->minimum_gain_index ||
+		args->rx1_gain_index_start > args->maximum_gain_index ||
+		args->rx1_gain_index_end < args->minimum_gain_index ||
+		args->rx1_gain_index_end > args->maximum_gain_index ||
+		args->rx1_gain_db_start != args->rx2_gain_db_start ||
+		args->rx1_gain_db_end != args->rx2_gain_db_end ||
+		args->rx1_gain_db_start < args->minimum_gain_db ||
+		args->rx1_gain_db_start > args->maximum_gain_db ||
+		args->rx1_gain_db_end < args->minimum_gain_db ||
+		args->rx1_gain_db_end > args->maximum_gain_db ||
+		args->timeline_flags != SPF_FPGA_GAIN_TIMELINE_COMPLETE ||
+		args->tandem_transition_count_end !=
+			args->tandem_transition_count_start + args->gain_event_count ||
+		(args->tandem_state == SPF_TANDEM_STATE_ARMED_HOLD &&
+		 args->gain_event_count != 0) ||
+		args->gain_event_overflow_count != 0)
+		return false;
+
+	/* The serialized start pair is the result of every boundary event. */
+	while (index < args->gain_event_count &&
+		args->gain_events[index].sample_sequence == args->first_sample_sequence)
+	{
+		if (args->gain_events[index].rx1_gain_index <
+				args->minimum_gain_index ||
+			args->gain_events[index].rx1_gain_index >
+				args->maximum_gain_index)
+			return false;
+		index++;
+	}
+	if (index != 0 &&
+		args->gain_events[index - 1].rx1_gain_index !=
+			args->rx1_gain_index_start)
+		return false;
+
+	current_gain = args->rx1_gain_index_start;
+	for (; index < args->gain_event_count; ++index)
+	{
+		const spf_gain_event_v7_t *event = &args->gain_events[index];
+		const uint16_t direction = (event->flags >> 4) & UINT16_C(0x3);
+
+		if (event->rx1_gain_index < args->minimum_gain_index ||
+			event->rx1_gain_index > args->maximum_gain_index ||
+			(direction == UINT16_C(1) &&
+			 event->rx1_gain_index <= current_gain) ||
+			(direction == UINT16_C(2) &&
+			 event->rx1_gain_index >= current_gain))
+			return false;
+		current_gain = event->rx1_gain_index;
+	}
+	return current_gain == args->rx1_gain_index_end;
 }
 
 static bool spf_radio_frame_v7_observations_valid(
@@ -305,13 +378,13 @@ bool spf_radio_frame_v7_base_build(
 	uint8_t *cursor;
 	uint32_t *crc;
 	spf_radio_meta_v3_prefix_t *header;
+	spf_radio_meta_v7_extension_t *extension;
 	const spf_gain_observation_v3_t *first_observation = NULL;
 	const spf_gain_observation_v3_t *last_observation = NULL;
 
 	if (!destination || !args || !args->stream_id ||
 		!args->samples_per_channel ||
-		(args->metadata_features & SPF_META_REQUIRED_FEATURES_V7_BASE) !=
-			SPF_META_REQUIRED_FEATURES_V7_BASE ||
+		args->metadata_features != SPF_META_REQUIRED_FEATURES_V7 ||
 		args->rx1_gain_db_start == SPF_GAIN_DB_INVALID ||
 		args->rx2_gain_db_start == SPF_GAIN_DB_INVALID ||
 		args->rx1_gain_db_end == SPF_GAIN_DB_INVALID ||
@@ -320,12 +393,8 @@ bool spf_radio_frame_v7_base_build(
 		(args->gain_observation_count != 0 && !args->gain_observations) ||
 		args->gain_event_count > args->gain_event_capacity ||
 		(args->gain_event_count != 0 && !args->gain_events) ||
-		(args->gain_observation_capacity == 0 &&
-			args->gain_observation_interval_samples != 0) ||
-		(args->gain_observation_capacity != 0 &&
-			(args->gain_observation_interval_samples == 0 ||
-			 args->gain_observation_interval_samples >
-				args->samples_per_channel)) ||
+		args->gain_observation_interval_samples == 0 ||
+		args->gain_observation_interval_samples > args->samples_per_channel ||
 		(args->rx1_first_change_sample != SPF_FIRST_CHANGE_UNAVAILABLE &&
 			args->rx1_first_change_sample >= args->samples_per_channel) ||
 		(args->rx2_first_change_sample != SPF_FIRST_CHANGE_UNAVAILABLE &&
@@ -337,7 +406,8 @@ bool spf_radio_frame_v7_base_build(
 		args->gain_observation_capacity, args->gain_event_capacity);
 	if (!header_bytes || destination_bytes < header_bytes ||
 		!spf_radio_frame_v7_events_valid(args) ||
-		!spf_radio_frame_v7_observations_valid(args))
+		!spf_radio_frame_v7_observations_valid(args) ||
+		!spf_radio_frame_v7_tandem_valid(args))
 		return false;
 
 	if (args->gain_event_count == 0)
@@ -363,10 +433,11 @@ bool spf_radio_frame_v7_base_build(
 		SPF_META_GAIN_DB_VALUES |
 		SPF_META_GAIN_FULL_TABLE_MODE |
 		SPF_META_HARDWARE_SAMPLE_COUNTER_VALID |
+		SPF_META_TANDEM_VALID |
 		SPF_META_FPGA_GAIN_TIMELINE_VALID;
-	if (args->rx1_gain_db_start != args->rx1_gain_db_end)
+	if (args->rx1_gain_index_start != args->rx1_gain_index_end)
 		flags |= SPF_META_RX1_ENDPOINT_CHANGED;
-	if (args->rx2_gain_db_start != args->rx2_gain_db_end)
+	if (args->rx2_gain_index_start != args->rx2_gain_index_end)
 		flags |= SPF_META_RX2_ENDPOINT_CHANGED;
 	if (args->rx1_first_change_sample != SPF_FIRST_CHANGE_UNAVAILABLE)
 		flags |= SPF_META_RX1_CHANGED_IN_BUFFER;
@@ -451,7 +522,32 @@ bool spf_radio_frame_v7_base_build(
 	header->reserved1 = (uint32_t)args->missing_samples_before;
 	header->reserved2 = (uint32_t)(args->missing_samples_before >> 32);
 
-	cursor = (uint8_t *)destination + sizeof(*header);
+	extension = (spf_radio_meta_v7_extension_t *)
+		((uint8_t *)destination + sizeof(*header));
+	extension->ownership_epoch = args->ownership_epoch;
+	extension->tandem_state = args->tandem_state;
+	extension->tandem_fault_flags = args->tandem_fault_flags;
+	extension->tandem_transition_count_end =
+		args->tandem_transition_count_end;
+	extension->gain_table_id = args->gain_table_id;
+	extension->threshold_provenance = args->threshold_provenance;
+	extension->minimum_gain_db = args->minimum_gain_db;
+	extension->maximum_gain_db = args->maximum_gain_db;
+	extension->initial_gain_db = args->initial_gain_db;
+	extension->minimum_gain_index = args->minimum_gain_index;
+	extension->maximum_gain_index = args->maximum_gain_index;
+	extension->rx1_gain_index_end = args->rx1_gain_index_end;
+	extension->rx2_gain_index_end = args->rx2_gain_index_end;
+	extension->ad9361_temperature_mdeg_c =
+		args->ad9361_temperature_mdeg_c;
+	extension->tandem_transition_count_start =
+		args->tandem_transition_count_start;
+	extension->rx1_gain_index_start = args->rx1_gain_index_start;
+	extension->rx2_gain_index_start = args->rx2_gain_index_start;
+	extension->timeline_flags = args->timeline_flags;
+	extension->event_sequence_start = args->event_sequence_start;
+
+	cursor = (uint8_t *)destination + SPF_RADIO_META_V7_PREFIX_BYTES;
 	if (args->gain_observation_count != 0)
 		memcpy(cursor, args->gain_observations,
 			(size_t)args->gain_observation_count *

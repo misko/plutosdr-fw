@@ -27,6 +27,8 @@
 #define SPF_META_FEATURE_RSSI_ENDPOINT_SNAPSHOTS  (UINT32_C(1) << 5)
 #define SPF_META_FEATURE_GAIN_OBSERVATION_SERIES   (UINT32_C(1) << 6)
 #define SPF_META_FEATURE_HARDWARE_SAMPLE_COUNTER   (UINT32_C(1) << 7)
+#define SPF_META_FEATURE_TANDEM_AGC_SESSION         (UINT32_C(1) << 8)
+#define SPF_META_FEATURE_AD9361_TEMPERATURE         (UINT32_C(1) << 9)
 #define SPF_META_FEATURE_CANONICAL_RX_LAYOUT       (UINT32_C(1) << 10)
 #define SPF_META_FEATURE_EXACT_GAP_ACCOUNTING      (UINT32_C(1) << 11)
 #define SPF_META_FEATURE_FPGA_GAIN_TIMELINE         (UINT32_C(1) << 12)
@@ -50,6 +52,11 @@
 #define SPF_META_REQUIRED_FEATURES_V7_BASE ( \
 	SPF_META_REQUIRED_FEATURES_V6_BASE | \
 	SPF_META_FEATURE_FPGA_GAIN_TIMELINE)
+#define SPF_META_REQUIRED_FEATURES_V7 ( \
+	SPF_META_REQUIRED_FEATURES_V7_BASE | \
+	SPF_META_FEATURE_FPGA_GAIN_EVENTS | \
+	SPF_META_FEATURE_TANDEM_AGC_SESSION | \
+	SPF_META_FEATURE_AD9361_TEMPERATURE)
 
 #define SPF_META_START_VALID                 (UINT32_C(1) << 0)
 #define SPF_META_END_VALID                   (UINT32_C(1) << 1)
@@ -73,6 +80,7 @@
 #define SPF_META_GAIN_OBSERVATIONS_VALID       (UINT32_C(1) << 19)
 #define SPF_META_GAIN_OBSERVATION_OVERFLOW     (UINT32_C(1) << 20)
 #define SPF_META_HARDWARE_SAMPLE_COUNTER_VALID (UINT32_C(1) << 21)
+#define SPF_META_TANDEM_VALID                    (UINT32_C(1) << 22)
 #define SPF_META_SAMPLE_GAP_BEFORE              (UINT32_C(1) << 23)
 #define SPF_META_FPGA_GAIN_TIMELINE_VALID        (UINT32_C(1) << 24)
 
@@ -87,8 +95,18 @@
 #define SPF_GAIN_OBSERVATION_BYTES UINT16_C(32)
 #define SPF_GAIN_EVENT_BYTES UINT16_C(16)
 #define SPF_RADIO_META_V3_PREFIX_BYTES UINT16_C(124)
+#define SPF_RADIO_META_V7_EXTENSION_BYTES UINT16_C(56)
+#define SPF_RADIO_META_V7_PREFIX_BYTES \
+	(SPF_RADIO_META_V3_PREFIX_BYTES + SPF_RADIO_META_V7_EXTENSION_BYTES)
 #define SPF_MAX_GAIN_OBSERVATIONS UINT16_C(256)
 #define SPF_MAX_GAIN_EVENTS UINT16_C(256)
+
+#define SPF_TANDEM_STATE_ARMED_HOLD UINT32_C(2)
+#define SPF_TANDEM_STATE_ARMED_AUTO UINT32_C(3)
+#define SPF_TANDEM_GAIN_TABLE_MIN UINT32_C(1)
+#define SPF_TANDEM_GAIN_TABLE_MAX UINT32_C(3)
+#define SPF_TANDEM_GAIN_DB_MAX INT32_C(62)
+#define SPF_FPGA_GAIN_TIMELINE_COMPLETE UINT16_C(1)
 
 #define SPF_SAMPLE_FORMAT_CS16_LE_TIME_INTERLEAVED UINT16_C(1)
 
@@ -226,6 +244,30 @@ typedef struct
 	uint32_t reserved1;
 	uint32_t reserved2;
 } spf_radio_meta_v3_prefix_t;
+
+/* Frozen protocol-v7 tandem extension at byte offset 124. */
+typedef struct
+{
+	uint32_t ownership_epoch;
+	uint32_t tandem_state;
+	uint32_t tandem_fault_flags;
+	uint32_t tandem_transition_count_end;
+	uint32_t gain_table_id;
+	uint32_t threshold_provenance;
+	int32_t minimum_gain_db;
+	int32_t maximum_gain_db;
+	int32_t initial_gain_db;
+	uint8_t minimum_gain_index;
+	uint8_t maximum_gain_index;
+	uint8_t rx1_gain_index_end;
+	uint8_t rx2_gain_index_end;
+	int32_t ad9361_temperature_mdeg_c;
+	uint32_t tandem_transition_count_start;
+	uint8_t rx1_gain_index_start;
+	uint8_t rx2_gain_index_start;
+	uint16_t timeline_flags;
+	uint32_t event_sequence_start;
+} spf_radio_meta_v7_extension_t;
 #pragma pack(pop)
 
 _Static_assert(sizeof(spf_gain_meta_v1_t) == SPF_GAIN_META_HEADER_BYTES,
@@ -258,6 +300,15 @@ _Static_assert(offsetof(spf_radio_meta_v3_prefix_t,
 	"unexpected v3 extension offset");
 _Static_assert(offsetof(spf_radio_meta_v3_prefix_t, reserved1) == 116,
 	"unexpected v3 reserved-word offset");
+_Static_assert(sizeof(spf_radio_meta_v7_extension_t) ==
+	SPF_RADIO_META_V7_EXTENSION_BYTES,
+	"SPF radio metadata v7 extension must be 56 bytes");
+_Static_assert(offsetof(spf_radio_meta_v7_extension_t,
+	tandem_transition_count_start) == 44,
+	"unexpected v7 start-transition offset");
+_Static_assert(offsetof(spf_radio_meta_v7_extension_t,
+	event_sequence_start) == 52,
+	"unexpected v7 event-sequence offset");
 
 /* V6 assigns the two V3 reserved words to one little-endian exact gap count. */
 static inline uint64_t spf_radio_meta_v6_missing_samples_before(

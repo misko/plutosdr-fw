@@ -6,20 +6,41 @@
 static spf_radio_frame_v7_args_t base_args(void)
 {
 	return (spf_radio_frame_v7_args_t){
-		.metadata_features = SPF_META_REQUIRED_FEATURES_V7_BASE,
-		.stream_id = UINT64_C(0x1122334455667788),
-		.buffer_sequence = 9,
+		.metadata_features = SPF_META_REQUIRED_FEATURES_V7,
+		.stream_id = UINT64_C(0x1234),
+		.buffer_sequence = 0,
 		.first_sample_sequence = 1000,
-		.samples_per_channel = 1024,
-		.iq_payload_bytes = 4096,
-		.enabled_scan_mask = UINT32_C(0x03),
-		.rx1_gain_db_start = -10,
-		.rx2_gain_db_start = -10,
-		.rx1_gain_db_end = -10,
-		.rx2_gain_db_end = -10,
+		.samples_per_channel = 4,
+		.iq_payload_bytes = 32,
+		.enabled_scan_mask = UINT32_C(0x0f),
+		.gain_observation_interval_samples = 4,
+		.gain_observation_capacity = 1,
+		.gain_event_capacity = 1,
+		.rx1_gain_db_start = 20,
+		.rx2_gain_db_start = 20,
+		.rx1_gain_db_end = 20,
+		.rx2_gain_db_end = 20,
 		.rx1_first_change_sample = SPF_FIRST_CHANGE_UNAVAILABLE,
 		.rx2_first_change_sample = SPF_FIRST_CHANGE_UNAVAILABLE,
-		.missing_samples_before = UINT64_C(0x0000000200000003),
+		.missing_samples_before = 0,
+		.ownership_epoch = 9,
+		.tandem_state = SPF_TANDEM_STATE_ARMED_HOLD,
+		.tandem_transition_count_end = 7,
+		.gain_table_id = 2,
+		.threshold_provenance = UINT32_C(0x30313A14),
+		.minimum_gain_db = 0,
+		.maximum_gain_db = 62,
+		.initial_gain_db = 20,
+		.minimum_gain_index = 0,
+		.maximum_gain_index = 76,
+		.rx1_gain_index_start = 20,
+		.rx2_gain_index_start = 20,
+		.rx1_gain_index_end = 20,
+		.rx2_gain_index_end = 20,
+		.ad9361_temperature_mdeg_c = 43000,
+		.tandem_transition_count_start = 7,
+		.timeline_flags = SPF_FPGA_GAIN_TIMELINE_COMPLETE,
+		.event_sequence_start = 55,
 	};
 }
 
@@ -34,14 +55,16 @@ static void test_no_spi_telemetry(void)
 {
 	uint8_t buffer[512];
 	spf_radio_frame_v7_args_t args = base_args();
-	const size_t header_bytes = spf_radio_frame_v7_header_bytes(0, 0);
+	const size_t header_bytes = spf_radio_frame_v7_header_bytes(1, 1);
 
-	assert(header_bytes == sizeof(spf_radio_meta_v3_prefix_t) + sizeof(uint32_t));
+	assert(header_bytes == SPF_RADIO_META_V7_PREFIX_BYTES +
+		sizeof(spf_gain_observation_v3_t) +
+		sizeof(spf_gain_event_v7_t) + sizeof(uint32_t));
 	assert(spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
 	const spf_radio_meta_v3_prefix_t *header = (const void *)buffer;
 	assert(header->version == SPF_GAIN_META_VERSION_V7);
 	assert(header->header_bytes == header_bytes);
-	assert(header->features == SPF_META_REQUIRED_FEATURES_V7_BASE);
+	assert(header->features == SPF_META_REQUIRED_FEATURES_V7);
 	assert((header->flags & SPF_META_FPGA_GAIN_TIMELINE_VALID) != 0);
 	assert((header->flags & SPF_META_START_VALID) != 0);
 	assert((header->flags & SPF_META_END_VALID) != 0);
@@ -51,13 +74,25 @@ static void test_no_spi_telemetry(void)
 	assert((header->flags & SPF_META_RSSI_START_VALID) == 0);
 	assert((header->flags & SPF_META_RSSI_END_VALID) == 0);
 	assert(header->gain_observation_count == 0);
-	assert(header->gain_observation_capacity == 0);
-	assert(header->gain_observation_interval_samples == 0);
+	assert(header->gain_observation_capacity == 1);
+	assert(header->gain_event_capacity == 1);
+	assert(header->gain_observation_interval_samples == 4);
 	assert(header->rx1_rssi_start_qdb == SPF_RSSI_QDB_INVALID);
 	assert(header->rx2_rssi_end_qdb == SPF_RSSI_QDB_INVALID);
 	assert(spf_radio_meta_v6_missing_samples_before(header) ==
 		args.missing_samples_before);
-	assert(stored_crc(buffer, header_bytes) == UINT32_C(0x2b3ab58a));
+	const spf_radio_meta_v7_extension_t *extension = (const void *)
+		(buffer + SPF_RADIO_META_V3_PREFIX_BYTES);
+	assert(extension->ownership_epoch == 9);
+	assert(extension->tandem_state == SPF_TANDEM_STATE_ARMED_HOLD);
+	assert(extension->tandem_transition_count_start == 7);
+	assert(extension->tandem_transition_count_end == 7);
+	assert(extension->rx1_gain_index_start == 20);
+	assert(extension->rx1_gain_index_end == 20);
+	assert(extension->timeline_flags == SPF_FPGA_GAIN_TIMELINE_COMPLETE);
+	assert(extension->event_sequence_start == 55);
+	/* Same complete HOLD frame as pluto-plus-utils test_tandem_v7.py. */
+	assert(stored_crc(buffer, header_bytes) == UINT32_C(0x4fe87f50));
 }
 
 static void test_exact_events_and_optional_rssi(void)
@@ -91,6 +126,8 @@ static void test_exact_events_and_optional_rssi(void)
 		},
 	};
 	spf_radio_frame_v7_args_t args = base_args();
+	args.samples_per_channel = 1024;
+	args.iq_payload_bytes = 8192;
 	args.gain_observation_interval_samples = 512;
 	args.gain_observations = &observation;
 	args.gain_observation_count = 1;
@@ -98,8 +135,16 @@ static void test_exact_events_and_optional_rssi(void)
 	args.gain_events = events;
 	args.gain_event_count = 2;
 	args.gain_event_capacity = 3;
-	args.rx1_gain_db_end = -8;
-	args.rx2_gain_db_end = -8;
+	args.tandem_state = SPF_TANDEM_STATE_ARMED_AUTO;
+	args.tandem_transition_count_end = 9;
+	args.tandem_transition_count_start = 7;
+	args.event_sequence_start = UINT32_MAX;
+	args.rx1_gain_index_start = 40;
+	args.rx2_gain_index_start = 40;
+	args.rx1_gain_db_end = 22;
+	args.rx2_gain_db_end = 22;
+	args.rx1_gain_index_end = 41;
+	args.rx2_gain_index_end = 41;
 	args.rx1_first_change_sample = 0;
 	args.rx2_first_change_sample = 0;
 	args.missing_samples_before = 0;
@@ -112,6 +157,7 @@ static void test_exact_events_and_optional_rssi(void)
 
 	const size_t header_bytes = spf_radio_frame_v7_header_bytes(2, 3);
 	assert(header_bytes == sizeof(spf_radio_meta_v3_prefix_t) +
+		SPF_RADIO_META_V7_EXTENSION_BYTES +
 		2 * sizeof(spf_gain_observation_v3_t) +
 		3 * sizeof(spf_gain_event_v7_t) + sizeof(uint32_t));
 	assert(spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
@@ -130,7 +176,7 @@ static void test_exact_events_and_optional_rssi(void)
 	assert((header->flags & SPF_META_RSSI_READ_FAILED) != 0);
 	assert(header->rx1_rssi_start_qdb == 400);
 	assert(header->rx1_rssi_end_qdb == SPF_RSSI_QDB_INVALID);
-	const size_t event_offset = sizeof(*header) +
+	const size_t event_offset = SPF_RADIO_META_V7_PREFIX_BYTES +
 		2 * sizeof(spf_gain_observation_v3_t);
 	const spf_gain_event_v7_t *wire_events =
 		(const spf_gain_event_v7_t *)(buffer + event_offset);
@@ -138,7 +184,14 @@ static void test_exact_events_and_optional_rssi(void)
 	assert(wire_events[1].event_sequence == 0);
 	assert(wire_events[1].rx1_gain_index == 41);
 	assert(buffer[event_offset + 2 * sizeof(*wire_events)] == 0);
-	assert(stored_crc(buffer, header_bytes) == UINT32_C(0xcd67e933));
+	const spf_radio_meta_v7_extension_t *extension = (const void *)
+		(buffer + SPF_RADIO_META_V3_PREFIX_BYTES);
+	assert(extension->tandem_transition_count_start == 7);
+	assert(extension->tandem_transition_count_end == 9);
+	assert(extension->rx1_gain_index_start == 40);
+	assert(extension->rx1_gain_index_end == 41);
+	assert(extension->event_sequence_start == UINT32_MAX);
+	assert(stored_crc(buffer, header_bytes) == UINT32_C(0x97fc1b82));
 }
 
 static void test_invalid_contracts(void)
@@ -168,12 +221,24 @@ static void test_invalid_contracts(void)
 			SPF_GAIN_OBSERVATION_SAMPLE_INTERVAL_VALID,
 	};
 
+	args.samples_per_channel = 1024;
+	args.iq_payload_bytes = 8192;
+	args.gain_observation_interval_samples = 1024;
 	args.rx1_gain_db_end = -9;
 	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
-	args.rx1_gain_db_end = -10;
+	args.rx1_gain_db_end = 20;
 	args.gain_events = events;
 	args.gain_event_count = 2;
 	args.gain_event_capacity = 2;
+	args.tandem_state = SPF_TANDEM_STATE_ARMED_AUTO;
+	args.tandem_transition_count_end = 9;
+	args.rx1_gain_index_start = 40;
+	args.rx2_gain_index_start = 40;
+	args.rx1_gain_db_end = 21;
+	args.rx2_gain_db_end = 21;
+	args.rx1_gain_index_end = 41;
+	args.rx2_gain_index_end = 41;
+	args.event_sequence_start = 7;
 	args.rx1_first_change_sample = 1;
 	args.rx2_first_change_sample = 1;
 	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
@@ -200,16 +265,22 @@ static void test_invalid_contracts(void)
 	events[1].flags = UINT16_C(0x13);
 
 	args.gain_event_count = 0;
-	args.gain_event_capacity = 0;
+	args.gain_event_capacity = 1;
 	args.gain_events = NULL;
+	args.tandem_state = SPF_TANDEM_STATE_ARMED_HOLD;
+	args.tandem_transition_count_end = 7;
+	args.rx1_gain_db_end = 20;
+	args.rx2_gain_db_end = 20;
+	args.rx1_gain_index_end = 40;
+	args.rx2_gain_index_end = 40;
 	args.rx1_first_change_sample = SPF_FIRST_CHANGE_UNAVAILABLE;
 	args.rx2_first_change_sample = SPF_FIRST_CHANGE_UNAVAILABLE;
-	args.gain_observation_interval_samples = 1;
-	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
 	args.gain_observation_interval_samples = 0;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.gain_observation_interval_samples = 1024;
 	args.rx1_gain_db_start = SPF_GAIN_DB_INVALID;
 	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
-	args.rx1_gain_db_start = -10;
+	args.rx1_gain_db_start = 20;
 	args.gain_observation_interval_samples = 512;
 	args.gain_observations = &observation;
 	args.gain_observation_count = 1;
@@ -224,6 +295,81 @@ static void test_invalid_contracts(void)
 	observation.sample_sequence_before = 1010;
 	observation.sample_sequence_after = 1009;
 	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+
+	observation.sample_sequence_before = 995;
+	observation.sample_sequence_after = 1010;
+	args.gain_observation_count = 0;
+	args.ownership_epoch = 0;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.ownership_epoch = 9;
+	args.tandem_fault_flags = 1;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.tandem_fault_flags = 0;
+	args.tandem_state = 4;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.tandem_state = SPF_TANDEM_STATE_ARMED_HOLD;
+	args.gain_table_id = 4;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.gain_table_id = 2;
+	args.timeline_flags = 3;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.timeline_flags = SPF_FPGA_GAIN_TIMELINE_COMPLETE;
+	args.tandem_transition_count_end = 8;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.tandem_transition_count_end = 7;
+	args.rx2_gain_index_start = 41;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.rx2_gain_index_start = 40;
+	args.metadata_features ^= SPF_META_FEATURE_AD9361_TEMPERATURE;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+}
+
+static void test_timeline_extension_mutations(void)
+{
+	uint8_t buffer[512];
+	spf_gain_event_v7_t event = {
+		.sample_sequence = 1002,
+		.event_sequence = UINT32_MAX,
+		.flags = UINT16_C(0x13),
+		.rx1_gain_index = 41,
+		.rx2_gain_index = 41,
+	};
+	spf_radio_frame_v7_args_t args = base_args();
+
+	assert(spf_radio_frame_v7_header_bytes(0, 1) == 0);
+	assert(spf_radio_frame_v7_header_bytes(1, 0) == 0);
+	args.tandem_state = SPF_TANDEM_STATE_ARMED_AUTO;
+	args.tandem_transition_count_start = UINT32_MAX;
+	args.tandem_transition_count_end = 0;
+	args.event_sequence_start = UINT32_MAX;
+	args.gain_events = &event;
+	args.gain_event_count = 1;
+	args.rx1_gain_db_end = 21;
+	args.rx2_gain_db_end = 21;
+	args.rx1_gain_index_end = 41;
+	args.rx2_gain_index_end = 41;
+	args.rx1_first_change_sample = 2;
+	args.rx2_first_change_sample = 2;
+	assert(spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+
+	event.event_sequence = 0;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	event.event_sequence = UINT32_MAX;
+	event.flags = UINT16_C(0x23);
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	event.flags = UINT16_C(0x13);
+	event.rx1_gain_index = 77;
+	event.rx2_gain_index = 77;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	event.rx1_gain_index = 41;
+	event.rx2_gain_index = 41;
+	args.rx1_gain_index_end = 42;
+	args.rx2_gain_index_end = 42;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
+	args.rx1_gain_index_end = 41;
+	args.rx2_gain_index_end = 41;
+	args.tandem_state = SPF_TANDEM_STATE_ARMED_HOLD;
+	assert(!spf_radio_frame_v7_base_build(buffer, sizeof(buffer), &args));
 }
 
 int main(void)
@@ -231,5 +377,6 @@ int main(void)
 	test_no_spi_telemetry();
 	test_exact_events_and_optional_rssi();
 	test_invalid_contracts();
+	test_timeline_extension_mutations();
 	return 0;
 }

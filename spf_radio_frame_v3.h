@@ -72,13 +72,32 @@ typedef struct
 	uint32_t rx1_first_change_sample;
 	uint32_t rx2_first_change_sample;
 	uint64_t missing_samples_before;
+	uint32_t ownership_epoch;
+	uint32_t tandem_state;
+	uint32_t tandem_fault_flags;
+	uint32_t tandem_transition_count_end;
+	uint32_t gain_table_id;
+	uint32_t threshold_provenance;
+	int32_t minimum_gain_db;
+	int32_t maximum_gain_db;
+	int32_t initial_gain_db;
+	uint8_t minimum_gain_index;
+	uint8_t maximum_gain_index;
+	uint8_t rx1_gain_index_start;
+	uint8_t rx2_gain_index_start;
+	uint8_t rx1_gain_index_end;
+	uint8_t rx2_gain_index_end;
+	int32_t ad9361_temperature_mdeg_c;
+	uint32_t tandem_transition_count_start;
+	uint16_t timeline_flags;
+	uint32_t event_sequence_start;
 } spf_radio_frame_v7_args_t;
 
 size_t spf_radio_frame_v3_header_bytes(
 	uint16_t gain_observation_capacity,
 	uint16_t gain_event_capacity);
 
-/* V7 permits a negotiated zero-capacity SPI observation array. */
+/* V7 permits zero observations within a negotiated non-zero capacity. */
 size_t spf_radio_frame_v7_header_bytes(
 	uint16_t gain_observation_capacity,
 	uint16_t gain_event_capacity);
