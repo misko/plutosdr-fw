@@ -74,11 +74,23 @@ module tandem_agc_axi #(
   tandem_reset_bridge u_rst_axi (
     .clk(s_axi_aclk), .aresetn(s_axi_aresetn), .resetn(axi_resetn));
 
+  // The status mailbox has state in both domains. Reset both sides from the
+  // combined reset source so an l_clk-only reset cannot leave stale pointers
+  // visible to the still-running AXI domain.
+  wire status_l_resetn;
+  tandem_reset_bridge u_rst_status_l (
+    .clk(l_clk), .aresetn(l_aresetn & s_axi_aresetn),
+    .resetn(status_l_resetn));
+  wire status_axi_resetn;
+  tandem_reset_bridge u_rst_status_axi (
+    .clk(s_axi_aclk), .aresetn(l_aresetn & s_axi_aresetn),
+    .resetn(status_axi_resetn));
+
   // ---------------------------------------------------------------------------
   // configuration registers, held in the AXI domain
   // ---------------------------------------------------------------------------
   localparam integer CFGW = 140;
-  localparam integer STAW = 62;
+  localparam integer STAW = 59;
 
   reg [7:0]  r_pulse_hi, r_pulse_lo;
   reg [15:0] r_blank_guard;
@@ -174,13 +186,13 @@ module tandem_agc_axi #(
     .evt_push_o(), .evt_wdata_o());
 
   // ---------------------------------------------------------------------------
-  // Status snapshot, l_clk -> AXI. Re-issued as soon as the preceding
-  // handshake completes, so a
-  // reader always sees one coherent instant instead of a mix of two. Keep only
-  // fields observable through the forward ABI: r_epoch already lives in the
-  // AXI domain, while the retired epoch and policy-debug counters have no
-  // software consumer. Crossing them duplicated 96 bits in both the source
-  // hold and destination registers on an already full XC7Z010.
+  // Status snapshot, l_clk -> AXI. A shallow BRAM mailbox continuously accepts
+  // complete receive-domain records and retains the last delivered record in
+  // the AXI domain. This avoids duplicating a wide payload in source and
+  // destination slice registers on the full XC7Z010. Keep only fields visible
+  // through the forward ABI: r_epoch already lives in AXI, while pulse_busy,
+  // cooldown_active, fpga_owns, retired epoch, and policy-debug counters have
+  // no AXI consumer.
   // ---------------------------------------------------------------------------
   // The low sample word and transition counter are captured in one receive-
   // domain snapshot. Software reads the fence first and the counter second,
@@ -189,34 +201,22 @@ module tandem_agc_axi #(
   // modulo fence is unambiguous because admission keeps the live DMA window
   // below 2^31 samples.
   wire [STAW-1:0] status_bundle = {
-      sample_counter[31:0], cnt_trans, fault, fpga_owns,
-      cooldown_active, pulse_busy,
-      expected_index, state };
-
-  wire       snap_busy;
-  // tandem_cdc_bus captures status_bundle in its source holding register on
-  // this pulse.  busy rises with that same source edge and remains asserted
-  // until the destination has acknowledged the snapshot, naturally turning
-  // this level into one load pulse per completed round trip.  This is both
-  // fresher and smaller than an arbitrary eight-bit polling divider.
-  wire       snap_load = l_resetn && !snap_busy;
+      sample_counter[31:0], cnt_trans, fault, expected_index, state };
 
   wire [STAW-1:0] status_axi;
   wire            status_axi_valid;
-  tandem_cdc_bus #(.W(STAW)) u_stat (
-    .src_clk(l_clk), .src_resetn(l_resetn),
-    .din(status_bundle), .load(snap_load), .busy(snap_busy),
-    .dst_clk(s_axi_aclk), .dst_resetn(axi_resetn),
+  tandem_cdc_mailbox #(.W(STAW), .AW(2)) u_stat (
+    .src_clk(l_clk), .src_resetn(status_l_resetn),
+    .din(status_bundle),
+    .dst_clk(s_axi_aclk), .dst_resetn(status_axi_resetn),
     .dout(status_axi), .dout_valid(status_axi_valid));
 
   wire [2:0]  a_state   = status_axi[2:0];
   wire [7:0]  a_expect  = status_axi[10:3];
-  wire        a_pbusy   = status_axi[11];
-  wire        a_cool    = status_axi[12];
-  wire        a_owns    = status_axi[13];
-  wire [7:0]  a_fault   = status_axi[21:14];
-  wire [7:0]  a_trans   = status_axi[29:22];
-  wire [31:0] a_sample_fence_low = status_axi[61:30];
+  wire [7:0]  a_fault   = status_axi[18:11];
+  wire [7:0]  a_trans   = status_axi[26:19];
+  wire [31:0] a_sample_fence_low = status_axi[58:27];
+  wire _unused_status_axi_valid = status_axi_valid;
 
   wire [2:0] a_public_state =
       (a_state == 3'd6) ? 3'd4 :

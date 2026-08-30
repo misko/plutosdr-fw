@@ -166,25 +166,33 @@ module tandem_async_fifo #(
   (* ASYNC_REG = "TRUE" *) reg [AW:0] wgray_s1, wgray_s2;
   (* ASYNC_REG = "TRUE" *) reg [AW:0] rgray_s1, rgray_s2;
 
+  // Both pointer domains must initialise even when their clocks are stopped.
+  // Without asynchronous assertion, a running peer can synchronise an unknown
+  // pointer from a late-starting domain and permanently poison its own Gray
+  // arithmetic before that clock ever gets an edge.
+  // Keep the memory write in a clock-only process. Xilinx block RAM cannot be
+  // inferred when the process that writes the array has an asynchronous reset,
+  // even when the reset branch does not explicitly touch the array.
   always @(posedge wr_clk) begin
+    if (wr_resetn && wr_en && !full_r) mem[wbin[AW-1:0]] <= wr_data;
+  end
+
+  always @(posedge wr_clk or negedge wr_resetn) begin
     if (!wr_resetn) begin
       wbin <= 0; wgray <= 0; wr_ovf <= 8'd0; full_r <= 1'b0;
       rgray_s1 <= 0; rgray_s2 <= 0;
     end else begin
       rgray_s1 <= rgray;
       rgray_s2 <= rgray_s1;
-      if (wr_en) begin
-        if (full_r && wr_ovf != 8'hFF)
-          wr_ovf <= wr_ovf + 8'd1;
-        else        mem[wbin[AW-1:0]] <= wr_data;
-      end
+      if (wr_en && full_r && wr_ovf != 8'hFF)
+        wr_ovf <= wr_ovf + 8'd1;
       wbin   <= wbin_nxt;
       wgray  <= wgray_nxt;
       full_r <= full_nxt;
     end
   end
 
-  always @(posedge rd_clk) begin
+  always @(posedge rd_clk or negedge rd_resetn) begin
     if (!rd_resetn) begin
       rbin <= 0; rgray <= 0; wgray_s1 <= 0; wgray_s2 <= 0;
     end else begin
@@ -220,4 +228,49 @@ module tandem_async_fifo #(
   endfunction
   assign rd_level = gray2bin(wgray_s2) - rbin;
 
+endmodule
+
+// -----------------------------------------------------------------------------
+// Latest coherent snapshot crossing. A shallow asynchronous FIFO puts the
+// payload in block RAM instead of duplicating a wide source holding register
+// and destination register bank in slices. The destination drains only while
+// more than one committed entry is visible, deliberately retaining the last
+// complete snapshot as a stable mailbox value. Intermediate snapshots may be
+// coalesced while the FIFO is full; every value that becomes visible is one
+// atomic source-domain sample.
+//
+// AW must be at least two because tandem_async_fifo's standard full detector
+// inverts the two high Gray-pointer bits. Production uses four slots (AW=2).
+// -----------------------------------------------------------------------------
+module tandem_cdc_mailbox #(
+  parameter integer W = 64,
+  parameter integer AW = 2
+) (
+  input  wire         src_clk,
+  input  wire         src_resetn,
+  input  wire [W-1:0] din,
+
+  input  wire         dst_clk,
+  input  wire         dst_resetn,
+  output wire [W-1:0] dout,
+  output wire         dout_valid
+);
+  wire          fifo_full;
+  wire          fifo_valid;
+  wire [AW:0]   fifo_level;
+  wire [7:0]    fifo_ovf;
+  // Keep one committed entry resident. The synchronous BRAM output therefore
+  // advances only to another known-valid slot and remains stable when the
+  // producer pauses.
+  wire fifo_pop = fifo_valid && (fifo_level > {{AW{1'b0}}, 1'b1});
+
+  tandem_async_fifo #(.W(W), .AW(AW)) u_mailbox_fifo (
+    .wr_clk(src_clk), .wr_resetn(src_resetn),
+    .wr_en(src_resetn && !fifo_full), .wr_data(din),
+    .wr_full(fifo_full), .wr_ovf(fifo_ovf),
+    .rd_clk(dst_clk), .rd_resetn(dst_resetn), .rd_en(fifo_pop),
+    .rd_data(dout), .rd_valid(fifo_valid), .rd_level(fifo_level));
+
+  assign dout_valid = fifo_valid;
+  wire _unused_fifo_ovf = |fifo_ovf;
 endmodule

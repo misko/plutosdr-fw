@@ -475,10 +475,11 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "preceding end endpoint is their input baseline" in (
         ROOT / "IIO_GAIN_TIMELINE_V8_DESIGN.md"
     ).read_text()
-    tandem_core = (ROOT / "hdl-tandem" / "tandem_agc_core.v").read_text()
-    assert "evt_seq <= 32'd0;" in tandem_core
-    assert "if (evt_push) evt_seq <= evt_seq + 32'd1;" in tandem_core
-    assert "evt_seq <= 32'hFFFF_FFFF;" not in tandem_core
+    tandem_axi = (ROOT / "hdl-tandem" / "tandem_agc_axi.v").read_text()
+    tandem_cdc = (ROOT / "hdl-tandem" / "tandem_cdc_lib.v").read_text()
+    assert "tandem_cdc_mailbox #(.W(STAW), .AW(2)) u_stat" in tandem_axi
+    assert "module tandem_cdc_mailbox" in tandem_cdc
+    assert '(* ram_style = "block" *)' in tandem_cdc
     utils_main = "97487a04810ea120e4071146d8a14ee95f0fcecd"
     for source in (wrapper, binding):
         assert utils_main in source
@@ -487,7 +488,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "selects authoritative buffer ABI 4" in planner
     assert "GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION" in evidence
     assert "GAIN_TIMELINE_FINAL_FIRMWARE_VERSION" in evidence
-    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v4" in evidence
+    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v5" in evidence
     assert branch in evidence
 
 

@@ -91,10 +91,53 @@ module tb_tandem_cdc;
     end
   end
 
+  // ===========================================================================
+  // 4. BRAM-backed coherent latest-snapshot mailbox
+  // ===========================================================================
+  reg mb_src_clk = 1'b0, mb_dst_clk = 1'b0;
+  reg mb_src_run = 1'b1, mb_dst_run = 1'b0;
+  always #8.138 if (mb_src_run) mb_src_clk = ~mb_src_clk;  // 61.44 MHz
+  always #5     if (mb_dst_run) mb_dst_clk = ~mb_dst_clk;  // 100 MHz
+
+  reg mb_src_resetn = 1'b1, mb_dst_resetn = 1'b1;
+  reg [31:0] mb_counter = 32'd0;
+  wire [63:0] mb_din = {~mb_counter, mb_counter};
+  wire [63:0] mb_dout;
+  wire mb_valid;
+
+  tandem_cdc_mailbox #(.W(64), .AW(2)) u_mailbox (
+    .src_clk(mb_src_clk), .src_resetn(mb_src_resetn), .din(mb_din),
+    .dst_clk(mb_dst_clk), .dst_resetn(mb_dst_resetn),
+    .dout(mb_dout), .dout_valid(mb_valid));
+
+  always @(posedge mb_src_clk) begin
+    if (!mb_src_resetn) mb_counter <= 32'd0;
+    else                mb_counter <= mb_counter + 32'd1;
+  end
+
+  integer mb_seen = 0;
+  integer mb_bad = 0;
+  reg [31:0] mb_last = 32'd0;
+  always @(posedge mb_dst_clk) begin
+    if (mb_dst_resetn && mb_valid) begin
+      if (mb_dout[63:32] !== ~mb_dout[31:0]) mb_bad = mb_bad + 1;
+      if (mb_seen != 0 && mb_dout[31:0] < mb_last) mb_bad = mb_bad + 1;
+      mb_last = mb_dout[31:0];
+      mb_seen = mb_seen + 1;
+    end
+  end
+
   integer i;
 
   initial begin
     $display("== tb_tandem_cdc ==");
+
+    // Create an actual assertion edge while both mailbox clocks are stopped or
+    // asynchronous. This models the post-configuration reset edge; merely
+    // declaring a testbench signal low does not trigger an asynchronous block
+    // in every Verilog simulator.
+    mb_src_resetn = 1'b0;
+    mb_dst_resetn = 1'b0;
 
     // ---- reset bridge -----------------------------------------------------
     rb_run = 1'b0;
@@ -188,6 +231,32 @@ module tb_tandem_cdc;
     repeat (20) @(posedge fw_clk);
     check(fw_full == 1'b1,  "the FIFO reports full when the reader stops");
     check(fw_ovf > 8'd0,    "overflow is counted, never silent");
+
+    // ---- coherent status mailbox ----------------------------------------
+    // Fill while the destination clock is stopped, then start it late. The
+    // source must not overwrite in-flight slots, and every delivered 64-bit
+    // relation must remain atomic across the asynchronous clocks.
+    mb_src_resetn = 1'b1;
+    repeat (20) @(posedge mb_src_clk);
+    check(mb_valid === 1'b0,
+          "mailbox reset initializes even while the destination clock is stopped");
+    mb_dst_run = 1'b1;
+    repeat (3) @(posedge mb_dst_clk);
+    mb_dst_resetn = 1'b1;
+    repeat (160) @(posedge mb_dst_clk);
+    check(mb_seen > 20, "mailbox resumes and publishes after a late clock start");
+    check(mb_bad == 0, "mailbox snapshots are coherent and never regress");
+    check(mb_valid, "mailbox retains one last committed snapshot");
+
+    mb_src_run = 1'b0;
+    repeat (50) @(posedge mb_dst_clk);
+    begin : mailbox_hold
+      reg [63:0] held;
+      held = mb_dout;
+      repeat (20) @(posedge mb_dst_clk);
+      check(mb_valid && mb_dout === held,
+            "mailbox holds its last snapshot when the producer stops");
+    end
 
     $display("---- scenario failures : %0d ----", errors);
     if (errors != 0) $fatal(1, "CDC TESTS FAILED");
