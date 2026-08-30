@@ -31,8 +31,9 @@ from scripts.tandem_release_evidence import (
     verify_artifact_index_semantics,
 )
 
+from . import candidate_binding as _candidate_binding
 from .candidate_binding import (
-    PLUTOPLUS_HARDWARE_MODEL,
+    PLUTOPLUS_SUPPORTED_HARDWARE_MODELS,
     RAM_BOOT_RECEIPT_SCHEMA_VERSION,
     REQUIRED_EVIDENCE_ROLES,
     CandidateBindingError,
@@ -40,6 +41,10 @@ from .candidate_binding import (
     validate_deployment_receipt,
 )
 
+PLUTOPLUS_AD9361_HARDWARE_MODEL = (
+    _candidate_binding.PLUTOPLUS_AD9361_HARDWARE_MODEL
+)
+PLUTOPLUS_HARDWARE_MODEL = _candidate_binding.PLUTOPLUS_HARDWARE_MODEL
 RECEIPT_SCHEMA = "plutosdr-fw.tandem-ram-boot-receipt"
 USB_INVENTORY_SCHEMA = "plutosdr-fw.usb-inventory"
 USB_VENDOR = "0456"
@@ -560,9 +565,9 @@ def load_candidate_artifact(options: DeploymentOptions) -> CandidateArtifact:
     hardware_model = _required_string(
         release.get("hardware_model"), label="release hardware model"
     )
-    if hardware_model != PLUTOPLUS_HARDWARE_MODEL:
+    if hardware_model not in PLUTOPLUS_SUPPORTED_HARDWARE_MODELS:
         raise DeploymentError(
-            "candidate hardware model is not the exact supported Pluto+ class"
+            "candidate hardware model is not an exact supported Pluto+ Rev.C model"
         )
     commit = _required_string(source.get("commit"), label="source commit")
     if re.fullmatch(r"[0-9a-f]{40}", commit) is None:
@@ -2102,10 +2107,10 @@ class SystemBackend:
             if (
                 observed_serial != self.options.serial
                 or not context_firmware
-                or hardware_model != PLUTOPLUS_HARDWARE_MODEL
+                or hardware_model not in PLUTOPLUS_SUPPORTED_HARDWARE_MODELS
             ):
                 raise DeploymentError(
-                    "USB IIO runtime identity or Pluto+ hardware model differs"
+                    "USB IIO runtime identity or supported Pluto+ hardware model differs"
                 )
 
             phy = context.find_device("ad9361-phy")

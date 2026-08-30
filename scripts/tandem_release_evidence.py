@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
 import stat
@@ -14,6 +15,7 @@ import sys
 import tarfile
 import zipfile
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -63,14 +65,55 @@ CANDIDATE_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8-rc32"
 FINAL_FIRMWARE_VERSION = "v0.41-plutoplus-spf-tandem-agc-v8"
 CANDIDATE_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-rc32-source/firmware-v2"
 FINAL_SOURCE_LOCK_REF = "refs/tags/tandem-agc-v8-source/firmware-v1"
+GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION = (
+    "v0.45-plutoplus-spf-iio-gain-timeline-v8-rc1"
+)
+GAIN_TIMELINE_FINAL_FIRMWARE_VERSION = "v0.45-plutoplus-spf-iio-gain-timeline-v8"
+GAIN_TIMELINE_CANDIDATE_SOURCE_LOCK_REF = (
+    "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v3"
+)
+GAIN_TIMELINE_FINAL_SOURCE_LOCK_REF = "refs/tags/iio-gain-timeline-v8-source/fw-v1"
 RELEASE_RADIO_SERIALS = (
     "104000bac4950008230026001b440a003a",
     "winbond-db620818a328172c",
     "winbond-db6968136727402c",
 )
-PRE_HARDWARE_SOURCE_LOCK_REFS = {
-    "candidate-pre-hardware": CANDIDATE_SOURCE_LOCK_REF,
-    "final-pre-confirmation": FINAL_SOURCE_LOCK_REF,
+PRE_HARDWARE_PROFILES = {
+    ("candidate-pre-hardware", CANDIDATE_FIRMWARE_VERSION): {
+        "source_lock_ref": CANDIDATE_SOURCE_LOCK_REF,
+        "manifest_basename": "tandem-agc-v8-rc32-source.yaml",
+        "build_ref": "refs/heads/codex/firmware-tandem-agc-v8-rc32",
+        "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+        "metadata_abi": "frame-metadata-v5",
+        "tandem_agc": "request-v2",
+    },
+    ("final-pre-confirmation", FINAL_FIRMWARE_VERSION): {
+        "source_lock_ref": FINAL_SOURCE_LOCK_REF,
+        "manifest_basename": "tandem-agc-v8-source.yaml",
+        "build_ref": "refs/heads/main",
+        "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+        "metadata_abi": "frame-metadata-v5",
+        "tandem_agc": "request-v2",
+    },
+    (
+        "candidate-pre-hardware",
+        GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION,
+    ): {
+        "source_lock_ref": GAIN_TIMELINE_CANDIDATE_SOURCE_LOCK_REF,
+        "manifest_basename": "iio-gain-timeline-v8-rc1-source.yaml",
+        "build_ref": "refs/heads/codex/iio-gain-timeline-v8-fw",
+        "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)",
+        "metadata_abi": "frame-metadata-v5",
+        "tandem_agc": "request-v2",
+    },
+    ("final-pre-confirmation", GAIN_TIMELINE_FINAL_FIRMWARE_VERSION): {
+        "source_lock_ref": GAIN_TIMELINE_FINAL_SOURCE_LOCK_REF,
+        "manifest_basename": "iio-gain-timeline-v8-rc1-source.yaml",
+        "build_ref": "refs/heads/main",
+        "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)",
+        "metadata_abi": "frame-metadata-v5",
+        "tandem_agc": "request-v2",
+    },
 }
 INDEX_FILENAMES = {
     "candidate-pre-hardware": "candidate-index.json",
@@ -127,6 +170,25 @@ _CAMPAIGN_FILENAMES = {
     "soak": "release-hardware-report.json",
     "lifecycle": "muted-metadata-batch-lifecycle-v5.json",
 }
+GAIN_TIMELINE_RELEASE_RADIO_IPS = (
+    ("1040007c4a94000211000b009186843ef2", "192.168.1.18"),
+    ("104000bac4950008230026001b440a003a", "192.168.1.17"),
+)
+GAIN_TIMELINE_RELEASE_RADIO_SERIALS = tuple(
+    serial for serial, _ip in GAIN_TIMELINE_RELEASE_RADIO_IPS
+)
+_GAIN_TIMELINE_PHASES = ("deploy", "qualification")
+_GAIN_TIMELINE_FILENAMES = {
+    "deploy": "ram-boot-receipt.json",
+    "qualification": "gain-timeline-report.json",
+}
+_GAIN_TIMELINE_PLAN_FILENAME = "gain-timeline-qualification-plan.json"
+_GAIN_TIMELINE_PLAN_SCHEMA = "pluto-plus-utils.gain-timeline-qualification-plan.v1"
+_GAIN_TIMELINE_REPORT_SCHEMA = "pluto-plus-utils.gain-timeline-qualification-report.v1"
+_GAIN_TIMELINE_SAMPLE_RATE_HZ = 20_000_000
+_GAIN_TIMELINE_SAMPLES_PER_CHANNEL = 262_144
+_GAIN_TIMELINE_KERNEL_BUFFERS = 4
+_GAIN_TIMELINE_RING_IQ_BYTES = 200_000_000
 RELEASE_HARDWARE_HARNESS_PATHS = (
     "scripts/deploy_tandem_agc_ram_hardware.sh",
     "scripts/run_tandem_agc_release_hardware.sh",
@@ -968,6 +1030,26 @@ def _committed_file_sha256(commit: str, relative: str) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def _pre_hardware_profile(stage: str, firmware_version: str) -> Mapping[str, str]:
+    profile = PRE_HARDWARE_PROFILES.get((stage, firmware_version))
+    if profile is None:
+        _fail("firmware/stage pair is not an exact supported release profile")
+    return profile
+
+
+def _verify_profile_release(
+    release: Mapping[str, object], *, stage: str
+) -> Mapping[str, str]:
+    firmware_version = _string(
+        release.get("firmware_version"), name="profile firmware version"
+    )
+    profile = _pre_hardware_profile(stage, firmware_version)
+    for key in ("hardware_model", "metadata_abi", "tandem_agc"):
+        if release.get(key) != profile[key]:
+            _fail(f"release {key} differs from the exact protected profile")
+    return profile
+
+
 def _verify_committed_source_manifest(
     *,
     stage: str,
@@ -976,16 +1058,8 @@ def _verify_committed_source_manifest(
     archived_sha256: str,
     commit: str,
 ) -> None:
-    if stage == "candidate-pre-hardware":
-        if firmware_version != CANDIDATE_FIRMWARE_VERSION:
-            _fail("candidate pre-hardware firmware identity is not exact RC32")
-        basename = "tandem-agc-v8-rc32-source.yaml"
-    elif stage == "final-pre-confirmation":
-        if firmware_version != FINAL_FIRMWARE_VERSION:
-            _fail("final pre-confirmation firmware identity is not exact v8")
-        basename = "tandem-agc-v8-source.yaml"
-    else:
-        _fail("source manifest verification requires a pre-hardware stage")
+    profile = _pre_hardware_profile(stage, firmware_version)
+    basename = profile["manifest_basename"]
     if archived_relative != f"source/{basename}":
         _fail("source manifest archive path/name is not the protected canonical path")
     committed_sha256 = _committed_file_sha256(commit, f"manifests/{basename}")
@@ -1012,10 +1086,15 @@ def _verify_source_lock(payload: bytes, *, commit: str, expected_ref: str) -> No
 
 
 def _trusted_build_ref(firmware_version: str) -> str:
-    match = re.fullmatch(r".+-rc([1-9][0-9]*)", firmware_version)
-    if match is not None:
-        return f"refs/heads/codex/firmware-tandem-agc-v8-rc{match.group(1)}"
-    return "refs/heads/main"
+    matches = {
+        profile["build_ref"]
+        for (stage, version), profile in PRE_HARDWARE_PROFILES.items()
+        if version == firmware_version
+        and stage in {"candidate-pre-hardware", "final-pre-confirmation"}
+    }
+    if len(matches) != 1:
+        _fail("firmware identity has no unique trusted protected build ref")
+    return matches.pop()
 
 
 def _verify_actions_run(
@@ -1304,9 +1383,7 @@ def _verify_attestation_record(
         _fail("attestation record is not an exact successful verification")
 
 
-def _verify_artifact_index(
-    index_path: Path, *, expected_stage: str, expected_source_lock_ref: str
-) -> dict[str, Any]:
+def _verify_artifact_index(index_path: Path, *, expected_stage: str) -> dict[str, Any]:
     index_path = index_path.absolute()
     if not index_path.is_file() or index_path.is_symlink():
         _fail("candidate index must be a regular nonsymlink file")
@@ -1320,6 +1397,7 @@ def _verify_artifact_index(
         raise EvidenceError(str(error)) from error
     if index["stage"] != expected_stage:
         _fail("candidate index stage differs from the requested verification stage")
+    profile = _verify_profile_release(index["release"], stage=expected_stage)
     if tuple(item["path"] for item in index["harness"]["files"]) != (
         ARTIFACT_HARNESS_PATHS
     ):
@@ -1437,7 +1515,7 @@ def _verify_artifact_index(
     _verify_source_lock(
         role_payloads["source-lock"],
         commit=commit,
-        expected_ref=expected_source_lock_ref,
+        expected_ref=profile["source_lock_ref"],
     )
     _verify_actions_run(
         role_payloads["actions-run"],
@@ -1673,6 +1751,590 @@ def _read_json_member(path: Path, *, name: str) -> Mapping[str, object]:
         _decode_json(_read_small(path, name=name), name=name),
         name=name,
     )
+
+
+def _is_gain_timeline_release(artifact_index: Mapping[str, Any]) -> bool:
+    release = _mapping(artifact_index.get("release"), name="artifact release")
+    return release.get("firmware_version") in {
+        GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION,
+        GAIN_TIMELINE_FINAL_FIRMWARE_VERSION,
+    }
+
+
+def _private_contract_payload(path: Path, *, name: str) -> bytes:
+    try:
+        mode = stat.S_IMODE(path.stat(follow_symlinks=False).st_mode)
+    except OSError as error:
+        raise EvidenceError(f"{name} cannot be inspected: {error}") from error
+    if mode != 0o600:
+        _fail(f"{name} mode must be exactly 0600")
+    return _read_small(path, name=name)
+
+
+def _utc_timestamp(value: object, *, name: str) -> datetime:
+    text = _string(value, name=name, maximum=64)
+    if not text.endswith("Z"):
+        _fail(f"{name} must be canonical UTC ending in Z")
+    try:
+        parsed = datetime.fromisoformat(text[:-1] + "+00:00")
+    except ValueError as error:
+        raise EvidenceError(f"{name} is not ISO-8601 UTC") from error
+    if parsed.utcoffset() != UTC.utcoffset(parsed):
+        _fail(f"{name} is not UTC")
+    return parsed
+
+
+def _finite_number(value: object, *, name: str, positive: bool = False) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        _fail(f"{name} must be a finite number")
+    parsed = float(value)
+    if not math.isfinite(parsed) or (positive and parsed <= 0):
+        _fail(f"{name} must be a finite{' positive' if positive else ''} number")
+    return parsed
+
+
+def _contract_identity(
+    value: object,
+    *,
+    payload: bytes,
+    expected_path: Path,
+    name: str,
+) -> None:
+    identity = _mapping(value, name=name)
+    _exact_keys(identity, {"path", "bytes", "sha256"}, name=name)
+    raw_path = _string(identity["path"], name=f"{name} path", maximum=4096)
+    path = PurePosixPath(raw_path)
+    if (
+        not path.is_absolute()
+        or ".." in path.parts
+        or Path(raw_path) != expected_path.absolute()
+    ):
+        _fail(f"{name} path is not the retained contract path")
+    if (
+        identity["bytes"] != len(payload)
+        or identity["sha256"] != hashlib.sha256(payload).hexdigest()
+    ):
+        _fail(f"{name} does not bind the retained bytes")
+
+
+def _gain_timeline_cases() -> tuple[dict[str, object], ...]:
+    tiers = (
+        ("regression", 200, 1),
+        ("regression", 200, 2),
+        ("regression", 600, 1),
+        ("regression", 600, 2),
+        ("soak", 5_000, 1),
+    )
+    cases: list[dict[str, object]] = []
+    for transport in ("usb", "physical-ip"):
+        for buffering in ("ordinary", "ring-200mb"):
+            for tandem_mode in ("hold", "auto"):
+                layouts = (
+                    ("single-rx0", "dual")
+                    if buffering == "ordinary"
+                    else ("single-rx0",)
+                )
+                for layout in layouts:
+                    for tier, frames, repetition in tiers:
+                        cases.append(
+                            {
+                                "transport": transport,
+                                "buffering": buffering,
+                                "tandem_mode": tandem_mode,
+                                "layout": layout,
+                                "tier": tier,
+                                "frames": frames,
+                                "repetition": repetition,
+                            }
+                        )
+    if len(cases) != 60 or any(
+        case["buffering"] == "ring-200mb" and case["layout"] == "dual" for case in cases
+    ):
+        raise AssertionError("gain-timeline qualification matrix is not canonical")
+    return tuple(cases)
+
+
+_GAIN_TIMELINE_CASES = _gain_timeline_cases()
+
+
+def _verify_gain_timeline_plan(
+    path: Path,
+    *,
+    operation_path: Path,
+    candidate_path: Path,
+    report_path: Path,
+    serial: str,
+    physical_ip: str,
+) -> tuple[Mapping[str, object], bytes]:
+    payload = _private_contract_payload(path, name=f"qualification plan {serial}")
+    plan = _mapping(
+        _decode_json(payload, name=f"qualification plan {serial}"),
+        name=f"qualification plan {serial}",
+    )
+    _exact_keys(
+        plan,
+        {
+            "schema",
+            "schema_version",
+            "campaign_id",
+            "created_at",
+            "operation_plan",
+            "candidate_plan",
+            "serial",
+            "physical_ip",
+            "report_path",
+            "sample_rate_hz",
+            "rf_bandwidth_hz",
+            "samples_per_channel",
+            "kernel_buffers",
+            "ddr_ring_iq_bytes",
+            "regression_frame_counts",
+            "regression_repetitions",
+            "soak_frame_count",
+            "ordinary_layouts",
+            "ring_layouts",
+            "confirmation_phrase",
+            "hardware_accessed",
+        },
+        name=f"qualification plan {serial}",
+    )
+    campaign_id = _string(
+        plan["campaign_id"], name=f"qualification campaign ID {serial}", maximum=32
+    )
+    if re.fullmatch(r"[0-9a-f]{32}", campaign_id) is None:
+        _fail("qualification campaign ID is malformed")
+    _utc_timestamp(plan["created_at"], name=f"qualification plan time {serial}")
+    operation_payload = _private_contract_payload(
+        operation_path, name=f"operation plan {serial}"
+    )
+    candidate_payload = _private_contract_payload(
+        candidate_path, name=f"candidate plan {serial}"
+    )
+    _contract_identity(
+        plan["operation_plan"],
+        payload=operation_payload,
+        expected_path=operation_path,
+        name=f"qualification operation identity {serial}",
+    )
+    _contract_identity(
+        plan["candidate_plan"],
+        payload=candidate_payload,
+        expected_path=candidate_path,
+        name=f"qualification candidate identity {serial}",
+    )
+    raw_report_path = _string(
+        plan["report_path"], name=f"qualification report path {serial}", maximum=4096
+    )
+    if Path(raw_report_path) != report_path.absolute():
+        _fail("qualification plan does not reserve the canonical archived report path")
+    expected = {
+        "schema": _GAIN_TIMELINE_PLAN_SCHEMA,
+        "schema_version": 1,
+        "serial": serial,
+        "physical_ip": physical_ip,
+        "sample_rate_hz": _GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "rf_bandwidth_hz": _GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "samples_per_channel": _GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
+        "kernel_buffers": _GAIN_TIMELINE_KERNEL_BUFFERS,
+        "ddr_ring_iq_bytes": _GAIN_TIMELINE_RING_IQ_BYTES,
+        "regression_frame_counts": [200, 600],
+        "regression_repetitions": 2,
+        "soak_frame_count": 5_000,
+        "ordinary_layouts": ["single-rx0", "dual"],
+        "ring_layouts": ["single-rx0"],
+        "confirmation_phrase": f"QUALIFY GAIN TIMELINE {serial} {campaign_id}",
+        "hardware_accessed": False,
+    }
+    for key, expected_value in expected.items():
+        if plan[key] != expected_value:
+            _fail(f"qualification plan {key} is not canonical")
+    return plan, payload
+
+
+def _verify_gain_timeline_ring_status(
+    value: object,
+    *,
+    frames: int,
+    first_sample: int,
+    last_sample: int,
+) -> None:
+    status = _mapping(value, name="qualification DDR ring status")
+    _exact_keys(
+        status,
+        {
+            "version",
+            "state",
+            "terminal_reason",
+            "error_code",
+            "requested_capacity_iq_bytes",
+            "admitted_capacity_iq_bytes",
+            "target_frames",
+            "produced_frames",
+            "consumed_frames",
+            "high_water_frames",
+            "wrap_count",
+            "producer_position",
+            "consumer_position",
+            "last_contiguous_sample_sequence",
+            "first_unavailable_sample_sequence",
+            "failure_frame_index",
+            "failure_sample_sequence",
+        },
+        name="qualification DDR ring status",
+    )
+    frame_bytes = _GAIN_TIMELINE_SAMPLES_PER_CHANNEL * 4
+    admitted = (_GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
+    capacity_frames = admitted // frame_bytes
+    prefix_frames = min(frames, capacity_frames)
+    expected = {
+        "version": 2,
+        "state": "complete",
+        "terminal_reason": "target_complete",
+        "error_code": 0,
+        "requested_capacity_iq_bytes": _GAIN_TIMELINE_RING_IQ_BYTES,
+        "admitted_capacity_iq_bytes": admitted,
+        "target_frames": frames,
+        "produced_frames": frames,
+        "consumed_frames": frames,
+        "high_water_frames": prefix_frames,
+        "wrap_count": frames // capacity_frames,
+        "producer_position": frames % capacity_frames,
+        "consumer_position": frames % capacity_frames,
+        "failure_frame_index": None,
+        "failure_sample_sequence": None,
+    }
+    for key, expected_value in expected.items():
+        if status[key] != expected_value:
+            _fail(f"qualification DDR ring {key} does not close")
+    contiguous = _nonnegative_int(
+        status["last_contiguous_sample_sequence"],
+        name="qualification DDR ring contiguous boundary",
+    )
+    unavailable = status["first_unavailable_sample_sequence"]
+    prefix_end = first_sample + prefix_frames * _GAIN_TIMELINE_SAMPLES_PER_CHANNEL
+    if contiguous < prefix_end:
+        _fail("qualification DDR ring does not prove its admitted contiguous prefix")
+    if unavailable is not None or contiguous != last_sample:
+        _fail("qualification DDR ring status contradicts the gapless metadata span")
+
+
+def _verify_gain_timeline_ladder(
+    value: object,
+    *,
+    case: Mapping[str, object],
+    artifact_index: Mapping[str, Any],
+    serial: str,
+    physical_ip: str,
+    usb_uri: str,
+) -> None:
+    report = _mapping(value, name="qualification ladder report")
+    _exact_keys(
+        report,
+        {
+            "serial",
+            "uri",
+            "transport",
+            "model",
+            "firmware_version",
+            "metadata_abi",
+            "sample_rate_hz",
+            "rf_bandwidth_hz",
+            "channels",
+            "kernel_buffers",
+            "tandem_mode",
+            "acceptance_mode",
+            "iq_decoder",
+            "ddr_burst_enabled",
+            "ddr_ring_requested_iq_bytes",
+            "minimum_observed_fraction",
+            "cells",
+            "failures",
+            "largest_passing_samples_per_channel",
+            "original_settings_restored",
+            "continuity_claim",
+        },
+        name="qualification ladder report",
+    )
+    is_usb = case["transport"] == "usb"
+    is_ring = case["buffering"] == "ring-200mb"
+    channels = [0] if case["layout"] == "single-rx0" else [0, 1]
+    expected = {
+        "serial": serial,
+        "uri": usb_uri if is_usb else f"ip:{physical_ip}",
+        "transport": "iio_usb" if is_usb else "iio_ip",
+        "model": artifact_index["release"]["hardware_model"],
+        "firmware_version": artifact_index["release"]["firmware_version"],
+        "metadata_abi": 4,
+        "sample_rate_hz": _GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "rf_bandwidth_hz": _GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "channels": channels,
+        "kernel_buffers": _GAIN_TIMELINE_KERNEL_BUFFERS,
+        "tandem_mode": case["tandem_mode"],
+        "acceptance_mode": "continuity",
+        "iq_decoder": "pyadi",
+        "ddr_burst_enabled": False,
+        "ddr_ring_requested_iq_bytes": (_GAIN_TIMELINE_RING_IQ_BYTES if is_ring else 0),
+        "minimum_observed_fraction": 0.95,
+        "failures": [],
+        "largest_passing_samples_per_channel": _GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
+        "original_settings_restored": True,
+        "continuity_claim": (
+            "passed binds FPGA counter coverage >=95%, zero overflow, exact selected-RX "
+            "geometry, and at least four kernel buffers; it is not inferred from host "
+            "throughput"
+        ),
+    }
+    for key, expected_value in expected.items():
+        if report[key] != expected_value:
+            _fail(f"qualification ladder {key} is not exact")
+    cells = report["cells"]
+    if (
+        not isinstance(cells, Sequence)
+        or isinstance(cells, (str, bytes))
+        or len(cells) != 1
+    ):
+        _fail("qualification ladder must contain exactly one cell")
+    cell = _mapping(cells[0], name="qualification ladder cell")
+    _exact_keys(
+        cell,
+        {
+            "samples_per_channel",
+            "requested_frames",
+            "observed_frames",
+            "observed_sample_count",
+            "device_span_sample_count",
+            "first_sample_sequence",
+            "last_sample_sequence_exclusive",
+            "missing_sample_count",
+            "gap_count",
+            "overflow_count",
+            "iq_bytes",
+            "elapsed_seconds",
+            "achieved_payload_mbps",
+            "achieved_payload_mibps",
+            "observed_fraction",
+            "tandem_metadata_frames",
+            "authoritative_gain_timeline_frames",
+            "gain_observation_interval_samples",
+            "gain_observation_count",
+            "gain_observation_overflow_count",
+            "gain_event_count",
+            "gain_event_overflow_count",
+            "ddr_burst_requested_iq_bytes",
+            "ddr_burst_admitted_iq_bytes",
+            "ddr_burst_frames",
+            "ddr_ring_status",
+            "ddr_ring_prefix_frames",
+            "ddr_ring_prefix_iq_bytes",
+            "ddr_ring_prefix_contiguous",
+            "passed",
+        },
+        name="qualification ladder cell",
+    )
+    frames = int(case["frames"])
+    observed_samples = frames * _GAIN_TIMELINE_SAMPLES_PER_CHANNEL
+    first = _nonnegative_int(
+        cell["first_sample_sequence"], name="qualification first sample sequence"
+    )
+    last = _positive_int(
+        cell["last_sample_sequence_exclusive"],
+        name="qualification last sample sequence",
+    )
+    interval = _positive_int(
+        cell["gain_observation_interval_samples"],
+        name="qualification gain observation interval",
+    )
+    del interval
+    exact_cell = {
+        "samples_per_channel": _GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
+        "requested_frames": frames,
+        "observed_frames": frames,
+        "observed_sample_count": observed_samples,
+        "device_span_sample_count": observed_samples,
+        "last_sample_sequence_exclusive": first + observed_samples,
+        "missing_sample_count": 0,
+        "gap_count": 0,
+        "overflow_count": 0,
+        "iq_bytes": observed_samples * len(channels) * 4,
+        "observed_fraction": 1.0,
+        "tandem_metadata_frames": frames,
+        "authoritative_gain_timeline_frames": frames,
+        "gain_observation_overflow_count": 0,
+        "gain_event_overflow_count": 0,
+        "ddr_burst_requested_iq_bytes": 0,
+        "ddr_burst_admitted_iq_bytes": 0,
+        "ddr_burst_frames": 0,
+        "passed": True,
+    }
+    for key, expected_value in exact_cell.items():
+        if cell[key] != expected_value:
+            _fail(f"qualification ladder cell {key} does not close")
+    for key in ("gain_observation_count", "gain_event_count"):
+        _nonnegative_int(cell[key], name=f"qualification ladder cell {key}")
+    elapsed = _finite_number(
+        cell["elapsed_seconds"], name="qualification elapsed seconds", positive=True
+    )
+    mbps = _finite_number(
+        cell["achieved_payload_mbps"],
+        name="qualification decimal throughput",
+        positive=True,
+    )
+    mibps = _finite_number(
+        cell["achieved_payload_mibps"],
+        name="qualification binary throughput",
+        positive=True,
+    )
+    iq_bytes = int(exact_cell["iq_bytes"])
+    if (
+        abs(mbps - iq_bytes / elapsed / 1_000_000) > 1e-9
+        or abs(mibps - iq_bytes / elapsed / (1024 * 1024)) > 1e-9
+    ):
+        _fail("qualification ladder throughput arithmetic does not close")
+    if is_ring:
+        frame_bytes = _GAIN_TIMELINE_SAMPLES_PER_CHANNEL * 4
+        admitted = (_GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
+        prefix_frames = min(frames, admitted // frame_bytes)
+        if (
+            cell["ddr_ring_prefix_frames"] != prefix_frames
+            or cell["ddr_ring_prefix_iq_bytes"] != prefix_frames * frame_bytes
+            or cell["ddr_ring_prefix_contiguous"] is not True
+            or cell["ddr_ring_status"] is None
+        ):
+            _fail("qualification DDR ring prefix does not close")
+        _verify_gain_timeline_ring_status(
+            cell["ddr_ring_status"], frames=frames, first_sample=first, last_sample=last
+        )
+    elif (
+        cell["ddr_ring_status"] is not None
+        or cell["ddr_ring_prefix_frames"] != 0
+        or cell["ddr_ring_prefix_iq_bytes"] != 0
+        or cell["ddr_ring_prefix_contiguous"] is not False
+    ):
+        _fail("ordinary qualification cell contains DDR ring evidence")
+
+
+def _verify_gain_timeline_report(
+    path: Path,
+    *,
+    plan_path: Path,
+    operation_path: Path,
+    candidate_path: Path,
+    receipt_path: Path,
+    artifact_index: Mapping[str, Any],
+    serial: str,
+    physical_ip: str,
+) -> None:
+    plan, plan_payload = _verify_gain_timeline_plan(
+        plan_path,
+        operation_path=operation_path,
+        candidate_path=candidate_path,
+        report_path=path,
+        serial=serial,
+        physical_ip=physical_ip,
+    )
+    payload = _private_contract_payload(path, name=f"qualification report {serial}")
+    report = _mapping(
+        _decode_json(payload, name=f"qualification report {serial}"),
+        name=f"qualification report {serial}",
+    )
+    _exact_keys(
+        report,
+        {
+            "schema",
+            "schema_version",
+            "campaign_plan",
+            "started_at",
+            "completed_at",
+            "outcome",
+            "planned_case_count",
+            "boot_receipt",
+            "cases",
+            "restored_runtime",
+            "persistent_qspi_unchanged",
+            "errors",
+        },
+        name=f"qualification report {serial}",
+    )
+    _contract_identity(
+        report["campaign_plan"],
+        payload=plan_payload,
+        expected_path=plan_path,
+        name=f"qualification report plan identity {serial}",
+    )
+    started = _utc_timestamp(report["started_at"], name="qualification start time")
+    completed = _utc_timestamp(
+        report["completed_at"], name="qualification completion time"
+    )
+    if completed < started:
+        _fail("qualification completion precedes its start")
+    if (
+        report["schema"] != _GAIN_TIMELINE_REPORT_SCHEMA
+        or report["schema_version"] != 1
+        or report["outcome"] != "pass"
+        or report["planned_case_count"] != 60
+        or report["persistent_qspi_unchanged"] is not True
+        or report["errors"] != []
+    ):
+        _fail("gain-timeline qualification report is not an exact passing outcome")
+    receipt_payload = _private_contract_payload(
+        receipt_path, name=f"RAM receipt {serial}"
+    )
+    receipt = _mapping(
+        _decode_json(receipt_payload, name=f"RAM receipt {serial}"),
+        name=f"RAM receipt {serial}",
+    )
+    if report["boot_receipt"] != receipt:
+        _fail("qualification report embeds a different RAM receipt")
+    pre_runtime = _mapping(receipt["pre_runtime"], name="qualification pre-runtime")
+    post_runtime = _mapping(receipt["post_runtime"], name="qualification post-runtime")
+    restored = _mapping(
+        report["restored_runtime"], name="qualification restored runtime"
+    )
+    if set(restored) != set(pre_runtime):
+        _fail(
+            "qualification restored runtime shape differs from persistent pre-runtime"
+        )
+    for key in pre_runtime:
+        if key not in {"boot_id", "usb_uri"} and restored[key] != pre_runtime[key]:
+            _fail(f"qualification restored runtime differs at {key}")
+    restored_usb_uri = _string(
+        restored["usb_uri"], name="qualification restored USB URI", maximum=64
+    )
+    if re.fullmatch(r"usb:[0-9]+[.][0-9]+[.]5", restored_usb_uri) is None:
+        _fail("qualification restored runtime USB URI is not concrete")
+    restored_boot = _string(
+        restored["boot_id"], name="qualification restored boot ID", maximum=36
+    )
+    if re.fullmatch(
+        r"[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-"
+        r"[89ab][0-9a-f]{3}-[0-9a-f]{12}",
+        restored_boot,
+    ) is None or restored_boot in {pre_runtime["boot_id"], post_runtime["boot_id"]}:
+        _fail("qualification restored runtime does not prove a fresh persistent boot")
+    raw_cases = report["cases"]
+    if not isinstance(raw_cases, Sequence) or isinstance(raw_cases, (str, bytes)):
+        _fail("qualification cases must be an array")
+    if len(raw_cases) != len(_GAIN_TIMELINE_CASES):
+        _fail("qualification report does not contain all 60 cases")
+    usb_uri = _string(post_runtime["usb_uri"], name="candidate runtime USB URI")
+    for position, (raw_result, expected_case) in enumerate(
+        zip(raw_cases, _GAIN_TIMELINE_CASES, strict=True)
+    ):
+        result = _mapping(raw_result, name=f"qualification result {position}")
+        _exact_keys(
+            result, {"case", "report", "error"}, name=f"qualification result {position}"
+        )
+        if result["case"] != expected_case or result["error"] is not None:
+            _fail(f"qualification result {position} is missing, reordered, or failed")
+        _verify_gain_timeline_ladder(
+            result["report"],
+            case=expected_case,
+            artifact_index=artifact_index,
+            serial=serial,
+            physical_ip=physical_ip,
+            usb_uri=usb_uri,
+        )
+    del plan
 
 
 def _verify_receipt_report(
@@ -2597,6 +3259,185 @@ def _verify_campaign_hardware(
         _fail("qualification index does not cover every raw hardware member")
 
 
+def _gain_timeline_serials(root: Path) -> tuple[str, ...]:
+    hardware = _member_path(root, "hardware", name="gain-timeline hardware root")
+    if not hardware.is_dir():
+        _fail("gain-timeline hardware root is not a directory")
+    top_entries = sorted(os.scandir(hardware), key=lambda entry: entry.name)
+    if {entry.name for entry in top_entries} != set(_GAIN_TIMELINE_PHASES) or any(
+        not entry.is_dir(follow_symlinks=False) or entry.is_symlink()
+        for entry in top_entries
+    ):
+        _fail("gain-timeline hardware phases are mixed or incomplete")
+    observed: list[set[str]] = []
+    for phase in _GAIN_TIMELINE_PHASES:
+        phase_root = _member_path(
+            root, f"hardware/{phase}", name=f"gain-timeline {phase} root"
+        )
+        entries = sorted(os.scandir(phase_root), key=lambda entry: entry.name)
+        serials: set[str] = set()
+        for entry in entries:
+            serial = _safe_id(entry.name, name=f"gain-timeline {phase} serial")
+            if not entry.is_dir(follow_symlinks=False) or entry.is_symlink():
+                _fail("gain-timeline evidence is not exactly serial-scoped")
+            serials.add(serial)
+        observed.append(serials)
+    expected = set(GAIN_TIMELINE_RELEASE_RADIO_SERIALS)
+    if any(serials != expected for serials in observed):
+        _fail("gain-timeline qualification differs from the exact .17/.18 radio scope")
+    return GAIN_TIMELINE_RELEASE_RADIO_SERIALS
+
+
+def _verify_gain_timeline_radio(
+    *,
+    artifact_index: Mapping[str, Any],
+    artifact_index_sha256: str,
+    serial: str,
+    physical_ip: str,
+    receipt_path: Path,
+    report_path: Path,
+) -> None:
+    _verify_receipt_report(
+        receipt_path,
+        artifact_index=artifact_index,
+        artifact_index_sha256=artifact_index_sha256,
+        serial=serial,
+    )
+    deploy_root = receipt_path.parent
+    qualification_root = report_path.parent
+    _verify_gain_timeline_report(
+        report_path,
+        plan_path=qualification_root / _GAIN_TIMELINE_PLAN_FILENAME,
+        operation_path=deploy_root / "operation-plan.json",
+        candidate_path=deploy_root / "release-candidate-plan.json",
+        receipt_path=receipt_path,
+        artifact_index=artifact_index,
+        serial=serial,
+        physical_ip=physical_ip,
+    )
+
+
+def _capture_gain_timeline_hardware(
+    root: Path,
+    *,
+    artifact_index: Mapping[str, Any],
+    artifact_index_sha256: str,
+) -> tuple[list[dict[str, object]], list[dict[str, object]]]:
+    serials = _gain_timeline_serials(root)
+    expected_ips = dict(GAIN_TIMELINE_RELEASE_RADIO_IPS)
+    known_paths: set[str] = set()
+    radios: list[dict[str, object]] = []
+    for serial in serials:
+        receipt_relative = (
+            f"hardware/deploy/{serial}/{_GAIN_TIMELINE_FILENAMES['deploy']}"
+        )
+        report_relative = (
+            "hardware/qualification/"
+            f"{serial}/{_GAIN_TIMELINE_FILENAMES['qualification']}"
+        )
+        receipt = _capture_member(root, receipt_relative, name=f"RAM receipt {serial}")
+        report = _capture_member(
+            root, report_relative, name=f"gain-timeline report {serial}"
+        )
+        known_paths.update({receipt_relative, report_relative})
+        _verify_gain_timeline_radio(
+            artifact_index=artifact_index,
+            artifact_index_sha256=artifact_index_sha256,
+            serial=serial,
+            physical_ip=expected_ips[serial],
+            receipt_path=_member_path(
+                root, receipt_relative, name=f"RAM receipt {serial}"
+            ),
+            report_path=_member_path(
+                root, report_relative, name=f"gain-timeline report {serial}"
+            ),
+        )
+        radios.append({"serial": serial, "deploy": receipt, "qualification": report})
+    inventory = set(_scan_tree_files(root, "hardware"))
+    raw_paths = sorted(inventory - known_paths)
+    raw_members = [
+        _capture_member(root, relative, name=f"raw gain-timeline evidence {relative}")
+        for relative in raw_paths
+    ]
+    return radios, raw_members
+
+
+def _verify_gain_timeline_hardware(
+    root: Path,
+    *,
+    radios_value: object,
+    raw_members_value: object,
+    artifact_index: Mapping[str, Any],
+    artifact_index_sha256: str,
+) -> None:
+    _gain_timeline_serials(root)
+    if not isinstance(radios_value, Sequence) or isinstance(radios_value, (str, bytes)):
+        _fail("gain-timeline qualification radios must be an array")
+    if not isinstance(raw_members_value, Sequence) or isinstance(
+        raw_members_value, (str, bytes)
+    ):
+        _fail("gain-timeline raw members must be an array")
+    expected_ips = dict(GAIN_TIMELINE_RELEASE_RADIO_IPS)
+    known_paths: set[str] = set()
+    observed_serials: list[str] = []
+    for position, value in enumerate(radios_value):
+        radio = _mapping(value, name=f"gain-timeline radio {position}")
+        _exact_keys(
+            radio,
+            {"serial", "deploy", "qualification"},
+            name=f"gain-timeline radio {position}",
+        )
+        serial = _safe_id(radio["serial"], name=f"gain-timeline serial {position}")
+        observed_serials.append(serial)
+        receipt, receipt_path = _verify_member(
+            root, radio["deploy"], name=f"gain-timeline RAM receipt {serial}"
+        )
+        report, report_path = _verify_member(
+            root,
+            radio["qualification"],
+            name=f"gain-timeline qualification report {serial}",
+        )
+        expected_receipt = (
+            f"hardware/deploy/{serial}/{_GAIN_TIMELINE_FILENAMES['deploy']}"
+        )
+        expected_report = (
+            "hardware/qualification/"
+            f"{serial}/{_GAIN_TIMELINE_FILENAMES['qualification']}"
+        )
+        if (
+            receipt["path"] != expected_receipt
+            or report["path"] != expected_report
+            or expected_receipt in known_paths
+            or expected_report in known_paths
+        ):
+            _fail("gain-timeline report paths are not canonical and unique")
+        known_paths.update({expected_receipt, expected_report})
+        if serial not in expected_ips:
+            _fail("gain-timeline qualification includes an unexpected radio")
+        _verify_gain_timeline_radio(
+            artifact_index=artifact_index,
+            artifact_index_sha256=artifact_index_sha256,
+            serial=serial,
+            physical_ip=expected_ips[serial],
+            receipt_path=receipt_path,
+            report_path=report_path,
+        )
+    if tuple(observed_serials) != GAIN_TIMELINE_RELEASE_RADIO_SERIALS:
+        _fail("gain-timeline qualification serial order/scope is not exact")
+    raw_paths: list[str] = []
+    for position, value in enumerate(raw_members_value):
+        member, _path = _verify_member(
+            root, value, name=f"gain-timeline raw member {position}"
+        )
+        raw_paths.append(str(member["path"]))
+    if raw_paths != sorted(raw_paths) or len(raw_paths) != len(set(raw_paths)):
+        _fail("gain-timeline raw members are not unique and sorted")
+    if known_paths & set(raw_paths):
+        _fail("gain-timeline raw members alias reports")
+    if set(_scan_tree_files(root, "hardware")) != known_paths | set(raw_paths):
+        _fail("gain-timeline index does not cover every raw hardware member")
+
+
 def _assemble_candidate_qualified(
     root: Path, *, parent_index_path: Path
 ) -> dict[str, Any]:
@@ -2606,11 +3447,18 @@ def _assemble_candidate_qualified(
         expected_stage="candidate-pre-hardware",
         name="candidate artifact index",
     )
-    radios, raw_members = _capture_campaign_hardware(
-        root,
-        artifact_index=artifact_index,
-        artifact_index_sha256=str(parent["sha256"]),
-    )
+    if _is_gain_timeline_release(artifact_index):
+        radios, raw_members = _capture_gain_timeline_hardware(
+            root,
+            artifact_index=artifact_index,
+            artifact_index_sha256=str(parent["sha256"]),
+        )
+    else:
+        radios, raw_members = _capture_campaign_hardware(
+            root,
+            artifact_index=artifact_index,
+            artifact_index_sha256=str(parent["sha256"]),
+        )
     return {
         "schema": QUALIFICATION_INDEX_SCHEMA,
         "schema_version": SCHEMA_VERSION,
@@ -2659,13 +3507,22 @@ def _verify_candidate_qualified(index_path: Path) -> dict[str, Any]:
     )
     if artifact_index["source"]["commit"] != source_commit:
         _fail("candidate qualification parent source lineage differs")
-    _verify_campaign_hardware(
-        root,
-        radios_value=raw["radios"],
-        raw_members_value=raw["raw_members"],
-        artifact_index=artifact_index,
-        artifact_index_sha256=str(raw["parent"]["sha256"]),
-    )
+    if _is_gain_timeline_release(artifact_index):
+        _verify_gain_timeline_hardware(
+            root,
+            radios_value=raw["radios"],
+            raw_members_value=raw["raw_members"],
+            artifact_index=artifact_index,
+            artifact_index_sha256=str(raw["parent"]["sha256"]),
+        )
+    else:
+        _verify_campaign_hardware(
+            root,
+            radios_value=raw["radios"],
+            raw_members_value=raw["raw_members"],
+            artifact_index=artifact_index,
+            artifact_index_sha256=str(raw["parent"]["sha256"]),
+        )
     return dict(raw)
 
 
@@ -3432,11 +4289,18 @@ def _assemble_final_qualified(
         )
         selected_evidence = {"mode": required_test, "aggregate": aggregate}
     else:
-        radios, raw_members = _capture_campaign_hardware(
-            root,
-            artifact_index=final_artifact,
-            artifact_index_sha256=str(final_reference["sha256"]),
-        )
+        if _is_gain_timeline_release(final_artifact):
+            radios, raw_members = _capture_gain_timeline_hardware(
+                root,
+                artifact_index=final_artifact,
+                artifact_index_sha256=str(final_reference["sha256"]),
+            )
+        else:
+            radios, raw_members = _capture_campaign_hardware(
+                root,
+                artifact_index=final_artifact,
+                artifact_index_sha256=str(final_reference["sha256"]),
+            )
         selected_evidence = {"mode": "full-campaign"}
     return {
         "schema": QUALIFICATION_INDEX_SCHEMA,
@@ -3516,13 +4380,22 @@ def _verify_final_qualified(index_path: Path) -> dict[str, Any]:
         _exact_keys(selected, {"mode"}, name="selected final evidence")
         if selected["mode"] != "full-campaign":
             _fail("selected final evidence mode differs from policy")
-        _verify_campaign_hardware(
-            root,
-            radios_value=raw["radios"],
-            raw_members_value=raw["raw_members"],
-            artifact_index=final_artifact,
-            artifact_index_sha256=str(raw["final_artifact"]["sha256"]),
-        )
+        if _is_gain_timeline_release(final_artifact):
+            _verify_gain_timeline_hardware(
+                root,
+                radios_value=raw["radios"],
+                raw_members_value=raw["raw_members"],
+                artifact_index=final_artifact,
+                artifact_index_sha256=str(raw["final_artifact"]["sha256"]),
+            )
+        else:
+            _verify_campaign_hardware(
+                root,
+                radios_value=raw["radios"],
+                raw_members_value=raw["raw_members"],
+                artifact_index=final_artifact,
+                artifact_index_sha256=str(raw["final_artifact"]["sha256"]),
+            )
     else:
         _fail("final qualification required-test is unknown")
     return dict(raw)
@@ -4338,8 +5211,6 @@ def _verify_published_release(index_path: Path) -> dict[str, Any]:
 def _assemble_input(
     input_path: Path,
     archive_root: Path,
-    *,
-    expected_source_lock_ref: str,
 ) -> dict[str, Any]:
     raw = _mapping(
         _decode_json(
@@ -4389,6 +5260,7 @@ def _assemble_input(
     firmware_version = _string(
         release_input.get("firmware_version"), name="evidence firmware version"
     )
+    profile = _verify_profile_release(release, stage=stage)
     _verify_committed_source_manifest(
         stage=stage,
         firmware_version=firmware_version,
@@ -4534,7 +5406,7 @@ def _assemble_input(
     _verify_source_lock(
         semantic_payloads["source-lock"],
         commit=commit,
-        expected_ref=expected_source_lock_ref,
+        expected_ref=profile["source_lock_ref"],
     )
     _verify_actions_run(
         semantic_payloads["actions-run"],
@@ -4584,7 +5456,6 @@ def verify_index(index_path: Path, *, expected_stage: str) -> dict[str, Any]:
         return _verify_artifact_index(
             index_path,
             expected_stage=expected_stage,
-            expected_source_lock_ref=PRE_HARDWARE_SOURCE_LOCK_REFS[expected_stage],
         )
     if expected_stage == "candidate-qualified":
         return _verify_candidate_qualified(index_path)
@@ -4653,7 +5524,6 @@ def assemble(
         candidate = _assemble_input(
             input_path,
             root,
-            expected_source_lock_ref=PRE_HARDWARE_SOURCE_LOCK_REFS[stage],
         )
         if candidate["stage"] != stage:
             _fail("evidence input stage differs from requested assembly stage")

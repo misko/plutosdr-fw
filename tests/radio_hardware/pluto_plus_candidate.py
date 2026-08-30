@@ -11,19 +11,22 @@ from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Any
 
-from .candidate_binding import CandidateBindingError, validate_artifact_index
+from . import candidate_binding as _candidate_binding
+from .candidate_binding import (
+    CandidateBindingError,
+    validate_artifact_index,
+)
 
+PLUTOPLUS_HARDWARE_MODEL = _candidate_binding.PLUTOPLUS_HARDWARE_MODEL
 PLUTO_PLUS_UTILS_REPOSITORY = "misko/pluto-plus-utils"
 PLUTO_PLUS_UTILS_VERSION = "0.1.0"
-PLUTO_PLUS_UTILS_SOURCE_COMMIT = "8a3f4e65ffba8459d085778e1c4e7cc3576d3421"
+PLUTO_PLUS_UTILS_SOURCE_COMMIT = "97487a04810ea120e4071146d8a14ee95f0fcecd"
 PLUTO_IIO_BUFFER_METADATA_ABI = "frame-metadata-v4"
 RELEASE_FRAME_METADATA_SCHEMA = "frame-metadata-v5"
 CANDIDATE_PLAN_SCHEMA = "pluto-plus-utils.release-candidate-plan.v1"
 USB_INVENTORY_SCHEMA = "pluto-plus-utils.release-usb-inventory.v1"
 OPERATION_PLAN_SCHEMA = "pluto-plus-utils.release-candidate-operation-plan.v1"
 RAM_RECEIPT_SCHEMA = "pluto-plus-utils.release-candidate-ram-receipt.v1"
-PLUTOPLUS_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
-
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 _COMMIT = re.compile(r"[0-9a-f]{40}")
 _IDENTIFIER = re.compile(r"[0-9a-f]{32}")
@@ -509,31 +512,71 @@ def _safe_state(value: object, *, name: str) -> dict[str, object]:
     return _normalized(record)
 
 
-def _runtime(value: object, *, name: str) -> dict[str, object]:
+def _canonical_hardware_setup(value: object, *, name: str) -> dict[str, object]:
     record = _mapping(value, name=name)
     _exact_keys(
         record,
         {
-            "serial",
-            "topology",
-            "usb_uri",
-            "hardware_model",
-            "firmware_version",
-            "metadata_abi",
-            "capabilities",
-            "boot_id",
-            "qspi",
-            "safe_state",
+            "uboot_attr_name_absent",
+            "uboot_attr_val_absent",
+            "uboot_compatible",
+            "uboot_mode",
+            "phy_model",
+            "rx_scan_channels",
+            "tandem_device",
         },
         name=name,
     )
-    return {
+    channels = tuple(_sequence(record["rx_scan_channels"], name=f"{name} RX scan"))
+    if (
+        _boolean(record["uboot_attr_name_absent"], name=f"{name} attr_name absent")
+        is not True
+        or _boolean(record["uboot_attr_val_absent"], name=f"{name} attr_val absent")
+        is not True
+        or record["uboot_compatible"] != "ad9361"
+        or record["uboot_mode"] != "2r2t"
+        or record["phy_model"] not in {"ad9361", "ad9363a"}
+        or channels != ("voltage0", "voltage1", "voltage2", "voltage3")
+        or _boolean(record["tandem_device"], name=f"{name} tandem device") is not True
+    ):
+        _fail(f"{name} is not the exact canonical Rev.C AD9361/2R2T setup")
+    return _normalized(record)
+
+
+def _runtime(value: object, *, name: str) -> dict[str, object]:
+    record = _mapping(value, name=name)
+    hardware_model = _string(record.get("hardware_model"), name=f"{name} model")
+    expected_keys = {
+        "serial",
+        "topology",
+        "usb_uri",
+        "hardware_model",
+        "firmware_version",
+        "metadata_abi",
+        "capabilities",
+        "boot_id",
+        "qspi",
+        "safe_state",
+    }
+    if "canonical_hardware_setup" in record:
+        expected_keys.add("canonical_hardware_setup")
+    _exact_keys(
+        record,
+        expected_keys,
+        name=name,
+    )
+    if (
+        hardware_model == _candidate_binding.PLUTOPLUS_AD9363A_HARDWARE_MODEL
+        and "canonical_hardware_setup" not in record
+    ):
+        _fail(f"{name} native AD9363A model lacks canonical hardware setup proof")
+    normalized = {
         "serial": _string(record["serial"], name=f"{name} serial", pattern=_SERIAL),
         "topology": _string(
             record["topology"], name=f"{name} topology", pattern=_TOPOLOGY
         ),
         "usb_uri": _string(record["usb_uri"], name=f"{name} USB URI", pattern=_USB_URI),
-        "hardware_model": _string(record["hardware_model"], name=f"{name} model"),
+        "hardware_model": hardware_model,
         "firmware_version": _string(
             record["firmware_version"], name=f"{name} firmware"
         ),
@@ -547,6 +590,11 @@ def _runtime(value: object, *, name: str) -> dict[str, object]:
         "qspi": _qspi(record["qspi"], name=f"{name} QSPI"),
         "safe_state": _safe_state(record["safe_state"], name=f"{name} safe state"),
     }
+    if "canonical_hardware_setup" in record:
+        normalized["canonical_hardware_setup"] = _canonical_hardware_setup(
+            record["canonical_hardware_setup"], name=f"{name} canonical hardware setup"
+        )
+    return normalized
 
 
 def validate_release_candidate_receipt(

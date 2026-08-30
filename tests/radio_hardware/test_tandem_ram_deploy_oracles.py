@@ -133,7 +133,7 @@ def _fixture(tmp_path: Path, *, artifact_name: str = "firmware.dfu") -> Fixture:
         "release": {
             "firmware_version": CANDIDATE_VERSION,
             "kernel_version": "5.15.0-g77a1f2352162",
-            "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+            "hardware_model": deploy.PLUTOPLUS_HARDWARE_MODEL,
             "metadata_abi": "frame-metadata-v5",
             "tandem_agc": "request-v2",
         },
@@ -797,10 +797,37 @@ def test_candidate_load_rejects_a_different_hardware_class(tmp_path: Path) -> No
     fixture.rewrite_index()
     backend = FakeBackend()
 
-    with pytest.raises(deploy.DeploymentError, match="supported Pluto\\+ class"):
+    with pytest.raises(deploy.DeploymentError, match="supported Pluto\\+ Rev.C model"):
         deploy.execute_deployment(fixture.options, backend)
 
     assert backend.inventory_calls == 0
+
+
+def test_candidate_load_and_transition_accept_exact_ad9361_revc_model(
+    tmp_path: Path,
+) -> None:
+    fixture = _fixture(tmp_path)
+    model = deploy.PLUTOPLUS_AD9361_HARDWARE_MODEL
+    fixture.index["release"]["hardware_model"] = model
+    fixture.rewrite_index()
+    backend = FakeBackend(
+        attestations=(
+            _attestation(
+                firmware=CURRENT_VERSION,
+                boot_id="boot-before",
+                hardware_model=model,
+            ),
+            _attestation(
+                firmware=CANDIDATE_VERSION,
+                boot_id="boot-after",
+                hardware_model=model,
+            ),
+        )
+    )
+
+    receipt, _digest = deploy.execute_deployment(fixture.options, backend)
+
+    assert receipt["runtime"]["hardware_model"] == model
 
 
 def test_runner_provenance_requires_clean_head_blob_and_index_agreement(
@@ -1500,6 +1527,21 @@ def test_actual_pre_and_post_hardware_model_must_match_candidate(
     )
     with pytest.raises(deploy.DeploymentError, match="returned runtime identity"):
         deploy.execute_deployment(fixture.options, wrong_post)
+    assert not fixture.options.receipt_path.exists()
+
+    supported_sibling = FakeBackend(
+        attestations=(
+            _attestation(firmware=CURRENT_VERSION, boot_id="boot-before"),
+            _attestation(
+                firmware=CANDIDATE_VERSION,
+                boot_id="boot-after",
+                hardware_model=deploy.PLUTOPLUS_AD9361_HARDWARE_MODEL,
+            ),
+            _attestation(firmware=CANDIDATE_VERSION, boot_id="boot-cleanup"),
+        )
+    )
+    with pytest.raises(deploy.DeploymentError, match="returned runtime identity"):
+        deploy.execute_deployment(fixture.options, supported_sibling)
     assert not fixture.options.receipt_path.exists()
 
 

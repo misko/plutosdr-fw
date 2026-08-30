@@ -9,6 +9,8 @@ from typing import Any
 import pytest
 
 from .candidate_binding import (
+    PLUTOPLUS_AD9361_HARDWARE_MODEL,
+    PLUTOPLUS_AD9363A_HARDWARE_MODEL,
     PLUTOPLUS_HARDWARE_MODEL,
     REQUIRED_EVIDENCE_ROLES,
     CandidateBindingError,
@@ -206,11 +208,52 @@ def test_candidate_bindings_accept_exact_versioned_records_and_return_copies() -
 
 
 @pytest.mark.parametrize(
+    "hardware_model",
+    [PLUTOPLUS_AD9361_HARDWARE_MODEL, PLUTOPLUS_AD9363A_HARDWARE_MODEL],
+)
+def test_candidate_bindings_accept_each_exact_supported_revc_model(
+    hardware_model: str,
+) -> None:
+    index = _artifact_index()
+    index["release"]["hardware_model"] = hardware_model
+    receipt = _receipt()
+    receipt["runtime"]["hardware_model"] = hardware_model
+
+    assert validate_artifact_index(index)["release"]["hardware_model"] == hardware_model
+    assert validate_deployment_receipt(
+        receipt,
+        artifact_index_sha256=SHA_B,
+        serial=SERIAL,
+        firmware_version=VERSION,
+        hardware_model=hardware_model,
+        dfu_sha256=SHA_A,
+    )["runtime"]["hardware_model"] == hardware_model
+
+
+def test_candidate_receipt_does_not_alias_supported_revc_models() -> None:
+    receipt = _receipt()
+    receipt["runtime"]["hardware_model"] = PLUTOPLUS_AD9361_HARDWARE_MODEL
+
+    with pytest.raises(CandidateBindingError, match="different hardware model"):
+        validate_deployment_receipt(
+            receipt,
+            artifact_index_sha256=SHA_B,
+            serial=SERIAL,
+            firmware_version=VERSION,
+            hardware_model=PLUTOPLUS_AD9363A_HARDWARE_MODEL,
+            dfu_sha256=SHA_A,
+        )
+
+
+@pytest.mark.parametrize(
     "mutation",
     [
         lambda value: value.update(extra=True),
         lambda value: value.update(schema_version=True),
         lambda value: value.update(stage="candidate-qualified"),
+        lambda value: value["release"].update(
+            hardware_model="Analog Devices PlutoSDR Rev.B"
+        ),
         lambda value: value["source"].update(commit="A" * 40),
         lambda value: value["source"].update(manifest_path="../escape.yaml"),
         lambda value: value["build"].update(run_attempt=0),

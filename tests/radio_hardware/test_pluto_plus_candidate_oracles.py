@@ -9,7 +9,12 @@ from typing import Any
 
 import pytest
 
-from .candidate_binding import REQUIRED_EVIDENCE_ROLES, CandidateBindingError
+from .candidate_binding import (
+    PLUTOPLUS_AD9361_HARDWARE_MODEL,
+    PLUTOPLUS_AD9363A_HARDWARE_MODEL,
+    REQUIRED_EVIDENCE_ROLES,
+    CandidateBindingError,
+)
 from .pluto_plus_candidate import (
     PLUTO_IIO_BUFFER_METADATA_ABI,
     PLUTO_PLUS_UTILS_REPOSITORY,
@@ -44,7 +49,9 @@ def _identity(path: str, value: object) -> dict[str, object]:
     }
 
 
-def _artifact_index() -> dict[str, Any]:
+def _artifact_index(
+    hardware_model: str = PLUTOPLUS_HARDWARE_MODEL,
+) -> dict[str, Any]:
     return {
         "schema": "plutosdr-fw.tandem-release-evidence",
         "schema_version": 1,
@@ -52,7 +59,7 @@ def _artifact_index() -> dict[str, Any]:
         "release": {
             "firmware_version": VERSION,
             "kernel_version": "5.15.0-g77a1f2352162",
-            "hardware_model": PLUTOPLUS_HARDWARE_MODEL,
+            "hardware_model": hardware_model,
             "metadata_abi": "frame-metadata-v5",
             "tandem_agc": "request-v2",
         },
@@ -92,7 +99,7 @@ def _artifact_index() -> dict[str, Any]:
     }
 
 
-def _candidate() -> dict[str, Any]:
+def _candidate(hardware_model: str = PLUTOPLUS_HARDWARE_MODEL) -> dict[str, Any]:
     return {
         "schema": "pluto-plus-utils.release-candidate-plan.v1",
         "schema_version": 1,
@@ -120,7 +127,7 @@ def _candidate() -> dict[str, Any]:
         "fit": {"bytes": 8_388_608, "sha256": FIT_SHA},
         "expected_runtime": {
             "firmware_version": VERSION,
-            "hardware_model": PLUTOPLUS_HARDWARE_MODEL,
+            "hardware_model": hardware_model,
             "metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
             "capabilities": ["tandem-agc"],
         },
@@ -192,12 +199,28 @@ def _safe() -> dict[str, Any]:
     }
 
 
-def _runtime(firmware: str, boot_id: str) -> dict[str, Any]:
+def _canonical_hardware_setup() -> dict[str, Any]:
     return {
+        "uboot_attr_name_absent": True,
+        "uboot_attr_val_absent": True,
+        "uboot_compatible": "ad9361",
+        "uboot_mode": "2r2t",
+        "phy_model": "ad9363a",
+        "rx_scan_channels": ["voltage0", "voltage1", "voltage2", "voltage3"],
+        "tandem_device": True,
+    }
+
+
+def _runtime(
+    firmware: str,
+    boot_id: str,
+    hardware_model: str = PLUTOPLUS_HARDWARE_MODEL,
+) -> dict[str, Any]:
+    runtime = {
         "serial": SERIAL,
         "topology": "3-7",
         "usb_uri": "usb:3.29.5",
-        "hardware_model": PLUTOPLUS_HARDWARE_MODEL,
+        "hardware_model": hardware_model,
         "firmware_version": firmware,
         "metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
         "capabilities": ["tandem-agc"],
@@ -210,9 +233,16 @@ def _runtime(firmware: str, boot_id: str) -> dict[str, Any]:
         },
         "safe_state": _safe(),
     }
+    if hardware_model == PLUTOPLUS_AD9363A_HARDWARE_MODEL:
+        runtime["canonical_hardware_setup"] = _canonical_hardware_setup()
+    return runtime
 
 
-def _receipt(candidate: object, operation: object) -> dict[str, Any]:
+def _receipt(
+    candidate: object,
+    operation: object,
+    hardware_model: str = PLUTOPLUS_HARDWARE_MODEL,
+) -> dict[str, Any]:
     return {
         "schema": "pluto-plus-utils.release-candidate-ram-receipt.v1",
         "schema_version": 1,
@@ -234,14 +264,19 @@ def _receipt(candidate: object, operation: object) -> dict[str, Any]:
         "candidate_fit": {"bytes": 8_388_608, "sha256": FIT_SHA},
         "target": _target(),
         "expected_firmware": VERSION,
-        "expected_hardware_model": PLUTOPLUS_HARDWARE_MODEL,
+        "expected_hardware_model": hardware_model,
         "expected_metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
         "required_capabilities": ["tandem-agc"],
         "pre_runtime": _runtime(
             "v0.41-plutoplus-spf-tandem-agc-v8-rc12",
             "11111111-1111-4111-8111-111111111111",
+            hardware_model,
         ),
-        "post_runtime": _runtime(VERSION, "22222222-2222-4222-8222-222222222222"),
+        "post_runtime": _runtime(
+            VERSION,
+            "22222222-2222-4222-8222-222222222222",
+            hardware_model,
+        ),
         "host_route": {
             "destination": "192.168.2.1/32",
             "interface": "enx00e02215c53b",
@@ -270,9 +305,10 @@ def _validate(
     operation: dict[str, Any],
     receipt: dict[str, Any],
 ) -> None:
+    hardware_model = str(candidate["expected_runtime"]["hardware_model"])
     validated_candidate = validate_release_candidate_plan(
         candidate,
-        artifact_index=_artifact_index(),
+        artifact_index=_artifact_index(hardware_model),
         artifact_index_bytes=INDEX_BYTES,
         artifact_index_sha256=INDEX_SHA,
     )
@@ -309,6 +345,115 @@ def test_exact_utility_contract_bundle_passes() -> None:
     receipt = _receipt(candidate, operation)
 
     _validate(candidate, inventory, operation, receipt)
+
+
+@pytest.mark.parametrize(
+    "hardware_model",
+    [PLUTOPLUS_AD9361_HARDWARE_MODEL, PLUTOPLUS_AD9363A_HARDWARE_MODEL],
+)
+def test_exact_utility_contract_bundle_accepts_each_supported_revc_model(
+    hardware_model: str,
+) -> None:
+    candidate = _candidate(hardware_model)
+    inventory = _inventory()
+    operation = _operation(candidate, inventory)
+    receipt = _receipt(candidate, operation, hardware_model)
+
+    _validate(candidate, inventory, operation, receipt)
+
+
+def test_ad9361_receipt_accepts_current_linux_canonical_setup_shape() -> None:
+    candidate = _candidate(PLUTOPLUS_AD9361_HARDWARE_MODEL)
+    inventory = _inventory()
+    operation = _operation(candidate, inventory)
+    receipt = _receipt(candidate, operation, PLUTOPLUS_AD9361_HARDWARE_MODEL)
+    setup = _canonical_hardware_setup()
+    setup["phy_model"] = "ad9361"
+    receipt["pre_runtime"]["canonical_hardware_setup"] = dict(setup)
+    receipt["post_runtime"]["canonical_hardware_setup"] = dict(setup)
+
+    _validate(candidate, inventory, operation, receipt)
+
+
+@pytest.mark.parametrize(
+    "receipt_field",
+    ["expected_hardware_model", "pre_runtime", "post_runtime"],
+)
+def test_utility_contract_does_not_alias_supported_revc_models(
+    receipt_field: str,
+) -> None:
+    candidate = _candidate(PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    inventory = _inventory()
+    operation = _operation(candidate, inventory)
+    receipt = _receipt(candidate, operation, PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    if receipt_field == "expected_hardware_model":
+        receipt[receipt_field] = PLUTOPLUS_AD9361_HARDWARE_MODEL
+    else:
+        receipt[receipt_field]["hardware_model"] = PLUTOPLUS_AD9361_HARDWARE_MODEL
+
+    with pytest.raises(
+        CandidateBindingError,
+        match="hardware model|expected runtime|exact RAM-only runtime",
+    ):
+        _validate(candidate, inventory, operation, receipt)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("uboot_attr_name_absent", False),
+        ("uboot_attr_val_absent", False),
+        ("uboot_compatible", "ad9363a"),
+        ("uboot_mode", "1r1t"),
+        ("phy_model", "ad9364"),
+        ("rx_scan_channels", ["voltage0", "voltage1"]),
+        (
+            "rx_scan_channels",
+            ["voltage0", "voltage1", "voltage3", "voltage2"],
+        ),
+        (
+            "rx_scan_channels",
+            ["voltage0", "voltage1", "voltage2", "voltage3", "voltage4"],
+        ),
+        ("tandem_device", False),
+    ],
+)
+def test_native_ad9363a_receipt_rejects_noncanonical_hardware_setup(
+    field: str, value: object
+) -> None:
+    candidate = _candidate(PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    inventory = _inventory()
+    operation = _operation(candidate, inventory)
+    receipt = _receipt(candidate, operation, PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    receipt["post_runtime"]["canonical_hardware_setup"][field] = value
+
+    with pytest.raises(CandidateBindingError, match="canonical"):
+        _validate(candidate, inventory, operation, receipt)
+
+
+@pytest.mark.parametrize("runtime_name", ["pre_runtime", "post_runtime"])
+def test_native_ad9363a_receipt_requires_canonical_hardware_setup(
+    runtime_name: str,
+) -> None:
+    candidate = _candidate(PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    inventory = _inventory()
+    operation = _operation(candidate, inventory)
+    receipt = _receipt(candidate, operation, PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    del receipt[runtime_name]["canonical_hardware_setup"]
+
+    with pytest.raises(CandidateBindingError, match="lacks canonical"):
+        _validate(candidate, inventory, operation, receipt)
+
+
+def test_native_ad9363a_receipt_rejects_hardware_setup_extension() -> None:
+    candidate = _candidate(PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    inventory = _inventory()
+    operation = _operation(candidate, inventory)
+    receipt = _receipt(candidate, operation, PLUTOPLUS_AD9363A_HARDWARE_MODEL)
+    receipt["post_runtime"]["canonical_hardware_setup"]["decoy"] = True
+
+    with pytest.raises(CandidateBindingError, match="keys are not exact"):
+        _validate(candidate, inventory, operation, receipt)
 
 
 @pytest.mark.parametrize(

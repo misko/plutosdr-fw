@@ -18,9 +18,27 @@ ARTIFACT_INDEX_SCHEMA = "plutosdr-fw.tandem-release-evidence"
 RAM_BOOT_RECEIPT_SCHEMA = "plutosdr-fw.tandem-ram-boot-receipt"
 ARTIFACT_INDEX_SCHEMA_VERSION = 1
 RAM_BOOT_RECEIPT_SCHEMA_VERSION = 4
-PLUTOPLUS_HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
-# Backward-compatible public name used by release-evidence code for the
-# artifact-index schema. Receipt validation has its own version above.
+PLUTOPLUS_AD9361_HARDWARE_MODEL = (
+    "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
+)
+PLUTOPLUS_AD9363A_HARDWARE_MODEL = (
+    "Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)"
+)
+# The runtime IIO model is derived from the selected live device-tree
+# compatible, while 2R2T is selected independently.  Keep the candidate and
+# receipt bound to one exact raw IIO model; this set only defines which exact
+# Rev.C models may be named by a candidate.
+PLUTOPLUS_SUPPORTED_HARDWARE_MODELS = frozenset(
+    {
+        PLUTOPLUS_AD9361_HARDWARE_MODEL,
+        PLUTOPLUS_AD9363A_HARDWARE_MODEL,
+    }
+)
+# Default for the two reserved RC qualification radios.  Historical AD9361
+# evidence remains valid through the explicit supported set above.
+PLUTOPLUS_HARDWARE_MODEL = PLUTOPLUS_AD9363A_HARDWARE_MODEL
+# Backward-compatible public schema name used by release-evidence code.
+# Receipt validation has its own version above.
 SCHEMA_VERSION = ARTIFACT_INDEX_SCHEMA_VERSION
 ARTIFACT_INDEX_STAGES = frozenset(
     {
@@ -193,7 +211,11 @@ def validate_artifact_index(value: object) -> dict[str, Any]:
     )
     _string(release["firmware_version"], name="artifact firmware version", maximum=256)
     _string(release["kernel_version"], name="artifact kernel version", maximum=256)
-    _string(release["hardware_model"], name="artifact hardware model", maximum=256)
+    hardware_model = _string(
+        release["hardware_model"], name="artifact hardware model", maximum=256
+    )
+    if hardware_model not in PLUTOPLUS_SUPPORTED_HARDWARE_MODELS:
+        _fail("artifact hardware model is not an exact supported Pluto+ Rev.C model")
     _string(release["metadata_abi"], name="artifact metadata ABI", maximum=128)
     _string(release["tandem_agc"], name="artifact tandem AGC identity", maximum=128)
 
@@ -300,8 +322,8 @@ def validate_deployment_receipt(
     expected_hardware_model = _string(
         hardware_model, name="expected hardware model", maximum=256
     )
-    if expected_hardware_model != PLUTOPLUS_HARDWARE_MODEL:
-        _fail("expected hardware model is not the exact Pluto+ model")
+    if expected_hardware_model not in PLUTOPLUS_SUPPORTED_HARDWARE_MODELS:
+        _fail("expected hardware model is not an exact supported Pluto+ Rev.C model")
     expected_dfu_sha = _sha256(dfu_sha256, name="expected DFU SHA-256")
 
     record = _mapping(value, name="RAM-boot receipt")

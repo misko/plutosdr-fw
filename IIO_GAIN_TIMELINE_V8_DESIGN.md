@@ -135,6 +135,14 @@ the domain at the failure source; errno alone is not used to guess it.
   record v7 and status v2.
 - Direct USB/IP gadget protocol v3 is unchanged.  It does not own the tandem
   event lease, so authoritative AUTO timelines there are a separate feature.
+- A candidate names one exact raw IIO hardware model.  The supported Pluto+
+  Rev.C set contains `Z7010-AD9363A` and `Z7010-AD9361`; it does not treat them
+  as interchangeable within a deployment receipt.  The boot gadget derives
+  this runtime string from the selected live device-tree `compatible`, while
+  `mode=2r2t` is an independent setting, so the model string alone is not a
+  2R2T proof.  Preboot, postboot, and restored observations must remain
+  byte-for-byte equal to the model selected by the artifact, while the
+  dual-RX qualification proves the required 2R2T runtime layout.
 - This release fixes IIO over USB and IIO over physical Ethernet: ordinary
   capture supports single and dual RX, while DDR-ring capture retains its
   advertised single-RX-only layout.

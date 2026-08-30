@@ -162,7 +162,7 @@ def build_utility_deployment_bundle(
         }
 
     def runtime(firmware: str, boot_id: str) -> dict[str, Any]:
-        return {
+        value = {
             "serial": serial,
             "topology": topology,
             "usb_uri": f"usb:{bus_number}.{device_number}.5",
@@ -179,6 +179,22 @@ def build_utility_deployment_bundle(
             },
             "safe_state": safe_state(),
         }
+        if artifact_index["release"]["hardware_model"].endswith("(Z7010-AD9363A)"):
+            value["canonical_hardware_setup"] = {
+                "uboot_attr_name_absent": True,
+                "uboot_attr_val_absent": True,
+                "uboot_compatible": "ad9361",
+                "uboot_mode": "2r2t",
+                "phy_model": "ad9363a",
+                "rx_scan_channels": [
+                    "voltage0",
+                    "voltage1",
+                    "voltage2",
+                    "voltage3",
+                ],
+                "tandem_device": True,
+            }
+        return value
 
     receipt = {
         "schema": "pluto-plus-utils.release-candidate-ram-receipt.v1",

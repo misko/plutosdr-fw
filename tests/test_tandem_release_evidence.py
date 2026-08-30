@@ -275,24 +275,18 @@ def _fixture(
     package_stem: str = PACKAGE_STEM,
     captured_attestation: bool = False,
     source_lock_ref: str | None = None,
+    hardware_model: str = "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
 ) -> tuple[Path, Path]:
     is_candidate = stage == "candidate-pre-hardware"
-    manifest_name = (
-        "tandem-agc-v8-rc32-source.yaml"
-        if is_candidate
-        else "tandem-agc-v8-source.yaml"
+    default_version = VERSION if is_candidate else FINAL_VERSION
+    profile = EVIDENCE.PRE_HARDWARE_PROFILES.get(
+        (stage, version),
+        EVIDENCE.PRE_HARDWARE_PROFILES[(stage, default_version)],
     )
+    manifest_name = profile["manifest_basename"]
     if source_lock_ref is None:
-        source_lock_ref = (
-            EVIDENCE.CANDIDATE_SOURCE_LOCK_REF
-            if is_candidate
-            else EVIDENCE.FINAL_SOURCE_LOCK_REF
-        )
-    build_ref = (
-        "refs/heads/codex/firmware-tandem-agc-v8-rc32"
-        if is_candidate
-        else "refs/heads/main"
-    )
+        source_lock_ref = profile["source_lock_ref"]
+    build_ref = profile["build_ref"]
     manifest = root / "source" / manifest_name
     manifest_payload = SOURCE_MANIFEST_PAYLOAD
     _write(manifest, manifest_payload)
@@ -558,7 +552,7 @@ u-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx
         "release": {
             "firmware_version": version,
             "kernel_version": "5.15.0-g77a1f2352162",
-            "hardware_model": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+            "hardware_model": hardware_model,
             "metadata_abi": "frame-metadata-v5",
             "tandem_agc": "request-v2",
         },
@@ -1137,6 +1131,251 @@ def _write_campaign_hardware(root: Path, artifact_index: Path) -> None:
     (root / "hardware").chmod(0o755)
 
 
+def _write_private_json(path: Path, value: object) -> bytes:
+    payload = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.parent.chmod(0o755)
+    path.write_bytes(payload)
+    path.chmod(0o600)
+    return payload
+
+
+def _file_identity(path: Path, payload: bytes) -> dict[str, object]:
+    return {
+        "path": str(path.absolute()),
+        "bytes": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
+def _gain_timeline_ladder(
+    *,
+    case: dict[str, object],
+    position: int,
+    serial: str,
+    physical_ip: str,
+    usb_uri: str,
+    artifact: dict[str, Any],
+) -> dict[str, object]:
+    frames = int(case["frames"])
+    channels = [0] if case["layout"] == "single-rx0" else [0, 1]
+    observed = frames * EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL
+    iq_bytes = observed * len(channels) * 4
+    first = 1_000 + position * 2_000_000_000
+    last = first + observed
+    elapsed = 1.0
+    ring = case["buffering"] == "ring-200mb"
+    frame_bytes = EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL * 4
+    admitted = (EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
+    capacity = admitted // frame_bytes
+    prefix_frames = min(frames, capacity) if ring else 0
+    ring_status = (
+        {
+            "version": 2,
+            "state": "complete",
+            "terminal_reason": "target_complete",
+            "error_code": 0,
+            "requested_capacity_iq_bytes": EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES,
+            "admitted_capacity_iq_bytes": admitted,
+            "target_frames": frames,
+            "produced_frames": frames,
+            "consumed_frames": frames,
+            "high_water_frames": prefix_frames,
+            "wrap_count": frames // capacity,
+            "producer_position": frames % capacity,
+            "consumer_position": frames % capacity,
+            "last_contiguous_sample_sequence": last,
+            "first_unavailable_sample_sequence": None,
+            "failure_frame_index": None,
+            "failure_sample_sequence": None,
+        }
+        if ring
+        else None
+    )
+    cell = {
+        "samples_per_channel": EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
+        "requested_frames": frames,
+        "observed_frames": frames,
+        "observed_sample_count": observed,
+        "device_span_sample_count": observed,
+        "first_sample_sequence": first,
+        "last_sample_sequence_exclusive": last,
+        "missing_sample_count": 0,
+        "gap_count": 0,
+        "overflow_count": 0,
+        "iq_bytes": iq_bytes,
+        "elapsed_seconds": elapsed,
+        "achieved_payload_mbps": iq_bytes / elapsed / 1_000_000,
+        "achieved_payload_mibps": iq_bytes / elapsed / (1024 * 1024),
+        "observed_fraction": 1.0,
+        "tandem_metadata_frames": frames,
+        "authoritative_gain_timeline_frames": frames,
+        "gain_observation_interval_samples": 4_096,
+        "gain_observation_count": 0,
+        "gain_observation_overflow_count": 0,
+        "gain_event_count": 0,
+        "gain_event_overflow_count": 0,
+        "ddr_burst_requested_iq_bytes": 0,
+        "ddr_burst_admitted_iq_bytes": 0,
+        "ddr_burst_frames": 0,
+        "ddr_ring_status": ring_status,
+        "ddr_ring_prefix_frames": prefix_frames,
+        "ddr_ring_prefix_iq_bytes": prefix_frames * frame_bytes,
+        "ddr_ring_prefix_contiguous": ring,
+        "passed": True,
+    }
+    is_usb = case["transport"] == "usb"
+    return {
+        "serial": serial,
+        "uri": usb_uri if is_usb else f"ip:{physical_ip}",
+        "transport": "iio_usb" if is_usb else "iio_ip",
+        "model": artifact["release"]["hardware_model"],
+        "firmware_version": artifact["release"]["firmware_version"],
+        "metadata_abi": 4,
+        "sample_rate_hz": EVIDENCE._GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "rf_bandwidth_hz": EVIDENCE._GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "channels": channels,
+        "kernel_buffers": EVIDENCE._GAIN_TIMELINE_KERNEL_BUFFERS,
+        "tandem_mode": case["tandem_mode"],
+        "acceptance_mode": "continuity",
+        "iq_decoder": "pyadi",
+        "ddr_burst_enabled": False,
+        "ddr_ring_requested_iq_bytes": (
+            EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES if ring else 0
+        ),
+        "minimum_observed_fraction": 0.95,
+        "cells": [cell],
+        "failures": [],
+        "largest_passing_samples_per_channel": (
+            EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL
+        ),
+        "original_settings_restored": True,
+        "continuity_claim": (
+            "passed binds FPGA counter coverage >=95%, zero overflow, exact selected-RX "
+            "geometry, and at least four kernel buffers; it is not inferred from host "
+            "throughput"
+        ),
+    }
+
+
+def _write_gain_timeline_hardware(root: Path, artifact_index_path: Path) -> None:
+    artifact_payload = artifact_index_path.read_bytes()
+    artifact = json.loads(artifact_payload)
+    topology = {
+        "1040007c4a94000211000b009186843ef2": ("3-8", 3, 23, "enx00e02297811f"),
+        "104000bac4950008230026001b440a003a": ("5-2", 5, 17, "enx00e0221686a8"),
+    }
+    persistent = {
+        "1040007c4a94000211000b009186843ef2": ("v0.42-plutoplus-spf-ddr-burst-v2"),
+        "104000bac4950008230026001b440a003a": (
+            "v0.44-plutoplus-spf-ddr-ring-prefill-v1"
+        ),
+    }
+    ip_map = dict(EVIDENCE.GAIN_TIMELINE_RELEASE_RADIO_IPS)
+    for serial in EVIDENCE.GAIN_TIMELINE_RELEASE_RADIO_SERIALS:
+        usb_topology, bus, device, interface = topology[serial]
+        bundle = build_utility_deployment_bundle(
+            root=root,
+            artifact_index_path=artifact_index_path,
+            artifact_index=artifact,
+            artifact_index_payload=artifact_payload,
+            serial=serial,
+            expected_current_firmware=persistent[serial],
+            topology=usb_topology,
+            bus_number=bus,
+            device_number=device,
+            network_interface=interface,
+        )
+        candidate_payload = bundle["candidate_plan"].read_bytes()
+        operation_payload = bundle["operation_plan"].read_bytes()
+        receipt = json.loads(bundle["receipt"].read_text())
+        qualification = root / "hardware" / "qualification" / serial
+        plan_path = qualification / EVIDENCE._GAIN_TIMELINE_PLAN_FILENAME
+        report_path = qualification / EVIDENCE._GAIN_TIMELINE_FILENAMES["qualification"]
+        campaign_id = hashlib.sha256(serial.encode()).hexdigest()[:32]
+        plan = {
+            "schema": EVIDENCE._GAIN_TIMELINE_PLAN_SCHEMA,
+            "schema_version": 1,
+            "campaign_id": campaign_id,
+            "created_at": "2026-08-30T18:00:00Z",
+            "operation_plan": _file_identity(
+                bundle["operation_plan"], operation_payload
+            ),
+            "candidate_plan": _file_identity(
+                bundle["candidate_plan"], candidate_payload
+            ),
+            "serial": serial,
+            "physical_ip": ip_map[serial],
+            "report_path": str(report_path.absolute()),
+            "sample_rate_hz": EVIDENCE._GAIN_TIMELINE_SAMPLE_RATE_HZ,
+            "rf_bandwidth_hz": EVIDENCE._GAIN_TIMELINE_SAMPLE_RATE_HZ,
+            "samples_per_channel": EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
+            "kernel_buffers": EVIDENCE._GAIN_TIMELINE_KERNEL_BUFFERS,
+            "ddr_ring_iq_bytes": EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES,
+            "regression_frame_counts": [200, 600],
+            "regression_repetitions": 2,
+            "soak_frame_count": 5_000,
+            "ordinary_layouts": ["single-rx0", "dual"],
+            "ring_layouts": ["single-rx0"],
+            "confirmation_phrase": f"QUALIFY GAIN TIMELINE {serial} {campaign_id}",
+            "hardware_accessed": False,
+        }
+        plan_payload = _write_private_json(plan_path, plan)
+        restored = json.loads(json.dumps(receipt["pre_runtime"]))
+        restored["boot_id"] = "33333333-3333-4333-8333-333333333333"
+        cases = [
+            {
+                "case": dict(case),
+                "report": _gain_timeline_ladder(
+                    case=dict(case),
+                    position=position,
+                    serial=serial,
+                    physical_ip=ip_map[serial],
+                    usb_uri=receipt["post_runtime"]["usb_uri"],
+                    artifact=artifact,
+                ),
+                "error": None,
+            }
+            for position, case in enumerate(EVIDENCE._GAIN_TIMELINE_CASES)
+        ]
+        report = {
+            "schema": EVIDENCE._GAIN_TIMELINE_REPORT_SCHEMA,
+            "schema_version": 1,
+            "campaign_plan": _file_identity(plan_path, plan_payload),
+            "started_at": "2026-08-30T18:01:00Z",
+            "completed_at": "2026-08-30T19:01:00Z",
+            "outcome": "pass",
+            "planned_case_count": 60,
+            "boot_receipt": receipt,
+            "cases": cases,
+            "restored_runtime": restored,
+            "persistent_qspi_unchanged": True,
+            "errors": [],
+        }
+        _write_private_json(report_path, report)
+    for directory in (root / "hardware").rglob("*"):
+        if directory.is_dir():
+            directory.chmod(0o755)
+    (root / "hardware").chmod(0o755)
+
+
+def _gain_timeline_candidate(root: Path) -> Path:
+    input_path, candidate = _fixture(
+        root,
+        version=EVIDENCE.GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION,
+        package_stem="plutoplus-spf-iio-gain-timeline-v8-111111111111",
+        source_lock_ref=EVIDENCE.GAIN_TIMELINE_CANDIDATE_SOURCE_LOCK_REF,
+        hardware_model="Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)",
+    )
+    EVIDENCE.assemble(
+        archive_root=root,
+        input_path=input_path,
+        output_path=candidate,
+        stage="candidate-pre-hardware",
+    )
+    return candidate
+
+
 def _assemble_campaign(
     root: Path, monkeypatch: pytest.MonkeyPatch, *, artifact_index: Path
 ) -> Path:
@@ -1551,6 +1790,108 @@ def test_assemble_and_verify_candidate_index(tmp_path: Path) -> None:
     assert output.with_suffix(".json.sha256").stat().st_mode & 0o777 == 0o644
 
 
+@pytest.mark.parametrize(
+    ("stage", "version", "source_lock_ref"),
+    [
+        (
+            "candidate-pre-hardware",
+            EVIDENCE.GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION,
+            EVIDENCE.GAIN_TIMELINE_CANDIDATE_SOURCE_LOCK_REF,
+        ),
+        (
+            "final-pre-confirmation",
+            EVIDENCE.GAIN_TIMELINE_FINAL_FIRMWARE_VERSION,
+            EVIDENCE.GAIN_TIMELINE_FINAL_SOURCE_LOCK_REF,
+        ),
+    ],
+)
+def test_assemble_and_verify_gain_timeline_v8_artifact_profiles(
+    tmp_path: Path,
+    stage: str,
+    version: str,
+    source_lock_ref: str,
+) -> None:
+    input_path, output = _fixture(
+        tmp_path,
+        version=version,
+        stage=stage,
+        package_stem="plutoplus-spf-iio-gain-timeline-v8-111111111111",
+        source_lock_ref=source_lock_ref,
+        hardware_model="Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)",
+    )
+
+    EVIDENCE.assemble(
+        archive_root=tmp_path,
+        input_path=input_path,
+        output_path=output,
+        stage=stage,
+    )
+    index = EVIDENCE.verify_index(output, expected_stage=stage)
+
+    assert index["release"]["firmware_version"] == version
+    assert index["release"]["hardware_model"].endswith("AD9363A)")
+    source_lock = next(
+        member
+        for member in index["evidence"]["members"]
+        if member["role"] == "source-lock"
+    )
+    assert source_lock_ref.encode() in (tmp_path / source_lock["path"]).read_bytes()
+
+
+def test_gain_timeline_profile_rejects_rc32_source_lock(tmp_path: Path) -> None:
+    input_path, output = _fixture(
+        tmp_path,
+        version=EVIDENCE.GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION,
+        package_stem="plutoplus-spf-iio-gain-timeline-v8-111111111111",
+        source_lock_ref=EVIDENCE.CANDIDATE_SOURCE_LOCK_REF,
+        hardware_model="Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)",
+    )
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="source lock ref is not exact"):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=input_path,
+            output_path=output,
+            stage="candidate-pre-hardware",
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "wrong_value"),
+    [
+        (
+            "hardware_model",
+            "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+        ),
+        ("metadata_abi", "frame-metadata-v4"),
+        ("tandem_agc", "request-v1"),
+    ],
+)
+def test_gain_timeline_profile_rejects_cross_profile_release_identity(
+    tmp_path: Path, field: str, wrong_value: str
+) -> None:
+    input_path, output = _fixture(
+        tmp_path,
+        version=EVIDENCE.GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION,
+        package_stem="plutoplus-spf-iio-gain-timeline-v8-111111111111",
+        hardware_model="Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)",
+    )
+    descriptor = json.loads(input_path.read_text())
+    descriptor["release"][field] = wrong_value
+    _write(input_path, _json_bytes(descriptor))
+
+    with pytest.raises(
+        EVIDENCE.EvidenceError,
+        match=rf"release {field} differs from the exact protected profile",
+    ):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            input_path=input_path,
+            output_path=output,
+            stage="candidate-pre-hardware",
+        )
+
+
 def test_cli_assemble_and_verify_are_hardware_free(tmp_path: Path) -> None:
     input_path, output = _fixture(tmp_path)
 
@@ -1667,7 +2008,7 @@ def test_assemble_rejects_typo_or_git_describe_candidate_identity(
 ) -> None:
     input_path, output = _fixture(tmp_path, version=version)
 
-    with pytest.raises(EVIDENCE.EvidenceError, match="identity is not exact RC32"):
+    with pytest.raises(EVIDENCE.EvidenceError, match="exact supported release profile"):
         EVIDENCE.assemble(
             archive_root=tmp_path,
             input_path=input_path,
@@ -2146,6 +2487,257 @@ def test_candidate_qualification_accepts_exact_operator_owned_campaign(
     assert len(record["radios"]) == len(EVIDENCE.RELEASE_RADIO_SERIALS)
 
 
+def test_gain_timeline_candidate_qualification_accepts_exact_two_radio_campaign(
+    tmp_path: Path,
+) -> None:
+    candidate = _gain_timeline_candidate(tmp_path)
+    _write_gain_timeline_hardware(tmp_path, candidate)
+    campaign = tmp_path / "campaign-index.json"
+
+    EVIDENCE.assemble(
+        archive_root=tmp_path,
+        output_path=campaign,
+        stage="candidate-qualified",
+        parent_index_path=candidate,
+    )
+
+    record = EVIDENCE.verify_index(campaign, expected_stage="candidate-qualified")
+    assert tuple(radio["serial"] for radio in record["radios"]) == (
+        EVIDENCE.GAIN_TIMELINE_RELEASE_RADIO_SERIALS
+    )
+    assert all(
+        set(radio) == {"serial", "deploy", "qualification"}
+        for radio in record["radios"]
+    )
+    assert len(record["raw_members"]) == 8
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "physical-ip",
+        "case-order",
+        "gap",
+        "not-authoritative",
+        "ring-status-v1",
+        "ring-capacity",
+        "ring-continuity-break",
+        "restore-qspi",
+        "embedded-receipt",
+    ],
+)
+def test_gain_timeline_candidate_qualification_rejects_semantic_mutations(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    candidate = _gain_timeline_candidate(tmp_path)
+    _write_gain_timeline_hardware(tmp_path, candidate)
+    serial = EVIDENCE.GAIN_TIMELINE_RELEASE_RADIO_SERIALS[0]
+    qualification = tmp_path / "hardware" / "qualification" / serial
+    plan_path = qualification / EVIDENCE._GAIN_TIMELINE_PLAN_FILENAME
+    report_path = qualification / EVIDENCE._GAIN_TIMELINE_FILENAMES["qualification"]
+    if mutation == "physical-ip":
+        plan = json.loads(plan_path.read_text())
+        plan["physical_ip"] = "192.168.1.17"
+        _write_private_json(plan_path, plan)
+    else:
+        report = json.loads(report_path.read_text())
+        if mutation == "case-order":
+            report["cases"][0], report["cases"][1] = (
+                report["cases"][1],
+                report["cases"][0],
+            )
+        elif mutation == "gap":
+            cell = report["cases"][0]["report"]["cells"][0]
+            cell["missing_sample_count"] = 1
+        elif mutation == "not-authoritative":
+            report["cases"][0]["report"]["cells"][0][
+                "authoritative_gain_timeline_frames"
+            ] -= 1
+        elif mutation == "ring-status-v1":
+            report["cases"][20]["report"]["cells"][0]["ddr_ring_status"]["version"] = 1
+        elif mutation == "ring-capacity":
+            report["cases"][20]["report"]["cells"][0]["ddr_ring_status"][
+                "admitted_capacity_iq_bytes"
+            ] -= 1
+        elif mutation == "ring-continuity-break":
+            cell = report["cases"][20]["report"]["cells"][0]
+            status = cell["ddr_ring_status"]
+            boundary = (
+                cell["first_sample_sequence"]
+                + cell["ddr_ring_prefix_frames"]
+                * EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL
+            )
+            status["last_contiguous_sample_sequence"] = boundary
+            status["first_unavailable_sample_sequence"] = boundary
+        elif mutation == "restore-qspi":
+            report["restored_runtime"]["qspi"]["sha256"] = "0" * 64
+        else:
+            report["boot_receipt"]["receipt_id"] = "0" * 32
+        _write_private_json(report_path, report)
+
+    with pytest.raises(EVIDENCE.EvidenceError):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            output_path=tmp_path / "campaign-index.json",
+            stage="candidate-qualified",
+            parent_index_path=candidate,
+        )
+
+
+def test_gain_timeline_candidate_qualification_rejects_radio_scope_substitution(
+    tmp_path: Path,
+) -> None:
+    candidate = _gain_timeline_candidate(tmp_path)
+    _write_gain_timeline_hardware(tmp_path, candidate)
+    serial = EVIDENCE.GAIN_TIMELINE_RELEASE_RADIO_SERIALS[0]
+    (tmp_path / "hardware" / "qualification" / serial).rename(
+        tmp_path / "excluded-radio-evidence"
+    )
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="exact .17/.18 radio scope"):
+        EVIDENCE.assemble(
+            archive_root=tmp_path,
+            output_path=tmp_path / "campaign-index.json",
+            stage="candidate-qualified",
+            parent_index_path=candidate,
+        )
+
+
+def test_gain_timeline_candidate_qualification_rejects_late_raw_member(
+    tmp_path: Path,
+) -> None:
+    candidate = _gain_timeline_candidate(tmp_path)
+    _write_gain_timeline_hardware(tmp_path, candidate)
+    campaign = tmp_path / "campaign-index.json"
+    EVIDENCE.assemble(
+        archive_root=tmp_path,
+        output_path=campaign,
+        stage="candidate-qualified",
+        parent_index_path=candidate,
+    )
+    serial = EVIDENCE.GAIN_TIMELINE_RELEASE_RADIO_SERIALS[0]
+    _write(tmp_path / "hardware" / "qualification" / serial / "late.log", "late\n")
+
+    with pytest.raises(EVIDENCE.EvidenceError, match="every raw"):
+        EVIDENCE.verify_index(campaign, expected_stage="candidate-qualified")
+
+
+def test_gain_timeline_final_qualified_assembly_dispatches_to_timeline_campaign(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    final_reference = {
+        "path": "final-artifact-index.json",
+        "bytes": 100,
+        "sha256": "a" * 64,
+    }
+    policy_reference = {
+        "path": "final-qualification-policy.json",
+        "bytes": 100,
+        "sha256": "b" * 64,
+    }
+    final_artifact = {
+        "source": {"commit": FINAL_COMMIT},
+        "release": {"firmware_version": EVIDENCE.GAIN_TIMELINE_FINAL_FIRMWARE_VERSION},
+    }
+    policy = {"final_artifact": final_reference, "required_test": "full-campaign"}
+
+    def capture_reference(
+        _root: Path, _path: Path, *, expected_stage: str, name: str
+    ) -> tuple[dict[str, object], dict[str, object]]:
+        del name
+        if expected_stage == "final-pre-confirmation":
+            return final_reference, final_artifact
+        return policy_reference, policy
+
+    observed: list[str] = []
+    monkeypatch.setattr(EVIDENCE, "_capture_index_reference", capture_reference)
+    monkeypatch.setattr(
+        EVIDENCE,
+        "_capture_gain_timeline_hardware",
+        lambda *_args, **_kwargs: (observed.append("gain") or [], []),
+    )
+    monkeypatch.setattr(
+        EVIDENCE,
+        "_capture_campaign_hardware",
+        lambda *_args, **_kwargs: pytest.fail("legacy campaign route selected"),
+    )
+
+    result = EVIDENCE._assemble_final_qualified(
+        tmp_path,
+        final_artifact_index_path=tmp_path / "final-artifact-index.json",
+        policy_index_path=tmp_path / "final-qualification-policy.json",
+    )
+
+    assert observed == ["gain"]
+    assert result["selected_evidence"] == {"mode": "full-campaign"}
+
+
+def test_gain_timeline_final_qualified_verifier_dispatches_to_timeline_campaign(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    final_reference = {
+        "path": "final-artifact-index.json",
+        "bytes": 100,
+        "sha256": "a" * 64,
+    }
+    policy_reference = {
+        "path": "final-qualification-policy.json",
+        "bytes": 100,
+        "sha256": "b" * 64,
+    }
+    final_artifact = {
+        "source": {"commit": FINAL_COMMIT},
+        "release": {"firmware_version": EVIDENCE.GAIN_TIMELINE_FINAL_FIRMWARE_VERSION},
+    }
+    policy = {"final_artifact": final_reference, "required_test": "full-campaign"}
+    raw = {
+        "schema": EVIDENCE.QUALIFICATION_INDEX_SCHEMA,
+        "schema_version": EVIDENCE.SCHEMA_VERSION,
+        "stage": "final-qualified",
+        "source_commit": FINAL_COMMIT,
+        "required_test": "full-campaign",
+        "final_artifact": final_reference,
+        "policy": policy_reference,
+        "selected_evidence": {"mode": "full-campaign"},
+        "radios": [],
+        "raw_members": [],
+    }
+    monkeypatch.setattr(
+        EVIDENCE,
+        "_read_index_record",
+        lambda *_args, **_kwargs: (tmp_path, b"{}", raw, "c" * 64),
+    )
+
+    def verify_reference(
+        _root: Path, _value: object, *, expected_stage: str, name: str
+    ) -> tuple[dict[str, object], Path]:
+        del name
+        if expected_stage == "final-pre-confirmation":
+            return final_artifact, tmp_path / "final-artifact-index.json"
+        return policy, tmp_path / "final-qualification-policy.json"
+
+    observed: list[str] = []
+    monkeypatch.setattr(EVIDENCE, "_verify_index_reference", verify_reference)
+    monkeypatch.setattr(
+        EVIDENCE,
+        "_verify_gain_timeline_hardware",
+        lambda *_args, **_kwargs: observed.append("gain"),
+    )
+    monkeypatch.setattr(
+        EVIDENCE,
+        "_verify_campaign_hardware",
+        lambda *_args, **_kwargs: pytest.fail("legacy campaign route selected"),
+    )
+
+    result = EVIDENCE._verify_final_qualified(
+        tmp_path / "final-qualification-index.json"
+    )
+
+    assert observed == ["gain"]
+    assert result == raw
+
+
 def test_release_campaign_and_promotion_use_one_exact_ordered_band_policy() -> None:
     from tests.radio_hardware.release_campaign import DEFAULT_BANDS
 
@@ -2173,7 +2765,10 @@ def test_candidate_qualification_accepts_recorded_nonbinding_2450_quality_failur
 ) -> None:
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
-    aggregate_path = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    aggregate_path = (
+        tmp_path
+        / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    )
     aggregate = json.loads(aggregate_path.read_text())
     record = aggregate["phases"]["diagnostic_2450mhz"]
     diagnostic_path = Path(record["report_path"])
@@ -2224,7 +2819,10 @@ def test_candidate_qualification_rejects_non_quality_2450_failures(
 ) -> None:
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
-    aggregate_path = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    aggregate_path = (
+        tmp_path
+        / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    )
     aggregate = json.loads(aggregate_path.read_text())
     record = aggregate["phases"]["diagnostic_2450mhz"]
     diagnostic_path = Path(record["report_path"])
@@ -2269,7 +2867,10 @@ def test_candidate_qualification_rejects_missing_utility_companion(
 ) -> None:
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
-    (tmp_path / "hardware/deploy/104000bac4950008230026001b440a003a/operation-plan.json").unlink()
+    (
+        tmp_path
+        / "hardware/deploy/104000bac4950008230026001b440a003a/operation-plan.json"
+    ).unlink()
 
     with pytest.raises(
         EVIDENCE.EvidenceError, match="operation plan cannot be inspected"
@@ -2336,7 +2937,8 @@ def test_candidate_qualification_reuses_the_lifecycle_producer_oracle(
     candidate = _assemble(tmp_path)
     _write_campaign_hardware(tmp_path, candidate)
     report_path = (
-        tmp_path / "hardware/lifecycle/104000bac4950008230026001b440a003a/muted-metadata-batch-lifecycle-v5.json"
+        tmp_path
+        / "hardware/lifecycle/104000bac4950008230026001b440a003a/muted-metadata-batch-lifecycle-v5.json"
     )
     report = json.loads(report_path.read_text())
     if mutation == "empty-preflight":
@@ -2423,7 +3025,11 @@ def test_candidate_qualified_rejects_unindexed_extra_raw_member(
 ) -> None:
     candidate = _assemble(tmp_path)
     campaign = _assemble_campaign(tmp_path, monkeypatch, artifact_index=candidate)
-    _write(tmp_path / "hardware/full/104000bac4950008230026001b440a003a/late-unindexed.log", "late\n")
+    _write(
+        tmp_path
+        / "hardware/full/104000bac4950008230026001b440a003a/late-unindexed.log",
+        "late\n",
+    )
 
     with pytest.raises(EVIDENCE.EvidenceError, match="every raw"):
         EVIDENCE.verify_index(campaign, expected_stage="candidate-qualified")
@@ -2434,7 +3040,10 @@ def test_candidate_qualified_rejects_report_receipt_substitution(
 ) -> None:
     candidate = _assemble(tmp_path)
     campaign = _assemble_campaign(tmp_path, monkeypatch, artifact_index=candidate)
-    report = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    report = (
+        tmp_path
+        / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    )
     value = json.loads(report.read_text())
     value["configuration"]["candidate_binding"]["deployment_receipt_sha256"] = "0" * 64
     _write(report, _json_bytes(value))
@@ -2592,7 +3201,10 @@ def test_final_qualified_rejects_mutated_full_campaign_evidence(
     _final_artifact, _policy, qualification = _assemble_final_qualification(
         tmp_path, monkeypatch
     )
-    report = tmp_path / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    report = (
+        tmp_path
+        / "hardware/full/104000bac4950008230026001b440a003a/release-hardware-report.json"
+    )
     value = json.loads(report.read_text())
     value["all_host_libiio_verified"] = False
     _write(report, _json_bytes(value))
