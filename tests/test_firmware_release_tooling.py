@@ -477,6 +477,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     ).read_text()
     tandem_axi = (ROOT / "hdl-tandem" / "tandem_agc_axi.v").read_text()
     tandem_cdc = (ROOT / "hdl-tandem" / "tandem_cdc_lib.v").read_text()
+    tandem_core = (ROOT / "hdl-tandem" / "tandem_agc_core.v").read_text()
     assert "tandem_cdc_mailbox #(.W(STAW)) u_stat" in tandem_axi
     assert "module tandem_cdc_mailbox" in tandem_cdc
     assert '(* ram_style = "block" *)' in tandem_cdc
@@ -485,6 +486,9 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "u_dst_ready_src" in tandem_cdc
     assert "u_src_ready_dst" in tandem_cdc
     assert "if (src_commit) mem[~src_request] <= din;" in tandem_cdc
+    assert "evt_seq <= 32'd0;" in tandem_core
+    assert "if (evt_push) evt_seq <= evt_seq + 32'd1;" in tandem_core
+    assert "evt_seq <= 32'hFFFF_FFFF;" not in tandem_core
     utils_main = "97487a04810ea120e4071146d8a14ee95f0fcecd"
     for source in (wrapper, binding):
         assert utils_main in source
