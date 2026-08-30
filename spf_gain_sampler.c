@@ -7,6 +7,7 @@
 
 #include <iio.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <sched.h>
 #include <stdio.h>
 #include <string.h>
@@ -93,9 +94,16 @@ static void *sampler_thread(void *opaque)
 	}
 	struct iio_device *rx = iio_context_find_device(context, "cf-ad9361-lpc");
 	struct iio_device *phy = iio_context_find_device(context, "ad9361-phy");
+	struct iio_channel *rx0 = phy ?
+		iio_device_find_channel(phy, "voltage0", false) : NULL;
+	long long sample_rate_hz = 0;
 	spf_gain_table_t table;
 	memset(&table, 0, sizeof(table));
-	if (!rx || !phy || !spf_gain_table_load(phy, &table))
+	if (!rx || !phy || !rx0 ||
+		iio_channel_attr_read_longlong(rx0, "sampling_frequency",
+			&sample_rate_hz) != 0 ||
+		sample_rate_hz <= 0 || sample_rate_hz > UINT32_MAX ||
+		!spf_gain_table_load(phy, &table))
 	{
 		atomic_store(&sampler->failed, true);
 		iio_context_destroy(context);
@@ -120,8 +128,6 @@ static void *sampler_thread(void *opaque)
 		return NULL;
 	}
 	uint32_t last_sampled = second - sampler->interval_samples;
-	const struct timespec poll_delay = {.tv_sec = 0, .tv_nsec = 100000};
-
 	while (!atomic_load_explicit(&sampler->stop_requested, memory_order_relaxed))
 	{
 		pthread_mutex_lock(&sampler->mutex);
@@ -148,6 +154,12 @@ static void *sampler_thread(void *opaque)
 		if (!spf_gain_sampler_observation_due(
 				sampler, current, last_sampled))
 		{
+			const struct timespec poll_delay = {
+				.tv_sec = 0,
+				.tv_nsec = spf_gain_sampler_poll_delay_ns(
+					sampler->interval_samples, current, last_sampled,
+					(uint32_t)sample_rate_hz),
+			};
 			nanosleep(&poll_delay, NULL);
 			continue;
 		}
@@ -484,6 +496,29 @@ bool spf_gain_sampler_observation_due(
 		return true;
 	return (uint32_t)(current_sample - last_sampled) >=
 		sampler->interval_samples;
+}
+
+uint32_t spf_gain_sampler_poll_delay_ns(
+	uint32_t interval_samples,
+	uint32_t current_sample,
+	uint32_t last_sampled,
+	uint32_t sample_rate_hz)
+{
+	const uint32_t elapsed_samples = current_sample - last_sampled;
+	uint64_t delay_ns;
+	uint32_t remaining_samples;
+
+	if (!interval_samples || !sample_rate_hz ||
+		elapsed_samples >= interval_samples)
+		return 0;
+	remaining_samples = interval_samples - elapsed_samples;
+	delay_ns = (uint64_t)remaining_samples * UINT64_C(1000000000) /
+		((uint64_t)sample_rate_hz * UINT64_C(2));
+	if (delay_ns < SPF_GAIN_SAMPLER_POLL_MIN_NS)
+		return SPF_GAIN_SAMPLER_POLL_MIN_NS;
+	if (delay_ns > SPF_GAIN_SAMPLER_POLL_MAX_NS)
+		return SPF_GAIN_SAMPLER_POLL_MAX_NS;
+	return (uint32_t)delay_ns;
 }
 
 uint16_t spf_gain_sampler_collect(

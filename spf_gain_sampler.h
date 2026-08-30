@@ -13,6 +13,8 @@
 #define SPF_ADC_TIMESTAMP_CONTROL_REG UINT32_C(0x800000BC)
 #define SPF_GAIN_SAMPLER_RING_CAPACITY 1024U
 #define SPF_GAIN_STARTUP_DISCARD_LIMIT 64U
+#define SPF_GAIN_SAMPLER_POLL_MIN_NS UINT32_C(100000)
+#define SPF_GAIN_SAMPLER_POLL_MAX_NS UINT32_C(1000000)
 
 typedef enum
 {
@@ -102,6 +104,18 @@ bool spf_gain_sampler_observation_due(
 	spf_gain_sampler_t *sampler,
 	uint32_t current_sample,
 	uint32_t last_sampled);
+
+/*
+ * Sleep for half the estimated samples remaining until the next observation,
+ * bounded between 100 us and 1 ms. The lower bound preserves AUTO cadence at
+ * high sample rates; the upper bound limits refill-fence wake latency while
+ * reducing HOLD-mode register polls by up to 10x.
+ */
+uint32_t spf_gain_sampler_poll_delay_ns(
+	uint32_t interval_samples,
+	uint32_t current_sample,
+	uint32_t last_sampled,
+	uint32_t sample_rate_hz);
 
 /*
  * Copy ordered observations overlapping [frame_start, frame_start+samples).

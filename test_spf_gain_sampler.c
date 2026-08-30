@@ -22,6 +22,18 @@ static void *announce_observation(void *opaque)
 
 int main(void)
 {
+	assert(spf_gain_sampler_poll_delay_ns(0, 0, 0, UINT32_C(20000000)) == 0);
+	assert(spf_gain_sampler_poll_delay_ns(
+		UINT32_C(262144), 0, 0, UINT32_C(20000000)) ==
+		SPF_GAIN_SAMPLER_POLL_MAX_NS);
+	assert(spf_gain_sampler_poll_delay_ns(
+		UINT32_C(32768), 0, 0, UINT32_C(61440000)) == UINT32_C(266666));
+	assert(spf_gain_sampler_poll_delay_ns(
+		UINT32_C(32768), UINT32_C(31744), 0, UINT32_C(61440000)) ==
+		SPF_GAIN_SAMPLER_POLL_MIN_NS);
+	assert(spf_gain_sampler_poll_delay_ns(
+		UINT32_C(512), UINT32_C(256), UINT32_C(0xFFFFFF00),
+		UINT32_C(20000000)) == 0);
 	assert(spf_gain_frame_decide(0, 1, 0) == SPF_GAIN_FRAME_ACCEPT);
 	assert(spf_gain_frame_decide(27, 1, 0) == SPF_GAIN_FRAME_ACCEPT);
 	assert(spf_gain_frame_decide(0, 0, 0) ==
