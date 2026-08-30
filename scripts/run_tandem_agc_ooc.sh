@@ -93,8 +93,24 @@ esac
 
 [[ "$(git_exact rev-parse --show-toplevel)" == "$ROOT" ]] ||
     fail "firmware repository top level is not exact"
-[[ "$(git_exact rev-parse --absolute-git-dir)" == "$ROOT/.git" ]] ||
-    fail "firmware Git directory is not exact"
+git_marker="$ROOT/.git"
+[[ ! -L "$git_marker" && ( -f "$git_marker" || -d "$git_marker" ) ]] ||
+    fail "firmware Git marker is not a regular file or directory"
+git_dir="$(git_exact rev-parse --absolute-git-dir)"
+git_common_dir="$(git_exact rev-parse --path-format=absolute --git-common-dir)"
+for resolved_git_dir in "$git_dir" "$git_common_dir"; do
+    [[ -d "$resolved_git_dir" && ! -L "$resolved_git_dir" ]] ||
+        fail "resolved Git directory is not a non-symlink directory"
+    [[ "$(realpath -- "$resolved_git_dir")" == "$resolved_git_dir" ]] ||
+        fail "resolved Git directory is not canonical"
+done
+if [[ "$git_dir" != "$git_common_dir" ]]; then
+    worktree_admin_prefix="$git_common_dir/worktrees/"
+    worktree_admin_name="${git_dir#"$worktree_admin_prefix"}"
+    [[ "$git_dir" == "$worktree_admin_prefix"* &&
+        -n "$worktree_admin_name" && "$worktree_admin_name" != */* ]] ||
+        fail "linked-worktree Git directory is outside the common repository"
+fi
 commit="$(git_exact rev-parse --verify HEAD)"
 [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || fail "cannot resolve an exact source commit"
 [[ -z "$(git_exact status --porcelain)" ]] ||

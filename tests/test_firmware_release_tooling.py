@@ -444,6 +444,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     wrapper = (ROOT / "scripts" / "deploy_tandem_agc_ram_hardware.sh").read_text()
     planner = (ROOT / "scripts" / "tandem_release_device_plan.py").read_text()
     evidence = (ROOT / "scripts" / "tandem_release_evidence.py").read_text()
+    ooc_launcher = (ROOT / "scripts" / "run_tandem_agc_ooc.sh").read_text()
     binding = (ROOT / "tests" / "radio_hardware" / "pluto_plus_candidate.py").read_text()
     branch = "refs/heads/codex/iio-gain-timeline-v8-fw"
     manifest_name = "iio-gain-timeline-v8-rc1-source.yaml"
@@ -499,6 +500,9 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "GAIN_TIMELINE_FINAL_FIRMWARE_VERSION" in evidence
     assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v5" in evidence
     assert branch in evidence
+    assert "git_exact rev-parse --path-format=absolute --git-common-dir" in ooc_launcher
+    assert 'worktree_admin_prefix="$git_common_dir/worktrees/"' in ooc_launcher
+    assert '== "$ROOT/.git"' not in ooc_launcher
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
