@@ -130,3 +130,31 @@ stream unchanged. It does not synthesize observations, change the wire ABI,
 relax overflow/counter validation, or authorize persistence. Hardware
 qualification must show lower sampler CPU while preserving AUTO events,
 metadata closure, ring status, recovery, and ordinary/PyADI compatibility.
+
+## V4 hardware result and v5 interruptible-wait prototype
+
+RAM-only v4 testing on the spare radio at physical `192.168.1.17` proved the
+refill fence is safe and useful, but not sufficient for promotion. A 100-frame
+20 MS/s HOLD capture improved from 44.27 MB/s on v3 to 55.58 MB/s on v4, and
+AUTO delivered 55.68 MB/s with valid FPGA events and no event or observation
+overflow. Ordinary raw IIO remained about 72 MB/s and PyADI delivered 61.01
+MB/s. The directly comparable 100-frame, 200 MB DDR-ring capture improved only
+from 42.11 to 43.90 MB/s. Every ring run retained the exact 197,132,288-byte
+prefix, completed its requested frame count with error zero, restored settings,
+and allowed immediate ordinary capture.
+
+The sampler still consumed about 30% of one core during a monitored 200-frame
+ring run. V4 records far fewer observations, but the v3 cadence helper still
+caps every predicted wait at one millisecond. It therefore reads the
+synchronized FPGA counter roughly one thousand times per second even when a
+20 MS/s refill observation is needed only about every 52 ms.
+
+V5 replaces only that polling sleep. It waits on the existing sampler condition
+variable for half the estimated counter interval, capped at 50 ms. Refill-fence
+and stop notifications interrupt the wait, and the predicate is checked while
+holding the same mutex as the broadcaster, so notifications cannot be lost.
+Unrelated condition broadcasts resume the original absolute deadline instead
+of causing an extra counter read. The refill fence, synchronized-counter
+records, FPGA AUTO events, DDR behavior, fail-closed policy, and wire ABI are
+unchanged. V5 remains RAM-only until hardware proves lower sampler CPU without
+regressing throughput, metadata closure, or recovery.

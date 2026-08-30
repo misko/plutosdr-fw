@@ -1,0 +1,55 @@
+# Immutable source graph for the interruptible metadata-sampler prototype.
+#
+# This candidate retains the v4 refill fence, selective iiOD R/W-worker
+# affinity, and timing instrumentation. Counter-cadence waits now block on the
+# sampler condition variable and are interrupted by refill-fence or stop
+# notifications. Exact intra-frame AUTO gain transitions remain authoritative
+# FPGA events. The IIO wire ABI, DDR limits, and failure contracts are
+# unchanged. This candidate is never persistence-authorized.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: d8e8688eaf6be16da9a0c9d92b7e8f49e0a3b334
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/iio-throughput-refill-sampler-v4-source/libiio-v1
+
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+metadata_repo: https://github.com/misko/plutosdr-fw.git
+metadata_ref: refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: 9222c97347334ba1eadf5580faeb3a1093246f46
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/iio-throughput-sampler-wake-v5-source/buildroot-v1
+
+submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/ddr-burst-v1-rc4-source/hdl-v1
+
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+
+submodule_linux: 93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/ddr-burst-v1-rc3-source/linux-v1
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
+versions_buildroot: iio-throughput-sampler-wake-v5-source/buildroot-v1
+versions_linux: ddr-burst-v1-rc3-source/linux-v1
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

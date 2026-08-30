@@ -39,6 +39,7 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
+         github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw' ||
          github.ref == 'refs/heads/codex/iio-throughput-refill-sampler-v4-fw' ||
          github.ref == 'refs/heads/codex/iio-throughput-sampler-poll-v3-fw' ||
          github.ref == 'refs/heads/codex/iio-throughput-rw-affinity-v2-fw' ||
@@ -95,6 +96,8 @@ jobs:
           'ddr-ring-prefill-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw' &&
+          'iio-throughput-sampler-wake-v5-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-refill-sampler-v4-fw' &&
           'iio-throughput-refill-sampler-v4-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-sampler-poll-v3-fw' &&
@@ -189,6 +192,8 @@ jobs:
           'plutoplus-spf-ddr-ring-prefill-v1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw' &&
+          'plutoplus-spf-iio-throughput-sampler-wake-v5-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-refill-sampler-v4-fw' &&
           'plutoplus-spf-iio-throughput-refill-sampler-v4-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-sampler-poll-v3-fw' &&
@@ -470,6 +475,14 @@ jobs:
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.45-plutoplus-spf-iio-throughput-refill-sampler-v4-rc1'
+
+      - name: Require the exact IIO throughput sampler wake v5 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-sampler-wake-v5-rc1'
 
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'

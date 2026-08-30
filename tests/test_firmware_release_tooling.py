@@ -362,6 +362,33 @@ def test_iio_throughput_refill_sampler_v4_has_an_exact_protected_route() -> None
     assert "submodule_buildroot: 8da0894c88e5a618b0bf9191c1fc0f2102a5d115" in manifest
 
 
+def test_iio_throughput_sampler_wake_v5_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/iio-throughput-sampler-wake-v5-fw"
+    manifest_name = "iio-throughput-sampler-wake-v5-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-sampler-wake-v5-rc1'")
+        == 1
+    )
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-throughput-sampler-wake-v5-rc1'")
+        == 1
+    )
+    assert f"{manifest_name}:candidate" in package
+    for source in (builder, package):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: d8e8688eaf6be16da9a0c9d92b7e8f49e0a3b334" in manifest
+    assert "metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad" in manifest
+    assert "submodule_buildroot: 9222c97347334ba1eadf5580faeb3a1093246f46" in manifest
+
+
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
     block_design = (ROOT / "hdl" / "projects" / "pluto" / "system_bd.tcl").read_text()
     project = (ROOT / "hdl" / "projects" / "pluto" / "system_project.tcl").read_text()
