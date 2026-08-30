@@ -181,3 +181,51 @@ accumulates across refills, so an idle or fast producer cannot create unbounded
 sampling history. A pure coverage-plan helper and boundary tests bind the
 queue-depth arithmetic; the v5 interruptible wait, metadata ABI, DDR sizes,
 and fail-closed validation remain unchanged.
+
+## V6 RAM-only hardware result
+
+The exact CI-built V6 candidate at source commit
+`1cbc115b2ea7aa7d1678ae1ca329ceed1af6a07c` was RAM-booted on spare serial
+`104000bac4950008230026001b440a003a`; QSPI was not written. All data-plane
+qualification used standard network IIO over the physical
+`192.168.1.17` endpoint, single RX0, 20 MS/s, 18 MHz RF bandwidth,
+1,048,576 samples per frame, and four kernel buffers. USB was used only as an
+independently serial- and topology-bound management path for the live CPU and
+memory sample.
+
+Ordinary raw IIO delivered 72.39 MB/s before the ring matrix and 72.27 MB/s
+immediately afterward. No-ring ABI-3 HOLD and AUTO controls completed all 100
+requested frames at 59.33 and 59.69 MB/s with no metadata error. The 200 MB
+ring admitted exactly 47 whole frames (197,132,288 IQ bytes) and produced the
+following capture-completion results:
+
+| Target | Runs | Result | Exact initial prefix | Wraps | Payload rate |
+| ---: | ---: | --- | ---: | ---: | ---: |
+| 100 frames | 1 | 100/100, `target_complete`, error 0 | 47 frames | 2 | 45.83 MB/s |
+| 200 frames | 3 | 200/200 each, `target_complete`, error 0 | 47 frames each | 4 each | 50.55–52.18 MB/s |
+| 600 frames | 1 | 600/600, `target_complete`, error 0 | 47 frames | 12 | 56.53 MB/s |
+
+A separate 50 MB ring control admitted an exact 11-frame/46,137,344-byte
+prefix and completed 200/200 frames across 18 wraps with error zero. Every run
+restored the original radio settings. The post-test radio log contains no
+`no overlap`, `no gain coverage`, `no RSSI coverage`, metadata error, DDR
+error, or DMA error record. Idle status showed no active RX buffer, about
+450 MB available memory, about 65 MB free CMA, an unchanged iiOD generation,
+and zero tandem fault/overflow counters.
+
+The 600-frame run provided a valid 12.4-second active CPU sample. The gain
+sampler used 9.35% of one CPU, while the two dominant iiOD data-path threads
+used 76.13% and 83.23%; total iiOD work was 170.48% across the two-core SoC.
+Available memory remained about 234 MB with the 200 MB ring active and CMA had
+about 50 MB free. This confirms that V6's added queue-depth coverage is bounded
+and inexpensive relative to refill/copy/send work; it does not move the
+sustained network-IIO ceiling.
+
+These are capture-completion results, not a claim of gap-free sustained
+20 MS/s delivery. After the contiguous DDR prefix, the slower host transport
+still produces exact ABI-3 accounted gaps, as expected when 80 MB/s is offered
+to a roughly 59 MB/s metadata path. V6 specifically fixes the false
+`-ENODATA` termination caused by missing gain/RSSI coverage of an already
+queued DMA frame: it crossed both V5 failure points (66 and 176 frames), then
+completed 600 frames without relaxing counter, metadata, or ring validation.
+The candidate remains RAM-only and has no persistent-flash authorization.
