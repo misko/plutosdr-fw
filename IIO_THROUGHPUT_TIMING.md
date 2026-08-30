@@ -14,6 +14,12 @@ mutually exclusive and both are disabled by default upstream. The worker is
 created with its CPU mask already applied, so a capture cannot begin in an
 unattested scheduling state.
 
+The thread pool records the daemon's original allowed-CPU mask before any
+device worker exists. An unqualified nested worker receives that recorded mask
+explicitly instead of inheriting its creator's specialized mask. This matters
+for the DDR-ring producer, which is created by the CPU1 R/W worker but must
+remain schedulable independently for capture and transport to overlap.
+
 The IIO context advertises `iio,buffer-metadata-timing-log=1`. Every 100
 transported frames, and again when the last client closes an opened device,
 iiOD emits `SPF_IIOD_TIMING_V1` records to stderr (the Pluto supervisor routes

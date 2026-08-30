@@ -305,8 +305,8 @@ def test_iio_throughput_rw_affinity_v2_has_an_exact_protected_route() -> None:
     for source in (builder, package):
         assert manifest_name in source
     assert "release_state: candidate" in manifest
-    assert "libiio_0_25_source: 78cafb3c011b1651141fede28419ea65da6dc2c0" in manifest
-    assert "submodule_buildroot: 247878b20ca898fffaab0dd7ea8fb759ca39420b" in manifest
+    assert "libiio_0_25_source: c1a7be84982fa4449bd7070084fa0389f9f90cfa" in manifest
+    assert "submodule_buildroot: b5026fc3f23227afd9cf9fbffcb0b971d9d47859" in manifest
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
