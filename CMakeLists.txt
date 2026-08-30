@@ -112,6 +112,8 @@ if (BUILD_HOST_TESTS)
 		spf_rssi_read.c
 		spf_thread_join.c)
     target_link_libraries(test_spf_gain_sampler iio pthread)
+	target_compile_definitions(test_spf_gain_sampler PRIVATE
+		SPF_GAIN_SAMPLER_TESTING=1)
     add_test(NAME spf_gain_sampler COMMAND test_spf_gain_sampler)
 
     add_executable(test_spf_rssi_read

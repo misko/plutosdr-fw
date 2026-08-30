@@ -17,6 +17,12 @@
 #define SPF_GAIN_SAMPLER_STOP_TIMEOUT_MS UINT32_C(500)
 #define SPF_GAIN_SAMPLER_STUCK_EXIT_STATUS 70
 
+#ifdef SPF_GAIN_SAMPLER_TESTING
+#define SPF_GAIN_SAMPLER_PRIVATE
+#else
+#define SPF_GAIN_SAMPLER_PRIVATE static
+#endif
+
 static void consume_credit_locked(spf_gain_sampler_t *sampler)
 {
 	if (!sampler->bounded)
@@ -42,6 +48,41 @@ static uint64_t extend_counter_near(uint64_t reference, uint32_t low)
 static bool read_counter(struct iio_device *rx, uint32_t *value)
 {
 	return iio_device_reg_read(rx, SPF_ADC_SAMPLE_COUNTER_LOW_REG, value) == 0;
+}
+
+SPF_GAIN_SAMPLER_PRIVATE bool spf_gain_sampler_wait_interruptible(
+	spf_gain_sampler_t *sampler,
+	uint32_t delay_ns)
+{
+	struct timespec deadline;
+	if (!sampler || !sampler->mutex_initialized || delay_ns == 0 ||
+		clock_gettime(CLOCK_REALTIME, &deadline) != 0)
+		return false;
+	deadline.tv_sec += delay_ns / UINT32_C(1000000000);
+	deadline.tv_nsec += (long)(delay_ns % UINT32_C(1000000000));
+	if (deadline.tv_nsec >= 1000000000L)
+	{
+		deadline.tv_sec++;
+		deadline.tv_nsec -= 1000000000L;
+	}
+
+	pthread_mutex_lock(&sampler->mutex);
+	int wait_result = 0;
+	while (!atomic_load_explicit(
+			&sampler->force_observation, memory_order_acquire) &&
+		!atomic_load_explicit(
+			&sampler->stop_requested, memory_order_relaxed) &&
+		wait_result == 0)
+	{
+		wait_result = pthread_cond_timedwait(
+			&sampler->credit_cond, &sampler->mutex, &deadline);
+	}
+	const bool interrupted = atomic_load_explicit(
+		&sampler->force_observation, memory_order_acquire) ||
+		atomic_load_explicit(
+			&sampler->stop_requested, memory_order_relaxed);
+	pthread_mutex_unlock(&sampler->mutex);
+	return interrupted;
 }
 
 static void append_records(
@@ -154,13 +195,11 @@ static void *sampler_thread(void *opaque)
 		if (!spf_gain_sampler_observation_due(
 				sampler, current, last_sampled))
 		{
-			const struct timespec poll_delay = {
-				.tv_sec = 0,
-				.tv_nsec = spf_gain_sampler_poll_delay_ns(
+			(void)spf_gain_sampler_wait_interruptible(
+				sampler,
+				spf_gain_sampler_poll_delay_ns(
 					sampler->interval_samples, current, last_sampled,
-					(uint32_t)sample_rate_hz),
-			};
-			nanosleep(&poll_delay, NULL);
+					(uint32_t)sample_rate_hz));
 			continue;
 		}
 

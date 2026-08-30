@@ -4,6 +4,37 @@
 #include <string.h>
 #include <time.h>
 
+typedef struct
+{
+	spf_gain_sampler_t *sampler;
+	uint32_t delay_ns;
+	uint64_t elapsed_ns;
+	bool interrupted;
+} interruptible_wait_test_t;
+
+static uint64_t elapsed_ns(
+	const struct timespec *start,
+	const struct timespec *end)
+{
+	return ((uint64_t)end->tv_sec * UINT64_C(1000000000) +
+		(uint64_t)end->tv_nsec) -
+		((uint64_t)start->tv_sec * UINT64_C(1000000000) +
+		(uint64_t)start->tv_nsec);
+}
+
+static void *run_interruptible_wait(void *opaque)
+{
+	interruptible_wait_test_t *test = opaque;
+	struct timespec start;
+	struct timespec end;
+	assert(clock_gettime(CLOCK_MONOTONIC, &start) == 0);
+	test->interrupted = spf_gain_sampler_wait_interruptible(
+		test->sampler, test->delay_ns);
+	assert(clock_gettime(CLOCK_MONOTONIC, &end) == 0);
+	test->elapsed_ns = elapsed_ns(&start, &end);
+	return NULL;
+}
+
 static void *announce_observation(void *opaque)
 {
 	spf_gain_sampler_t *sampler = opaque;
@@ -25,6 +56,12 @@ int main(void)
 	assert(spf_gain_sampler_poll_delay_ns(0, 0, 0, UINT32_C(20000000)) == 0);
 	assert(spf_gain_sampler_poll_delay_ns(
 		UINT32_C(262144), 0, 0, UINT32_C(20000000)) ==
+		UINT32_C(6553600));
+	assert(spf_gain_sampler_poll_delay_ns(
+		UINT32_C(1048576), 0, 0, UINT32_C(20000000)) ==
+		UINT32_C(26214400));
+	assert(spf_gain_sampler_poll_delay_ns(
+		UINT32_C(4000000), 0, 0, UINT32_C(1000000)) ==
 		SPF_GAIN_SAMPLER_POLL_MAX_NS);
 	assert(spf_gain_sampler_poll_delay_ns(
 		UINT32_C(32768), 0, 0, UINT32_C(61440000)) == UINT32_C(266666));
@@ -55,6 +92,35 @@ int main(void)
 	atomic_init(&sampler.failed, false);
 	atomic_init(&sampler.stop_requested, false);
 	atomic_init(&sampler.force_observation, false);
+	interruptible_wait_test_t wait_test = {
+		.sampler = &sampler,
+		.delay_ns = UINT32_C(500000000),
+	};
+	pthread_t waiter;
+	assert(pthread_create(&waiter, NULL, run_interruptible_wait, &wait_test) == 0);
+	const struct timespec wake_delay = {.tv_sec = 0, .tv_nsec = 1000000};
+	nanosleep(&wake_delay, NULL);
+	pthread_mutex_lock(&sampler.mutex);
+	atomic_store_explicit(
+		&sampler.force_observation, true, memory_order_release);
+	pthread_cond_broadcast(&sampler.credit_cond);
+	pthread_mutex_unlock(&sampler.mutex);
+	assert(pthread_join(waiter, NULL) == 0);
+	assert(wait_test.interrupted);
+	assert(wait_test.elapsed_ns < UINT64_C(250000000));
+	atomic_store(&sampler.force_observation, false);
+	wait_test = (interruptible_wait_test_t){
+		.sampler = &sampler,
+		.delay_ns = UINT32_C(20000000),
+	};
+	assert(pthread_create(&waiter, NULL, run_interruptible_wait, &wait_test) == 0);
+	nanosleep(&wake_delay, NULL);
+	pthread_mutex_lock(&sampler.mutex);
+	pthread_cond_broadcast(&sampler.credit_cond);
+	pthread_mutex_unlock(&sampler.mutex);
+	assert(pthread_join(waiter, NULL) == 0);
+	assert(!wait_test.interrupted);
+	assert(wait_test.elapsed_ns >= UINT64_C(10000000));
 	sampler.interval_samples = UINT32_C(250000);
 	assert(!spf_gain_sampler_observation_due(
 		&sampler, UINT32_C(1000), UINT32_C(900)));
