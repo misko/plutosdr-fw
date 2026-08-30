@@ -39,6 +39,14 @@ jobs:
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
+         github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' ||
+         github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw' ||
+         github.ref == 'refs/heads/codex/iio-throughput-refill-sampler-v4-fw' ||
+         github.ref == 'refs/heads/codex/iio-throughput-sampler-poll-v3-fw' ||
+         github.ref == 'refs/heads/codex/iio-throughput-rw-affinity-v2-fw' ||
+         github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' ||
+         github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' ||
+         github.ref == 'refs/heads/codex/iio-throughput-prototype' ||
          github.ref == 'refs/heads/codex/issue-63-ddr-prefill' ||
          github.ref == 'refs/heads/codex/ddr-ring-v1' ||
          github.ref == 'refs/heads/codex/ddr-burst-v2' ||
@@ -86,9 +94,25 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'ddr-ring-prefill-v1-rc1-source.yaml' ||
+          'iio-throughput-coverage-window-v6-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' &&
+          'iio-throughput-coverage-window-v6-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw' &&
+          'iio-throughput-sampler-wake-v5-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-refill-sampler-v4-fw' &&
+          'iio-throughput-refill-sampler-v4-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-sampler-poll-v3-fw' &&
+          'iio-throughput-sampler-poll-v3-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-rw-affinity-v2-fw' &&
+          'iio-throughput-rw-affinity-v2-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' &&
+          'iio-throughput-affinity-v1-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' &&
+          'iio-throughput-hold-v2-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-throughput-prototype' &&
+          'iio-throughput-hold-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/issue-63-ddr-prefill' &&
           'ddr-ring-prefill-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-ring-v1' &&
@@ -168,9 +192,25 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-ddr-ring-prefill-v1' ||
+          'plutoplus-spf-iio-throughput-coverage-window-v6' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' &&
+          'plutoplus-spf-iio-throughput-coverage-window-v6-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw' &&
+          'plutoplus-spf-iio-throughput-sampler-wake-v5-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-refill-sampler-v4-fw' &&
+          'plutoplus-spf-iio-throughput-refill-sampler-v4-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-sampler-poll-v3-fw' &&
+          'plutoplus-spf-iio-throughput-sampler-poll-v3-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-rw-affinity-v2-fw' &&
+          'plutoplus-spf-iio-throughput-rw-affinity-v2-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' &&
+          'plutoplus-spf-iio-throughput-affinity-v1-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' &&
+          'plutoplus-spf-iio-throughput-hold-v2-rc1' ||
+          github.ref == 'refs/heads/codex/iio-throughput-prototype' &&
+          'plutoplus-spf-iio-throughput-hold-v1-rc1' ||
           github.ref == 'refs/heads/codex/issue-63-ddr-prefill' &&
           'plutoplus-spf-ddr-ring-prefill-v1-rc1' ||
           github.ref == 'refs/heads/codex/ddr-ring-v1' &&
@@ -393,6 +433,70 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1'
 
+      - name: Require the exact IIO throughput HOLD v1 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-prototype'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
+
+      - name: Require the exact IIO throughput HOLD v2 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-hold-v2-rc1'
+
+      - name: Require the exact IIO throughput affinity v1 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-affinity-v1-rc1'
+
+      - name: Require the exact IIO throughput R/W affinity v2 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-rw-affinity-v2-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-rw-affinity-v2-rc1'
+
+      - name: Require the exact IIO throughput sampler poll v3 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-sampler-poll-v3-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-sampler-poll-v3-rc1'
+
+      - name: Require the exact IIO throughput refill sampler v4 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-refill-sampler-v4-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-refill-sampler-v4-rc1'
+
+      - name: Require the exact IIO throughput sampler wake v5 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-sampler-wake-v5-rc1'
+
+      - name: Require the exact IIO throughput coverage window v6 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1'
+
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'
         env:
@@ -553,7 +657,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.44-plutoplus-spf-ddr-ring-prefill-v1'
+            'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'
 
       - name: Build, validate, and package
         id: build

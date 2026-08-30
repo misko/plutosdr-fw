@@ -108,6 +108,8 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "ddr-ring-v1-rc2-source.yaml:final-release" in package
     assert "ddr-ring-prefill-v1-rc1-source.yaml:candidate" in package
     assert "ddr-ring-prefill-v1-rc1-source.yaml:final-release" in package
+    assert "iio-throughput-coverage-window-v6-rc1-source.yaml:candidate" in package
+    assert "iio-throughput-coverage-window-v6-rc1-source.yaml:final-release" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -240,7 +242,7 @@ def test_ddr_ring_v1_keeps_its_exact_historical_rc2_candidate_route() -> None:
         assert "ddr-ring-v1-rc2-source.yaml" in source
 
 
-def test_ddr_ring_prefill_v1_has_exact_rc1_candidate_and_main_routes() -> None:
+def test_ddr_ring_prefill_v1_keeps_its_exact_historical_candidate_route() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
@@ -248,20 +250,189 @@ def test_ddr_ring_prefill_v1_has_exact_rc1_candidate_and_main_routes() -> None:
     branch = "refs/heads/codex/issue-63-ddr-prefill"
 
     assert workflow.count(branch) == 4
-    assert workflow.count("'ddr-ring-prefill-v1-rc1-source.yaml'") == 2
-    assert workflow.count("'plutoplus-spf-ddr-ring-prefill-v1'") == 1
+    assert workflow.count("'ddr-ring-prefill-v1-rc1-source.yaml'") == 1
+    assert workflow.count("'plutoplus-spf-ddr-ring-prefill-v1'") == 0
     assert workflow.count("'plutoplus-spf-ddr-ring-prefill-v1-rc1'") == 1
-    assert workflow.count("'v0.44-plutoplus-spf-ddr-ring-prefill-v1'") == 1
+    assert workflow.count("'v0.44-plutoplus-spf-ddr-ring-prefill-v1'") == 0
     assert workflow.count("'v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1'") == 1
     assert "Require the exact DDR ring prefill v1 RC1 candidate identity" in workflow
     assert "Require the exact final release identity" in workflow
     assert "ddr-ring-prefill-v1-rc1-source.yaml:candidate" in package
     assert "ddr-ring-prefill-v1-rc1-source.yaml:final-release" in package
     assert (
-        "./scripts/check_source_graph.sh manifests/ddr-ring-prefill-v1-rc1-source.yaml"
+        "SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh "
+        "manifests/ddr-ring-prefill-v1-rc1-source.yaml"
     ) in checker
     for source in (builder, package, checker):
         assert "ddr-ring-prefill-v1-rc1-source.yaml" in source
+
+
+def test_iio_throughput_affinity_candidate_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    manifest_name = "iio-throughput-affinity-v1-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count("refs/heads/codex/iio-throughput-stage-timing-fw") == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert workflow.count("'plutoplus-spf-iio-throughput-affinity-v1-rc1'") == 1
+    assert workflow.count("'v0.45-plutoplus-spf-iio-throughput-affinity-v1-rc1'") == 1
+    assert f"{manifest_name}:candidate" in package
+    for source in (builder, package):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: 69ba17e53198d1f1db68b1f9c186e99da30f04aa" in manifest
+    assert "submodule_buildroot: e560f6df5e8cd1aecc49cd43900a4ef6574bc0d1" in manifest
+
+
+def test_iio_throughput_rw_affinity_v2_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/iio-throughput-rw-affinity-v2-fw"
+    manifest_name = "iio-throughput-rw-affinity-v2-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-rw-affinity-v2-rc1'")
+        == 1
+    )
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-throughput-rw-affinity-v2-rc1'")
+        == 1
+    )
+    assert f"{manifest_name}:candidate" in package
+    for source in (builder, package):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: c1a7be84982fa4449bd7070084fa0389f9f90cfa" in manifest
+    assert "submodule_buildroot: b5026fc3f23227afd9cf9fbffcb0b971d9d47859" in manifest
+
+
+def test_iio_throughput_sampler_poll_v3_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/iio-throughput-sampler-poll-v3-fw"
+    manifest_name = "iio-throughput-sampler-poll-v3-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-sampler-poll-v3-rc1'")
+        == 1
+    )
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-throughput-sampler-poll-v3-rc1'")
+        == 1
+    )
+    assert f"{manifest_name}:candidate" in package
+    for source in (builder, package):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "metadata_source: 195d4c4f140009e93c282522a686bfad6b8718b6" in manifest
+    assert "submodule_buildroot: 3674741f33623c32e6d29f05f219185af28285a6" in manifest
+
+
+def test_iio_throughput_refill_sampler_v4_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/iio-throughput-refill-sampler-v4-fw"
+    manifest_name = "iio-throughput-refill-sampler-v4-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-refill-sampler-v4-rc1'")
+        == 1
+    )
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-throughput-refill-sampler-v4-rc1'")
+        == 1
+    )
+    assert f"{manifest_name}:candidate" in package
+    for source in (builder, package):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: d8e8688eaf6be16da9a0c9d92b7e8f49e0a3b334" in manifest
+    assert "metadata_source: 195d4c4f140009e93c282522a686bfad6b8718b6" in manifest
+    assert "submodule_buildroot: 8da0894c88e5a618b0bf9191c1fc0f2102a5d115" in manifest
+
+
+def test_iio_throughput_sampler_wake_v5_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/iio-throughput-sampler-wake-v5-fw"
+    manifest_name = "iio-throughput-sampler-wake-v5-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-sampler-wake-v5-rc1'")
+        == 1
+    )
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-throughput-sampler-wake-v5-rc1'")
+        == 1
+    )
+    assert f"{manifest_name}:candidate" in package
+    for source in (builder, package):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: d8e8688eaf6be16da9a0c9d92b7e8f49e0a3b334" in manifest
+    assert "metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad" in manifest
+    assert "submodule_buildroot: 9222c97347334ba1eadf5580faeb3a1093246f46" in manifest
+
+
+def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    checker = (ROOT / "scripts" / "check_tandem_release_offline.sh").read_text()
+    branch = "refs/heads/codex/iio-throughput-coverage-window-v6-fw"
+    manifest_name = "iio-throughput-coverage-window-v6-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 2
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6'") == 1
+    )
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6-rc1'")
+        == 1
+    )
+    assert (
+        workflow.count(
+            "'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1'"
+        )
+        == 1
+    )
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'")
+        == 1
+    )
+    assert "Require the exact final release identity" in workflow
+    assert f"{manifest_name}:candidate" in package
+    assert f"{manifest_name}:final-release" in package
+    assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
+    for source in (builder, package, checker):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: 6ba402481fc5a17464460cef79628cb42019fb12" in manifest
+    assert "metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad" in manifest
+    assert (
+        "submodule_buildroot: b3b02cb8cd505972333a65be3962b131de2bc270"
+        in manifest
+    )
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:

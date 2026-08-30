@@ -59,6 +59,7 @@
 | `ddr-ring-v1-rc2` | 2026-08-29 | **hardware-qualified release source; final bytes pending** | fixes the exclusive status boundary; exact candidate passed direct USB, physical Ethernet, wrap, recovery, and ordinary-IIO gates on AD9361 and AD9363A hardware |
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
+| `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -66,6 +67,58 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1 — 2026-08-30 — **hardware-qualified release source; final bytes pending**
+
+This candidate fixes a metadata-coverage race found while reducing iiOD's
+sampler CPU load. V5 renewed only two frames of gain/RSSI sampling credit at a
+refill fence. Four kernel DMA blocks could remain in flight while the DDR-ring
+producer copied data or waited for a free slot, so an older completed block
+could emerge after its supporting observations had aged out. Two 200-frame,
+200 MB ring runs failed after 66 and 176 frames with `-ENODATA`, reported by
+the ring as `dma_error`, even though DMA itself had succeeded.
+
+The first failure's frame ended 1,649,865 samples, or 82.49 ms at 20 MS/s,
+before the earliest retained observation. Its 49.57 ms maximum producer wait
+plus the normal 32.54 ms DDR-copy interval totals 82.10 ms, quantitatively
+matching the uncovered interval. V6 therefore derives one bounded credit
+window from the actual queue geometry:
+`samples_per_frame * (kernel_buffers + 1)`. Every refill renews that fixed
+window; credit never accumulates, and all existing metadata, counter, DDR,
+and fail-closed validation remains active.
+
+Protected build [33293657116](https://github.com/misko/plutosdr-fw/actions/runs/33293657116)
+for exact source commit `1cbc115b2ea7aa7d1678ae1ca329ceed1af6a07c`
+passed source-lock, routed timing, packaging, integrated-release, version, and
+payload gates. Its DFU SHA-256 is
+`7bad93cc3411b30d15c4c93472cd82a5fb5e10481f246062fae7f60f1a21207a`;
+the FIT-body SHA-256 is
+`299ea1db5ffb2f16c52ec22e8078c1f64a09fd49cad544477ca08d21547676ca`.
+
+Those exact bytes were RAM-booted on spare AD9363A serial
+`104000bac4950008230026001b440a003a`; QSPI was not written. All capture tests
+used standard network IIO over physical `192.168.1.17`, single RX0, 20 MS/s,
+1,048,576 samples per frame, and four kernel buffers. Three consecutive
+200-frame/200 MB ring runs and one 600-frame run completed every requested
+frame with an exact 47-frame/197,132,288-byte contiguous prefix,
+`target_complete`, error zero, and four or twelve wraps. A 50 MB control
+completed 18 wraps with its exact 11-frame prefix. HOLD and AUTO no-ring
+controls completed, immediate ordinary-IIO recovery passed, settings were
+restored, and the radio log contained no coverage, metadata, DDR, or DMA
+error.
+
+Ordinary raw throughput was unchanged at 72.39 MB/s before and 72.27 MB/s
+after the matrix. During the 600-frame ring run, the gain sampler used 9.35%
+of one CPU while the two dominant iiOD data-path threads used 76.13% and
+83.23%; the remaining sustained limit is refill/copy/send work rather than
+metadata sampling. The release does not claim lossless indefinite 20 MS/s IP
+capture: 80 MB/s is offered to a roughly 59 MB/s metadata path. With the ring,
+the initial 2.464-second admitted prefix is exact; later pressure gaps are
+reported through ABI 3 instead of terminating the capture.
+
+The final version-stamped bytes must repeat a focused physical-IP RAM gate
+before publication. Persistent-flash authorization is separate and is not a
+release requirement.
 
 ## v0.44-plutoplus-spf-ddr-ring-prefill-v1 — 2026-08-29 — **current hardware-qualified release**
 
