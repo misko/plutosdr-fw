@@ -27,9 +27,9 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 19e5b94e711b347f06f00e37dc0b5ad8a006784a
+submodule_buildroot: e560f6df5e8cd1aecc49cd43900a4ef6574bc0d1
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/iio-throughput-affinity-v1-source/buildroot-v1
+submodule_buildroot_ref: refs/tags/iio-throughput-affinity-v1-source/buildroot-v2
 
 submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
@@ -48,6 +48,6 @@ submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
 submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
 
 versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
-versions_buildroot: iio-throughput-affinity-v1-source/buildroot-v1
+versions_buildroot: iio-throughput-affinity-v1-source/buildroot-v2
 versions_linux: ddr-burst-v1-rc3-source/linux-v1
 versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
