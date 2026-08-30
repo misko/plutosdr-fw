@@ -158,3 +158,26 @@ of causing an extra counter read. The refill fence, synchronized-counter
 records, FPGA AUTO events, DDR behavior, fail-closed policy, and wire ABI are
 unchanged. V5 remains RAM-only until hardware proves lower sampler CPU without
 regressing throughput, metadata closure, or recovery.
+
+## V5 hardware regression and v6 queue-coverage prototype
+
+V5 improved the 20 MS/s HOLD and AUTO paths by about 7% and the 200 MB DDR
+ring by about 5%, but two 200-frame ring captures failed after 66 and 176
+frames with `-ENODATA`. The ring reported `dma_error`; radio logs prove the
+DMA refill itself succeeded and the metadata provider rejected a frame with no
+overlapping gain observation. For the first failure, the frame ended 1,649,865
+samples (82.49 ms at 20 MS/s) before the earliest retained observation. That
+run's one 49.57 ms ring-producer wait plus normal 32.54 ms DDR-copy work totals
+82.10 ms, matching the uncovered interval.
+
+The existing refill fence resets sampler credit to two frames. That is too
+short when four already-queued kernel DMA blocks can continue capturing while
+the ring producer copies or waits for a slot. V6 computes one fixed coverage
+window from the actual kernel queue depth: `samples_per_frame *
+(kernel_buffers + 1)`. Initial arm and every later refill reset to that same
+bounded window. With four kernel buffers, the forced fence consumes one frame
+of credit and four frames remain to cover all in-flight DMA work. Credit never
+accumulates across refills, so an idle or fast producer cannot create unbounded
+sampling history. A pure coverage-plan helper and boundary tests bind the
+queue-depth arithmetic; the v5 interruptible wait, metadata ABI, DDR sizes,
+and fail-closed validation remain unchanged.
