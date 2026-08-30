@@ -37,6 +37,13 @@ run_oracles() {
         fail "pinned Pluto HDL explicitly disables authoritative tandem events"
     fi
 
+    gain_timeline_design="${ROOT}/IIO_GAIN_TIMELINE_V8_DESIGN.md"
+    rg -Fq -- 'no event at its first sample' "$gain_timeline_design" ||
+        fail "gain timeline contract omits the no-boundary endpoint rule"
+    rg -Fq -- 'preceding end endpoint is their input baseline' \
+        "$gain_timeline_design" ||
+        fail "gain timeline contract omits the frame-boundary event baseline"
+
     bash -n \
         download_and_test.sh \
         scripts/build_gain_series_candidate.sh \

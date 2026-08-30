@@ -38,6 +38,7 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/iio-gain-timeline-v8-fw' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
          github.ref == 'refs/heads/codex/iio-throughput-buffered-sampler-v7-fw' ||
          github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' ||
@@ -95,7 +96,9 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'iio-throughput-coverage-window-v6-rc1-source.yaml' ||
+          'iio-gain-timeline-v8-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iio-gain-timeline-v8-fw' &&
+          'iio-gain-timeline-v8-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-buffered-sampler-v7-fw' &&
@@ -195,7 +198,9 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-iio-throughput-coverage-window-v6' ||
+          'plutoplus-spf-iio-gain-timeline-v8' ||
+          github.ref == 'refs/heads/codex/iio-gain-timeline-v8-fw' &&
+          'plutoplus-spf-iio-gain-timeline-v8-rc1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-buffered-sampler-v7-fw' &&
@@ -510,6 +515,14 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.45-plutoplus-spf-iio-throughput-buffered-sampler-v7-rc1'
 
+      - name: Require the exact IIO gain timeline v8 RC1 identity
+        if: github.ref == 'refs/heads/codex/iio-gain-timeline-v8-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.45-plutoplus-spf-iio-gain-timeline-v8-rc1'
+
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'
         env:
@@ -670,7 +683,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'
+            'v0.45-plutoplus-spf-iio-gain-timeline-v8'
 
       - name: Build, validate, and package
         id: build

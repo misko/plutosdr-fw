@@ -110,6 +110,8 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "ddr-ring-prefill-v1-rc1-source.yaml:final-release" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:candidate" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:final-release" in package
+    assert "iio-gain-timeline-v8-rc1-source.yaml:candidate" in package
+    assert "iio-gain-timeline-v8-rc1-source.yaml:final-release" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
     assert "protected route requires RELEASE_VERSION=" in package
     for source in (package, builder):
@@ -392,7 +394,7 @@ def test_iio_throughput_sampler_wake_v5_has_an_exact_protected_route() -> None:
     assert "submodule_buildroot: 9222c97347334ba1eadf5580faeb3a1093246f46" in manifest
 
 
-def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> None:
+def test_iio_throughput_coverage_window_v6_keeps_its_candidate_route() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
@@ -402,9 +404,9 @@ def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> No
     manifest = (ROOT / "manifests" / manifest_name).read_text()
 
     assert workflow.count(branch) == 4
-    assert workflow.count(f"'{manifest_name}'") == 2
+    assert workflow.count(f"'{manifest_name}'") == 1
     assert (
-        workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6'") == 1
+        workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6'") == 0
     )
     assert (
         workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6-rc1'")
@@ -418,9 +420,8 @@ def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> No
     )
     assert (
         workflow.count("'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'")
-        == 1
+        == 0
     )
-    assert "Require the exact final release identity" in workflow
     assert f"{manifest_name}:candidate" in package
     assert f"{manifest_name}:final-release" in package
     assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
@@ -433,6 +434,43 @@ def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> No
         "submodule_buildroot: b3b02cb8cd505972333a65be3962b131de2bc270"
         in manifest
     )
+
+
+def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    checker = (ROOT / "scripts" / "check_tandem_release_offline.sh").read_text()
+    branch = "refs/heads/codex/iio-gain-timeline-v8-fw"
+    manifest_name = "iio-gain-timeline-v8-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 2
+    assert workflow.count("'plutoplus-spf-iio-gain-timeline-v8'") == 1
+    assert workflow.count("'plutoplus-spf-iio-gain-timeline-v8-rc1'") == 1
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-gain-timeline-v8-rc1'")
+        == 1
+    )
+    assert workflow.count("'v0.45-plutoplus-spf-iio-gain-timeline-v8'") == 1
+    assert "Require the exact IIO gain timeline v8 RC1 identity" in workflow
+    assert "Require the exact final release identity" in workflow
+    assert f"{manifest_name}:candidate" in package
+    assert f"{manifest_name}:final-release" in package
+    assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
+    for source in (builder, package, checker):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: bab8fb1c08aa2a7a91efd4aefd0648a720482576" in manifest
+    assert "metadata_source: bbbf2f13e1a5aa7edab541e76f08afb384230d77" in manifest
+    assert "submodule_buildroot: 9d9164c0fabe4bf31a60dfa3973806692c88ddb4" in manifest
+    assert "submodule_hdl: ff17846a5d9b90c3294bdecb53eaa43617a519a7" in manifest
+    assert "submodule_linux: 4b397a547f3ad35a29c9d07685be423db908f9bf" in manifest
+    assert "no event at its first sample" in (ROOT / "IIO_GAIN_TIMELINE_V8_DESIGN.md").read_text()
+    assert "preceding end endpoint is their input baseline" in (
+        ROOT / "IIO_GAIN_TIMELINE_V8_DESIGN.md"
+    ).read_text()
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:

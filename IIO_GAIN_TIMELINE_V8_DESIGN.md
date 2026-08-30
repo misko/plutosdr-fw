@@ -96,11 +96,17 @@ The authoritative provider lifecycle is:
 
 The host independently maintains the same transaction boundary.  Its first
 accepted ABI-4 frame must start at transition count zero and event sequence
-zero.  Every later frame must start at the preceding transition endpoint, the
-preceding event start plus event count modulo 2^32, and the preceding gain/index
-endpoint under the same ownership and gain-table contract.  It advances this
-ledger only after the complete frame, CRC, DMA continuity, and timeline checks
-pass; individually valid records may not hide a missing boundary transition.
+zero.  Every later frame must begin at the preceding transition endpoint and
+at the preceding event-sequence start plus event count modulo 2^32, under the
+same ownership and gain-table contract.  If the current frame has no event at its first sample,
+its start gain/index endpoint must equal the preceding
+frame's end endpoint.  If one or more ordered events occur at the current
+frame's first sample, the preceding end endpoint is their input baseline: each
+direction/result must be valid in order and the current start endpoint must
+equal the final boundary-event result, with dB direction consistent with the
+index change.  The host advances this ledger only after the complete frame,
+CRC, DMA continuity, and timeline checks pass; individually valid records may
+not hide a missing boundary transition.
 
 The transition counter is extended from its hardware modulo-256 value only
 when the delta is unambiguous and within the admitted FIFO/ledger window.
