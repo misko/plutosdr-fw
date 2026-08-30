@@ -1,18 +1,26 @@
-# IIO throughput timing prototype
+# IIO throughput R/W-worker affinity prototype
 
-The candidate `v0.45-plutoplus-spf-iio-throughput-affinity-v1-rc1` retains the
-HOLD v2 refill-fence prototype and aggregate timing from timing v1. It also
-pins iiOD and its workers to CPU1, leaving the Ethernet, DMA, and USB hardware
-IRQs on CPU0. The affinity is an opt-in iiOD startup option and is enabled only
-by this diagnostic firmware. This is a RAM-boot candidate, not a
-persistent-flash release.
+The candidate `v0.45-plutoplus-spf-iio-throughput-rw-affinity-v2-rc1` retains
+the HOLD v2 refill-fence prototype and aggregate timing from timing v1. It pins
+only iiOD's per-device read/write workers to CPU1, leaving client, metadata,
+and DDR-ring producer threads schedulable on both CPUs. Ethernet, DMA, and USB
+hardware IRQs remain on CPU0. The affinity is an opt-in iiOD startup option
+and is enabled only by this diagnostic firmware. This is a RAM-boot candidate,
+not a persistent-flash release.
+
+The IIO context advertises `iio,iiod-rw-cpu-affinity=1`. It must not advertise
+the v1 whole-process attribute `iio,iiod-cpu-affinity`; the two iiOD modes are
+mutually exclusive and both are disabled by default upstream. The worker is
+created with its CPU mask already applied, so a capture cannot begin in an
+unattested scheduling state.
 
 The IIO context advertises `iio,buffer-metadata-timing-log=1`. Every 100
 transported frames, and again when the last client closes an opened device,
 iiOD emits `SPF_IIOD_TIMING_V1` records to stderr (the Pluto supervisor routes
 this to the kernel log). Each record includes whether it is an in-flight
-snapshot, the device, metadata/burst/ring mode, IQ frame size, measured capture
-wall time, stage count, total nanoseconds, and maximum nanoseconds.
+snapshot, the device, metadata/burst/ring mode, IQ frame size, successfully
+transported IQ bytes and frames, measured capture wall time, stage count, total
+nanoseconds, and maximum nanoseconds.
 
 | Stage | What is timed |
 | --- | --- |
@@ -34,8 +42,9 @@ time. Compare per-stage averages and maxima against the separately reported
 wall time and host-side throughput evidence.
 
 The implementation uses a monotonic clock and one short statistics lock per
-stage completion. It emits an in-flight snapshot every 100 transported frames
-and a final snapshot on device-entry teardown. Timing-clock failure drops the
+stage completion. It advances the in-flight snapshot counter from successfully
+transported IQ bytes rather than transport-call count, emitting every 100 full
+frames and again on device-entry teardown. Timing-clock failure drops the
 affected measurement without changing capture behavior.
 The wire format, IIO API, sampler cadence, DMA queue sizes, and DDR admission
 limits are unchanged.
@@ -47,3 +56,10 @@ run against the uninstrumented HOLD v2 candidate establishes whether timing
 overhead is material. Stage timing can localize blocking but does not by
 itself distinguish CPU execution from scheduling or network backpressure;
 those require correlation with CPU and transport measurements.
+
+Affinity v1 pinned every iiOD thread to CPU1. It improved ordinary raw 20 MS/s
+delivery from about 61 MB/s to 73.15 MB/s, confirming CPU/IRQ contention, but
+starved the concurrent DDR-ring producer and caused an immediate counter gap.
+That candidate is rejected. V2 is acceptable only if ordinary throughput keeps
+the gain, a 200 MB ring completes without continuity loss, and a following
+ordinary capture returns to baseline without rebooting.

@@ -283,6 +283,32 @@ def test_iio_throughput_affinity_candidate_has_an_exact_protected_route() -> Non
     assert "submodule_buildroot: e560f6df5e8cd1aecc49cd43900a4ef6574bc0d1" in manifest
 
 
+def test_iio_throughput_rw_affinity_v2_has_an_exact_protected_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/iio-throughput-rw-affinity-v2-fw"
+    manifest_name = "iio-throughput-rw-affinity-v2-rc1-source.yaml"
+    manifest = (ROOT / "manifests" / manifest_name).read_text()
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert (
+        workflow.count("'plutoplus-spf-iio-throughput-rw-affinity-v2-rc1'")
+        == 1
+    )
+    assert (
+        workflow.count("'v0.45-plutoplus-spf-iio-throughput-rw-affinity-v2-rc1'")
+        == 1
+    )
+    assert f"{manifest_name}:candidate" in package
+    for source in (builder, package):
+        assert manifest_name in source
+    assert "release_state: candidate" in manifest
+    assert "libiio_0_25_source: 78cafb3c011b1651141fede28419ea65da6dc2c0" in manifest
+    assert "submodule_buildroot: 247878b20ca898fffaab0dd7ea8fb759ca39420b" in manifest
+
+
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
     block_design = (ROOT / "hdl" / "projects" / "pluto" / "system_bd.tcl").read_text()
     project = (ROOT / "hdl" / "projects" / "pluto" / "system_project.tcl").read_text()
