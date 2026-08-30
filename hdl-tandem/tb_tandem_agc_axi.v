@@ -165,6 +165,9 @@ module tb_tandem_agc_axi;
   endtask
 
   reg [31:0] v;
+  reg [31:0] fence_obs [0:255];
+  reg [31:0] transition_obs [0:255];
+  integer obs_i;
 
   initial begin
     $display("== tb_tandem_agc_axi (dual clock, 100 MHz / 61.44 MHz) ==");
@@ -174,8 +177,32 @@ module tb_tandem_agc_axi;
     tick(20);
 
     axi_read(8'h00, v); check(v == 32'h5441_4732, "TAG2 identity matches the kernel ABI");
-    axi_read(8'h04, v); check(v == 32'd1, "FPGA ABI version is one");
-    axi_read(8'h08, v); check(v[15:0] == 16'd64, "capabilities report FIFO depth");
+    axi_read(8'h04, v); check(v == 32'd2, "FPGA ABI version is two");
+    axi_read(8'h08, v);
+    check(v == {16'h000F, 16'd64},
+          "capabilities report the sample fence and FIFO depth");
+    begin : sample_fence_progress
+      reg [31:0] fence0, fence1;
+      axi_read(8'h54, fence0);
+      tick(100);
+      axi_read(8'h54, fence1);
+      check((fence1 - fence0) < 32'h8000_0000 && fence1 != fence0,
+            "coherent low-word sample fence advances modulo 2^32");
+
+      // Exercise the actual low-word wrap, not only ordinary progression.
+      // The comparison used by software must remain forward and unambiguous
+      // across zero while the admitted window is below half the modulus.
+      @(negedge l_clk);
+      sample_counter = 64'h0000_0001_ffff_fff0;
+      tick(5);
+      axi_read(8'h54, fence0);
+      tick(100);
+      axi_read(8'h54, fence1);
+      check(fence0 > 32'hffff_0000 && fence1 < 32'h0001_0000,
+            "coherent low-word sample fence crosses zero");
+      check((fence1 - fence0) < 32'h8000_0000 && fence1 != fence0,
+            "modulo fence ordering remains forward across wrap");
+    end
     axi_read(8'h10, v); check(v[2:0] == 3'd0, "public state is IDLE after reset");
     axi_read(8'h18, v);
     check(v[7:0] == 8'd0 && v[15:8] == 8'd76,
@@ -232,6 +259,15 @@ module tb_tandem_agc_axi;
 
     // run the loop and confirm events cross domains
     rx1_level = -16'sd35; rx2_level = -16'sd35;
+
+    // Observe the kernel's actual read order across the first decision.  The
+    // fence and transition counter originate in one coherent CDC snapshot;
+    // reading the counter second may select that snapshot or a newer one, but
+    // it must never omit an event already strictly behind the observed fence.
+    for (obs_i = 0; obs_i < 256; obs_i = obs_i + 1) begin
+      axi_read(8'h54, fence_obs[obs_i]);
+      axi_read(8'h40, transition_obs[obs_i]);
+    end
     tick(4000);
     axi_read(8'h40, v); check(v > 32'd0, "transition count crossed back non-zero");
     axi_read(8'h38, v); check(v > 32'd0, "event level shows captured records");
@@ -239,6 +275,7 @@ module tb_tandem_agc_axi;
     // drain one event through the four-read sequence across the CDC
     begin : drain
       reg [31:0] w0,w1,w2,w3,l0,l1;
+      integer covered, coherent;
       axi_read(8'h38, l0);
       axi_read(8'h44, w0); axi_read(8'h48, w1);
       axi_read(8'h4C, w2); axi_read(8'h50, w3);
@@ -246,8 +283,21 @@ module tb_tandem_agc_axi;
       axi_read(8'h38, l1);
       check(l1 == l0 - 1, "reading event word three pops exactly one entry");
       check(w3[23:16] == w3[31:24], "event carries paired gain indices");
-      check(w2 != 32'd0, "event sequence and flags are populated");
+      check(w2 == 32'd0, "the first hardware event sequence is exactly zero");
       check(w0 != 32'd0 || w1 != 32'd0, "the 64-bit sample counter crossed intact");
+      covered = 0;
+      coherent = 1;
+      for (obs_i = 0; obs_i < 256; obs_i = obs_i + 1)
+        if (fence_obs[obs_i] != w0 &&
+            (fence_obs[obs_i] - w0) < 32'h8000_0000) begin
+          covered = covered + 1;
+          if (transition_obs[obs_i] == 0)
+            coherent = 0;
+        end
+      check(covered > 0,
+            "status observer sampled a fence strictly after event zero");
+      check(coherent,
+            "every post-event fence carries a covering transition watermark");
     end
 
     // tandem invariant still holds with the domains truly asynchronous

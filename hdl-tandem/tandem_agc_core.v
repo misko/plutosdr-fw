@@ -339,7 +339,9 @@ module tandem_agc_core #(
       dwell_kind <= DWELL_NONE;
       small_latch_episode <= EPISODE_READY;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
-      evt_seq <= 32'd0;
+      // evt_seq is the last emitted sequence.  The first accepted decision
+      // increments UINT32_MAX to zero before evt_push reaches the FIFO.
+      evt_seq <= 32'hFFFF_FFFF;
       evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else if (fault_clear && state != ST_ACTIVE) begin
@@ -348,7 +350,7 @@ module tandem_agc_core #(
       dwell_kind <= DWELL_NONE;
       small_latch_episode <= EPISODE_READY;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
-      evt_seq <= 32'd0;
+      evt_seq <= 32'hFFFF_FFFF;
       evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else begin

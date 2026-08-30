@@ -54,7 +54,8 @@ The v7 event record is exactly 16 bytes: sample sequence (`u64`), event
 sequence (`u32`), flags (`u16`), and the resulting RX1/RX2 indices (`u8`,
 `u8`).  Events are ordered, gap-free modulo 2^32, and lie in
 `[frame_start, frame_end)`.  An event at frame start applies to the first
-sample; an event at frame end belongs to the next frame.
+sample; an event at frame end belongs to the next frame.  CLEAR seeds the
+hardware event counter so the first emitted event sequence is exactly zero.
 
 Zero SPI observations and unavailable RSSI are valid v7 telemetry states.  In
 that case their existing validity flags are clear and their existing read-fail
@@ -63,20 +64,35 @@ first-change offsets, and exact events remain mandatory.
 
 ## Acquisition and ledger ordering
 
-The provider lifecycle is:
+FPGA ABI 2 adds feature bit 3 (`SAMPLE_FENCE`) and register `0x54`, the low
+32 bits of the exclusive RX sample boundary.  That fence and the modulo-256
+transition counter cross in the same coherent receive-domain status snapshot.
+The kernel keeps the existing status structure and ioctl sizes by assigning
+the first formerly reserved status word to `sample_counter_fence_low`; it
+reads the fence register before the transition register.  The returned
+transition count is therefore from the fence's snapshot or a newer one and
+covers every gain decision strictly before the fence.
+
+The authoritative provider lifecycle is:
 
 1. parse and validate the complete request;
 2. reserve and prefault optional DDR storage;
-3. acquire the tandem lease and its authoritative initial gain state;
+3. acquire the tandem lease in HOLD and require zero transitions, zero
+   overflows, event sequence zero, and its authoritative initial gain state;
 4. create and arm the IIO DMA buffer;
-5. after each refill, snapshot a fixed transition-count watermark;
-6. drain and validate the event FIFO through that watermark;
-7. transactionally resolve the frame timeline;
-8. attach any available SPI/RSSI telemetry and serialize metadata; and
-9. commit the tandem ledger and DMA sequence only after serialization succeeds.
+5. for a requested AUTO session, issue the explicit `START_AUTO` ioctl only
+   after step 4; legacy providers retain their original one-phase lifecycle;
+6. after each refill, wait until the modulo-32-bit sample fence reaches the
+   frame's exclusive end, then freeze its same-or-newer transition watermark;
+7. drain and validate the event FIFO through that watermark;
+8. transactionally resolve the frame timeline;
+9. attach any available SPI/RSSI telemetry and serialize metadata; and
+10. commit the tandem ledger and DMA sequence only after serialization succeeds.
 
 The transition counter is extended from its hardware modulo-256 value only
 when the delta is unambiguous and within the admitted FIFO/ledger window.
+The 32-bit sample fence is compared modulo 2^32 only while the admitted live
+window is below 2^31 samples, making before/after unambiguous across wrap.
 Status faults, FIFO overflow, event-sequence gaps, sample regression, malformed
 geometry, and DMA counter gaps remain fail-closed.
 
@@ -93,9 +109,9 @@ the domain at the failure source; errno alone is not used to guess it.
   parsers and golden byte vectors.
 - Direct USB/IP gadget protocol v3 is unchanged.  It does not own the tandem
   event lease, so authoritative AUTO timelines there are a separate feature.
-- This release fixes IIO over USB and IIO over physical Ethernet, ordinary and
-  DDR-ring capture, single and dual RX layouts supported by the advertised
-  metadata layout table.
+- This release fixes IIO over USB and IIO over physical Ethernet: ordinary
+  capture supports single and dual RX, while DDR-ring capture retains its
+  advertised single-RX-only layout.
 - No persistent radio write is permitted before the exact candidate bytes pass
   RAM-only qualification on the two reserved radios.
 
