@@ -13,10 +13,12 @@ so a valid refill could still terminate with `ENODATA`.
 
 ## Versioned contract
 
-The new provider advertises `iio,buffer-metadata=4` and emits metadata record
-version 7 only when the client sends the explicit provider-v4 envelope.  The
-legacy 104-byte tandem request and its burst/ring suffixes retain their existing
-version-6 behavior and byte layout.
+The new provider advertises ABI 4 in the additive
+`iio,buffer-metadata-abi-versions` set and emits metadata record version 7 only
+when the client sends the explicit provider-v4 envelope.  The legacy scalar
+advertisement remains `iio,buffer-metadata=3`; the 104-byte tandem request and
+its burst/ring suffixes retain their existing version-6 behavior and byte
+layout.
 
 The 32-byte little-endian envelope is:
 
