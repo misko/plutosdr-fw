@@ -124,6 +124,7 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-ring-v1-rc1-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-ring-v1-rc2-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-ring-prefill-v1-rc1-source.yaml
+    ./scripts/check_source_graph.sh manifests/iio-throughput-buffered-sampler-v7-rc1-source.yaml
     ./scripts/check_source_graph.sh manifests/iio-throughput-coverage-window-v6-rc1-source.yaml
     ./buildroot/board/pluto/test_iiod_supervisor.sh
     ./scripts/test_legal_info_network.sh
