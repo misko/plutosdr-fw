@@ -339,9 +339,12 @@ module tandem_agc_core #(
       dwell_kind <= DWELL_NONE;
       small_latch_episode <= EPISODE_READY;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
-      // evt_seq is the last emitted sequence.  The first accepted decision
-      // increments UINT32_MAX to zero before evt_push reaches the FIFO.
-      evt_seq <= 32'hFFFF_FFFF;
+      // evt_seq is the next sequence presented to the FIFO.  It advances on
+      // the registered push handoff, after the FIFO has sampled the current
+      // value, so the first emitted event is zero without a set-valued reset.
+      // Keeping this reset at zero also shares the dense XC7Z010 reset control
+      // set instead of creating 32 otherwise unnecessary set-type flops.
+      evt_seq <= 32'd0;
       evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else if (fault_clear && state != ST_ACTIVE) begin
@@ -350,12 +353,17 @@ module tandem_agc_core #(
       dwell_kind <= DWELL_NONE;
       small_latch_episode <= EPISODE_READY;
       cnt_trans <= 8'd0; cnt_inhib <= 8'd0; cnt_clamp <= 8'd0;
-      evt_seq <= 32'hFFFF_FFFF;
+      evt_seq <= 32'd0;
       evt_reason <= 4'd0; evt_push <= 1'b0;
       fire_req <= 1'b0; req_dir <= 2'd0;
     end else begin
       evt_push <= 1'b0;
       fire_req <= 1'b0;
+
+      // evt_push is registered one cycle before the FIFO write.  At this edge
+      // the FIFO samples the old evt_seq while this accumulator advances to
+      // the value for the next event.
+      if (evt_push) evt_seq <= evt_seq + 32'd1;
 
       // seed the model when ownership is taken
       if (state == ST_ARMING) begin
@@ -403,7 +411,6 @@ module tandem_agc_core #(
             expected_index <= expected_index - 8'd1;
             evt_reason     <= (ch1_lglmt | ch2_lglmt) ? R_LG_LMT : R_LG_ADC;
             evt_push       <= 1'b1;
-            evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
@@ -428,7 +435,6 @@ module tandem_agc_core #(
             expected_index <= expected_index - 8'd1;
             evt_reason     <= R_SM_INHIB;
             evt_push       <= 1'b1;
-            evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;
@@ -449,7 +455,6 @@ module tandem_agc_core #(
             expected_index <= expected_index + 8'd1;
             evt_reason     <= R_BOTH_LP;
             evt_push       <= 1'b1;
-            evt_seq        <= evt_seq + 32'd1;
             cnt_trans      <= cnt_trans + 32'd1;
             cooldown_cnt   <= cfg_cooldown;
             dwell_cnt      <= 8'd0;

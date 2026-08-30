@@ -285,6 +285,14 @@ module tb_tandem_agc_axi;
       check(w3[23:16] == w3[31:24], "event carries paired gain indices");
       check(w2 == 32'd0, "the first hardware event sequence is exactly zero");
       check(w0 != 32'd0 || w1 != 32'd0, "the 64-bit sample counter crossed intact");
+      check(l1 > 0, "the deterministic AUTO run queued a second event");
+      l0 = l1;
+      axi_read(8'h44, w0); axi_read(8'h48, w1);
+      axi_read(8'h4C, w2); axi_read(8'h50, w3);
+      tick(10);
+      axi_read(8'h38, l1);
+      check(l1 == l0 - 1, "reading the second event pops exactly one entry");
+      check(w2 == 32'd1, "hardware event sequences advance contiguously");
       covered = 0;
       coherent = 1;
       for (obs_i = 0; obs_i < 256; obs_i = obs_i + 1)

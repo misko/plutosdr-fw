@@ -61,6 +61,10 @@ sequence (`u32`), flags (`u16`), and the resulting RX1/RX2 indices (`u8`,
 `[frame_start, frame_end)`.  An event at frame start applies to the first
 sample; an event at frame end belongs to the next frame.  CLEAR seeds the
 hardware event counter so the first emitted event sequence is exactly zero.
+The counter holds the next sequence presented to the FIFO and increments on
+the registered FIFO handoff, after that value is sampled.  This ordering keeps
+the first event at zero without a set-valued reset or a separate FPGA control
+set on the slice-constrained Zynq-7010.
 
 Zero SPI observations and unavailable RSSI are valid v7 telemetry states.  In
 that case their existing validity flags are clear and their existing read-fail
