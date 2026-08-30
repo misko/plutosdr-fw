@@ -4,7 +4,7 @@ source /etc/device_config
 
 CONFIGFS=/sys/kernel/config/usb_gadget
 GADGET=$CONFIGFS/composite_gadget
-IIOD_OPTS="-D -n $ENDPOINTS -F /dev/iio_ffs"
+IIOD_OPTS="-D -n $ENDPOINTS -F /dev/iio_ffs --cpu-affinity 1"
 SDR_USB_GADGET_OPTS="/dev/sdr_gadget_ffs"
 UDC_HANDLE_SUSPEND=`fw_printenv -n udc_handle_suspend 2> /dev/null || echo 0`
 USB_ETH_MODE=`fw_printenv -n usb_ethernet_mode 2> /dev/null || echo 0`
