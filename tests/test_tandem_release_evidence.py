@@ -1159,71 +1159,78 @@ def _gain_timeline_ladder(
 ) -> dict[str, object]:
     frames = int(case["frames"])
     channels = [0] if case["layout"] == "single-rx0" else [0, 1]
-    observed = frames * EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL
-    iq_bytes = observed * len(channels) * 4
-    first = 1_000 + position * 2_000_000_000
-    last = first + observed
-    elapsed = 1.0
     ring = case["buffering"] == "ring-200mb"
-    frame_bytes = EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL * 4
-    admitted = (EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
-    capacity = admitted // frame_bytes
-    prefix_frames = min(frames, capacity) if ring else 0
-    ring_status = (
-        {
-            "version": 2,
-            "state": "complete",
-            "terminal_reason": "target_complete",
-            "error_code": 0,
-            "requested_capacity_iq_bytes": EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES,
-            "admitted_capacity_iq_bytes": admitted,
-            "target_frames": frames,
-            "produced_frames": frames,
-            "consumed_frames": frames,
-            "high_water_frames": prefix_frames,
-            "wrap_count": frames // capacity,
-            "producer_position": frames % capacity,
-            "consumer_position": frames % capacity,
-            "last_contiguous_sample_sequence": last,
-            "first_unavailable_sample_sequence": None,
-            "failure_frame_index": None,
-            "failure_sample_sequence": None,
-        }
-        if ring
-        else None
-    )
-    cell = {
-        "samples_per_channel": EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
-        "requested_frames": frames,
-        "observed_frames": frames,
-        "observed_sample_count": observed,
-        "device_span_sample_count": observed,
-        "first_sample_sequence": first,
-        "last_sample_sequence_exclusive": last,
-        "missing_sample_count": 0,
-        "gap_count": 0,
-        "overflow_count": 0,
-        "iq_bytes": iq_bytes,
-        "elapsed_seconds": elapsed,
-        "achieved_payload_mbps": iq_bytes / elapsed / 1_000_000,
-        "achieved_payload_mibps": iq_bytes / elapsed / (1024 * 1024),
-        "observed_fraction": 1.0,
-        "tandem_metadata_frames": frames,
-        "authoritative_gain_timeline_frames": frames,
-        "gain_observation_interval_samples": 4_096,
-        "gain_observation_count": 0,
-        "gain_observation_overflow_count": 0,
-        "gain_event_count": 0,
-        "gain_event_overflow_count": 0,
-        "ddr_burst_requested_iq_bytes": 0,
-        "ddr_burst_admitted_iq_bytes": 0,
-        "ddr_burst_frames": 0,
-        "ddr_ring_status": ring_status,
-        "ddr_ring_prefix_frames": prefix_frames,
-        "ddr_ring_prefix_iq_bytes": prefix_frames * frame_bytes,
-        "ddr_ring_prefix_contiguous": ring,
-        "passed": True,
-    }
+    sample_ladder = [int(item) for item in case["samples_per_channel"]]
+    cells: list[dict[str, object]] = []
+    for rung, samples_per_channel in enumerate(sample_ladder):
+        observed = frames * samples_per_channel
+        iq_bytes = observed * len(channels) * 4
+        first = 1_000 + position * 100_000_000_000 + rung * 10_000_000_000
+        last = first + observed
+        elapsed = 1.0
+        frame_bytes = samples_per_channel * len(channels) * 4
+        admitted = (
+            EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes * frame_bytes
+        )
+        capacity = admitted // frame_bytes
+        prefix_frames = min(frames, capacity) if ring else 0
+        ring_status = (
+            {
+                "version": 2,
+                "state": "complete",
+                "terminal_reason": "target_complete",
+                "error_code": 0,
+                "requested_capacity_iq_bytes": EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES,
+                "admitted_capacity_iq_bytes": admitted,
+                "target_frames": frames,
+                "produced_frames": frames,
+                "consumed_frames": frames,
+                "high_water_frames": prefix_frames,
+                "wrap_count": frames // capacity,
+                "producer_position": frames % capacity,
+                "consumer_position": frames % capacity,
+                "last_contiguous_sample_sequence": last,
+                "first_unavailable_sample_sequence": None,
+                "failure_frame_index": None,
+                "failure_sample_sequence": None,
+            }
+            if ring
+            else None
+        )
+        cells.append(
+            {
+                "samples_per_channel": samples_per_channel,
+                "requested_frames": frames,
+                "observed_frames": frames,
+                "observed_sample_count": observed,
+                "device_span_sample_count": observed,
+                "first_sample_sequence": first,
+                "last_sample_sequence_exclusive": last,
+                "missing_sample_count": 0,
+                "gap_count": 0,
+                "overflow_count": 0,
+                "iq_bytes": iq_bytes,
+                "elapsed_seconds": elapsed,
+                "achieved_payload_mbps": iq_bytes / elapsed / 1_000_000,
+                "achieved_payload_mibps": iq_bytes / elapsed / (1024 * 1024),
+                "observed_fraction": 1.0,
+                "tandem_metadata_frames": frames,
+                "authoritative_gain_timeline_frames": frames,
+                "gain_observation_interval_samples": 4_096,
+                "gain_observation_count": 0,
+                "gain_observation_overflow_count": 0,
+                "gain_event_count": 0,
+                "gain_event_overflow_count": 0,
+                "ddr_burst_requested_iq_bytes": 0,
+                "ddr_burst_admitted_iq_bytes": 0,
+                "ddr_burst_frames": 0,
+                "ddr_ring_status": ring_status,
+                "ddr_ring_prefix_frames": prefix_frames,
+                "ddr_ring_prefix_iq_bytes": prefix_frames * frame_bytes,
+                "ddr_ring_prefix_contiguous": ring,
+                "passed": True,
+            }
+        )
     is_usb = case["transport"] == "usb"
     return {
         "serial": serial,
@@ -1232,10 +1239,10 @@ def _gain_timeline_ladder(
         "model": artifact["release"]["hardware_model"],
         "firmware_version": artifact["release"]["firmware_version"],
         "metadata_abi": 4,
-        "sample_rate_hz": EVIDENCE._GAIN_TIMELINE_SAMPLE_RATE_HZ,
-        "rf_bandwidth_hz": EVIDENCE._GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "sample_rate_hz": case["sample_rate_hz"],
+        "rf_bandwidth_hz": case["rf_bandwidth_hz"],
         "channels": channels,
-        "kernel_buffers": EVIDENCE._GAIN_TIMELINE_KERNEL_BUFFERS,
+        "kernel_buffers": case["kernel_buffers"],
         "tandem_mode": case["tandem_mode"],
         "acceptance_mode": "continuity",
         "iq_decoder": "pyadi",
@@ -1244,11 +1251,9 @@ def _gain_timeline_ladder(
             EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES if ring else 0
         ),
         "minimum_observed_fraction": 0.95,
-        "cells": [cell],
+        "cells": cells,
         "failures": [],
-        "largest_passing_samples_per_channel": (
-            EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL
-        ),
+        "largest_passing_samples_per_channel": sample_ladder[0],
         "original_settings_restored": True,
         "continuity_claim": (
             "passed binds FPGA counter coverage >=95%, zero overflow, exact selected-RX "
@@ -1295,7 +1300,7 @@ def _write_gain_timeline_hardware(root: Path, artifact_index_path: Path) -> None
         campaign_id = hashlib.sha256(serial.encode()).hexdigest()[:32]
         plan = {
             "schema": EVIDENCE._GAIN_TIMELINE_PLAN_SCHEMA,
-            "schema_version": 1,
+            "schema_version": 2,
             "campaign_id": campaign_id,
             "created_at": "2026-08-30T18:00:00Z",
             "operation_plan": _file_identity(
@@ -1317,6 +1322,7 @@ def _write_gain_timeline_hardware(root: Path, artifact_index_path: Path) -> None
             "soak_frame_count": 5_000,
             "ordinary_layouts": ["single-rx0", "dual"],
             "ring_layouts": ["single-rx0"],
+            "planned_case_count": EVIDENCE._GAIN_TIMELINE_CASE_COUNT,
             "confirmation_phrase": f"QUALIFY GAIN TIMELINE {serial} {campaign_id}",
             "hardware_accessed": False,
         }
@@ -1340,12 +1346,12 @@ def _write_gain_timeline_hardware(root: Path, artifact_index_path: Path) -> None
         ]
         report = {
             "schema": EVIDENCE._GAIN_TIMELINE_REPORT_SCHEMA,
-            "schema_version": 1,
+            "schema_version": 2,
             "campaign_plan": _file_identity(plan_path, plan_payload),
             "started_at": "2026-08-30T18:01:00Z",
             "completed_at": "2026-08-30T19:01:00Z",
             "outcome": "pass",
-            "planned_case_count": 60,
+            "planned_case_count": EVIDENCE._GAIN_TIMELINE_CASE_COUNT,
             "boot_receipt": receipt,
             "cases": cases,
             "restored_runtime": restored,
@@ -2519,6 +2525,8 @@ def test_gain_timeline_candidate_qualification_accepts_exact_two_radio_campaign(
         "case-order",
         "gap",
         "not-authoritative",
+        "issue-49-kernel-buffers",
+        "issue-54-ladder-cell",
         "ring-status-v1",
         "ring-capacity",
         "ring-continuity-break",
@@ -2542,6 +2550,11 @@ def test_gain_timeline_candidate_qualification_rejects_semantic_mutations(
         _write_private_json(plan_path, plan)
     else:
         report = json.loads(report_path.read_text())
+        ring_position = next(
+            index
+            for index, result in enumerate(report["cases"])
+            if result["case"]["buffering"] == "ring-200mb"
+        )
         if mutation == "case-order":
             report["cases"][0], report["cases"][1] = (
                 report["cases"][1],
@@ -2554,19 +2567,30 @@ def test_gain_timeline_candidate_qualification_rejects_semantic_mutations(
             report["cases"][0]["report"]["cells"][0][
                 "authoritative_gain_timeline_frames"
             ] -= 1
+        elif mutation == "issue-49-kernel-buffers":
+            report["cases"][0]["report"]["kernel_buffers"] = 4
+        elif mutation == "issue-54-ladder-cell":
+            ladder_position = next(
+                index
+                for index, result in enumerate(report["cases"])
+                if result["case"]["profile"] == "issue-54-ip-ladder"
+            )
+            report["cases"][ladder_position]["report"]["cells"].pop()
         elif mutation == "ring-status-v1":
-            report["cases"][20]["report"]["cells"][0]["ddr_ring_status"]["version"] = 1
+            report["cases"][ring_position]["report"]["cells"][0]["ddr_ring_status"][
+                "version"
+            ] = 1
         elif mutation == "ring-capacity":
-            report["cases"][20]["report"]["cells"][0]["ddr_ring_status"][
-                "admitted_capacity_iq_bytes"
-            ] -= 1
+            report["cases"][ring_position]["report"]["cells"][0][
+                "ddr_ring_status"
+            ]["admitted_capacity_iq_bytes"] -= 1
         elif mutation == "ring-continuity-break":
-            cell = report["cases"][20]["report"]["cells"][0]
+            cell = report["cases"][ring_position]["report"]["cells"][0]
             status = cell["ddr_ring_status"]
             boundary = (
                 cell["first_sample_sequence"]
                 + cell["ddr_ring_prefix_frames"]
-                * EVIDENCE._GAIN_TIMELINE_SAMPLES_PER_CHANNEL
+                * cell["samples_per_channel"]
             )
             status["last_contiguous_sample_sequence"] = boundary
             status["first_unavailable_sample_sequence"] = boundary

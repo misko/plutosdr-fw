@@ -183,12 +183,13 @@ _GAIN_TIMELINE_FILENAMES = {
     "qualification": "gain-timeline-report.json",
 }
 _GAIN_TIMELINE_PLAN_FILENAME = "gain-timeline-qualification-plan.json"
-_GAIN_TIMELINE_PLAN_SCHEMA = "pluto-plus-utils.gain-timeline-qualification-plan.v1"
-_GAIN_TIMELINE_REPORT_SCHEMA = "pluto-plus-utils.gain-timeline-qualification-report.v1"
+_GAIN_TIMELINE_PLAN_SCHEMA = "pluto-plus-utils.gain-timeline-qualification-plan.v2"
+_GAIN_TIMELINE_REPORT_SCHEMA = "pluto-plus-utils.gain-timeline-qualification-report.v2"
 _GAIN_TIMELINE_SAMPLE_RATE_HZ = 20_000_000
 _GAIN_TIMELINE_SAMPLES_PER_CHANNEL = 262_144
 _GAIN_TIMELINE_KERNEL_BUFFERS = 4
 _GAIN_TIMELINE_RING_IQ_BYTES = 200_000_000
+_GAIN_TIMELINE_CASE_COUNT = 187
 RELEASE_HARDWARE_HARNESS_PATHS = (
     "scripts/deploy_tandem_agc_ram_hardware.sh",
     "scripts/run_tandem_agc_release_hardware.sh",
@@ -1826,7 +1827,8 @@ def _gain_timeline_cases() -> tuple[dict[str, object], ...]:
         ("soak", 5_000, 1),
     )
     cases: list[dict[str, object]] = []
-    for transport in ("usb", "physical-ip"):
+
+    def append_matrix(transport: str) -> None:
         for buffering in ("ordinary", "ring-200mb"):
             for tandem_mode in ("hold", "auto"):
                 layouts = (
@@ -1838,19 +1840,83 @@ def _gain_timeline_cases() -> tuple[dict[str, object], ...]:
                     for tier, frames, repetition in tiers:
                         cases.append(
                             {
+                                "profile": "matrix",
                                 "transport": transport,
                                 "buffering": buffering,
                                 "tandem_mode": tandem_mode,
                                 "layout": layout,
                                 "tier": tier,
+                                "sample_rate_hz": 20_000_000,
+                                "rf_bandwidth_hz": 20_000_000,
+                                "samples_per_channel": [262_144],
                                 "frames": frames,
+                                "kernel_buffers": 4,
                                 "repetition": repetition,
                             }
                         )
-    if len(cases) != 60 or any(
+
+    cases.extend(
+        {
+            "profile": "issue-49-usb-enodata",
+            "transport": "usb",
+            "buffering": "ordinary",
+            "tandem_mode": "hold",
+            "layout": "dual",
+            "tier": "regression",
+            "sample_rate_hz": 1_000_000,
+            "rf_bandwidth_hz": 1_000_000,
+            "samples_per_channel": [100_000],
+            "frames": 100,
+            "kernel_buffers": 8,
+            "repetition": repetition,
+        }
+        for repetition in range(1, 65)
+    )
+    append_matrix("usb")
+    for sample_rate_hz in (2_500_000, 3_000_000, 5_000_000):
+        cases.extend(
+            {
+                "profile": "issue-54-ip-max",
+                "transport": "physical-ip",
+                "buffering": "ordinary",
+                "tandem_mode": "hold",
+                "layout": "dual",
+                "tier": "regression",
+                "sample_rate_hz": sample_rate_hz,
+                "rf_bandwidth_hz": sample_rate_hz,
+                "samples_per_channel": [4_194_304],
+                "frames": 6,
+                "kernel_buffers": 4,
+                "repetition": repetition,
+            }
+            for repetition in range(1, 21)
+        )
+        cases.append(
+            {
+                "profile": "issue-54-ip-ladder",
+                "transport": "physical-ip",
+                "buffering": "ordinary",
+                "tandem_mode": "hold",
+                "layout": "dual",
+                "tier": "regression",
+                "sample_rate_hz": sample_rate_hz,
+                "rf_bandwidth_hz": sample_rate_hz,
+                "samples_per_channel": [
+                    4_194_304,
+                    2_097_152,
+                    1_048_576,
+                    524_288,
+                ],
+                "frames": 6,
+                "kernel_buffers": 4,
+                "repetition": 1,
+            }
+        )
+    append_matrix("physical-ip")
+    if len(cases) != _GAIN_TIMELINE_CASE_COUNT or any(
         case["buffering"] == "ring-200mb" and case["layout"] == "dual" for case in cases
     ):
-        raise AssertionError("gain-timeline qualification matrix is not canonical")
+        raise AssertionError("gain-timeline qualification cases are not canonical")
     return tuple(cases)
 
 
@@ -1893,6 +1959,7 @@ def _verify_gain_timeline_plan(
             "soak_frame_count",
             "ordinary_layouts",
             "ring_layouts",
+            "planned_case_count",
             "confirmation_phrase",
             "hardware_accessed",
         },
@@ -1929,7 +1996,7 @@ def _verify_gain_timeline_plan(
         _fail("qualification plan does not reserve the canonical archived report path")
     expected = {
         "schema": _GAIN_TIMELINE_PLAN_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "serial": serial,
         "physical_ip": physical_ip,
         "sample_rate_hz": _GAIN_TIMELINE_SAMPLE_RATE_HZ,
@@ -1942,6 +2009,7 @@ def _verify_gain_timeline_plan(
         "soak_frame_count": 5_000,
         "ordinary_layouts": ["single-rx0", "dual"],
         "ring_layouts": ["single-rx0"],
+        "planned_case_count": _GAIN_TIMELINE_CASE_COUNT,
         "confirmation_phrase": f"QUALIFY GAIN TIMELINE {serial} {campaign_id}",
         "hardware_accessed": False,
     }
@@ -1954,6 +2022,8 @@ def _verify_gain_timeline_plan(
 def _verify_gain_timeline_ring_status(
     value: object,
     *,
+    samples_per_channel: int,
+    receiver_count: int,
     frames: int,
     first_sample: int,
     last_sample: int,
@@ -1982,7 +2052,7 @@ def _verify_gain_timeline_ring_status(
         },
         name="qualification DDR ring status",
     )
-    frame_bytes = _GAIN_TIMELINE_SAMPLES_PER_CHANNEL * 4
+    frame_bytes = samples_per_channel * receiver_count * 4
     admitted = (_GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
     capacity_frames = admitted // frame_bytes
     prefix_frames = min(frames, capacity_frames)
@@ -2011,7 +2081,7 @@ def _verify_gain_timeline_ring_status(
         name="qualification DDR ring contiguous boundary",
     )
     unavailable = status["first_unavailable_sample_sequence"]
-    prefix_end = first_sample + prefix_frames * _GAIN_TIMELINE_SAMPLES_PER_CHANNEL
+    prefix_end = first_sample + prefix_frames * samples_per_channel
     if contiguous < prefix_end:
         _fail("qualification DDR ring does not prove its admitted contiguous prefix")
     if unavailable is not None or contiguous != last_sample:
@@ -2058,6 +2128,13 @@ def _verify_gain_timeline_ladder(
     is_usb = case["transport"] == "usb"
     is_ring = case["buffering"] == "ring-200mb"
     channels = [0] if case["layout"] == "single-rx0" else [0, 1]
+    raw_sample_ladder = case["samples_per_channel"]
+    if not isinstance(raw_sample_ladder, list) or not raw_sample_ladder:
+        raise AssertionError("canonical qualification case has no sample ladder")
+    sample_ladder = tuple(int(item) for item in raw_sample_ladder)
+    sample_rate_hz = int(case["sample_rate_hz"])
+    rf_bandwidth_hz = int(case["rf_bandwidth_hz"])
+    kernel_buffers = int(case["kernel_buffers"])
     expected = {
         "serial": serial,
         "uri": usb_uri if is_usb else f"ip:{physical_ip}",
@@ -2065,10 +2142,10 @@ def _verify_gain_timeline_ladder(
         "model": artifact_index["release"]["hardware_model"],
         "firmware_version": artifact_index["release"]["firmware_version"],
         "metadata_abi": 4,
-        "sample_rate_hz": _GAIN_TIMELINE_SAMPLE_RATE_HZ,
-        "rf_bandwidth_hz": _GAIN_TIMELINE_SAMPLE_RATE_HZ,
+        "sample_rate_hz": sample_rate_hz,
+        "rf_bandwidth_hz": rf_bandwidth_hz,
         "channels": channels,
-        "kernel_buffers": _GAIN_TIMELINE_KERNEL_BUFFERS,
+        "kernel_buffers": kernel_buffers,
         "tandem_mode": case["tandem_mode"],
         "acceptance_mode": "continuity",
         "iq_decoder": "pyadi",
@@ -2076,7 +2153,7 @@ def _verify_gain_timeline_ladder(
         "ddr_ring_requested_iq_bytes": (_GAIN_TIMELINE_RING_IQ_BYTES if is_ring else 0),
         "minimum_observed_fraction": 0.95,
         "failures": [],
-        "largest_passing_samples_per_channel": _GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
+        "largest_passing_samples_per_channel": sample_ladder[0],
         "original_settings_restored": True,
         "continuity_claim": (
             "passed binds FPGA counter coverage >=95%, zero overflow, exact selected-RX "
@@ -2091,126 +2168,136 @@ def _verify_gain_timeline_ladder(
     if (
         not isinstance(cells, Sequence)
         or isinstance(cells, (str, bytes))
-        or len(cells) != 1
+        or len(cells) != len(sample_ladder)
     ):
-        _fail("qualification ladder must contain exactly one cell")
-    cell = _mapping(cells[0], name="qualification ladder cell")
-    _exact_keys(
-        cell,
-        {
-            "samples_per_channel",
-            "requested_frames",
-            "observed_frames",
-            "observed_sample_count",
-            "device_span_sample_count",
-            "first_sample_sequence",
-            "last_sample_sequence_exclusive",
-            "missing_sample_count",
-            "gap_count",
-            "overflow_count",
-            "iq_bytes",
-            "elapsed_seconds",
-            "achieved_payload_mbps",
-            "achieved_payload_mibps",
-            "observed_fraction",
-            "tandem_metadata_frames",
-            "authoritative_gain_timeline_frames",
-            "gain_observation_interval_samples",
-            "gain_observation_count",
-            "gain_observation_overflow_count",
-            "gain_event_count",
-            "gain_event_overflow_count",
-            "ddr_burst_requested_iq_bytes",
-            "ddr_burst_admitted_iq_bytes",
-            "ddr_burst_frames",
-            "ddr_ring_status",
-            "ddr_ring_prefix_frames",
-            "ddr_ring_prefix_iq_bytes",
-            "ddr_ring_prefix_contiguous",
-            "passed",
-        },
-        name="qualification ladder cell",
-    )
+        _fail("qualification ladder does not contain its exact requested cells")
     frames = int(case["frames"])
-    observed_samples = frames * _GAIN_TIMELINE_SAMPLES_PER_CHANNEL
-    first = _nonnegative_int(
-        cell["first_sample_sequence"], name="qualification first sample sequence"
-    )
-    last = _positive_int(
-        cell["last_sample_sequence_exclusive"],
-        name="qualification last sample sequence",
-    )
-    interval = _positive_int(
-        cell["gain_observation_interval_samples"],
-        name="qualification gain observation interval",
-    )
-    del interval
-    exact_cell = {
-        "samples_per_channel": _GAIN_TIMELINE_SAMPLES_PER_CHANNEL,
-        "requested_frames": frames,
-        "observed_frames": frames,
-        "observed_sample_count": observed_samples,
-        "device_span_sample_count": observed_samples,
-        "last_sample_sequence_exclusive": first + observed_samples,
-        "missing_sample_count": 0,
-        "gap_count": 0,
-        "overflow_count": 0,
-        "iq_bytes": observed_samples * len(channels) * 4,
-        "observed_fraction": 1.0,
-        "tandem_metadata_frames": frames,
-        "authoritative_gain_timeline_frames": frames,
-        "gain_observation_overflow_count": 0,
-        "gain_event_overflow_count": 0,
-        "ddr_burst_requested_iq_bytes": 0,
-        "ddr_burst_admitted_iq_bytes": 0,
-        "ddr_burst_frames": 0,
-        "passed": True,
-    }
-    for key, expected_value in exact_cell.items():
-        if cell[key] != expected_value:
-            _fail(f"qualification ladder cell {key} does not close")
-    for key in ("gain_observation_count", "gain_event_count"):
-        _nonnegative_int(cell[key], name=f"qualification ladder cell {key}")
-    elapsed = _finite_number(
-        cell["elapsed_seconds"], name="qualification elapsed seconds", positive=True
-    )
-    mbps = _finite_number(
-        cell["achieved_payload_mbps"],
-        name="qualification decimal throughput",
-        positive=True,
-    )
-    mibps = _finite_number(
-        cell["achieved_payload_mibps"],
-        name="qualification binary throughput",
-        positive=True,
-    )
-    iq_bytes = int(exact_cell["iq_bytes"])
-    if (
-        abs(mbps - iq_bytes / elapsed / 1_000_000) > 1e-9
-        or abs(mibps - iq_bytes / elapsed / (1024 * 1024)) > 1e-9
+    for cell_index, (raw_cell, samples_per_channel) in enumerate(
+        zip(cells, sample_ladder, strict=True)
     ):
-        _fail("qualification ladder throughput arithmetic does not close")
-    if is_ring:
-        frame_bytes = _GAIN_TIMELINE_SAMPLES_PER_CHANNEL * 4
-        admitted = (_GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
-        prefix_frames = min(frames, admitted // frame_bytes)
-        if (
-            cell["ddr_ring_prefix_frames"] != prefix_frames
-            or cell["ddr_ring_prefix_iq_bytes"] != prefix_frames * frame_bytes
-            or cell["ddr_ring_prefix_contiguous"] is not True
-            or cell["ddr_ring_status"] is None
-        ):
-            _fail("qualification DDR ring prefix does not close")
-        _verify_gain_timeline_ring_status(
-            cell["ddr_ring_status"], frames=frames, first_sample=first, last_sample=last
+        cell = _mapping(raw_cell, name=f"qualification ladder cell {cell_index}")
+        _exact_keys(
+            cell,
+            {
+                "samples_per_channel",
+                "requested_frames",
+                "observed_frames",
+                "observed_sample_count",
+                "device_span_sample_count",
+                "first_sample_sequence",
+                "last_sample_sequence_exclusive",
+                "missing_sample_count",
+                "gap_count",
+                "overflow_count",
+                "iq_bytes",
+                "elapsed_seconds",
+                "achieved_payload_mbps",
+                "achieved_payload_mibps",
+                "observed_fraction",
+                "tandem_metadata_frames",
+                "authoritative_gain_timeline_frames",
+                "gain_observation_interval_samples",
+                "gain_observation_count",
+                "gain_observation_overflow_count",
+                "gain_event_count",
+                "gain_event_overflow_count",
+                "ddr_burst_requested_iq_bytes",
+                "ddr_burst_admitted_iq_bytes",
+                "ddr_burst_frames",
+                "ddr_ring_status",
+                "ddr_ring_prefix_frames",
+                "ddr_ring_prefix_iq_bytes",
+                "ddr_ring_prefix_contiguous",
+                "passed",
+            },
+            name=f"qualification ladder cell {cell_index}",
         )
-    elif (
-        cell["ddr_ring_status"] is not None
-        or cell["ddr_ring_prefix_frames"] != 0
-        or cell["ddr_ring_prefix_iq_bytes"] != 0
-        or cell["ddr_ring_prefix_contiguous"] is not False
-    ):
-        _fail("ordinary qualification cell contains DDR ring evidence")
+        observed_samples = frames * samples_per_channel
+        first = _nonnegative_int(
+            cell["first_sample_sequence"],
+            name="qualification first sample sequence",
+        )
+        last = _positive_int(
+            cell["last_sample_sequence_exclusive"],
+            name="qualification last sample sequence",
+        )
+        _positive_int(
+            cell["gain_observation_interval_samples"],
+            name="qualification gain observation interval",
+        )
+        exact_cell = {
+            "samples_per_channel": samples_per_channel,
+            "requested_frames": frames,
+            "observed_frames": frames,
+            "observed_sample_count": observed_samples,
+            "device_span_sample_count": observed_samples,
+            "last_sample_sequence_exclusive": first + observed_samples,
+            "missing_sample_count": 0,
+            "gap_count": 0,
+            "overflow_count": 0,
+            "iq_bytes": observed_samples * len(channels) * 4,
+            "observed_fraction": 1.0,
+            "tandem_metadata_frames": frames,
+            "authoritative_gain_timeline_frames": frames,
+            "gain_observation_overflow_count": 0,
+            "gain_event_overflow_count": 0,
+            "ddr_burst_requested_iq_bytes": 0,
+            "ddr_burst_admitted_iq_bytes": 0,
+            "ddr_burst_frames": 0,
+            "passed": True,
+        }
+        for key, expected_value in exact_cell.items():
+            if cell[key] != expected_value:
+                _fail(f"qualification ladder cell {key} does not close")
+        for key in ("gain_observation_count", "gain_event_count"):
+            _nonnegative_int(cell[key], name=f"qualification ladder cell {key}")
+        elapsed = _finite_number(
+            cell["elapsed_seconds"],
+            name="qualification elapsed seconds",
+            positive=True,
+        )
+        mbps = _finite_number(
+            cell["achieved_payload_mbps"],
+            name="qualification decimal throughput",
+            positive=True,
+        )
+        mibps = _finite_number(
+            cell["achieved_payload_mibps"],
+            name="qualification binary throughput",
+            positive=True,
+        )
+        iq_bytes = int(exact_cell["iq_bytes"])
+        if (
+            abs(mbps - iq_bytes / elapsed / 1_000_000) > 1e-9
+            or abs(mibps - iq_bytes / elapsed / (1024 * 1024)) > 1e-9
+        ):
+            _fail("qualification ladder throughput arithmetic does not close")
+        if is_ring:
+            frame_bytes = samples_per_channel * len(channels) * 4
+            admitted = (_GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
+            prefix_frames = min(frames, admitted // frame_bytes)
+            if (
+                cell["ddr_ring_prefix_frames"] != prefix_frames
+                or cell["ddr_ring_prefix_iq_bytes"] != prefix_frames * frame_bytes
+                or cell["ddr_ring_prefix_contiguous"] is not True
+                or cell["ddr_ring_status"] is None
+            ):
+                _fail("qualification DDR ring prefix does not close")
+            _verify_gain_timeline_ring_status(
+                cell["ddr_ring_status"],
+                samples_per_channel=samples_per_channel,
+                receiver_count=len(channels),
+                frames=frames,
+                first_sample=first,
+                last_sample=last,
+            )
+        elif (
+            cell["ddr_ring_status"] is not None
+            or cell["ddr_ring_prefix_frames"] != 0
+            or cell["ddr_ring_prefix_iq_bytes"] != 0
+            or cell["ddr_ring_prefix_contiguous"] is not False
+        ):
+            _fail("ordinary qualification cell contains DDR ring evidence")
 
 
 def _verify_gain_timeline_report(
@@ -2269,9 +2356,9 @@ def _verify_gain_timeline_report(
         _fail("qualification completion precedes its start")
     if (
         report["schema"] != _GAIN_TIMELINE_REPORT_SCHEMA
-        or report["schema_version"] != 1
+        or report["schema_version"] != 2
         or report["outcome"] != "pass"
-        or report["planned_case_count"] != 60
+        or report["planned_case_count"] != _GAIN_TIMELINE_CASE_COUNT
         or report["persistent_qspi_unchanged"] is not True
         or report["errors"] != []
     ):
@@ -2315,7 +2402,7 @@ def _verify_gain_timeline_report(
     if not isinstance(raw_cases, Sequence) or isinstance(raw_cases, (str, bytes)):
         _fail("qualification cases must be an array")
     if len(raw_cases) != len(_GAIN_TIMELINE_CASES):
-        _fail("qualification report does not contain all 60 cases")
+        _fail("qualification report does not contain all canonical cases")
     usb_uri = _string(post_runtime["usb_uri"], name="candidate runtime USB URI")
     for position, (raw_result, expected_case) in enumerate(
         zip(raw_cases, _GAIN_TIMELINE_CASES, strict=True)

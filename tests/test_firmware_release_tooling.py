@@ -490,7 +490,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "evt_seq <= 32'd0;" in tandem_core
     assert "if (evt_push) evt_seq <= evt_seq + 32'd1;" in tandem_core
     assert "evt_seq <= 32'hFFFF_FFFF;" not in tandem_core
-    utils_main = "97487a04810ea120e4071146d8a14ee95f0fcecd"
+    utils_main = "4a9c761f3f974a96855589f7a3e867a790dce3f1"
     for source in (wrapper, binding):
         assert utils_main in source
         assert "b2b3113c2e8724453179f09d357b4917c0f14c77" not in source

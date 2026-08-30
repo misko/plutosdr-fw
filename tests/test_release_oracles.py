@@ -705,19 +705,19 @@ def test_tandem_ooc_gate_is_exact_routed_and_fail_closed() -> None:
     assert commands[-1] == final_status_claim
 
     for exact_inventory in (
-        '"CDC-3": ("Info", 5,',
+        '"CDC-3": ("Info", 7,',
         '"CDC-6": ("Warning", 2,',
-        '"CDC-15": ("Warning", 133,',
-        '"REQP-1839": ("Warning", "RAMB36 async control check", 18)',
+        '"CDC-15": ("Warning", 111,',
+        '"REQP-1839": ("Warning", "RAMB36 async control check", 4)',
         '"ZPS7-1": ("Warning", "PS7 block required", 1)',
         '"LUTAR-1": ("Warning", "LUT drives async reset alert", 1)',
         '"TIMING-18": ("Warning", "Missing input or output delay", 182)',
         '"no_input_delay": 137',
         '"no_output_delay": 45',
-        '"Slice LUTs": (17600, 1, 17600)',
-        '"Slice Registers": (35200, 1, 35200)',
-        '"Block RAM Tile": (60, 2, 2)',
-        '"DSPs": (80, 0, 80)',
+        '"Slice LUTs": (17600, 1, 550)',
+        '"Slice Registers": (35200, 1, 650)',
+        '"Block RAM Tile": (60, 3, 3)',
+        '"DSPs": (80, 2, 2)',
     ):
         assert exact_inventory in validator
 
