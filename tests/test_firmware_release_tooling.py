@@ -467,9 +467,9 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     for source in (builder, package, checker):
         assert manifest_name in source
     assert "release_state: candidate" in manifest
-    assert "libiio_0_25_source: bab8fb1c08aa2a7a91efd4aefd0648a720482576" in manifest
+    assert "libiio_0_25_source: cd0901ccd0f521b956f58dd961943f099953ae71" in manifest
     assert "metadata_source: bbbf2f13e1a5aa7edab541e76f08afb384230d77" in manifest
-    assert "submodule_buildroot: 9d9164c0fabe4bf31a60dfa3973806692c88ddb4" in manifest
+    assert "submodule_buildroot: bdde66d448bd32b32e1a13ccf4278919e05e19ed" in manifest
     assert "submodule_hdl: ff17846a5d9b90c3294bdecb53eaa43617a519a7" in manifest
     assert "submodule_linux: 4b397a547f3ad35a29c9d07685be423db908f9bf" in manifest
     assert "no event at its first sample" in (ROOT / "IIO_GAIN_TIMELINE_V8_DESIGN.md").read_text()

@@ -12,9 +12,9 @@ release_state: candidate
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
-libiio_0_25_source: bab8fb1c08aa2a7a91efd4aefd0648a720482576
+libiio_0_25_source: cd0901ccd0f521b956f58dd961943f099953ae71
 libiio_0_25_repo: https://github.com/misko/libiio.git
-libiio_0_25_ref: refs/tags/iio-gain-timeline-v8-rc1-source/libiio-v1
+libiio_0_25_ref: refs/tags/iio-gain-timeline-v8-rc1-source/libiio-v2
 
 metadata_source: bbbf2f13e1a5aa7edab541e76f08afb384230d77
 metadata_repo: https://github.com/misko/plutosdr-fw.git
@@ -28,9 +28,9 @@ ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
 ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
 ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
 
-submodule_buildroot: 9d9164c0fabe4bf31a60dfa3973806692c88ddb4
+submodule_buildroot: bdde66d448bd32b32e1a13ccf4278919e05e19ed
 submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
-submodule_buildroot_ref: refs/tags/iio-gain-timeline-v8-rc1-source/buildroot-v1
+submodule_buildroot_ref: refs/tags/iio-gain-timeline-v8-rc1-source/buildroot-v2
 
 submodule_hdl: ff17846a5d9b90c3294bdecb53eaa43617a519a7
 submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
@@ -49,6 +49,6 @@ submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
 submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
 
 versions_hdl: iio-gain-timeline-v8-rc1-source/hdl-v1
-versions_buildroot: iio-gain-timeline-v8-rc1-source/buildroot-v1
+versions_buildroot: iio-gain-timeline-v8-rc1-source/buildroot-v2
 versions_linux: iio-gain-timeline-v8-rc1-source/linux-v1
 versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
