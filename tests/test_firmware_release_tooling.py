@@ -477,11 +477,14 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     ).read_text()
     tandem_axi = (ROOT / "hdl-tandem" / "tandem_agc_axi.v").read_text()
     tandem_cdc = (ROOT / "hdl-tandem" / "tandem_cdc_lib.v").read_text()
-    assert "tandem_cdc_mailbox #(.W(STAW), .AW(2)) u_stat" in tandem_axi
+    assert "tandem_cdc_mailbox #(.W(STAW)) u_stat" in tandem_axi
     assert "module tandem_cdc_mailbox" in tandem_cdc
     assert '(* ram_style = "block" *)' in tandem_cdc
     assert "if (wr_resetn && wr_en && !full_r) mem[wbin[AW-1:0]] <= wr_data;" in tandem_cdc
     assert "always @(posedge wr_clk or negedge wr_resetn)" not in tandem_cdc
+    assert "u_dst_ready_src" in tandem_cdc
+    assert "u_src_ready_dst" in tandem_cdc
+    assert "if (src_commit) mem[~src_request] <= din;" in tandem_cdc
     utils_main = "97487a04810ea120e4071146d8a14ee95f0fcecd"
     for source in (wrapper, binding):
         assert utils_main in source

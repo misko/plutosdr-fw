@@ -99,31 +99,61 @@ module tb_tandem_cdc;
   always #8.138 if (mb_src_run) mb_src_clk = ~mb_src_clk;  // 61.44 MHz
   always #5     if (mb_dst_run) mb_dst_clk = ~mb_dst_clk;  // 100 MHz
 
-  reg mb_src_resetn = 1'b0, mb_dst_resetn = 1'b0;
+  reg mb_aresetn = 1'b0;
+  wire mb_src_resetn, mb_dst_resetn;
+  tandem_reset_bridge u_mb_src_reset (
+    .clk(mb_src_clk), .aresetn(mb_aresetn), .resetn(mb_src_resetn));
+  tandem_reset_bridge u_mb_dst_reset (
+    .clk(mb_dst_clk), .aresetn(mb_aresetn), .resetn(mb_dst_resetn));
+
+  reg [31:0] mb_seed = 32'h1000_0000;
   reg [31:0] mb_counter = 32'd0;
   wire [63:0] mb_din = {~mb_counter, mb_counter};
   wire [63:0] mb_dout;
   wire mb_valid;
 
-  tandem_cdc_mailbox #(.W(64), .AW(2)) u_mailbox (
+  tandem_cdc_mailbox #(.W(64)) u_mailbox (
     .src_clk(mb_src_clk), .src_resetn(mb_src_resetn), .din(mb_din),
     .dst_clk(mb_dst_clk), .dst_resetn(mb_dst_resetn),
     .dout(mb_dout), .dout_valid(mb_valid));
 
   always @(posedge mb_src_clk) begin
-    if (!mb_src_resetn) mb_counter <= 32'd0;
+    if (!mb_src_resetn) mb_counter <= mb_seed;
     else                mb_counter <= mb_counter + 32'd1;
   end
 
-  integer mb_seen = 0;
+  reg mb_check = 1'b0;
+  reg [63:0] mb_committed [0:1023];
+  integer mb_commit_count = 0;
+  integer mb_deliver_count = 0;
+  integer mb_advances = 0;
   integer mb_bad = 0;
-  reg [31:0] mb_last = 32'd0;
+  reg mb_prev_valid = 1'b0;
+  reg [63:0] mb_previous = 64'd0;
+  always @(posedge mb_src_clk) begin
+    if (mb_check && u_mailbox.src_commit) begin
+      if (mb_commit_count < 1024)
+        mb_committed[mb_commit_count] = mb_din;
+      else
+        mb_bad = mb_bad + 1;
+      mb_commit_count = mb_commit_count + 1;
+    end
+  end
+
   always @(posedge mb_dst_clk) begin
-    if (mb_dst_resetn && mb_valid) begin
+    if (!mb_check) begin
+      mb_prev_valid = 1'b0;
+    end else if (mb_dst_resetn && mb_valid) begin
       if (mb_dout[63:32] !== ~mb_dout[31:0]) mb_bad = mb_bad + 1;
-      if (mb_seen != 0 && mb_dout[31:0] < mb_last) mb_bad = mb_bad + 1;
-      mb_last = mb_dout[31:0];
-      mb_seen = mb_seen + 1;
+      if (!mb_prev_valid || mb_dout !== mb_previous) begin
+        if (mb_deliver_count >= mb_commit_count ||
+            mb_dout !== mb_committed[mb_deliver_count])
+          mb_bad = mb_bad + 1;
+        mb_deliver_count = mb_deliver_count + 1;
+        mb_advances = mb_advances + 1;
+      end
+      mb_previous = mb_dout;
+      mb_prev_valid = 1'b1;
     end
   end
 
@@ -226,33 +256,87 @@ module tb_tandem_cdc;
     check(fw_ovf > 8'd0,    "overflow is counted, never silent");
 
     // ---- coherent status mailbox ----------------------------------------
-    // Both domains first receive their configuration/GSR reset state. Stop the
-    // destination after that initialization, fill from the source, and restart
-    // it late. The source must not overwrite in-flight slots, and every
-    // delivered 64-bit relation must remain atomic across asynchronous clocks.
+    // Start with the destination clock absent. Its reset bridge cannot release,
+    // so crossed readiness must prevent the running source from publishing.
     mb_dst_run = 1'b0;
     repeat (4) @(posedge mb_src_clk);
-    mb_src_resetn = 1'b1;
+    mb_aresetn = 1'b1;
     repeat (20) @(posedge mb_src_clk);
-    check(mb_valid === 1'b0,
-          "mailbox remains empty while the destination clock is stopped");
+    check(mb_src_resetn && !mb_dst_resetn,
+          "stopped destination retains its local bridged reset");
+    check(!u_mailbox.src_commit && !mb_valid,
+          "peer readiness blocks publication before a late clock starts");
+
+    mb_commit_count = 0; mb_deliver_count = 0; mb_advances = 0;
+    mb_bad = 0; mb_check = 1'b1;
     mb_dst_run = 1'b1;
-    repeat (3) @(posedge mb_dst_clk);
-    mb_dst_resetn = 1'b1;
-    repeat (160) @(posedge mb_dst_clk);
-    check(mb_seen > 20, "mailbox resumes and publishes after a late clock start");
-    check(mb_bad == 0, "mailbox snapshots are coherent and never regress");
+    repeat (300) @(posedge mb_dst_clk);
+    check(mb_advances > 10,
+          "mailbox publishes distinct records after a late clock start");
+    check(mb_bad == 0,
+          "every visible record is an ordered, accepted, coherent commit");
     check(mb_valid, "mailbox retains one last committed snapshot");
 
+    // Stop the producer and let the in-flight commit drain. The retained BRAM
+    // output must be the newest record that the source actually accepted.
     mb_src_run = 1'b0;
-    repeat (50) @(posedge mb_dst_clk);
+    repeat (100) @(posedge mb_dst_clk);
     begin : mailbox_hold
       reg [63:0] held;
       held = mb_dout;
+      check(mb_deliver_count == mb_commit_count,
+            "all accepted commits drain before the stopped-source hold");
+      check(mb_commit_count > 0 &&
+            held === mb_committed[mb_commit_count-1],
+            "retained output equals the newest accepted source commit");
       repeat (20) @(posedge mb_dst_clk);
       check(mb_valid && mb_dout === held,
             "mailbox holds its last snapshot when the producer stops");
     end
+
+    // Runtime shared reset with SOURCE stopped for the complete pulse. The
+    // destination starts first; it must remain invalid until the source has
+    // restarted, clocked reset, and published a generation-2 record.
+    mb_check = 1'b0;
+    mb_aresetn = 1'b0; #1;
+    mb_seed = 32'h2000_0000;
+    repeat (6) @(posedge mb_dst_clk);
+    mb_aresetn = 1'b1;
+    repeat (20) @(posedge mb_dst_clk);
+    check(!mb_src_resetn && !mb_valid,
+          "source-stopped reset cannot republish a stale BRAM record");
+    mb_commit_count = 0; mb_deliver_count = 0; mb_advances = 0;
+    mb_bad = 0; mb_check = 1'b1;
+    mb_src_run = 1'b1;
+    repeat (300) @(posedge mb_dst_clk);
+    check(mb_advances > 10 && mb_dout[31:0] >= 32'h2000_0000,
+          "source-late restart publishes only the post-reset generation");
+    check(mb_bad == 0,
+          "source-late restart preserves the accepted-commit scoreboard");
+
+    // Stop the destination only after a request is pending, then reset while
+    // that clock remains absent. The running source must observe peer-not-ready
+    // and publish nothing until the destination has clocked its own reset.
+    mb_dst_run = 1'b0;
+    repeat (20) @(posedge mb_src_clk);
+    check(u_mailbox.src_request != u_mailbox.dst_ack_src,
+          "stopped destination leaves exactly one commit pending");
+    mb_check = 1'b0;
+    mb_aresetn = 1'b0; #1;
+    mb_seed = 32'h3000_0000;
+    repeat (6) @(posedge mb_src_clk);
+    mb_aresetn = 1'b1;
+    mb_commit_count = 0; mb_deliver_count = 0; mb_advances = 0;
+    mb_bad = 0; mb_check = 1'b1;
+    repeat (20) @(posedge mb_src_clk);
+    check(!mb_dst_resetn && !u_mailbox.src_commit && mb_commit_count == 0,
+          "destination-stopped reset blocks every premature source commit");
+    mb_dst_run = 1'b1;
+    repeat (300) @(posedge mb_dst_clk);
+    check(mb_advances > 10 && mb_dout[31:0] >= 32'h3000_0000,
+          "destination-late restart publishes only post-reset records");
+    check(mb_bad == 0,
+          "destination-late restart preserves the accepted-commit scoreboard");
 
     $display("---- scenario failures : %0d ----", errors);
     if (errors != 0) $fatal(1, "CDC TESTS FAILED");

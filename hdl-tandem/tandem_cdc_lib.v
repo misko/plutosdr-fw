@@ -227,20 +227,22 @@ module tandem_async_fifo #(
 endmodule
 
 // -----------------------------------------------------------------------------
-// Latest coherent snapshot crossing. A shallow asynchronous FIFO puts the
-// payload in block RAM instead of duplicating a wide source holding register
-// and destination register bank in slices. The destination drains only while
-// more than one committed entry is visible, deliberately retaining the last
-// complete snapshot as a stable mailbox value. Intermediate snapshots may be
-// coalesced while the FIFO is full; every value that becomes visible is one
-// atomic source-domain sample.
+// Coherent snapshot crossing backed by a two-slot, dual-clock block RAM. The
+// request bit is also the committed slot number. The producer writes only the
+// slot opposite the currently acknowledged one, then publishes that slot by
+// toggling request. The consumer reads the published slot before acknowledging
+// it, so a subsequent producer write can never overwrite the visible record.
+// Intermediate source observations are intentionally coalesced while a record
+// is in flight; every value that becomes visible is one atomic source-domain
+// sample, and the final BRAM output remains stable until a newer record lands.
 //
-// AW must be at least two because tandem_async_fifo's standard full detector
-// inverts the two high Gray-pointer bits. Production uses four slots (AW=2).
+// src_resetn and dst_resetn must be the outputs of local asynchronous-assert,
+// synchronous-deassert reset bridges. Crossing those readiness levels holds
+// each side inactive until the peer has actually clocked its reset. That is
+// what makes a complete reset pulse safe even if either clock is stopped.
 // -----------------------------------------------------------------------------
 module tandem_cdc_mailbox #(
-  parameter integer W = 64,
-  parameter integer AW = 2
+  parameter integer W = 64
 ) (
   input  wire         src_clk,
   input  wire         src_resetn,
@@ -248,25 +250,80 @@ module tandem_cdc_mailbox #(
 
   input  wire         dst_clk,
   input  wire         dst_resetn,
-  output wire [W-1:0] dout,
-  output wire         dout_valid
+  output reg  [W-1:0] dout,
+  output reg          dout_valid
 );
-  wire          fifo_full;
-  wire          fifo_valid;
-  wire [AW:0]   fifo_level;
-  wire [7:0]    fifo_ovf;
-  // Keep one committed entry resident. The synchronous BRAM output therefore
-  // advances only to another known-valid slot and remains stable when the
-  // producer pauses.
-  wire fifo_pop = fifo_valid && (fifo_level > {{AW{1'b0}}, 1'b1});
+  (* ram_style = "block" *) reg [W-1:0] mem [0:1];
 
-  tandem_async_fifo #(.W(W), .AW(AW)) u_mailbox_fifo (
-    .wr_clk(src_clk), .wr_resetn(src_resetn),
-    .wr_en(src_resetn && !fifo_full), .wr_data(din),
-    .wr_full(fifo_full), .wr_ovf(fifo_ovf),
-    .rd_clk(dst_clk), .rd_resetn(dst_resetn), .rd_en(fifo_pop),
-    .rd_data(dout), .rd_valid(fifo_valid), .rd_level(fifo_level));
+  // Outer-domain readiness, independent of mailbox state, breaks the reset
+  // ordering cycle. A running side cannot sample a stale request/acknowledge
+  // from a peer that has not yet clocked its local reset.
+  wire dst_ready_src;
+  wire src_ready_dst;
+  tandem_sync_bit #(.STAGES(3)) u_dst_ready_src (
+    .clk(src_clk), .resetn(src_resetn), .d(dst_resetn), .q(dst_ready_src));
+  tandem_sync_bit #(.STAGES(3)) u_src_ready_dst (
+    .clk(dst_clk), .resetn(dst_resetn), .d(src_resetn), .q(src_ready_dst));
 
-  assign dout_valid = fifo_valid;
-  wire _unused_fifo_ovf = |fifo_ovf;
+  reg src_active;
+  reg src_request;
+  reg dst_ack;
+  wire dst_ack_src;
+  tandem_sync_bit #(.STAGES(3)) u_ack_src (
+    .clk(src_clk), .resetn(src_resetn), .d(dst_ack), .q(dst_ack_src));
+
+  wire src_commit = src_active && (dst_ack_src == src_request);
+  always @(posedge src_clk) begin
+    if (src_commit) mem[~src_request] <= din;
+  end
+  always @(posedge src_clk) begin
+    if (!src_resetn || !dst_ready_src) begin
+      src_active  <= 1'b0;
+      src_request <= 1'b0;
+    end else begin
+      src_active <= 1'b1;
+      if (src_commit) src_request <= ~src_request;
+    end
+  end
+
+  wire request_dst;
+  tandem_sync_bit #(.STAGES(3)) u_request_dst (
+    .clk(dst_clk), .resetn(dst_resetn), .d(src_request), .q(request_dst));
+
+  reg dst_active;
+  reg request_seen;
+  reg read_pending;
+  wire dst_read = dst_active && !read_pending &&
+                  (request_dst != request_seen);
+
+  // No reset branch touches dout: this is the registered output of the inferred
+  // dual-clock BRAM. dout_valid invalidates stale contents across every reset.
+  always @(posedge dst_clk) begin
+    if (dst_read) dout <= mem[request_dst];
+  end
+
+  always @(posedge dst_clk) begin
+    if (!dst_resetn || !src_ready_dst) begin
+      dst_active  <= 1'b0;
+      dst_ack     <= 1'b0;
+      request_seen <= 1'b0;
+      read_pending <= 1'b0;
+      dout_valid   <= 1'b0;
+    end else begin
+      dst_active <= 1'b1;
+      if (!dst_active) begin
+        dst_ack      <= 1'b0;
+        request_seen <= 1'b0;
+        read_pending <= 1'b0;
+        dout_valid   <= 1'b0;
+      end else if (read_pending) begin
+        request_seen <= request_dst;
+        dst_ack      <= request_dst;
+        read_pending <= 1'b0;
+        dout_valid   <= 1'b1;
+      end else if (request_dst != request_seen) begin
+        read_pending <= 1'b1;
+      end
+    end
+  end
 endmodule

@@ -11,9 +11,9 @@
 //
 //   config   AXI -> l_clk   one toggle-handshake bus carrying the whole bundle,
 //                           so no field can be torn against another
-//   status   l_clk -> AXI   a periodic snapshot over the same handshake, so a
-//                           reader always sees one coherent instant rather than
-//                           a mixture of two
+//   status   l_clk -> AXI   a two-slot BRAM request/ack mailbox, so a reader
+//                           always sees one coherent instant rather than a
+//                           mixture of two
 //   events   l_clk -> AXI   the gray-coded asynchronous FIFO
 //
 // Port names follow the AXI4-Lite convention so Vivado infers the interface
@@ -186,13 +186,13 @@ module tandem_agc_axi #(
     .evt_push_o(), .evt_wdata_o());
 
   // ---------------------------------------------------------------------------
-  // Status snapshot, l_clk -> AXI. A shallow BRAM mailbox continuously accepts
+  // Status snapshot, l_clk -> AXI. A two-slot BRAM request/ack mailbox accepts
   // complete receive-domain records and retains the last delivered record in
-  // the AXI domain. This avoids duplicating a wide payload in source and
-  // destination slice registers on the full XC7Z010. Keep only fields visible
-  // through the forward ABI: r_epoch already lives in AXI, while pulse_busy,
-  // cooldown_active, fpga_owns, retired epoch, and policy-debug counters have
-  // no AXI consumer.
+  // its registered BRAM output. This avoids duplicating a wide payload in
+  // source and destination slice registers on the full XC7Z010. Keep only
+  // fields visible through the forward ABI: r_epoch already lives in AXI,
+  // while pulse_busy, cooldown_active, fpga_owns, retired epoch, and policy-
+  // debug counters have no AXI consumer.
   // ---------------------------------------------------------------------------
   // The low sample word and transition counter are captured in one receive-
   // domain snapshot. Software reads the fence first and the counter second,
@@ -205,7 +205,7 @@ module tandem_agc_axi #(
 
   wire [STAW-1:0] status_axi;
   wire            status_axi_valid;
-  tandem_cdc_mailbox #(.W(STAW), .AW(2)) u_stat (
+  tandem_cdc_mailbox #(.W(STAW)) u_stat (
     .src_clk(l_clk), .src_resetn(status_l_resetn),
     .din(status_bundle),
     .dst_clk(s_axi_aclk), .dst_resetn(status_axi_resetn),

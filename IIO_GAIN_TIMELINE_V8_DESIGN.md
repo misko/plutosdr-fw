@@ -78,13 +78,15 @@ reads the fence register before the transition register.  The returned
 transition count is therefore from the fence's snapshot or a newer one and
 covers every gain decision strictly before the fence.
 
-The coherent status record crosses through a four-slot BRAM mailbox.  Each
-slot is written as one receive-domain snapshot; Gray-coded pointers publish
-only committed slots, and the AXI side drains only while another committed
-slot is available, retaining the last complete record.  A full mailbox may
-coalesce intermediate observations, but can neither tear a fence/count pair
-nor overwrite the record visible to AXI.  This moves the wide crossing out of
-slice registers while preserving the same-or-newer read guarantee.
+The coherent status record crosses through a two-slot BRAM ping-pong mailbox.
+The receive side writes only the slot opposite the acknowledged one and then
+publishes its slot bit; the AXI side reads that committed slot before returning
+the acknowledgement.  Intermediate observations may coalesce while a record
+is in flight, but the producer can neither tear a fence/count pair nor overwrite
+the record visible to AXI.  Crossed reset-readiness levels keep both sides
+inactive until even a stopped peer has clocked its local reset.  This moves the
+wide crossing out of slice registers while preserving the same-or-newer read
+guarantee.
 
 The authoritative provider lifecycle is:
 
