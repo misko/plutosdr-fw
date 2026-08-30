@@ -34,7 +34,8 @@ The canary also omits the AXI4-Lite slave (a standard component, roughly
 
 `tandem_agc_core.v` is the receive-clock controller and `tandem_agc_axi.v` is
 the only control surface. It implements the forward-only `TAG2` register ABI
-with a coherent 30-bit return crossing containing only software-observable
+with a coherent 62-bit return crossing containing the transition watermark and
+low 32-bit exclusive sample fence alongside the other software-observable
 state. Epoch configuration is already AXI-local; retired-epoch and policy
 diagnostic counters remain core-local for simulation and do not consume a
 second pair of wide CDC register banks.
@@ -109,3 +110,8 @@ Against the measured RC17 baseline of 13,088 LUT, that prior core projected to
 
 The obsolete standalone wrapper and FIFO-only Tcl entry points have been
 removed; neither represented the complete production control surface.
+
+The checked-in integration patch and the pinned Pluto HDL source both retain
+`EVENTS=1` and connect `rx_fir_decimator/valid_out_0` to `sample_valid`. Those
+connections are release invariants: removing either one destroys the
+sample-clock-aligned authoritative event timeline.

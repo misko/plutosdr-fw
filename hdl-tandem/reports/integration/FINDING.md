@@ -57,7 +57,12 @@ the controller, the CDC layer, the AXI slave and seven test suites all stand.
 
 ---
 
-## Resolution: EVENTS=0 fits
+> Historical evidence only: later production sources recovered enough capacity
+> to ship `EVENTS=1` and connect the RX decimator `sample_valid` strobe.  The
+> release source graph and validator, not this pre-event integration trial, are
+> authoritative for current builds.
+
+## Historical resolution: EVENTS=0 fits
 
 The fork was measured rather than argued. An `EVENTS` parameter compiles out
 the whole event-capture path -- FIFO, sequence counter, record registers and

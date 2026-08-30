@@ -25,13 +25,14 @@ index 78e3ef30..8729b8e7 100644
 +update_compile_order -fileset sources_1
 +
 +create_bd_cell -type module -reference tandem_agc_axi i_tandem_agc
-+# EVENTS=0 compiles out the event-capture path. Tandem gain control does not
-+# depend on it, and the 7010 cannot hold both alongside RC17 -- see
-+# hdl-tandem/reports/integration/FINDING.md for the five placement attempts.
-+set_property CONFIG.EVENTS 0 [get_bd_cells i_tandem_agc]
++# The authoritative IIO gain timeline requires the event FIFO and the same
++# decimated-sample valid strobe used by the DMA-facing receive path. Neither
++# connection is optional in a release build.
++set_property CONFIG.EVENTS 1 [get_bd_cells i_tandem_agc]
 +ad_connect axi_ad9361/l_clk        i_tandem_agc/l_clk
 +ad_connect sys_cpu_resetn          i_tandem_agc/l_aresetn
 +ad_connect counter_timestamp/Q     i_tandem_agc/sample_counter
++ad_connect rx_fir_decimator/valid_out_0 i_tandem_agc/sample_valid
 +ad_connect tandem_detect           i_tandem_agc/detect_async
 +ad_connect tandem_ps_ctl_o         i_tandem_agc/ps_ctl_o
 +ad_connect tandem_ps_ctl_t         i_tandem_agc/ps_ctl_t

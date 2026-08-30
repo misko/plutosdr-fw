@@ -25,6 +25,18 @@ run_oracles() {
     command -v "$PYTHON" >/dev/null || fail "Python not found: $PYTHON"
     command -v iverilog >/dev/null || fail "iverilog is required for RTL oracles"
 
+    hdl_bd="${ROOT}/hdl/projects/pluto/system_bd.tcl"
+    [[ -f "$hdl_bd" ]] || fail "pinned Pluto HDL is not initialized: $hdl_bd"
+    rg -Fxq -- 'set_property CONFIG.EVENTS 1 [get_bd_cells i_tandem_agc]' \
+        "$hdl_bd" || fail "pinned Pluto HDL disables authoritative tandem events"
+    rg -Fxq -- \
+        'ad_connect rx_fir_decimator/valid_out_0 i_tandem_agc/sample_valid' \
+        "$hdl_bd" || fail "pinned Pluto HDL omits the DMA-aligned tandem valid strobe"
+    if rg -Fxq -- 'set_property CONFIG.EVENTS 0 [get_bd_cells i_tandem_agc]' \
+            "$hdl_bd"; then
+        fail "pinned Pluto HDL explicitly disables authoritative tandem events"
+    fi
+
     bash -n \
         download_and_test.sh \
         scripts/build_gain_series_candidate.sh \
@@ -124,6 +136,7 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-ring-v1-rc1-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-ring-v1-rc2-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/ddr-ring-prefill-v1-rc1-source.yaml
+    ./scripts/check_source_graph.sh manifests/iio-gain-timeline-v8-rc1-source.yaml
     ./scripts/check_source_graph.sh manifests/iio-throughput-buffered-sampler-v7-rc1-source.yaml
     ./scripts/check_source_graph.sh manifests/iio-throughput-coverage-window-v6-rc1-source.yaml
     ./buildroot/board/pluto/test_iiod_supervisor.sh
