@@ -85,7 +85,11 @@ module tandem_agc_axi #(
   reg [19:0] r_pwr_period;
   reg [7:0]  r_cooldown, r_dwell, r_debounce;
   reg [7:0]  r_idx_min, r_idx_max, r_idx_init;
-  reg [31:0] r_epoch, r_thresholds;
+  reg [31:0] r_epoch;
+  // The threshold register's three reserved bits are always zero for a valid
+  // AD9361 request: low power is 7 bits and large-LMT is 6 bits. Store only
+  // the 29 payload bits and reconstruct the canonical 32-bit MMIO value.
+  reg [28:0] r_thresholds;
   reg [1:0]  r_mode;
   reg        r_fault_clear;
   reg        cfg_load;
@@ -243,7 +247,7 @@ module tandem_agc_axi #(
       r_pwr_period <= 20'd10000; r_cooldown <= 8'd2; r_dwell <= 8'd4;
       r_debounce <= 8'd8; r_idx_min <= 8'd0; r_idx_max <= 8'd76;
       r_idx_init <= 8'd40; r_mode <= 2'd0; r_epoch <= 32'd0;
-      r_thresholds <= 32'd0;
+      r_thresholds <= 29'd0;
     end else begin
       cfg_load <= 1'b0;
 
@@ -272,7 +276,8 @@ module tandem_agc_axi #(
           8'h28: begin r_pulse_hi <= wdata_q[7:0];
                        r_pulse_lo <= wdata_q[15:8]; end
           8'h2C: r_blank_guard <= wdata_q[15:0];
-          8'h30: r_thresholds <= wdata_q;
+          8'h30: r_thresholds <= {
+              wdata_q[31:16], wdata_q[13:8], wdata_q[6:0]};
           default: ;
         endcase
         cfg_load <= 1'b1;
@@ -313,7 +318,9 @@ module tandem_agc_axi #(
           8'h24: rdata_q <= {8'd0, r_debounce, r_cooldown, r_dwell};
           8'h28: rdata_q <= {16'd0, r_pulse_lo, r_pulse_hi};
           8'h2C: rdata_q <= {16'd0, r_blank_guard};
-          8'h30: rdata_q <= r_thresholds;
+          8'h30: rdata_q <= {
+              r_thresholds[28:13], 2'b00,
+              r_thresholds[12:7], 1'b0, r_thresholds[6:0]};
           8'h34: rdata_q <= {24'd0, a_fault};
           8'h38: rdata_q <= {{(31-EVT_AW){1'b0}}, evt_level};
           8'h3C: rdata_q <= {24'd0, evt_ovf};

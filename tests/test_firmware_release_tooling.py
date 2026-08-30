@@ -483,6 +483,10 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "r_epoch, r_fault_clear, r_mode," in tandem_axi
     assert "r_epoch, 5'd0, r_fault_clear" not in tandem_axi
     assert "c_epoch       = cfg_held[134:103]" in tandem_axi
+    assert "reg [28:0] r_thresholds;" in tandem_axi
+    assert "wdata_q[31:16], wdata_q[13:8], wdata_q[6:0]" in tandem_axi
+    assert "r_thresholds[28:13], 2'b00" in tandem_axi
+    assert "r_thresholds[12:7], 1'b0, r_thresholds[6:0]" in tandem_axi
     assert "tandem_cdc_mailbox #(.W(STAW)) u_stat" in tandem_axi
     assert ".src_clk(l_clk), .src_resetn(l_resetn)" in tandem_axi
     assert ".dst_clk(s_axi_aclk), .dst_resetn(axi_resetn)" in tandem_axi
@@ -506,7 +510,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "selects authoritative buffer ABI 4" in planner
     assert "GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION" in evidence
     assert "GAIN_TIMELINE_FINAL_FIRMWARE_VERSION" in evidence
-    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v6" in evidence
+    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v7" in evidence
     assert branch in evidence
     assert "git_exact rev-parse --path-format=absolute --git-common-dir" in ooc_launcher
     assert 'worktree_admin_prefix="$git_common_dir/worktrees/"' in ooc_launcher

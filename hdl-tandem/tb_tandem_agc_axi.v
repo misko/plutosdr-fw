@@ -231,6 +231,10 @@ module tb_tandem_agc_axi;
     axi_write_w_first(8'h30, 32'h5aa5_2468);
     axi_read(8'h30, v);
     check(v == 32'h5aa5_2468, "W-before-AW data and address remain paired");
+    axi_write(8'h30, 32'hffff_ffff);
+    axi_read(8'h30, v);
+    check(v == 32'hffff_3f7f,
+          "reserved threshold bits read as canonical zero");
 
     // A second AXI write while the first configuration CDC is busy must be
     // retained and delivered after the in-flight snapshot, never discarded.
