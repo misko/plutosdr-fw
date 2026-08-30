@@ -107,6 +107,13 @@ the domain at the failure source; errno alone is not used to guess it.
 
 - Metadata ABIs 1 through 3 and record versions 1 through 6 keep their strict
   parsers and golden byte vectors.
+- The legacy scalar discovery attributes remain
+  `iio,buffer-metadata=3` and `iio,buffer-metadata-status=1`, so an older host
+  can continue to request record v6 and status v1 from a v8 server.  New hosts
+  discover the additive protocols through
+  `iio,buffer-metadata-abi-versions=1,2,3,4` and
+  `iio,buffer-metadata-status-versions=1,2`; only an ABI 4 request selects
+  record v7 and status v2.
 - Direct USB/IP gadget protocol v3 is unchanged.  It does not own the tandem
   event lease, so authoritative AUTO timelines there are a separate feature.
 - This release fixes IIO over USB and IIO over physical Ethernet: ordinary
