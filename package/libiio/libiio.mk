@@ -68,7 +68,7 @@ LIBIIO_CONF_OPTS += \
 	-DWITH_IIOD=ON \
 	-DWITH_AIO=ON \
 	-DIIOD_BUFFER_METADATA_PROVIDER=$(@D)/iiod/spf-buffer-metadata.c \
-	-DIIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES="$(@D)/iiod/spf-tandem-session.c;$(@D)/iiod/spf-tandem-metadata.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_sampler.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_rssi_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_radio_frame_v3.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_thread_join.c" \
+	-DIIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES="$(@D)/iiod/spf-tandem-session.c;$(@D)/iiod/spf-tandem-metadata.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_timeline.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_sampler.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_rssi_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_radio_frame_v3.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_thread_join.c" \
 	-DIIOD_BUFFER_METADATA_INCLUDE_DIRS=$(STAGING_DIR)/usr/include/spf
 else
 LIBIIO_CONF_OPTS += -DWITH_IIOD=OFF
