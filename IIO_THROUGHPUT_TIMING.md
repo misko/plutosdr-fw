@@ -1,4 +1,4 @@
-# IIO throughput R/W-worker affinity prototype
+# IIO throughput CPU-isolation prototypes
 
 The candidate `v0.45-plutoplus-spf-iio-throughput-rw-affinity-v2-rc1` retains
 the HOLD v2 refill-fence prototype and aggregate timing from timing v1. It pins
@@ -52,8 +52,8 @@ stage completion. It advances the in-flight snapshot counter from successfully
 transported IQ bytes rather than transport-call count, emitting every 100 full
 frames and again on device-entry teardown. Timing-clock failure drops the
 affected measurement without changing capture behavior.
-The wire format, IIO API, sampler cadence, DMA queue sizes, and DDR admission
-limits are unchanged.
+In v2, the wire format, IIO API, sampler cadence, DMA queue sizes, and DDR
+admission limits are unchanged.
 
 Validation must compare ordinary, HOLD metadata, AUTO metadata, and 200 MB
 DDR-ring captures with identical sample rate, frame size, kernel-buffer
@@ -69,3 +69,31 @@ starved the concurrent DDR-ring producer and caused an immediate counter gap.
 That candidate is rejected. V2 is acceptable only if ordinary throughput keeps
 the gain, a 200 MB ring completes without continuity loss, and a following
 ordinary capture returns to baseline without rebooting.
+
+## V2 hardware result and v3 sampler prototype
+
+RAM-only testing on the physical `192.168.1.17` path showed that v2 fixes the
+v1 cleanup failure but is not a complete throughput remedy. Two ordinary raw
+20 MS/s runs delivered 72.63 and 72.68 MB/s, and PyADI delivered 61.38 MB/s.
+Two 200 MB ring runs completed all 100 frames with no ring error and the exact
+197,132,288-byte admitted prefix contiguous; an ordinary run immediately after
+each ring returned to 72.6 MB/s. HOLD metadata reached 47.75 MB/s and the ring
+settled near 42 MB/s, however, so v2 remains diagnostic and non-promotable.
+
+Live per-thread evidence explains the remaining metadata gap. The gain sampler
+is deliberately pinned to CPU1 and its fixed 100 us counter poll issues up to
+10,000 register reads and timer wakeups per second. During a ring capture the
+sampler and CPU1 R/W/transport worker accumulated roughly 2.44 and 2.57 CPU
+seconds concurrently on that one core, while the independently schedulable
+ring producer accumulated 3.62 CPU seconds. Selective affinity therefore
+removed Ethernet-IRQ contention but exposed sampler/transport contention.
+
+The v3 candidate preserves the v2 transport affinity and every wire, refill-
+fence, ring, and admission contract. It replaces the fixed sampler sleep with
+a delay derived from the live AD936x sampling frequency and counter distance
+to the next observation. The sampler sleeps for half the estimated remaining
+time, clamped to 100 us–1 ms. High-rate AUTO retains its short observation
+cadence; sparse HOLD capture reduces redundant polling by up to 10x; a forced
+refill observation can never wait more than 1 ms for the polling sleep. V3 is
+RAM-only until identical ordinary, HOLD, AUTO, 200 MB ring, PyADI, and immediate
+recovery tests prove both metadata semantics and throughput on hardware.
