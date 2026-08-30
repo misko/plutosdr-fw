@@ -11,6 +11,11 @@ target_include_directories(spf_radio_frame_v3 PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:include/spf>)
 
+add_library(spf_gain_timeline STATIC spf_gain_timeline.c)
+target_include_directories(spf_gain_timeline PUBLIC
+	$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
+	$<INSTALL_INTERFACE:include/spf>)
+
 add_library(spf_gain_observation STATIC
 	spf_gain_read.c
 	spf_gain_sampler.c
@@ -72,9 +77,11 @@ endif(GENERATE_STATS)
 
 install(TARGETS sdr_usb_gadget RUNTIME DESTINATION sbin)
 install(TARGETS spf_radio_frame_v3 ARCHIVE DESTINATION lib)
+install(TARGETS spf_gain_timeline ARCHIVE DESTINATION lib)
 install(TARGETS spf_gain_observation ARCHIVE DESTINATION lib)
 install(FILES
 	spf_gain_metadata.h
+	spf_gain_timeline.h
 	spf_gain_read.h
 	spf_gain_sampler.h
 	spf_rssi_read.h
@@ -98,6 +105,10 @@ if (BUILD_HOST_TESTS)
 		test_spf_radio_frame_v3.c)
 	target_link_libraries(test_spf_radio_frame_v3 spf_radio_frame_v3)
 	add_test(NAME spf_radio_frame_v3 COMMAND test_spf_radio_frame_v3)
+
+	add_executable(test_spf_gain_timeline test_spf_gain_timeline.c)
+	target_link_libraries(test_spf_gain_timeline spf_gain_timeline)
+	add_test(NAME spf_gain_timeline COMMAND test_spf_gain_timeline)
 
     add_executable(test_spf_gain_read
         test_spf_gain_read.c
