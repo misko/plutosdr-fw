@@ -68,7 +68,7 @@ def test_rc17_separates_release_frame_schema_from_live_buffer_abi() -> None:
     binding = BINDING.read_text(encoding="utf-8")
     for source in (plan, binding):
         assert "PLUTO_IIO_BUFFER_METADATA_ABI" in source
-        assert "frame-metadata-v2" in binding
+        assert "frame-metadata-v4" in binding
         assert "frame-metadata-v5" in binding
     assert '"metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI' in plan
 

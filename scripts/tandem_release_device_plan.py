@@ -205,8 +205,8 @@ def build_plan(index_path: Path, *, created_at: str | None = None) -> dict[str, 
             "firmware_version": index["release"]["firmware_version"],
             "hardware_model": index["release"]["hardware_model"],
             # The release index names the v5 durable frame/report schema.  The
-            # live IIO context independently exposes buffer ABI 2; they are
-            # intentionally different contracts.
+            # live IIO context independently selects authoritative buffer ABI 4;
+            # they are intentionally different contracts.
             "metadata_abi": PLUTO_IIO_BUFFER_METADATA_ABI,
             "capabilities": ["tandem-agc"],
         },

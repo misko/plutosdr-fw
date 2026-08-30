@@ -441,6 +441,9 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     checker = (ROOT / "scripts" / "check_tandem_release_offline.sh").read_text()
+    wrapper = (ROOT / "scripts" / "deploy_tandem_agc_ram_hardware.sh").read_text()
+    planner = (ROOT / "scripts" / "tandem_release_device_plan.py").read_text()
+    binding = (ROOT / "tests" / "radio_hardware" / "pluto_plus_candidate.py").read_text()
     branch = "refs/heads/codex/iio-gain-timeline-v8-fw"
     manifest_name = "iio-gain-timeline-v8-rc1-source.yaml"
     manifest = (ROOT / "manifests" / manifest_name).read_text()
@@ -471,6 +474,12 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "preceding end endpoint is their input baseline" in (
         ROOT / "IIO_GAIN_TIMELINE_V8_DESIGN.md"
     ).read_text()
+    utils_main = "8a3f4e65ffba8459d085778e1c4e7cc3576d3421"
+    for source in (wrapper, binding):
+        assert utils_main in source
+        assert "b2b3113c2e8724453179f09d357b4917c0f14c77" not in source
+    assert 'PLUTO_IIO_BUFFER_METADATA_ABI = "frame-metadata-v4"' in binding
+    assert "selects authoritative buffer ABI 4" in planner
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:

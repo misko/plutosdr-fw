@@ -63,10 +63,10 @@ def test_rc16_is_in_every_offline_and_protected_package_gate() -> None:
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc16" in package
 
 
-def test_rc16_pins_the_recovery_corrected_pushed_utility() -> None:
+def test_rc16_preserves_its_utility_while_the_current_tool_advances() -> None:
     historical = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
     assert historical in RC16_MANIFEST.read_text(encoding="utf-8")
-    current = "b2b3113c2e8724453179f09d357b4917c0f14c77"
+    current = "8a3f4e65ffba8459d085778e1c4e7cc3576d3421"
     for path in (WRAPPER, BINDING):
         assert current in path.read_text(encoding="utf-8")
     assert 'pluto firmware candidate-ram "$@"' in WRAPPER.read_text(encoding="utf-8")

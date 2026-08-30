@@ -64,11 +64,12 @@ def test_rc32_is_in_every_offline_and_protected_package_gate() -> None:
     assert "v0.41-plutoplus-spf-tandem-agc-v8-rc32" in package
 
 
-def test_rc32_pins_the_same_target_scoped_mixed_usb_inventory_tool() -> None:
-    expected = "b2b3113c2e8724453179f09d357b4917c0f14c77"
-    assert expected in WRAPPER.read_text(encoding="utf-8")
-    assert expected in BINDING.read_text(encoding="utf-8")
-    assert expected in RC32_MANIFEST.read_text(encoding="utf-8")
+def test_rc32_preserves_its_tool_while_the_current_tool_advances() -> None:
+    historical = "b2b3113c2e8724453179f09d357b4917c0f14c77"
+    current = "8a3f4e65ffba8459d085778e1c4e7cc3576d3421"
+    assert current in WRAPPER.read_text(encoding="utf-8")
+    assert current in BINDING.read_text(encoding="utf-8")
+    assert historical in RC32_MANIFEST.read_text(encoding="utf-8")
 
 
 def test_rc32_docs_preserve_rc31_result_and_active_identity() -> None:
