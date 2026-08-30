@@ -60,6 +60,7 @@
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
+| `iio-gain-timeline-v8-rc1` | 2026-08-30 | **source-locked candidate; protected build pending** | authoritative ABI-4 gain timeline plus an immediate-drain DDR queue extension with measured first-frame latency |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -67,6 +68,29 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.45-plutoplus-spf-iio-gain-timeline-v8-rc1 — 2026-08-30 — **source-locked candidate; protected build pending**
+
+This candidate makes the optional 200 MB DDR ring behave as a natural
+extension of the kernel-buffer queue. Each committed frame becomes readable
+immediately; the consumer waits only while the queue is empty, the producer
+waits only while it is full, and there is no startup prefill or low-water
+rebuffering phase. Capacity, no-overwrite behavior, finite target closure,
+wrap accounting, typed failures, and sample-counter continuity remain intact.
+
+The host no longer scales its first refill timeout by the entire ring capacity.
+The metadata ladder records first-frame latency independently of total capture
+time, accepts the naturally observed bounded high-water mark, and derives the
+initial contiguous span from FPGA counter evidence rather than assuming that it
+equals RAM capacity. Frozen qualification rejects a ring whose first frame
+arrives on the former full-prefill timescale.
+
+The firmware also carries the minimal authoritative ABI-4 gain-timeline fix:
+FPGA events and the exclusive DMA sample fence share one ordered ledger, while
+gain/RSSI telemetry remains optional rather than turning an otherwise valid
+capture into `-ENODATA`. The candidate remains default-off for DDR-ring mode
+and is not persistence-authorized until exact protected bytes pass RAM-only
+tests on both reserved radios.
 
 ## v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1 — 2026-08-30 — **hardware-qualified release source; final bytes pending**
 

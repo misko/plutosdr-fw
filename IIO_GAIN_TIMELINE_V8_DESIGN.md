@@ -159,6 +159,10 @@ the domain at the failure source; errno alone is not used to guess it.
 - This release fixes IIO over USB and IIO over physical Ethernet: ordinary
   capture supports single and dual RX, while DDR-ring capture retains its
   advertised single-RX-only layout.
+- The optional DDR ring is a queue extension, not a sealed burst.  Its first
+  committed frame is immediately readable; occupancy grows only when the
+  producer outruns transport, and an empty ring waits for the next frame
+  without imposing a startup prefill or low-water rebuffering phase.
 - No persistent radio write is permitted before the exact candidate bytes pass
   RAM-only qualification on the two reserved radios.
 

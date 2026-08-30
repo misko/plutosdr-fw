@@ -70,7 +70,7 @@ GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION = (
 )
 GAIN_TIMELINE_FINAL_FIRMWARE_VERSION = "v0.45-plutoplus-spf-iio-gain-timeline-v8"
 GAIN_TIMELINE_CANDIDATE_SOURCE_LOCK_REF = (
-    "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v8"
+    "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v9"
 )
 GAIN_TIMELINE_FINAL_SOURCE_LOCK_REF = "refs/tags/iio-gain-timeline-v8-source/fw-v1"
 RELEASE_RADIO_SERIALS = (
@@ -2025,7 +2025,6 @@ def _verify_gain_timeline_ring_status(
     samples_per_channel: int,
     receiver_count: int,
     frames: int,
-    first_sample: int,
     last_sample: int,
 ) -> None:
     status = _mapping(value, name="qualification DDR ring status")
@@ -2055,7 +2054,6 @@ def _verify_gain_timeline_ring_status(
     frame_bytes = samples_per_channel * receiver_count * 4
     admitted = (_GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
     capacity_frames = admitted // frame_bytes
-    prefix_frames = min(frames, capacity_frames)
     expected = {
         "version": 2,
         "state": "complete",
@@ -2066,7 +2064,6 @@ def _verify_gain_timeline_ring_status(
         "target_frames": frames,
         "produced_frames": frames,
         "consumed_frames": frames,
-        "high_water_frames": prefix_frames,
         "wrap_count": frames // capacity_frames,
         "producer_position": frames % capacity_frames,
         "consumer_position": frames % capacity_frames,
@@ -2076,14 +2073,16 @@ def _verify_gain_timeline_ring_status(
     for key, expected_value in expected.items():
         if status[key] != expected_value:
             _fail(f"qualification DDR ring {key} does not close")
+    high_water = _positive_int(
+        status["high_water_frames"], name="qualification DDR ring high-water frames"
+    )
+    if high_water > min(frames, capacity_frames):
+        _fail("qualification DDR ring high-water mark exceeds its finite capacity")
     contiguous = _nonnegative_int(
         status["last_contiguous_sample_sequence"],
         name="qualification DDR ring contiguous boundary",
     )
     unavailable = status["first_unavailable_sample_sequence"]
-    prefix_end = first_sample + prefix_frames * samples_per_channel
-    if contiguous < prefix_end:
-        _fail("qualification DDR ring does not prove its admitted contiguous prefix")
     if unavailable is not None or contiguous != last_sample:
         _fail("qualification DDR ring status contradicts the gapless metadata span")
 
@@ -2190,6 +2189,7 @@ def _verify_gain_timeline_ladder(
                 "gap_count",
                 "overflow_count",
                 "iq_bytes",
+                "first_frame_latency_seconds",
                 "elapsed_seconds",
                 "achieved_payload_mbps",
                 "achieved_payload_mibps",
@@ -2256,6 +2256,17 @@ def _verify_gain_timeline_ladder(
             name="qualification elapsed seconds",
             positive=True,
         )
+        first_frame_latency = _finite_number(
+            cell["first_frame_latency_seconds"],
+            name="qualification first-frame latency seconds",
+            positive=True,
+        )
+        maximum_first_frame_latency = 1.0 + 8.0 * samples_per_channel / sample_rate_hz
+        if (
+            first_frame_latency > elapsed
+            or first_frame_latency > maximum_first_frame_latency
+        ):
+            _fail("qualification first frame was not delivered promptly")
         mbps = _finite_number(
             cell["achieved_payload_mbps"],
             name="qualification decimal throughput",
@@ -2274,21 +2285,18 @@ def _verify_gain_timeline_ladder(
             _fail("qualification ladder throughput arithmetic does not close")
         if is_ring:
             frame_bytes = samples_per_channel * len(channels) * 4
-            admitted = (_GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes) * frame_bytes
-            prefix_frames = min(frames, admitted // frame_bytes)
             if (
-                cell["ddr_ring_prefix_frames"] != prefix_frames
-                or cell["ddr_ring_prefix_iq_bytes"] != prefix_frames * frame_bytes
+                cell["ddr_ring_prefix_frames"] != frames
+                or cell["ddr_ring_prefix_iq_bytes"] != frames * frame_bytes
                 or cell["ddr_ring_prefix_contiguous"] is not True
                 or cell["ddr_ring_status"] is None
             ):
-                _fail("qualification DDR ring prefix does not close")
+                _fail("qualification DDR ring initial contiguous stream does not close")
             _verify_gain_timeline_ring_status(
                 cell["ddr_ring_status"],
                 samples_per_channel=samples_per_channel,
                 receiver_count=len(channels),
                 frames=frames,
-                first_sample=first,
                 last_sample=last,
             )
         elif (

@@ -66,7 +66,7 @@ def test_rc16_is_in_every_offline_and_protected_package_gate() -> None:
 def test_rc16_preserves_its_utility_while_the_current_tool_advances() -> None:
     historical = "2654f34eb909904ec65bc0526e0f8977cb30e2ed"
     assert historical in RC16_MANIFEST.read_text(encoding="utf-8")
-    current = "4a9c761f3f974a96855589f7a3e867a790dce3f1"
+    current = "297dc63a066121cedf52f28ac16607ad7fdf1698"
     for path in (WRAPPER, BINDING):
         assert current in path.read_text(encoding="utf-8")
     assert 'pluto firmware candidate-ram "$@"' in WRAPPER.read_text(encoding="utf-8")

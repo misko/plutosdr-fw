@@ -1173,7 +1173,7 @@ def _gain_timeline_ladder(
             EVIDENCE._GAIN_TIMELINE_RING_IQ_BYTES // frame_bytes * frame_bytes
         )
         capacity = admitted // frame_bytes
-        prefix_frames = min(frames, capacity) if ring else 0
+        prefix_frames = frames if ring else 0
         ring_status = (
             {
                 "version": 2,
@@ -1185,7 +1185,7 @@ def _gain_timeline_ladder(
                 "target_frames": frames,
                 "produced_frames": frames,
                 "consumed_frames": frames,
-                "high_water_frames": prefix_frames,
+                "high_water_frames": 1,
                 "wrap_count": frames // capacity,
                 "producer_position": frames % capacity,
                 "consumer_position": frames % capacity,
@@ -1210,6 +1210,7 @@ def _gain_timeline_ladder(
                 "gap_count": 0,
                 "overflow_count": 0,
                 "iq_bytes": iq_bytes,
+                "first_frame_latency_seconds": 0.5,
                 "elapsed_seconds": elapsed,
                 "achieved_payload_mbps": iq_bytes / elapsed / 1_000_000,
                 "achieved_payload_mibps": iq_bytes / elapsed / (1024 * 1024),
@@ -2529,6 +2530,8 @@ def test_gain_timeline_candidate_qualification_accepts_exact_two_radio_campaign(
         "issue-54-ladder-cell",
         "ring-status-v1",
         "ring-capacity",
+        "ring-high-water",
+        "ring-prefill-latency",
         "ring-continuity-break",
         "restore-qspi",
         "embedded-receipt",
@@ -2584,6 +2587,16 @@ def test_gain_timeline_candidate_qualification_rejects_semantic_mutations(
             report["cases"][ring_position]["report"]["cells"][0][
                 "ddr_ring_status"
             ]["admitted_capacity_iq_bytes"] -= 1
+        elif mutation == "ring-high-water":
+            report["cases"][ring_position]["report"]["cells"][0]["ddr_ring_status"][
+                "high_water_frames"
+            ] = 0
+        elif mutation == "ring-prefill-latency":
+            cell = report["cases"][ring_position]["report"]["cells"][0]
+            cell["first_frame_latency_seconds"] = 2.5
+            cell["elapsed_seconds"] = 3.0
+            cell["achieved_payload_mbps"] = cell["iq_bytes"] / 3.0 / 1_000_000
+            cell["achieved_payload_mibps"] = cell["iq_bytes"] / 3.0 / (1024 * 1024)
         elif mutation == "ring-continuity-break":
             cell = report["cases"][ring_position]["report"]["cells"][0]
             status = cell["ddr_ring_status"]
