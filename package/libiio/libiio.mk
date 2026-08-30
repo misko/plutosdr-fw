@@ -8,7 +8,7 @@
 #LIBIIO_VERSION = 0.25
 #LIBIIO_SITE = $(call github,analogdevicesinc,libiio,v$(LIBIIO_VERSION))
 
-LIBIIO_VERSION = c1a7be84982fa4449bd7070084fa0389f9f90cfa
+LIBIIO_VERSION = d8e8688eaf6be16da9a0c9d92b7e8f49e0a3b334
 LIBIIO_SITE = $(call github,misko,libiio,$(LIBIIO_VERSION))
 
 LIBIIO_INSTALL_STAGING = YES
