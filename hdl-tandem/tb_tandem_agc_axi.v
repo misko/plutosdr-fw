@@ -202,6 +202,23 @@ module tb_tandem_agc_axi;
             "coherent low-word sample fence crosses zero");
       check((fence1 - fence0) < 32'h8000_0000 && fence1 != fence0,
             "modulo fence ordering remains forward across wrap");
+
+      // The status mailbox shares the module's two qualified local resets.
+      // Its crossed peer-readiness must therefore invalidate the still-running
+      // AXI side during a receive-only reset, then restart coherent snapshots.
+      l_aresetn = 1'b0;
+      tick(10);
+      check(!dut.status_axi_valid,
+            "receive-only reset invalidates the live AXI status view");
+      l_aresetn = 1'b1;
+      tick(30);
+      check(dut.status_axi_valid,
+            "status mailbox recovers after a receive-only reset");
+      axi_read(8'h54, fence0);
+      tick(100);
+      axi_read(8'h54, fence1);
+      check((fence1 - fence0) < 32'h8000_0000 && fence1 != fence0,
+            "sample fence resumes after a receive-only reset");
     end
     axi_read(8'h10, v); check(v[2:0] == 3'd0, "public state is IDLE after reset");
     axi_read(8'h18, v);

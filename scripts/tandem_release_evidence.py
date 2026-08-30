@@ -70,7 +70,7 @@ GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION = (
 )
 GAIN_TIMELINE_FINAL_FIRMWARE_VERSION = "v0.45-plutoplus-spf-iio-gain-timeline-v8"
 GAIN_TIMELINE_CANDIDATE_SOURCE_LOCK_REF = (
-    "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v5"
+    "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v6"
 )
 GAIN_TIMELINE_FINAL_SOURCE_LOCK_REF = "refs/tags/iio-gain-timeline-v8-source/fw-v1"
 RELEASE_RADIO_SERIALS = (

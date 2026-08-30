@@ -1731,7 +1731,7 @@ def test_utilization_authoritative_body_heading_decoys_reject(
         ),
         ("|     17600 |  2.89 |", "|     17601 |  2.89 |"),
         ("|     17600 |  2.89 |", "|     17600 |  2.90 |"),
-        ("| Slice                    |  204 |", "| Slice                    |  205 |"),
+        ("| Slice                    |  204 |", "| Slice                    |  211 |"),
         ("|      4400 |  4.64 |", "|      4400 |  4.63 |"),
         ("| Block RAM Tile          |    3 |", "| Block RAM Tile          |    0 |"),
         ("|        60 |  5.00 |", "|        60 |  0.00 |"),

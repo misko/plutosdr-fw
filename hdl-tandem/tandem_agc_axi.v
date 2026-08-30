@@ -74,22 +74,10 @@ module tandem_agc_axi #(
   tandem_reset_bridge u_rst_axi (
     .clk(s_axi_aclk), .aresetn(s_axi_aresetn), .resetn(axi_resetn));
 
-  // The status mailbox has state in both domains. Reset both sides from the
-  // combined reset source so an l_clk-only reset cannot leave stale pointers
-  // visible to the still-running AXI domain.
-  wire status_l_resetn;
-  tandem_reset_bridge u_rst_status_l (
-    .clk(l_clk), .aresetn(l_aresetn & s_axi_aresetn),
-    .resetn(status_l_resetn));
-  wire status_axi_resetn;
-  tandem_reset_bridge u_rst_status_axi (
-    .clk(s_axi_aclk), .aresetn(l_aresetn & s_axi_aresetn),
-    .resetn(status_axi_resetn));
-
   // ---------------------------------------------------------------------------
   // configuration registers, held in the AXI domain
   // ---------------------------------------------------------------------------
-  localparam integer CFGW = 140;
+  localparam integer CFGW = 135;
   localparam integer STAW = 59;
 
   reg [7:0]  r_pulse_hi, r_pulse_lo;
@@ -103,7 +91,7 @@ module tandem_agc_axi #(
   reg        cfg_load;
 
   wire [CFGW-1:0] cfg_bundle = {
-      r_epoch, 5'd0, r_fault_clear, r_mode,
+      r_epoch, r_fault_clear, r_mode,
       r_idx_init, r_idx_max, r_idx_min,
       r_debounce, r_dwell, r_cooldown, r_pwr_period, r_blank_guard,
       r_pulse_lo, r_pulse_hi };
@@ -146,7 +134,7 @@ module tandem_agc_axi #(
   wire [7:0]  c_idx_init    = cfg_held[99:92];
   wire [1:0]  c_mode        = cfg_held[101:100];
   wire        c_fault_clear = cfg_held[102];
-  wire [31:0] c_epoch       = cfg_held[139:108];
+  wire [31:0] c_epoch       = cfg_held[134:103];
 
   // ---------------------------------------------------------------------------
   // the controller
@@ -206,9 +194,13 @@ module tandem_agc_axi #(
   wire [STAW-1:0] status_axi;
   wire            status_axi_valid;
   tandem_cdc_mailbox #(.W(STAW)) u_stat (
-    .src_clk(l_clk), .src_resetn(status_l_resetn),
+    // Reuse the module's qualified local resets. The mailbox crosses each
+    // peer's reset readiness and invalidates local state when that readiness
+    // falls, so a receive-only reset still clears the live AXI view without a
+    // second AXI reset control set.
+    .src_clk(l_clk), .src_resetn(l_resetn),
     .din(status_bundle),
-    .dst_clk(s_axi_aclk), .dst_resetn(status_axi_resetn),
+    .dst_clk(s_axi_aclk), .dst_resetn(axi_resetn),
     .dout(status_axi), .dout_valid(status_axi_valid));
 
   wire [2:0]  a_state   = status_axi[2:0];

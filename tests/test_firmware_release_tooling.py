@@ -479,7 +479,15 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     tandem_axi = (ROOT / "hdl-tandem" / "tandem_agc_axi.v").read_text()
     tandem_cdc = (ROOT / "hdl-tandem" / "tandem_cdc_lib.v").read_text()
     tandem_core = (ROOT / "hdl-tandem" / "tandem_agc_core.v").read_text()
+    assert "localparam integer CFGW = 135;" in tandem_axi
+    assert "r_epoch, r_fault_clear, r_mode," in tandem_axi
+    assert "r_epoch, 5'd0, r_fault_clear" not in tandem_axi
+    assert "c_epoch       = cfg_held[134:103]" in tandem_axi
     assert "tandem_cdc_mailbox #(.W(STAW)) u_stat" in tandem_axi
+    assert ".src_clk(l_clk), .src_resetn(l_resetn)" in tandem_axi
+    assert ".dst_clk(s_axi_aclk), .dst_resetn(axi_resetn)" in tandem_axi
+    assert "u_rst_status_l" not in tandem_axi
+    assert "u_rst_status_axi" not in tandem_axi
     assert "module tandem_cdc_mailbox" in tandem_cdc
     assert '(* ram_style = "block" *)' in tandem_cdc
     assert "if (wr_resetn && wr_en && !full_r) mem[wbin[AW-1:0]] <= wr_data;" in tandem_cdc
@@ -498,7 +506,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "selects authoritative buffer ABI 4" in planner
     assert "GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION" in evidence
     assert "GAIN_TIMELINE_FINAL_FIRMWARE_VERSION" in evidence
-    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v5" in evidence
+    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v6" in evidence
     assert branch in evidence
     assert "git_exact rev-parse --path-format=absolute --git-common-dir" in ooc_launcher
     assert 'worktree_admin_prefix="$git_common_dir/worktrees/"' in ooc_launcher
