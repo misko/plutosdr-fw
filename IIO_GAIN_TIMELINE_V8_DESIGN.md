@@ -18,7 +18,10 @@ The new provider advertises ABI 4 in the additive
 when the client sends the explicit provider-v4 envelope.  The legacy scalar
 advertisement remains `iio,buffer-metadata=3`; the 104-byte tandem request and
 its burst/ring suffixes retain their existing version-6 behavior and byte
-layout.
+layout.  In particular, the inner tandem request retains required-features
+mask `0x00000007`; the outer ABI-4 envelope requires mask `0x0000000f`, and the
+provider separately proves FPGA ABI 2 plus the `SAMPLE_FENCE` capability before
+acquisition.
 
 The 32-byte little-endian envelope is:
 
