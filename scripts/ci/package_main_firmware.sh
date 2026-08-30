@@ -376,6 +376,9 @@ iio-throughput-sampler-wake-v5-rc1-source.yaml:candidate)
 iio-throughput-coverage-window-v6-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1'
     ;;
+iio-throughput-coverage-window-v6-rc1-source.yaml:final-release)
+    protected_version='v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'
+    ;;
 tandem-agc-v8-source.yaml:final-release)
     protected_version='v0.41-plutoplus-spf-tandem-agc-v8'
     ;;
