@@ -106,6 +106,11 @@ if (BUILD_HOST_TESTS)
 	target_link_libraries(test_spf_radio_frame_v3 spf_radio_frame_v3)
 	add_test(NAME spf_radio_frame_v3 COMMAND test_spf_radio_frame_v3)
 
+	add_executable(test_spf_radio_frame_v7
+		test_spf_radio_frame_v7.c)
+	target_link_libraries(test_spf_radio_frame_v7 spf_radio_frame_v3)
+	add_test(NAME spf_radio_frame_v7 COMMAND test_spf_radio_frame_v7)
+
 	add_executable(test_spf_gain_timeline test_spf_gain_timeline.c)
 	target_link_libraries(test_spf_gain_timeline spf_gain_timeline)
 	add_test(NAME spf_gain_timeline COMMAND test_spf_gain_timeline)
