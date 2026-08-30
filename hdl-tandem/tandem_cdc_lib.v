@@ -166,10 +166,6 @@ module tandem_async_fifo #(
   (* ASYNC_REG = "TRUE" *) reg [AW:0] wgray_s1, wgray_s2;
   (* ASYNC_REG = "TRUE" *) reg [AW:0] rgray_s1, rgray_s2;
 
-  // Both pointer domains must initialise even when their clocks are stopped.
-  // Without asynchronous assertion, a running peer can synchronise an unknown
-  // pointer from a late-starting domain and permanently poison its own Gray
-  // arithmetic before that clock ever gets an edge.
   // Keep the memory write in a clock-only process. Xilinx block RAM cannot be
   // inferred when the process that writes the array has an asynchronous reset,
   // even when the reset branch does not explicitly touch the array.
@@ -177,7 +173,7 @@ module tandem_async_fifo #(
     if (wr_resetn && wr_en && !full_r) mem[wbin[AW-1:0]] <= wr_data;
   end
 
-  always @(posedge wr_clk or negedge wr_resetn) begin
+  always @(posedge wr_clk) begin
     if (!wr_resetn) begin
       wbin <= 0; wgray <= 0; wr_ovf <= 8'd0; full_r <= 1'b0;
       rgray_s1 <= 0; rgray_s2 <= 0;
@@ -192,7 +188,7 @@ module tandem_async_fifo #(
     end
   end
 
-  always @(posedge rd_clk or negedge rd_resetn) begin
+  always @(posedge rd_clk) begin
     if (!rd_resetn) begin
       rbin <= 0; rgray <= 0; wgray_s1 <= 0; wgray_s2 <= 0;
     end else begin

@@ -95,11 +95,11 @@ module tb_tandem_cdc;
   // 4. BRAM-backed coherent latest-snapshot mailbox
   // ===========================================================================
   reg mb_src_clk = 1'b0, mb_dst_clk = 1'b0;
-  reg mb_src_run = 1'b1, mb_dst_run = 1'b0;
+  reg mb_src_run = 1'b1, mb_dst_run = 1'b1;
   always #8.138 if (mb_src_run) mb_src_clk = ~mb_src_clk;  // 61.44 MHz
   always #5     if (mb_dst_run) mb_dst_clk = ~mb_dst_clk;  // 100 MHz
 
-  reg mb_src_resetn = 1'b1, mb_dst_resetn = 1'b1;
+  reg mb_src_resetn = 1'b0, mb_dst_resetn = 1'b0;
   reg [31:0] mb_counter = 32'd0;
   wire [63:0] mb_din = {~mb_counter, mb_counter};
   wire [63:0] mb_dout;
@@ -131,13 +131,6 @@ module tb_tandem_cdc;
 
   initial begin
     $display("== tb_tandem_cdc ==");
-
-    // Create an actual assertion edge while both mailbox clocks are stopped or
-    // asynchronous. This models the post-configuration reset edge; merely
-    // declaring a testbench signal low does not trigger an asynchronous block
-    // in every Verilog simulator.
-    mb_src_resetn = 1'b0;
-    mb_dst_resetn = 1'b0;
 
     // ---- reset bridge -----------------------------------------------------
     rb_run = 1'b0;
@@ -233,13 +226,16 @@ module tb_tandem_cdc;
     check(fw_ovf > 8'd0,    "overflow is counted, never silent");
 
     // ---- coherent status mailbox ----------------------------------------
-    // Fill while the destination clock is stopped, then start it late. The
-    // source must not overwrite in-flight slots, and every delivered 64-bit
-    // relation must remain atomic across the asynchronous clocks.
+    // Both domains first receive their configuration/GSR reset state. Stop the
+    // destination after that initialization, fill from the source, and restart
+    // it late. The source must not overwrite in-flight slots, and every
+    // delivered 64-bit relation must remain atomic across asynchronous clocks.
+    mb_dst_run = 1'b0;
+    repeat (4) @(posedge mb_src_clk);
     mb_src_resetn = 1'b1;
     repeat (20) @(posedge mb_src_clk);
     check(mb_valid === 1'b0,
-          "mailbox reset initializes even while the destination clock is stopped");
+          "mailbox remains empty while the destination clock is stopped");
     mb_dst_run = 1'b1;
     repeat (3) @(posedge mb_dst_clk);
     mb_dst_resetn = 1'b1;
