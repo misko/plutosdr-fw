@@ -94,6 +94,14 @@ The authoritative provider lifecycle is:
 9. attach any available SPI/RSSI telemetry and serialize metadata; and
 10. commit the tandem ledger and DMA sequence only after serialization succeeds.
 
+The host independently maintains the same transaction boundary.  Its first
+accepted ABI-4 frame must start at transition count zero and event sequence
+zero.  Every later frame must start at the preceding transition endpoint, the
+preceding event start plus event count modulo 2^32, and the preceding gain/index
+endpoint under the same ownership and gain-table contract.  It advances this
+ledger only after the complete frame, CRC, DMA continuity, and timeline checks
+pass; individually valid records may not hide a missing boundary transition.
+
 The transition counter is extended from its hardware modulo-256 value only
 when the delta is unambiguous and within the admitted FIFO/ledger window.
 The 32-bit sample fence is compared modulo 2^32 only while the admitted live
