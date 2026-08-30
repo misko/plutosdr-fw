@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-SPF_METADATA_SOURCE_VERSION = 1c24a19eee3f777501889f6db73327f89e600bd5
+SPF_METADATA_SOURCE_VERSION = bbbf2f13e1a5aa7edab541e76f08afb384230d77
 SPF_METADATA_SOURCE_SITE = $(call github,misko,plutosdr-fw,$(SPF_METADATA_SOURCE_VERSION))
 SPF_METADATA_SOURCE_INSTALL_STAGING = YES
 SPF_METADATA_SOURCE_LICENSE = MIT
