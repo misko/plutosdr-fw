@@ -312,7 +312,7 @@ def test_valid_integrated_evidence_emits_exact_release_verdict(tmp_path: Path) -
     }
 
 
-def test_policy_records_reviewed_rc6_dsp_and_cdc_inventory() -> None:
+def test_policy_records_reviewed_dsp_and_mailbox_cdc_inventory() -> None:
     policy = json.loads(POLICY_PATH.read_text())
     dsp = next(entry for entry in policy["utilization"] if entry["resource"] == "DSPs")
     assert dsp == {
@@ -327,17 +327,28 @@ def test_policy_records_reviewed_rc6_dsp_and_cdc_inventory() -> None:
             "placement margin."
         ),
     }
-    cdc15 = next(
-        entry for entry in policy["cdc"]["summary"] if entry["rule"] == "CDC-15"
-    )
+    cdc_by_rule = {entry["rule"]: entry for entry in policy["cdc"]["summary"]}
+    assert cdc_by_rule["CDC-3"] == {
+        "rule": "CDC-3",
+        "severity": "Info",
+        "count": 77,
+        "rationale": (
+            "The exact inventory includes the four recognized ASYNC_REG mailbox "
+            "request, acknowledge, and peer-reset-readiness synchronizers that "
+            "replace the old two-signal status-bus handshake."
+        ),
+    }
+    cdc15 = cdc_by_rule["CDC-15"]
     assert cdc15 == {
         "rule": "CDC-15",
         "severity": "Warning",
-        "count": 2085,
+        "count": 2063,
         "rationale": (
             "The exact inventory covers inherited ADI clock-enable controlled "
-            "false-path crossings plus the added coherent tandem "
-            "fault[3]/F_ILLEGAL snapshot crossing."
+            "false-path crossings and the handshake-qualified tandem configuration "
+            "and event-overflow diagnostics; the former 22-bit status holding-register "
+            "crossing is absent because the coherent status payload now uses the "
+            "two-slot BRAM mailbox."
         ),
     }
 
@@ -364,13 +375,27 @@ def test_dsp_guardrail_accepts_headroom_and_rejects_excess(
         assert not args.output.exists()
 
 
-@pytest.mark.parametrize("count", (2084, 2086))
-def test_cdc15_old_and_extra_counts_are_rejected(tmp_path: Path, count: int) -> None:
+@pytest.mark.parametrize(
+    ("rule", "severity", "accepted_count", "changed_count"),
+    (
+        ("CDC-3", "Info", 77, 75),
+        ("CDC-3", "Info", 77, 78),
+        ("CDC-15", "Warning", 2063, 2085),
+        ("CDC-15", "Warning", 2063, 2064),
+    ),
+)
+def test_old_and_extra_mailbox_cdc_counts_are_rejected(
+    tmp_path: Path,
+    rule: str,
+    severity: str,
+    accepted_count: int,
+    changed_count: int,
+) -> None:
     args = _fixture(tmp_path)
     _replace(
         args.cdc_report,
-        "CDC-15  Warning  2085  reviewed",
-        f"CDC-15  Warning  {count}  reviewed",
+        f"{rule}  {severity}  {accepted_count}  reviewed",
+        f"{rule}  {severity}  {changed_count}  reviewed",
     )
     with pytest.raises(VALIDATOR.ValidationError, match="CDC summary"):
         VALIDATOR.run(args)

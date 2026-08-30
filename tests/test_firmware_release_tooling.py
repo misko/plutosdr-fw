@@ -510,7 +510,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "selects authoritative buffer ABI 4" in planner
     assert "GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION" in evidence
     assert "GAIN_TIMELINE_FINAL_FIRMWARE_VERSION" in evidence
-    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v7" in evidence
+    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v8" in evidence
     assert branch in evidence
     assert "git_exact rev-parse --path-format=absolute --git-common-dir" in ooc_launcher
     assert 'worktree_admin_prefix="$git_common_dir/worktrees/"' in ooc_launcher
