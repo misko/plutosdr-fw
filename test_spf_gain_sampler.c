@@ -139,7 +139,18 @@ int main(void)
 	assert(sampler.sample_credit == UINT64_C(4096));
 	spf_gain_sampler_add_credit(&sampler, UINT64_C(2048));
 	assert(sampler.sample_credit == UINT64_C(6144));
+	spf_gain_sampler_unlimit(&sampler);
+	assert(!sampler.bounded);
+	assert(sampler.sample_credit == 0);
 	pthread_t announcer;
+	assert(pthread_create(&announcer, NULL, announce_observation, &sampler) == 0);
+	assert(spf_gain_sampler_wait_started(&sampler, UINT32_C(100)));
+	assert(atomic_load(&sampler.force_observation));
+	atomic_store(&sampler.force_observation, false);
+	assert(spf_gain_sampler_finish_capture(&sampler, UINT32_C(100)));
+	assert(pthread_join(announcer, NULL) == 0);
+	assert(!sampler.bounded);
+	assert(sampler.sample_credit == 0);
 	assert(pthread_create(&announcer, NULL, announce_observation, &sampler) == 0);
 	assert(spf_gain_sampler_limit_and_wait_started(
 		&sampler, UINT64_C(2048), UINT32_C(100)));
@@ -147,6 +158,7 @@ int main(void)
 	atomic_store(&sampler.force_observation, false);
 	assert(spf_gain_sampler_finish_capture(&sampler, UINT32_C(100)));
 	assert(pthread_join(announcer, NULL) == 0);
+	assert(sampler.bounded);
 	assert(sampler.sample_credit == UINT64_C(2048));
 	assert(!spf_gain_sampler_limit_and_wait_started(
 		&sampler, UINT64_C(2048), UINT32_C(1)));

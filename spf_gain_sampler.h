@@ -74,6 +74,23 @@ void spf_gain_sampler_limit(
 	uint64_t samples);
 
 /*
+ * Keep sampling continuously until the owner explicitly bounds the sampler
+ * again. Buffered transports use this for their whole DMA-buffer lifetime so
+ * host-side copy or ring backpressure cannot open a coverage gap behind the
+ * kernel queue.
+ */
+void spf_gain_sampler_unlimit(spf_gain_sampler_t *sampler);
+
+/*
+ * Wait until an observation has started without changing the sampler's credit
+ * policy. This gives continuously sampled buffered transports the same exact
+ * refill fence as request-bounded transports.
+ */
+bool spf_gain_sampler_wait_started(
+	spf_gain_sampler_t *sampler,
+	uint32_t timeout_ms);
+
+/*
  * Replace the current credit and wait until the sampler has started a fresh
  * observation.  Request-driven IIO uses this immediately before re-enqueuing
  * a delivered DMA block, ensuring capture begins while gain/RSSI reads are

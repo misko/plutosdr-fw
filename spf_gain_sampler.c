@@ -413,12 +413,25 @@ void spf_gain_sampler_limit(spf_gain_sampler_t *sampler, uint64_t samples)
 	pthread_mutex_unlock(&sampler->mutex);
 }
 
-bool spf_gain_sampler_limit_and_wait_started(
+void spf_gain_sampler_unlimit(spf_gain_sampler_t *sampler)
+{
+	if (!sampler || !sampler->mutex_initialized)
+		return;
+	pthread_mutex_lock(&sampler->mutex);
+	sampler->bounded = false;
+	sampler->sample_credit = 0;
+	pthread_cond_broadcast(&sampler->credit_cond);
+	pthread_mutex_unlock(&sampler->mutex);
+}
+
+static bool request_and_wait_started(
 	spf_gain_sampler_t *sampler,
 	uint64_t samples,
+	bool replace_credit,
 	uint32_t timeout_ms)
 {
-	if (!sampler || !sampler->mutex_initialized || samples == 0 ||
+	if (!sampler || !sampler->mutex_initialized ||
+		(replace_credit && samples == 0) ||
 		timeout_ms == 0)
 		return false;
 	struct timespec deadline;
@@ -434,8 +447,11 @@ bool spf_gain_sampler_limit_and_wait_started(
 
 	pthread_mutex_lock(&sampler->mutex);
 	const uint64_t target = ++sampler->capture_requested;
-	sampler->bounded = true;
-	sampler->sample_credit = samples;
+	if (replace_credit)
+	{
+		sampler->bounded = true;
+		sampler->sample_credit = samples;
+	}
 	atomic_store_explicit(
 		&sampler->force_observation, true, memory_order_release);
 	pthread_cond_broadcast(&sampler->credit_cond);
@@ -460,6 +476,21 @@ bool spf_gain_sampler_limit_and_wait_started(
 	}
 	pthread_mutex_unlock(&sampler->mutex);
 	return started;
+}
+
+bool spf_gain_sampler_wait_started(
+	spf_gain_sampler_t *sampler,
+	uint32_t timeout_ms)
+{
+	return request_and_wait_started(sampler, 0, false, timeout_ms);
+}
+
+bool spf_gain_sampler_limit_and_wait_started(
+	spf_gain_sampler_t *sampler,
+	uint64_t samples,
+	uint32_t timeout_ms)
+{
+	return request_and_wait_started(sampler, samples, true, timeout_ms);
 }
 
 bool spf_gain_sampler_finish_capture(
