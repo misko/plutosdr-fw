@@ -97,3 +97,36 @@ cadence; sparse HOLD capture reduces redundant polling by up to 10x; a forced
 refill observation can never wait more than 1 ms for the polling sleep. V3 is
 RAM-only until identical ordinary, HOLD, AUTO, 200 MB ring, PyADI, and immediate
 recovery tests prove both metadata semantics and throughput on hardware.
+
+## V3 hardware result and v4 refill-fenced prototype
+
+RAM-only v3 testing on the same AD9363A radio and physical `192.168.1.17`
+path disproved adaptive counter polling as a sufficient remedy. Ordinary raw
+IIO still delivered 71.71 MB/s, but HOLD without the DDR ring delivered 44.27
+MB/s, AUTO delivered 37.79 MB/s, and an unmonitored 200 MB ring delivered
+42.11 MB/s. Every ring run still completed 100 frames, retained the exact
+197,132,288-byte contiguous prefix, terminated `target_complete` with error
+zero, restored settings, and permitted immediate ordinary capture. V3 is
+therefore safe but not throughput-promotable.
+
+A low-intrusion four-second CPU sample during a ring run found 117 sampler
+jiffies, 108 pinned R/W-worker jiffies, and 225 ring-producer jiffies. Those
+are about 27%, 25%, and 52% of one CPU respectively. Timing over a 400 MiB
+ring capture attributed about 4.24 seconds to DMA-buffer-to-DDR copies and
+6.48 seconds to IQ transport; those stages overlap and must not be summed.
+The adaptive sleep removed redundant counter wakeups, but each scheduled
+observation still performs real SPI-backed AD936x gain and RSSI reads. HOLD
+requests four observations per frame and AUTO requests a 32,768-sample
+cadence, so those mandatory reads dominate the sampler cost.
+
+The v4 candidate changes only the requested observation cadence. Every refill
+after the first already has a fail-closed fence that starts one real gain/RSSI
+observation before DMA refill and completes its synchronized counter interval
+after refill; the bounded startup-discard contract covers the first frame.
+HOLD cannot transition, while AUTO already carries authoritative FPGA gain
+events with exact sample sequences for every intra-frame transition. V4 uses
+one refill-fenced observation per frame for both modes and keeps the event
+stream unchanged. It does not synthesize observations, change the wire ABI,
+relax overflow/counter validation, or authorize persistence. Hardware
+qualification must show lower sampler CPU while preserving AUTO events,
+metadata closure, ring status, recovery, and ordinary/PyADI compatibility.
