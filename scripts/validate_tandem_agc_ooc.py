@@ -68,24 +68,24 @@ CDC_SUMMARY = {
         "l_clk",
         "No Common Primary Clock",
         "Asynch Clock Groups",
-    ): (112, 112, 0, 0, 0),
+    ): (113, 113, 0, 0, 0),
     (
         "Warning",
         "l_clk",
         "s_axi_aclk",
         "No Common Primary Clock",
         "Asynch Clock Groups",
-    ): (39, 39, 0, 0, 0),
+    ): (18, 18, 0, 0, 0),
 }
 CDC_RULES = {
-    "CDC-3": ("Info", 5, "1-bit synchronized with ASYNC_REG property"),
+    "CDC-3": ("Info", 7, "1-bit synchronized with ASYNC_REG property"),
     "CDC-6": ("Warning", 2, "Multi-bit synchronized with ASYNC_REG property"),
-    "CDC-15": ("Warning", 133, "Clock enable controlled CDC structure detected"),
+    "CDC-15": ("Warning", 111, "Clock enable controlled CDC structure detected"),
 }
 CDC_DIRECTIONS = {
     ("s_axi_aclk", "l_clk"): Counter(
         {
-            ("CDC-3", "Info", 3): 2,
+            ("CDC-3", "Info", 3): 3,
             ("CDC-6", "Warning", 2): 1,
             ("CDC-15", "Warning", 0): 103,
         }
@@ -93,9 +93,9 @@ CDC_DIRECTIONS = {
     ("l_clk", "s_axi_aclk"): Counter(
         {
             ("CDC-3", "Info", 2): 1,
-            ("CDC-3", "Info", 3): 2,
+            ("CDC-3", "Info", 3): 3,
             ("CDC-6", "Warning", 2): 1,
-            ("CDC-15", "Warning", 0): 30,
+            ("CDC-15", "Warning", 0): 8,
         }
     ),
 }
@@ -104,11 +104,12 @@ CDC_BUS_WIDTHS = {
     ("l_clk", "s_axi_aclk"): 6,
 }
 DRC_RULES = {
-    "REQP-1839": ("Warning", "RAMB36 async control check", 18),
+    "REQP-1839": ("Warning", "RAMB36 async control check", 4),
     "ZPS7-1": ("Warning", "PS7 block required", 1),
 }
 METHODOLOGY_RULES = {
     "LUTAR-1": ("Warning", "LUT drives async reset alert", 1),
+    "SYNTH-4": ("Warning", "Shallow depth for a dedicated block RAM", 1),
     "TIMING-18": ("Warning", "Missing input or output delay", 182),
 }
 CHECK_TIMING = {
@@ -137,10 +138,11 @@ ROUTE_LABELS = (
     "nets with routing errors",
 )
 UTILIZATION_CAPACITY = {
-    "Slice LUTs": (17600, 1, 17600),
-    "Slice Registers": (35200, 1, 35200),
-    "Block RAM Tile": (60, 2, 2),
-    "DSPs": (80, 0, 80),
+    "Slice LUTs": (17600, 1, 550),
+    "Slice Registers": (35200, 1, 650),
+    "Slice": (4400, 1, 204),
+    "Block RAM Tile": (60, 3, 3),
+    "DSPs": (80, 2, 2),
 }
 HEADED_REPORTS = tuple(name for name in REPORT_LIMITS if name.endswith(".rpt"))
 
@@ -777,6 +779,34 @@ def _validate_methodology_timing18_details(text: str) -> None:
         )
 
 
+def _validate_methodology_synth4_detail(text: str) -> None:
+    lines = text.splitlines()
+    headings = [
+        index
+        for index, line in enumerate(lines)
+        if line == "SYNTH-4#1 Warning"
+    ]
+    if len(headings) != 1:
+        _fail("SYNTH-4 detail heading is not unique")
+    index = headings[0]
+    expected = (
+        "Shallow depth for a dedicated block RAM",
+        (
+            "The instance u_stat/mem_reg is implemented as block RAM but is "
+            "better mapped onto distributed LUT RAM for the following reason: "
+            "The depth (1 address bits) is shallow. Please use attribute "
+            '(* ram_style = "distributed" *)  to instruct Vivado to infer '
+            "distributed LUT RAM."
+        ),
+        "Related violations: <none>",
+    )
+    if index + len(expected) >= len(lines):
+        _fail("SYNTH-4 detail is truncated")
+    actual = tuple(lines[index + offset].strip() for offset in range(1, 4))
+    if actual != expected:
+        _fail(f"SYNTH-4 is not the reviewed status-mailbox warning: {actual}")
+
+
 def _validate_drc(text: str) -> None:
     _require_header(
         text,
@@ -815,6 +845,7 @@ def _validate_methodology(text: str) -> None:
         label="methodology",
         expected=METHODOLOGY_RULES,
     )
+    _validate_methodology_synth4_detail(text)
     _validate_methodology_timing18_details(text)
 
 
@@ -1070,6 +1101,12 @@ def _validate_timing(
     if embedded_rows != Counter(
         {
             ("LUTAR-1", "Warning", "LUT drives async reset alert", 1): 1,
+            (
+                "SYNTH-4",
+                "Warning",
+                "Shallow depth for a dedicated block RAM",
+                1,
+            ): 1,
             ("TIMING-18", "Warning", "Missing input or output delay", 182): 1,
         }
     ):
@@ -1371,6 +1408,7 @@ def _validate_utilization(text: str) -> None:
     heading_titles = (
         "1. Slice Logic",
         "1.1 Summary of Registers by Type",
+        "2. Slice Logic Distribution",
         "3. Memory",
         "4. DSP",
         "5. IO and GT Specific",
@@ -1411,11 +1449,13 @@ def _validate_utilization(text: str) -> None:
         return text[body_headings[start].end() : body_headings[end].start()]
 
     slice_logic = section("1. Slice Logic", "1.1 Summary of Registers by Type")
+    slice_distribution = section("2. Slice Logic Distribution", "3. Memory")
     memory = section("3. Memory", "4. DSP")
     dsp = section("4. DSP", "5. IO and GT Specific")
     scoped_values = {
         "Slice LUTs": slice_logic,
         "Slice Registers": slice_logic,
+        "Slice": slice_distribution,
         "Block RAM Tile": memory,
         "DSPs": dsp,
     }

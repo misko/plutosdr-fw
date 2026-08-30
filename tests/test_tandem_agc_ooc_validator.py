@@ -110,8 +110,8 @@ def _cdc_summary() -> str:
 
 Severity  Source Clock  Destination Clock  CDC Type                 Exceptions           Endpoints  Safe  Unsafe  Unknown  No ASYNC_REG
 --------  ------------  -----------------  -----------------------  -------------------  ---------  ----  ------  -------  ------------
-Warning   s_axi_aclk    l_clk              No Common Primary Clock  Asynch Clock Groups        112   112       0        0             0
-Warning   l_clk         s_axi_aclk         No Common Primary Clock  Asynch Clock Groups         39    39       0        0             0
+Warning   s_axi_aclk    l_clk              No Common Primary Clock  Asynch Clock Groups        113   113       0        0             0
+Warning   l_clk         s_axi_aclk         No Common Primary Clock  Asynch Clock Groups         18    18       0        0             0
 """
     )
 
@@ -168,6 +168,13 @@ def _cdc_section(source: str, destination: str) -> str:
                 3,
                 None,
             ),
+            (
+                "CDC-3",
+                "Info",
+                "1-bit synchronized with ASYNC_REG property",
+                3,
+                None,
+            ),
         ]
     else:
         specifications = [
@@ -178,7 +185,7 @@ def _cdc_section(source: str, destination: str) -> str:
                 0,
                 None,
             )
-        ] * 30 + [
+        ] * 8 + [
             (
                 "CDC-6",
                 "Warning",
@@ -191,6 +198,13 @@ def _cdc_section(source: str, destination: str) -> str:
                 "Info",
                 "1-bit synchronized with ASYNC_REG property",
                 2,
+                None,
+            ),
+            (
+                "CDC-3",
+                "Info",
+                "1-bit synchronized with ASYNC_REG property",
+                3,
                 None,
             ),
             (
@@ -240,9 +254,9 @@ def _cdc_details() -> str:
 
 ID      Severity  Count  Description
 ------  --------  -----  ----------------------------------------------
-CDC-3   Info          5  1-bit synchronized with ASYNC_REG property
+CDC-3   Info          7  1-bit synchronized with ASYNC_REG property
 CDC-6   Warning       2  Multi-bit synchronized with ASYNC_REG property
-CDC-15  Warning     133  Clock enable controlled CDC structure detected
+CDC-15  Warning     111  Clock enable controlled CDC structure detected
 
 """
         + _cdc_section("s_axi_aclk", "l_clk")
@@ -278,6 +292,14 @@ def _rule_report(
                     f"An {kind} delay is missing on synthetic_{ordinal} "
                     "relative to clock(s) synthetic_clock"
                 )
+            elif rule == "SYNTH-4":
+                details.append(
+                    "The instance u_stat/mem_reg is implemented as block RAM but "
+                    "is better mapped onto distributed LUT RAM for the following "
+                    "reason: The depth (1 address bits) is shallow. Please use "
+                    'attribute (* ram_style = "distributed" *)  to instruct Vivado '
+                    "to infer distributed LUT RAM."
+                )
             else:
                 details.append("Synthetic exact-detail payload")
             details.extend(["Related violations: <none>", ""])
@@ -292,7 +314,7 @@ def _drc() -> str:
     return _rule_report(
         command=("report_drc -ruledeck default -no_waivers -file /evidence/drc.rpt"),
         rules=[
-            ("REQP-1839", "Warning", "RAMB36 async control check", 18),
+            ("REQP-1839", "Warning", "RAMB36 async control check", 4),
             ("ZPS7-1", "Warning", "PS7 block required", 1),
         ],
     )
@@ -303,6 +325,12 @@ def _methodology() -> str:
         command=("report_methodology -no_waivers -file /evidence/methodology.rpt"),
         rules=[
             ("LUTAR-1", "Warning", "LUT drives async reset alert", 1),
+            (
+                "SYNTH-4",
+                "Warning",
+                "Shallow depth for a dedicated block RAM",
+                1,
+            ),
             ("TIMING-18", "Warning", "Missing input or output delay", 182),
         ],
     )
@@ -344,6 +372,7 @@ def _timing() -> str:
 Rule       Severity  Description                    Violations
 ---------  --------  -----------------------------  ----------
 LUTAR-1    Warning   LUT drives async reset alert   1
+SYNTH-4    Warning   Shallow depth for a dedicated block RAM  1
 TIMING-18  Warning   Missing input or output delay  182
 
 Note: This report is based on the most recent report_methodology run and may not be up-to-date. Run report_methodology on the current design for the latest report.
@@ -405,8 +434,8 @@ def _clock_interaction(
     *,
     l_clk_wns: str = "9.13",
     l_clk_endpoints: int = 1001,
-    l_to_axi_endpoints: int = 39,
-    axi_to_l_endpoints: int = 112,
+    l_to_axi_endpoints: int = 18,
+    axi_to_l_endpoints: int = 113,
     axi_wns: str = "3.76",
     axi_endpoints: int = 805,
 ) -> str:
@@ -531,21 +560,26 @@ Table of Contents
 1. Slice Logic
 --------------
 
-| Slice LUTs              |  475 |     0 |          0 |     17600 |  2.70 |
-| Slice Registers         |  694 |     0 |          0 |     35200 |  1.97 |
+| Slice LUTs              |  509 |     0 |          0 |     17600 |  2.89 |
+| Slice Registers         |  587 |     0 |          0 |     35200 |  1.67 |
 
 1.1 Summary of Registers by Type
 --------------------------------
 
+2. Slice Logic Distribution
+---------------------------
+
+| Slice                    |  204 |     0 |          0 |      4400 |  4.64 |
+
 3. Memory
 ---------
 
-| Block RAM Tile          |    2 |     0 |          0 |        60 |  3.33 |
+| Block RAM Tile          |    3 |     0 |          0 |        60 |  5.00 |
 
 4. DSP
 ------
 
-| DSPs                    |    0 |     0 |          0 |        80 |  0.00 |
+| DSPs                    |    2 |     0 |          0 |        80 |  2.50 |
 
 5. IO and GT Specific
 ---------------------
@@ -800,12 +834,12 @@ def test_valid_rc6_metric_variant_passes_without_rc5_numeric_baselines(
 
     utilization = tmp_path / "utilization.rpt"
     for old, new in (
-        ("| Slice LUTs              |  475 |", "| Slice LUTs              |  456 |"),
-        ("| Slice Registers         |  694 |", "| Slice Registers         |  620 |"),
-        ("| DSPs                    |    0 |", "| DSPs                    |    2 |"),
-        ("|     17600 |  2.70 |", "|     17600 |  2.59 |"),
-        ("|     35200 |  1.97 |", "|     35200 |  1.76 |"),
-        ("|        80 |  0.00 |", "|        80 |  2.50 |"),
+        ("| Slice LUTs              |  509 |", "| Slice LUTs              |  520 |"),
+        ("| Slice Registers         |  587 |", "| Slice Registers         |  620 |"),
+        ("| Slice                    |  204 |", "| Slice                    |  200 |"),
+        ("|     17600 |  2.89 |", "|     17600 |  2.95 |"),
+        ("|     35200 |  1.67 |", "|     35200 |  1.76 |"),
+        ("|      4400 |  4.64 |", "|      4400 |  4.55 |"),
     ):
         _replace(utilization, old, new)
 
@@ -941,19 +975,19 @@ def test_public_cli_normalizes_corrupt_dcp_deflate(
     [
         (
             "cdc-summary.rpt",
-            "112   112       0        0             0",
-            "112   111       1        0             0",
+            "113   113       0        0             0",
+            "113   112       1        0             0",
             1,
         ),
-        ("cdc-details.rpt", "CDC-15  Warning", "CDC-10  Warning", 134),
+        ("cdc-details.rpt", "CDC-15  Warning", "CDC-10  Warning", 112),
         ("cdc-details.rpt", "CDC-6   Warning       2", "CDC-6   Info          2", 1),
         (
             "cdc-details.rpt",
             "Clock enable controlled CDC structure detected",
             "Changed CDC detail description",
-            134,
+            112,
         ),
-        ("drc.rpt", "Violations found: 19", "Violations found: 20", 1),
+        ("drc.rpt", "Violations found: 5", "Violations found: 6", 1),
         ("drc.rpt", "ZPS7-1    | Warning", "ZPS7-1    | Error  ", 1),
         ("drc.rpt", "ZPS7-1", "UNKNOWN-1", 2),
         (
@@ -994,20 +1028,20 @@ def test_public_cli_normalizes_corrupt_dcp_deflate(
         ),
         (
             "clock_interaction.rpt",
-            "0          112                   Ignored              Asynchronous Groups",
-            "0          112                   Unsafe               Timed",
+            "0          113                   Ignored              Asynchronous Groups",
+            "0          113                   Unsafe               Timed",
             1,
         ),
         (
             "utilization.rpt",
-            "| Slice LUTs              |  475",
+            "| Slice LUTs              |  509",
             "| Slice LUTs              | 17601",
             1,
         ),
         (
             "utilization.rpt",
-            "| Block RAM Tile          |    2",
             "| Block RAM Tile          |    3",
+            "| Block RAM Tile          |    4",
             1,
         ),
         (
@@ -1135,9 +1169,9 @@ def test_cdc_tables_reject_unknown_or_malformed_rows(tmp_path: Path) -> None:
         "axi_endpoints",
     ),
     [
-        ("9.13", 1001, 39, 112, "3.76", 805),
-        ("9.27", 791, 39, 112, "3.68", 805),
-        ("0.00", 792, 40, 113, "99.99", 806),
+        ("9.13", 1001, 18, 113, "3.76", 805),
+        ("9.27", 791, 18, 113, "3.68", 805),
+        ("0.00", 792, 19, 114, "99.99", 806),
     ],
 )
 def test_clock_interaction_accepts_clean_dynamic_metrics(
@@ -1281,12 +1315,12 @@ def test_clock_interaction_title_and_table_headers_are_exact(
         ("rise - rise     9.13", "rise - rise     9.14"),
         ("0         1001            16.28", "0         1000            16.28"),
         (
-            "0           39                   Ignored",
-            "0           40                   Ignored",
+            "0           18                   Ignored",
+            "0           19                   Ignored",
         ),
         (
-            "0          112                   Ignored",
             "0          113                   Ignored",
+            "0          114                   Ignored",
         ),
     ],
 )
@@ -1634,7 +1668,7 @@ def test_utilization_rows_cannot_be_spoofed_outside_their_sections(
     _valid_reports(tmp_path)
     utilization = tmp_path / "utilization.rpt"
     exact = (
-        "| Slice LUTs              |  475 |     0 |          0 |     17600 |  2.70 |"
+        "| Slice LUTs              |  509 |     0 |          0 |     17600 |  2.89 |"
     )
     _replace(utilization, exact, exact.replace("Slice LUTs", "Slice LUTx"))
     with utilization.open("a", encoding="utf-8") as stream:
@@ -1685,21 +1719,23 @@ def test_utilization_authoritative_body_heading_decoys_reject(
 @pytest.mark.parametrize(
     ("old", "new"),
     [
-        ("| Slice LUTs              |  475 |", "| Slice LUTs              | 17601 |"),
-        ("| Slice LUTs              |  475 |", "| Slice LUTs              |    0 |"),
+        ("| Slice LUTs              |  509 |", "| Slice LUTs              |  551 |"),
+        ("| Slice LUTs              |  509 |", "| Slice LUTs              |    0 |"),
         (
-            "| Slice LUTs              |  475 |     0 |",
-            "| Slice LUTs              |  475 |     1 |",
+            "| Slice LUTs              |  509 |     0 |",
+            "| Slice LUTs              |  509 |     1 |",
         ),
         (
-            "| Slice LUTs              |  475 |     0 |          0 |",
-            "| Slice LUTs              |  475 |     0 |          1 |",
+            "| Slice LUTs              |  509 |     0 |          0 |",
+            "| Slice LUTs              |  509 |     0 |          1 |",
         ),
-        ("|     17600 |  2.70 |", "|     17601 |  2.70 |"),
-        ("|     17600 |  2.70 |", "|     17600 |  2.71 |"),
-        ("| Block RAM Tile          |    2 |", "| Block RAM Tile          |    0 |"),
-        ("|        60 |  3.33 |", "|        60 |  0.00 |"),
-        ("| DSPs                    |    0 |", "| DSPs                    |   81 |"),
+        ("|     17600 |  2.89 |", "|     17601 |  2.89 |"),
+        ("|     17600 |  2.89 |", "|     17600 |  2.90 |"),
+        ("| Slice                    |  204 |", "| Slice                    |  205 |"),
+        ("|      4400 |  4.64 |", "|      4400 |  4.63 |"),
+        ("| Block RAM Tile          |    3 |", "| Block RAM Tile          |    0 |"),
+        ("|        60 |  5.00 |", "|        60 |  0.00 |"),
+        ("| DSPs                    |    2 |", "| DSPs                    |   81 |"),
     ],
 )
 def test_utilization_capacity_invariant_mutations_reject(old: str, new: str) -> None:
