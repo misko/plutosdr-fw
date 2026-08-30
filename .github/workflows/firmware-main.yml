@@ -93,7 +93,7 @@ jobs:
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' &&
-          'iio-throughput-timing-v1-rc1-source.yaml' ||
+          'iio-throughput-affinity-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' &&
           'iio-throughput-hold-v2-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-prototype' &&
@@ -181,7 +181,7 @@ jobs:
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw' &&
-          'plutoplus-spf-iio-throughput-timing-v1-rc1' ||
+          'plutoplus-spf-iio-throughput-affinity-v1-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-refill-fence-fw' &&
           'plutoplus-spf-iio-throughput-hold-v2-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-prototype' &&
@@ -424,13 +424,13 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.45-plutoplus-spf-iio-throughput-hold-v2-rc1'
 
-      - name: Require the exact IIO throughput timing v1 RC1 identity
+      - name: Require the exact IIO throughput affinity v1 RC1 identity
         if: github.ref == 'refs/heads/codex/iio-throughput-stage-timing-fw'
         env:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.45-plutoplus-spf-iio-throughput-timing-v1-rc1'
+            'v0.45-plutoplus-spf-iio-throughput-affinity-v1-rc1'
 
       - name: Require the exact protected RC29 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc29'

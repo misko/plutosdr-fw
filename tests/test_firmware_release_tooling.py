@@ -264,23 +264,23 @@ def test_ddr_ring_prefill_v1_has_exact_rc1_candidate_and_main_routes() -> None:
         assert "ddr-ring-prefill-v1-rc1-source.yaml" in source
 
 
-def test_iio_throughput_timing_candidate_has_an_exact_protected_route() -> None:
+def test_iio_throughput_affinity_candidate_has_an_exact_protected_route() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
-    manifest_name = "iio-throughput-timing-v1-rc1-source.yaml"
+    manifest_name = "iio-throughput-affinity-v1-rc1-source.yaml"
     manifest = (ROOT / "manifests" / manifest_name).read_text()
 
     assert workflow.count("refs/heads/codex/iio-throughput-stage-timing-fw") == 4
     assert workflow.count(f"'{manifest_name}'") == 1
-    assert workflow.count("'plutoplus-spf-iio-throughput-timing-v1-rc1'") == 1
-    assert workflow.count("'v0.45-plutoplus-spf-iio-throughput-timing-v1-rc1'") == 1
+    assert workflow.count("'plutoplus-spf-iio-throughput-affinity-v1-rc1'") == 1
+    assert workflow.count("'v0.45-plutoplus-spf-iio-throughput-affinity-v1-rc1'") == 1
     assert f"{manifest_name}:candidate" in package
     for source in (builder, package):
         assert manifest_name in source
     assert "release_state: candidate" in manifest
-    assert "libiio_0_25_source: 33dc5c96389f0a757720c9b19dc91df2e607b1dc" in manifest
-    assert "submodule_buildroot: 1afc5d3c28fca17ddea3564896245d28afb15cec" in manifest
+    assert "libiio_0_25_source: 69ba17e53198d1f1db68b1f9c186e99da30f04aa" in manifest
+    assert "submodule_buildroot: 19e5b94e711b347f06f00e37dc0b5ad8a006784a" in manifest
 
 
 def test_wide_metadata_dma_uses_the_qualified_fit_strategy() -> None:
