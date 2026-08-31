@@ -5,12 +5,13 @@ For release discovery and safe persistent or RAM-only installation on Pluto
 and Pluto+, see **[Flashing firmware](flashing.md)**. Pluto+ users should read
 its bootloader safety warning before copying any image to a radio.
 
-The direct-async/RAM-extension stack is published as hardware-qualified
-prerelease `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. Its exact final
-image passed guarded RAM boot, unified DMA/RAM queue, finite-ring, abrupt-client
-recovery, and RF-restoration gates. The exact packaged runtime exceeded
-70 MB/s over 1 GbE. Persistent QSPI installation is not yet qualified. See the
-**[RC1 release notes](RELEASE_IQ_DIRECT_ASYNC_RING_V1_RC1.md)** and
+The direct-async/RAM-extension stack is published as full hardware-qualified
+release `v0.46-plutoplus-spf-iq-direct-async-ring-v1`. Its exact image passed
+RAM boot, unified DMA/RAM queue, finite-ring, abrupt-client recovery, RF
+restoration, guarded persistent QSPI installation, user power-cycle, and exact
+QSPI byte-attestation gates. Three finite direct runs exceeded 70 MB/s over
+physical 1 GbE with zero gaps. See the
+**[full release notes](RELEASE_IQ_DIRECT_ASYNC_RING_V1.md)** and
 **[source and installation requirements](IIO_DIRECT_ASYNC_INSTALL.md)** for the
 firmware, Buildroot, libiio, metadata-provider, host, toolchain, ladder-test,
 and binding pins.

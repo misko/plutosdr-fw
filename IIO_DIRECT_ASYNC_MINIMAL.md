@@ -1,11 +1,11 @@
 # Direct-async IQ queue with optional RAM extension
 
-This candidate is based directly on firmware `origin/main`
-`4f15c87033e332293711ad679a50af0109c72862` as observed on 2026-08-31. It
-preserves the minimal direct DMA transport and optionally lets the existing
-RAM ring extend that same FIFO. The exact source branches, immutable dependency
-tags, and hardware-qualified RC1 assets are published; the firmware remains
-unmerged and is not authorized for persistent flash.
+This implementation was refreshed from firmware `origin/main`
+`4f15c87033e332293711ad679a50af0109c72862` and is merged in current `main` at
+`f182a8fa0811d2e70186b8f75d06ff4d5d896140`. It preserves the minimal direct
+DMA transport and optionally lets the existing RAM ring extend that same FIFO.
+The exact source locks and full hardware-qualified release are published, and
+the exact image is authorized for persistent use through its guarded profile.
 
 ## Interface
 
@@ -92,9 +92,10 @@ with either direct mode.
 
 | Component | Branch | Commit | Purpose |
 | --- | --- | --- | --- |
+| firmware integration | published `main` | `f182a8fa0811d2e70186b8f75d06ff4d5d896140` | exact full-release binary source, protected identity, Buildroot graph, manifest, and queue contract |
 | libiio/iiOD | `codex/iq-direct-async-main-refresh-libiio` | `b7303fded264e10473bbbb084afade8f1b1373d1` | direct producer, unified DMA/RAM FIFO, spill accounting, DMA headroom, binding and native tests |
 | Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `a929267288a80a31407a3af06345c088979bcc2e` | exact libiio pin and archive SHA-256 |
-| host | published `main` | `fd76f6694a60c3edc471be12deee942076d5b216` | API admission, capability checks, status exposure, finite-ring timestamp handling, one-command ladder, exact RAM-only RC1 image binding, serial/path-scoped USB route isolation, tests |
+| host | published `main` | `d3e5cfeb1bae07357c711e4277053bb97fd5cee7` | API admission, bounded CMA-safe priming, capability/status checks, finite-ring timestamp handling, one-command ladder, exact persistent promotion, serial/path-scoped USB route isolation, tests |
 
 The libiio branch descends from its audited `origin/master` base
 `4c6022caf838813c1fc88d6de7a83f2bb5fa8e9f`; the host work descends from its
@@ -116,7 +117,7 @@ DMA leases, ring core/request/status, metadata batching, sampler coverage,
 tandem session, and thread-affinity coverage. The Python libiio suite passes
 38 tests.
 
-The final host head passes 1,175 tests with 11 explicit browser, attached-radio,
+The final host head passes 1,179 tests with 11 explicit browser, attached-radio,
 or transmitter skips and one third-party deprecation warning. Ruff passes and
 strict mypy reports no issues in 65 source files.
 
@@ -210,19 +211,13 @@ Every run snapshotted and restored sample rate, bandwidth, LO, enabled
 channels, gain modes, and gains. The restored state was 30.72 MS/s, 18 MHz
 bandwidth, 2.4 GHz RX LO, both RX channels, and `slow_attack` on both channels.
 
-The exact dependency tags and host command are published. Trusted build
-33360776546 produced the protected version
-`v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`; its DFU SHA-256 is
-`6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391`.
-That exact image passed guarded RAM boot, combined-queue spill/drain,
-standalone-ring, abrupt-client recovery, RF restoration, and guarded return to
-the prior persistent firmware on local serial
-`1040007c4a94000211000b009186843ef2`.
-
-The local USB-gadget Ethernet link is limited to 480 Mb/s, so the exact
-packaged iiOD and library from the final rootfs repeated the full ladder on the
-authorized 1 GbE radio at `192.168.1.15` without replacing installed files.
-The 25-MS/s cells reached 73.30 and 75.17 MB/s while reporting 7 and 20 missing
-frames. RAM reduced total missing frames from 27 to 22 and recorded matching
-spill/drain counts. The hardware-qualified RC1 is published as a GitHub
-prerelease; persistent QSPI promotion remains unqualified and unauthorized.
+The dependency tags and host command are published. Protected build
+33408049625 produced full version
+`v0.46-plutoplus-spf-iq-direct-async-ring-v1`; its DFU SHA-256 is
+`ac51893dac8a914621aa8eb6f5c65d324ae8f09812033aa4880dc1dad8e6d739`.
+The exact image passed RAM boot, complete ringless and RAM-extension ladders,
+three zero-gap 70 MB/s+ direct runs, combined spill/drain, standalone ring,
+abrupt-client recovery, RF restoration, guarded persistent installation,
+power-cycle, and exact QSPI FIT attestation. See the
+[`full release notes`](RELEASE_IQ_DIRECT_ASYNC_RING_V1.md) for the final
+measurements, release asset hashes, install profile, and known limits.
