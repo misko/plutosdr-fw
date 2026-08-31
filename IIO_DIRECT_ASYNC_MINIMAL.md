@@ -100,7 +100,9 @@ The libiio branch descends from current `origin/master`
 current `origin/main` `1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1`.
 The proposed immutable source ref remains
 `iq-direct-async-ring-v1-rc1-source/libiio-v1`, but neither it nor any branch
-has been pushed.
+has been pushed. The exact package matrix, submodule pins, publication order,
+host runtime procedure, and install/rollback boundary are maintained in
+[`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md).
 
 ## Software verification
 

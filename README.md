@@ -5,6 +5,11 @@ For release discovery and safe persistent or RAM-only installation on Pluto
 and Pluto+, see **[Flashing firmware](flashing.md)**. Pluto+ users should read
 its bootloader safety warning before copying any image to a radio.
 
+The local direct-async/RAM-extension candidate is source-qualified but not yet
+a flashable release. Its exact firmware, Buildroot, libiio, metadata-provider,
+host, toolchain, and binding requirements are in
+**[Direct-async IQ source and installation requirements](IIO_DIRECT_ASYNC_INSTALL.md)**.
+
 Latest binary release: [![GitHub Release](https://img.shields.io/github/v/release/misko/plutosdr-fw)](https://github.com/misko/plutosdr-fw/releases/latest) [![GitHub release downloads](https://img.shields.io/github/downloads/misko/plutosdr-fw/total.svg)](https://github.com/misko/plutosdr-fw/releases)
 
 Firmware License : [![Many Licenses](https://img.shields.io/badge/license-LGPL2+-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md)  [![Many License](https://img.shields.io/badge/license-GPL2+-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md)  [![Many License](https://img.shields.io/badge/license-BSD-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md)  [![Many License](https://img.shields.io/badge/license-apache-blue.svg)](https://github.com/analogdevicesinc/plutosdr-fw/blob/master/LICENSE.md) and many others.
@@ -18,7 +23,7 @@ Firmware License : [![Many Licenses](https://img.shields.io/badge/license-LGPL2+
  sudo apt-get install bc python cpio zip unzip rsync file wget
  git clone --recursive https://github.com/analogdevicesinc/plutosdr-fw.git
  cd plutosdr-fw
- export VIVADO_SETTINGS=/opt/Xilinx/Vivado/2021.2/settings64.sh
+ export VIVADO_SETTINGS=/opt/Xilinx/Vivado/2022.2/settings64.sh
  make
 
 ```

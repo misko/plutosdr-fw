@@ -60,6 +60,7 @@
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
+| `iq-direct-async-ring-v1-rc1-source` | 2026-08-31 | **hardware-qualified source stack; no release image** | overlaps DMA capture with TCP delivery and optionally extends the same FIFO with RAM-backed descriptors |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -67,6 +68,78 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## iq-direct-async-ring-v1-rc1-source — 2026-08-31 — **hardware-qualified source stack; no release image**
+
+This source candidate rebases the finite direct-async IQ prototype onto the
+current firmware `origin/main` base
+`4f15c87033e332293711ad679a50af0109c72862`. The radio producer captures into
+kernel DMA blocks while the existing iiOD TCP worker consumes the same ordered
+FIFO. Ringless mode retains DMA-block leases until their IQ bytes are accepted
+by the transport and does not allocate or copy into ordinary RAM.
+
+RAM is an optional extension of that FIFO, not a second capture pipeline. At
+the configured DMA watermark, iiOD copies the newest eligible queued payload
+to a RAM-ring slot, changes only that descriptor's backing owner, releases its
+DMA lease, and preserves the descriptor's original FIFO position. The consumer
+then drains DMA-backed and RAM-backed entries in one order. The head descriptor
+is never spilled because the network worker may already be using it. A
+three-period DMA reserve absorbs consecutive 4 MiB copy latency on Zynq when at
+least five DMA buffers are configured; smaller valid configurations retain
+`kernel_buffers - 2` blocks as headroom.
+
+The exact compatible source graph is:
+
+| Component | Version/ref | Required implementation commit |
+| --- | --- | --- |
+| firmware integration | `codex/iq-direct-async-main-refresh` | `a5253497d15613831055dbfb543ca5a9936bd2c6` |
+| Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `4a1e90704706756a6f6062482a070e63f9b27573` |
+| radio and host libiio | 0.25; proposed `iq-direct-async-ring-v1-rc1-source/libiio-v1` | `b7303fded264e10473bbbb084afade8f1b1373d1` |
+| metadata provider | ABI 3 / `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` |
+| Pluto Plus Utils | package 0.1.0; `codex/iq-direct-async-main-refresh-host` | `55e3c08ecf703c2a2f6b5367b3e3d64644c58c1a` |
+
+The native host library and generated Python binding must both come from the
+same `b7303fd` source. Stock libiio and the PyPI-only `pylibiio` package do not
+implement the command or binding contract. Admission requires metadata ABI 3,
+`iio,buffer-direct-async=1`, and, for combined mode,
+`iio,buffer-direct-async-ring=1`. iiOD must be run with `-r 1` for the qualified
+performance profile.
+
+The exact ARM32 cross-build identified itself as libiio 0.25 git tag
+`b7303fd`. Its iiOD SHA-256 was
+`89c5eae83b7bb517279ebe97e3300615c58efbf3892dc9d6939966429122e01d`;
+the `libiio.so.0.25` SHA-256 was
+`8fd0530bd712abe6398f300c17c34052a3e86acfbf374680071869f260921841`.
+These identify the qualification build, not downloadable release assets.
+
+Radio `104000b29905000e17000800065934759d` at `192.168.1.15` qualified the
+exact volatile binaries without replacing its installed firmware. With 23
+frames of 1,048,576 single-RX CI16 samples at 30.72 MS/s, the 15-DMA-buffer,
+RAM-disabled application path delivered 71.40, 71.24, and 70.93 MB/s with zero
+gaps, for a 71.19 MB/s mean across 69 frames. A combined 10-DMA/13-RAM profile
+also delivered all 69 frames without a gap and recorded real RAM spill/drain
+counts of 9, 9, and 6. A standalone 8-DMA/15-RAM finite ring delivered all 23
+frames without a gap at 20 MS/s and closed at 23 produced/23 consumed.
+
+RAM extension is a capacity and continuity mode, not the 70 MB/s performance
+mode. Its measured application rates ranged from 42.80 to 67.91 MB/s because
+the Zynq performs explicit 4 MiB RAM copies. The ringless direct profile is the
+one that satisfies the 70 MB/s gate. An eight-DMA-buffer ringless control still
+transported above 70 MB/s but overran after frame 14, so the qualified
+15-buffer profile is a compatibility requirement for this finite workload.
+
+The final source heads pass 14 native and 14 ASan/UBSan C tests, 38 libiio
+Python tests, 1,158 host tests with 11 explicit skips, Ruff, and strict mypy.
+The radio's stock iiOD, installed library hashes, RF settings, buffer state,
+and DMA control register were restored after the volatile test.
+
+No firmware release version has been assigned. The proposed libiio source ref,
+branches, and firmware image are not published. A normal Buildroot fetch and
+the receipt-writing host installer must remain blocked until the immutable ref
+is published at exactly `b7303fd`; persistent flashing then remains a separate
+authorization after final version-stamped RAM qualification. See
+[`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for the exact
+component matrix, installation order, checks, and rollback boundary.
 
 ## v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1 — 2026-08-30 — **hardware-qualified release source; final bytes pending**
 

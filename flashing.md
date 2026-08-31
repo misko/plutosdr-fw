@@ -48,6 +48,26 @@ a radio. With multiple radios attached, identify every radio by USB serial and
 topology. The safest manual DFU procedure is to leave only the intended radio
 connected.
 
+### Direct-async IQ candidate is not flashable yet
+
+The `iq-direct-async-ring-v1-rc1-source` stack is hardware-qualified source,
+not a published firmware release. It has no assigned `device-fw` version,
+version-stamped image, release checksums, or published immutable libiio tag.
+Do not substitute the firmware implementation commit `a5253497d` for a release
+version and do not flash an ordinary CI or local build persistently.
+
+Its exact compatibility set is firmware implementation `a5253497d`, Buildroot
+`4a1e90704`, libiio 0.25 `b7303fded`, metadata provider `3294365ff`, and Pluto
+Plus Utils 0.1.0 implementation `55e3c08ec`. Both the host native library and
+Python binding must be built from the same `b7303fded` source. See
+[`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for full hashes,
+submodule pins, publication order, host installation, verification profiles,
+and rollback requirements.
+
+This section remains a stop condition until release notes name an exact
+hardware-qualified firmware tag and image SHA-256. Once those exist, use the
+ordinary checksum-verified RAM-boot and persistent procedures below.
+
 ## Find and download a release
 
 List releases, newest first:
