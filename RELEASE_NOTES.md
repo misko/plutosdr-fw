@@ -60,7 +60,7 @@
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
-| `iio-gain-timeline-v8-rc1` | 2026-08-30 | **source-locked candidate; protected build pending** | authoritative ABI-4 gain timeline plus an immediate-drain DDR queue extension with measured first-frame latency |
+| `iio-gain-timeline-v8-rc1` | 2026-08-31 | **source-locked candidate; replacement protected build pending** | authoritative ABI-4 gain timeline, immediate-drain DDR queue extension, and teardown-only timing diagnostics |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -69,7 +69,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.45-plutoplus-spf-iio-gain-timeline-v8-rc1 — 2026-08-30 — **source-locked candidate; protected build pending**
+## v0.45-plutoplus-spf-iio-gain-timeline-v8-rc1 — 2026-08-31 — **source-locked candidate; replacement protected build pending**
 
 This candidate makes the optional 200 MB DDR ring behave as a natural
 extension of the kernel-buffer queue. Each committed frame becomes readable
@@ -91,6 +91,14 @@ gain/RSSI telemetry remains optional rather than turning an otherwise valid
 capture into `-ENODATA`. The candidate remains default-off for DDR-ring mode
 and is not persistence-authorized until exact protected bytes pass RAM-only
 tests on both reserved radios.
+
+The first protected artifact exposed a deterministic transport-side regression
+on hardware: ordinary and ring captures both reached frame 100, iiOD emitted
+its synchronous in-flight timing snapshot, and the DMA queue reported the
+resulting counter gap at frame 104. The replacement keeps timing accumulation
+on the hot path but emits the complete stage counts, totals, and maxima only
+when the device entry closes. This removes blocking diagnostic I/O from capture
+without removing the evidence needed to localize throughput bottlenecks.
 
 ## v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1 — 2026-08-30 — **hardware-qualified release source; final bytes pending**
 

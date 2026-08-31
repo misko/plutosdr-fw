@@ -66,7 +66,7 @@ def test_rc31_is_in_every_offline_and_protected_package_gate() -> None:
 
 def test_rc31_preserves_its_tool_while_the_current_tool_advances() -> None:
     historical = "b2b3113c2e8724453179f09d357b4917c0f14c77"
-    current = "297dc63a066121cedf52f28ac16607ad7fdf1698"
+    current = "646758ad7f28493f8b4584dfec5c0f84ebfde19c"
     assert current in WRAPPER.read_text(encoding="utf-8")
     assert current in BINDING.read_text(encoding="utf-8")
     manifest = RC31_MANIFEST.read_text(encoding="utf-8")
