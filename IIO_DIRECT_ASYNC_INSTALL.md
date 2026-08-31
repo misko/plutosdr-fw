@@ -1,136 +1,108 @@
-# Direct-async IQ + RAM queue v1 installation and compatibility
+# Direct-async IQ v2 installation and compatibility
 
-This is the normative compatibility, installation, and acceptance record for
-full release `v0.46-plutoplus-spf-iq-direct-async-ring-v1`. It supplements
-[`flashing.md`](flashing.md); every Pluto+ bootloader safety rule in that guide
-still applies.
+This is the normative compatibility, host-runtime, installation, and
+acceptance guide for full release
+`v0.47-plutoplus-spf-iq-direct-async-v2`. It supplements
+[`flashing.md`](flashing.md); every Pluto+ bootloader safety rule there still
+applies.
 
 ## Release status
 
-The exact non-RC image is qualified for guarded persistent installation:
+Protected run
+[33440908273](https://github.com/misko/plutosdr-fw/actions/runs/33440908273)
+built exact merged firmware `main` commit
+`2bab87dcd9b18c8f957ae781603e88160c8509cc`. Those bytes passed the integrated
+route gate, RAM boot, 5/10/15/25 MS/s ladders, sustained 70 MB/s, direct DMA,
+200 MB RAM extension, both v2 overrun policies, single-session 1 GB timelines,
+abrupt-client recovery, ordinary dual-RX, TX-safe, 5.8 GHz tune/restore,
+persistent write, and exact QSPI FIT verification.
 
-- protected build 33408049625 built clean merged firmware `main` at
-  `f182a8fa0811d2e70186b8f75d06ff4d5d896140`;
-- the integrated routed result is `PASS` and
-  `firmware_release_eligible: true`;
-- the final image passed RAM boot, physical-1-GbE throughput, direct DMA,
-  combined DMA/RAM, standalone ring, client-loss recovery, and RF restoration;
-- guarded persistent installation, user power-cycle, exact `/dev/mtd3` FIT
-  attestation, and all post-cold-boot functional checks passed; and
-- three 23-frame direct-DMA runs delivered 71.05, 72.12, and 71.76 MB/s with
-  zero gaps.
-
-Do not flash an ordinary branch or CI artifact. Download only the named release
-assets and verify the release checksum file before using them.
+The all-power-removed cold-boot gate passed on the exact persistent bytes. Full
+evidence is recorded in
+[`RELEASE_IQ_DIRECT_ASYNC_V2.md`](RELEASE_IQ_DIRECT_ASYNC_V2.md).
 
 ## Exact matched component set
 
-Substituting stock libiio, an unmodified PyPI `pylibiio`, or an older ABI-3
-runtime is unsupported.
+Substituting stock libiio, an unmodified PyPI `pylibiio`, a different firmware
+asset, or an older Pluto Plus Utils checkout is unsupported.
 
 | Layer | Required version, ref, or commit |
 | --- | --- |
-| firmware identity | `v0.46-plutoplus-spf-iq-direct-async-ring-v1` |
-| firmware binary source | `f182a8fa0811d2e70186b8f75d06ff4d5d896140`; immutable tag `iq-direct-async-ring-v1-source/fw-v1` |
-| original refreshed base | `origin/main` at `4f15c87033e332293711ad679a50af0109c72862` |
-| Buildroot | `a929267288a80a31407a3af06345c088979bcc2e`; immutable tag `iq-direct-async-ring-v1-rc1-source/buildroot-v2` |
-| radio and host libiio | API/SONAME 0.25 at `b7303fded264e10473bbbb084afade8f1b1373d1`; immutable tag `iq-direct-async-ring-v1-rc1-source/libiio-v1` |
-| SPF metadata provider | ABI 3 / strict `RadioMetadataV6` at `3294365ff44da26b261be4a2ccb241b7896d23ad` |
-| HDL | `145bd47e55d5c5537e0ba49d53cb25a5393f66ba`; tag `ddr-burst-v1-rc4-source/hdl-v1` |
+| firmware identity | `v0.47-plutoplus-spf-iq-direct-async-v2` |
+| firmware binary source | `2bab87dcd9b18c8f957ae781603e88160c8509cc`; tag `iq-direct-async-v2-source/fw-v1` |
+| Buildroot | `3e1dd15acf361cc06e202e9e59e907dd379a13c3`; tag `iq-direct-async-v2-source/buildroot-v1` |
+| radio and host libiio | 0.25 at `8f66f353c9a70a5524988ceb588b0e9271c2390d`; tag `iq-direct-async-v2-source/libiio-v1` |
+| metadata provider | ABI 3 / `RadioMetadataV6` at `3294365ff44da26b261be4a2ccb241b7896d23ad` |
+| HDL | `145bd47e55d5c5537e0ba49d53cb25a5393f66ba`; `ddr-burst-v1-rc4-source/hdl-v1` |
 | HDL Quantulum | `364b3dc7e770c3971d1f41a75c00e6cae76e2e6d` |
-| Linux | `93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7`; tag `ddr-burst-v1-rc3-source/linux-v1` |
-| U-Boot | `1ff0468e9bea29b0a768a7bf52db8d025c521b9a`; tag `gain-series-v4-rc2-source/u-boot-xlnx` |
-| Pluto Plus Utils | package 0.1.0, Python 3.11+; published `main` at `d3e5cfeb1bae07357c711e4277053bb97fd5cee7` or later |
-| host qualification/promotion implementation | `605384fc1095196e5a5946bc08e633394675c0c1` |
+| Linux | `93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7`; `ddr-burst-v1-rc3-source/linux-v1` |
+| U-Boot | `1ff0468e9bea29b0a768a7bf52db8d025c521b9a`; `gain-series-v4-rc2-source/u-boot-xlnx` |
+| Pluto Plus Utils | package 0.1.0, Python 3.11+; `main` at `9f9a2bd6d059833bc7d9259a48eabff8e20642ad` or later |
+| PPU long-session/overrun implementation | merge `d5435901dd7a37619d71db9fdd0d0f1fb368b0bd` |
+| PPU persistent v2 promotion / repeat read-only reconciliation | `cb7c81127688e00dc0990e7b9d7cea3d05b7b936` / `a6c0ae65cb6818afbd3e0e20be457868e87f50f6` |
 | Vivado | 2022.2, build 3671981 |
 | ARM toolchain | Linaro GCC 7.3-2018.05, GCC 7.3.1 |
-
-The `rc1-source` dependency tags are historical immutable source-lock names.
-The full release deliberately reuses those exact hardware-qualified dependency
-bytes; its firmware version and release tag are non-RC.
 
 The packaged `/opt/VERSIONS` must be exactly:
 
 ```text
-device-fw v0.46-plutoplus-spf-iq-direct-async-ring-v1
+device-fw v0.47-plutoplus-spf-iq-direct-async-v2
 hdl ddr-burst-v1-rc4-source/hdl-v1
-buildroot iq-direct-async-ring-v1-rc1-source/buildroot-v2
+buildroot iq-direct-async-v2-source/buildroot-v1
 linux ddr-burst-v1-rc3-source/linux-v1
 u-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx
 ```
 
-## Release asset identities
+## Download and verify
 
-Protected Actions run
-[33408049625](https://github.com/misko/plutosdr-fw/actions/runs/33408049625),
-attempt 1, produced these exact objects:
-
-| Object | SHA-256 |
-| --- | --- |
-| `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811.tar.gz` | `c91ab1fdd68fd66ca6f871d190c994417012bc6957f2b242ada680a9edab086e` |
-| `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.dfu` | `ac51893dac8a914621aa8eb6f5c65d324ae8f09812033aa4880dc1dad8e6d739` |
-| `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.frm` | `8a18aa951ba4d0e24534d2e15eec624587b07c92be991b0cb7f0d1669cad241e` |
-| `iq-direct-async-ring-v1-rc1-source.yaml` | `7be350c946ef9cfe8c80e18ef74e30c78342bb4e5ae3484ba51f925dc80fabf0` |
-| rootfs | `d80bbd7d8f4c9f997b318f815cd1664e5d8b97580bac5478e532bf117aa6d09b` |
-| FIT body, 12,821,527 bytes | `8dc973cd808a49392d26e69336c3b5c32dbece6903f69b30698873caa1bf79c5` |
-| packaged `/usr/sbin/iiod` | `cf950bdcdefa56ff90690e90fad8ce64151997c707ae3236b967b4bcfc6e9ec6` |
-| packaged `libiio.so.0.25` | `7333f76edb775ebea3a51911c42dc5f3e45fb1e082676a867b7fa90b5d61168a` |
-
-The exact protected build-input manifest deliberately keeps its historical
-RC1 name and values. It pins the reused dependency graph; the final binary
-source is merged firmware `main` at `f182a8fa...`, independently locked by
-`iq-direct-async-ring-v1-source/fw-v1` and recorded in the bundle provenance.
-
-Download and verify into a new private directory:
+Create a new private directory and download only the named release:
 
 ```bash
-candidate_dir="$(mktemp -d /tmp/pluto-direct-async-v1.XXXXXX)"
+candidate_dir="$(mktemp -d /tmp/pluto-direct-async-v2.XXXXXX)"
 chmod 0700 "$candidate_dir"
-gh release download v0.46-plutoplus-spf-iq-direct-async-ring-v1 \
+gh release download v0.47-plutoplus-spf-iq-direct-async-v2 \
   --repo misko/plutosdr-fw --dir "$candidate_dir"
 (
   cd "$candidate_dir"
-  sha256sum -c iq-direct-async-ring-v1-SHA256SUMS
+  sha256sum -c iq-direct-async-v2-SHA256SUMS
 )
 ```
 
-If using the retained deployment bundle, also require its internal
-`SHA256SUMS` and `PAYLOAD_SHA256SUMS` checks to pass before inspecting or using
-any member.
+The release checksum inventory is:
 
-## Runtime contract
-
-The radio and host must agree on every item below:
-
-| Contract item | Required value |
+| Object | SHA-256 |
 | --- | --- |
-| libiio line | 0.25, git build tag `b7303fd` |
-| metadata ABI | `iio,buffer-metadata=3` |
-| scan layouts | `00000003:1:4:2,0000000c:1:4:2,0000000f:2:8:1` |
-| direct capability | `iio,buffer-direct-async=1` |
-| RAM-extension capability | `iio,buffer-direct-async-ring=1` |
-| standalone RAM capabilities | `iio,buffer-ddr-ring=1`, finite and continuous modes, metadata status, and a positive maximum |
-| direct topology | exactly one selected receiver |
-| direct finite target | `direct_async_frames`, 1 through 64 per request |
-| combined RAM target | `ddr_ring_frames=0`, `ddr_ring_continuous=False` |
-| DMA depth | 2 through 64 without RAM; at least 3 with RAM |
-| incompatible mode | `ddr_burst_bytes=0` |
-| radio daemon | `iiod -r 1`, or supervised equivalent `--rw-cpu-affinity 1` |
+| `plutoplus-spf-iq-direct-async-v2-2bab87dcd9b1.tar.gz` | `04866f2d3e420326f70184f654d28e4a42d4251c0a97765a3eae3b367c63d8eb` |
+| `plutoplus-spf-iq-direct-async-v2-2bab87dcd9b1-pluto.dfu` | `b97564524058b4b57e73ccfa60cdf1acbefaac05f90b16ccd460b0a8bb6c307d` |
+| `plutoplus-spf-iq-direct-async-v2-2bab87dcd9b1-pluto.frm` | `e56728f87fea150d0f0b057deed2f1878ecb830bab3e81ddaba84dc8a7449451` |
+| `iq-direct-async-v2-source.yaml` | `8686c67e6cb19d7f75ef9cc171a4f1598430b8e1f39fa346bc41b9856cad414b` |
+| `iq-direct-async-v2.yaml` | `f534ca8a7d08535409c846f350c266d76d5525d284158e43030f82a700974d56` |
+| DFU/FRM FIT body, 12,826,107 bytes | `7a198f961cd6765ebd831c21314baac0f962650541af671911c23e76db33cbc2` |
 
-RAM extension contributes overflow slots to the same ordered DMA descriptor
-FIFO. It is not a second capture, prefill, or output queue. With RAM disabled,
-the direct path allocates and copies no ring IQ.
+If using the tar bundle, extract it into another private directory and require
+both of its checksum inventories to pass before using a member:
+
+```bash
+bundle_dir="$(mktemp -d /tmp/pluto-direct-async-v2-bundle.XXXXXX)"
+tar -xzf "$candidate_dir/plutoplus-spf-iq-direct-async-v2-2bab87dcd9b1.tar.gz" \
+  -C "$bundle_dir"
+(
+  cd "$bundle_dir"
+  sha256sum -c SHA256SUMS
+  sha256sum -c PAYLOAD_SHA256SUMS
+)
+```
 
 ## Install the matched host runtime
 
-Use Pluto Plus Utils `main` at `d3e5cfeb1bae07357c711e4277053bb97fd5cee7`
-or later. The native library and generated Python binding must both be built
-from exact libiio `b7303fd`:
+Install Pluto Plus Utils from the required `main` or later, then use its
+repository installer. The native library and generated Python binding are
+built from the same immutable libiio tree:
 
 ```bash
 git clone https://github.com/misko/pluto-plus-utils.git
 cd pluto-plus-utils
-git checkout d3e5cfeb1bae07357c711e4277053bb97fd5cee7
+git checkout 9f9a2bd6d059833bc7d9259a48eabff8e20642ad
 uv sync --extra hardware
 
 scripts/install_native_libiio.sh \
@@ -140,148 +112,247 @@ scripts/install_native_libiio.sh \
   --prefix "$PWD/.venv"
 ```
 
-The installer must write
-`.venv/share/pluto-plus-utils/metadata-runtime.json` naming metadata ABI 3,
-the immutable libiio ref, full source commit, installed library/binding hashes,
-and a `MetadataBuffer` constructor ending in `direct_async_frames`.
+The installer pins `iq-direct-async-v2-source/libiio-v1` at full commit
+`8f66f353c9a70a5524988ceb588b0e9271c2390d`. Do not install `pylibiio` from
+PyPI afterward. Do not mix the native library, Python binding, or runtime
+receipt from different commits.
 
-Do not install `pylibiio` from PyPI afterward. Do not mix a wheel, native
-library, Python binding, or receipt from different commits. Verify the result:
+Verify the installed environment:
 
 ```bash
 uv run pluto environment --format json
 
-.venv/bin/python - <<'PY'
+LD_LIBRARY_PATH="$PWD/.venv/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  .venv/bin/python - <<'PY'
 import inspect
 import iio
 
-assert iio.version == (0, 25, "b7303fd")
-assert tuple(inspect.signature(iio.MetadataBuffer.__init__).parameters)[-1] == (
-    "direct_async_frames"
-)
+assert iio.version == (0, 25, "8f66f35")
+parameters = tuple(inspect.signature(iio.MetadataBuffer.__init__).parameters)
+assert "direct_async_frames" in parameters
+assert "drop_backlog_on_overrun" in parameters
 print(iio.__file__, iio.version)
 PY
 ```
 
-## Guarded persistent installation
+The radio uses the same libiio source and supervises iiOD with R/W worker CPU
+affinity 1, equivalent to `iiod -r 1`.
 
-For Pluto+, update only the `qspi-linux` firmware partition. Never use a full
-firmware ZIP, `boot.frm`, `boot.dfu`, or `uboot-env.dfu`.
+## Runtime contract
 
-Identify one directly attached radio by exact USB serial and sysfs topology,
-stop every process using it, and run the flash command once without `--execute`:
+Require every item below before starting a capture:
+
+| Contract item | Required value |
+| --- | --- |
+| metadata ABI | `iio,buffer-metadata=3` |
+| direct mode | `iio,buffer-direct-async=1` |
+| RAM extension | `iio,buffer-direct-async-ring=1` |
+| overrun modes | `iio,buffer-direct-async-overrun-policies=drop-backlog,preserve-backlog` |
+| default overrun mode | `iio,buffer-direct-async-default-overrun-policy=drop-backlog` |
+| RAM capacity | `iio,buffer-ddr-ring-max-iq-bytes=200000000` |
+| RAM modes | `iio,buffer-ddr-ring-modes=finite,continuous` |
+| topology | exactly one selected receiver |
+| direct target | 1 through 4,096 frames in one request |
+| incompatible mode | `ddr_burst_bytes=0` |
+| host/radio libiio | exact `8f66f35` tree on both sides |
+
+RAM slots extend the same FIFO and preserve frame order. With RAM disabled,
+the direct path allocates and copies no RAM-ring IQ. The frame already entering
+TCP is never retired by either overrun policy.
+
+## Guarded local-USB persistent installation
+
+Pluto+ installation updates only the `qspi-linux` firmware partition. Never
+use a full firmware ZIP, `boot.frm`, `boot.dfu`, or `uboot-env.dfu`.
+
+Identify one directly attached radio by exact USB serial and sysfs path. Stop
+every process using it. First run the command without `--execute`:
 
 ```bash
 uv run pluto firmware flash \
-  /absolute/path/plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.dfu \
+  "$candidate_dir/plutoplus-spf-iq-direct-async-v2-2bab87dcd9b1-pluto.dfu" \
   --usb-sysfs-path /sys/bus/usb/devices/EXACT_PATH \
-  --profile iq-direct-async-ring-v1-release-persistent-promotion
+  --profile iq-direct-async-v2-release-persistent-promotion
 ```
 
-The plan must show the intended serial, exact DFU SHA-256 `ac51893d...`, FIT
-SHA-256 `8dc973cd...`, target v0.46 identity, qualified prior-version policy,
-and firmware-partition-only operation. If any value differs, stop.
-
-Execute that same plan only with its exact confirmation phrase:
+The dry run must show the intended serial/path, DFU SHA `b9756452...`, FIT SHA
+`7a198f96...`, FIT size 12,826,107, metadata ABI 3, tandem capability, and
+target v0.47. If any field differs, stop. Execute only with the exact phrase
+printed by that plan:
 
 ```bash
 uv run pluto firmware flash \
-  /absolute/path/plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.dfu \
+  "$candidate_dir/plutoplus-spf-iq-direct-async-v2-2bab87dcd9b1-pluto.dfu" \
   --usb-sysfs-path /sys/bus/usb/devices/EXACT_PATH \
-  --profile iq-direct-async-ring-v1-release-persistent-promotion \
+  --profile iq-direct-async-v2-release-persistent-promotion \
   --execute --confirm 'FLASH EXACT_SERIAL'
 ```
 
-Keep the durable receipt. Do not retry an uncertain post-eject operation. After
-the radio returns, pin its SSH host key and use the read-only reconciliation
-command to attest the active identity and hash exactly the recorded FIT length
-from `/dev/mtd3`:
+Keep the durable receipt. Do not retry an uncertain post-eject operation;
+reconcile it read-only.
+
+### Ephemeral SSH key handling
+
+The radio generates a new SSH host key after reboot. Do not disable host-key
+checking and do not keep a fleet-wide static trust exception. Enroll the
+current key only after PPU attests the exact USB path, IIOD serial, and selected
+route:
+
+```bash
+uv run pluto firmware enroll-usb-ssh EXACT_SERIAL \
+  --usb-sysfs-path /sys/bus/usb/devices/EXACT_PATH \
+  --known-hosts-file /ABSOLUTE/PRIVATE/PATH/EXACT_SERIAL.known_hosts \
+  --password-file /ABSOLUTE/PRIVATE/PATH/radio.password \
+  --isolate-usb-route
+```
+
+Review the dry run, then repeat with:
+
+```text
+--execute --confirm 'TRUST USB SSH EXACT_SERIAL' \
+  --isolation-confirm 'ISOLATE USB SSH EXACT_INTERFACE'
+```
+
+Re-enroll after every reboot. PPU temporarily isolates competing Pluto routes,
+binds the trust action to one serial/path, and restores the host network in a
+`finally` path.
+
+Use the new key to verify active identity, TX-safe state, and the exact FIT
+length and hash in `/dev/mtd3`:
 
 ```bash
 uv run pluto firmware reconcile-local RECEIPT_ID \
   --usb-sysfs-path /sys/bus/usb/devices/EXACT_PATH \
-  --profile iq-direct-async-ring-v1-release-persistent-promotion \
-  --ssh-known-hosts-file /absolute/private/path/radio.known_hosts \
-  --ssh-host RADIO_ADDRESS
+  --profile iq-direct-async-v2-release-persistent-promotion \
+  --ssh-known-hosts-file /ABSOLUTE/PRIVATE/PATH/EXACT_SERIAL.known_hosts \
+  --ssh-password-file /ABSOLUTE/PRIVATE/PATH/radio.password \
+  --isolate-usb-route \
+  --isolation-confirm 'ISOLATE USB SSH EXACT_INTERFACE'
 ```
 
-Reconciliation never writes QSPI, changes RF state, or reboots. A mismatch is
-a stop condition, not permission to replay the flash.
+Then remove every power source for at least 10 seconds. After reconnect, enroll
+the newly rotated key again and repeat reconciliation, doctor, ordinary RX,
+5.8 GHz tune/restore, and TX-safe checks. A software reboot or USB detach while
+the board remains powered is not a cold-boot qualification.
 
-## Functional ladder and acceptance tests
+## Guarded network-only installation
 
-The one-command ringless speed matrix uses the requested 5/10/15/25 MS/s rates
-for 3 and 10 seconds:
+Network flashing is supported only with PPU's serial-attested LAN workflow.
+First pin the current ephemeral key through read-only IIOD identity:
 
 ```bash
-uv run pluto radio direct-async-ladder RADIO_ADDRESS \
+uv run pluto firmware enroll-lan-ssh EXACT_SERIAL \
+  --host 192.168.1.20 \
+  --known-hosts-file /ABSOLUTE/PRIVATE/PATH/EXACT_SERIAL.known_hosts \
+  --profile iq-direct-async-v2-release \
+  --execute --use-default-password \
+  --confirm 'TRUST LAN SSH EXACT_SERIAL 192.168.1.20'
+```
+
+Run the exact flash once without `--execute`:
+
+```bash
+uv run pluto firmware flash-lan \
+  "$candidate_dir/plutoplus-spf-iq-direct-async-v2-2bab87dcd9b1-pluto.dfu" \
+  --serial EXACT_SERIAL --host 192.168.1.20 \
+  --profile iq-direct-async-v2-release-persistent-promotion \
+  --ssh-known-hosts-file /ABSOLUTE/PRIVATE/PATH/EXACT_SERIAL.known_hosts \
+  --ssh-password-file /ABSOLUTE/PRIVATE/PATH/radio.password
+```
+
+After reviewing the serial, host, hashes, profile, and prior firmware, execute
+with `--execute --confirm 'FLASH LAN EXACT_SERIAL 192.168.1.20'`. The workflow
+attests IIOD disappearance/return, verifies v0.47 and its release-specific
+capabilities, mutes TX, rotates the ephemeral SSH key only after exact return,
+and emits a durable receipt. Repeat independently for another address; never
+reuse the first radio's serial or known-hosts file.
+
+## Functional ladder and acceptance
+
+The release matrix is one PPU command. Its defaults are the 5/10/15/25 MS/s by
+3/10-second ladder, but the explicit form is recommended for evidence:
+
+```bash
+uv run pluto radio direct-async-ladder 192.168.1.15 \
   --transport ip --expect-serial EXACT_SERIAL \
   --rates 5M,10M,15M,25M --durations 3,10 \
   --samples 1048576 --kernel-buffers 15 \
   --iq-decoder raw-complex64 \
+  --drop-backlog-on-overrun \
   --format json --report /ABSOLUTE/PRIVATE/PATH/ringless-ladder.json
 ```
 
-Run the same matrix with 13 RAM slots extending a 10-descriptor DMA queue:
+Run a matched 200 MB extension with one-million-sample frames, 12 DMA
+descriptors, and 50 RAM slots:
 
 ```bash
-uv run pluto radio direct-async-ladder RADIO_ADDRESS \
+uv run pluto radio direct-async-ladder 192.168.1.15 \
   --transport ip --expect-serial EXACT_SERIAL \
   --rates 5M,10M,15M,25M --durations 3,10 \
-  --samples 1048576 --kernel-buffers 10 --ram-ring-slots 13 \
+  --samples 1000000 --kernel-buffers 12 --ram-ring-slots 50 \
   --iq-decoder raw-complex64 \
-  --format json --report /ABSOLUTE/PRIVATE/PATH/ram-extension-ladder.json
+  --drop-backlog-on-overrun \
+  --format json --report /ABSOLUTE/PRIVATE/PATH/ram200-ladder.json
 ```
 
-The ladder must execute all eight cells, restore the complete RX configuration,
-and report counter-observed gaps rather than conceal them. Sustained 25 MS/s
-offers 100 MB/s and outruns this 1-GbE path, so gaps in those duration cells are
-expected. The separate hard throughput/continuity gate is three independent
-finite 23-frame captures at 30.72 MS/s, 1,048,576 samples per frame, 15 DMA
-buffers, RAM disabled, and `raw-complex64`; require at least 70 MB/s and zero
-counter gaps in every run.
+Use `--preserve-backlog-on-overrun` for the control policy. Every supported
+cell is one finite DMA session; there is no periodic 64-frame re-arm. The
+duration is requested source time, not a wall-clock deadline. Counter-observed
+gaps are reported results; protocol, cleanup, restoration, or readback failures
+make the command exit nonzero.
 
-Also require:
+For a local gadget among several radios sharing `192.168.2.1`, add the exact
+`--usb-sysfs-path`, `--isolate-usb-route`, and confirmation phrase. This still
+tests TCP/IP; `--transport usb` is a different path and cannot substitute for
+the 1-GbE performance gate.
 
-- combined direct mode actually spills and drains RAM frames in equal counts;
-- standalone finite ring reaches its requested target, drains completely, and
-  preserves frame order across a wrap;
-- two deliberate large-ring client losses recover without Linux or iiOD
-  restart and leave zero buffers/faults with DDS off and TX at -80 dB; and
-- 5.8 GHz LO tune/readback succeeds on AD9361 and restores the exact prior LO.
+Acceptance requires:
 
-The exact hardware results and limitations are recorded in
-[`RELEASE_IQ_DIRECT_ASYNC_RING_V1.md`](RELEASE_IQ_DIRECT_ASYNC_RING_V1.md).
+- all eight ladder cells complete and restore settings;
+- ringless sustained 25 MS/s exceeds 70 MB/s on the qualified physical-1-GbE
+  host;
+- 5, 10, and 15 MS/s cells have zero counter gaps;
+- RAM mode reports exact `spilled = drained + evicted`, valid high-water/wrap,
+  and clean target completion;
+- a 250-frame/1 GB request reports one capture segment and zero host re-arms;
+- abrupt client loss recovers without Linux or iiOD restart;
+- ordinary dual-RX refill, zero active buffers/faults, TX mute, and exact RX
+  settings restoration pass; and
+- AD9361/2R2T setup and 5.8 GHz tune/readback/exact prior-LO restoration pass.
+
+At 25 MS/s, CI16 offers 100 MB/s. Buffers can defer loss but cannot make a
+slower steady consumer lossless forever. `drop-backlog` minimizes stale-data
+latency and gap-event count; it does not promise the highest source coverage.
 
 ## Source-build verification
 
-Before reproducing the protected build, verify the pins:
+Before reproducing the protected build, verify every pin:
 
 ```bash
 git -C /PATH/TO/plutosdr-fw rev-parse HEAD
-git -C /PATH/TO/plutosdr-fw ls-tree HEAD buildroot
-git -C /PATH/TO/plutosdr-buildroot rev-parse HEAD
+git -C /PATH/TO/plutosdr-fw ls-tree HEAD buildroot hdl hdl-quantulum linux u-boot-xlnx
 git -C /PATH/TO/libiio rev-parse HEAD
 git -C /PATH/TO/pluto-plus-utils rev-parse HEAD
 ```
 
-Expected firmware binary source is `f182a8fa...`; Buildroot is `a9292672...`;
-libiio is `b7303fde...`; and host `main` contains `d3e5cfeb...`. Build with
-Vivado 2022.2 and the pinned Linaro toolchain, supplying the exact protected
-identity:
+Expected values are firmware `2bab87d...`, Buildroot `3e1dd15...`, HDL
+`145bd47...`, HDL Quantulum `364b3dc...`, Linux `93174a1...`, U-Boot
+`1ff0468...`, libiio `8f66f35...`, and PPU `9f9a2bd...` or later. Build with
+Vivado 2022.2 and the pinned Linaro toolchain:
 
 ```bash
 cd /PATH/TO/plutosdr-fw
-RELEASE_VERSION=v0.46-plutoplus-spf-iq-direct-async-ring-v1 \
+RELEASE_VERSION=v0.47-plutoplus-spf-iq-direct-async-v2 \
   make build/pluto.dfu
 ```
 
-Any implementation-pin change requires a new protected build and complete
-hardware requalification.
+Any source-pin change produces different bytes and requires a new protected
+build and complete hardware qualification.
 
 ## Rollback
 
-Retain the previous hardware-qualified DFU/FRM and its checksum/profile until
-all post-install tests pass. Roll back only the firmware partition using that
-release's own exact guarded persistent profile. Never rewrite the Pluto+
-bootloader or U-Boot environment as part of a routine firmware rollback.
+Retain the previous hardware-qualified v0.46 DFU, checksum file, and its own
+PPU persistent profile until all post-install tests pass. Roll back only the
+`qspi-linux` firmware partition using
+`iq-direct-async-ring-v1-release-persistent-promotion`. Never rewrite the
+Pluto+ bootloader or U-Boot environment during a routine upgrade or rollback.
