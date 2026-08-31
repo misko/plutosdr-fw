@@ -70,11 +70,16 @@ attempt 1, produced these exact objects:
 | `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811.tar.gz` | `c91ab1fdd68fd66ca6f871d190c994417012bc6957f2b242ada680a9edab086e` |
 | `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.dfu` | `ac51893dac8a914621aa8eb6f5c65d324ae8f09812033aa4880dc1dad8e6d739` |
 | `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.frm` | `8a18aa951ba4d0e24534d2e15eec624587b07c92be991b0cb7f0d1669cad241e` |
-| source manifest | `7be350c946ef9cfe8c80e18ef74e30c78342bb4e5ae3484ba51f925dc80fabf0` |
+| `iq-direct-async-ring-v1-rc1-source.yaml` | `7be350c946ef9cfe8c80e18ef74e30c78342bb4e5ae3484ba51f925dc80fabf0` |
 | rootfs | `d80bbd7d8f4c9f997b318f815cd1664e5d8b97580bac5478e532bf117aa6d09b` |
 | FIT body, 12,821,527 bytes | `8dc973cd808a49392d26e69336c3b5c32dbece6903f69b30698873caa1bf79c5` |
 | packaged `/usr/sbin/iiod` | `cf950bdcdefa56ff90690e90fad8ce64151997c707ae3236b967b4bcfc6e9ec6` |
 | packaged `libiio.so.0.25` | `7333f76edb775ebea3a51911c42dc5f3e45fb1e082676a867b7fa90b5d61168a` |
+
+The exact protected build-input manifest deliberately keeps its historical
+RC1 name and values. It pins the reused dependency graph; the final binary
+source is merged firmware `main` at `f182a8fa...`, independently locked by
+`iq-direct-async-ring-v1-source/fw-v1` and recorded in the bundle provenance.
 
 Download and verify into a new private directory:
 
