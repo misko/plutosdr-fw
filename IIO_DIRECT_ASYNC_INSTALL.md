@@ -1,238 +1,149 @@
-# Direct-async IQ source and installation requirements
+# Direct-async IQ + RAM queue v1 installation and compatibility
 
-This document is the compatibility and installation record for the
-`iq-direct-async-ring-v1-rc1-source` hardware-qualified prerelease. It supplements
-[`flashing.md`](flashing.md); the safety rules in that guide still apply.
+This is the normative compatibility, installation, and acceptance record for
+full release `v0.46-plutoplus-spf-iq-direct-async-ring-v1`. It supplements
+[`flashing.md`](flashing.md); every Pluto+ bootloader safety rule in that guide
+still applies.
 
-## Current status
+## Release status
 
-The implementation, exact source runtime, and version-stamped image are
-hardware-qualified as a prerelease:
+The exact non-RC image is qualified for guarded persistent installation:
 
-- the protected firmware identity is
-  `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`;
-- trusted build 33360776546 produced the checksum-verified published
-  `pluto.frm`, `pluto.dfu`, and provenance bundle;
-- the immutable libiio and Buildroot tags are published;
-- Pluto Plus Utils `main` at `fd76f6694a60` contains the matched host API,
-  ladder command, and exact local-USB route isolation;
-- the firmware branch remains unmerged;
-- the final image passed RAM-only functional, ring, recovery, RF restoration,
-  and persistent-return qualification;
-- the exact packaged runtime passed the 70 MB/s+ gate over 1 GbE; and
-- persistent QSPI installation has not been authorized.
+- protected build 33408049625 built clean merged firmware `main` at
+  `f182a8fa0811d2e70186b8f75d06ff4d5d896140`;
+- the integrated routed result is `PASS` and
+  `firmware_release_eligible: true`;
+- the final image passed RAM boot, physical-1-GbE throughput, direct DMA,
+  combined DMA/RAM, standalone ring, client-loss recovery, and RF restoration;
+- guarded persistent installation, user power-cycle, exact `/dev/mtd3` FIT
+  attestation, and all post-cold-boot functional checks passed; and
+- three 23-frame direct-DMA runs delivered 71.05, 72.12, and 71.76 MB/s with
+  zero gaps.
 
-Do not flash an ordinary branch build. Use only the published assets and their
-checksums. The 1 GbE performance test staged the iiOD and shared library
-extracted from the final release rootfs under a unique `/tmp` directory,
-leaving the installed firmware and system library unchanged. The complete
-final image was independently RAM-booted and functionally qualified on a local
-USB radio.
+Do not flash an ordinary branch or CI artifact. Download only the named release
+assets and verify the release checksum file before using them.
 
-## Required component matrix
+## Exact matched component set
 
-The commits below are a matched set. Substituting upstream libiio, a different
-Python binding, or an older ABI-3 runtime is unsupported.
+Substituting stock libiio, an unmodified PyPI `pylibiio`, or an older ABI-3
+runtime is unsupported.
 
-| Layer | Package/version | Required ref or commit | Why it is pinned |
-| --- | --- | --- | --- |
-| firmware integration | PlutoSDR firmware source; protected RC1 identity `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | built source `4af2ab74605a62832f7f38a0eefe3b3bc1d492cf` on `codex/iq-direct-async-main-refresh`; implementation ancestor `a5253497d15613831055dbfb543ca5a9936bd2c6` | pins the Buildroot graph, records the qualified interface, and supplies the protected source manifest |
-| firmware base | `origin/main` as of 2026-08-31 | `4f15c87033e332293711ad679a50af0109c72862` | current-main rebase point used for qualification |
-| Buildroot | PlutoSDR Buildroot fork | `a929267288a80a31407a3af06345c088979bcc2e` / `iq-direct-async-ring-v1-rc1-source/buildroot-v2` | selects the exact radio-side libiio and metadata provider and pins the fetched archive hash |
-| radio iiOD/libiio | libiio API/SONAME line 0.25 | `b7303fded264e10473bbbb084afade8f1b1373d1` on `codex/iq-direct-async-main-refresh-libiio` | unified DMA/RAM FIFO and three-period spill headroom |
-| immutable libiio ref | published source tag | `iq-direct-async-ring-v1-rc1-source/libiio-v1` resolving exactly to `b7303fded264e10473bbbb084afade8f1b1373d1` | required by the receipt-writing host installer |
-| libiio source archive | GitHub commit archive | SHA-256 `67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a` | required by Buildroot before extraction; independently reproduced twice |
-| metadata provider | SPF metadata ABI 3 / strict `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` | frame counter, gap, gain, and RSSI provider compiled into iiOD |
-| host application | `pluto-plus-utils` package 0.1.0, Python 3.11 or newer | published `main` commit `fd76f6694a60c3edc471be12deee942076d5b216`; RC binding ancestor `65dd2c8b6184838b9147df917fbf3fbf3439ac99` | API, fail-closed admission, status parsing, finite-ring anchor handling, one-command ladder, exact RAM-only RC1 binding, and serial/path-scoped local USB route isolation |
-| host native library | libiio 0.25 | the same `b7303fded264e10473bbbb084afade8f1b1373d1` | implements the host side of `READBUFMA` and ring-extension request |
-| host Python binding | generated `pylibiio` from libiio 0.25 | the same `b7303fded264e10473bbbb084afade8f1b1373d1` | exposes the exact `MetadataBuffer(..., direct_async_frames=...)` signature |
-
-The complete firmware gitlink set at the qualified integration commit is:
-
-| Firmware component | Commit |
+| Layer | Required version, ref, or commit |
 | --- | --- |
-| Buildroot | `a929267288a80a31407a3af06345c088979bcc2e` |
-| HDL | `145bd47e55d5c5537e0ba49d53cb25a5393f66ba` |
+| firmware identity | `v0.46-plutoplus-spf-iq-direct-async-ring-v1` |
+| firmware binary source | `f182a8fa0811d2e70186b8f75d06ff4d5d896140`; immutable tag `iq-direct-async-ring-v1-source/fw-v1` |
+| original refreshed base | `origin/main` at `4f15c87033e332293711ad679a50af0109c72862` |
+| Buildroot | `a929267288a80a31407a3af06345c088979bcc2e`; immutable tag `iq-direct-async-ring-v1-rc1-source/buildroot-v2` |
+| radio and host libiio | API/SONAME 0.25 at `b7303fded264e10473bbbb084afade8f1b1373d1`; immutable tag `iq-direct-async-ring-v1-rc1-source/libiio-v1` |
+| SPF metadata provider | ABI 3 / strict `RadioMetadataV6` at `3294365ff44da26b261be4a2ccb241b7896d23ad` |
+| HDL | `145bd47e55d5c5537e0ba49d53cb25a5393f66ba`; tag `ddr-burst-v1-rc4-source/hdl-v1` |
 | HDL Quantulum | `364b3dc7e770c3971d1f41a75c00e6cae76e2e6d` |
-| Linux | `93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7` |
-| U-Boot | `1ff0468e9bea29b0a768a7bf52db8d025c521b9a` |
+| Linux | `93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7`; tag `ddr-burst-v1-rc3-source/linux-v1` |
+| U-Boot | `1ff0468e9bea29b0a768a7bf52db8d025c521b9a`; tag `gain-series-v4-rc2-source/u-boot-xlnx` |
+| Pluto Plus Utils | package 0.1.0, Python 3.11+; published `main` at `d3e5cfeb1bae07357c711e4277053bb97fd5cee7` or later |
+| host qualification/promotion implementation | `605384fc1095196e5a5946bc08e633394675c0c1` |
+| Vivado | 2022.2, build 3671981 |
+| ARM toolchain | Linaro GCC 7.3-2018.05, GCC 7.3.1 |
 
-The firmware Makefile requires Vivado 2022.2. Its x86-64 Buildroot path uses
-the pinned Linaro 2018.05 `arm-linux-gnueabihf` toolchain. Do not silently
-replace either toolchain in a release build.
+The `rc1-source` dependency tags are historical immutable source-lock names.
+The full release deliberately reuses those exact hardware-qualified dependency
+bytes; its firmware version and release tag are non-RC.
 
-## Trusted prerelease image identities
+The packaged `/opt/VERSIONS` must be exactly:
 
-Protected workflow run
-[33360776546](https://github.com/misko/plutosdr-fw/actions/runs/33360776546)
-built firmware source `4af2ab74605a62832f7f38a0eefe3b3bc1d492cf`.
-The run is successful, hardware-qualified, and published as a GitHub
-prerelease. Its exact bytes remain RAM-first; persistent QSPI promotion is a
-separate gate.
+```text
+device-fw v0.46-plutoplus-spf-iq-direct-async-ring-v1
+hdl ddr-burst-v1-rc4-source/hdl-v1
+buildroot iq-direct-async-ring-v1-rc1-source/buildroot-v2
+linux ddr-burst-v1-rc3-source/linux-v1
+u-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx
+```
 
-| Object | Exact identity |
+## Release asset identities
+
+Protected Actions run
+[33408049625](https://github.com/misko/plutosdr-fw/actions/runs/33408049625),
+attempt 1, produced these exact objects:
+
+| Object | SHA-256 |
 | --- | --- |
-| Actions artifact | `plutoplus-main-4af2ab74605a62832f7f38a0eefe3b3bc1d492cf-33360776546-1` |
-| deployment bundle | `plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a.tar.gz`; SHA-256 `3045f0f5045693a4599ee3891ec9fa5e027e7f327fccba7d76de858729ce5c6f` |
-| DFU | `plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a-pluto.dfu`; SHA-256 `6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391` |
-| FIT body | 12,821,279 bytes; SHA-256 `47e850f4dabb5be58203991f9b4f5fefc45305335d9594210a661791ac0189e9` |
-| FRM | `plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a-pluto.frm`; SHA-256 `5cd286cae15692cd2df917d954c8e50fe86899ab7877d67b8fc3a04c203df617` |
-| rootfs | SHA-256 `fd802e8fde40ba114f5b5ff46023d744f39c45ff26f902f1a19a3c9f1334226e` |
-| packaged iiOD | SHA-256 `cf950bdcdefa56ff90690e90fad8ce64151997c707ae3236b967b4bcfc6e9ec6` |
-| packaged `libiio.so.0.25` | SHA-256 `7333f76edb775ebea3a51911c42dc5f3e45fb1e082676a867b7fa90b5d61168a` |
+| `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811.tar.gz` | `c91ab1fdd68fd66ca6f871d190c994417012bc6957f2b242ada680a9edab086e` |
+| `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.dfu` | `ac51893dac8a914621aa8eb6f5c65d324ae8f09812033aa4880dc1dad8e6d739` |
+| `plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.frm` | `8a18aa951ba4d0e24534d2e15eec624587b07c92be991b0cb7f0d1669cad241e` |
+| source manifest | `7be350c946ef9cfe8c80e18ef74e30c78342bb4e5ae3484ba51f925dc80fabf0` |
+| rootfs | `d80bbd7d8f4c9f997b318f815cd1664e5d8b97580bac5478e532bf117aa6d09b` |
+| FIT body, 12,821,527 bytes | `8dc973cd808a49392d26e69336c3b5c32dbece6903f69b30698873caa1bf79c5` |
+| packaged `/usr/sbin/iiod` | `cf950bdcdefa56ff90690e90fad8ce64151997c707ae3236b967b4bcfc6e9ec6` |
+| packaged `libiio.so.0.25` | `7333f76edb775ebea3a51911c42dc5f3e45fb1e082676a867b7fa90b5d61168a` |
 
-Download and verify the exact published assets into a new private directory:
+Download and verify into a new private directory:
 
 ```bash
-candidate_dir="$(mktemp -d /tmp/pluto-direct-async-rc1.XXXXXX)"
+candidate_dir="$(mktemp -d /tmp/pluto-direct-async-v1.XXXXXX)"
 chmod 0700 "$candidate_dir"
-gh release download v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 \
+gh release download v0.46-plutoplus-spf-iq-direct-async-ring-v1 \
   --repo misko/plutosdr-fw --dir "$candidate_dir"
 (
   cd "$candidate_dir"
-  sha256sum -c iq-direct-async-ring-v1-rc1-SHA256SUMS
+  sha256sum -c iq-direct-async-ring-v1-SHA256SUMS
 )
 ```
 
-The full tarball is the retained workflow artifact. After safe extraction,
-require both `sha256sum -c SHA256SUMS` and
-`sha256sum -c PAYLOAD_SHA256SUMS` to pass. The packaged `/opt/VERSIONS` must
-name the exact v0.46 RC1 and Buildroot v2. The integrated verdict must be
-`PASS` and `firmware_release_eligible: true`.
+If using the retained deployment bundle, also require its internal
+`SHA256SUMS` and `PAYLOAD_SHA256SUMS` checks to pass before inspecting or using
+any member.
 
-## Runtime compatibility contract
+## Runtime contract
 
-The radio and host must agree on all of the following:
+The radio and host must agree on every item below:
 
 | Contract item | Required value |
 | --- | --- |
-| libiio protocol/API line | 0.25, git tag `b7303fd` |
+| libiio line | 0.25, git build tag `b7303fd` |
 | metadata ABI | `iio,buffer-metadata=3` |
 | scan layouts | `00000003:1:4:2,0000000c:1:4:2,0000000f:2:8:1` |
 | direct capability | `iio,buffer-direct-async=1` |
 | RAM-extension capability | `iio,buffer-direct-async-ring=1` |
-| RAM-ring base capabilities | `iio,buffer-ddr-ring=1`, modes `finite,continuous`, metadata status 1, and a positive advertised maximum |
-| direct capture topology | exactly one selected receiver |
-| finite target owner | `direct_async_frames`, 1 through 64 |
+| standalone RAM capabilities | `iio,buffer-ddr-ring=1`, finite and continuous modes, metadata status, and a positive maximum |
+| direct topology | exactly one selected receiver |
+| direct finite target | `direct_async_frames`, 1 through 64 per request |
 | combined RAM target | `ddr_ring_frames=0`, `ddr_ring_continuous=False` |
-| DMA depth | at least 2 without RAM; at least 3 with RAM |
-| incompatible mode | `ddr_burst_bytes` must be zero |
-| qualified network daemon setting | `iiod -r 1` |
+| DMA depth | 2 through 64 without RAM; at least 3 with RAM |
+| incompatible mode | `ddr_burst_bytes=0` |
+| radio daemon | `iiod -r 1`, or supervised equivalent `--rw-cpu-affinity 1` |
 
-The 70 MB/s result is conditional on `-r 1` and adequate queue depth. The
-qualified direct profile used 15 DMA buffers for 23 frames. Eight DMA buffers
-still moved bytes above 70 MB/s but lost five whole frames, so it is not an
-acceptable installation profile.
-
-The pinned Buildroot startup script supplies `--rw-cpu-affinity 1`, the
-long-form equivalent of `-r 1`, to the supervised production iiOD. Final-image
-qualification must verify that exact live command line. Do not run a second
-iiOD against the same IIO device while the supervised service owns it.
-
-## Verify the source graph
-
-Run these checks in the four existing worktrees before building:
-
-```bash
-FW_SRC=/ABSOLUTE/PATH/TO/plutosdr-fw-iq-direct-async-main-refresh
-BUILDROOT_SRC=/ABSOLUTE/PATH/TO/plutosdr-buildroot-iq-direct-async-main-refresh
-LIBIIO_SRC=/ABSOLUTE/PATH/TO/libiio-iq-direct-async-main-refresh
-HOST_SRC=/ABSOLUTE/PATH/TO/pluto-plus-utils-iq-direct-async-main-refresh
-
-git -C "$FW_SRC" merge-base --is-ancestor 4f15c87033e332293711ad679a50af0109c72862 HEAD
-git -C "$FW_SRC" ls-tree HEAD buildroot
-
-git -C "$BUILDROOT_SRC" rev-parse HEAD
-sed -n 's/^LIBIIO_VERSION[[:space:]]*=[[:space:]]*//p' "$BUILDROOT_SRC/package/libiio/libiio.mk"
-sed -n 's/^SPF_METADATA_SOURCE_VERSION[[:space:]]*=[[:space:]]*//p' "$BUILDROOT_SRC/package/spf_metadata_source/spf_metadata_source.mk"
-
-git -C "$LIBIIO_SRC" rev-parse HEAD
-git -C "$HOST_SRC" rev-parse HEAD
-```
-
-Expected values are Buildroot `a9292672...`, libiio `b7303fde...`,
-metadata provider `3294365f...`, and host commit `fd76f669...` (or a descendant)
-on published `main`. Host commit `65dd2c8b...` is the minimum RC binding, but
-`fd76f669...` is required when multiple local Pluto USB routes exist. A later
-documentation-only descendant is acceptable; changing any implementation pin
-requires rebuilding and repeating the qualification.
-
-## Publication and firmware build order
-
-The order matters:
-
-1. Verify the published immutable libiio tag resolves exactly to
-   `b7303fded264e10473bbbb084afade8f1b1373d1` and the published Buildroot v2 tag
-   resolves exactly to `a929267288a80a31407a3af06345c088979bcc2e`.
-2. Verify Pluto Plus Utils `main` contains exact commit `fd76f6694a60` and
-   install its receipt-bound native runtime from the immutable libiio tag.
-3. Validate `manifests/iq-direct-async-ring-v1-rc1-source.yaml` and the
-   protected candidate packaging route.
-4. Build the exact firmware source graph with Vivado 2022.2 and the pinned
-   Buildroot toolchain, using the clone-depth and architecture rules in
-   [`BUILD.md`](BUILD.md).
-5. Supply the exact protected firmware version
-   `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` through
-   `RELEASE_VERSION`. Do not use `a5253497d` as the on-radio `device-fw` value.
-6. Verify the packaged `/opt/VERSIONS`, source manifest, image checksums, and
-   exact libiio identity.
-7. RAM-boot the final version-stamped image and repeat the direct, combined,
-   standalone-ring, recovery, and RF-restoration gates. RC1 passed this gate on
-   serial `1040007c4a94000211000b009186843ef2`.
-8. Confirm the packaged iiOD/libiio pair crosses 70 MB/s on adequate Ethernet.
-   RC1 delivered 73.30 and 75.17 MB/s in the 25-MS/s cells on 1 GbE.
-9. Publish the exact qualified bytes. Persistent flashing remains a separate
-   approval after prerelease publication.
-
-After the protected environment has resolved and checked the exact gitlinks,
-the firmware-partition build entry point is:
-
-```bash
-cd /ABSOLUTE/PATH/TO/plutosdr-fw-iq-direct-async-main-refresh
-RELEASE_VERSION=v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 \
-  make build/pluto.dfu
-```
-
-The protected workflow rejects any other version for this manifest. Follow
-[`RELEASING.md`](RELEASING.md) for the source-lock, packaging, and provenance
-gates.
+RAM extension contributes overflow slots to the same ordered DMA descriptor
+FIFO. It is not a second capture, prefill, or output queue. With RAM disabled,
+the direct path allocates and copies no ring IQ.
 
 ## Install the matched host runtime
 
-The immutable libiio ref is published, so the receipt-writing installation
-procedure is now usable. It must fail rather than fall back to another commit.
+Use Pluto Plus Utils `main` at `d3e5cfeb1bae07357c711e4277053bb97fd5cee7`
+or later. The native library and generated Python binding must both be built
+from exact libiio `b7303fd`:
 
 ```bash
-cd /ABSOLUTE/PATH/TO/pluto-plus-utils-iq-direct-async-main-refresh
+git clone https://github.com/misko/pluto-plus-utils.git
+cd pluto-plus-utils
+git checkout d3e5cfeb1bae07357c711e4277053bb97fd5cee7
 uv sync --extra hardware
 
 scripts/install_native_libiio.sh \
   --uv-bin /ABSOLUTE/PATH/TO/NON-SYMLINK/uv \
   --metadata-abi 3 \
-  --python /ABSOLUTE/PATH/TO/pluto-plus-utils-iq-direct-async-main-refresh/.venv/bin/python \
-  --prefix /ABSOLUTE/PATH/TO/pluto-plus-utils-iq-direct-async-main-refresh/.venv
+  --python "$PWD/.venv/bin/python" \
+  --prefix "$PWD/.venv"
 ```
 
-The installer clones the immutable ref, checks the full commit, builds native
-libiio and its generated binding together, and writes
-`.venv/share/pluto-plus-utils/metadata-runtime.json`. It must record:
+The installer must write
+`.venv/share/pluto-plus-utils/metadata-runtime.json` naming metadata ABI 3,
+the immutable libiio ref, full source commit, installed library/binding hashes,
+and a `MetadataBuffer` constructor ending in `direct_async_frames`.
 
-- `metadata_abi: 3`;
-- source ref `iq-direct-async-ring-v1-rc1-source/libiio-v1`;
-- source commit `b7303fded264e10473bbbb084afade8f1b1373d1`;
-- the installed native library's absolute path and SHA-256;
-- the installed Python binding's absolute path and SHA-256; and
-- a `MetadataBuffer` constructor ending in `direct_async_frames`.
-
-Do not install `pylibiio` from PyPI afterward. Do not combine a wheel, native
-library, or receipt from different commits. A system libiio may coexist, but
-the application must preload the receipt-bound library inside its release
-environment.
-
-Verify the host installation:
+Do not install `pylibiio` from PyPI afterward. Do not mix a wheel, native
+library, Python binding, or receipt from different commits. Verify the result:
 
 ```bash
-cd /ABSOLUTE/PATH/TO/pluto-plus-utils-iq-direct-async-main-refresh
 uv run pluto environment --format json
 
 .venv/bin/python - <<'PY'
@@ -247,142 +158,125 @@ print(iio.__file__, iio.version)
 PY
 ```
 
-## Verify the installed radio and host together
+## Guarded persistent installation
 
-After a final firmware image exists and has been RAM-booted, use the
-receipt-bound tools to inspect the intended serial-pinned URI:
+For Pluto+, update only the `qspi-linux` firmware partition. Never use a full
+firmware ZIP, `boot.frm`, `boot.dfu`, or `uboot-env.dfu`.
+
+Identify one directly attached radio by exact USB serial and sysfs topology,
+stop every process using it, and run the flash command once without `--execute`:
 
 ```bash
-.venv/bin/iio_info -u ip:RADIO_ADDRESS | sed -n '1,40p'
+uv run pluto firmware flash \
+  /absolute/path/plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.dfu \
+  --usb-sysfs-path /sys/bus/usb/devices/EXACT_PATH \
+  --profile iq-direct-async-ring-v1-release-persistent-promotion
 ```
 
-Require all of these observations before capture:
+The plan must show the intended serial, exact DFU SHA-256 `ac51893d...`, FIT
+SHA-256 `8dc973cd...`, target v0.46 identity, qualified prior-version policy,
+and firmware-partition-only operation. If any value differs, stop.
 
-- the expected final `fw_version`, not the old installed firmware;
-- the intended hardware serial;
-- frontend and backend libiio version 0.25, git tag `b7303fd`;
-- `iio,buffer-metadata: 3`;
-- `iio,buffer-direct-async: 1`;
-- `iio,buffer-direct-async-ring: 1`; and
-- the exact ABI-3 scan-layout string.
-
-The release acceptance profiles are:
-
-| Mode | Sample rate | DMA buffers | RAM slots | Frames | Required result |
-| --- | ---: | ---: | ---: | ---: | --- |
-| direct DMA | 30.72 MS/s | 15 | 0 | 23 | at least 70 MB/s and zero gaps |
-| DMA with RAM extension | 30.72 MS/s | 10 | 13 | 23 | zero gaps, nonzero spill/drain counts, clean completion |
-| standalone finite RAM ring | 20 MS/s | 8 | 15 | 23 | zero gaps, 23 produced/consumed, clean completion |
-
-RAM-extension application throughput is not required to reach 70 MB/s. Its
-acceptance purpose is extra FIFO capacity with preserved ordering and exact
-status.
-
-The guarded volatile transition is bound by Pluto Plus Utils ancestor
-`65dd2c8b6` and present in the required `fd76f6694a60` head as profile
-`iq-direct-async-ring-v1-rc1-ram`. It accepts only the DFU/FIT identity above
-and has no persistent counterpart. First run the command without
-`--execute` and review the serial, direct USB sysfs path, current firmware,
-candidate version, and confirmation phrase. Execution uses the same arguments
-plus `--execute --confirm 'RAM BOOT EXPECTED_SERIAL'`:
+Execute that same plan only with its exact confirmation phrase:
 
 ```bash
-pluto firmware ram-boot /ABSOLUTE/PATH/TO/EXACT_RC1.dfu \
-  --usb-sysfs-path /sys/bus/usb/devices/EXACT_DIRECT_PATH \
-  --profile iq-direct-async-ring-v1-rc1-ram \
-  --ssh-known-hosts-file /ABSOLUTE/PRIVATE/PATH/EXPECTED_SERIAL.known_hosts
+uv run pluto firmware flash \
+  /absolute/path/plutoplus-spf-iq-direct-async-ring-v1-f182a8fa0811-pluto.dfu \
+  --usb-sysfs-path /sys/bus/usb/devices/EXACT_PATH \
+  --profile iq-direct-async-ring-v1-release-persistent-promotion \
+  --execute --confirm 'FLASH EXACT_SERIAL'
 ```
 
-The exact final image was RAM-booted on directly attached serial
-`1040007c4a94000211000b009186843ef2` at `/sys/bus/usb/devices/3-8`. The guarded
-receipt attested the candidate identity and unchanged QSPI. After qualification,
-the same guarded utility rebooted it to its prior persistent
-`v0.42-plutoplus-spf-ddr-burst-v2`; a bounded dual-RX refill, AD9361/2R2T tuple,
-and 5.8 GHz tune/readback/restore probe passed. RC1 was never persistently
-written.
-
-The sustained release ladder is one Pluto Plus Utils command. Its defaults are
-the required `5M,10M,15M,25M` rates, `3,10` second durations, 1,048,576 samples
-per block, and 15 DMA buffers:
+Keep the durable receipt. Do not retry an uncertain post-eject operation. After
+the radio returns, pin its SSH host key and use the read-only reconciliation
+command to attest the active identity and hash exactly the recorded FIT length
+from `/dev/mtd3`:
 
 ```bash
-pluto radio direct-async-ladder RADIO_ADDRESS \
-  --transport ip --ip-port 30431 \
-  --expect-serial EXPECTED_SERIAL
+uv run pluto firmware reconcile-local RECEIPT_ID \
+  --usb-sysfs-path /sys/bus/usb/devices/EXACT_PATH \
+  --profile iq-direct-async-ring-v1-release-persistent-promotion \
+  --ssh-known-hosts-file /absolute/private/path/radio.known_hosts \
+  --ssh-host RADIO_ADDRESS
 ```
 
-Repeat it with RAM extending the same queue:
+Reconciliation never writes QSPI, changes RF state, or reboots. A mismatch is
+a stop condition, not permission to replay the flash.
+
+## Functional ladder and acceptance tests
+
+The one-command ringless speed matrix uses the requested 5/10/15/25 MS/s rates
+for 3 and 10 seconds:
 
 ```bash
-pluto radio direct-async-ladder RADIO_ADDRESS \
-  --transport ip --ip-port 30431 \
-  --expect-serial EXPECTED_SERIAL \
-  --kernel-buffers 10 --ram-ring-slots 13
-```
-
-Both commands must execute all eight cells and restore the pre-test RX
-settings. Require no command/protocol/readback/capture failures;
-evaluate reported gap and missing-sample counts as measurements rather than
-hiding them behind a successful exit. The ringless 25-MS/s cells must exceed
-70 MB/s. RAM mode must show nonzero and equal aggregate spill/drain counts
-with a high-water mark no greater than 13. A sustained-rate cell is gapless
-only when its reported gap events, missing samples, and overflow count are all
-zero.
-
-The exact final image's 480 Mb/s USB-gadget link passed the 5-MS/s ladder cells
-but could not carry the higher rates and reset under pressure. That is a host
-link limit, not 70 MB/s evidence. On the 1 GbE radio at `192.168.1.15`, the
-exact packaged iiOD and `libiio.so.0.25` extracted from the final rootfs ran on
-an isolated port without replacing installed files. The ringless 25-MS/s cells
-delivered 73.30 and 75.17 MB/s. They also reported 7 and 20 missing frames, so
-RC1 claims 70 MB/s+ transport but not gapless continuously offered 25 MS/s.
-
-The corresponding RAM-extension ladder spilled/drained 29/29 and 106/106
-descriptors in the 25-MS/s cells, reached its configured 13-slot high-water
-mark, and reduced missing frames from 27 to 22. Final-image local qualification
-separately delivered a 29-frame, 10-MS/s run with zero gaps, 9 spills, 9 drains,
-and high-water 8. Together these measurements prove that RAM extends the same
-ordered queue.
-
-For release evidence, add `--format table --report ABSENT_REPORT_PATH`. The
-report path must be new and beneath an operator-owned mode-0700 directory; the
-command deliberately refuses an existing path or a less-private parent.
-
-For exact reproducibility, the explicit form of the defaults is:
-
-```bash
-pluto radio direct-async-ladder RADIO_ADDRESS \
-  --transport ip --ip-port 30431 \
-  --expect-serial EXPECTED_SERIAL \
+uv run pluto radio direct-async-ladder RADIO_ADDRESS \
+  --transport ip --expect-serial EXACT_SERIAL \
   --rates 5M,10M,15M,25M --durations 3,10 \
-  --samples 1048576 --kernel-buffers 15
+  --samples 1048576 --kernel-buffers 15 \
+  --iq-decoder raw-complex64 \
+  --format json --report /ABSOLUTE/PRIVATE/PATH/ringless-ladder.json
 ```
 
-## Qualification binary identities
+Run the same matrix with 13 RAM slots extending a 10-descriptor DMA queue:
 
-The volatile qualification used these ARM32 EABI5 files built from exact
-`b7303fd`:
+```bash
+uv run pluto radio direct-async-ladder RADIO_ADDRESS \
+  --transport ip --expect-serial EXACT_SERIAL \
+  --rates 5M,10M,15M,25M --durations 3,10 \
+  --samples 1048576 --kernel-buffers 10 --ram-ring-slots 13 \
+  --iq-decoder raw-complex64 \
+  --format json --report /ABSOLUTE/PRIVATE/PATH/ram-extension-ladder.json
+```
 
-| File | SHA-256 |
-| --- | --- |
-| `iiod` | `89c5eae83b7bb517279ebe97e3300615c58efbf3892dc9d6939966429122e01d` |
-| `libiio.so.0.25` | `8fd0530bd712abe6398f300c17c34052a3e86acfbf374680071869f260921841` |
+The ladder must execute all eight cells, restore the complete RX configuration,
+and report counter-observed gaps rather than conceal them. Sustained 25 MS/s
+offers 100 MB/s and outruns this 1-GbE path, so gaps in those duration cells are
+expected. The separate hard throughput/continuity gate is three independent
+finite 23-frame captures at 30.72 MS/s, 1,048,576 samples per frame, 15 DMA
+buffers, RAM disabled, and `raw-complex64`; require at least 70 MB/s and zero
+counter gaps in every run.
 
-These hashes identify the earlier independent source cross-build only. The
-published release contains its own packaged iiOD and library hashes in the
-asset table above; do not interchange the two binary pairs.
+Also require:
 
-## Rollback and recovery
+- combined direct mode actually spills and drains RAM frames in equal counts;
+- standalone finite ring reaches its requested target, drains completely, and
+  preserves frame order across a wrap;
+- two deliberate large-ring client losses recover without Linux or iiOD
+  restart and leave zero buffers/faults with DDS off and TX at -80 dB; and
+- 5.8 GHz LO tune/readback succeeds on AD9361 and restores the exact prior LO.
 
-For a volatile test, stop only the exact temporary iiOD process, ensure the DMA
-buffer and control register are clear, remove its explicit temporary directory,
-and restore the original supervised iiOD command. Recheck installed
-`/usr/sbin/iiod` and `/usr/lib/libiio.so.0.25` hashes and restore all RF
-settings.
+The exact hardware results and limitations are recorded in
+[`RELEASE_IQ_DIRECT_ASYNC_RING_V1.md`](RELEASE_IQ_DIRECT_ASYNC_RING_V1.md).
 
-For a published persistent image, use only the firmware-partition recovery
-methods in [`flashing.md`](flashing.md). Never install or roll back with a
-full firmware ZIP on Pluto+. Keep the previous hardware-qualified
-`pluto.frm` or `pluto.dfu`, its checksums, serial-scoped preflight record,
-and the matching host-runtime package available until the new release passes
-cold-boot and recovery qualification.
+## Source-build verification
+
+Before reproducing the protected build, verify the pins:
+
+```bash
+git -C /PATH/TO/plutosdr-fw rev-parse HEAD
+git -C /PATH/TO/plutosdr-fw ls-tree HEAD buildroot
+git -C /PATH/TO/plutosdr-buildroot rev-parse HEAD
+git -C /PATH/TO/libiio rev-parse HEAD
+git -C /PATH/TO/pluto-plus-utils rev-parse HEAD
+```
+
+Expected firmware binary source is `f182a8fa...`; Buildroot is `a9292672...`;
+libiio is `b7303fde...`; and host `main` contains `d3e5cfeb...`. Build with
+Vivado 2022.2 and the pinned Linaro toolchain, supplying the exact protected
+identity:
+
+```bash
+cd /PATH/TO/plutosdr-fw
+RELEASE_VERSION=v0.46-plutoplus-spf-iq-direct-async-ring-v1 \
+  make build/pluto.dfu
+```
+
+Any implementation-pin change requires a new protected build and complete
+hardware requalification.
+
+## Rollback
+
+Retain the previous hardware-qualified DFU/FRM and its checksum/profile until
+all post-install tests pass. Roll back only the firmware partition using that
+release's own exact guarded persistent profile. Never rewrite the Pluto+
+bootloader or U-Boot environment as part of a routine firmware rollback.

@@ -48,32 +48,29 @@ a radio. With multiple radios attached, identify every radio by USB serial and
 topology. The safest manual DFU procedure is to leave only the intended radio
 connected.
 
-### Direct-async IQ RC1 remains unflashable until its image is qualified
+### Direct-async IQ + RAM queue v1 is approved for guarded persistent use
 
-The protected candidate identity is
-`v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. Its source stack and
-performance path are hardware-qualified, and its immutable libiio and
-Buildroot source tags are published. Trusted build 33360776546 produced a
-version-stamped, checksum-verified image, but those exact bytes have not been
-RAM-booted and no GitHub release exists. Do not substitute the
-firmware implementation commit `a5253497d` for a release version and do not
-flash an ordinary CI or local build persistently.
+Full release `v0.46-plutoplus-spf-iq-direct-async-ring-v1` passed RAM boot,
+physical-1-GbE throughput, unified DMA/RAM queue, standalone ring,
+abrupt-client recovery, RF restoration, guarded persistent installation, user
+power-cycle, and exact `/dev/mtd3` FIT attestation. Use only the assets from
+protected build 33408049625 and the exact Pluto Plus Utils profile
+`iq-direct-async-ring-v1-release-persistent-promotion`.
 
-Its exact compatibility set is firmware implementation `a5253497d`, Buildroot
-`a92926728`, libiio 0.25 `b7303fded`, metadata provider `3294365ff`, and Pluto
-Plus Utils 0.1.0 implementation `65dd2c8b6` on published `main`. Both the host
-native library and Python binding must be built from the same `b7303fded`
-source. See
-[`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for full hashes,
-submodule pins, publication order, host installation, verification profiles,
-and rollback requirements.
+The exact release DFU SHA-256 is
+`ac51893dac8a914621aa8eb6f5c65d324ae8f09812033aa4880dc1dad8e6d739`;
+its 12,821,527-byte FIT SHA-256 is
+`8dc973cd808a49392d26e69336c3b5c32dbece6903f69b30698873caa1bf79c5`.
+Required components are firmware source `f182a8fa0811`, Buildroot
+`a929267288a8`, libiio 0.25 `b7303fded264`, metadata provider
+`3294365ff44d`, and Pluto Plus Utils published `main` at `d3e5cfeb1bae` or
+later. Both host native libiio and its Python binding must come from the exact
+`b7303fd` source.
 
-The exact RC1 DFU SHA-256 is
-`6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391`.
-This section remains a stop condition until release notes record those exact
-bytes' hardware qualification. Once that exists, use the ordinary
-checksum-verified RAM-boot procedure below.
-Persistent installation still requires a separately documented authorization.
+See [`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for the
+checksum-first download, exact host runtime, dry-run/confirmation command,
+read-only post-flash reconciliation, acceptance profiles, and rollback rules.
+Never use an ordinary branch artifact or rewrite Pluto+ bootloader partitions.
 
 ## Find and download a release
 
