@@ -60,7 +60,7 @@
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
-| `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **offline-qualified image; RAM test pending** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and adds a one-command rate/duration ladder |
+| `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **hardware-qualified RAM-first prerelease; persistent promotion pending** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and exceeds 70 MB/s with the exact packaged runtime over 1 GbE |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -69,7 +69,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 — 2026-08-31 — **offline-qualified image; RAM test pending**
+## v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 — 2026-08-31 — **hardware-qualified RAM-first prerelease**
 
 This source candidate rebases the finite direct-async IQ prototype onto the
 current firmware `origin/main` base
@@ -92,12 +92,12 @@ The exact compatible source graph is:
 
 | Component | Version/ref | Required implementation commit |
 | --- | --- | --- |
-| firmware integration | `codex/iq-direct-async-main-refresh` | `a5253497d15613831055dbfb543ca5a9936bd2c6` |
-| source manifest | `iq-direct-async-ring-v1-rc1-source.yaml` | candidate source graph in the firmware release commit |
+| firmware integration | `codex/iq-direct-async-main-refresh` | built source `4af2ab74605a62832f7f38a0eefe3b3bc1d492cf`; implementation ancestor `a5253497d15613831055dbfb543ca5a9936bd2c6` |
+| source manifest | `iq-direct-async-ring-v1-rc1-source.yaml` | candidate source graph embedded in the built commit; promoted record pins the annotated release tag |
 | Buildroot | `iq-direct-async-ring-v1-rc1-source/buildroot-v2` | `a929267288a80a31407a3af06345c088979bcc2e` |
 | radio and host libiio | 0.25; `iq-direct-async-ring-v1-rc1-source/libiio-v1` | `b7303fded264e10473bbbb084afade8f1b1373d1` |
 | metadata provider | ABI 3 / `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` |
-| Pluto Plus Utils | package 0.1.0; published `main` | `65dd2c8b6184838b9147df917fbf3fbf3439ac99` (ladder introduced by ancestor `37f6c38650bce42d017b5516edf2c736ef81b889`) |
+| Pluto Plus Utils | package 0.1.0; published `main` | `fd76f6694a60c3edc471be12deee942076d5b216` (RC binding `65dd2c8b6184838b9147df917fbf3fbf3439ac99`; ladder `37f6c38650bce42d017b5516edf2c736ef81b889`) |
 
 The native host library and generated Python binding must both come from the
 same `b7303fd` source. Stock libiio and the PyPI-only `pylibiio` package do not
@@ -145,8 +145,11 @@ proved that RAM extends the existing queue: 134 descriptors spilled and all
 and 68.74 MB/s and reduced missing IQ bytes from 31,457,280 ringless to
 20,971,520. The RAM report SHA-256 is
 `4594fe3d573ce063ae105e9fa84e9554456b8b44fbdbddc968886a78cdc8e969`.
-These ladder results used the exact release-source iiOD from `/tmp`; the final
-version-stamped image must repeat both commands before the RC1 is published.
+These ladder results used the exact release-source iiOD from `/tmp`. Final
+qualification later repeated the full 1 GbE ladder with the iiOD and
+`libiio.so.0.25` extracted from the version-stamped image's rootfs, while the
+complete final image independently passed RAM-boot functional and recovery
+gates on a local USB radio.
 
 RAM extension is a capacity and continuity mode, not the 70 MB/s performance
 mode. Its measured application rates ranged from 42.80 to 67.91 MB/s because
@@ -156,7 +159,7 @@ transported above 70 MB/s but overran after frame 14, so the qualified
 15-buffer profile is a compatibility requirement for this finite workload.
 
 The final source heads pass 14 native and 14 ASan/UBSan C tests, 38 libiio
-Python tests, 1,171 host tests with 11 explicit skips, Ruff, and strict mypy
+Python tests, 1,175 host tests with 11 explicit skips, Ruff, and strict mypy
 across 65 source files.
 The radio's stock iiOD, installed library hashes, RF settings, buffer state,
 and DMA control register were restored after the volatile test.
@@ -164,9 +167,9 @@ and DMA control register were restored after the volatile test.
 The protected candidate identity is
 `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. The immutable libiio and
 Buildroot refs are published at exactly `b7303fd` and `a92926728`; Pluto Plus
-Utils `main` contains the matched host implementation and ladder at
-`65dd2c8b6`; exact RAM-only image binding was added after the ladder at
-`37f6c3865`.
+Utils `main` contains the complete matched host at `fd76f6694a60`, including
+the ladder, exact RAM-only image binding, and serial/path-scoped local USB route
+isolation.
 Protected build
 [33360194246](https://github.com/misko/plutosdr-fw/actions/runs/33360194246)
 validated the source graph and version guard, then stopped before compilation
@@ -196,15 +199,57 @@ artifact identities are:
 The packaged `/opt/VERSIONS` reports the exact v0.46 RC1, Buildroot v2, and
 the declared HDL/Linux/U-Boot locks. Its supervised iiOD command contains
 `--rw-cpu-affinity 1`, and the ARM binary contains both direct-async capability
-names. As of the qualification inventory, target serial
-`104000b29905000e17000800065934759d` at `192.168.1.15` is Ethernet-reachable
-but is not attached to this host over USB. Therefore the exact image has not
-been RAM-booted, the two ladder commands have not run on final bytes, and no
-GitHub release has been minted. A different attached radio was not substituted.
+names.
 
-Final version-stamped RAM qualification remains the publication gate.
-Persistent flashing remains a separate authorization even after an RC1 is
-published. See
+The exact final DFU was then RAM-booted, without a QSPI write, on local USB
+serial `1040007c4a94000211000b009186843ef2`. It reported the exact v0.46 RC1,
+AD9361 paired RX, ABI 3, and both direct/RAM-extension capabilities. On its
+480 Mb/s USB-gadget IP link, the 5-MS/s 3- and 10-second direct cells were
+gapless at 18.17 and 19.33 MB/s. The link reset under higher-rate pressure, so
+those failures are retained as USB transport evidence and are not used for the
+70 MB/s claim.
+
+On that exact final image, a 29-frame 10-MS/s combined run completed with zero
+gaps, 9 RAM spills, 9 drains, and a high-water mark of 8. A standalone finite
+ring delivered 23/23 frames and 96,468,992 IQ bytes with zero gaps, high-water
+15, one wrap, and `target_complete`. Two abrupt 200 MB client-loss cycles,
+alternating RX0 and RX1, were each followed immediately by gapless ring and
+ordinary probes with the same iiOD PID/generation and zero final buffers or
+faults. Their report SHA-256 values are respectively
+`3dc42694ed8b234564e66a2184ded32a1ea87c96c1370c6b1d980293dcd83238`,
+`e0ad39f5d825c1a723e10501d503fcfadb0603ca15b5b6aa3a891e34f96a6149`,
+and `694d16dde1ab366d1cd12699fd0ebd6e0d79984b3f7ba4e41967eee58428d598`.
+
+For the adequate-link performance gate, the exact packaged iiOD and
+`libiio.so.0.25` were extracted from the final rootfs and staged on isolated
+port 30432 of the authorized 1 GbE radio at `192.168.1.15`. Installed firmware
+and libraries remained unchanged. The ringless ladder was gapless through
+15 MS/s and delivered **73.30 MB/s** for 3 seconds and **75.17 MB/s** for
+10 seconds at 25 MS/s. The 25-MS/s counters reported 7 and 20 missing frames;
+the release therefore claims 70 MB/s+ transport, not gapless continuously
+offered 25 MS/s. Report SHA-256 is
+`059e2cd02503252beda0a4377e50f7d293e95b0c6a4456a58a46193e0dafad7b`.
+
+The packaged-runtime RAM ladder was also gapless through 15 MS/s. At 25 MS/s
+it delivered 67.69 and 67.95 MB/s, spilled/drained 29/29 and 106/106
+descriptors, reached the configured 13-slot high-water mark, and reduced
+missing frames from 27 ringless to 22. Report SHA-256 is
+`d0a1943243a8b9a63c80aa84a76645fe23a7054660928f7f8a3e9f721d9f0630`.
+This confirms that RAM extends the existing FIFO; it is a capacity option, not
+the ringless 70 MB/s fast path.
+
+After testing, the temporary 30432 daemon and staging directory were removed
+and the Ethernet radio returned to its unchanged installed service. The local
+radio guard-rebooted to its prior persistent
+`v0.42-plutoplus-spf-ddr-burst-v2`, passed a bounded dual-RX refill, reported
+the canonical AD9361/2R2T U-Boot tuple, and accepted/read back/restored a
+5.8 GHz RX LO. The RC1 was not persistently written to either unit.
+
+The exact bytes are published as GitHub prerelease
+`v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. Persistent flashing remains
+a separate authorization and qualification gate. See
+[`RELEASE_IQ_DIRECT_ASYNC_RING_V1_RC1.md`](RELEASE_IQ_DIRECT_ASYNC_RING_V1_RC1.md)
+and
 [`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for the exact
 component matrix, installation order, checks, and rollback boundary.
 

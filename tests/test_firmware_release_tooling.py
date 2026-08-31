@@ -277,6 +277,9 @@ def test_direct_async_ring_v1_has_an_exact_protected_candidate_route() -> None:
     branch = "refs/heads/codex/iq-direct-async-main-refresh"
     manifest_name = "iq-direct-async-ring-v1-rc1-source.yaml"
     manifest = (ROOT / "manifests" / manifest_name).read_text()
+    build_manifest = (
+        ROOT / "manifests" / "iq-direct-async-ring-v1-rc1.yaml"
+    ).read_text()
 
     assert workflow.count(branch) == 4
     assert workflow.count(f"'{manifest_name}'") == 1
@@ -291,7 +294,12 @@ def test_direct_async_ring_v1_has_an_exact_protected_candidate_route() -> None:
     for source in (builder, package, checker):
         assert manifest_name in source
     assert "libiio_0_25_archive_sha256" in source_graph
-    assert "release_state: candidate" in manifest
+    assert "release_state: hardware-qualified-prerelease" in manifest
+    assert (
+        "release_tag: v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1"
+        in manifest
+    )
+    assert "firmware_source: 4af2ab74605a62832f7f38a0eefe3b3bc1d492cf" in manifest
     assert "libiio_0_25_source: b7303fded264e10473bbbb084afade8f1b1373d1" in manifest
     assert "metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad" in manifest
     assert "submodule_buildroot: a929267288a80a31407a3af06345c088979bcc2e" in manifest
@@ -300,6 +308,17 @@ def test_direct_async_ring_v1_has_an_exact_protected_candidate_route() -> None:
         "67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a"
         in manifest
     )
+    assert (
+        "qualification_utility_commit: "
+        "fd76f6694a60c3edc471be12deee942076d5b216"
+        in build_manifest
+    )
+    assert (
+        "image_sha256: "
+        "6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391"
+        in build_manifest
+    )
+    assert "persistent_qualified: false" in build_manifest
 
 
 def test_iio_throughput_affinity_candidate_has_an_exact_protected_route() -> None:

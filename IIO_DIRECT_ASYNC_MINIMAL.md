@@ -3,9 +3,9 @@
 This candidate is based directly on firmware `origin/main`
 `4f15c87033e332293711ad679a50af0109c72862` as observed on 2026-08-31. It
 preserves the minimal direct DMA transport and optionally lets the existing
-RAM ring extend that same FIFO. The exact source branches and immutable
-dependency tags are published; the firmware remains unmerged and is not
-authorized for persistent flash.
+RAM ring extend that same FIFO. The exact source branches, immutable dependency
+tags, and hardware-qualified RC1 assets are published; the firmware remains
+unmerged and is not authorized for persistent flash.
 
 ## Interface
 
@@ -94,7 +94,7 @@ with either direct mode.
 | --- | --- | --- | --- |
 | libiio/iiOD | `codex/iq-direct-async-main-refresh-libiio` | `b7303fded264e10473bbbb084afade8f1b1373d1` | direct producer, unified DMA/RAM FIFO, spill accounting, DMA headroom, binding and native tests |
 | Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `a929267288a80a31407a3af06345c088979bcc2e` | exact libiio pin and archive SHA-256 |
-| host | published `main` | `65dd2c8b6184838b9147df917fbf3fbf3439ac99` | API admission, capability checks, status exposure, finite-ring timestamp handling, one-command ladder, exact RAM-only RC1 image binding, tests |
+| host | published `main` | `fd76f6694a60c3edc471be12deee942076d5b216` | API admission, capability checks, status exposure, finite-ring timestamp handling, one-command ladder, exact RAM-only RC1 image binding, serial/path-scoped USB route isolation, tests |
 
 The libiio branch descends from its audited `origin/master` base
 `4c6022caf838813c1fc88d6de7a83f2bb5fa8e9f`; the host work descends from its
@@ -116,7 +116,7 @@ DMA leases, ring core/request/status, metadata batching, sampler coverage,
 tandem session, and thread-affinity coverage. The Python libiio suite passes
 38 tests.
 
-The final host head passes 1,171 tests with 11 explicit browser, attached-radio,
+The final host head passes 1,175 tests with 11 explicit browser, attached-radio,
 or transmitter skips and one third-party deprecation warning. Ruff passes and
 strict mypy reports no issues in 65 source files.
 
@@ -214,8 +214,15 @@ The exact dependency tags and host command are published. Trusted build
 33360776546 produced the protected version
 `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`; its DFU SHA-256 is
 `6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391`.
-No GitHub release exists yet. The final image must repeat
-the fixed direct, combined, standalone-ring, and two ladder profiles under its
-normal supervised iiOD before publication. Target `192.168.1.15` was not
-locally USB-attached, so it could not be RAM-booted; no other radio was
-substituted and no persistent radio mutation was made.
+That exact image passed guarded RAM boot, combined-queue spill/drain,
+standalone-ring, abrupt-client recovery, RF restoration, and guarded return to
+the prior persistent firmware on local serial
+`1040007c4a94000211000b009186843ef2`.
+
+The local USB-gadget Ethernet link is limited to 480 Mb/s, so the exact
+packaged iiOD and library from the final rootfs repeated the full ladder on the
+authorized 1 GbE radio at `192.168.1.15` without replacing installed files.
+The 25-MS/s cells reached 73.30 and 75.17 MB/s while reporting 7 and 20 missing
+frames. RAM reduced total missing frames from 27 to 22 and recorded matching
+spill/drain counts. The hardware-qualified RC1 is published as a GitHub
+prerelease; persistent QSPI promotion remains unqualified and unauthorized.

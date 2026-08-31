@@ -5,12 +5,15 @@ For release discovery and safe persistent or RAM-only installation on Pluto
 and Pluto+, see **[Flashing firmware](flashing.md)**. Pluto+ users should read
 its bootloader safety warning before copying any image to a radio.
 
-The direct-async/RAM-extension stack is staged as protected prerelease
-candidate `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. Its trusted image
-is offline-qualified, but final RAM-boot qualification and the GitHub release
-are pending. Its exact firmware, Buildroot, libiio,
-metadata-provider, host, toolchain, ladder-test, and binding requirements are in
-**[Direct-async IQ source and installation requirements](IIO_DIRECT_ASYNC_INSTALL.md)**.
+The direct-async/RAM-extension stack is published as hardware-qualified
+prerelease `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. Its exact final
+image passed guarded RAM boot, unified DMA/RAM queue, finite-ring, abrupt-client
+recovery, and RF-restoration gates. The exact packaged runtime exceeded
+70 MB/s over 1 GbE. Persistent QSPI installation is not yet qualified. See the
+**[RC1 release notes](RELEASE_IQ_DIRECT_ASYNC_RING_V1_RC1.md)** and
+**[source and installation requirements](IIO_DIRECT_ASYNC_INSTALL.md)** for the
+firmware, Buildroot, libiio, metadata-provider, host, toolchain, ladder-test,
+and binding pins.
 
 Latest binary release: [![GitHub Release](https://img.shields.io/github/v/release/misko/plutosdr-fw)](https://github.com/misko/plutosdr-fw/releases/latest) [![GitHub release downloads](https://img.shields.io/github/downloads/misko/plutosdr-fw/total.svg)](https://github.com/misko/plutosdr-fw/releases)
 

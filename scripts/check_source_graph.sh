@@ -159,7 +159,10 @@ else
     warn ".gitmodules not present (not a firmware checkout?)"
 fi
 
-if [[ "$CHECK_WORKTREE" == 1 && "$(m release_state)" == "candidate" ]] && \
+release_state="$(m release_state)"
+if [[ "$CHECK_WORKTREE" == 1 &&
+      ( "$release_state" == "candidate" ||
+        "$release_state" == "hardware-qualified-prerelease" ) ]] && \
     git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     for entry in "buildroot:submodule_buildroot" "hdl:submodule_hdl" \
         "hdl-quantulum:submodule_hdl_quantulum" \

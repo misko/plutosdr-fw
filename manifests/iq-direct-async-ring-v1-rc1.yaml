@@ -1,0 +1,78 @@
+# Immutable build manifest for the hardware-qualified direct-async/RAM-queue
+# RC1 prerelease. The complete final image ran on one USB Pluto+; its exact
+# packaged iiOD/libiio runtime ran the 1 GbE performance ladder on a second.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+
+release_tag: v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1
+asset_name: plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1/plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a-pluto.dfu
+image_sha256: 6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391
+fit_body_sha256: 47e850f4dabb5be58203991f9b4f5fefc45305335d9594210a661791ac0189e9
+fit_body_size: 12821279
+device_fw: v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1
+
+frm_asset_name: plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a-pluto.frm
+frm_sha256: 5cd286cae15692cd2df917d954c8e50fe86899ab7877d67b8fc3a04c203df617
+bundle_asset_name: plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a.tar.gz
+bundle_sha256: 3045f0f5045693a4599ee3891ec9fa5e027e7f327fccba7d76de858729ce5c6f
+ci_run_id: 33360776546
+ci_run_attempt: 1
+
+firmware_source: 4af2ab74605a62832f7f38a0eefe3b3bc1d492cf
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_base: 4f15c87033e332293711ad679a50af0109c72862
+
+libiio_0_25_source: b7303fded264e10473bbbb084afade8f1b1373d1
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/iq-direct-async-ring-v1-rc1-source/libiio-v1
+libiio_0_25_archive_sha256: 67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a
+
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+submodule_buildroot: a929267288a80a31407a3af06345c088979bcc2e
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+
+versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
+versions_buildroot: iq-direct-async-ring-v1-rc1-source/buildroot-v2
+versions_linux: ddr-burst-v1-rc3-source/linux-v1
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+
+fpga_bitstream_md5: 60134f7a73f2f7f5fab0566e8fb681cb
+fpga_bitstream_sha256: 2221c9ba0eb51cc6c5155fa9a955e8574b3dae51f4349e124d5858db7103e277
+ramdisk_md5: 181339dc00446a4ac91e39e0b6983ea6
+rootfs_sha256: fd802e8fde40ba114f5b5ff46023d744f39c45ff26f902f1a19a3c9f1334226e
+packaged_iiod_sha256: cf950bdcdefa56ff90690e90fad8ce64151997c707ae3236b967b4bcfc6e9ec6
+packaged_libiio_sha256: 7333f76edb775ebea3a51911c42dc5f3e45fb1e082676a867b7fa90b5d61168a
+fit_description: Configuration to load fpga before Kernel
+
+hardware_qualified: true
+hardware_qualified_date: 2026-08-31
+hardware_units: 2
+final_image_ram_units: 1
+packaged_runtime_ethernet_units: 1
+persistent_qualified: false
+radio_libiio: 0.25
+metadata_abi: 3
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_commit: fd76f6694a60c3edc471be12deee942076d5b216
+qualification_transports: usb-gadget-ip,physical-ethernet
+ringless_25m_3s_payload_mbps: 73.30138486632721
+ringless_25m_10s_payload_mbps: 75.16844446222522
+ringless_25m_3s_missing_frames: 7
+ringless_25m_10s_missing_frames: 20
+ram_extension_spill_drain_proven: true
+final_image_ram_report_sha256: 3dc42694ed8b234564e66a2184ded32a1ea87c96c1370c6b1d980293dcd83238
+final_image_finite_ring_report_sha256: e0ad39f5d825c1a723e10501d503fcfadb0603ca15b5b6aa3a891e34f96a6149
+final_image_recovery_report_sha256: 694d16dde1ab366d1cd12699fd0ebd6e0d79984b3f7ba4e41967eee58428d598
+packaged_runtime_ringless_report_sha256: 059e2cd02503252beda0a4377e50f7d293e95b0c6a4456a58a46193e0dafad7b
+packaged_runtime_ram_report_sha256: d0a1943243a8b9a63c80aa84a76645fe23a7054660928f7f8a3e9f721d9f0630
