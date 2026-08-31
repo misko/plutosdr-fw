@@ -6,15 +6,17 @@ This document is the compatibility and installation record for the
 
 ## Current status
 
-The implementation and its exact source runtime are hardware-qualified, but
-the version-stamped firmware is not installable yet:
+The implementation and its exact source runtime are hardware-qualified. The
+version-stamped image is offline-qualified but not installable yet:
 
 - the protected firmware identity is
   `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`;
-- no version-stamped `pluto.frm` or `pluto.dfu` exists;
+- trusted build 33360776546 produced checksum-verified `pluto.frm` and
+  `pluto.dfu` artifacts;
 - the immutable libiio and Buildroot tags are published;
 - Pluto Plus Utils `main` contains the matched host API and ladder command;
-- the firmware branch remains unmerged; and
+- the firmware branch remains unmerged;
+- final-image RAM qualification and the GitHub release are pending; and
 - persistent QSPI installation has not been authorized.
 
 Do not flash an ordinary branch build. The hardware qualification used an
@@ -36,7 +38,7 @@ Python binding, or an older ABI-3 runtime is unsupported.
 | immutable libiio ref | published source tag | `iq-direct-async-ring-v1-rc1-source/libiio-v1` resolving exactly to `b7303fded264e10473bbbb084afade8f1b1373d1` | required by the receipt-writing host installer |
 | libiio source archive | GitHub commit archive | SHA-256 `67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a` | required by Buildroot before extraction; independently reproduced twice |
 | metadata provider | SPF metadata ABI 3 / strict `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` | frame counter, gap, gain, and RSSI provider compiled into iiOD |
-| host application | `pluto-plus-utils` package 0.1.0, Python 3.11 or newer | published `main` commit `37f6c38650bce42d017b5516edf2c736ef81b889` | API, fail-closed admission, status parsing, finite-ring anchor handling, and one-command ladder |
+| host application | `pluto-plus-utils` package 0.1.0, Python 3.11 or newer | published `main` commit `65dd2c8b6184838b9147df917fbf3fbf3439ac99` | API, fail-closed admission, status parsing, finite-ring anchor handling, one-command ladder, and exact RAM-only RC1 binding |
 | host native library | libiio 0.25 | the same `b7303fded264e10473bbbb084afade8f1b1373d1` | implements the host side of `READBUFMA` and ring-extension request |
 | host Python binding | generated `pylibiio` from libiio 0.25 | the same `b7303fded264e10473bbbb084afade8f1b1373d1` | exposes the exact `MetadataBuffer(..., direct_async_frames=...)` signature |
 
@@ -53,6 +55,46 @@ The complete firmware gitlink set at the qualified integration commit is:
 The firmware Makefile requires Vivado 2022.2. Its x86-64 Buildroot path uses
 the pinned Linaro 2018.05 `arm-linux-gnueabihf` toolchain. Do not silently
 replace either toolchain in a release build.
+
+## Trusted candidate image identities
+
+Protected workflow run
+[33360776546](https://github.com/misko/plutosdr-fw/actions/runs/33360776546)
+built firmware source `4af2ab74605a62832f7f38a0eefe3b3bc1d492cf`.
+The run is successful and offline-qualified, but its artifact is not a GitHub
+release and its exact bytes remain RAM-only until the hardware gates pass.
+
+| Object | Exact identity |
+| --- | --- |
+| Actions artifact | `plutoplus-main-4af2ab74605a62832f7f38a0eefe3b3bc1d492cf-33360776546-1` |
+| deployment bundle | `plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a.tar.gz`; SHA-256 `3045f0f5045693a4599ee3891ec9fa5e027e7f327fccba7d76de858729ce5c6f` |
+| DFU | `plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a-pluto.dfu`; SHA-256 `6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391` |
+| FIT body | 12,821,279 bytes; SHA-256 `47e850f4dabb5be58203991f9b4f5fefc45305335d9594210a661791ac0189e9` |
+| FRM | `plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a-pluto.frm`; SHA-256 `5cd286cae15692cd2df917d954c8e50fe86899ab7877d67b8fc3a04c203df617` |
+| rootfs | SHA-256 `fd802e8fde40ba114f5b5ff46023d744f39c45ff26f902f1a19a3c9f1334226e` |
+| packaged iiOD | SHA-256 `cf950bdcdefa56ff90690e90fad8ce64151997c707ae3236b967b4bcfc6e9ec6` |
+| packaged `libiio.so.0.25` | SHA-256 `7333f76edb775ebea3a51911c42dc5f3e45fb1e082676a867b7fa90b5d61168a` |
+
+Download and verify the exact retained workflow artifact into a new private
+directory:
+
+```bash
+candidate_dir="$(mktemp -d /tmp/pluto-direct-async-rc1.XXXXXX)"
+chmod 0700 "$candidate_dir"
+gh run download 33360776546 --repo misko/plutosdr-fw --dir "$candidate_dir"
+
+artifact_dir="$candidate_dir/plutoplus-main-4af2ab74605a62832f7f38a0eefe3b3bc1d492cf-33360776546-1"
+(
+  cd "$artifact_dir"
+  sha256sum -c \
+    plutoplus-spf-iq-direct-async-ring-v1-rc1-4af2ab74605a.tar.gz.sha256
+)
+```
+
+After safe extraction, require both `sha256sum -c SHA256SUMS` and
+`sha256sum -c PAYLOAD_SHA256SUMS` to pass. The packaged `/opt/VERSIONS` must
+name the exact v0.46 RC1 and Buildroot v2. The integrated verdict must be
+`PASS` and `firmware_release_eligible: true`.
 
 ## Runtime compatibility contract
 
@@ -105,7 +147,7 @@ git -C "$HOST_SRC" rev-parse HEAD
 ```
 
 Expected values are Buildroot `a9292672...`, libiio `b7303fde...`,
-metadata provider `3294365f...`, and host commit `37f6c386...` (or a descendant)
+metadata provider `3294365f...`, and host commit `65dd2c8b...` (or a descendant)
 on published `main`. A later documentation-only descendant is acceptable;
 changing any implementation pin requires rebuilding and repeating the
 qualification.
@@ -117,7 +159,7 @@ The order matters:
 1. Verify the published immutable libiio tag resolves exactly to
    `b7303fded264e10473bbbb084afade8f1b1373d1` and the published Buildroot v2 tag
    resolves exactly to `a929267288a80a31407a3af06345c088979bcc2e`.
-2. Verify Pluto Plus Utils `main` contains exact commit `37f6c3865` and install
+2. Verify Pluto Plus Utils `main` contains exact commit `65dd2c8b6` and install
    its receipt-bound native runtime from the immutable libiio tag.
 3. Validate `manifests/iq-direct-async-ring-v1-rc1-source.yaml` and the
    protected candidate packaging route.
@@ -227,6 +269,25 @@ The release acceptance profiles are:
 RAM-extension application throughput is not required to reach 70 MB/s. Its
 acceptance purpose is extra FIFO capacity with preserved ordering and exact
 status.
+
+The guarded volatile transition is bound in Pluto Plus Utils `65dd2c8b6` as
+profile `iq-direct-async-ring-v1-rc1-ram`. It accepts only the DFU/FIT identity
+above and has no persistent counterpart. First run the command without
+`--execute` and review the serial, direct USB sysfs path, current firmware,
+candidate version, and confirmation phrase. Execution uses the same arguments
+plus `--execute --confirm 'RAM BOOT EXPECTED_SERIAL'`:
+
+```bash
+pluto firmware ram-boot /ABSOLUTE/PATH/TO/EXACT_RC1.dfu \
+  --usb-sysfs-path /sys/bus/usb/devices/EXACT_DIRECT_PATH \
+  --profile iq-direct-async-ring-v1-rc1-ram \
+  --ssh-known-hosts-file /ABSOLUTE/PRIVATE/PATH/EXPECTED_SERIAL.known_hosts
+```
+
+Target `192.168.1.15`, serial `104000b29905000e17000800065934759d`,
+was Ethernet-attested but not locally USB-attached on 2026-08-31. That exact
+radio therefore has not been RAM-booted. Do not substitute another attached
+radio or use a persistent transport to bypass this stop condition.
 
 The sustained release ladder is one Pluto Plus Utils command. Its defaults are
 the required `5M,10M,15M,25M` rates, `3,10` second durations, 1,048,576 samples

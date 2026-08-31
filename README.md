@@ -6,8 +6,9 @@ and Pluto+, see **[Flashing firmware](flashing.md)**. Pluto+ users should read
 its bootloader safety warning before copying any image to a radio.
 
 The direct-async/RAM-extension stack is staged as protected prerelease
-candidate `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`, but no candidate
-image or GitHub release exists yet. Its exact firmware, Buildroot, libiio,
+candidate `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. Its trusted image
+is offline-qualified, but final RAM-boot qualification and the GitHub release
+are pending. Its exact firmware, Buildroot, libiio,
 metadata-provider, host, toolchain, ladder-test, and binding requirements are in
 **[Direct-async IQ source and installation requirements](IIO_DIRECT_ASYNC_INSTALL.md)**.
 

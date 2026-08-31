@@ -60,7 +60,7 @@
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
-| `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **source-qualified prerelease candidate; image pending** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and adds a one-command rate/duration ladder |
+| `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **offline-qualified image; RAM test pending** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and adds a one-command rate/duration ladder |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -69,7 +69,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 — 2026-08-31 — **source-qualified prerelease candidate; image pending**
+## v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 — 2026-08-31 — **offline-qualified image; RAM test pending**
 
 This source candidate rebases the finite direct-async IQ prototype onto the
 current firmware `origin/main` base
@@ -97,7 +97,7 @@ The exact compatible source graph is:
 | Buildroot | `iq-direct-async-ring-v1-rc1-source/buildroot-v2` | `a929267288a80a31407a3af06345c088979bcc2e` |
 | radio and host libiio | 0.25; `iq-direct-async-ring-v1-rc1-source/libiio-v1` | `b7303fded264e10473bbbb084afade8f1b1373d1` |
 | metadata provider | ABI 3 / `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` |
-| Pluto Plus Utils | package 0.1.0; published `main` | `37f6c38650bce42d017b5516edf2c736ef81b889` |
+| Pluto Plus Utils | package 0.1.0; published `main` | `65dd2c8b6184838b9147df917fbf3fbf3439ac99` (ladder introduced by ancestor `37f6c38650bce42d017b5516edf2c736ef81b889`) |
 
 The native host library and generated Python binding must both come from the
 same `b7303fd` source. Stock libiio and the PyPI-only `pylibiio` package do not
@@ -156,7 +156,7 @@ transported above 70 MB/s but overran after frame 14, so the qualified
 15-buffer profile is a compatibility requirement for this finite workload.
 
 The final source heads pass 14 native and 14 ASan/UBSan C tests, 38 libiio
-Python tests, 1,169 host tests with 11 explicit skips, Ruff, and strict mypy
+Python tests, 1,171 host tests with 11 explicit skips, Ruff, and strict mypy
 across 65 source files.
 The radio's stock iiOD, installed library hashes, RF settings, buffer state,
 and DMA control register were restored after the volatile test.
@@ -165,7 +165,8 @@ The protected candidate identity is
 `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. The immutable libiio and
 Buildroot refs are published at exactly `b7303fd` and `a92926728`; Pluto Plus
 Utils `main` contains the matched host implementation and ladder at
-`37f6c3865`. No version-stamped firmware image or GitHub release exists yet.
+`65dd2c8b6`; exact RAM-only image binding was added after the ladder at
+`37f6c3865`.
 Protected build
 [33360194246](https://github.com/misko/plutosdr-fw/actions/runs/33360194246)
 validated the source graph and version guard, then stopped before compilation
@@ -173,9 +174,37 @@ because Buildroot v1 did not declare the freshly fetched libiio archive hash.
 Buildroot v2 adds the independently reproduced SHA-256
 `67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a`;
 no artifact from the failed run exists.
-The protected build, artifact validation, and final version-stamped RAM
-qualification remain publication gates. Persistent flashing remains a
-separate authorization even after an RC1 is published. See
+
+Protected build
+[33360776546](https://github.com/misko/plutosdr-fw/actions/runs/33360776546)
+then built exact firmware source
+`4af2ab74605a62832f7f38a0eefe3b3bc1d492cf` with Vivado 2022.2. Both bundle
+checksum manifests pass, the integrated release verdict is eligible, and
+routed timing closed at WNS 0.767 ns, WHS 0.019 ns, and WPWS 0.264 ns. Exact
+artifact identities are:
+
+| Artifact | SHA-256 |
+| --- | --- |
+| deployment bundle | `3045f0f5045693a4599ee3891ec9fa5e027e7f327fccba7d76de858729ce5c6f` |
+| `pluto.dfu` | `6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391` |
+| DFU FIT body | `47e850f4dabb5be58203991f9b4f5fefc45305335d9594210a661791ac0189e9` |
+| `pluto.frm` | `5cd286cae15692cd2df917d954c8e50fe86899ab7877d67b8fc3a04c203df617` |
+| rootfs | `fd802e8fde40ba114f5b5ff46023d744f39c45ff26f902f1a19a3c9f1334226e` |
+| packaged iiOD | `cf950bdcdefa56ff90690e90fad8ce64151997c707ae3236b967b4bcfc6e9ec6` |
+| packaged `libiio.so.0.25` | `7333f76edb775ebea3a51911c42dc5f3e45fb1e082676a867b7fa90b5d61168a` |
+
+The packaged `/opt/VERSIONS` reports the exact v0.46 RC1, Buildroot v2, and
+the declared HDL/Linux/U-Boot locks. Its supervised iiOD command contains
+`--rw-cpu-affinity 1`, and the ARM binary contains both direct-async capability
+names. As of the qualification inventory, target serial
+`104000b29905000e17000800065934759d` at `192.168.1.15` is Ethernet-reachable
+but is not attached to this host over USB. Therefore the exact image has not
+been RAM-booted, the two ladder commands have not run on final bytes, and no
+GitHub release has been minted. A different attached radio was not substituted.
+
+Final version-stamped RAM qualification remains the publication gate.
+Persistent flashing remains a separate authorization even after an RC1 is
+published. See
 [`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for the exact
 component matrix, installation order, checks, and rollback boundary.
 

@@ -94,7 +94,7 @@ with either direct mode.
 | --- | --- | --- | --- |
 | libiio/iiOD | `codex/iq-direct-async-main-refresh-libiio` | `b7303fded264e10473bbbb084afade8f1b1373d1` | direct producer, unified DMA/RAM FIFO, spill accounting, DMA headroom, binding and native tests |
 | Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `a929267288a80a31407a3af06345c088979bcc2e` | exact libiio pin and archive SHA-256 |
-| host | published `main` | `37f6c38650bce42d017b5516edf2c736ef81b889` | API admission, capability checks, status exposure, finite-ring timestamp handling, one-command ladder, tests |
+| host | published `main` | `65dd2c8b6184838b9147df917fbf3fbf3439ac99` | API admission, capability checks, status exposure, finite-ring timestamp handling, one-command ladder, exact RAM-only RC1 image binding, tests |
 
 The libiio branch descends from its audited `origin/master` base
 `4c6022caf838813c1fc88d6de7a83f2bb5fa8e9f`; the host work descends from its
@@ -116,7 +116,7 @@ DMA leases, ring core/request/status, metadata batching, sampler coverage,
 tandem session, and thread-affinity coverage. The Python libiio suite passes
 38 tests.
 
-The final host head passes 1,169 tests with 11 explicit browser, attached-radio,
+The final host head passes 1,171 tests with 11 explicit browser, attached-radio,
 or transmitter skips and one third-party deprecation warning. Ruff passes and
 strict mypy reports no issues in 65 source files.
 
@@ -210,9 +210,12 @@ Every run snapshotted and restored sample rate, bandwidth, LO, enabled
 channels, gain modes, and gains. The restored state was 30.72 MS/s, 18 MHz
 bandwidth, 2.4 GHz RX LO, both RX channels, and `slow_attack` on both channels.
 
-The exact dependency tags and host command are published. The protected
-firmware version is `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`, but no
-version-stamped image or GitHub release exists yet. The final image must repeat
+The exact dependency tags and host command are published. Trusted build
+33360776546 produced the protected version
+`v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`; its DFU SHA-256 is
+`6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391`.
+No GitHub release exists yet. The final image must repeat
 the fixed direct, combined, standalone-ring, and two ladder profiles under its
-normal supervised iiOD before publication. No persistent radio mutation was
-made during source qualification.
+normal supervised iiOD before publication. Target `192.168.1.15` was not
+locally USB-attached, so it could not be RAM-booted; no other radio was
+substituted and no persistent radio mutation was made.
