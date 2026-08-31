@@ -467,9 +467,9 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     for source in (builder, package, checker):
         assert manifest_name in source
     assert "release_state: candidate" in manifest
-    assert "libiio_0_25_source: 98a5e6139459a01a5a42ca7cd3e98d807156b6b0" in manifest
+    assert "libiio_0_25_source: f19caef34f469cdda5efc18724b9d195b493bf65" in manifest
     assert "metadata_source: bbbf2f13e1a5aa7edab541e76f08afb384230d77" in manifest
-    assert "submodule_buildroot: 67182ca21ae5cb90481217ec7e7e27934fd5be5e" in manifest
+    assert "submodule_buildroot: 8002a61018773dd858369e67dc722707303827e0" in manifest
     assert "submodule_hdl: ff17846a5d9b90c3294bdecb53eaa43617a519a7" in manifest
     assert "submodule_linux: 4b397a547f3ad35a29c9d07685be423db908f9bf" in manifest
     assert "no event at its first sample" in (ROOT / "IIO_GAIN_TIMELINE_V8_DESIGN.md").read_text()
@@ -502,7 +502,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "evt_seq <= 32'd0;" in tandem_core
     assert "if (evt_push) evt_seq <= evt_seq + 32'd1;" in tandem_core
     assert "evt_seq <= 32'hFFFF_FFFF;" not in tandem_core
-    utils_main = "646758ad7f28493f8b4584dfec5c0f84ebfde19c"
+    utils_main = "1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1"
     for source in (wrapper, binding):
         assert utils_main in source
         assert "b2b3113c2e8724453179f09d357b4917c0f14c77" not in source
@@ -510,7 +510,7 @@ def test_iio_gain_timeline_v8_has_candidate_and_main_routes() -> None:
     assert "selects authoritative buffer ABI 4" in planner
     assert "GAIN_TIMELINE_CANDIDATE_FIRMWARE_VERSION" in evidence
     assert "GAIN_TIMELINE_FINAL_FIRMWARE_VERSION" in evidence
-    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v10" in evidence
+    assert "refs/tags/iio-gain-timeline-v8-rc1-source/fw-v11" in evidence
     assert branch in evidence
     assert "git_exact rev-parse --path-format=absolute --git-common-dir" in ooc_launcher
     assert 'worktree_admin_prefix="$git_common_dir/worktrees/"' in ooc_launcher

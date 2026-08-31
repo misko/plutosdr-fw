@@ -126,11 +126,17 @@ when the delta is unambiguous and within the admitted FIFO/ledger window.
 The 32-bit sample fence is compared modulo 2^32 only while the admitted live
 window is below 2^31 samples, making before/after unambiguous across wrap.
 Status faults, FIFO overflow, event-sequence gaps, sample regression, malformed
-geometry, and DMA counter gaps remain fail-closed.
+geometry, and unrepresentable DMA sequence arithmetic remain fail-closed.  A
+forward DMA counter gap is instead an explicit discontinuity: record v7 carries
+its exact missing-sample count and overflow flags, while the authoritative gain
+timeline consumes every ordered event in the missing IQ interval to derive the
+next frame's start state.  The host accepts that frame only when the transition
+counter and event-sequence ledger independently agree on the number of hidden
+events within the bounded provider window.
 
 ## Failure domains
 
-Ring status v2 distinguishes target completion, DMA failure, DMA counter gap,
+Ring status v2 distinguishes target completion, DMA failure, invalid DMA sequencing,
 gain-event gap, gain-event overflow, metadata encoding/protocol failure,
 consumer stall, and client cancellation/disconnection.  The provider assigns
 the domain at the failure source; errno alone is not used to guess it.

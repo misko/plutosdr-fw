@@ -100,6 +100,18 @@ on the hot path but emits the complete stage counts, totals, and maxima only
 when the device entry closes. This removes blocking diagnostic I/O from capture
 without removing the evidence needed to localize throughput bottlenecks.
 
+Hardware then exposed a second, independent high-rate policy defect: ABI 4
+encoded an exact forward DMA gap and an authoritative post-gap gain state, but
+iiOD and the host both rejected the record before returning it. The corrected
+provider now continues across only an exactly counted forward discontinuity.
+Pluto Plus Utils independently reconciles the transition counter with the
+event-sequence ledger across the missing IQ interval; counter regressions,
+ambiguous modular deltas, gain-event loss/overflow, and contradictory endpoints
+still terminate the capture. The 20 MS/s release matrix therefore uses the
+existing `capture-completion` contract: every requested frame must return with
+exact sample accounting, while ring status must additionally prove prompt
+delivery, its initial contiguous prefix, and clean `target_complete` closure.
+
 ## v0.45-plutoplus-spf-iio-throughput-coverage-window-v6-rc1 — 2026-08-30 — **hardware-qualified release source; final bytes pending**
 
 This candidate fixes a metadata-coverage race found while reducing iiOD's

@@ -47,9 +47,14 @@ Full-ring behavior is backpressure: iiOD stops requesting the next DMA block
 until the consumer releases a slot. The already-queued kernel blocks absorb a
 short transport stall. If that window is exceeded, the authoritative FPGA
 counter detects the first discontinuity; no synthetic continuity or silent
-overwrite is permitted. Committed frames drain in order, then the original
-producer error is returned. Disconnect cancels DMA, joins the producer, frees
-the arena and reservation, and preserves immediate ordinary/ring reuse.
+overwrite is permitted. Record v7 reports the exact missing-sample interval and
+advances both authoritative gain ledgers across it, so finite capture continues
+and the ring settles to the same transport-limited behavior as ordinary DMA.
+Status preserves the counter-proven initial contiguous boundary while every
+requested frame still drains in order. A regression, ambiguous counter delta,
+gain-event gap/overflow, or inconsistent ledger remains fatal. Disconnect
+cancels DMA, joins the producer, frees the arena and reservation, and preserves
+immediate ordinary/ring reuse.
 
 The ordinary IIO buffer also exposes a non-consuming 128-byte `SFRS` snapshot:
 state, terminal reason/error, requested and admitted capacity, finite target,

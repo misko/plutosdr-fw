@@ -70,7 +70,7 @@ def test_rc15_is_in_every_offline_and_protected_package_gate() -> None:
 def test_rc15_preserves_its_burned_utility_while_the_current_tool_advances() -> None:
     expected = "5ab8361211e747387c5dfa854f5ae65a6a4dac87"
     assert expected in RC15_MANIFEST.read_text(encoding="utf-8")
-    advanced = "646758ad7f28493f8b4584dfec5c0f84ebfde19c"
+    advanced = "1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1"
     for path in (WRAPPER, BINDING):
         assert advanced in path.read_text(encoding="utf-8")
     source = BINDING.read_text(encoding="utf-8")

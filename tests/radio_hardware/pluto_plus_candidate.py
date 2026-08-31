@@ -20,7 +20,7 @@ from .candidate_binding import (
 PLUTOPLUS_HARDWARE_MODEL = _candidate_binding.PLUTOPLUS_HARDWARE_MODEL
 PLUTO_PLUS_UTILS_REPOSITORY = "misko/pluto-plus-utils"
 PLUTO_PLUS_UTILS_VERSION = "0.1.0"
-PLUTO_PLUS_UTILS_SOURCE_COMMIT = "646758ad7f28493f8b4584dfec5c0f84ebfde19c"
+PLUTO_PLUS_UTILS_SOURCE_COMMIT = "1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1"
 PLUTO_IIO_BUFFER_METADATA_ABI = "frame-metadata-v4"
 RELEASE_FRAME_METADATA_SCHEMA = "frame-metadata-v5"
 CANDIDATE_PLAN_SCHEMA = "pluto-plus-utils.release-candidate-plan.v1"
