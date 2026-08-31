@@ -1,133 +1,179 @@
-# Minimal direct-async IQ prototype
+# Direct-async IQ queue with optional RAM extension
 
-This worktree isolates the smallest reviewed no-RAM-ring path from the earlier
-DDR-ring and zero-copy experiments. It is a prototype based on firmware main
-`4f15c87033e332293711ad679a50af0109c72862`; it is not merged, published, or
-authorized for persistent flash.
+This prototype is based directly on firmware `origin/main`
+`4f15c87033e332293711ad679a50af0109c72862` as observed on 2026-08-31. It
+preserves the minimal direct DMA transport and optionally lets the existing
+RAM ring extend that same FIFO. The branches are local, unmerged, and not
+authorized for persistent flash or publication.
 
-## Scope
+## Interface
 
-The only new data-plane mode is one finite request:
+Ringless direct mode is unchanged:
 
 ```python
 with radio.begin_metadata_capture(
     1_048_576,
-    kernel_buffers=12,
+    kernel_buffers=15,
     direct_async_frames=23,
     ddr_ring_bytes=0,
 ) as capture:
     blocks = [capture.read_block() for _ in range(23)]
 ```
 
-The host sends one bounded `READBUFMA` request. On the radio, a producer owns
-the next DMA block while the existing network worker transmits the current
-block. The producer queue contains metadata and DMA-block leases only; IQ is
-never copied into a DDR/RAM ring. A DMA block is released only after all of its
-IQ bytes have been accepted by the existing TCP transport.
+RAM extension is opt-in. `direct_async_frames` remains the single finite
+target, while `ddr_ring_bytes` contributes extra queue storage:
 
-Direct mode fails closed unless all of these conditions hold:
+```python
+with radio.begin_metadata_capture(
+    1_048_576,
+    kernel_buffers=10,
+    direct_async_frames=23,
+    ddr_ring_bytes=13 * 4_194_304,
+    ddr_ring_frames=0,
+    ddr_ring_continuous=False,
+) as capture:
+    assert capture.direct_async_ring_extension
+    blocks = [capture.read_block() for _ in range(23)]
+```
 
-- metadata ABI 3 and exactly one receiver;
-- `iio,buffer-direct-async=1` is advertised;
-- 2--64 kernel buffers and 1--64 finite direct frames;
-- DDR burst and DDR ring storage are both disabled.
+Standalone finite and continuous RAM-ring modes remain supported. A host can
+therefore select direct DMA only, direct DMA with RAM overflow capacity, or the
+existing standalone RAM ring without changing the block-reading API.
 
-Generic host prequeue controls, DDR-ring pipeline controls, `sendfile`,
-`splice`, cached-ring zero-copy, and firmware/FPGA changes are deliberately
-excluded.
+## Queue semantics
+
+iiOD presents one ordered producer/consumer FIFO. Every descriptor records its
+metadata and whether its IQ payload is owned by a DMA-block lease or a RAM-ring
+slot.
+
+1. The producer always captures into a kernel DMA block.
+2. Normally that DMA-backed descriptor stays in the FIFO until the network
+   consumer sends it.
+3. When the DMA watermark is reached and RAM extension is enabled, iiOD copies
+   the newest eligible queued descriptor into the next RAM slot. It never
+   spills the head descriptor because the consumer may already be using it.
+4. The descriptor keeps its FIFO position, the DMA lease is released for
+   immediate capture reuse, and the consumer later sends the RAM-backed payload
+   through the same path.
+5. The consumer releases whichever owner backs the descriptor only after its
+   IQ bytes have been accepted by the existing TCP transport.
+
+There is no RAM prefill phase, second output queue, or ordering hand-off. RAM
+only extends the existing DMA queue. When RAM is disabled, no IQ copy or ring
+allocation is introduced.
+
+A 4 MiB copy on the Zynq can consume more than one 30.72 MS/s frame period, and
+consecutive spills can accumulate beyond two periods. Combined mode therefore
+keeps three DMA blocks available as ingestion headroom when at least five are
+configured. Three- and four-buffer configurations scale that reserve to
+`kernel_buffers - 2`, retaining both a head lease and a spillable lease. The
+logical descriptor capacity is the configured DMA plus useful RAM capacity
+minus this reserved headroom; producer and consumer still run concurrently.
+
+RAM status in combined mode counts real RAM spills and drains rather than all
+captured DMA frames. Its target is zero because `direct_async_frames` owns
+completion. The existing standalone ring continues to report its ordinary
+finite target and positions.
+
+The wire request uses the new
+`SPF_DDR_RING_FLAG_DIRECT_EXTENSION` bit and iiOD advertises
+`iio,buffer-direct-async-ring=1`. Older implementations reject the unknown
+flag instead of silently changing semantics.
+
+Direct mode fails closed unless metadata ABI 3, exactly one receiver,
+`iio,buffer-direct-async=1`, 2--64 kernel buffers, and 1--64 finite frames are
+available. Combined mode additionally requires at least three kernel buffers,
+`iio,buffer-direct-async-ring=1`, a nonzero RAM capacity,
+`ddr_ring_frames=0`, and `ddr_ring_continuous=False`. DDR burst cannot be mixed
+with either direct mode.
 
 ## Source graph
 
-| Component | Branch | Commit | Change |
+| Component | Branch | Commit | Purpose |
 | --- | --- | --- | --- |
-| libiio | `codex/iq-direct-async-main-refresh-libiio` | `c3fb64580fd2a48cf71fa9ebf60c2555d6c252ed` | bounded DMA leases, one direct wire command, async producer, capability, Python binding, tests |
-| Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `f17bd6e2a0853e975c3f5a86e14f096bc16fe05c` | pin the exact libiio prototype |
-| host | `codex/iq-direct-async-main-refresh-host` | `a7ceeae9a1a8c44a81c9f58518a0200ef8837d89` | expose `direct_async_frames`, fail-closed admission, runtime attestation, tests |
+| libiio/iiOD | `codex/iq-direct-async-main-refresh-libiio` | `b7303fded264e10473bbbb084afade8f1b1373d1` | direct producer, unified DMA/RAM FIFO, spill accounting, DMA headroom, binding and native tests |
+| Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `4a1e90704706756a6f6062482a070e63f9b27573` | exact libiio pin |
+| host | `codex/iq-direct-async-main-refresh-host` | `55e3c08ecf703c2a2f6b5367b3e3d64644c58c1a` | API admission, capability checks, status exposure, finite-ring timestamp handling, tests |
 
-The refreshed libiio series descends from current `origin/master`
-`4c6022caf838813c1fc88d6de7a83f2bb5fa8e9f`.  `git range-diff` reports all
-nine prerequisite/direct patches as unchanged, and the refreshed final tree is
-identical to the previously measured `393cd218` tree.  The refreshed host
-commit descends from current `origin/main`
-`1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1` and therefore retains its ABI-4
-DMA-gap accounting.
+The libiio branch descends from current `origin/master`
+`4c6022caf838813c1fc88d6de7a83f2bb5fa8e9f`; the host branch descends from
+current `origin/main` `1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1`.
+The proposed immutable source ref remains
+`iq-direct-async-ring-v1-rc1-source/libiio-v1`, but neither it nor any branch
+has been pushed.
 
-The libiio implementation adds 892 non-test lines across 15 files. The old
-accumulated experimental branch changed roughly 3,955 lines and included DDR
-ring and rejected zero-copy work.
+## Software verification
 
-The libiio commit and proposed immutable source ref are local only. The ARM
-cross-build and hardware deployment use this exact local commit; a reproducible
-full firmware image intentionally remains blocked until publication is
-separately authorized. No branch, tag, or artifact was pushed.
+The exact `b7303fd` tree was configured and built independently as native
+release, ASan/UBSan, and ARM cross-builds. Fourteen self-contained native C
+tests pass in both release and sanitizer builds, including direct transport,
+DMA leases, ring core/request/status, metadata batching, sampler coverage,
+tandem session, and thread-affinity coverage. The Python libiio suite passes
+38 tests.
 
-## Verification
+The final host head passes 1,158 tests with 11 explicit browser, attached-radio,
+or transmitter skips and one third-party deprecation warning. Ruff passes and
+strict mypy reports no issues in 64 source files.
 
-Clean native release, ASan/UBSan, and ARM cross-builds pass. The native and
-sanitized builds each pass `test_buffer_block_lease`,
-`test_direct_async_transport`, `test_metadata_batch_core`,
-`test_iiod_command_batch`, and `test_thread_pool_affinity`. The libiio Python
-binding suite passes 33 tests. The complete refreshed host suite passes 1,157
-tests with 11 explicit browser, hardware, or transmitter skips; Ruff and
-strict mypy over 64 source files also pass.
+The ARM32 EABI5 outputs contain the exact `b7303fd` build tag:
 
-The ARM build used the firmware-main Linux UAPI and the exact metadata provider
-from firmware commit `3294365ff44da26b261be4a2ccb241b7896d23ad`. Its outputs
-are ARM32 EABI5 and have these SHA-256 digests:
+- `iiod`: `89c5eae83b7bb517279ebe97e3300615c58efbf3892dc9d6939966429122e01d`
+- `libiio.so.0.25`: `8fd0530bd712abe6398f300c17c34052a3e86acfbf374680071869f260921841`
 
-- `iiod`: `40f22164440fd12d6692846e5d8d41a7f1bbad36785c7502eda7da628902ff90`
-- `libiio.so.0.25`: `9a00dcecbe1bb156fd622849558adc0fcda57b2f2e2d28b9fcbf7f443bd8112e`
+## Radio qualification
 
-Hardware testing was nonpersistent and used radio `192.168.1.15`, serial
-`104000b29905000e17000800065934759d`. The installed firmware remained
-`v0.40-plutoplus-spf-tandem-agc-v7`; its system iiOD and library were not
-replaced. The exact cross-built daemon and library ran from a temporary
-directory on port 30432, with `iiod -r 1`. Context discovery reported libiio
-commit `c3fb645`, metadata ABI 3, `iio,buffer-direct-async=1`, and R/W worker
-affinity 1.
+Testing used `192.168.1.15`, serial
+`104000b29905000e17000800065934759d`, at 30.72 MS/s unless noted. The installed
+firmware stayed `v0.40-plutoplus-spf-tandem-agc-v7`. The exact ARM daemon and
+library ran only from `/tmp` on port 30432 as `iiod -r 1`; installed files were
+not replaced. Context discovery reported metadata ABI 3 and both direct and
+RAM-extension capabilities from git tag `b7303fd`.
 
-The workload was 23 frames of 1,048,576 single-RX CI16 samples: 96,468,992
-wire IQ bytes. The radio was at 30.72 MS/s with 12 kernel buffers. Direct runs
-set `direct_async_frames=23`, left DDR burst and DDR/RAM ring storage disabled,
-and were confirmed as `direct=1 ring=0` by iiOD timing records. Each table value
-is the mean of three alternating ordinary/direct runs.
+Each qualification captured 23 frames of 1,048,576 single-receiver CI16
+samples, or 96,468,992 IQ bytes. Rates below count those wire-format bytes over
+the application `read_block()` loop rather than the expanded NumPy arrays.
 
-### Low-level host drain
+### Direct DMA, RAM disabled
 
-| Mode | Read loop | Full buffer setup + loop | Steady after first frame | Gap frames |
-| --- | ---: | ---: | ---: | ---: |
-| ordinary | 68.09 MB/s | 49.35 MB/s | 68.77 MB/s | 0 / 69 |
-| direct async, no ring | 72.63 MB/s | 51.64 MB/s | 73.53 MB/s | 0 / 69 |
-| improvement | +6.67% | +4.63% | +6.92% | -- |
+The acceptance profile used 15 DMA buffers and no RAM. Three final runs were
+all sequential from frame 0 through frame 22 with no missing samples:
 
-### Application `read_block()` with default PyADI decoding
+| Run | Application rate | Gap frames |
+| --- | ---: | ---: |
+| 1 | 71.40 MB/s | 0 / 23 |
+| 2 | 71.24 MB/s | 0 / 23 |
+| 3 | 70.93 MB/s | 0 / 23 |
+| **Mean** | **71.19 MB/s** | **0 / 69** |
 
-| Mode | 23-block read loop | Capture setup + loop | Steady after first frame | Gap frames |
-| --- | ---: | ---: | ---: | ---: |
-| ordinary | 55.71 MB/s | 42.56 MB/s | 56.31 MB/s | 9 / 69 |
-| direct async, no ring | 71.97 MB/s | 51.29 MB/s | 73.48 MB/s | 0 / 69 |
-| improvement | +29.19% | +20.50% | +30.49% | gaps eliminated |
+This satisfies the 70 MB/s acceptance target on the refreshed exact revision.
+An intentionally shallower eight-DMA-buffer profile still transported above
+70 MB/s but overran after frame 14, confirming that throughput alone is not a
+continuity guarantee and that finite queue depth is part of the profile.
 
-The application retained all 23 complex64 arrays, totaling 192,937,984 host
-bytes. Rates count the 96,468,992 CI16 bytes transferred on the wire, not the
-expanded NumPy representation. The direct application runs reported no missing
-samples over all 69 frames; ordinary mode reported 12,582,912 missing samples.
+### Direct DMA with RAM extension
 
-The volatile daemon was then deliberately restarted and both layers were
-rechecked. The low-level refill loop reached 73.67 MB/s and the complete
-`read_block()` loop reached 71.15 MB/s, both with zero gaps. An investigation
-also found that pinning the host process to an otherwise idle CPU in the
-machine's lower-frequency core group reduced throughput. Qualification values
-therefore use the normal unpinned scheduler configuration; concurrent
-lower-priority production workers were left running.
+The combined profile used 10 DMA buffers plus 13 RAM slots at 30.72 MS/s. All
+three runs delivered frames 0--22 with zero gaps. RAM produced/consumed/high
+water counts were 9/9/9, 9/9/9, and 6/6/6, proving that payloads actually
+spilled to RAM, retained their FIFO order, and drained before clean
+`target_complete` termination. Application rates were 42.80, 53.27, and
+67.91 MB/s. RAM-copy contention makes this safety/capacity mode slower than the
+ringless fast path, but continuity remained zero-gap in all 69 frames.
 
-All RF and channel settings were snapshotted and exactly restored after every
-hardware run. The temporary daemon was stopped after testing, the temporary
-radio files were removed, port 30432 was closed, the DMA buffer was disabled,
-and the original system iiOD and installed-file hashes were rechecked.
+### Standalone finite RAM ring
 
-Because the refreshed libiio commit remains local, the hardware test injected
-the exact local native and Python modules into the refreshed host adapter after
-hash/build verification. It did not fabricate a release receipt. Publishing an
-immutable source ref and then producing a full firmware/release image remain
-separate authorization gates.
+At 20 MS/s, an 8-DMA/15-RAM standalone profile captured and drained all 23
+frames with zero gaps. Ring status closed at 23 produced, 23 consumed, a
+15-frame high-water mark, one wrap, and `target_complete`. The wire-equivalent
+application rate was 44.53 MB/s. The host retains capture-time counter anchors
+while draining a completed finite ring, avoiding invalid post-capture timestamp
+fits.
+
+Every run snapshotted and restored sample rate, bandwidth, LO, enabled
+channels, gain modes, and gains. The restored state was 30.72 MS/s, 18 MHz
+bandwidth, 2.4 GHz RX LO, both RX channels, and `slow_attack` on both channels.
+
+The exact source commits remain local, so a reproducible full firmware image
+is intentionally gated on publishing an immutable libiio ref. No release
+receipt, tag, remote branch, firmware image, or persistent radio mutation is
+created by this prototype.
