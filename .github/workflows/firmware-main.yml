@@ -38,6 +38,7 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
          github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' ||
          github.ref == 'refs/heads/codex/iio-throughput-sampler-wake-v5-fw' ||
@@ -94,7 +95,9 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'iio-throughput-coverage-window-v6-rc1-source.yaml' ||
+          'iq-direct-async-ring-v1-rc1-source.yaml' ||
+          github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
+          'iq-direct-async-ring-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'ddr-capacity-test-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' &&
@@ -192,7 +195,9 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-iio-throughput-coverage-window-v6' ||
+          'plutoplus-spf-iq-direct-async-ring-v1' ||
+          github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
+          'plutoplus-spf-iq-direct-async-ring-v1-rc1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
           'plutoplus-spf-ddr-capacity-test-rc1' ||
           github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' &&
@@ -433,6 +438,14 @@ jobs:
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.44-plutoplus-spf-ddr-ring-prefill-v1-rc1'
 
+      - name: Require the exact direct-async IQ ring v1 RC1 identity
+        if: github.ref == 'refs/heads/codex/iq-direct-async-main-refresh'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1'
+
       - name: Require the exact IIO throughput HOLD v1 RC1 identity
         if: github.ref == 'refs/heads/codex/iio-throughput-prototype'
         env:
@@ -657,7 +670,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'
+            'v0.46-plutoplus-spf-iq-direct-async-ring-v1'
 
       - name: Build, validate, and package
         id: build

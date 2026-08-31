@@ -159,7 +159,10 @@ else
     warn ".gitmodules not present (not a firmware checkout?)"
 fi
 
-if [[ "$CHECK_WORKTREE" == 1 && "$(m release_state)" == "candidate" ]] && \
+release_state="$(m release_state)"
+if [[ "$CHECK_WORKTREE" == 1 &&
+      ( "$release_state" == "candidate" ||
+        "$release_state" == "hardware-qualified-prerelease" ) ]] && \
     git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     for entry in "buildroot:submodule_buildroot" "hdl:submodule_hdl" \
         "hdl-quantulum:submodule_hdl_quantulum" \
@@ -188,6 +191,18 @@ if [[ "$CHECK_WORKTREE" == 1 && "$(m release_state)" == "candidate" ]] && \
         fi
     elif [[ -n "$expected_libiio" ]]; then
         bad "Buildroot libiio recipe not found: ${recipe}"
+    fi
+    expected_libiio_archive_sha="$(m libiio_0_25_archive_sha256)"
+    libiio_hash="buildroot/package/libiio/libiio.hash"
+    if [[ -n "$expected_libiio_archive_sha" && -f "$libiio_hash" ]]; then
+        expected_hash_line="sha256 ${expected_libiio_archive_sha}  libiio-${expected_libiio}.tar.gz"
+        if grep -Fqx "$expected_hash_line" "$libiio_hash"; then
+            ok "Buildroot libiio archive hash ${expected_libiio_archive_sha:0:12}"
+        else
+            bad "Buildroot libiio archive hash does not match the manifest"
+        fi
+    elif [[ -n "$expected_libiio_archive_sha" ]]; then
+        bad "Buildroot libiio hash file not found: ${libiio_hash}"
     fi
     expected_metadata="$(m metadata_source)"
     metadata_recipe="buildroot/package/spf_metadata_source/spf_metadata_source.mk"

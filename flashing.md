@@ -48,6 +48,33 @@ a radio. With multiple radios attached, identify every radio by USB serial and
 topology. The safest manual DFU procedure is to leave only the intended radio
 connected.
 
+### Direct-async IQ RC1 remains unflashable until its image is qualified
+
+The protected candidate identity is
+`v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. Its source stack and
+performance path are hardware-qualified, and its immutable libiio and
+Buildroot source tags are published. Trusted build 33360776546 produced a
+version-stamped, checksum-verified image, but those exact bytes have not been
+RAM-booted and no GitHub release exists. Do not substitute the
+firmware implementation commit `a5253497d` for a release version and do not
+flash an ordinary CI or local build persistently.
+
+Its exact compatibility set is firmware implementation `a5253497d`, Buildroot
+`a92926728`, libiio 0.25 `b7303fded`, metadata provider `3294365ff`, and Pluto
+Plus Utils 0.1.0 implementation `65dd2c8b6` on published `main`. Both the host
+native library and Python binding must be built from the same `b7303fded`
+source. See
+[`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for full hashes,
+submodule pins, publication order, host installation, verification profiles,
+and rollback requirements.
+
+The exact RC1 DFU SHA-256 is
+`6b29618d186d82c6b8fa02f74073853029b7d081196cb8643b92550e09162391`.
+This section remains a stop condition until release notes record those exact
+bytes' hardware qualification. Once that exists, use the ordinary
+checksum-verified RAM-boot procedure below.
+Persistent installation still requires a separately documented authorization.
+
 ## Find and download a release
 
 List releases, newest first:
