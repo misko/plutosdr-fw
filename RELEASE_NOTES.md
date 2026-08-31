@@ -61,7 +61,8 @@
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
 | `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **hardware-qualified RAM-first prerelease; source promoted** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and exceeds 70 MB/s with the exact packaged runtime over 1 GbE |
-| **`v0.46-plutoplus-spf-iq-direct-async-ring-v1`** | 2026-08-31 | **full-release source; final build and persistent qualification pending** | promotes the exact RC1 component graph to the protected `main` build route without changing the direct/RAM queue implementation |
+| `v0.46-plutoplus-spf-iq-direct-async-ring-v1` | 2026-08-31 | superseded hardware-qualified full release | first non-RC direct/RAM release; exact final image passed guarded persistent installation and cold-boot qualification |
+| **`v0.47-plutoplus-spf-iq-direct-async-v2`** | 2026-08-31 | **current hardware-qualified full release** | keeps a whole host target in one DMA session and adds default drop-backlog plus preserve-backlog overrun policies for ringless and RAM-extended queues |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -70,21 +71,63 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.46-plutoplus-spf-iq-direct-async-ring-v1 — 2026-08-31 — **full-release source promoted; final bytes pending**
+## v0.47-plutoplus-spf-iq-direct-async-v2 — 2026-08-31 — **current hardware-qualified full release**
 
-The hardware-qualified RC1 source graph is now the protected `main` release
-route. The final build intentionally keeps the exact Buildroot `a92926728`,
-libiio `b7303fd`, metadata-provider `3294365f`, HDL, Linux, and U-Boot pins
-listed below while changing the on-radio identity to the non-RC release name.
-The RC artifact is not relabelled: the protected workflow must produce new
-version-stamped bytes from the merged `main` commit.
+V2 keeps one producer/consumer session alive for up to 4,096 requested frames;
+there is no 64-frame request re-arm. RAM slots extend the same ordered DMA
+queue. On a radio-side overrun, the default `drop-backlog` policy preserves the
+frame already entering TCP, retires every queued-but-unsent DMA or RAM frame,
+rebases exact ABI-3 gap metadata, and refills the original host target.
+`preserve-backlog` retains every queued frame. Dropping reduces separate gap
+events and stale-data latency; it does not promise fewer missing samples when a
+25 MS/s source continuously offers 100 MB/s to a slower link.
 
-Those exact final bytes must pass checksum, packed-version, routed-design,
-physical-1-GbE direct/RAM ladder, finite 23-frame continuity, abrupt-client
-recovery, guarded persistent installation, cold-boot identity, RF restoration,
-and rollback-readiness gates before the annotated tag or full GitHub release is
-created. Final hashes, the Actions run, persistent evidence, utility binding,
-and installation commands will be recorded here only from the qualified bytes.
+Protected `main` run 33440908273 built commit
+`2bab87dcd9b18c8f957ae781603e88160c8509cc` with Buildroot `3e1dd15`, libiio
+0.25 `8f66f35`, metadata ABI 3 provider `3294365`, HDL `145bd47`, Linux
+`93174a1`, and U-Boot `1ff0468`. The exact DFU SHA-256 is `b9756452...`, its
+12,826,107-byte FIT is `7a198f96...`, and the packaged iiOD uses R/W affinity
+on CPU 1. Pluto Plus Utils `main` `9f9a2bd` carries the exact RAM and persistent
+profiles, one-session ladder, both overrun modes, serial-bound USB/LAN flash,
+ephemeral-key rotation, and release-specific return attestation.
+
+The ringless 5/10/15 MS/s ladder was gapless. Its 25 MS/s cells sustained
+73.876 MB/s for 3 seconds and 73.546 MB/s for 10 seconds. Three 23-frame
+continuity runs were gapless, while their startup-heavy rates were 68.15,
+69.94, and 69.33 MB/s; the release therefore claims sustained, not universal
+short-session, 70 MB/s performance. A 200 MB RAM extension was gapless for the
+3-second 25 MS/s cell but reduced throughput because its Zynq RAM copies share
+CPU with iiOD.
+
+Four 250-frame, 1 GB, single-session timelines compared the policies. Ringless
+drop produced nine gap events and 73.53% coverage; ringless preserve produced
+73 events and 76.22%. RAM drop produced four events and 64.60% coverage; RAM
+preserve produced 65 events and 79.11%. All returned the exact 250 requested
+frames with zero host re-arms. Ordinary dual-RX, abrupt-client recovery, RF
+restoration, TX safety, guarded QSPI write, and exact `/dev/mtd3` FIT hash
+passed. After all power was removed for at least 10 seconds, the same serial
+returned directly as v0.47. Repeated read-only reconciliation at
+`2026-08-31T23:07:11Z` matched `/dev/mtd3` FIT `7a198f96...`, while ordinary
+dual-RX, AD9361/2R2T, 5.8 GHz exact tune/restore, and TX-safe checks passed with
+no repair or write.
+
+Exact hashes, component commits, commands, performance tables, and rollback
+requirements are in
+[`RELEASE_IQ_DIRECT_ASYNC_V2.md`](RELEASE_IQ_DIRECT_ASYNC_V2.md) and
+[`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md).
+
+## v0.46-plutoplus-spf-iq-direct-async-ring-v1 — 2026-08-31 — **superseded hardware-qualified full release**
+
+Protected run 33408049625 built exact merged `main` commit
+`f182a8fa0811d2e70186b8f75d06ff4d5d896140` while retaining Buildroot
+`a92926728`, libiio `b7303fd`, metadata provider `3294365f`, and the qualified
+HDL/Linux/U-Boot graph. The final image passed checksum, packed-version,
+routed-design, physical-1-GbE direct/RAM ladder, three gapless 70 MB/s+
+23-frame runs, abrupt-client recovery, guarded persistent installation,
+all-power-removed cold boot, exact `/dev/mtd3` FIT attestation, RF restoration,
+and rollback-readiness gates. It was published as the full v0.46 release and is
+now retained as the v0.47 rollback target. Exact v0.46 evidence remains in
+[`RELEASE_IQ_DIRECT_ASYNC_RING_V1.md`](RELEASE_IQ_DIRECT_ASYNC_RING_V1.md).
 
 ## v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 — 2026-08-31 — **hardware-qualified RAM-first prerelease**
 
