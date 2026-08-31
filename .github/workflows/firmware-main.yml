@@ -95,7 +95,7 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/main' &&
-          'iio-throughput-coverage-window-v6-rc1-source.yaml' ||
+          'iq-direct-async-ring-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
           'iq-direct-async-ring-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
@@ -195,7 +195,7 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-iio-throughput-coverage-window-v6' ||
+          'plutoplus-spf-iq-direct-async-ring-v1' ||
           github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
           'plutoplus-spf-iq-direct-async-ring-v1-rc1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
@@ -670,7 +670,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'
+            'v0.46-plutoplus-spf-iq-direct-async-ring-v1'
 
       - name: Build, validate, and package
         id: build

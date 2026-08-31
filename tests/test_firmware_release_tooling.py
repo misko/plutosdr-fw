@@ -109,6 +109,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "ddr-ring-prefill-v1-rc1-source.yaml:candidate" in package
     assert "ddr-ring-prefill-v1-rc1-source.yaml:final-release" in package
     assert "iq-direct-async-ring-v1-rc1-source.yaml:candidate" in package
+    assert "iq-direct-async-ring-v1-rc1-source.yaml:final-release" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:candidate" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:final-release" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
@@ -268,7 +269,7 @@ def test_ddr_ring_prefill_v1_keeps_its_exact_historical_candidate_route() -> Non
         assert "ddr-ring-prefill-v1-rc1-source.yaml" in source
 
 
-def test_direct_async_ring_v1_has_an_exact_protected_candidate_route() -> None:
+def test_direct_async_ring_v1_has_exact_candidate_and_main_routes() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
@@ -282,14 +283,20 @@ def test_direct_async_ring_v1_has_an_exact_protected_candidate_route() -> None:
     ).read_text()
 
     assert workflow.count(branch) == 4
-    assert workflow.count(f"'{manifest_name}'") == 1
+    assert workflow.count(f"'{manifest_name}'") == 2
+    assert workflow.count("'plutoplus-spf-iq-direct-async-ring-v1'") == 1
     assert workflow.count("'plutoplus-spf-iq-direct-async-ring-v1-rc1'") == 1
+    assert (
+        workflow.count("'v0.46-plutoplus-spf-iq-direct-async-ring-v1'") == 1
+    )
     assert (
         workflow.count("'v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1'")
         == 1
     )
     assert "Require the exact direct-async IQ ring v1 RC1 identity" in workflow
+    assert "Require the exact final release identity" in workflow
     assert f"{manifest_name}:candidate" in package
+    assert f"{manifest_name}:final-release" in package
     assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
     for source in (builder, package, checker):
         assert manifest_name in source
@@ -446,7 +453,7 @@ def test_iio_throughput_sampler_wake_v5_has_an_exact_protected_route() -> None:
     assert "submodule_buildroot: 9222c97347334ba1eadf5580faeb3a1093246f46" in manifest
 
 
-def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> None:
+def test_iio_throughput_coverage_window_v6_keeps_historical_routes() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
@@ -456,9 +463,9 @@ def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> No
     manifest = (ROOT / "manifests" / manifest_name).read_text()
 
     assert workflow.count(branch) == 4
-    assert workflow.count(f"'{manifest_name}'") == 2
+    assert workflow.count(f"'{manifest_name}'") == 1
     assert (
-        workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6'") == 1
+        workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6'") == 0
     )
     assert (
         workflow.count("'plutoplus-spf-iio-throughput-coverage-window-v6-rc1'")
@@ -472,12 +479,15 @@ def test_iio_throughput_coverage_window_v6_has_candidate_and_main_routes() -> No
     )
     assert (
         workflow.count("'v0.45-plutoplus-spf-iio-throughput-coverage-window-v6'")
-        == 1
+        == 0
     )
     assert "Require the exact final release identity" in workflow
     assert f"{manifest_name}:candidate" in package
     assert f"{manifest_name}:final-release" in package
-    assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
+    assert (
+        "SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh "
+        f"manifests/{manifest_name}"
+    ) in checker
     for source in (builder, package, checker):
         assert manifest_name in source
     assert "release_state: candidate" in manifest

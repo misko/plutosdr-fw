@@ -516,7 +516,13 @@ def test_direct_async_ring_v1_rc1_pins_the_qualified_source_graph() -> None:
 
     assert values["schema"] == "plutosdr-fw.source-manifest"
     assert values["schema_version"] == "1"
-    assert values["release_state"] == "candidate"
+    assert values["release_state"] == "hardware-qualified-prerelease"
+    assert values["release_tag"] == (
+        "v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1"
+    )
+    assert values["firmware_source"] == (
+        "4af2ab74605a62832f7f38a0eefe3b3bc1d492cf"
+    )
     assert values["libiio_0_25_source"] == (
         "b7303fded264e10473bbbb084afade8f1b1373d1"
     )
@@ -535,7 +541,6 @@ def test_direct_async_ring_v1_rc1_pins_the_qualified_source_graph() -> None:
     assert values["versions_buildroot"] == (
         "iq-direct-async-ring-v1-rc1-source/buildroot-v2"
     )
-    assert "release_tag" not in values
 
 
 def test_historical_routes_and_all_v8_source_graphs_are_explicit() -> None:

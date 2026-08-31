@@ -60,7 +60,8 @@
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
-| `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **hardware-qualified RAM-first prerelease; persistent promotion pending** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and exceeds 70 MB/s with the exact packaged runtime over 1 GbE |
+| `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **hardware-qualified RAM-first prerelease; source promoted** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and exceeds 70 MB/s with the exact packaged runtime over 1 GbE |
+| **`v0.46-plutoplus-spf-iq-direct-async-ring-v1`** | 2026-08-31 | **full-release source; final build and persistent qualification pending** | promotes the exact RC1 component graph to the protected `main` build route without changing the direct/RAM queue implementation |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -68,6 +69,22 @@ across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
 work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
+
+## v0.46-plutoplus-spf-iq-direct-async-ring-v1 — 2026-08-31 — **full-release source promoted; final bytes pending**
+
+The hardware-qualified RC1 source graph is now the protected `main` release
+route. The final build intentionally keeps the exact Buildroot `a92926728`,
+libiio `b7303fd`, metadata-provider `3294365f`, HDL, Linux, and U-Boot pins
+listed below while changing the on-radio identity to the non-RC release name.
+The RC artifact is not relabelled: the protected workflow must produce new
+version-stamped bytes from the merged `main` commit.
+
+Those exact final bytes must pass checksum, packed-version, routed-design,
+physical-1-GbE direct/RAM ladder, finite 23-frame continuity, abrupt-client
+recovery, guarded persistent installation, cold-boot identity, RF restoration,
+and rollback-readiness gates before the annotated tag or full GitHub release is
+created. Final hashes, the Actions run, persistent evidence, utility binding,
+and installation commands will be recorded here only from the qualified bytes.
 
 ## v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 — 2026-08-31 — **hardware-qualified RAM-first prerelease**
 

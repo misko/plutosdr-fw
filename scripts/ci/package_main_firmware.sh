@@ -352,6 +352,9 @@ ddr-ring-prefill-v1-rc1-source.yaml:final-release)
 iq-direct-async-ring-v1-rc1-source.yaml:candidate)
     protected_version='v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1'
     ;;
+iq-direct-async-ring-v1-rc1-source.yaml:final-release)
+    protected_version='v0.46-plutoplus-spf-iq-direct-async-ring-v1'
+    ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
     ;;
