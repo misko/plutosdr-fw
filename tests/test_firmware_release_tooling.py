@@ -298,7 +298,10 @@ def test_direct_async_ring_v1_has_exact_historical_candidate_route() -> None:
     assert "Require the exact final release identity" in workflow
     assert f"{manifest_name}:candidate" in package
     assert f"{manifest_name}:final-release" in package
-    assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
+    assert (
+        "SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh "
+        f"manifests/{manifest_name}"
+    ) in checker
     for source in (builder, package, checker):
         assert manifest_name in source
     assert "libiio_0_25_archive_sha256" in source_graph
@@ -342,6 +345,15 @@ def test_direct_async_v2_has_exact_main_release_route() -> None:
     assert workflow.count("'v0.47-plutoplus-spf-iq-direct-async-v2'") == 1
     assert f"{manifest_name}:final-release" in package
     assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
+    current_worktree_checks = [
+        line.strip()
+        for line in checker.splitlines()
+        if "./scripts/check_source_graph.sh manifests/" in line
+        and "SOURCE_GRAPH_CHECK_WORKTREE=0" not in line
+    ]
+    assert current_worktree_checks == [
+        f"./scripts/check_source_graph.sh manifests/{manifest_name}"
+    ]
     for source in (builder, package, checker):
         assert manifest_name in source
     assert "release_state: candidate" in manifest
@@ -350,6 +362,8 @@ def test_direct_async_v2_has_exact_main_release_route() -> None:
     assert "libiio_0_25_source: 8f66f353c9a70a5524988ceb588b0e9271c2390d" in manifest
     assert "submodule_buildroot: 3e1dd15acf361cc06e202e9e59e907dd379a13c3" in manifest
     assert "versions_buildroot: iq-direct-async-v2-source/buildroot-v1" in manifest
+
+
 def test_iio_throughput_affinity_candidate_has_an_exact_protected_route() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
