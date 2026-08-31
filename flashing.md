@@ -59,7 +59,7 @@ firmware implementation commit `a5253497d` for a release version and do not
 flash an ordinary CI or local build persistently.
 
 Its exact compatibility set is firmware implementation `a5253497d`, Buildroot
-`4a1e90704`, libiio 0.25 `b7303fded`, metadata provider `3294365ff`, and Pluto
+`a92926728`, libiio 0.25 `b7303fded`, metadata provider `3294365ff`, and Pluto
 Plus Utils 0.1.0 implementation `37f6c3865` on published `main`. Both the host
 native library and Python binding must be built from the same `b7303fded`
 source. See

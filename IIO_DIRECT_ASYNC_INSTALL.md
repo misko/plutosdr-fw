@@ -31,9 +31,10 @@ Python binding, or an older ABI-3 runtime is unsupported.
 | --- | --- | --- | --- |
 | firmware integration | PlutoSDR firmware source; protected RC1 identity `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | implementation commit `a5253497d15613831055dbfb543ca5a9936bd2c6` plus the release-route descendant on `codex/iq-direct-async-main-refresh` | pins the Buildroot graph, records the qualified interface, and supplies the protected source manifest |
 | firmware base | `origin/main` as of 2026-08-31 | `4f15c87033e332293711ad679a50af0109c72862` | current-main rebase point used for qualification |
-| Buildroot | PlutoSDR Buildroot fork | `4a1e90704706756a6f6062482a070e63f9b27573` on `codex/iq-direct-async-main-refresh-buildroot` | selects the exact radio-side libiio and metadata provider |
+| Buildroot | PlutoSDR Buildroot fork | `a929267288a80a31407a3af06345c088979bcc2e` / `iq-direct-async-ring-v1-rc1-source/buildroot-v2` | selects the exact radio-side libiio and metadata provider and pins the fetched archive hash |
 | radio iiOD/libiio | libiio API/SONAME line 0.25 | `b7303fded264e10473bbbb084afade8f1b1373d1` on `codex/iq-direct-async-main-refresh-libiio` | unified DMA/RAM FIFO and three-period spill headroom |
 | immutable libiio ref | published source tag | `iq-direct-async-ring-v1-rc1-source/libiio-v1` resolving exactly to `b7303fded264e10473bbbb084afade8f1b1373d1` | required by the receipt-writing host installer |
+| libiio source archive | GitHub commit archive | SHA-256 `67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a` | required by Buildroot before extraction; independently reproduced twice |
 | metadata provider | SPF metadata ABI 3 / strict `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` | frame counter, gap, gain, and RSSI provider compiled into iiOD |
 | host application | `pluto-plus-utils` package 0.1.0, Python 3.11 or newer | published `main` commit `37f6c38650bce42d017b5516edf2c736ef81b889` | API, fail-closed admission, status parsing, finite-ring anchor handling, and one-command ladder |
 | host native library | libiio 0.25 | the same `b7303fded264e10473bbbb084afade8f1b1373d1` | implements the host side of `READBUFMA` and ring-extension request |
@@ -43,7 +44,7 @@ The complete firmware gitlink set at the qualified integration commit is:
 
 | Firmware component | Commit |
 | --- | --- |
-| Buildroot | `4a1e90704706756a6f6062482a070e63f9b27573` |
+| Buildroot | `a929267288a80a31407a3af06345c088979bcc2e` |
 | HDL | `145bd47e55d5c5537e0ba49d53cb25a5393f66ba` |
 | HDL Quantulum | `364b3dc7e770c3971d1f41a75c00e6cae76e2e6d` |
 | Linux | `93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7` |
@@ -103,7 +104,7 @@ git -C "$LIBIIO_SRC" rev-parse HEAD
 git -C "$HOST_SRC" rev-parse HEAD
 ```
 
-Expected values are Buildroot `4a1e9070...`, libiio `b7303fde...`,
+Expected values are Buildroot `a9292672...`, libiio `b7303fde...`,
 metadata provider `3294365f...`, and host commit `37f6c386...` (or a descendant)
 on published `main`. A later documentation-only descendant is acceptable;
 changing any implementation pin requires rebuilding and repeating the
@@ -114,8 +115,8 @@ qualification.
 The order matters:
 
 1. Verify the published immutable libiio tag resolves exactly to
-   `b7303fded264e10473bbbb084afade8f1b1373d1` and the published Buildroot tag
-   resolves exactly to `4a1e90704706756a6f6062482a070e63f9b27573`.
+   `b7303fded264e10473bbbb084afade8f1b1373d1` and the published Buildroot v2 tag
+   resolves exactly to `a929267288a80a31407a3af06345c088979bcc2e`.
 2. Verify Pluto Plus Utils `main` contains exact commit `37f6c3865` and install
    its receipt-bound native runtime from the immutable libiio tag.
 3. Validate `manifests/iq-direct-async-ring-v1-rc1-source.yaml` and the

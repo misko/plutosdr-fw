@@ -94,7 +94,7 @@ The exact compatible source graph is:
 | --- | --- | --- |
 | firmware integration | `codex/iq-direct-async-main-refresh` | `a5253497d15613831055dbfb543ca5a9936bd2c6` |
 | source manifest | `iq-direct-async-ring-v1-rc1-source.yaml` | candidate source graph in the firmware release commit |
-| Buildroot | `iq-direct-async-ring-v1-rc1-source/buildroot-v1` | `4a1e90704706756a6f6062482a070e63f9b27573` |
+| Buildroot | `iq-direct-async-ring-v1-rc1-source/buildroot-v2` | `a929267288a80a31407a3af06345c088979bcc2e` |
 | radio and host libiio | 0.25; `iq-direct-async-ring-v1-rc1-source/libiio-v1` | `b7303fded264e10473bbbb084afade8f1b1373d1` |
 | metadata provider | ABI 3 / `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` |
 | Pluto Plus Utils | package 0.1.0; published `main` | `37f6c38650bce42d017b5516edf2c736ef81b889` |
@@ -163,9 +163,16 @@ and DMA control register were restored after the volatile test.
 
 The protected candidate identity is
 `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. The immutable libiio and
-Buildroot refs are published at exactly `b7303fd` and `4a1e90704`; Pluto Plus
+Buildroot refs are published at exactly `b7303fd` and `a92926728`; Pluto Plus
 Utils `main` contains the matched host implementation and ladder at
 `37f6c3865`. No version-stamped firmware image or GitHub release exists yet.
+Protected build
+[33360194246](https://github.com/misko/plutosdr-fw/actions/runs/33360194246)
+validated the source graph and version guard, then stopped before compilation
+because Buildroot v1 did not declare the freshly fetched libiio archive hash.
+Buildroot v2 adds the independently reproduced SHA-256
+`67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a`;
+no artifact from the failed run exists.
 The protected build, artifact validation, and final version-stamped RAM
 qualification remain publication gates. Persistent flashing remains a
 separate authorization even after an RC1 is published. See

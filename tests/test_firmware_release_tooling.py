@@ -273,6 +273,7 @@ def test_direct_async_ring_v1_has_an_exact_protected_candidate_route() -> None:
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     checker = (ROOT / "scripts" / "check_tandem_release_offline.sh").read_text()
+    source_graph = (ROOT / "scripts" / "check_source_graph.sh").read_text()
     branch = "refs/heads/codex/iq-direct-async-main-refresh"
     manifest_name = "iq-direct-async-ring-v1-rc1-source.yaml"
     manifest = (ROOT / "manifests" / manifest_name).read_text()
@@ -289,10 +290,16 @@ def test_direct_async_ring_v1_has_an_exact_protected_candidate_route() -> None:
     assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
     for source in (builder, package, checker):
         assert manifest_name in source
+    assert "libiio_0_25_archive_sha256" in source_graph
     assert "release_state: candidate" in manifest
     assert "libiio_0_25_source: b7303fded264e10473bbbb084afade8f1b1373d1" in manifest
     assert "metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad" in manifest
-    assert "submodule_buildroot: 4a1e90704706756a6f6062482a070e63f9b27573" in manifest
+    assert "submodule_buildroot: a929267288a80a31407a3af06345c088979bcc2e" in manifest
+    assert (
+        "libiio_0_25_archive_sha256: "
+        "67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a"
+        in manifest
+    )
 
 
 def test_iio_throughput_affinity_candidate_has_an_exact_protected_route() -> None:

@@ -523,14 +523,17 @@ def test_direct_async_ring_v1_rc1_pins_the_qualified_source_graph() -> None:
     assert values["libiio_0_25_ref"] == (
         "refs/tags/iq-direct-async-ring-v1-rc1-source/libiio-v1"
     )
+    assert values["libiio_0_25_archive_sha256"] == (
+        "67364f519619afb1c7f12d35ea35e605e00d01d23fc470f16dc903c5b5cdd49a"
+    )
     assert values["metadata_source"] == (
         "3294365ff44da26b261be4a2ccb241b7896d23ad"
     )
     assert values["submodule_buildroot"] == (
-        "4a1e90704706756a6f6062482a070e63f9b27573"
+        "a929267288a80a31407a3af06345c088979bcc2e"
     )
     assert values["versions_buildroot"] == (
-        "iq-direct-async-ring-v1-rc1-source/buildroot-v1"
+        "iq-direct-async-ring-v1-rc1-source/buildroot-v2"
     )
     assert "release_tag" not in values
 

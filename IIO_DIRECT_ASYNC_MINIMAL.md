@@ -93,7 +93,7 @@ with either direct mode.
 | Component | Branch | Commit | Purpose |
 | --- | --- | --- | --- |
 | libiio/iiOD | `codex/iq-direct-async-main-refresh-libiio` | `b7303fded264e10473bbbb084afade8f1b1373d1` | direct producer, unified DMA/RAM FIFO, spill accounting, DMA headroom, binding and native tests |
-| Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `4a1e90704706756a6f6062482a070e63f9b27573` | exact libiio pin |
+| Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `a929267288a80a31407a3af06345c088979bcc2e` | exact libiio pin and archive SHA-256 |
 | host | published `main` | `37f6c38650bce42d017b5516edf2c736ef81b889` | API admission, capability checks, status exposure, finite-ring timestamp handling, one-command ladder, tests |
 
 The libiio branch descends from its audited `origin/master` base
@@ -101,7 +101,7 @@ The libiio branch descends from its audited `origin/master` base
 audited `origin/main` base `1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1`.
 The immutable libiio source ref is
 `iq-direct-async-ring-v1-rc1-source/libiio-v1`; the matched Buildroot ref is
-`iq-direct-async-ring-v1-rc1-source/buildroot-v1`. Both resolve to the exact
+`iq-direct-async-ring-v1-rc1-source/buildroot-v2`. Both resolve to the exact
 commits above and are published. The exact package matrix, submodule pins,
 publication order, host runtime procedure, and install/rollback boundary are
 maintained in
