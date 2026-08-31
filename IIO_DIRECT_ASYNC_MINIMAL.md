@@ -1,10 +1,11 @@
 # Direct-async IQ queue with optional RAM extension
 
-This prototype is based directly on firmware `origin/main`
+This candidate is based directly on firmware `origin/main`
 `4f15c87033e332293711ad679a50af0109c72862` as observed on 2026-08-31. It
 preserves the minimal direct DMA transport and optionally lets the existing
-RAM ring extend that same FIFO. The branches are local, unmerged, and not
-authorized for persistent flash or publication.
+RAM ring extend that same FIFO. The exact source branches and immutable
+dependency tags are published; the firmware remains unmerged and is not
+authorized for persistent flash.
 
 ## Interface
 
@@ -93,15 +94,17 @@ with either direct mode.
 | --- | --- | --- | --- |
 | libiio/iiOD | `codex/iq-direct-async-main-refresh-libiio` | `b7303fded264e10473bbbb084afade8f1b1373d1` | direct producer, unified DMA/RAM FIFO, spill accounting, DMA headroom, binding and native tests |
 | Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `4a1e90704706756a6f6062482a070e63f9b27573` | exact libiio pin |
-| host | `codex/iq-direct-async-main-refresh-host` | `55e3c08ecf703c2a2f6b5367b3e3d64644c58c1a` | API admission, capability checks, status exposure, finite-ring timestamp handling, tests |
+| host | published `main` | `37f6c38650bce42d017b5516edf2c736ef81b889` | API admission, capability checks, status exposure, finite-ring timestamp handling, one-command ladder, tests |
 
-The libiio branch descends from current `origin/master`
-`4c6022caf838813c1fc88d6de7a83f2bb5fa8e9f`; the host branch descends from
-current `origin/main` `1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1`.
-The proposed immutable source ref remains
-`iq-direct-async-ring-v1-rc1-source/libiio-v1`, but neither it nor any branch
-has been pushed. The exact package matrix, submodule pins, publication order,
-host runtime procedure, and install/rollback boundary are maintained in
+The libiio branch descends from its audited `origin/master` base
+`4c6022caf838813c1fc88d6de7a83f2bb5fa8e9f`; the host work descends from its
+audited `origin/main` base `1d1cdb1241ec8dcda7ff0ee68bafcbfd1ddff4a1`.
+The immutable libiio source ref is
+`iq-direct-async-ring-v1-rc1-source/libiio-v1`; the matched Buildroot ref is
+`iq-direct-async-ring-v1-rc1-source/buildroot-v1`. Both resolve to the exact
+commits above and are published. The exact package matrix, submodule pins,
+publication order, host runtime procedure, and install/rollback boundary are
+maintained in
 [`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md).
 
 ## Software verification
@@ -113,9 +116,9 @@ DMA leases, ring core/request/status, metadata batching, sampler coverage,
 tandem session, and thread-affinity coverage. The Python libiio suite passes
 38 tests.
 
-The final host head passes 1,158 tests with 11 explicit browser, attached-radio,
+The final host head passes 1,169 tests with 11 explicit browser, attached-radio,
 or transmitter skips and one third-party deprecation warning. Ruff passes and
-strict mypy reports no issues in 64 source files.
+strict mypy reports no issues in 65 source files.
 
 The ARM32 EABI5 outputs contain the exact `b7303fd` build tag:
 
@@ -171,11 +174,45 @@ application rate was 44.53 MB/s. The host retains capture-time counter anchors
 while draining a completed finite ring, avoiding invalid post-capture timestamp
 fits.
 
+### One-command rate/duration ladder
+
+Pluto Plus Utils `37f6c3865` adds a bounded ladder command whose defaults are
+the requested 5/10/15/25 MS/s rates and 3/10-second durations:
+
+```bash
+pluto radio direct-async-ladder 192.168.1.15 \
+  --transport ip --ip-port 30431 \
+  --expect-serial 104000b29905000e17000800065934759d
+```
+
+The ringless source qualification produced:
+
+| Sample rate | 3 seconds | 10 seconds | Gap events |
+| ---: | ---: | ---: | ---: |
+| 5 MS/s | 18.65 MB/s | 19.57 MB/s | 0 / 0 |
+| 10 MS/s | 38.37 MB/s | 39.03 MB/s | 0 / 0 |
+| 15 MS/s | 58.34 MB/s | 58.56 MB/s | 0 / 0 |
+| 25 MS/s | 72.50 MB/s | 75.05 MB/s | 8 / 22 |
+
+The command continued through every cell, accounted for missing samples,
+restored the RX configuration, and emitted a JSON report with SHA-256
+`73682011786c1e55c7d8c3721c17fe82ed7bde9c2716449171dfce6a3e4a9a86`.
+Thus the transport clears 70 MB/s at the top rate, but this sustained ladder
+also shows that a 15-block finite queue does not make 25 MS/s lossless.
+
+The RAM-extension variant is the same command plus
+`--kernel-buffers 10 --ram-ring-slots 13`. All 134 spilled descriptors drained
+in order, the high-water mark reached 13, and missing IQ bytes at 25 MS/s fell
+from 31,457,280 to 20,971,520. The report SHA-256 is
+`4594fe3d573ce063ae105e9fa84e9554456b8b44fbdbddc968886a78cdc8e969`.
+
 Every run snapshotted and restored sample rate, bandwidth, LO, enabled
 channels, gain modes, and gains. The restored state was 30.72 MS/s, 18 MHz
 bandwidth, 2.4 GHz RX LO, both RX channels, and `slow_attack` on both channels.
 
-The exact source commits remain local, so a reproducible full firmware image
-is intentionally gated on publishing an immutable libiio ref. No release
-receipt, tag, remote branch, firmware image, or persistent radio mutation is
-created by this prototype.
+The exact dependency tags and host command are published. The protected
+firmware version is `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`, but no
+version-stamped image or GitHub release exists yet. The final image must repeat
+the fixed direct, combined, standalone-ring, and two ladder profiles under its
+normal supervised iiOD before publication. No persistent radio mutation was
+made during source qualification.

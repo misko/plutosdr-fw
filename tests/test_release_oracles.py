@@ -64,6 +64,9 @@ DDR_RING_V1_RC2_SOURCE_MANIFEST = (
 DDR_RING_PREFILL_V1_RC1_SOURCE_MANIFEST = (
     ROOT / "manifests" / "ddr-ring-prefill-v1-rc1-source.yaml"
 )
+DIRECT_ASYNC_RING_V1_RC1_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "iq-direct-async-ring-v1-rc1-source.yaml"
+)
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 FIRMWARE_PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
@@ -506,6 +509,30 @@ def test_ddr_ring_prefill_v1_rc1_advances_only_libiio_and_buildroot() -> None:
         "dd1bf9e2ea775bcb047edf4c80eb68fb27d486c0"
     )
     assert "release_tag" not in current
+
+
+def test_direct_async_ring_v1_rc1_pins_the_qualified_source_graph() -> None:
+    values = _manifest_values(DIRECT_ASYNC_RING_V1_RC1_SOURCE_MANIFEST)
+
+    assert values["schema"] == "plutosdr-fw.source-manifest"
+    assert values["schema_version"] == "1"
+    assert values["release_state"] == "candidate"
+    assert values["libiio_0_25_source"] == (
+        "b7303fded264e10473bbbb084afade8f1b1373d1"
+    )
+    assert values["libiio_0_25_ref"] == (
+        "refs/tags/iq-direct-async-ring-v1-rc1-source/libiio-v1"
+    )
+    assert values["metadata_source"] == (
+        "3294365ff44da26b261be4a2ccb241b7896d23ad"
+    )
+    assert values["submodule_buildroot"] == (
+        "4a1e90704706756a6f6062482a070e63f9b27573"
+    )
+    assert values["versions_buildroot"] == (
+        "iq-direct-async-ring-v1-rc1-source/buildroot-v1"
+    )
+    assert "release_tag" not in values
 
 
 def test_historical_routes_and_all_v8_source_graphs_are_explicit() -> None:

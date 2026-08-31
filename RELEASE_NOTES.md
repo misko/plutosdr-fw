@@ -60,7 +60,7 @@
 | `ddr-ring-prefill-v1-rc1` | 2026-08-29 | **hardware-qualified release source; promoted** | fills a strict contiguous DDR prefix before transport, then completes pressure-limited streams with exact gap metadata instead of terminal overflow |
 | **`ddr-ring-prefill-v1`** | 2026-08-29 | **current hardware-qualified release** | exact 200 MB contiguous prefix plus nonterminal ABI-3 pressure-gap completion at 20 MS/s |
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
-| `iq-direct-async-ring-v1-rc1-source` | 2026-08-31 | **hardware-qualified source stack; no release image** | overlaps DMA capture with TCP delivery and optionally extends the same FIFO with RAM-backed descriptors |
+| `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **source-qualified prerelease candidate; image pending** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and adds a one-command rate/duration ladder |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -69,7 +69,7 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## iq-direct-async-ring-v1-rc1-source — 2026-08-31 — **hardware-qualified source stack; no release image**
+## v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1 — 2026-08-31 — **source-qualified prerelease candidate; image pending**
 
 This source candidate rebases the finite direct-async IQ prototype onto the
 current firmware `origin/main` base
@@ -93,10 +93,11 @@ The exact compatible source graph is:
 | Component | Version/ref | Required implementation commit |
 | --- | --- | --- |
 | firmware integration | `codex/iq-direct-async-main-refresh` | `a5253497d15613831055dbfb543ca5a9936bd2c6` |
-| Buildroot | `codex/iq-direct-async-main-refresh-buildroot` | `4a1e90704706756a6f6062482a070e63f9b27573` |
-| radio and host libiio | 0.25; proposed `iq-direct-async-ring-v1-rc1-source/libiio-v1` | `b7303fded264e10473bbbb084afade8f1b1373d1` |
+| source manifest | `iq-direct-async-ring-v1-rc1-source.yaml` | candidate source graph in the firmware release commit |
+| Buildroot | `iq-direct-async-ring-v1-rc1-source/buildroot-v1` | `4a1e90704706756a6f6062482a070e63f9b27573` |
+| radio and host libiio | 0.25; `iq-direct-async-ring-v1-rc1-source/libiio-v1` | `b7303fded264e10473bbbb084afade8f1b1373d1` |
 | metadata provider | ABI 3 / `RadioMetadataV6` | `3294365ff44da26b261be4a2ccb241b7896d23ad` |
-| Pluto Plus Utils | package 0.1.0; `codex/iq-direct-async-main-refresh-host` | `55e3c08ecf703c2a2f6b5367b3e3d64644c58c1a` |
+| Pluto Plus Utils | package 0.1.0; published `main` | `37f6c38650bce42d017b5516edf2c736ef81b889` |
 
 The native host library and generated Python binding must both come from the
 same `b7303fd` source. Stock libiio and the PyPI-only `pylibiio` package do not
@@ -121,6 +122,32 @@ also delivered all 69 frames without a gap and recorded real RAM spill/drain
 counts of 9, 9, and 6. A standalone 8-DMA/15-RAM finite ring delivered all 23
 frames without a gap at 20 MS/s and closed at 23 produced/23 consumed.
 
+The published host command can also execute the complete 5/10/15/25 MS/s by
+3/10-second matrix without a separate test script:
+
+```bash
+pluto radio direct-async-ladder 192.168.1.15 \
+  --transport ip --ip-port 30431 \
+  --expect-serial 104000b29905000e17000800065934759d
+```
+
+Its defaults are exactly `--rates 5M,10M,15M,25M --durations 3,10
+--samples 1048576 --kernel-buffers 15`. The source-qualified ringless run was
+gapless at 5, 10, and 15 MS/s. It delivered 72.50 MB/s for three seconds and
+75.05 MB/s for ten seconds at 25 MS/s, while correctly reporting 8 and 22 gap
+events rather than calling those two cells lossless. The JSON evidence is
+`ringless-5-10-15-25Msps-3-10s.json`, SHA-256
+`73682011786c1e55c7d8c3721c17fe82ed7bde9c2716449171dfce6a3e4a9a86`.
+
+The same one-command matrix with `--kernel-buffers 10 --ram-ring-slots 13`
+proved that RAM extends the existing queue: 134 descriptors spilled and all
+134 drained, with a high-water mark of 13. Its 25-MS/s cells delivered 67.14
+and 68.74 MB/s and reduced missing IQ bytes from 31,457,280 ringless to
+20,971,520. The RAM report SHA-256 is
+`4594fe3d573ce063ae105e9fa84e9554456b8b44fbdbddc968886a78cdc8e969`.
+These ladder results used the exact release-source iiOD from `/tmp`; the final
+version-stamped image must repeat both commands before the RC1 is published.
+
 RAM extension is a capacity and continuity mode, not the 70 MB/s performance
 mode. Its measured application rates ranged from 42.80 to 67.91 MB/s because
 the Zynq performs explicit 4 MiB RAM copies. The ringless direct profile is the
@@ -129,15 +156,19 @@ transported above 70 MB/s but overran after frame 14, so the qualified
 15-buffer profile is a compatibility requirement for this finite workload.
 
 The final source heads pass 14 native and 14 ASan/UBSan C tests, 38 libiio
-Python tests, 1,158 host tests with 11 explicit skips, Ruff, and strict mypy.
+Python tests, 1,169 host tests with 11 explicit skips, Ruff, and strict mypy
+across 65 source files.
 The radio's stock iiOD, installed library hashes, RF settings, buffer state,
 and DMA control register were restored after the volatile test.
 
-No firmware release version has been assigned. The proposed libiio source ref,
-branches, and firmware image are not published. A normal Buildroot fetch and
-the receipt-writing host installer must remain blocked until the immutable ref
-is published at exactly `b7303fd`; persistent flashing then remains a separate
-authorization after final version-stamped RAM qualification. See
+The protected candidate identity is
+`v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1`. The immutable libiio and
+Buildroot refs are published at exactly `b7303fd` and `4a1e90704`; Pluto Plus
+Utils `main` contains the matched host implementation and ladder at
+`37f6c3865`. No version-stamped firmware image or GitHub release exists yet.
+The protected build, artifact validation, and final version-stamped RAM
+qualification remain publication gates. Persistent flashing remains a
+separate authorization even after an RC1 is published. See
 [`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md) for the exact
 component matrix, installation order, checks, and rollback boundary.
 
