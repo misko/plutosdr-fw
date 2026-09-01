@@ -12,13 +12,7 @@ INTEGRATED_WAIVERS="${SPF_INTEGRATED_WAIVERS:-}"
 PACKAGE_STEM_PREFIX="${SPF_PACKAGE_STEM_PREFIX:-plutoplus-spf-main}"
 RELEASE_STATE="${SPF_RELEASE_STATE:-main-ci}"
 REQUIRED_BUS_SKEW_CONSTRAINTS=4
-
-# The RX-only shell intentionally removes the TX timestamp FIFO and therefore
-# has one RX FIFO crossing pair (read and write) instead of the legacy RX+TX
-# pair set. Keep the established four-constraint floor for every other build.
-if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; then
-    REQUIRED_BUS_SKEW_CONSTRAINTS=2
-fi
+STARLINK_RX_ONLY_BUILD=false
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -46,6 +40,22 @@ tandem-agc-v8-rc5-source.yaml | tandem-agc-v8-rc6-source.yaml | tandem-agc-v8-rc
     INTEGRATED_WAIVERS="${ROOT}/manifests/tandem-agc-v8-integrated-waivers.json"
     ;;
 esac
+
+# The RX-only shell intentionally removes the TX timestamp FIFO and therefore
+# has one RX FIFO crossing pair (read and write) instead of the legacy RX+TX
+# pair set. Authorize that two-constraint inventory only for the exact canonical
+# manifest committed at HEAD; a same-basename file cannot weaken this gate.
+if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; then
+    starlink_manifest="${ROOT}/manifests/starlink-rx-only-dnm-v1-source.yaml"
+    [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_manifest" ]] ||
+        fail "RX-only build must use the canonical manifest: ${starlink_manifest}"
+    git --no-replace-objects -C "$ROOT" \
+        show 'HEAD:manifests/starlink-rx-only-dnm-v1-source.yaml' |
+        cmp -s - "$starlink_manifest" ||
+        fail "RX-only manifest differs from its committed HEAD blob"
+    STARLINK_RX_ONLY_BUILD=true
+    REQUIRED_BUS_SKEW_CONSTRAINTS=2
+fi
 
 [[ -n "$ARTIFACT_ROOT" ]] ||
     fail "usage: scripts/ci/package_main_firmware.sh /absolute/artifact/directory"
@@ -510,6 +520,20 @@ grep -Fq 'All user specified timing constraints are met.' \
     fail "routed timing constraints are not met"
 if grep -Eq '^CDC-10[[:space:]]' "$ARTIFACT_ROOT/system_top_cdc_routed.rpt"; then
     fail "routed CDC report contains CDC-10 combinational-before-sync paths"
+fi
+if [[ "$STARLINK_RX_ONLY_BUILD" == true ]]; then
+    starlink_critical_cdc_rows="$(
+        grep -E '^[[:space:]]*[0-9]+[[:space:]]+CDC-[0-9]+[[:space:]]+Critical' \
+            "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" || true
+    )"
+    [[ "$(grep -c . <<<"$starlink_critical_cdc_rows")" == 2 ]] ||
+        fail "RX-only routed CDC critical inventory differs from the two reviewed crossings"
+    grep -Eq 'CDC-1[[:space:]]+Critical.*cpack_timestamp/inst/overflow_sync' \
+        <<<"$starlink_critical_cdc_rows" ||
+        fail "RX-only routed CDC report lacks the reviewed overflow snapshot crossing"
+    grep -Eq 'CDC-4[[:space:]]+Critical.*cpack_timestamp/inst/timestamp_cpu_sync' \
+        <<<"$starlink_critical_cdc_rows" ||
+        fail "RX-only routed CDC report lacks the reviewed timestamp snapshot crossing"
 fi
 [[ "$(grep -c 'Slack (MET)' "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt")" \
    -ge "$REQUIRED_BUS_SKEW_CONSTRAINTS" ]] ||

@@ -43,10 +43,17 @@ def test_rx_only_packaging_requires_the_two_remaining_fifo_crossings() -> None:
     packager = _read("scripts/ci/package_main_firmware.sh")
 
     assert "REQUIRED_BUS_SKEW_CONSTRAINTS=4" in packager
-    assert '== "starlink-rx-only-dnm-v1-source.yaml"' in packager
+    assert "STARLINK_RX_ONLY_BUILD=false" in packager
+    assert 'realpath -- "$MANIFEST"' in packager
+    assert "HEAD:manifests/starlink-rx-only-dnm-v1-source.yaml" in packager
+    assert "RX-only manifest differs from its committed HEAD blob" in packager
+    assert "STARLINK_RX_ONLY_BUILD=true" in packager
     assert "REQUIRED_BUS_SKEW_CONSTRAINTS=2" in packager
     assert '-ge "$REQUIRED_BUS_SKEW_CONSTRAINTS"' in packager
     assert "Slack (VIOLATED)" in packager
+    assert "RX-only routed CDC critical inventory differs" in packager
+    assert "cpack_timestamp/inst/overflow_sync" in packager
+    assert "cpack_timestamp/inst/timestamp_cpu_sync" in packager
 
 
 def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:
