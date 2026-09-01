@@ -111,6 +111,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "iq-direct-async-ring-v1-rc1-source.yaml:candidate" in package
     assert "iq-direct-async-ring-v1-rc1-source.yaml:final-release" in package
     assert "iq-direct-async-v2-source.yaml:final-release" in package
+    assert "iq-direct-async-v3-source.yaml:final-release" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:candidate" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:final-release" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
@@ -332,17 +333,17 @@ def test_direct_async_ring_v1_has_exact_historical_candidate_route() -> None:
     assert "persistent_qualified: false" in build_manifest
 
 
-def test_direct_async_v2_has_exact_main_release_route() -> None:
+def test_direct_async_v3_has_exact_main_release_route() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
     checker = (ROOT / "scripts" / "check_tandem_release_offline.sh").read_text()
-    manifest_name = "iq-direct-async-v2-source.yaml"
+    manifest_name = "iq-direct-async-v3-source.yaml"
     manifest = (ROOT / "manifests" / manifest_name).read_text()
 
     assert workflow.count(f"'{manifest_name}'") == 1
-    assert workflow.count("'plutoplus-spf-iq-direct-async-v2'") == 1
-    assert workflow.count("'v0.47-plutoplus-spf-iq-direct-async-v2'") == 1
+    assert workflow.count("'plutoplus-spf-iq-direct-async-v3'") == 1
+    assert workflow.count("'v0.48-plutoplus-spf-iq-direct-async-v3'") == 1
     assert f"{manifest_name}:final-release" in package
     assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
     current_worktree_checks = [
@@ -359,9 +360,9 @@ def test_direct_async_v2_has_exact_main_release_route() -> None:
     assert "release_state: candidate" in manifest
     assert "release_tag:" not in manifest
     assert "firmware_source:" not in manifest
-    assert "libiio_0_25_source: 8f66f353c9a70a5524988ceb588b0e9271c2390d" in manifest
-    assert "submodule_buildroot: 3e1dd15acf361cc06e202e9e59e907dd379a13c3" in manifest
-    assert "versions_buildroot: iq-direct-async-v2-source/buildroot-v1" in manifest
+    assert "libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2" in manifest
+    assert "submodule_buildroot: 1c337a0b8d8126c9d1ed785607bc5ea52e7fed22" in manifest
+    assert "versions_buildroot: iq-direct-async-v3-source/buildroot-v1" in manifest
 
 
 def test_iio_throughput_affinity_candidate_has_an_exact_protected_route() -> None:
