@@ -95,9 +95,23 @@ Current control-plane evidence:
   `starlink-rx-only-dnm-v1-source/*` namespace against update or deletion in
   firmware (ruleset `22043674`), HDL (`22044279`), and Linux (`22044287`).
 
-The two live negative canaries remain mandatory before the first exact-detector
-candidate build; their PR, head, run, failure reason, closure, and no-merge
-states are recorded here after execution.
+The two live negative canaries are complete:
+
+- [firmware PR #77](https://github.com/misko/plutosdr-fw/pull/77) at experimental head
+  `0ca087edb5f7f67156c55faa7916668e82903742` was rejected by required guard
+  [run `33558147580`](https://github.com/misko/plutosdr-fw/actions/runs/33558147580)
+  with the exact reason `experimental branch name is
+  forbidden: codex/starlink-rx-only-do-not-merge`; and
+- [firmware PR #78](https://github.com/misko/plutosdr-fw/pull/78) at ordinary-named canary head
+  `d5518234c2e3c0575ea0c5c9b6071cdf75bdff9f` was rejected by required guard
+  [run `33558248086`](https://github.com/misko/plutosdr-fw/actions/runs/33558248086)
+  because hidden
+  `docs/firmware-guard-canary.md` contained an experimental warning marker.
+
+Both PRs are closed with `mergedAt=null`. The temporary PR #78 branch was
+removed after its unrelated long checks were cancelled; the real DNM branch
+used by PR #77 remains retained. This satisfies the live branch-name and
+renamed-content promotion guard gate.
 
 ## Fixed geometry and rate strategy
 
