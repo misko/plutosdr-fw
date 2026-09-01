@@ -4,8 +4,14 @@
 # Keep the root overridable so the behavior can be tested without hardware.
 
 IIO_ROOT=${PLUTO_IIO_ROOT:-/sys/bus/iio/devices}
+DT_ROOT=${PLUTO_DT_ROOT:-/sys/firmware/devicetree/base}
 phy=
 dds=
+rx_only=0
+
+if [ -e "$DT_ROOT/misko,rx-only-fpga" ]; then
+	rx_only=1
+fi
 
 for candidate in "$IIO_ROOT"/*; do
 	[ -r "$candidate/name" ] || continue
@@ -26,25 +32,39 @@ for candidate in "$IIO_ROOT"/*; do
 	break
 done
 
-if [ -z "$dds" ]; then
-	printf '%s\n' "pluto-mute-tx: AD9361 DDS core was not found" >&2
-	exit 1
-fi
-
 dds_count=0
-for control in "$dds"/out_altvoltage*_raw; do
-	[ -e "$control" ] || continue
-	printf '0\n' > "$control" || exit 1
-	[ "$(cat "$control")" = "0" ] || {
-		printf 'pluto-mute-tx: DDS control did not mute: %s\n' "$control" >&2
-		exit 1
-	}
-	dds_count=$((dds_count + 1))
-done
 
-if [ "$dds_count" -eq 0 ]; then
-	printf '%s\n' "pluto-mute-tx: no DDS controls were found" >&2
-	exit 1
+if [ -n "$dds" ]; then
+	for control in "$dds"/out_altvoltage*_raw; do
+		[ -e "$control" ] || continue
+		printf '0\n' > "$control" || exit 1
+		[ "$(cat "$control")" = "0" ] || {
+			printf 'pluto-mute-tx: DDS control did not mute: %s\n' "$control" >&2
+			exit 1
+		}
+		dds_count=$((dds_count + 1))
+	done
+
+	if [ "$dds_count" -eq 0 ]; then
+		printf '%s\n' "pluto-mute-tx: no DDS controls were found" >&2
+		exit 1
+	fi
+else
+	if [ "$rx_only" -ne 1 ]; then
+		printf '%s\n' "pluto-mute-tx: AD9361 DDS core was not found" >&2
+		exit 1
+	fi
+	disabled_dds=0
+	for status in "$DT_ROOT"/fpga-axi*/cf-ad9361-dds-core-lpc@79024000/status; do
+		[ -r "$status" ] || continue
+		[ "$(tr -d '\000' < "$status")" = "disabled" ] || continue
+		disabled_dds=$((disabled_dds + 1))
+	done
+	if [ "$disabled_dds" -ne 1 ]; then
+		printf '%s\n' \
+			"pluto-mute-tx: RX-only marker lacks one disabled DDS node" >&2
+		exit 1
+	fi
 fi
 
 gain_count=0
@@ -66,4 +86,21 @@ if [ "$gain_count" -eq 0 ]; then
 	exit 1
 fi
 
-printf 'TX muted: dds_controls=%s tx_channels=%s\n' "$dds_count" "$gain_count"
+tx_lo_count=0
+for control in "$phy"/out_altvoltage*_TX_LO_powerdown; do
+	[ -e "$control" ] || continue
+	printf '1\n' > "$control" || exit 1
+	[ "$(cat "$control")" = "1" ] || {
+		printf 'pluto-mute-tx: TX LO did not power down: %s\n' "$control" >&2
+		exit 1
+	}
+	tx_lo_count=$((tx_lo_count + 1))
+done
+
+if [ "$tx_lo_count" -ne 1 ]; then
+	printf '%s\n' "pluto-mute-tx: expected one TX LO powerdown control" >&2
+	exit 1
+fi
+
+printf 'TX muted: rx_only=%s dds_controls=%s tx_channels=%s tx_lo_powerdown=%s\n' \
+	"$rx_only" "$dds_count" "$gain_count" "$tx_lo_count"
