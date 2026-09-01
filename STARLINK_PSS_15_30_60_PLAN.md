@@ -173,8 +173,10 @@ Every rate must pass all of these common gates:
   no unexplained gaps or overflow occur, and x2/x4 lane phase plus delay maps
   exactly to the full-rate index;
 - RX-only attestation: only RX voltage channels 0 and 1 are scan-capable, no
-  TX DMA/DDS IIO device is live, both TX gains are <= -80 dB, the
-  TX LO is powered down, and removed-device DT markers match the image;
+  TX DMA/DDS IIO device is live, every exactly inventoried TX hardware-gain
+  control is <= -80 dB, the one shared AD936x TX-LO control is powered down,
+  and removed-device DT markers match the image. The receipt must not invent a
+  second LO or a second 1R1T gain control that the IIO ABI does not expose;
 - identity and rollback: exact serial and USB-topology lock, exact `/32` route,
   isolated known-host file, pre/post receipts, new boot ID, unchanged
   persistent QSPI/Linux hash, bounded cleanup, automatic rollback, and proof
