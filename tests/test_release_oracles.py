@@ -70,6 +70,9 @@ DIRECT_ASYNC_RING_V1_RC1_SOURCE_MANIFEST = (
 DIRECT_ASYNC_V2_SOURCE_MANIFEST = (
     ROOT / "manifests" / "iq-direct-async-v2-source.yaml"
 )
+DIRECT_ASYNC_V3_SOURCE_MANIFEST = (
+    ROOT / "manifests" / "iq-direct-async-v3-source.yaml"
+)
 TANDEM_V2_SOURCE_MANIFEST = ROOT / "manifests" / "tandem-agc-v2-source.yaml"
 FIRMWARE_MAIN_WORKFLOW = ROOT / ".github" / "workflows" / "firmware-main.yml"
 FIRMWARE_PR_WORKFLOW = ROOT / ".github" / "workflows" / "firmware.yml"
@@ -568,6 +571,34 @@ def test_direct_async_v2_pins_the_candidate_source_graph() -> None:
     )
     assert values["versions_buildroot"] == (
         "iq-direct-async-v2-source/buildroot-v1"
+    )
+
+
+def test_direct_async_v3_pins_the_candidate_source_graph() -> None:
+    values = _manifest_values(DIRECT_ASYNC_V3_SOURCE_MANIFEST)
+
+    assert values["schema"] == "plutosdr-fw.source-manifest"
+    assert values["schema_version"] == "1"
+    assert values["release_state"] == "candidate"
+    assert "release_tag" not in values
+    assert "firmware_source" not in values
+    assert values["libiio_0_25_source"] == (
+        "0d323080a0a1067da8c7adbadfd03ee186a40ec2"
+    )
+    assert values["libiio_0_25_ref"] == (
+        "refs/tags/iq-direct-async-v3-source/libiio-v1"
+    )
+    assert values["libiio_0_25_archive_sha256"] == (
+        "66ccc7230ebe75c477c4dfc147aa86289c3f896c0a0d6b3b6c964e152d89c266"
+    )
+    assert values["submodule_buildroot"] == (
+        "1c337a0b8d8126c9d1ed785607bc5ea52e7fed22"
+    )
+    assert values["submodule_buildroot_ref"] == (
+        "refs/tags/iq-direct-async-v3-source/buildroot-v1"
+    )
+    assert values["versions_buildroot"] == (
+        "iq-direct-async-v3-source/buildroot-v1"
     )
 
 
