@@ -1,0 +1,6 @@
+This source graph is an experimental Starlink RX-only RAM-boot campaign.
+
+Do not merge or cherry-pick this branch, its firmware/HDL/Linux changes, its
+candidate manifests, or its generated images into firmware main. Reusable host
+tooling belongs in pluto-plus-utils main; generic firmware-repository governance
+must travel through a separate clean pull request based on firmware main.
