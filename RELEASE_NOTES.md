@@ -62,7 +62,8 @@
 | `iio-throughput-coverage-window-v6-rc1` | 2026-08-30 | **hardware-qualified release source; final bytes pending** | prevents queued DMA frames from aging out of gain/RSSI coverage during DDR copy and backpressure |
 | `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **hardware-qualified RAM-first prerelease; source promoted** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and exceeds 70 MB/s with the exact packaged runtime over 1 GbE |
 | `v0.46-plutoplus-spf-iq-direct-async-ring-v1` | 2026-08-31 | superseded hardware-qualified full release | first non-RC direct/RAM release; exact final image passed guarded persistent installation and cold-boot qualification |
-| **`v0.47-plutoplus-spf-iq-direct-async-v2`** | 2026-08-31 | **current hardware-qualified full release** | keeps a whole host target in one DMA session and adds default drop-backlog plus preserve-backlog overrun policies for ringless and RAM-extended queues |
+| `v0.47-plutoplus-spf-iq-direct-async-v2` | 2026-08-31 | superseded hardware-qualified full release; rollback target | keeps a whole host target in one DMA session and adds default drop-backlog plus preserve-backlog overrun policies for ringless and RAM-extended queues |
+| **`v0.48-plutoplus-spf-iq-direct-async-v3`** | 2026-09-01 | **current hardware-qualified full release** | recovers stale gain/RSSI metadata in drop-backlog mode, completes long finite sessions, and sustains 70 MB/s+ over physical 1 GbE |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -71,7 +72,51 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.47-plutoplus-spf-iq-direct-async-v2 — 2026-08-31 — **current hardware-qualified full release**
+## v0.48-plutoplus-spf-iq-direct-async-v3 — 2026-09-01 — **current hardware-qualified full release**
+
+V3 fixes issue #72 without changing the ABI-3 IQ or metadata layout. When a
+real queued IQ frame has aged beyond the finite gain/RSSI coverage window, the
+SPF provider returns `ESTALE`. In default drop-backlog mode, iiOD retires that
+frame and every queued-but-unsent stale DMA/RAM frame, preserves the TCP frame
+already in flight, rebases exact loss metadata, and continues filling the same
+finite host target. Preserve-backlog remains available and fail-closed.
+
+Protected `main` run 33481347855 built source
+`e3078376a6e1a8c6ea841dc69966b3880e020c70` with Buildroot `1c337a0`, libiio
+0.25 `0d32308`, metadata ABI 3 provider `3294365`, HDL `145bd47`, Linux
+`93174a1`, and U-Boot `1ff0468`. The exact DFU is SHA-256 `cc87c36a…9995a`;
+its 12,825,571-byte FIT is `db777ac9…5f1df`. The packaged iiOD uses R/W-worker
+affinity on CPU 1, the supervised equivalent of `iiod -r 1`.
+
+The exact final DFU RAM-booted successfully on four serial/path-bound USB
+radios; all four completed gapless 5 MS/s smoke captures. Over physical 1 GbE,
+the ringless 47-frame DMA profile completed 3-, 10-, and 60-second 25 MS/s
+requests at 73.571, 74.088, and 72.823 MB/s. The 60-second cell returned all
+1,431 frames in one segment with no `ENODATA` or host re-arm.
+
+In matched 25 MS/s/20-second runs, gap events were 143/21 for ringless
+preserve/drop and 198/12 for RAM32 preserve/drop. Thus drop-backlog reduced
+separate discontinuity events by 85.3% ringless and 93.9% with RAM. It can
+reduce source coverage because it intentionally creates fewer, larger skips
+to return to fresher RF time; a 100 MB/s source cannot remain lossless over a
+roughly 73 MB/s consumer indefinitely.
+
+PPU `main` `246ead24fd9c9052a978340a0905408afcb3b8aa` contains the exact v3
+RAM and persistent profiles, matched `0d32308` runtime installer, serial-bound
+USB/LAN flashing, ephemeral SSH-key rotation, read-only QSPI reconciliation,
+and the final public qualification visual. Persistent installation, exact
+`/dev/mtd3` FIT verification, an independent guarded reboot, repeated QSPI
+verification, TX safety, and a post-reboot direct capture passed. This release
+is persistent-reboot qualified; it does not claim an all-power-removed cold
+boot.
+
+Exact assets, component commits, performance/coverage tables, commands, and
+rollback requirements are in
+[`RELEASE_IQ_DIRECT_ASYNC_V3.md`](RELEASE_IQ_DIRECT_ASYNC_V3.md),
+[`IIO_DIRECT_ASYNC_INSTALL.md`](IIO_DIRECT_ASYNC_INSTALL.md), and
+[`manifests/iq-direct-async-v3.yaml`](manifests/iq-direct-async-v3.yaml).
+
+## v0.47-plutoplus-spf-iq-direct-async-v2 — 2026-08-31 — **superseded hardware-qualified full release; rollback target**
 
 V2 keeps one producer/consumer session alive for up to 4,096 requested frames;
 there is no 64-frame request re-arm. RAM slots extend the same ordered DMA

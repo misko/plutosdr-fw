@@ -6,12 +6,13 @@ and Pluto+, see **[Flashing firmware](flashing.md)**. Pluto+ users should read
 its bootloader safety warning before copying any image to a radio.
 
 The current direct-async/RAM-extension stack is
-`v0.47-plutoplus-spf-iq-direct-async-v2`. It keeps one DMA session alive for a
+`v0.48-plutoplus-spf-iq-direct-async-v3`. It keeps one DMA session alive for a
 complete host request, supports a 200 MB RAM extension of the same FIFO, and
-adds explicit `drop-backlog` (default) and `preserve-backlog` overrun policies.
-The exact image sustained 73.55--73.88 MB/s at 25 MS/s over physical 1 GbE;
-three short continuity runs were gapless. See the
-**[v0.47 release notes](RELEASE_IQ_DIRECT_ASYNC_V2.md)** and
+recovers stale metadata in default `drop-backlog` mode without ending the host
+request. The exact image sustained 72.82--74.09 MB/s at 25 MS/s over physical
+1 GbE for 3-, 10-, and 60-second sessions; all 1,431 frames returned in the
+60-second gate. See the
+**[v0.48 release notes](RELEASE_IQ_DIRECT_ASYNC_V3.md)** and
 **[source and installation requirements](IIO_DIRECT_ASYNC_INSTALL.md)** for the
 firmware, Buildroot, libiio, metadata-provider, host, toolchain, ladder-test,
 and binding pins.

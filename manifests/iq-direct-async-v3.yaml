@@ -1,0 +1,135 @@
+# Immutable build and hardware-qualification manifest for the direct-async v3
+# full release. Values bind the protected build, exact persistent image,
+# matched host runtime, final hardware evidence, and PPU publication commit.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+
+release_tag: v0.48-plutoplus-spf-iq-direct-async-v3
+release_url: https://github.com/misko/plutosdr-fw/releases/tag/v0.48-plutoplus-spf-iq-direct-async-v3
+device_fw: v0.48-plutoplus-spf-iq-direct-async-v3
+
+asset_name: plutoplus-spf-iq-direct-async-v3-e3078376a6e1-pluto.dfu
+image_url: https://github.com/misko/plutosdr-fw/releases/download/v0.48-plutoplus-spf-iq-direct-async-v3/plutoplus-spf-iq-direct-async-v3-e3078376a6e1-pluto.dfu
+image_sha256: cc87c36a3aad609a64b45f4a02eecf916b99a3099fa523eed1bf4526ed98995a
+image_size: 12825587
+fit_body_sha256: db777ac93d5c6f0be0cf2799808a4d06fe39264ee1e99e76001509394d75f1df
+fit_body_size: 12825571
+
+frm_asset_name: plutoplus-spf-iq-direct-async-v3-e3078376a6e1-pluto.frm
+frm_sha256: 98341f4d5e926684c092b2addc283852a56f999ba57b4e89ea30a306785e81e0
+frm_size: 12825604
+bundle_asset_name: plutoplus-spf-iq-direct-async-v3-e3078376a6e1.tar.gz
+bundle_sha256: 4839ef4e97b2c7d2f56363219184ec48db8fbdab67f1b6d8388f531ca79836fd
+bundle_size: 134226947
+source_manifest_name: iq-direct-async-v3-source.yaml
+source_manifest_sha256: 8f9b4aa76958a63aee3927ca7a4d57bbec18b3c9afacca4dbe46dd64a7ce9b22
+ci_run_id: 33481347855
+ci_run_attempt: 1
+
+firmware_source: e3078376a6e1a8c6ea841dc69966b3880e020c70
+firmware_implementation_ancestor: 322b67f9580d215c1f8362735c877f7c5ee2f89e
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_ref: refs/tags/v0.48-plutoplus-spf-iq-direct-async-v3
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/iq-direct-async-v3-source/libiio-v1
+libiio_0_25_archive_sha256: 66ccc7230ebe75c477c4dfc147aa86289c3f896c0a0d6b3b6c964e152d89c266
+
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+metadata_repo: https://github.com/misko/plutosdr-fw.git
+metadata_ref: refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: 1c337a0b8d8126c9d1ed785607bc5ea52e7fed22
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/iq-direct-async-v3-source/buildroot-v1
+submodule_hdl: 145bd47e55d5c5537e0ba49d53cb25a5393f66ba
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/ddr-burst-v1-rc4-source/hdl-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum.git
+submodule_hdl_quantulum_ref: refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+submodule_linux: 93174a1c049ca6ee42f042dbe93f0fb06fbc9cd7
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/ddr-burst-v1-rc3-source/linux-v1
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: ddr-burst-v1-rc4-source/hdl-v1
+versions_buildroot: iq-direct-async-v3-source/buildroot-v1
+versions_linux: ddr-burst-v1-rc3-source/linux-v1
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+
+fpga_bitstream_sha256: 5e5fb42a4fd0a69e35f06b1631615564307fcc1e8f3b87c54ba880693f450e9f
+xsa_sha256: d838a83049217036f226bcd18be88c15f0bf48bac8c817e3c4813c8af8b04aaf
+rootfs_sha256: c94d9c88db9d840998ef68633926863c64184f07d67866d079455c1332b6aa01
+fit_description: Configuration to load fpga before Kernel
+integrated_route_verdict: PASS
+routed_wns_ns: 0.767
+routed_whs_ns: 0.019
+
+hardware_qualified: true
+hardware_qualified_date: 2026-09-01
+persistent_qualified: true
+persistent_reboot_qualified: true
+cold_boot_qualified: false
+hardware_units_ram_booted: 4
+hardware_units_persistently_installed: 1
+persistent_hardware_serial: winbond-db6968136727402c
+persistent_hardware_phy: ad9361
+qualification_transport: physical-ethernet
+radio_libiio: 0.25
+metadata_abi: 3
+iiod_rw_cpu_affinity: 1
+default_overrun_policy: drop-backlog
+supported_overrun_policies: drop-backlog,preserve-backlog
+ram_ring_max_iq_bytes: 200000000
+
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_main_commit: 246ead24fd9c9052a978340a0905408afcb3b8aa
+qualification_ram_profile_commit: 1287462dca2dfd6d06ca192e3c8c37eabb64181a
+qualification_persistent_profile_commit: 0a21ce250b44006a7880ae35dc30d11673fd2180
+
+ringless_25m_3s_payload_mb_s: 73.57080926631701
+ringless_25m_10s_payload_mb_s: 74.08811037839098
+ringless_25m_60s_payload_mb_s: 72.82267932996048
+ringless_25m_3s_source_coverage_percent: 78.26086956521739
+ringless_25m_10s_source_coverage_percent: 77.3462783171521
+ringless_25m_60s_source_coverage_percent: 73.08478038815117
+ringless_25m_60s_requested_frames: 1431
+ringless_25m_60s_observed_frames: 1431
+ringless_25m_60s_capture_segments: 1
+ringless_25m_60s_terminal_failures: 0
+
+ringless_preserve_20s_gap_frames: 143
+ringless_drop_20s_gap_frames: 21
+ram32_preserve_20s_gap_frames: 198
+ram32_drop_20s_gap_frames: 12
+ringless_preserve_20s_source_coverage_percent: 76.56500802568219
+ringless_drop_20s_source_coverage_percent: 73.72488408037094
+ram32_preserve_20s_source_coverage_percent: 70.04405286343612
+ram32_drop_20s_source_coverage_percent: 62.59842519685039
+
+gbe_25m_3_10_60_report_sha256: 162dd0574170a045d6bbf19e94de5b6b3451b11cc516e8c319336f0942ac065d
+ram_ladder_report_sha256: 88680d860f4c1b0950572ad0732005022d5708b7e0bd293bd0c4164cc06cc34b
+ringless_preserve_report_sha256: f33fa41216c802cdc68a0b87e0936a316a907bc76ed19962fa36689774b824d2
+ringless_drop_report_sha256: 2bd524e93ec0248c70547af79d106f120b0c368acefb7877d7b1fcda9cecb74e
+ram32_preserve_report_sha256: 0d77b56ffeee8c9fd1740dd8c7bd34cede185fbfa0b45862ebd817acbd1a64a3
+ram32_drop_report_sha256: 963a60f8f493851d4951d30c67cbe7538147951f9f4679ce8e2d872cbf652adf
+
+persistent_flash_receipt_id: 016eb590-5fb4-42e3-9568-afe0f4d4254c
+persistent_flash_receipt_sha256: e8659e0e92401dd91ac720e122ac1f7530ffbfb999e8a1634bc60f74d521f096
+persistent_reboot_receipt_id: 7605359b000b474994626df2e602691b
+persistent_reboot_receipt_sha256: bd427436570f03b286aa7fc9b32f6873d52b0552fdf23b50b4b03de629f7faec
+post_reboot_fit_sha256: db777ac93d5c6f0be0cf2799808a4d06fe39264ee1e99e76001509394d75f1df
+post_reboot_tx_safe: true
