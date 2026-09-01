@@ -1,0 +1,21 @@
+name: Experimental firmware merge guard
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: experimental firmware merge guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Prove positive and negative guard behavior
+        run: scripts/test_firmware_merge_guard.sh
+      - name: Reject experimental firmware promotion
+        env:
+          PULL_REQUEST_HEAD_REF: ${{ github.head_ref }}
+        run: scripts/check_firmware_merge_guard.sh "$PULL_REQUEST_HEAD_REF" "$GITHUB_WORKSPACE"
