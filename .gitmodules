@@ -16,17 +16,17 @@
 [submodule "buildroot"]
 	path = buildroot
 	url = https://github.com/misko/plutosdr-fw.git
-	branch = codex/ddr-ring-v1-buildroot
+	branch = codex/starlink-rx-only-buildroot-do-not-merge
 
 [submodule "linux"]
 	path = linux
 	url = https://github.com/misko/plutosdr-linux.git
-	branch = v0.38_plutoplus
+	branch = codex/starlink-rx-only-do-not-merge
 
 [submodule "hdl"]
 	path = hdl
 	url = https://github.com/misko/plutosdr-hdl.git
-	branch = codex/metadata-max-dma-fit-v2
+	branch = codex/starlink-rx-only-do-not-merge
 [submodule "hdl-quantulum"]
 	path = hdl-quantulum
 	url = https://github.com/misko/plutosdr-hdl-quantulum

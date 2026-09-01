@@ -2,17 +2,18 @@
 
 This document applies to branch `codex/starlink-rx-only-do-not-merge`.
 
-The branch is an isolated, receive-only numerical experiment. It is not a
-firmware release candidate and must not be merged to `main`, tagged as a
-release, built for a release manifest, or deployed to any PlutoSDR/Pluto+
-hardware.
+The branch is an isolated, receive-only FPGA experiment. It is not a firmware
+release candidate and must not be merged to `main`, tagged as a release, or
+persistently flashed to any PlutoSDR/Pluto+ hardware. Any hardware trial must
+be a receipt-backed, guarded RAM boot on the one explicitly selected radio,
+with automatic return to its known persistent image after power-cycle.
 
-The first permitted slice contains only the pure NumPy golden oracle in
-`tests/starlink_oracle`: exact published PSS/SSS construction, declared
-15/30/60 MS/s geometry, deterministic edge projection and direct float search,
-and an explicitly specified fixed-point correlation model. It does not modify
-HDL, Linux, Buildroot, boot artifacts, device configuration, transmit paths, or
-Git submodules.
+The permitted development scope is defined by
+`STARLINK_PSS_15_30_60_PLAN.md`. It includes the pure NumPy golden oracle,
+standalone detector RTL and simulation, an RX-only/1R1T FPGA shell, Linux nodes
+that match that shell, out-of-context and full Vivado measurements, and then
+strictly gated 15, 30, and 60 MS/s RAM-only trials. The shell removes the FPGA
+TX datapath; it does not claim the physical RFIC has ceased to be a transceiver.
 
 Evidence limits are equally strict:
 
@@ -23,7 +24,7 @@ Evidence limits are equally strict:
 - A correlation match is synchronization evidence, not payload decode,
   spacecraft identity, transmission authority, or deployment qualification.
 
-Any expansion beyond this oracle requires explicit coordination and a new,
-reviewed scope. In particular, do not add an NCO, HDL DUT, firmware integration,
-hardware capture, device access, or deployment step on the authority of this
-branch document.
+The branch name, this stop document, and every artifact label must retain the
+words `DO NOT MERGE`. A passing detector test, Vivado build, or RAM trial does
+not authorize QSPI/SD persistence, unattended RF operation, release promotion,
+or a merge into firmware `main`.

@@ -96,6 +96,30 @@ scripts/build_gain_series_candidate.sh preflight \
     2>&1 | tee "$artifact_real/preflight.log"
 TMPDIR="$artifact_real" scripts/test_gain_series_hdl.sh \
     2>&1 | tee "$artifact_real/hdl-simulation.log"
+if [[ "$(basename -- "$source_manifest")" == \
+      "starlink-rx-only-dnm-v1-source.yaml" ]]; then
+    bash hdl-starlink/run_tests.sh \
+        2>&1 | tee "$artifact_real/starlink-pss-rtl-simulation.log"
+    (
+        # shellcheck source=/dev/null
+        source "$VIVADO_SETTINGS"
+        for rate in 15 30 60; do
+            result="$artifact_real/starlink-pss-ooc-${rate}m"
+            vivado -mode batch \
+                -log "$artifact_real/starlink-pss-ooc-${rate}m.log" \
+                -journal "$artifact_real/starlink-pss-ooc-${rate}m.jou" \
+                -source hdl-starlink/synth_ooc.tcl \
+                -tclargs hdl-starlink/starlink_pss_delay_candidate.v \
+                    "$rate" "$result"
+            cp "$result/utilization.rpt" \
+                "$artifact_real/starlink-pss-ooc-${rate}m-utilization.rpt"
+            cp "$result/timing_synth.rpt" \
+                "$artifact_real/starlink-pss-ooc-${rate}m-timing-synth.rpt"
+            cp "$result/synthesized.dcp" \
+                "$artifact_real/starlink-pss-ooc-${rate}m-synthesized.dcp"
+        done
+    )
+fi
 scripts/build_gain_series_candidate.sh image \
     2>&1 | tee "$artifact_real/image-build.log"
 

@@ -1,0 +1,18 @@
+name: Block Starlink RX-only experiment merge
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  do-not-merge:
+    if: github.head_ref == 'codex/starlink-rx-only-do-not-merge'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject firmware-main promotion
+        run: |
+          echo 'codex/starlink-rx-only-do-not-merge is RAM-only experimental firmware.' >&2
+          echo 'Do not merge this branch into main.' >&2
+          exit 1

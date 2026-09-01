@@ -361,6 +361,9 @@ iq-direct-async-v2-source.yaml:final-release)
 iq-direct-async-v3-source.yaml:final-release)
     protected_version='v0.48-plutoplus-spf-iq-direct-async-v3'
     ;;
+starlink-rx-only-dnm-v1-source.yaml:candidate)
+    protected_version='v0.49-plutoplus-starlink-rx-only-dnm-v1'
+    ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
     ;;
