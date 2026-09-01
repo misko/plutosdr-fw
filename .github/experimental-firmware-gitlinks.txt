@@ -1,0 +1,8 @@
+# Base-owned denylist of component pins used by experimental firmware.
+# Format: <gitlink-path> <lowercase 40-hex pin> <stable-label>
+buildroot 6cdcb980b840d0a186aee5d72857d30b9cbaab38 starlink-rx-only-buildroot-v1
+hdl 0c0d01957e42abeab64db65d0e4b9ac399463e31 starlink-rx-only-hdl-v1
+hdl 091f8d5852fac53b369032297f81afd0ae35e0ff starlink-rx-only-hdl-pre-route-v1
+linux 154bda793ee846c57421d07b722fae898f0ae134 starlink-rx-only-linux-v1
+hdl 8290233f93177c231a57436710902bbd058d7f82 starlink-pss15-raw-source-hdl-v1
+hdl d53ac844e1206fa37fb858c30c1301a831c11843 starlink-pss15-raw-hdl-v1
