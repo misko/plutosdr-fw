@@ -90,19 +90,25 @@ Consequently:
    overflow reporting independently of all detector logic.
 2. At 15 MS/s, acquire with the existing host golden search: exact lower/upper
    PSS templates, explicit CFO hypotheses, deterministic tie handling, and
-   multi-frame 750 Hz cadence. Record the selected sideband, CFO, phase, and
-   uncertainty window.
+   multi-frame 750 Hz cadence. Refine the nine CFO banks across repeated-frame
+   evidence, then lock one block-selected CFO for local frame tracking. Do not
+   maximize nine banks independently on every frame; that changes the oracle
+   and preferentially selects noise.
 3. Hand only bounded predicted windows to a candidate-gated FPGA exact
-   correlator. The first implementation targets 64 trial phases centered on an
-   approximately +/-32-sample window, 66 template taps, nine declared CFO
-   hypotheses, and 750 windows/s.
-   That is about 28.5 million complex MACs/s before implementation overhead,
-   suitable for evaluation as a time-multiplexed 100/200 MHz engine rather
-   than 66 parallel tap multipliers. This is a workload estimate, not timing
-   closure.
-4. Compare every FPGA score, selected hypothesis, event index, and timestamp
-   against the bit-accurate host oracle. Confirm multiple 750 Hz frames before
-   declaring alignment; a single peak is only a candidate.
+   correlator. The engine supports 65 trial lags `[-32,+32]` and 66 template
+   taps. Normal one-CFO tracking is 3,217,500 complex tap-MACs/s. An explicitly
+   commanded three-bank check is 9,652,500, and an all-nine diagnostic is
+   28,957,500. Blind acquisition remains on the host. A three-DSP, one-complex-
+   tap-per-cycle engine has ample scheduling margin at 100 MHz; generated OOC
+   and full-route reports, not this arithmetic, decide acceptance.
+4. Deliver the exact engine in two steps. First publish all 65 raw
+   `{lag,index,C_re,C_im,Ex,Eh}` tuples for one host-selected Q1.15 coefficient
+   bank so the host can reproduce every score and tie. Then add the exact
+   normalized reducer, nine-bank one-lag CFO refinement, adjacent-bank checks,
+   and trace mode. Coefficients are host-quantized with round-to-nearest,
+   ties-to-even, digest- and CRC-bound, and never synthesized by a runtime NCO.
+   The engine reports candidate measurements only; multi-frame alignment and
+   false-alarm policy remain on the host.
 5. For 30 and 60 MS/s, feed the same correlator through independently qualified
    x2 and x4 detection-lane decimators while preserving full-rate DMA.
 6. Keep the 0.75 repeated-delay monitor as an AXI-readable integration aid for
@@ -117,6 +123,45 @@ bootstrap is later unacceptable, compare an overlap-save FFT correlator or a
 separately proven coarse stage against the same recordings and negative
 controls as a new reviewed scope. The repeated-delay metric is not promoted to
 that role without new evidence.
+
+### Stage-15 exact-engine contract
+
+The first exact engine runs at 100 MHz and captures exactly 130 tagged samples
+around each predicted center: `p-32` through `p+97`. Each output names the
+stored raw timestamp at its first tap; no timestamp is reconstructed from
+pipeline latency. Disable, FIFO overflow, or a nonconsecutive accepted index
+flushes the job and increments a visible abort counter.
+
+A three-DSP Gauss complex multiplier issues one exact tap per engine clock.
+CI16 samples and coefficients produce signed 33-bit complex taps accumulated
+without loss in signed 48-bit real and imaginary sums. Sample energy uses 38
+bits, committed coefficient energy is constrained below 31 bits, and exact
+normalized-score comparison uses wide rational cross-products rather than a
+divider or floating point. The same three DSPs are time-multiplexed for a
+bounded sample-energy prepass and coefficient-commit validation before the
+one-tap-per-clock complex loop; the design does not quietly assume two extra
+squaring multipliers. The raw-result milestone precedes the winner reducer so
+its arithmetic can be checked independently.
+
+The exact engine receives a distinct 16 KiB AXI aperture at `0x79040000`; the
+diagnostic monitor remains read-only at `0x79030000`. Its versioned ABI has
+separate `TRACK_ONE`, `CFO_REFINE`, `VALIDATE_BANKS`, and `SINGLE_SHOT_TRACE`
+modes, shadow/active coefficient banks, commit generation and validation
+status, double-buffered results, and processed/aborted/overrun counters. A
+configuration becomes active only after host readback, SHA-256 verification,
+CRC/energy validation, and an idle-boundary generation acknowledgement.
+
+The initial measured-budget target for the exact correlator, control, and
+result block is at most 3 DSP48E1s, 5 BRAM36 equivalents, 2,500 LUTs, and 2,000
+registers. Detection-lane DDC resources at 30/60 MS/s are budgeted separately.
+Every number remains provisional until both OOC and complete Zynq-7010 route
+reports exist.
+
+The 21-DSP repeated-delay monitor is temporary integration instrumentation. It
+may remain beside the exact engine at 15 MS/s only while the full routed shell
+retains the declared headroom. It is compile-time removed before allocating an
+x2/x4 detection lane if it would crowd the useful exact correlator or DDC; no
+PSS function depends on keeping it.
 
 ## Current implementation evidence
 
@@ -134,6 +179,28 @@ These figures are retained as diagnostic-baseline evidence. The new exact
 correlator and x2/x4 detection lane require separate OOC and full-shell reports.
 No resource or timing estimate is substituted for a generated report.
 
+The integrated 15 MS/s diagnostic-monitor shell was rebuilt locally with
+Vivado 2022.2 after the geometry, independent-arithmetic fixture, and scoped
+bus-skew checks were fixed. It used 6,417/17,600 LUTs (36.46%), 9,187/35,200
+registers (26.10%), 1,012/6,000 LUT-memory cells (16.87%), 3/60 BRAM tiles, and
+49/80 DSPs. Setup WNS was +1.277 ns, hold WHS was +0.016 ns, and all 15,945
+nets routed. The monitor mailbox had +8.019 ns max-delay slack and +8.238 ns
+bus-skew slack, with exactly 293 CDC-15 payload rows, two CDC-3 toggle rows,
+and no new critical crossing. The routed-checkpoint SHA-256 was
+`c81e64767b02ca1a535f487a6dc7c64df7f497d975623c064f94f479ac069f9e`.
+This is implementation evidence for diagnostic plumbing, not PSS-detection or
+radio qualification.
+
+A frozen CI16/Q1.15 one-bank tracking model has also been replayed over all 210
+first-chunk real windows using the oracle's actual upper-edge, `-100 kHz`,
+local-radius-30 semantics. It selected the identical integer lag in 210/210
+windows. Fixed-versus-float normalized-score absolute error was at most
+`1.52e-5`, with median `3.49e-6`. In contrast, allowing each frame to maximize
+all nine CFO banks across the proposed 65-lag `[-32,+32]` aperture retained the
+block-selected `-100 kHz` bank in only 97/210 windows. These results freeze the
+acquisition-versus-tracking split and form a predeclared Stage-15 equivalence
+target.
+
 The trusted full-shell run `33540748707` at parent commit `829380e76240` and
 HDL source `091f8d5852fa` also completed implementation and produced a fully
 routed RX-only checkpoint. It used 4,429/17,600 LUTs (25.16%), 7,173/35,200
@@ -142,9 +209,15 @@ WNS was +2.049 ns and hold WHS was +0.006 ns, with zero setup and hold failing
 endpoints. Both remaining RX timestamp-FIFO bus-skew constraints were met at
 +8.997 ns and +9.413 ns. Packaging then stopped because its inherited policy
 expected four RX-plus-TX FIFO constraints; the RX-only shell intentionally has
-only the two RX crossings. That manifest-specific count has been corrected
-without weakening the four-constraint requirement for other builds, but a new
-trusted run must pass before this shell becomes RAM-boot eligible.
+only the two RX crossings.
+
+Replacement trusted run `33542849550` at parent commit `c9c0c72c1b52` passed
+the complete build and packaging workflow with the same routed checkpoint and
+source graph. Its outer archive and both internal SHA-256 manifests have been
+independently verified. It remains explicitly hardware-untested and is a
+comparison baseline, not the detector image to boot. The first radio-eligible
+candidate must be rebuilt from the later, source-locked monitor/exact-engine
+commit and consumed by the merged PPU v2 RAM-qualification path.
 
 ## RX-only shell and common qualification gates
 
@@ -216,9 +289,17 @@ missed frames, timing error, score distribution, and negative-control rate.
 ### Gate 2: 15 MS/s FPGA tracking and RX-only implementation
 
 - First integrate and validate the AXI diagnostic monitor without calling it a
-  detector. Then implement the candidate-gated exact correlator and host handoff.
+  detector. Then implement the one-bank, 65-lag raw-result exact correlator at
+  100 MHz. Prove the captured samples, stored raw timestamps, coefficient-bank
+  identity, 48-bit accumulators, and all 65 score tuples before adding a winner
+  reducer.
+- Add the exact rational reducer, one-lag nine-bank CFO-refinement mode,
+  commanded adjacent-bank validation, double-buffered result publication, and
+  single-shot trace. Per-frame CFO switching is forbidden in normal tracking.
 - Prove bit-exact equivalence in simulation on structural vectors and bounded
-  real-capture windows, including enable/gap/index-jump flushing.
+  real-capture windows, including all 210 frozen replay windows, ties,
+  enable/gap/index-jump flushing, coefficient rejection, and publication
+  overrun accounting.
 - Run OOC reports, then full RX-only shell implementation and every common
   timing, DRC, resource-headroom, DMA-equivalence, and device-tree gate.
 - If the exact engine misses its budget, reduce parallelism or scheduling while
@@ -250,6 +331,10 @@ requires multi-frame exact-template agreement with the oracle.
 - Preserve 30 MS/s DMA and qualify a deterministic x2 detection lane against
   the versioned 15 MS/s oracle, including anti-alias response and timestamp
   phase/delay mapping.
+- Before freezing that architecture, compare it with a bounded sparse
+  native-30-MS/s correlator using the already frozen 132-sample template. The
+  chosen path must win on generated resource/timing reports and exact replay
+  equivalence, not on an estimate.
 - Use `ad9361-1r1t` for full intended bandwidth; an AD9363A run is explicitly
   labeled bandwidth-limited and cannot qualify full-band 30 MS/s reception.
 - Repeat all offline, implementation, safe-state, capture-continuity, live,
@@ -267,6 +352,10 @@ full-rate capture evidence, and rollback proof.
   and stress DDR/USB backpressure, overflow reporting, thermal behavior, and
   long-run timestamp continuity. Use bounded DDR captures or segmented readout;
   do not imply that USB can continuously carry the raw full-rate stream.
+- Re-evaluate the x4 DDC against bounded sparse native-rate correlation after
+  30 MS/s results are known. The x4 filter has a different quantized response
+  and therefore requires a new versioned template digest; it cannot inherit the
+  direct-15-MS/s template identity merely because its output rate is 15 MS/s.
 - The AD9361 nominal 56 MHz analog RF bandwidth is not described as a flat
   60 MHz passband. If the practical clock is 61.44 MS/s, version that exact
   geometry rather than labeling it 60. If RF response, timing, or transport

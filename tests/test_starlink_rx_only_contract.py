@@ -39,8 +39,9 @@ def test_source_graph_and_builder_are_locked_to_the_experiment() -> None:
     assert "bash hdl-starlink/run_tests.sh" in builder
 
 
-def test_rx_only_packaging_requires_the_two_remaining_fifo_crossings() -> None:
+def test_rx_only_packaging_requires_fifo_and_monitor_mailbox_crossings() -> None:
     packager = _read("scripts/ci/package_main_firmware.sh")
+    validator = _read("scripts/ci/validate_starlink_rx_only_route_reports.py")
 
     assert "REQUIRED_BUS_SKEW_CONSTRAINTS=4" in packager
     assert "STARLINK_RX_ONLY_BUILD=false" in packager
@@ -48,12 +49,16 @@ def test_rx_only_packaging_requires_the_two_remaining_fifo_crossings() -> None:
     assert "HEAD:manifests/starlink-rx-only-dnm-v1-source.yaml" in packager
     assert "RX-only manifest differs from its committed HEAD blob" in packager
     assert "STARLINK_RX_ONLY_BUILD=true" in packager
-    assert "REQUIRED_BUS_SKEW_CONSTRAINTS=2" in packager
+    assert "REQUIRED_BUS_SKEW_CONSTRAINTS=3" in packager
     assert '-ge "$REQUIRED_BUS_SKEW_CONSTRAINTS"' in packager
     assert "Slack (VIOLATED)" in packager
-    assert "RX-only routed CDC critical inventory differs" in packager
-    assert "cpack_timestamp/inst/overflow_sync" in packager
-    assert "cpack_timestamp/inst/timestamp_cpu_sync" in packager
+    assert "validate_starlink_rx_only_route_reports.py" in packager
+    assert "EXPECTED_BUS_SKEW_MET = 3" in validator
+    assert "EXPECTED_MONITOR_PAYLOAD_ROWS = 293" in validator
+    assert "EXPECTED_MONITOR_TOGGLE_ROWS = 2" in validator
+    assert "diagnostic monitor contributes Critical routed CDC rows" in validator
+    assert "cpack_timestamp/inst/overflow_sync/" in validator
+    assert "cpack_timestamp/inst/timestamp_cpu_sync/" in validator
 
 
 def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:

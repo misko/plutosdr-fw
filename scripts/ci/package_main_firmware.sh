@@ -43,8 +43,10 @@ esac
 
 # The RX-only shell intentionally removes the TX timestamp FIFO and therefore
 # has one RX FIFO crossing pair (read and write) instead of the legacy RX+TX
-# pair set. Authorize that two-constraint inventory only for the exact canonical
-# manifest committed at HEAD; a same-basename file cannot weaken this gate.
+# pair set.  Its diagnostic monitor adds one bundled-mailbox constraint.  The
+# resulting three-constraint inventory is authorized only for the exact
+# canonical manifest committed at HEAD; a same-basename file cannot weaken
+# this gate.
 if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; then
     starlink_manifest="${ROOT}/manifests/starlink-rx-only-dnm-v1-source.yaml"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_manifest" ]] ||
@@ -54,7 +56,7 @@ if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; 
         cmp -s - "$starlink_manifest" ||
         fail "RX-only manifest differs from its committed HEAD blob"
     STARLINK_RX_ONLY_BUILD=true
-    REQUIRED_BUS_SKEW_CONSTRAINTS=2
+    REQUIRED_BUS_SKEW_CONSTRAINTS=3
 fi
 
 [[ -n "$ARTIFACT_ROOT" ]] ||
@@ -521,25 +523,16 @@ grep -Fq 'All user specified timing constraints are met.' \
 if grep -Eq '^CDC-10[[:space:]]' "$ARTIFACT_ROOT/system_top_cdc_routed.rpt"; then
     fail "routed CDC report contains CDC-10 combinational-before-sync paths"
 fi
-if [[ "$STARLINK_RX_ONLY_BUILD" == true ]]; then
-    starlink_critical_cdc_rows="$(
-        grep -E '^[[:space:]]*[0-9]+[[:space:]]+CDC-[0-9]+[[:space:]]+Critical' \
-            "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" || true
-    )"
-    [[ "$(grep -c . <<<"$starlink_critical_cdc_rows")" == 2 ]] ||
-        fail "RX-only routed CDC critical inventory differs from the two reviewed crossings"
-    grep -Eq 'CDC-1[[:space:]]+Critical.*cpack_timestamp/inst/overflow_sync' \
-        <<<"$starlink_critical_cdc_rows" ||
-        fail "RX-only routed CDC report lacks the reviewed overflow snapshot crossing"
-    grep -Eq 'CDC-4[[:space:]]+Critical.*cpack_timestamp/inst/timestamp_cpu_sync' \
-        <<<"$starlink_critical_cdc_rows" ||
-        fail "RX-only routed CDC report lacks the reviewed timestamp snapshot crossing"
-fi
 [[ "$(grep -c 'Slack (MET)' "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt")" \
    -ge "$REQUIRED_BUS_SKEW_CONSTRAINTS" ]] ||
     fail "fewer than ${REQUIRED_BUS_SKEW_CONSTRAINTS} bus-skew constraints report MET"
 if grep -q 'Slack (VIOLATED)' "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"; then
     fail "a timestamp FIFO bus-skew constraint is violated"
+fi
+if [[ "$STARLINK_RX_ONLY_BUILD" == true ]]; then
+    python3 scripts/ci/validate_starlink_rx_only_route_reports.py \
+        --cdc-report "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
+        --bus-skew-report "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
 fi
 
 if [[ -n "$INTEGRATED_WAIVERS" ]]; then
