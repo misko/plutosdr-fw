@@ -1,0 +1,3 @@
+# Base-owned denylist of experimental firmware lineage roots.
+# Format: <lowercase 40-hex root> <trusted origin ref> <stable-label>
+b7a5aa32f4fa421dc3905ff31e2181176f37e81e refs/tags/starlink-rx-only-dnm-v1-source/firmware-root-v1 starlink-rx-only-dnm-v1

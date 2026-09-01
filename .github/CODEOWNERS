@@ -1,9 +1,13 @@
 # Changes that can alter what the trusted Kalman runner executes or packages.
 /.github/CODEOWNERS @misko
 /.github/workflows/ @misko
+/.github/experimental-firmware-gitlinks.txt @misko
+/.github/experimental-firmware-lineages.txt @misko
 /scripts/ci/ @misko
 /scripts/build_gain_series_candidate.sh @misko
 /scripts/check_source_graph.sh @misko
+/scripts/check_firmware_merge_guard.sh @misko
+/scripts/test_firmware_merge_guard.sh @misko
 /scripts/test_gain_series_hdl.sh @misko
 /scripts/check_tandem_release_offline.sh @misko
 /scripts/run_tandem_agc_ooc.sh @misko
