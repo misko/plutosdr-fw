@@ -47,7 +47,7 @@ def test_rc5_owner_only_route_maps_ref_manifest_and_package_together() -> None:
     assert workflow.count("'plutoplus-spf-tandem-agc-v8-rc5'") == 1
     assert workflow.count("'v0.41-plutoplus-spf-tandem-agc-v8-rc5'") == 1
     assert "Require the exact protected RC5 reproduction identity" in workflow
-    assert workflow.count("'v0.48-plutoplus-spf-iq-direct-async-v3'") == 1
+    assert workflow.count("'v0.49-plutoplus-spf-iq-direct-async-v4'") == 2
     assert "Require the exact final release identity" in workflow
     assert "'final-release'" in workflow
     assert workflow.index(branch) < workflow.index("tandem-agc-v8-rc4-source.yaml")

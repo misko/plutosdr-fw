@@ -63,7 +63,8 @@
 | `v0.46-plutoplus-spf-iq-direct-async-ring-v1-rc1` | 2026-08-31 | **hardware-qualified RAM-first prerelease; source promoted** | overlaps DMA capture with TCP delivery, optionally extends the same FIFO with RAM-backed descriptors, and exceeds 70 MB/s with the exact packaged runtime over 1 GbE |
 | `v0.46-plutoplus-spf-iq-direct-async-ring-v1` | 2026-08-31 | superseded hardware-qualified full release | first non-RC direct/RAM release; exact final image passed guarded persistent installation and cold-boot qualification |
 | `v0.47-plutoplus-spf-iq-direct-async-v2` | 2026-08-31 | superseded hardware-qualified full release; rollback target | keeps a whole host target in one DMA session and adds default drop-backlog plus preserve-backlog overrun policies for ringless and RAM-extended queues |
-| **`v0.48-plutoplus-spf-iq-direct-async-v3`** | 2026-09-01 | **current hardware-qualified full release** | recovers stale gain/RSSI metadata in drop-backlog mode, completes long finite sessions, and sustains 70 MB/s+ over physical 1 GbE |
+| `v0.48-plutoplus-spf-iq-direct-async-v3` | 2026-09-01 | superseded hardware-qualified full release; rollback target | recovers stale gain/RSSI metadata in drop-backlog mode and completes long finite sessions |
+| **`v0.49-plutoplus-spf-iq-direct-async-v4`** | 2026-09-01 | **current hardware-qualified full release** | authoritative requested/allocated DMA admission, real 50-buffer/200 MB DMA profile, 216 MiB CMA, and persistent return qualification |
 
 **A note on the numbering.** The trailing number does not mean the same thing
 across families. `gain-rssi-v2` names the *direct-USB metadata protocol* version
@@ -72,7 +73,33 @@ work, which is why v1 follows v2. `gain-series-v4` is the protocol-**v3** gain
 series. `libiio-metadata-v5` and `v6-rc3` then move that metadata into the
 standard libiio transports. Read the family name, not the digit.
 
-## v0.48-plutoplus-spf-iq-direct-async-v3 — 2026-09-01 — **current hardware-qualified full release**
+## v0.49-plutoplus-spf-iq-direct-async-v4 — 2026-09-01 — **current hardware-qualified full release**
+
+V4 fixes the silent partial-DMA-allocation ambiguity. Local libiio exposes the
+real mapped block count, iiOD refuses direct async unless allocated equals
+requested, host libiio/PPU require the exact-admission capability, and Linux
+reserves 216 MiB CMA for a true 50 × 1,000,000-sample, 200,000,000-byte queue.
+
+Trusted run 33535095284 built `bc00edb8c340dd4f9b04361398cbd2c8edcc9cae`
+with Buildroot `2e146948`, libiio `5cb23897`, Linux `7176508d`, metadata
+provider `3294365f`, HDL `145bd47e`, and U-Boot `1ff0468e`. The DFU is
+`f45524f4…1f84b6`; its 12,825,815-byte FIT is `77f89961…bfca67`.
+
+On serial `104000…3ef2`, the exact 50-buffer queue attested 50/50. Matched
+40-second 25 MS/s drop-backlog runs reduced gap events from 79 with default
+15-buffer DMA to 11 with exact 200 MB DMA and improved source coverage from
+55.71% to 69.25%. The 4 GB radio transport stage measured 70.884 MB/s. PPU
+then completed guarded persistent installation, `/dev/mtd3` hash
+reconciliation, independent reboot, second reconciliation, TX-safety checks,
+and a post-reboot 50/50 allocation capture. `.20` and `.21` were untouched.
+
+Use only PPU main `ec2b3ee85721011c0ffcb1619c85300672413aba` or later and matched native/Python libiio
+`0.25 (5cb2389)`. Exact assets, all package pins, checksum verification,
+installation, ephemeral SSH-key handling, ladder commands, and rollback are in
+[`RELEASE_IQ_DIRECT_ASYNC_V4.md`](RELEASE_IQ_DIRECT_ASYNC_V4.md) and
+[`IIO_DIRECT_ASYNC_V4_INSTALL.md`](IIO_DIRECT_ASYNC_V4_INSTALL.md).
+
+## v0.48-plutoplus-spf-iq-direct-async-v3 — 2026-09-01 — **superseded hardware-qualified full release; rollback target**
 
 V3 fixes issue #72 without changing the ABI-3 IQ or metadata layout. When a
 real queued IQ frame has aged beyond the finite gain/RSSI coverage window, the

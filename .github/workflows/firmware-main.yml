@@ -38,6 +38,7 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m' ||
          github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
          github.ref == 'refs/heads/codex/iio-throughput-coverage-window-v6-fw' ||
@@ -94,8 +95,9 @@ jobs:
       # usable only for reproducing independently locked candidates.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
-          github.ref == 'refs/heads/main' &&
-          'iq-direct-async-v3-source.yaml' ||
+          (github.ref == 'refs/heads/main' ||
+          github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m') &&
+          'iq-direct-async-v4-source.yaml' ||
           github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
           'iq-direct-async-ring-v1-rc1-source.yaml' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
@@ -194,8 +196,9 @@ jobs:
           'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
-        ${{ github.ref == 'refs/heads/main' &&
-          'plutoplus-spf-iq-direct-async-v3' ||
+        ${{ (github.ref == 'refs/heads/main' ||
+          github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m') &&
+          'plutoplus-spf-iq-direct-async-v4' ||
           github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
           'plutoplus-spf-iq-direct-async-ring-v1-rc1' ||
           github.ref == 'refs/heads/codex/ddr-capacity-test' &&
@@ -429,6 +432,14 @@ jobs:
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
             'v0.43-plutoplus-spf-ddr-ring-v1-rc2'
+
+      - name: Require the exact direct-async IQ v4 candidate identity
+        if: github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.49-plutoplus-spf-iq-direct-async-v4'
 
       - name: Require the exact DDR ring prefill v1 RC1 candidate identity
         if: github.ref == 'refs/heads/codex/issue-63-ddr-prefill'
@@ -670,7 +681,7 @@ jobs:
           REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
         run: |
           test "$REQUESTED_RELEASE_VERSION" = \
-            'v0.48-plutoplus-spf-iq-direct-async-v3'
+            'v0.49-plutoplus-spf-iq-direct-async-v4'
 
       - name: Build, validate, and package
         id: build
