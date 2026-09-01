@@ -39,6 +39,16 @@ def test_source_graph_and_builder_are_locked_to_the_experiment() -> None:
     assert "bash hdl-starlink/run_tests.sh" in builder
 
 
+def test_rx_only_packaging_requires_the_two_remaining_fifo_crossings() -> None:
+    packager = _read("scripts/ci/package_main_firmware.sh")
+
+    assert "REQUIRED_BUS_SKEW_CONSTRAINTS=4" in packager
+    assert '== "starlink-rx-only-dnm-v1-source.yaml"' in packager
+    assert "REQUIRED_BUS_SKEW_CONSTRAINTS=2" in packager
+    assert '-ge "$REQUIRED_BUS_SKEW_CONSTRAINTS"' in packager
+    assert "Slack (VIOLATED)" in packager
+
+
 def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:
     design = _read("hdl/projects/pluto/system_bd.tcl")
 

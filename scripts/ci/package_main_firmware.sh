@@ -11,6 +11,14 @@ MANIFEST="${SPF_GAIN_SERIES_MANIFEST:-${ROOT}/manifests/libiio-frame-metadata-v5
 INTEGRATED_WAIVERS="${SPF_INTEGRATED_WAIVERS:-}"
 PACKAGE_STEM_PREFIX="${SPF_PACKAGE_STEM_PREFIX:-plutoplus-spf-main}"
 RELEASE_STATE="${SPF_RELEASE_STATE:-main-ci}"
+REQUIRED_BUS_SKEW_CONSTRAINTS=4
+
+# The RX-only shell intentionally removes the TX timestamp FIFO and therefore
+# has one RX FIFO crossing pair (read and write) instead of the legacy RX+TX
+# pair set. Keep the established four-constraint floor for every other build.
+if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; then
+    REQUIRED_BUS_SKEW_CONSTRAINTS=2
+fi
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -503,8 +511,9 @@ grep -Fq 'All user specified timing constraints are met.' \
 if grep -Eq '^CDC-10[[:space:]]' "$ARTIFACT_ROOT/system_top_cdc_routed.rpt"; then
     fail "routed CDC report contains CDC-10 combinational-before-sync paths"
 fi
-[[ "$(grep -c 'Slack (MET)' "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt")" -ge 4 ]] ||
-    fail "fewer than four bus-skew constraints report MET"
+[[ "$(grep -c 'Slack (MET)' "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt")" \
+   -ge "$REQUIRED_BUS_SKEW_CONSTRAINTS" ]] ||
+    fail "fewer than ${REQUIRED_BUS_SKEW_CONSTRAINTS} bus-skew constraints report MET"
 if grep -q 'Slack (VIOLATED)' "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"; then
     fail "a timestamp FIFO bus-skew constraint is violated"
 fi
