@@ -188,6 +188,14 @@ expect_reject 'content marker' 'experimental content marker' \
 
 new_candidate
 mkdir -p "$repository/docs"
+printf '# STOP: do not merge or cherry-pick this branch\n' \
+  >"$repository/docs/innocent-root-marker.md"
+root_marker_content_sha=$(git_commit 'hide root marker in ordinary path')
+expect_reject 'root marker content' 'experimental content marker' \
+  codex/renamed-experiment "$base_sha" "$root_marker_content_sha"
+
+new_candidate
+mkdir -p "$repository/docs"
 printf 'branch = codex/starlink-rx-only-do-not-merge\n' \
   >"$repository/docs/ordinary-module-config"
 ref_content_sha=$(git_commit 'hide forbidden branch in ordinary configuration')

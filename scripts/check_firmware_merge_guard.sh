@@ -480,7 +480,7 @@ while IFS= read -r -d '' path; do
   fi
 done <"$history_paths"
 
-readonly CONTENT_PATTERN='do[^[:alnum:][:space:]]+not[^[:alnum:][:space:]]+merge|(^|[^[:alnum:]])dnm([^[:alnum:]]|$)|do[ _.-]+not[ _.-]+merge([ _.-]+into[ _.-]+firmware[ _.-]+main|[ _.-]+or[ _.-]+deploy|,[[:space:]]+release)'
+readonly CONTENT_PATTERN='do[^[:alnum:][:space:]]+not[^[:alnum:][:space:]]+merge|(^|[^[:alnum:]])dnm([^[:alnum:]]|$)|do[ _.-]+not[ _.-]+merge([ _.-]+into[ _.-]+firmware[ _.-]+main|[ _.-]+or[ _.-]+deploy|[ _.-]+or[ _.-]+cherry[ _.-]*pick|,[[:space:]]+release)'
 content_pathspecs=(.)
 for protected_path in "${ALL_POLICY_PATHS[@]}"; do
   content_pathspecs+=(":(exclude)$protected_path")
