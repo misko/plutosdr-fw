@@ -1,0 +1,210 @@
+# Immutable offline evidence for the Stage-15 ABI 1.2 batch/clock package.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This image reuses the prior
+# routed FPGA and is eligible only for a serial-locked PPU RAM lifecycle on the
+# exact native-AD9363A target below. Hardware qualification has not happened.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+release_state: ram-only-candidate
+do_not_merge: true
+do_not_release: true
+ram_boot_eligible: true
+persistent_flash_eligible: false
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_usb_topology: 5-2
+qualification_runtime_target: ad9363a-1r1t
+qualification_candidate_schema: pluto-plus-utils.release-candidate-plan.v2
+qualification_policy_profile: rx-only-v1
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_branch: main
+qualification_utility_version: 0.1.0
+
+release_tag: starlink-rx-only-dnm-v1-source/firmware-pss15-batch-clock-v1
+asset_name: starlink-pss15-batch-clock-v1-pluto.dfu
+image_url: unpublished-local-only
+image_local_path: /home/mouse9911/.local/state/pluto-plus-utils/starlink-pss15-batch-clock-v1-20260902/artifacts/starlink-pss15-batch-clock-v1-pluto.dfu
+image_sha256: 313a76a364eb4dbeefb9b2618e8bb5187a23155073c627ea326445baade828d1
+image_size: 12852919
+fit_body_sha256: f9175561ff67990252b370676a9ec5233ac2e1e8e698c58eeb907e21a3c9ee30
+fit_body_size: 12852903
+device_fw: starlink-rx-only-dnm-v1-source/firmware-pss15-batch-clock-v1
+
+frm_asset_name: starlink-pss15-batch-clock-v1-pluto.frm
+frm_sha256: f210f5b5ab2427032357238cb0cd628f223467c484d4d89d283c08c4c10d0427
+frm_size: 12852936
+itb_asset_name: starlink-pss15-batch-clock-v1-pluto.itb
+itb_sha256: f9175561ff67990252b370676a9ec5233ac2e1e8e698c58eeb907e21a3c9ee30
+itb_md5: c5f46368b2e947cd0790273f76d1e18a
+itb_size: 12852903
+dfu_suffix_vendor_id: 0x0456
+dfu_suffix_product_id: 0xb673
+dfu_suffix_length: 16
+dfu_suffix_crc: 0xfe96d0d6
+
+source_manifest_name: starlink-pss15-batch-clock-dnm-v1-source.yaml
+source_manifest_sha256: 1e5e1dcab76e276f81b927f0ba168d4a08656025f7c43f525b46daa95e1dead6
+firmware_source: d83f898bb3f18fce73db75545598df03243c9629
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-batch-clock-v1
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: ecf2ee383e86dced8189964ab4c6b28a47ee208f
+submodule_hdl_rtl_source: e106eabf79245f394fe1ef43fc4a274779e9fc0a
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3-evidence
+versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1
+versions_linux: starlink-rx-only-dnm-v1-source/linux-v2
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+versions_file_sha256: 7336759879d82aca4669afed5e3bd96c7cdbb853413461e145485fa649f7d52f
+
+tracker_identification: 0x50535354
+tracker_version: 0x00010002
+tracker_rate_msps: 15
+tracker_geometry: 0x003d8242
+tracker_capabilities: 0x0000003d
+tracker_mmio_base: 0x79030000
+tracker_taps: 66
+tracker_capture_samples: 130
+tracker_qualified_lags: 61
+tracker_command_fifo_storage: 8
+tracker_command_fifo_usable: 7
+tracker_rtl_changed: false
+tracker_xsa_reused: true
+
+host_api_contract: "1.2"
+host_api_radio_serial_guard: mandatory-before-devmem
+host_api_default_lead_samples: 1000000
+host_api_minimum_lead_samples: 65536
+host_api_batch_default_period_samples: 20000
+host_api_batch_default_queue_target: 7
+host_api_batch_maximum_count: 1000000
+host_api_static_binary_sha256: 734372c1b2b4679745ad28f4279978d9ee521f4892359fb87a5ce1a0fe4c8189
+host_api_static_binary_size: 4308932
+packed_host_api_binary_sha256: 537fe81741ea52b51234f4843511d95131f1439a06baef8505f688a771126ee7
+packed_host_api_binary_size: 50492
+packed_host_api_commands: [clock-slope, track-batch]
+
+host_api_selftest_verdict: PASS
+host_api_selftest_contract: "contract=1.2 batch_fifo=7 batch_refill=1 clock_slope=1"
+host_api_sanitizers: [address, undefined]
+host_api_sanitizer_verdict: PASS
+firmware_contract_tests: 10
+firmware_contract_test_verdict: PASS
+ppu_targeted_tests: 38
+ppu_full_tests_passed: 1330
+ppu_full_tests_skipped: 11
+ppu_lint_verdict: PASS
+ppu_mypy_source_files: 70
+ppu_mypy_verdict: PASS
+ppu_github_ci_python: ["3.11", "3.12", "3.13"]
+ppu_github_ci_browser: PASS
+ppu_github_ci_verdict: PASS
+
+# The broad legacy firmware suite is not a gate for this isolated host-only
+# revision. It reached 1463 passes and five explicit hardware skips. Ninety-
+# four unrelated failures were dominated by the shared checkout's intentionally
+# rejected group-writable tandem verifier scripts; one existing integrated-
+# packaging count assertion also failed. No such failure touches this source,
+# manifest, controller, mock, reused XSA, or package.
+repository_full_suite_passed: 1463
+repository_full_suite_skipped: 5
+repository_full_suite_unrelated_failures: 94
+repository_full_suite_gate_for_this_revision: false
+
+fpga_bitstream_md5: e509c91dad2909bf2e2c53bb6e4954a0
+fpga_bitstream_sha256: a92415ed08d03c9fccbcdac0d24c91835c7d8f701058d8383e257f0f0381bbf6
+fpga_bitstream_size: 971256
+xsa_sha256: b8270e4789a9164b78dbccac19de0a6219083a65e736be045cbfc92fdf22b657
+xsa_size: 724439
+routed_dcp_sha256: c8631df82584b7b2c418603e936a700bb6c7c5ce66d2bf8446a7eb18a421eae6
+routed_dcp_size: 11742931
+routed_wns_ns: 0.328
+routed_whs_ns: 0.009
+gray_index_skew_ns: 1.851
+telemetry_payload_skew_ns: 1.692
+injection_start_payload_skew_ns: 1.740
+tracker_critical_cdc_rows: 0
+route_errors: 0
+tracker_dsp48e1: 3
+tracker_ramb18e1: 4
+tracker_ramb36e1: 4
+shell_luts: 9740
+shell_registers: 14961
+shell_bram_tiles: 9
+shell_dsps: 31
+
+linux_kernel_md5: 793c0d3f2a770ff9dd80c4d3b9723f51
+linux_kernel_sha256: 3eb081ede0e6155969c5b1ff215f6cc8280f2d6256d9af33bcf610cd439c8fd9
+linux_kernel_size: 4570928
+ramdisk_md5: a653ed8f3ffdc5ed3a2d96966a5d6c68
+rootfs_sha256: f6ffd8ed206284f0673412e9d201856a3ae5291a8f4e2c82dbaf7dc1cba375ed
+rootfs_size: 7234778
+dtb_reva_sha256: 360455e7bb0ab1c5d080a61dbb6bf7481d50a6b510e7e9887eb74922e9d290a6
+dtb_revb_sha256: d2255d934e611cfb63f288f6767c3300d9f1d430ae15987c04ce4ce3c59e6c49
+dtb_revc_sha256: 909c8499e492abb3269e5521511c55c29a514380c11e7f1145d19c83f414f01d
+fit_description: Configuration to load fpga before Kernel
+
+container_dfu_fit_matches_itb: true
+container_frm_fit_matches_itb: true
+container_fpga_matches_xsa: true
+container_rootfs_matches_build: true
+container_versions_matches_source_lock: true
+container_controller_contains_clock_slope: true
+container_controller_contains_track_batch: true
+container_controller_mode: 0755
+
+root_device_tree_marker: misko,rx-only-fpga
+rx_dma_dt_state: enabled
+tx_dma_dt_state: disabled
+dds_dt_state: disabled
+tandem_dt_state: disabled
+tx_dma_hierarchies: 0
+kernel_devmem_enabled: true
+
+stage15_sample_rate_hz: 15000000
+stage15_rf_bandwidth_hz: 15000000
+stage15_fir_enabled: false
+stage15_gain_mode: slow_attack
+clock_observation_repeats_each_path: 5
+clock_observation_duration_ms: 1000
+clock_tolerance_ppm: 5000
+batch_smoke_count: 750
+batch_primary_count: 45000
+batch_period_samples: 20000
+batch_queue_target: 7
+batch_initial_lead_samples: 1000000
+batch_minimum_post_submit_lead_samples: 65536
+concurrent_dma_segments: 4
+concurrent_dma_samples_per_segment: 4000000
+
+build_xsa_mode: prebuilt-source-locked
+build_command: "make HAVE_VIVADO=0 SKIP_LEGAL=1 RELEASE_VERSION=starlink-rx-only-dnm-v1-source/firmware-pss15-batch-clock-v1 XSA_FILE=hdl/projects/pluto/pluto.sdk/system_top.xsa build/pluto.frm build/pluto.dfu"
+host_gcc: gcc-15.2.0
+host_make: make-4.4.1
+host_dfu_suffix: dfu-util-0.11
+vivado_route_reused: 2022.2-build-3671981
+
+packaging_verdict: PASS_OFFLINE
+container_verification_verdict: PASS_OFFLINE
+runtime_contract_verdict: PASS_OFFLINE
+hardware_qualified: false
+queue_depth_qualified: false
+timestamp_slope_qualified: false
+signal_path_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+persistent_qualified: false
+persistent_flash_performed: false
+radio_contacted: false
+dfu_transfer_performed: false
