@@ -24,6 +24,9 @@ define STARLINK_PSSCTL_INSTALL_TARGET_CMDS
 	$(INSTALL) -D -m 0644 \
 		$(TOPDIR)/../hdl/library/axi_starlink_pss_tracker/tb/real_071200_wrapper_replay_provenance.json \
 		$(TARGET_DIR)/opt/starlink-pss/real_071200_wrapper_replay_provenance.json
+	$(INSTALL) -D -m 0644 \
+		$(TOPDIR)/../hdl/library/axi_starlink_pss_tracker/tb/real_071200_window0_samples_ci16.mem \
+		$(TARGET_DIR)/opt/starlink-pss/real_071200_window0_samples_ci16.mem
 endef
 
 $(eval $(generic-package))
