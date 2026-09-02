@@ -253,6 +253,83 @@ def test_acquisition_oracle_checkpoint_is_offline_and_fail_closed() -> None:
     assert "not live-PSS or hardware evidence" in report
 
 
+def test_continuous_phase_map_checkpoint_is_isolated_and_source_locked() -> None:
+    manifest = _read("manifests/starlink-pss15-phase-map-dnm-v1-source.yaml")
+    report = _read("reports/STARLINK_PSS15_PHASE_MAP_V1.md")
+    summary = _read("reports/starlink-pss15-phase-map-v1-ooc-summary.txt")
+    plan = _read("STARLINK_PSS_15_30_60_PLAN.md")
+    rtl = _read("hdl/library/starlink_pss_acquisition/starlink_pss_phase_map.v")
+
+    assert "do_not_merge: true" in manifest
+    assert "persistent_flash_eligible: false" in manifest
+    assert "build_eligible: false" in manifest
+    assert "radio_eligible: false" in manifest
+    assert "radio_contacted_by_this_revision: false" in manifest
+    assert "qualification_utility_changed: false" in manifest
+    assert "submodule_hdl: d291871923c6dc6cc2f30745d2e9d8a6abd3188f" in manifest
+    assert "superseded_submodule_hdl_v1: 1e36384bbf54798a7778b22cd1a54bfb6828dc53" in manifest
+    assert "superseded_submodule_hdl_v2: 77aefb265a88f1d1b746b7d6df4e45d0a3f10627" in manifest
+    assert "firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/82" in manifest
+    assert "firmware_main_gitlink_guard_merge_commit: ae9be3ec411eeebe0ee396b93c0f59e2d9d1940b" in manifest
+    assert "acquisition_phase_bins: 20000" in manifest
+    assert "acquisition_tile_frames: 64" in manifest
+    assert "phase_map_memory_segments_per_bank: 10" in manifest
+    assert "phase_map_publish_complete_tiles_only: true" in manifest
+    assert "phase_map_backpressures_rx_dma: false" in manifest
+    assert "rtl_phase_map_implemented: true" in manifest
+    assert "rtl_score_frontend_implemented: false" in manifest
+    assert "rtl_fft_implemented: false" in manifest
+    assert "rtl_detector_integrated: false" in manifest
+    assert "hardware_qualified: false" in manifest
+    assert "stage_30_authorized: false" in manifest
+    assert "stage_60_authorized: false" in manifest
+
+    hdl_bound_files = {
+        "phase_map_rtl_sha256": (
+            "hdl/library/starlink_pss_acquisition/starlink_pss_phase_map.v"
+        ),
+        "phase_map_bank_rtl_sha256": (
+            "hdl/library/starlink_pss_acquisition/starlink_pss_phase_map_bank.v"
+        ),
+        "phase_map_testbench_sha256": (
+            "hdl/library/starlink_pss_acquisition/tb/"
+            "tb_starlink_pss_phase_map.sv"
+        ),
+        "phase_map_test_runner_sha256": (
+            "hdl/library/starlink_pss_acquisition/run_tests.sh"
+        ),
+        "phase_map_ooc_runner_sha256": (
+            "hdl/library/starlink_pss_acquisition/run_phase_map_ooc.sh"
+        ),
+        "phase_map_ooc_xdc_sha256": (
+            "hdl/library/starlink_pss_acquisition/"
+            "starlink_pss_phase_map_ooc.xdc"
+        ),
+        "phase_map_ooc_tcl_sha256": (
+            "hdl/library/starlink_pss_acquisition/"
+            "synthesize_phase_map_ooc.tcl"
+        ),
+        "phase_map_ooc_summary_sha256": (
+            "reports/starlink-pss15-phase-map-v1-ooc-summary.txt"
+        ),
+        "phase_map_report_sha256": "reports/STARLINK_PSS15_PHASE_MAP_V1.md",
+    }
+    for field, relative in hdl_bound_files.items():
+        assert f"{field}: {_sha256(relative)}" in manifest
+
+    assert "parameter integer PHASE_BINS = 20000" in rtl
+    assert "parameter integer TILE_FRAMES = 64" in rtl
+    assert "parameter integer MAP_SEGMENT_COUNT = 10" in rtl
+    assert "state != STATE_DRAIN" in rtl
+    assert "map_release_bank == map_read_bank" in rtl
+    assert "setup_wns_ns=1.190" in summary
+    assert "ramb36e1=20" in summary
+    assert "dsp48e1=0" in summary
+    assert "It does not yet" in report
+    assert "generate those scores from IQ samples" in report
+    assert "there is no FFT/scorer" in plan
+
+
 def test_top_level_holds_digital_tx_bus_static() -> None:
     top = _read("hdl/projects/pluto/system_top.v")
 

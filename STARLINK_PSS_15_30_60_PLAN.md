@@ -255,6 +255,10 @@ Current control-plane evidence:
   and Buildroot controller/package pins, passed all five checks, and merged to
   firmware `main` as `3c9dea6d8f061f55b2615689783dd0e6aa4999c5`
   before the experimental parent advanced either gitlink;
+- guard PR #82 appended all three immutable phase-map HDL review pins, passed
+  all five checks, and merged to firmware `main` as
+  `ae9be3ec411eeebe0ee396b93c0f59e2d9d1940b` before this parent advanced to
+  the selected v3 pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -538,6 +542,24 @@ re-proves that 30/60 rate writes reach the converter rather than a stale PL
 rate shim.
 
 ## Current implementation evidence
+
+The first continuous-acquisition RTL slice is now source-locked at HDL commit
+`d291871923c6dc6cc2f30745d2e9d8a6abd3188f`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-phase-map-v3`. It implements the
+oracle-selected 20,000-bin, 64-frame, one-sample-resolution phase map as two
+segmented simple-dual-port BRAM banks. Deterministic simulation covers
+back-to-back tiles without a dropped boundary score, a simultaneous immutable
+map read while the other bank fills, exact published sums and metadata, gap
+invalidation and clearing, fail-closed lifecycle requests, and a disable on the
+drain/publish cycle. Vivado 2022.2 post-opt OOC at 100 MHz uses 542 LUTs, 722
+registers, exactly 20 RAMB36E1s, and zero DSPs, with setup WNS `+1.190 ns`, hold
+WHS `+0.204 ns`, zero methodology violations, and no nonempty
+`check_timing` category. This block still consumes already-normalized scores:
+there is no FFT/scorer, AXI/CDC wrapper, shell integration, image, or radio
+claim. The RX DMA path is unchanged. Immutable v1 and v2 tags are retained but
+superseded after review found, respectively, a shared two-bank read-address mux
+and clean-bank reservation leaks across disable; neither was advanced into this
+parent graph, built into an image, or used on a radio.
 
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.

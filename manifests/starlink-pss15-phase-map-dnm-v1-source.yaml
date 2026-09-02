@@ -1,0 +1,103 @@
+# Source contract for the first continuous 15 MS/s acquisition RTL slice.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# The isolated phase-map consumes scores; the FFT/scorer and shell connection
+# do not exist in this checkpoint.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss-acquisition-oracle-v1-source.yaml
+supersedes_reason: "implement and synthesize the oracle-selected ping-pong phase map without claiming a score front end or detector"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: d291871923c6dc6cc2f30745d2e9d8a6abd3188f
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-phase-map-v3
+superseded_submodule_hdl_v1: 1e36384bbf54798a7778b22cd1a54bfb6828dc53
+superseded_submodule_hdl_v1_reason: "shared bank-read address mux did not support simultaneous fill and immutable-map read"
+superseded_submodule_hdl_v2: 77aefb265a88f1d1b746b7d6df4e45d0a3f10627
+superseded_submodule_hdl_v2_reason: "disable during bank reservation or drain could strand the next clean bank"
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/82
+firmware_main_gitlink_guard_merge_commit: ae9be3ec411eeebe0ee396b93c0f59e2d9d1940b
+
+acquisition_sample_rate_hz: 15000000
+acquisition_score_bits: 8
+acquisition_phase_bin_samples: 1
+acquisition_phase_bins: 20000
+acquisition_tile_frames: 64
+acquisition_phase_map_word_bits: 16
+acquisition_phase_map_banks: 2
+acquisition_phase_map_bytes_per_bank: 40000
+acquisition_maximum_map_value: 16320
+
+phase_map_memory_segments_per_bank: 10
+phase_map_memory_words_per_segment: 2048
+phase_map_memory_port_model: simple-dual-port
+phase_map_publish_complete_tiles_only: true
+phase_map_absolute_index_checked: true
+phase_map_phase_checked: true
+phase_map_gap_abort_and_clear: true
+phase_map_read_release_fail_closed: true
+phase_map_backpressures_rx_dma: false
+
+simulation_verdict: PASS
+simulation_accepted_scores: 139
+simulation_discarded_scores: 3
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 1.190
+ooc_hold_whs_ns: 0.204
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 542
+ooc_total_ffs: 722
+ooc_ramb36e1: 20
+ooc_ramb18e1: 0
+ooc_dsp48e1: 0
+
+phase_map_rtl_sha256: 4bf179dd7406c14bf12da744040c3240a38f228429a90b3df69e360da9e61c17
+phase_map_bank_rtl_sha256: aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802
+phase_map_testbench_sha256: 045a2d6a52977f98c53be43023a9bbcc2d50b0c517ab7027acb205fbb220af94
+phase_map_test_runner_sha256: f3dea923744c5d1c7ca1d549bfe788240b2b240952c0e1b5c1e4b006a9b8852b
+phase_map_ooc_runner_sha256: d0b0c43c4a9c5116583d454f6deb61f23b1c31597aecd10b33627396ec6d603f
+phase_map_ooc_xdc_sha256: b490a6a35ec23a176bda2a00a36331556704874d98ce048506ad97d91e9cb6bb
+phase_map_ooc_tcl_sha256: e1a9670dcc84666a7602f50976cee45dd20371525fc55e909aca006b88eb07cb
+phase_map_ooc_summary_sha256: f983afc56cbef66fb61f9cd1e3d1b868d4b729a9d2e0274990db5f3b4347aaaa
+phase_map_report_sha256: 63acb5561aaecb9e4fd3df1b9e94e2426818dada8fbde421c4b5742af7dd79e0
+
+rtl_phase_map_implemented: true
+rtl_score_frontend_implemented: false
+rtl_fft_implemented: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false
