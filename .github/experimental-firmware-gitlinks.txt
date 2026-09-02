@@ -7,3 +7,7 @@ linux 154bda793ee846c57421d07b722fae898f0ae134 starlink-rx-only-linux-v1
 hdl 8290233f93177c231a57436710902bbd058d7f82 starlink-pss15-raw-source-hdl-v1
 hdl d53ac844e1206fa37fb858c30c1301a831c11843 starlink-pss15-raw-hdl-v1
 hdl abdd877aefd7b7b80df90818f556e11a88d3ccd6 starlink-pss15-tracking-hdl-v1
+hdl e0f99540df9cb289683db0317aa23eab4b9f6804 starlink-pss15-result-store-hdl-v1
+hdl 928dcc4e8e70cf61c6772c331142aedcd34e522d starlink-pss15-track-one-hdl-v1
+hdl 278d87953cf169d0456f0408be9fa549bb3bddcc starlink-pss15-split-reset-hdl-v1
+hdl d30e7b3c1128448b8cfa5a9dbfeec49154a136a5 starlink-pss15-axi-tracker-hdl-v1
