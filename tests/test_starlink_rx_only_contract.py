@@ -1,3 +1,4 @@
+import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -5,6 +6,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def _read(relative: str) -> str:
     return (ROOT / relative).read_text(encoding="utf-8")
+
+
+def _sha256(relative: str) -> str:
+    return hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
 
 
 def test_experiment_is_marked_do_not_merge_and_ram_only() -> None:
@@ -194,6 +199,58 @@ def test_abi12_batch_hardware_evidence_keeps_rt_and_live_signal_boundaries() -> 
     assert "SCHED_FIFO` priority 80" in plan
     assert "ordinary best-effort Linux scheduling is explicitly unqualified" in plan
     assert "does not authorize Stage 30" in plan
+
+
+def test_acquisition_oracle_checkpoint_is_offline_and_fail_closed() -> None:
+    manifest = _read("manifests/starlink-pss-acquisition-oracle-v1-source.yaml")
+    plan = _read("STARLINK_PSS_15_30_60_PLAN.md")
+    report = _read("reports/STARLINK_PSS_ACQUISITION_ORACLE_V1.md")
+    oracle = _read("tests/starlink_oracle/acquisition.py")
+
+    assert "do_not_merge: true" in manifest
+    assert "persistent_flash_eligible: false" in manifest
+    assert "radio_eligible: false" in manifest
+    assert "radio_contacted_by_this_revision: false" in manifest
+    assert "qualification_utility_branch: main" in manifest
+    assert "qualification_utility_changed: false" in manifest
+    assert "acquisition_score_bits: 8" in manifest
+    assert "acquisition_phase_bin_samples: 1" in manifest
+    assert "acquisition_phase_bins: 20000" in manifest
+    assert "acquisition_tile_frames: 64" in manifest
+    assert "acquisition_phase_map_word_bits: 16" in manifest
+    assert "independent_positive_verdict: PASS" in manifest
+    assert "independent_negative_verdict: REJECT" in manifest
+    assert "rtl_fft_implemented: false" in manifest
+    assert "hardware_qualified: false" in manifest
+    assert "production_false_alarm_policy_frozen: false" in manifest
+
+    bound_files = {
+        "acquisition_oracle_source_sha256": "tests/starlink_oracle/acquisition.py",
+        "acquisition_oracle_test_sha256": "tests/starlink_oracle/test_acquisition.py",
+        "acquisition_study_cli_test_sha256": (
+            "tests/test_starlink_pss_acquisition_study.py"
+        ),
+        "acquisition_study_tool_sha256": "tools/starlink_pss_acquisition_study.py",
+        "acquisition_report_sha256": (
+            "reports/STARLINK_PSS_ACQUISITION_ORACLE_V1.md"
+        ),
+        "primary_positive_report_sha256": (
+            "reports/starlink-pss-acquisition-oracle-v1.json"
+        ),
+        "independent_positive_report_sha256": (
+            "reports/starlink-pss-acquisition-oracle-v1-independent-positive.json"
+        ),
+        "independent_negative_report_sha256": (
+            "reports/starlink-pss-acquisition-oracle-v1-independent-negative.json"
+        ),
+    }
+    for field, relative in bound_files.items():
+        assert f"{field}: {_sha256(relative)}" in manifest
+
+    assert "coarse phase bins are rejected" in plan
+    assert "one-sample phase resolution" in plan
+    assert "FPGA-facing reduction" in oracle
+    assert "not live-PSS or hardware evidence" in report
 
 
 def test_top_level_holds_digital_tx_bus_static() -> None:

@@ -1,0 +1,102 @@
+# Immutable offline source contract for the first continuous 15 MS/s PSS
+# acquisition architecture checkpoint.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This revision changes no RTL,
+# boot image, radio configuration, or PPU source. It is not eligible for radio
+# use. A later RTL source graph must receive its own manifest and RAM-only
+# lifecycle.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-batch-clock-dnm-v1-source.yaml
+supersedes_reason: "add an offline continuous-acquisition oracle and measured phase-map architecture without changing the qualified ABI 1.2 runtime"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: ecf2ee383e86dced8189964ab4c6b28a47ee208f
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: false
+
+acquisition_oracle_schema: starlink-pss-acquisition-oracle-v1
+acquisition_sample_rate_hz: 15000000
+acquisition_fft_samples: 512
+acquisition_template_samples: 66
+acquisition_valid_outputs_per_fft: 447
+acquisition_score_bits: 8
+acquisition_phase_bin_samples: 1
+acquisition_phase_bins: 20000
+acquisition_tile_frames: 64
+acquisition_tile_duration_us: 85333.33333333333
+acquisition_phase_map_word_bits: 16
+acquisition_phase_map_bytes: 40000
+acquisition_phase_map_bytes_per_second_per_template: 468750
+acquisition_maximum_map_value: 16320
+acquisition_period_half_width_ppm: 10
+acquisition_period_step_ppm: 3.125
+acquisition_peak_to_median_gate: 1.15
+acquisition_robust_z_gate: 6.0
+
+primary_positive_capture_id: cap-20260831T071200-9184cf0ad6cc
+primary_positive_chunk_compressed_sha256: 68732179d9e147e0f173677f810e032d5240fc3ba024cb9045fe17dff9f38946
+primary_positive_chunk_samples: 4194304
+primary_positive_64_frame_peak_to_median: 1.9364238410596026
+primary_positive_64_frame_robust_z: 12.549078077630337
+primary_positive_64_frame_phase_error_samples: 12
+primary_positive_verdict: PASS
+
+independent_positive_capture_id: cap-20260831T044729-6a598698a226
+independent_positive_chunk_index: 278
+independent_positive_chunk_compressed_sha256: fd6bc878e76d52671c5ea1c8f3ceae773e2539da285363c52118f698581bdaae
+independent_positive_chunk_samples: 3145728
+independent_positive_64_frame_peak_to_median: 1.549800796812749
+independent_positive_64_frame_robust_z: 6.205314987184677
+independent_positive_64_frame_phase_error_samples: 1
+independent_positive_verdict: PASS
+
+independent_negative_capture_id: cap-20260831T052807-77e01d5101ea
+independent_negative_chunk_index: 0
+independent_negative_chunk_compressed_sha256: d33e16b72bb64a7718fbdc3063fcce7d92ea1d33cb3f3077ac78edc010cedb50
+independent_negative_chunk_samples: 5242880
+independent_negative_64_frame_peak_to_median: 1.2825870646766169
+independent_negative_64_frame_robust_z: 4.5608422783655485
+independent_negative_verdict: REJECT
+
+acquisition_oracle_source_sha256: 9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b
+acquisition_oracle_test_sha256: 1caef056a00d1cd1d72ef6bbad3e8272dd8c1635f16f462f6fe0c38db5db1f47
+acquisition_study_cli_test_sha256: 1bfd8e6e21efaacc2e738d4ea98c9592b3bc8acbf6c9431fd4585d0a787e4fa3
+acquisition_study_tool_sha256: d013828361cae43f9c3300f756ce8079ddd3594a5875c944b7c72acb90129da4
+acquisition_report_sha256: 7b1b6da4db45a7fe69cb7f8938b073cea037663784cca8baa823987b5418a756
+primary_positive_report_sha256: 8165f8be6331911e2319dd9f98e56c99b6136c793241a7cd03757dba6ab13f00
+independent_positive_report_sha256: 4a632a649b95a8f688b0777c4b4d2176e188631af7758dc73c477a3fcf4a8222
+independent_negative_report_sha256: 13eaef1466bf74672751f3fbd6d435b6a8bd539544a75ced2f2cedfb46767505
+
+focused_acquisition_tests_passed: 30
+focused_acquisition_tests_failed: 0
+ruff_verdict: PASS
+diff_check_verdict: PASS
+
+rtl_fft_implemented: false
+rtl_phase_map_implemented: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+production_false_alarm_policy_frozen: false

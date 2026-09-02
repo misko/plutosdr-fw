@@ -43,3 +43,44 @@ library must emit identical low bits.
   accumulators. It contains no NCO; inputs are zero-CFO or pre-corrected.
 - No real 30 or 60 MS/s validation capture was found. Tests at those rates are
   synthetic. Real-capture replay is deliberately outside this first slice.
+
+## Acquisition oracle
+
+`acquisition.py` defines `starlink-pss-acquisition-oracle-v1`.  It uses a
+512-sample overlap-save FFT to accelerate the exact CI16/Q1.15 correlation,
+rounds every complex result back to the integer dot-product lattice, and then
+quantizes normalized power with exact rational ties-to-even arithmetic.  The
+FFT is a host acceleration technique, not yet the arithmetic contract of a
+future fixed-point RTL FFT.
+
+The FPGA-facing reduction keeps the maximum score in each coarse phase bin for
+one nominal frame and sums those maxima across a configurable tile.  Complete
+tiles never cross a partial frame or continuity gap.  `search_phase_map_drift`
+then models the bounded ARM-side shift-and-sum cadence search without exposing
+raw IQ.
+
+The default candidate geometry is one 15 MS/s sample per bin, eight score bits,
+and 64 frames per tile: 20,000 16-bit bins, 40,000 bytes per map, and 468,750
+bytes/s per template.  Real-capture study showed that coarsening phase bins
+lost the weaker held-out positive even though it improved the strongest
+recording.  Narrow score and map words save BRAM without discarding timing
+hypotheses.
+
+Run the bounded study directly on one continuity-safe CI16 or CI16-Zstandard
+file.  The input is opened read-only and is never copied into this repository:
+
+```sh
+PYTHONPATH=. python tools/starlink_pss_acquisition_study.py \
+  /path/to/iq-000000.ci16.zst \
+  --edge upper \
+  --expected-phase-sample 1185 \
+  --generated-at-utc 2026-09-02T00:00:00Z \
+  --output reports/starlink-pss-acquisition-oracle-v1.json
+```
+
+Pin `--generated-at-utc` when the report itself must reproduce byte for byte;
+omit it for an ordinary run that should record its actual generation time.
+
+The report includes a deterministic frame-scrambled score control.  That
+control preserves the marginal score distribution while destroying repeated
+frame phase; it is not presented as an independent RF negative recording.

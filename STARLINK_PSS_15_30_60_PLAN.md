@@ -163,6 +163,27 @@ PPU PR #110 to clean PPU `main` commit
 `4ca3451ae6de233b00eb31c38c7d4b29ba6b249a`. All later Stage-15 plans and
 receipts bind that commit; no radio trial depends on the deleted feature branch.
 
+The first continuous-acquisition work packet is now implemented offline as
+`starlink-pss-acquisition-oracle-v1`. It models a 512-sample overlap-save
+correlator, exact rational score quantization, bounded phase-map production,
+and ARM-side shift-and-sum cadence hypotheses. It is checked against two
+independent real 15 MS/s positive chunks, one independent RF-negative chunk,
+and deterministic frame-scrambled controls. This is algorithm and data-product
+evidence only; it is not an RTL FFT, routed design, radio result, or live-PSS
+qualification.
+
+The held-out weaker positive rejects the earlier four-sample-bin proposal: its
+robust z falls below the unchanged 6.0 gate for every tested coarse bin at the
+64-frame geometry. The retained acquisition-v1 candidate therefore preserves
+all 20,000 phase samples, quantizes normalized power to eight bits, accumulates
+64 frames into 16-bit stored map words, and exports one 40,000-byte map per
+85.333 ms per template. Both real positives pass the existing joint epoch
+gates at this geometry while the independent RF negative and both scrambled
+controls reject. The complete checkpoint and machine-readable reports are in
+`reports/STARLINK_PSS_ACQUISITION_ORACLE_V1.md` and its three referenced JSON
+files. The production false-alarm policy remains open pending a predeclared
+multi-capture corpus partition.
+
 The authoritative device limits used by these gates are Analog Devices'
 [AD9363 data sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/AD9363.pdf)
 (up to 20 MHz channel bandwidth) and
@@ -263,14 +284,17 @@ renamed-content promotion guard gate.
 The native waveform model is 240 MS/s, 1024 useful samples, 32 samples of
 inverted prefix, and a 750 Hz frame rate. Its exact integer projections are:
 
-| RX/DMA rate | Projected useful/prefix/symbol at RX rate | Samples/frame | Direct taps / qualified lags / raw guard lags | One-bank raw correlation tap-cycles/s | Optional measured fallback |
+| RX/DMA rate | Projected useful/prefix/symbol at RX rate | Samples/frame | Direct taps / qualified lags / raw guard lags | One-bank raw correlation tap-cycles/s | Continuous-acquisition lane |
 |---:|---:|---:|---:|---:|---:|
 | 15 MS/s | 64 / 2 / 66 | 20,000 | 66 / 61 (`+/-30`) / 65 (`+/-32`) | 3.2175 M | none |
-| 30 MS/s | 128 / 4 / 132 | 40,000 | 132 / 121 (`+/-60`) / 129 (`+/-64`) | 12.771 M | x2 to 15 only if measured better |
-| 60 MS/s | 256 / 8 / 264 | 80,000 | 264 / 241 (`+/-120`) / 257 (`+/-128`) | 50.886 M | x4 to 15 only if measured better |
+| 30 MS/s | 128 / 4 / 132 | 40,000 | 132 / 121 (`+/-60`) / 129 (`+/-64`) | 12.771 M | required, separately qualified x2 DDC to 15 MS/s |
+| 60 MS/s | 256 / 8 / 264 | 80,000 | 264 / 241 (`+/-120`) / 257 (`+/-128`) | 50.886 M | required, separately qualified x4 DDC to 15 MS/s |
 
-The default 30 and 60 MS/s design is sparse, candidate-gated direct correlation
-at the full RX rate; it does not process the continuous stream. The search
+The default design separates continuous acquisition from exact tracking.
+Acquisition always uses the canonical 15 MS/s, 66-tap geometry: native bypass
+at 15 MS/s and separately qualified x2/x4 DDC lanes at 30/60 MS/s. Exact
+tracking remains sparse, candidate-gated direct correlation at the full RX
+rate; it does not process the continuous stream. The tracking search
 qualified half-width is fixed in time at `30/15e6 = 2 us`. For rate multiplier
 `m` in `{1,2,4}`, taps are `66m` and the qualified winner aperture has
 `60m+1` lags. The capture/raw-trace guard remains `32m` on either side, so the
@@ -308,12 +332,14 @@ formula, admission deadline, and counter. Queue admission includes measured
 wrapper/publication latency and rejects work that cannot finish before its
 declared result deadline.
 
-An independent x2/x4 DDC lane remains an alternative, not an assumption. Its
-mixer, filter coefficients, integer phase, group delay, rounding, saturation,
-alias controls, post-filter template digest, and full-rate timestamp mapping
-must form a new versioned oracle and materially beat the direct design in OOC
-and full-route evidence. Either architecture preserves detector-independent
-full-rate RX DMA.
+The acquisition x2/x4 DDC lane is now an explicit stage deliverable rather than
+an optional replacement for exact tracking. Its mixer, filter coefficients,
+integer phase, group delay, rounding, saturation, alias controls, post-filter
+template digest, and full-rate timestamp mapping form a new versioned oracle.
+The direct full-rate tracker remains the reference exact-timing architecture;
+any proposal to decimate that bounded tracker window still requires separate
+OOC and complete-route evidence. All architectures preserve
+detector-independent full-rate RX DMA.
 
 CI16 complex ingress is 60, 120, and 240 MB/s at 15, 30, and 60 MS/s. Host
 bootstrap and capture evidence therefore use bounded DDR captures or segmented
@@ -330,13 +356,15 @@ tests an explicit ideal-template mismatch allowance. A 60 MS/s IIO stream is
 never used as evidence of a 60 MHz flat RF passband.
 
 A tracked result can be produced after a predicted PSS window plus correlator
-pipeline latency. Initial acquisition is different: host bootstrap must first
-collect and search enough data to establish template, sideband, CFO, phase,
-and 750 Hz cadence. No sub-symbol acquisition-latency claim is made. Once
-locked, an N-frame observation window is `N/750` seconds, while latency from the
-first through the Nth event is `(N-1)/750` seconds. Thus four events span 4.00 ms
-first-to-fourth within a 5.33 ms observation allocation; eight span 9.33 ms
-within 10.67 ms, plus pipeline and host/FPGA handoff latency.
+pipeline latency. Initial acquisition is different: the continuous FPGA score
+and phase-map path must first observe enough complete frames for the bounded ARM
+map search to establish sideband, phase, and 750 Hz cadence; sparse exact FPGA
+correlation then confirms the candidate and refines CFO. No sub-symbol
+acquisition-latency claim is made. Once locked, an N-frame observation window is
+`N/750` seconds, while latency from the first through the Nth event is
+`(N-1)/750` seconds. Thus four events span 4.00 ms first-to-fourth within a
+5.33 ms observation allocation; eight span 9.33 ms within 10.67 ms, plus
+pipeline and ARM/FPGA handoff latency.
 
 ## What the 15 MS/s evidence says
 
@@ -373,21 +401,25 @@ Consequently:
 
 1. Preserve formatted RX0 I/Q, full-rate timestamps, DMA data, continuity, and
    overflow reporting independently of all detector logic.
-2. At 15 MS/s, acquire with the existing host golden search: exact lower/upper
-   PSS templates, explicit CFO hypotheses, deterministic tie handling, and
-   multi-frame 750 Hz cadence. Refine the nine CFO banks across repeated-frame
-   evidence, then lock one block-selected CFO for local frame tracking. Do not
-   maximize nine banks independently on every frame; that changes the oracle
-   and preferentially selects noise.
+2. Continuously acquire in FPGA at the canonical 15 MS/s rate. A shared
+   512-sample overlap-save front end produces 447 valid score positions per
+   block for each enabled lower/upper PSS template. Normalized power is
+   quantized to eight bits and accumulated at full one-sample phase resolution
+   into 20,000-bin, 64-frame maps. The ARM sees bounded maps, applies the
+   frozen robust epoch policy and a small explicitly trial-corrected cadence
+   bank, and returns only top candidates. Nine CFO banks remain a sparse
+   post-candidate refinement; they are never independently maximized on every
+   frame.
 3. Hand only bounded predicted windows to a candidate-gated FPGA exact
    correlator. The current engine emits 65 raw guard lags `[-32,+32]` with 66
    template taps, but `TRACK_ONE` admits only the frozen 61 lags `[-30,+30]`
    to its winner reducer. Normal one-CFO tracking currently performs 3,217,500
    complex tap-MACs/s. An explicitly
    commanded three-bank check is 9,652,500, and an all-nine diagnostic is
-   28,957,500. Blind acquisition remains on the host. A three-DSP, one-complex-
-   tap-per-cycle engine has ample scheduling margin at 100 MHz; generated OOC
-   and full-route reports, not this arithmetic, decide acceptance.
+   28,957,500. Blind acquisition remains on the continuous canonical-15 FPGA
+   score/map path, not this sparse tracker. A three-DSP,
+   one-complex-tap-per-cycle engine has ample scheduling margin at 100 MHz;
+   generated OOC and full-route reports, not this arithmetic, decide acceptance.
 4. Deliver the exact engine in two steps. First preserve all 65 raw
    `{lag,index,C_re,C_im,Ex,Eh}` tuples for one host-selected Q1.15 coefficient
    bank so the host can reproduce every score and tie. Then add the exact
@@ -397,10 +429,11 @@ Consequently:
    The raw trace remains separately available for diagnostics; normal
    `TRACK_ONE` reduces only `[-30,+30]`. The engine reports candidate measurements only; multi-frame alignment and
    false-alarm policy remain on the host.
-5. Scale the sparse direct engine first at 30 and 60 MS/s: 132 taps/129 lags,
-   then 264 taps/257 lags, with sliding `Ex` and cached `Eh`. An independently
-   qualified x2/x4 DDC is considered only if generated OOC and full-route
-   evidence shows a material advantage while preserving full-rate DMA.
+5. Scale the sparse direct tracking engine at 30 and 60 MS/s: 132 taps/129
+   lags, then 264 taps/257 lags, with sliding `Ex`, cached `Eh`, and an elastic
+   tuple FIFO before the bit-serial reducer. In parallel, feed the unchanged
+   acquisition engine through independently qualified x2/x4 DDC lanes while
+   preserving full-rate DMA and exact source-index mapping.
 6. Retain the 0.75 repeated-delay monitor only in a separate diagnostic build
    as the already-qualified AXI/CDC reference. Compile it out of the first
    radio-eligible exact-detector image so its 21 DSPs and control logic cannot
@@ -411,11 +444,12 @@ Consequently:
    evidence. Start SSS in the host; move it into FPGA only if profiling shows a
    justified bounded workload.
 
-An autonomous full-stream blind FPGA search is deliberately deferred. If host
-bootstrap is later unacceptable, compare an overlap-save FFT correlator or a
-separately proven coarse stage against the same recordings and negative
-controls as a new reviewed scope. The repeated-delay metric is not promoted to
-that role without new evidence.
+Autonomous full-stream acquisition is now in scope through the bounded
+15-MS/s overlap-save phase-map design. Linux is not assigned a per-frame
+deadline: after ARM candidate selection, a PL fixed-point recurrence generator
+schedules confirmation and tracking into an aligned result ring. The state
+sequence is `ACQUIRE -> CONFIRM -> LOCK -> TRACK -> HOLDOVER -> ACQUIRE`.
+The repeated-delay metric is not promoted into this path without new evidence.
 
 ### Stage-15 exact-engine contract
 
@@ -781,8 +815,9 @@ Current status ledger:
   source-locked RAM-only package, exact positive and independent-window packet
   invariants on the target radio, one byte-exact shared RX-DMA observation, and
   eight passing sequential repeat transactions;
-- Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
-  pending;
+- Gate 1 acquisition oracle: **FIRST REAL-DATA ARCHITECTURE CHECKPOINT
+  COMPLETE; PRODUCTION CORPUS POLICY OPEN**. The remaining Gate 2
+  modes/equivalence bundle is in progress or pending;
 - Gate 3: **IMPLEMENTATION/RADIO-TRANSPORT PASS WITH MANDATORY RT POLICY; LIVE
   PSS OPEN** for native
   `ad9363a-1r1t`; its RAM lifecycle, exact 15 MS/s PHY/capture path, factor-1
@@ -823,6 +858,12 @@ builds. Starlink code is not part of any PPU commit.
 
 ### Gate 1: frozen oracle and 15 MS/s offline acquisition
 
+- Complete for the first architecture checkpoint: exact-integer accelerated
+  overlap-save scoring, eight-bit rational quantization, 20,000-bin phase maps,
+  64-frame/16-bit accumulation, bounded `+/-10 ppm` cadence hypotheses, two
+  independent real positive chunks, one independent RF-negative chunk, and
+  deterministic scrambled controls. The retained default is one-sample phase
+  resolution; coarse phase bins are rejected by the weaker positive.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run
@@ -833,6 +874,10 @@ builds. Starlink code is not part of any PPU commit.
   confirmation count, score/z thresholds, false-alarm denominator and ceiling,
   live observation duration, and tie/pass/fail rules.
 - Preserve the lag-monitor analysis and its expected no-event result at 0.75.
+- Expand the checkpoint into a predeclared multi-capture positive/negative
+  partition, include the cadence-bank trial count in the false-alarm policy,
+  and freeze the selected map ABI before RTL implementation. The current three
+  chunks do not close that production policy.
 
 Pass artifact: a machine-readable replay report with provenance, matched and
 missed frames, timing error, score distribution, negative-control rate, and the
@@ -934,12 +979,14 @@ remains mandatory before SSS or a live-performance claim.
   A commanded three-bank full-aperture validation budget is 38.604 Mcycles/s
   at 750 Hz and may be enabled after full route. Nine full-aperture banks every
   frame are explicitly rejected at a 100 MHz engine; the nine-bank one-lag
-  refiner is separately budgeted and blind acquisition remains on the host.
-- Only after the direct design has exact replay, OOC, and complete-route results,
-  prototype a deterministic x2 lane if warranted. Its anti-alias response,
-  phase/delay mapping, rounding, saturation, and post-filter template digest are
-  a distinct oracle. Select it only if measured evidence materially beats the
-  direct design, never merely because it reuses the 15 MS/s tap count.
+  refiner is separately budgeted; blind acquisition remains on the canonical
+  15 MS/s FPGA score/map path.
+- Implement a deterministic x2 lane for continuous acquisition while retaining
+  the direct 30 MS/s exact tracker. Its anti-alias response, phase/delay
+  mapping, rounding, saturation, source-index convention, and post-filter
+  template digest are a distinct oracle. The x2 output must reproduce the
+  selected 15 MS/s phase-map decisions within the predeclared tolerance; it is
+  never used to relabel reduced-rate timing as exact 30 MS/s timing.
 - On the required exact AD9363A serial, first run `ad9363a-1r1t` with read-back
   RF bandwidth at or below 20 MHz as an in-spec narrowband/sample-rate trial.
   Use `ad9361-1r1t` only for an explicitly out-of-spec greater-than-20-MHz
@@ -984,9 +1031,10 @@ requires `30-MS/s FULL-BAND PASS`.
   bounded readout backpressure, expected overflow reporting, thermal behavior,
   and long-run timestamp continuity. Use bounded DDR captures or segmented
   readout; do not imply that USB can continuously carry 240 MB/s CI16 ingress.
-- Prototype an x4 DDC only if the routed direct result leaves a concrete need.
-  Its quantized response requires a new versioned template digest and cannot
-  inherit direct-15 identity merely because its output rate is 15 MS/s.
+- Implement an x4 DDC for continuous acquisition while retaining the direct
+  60 MS/s exact tracker. Its quantized response, source-index phase, and group
+  delay require a new versioned template digest and cannot inherit direct-15
+  identity merely because its output rate is 15 MS/s.
 - The AD9361 nominal 56 MHz analog RF bandwidth is not described as a flat
   60 MHz passband. This gate requires requested and observed `60,000,000` S/s
   under a predeclared clock-tolerance policy. A 61.44 MS/s result is not renamed
