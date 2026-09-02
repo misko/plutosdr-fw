@@ -89,6 +89,10 @@ Current control-plane evidence:
 - generic firmware promotion guard PR #76 merged to firmware `main` as
   `7ef0a768096207526dc39331e0bedbce8c9f02dd` after all four existing required
   checks passed;
+- guard PR #80 appended the exact Stage-15 split-reset and routed AXI-tracker
+  HDL pins, passed all five checks, and merged to firmware `main` as
+  `7a646abc591fbeb6f1c32a1addcebced2e8b1517` before the experimental parent
+  advanced its HDL gitlink;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -273,13 +277,15 @@ stored raw timestamp at its first tap; no timestamp is reconstructed from
 pipeline latency. Disable, FIFO overflow, or a nonconsecutive accepted index
 flushes the job and increments a visible abort counter.
 
-Before wrapper RTL freezes, the versioned ABI must define how `p` is delivered:
-a full-width accepted-sample index/timestamp and explicit wrap rule, the host
-queue operation, queue depth and minimum lead time, and deterministic treatment
-of late, duplicate, or overlapping centers. Disable, valid gaps, index jumps,
-capture/result overflow, and reset flush every affected request and increment
-separate rejected, late, aborted, and overrun counters. Gate 2 tests every case;
-an inferred pipeline-time center is never accepted as equivalent.
+The first wrapper ABI is now frozen for `TRACK_ONE`: software reads a coherent
+64-bit accepted-sample index, submits a full-width center index/timestamp and
+request ID through a buffered command, and receives an immutable 26-word result
+packet through a level interrupt. The candidate queue has seven usable entries
+and hardware rejects less than 64 samples of lead. Disable, valid gaps, index
+jumps, capture/result overflow, and reset flush affected work; separate
+diagnostics make each class observable. Gate 2 still must replay every boundary
+case through the host driver and retained real windows. An inferred
+pipeline-time center is never accepted as equivalent.
 
 A three-DSP Gauss complex multiplier issues one exact tap per engine clock.
 CI16/Q1.15 operands feed signed 17x17 products; Gauss reconstruction is
@@ -306,24 +312,28 @@ tuple behavior while moving validated `Eh` to coefficient commit and replacing
 per-lag energy prepasses with the sliding-`Ex` schedule above. A differential
 test must compare all raw tuples before and after that optimization.
 
-The exact engine receives a distinct 16 KiB AXI aperture at `0x79040000`; the
-diagnostic monitor remains read-only at `0x79030000`. Its versioned ABI has
-separate `TRACK_ONE`, `CFO_REFINE`, `VALIDATE_BANKS`, and `SINGLE_SHOT_TRACE`
-modes, shadow/active coefficient banks, commit generation and validation
-status, double-buffered results, and processed/aborted/overrun counters. A
-configuration becomes active only after host readback, SHA-256 verification,
-CRC/energy validation, and an idle-boundary generation acknowledgement.
+The exact engine replaces the diagnostic monitor in the 4 KiB AXI aperture at
+`0x79030000`; both are never present in the radio-candidate shell. ABI v1
+implements only `TRACK_ONE`, with a 66-tap shadow/active coefficient bank,
+commit generation and energy validation, double-buffered atomic results, and
+processed/aborted/overrun diagnostics. Live sample-domain binary counters were
+removed from offsets `0x84..0xb8` rather than exposed through a tearing CDC;
+those offsets remain reserved for a later atomic telemetry snapshot. Future
+`CFO_REFINE`, `VALIDATE_BANKS`, and `SINGLE_SHOT_TRACE` modes require a new
+versioned capability/ABI extension and do not block the first one-bank radio
+trial. The host evidence bundle, not the FPGA register file, binds the template
+SHA-256/CRC to the acknowledged coefficient generation.
 
-The initial measured-budget target for the exact correlator, control, and
-result block is at most 3 DSP48E1s, 5 BRAM36 equivalents, 2,500 LUTs, and 2,000
-registers. Detection-lane DDC resources at 30/60 MS/s are budgeted separately.
-Every number remains provisional until both OOC and complete Zynq-7010 route
-reports exist.
+The original 3-DSP, 5-BRAM-equivalent, 2,500-LUT, 2,000-register target was a
+planning estimate, not an acceptance override. Routed Stage 15 establishes the
+real baseline: exactly 3 DSP48E1s and 5.5 BRAM tiles in the tracker hierarchy;
+the core OOC result is 4,268 LUTs and 3,565 registers. The complete shell still
+fits, but 30 and especially 60 MS/s must earn their geometry through fresh OOC
+and full-route evidence rather than scaling this estimate arithmetically.
 
-The 21-DSP repeated-delay monitor is temporary integration instrumentation. Its
-source-locked routed build remains the reference for AXI visibility and CDC,
-but the first radio-eligible exact image compiles it out. No PSS function
-depends on keeping it.
+The 21-DSP repeated-delay monitor remains a source-locked historical AXI/CDC
+reference, but the exact Stage-15 shell compiles it out. No PSS function depends
+on it and it is not reintroduced at 30 or 60 MS/s.
 
 The legacy fixed `/8` RX FIR is also not a 30/60 detection lane. It is forced to
 bypass for Stage 15 and removed before Stage 30 unless a separately reviewed
@@ -412,6 +422,34 @@ Every manifest source, report, DCP, transcript, and fixture digest was replayed
 after the source commit. Parent manifest
 `starlink-pss15-raw-dnm-v1-source.yaml` pins this exact graph and explicitly
 forbids building, booting, releasing, or flashing the still-isolated core.
+
+The integrated Stage-15 `TRACK_ONE` milestone is now HDL commit
+`d30e7b3c1128448b8cfa5a9dbfeec49154a136a5` on
+`codex/starlink-rx-only-do-not-merge`, locked by annotated tag
+`starlink-rx-only-dnm-v1-source/hdl-pss15-track-one-v1`. It adds the
+host-scheduled AXI wrapper,
+queued capture, cached `Eh`, sliding `Ex`, exact rational winner reducer, and
+atomic 26-word result publication; removes the diagnostic monitor and TX DMA;
+and remains elaboration-locked to 15 MS/s. The asynchronous-clock AXI test
+loads 66 coefficients, captures 130 tagged samples, evaluates all 65 lags,
+checks every result word, releases the level IRQ, and proves that sample reset
+flushes the whole epoch. The complete underlying scheduler/capture/correlator/
+reducer/result-store suite also passes.
+
+The clean Vivado 2022.2 Pluto route at that HDL commit has setup WNS
+`+0.519 ns`, hold WHS `+0.014 ns`, zero timing failures, zero routing errors,
+and zero tracker Critical CDC rows. Its 64-bit Gray scheduling-index crossing
+meets the 10 ns bus-skew constraint with 1.590 ns actual skew. The complete
+RX-only shell uses 8,906/17,600 LUTs (50.60%), 11,531/35,200 registers
+(32.76%), 8.5/60 BRAM tiles (14.17%), and 31/80 DSPs (38.75%); the tracker
+hierarchy accounts for exactly 3 DSP48E1s, 3 RAMB18E1s, and 4 RAMB36E1s. The
+routed DCP, bitstream, and XSA SHA-256 values are respectively
+`64785b8b5a4e9e5af1ead62d659f4078076aab98c42fc639fb95b2fe4548160a`,
+`0e783199a0a56c7742d6079daeb4ebc6ac4750e58f543d4020529275a39b3e49`,
+and `44dd4c0525fa67630dbb0f225999d0498a62baf27991fca497d6cfba96ff565d`.
+This closes local wrapper/integration/route work for one-bank Stage 15; it does
+not close frozen-real-window replay, the complete host API, target-radio RAM
+qualification, CFO refinement modes, acquisition, SSS, 30 MS/s, or 60 MS/s.
 
 A frozen CI16/Q1.15 one-bank tracking model has also been replayed over all 210
 first-chunk real windows using the oracle's actual upper-edge, `-100 kHz`,
@@ -531,9 +569,12 @@ Current status ledger:
 - Gate 0: **COMPLETE - SOFTWARE ONLY / HARDWARE UNTESTED**;
 - Gate 2A diagnostic monitor: **COMPLETE OFFLINE** at the source-bound trusted
   run above; it is status plumbing, not PSS;
-- Gate 2B raw exact arithmetic: **COMPLETE OFFLINE**; its wrapper, sliding-energy
-  scheduler, reducer, integration, and full route remain pending;
-- Gate 1 and the rest of Gate 2B: in progress or pending;
+- Gate 2B one-bank Stage-15 `TRACK_ONE`: **WRAPPER / INTEGRATION / FULL ROUTE
+  COMPLETE OFFLINE** at HDL `d30e7b3c`; frozen-real-window wrapper replay,
+  source-locked firmware packaging, host API, and hardware qualification remain
+  pending;
+- Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
+  pending;
 - every target-radio, 30 MS/s, 60 MS/s, campaign-close, and SSS gate: pending.
 
 ### Gate 0: PPU foundation on `main` - COMPLETE SOFTWARE ONLY
@@ -573,26 +614,28 @@ exact qualification-policy digest.
 
 ### Gate 2: 15 MS/s FPGA tracking and RX-only implementation
 
-- Treat the already routed AXI diagnostic monitor as a completed, separate
-  plumbing reference without calling it a detector. Complete the one-bank,
-  65-lag raw-result exact correlator at 100 MHz, then compile the monitor out of
-  the radio candidate. Prove captured samples, stored raw timestamps,
-  coefficient-bank identity, 48-bit accumulators, and all 65 raw tuples before
-  adding a winner reducer.
-- Add the queued-center wrapper and convert `Eh`/`Ex` scheduling to cached and
-  sliding form. Differentially prove that all 65 raw tuples remain identical to
-  the isolated milestone, including under result backpressure.
-- Add the exact rational reducer, one-lag nine-bank CFO-refinement mode,
-  commanded adjacent-bank validation, double-buffered result publication, and
-  single-shot trace. Per-frame CFO switching is forbidden in normal tracking.
+- Complete: retain the routed AXI diagnostic monitor only as a separate
+  historical plumbing reference; compile it out of the exact shell. The
+  one-bank, 65-lag raw correlator proves captured samples, stored raw
+  timestamps, coefficient generation, 48-bit accumulators, and every raw tuple
+  before reduction.
+- Complete for `TRACK_ONE`: the queued-center AXI wrapper, cached `Eh`, sliding
+  `Ex`, exact rational winner reducer, double-buffered result publication,
+  level IRQ, coordinated reset, and full RX-only route.
+- Pending before advanced tracking modes: add one-lag nine-bank CFO refinement,
+  commanded adjacent-bank validation, and single-shot trace through a new
+  capability-versioned ABI. Per-frame CFO switching remains forbidden in normal
+  tracking.
 - Prove bit-exact equivalence in simulation on structural vectors and bounded
   real-capture windows, including all 210 frozen replay windows, ties,
   enable/gap/index-jump flushing, coefficient rejection, and publication
   overrun accounting. Exercise full-width index wrap plus queued-center lead
   time, depth, late, duplicate, and overlap behavior and every corresponding
   counter.
-- Run OOC reports, then full RX-only shell implementation and every common
-  timing, DRC, resource-headroom, DMA-equivalence, and device-tree gate.
+- Complete locally for the v1 shell: OOC reports and full RX-only timing, hold,
+  scoped CDC, bus-skew, routing, exact hierarchy resources, and absence of TX
+  DMA. Still pending: source-locked firmware package, DMA/device-tree runtime
+  equivalence, retained-real-window wrapper replay, and target-radio evidence.
 - If the exact engine misses its budget, reduce parallelism or scheduling while
   preserving numerical behavior. Do not weaken oracle agreement.
 
