@@ -1,0 +1,6 @@
+config BR2_PACKAGE_STARLINK_PSSCTL
+	bool "starlink_pssctl (experimental DNM firmware only)"
+	help
+	  Fail-closed userspace controller for the experimental Stage-15,
+	  one-RX PSS TRACK_ONE FPGA block. This package belongs only in the
+	  explicitly do-not-merge Starlink firmware branch.
