@@ -59,12 +59,14 @@ mandatory before the 15-MS/s engineering-advancement state can authorize Stage
 The earlier compatibility-profile index is
 `manifests/starlink-pss15-track-one-dnm-v3-hardware.yaml`; the native,
 rate-locked successor is
-`manifests/starlink-pss15-track-one-dnm-v5-native9363-hardware.yaml`. The native
-lifecycle used PPU `10ae7c74bb85a0e31f01c308bda8e62209b3c0b2`; exact RX-only
-rate attestation, the tracker transaction, and final canonical setup used PPU
-`main` `c70d46bb2d413d1061a78dfb685fb2483b111514`. That commit passes 1,328
-tests with 11 skips, Ruff, mypy, and package builds. The selected radio ended on
-persistent
+`manifests/starlink-pss15-track-one-dnm-v5-native9363-hardware.yaml`, read with
+its retained tool-provenance correction
+`manifests/starlink-pss15-track-one-dnm-v6-tool-provenance-erratum.yaml`. The
+native lifecycle used PPU `10ae7c74bb85a0e31f01c308bda8e62209b3c0b2`;
+exact RX-only rate attestation, the tracker transaction, and final canonical
+setup used PPU `main` `c70d46bb420de05112f2e60052025606321fc8f0`. That commit
+passes 1,328 tests with 11 skips, Ruff, mypy, and package builds. The selected
+radio ended on persistent
 `v0.48-plutoplus-spf-iq-direct-async-v3`, verified `ad9361-2r2t`, four RX scan
 elements, and quiescent TX outputs.
 
@@ -651,7 +653,7 @@ Every rate must pass all of these common gates:
 Recovery is an always-run safety epilogue on success, failure, abort, tool
 crash, or operator interruption, not merely the last successful campaign gate.
 The emergency implementation is pinned to known-good merged PPU commit
-`c70d46bb2d413d1061a78dfb685fb2483b111514`, which preserves the recovery
+`c70d46bb420de05112f2e60052025606321fc8f0`, which preserves the recovery
 fixtures and has now exercised exact RX-only rate proof plus final canonical
 setup on the selected hardware. The epilogue closes buffers, stops detector
 work, performs bounded route cleanup, reconciles receipts, uses

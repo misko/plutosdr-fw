@@ -1,0 +1,59 @@
+# Erratum for the native-AD9363A Stage-15 hardware checkpoint. The published
+# v5 checkpoint is retained byte-for-byte so its tag remains auditable.
+#
+# This record corrects one malformed full PPU Git object ID that was copied into
+# two private JSON evidence files and then into v5. It changes no measurement,
+# counter, firmware, radio-state, or qualification claim. DO NOT MERGE, RELEASE,
+# OR PERSISTENTLY FLASH the experimental firmware identified by v5.
+
+schema: plutosdr-fw.hardware-evidence-erratum
+schema_version: 1
+release_state: ram-only-hardware-checkpoint-erratum
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+
+corrects_checkpoint: starlink-pss15-track-one-dnm-v5-native9363-hardware.yaml
+corrects_checkpoint_sha256: 7c834a03845d7f4004524c972323d9c4da5f26a5dbd35ed2cc497e74fc9ef3a8
+corrects_checkpoint_commit: dbc4f554e47f9eeac1c39f540547408e443204d7
+corrects_checkpoint_tag: starlink-rx-only-dnm-v1-evidence/firmware-pss15-track-one-v5-native9363-hardware
+correction_scope: tool-source-commit-metadata-only
+
+incorrect_tool_source_commit: c70d46bb2d413d1061a78dfb685fb2483b111514
+incorrect_tool_source_commit_is_git_object: false
+correct_tool_source_commit: c70d46bb420de05112f2e60052025606321fc8f0
+correct_tool_source_commit_subject: "hardware: support source-rate proof on RX-only images"
+correct_tool_source_commit_local_main_verified: true
+correct_tool_source_commit_origin_main_verified: true
+
+affected_private_evidence:
+  - schema: pluto-plus-utils.source-locked-rx-rate-evidence.v1
+    sha256: 060b6870a074a199bf11af059868dbf24ad484c243b690a768bda612b133ad3e
+    affected_field: tool_source_commit
+  - schema: pluto-plus-utils.stage15-tracker-transaction-evidence.v1
+    sha256: c1eb66357b5b55e511caecaea003064929180ca0a4de711f8834458e55bb7461
+    affected_field: tool_source_commit
+
+unaffected_lifecycle_tool_source_commit: 10ae7c74bb85a0e31f01c308bda8e62209b3c0b2
+unaffected_ram_receipt_sha256: 644df150abb3f6202503da6b06620169168fabe8f29493b71342e67396115e93
+unaffected_recovery_receipt_sha256: 9a99190d68d23ddb3fc2e7fcbde31827b2e96a47d149af0c377d37f76a083d5c
+unaffected_final_setup_receipt_sha256: adb26f1ba17d5b2a00a21d2e297d7678a9d3db4f7ab5793d167a3ccc7863b798
+
+measurement_values_changed: false
+firmware_identity_changed: false
+radio_identity_changed: false
+hardware_claims_expanded: false
+over_the_air_starlink_pss_detected: false
+sss_qualified: false
+
+qualification_utility_tests_passed: 1328
+qualification_utility_tests_skipped: 11
+qualification_utility_ruff: PASS
+qualification_utility_mypy: PASS
+qualification_utility_build: PASS
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+final_persistent_firmware: v0.48-plutoplus-spf-iq-direct-async-v3
+final_runtime_target: ad9361-2r2t
+final_route_release_verified: true
+final_control_daemon_stopped: true
