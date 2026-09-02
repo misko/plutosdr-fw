@@ -74,6 +74,14 @@ window, byte-exact observation of the injected 130 samples in RX DMA, sustained
 error-free scheduled operation, and the mandatory persistent 2R2T recovery.
 It is not an over-the-air PSS, frame-alignment, or SSS result.
 
+The ABI 1.2 source-locked RAM-only package also passes offline container
+qualification. Its DFU SHA-256 is
+`e407f7366e8745713ce582217fdcdae90fea2dbce271017cb5638c14fc2a1a7a`;
+the extracted FPGA payload is byte-identical to the qualified XSA bitstream,
+the packed rootfs contains the exact ABI 1.2 controller and fixtures, and
+`/opt/VERSIONS` names the immutable DNM source locks. The package remains
+hardware-unqualified and persistent-flash-ineligible.
+
 The earlier compatibility-profile index is
 `manifests/starlink-pss15-track-one-dnm-v3-hardware.yaml`; the native,
 rate-locked successor is
@@ -703,8 +711,8 @@ Current status ledger:
   and one passing hardware tracker transaction. Full DMA equivalence and the
   advanced CFO/trace modes remain pending. ABI 1.2 deterministic injection has
   passing standalone and 210-window real replay, a tested static-ARM host API,
-  and a passing full route; firmware packaging and target-radio evidence remain
-  pending;
+  a passing full route, and a source-locked RAM-only package; target-radio
+  evidence remains pending;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
 - Gate 3: **PARTIAL RATE-LOCKED SAFE CHECKPOINT** for native
@@ -787,8 +795,8 @@ exact qualification-policy digest.
   offline for ABI 1.2: deterministic 130-sample accepted-path injection, shared
   tracker/RX-DMA fan-out structure, fail-closed arm/mismatch behavior,
   real-window injection replay, block-RAM CDC implementation, and a fresh full
-  route. Pending: source-locked package, byte-exact DMA observation, and
-  target-radio evidence.
+  route and package. Pending: byte-exact DMA observation and target-radio
+  evidence.
 - If the exact engine misses its budget, reduce parallelism or scheduling while
   preserving numerical behavior. Do not weaken oracle agreement.
 

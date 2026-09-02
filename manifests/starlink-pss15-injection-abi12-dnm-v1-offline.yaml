@@ -1,0 +1,182 @@
+# Immutable offline evidence for the Stage-15 deterministic accepted-sample
+# injection ABI 1.2 firmware package.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This image is eligible only
+# for the pluto-plus-utils candidate-plan.v2 RAM lifecycle on the exact serial
+# and native ad9363a-1r1t prerequisite below, with mandatory persistent
+# recovery. Hardware qualification has not happened yet.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+release_state: ram-only-candidate
+do_not_merge: true
+do_not_release: true
+ram_boot_eligible: true
+persistent_flash_eligible: false
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_candidate_schema: pluto-plus-utils.release-candidate-plan.v2
+qualification_policy_profile: rx-only-v1
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_main_commit: c70d46bb420de05112f2e60052025606321fc8f0
+qualification_utility_version: 0.1.0
+
+release_tag: starlink-rx-only-dnm-v1-source/firmware-pss15-injection-abi12-v1
+asset_name: starlink-pss15-injection-abi12-v1-pluto.dfu
+image_url: unpublished-local-only
+image_sha256: e407f7366e8745713ce582217fdcdae90fea2dbce271017cb5638c14fc2a1a7a
+image_size: 12843983
+fit_body_sha256: 327a70f2faf865f40573ed479cbb2be93c1ad0ac2f33362446f08124d2092b5b
+fit_body_size: 12843967
+device_fw: starlink-rx-only-dnm-v1-source/firmware-pss15-injection-abi12-v1
+
+frm_asset_name: starlink-pss15-injection-abi12-v1-pluto.frm
+frm_sha256: cb97ab1c1c93847e6f7e4b580991e9e569e1859b73cf38a250f46973f088310c
+frm_size: 12844000
+itb_sha256: 327a70f2faf865f40573ed479cbb2be93c1ad0ac2f33362446f08124d2092b5b
+itb_md5: b0ea1c64b10a3dbce4d72f7dd243677a
+itb_size: 12843967
+
+source_manifest_name: starlink-pss15-injection-abi12-dnm-v1-source.yaml
+source_manifest_sha256: 3c4fcdf283526932051b7213344791be24d7d1adea2606769c3fcf6a6fd278e2
+
+firmware_source: 279cc4f1a5a3dbcea1eda31d8eec29ed5b4857b7
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-injection-abi12-v1
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_hdl: ecf2ee383e86dced8189964ab4c6b28a47ee208f
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_rtl_source: e106eabf79245f394fe1ef43fc4a274779e9fc0a
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+
+versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3-evidence
+versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1
+versions_linux: starlink-rx-only-dnm-v1-source/linux-v2
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+versions_file_sha256: 2f4fbb0f2d2c7620c1d0d0c56eb4d6967357dc652e31eb32873f2f4e140bcb5c
+
+tracker_identification: 0x50535354
+tracker_version: 0x00010002
+tracker_rate_msps: 15
+tracker_geometry: 0x003d8242
+tracker_capabilities: 0x0000003d
+tracker_mmio_base: 0x79030000
+tracker_raw_lags: 65
+tracker_qualified_lags: 61
+tracker_lag_min: -30
+tracker_lag_max: 30
+tracker_capture_samples: 130
+tracker_taps: 66
+tracker_minimum_lead_samples: 64
+tracker_command_fifo_depth: 8
+
+injection_fixture_samples: 130
+injection_positive_fixture_sha256: ae29a3fa0bcc63ea55c4a2ae87ecb90f3e28a13d9a7c6f51c8b4640f5029e083
+injection_generation: 0x1a120001
+injection_hardware_minimum_lead_samples: 64
+injection_host_minimum_lead_samples: 65536
+injection_shared_consumers: tracker-and-rx-dma-cpack
+injection_substituted_fields: iq-only
+injection_source_derived_fields: strobe-enable-index-timestamp
+injection_fixture_storage: one-dual-clock-RAMB18E1
+injection_positive_packet0_sha256: ab4c2b0292d951ec5ad35bd536249fc90ab3ecd8f2d182a54fa672bf1c7fdfc6
+injection_oracle_rejection_window1_sha256: 83006877c4827e9b23a9fe9d8e774863b4e3533c9c2e6f978d92d5fcb27df283
+injection_oracle_rejection_packet1_sha256: d7a8a21afbe73671592afc97efdf5e8e8ac3249790f04a86bd64e6c5e64fc9a3
+injection_oracle_rejection_rule: "window 1 must match packet 1 invariants and must not match packet 0 invariants"
+
+wrapper_replay_windows: 210
+wrapper_replay_frozen_lag_matches: 210
+wrapper_replay_injected_window0_samples: 130
+wrapper_replay_direct_windows: 209
+wrapper_replay_verdict: PASS
+standalone_injection_mux_verdict: PASS
+host_api_selftest_verdict: PASS
+host_api_contract: "1.2"
+host_api_radio_serial_guard: mandatory-before-devmem
+host_api_default_lead_samples: 1000000
+host_api_minimum_lead_samples: 65536
+host_api_static_binary_sha256: 6609a7e8e04b76e0fc5b911936a60c30b0685942c0b8e2a03f18d0e7b562aa1f
+host_api_static_binary_size: 4248048
+packed_host_api_binary_sha256: acba53d793aa16027a74438167b5bee31b8702e0bf9ada943b72b7a38771cdfe
+packed_host_api_binary_size: 34108
+coefficient_fixture_sha256: c660bf9a60fc112697a5939db4682e55a0ce9b5ef8c99f2e4dee7e2b328d62c2
+wrapper_replay_provenance_sha256: 861950266dd8dff60b886afb20863c98f8fad1c7f7509724ba40770a015d3422
+
+fpga_bitstream_md5: e509c91dad2909bf2e2c53bb6e4954a0
+fpga_bitstream_sha256: a92415ed08d03c9fccbcdac0d24c91835c7d8f701058d8383e257f0f0381bbf6
+fpga_bitstream_size: 971256
+xsa_sha256: b8270e4789a9164b78dbccac19de0a6219083a65e736be045cbfc92fdf22b657
+xsa_size: 724439
+routed_dcp_sha256: c8631df82584b7b2c418603e936a700bb6c7c5ce66d2bf8446a7eb18a421eae6
+routed_dcp_size: 11742931
+linux_kernel_md5: 793c0d3f2a770ff9dd80c4d3b9723f51
+linux_kernel_sha256: 3eb081ede0e6155969c5b1ff215f6cc8280f2d6256d9af33bcf610cd439c8fd9
+linux_kernel_size: 4570928
+ramdisk_md5: e645cbf32004558fc9d7be8ea4761cfa
+rootfs_sha256: c4e32959569c828a4a42f2080917cdd3c1ff3b3cbd5b9b20494302c2e4763ce0
+rootfs_size: 7225843
+dtb_reva_sha256: 360455e7bb0ab1c5d080a61dbb6bf7481d50a6b510e7e9887eb74922e9d290a6
+dtb_revb_sha256: d2255d934e611cfb63f288f6767c3300d9f1d430ae15987c04ce4ce3c59e6c49
+dtb_revc_sha256: 909c8499e492abb3269e5521511c55c29a514380c11e7f1145d19c83f414f01d
+fit_description: Configuration to load fpga before Kernel
+dfu_vendor_id: 0x0456
+dfu_product_id: 0xb673
+dfu_suffix_crc: 0x6bf33749
+
+root_device_tree_marker: misko,rx-only-fpga
+rx_dma_dt_state: enabled
+tx_dma_dt_state: disabled
+dds_dt_state: disabled
+tandem_dt_state: disabled
+tx_dma_hierarchies: 0
+kernel_devmem_enabled: true
+
+integrated_route_verdict: PASS
+routed_wns_ns: 0.328
+routed_whs_ns: 0.009
+tracker_bus_skew_met: 3
+tracker_bus_skew_violated: 0
+gray_index_skew_ns: 1.851
+telemetry_payload_skew_ns: 1.692
+injection_start_payload_skew_ns: 1.740
+tracker_critical_cdc_rows: 0
+route_errors: 0
+tracker_dsp48e1: 3
+tracker_ramb18e1: 4
+tracker_ramb36e1: 4
+route_summary_sha256: 0b188045dc33a66a5a1e0507b5c4f7a5974927f4ca62c51fc90041821ac57167
+route_bus_skew_report_sha256: 0f09843f41aed853b753d0b171bfdada66a0a29a6a48adfc5efb706922192375
+route_cdc_report_sha256: 8f1ee51b63f6da13ff8f76eabe643a239e70b9e7acf94c5486f9e0bf649183b4
+route_timing_report_sha256: 8efac71d7ed80a7fa52178c916f841432ebf0135b52543811258a494f9aa3496
+
+build_xsa_mode: prebuilt-source-locked
+build_command: "make HAVE_VIVADO=0 SKIP_LEGAL=1 RELEASE_VERSION=starlink-rx-only-dnm-v1-source/firmware-pss15-injection-abi12-v1 XSA_FILE=hdl/projects/pluto/pluto.sdk/system_top.xsa build/pluto.frm build/pluto.dfu"
+host_gcc: gcc-15.2.0
+host_make: make-4.4.1
+host_dfu_suffix: dfu-util-0.11
+vivado: 2022.2-build-3671981
+
+packaging_verdict: PASS_OFFLINE
+container_verification_verdict: PASS_OFFLINE
+runtime_contract_verdict: PASS_OFFLINE
+hardware_qualified: false
+hardware_injection_qualified: false
+hardware_dma_injection_qualified: false
+over_the_air_starlink_pss_detected: false
+sss_qualified: false
+persistent_qualified: false
+persistent_flash_performed: false
+radio_contacted: false
+dfu_transfer_performed: false
