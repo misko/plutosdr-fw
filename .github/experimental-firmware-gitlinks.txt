@@ -11,3 +11,5 @@ hdl e0f99540df9cb289683db0317aa23eab4b9f6804 starlink-pss15-result-store-hdl-v1
 hdl 928dcc4e8e70cf61c6772c331142aedcd34e522d starlink-pss15-track-one-hdl-v1
 hdl 278d87953cf169d0456f0408be9fa549bb3bddcc starlink-pss15-split-reset-hdl-v1
 hdl d30e7b3c1128448b8cfa5a9dbfeec49154a136a5 starlink-pss15-axi-tracker-hdl-v1
+hdl e106eabf79245f394fe1ef43fc4a274779e9fc0a starlink-pss15-injection-abi12-hdl-v1
+hdl ecf2ee383e86dced8189964ab4c6b28a47ee208f starlink-pss15-injection-abi12-evidence-hdl-v1
