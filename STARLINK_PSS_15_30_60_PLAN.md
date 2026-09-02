@@ -283,6 +283,10 @@ Current control-plane evidence:
   passed all five checks, and merged to firmware `main` as
   `627f1f48e776e174095d34822a8ce3506ed0aebb` before this parent advanced to
   the FIFO pin;
+- guard PR #89 appended the exact composed IFFT-candidate score-path HDL pin,
+  passed all five checks, and merged to firmware `main` as
+  `e1966f5fe20370aa841e16143eb05c94152ea8eb` before this parent advanced to
+  the candidate-score-path pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -732,6 +736,31 @@ join, two-lane dispatcher/ordered merge, FFT binding/controller, phase-map
 connection, and complete route remain pending. Detailed evidence is in
 `reports/STARLINK_PSS15_RAW_RESULT_FIFO_V1.md`; no radio was contacted.
 
+The complete IFFT-candidate-to-score tail is now composed and source-locked at
+HDL commit `e12355ec0572c0637932fed0b3846c6a0b52a99c`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-candidate-score-path-v1`. A strict
+qualifier checks all 512 IFFT indexes, TLAST, exponents, block identity, and the
+447-sample next-block stride, discarding only indexes 0 through 64. The raw
+FIFO then joins each of the 447 absolute candidate starts to the exact energy
+cache response; miss, identity mismatch, orphan response, framing fault, and
+FIFO overflow all latch a quarantine and can never become a zero score. Two
+fixed-latency divider lanes preserve input order under output stalls. Five new
+tests cover two complete IFFT blocks, 1,000 one-per-clock energy joins, 1,500
+ordered two-lane ratios, 4,112 independent arbitrary-precision raw-to-score
+vectors, and a real-energy-cache one-block integration. The integrated block
+accepts all 512 dense IFFT outputs without backpressure, produces 447 exact
+scores, peaks at 344 of 512 FIFO entries, and publishes no score after a forced
+cache miss. Vivado 2022.2 post-opt OOC at 100 MHz for the composed tail uses
+1,968 LUTs, 1,827 registers, exactly two RAMB36E1 tiles, no RAMB18E1, and four
+DSP48E1s, with setup WNS `+0.633 ns`, hold WHS `+0.265 ns`, zero methodology
+violations, and no nonempty `check_timing` category. Replacing the prior
+independent FIFO/preparation/two-divider sum with this composed result gives an
+isolated planning subtotal of 7,850 LUTs, 11,928 registers, 37.5 BRAM tiles,
+and 32 DSPs. The generated XFFT wrapper/controller, coefficient ROM, complete
+CI16 IQ-to-score replay, phase-map connection, full RX-only route, and hardware
+qualification remain pending. Detailed evidence is in
+`reports/STARLINK_PSS15_CANDIDATE_SCORE_PATH_V1.md`; no radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -1102,6 +1131,14 @@ builds. Starlink code is not part of any PPU commit.
   two-RAMB36 inference, and positive 100 MHz post-opt OOC timing. The narrow
   OOC hold margin remains a composed-route risk; IFFT result qualification,
   indexed-energy joining, and two-lane score composition remain pending.
+- Complete for the composed IFFT-candidate-to-score tail: strict 512-result
+  framing qualification, 65-result overlap-save discard, absolute-indexed
+  energy join, fail-closed miss/mismatch/orphan handling, 512-entry burst FIFO,
+  exact exponent-aware ratio, two ordered divider lanes, 4,112-vector integer
+  oracle replay, real-energy-cache one-block composition, bounded 344-entry
+  measured occupancy, and positive 100 MHz post-opt OOC setup/hold timing. The
+  XFFT wrapper/controller, coefficient ROM, CI16 IQ-to-score composition,
+  phase-map connection, and full route remain pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

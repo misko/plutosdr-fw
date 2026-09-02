@@ -136,14 +136,35 @@ def test_raw_result_fifo_manifest_is_safe_and_binds_sources() -> None:
     assert "hardware_qualified: false" in manifest
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
-    historical_shared_files = {"acquisition_test_runner_sha256"}
+    historical_shared_files = {
+        "acquisition_test_runner_sha256",
+        "acquisition_hdl_readme_sha256",
+        "raw_result_fifo_evidence_test_sha256",
+        "starlink_plan_sha256",
+    }
     for field, relative in bound_files.items():
         if field in historical_shared_files:
             continue
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
-    # The living runner advances with the next independently checkpointed RTL
-    # slice. Preserve the raw-FIFO checkpoint's reviewed runner digest.
+    # These living files advance with later independently checkpointed slices.
+    # Preserve the raw-FIFO checkpoint's reviewed historical digests instead
+    # of comparing those records to the current branch tips.
     assert (
         "acquisition_test_runner_sha256: "
         "d8b1adb8152919f90b927c0026dd78da4293fee0356750272e225ec86063d688" in manifest
+    )
+    assert (
+        "acquisition_hdl_readme_sha256: "
+        "b571ce8e2b039b320b0a140ea4806f8c6daec0caac019a4b9fd9eabae79b0b6f"
+        in manifest
+    )
+    assert (
+        "raw_result_fifo_evidence_test_sha256: "
+        "c5bddbfe7d8211a5dc39eb6afeb49f445422e29b5088b9a7db2acd9267924cd3"
+        in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "3871e0af0fe9c5de86b6d78cb1cd38c92e47cb3bf3bfa0e0901c2403db1fe33c"
+        in manifest
     )
