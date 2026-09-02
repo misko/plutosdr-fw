@@ -1,0 +1,60 @@
+# Eligibility record for the native-AD9363A Stage-15 RAM trial.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This record changes no firmware
+# bytes. It permits the already-qualified immutable DFU below to enter only the
+# pluto-plus-utils candidate-plan.v2 RAM lifecycle on the exact serial and
+# native ad9363a-1r1t prerequisite below, with mandatory persistent recovery.
+# It is not hardware-detection evidence.
+
+schema: plutosdr-fw.ram-trial-eligibility
+schema_version: 1
+release_state: ram-only-candidate
+do_not_merge: true
+do_not_release: true
+ram_boot_eligible: true
+persistent_flash_eligible: false
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_usb_topology: 5-2
+qualification_runtime_target: ad9363a-1r1t
+qualification_physical_rfic_record: AD9363A
+qualification_candidate_schema: pluto-plus-utils.release-candidate-plan.v2
+qualification_policy_profile: rx-only-v1
+mandatory_recovery: persistent-reset
+mandatory_final_setup_target: ad9361-2r2t
+
+firmware_source: df111429a56292011eefc66d3fae23fded0a80c5
+firmware_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v2
+device_fw: starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v2
+image_sha256: 850c05de612549eb10b3572a3f36ac2e4d550fdc7288b4ce80803a52b2e37cb1
+image_size: 12837531
+fit_body_sha256: 6d2aaab891a1ffd115e5bc8ba5610a7e3b4f6c14ce42fc0e9680343f52323279
+fit_body_size: 12837515
+
+offline_manifest: starlink-pss15-track-one-dnm-v2-offline.yaml
+offline_manifest_sha256: a44550e7dbde6acae15703e1e97d01b861cfabb4ef86e4f85a6cf43d21e181ba
+prior_hardware_checkpoint: starlink-pss15-track-one-dnm-v3-hardware.yaml
+prior_hardware_checkpoint_sha256: 89ce9a73583fbaa34eeedf094f3ed4654ae36be201b36e4d1c93eef1c5523dbc
+
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_main_commit: 10ae7c74bb85a0e31f01c308bda8e62209b3c0b2
+qualification_utility_version: 0.1.0
+required_rate_method: configure_source_locked_rx_rate
+required_phy_rate_hz: 15000000
+required_capture_rate_hz: 15000000
+required_fpga_decimation_factor: 1
+required_fpga_decimation_bypass: true
+
+tracker_identification: 0x50535354
+tracker_version: 0x00010001
+tracker_rate_msps: 15
+tracker_geometry: 0x003d8242
+tracker_capabilities: 0x0000001d
+tracker_mmio_base: 0x79030000
+
+hardware_qualified: false
+hardware_injection_qualified: false
+over_the_air_starlink_pss_detected: false
+sss_qualified: false
+persistent_qualified: false
+persistent_flash_performed: false
