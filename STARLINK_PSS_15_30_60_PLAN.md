@@ -259,6 +259,10 @@ Current control-plane evidence:
   all five checks, and merged to firmware `main` as
   `ae9be3ec411eeebe0ee396b93c0f59e2d9d1940b` before this parent advanced to
   the selected v3 pin;
+- guard PR #83 appended the exact overlap-save scheduler HDL pin, passed all
+  five checks, and merged to firmware `main` as
+  `fed8a275c21abac4360b2a55a2f0bda8828efa4e` before this parent advanced to
+  the scheduler pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -587,6 +591,24 @@ search would duplicate the inverse path and 20-RAMB36 map and is deferred
 unless a complete-shell resource study justifies it. Detailed evidence is in
 `reports/STARLINK_PSS15_XFFT_BITACC_V1.md`; no Xilinx proprietary C-model file
 or generated IP is retained in source.
+
+The IP-independent overlap-save scheduler is now implemented and source-locked
+at HDL commit `2c9e564350e1c42d9aa5b14e7ee61929a754f1fd`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-overlap-scheduler-v1`. It accepts the
+non-backpressured, gap-tagged CI16 stream with 64-bit absolute indexes, retains
+2,048 samples in a two-RAMB36 ring, and emits exact 512-sample ready/valid FFT
+frames with 65 samples of overlap and a 447-sample stride. Two deterministic
+testbenches cover default-geometry 15-MS/s-equivalent cadence and backpressure,
+plus disable, gap, index, descriptor-capacity, and ring-retention restarts. All
+fail closed without publishing a partial frame. Vivado 2022.2 post-opt OOC at
+100 MHz uses 273 LUTs, 695 registers, exactly two RAMB36E1s, and zero DSPs, with
+setup WNS `+2.012 ns`, hold WHS `+0.011 ns`, zero methodology violations, and
+no nonempty `check_timing` category. Adding this slice to the isolated two-core
+XFFT and phase-map subtotal yields 5,193 LUTs, 9,111 registers, 33 BRAM tiles,
+and 18 DSPs before the multiplier, energy window, result FIFO, normalizer, and
+shell. This remains slice evidence: no XFFT is yet instantiated in the RTL, no
+score reaches the map, and no radio was contacted. Detailed evidence is in
+`reports/STARLINK_PSS15_OVERLAP_SCHEDULER_V1.md`.
 
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
@@ -921,6 +943,11 @@ builds. Starlink code is not part of any PPU commit.
   boundary, both kernel digests, all three real captures, maximum one-count
   score error, exact final phase/cadence/classification agreement, zero modeled
   overflow, and a generated one-core OOC resource/timing report.
+- Complete for the IP-independent input-scheduling checkpoint: exact
+  512/65/447 overlap contents, non-backpressured accepted-sample admission,
+  ready/valid output stalls, absolute start indexes, fail-closed lifecycle and
+  capacity restarts, two-RAMB36 inference, and 100 MHz post-opt OOC timing.
+  Binding generated XFFT IP and producing normalized scores remain pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

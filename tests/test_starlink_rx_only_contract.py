@@ -295,9 +295,6 @@ def test_continuous_phase_map_checkpoint_is_isolated_and_source_locked() -> None
             "hdl/library/starlink_pss_acquisition/tb/"
             "tb_starlink_pss_phase_map.sv"
         ),
-        "phase_map_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
-        ),
         "phase_map_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/run_phase_map_ooc.sh"
         ),
@@ -316,6 +313,15 @@ def test_continuous_phase_map_checkpoint_is_isolated_and_source_locked() -> None
     }
     for field, relative in hdl_bound_files.items():
         assert f"{field}: {_sha256(relative)}" in manifest
+
+    # The shared runner grows as later independently tested slices are added.
+    # Keep the phase-map checkpoint bound to its historical runner digest
+    # rather than silently rewriting the immutable v1 manifest.
+    assert (
+        "phase_map_test_runner_sha256: "
+        "f3dea923744c5d1c7ca1d549bfe788240b2b240952c0e1b5c1e4b006a9b8852b"
+        in manifest
+    )
 
     assert "parameter integer PHASE_BINS = 20000" in rtl
     assert "parameter integer TILE_FRAMES = 64" in rtl

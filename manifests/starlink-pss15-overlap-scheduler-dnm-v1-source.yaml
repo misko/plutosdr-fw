@@ -1,0 +1,121 @@
+# Source contract for the canonical 15 MS/s overlap-save input scheduler.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint schedules CI16 into FFT frames; it does not instantiate FFT
+# IP, calculate a normalized score, connect the phase map, or detect PSS.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-xfft-bitacc-dnm-v1-source.yaml
+supersedes_reason: "implement and synthesize the IP-independent continuous-IQ overlap-save scheduler without claiming an integrated score path"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: 2c9e564350e1c42d9aa5b14e7ee61929a754f1fd
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-overlap-scheduler-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/83
+firmware_main_gitlink_guard_merge_commit: fed8a275c21abac4360b2a55a2f0bda8828efa4e
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+scheduler_schema: starlink-pss15-overlap-scheduler-v1
+acquisition_sample_rate_hz: 15000000
+acquisition_fft_samples: 512
+acquisition_overlap_samples: 65
+acquisition_stride_samples: 447
+acquisition_valid_outputs_per_fft: 447
+scheduler_ring_samples: 2048
+scheduler_descriptor_queue_depth: 4
+scheduler_input_format: ci16
+scheduler_input_backpressured: false
+scheduler_output_protocol: ready_valid
+scheduler_absolute_index_bits: 64
+scheduler_memory_port_model: two_simple_dual_port_component_rams
+scheduler_gap_restart_fail_closed: true
+scheduler_index_restart_fail_closed: true
+scheduler_disable_abort_fail_closed: true
+scheduler_queue_overflow_restart_fail_closed: true
+scheduler_retention_overflow_restart_fail_closed: true
+
+scheduler_simulation_verdict: PASS
+scheduler_default_geometry_blocks_checked: 8
+scheduler_default_geometry_backpressure_checked: true
+scheduler_default_geometry_gap_restart_checked: true
+scheduler_small_geometry_completed_blocks_checked: 7
+scheduler_small_geometry_disable_abort_checked: true
+scheduler_small_geometry_queue_overflow_checked: true
+scheduler_small_geometry_retention_overflow_checked: true
+scheduler_small_geometry_index_restart_checked: true
+scheduler_small_geometry_gap_restart_checked: true
+
+scheduler_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 2.012
+ooc_hold_whs_ns: 0.011
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 273
+ooc_total_ffs: 695
+ooc_ramb36e1: 2
+ooc_ramb18e1: 0
+ooc_dsp48e1: 0
+
+isolated_planning_total_luts: 5193
+isolated_planning_total_ffs: 9111
+isolated_planning_total_bram_tiles: 33
+isolated_planning_total_dsp48e1: 18
+isolated_planning_total_includes: two_xfft_cores_phase_map_overlap_scheduler
+isolated_planning_total_excludes: spectrum_product_energy_window_result_fifo_normalizer_axi_cdc_shell_and_route_margin
+
+scheduler_rtl_sha256: 82954c57a82d6c3beed733fa42246aa2633eb0f5e951972e7c227616d9bce58d
+scheduler_default_testbench_sha256: da4543030e82c0c53d206987098507b8f1285db298cdada549cdfc4f9227564a
+scheduler_lifecycle_testbench_sha256: 91bcd62702485ef6ed827c85eff001cffcd07ff23a4fa8f64d26af46c143d24d
+acquisition_test_runner_sha256: a921c2abfc30743a4025b0013771045d5e05dde930253cca534803e3eec0a52e
+scheduler_ooc_runner_sha256: e29916abb3630de23e4c7f5f90352e24097270c6a63761a09edf7752094b11bf
+scheduler_ooc_xdc_sha256: 7798ae720c06c229bbd1f83fe698b7a55d99849e7f3d9affed72040eb0da3a3d
+scheduler_ooc_tcl_sha256: 226574e2be0d27baa66d0216cc07139309349caf7e798f0eb58b83c00de0ec71
+acquisition_hdl_readme_sha256: fa15055a5be911924496f89bb5d09c77522a957b75ae738a01accaefd92807ef
+scheduler_ooc_summary_sha256: 37682496c3f6edcee513c6c775aa42e0a5837defd5da98b791eda88baa4a60b3
+scheduler_report_sha256: a4319b8b0ef999112f932554d234374d732d3e4a9b4ca0bedffd87731b54ba0a
+scheduler_evidence_test_sha256: 31e73fd21bdfa27df4f09bedb45f0efe557513c721b4823e8cf64238c895e95b
+historical_phase_map_test_sha256: 7afc4187584cee61250764b032a0ec2d6404235ca484f936d625e6cf1571eb5d
+historical_xfft_test_sha256: 12064d700f399a45c5114d1ab1df1d54b27f900c4f2a702744d008c6f8d05881
+starlink_plan_sha256: d58748015c9157500aacc26161b1f487b77854a6f447f545f983ef9f8003e905
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_score_frontend_implemented: false
+rtl_fft_instantiated: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

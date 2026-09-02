@@ -94,9 +94,6 @@ def test_xfft_source_manifest_is_safe_and_binds_every_input() -> None:
         ),
         "starlink_oracle_init_sha256": "tests/starlink_oracle/__init__.py",
         "starlink_oracle_readme_sha256": "tests/starlink_oracle/README.md",
-        "xfft_evidence_test_sha256": (
-            "tests/test_starlink_xfft_bitacc_evidence.py"
-        ),
         "xfft_study_tool_sha256": "tools/starlink_xfft_bitacc_study.py",
         "xfft_ooc_tcl_sha256": "tools/starlink_xfft24_ooc.tcl",
         "xfft_ooc_runner_sha256": "tools/run_starlink_xfft24_ooc.sh",
@@ -107,7 +104,6 @@ def test_xfft_source_manifest_is_safe_and_binds_every_input() -> None:
             "reports/starlink-pss15-xfft24-ooc-summary.txt"
         ),
         "xfft_report_sha256": "reports/STARLINK_PSS15_XFFT_BITACC_V1.md",
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
 
     assert "do_not_merge: true" in manifest
@@ -121,3 +117,15 @@ def test_xfft_source_manifest_is_safe_and_binds_every_input() -> None:
     assert "hardware_qualified: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # The living 15/30/60 plan advances after this arithmetic-only checkpoint;
+    # its historical digest remains immutable in the superseded manifest.
+    assert (
+        "starlink_plan_sha256: "
+        "b837bbb92b1b6f9239761912b3cef7fbc785e720787428e04061c2011e5754e8"
+        in manifest
+    )
+    assert (
+        "xfft_evidence_test_sha256: "
+        "72e0555322c57720219847f9652440503f7c7e25075df6fffa112a09860a03dd"
+        in manifest
+    )
