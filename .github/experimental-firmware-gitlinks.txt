@@ -15,3 +15,6 @@ hdl e106eabf79245f394fe1ef43fc4a274779e9fc0a starlink-pss15-injection-abi12-hdl-
 hdl ecf2ee383e86dced8189964ab4c6b28a47ee208f starlink-pss15-injection-abi12-evidence-hdl-v1
 buildroot 875844d0dd2c2e9fa6cbf27f4fc7001f853e9d56 starlink-pss15-controller-buildroot-v1
 buildroot daf5ec3fe6b394337379394fa98a52815520d886 starlink-pss15-injection-abi12-buildroot-v1
+hdl 1e36384bbf54798a7778b22cd1a54bfb6828dc53 starlink-pss15-phase-map-hdl-v1
+hdl 77aefb265a88f1d1b746b7d6df4e45d0a3f10627 starlink-pss15-phase-map-hdl-v2
+hdl d291871923c6dc6cc2f30745d2e9d8a6abd3188f starlink-pss15-phase-map-hdl-v3
