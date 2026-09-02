@@ -279,6 +279,10 @@ Current control-plane evidence:
   passed all five checks, and merged to firmware `main` as
   `bfb0247a374724efde0589dcb259bb1396cf4abd` before this parent advanced to
   the preparation pin;
+- guard PR #88 appended the exact 512-entry raw IFFT-result FIFO HDL pin,
+  passed all five checks, and merged to firmware `main` as
+  `627f1f48e776e174095d34822a8ce3506ed0aebb` before this parent advanced to
+  the FIFO pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -708,6 +712,26 @@ two-lane dispatcher/ordered merge, FFT binding/controller, phase-map
 connection, and complete route remain pending. Detailed evidence is in
 `reports/STARLINK_PSS15_SCORE_PREPARE_V1.md`; no radio was contacted.
 
+The raw IFFT-result FIFO is now implemented and source-locked at HDL commit
+`7cba0eac1cd83e29846b812caca0f0dfee2523d4`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-raw-result-fifo-v1`. Its 512-entry,
+123-bit storage retains signed Q1.23 correlation, both block exponents,
+absolute candidate-start index, and block-last identity. The capacity includes
+the registered prefetch stage; memory contents are never bulk reset. A
+self-checking simulation accepts a complete 447-result inverse-FFT burst at
+one result/clock while its consumer is fully stalled, drains every payload bit
+in order under backpressure, checks 1,200 concurrent transfers, fills exactly
+512 entries, rejects the 513th without state mutation, and proves flush. Vivado
+2022.2 post-opt OOC at 100 MHz uses 79 LUTs, 42 registers, exactly two RAMB36E1
+tiles, no RAMB18E1, and no DSP48E1, with setup WNS `+3.342 ns`, hold WHS
+`+0.011 ns`, zero methodology violations, and no nonempty `check_timing`
+category. The isolated planning subtotal is now 7,720 LUTs, 11,480 registers,
+37.5 BRAM tiles, and 32 DSPs. The positive but narrow OOC hold result remains
+an explicit complete-route risk. IFFT result qualification, the indexed-energy
+join, two-lane dispatcher/ordered merge, FFT binding/controller, phase-map
+connection, and complete route remain pending. Detailed evidence is in
+`reports/STARLINK_PSS15_RAW_RESULT_FIFO_V1.md`; no radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -1072,6 +1096,12 @@ builds. Starlink code is not part of any PPU commit.
   unplaced setup margin remains a composed-route risk; the raw-result FIFO,
   indexed-energy join, two-lane dispatch/merge, and IQ-to-score replay remain
   pending.
+- Complete for the raw IFFT-result FIFO: 512 entries, exact 123-bit payload,
+  complete 447-result burst absorption with a fully stalled consumer,
+  concurrent read/write ordering, exact declared-capacity overflow, flush,
+  two-RAMB36 inference, and positive 100 MHz post-opt OOC timing. The narrow
+  OOC hold margin remains a composed-route risk; IFFT result qualification,
+  indexed-energy joining, and two-lane score composition remain pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

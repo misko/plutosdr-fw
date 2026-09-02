@@ -94,9 +94,6 @@ def test_score_prepare_manifest_is_safe_and_binds_sources() -> None:
         "score_prepare_vector_generator_sha256": (
             "hdl/library/starlink_pss_acquisition/tb/generate_score_prepare_vectors.py"
         ),
-        "acquisition_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
-        ),
         "score_prepare_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/run_score_prepare_ooc.sh"
         ),
@@ -106,17 +103,10 @@ def test_score_prepare_manifest_is_safe_and_binds_sources() -> None:
         "score_prepare_ooc_tcl_sha256": (
             "hdl/library/starlink_pss_acquisition/synthesize_score_prepare_ooc.tcl"
         ),
-        "acquisition_hdl_readme_sha256": (
-            "hdl/library/starlink_pss_acquisition/README.md"
-        ),
         "score_prepare_ooc_summary_sha256": (
             "reports/starlink-pss15-score-prepare-ooc-summary.txt"
         ),
         "score_prepare_report_sha256": ("reports/STARLINK_PSS15_SCORE_PREPARE_V1.md"),
-        "score_prepare_evidence_test_sha256": (
-            "tests/test_starlink_score_prepare_evidence.py"
-        ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
 
     assert "do_not_merge: true" in manifest
@@ -150,3 +140,22 @@ def test_score_prepare_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # Shared acquisition sources and the living plan advance with the next
+    # independently checkpointed slice. Preserve this manifest's historical
+    # digests instead of rewriting the preparation checkpoint.
+    assert (
+        "acquisition_test_runner_sha256: "
+        "f4e0b6646827c0d53e218787dc904d8bce58323a1d5c4a6661ee878fa088b130" in manifest
+    )
+    assert (
+        "acquisition_hdl_readme_sha256: "
+        "29ed1eefa0e6d2c60bde948f87c96f1b8f5fa182f62ee164c30faf66a732e2cf" in manifest
+    )
+    assert (
+        "score_prepare_evidence_test_sha256: "
+        "8cfa7b1ef78b7a874551899f6a562c3416cdf2022a167a5e2e3151c1531ddfa7" in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "785eac0bce06cff4f8b97488386ffc8ccbb493e68f10a0949aecb5dc8326289d" in manifest
+    )

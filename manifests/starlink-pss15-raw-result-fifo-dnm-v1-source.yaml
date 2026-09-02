@@ -1,0 +1,125 @@
+# Source contract for the 512-entry raw overlap-save IFFT-result FIFO.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint stores qualified results; it does not qualify IFFT indexes,
+# join energy, dispatch score lanes, bind FFT IP, feed the map, or detect PSS.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-score-prepare-dnm-v1-source.yaml
+supersedes_reason: "implement and synthesize the full one-block raw IFFT-result burst buffer without claiming IFFT qualification, indexed energy joining, or score-stream composition"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: 7cba0eac1cd83e29846b812caca0f0dfee2523d4
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-raw-result-fifo-v1
+submodule_hdl_quantulum: cc58742a96fbfe642ec7b358b56b309b9577ddea
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/88
+firmware_main_gitlink_guard_merge_commit: 627f1f48e776e174095d34822a8ce3506ed0aebb
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+raw_result_fifo_schema: starlink-pss15-raw-result-fifo-v1
+raw_result_fifo_depth: 512
+raw_result_fifo_payload_bits: 123
+raw_result_fifo_qualified_ifft_burst_results: 447
+raw_result_fifo_correlation_components: two_signed_q1_23
+raw_result_fifo_forward_exponent_bits: 5
+raw_result_fifo_inverse_exponent_bits: 5
+raw_result_fifo_start_index_bits: 64
+raw_result_fifo_block_last_bits: 1
+raw_result_fifo_visible_capacity_includes_output_prefetch: true
+raw_result_fifo_full_replacement_on_output_accept: true
+raw_result_fifo_overflow_mutates_state: false
+raw_result_fifo_memory_bulk_reset: false
+raw_result_fifo_output_stall_stable: true
+raw_result_fifo_flush_fail_closed: true
+
+raw_result_fifo_simulation_verdict: PASS
+raw_result_fifo_complete_stalled_burst_results_checked: 447
+raw_result_fifo_complete_stalled_burst_backpressure_events: 0
+raw_result_fifo_concurrent_results_checked: 1200
+raw_result_fifo_declared_capacity_checked: 512
+raw_result_fifo_513th_input_overflow_checked: true
+raw_result_fifo_payload_order_checked: true
+raw_result_fifo_output_stability_checked: true
+raw_result_fifo_simultaneous_io_checked: true
+raw_result_fifo_flush_checked: true
+
+raw_result_fifo_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 3.342
+ooc_hold_whs_ns: 0.011
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 79
+ooc_total_ffs: 42
+ooc_ramb36e1: 2
+ooc_ramb18e1: 0
+ooc_bram_tiles: 2
+ooc_dsp48e1: 0
+ooc_complete_route_risk_due_narrow_unplaced_hold_margin: true
+
+isolated_planning_total_luts: 7720
+isolated_planning_total_ffs: 11480
+isolated_planning_total_bram_tiles: 37.5
+isolated_planning_total_dsp48e1: 32
+isolated_planning_total_includes: two_xfft_cores_phase_map_overlap_scheduler_spectrum_product_energy_cache_score_prepare_raw_result_fifo_and_two_score_divider_lanes
+isolated_planning_total_excludes: kernel_rom_fft_controller_ifft_qualifier_energy_join_dispatcher_ordered_merge_axi_cdc_shell_and_route_margin
+
+raw_result_fifo_rtl_sha256: 146215dea3ab7fe9ffa1aceed84b8bd898968c53dc510386e8b4ccb71da73a68
+raw_result_fifo_testbench_sha256: 41173f9f58070c7d002a57e3ee84179773b77bc4bfae6d5bbe81d73b25293325
+acquisition_test_runner_sha256: d8b1adb8152919f90b927c0026dd78da4293fee0356750272e225ec86063d688
+raw_result_fifo_ooc_runner_sha256: 3eab5c1b0dc02a5b20b9f006ced3b7246a5c5869f22f289eeb4c30b57c7d3f10
+raw_result_fifo_ooc_xdc_sha256: 78568bdac831c6fa13c37ac91f98375cf63549556d6eee54173618b53f9505ff
+raw_result_fifo_ooc_tcl_sha256: 47f70af3ed874a34d0dc49b18632cc23dbe89b09fa94d042ab75c73ca03151e4
+acquisition_hdl_readme_sha256: b571ce8e2b039b320b0a140ea4806f8c6daec0caac019a4b9fd9eabae79b0b6f
+raw_result_fifo_ooc_summary_sha256: 8226e38e2c7739350173a335129cd2398e4eb038091fc7d1ea6312f70abe5a38
+raw_result_fifo_report_sha256: c3570688e8dde88aa9acf914d15ff1aa08aee8170c67afba4f48e7c07b112dc2
+raw_result_fifo_evidence_test_sha256: c5bddbfe7d8211a5dc39eb6afeb49f445422e29b5088b9a7db2acd9267924cd3
+starlink_plan_sha256: 3871e0af0fe9c5de86b6d78cb1cd38c92e47cb3bf3bfa0e0901c2403db1fe33c
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_energy_cache_implemented: true
+rtl_score_divider_lane_implemented: true
+rtl_score_preprocessor_implemented: true
+rtl_raw_result_fifo_implemented: true
+rtl_ifft_qualifier_implemented: false
+rtl_energy_join_implemented: false
+rtl_two_lane_dispatch_implemented: false
+rtl_ordered_score_merge_implemented: false
+rtl_fft_instantiated: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false
