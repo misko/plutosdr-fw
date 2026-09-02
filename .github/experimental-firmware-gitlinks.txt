@@ -25,3 +25,4 @@ hdl 8755d94eefb65cba6155a28c8a4c9c3f2ec69e41 starlink-pss15-score-divider-hdl-v1
 hdl 078e725389c8c790e1f3c3c612b242697f87de77 starlink-pss15-score-prepare-hdl-v1
 hdl 7cba0eac1cd83e29846b812caca0f0dfee2523d4 starlink-pss15-raw-result-fifo-hdl-v1
 hdl e12355ec0572c0637932fed0b3846c6a0b52a99c starlink-pss15-candidate-score-path-hdl-v1
+hdl b8657819e56c9a2b836319e9b9b8596fc4ce3204 starlink-pss15-xfft-block-adapter-hdl-v1
