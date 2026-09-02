@@ -122,28 +122,32 @@ renamed-content promotion guard gate.
 The native waveform model is 240 MS/s, 1024 useful samples, 32 samples of
 inverted prefix, and a 750 Hz frame rate. Its exact integer projections are:
 
-| RX/DMA rate | Projected useful/prefix/symbol at RX rate | Samples/frame | Direct taps/lags | One-bank correlation tap-cycles/s | Optional measured fallback |
+| RX/DMA rate | Projected useful/prefix/symbol at RX rate | Samples/frame | Direct taps / qualified lags / raw guard lags | One-bank raw correlation tap-cycles/s | Optional measured fallback |
 |---:|---:|---:|---:|---:|---:|
-| 15 MS/s | 64 / 2 / 66 | 20,000 | 66 / 65 (`+/-32`) | 3.2175 M | none |
-| 30 MS/s | 128 / 4 / 132 | 40,000 | 132 / 129 (`+/-64`) | 12.771 M | x2 to 15 only if measured better |
-| 60 MS/s | 256 / 8 / 264 | 80,000 | 264 / 257 (`+/-128`) | 50.886 M | x4 to 15 only if measured better |
+| 15 MS/s | 64 / 2 / 66 | 20,000 | 66 / 61 (`+/-30`) / 65 (`+/-32`) | 3.2175 M | none |
+| 30 MS/s | 128 / 4 / 132 | 40,000 | 132 / 121 (`+/-60`) / 129 (`+/-64`) | 12.771 M | x2 to 15 only if measured better |
+| 60 MS/s | 256 / 8 / 264 | 80,000 | 264 / 241 (`+/-120`) / 257 (`+/-128`) | 50.886 M | x4 to 15 only if measured better |
 
 The default 30 and 60 MS/s design is sparse, candidate-gated direct correlation
 at the full RX rate; it does not process the continuous stream. The search
-half-width is fixed in time at `32/15e6 = 2.133333 us`. For rate multiplier
-`m` in `{1,2,4}`, taps are `66m`, half-width is `32m`, lags are `64m+1`, and
-capture length is taps plus lags minus one: 130, 260, or 520 samples. This keeps
-the capture interval at 8.667 us and yields ranges `p-32..p+97`,
-`p-64..p+195`, and `p-128..p+391`.
+qualified half-width is fixed in time at `30/15e6 = 2 us`. For rate multiplier
+`m` in `{1,2,4}`, taps are `66m` and the qualified winner aperture has
+`60m+1` lags. The capture/raw-trace guard remains `32m` on either side, so the
+raw trace has `64m+1` lags and capture length 130, 260, or 520 samples. This
+keeps the capture interval at 8.667 us and yields guarded ranges
+`p-32..p+97`, `p-64..p+195`, and `p-128..p+391`. Guard tuples are diagnostic
+only and cannot win `TRACK_ONE`.
 
 Correlation tap count alone is not a schedule. The direct design computes each
 captured sample energy once, forms the first `Ex` window, then updates it by
 `Ex[k+1] = Ex[k] - e[k] + e[k+N]`; validated coefficient `Eh` is cached at
-commit. With `N=66m`, `L=64m+1`, and capture length `M=N+L-1`, the conservative
-full-aperture budget is `M + (L-1) + B*L*N` cycles for `B` coefficient banks,
+commit. With `N=66m`, raw guard count `Lraw=64m+1`, qualified count
+`Lq=60m+1`, and capture length `M=N+Lraw-1`, the currently implemented
+conservative budget is `M + (Lraw-1) + B*Lraw*N` cycles for `B` coefficient banks,
 before small wrapper/publication overhead. Here `B=3` and `B=9` mean all lags
 for every bank; they are validation/diagnostic modes, not the one-lag CFO
-refiner:
+refiner. A later engine may avoid computing the outer guard tuples, but no rate
+gate takes credit for that optimization before bit-exact and routed evidence:
 
 | Rate | `TRACK_ONE` | Three-bank full-aperture validation | Nine-bank full-aperture diagnostic | Declared scheduling consequence |
 |---:|---:|---:|---:|---|
@@ -235,19 +239,22 @@ Consequently:
    maximize nine banks independently on every frame; that changes the oracle
    and preferentially selects noise.
 3. Hand only bounded predicted windows to a candidate-gated FPGA exact
-   correlator. The engine supports 65 trial lags `[-32,+32]` and 66 template
-   taps. Normal one-CFO tracking is 3,217,500 complex tap-MACs/s. An explicitly
+   correlator. The current engine emits 65 raw guard lags `[-32,+32]` with 66
+   template taps, but `TRACK_ONE` admits only the frozen 61 lags `[-30,+30]`
+   to its winner reducer. Normal one-CFO tracking currently performs 3,217,500
+   complex tap-MACs/s. An explicitly
    commanded three-bank check is 9,652,500, and an all-nine diagnostic is
    28,957,500. Blind acquisition remains on the host. A three-DSP, one-complex-
    tap-per-cycle engine has ample scheduling margin at 100 MHz; generated OOC
    and full-route reports, not this arithmetic, decide acceptance.
-4. Deliver the exact engine in two steps. First publish all 65 raw
+4. Deliver the exact engine in two steps. First preserve all 65 raw
    `{lag,index,C_re,C_im,Ex,Eh}` tuples for one host-selected Q1.15 coefficient
    bank so the host can reproduce every score and tie. Then add the exact
    normalized reducer, nine-bank one-lag CFO refinement, adjacent-bank checks,
    and trace mode. Coefficients are host-quantized with round-to-nearest,
    ties-to-even, digest- and CRC-bound, and never synthesized by a runtime NCO.
-   The engine reports candidate measurements only; multi-frame alignment and
+   The raw trace remains separately available for diagnostics; normal
+   `TRACK_ONE` reduces only `[-30,+30]`. The engine reports candidate measurements only; multi-frame alignment and
    false-alarm policy remain on the host.
 5. Scale the sparse direct engine first at 30 and 60 MS/s: 132 taps/129 lags,
    then 264 taps/257 lags, with sliding `Ex` and cached `Eh`. An independently
@@ -277,7 +284,7 @@ stored raw timestamp at its first tap; no timestamp is reconstructed from
 pipeline latency. Disable, FIFO overflow, or a nonconsecutive accepted index
 flushes the job and increments a visible abort counter.
 
-The first wrapper ABI is now frozen for `TRACK_ONE`: software reads a coherent
+The corrected wrapper ABI 1.1 is frozen for `TRACK_ONE`: software reads a coherent
 64-bit accepted-sample index, submits a full-width center index/timestamp and
 request ID through a buffered command, and receives an immutable 26-word result
 packet through a level interrupt. The candidate queue has seven usable entries
@@ -313,12 +320,13 @@ per-lag energy prepasses with the sliding-`Ex` schedule above. A differential
 test must compare all raw tuples before and after that optimization.
 
 The exact engine replaces the diagnostic monitor in the 4 KiB AXI aperture at
-`0x79030000`; both are never present in the radio-candidate shell. ABI v1
+`0x79030000`; both are never present in the radio-candidate shell. ABI 1.1
 implements only `TRACK_ONE`, with a 66-tap shadow/active coefficient bank,
-commit generation and energy validation, double-buffered atomic results, and
-processed/aborted/overrun diagnostics. Live sample-domain binary counters were
-removed from offsets `0x84..0xb8` rather than exposed through a tearing CDC;
-those offsets remain reserved for a later atomic telemetry snapshot. Future
+61 qualified winner lags, commit generation and energy validation,
+double-buffered atomic results, and processed/aborted/overrun diagnostics.
+Offsets `0x84..0xb8` expose fourteen sample-domain counters only through an
+explicit toggle-requested 448-bit atomic snapshot, never as tearing live binary
+CDC. Future
 `CFO_REFINE`, `VALIDATE_BANKS`, and `SINGLE_SHOT_TRACE` modes require a new
 versioned capability/ABI extension and do not block the first one-bank radio
 trial. The host evidence bundle, not the FPGA register file, binds the template
@@ -327,7 +335,7 @@ SHA-256/CRC to the acknowledged coefficient generation.
 The original 3-DSP, 5-BRAM-equivalent, 2,500-LUT, 2,000-register target was a
 planning estimate, not an acceptance override. Routed Stage 15 establishes the
 real baseline: exactly 3 DSP48E1s and 5.5 BRAM tiles in the tracker hierarchy;
-the core OOC result is 4,268 LUTs and 3,565 registers. The complete shell still
+the corrected core OOC result is 4,267 LUTs and 3,565 registers. The complete shell still
 fits, but 30 and especially 60 MS/s must earn their geometry through fresh OOC
 and full-route evidence rather than scaling this estimate arithmetically.
 
@@ -423,7 +431,7 @@ after the source commit. Parent manifest
 `starlink-pss15-raw-dnm-v1-source.yaml` pins this exact graph and explicitly
 forbids building, booting, releasing, or flashing the still-isolated core.
 
-The integrated Stage-15 `TRACK_ONE` milestone is now HDL commit
+The superseded Stage-15 `TRACK_ONE` ABI 1.0 milestone was HDL commit
 `d30e7b3c1128448b8cfa5a9dbfeec49154a136a5` on
 `codex/starlink-rx-only-do-not-merge`, locked by annotated tag
 `starlink-rx-only-dnm-v1-source/hdl-pss15-track-one-v1`. It adds the
@@ -431,7 +439,7 @@ host-scheduled AXI wrapper,
 queued capture, cached `Eh`, sliding `Ex`, exact rational winner reducer, and
 atomic 26-word result publication; removes the diagnostic monitor and TX DMA;
 and remains elaboration-locked to 15 MS/s. The asynchronous-clock AXI test
-loads 66 coefficients, captures 130 tagged samples, evaluates all 65 lags,
+loads 66 coefficients, captures 130 tagged samples, evaluates all 65 raw lags,
 checks every result word, releases the level IRQ, and proves that sample reset
 flushes the whole epoch. The complete underlying scheduler/capture/correlator/
 reducer/result-store suite also passes.
@@ -447,11 +455,12 @@ routed DCP, bitstream, and XSA SHA-256 values are respectively
 `64785b8b5a4e9e5af1ead62d659f4078076aab98c42fc639fb95b2fe4548160a`,
 `0e783199a0a56c7742d6079daeb4ebc6ac4750e58f543d4020529275a39b3e49`,
 and `44dd4c0525fa67630dbb0f225999d0498a62baf27991fca497d6cfba96ff565d`.
-This closes local wrapper/integration/route work for one-bank Stage 15; it does
-not close frozen-real-window replay, the complete host API, target-radio RAM
-qualification, CFO refinement modes, acquisition, SSS, 30 MS/s, or 60 MS/s.
+Those route results are retained as historical evidence only. They no longer
+close wrapper/integration/route work because ABI 1.0 incorrectly permitted the
+outer `[-32,-31,+31,+32]` guard lags to win. Nothing derived from that route is
+eligible for a radio boot.
 
-The corresponding full firmware container has now also been built and verified
+The corresponding ABI 1.0 full firmware container was built and verified
 offline from parent source commit
 `5cc58ccde59b642aa504399ac148fc999f8cf3e4`, with that graph locked by annotated
 tag `starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v1`. The DFU, FRM,
@@ -470,22 +479,45 @@ build ID. The offline manifest and checksum list are
 are `445b1413b1d91ec6b40bd058bf74a3df1d917dc9a2b6a4142c23cade684714f3`
 and `973d999911e23b05b552711bae1dce8e5768a74acc71333e9f57f7a5def5c5f4`.
 
-This is only a reproducible container boundary, not a release or hardware
-qualification. No radio, USB/serial interface, network route, or DFU transfer
+This is only a reproducible historical container boundary, not a release or
+hardware qualification. It is explicitly **superseded, obsolete, and forbidden
+for radio use**. No radio, USB/serial interface, network route, or DFU transfer
 was used. GCC 15's C23 default required rebuilding the generated host-m4 stage
 with `-std=gnu17`; the target build then resumed with its normal flags so the
 ARM GCC 7.3 stages retained their supported language mode. No source change was
 needed for that host-tool compatibility workaround.
 
-A frozen CI16/Q1.15 one-bank tracking model has also been replayed over all 210
+A frozen CI16/Q1.15 one-bank tracking model has been replayed over all 210
 first-chunk real windows using the oracle's actual upper-edge, `-100 kHz`,
-local-radius-30 semantics. It selected the identical integer lag in 210/210
-windows. Fixed-versus-float normalized-score absolute error was at most
+local-radius-30 semantics. The corrected bit-exact `[-30,+30]` reducer selected
+the identical integer lag in 210/210 windows. The superseded `[-32,+32]`
+reducer matched only 207/210: windows 141, 195, and 201 were incorrectly won by
+outer guard lags. Fixed-versus-float normalized-score absolute error was at most
 `1.52e-5`, with median `3.49e-6`. In contrast, allowing each frame to maximize
 all nine CFO banks across the proposed 65-lag `[-32,+32]` aperture retained the
 block-selected `-100 kHz` bank in only 97/210 windows. These results freeze the
 acquisition-versus-tracking split and form a predeclared Stage-15 equivalence
 target.
+
+The current ABI 1.1 correction drains all four outer raw tuples,
+advertises geometry `{lags=61,capture=130,taps=66}`, and adds atomic telemetry.
+The full AXI wrapper now replays the 27,300 retained CI16 samples and all 5,460
+expected packet words with 210/210 frozen float-lag agreement and zero errors.
+The native mock host controller additionally proves exact ABI/serial refusal,
+coefficient I/Q conversion, atomic counter gates, packet validation, and
+failure-with-result-retained behavior; a static ARM EABI build passes. The HDL
+source is now commit `6a73ee090ff17b48cad2e089daa4d7a1013c993f`, annotated
+by the explicitly do-not-merge tag
+`starlink-rx-only-dnm-v1-source/hdl-pss15-track-one-v2`. Its fresh route passes
+with setup WNS `+0.314 ns`, hold WHS `+0.024 ns`, Gray-index and telemetry
+payload skew `1.235 ns` and `1.880 ns`, zero tracker Critical CDC rows, zero
+routing errors, and no TX DMA hierarchy. The shell uses 9,176 LUTs, 13,820
+registers, 8.5 BRAM tiles, and 31 DSPs. The DCP/bitstream/XSA SHA-256 values are
+`3283a9b0855241415cd2b3d3a7ea2cd36363f7d8597291687feb49ba0ca7220b`,
+`a1c3e01a78cc71f2984290f98677e9b44acb3f7e2bdf4a86405916a537fb83fe`, and
+`eee9d8fd5ade10dfcee674a2dba1acfb413662ff915c9b21b33519a28a2b3a9c`.
+Firmware packaging, device-tree/runtime checks, and every radio gate remain
+pending.
 
 The trusted full-shell run `33540748707` at parent commit `829380e76240` and
 HDL source `091f8d5852fa` also completed implementation and produced a fully
@@ -595,11 +627,11 @@ Current status ledger:
 - Gate 0: **COMPLETE - SOFTWARE ONLY / HARDWARE UNTESTED**;
 - Gate 2A diagnostic monitor: **COMPLETE OFFLINE** at the source-bound trusted
   run above; it is status plumbing, not PSS;
-- Gate 2B one-bank Stage-15 `TRACK_ONE`: **WRAPPER / INTEGRATION / FULL ROUTE /
-  SOURCE-LOCKED FIRMWARE PACKAGE COMPLETE OFFLINE** at HDL `d30e7b3c` and
-  firmware source `5cc58cc`; frozen-real-window wrapper replay, host API,
-  DMA/device-tree runtime equivalence, and hardware qualification remain
-  pending;
+- Gate 2B one-bank Stage-15 `TRACK_ONE`: the HDL `d30e7b3c` / firmware
+  `5cc58cc` ABI 1.0 route and package are **SUPERSEDED / RADIO-FORBIDDEN**.
+  ABI 1.1 has 210/210 corrected wrapper replay, a tested static-ARM host API,
+  source lock, and a passing fresh route; package, DMA/device-tree runtime
+  equivalence, and hardware qualification remain pending;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
 - every target-radio, 30 MS/s, 60 MS/s, campaign-close, and SSS gate: pending.
@@ -647,8 +679,10 @@ exact qualification-policy digest.
   timestamps, coefficient generation, 48-bit accumulators, and every raw tuple
   before reduction.
 - Complete for `TRACK_ONE`: the queued-center AXI wrapper, cached `Eh`, sliding
-  `Ex`, exact rational winner reducer, double-buffered result publication,
-  level IRQ, coordinated reset, and full RX-only route.
+  `Ex`, corrected 61-lag exact rational winner reducer, double-buffered result
+  publication, level IRQ, coordinated reset, atomic telemetry, 210-window
+  retained replay, and tested host controller. The prior full RX-only route is
+  historical only; ABI 1.1 now has a separately validated fresh route.
 - Pending before advanced tracking modes: add one-lag nine-bank CFO refinement,
   commanded adjacent-bank validation, and single-shot trace through a new
   capability-versioned ABI. Per-frame CFO switching remains forbidden in normal
@@ -659,12 +693,12 @@ exact qualification-policy digest.
   overrun accounting. Exercise full-width index wrap plus queued-center lead
   time, depth, late, duplicate, and overlap behavior and every corresponding
   counter.
-- Complete locally for the v1 shell: OOC reports and full RX-only timing, hold,
-  scoped CDC, bus-skew, routing, exact hierarchy resources, absence of TX DMA,
-  and the source-locked offline firmware package with a verified DFU suffix and
-  bit-exact routed FPGA payload. Still pending: DMA/device-tree runtime
-  equivalence, retained-real-window wrapper replay, the host API, and
-  target-radio evidence.
+- Superseded for the v1.0 shell: OOC reports, full RX-only timing/hold/CDC,
+  resources, and the source-locked package remain audit evidence but are not
+  reusable radio artifacts. Complete for ABI 1.1: fresh OOC/full route, scoped
+  CDC and telemetry-bus skew, exact resources, and absence of TX DMA. Pending:
+  source-locked package, DMA/device-tree runtime equivalence, and target-radio
+  evidence.
 - If the exact engine misses its budget, reduce parallelism or scheduling while
   preserving numerical behavior. Do not weaken oracle agreement.
 
