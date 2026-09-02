@@ -451,6 +451,32 @@ This closes local wrapper/integration/route work for one-bank Stage 15; it does
 not close frozen-real-window replay, the complete host API, target-radio RAM
 qualification, CFO refinement modes, acquisition, SSS, 30 MS/s, or 60 MS/s.
 
+The corresponding full firmware container has now also been built and verified
+offline from parent source commit
+`5cc58ccde59b642aa504399ac148fc999f8cf3e4`, with that graph locked by annotated
+tag `starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v1`. The DFU, FRM,
+and FIT SHA-256 values are respectively
+`27a1b3381bce882ac961614277091619946a5a3e395c4db0dc8c3c2577a999b5`,
+`242df10166f856e4cd68c90d144b9dcaba3cc1e100aa3a6bcf6b1ffe3caa1fbc`,
+and `c803d5305c0417b1659212866b171e150e8efe107e724bc581bde762d7e9f976`.
+The packaged FPGA payload is byte-identical to the routed bitstream above, and
+the packaged XSA is byte-identical to the routed XSA. Rootfs `/opt/VERSIONS`
+records the exact firmware, HDL, Buildroot, Linux, and U-Boot identities. The
+14-check container verifier passes the image digest, DFU suffix, FIT metadata,
+payload digests, embedded identities, tag-to-pin relationships, and gadget
+build ID. The offline manifest and checksum list are
+`starlink-pss15-track-one-dnm-v1-offline.yaml` and
+`starlink-pss15-track-one-dnm-v1-offline-SHA256SUMS`; their own SHA-256 values
+are `445b1413b1d91ec6b40bd058bf74a3df1d917dc9a2b6a4142c23cade684714f3`
+and `973d999911e23b05b552711bae1dce8e5768a74acc71333e9f57f7a5def5c5f4`.
+
+This is only a reproducible container boundary, not a release or hardware
+qualification. No radio, USB/serial interface, network route, or DFU transfer
+was used. GCC 15's C23 default required rebuilding the generated host-m4 stage
+with `-std=gnu17`; the target build then resumed with its normal flags so the
+ARM GCC 7.3 stages retained their supported language mode. No source change was
+needed for that host-tool compatibility workaround.
+
 A frozen CI16/Q1.15 one-bank tracking model has also been replayed over all 210
 first-chunk real windows using the oracle's actual upper-edge, `-100 kHz`,
 local-radius-30 semantics. It selected the identical integer lag in 210/210
@@ -569,9 +595,10 @@ Current status ledger:
 - Gate 0: **COMPLETE - SOFTWARE ONLY / HARDWARE UNTESTED**;
 - Gate 2A diagnostic monitor: **COMPLETE OFFLINE** at the source-bound trusted
   run above; it is status plumbing, not PSS;
-- Gate 2B one-bank Stage-15 `TRACK_ONE`: **WRAPPER / INTEGRATION / FULL ROUTE
-  COMPLETE OFFLINE** at HDL `d30e7b3c`; frozen-real-window wrapper replay,
-  source-locked firmware packaging, host API, and hardware qualification remain
+- Gate 2B one-bank Stage-15 `TRACK_ONE`: **WRAPPER / INTEGRATION / FULL ROUTE /
+  SOURCE-LOCKED FIRMWARE PACKAGE COMPLETE OFFLINE** at HDL `d30e7b3c` and
+  firmware source `5cc58cc`; frozen-real-window wrapper replay, host API,
+  DMA/device-tree runtime equivalence, and hardware qualification remain
   pending;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
@@ -633,9 +660,11 @@ exact qualification-policy digest.
   time, depth, late, duplicate, and overlap behavior and every corresponding
   counter.
 - Complete locally for the v1 shell: OOC reports and full RX-only timing, hold,
-  scoped CDC, bus-skew, routing, exact hierarchy resources, and absence of TX
-  DMA. Still pending: source-locked firmware package, DMA/device-tree runtime
-  equivalence, retained-real-window wrapper replay, and target-radio evidence.
+  scoped CDC, bus-skew, routing, exact hierarchy resources, absence of TX DMA,
+  and the source-locked offline firmware package with a verified DFU suffix and
+  bit-exact routed FPGA payload. Still pending: DMA/device-tree runtime
+  equivalence, retained-real-window wrapper replay, the host API, and
+  target-radio evidence.
 - If the exact engine misses its budget, reduce parallelism or scheduling while
   preserving numerical behavior. Do not weaken oracle agreement.
 

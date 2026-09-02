@@ -1,0 +1,103 @@
+# Immutable evidence for the first complete offline firmware package containing
+# the routed Stage-15 exact-PSS TRACK_ONE block.
+#
+# DO NOT MERGE, RELEASE, BOOT, OR FLASH. This is a local packaging result, not
+# target-radio qualification. It may become an input to the serial-locked,
+# RAM-only Gate-3 workflow only after the remaining host/oracle preflight is
+# complete. A later build or qualification result gets a new manifest.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+release_state: offline-build-only
+do_not_merge: true
+do_not_release: true
+ram_boot_eligible: false
+persistent_flash_eligible: false
+
+# This is a source-lock tag, not a release tag. It resolves to the exact parent
+# commit used for the build. The embedded device-fw string predates this tag and
+# therefore records the preceding raw-source tag plus one exact commit.
+release_tag: starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v1
+asset_name: pluto.dfu
+image_url: unpublished-local-only
+image_sha256: 27a1b3381bce882ac961614277091619946a5a3e395c4db0dc8c3c2577a999b5
+image_size: 12825267
+fit_body_sha256: c803d5305c0417b1659212866b171e150e8efe107e724bc581bde762d7e9f976
+fit_body_size: 12825251
+device_fw: starlink-rx-only-dnm-v1-source/firmware-pss15-raw-v1-1-g5cc58
+
+frm_asset_name: pluto.frm
+frm_sha256: 242df10166f856e4cd68c90d144b9dcaba3cc1e100aa3a6bcf6b1ffe3caa1fbc
+frm_size: 12825284
+itb_sha256: c803d5305c0417b1659212866b171e150e8efe107e724bc581bde762d7e9f976
+itb_md5: cc48677e7da5b4915897c6ee237f0c68
+itb_size: 12825251
+
+source_manifest_name: starlink-pss15-track-one-dnm-v1-source.yaml
+source_manifest_sha256: cd7a86028bd01a54a9cbabb80adf9f9c975539d2cc23668d46556411774ceb38
+
+firmware_source: 5cc58ccde59b642aa504399ac148fc999f8cf3e4
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v1
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+
+submodule_buildroot: 6cdcb980b840d0a186aee5d72857d30b9cbaab38
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_hdl: d30e7b3c1128448b8cfa5a9dbfeec49154a136a5
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+
+versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-track-one-v1
+versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-v1
+versions_linux: starlink-rx-only-dnm-v1-source/linux-v2
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+versions_file_sha256: 0b1e1cc09470259a94ecd456f29de18af931d6ba61de7ae73eac3293c1d53c4c
+
+fpga_bitstream_md5: 7bdbb2061c2b927c35785d3abf13d65a
+fpga_bitstream_sha256: 0e783199a0a56c7742d6079daeb4ebc6ac4750e58f543d4020529275a39b3e49
+fpga_bitstream_size: 968788
+xsa_sha256: 44dd4c0525fa67630dbb0f225999d0498a62baf27991fca497d6cfba96ff565d
+xsa_size: 681742
+linux_kernel_md5: 793c0d3f2a770ff9dd80c4d3b9723f51
+linux_kernel_sha256: 3eb081ede0e6155969c5b1ff215f6cc8280f2d6256d9af33bcf610cd439c8fd9
+linux_kernel_size: 4570928
+ramdisk_md5: 55daf8bc51b6d27e0c82e4c3bb5ee2ba
+rootfs_sha256: a96d29c0f67ec5905eb528374d708594c673f8311fcc549f160c42691685649a
+rootfs_size: 7209596
+fit_description: Configuration to load fpga before Kernel
+dfu_vendor_id: 0x0456
+dfu_product_id: 0xb673
+dfu_suffix_crc: 0x5fcab7a0
+
+integrated_route_verdict: PASS
+routed_wns_ns: 0.519
+routed_whs_ns: 0.014
+tracker_critical_cdc_rows: 0
+route_errors: 0
+packaging_verdict: PASS_OFFLINE
+container_verification_verdict: PASS_OFFLINE
+
+build_xsa_mode: prebuilt-source-locked
+build_command: make HAVE_VIVADO=0 XSA_FILE=hdl/projects/pluto/pluto.sdk/system_top.xsa build/pluto.frm build/pluto.dfu
+host_gcc: gcc-15.2.0
+host_make: make-4.4.1
+host_dfu_suffix: dfu-util-0.11
+host_m4_compatibility: "host-m4 1.4.19 built once with HOST_CFLAGS='-O2 -std=gnu17 ...', then normal flags restored before remaining target-side tools"
+
+hardware_qualified: false
+hardware_units: 0
+ram_boot_performed: false
+persistent_qualified: false
+persistent_flash_performed: false
+radio_contacted: false
+dfu_transfer_performed: false
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_main_commit: 8074b228083240860843b0fb4dd4d5b46f06805b
