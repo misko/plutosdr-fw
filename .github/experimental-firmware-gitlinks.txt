@@ -13,3 +13,5 @@ hdl 278d87953cf169d0456f0408be9fa549bb3bddcc starlink-pss15-split-reset-hdl-v1
 hdl d30e7b3c1128448b8cfa5a9dbfeec49154a136a5 starlink-pss15-axi-tracker-hdl-v1
 hdl e106eabf79245f394fe1ef43fc4a274779e9fc0a starlink-pss15-injection-abi12-hdl-v1
 hdl ecf2ee383e86dced8189964ab4c6b28a47ee208f starlink-pss15-injection-abi12-evidence-hdl-v1
+buildroot 875844d0dd2c2e9fa6cbf27f4fc7001f853e9d56 starlink-pss15-controller-buildroot-v1
+buildroot daf5ec3fe6b394337379394fa98a52815520d886 starlink-pss15-injection-abi12-buildroot-v1
