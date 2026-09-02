@@ -1,7 +1,8 @@
 # Starlink PSS 15/30/60 MS/s RX-only development plan
 
 Status: experimental and **DO NOT MERGE INTO FIRMWARE MAIN**. The experimental
-FIT/DFU image is RAM-boot-only and is never written to QSPI. PPU setup may make
+FIT/DFU image is RAM-only: it is RAM-booted and is never written to QSPI. PPU
+setup may make
 deliberate, receipted changes to the persistent U-Boot radio-target environment;
 the campaign is incomplete until its final 2R2T restoration gate passes.
 
@@ -26,7 +27,7 @@ establish full-band Starlink reception. Full-band Gates 4 and 5 need a second
 serial-bound radio with physical AD9361/AD9364 attestation; otherwise those
 full-band pass states remain open by design.
 
-## 2026-09-02 Stage-15 hardware checkpoint
+## 2026-09-02 Stage-15 hardware checkpoints
 
 The corrected ABI 1.1 image has now completed one exact-radio RAM lifecycle and
 one scheduled live tracker transaction under the `ad9361-1r1t` driver
@@ -36,20 +37,34 @@ transaction, success-counter deltas, zero error-counter deltas, recovery, and
 final 2R2T restoration all passed. The candidate never wrote QSPI; the full
 QSPI partition SHA-256 was identical before, during, and after the RAM trial.
 
-This checkpoint is deliberately labeled
-`STAGE15_RAM_LIFECYCLE_AND_TRACKER_TRANSACTION_PASS`. Ambient samples were not
-controlled, so the reported winning lag is not a Starlink detection. Gate 3 is
-still open for the native `ad9363a-1r1t` profile, exact PHY/capture-rate and RF
-readbacks, deterministic accepted-sample injection, frozen negative controls,
-and live multi-frame PSS evidence. Those items remain mandatory before the
-15-MS/s engineering-advancement state can authorize Stage 30.
+The second trial used the physical unit's native `ad9363a-1r1t` profile. It
+proved exact 15,000,000 S/s PHY and capture-core readback, the only advertised
+capture alternatives `[15,000,000, 1,875,000]`, FPGA factor 1/bypass, the
+RX-only no-DDS/no-TX-DMA layout, and another complete scheduled ABI 1.1 tracker
+transaction. All eight success counters advanced exactly once, all nineteen
+error counters stayed unchanged, and recovery returned the same persistent
+QSPI partition before the final verified `ad9361-2r2t` restoration.
 
-The durable evidence index is
-`manifests/starlink-pss15-track-one-dnm-v3-hardware.yaml`. Its PPU operation
-commit is `fee84440efa7ac2f51100f61ffa2e3fb35ddb499`; post-trial PPU `main`
-is `f22f3c98aeec5284f123262ab0ce63b050841289`, including the tested
-180-second CLI window for the two-profile canonical setup path. The selected
-radio ended on persistent
+The native checkpoint is deliberately labeled
+`STAGE15_NATIVE_AD9363A_RATE_LOCKED_TRACKER_TRANSACTION_PASS`. It supersedes the
+trial-eligibility record, but does not upgrade the earlier `ad9361-1r1t` trial
+to an exact-rate claim. Both transactions used uncontrolled ambient samples,
+so neither winning lag is a Starlink detection. Gate 3 remains open for frozen
+RF-bandwidth/filter/gain and timestamp-slope evidence, sustained queue and
+continuity qualification, deterministic accepted-sample injection, frozen
+negative controls, and live multi-frame PSS evidence. Those items remain
+mandatory before the 15-MS/s engineering-advancement state can authorize Stage
+30.
+
+The earlier compatibility-profile index is
+`manifests/starlink-pss15-track-one-dnm-v3-hardware.yaml`; the native,
+rate-locked successor is
+`manifests/starlink-pss15-track-one-dnm-v5-native9363-hardware.yaml`. The native
+lifecycle used PPU `10ae7c74bb85a0e31f01c308bda8e62209b3c0b2`; exact RX-only
+rate attestation, the tracker transaction, and final canonical setup used PPU
+`main` `c70d46bb2d413d1061a78dfb685fb2483b111514`. That commit passes 1,328
+tests with 11 skips, Ruff, mypy, and package builds. The selected radio ended on
+persistent
 `v0.48-plutoplus-spf-iq-direct-async-v3`, verified `ad9361-2r2t`, four RX scan
 elements, and quiescent TX outputs.
 
@@ -636,8 +651,9 @@ Every rate must pass all of these common gates:
 Recovery is an always-run safety epilogue on success, failure, abort, tool
 crash, or operator interruption, not merely the last successful campaign gate.
 The emergency implementation is pinned to known-good merged PPU commit
-`8074b228083240860843b0fb4dd4d5b46f06805b` until a later merged PPU revision
-passes the same recovery fixtures. The epilogue closes buffers, stops detector
+`c70d46bb2d413d1061a78dfb685fb2483b111514`, which preserves the recovery
+fixtures and has now exercised exact RX-only rate proof plus final canonical
+setup on the selected hardware. The epilogue closes buffers, stops detector
 work, performs bounded route cleanup, reconciles receipts, uses
 `candidate-ram recover` only for an eligible v2 receipt, and restores/verifies
 persistent `ad9361-2r2t`. If persistent setup failed before a RAM receipt exists,
@@ -652,7 +668,8 @@ proved.
 Current status ledger:
 
 - Gate 0: **COMPLETE / HARDWARE-EXERCISED** on the selected unit through PPU
-  `fee8444`, with post-trial CLI timeout hardening on PPU `main` at `f22f3c9`;
+  `c70d46b`, including native-AD9363A setup, exact RX-only rate proof, recovery,
+  and final canonical 2R2T setup;
 - Gate 2A diagnostic monitor: **COMPLETE OFFLINE** at the source-bound trusted
   run above; it is status plumbing, not PSS;
 - Gate 2B one-bank Stage-15 `TRACK_ONE`: the HDL `d30e7b3c` / firmware
@@ -663,10 +680,12 @@ Current status ledger:
   advanced CFO/trace modes remain pending;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
-- Gate 3: **PARTIAL SAFE CHECKPOINT** for `ad9361-1r1t`; native-AD9363A,
-  deterministic-injection, negative-control, and live-signal evidence remain
-  pending;
-- Gate 6 epilogue for this Stage-15 trial: **COMPLETE** with verified persistent
+- Gate 3: **PARTIAL RATE-LOCKED SAFE CHECKPOINT** for native
+  `ad9363a-1r1t`; its RAM lifecycle, exact 15 MS/s PHY/capture path, factor-1
+  FPGA path, and one tracker transaction passed. RF/filter/timestamp-slope,
+  sustained-queue, deterministic-injection, negative-control, and live-signal
+  evidence remain pending;
+- Gate 6 epilogue for both Stage-15 trials: **COMPLETE** with verified persistent
   2R2T restoration and unchanged QSPI;
 - every 30 MS/s, 60 MS/s, full campaign-close, and SSS gate: pending.
 
@@ -690,7 +709,10 @@ path through exact-route leasing, sysfs-pinned IIO re-enumeration, host-key
 rotation, v2 RAM receipts/recovery, and verified 1R1T-to-2R2T restoration at
 `fee8444`. Post-trial `f22f3c9` raises only the synchronous setup-execution CLI
 window to 180 seconds and passes 1,320 tests with 11 skips, Ruff, mypy, and both
-package builds. Starlink code is not part of either PPU commit.
+package builds. PPU `10ae7c7` adds source-locked generic rate attestation, and
+`c70d46b` adds the direct-libiio RX-only path that does not invent a missing TX
+device; the latter passes 1,328 tests with 11 skips plus Ruff, mypy, and package
+builds. Starlink code is not part of any PPU commit.
 
 ### Gate 1: frozen oracle and 15 MS/s offline acquisition
 

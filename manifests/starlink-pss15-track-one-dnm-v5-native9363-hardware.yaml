@@ -1,0 +1,200 @@
+# Native-AD9363A hardware evidence for the corrected Stage-15 exact-PSS
+# TRACK_ONE ABI 1.1 firmware package. This is an evidence record, not a release
+# manifest.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. The candidate ran only from
+# RAM on the exact radio below. The exact source/capture-rate proof and one live
+# ambient tracker transaction establish a rate-locked hardware checkpoint; they
+# are not an over-the-air Starlink PSS detection, frame acquisition, or SSS.
+
+schema: plutosdr-fw.hardware-evidence
+schema_version: 1
+release_state: ram-only-hardware-checkpoint
+do_not_merge: true
+do_not_release: true
+ram_boot_eligible: true
+persistent_flash_eligible: false
+
+evidence_label: STAGE15_NATIVE_AD9363A_RATE_LOCKED_TRACKER_TRANSACTION_PASS
+extends_hardware_checkpoint: starlink-pss15-track-one-dnm-v3-hardware.yaml
+extends_hardware_checkpoint_sha256: 89ce9a73583fbaa34eeedf094f3ed4654ae36be201b36e4d1c93eef1c5523dbc
+supersedes_trial_eligibility: starlink-pss15-track-one-dnm-v4-native9363-candidate.yaml
+supersedes_trial_eligibility_sha256: d370c4eebddbf45ed2c71d9533abf4f315bb303f35963e4b81ec504ce1800e4e
+gate_3_complete: false
+gate_3_remaining:
+  - frozen-rf-bandwidth-filter-gain-and-timestamp-slope-attestation
+  - deterministic-accepted-sample-hardware-injection
+  - frozen-policy-negative-controls
+  - sustained-queue-continuity-and-overflow-qualification
+  - live-multiframe-pss-qualification
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_usb_topology: 5-2
+qualification_usb_sysfs_path: /sys/bus/usb/devices/5-2
+qualification_usb_interface: enx00e0221686a8
+qualification_runtime_target: ad9363a-1r1t
+qualification_physical_rfic_record: AD9363A
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_source: df111429a56292011eefc66d3fae23fded0a80c5
+firmware_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v2
+device_fw: starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v2
+image_sha256: 850c05de612549eb10b3572a3f36ac2e4d550fdc7288b4ce80803a52b2e37cb1
+image_size: 12837531
+fit_body_sha256: 6d2aaab891a1ffd115e5bc8ba5610a7e3b4f6c14ce42fc0e9680343f52323279
+fit_body_size: 12837515
+offline_manifest: starlink-pss15-track-one-dnm-v2-offline.yaml
+offline_manifest_sha256: a44550e7dbde6acae15703e1e97d01b861cfabb4ef86e4f85a6cf43d21e181ba
+
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_lifecycle_commit: 10ae7c74bb85a0e31f01c308bda8e62209b3c0b2
+qualification_utility_rate_and_transaction_commit: c70d46bb2d413d1061a78dfb685fb2483b111514
+qualification_utility_final_setup_commit: c70d46bb2d413d1061a78dfb685fb2483b111514
+qualification_utility_version: 0.1.0
+qualification_utility_tests_passed: 1328
+qualification_utility_tests_skipped: 11
+qualification_utility_ruff: PASS
+qualification_utility_mypy: PASS
+qualification_utility_build: PASS
+
+usb_inventory_schema: pluto-plus-utils.release-usb-inventory.v1
+usb_inventory_sha256: 41e0a14de49c71e30dca03865abae44a896d24b3fdcc460d9fff051bc451d14d
+usb_inventory_serial_filter_exact: true
+usb_inventory_radios_scanned: 4
+usb_inventory_radios_retained: 1
+peer_radios_contacted: false
+
+candidate_plan_schema: pluto-plus-utils.release-candidate-plan.v2
+candidate_plan_sha256: b4baede7eef985e2a742773bf6033d32b881d423c4b1e82ebc41bcdf99efc302
+operation_plan_schema: pluto-plus-utils.release-candidate-operation-plan.v2
+operation_plan_id: 663ce7b873bc4509a136ba1051651e56
+operation_plan_sha256: 852a9b1ae7876af16a2273edd5f9ed99a278d2f1f47c2cf15925c42e9a33f8cc
+ram_receipt_schema: pluto-plus-utils.release-candidate-ram-receipt.v2
+ram_receipt_id: 6b276cd2c432460cae651d312f95334a
+ram_receipt_sha256: 644df150abb3f6202503da6b06620169168fabe8f29493b71342e67396115e93
+ram_receipt_started_at: 2026-09-02T03:46:27.314096Z
+ram_receipt_completed_at: 2026-09-02T03:47:12.055259Z
+ram_receipt_outcome: PASS
+ram_transition: download-then-detach-e
+ram_transition_persistent_write: false
+ram_cleanup_verified: true
+ram_route_release_verified: true
+
+persistent_qspi_partition: /dev/mtdblock3
+persistent_qspi_bytes: 31457280
+persistent_qspi_sha256_before: 07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7
+persistent_qspi_sha256_during_candidate: 07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7
+persistent_qspi_sha256_after_recovery: 07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7
+
+candidate_layout: rx-only
+candidate_root_device_tree_marker: misko,rx-only-fpga
+candidate_rx_dma_device: cf-ad9361-lpc
+candidate_tx_dma_device: null
+candidate_dds_device: null
+candidate_tandem_device: null
+candidate_phy_model: ad9363a
+candidate_rx_scan_channels: [voltage0, voltage1]
+candidate_tx_gain_db: -80.0
+candidate_tx_lo_powerdown: true
+
+source_rate_evidence_schema: pluto-plus-utils.source-locked-rx-rate-evidence.v1
+source_rate_evidence_sha256: 060b6870a074a199bf11af059868dbf24ad484c243b690a768bda612b133ad3e
+source_rate_evidence_access_path: direct-libiio
+requested_rate_hz: 15000000
+readback_phy_rate_hz: 15000000
+readback_capture_rate_hz: 15000000
+capture_rates_available_hz: [15000000, 1875000]
+fpga_decimation_factor: 1
+fpga_decimation_bypass: true
+adc_gp_control: 0x00000000
+
+tracker_transaction_schema: pluto-plus-utils.stage15-tracker-transaction-evidence.v1
+tracker_transaction_sha256: c1eb66357b5b55e511caecaea003064929180ca0a4de711f8834458e55bb7461
+tracker_install_path: /usr/sbin/starlink_pssctl
+tracker_identification: 0x50535354
+tracker_version: 0x00010001
+tracker_rate_msps: 15
+tracker_taps: 66
+tracker_capture_samples: 130
+tracker_raw_lags: 65
+tracker_qualified_lags: 61
+tracker_lag_min: -30
+tracker_lag_max: 30
+tracker_capabilities: 0x0000001d
+tracker_mmio_base: 0x79030000
+tracker_contract_valid: true
+
+coefficient_fixture_sha256: c660bf9a60fc112697a5939db4682e55a0ce9b5ef8c99f2e4dee7e2b328d62c2
+coefficient_generation: 0x07120002
+coefficient_taps_loaded: 66
+sample_index_first: 16095111578
+sample_index_second: 16101597714
+sample_index_advanced: true
+
+track_request_id: 0x07120002
+track_scheduled_center: 16124282182
+track_winner_lag: -25
+track_winner_timestamp: 16124282157
+track_correlation_real: 1331006
+track_correlation_imag: -1311758
+track_sample_energy: 63236
+track_coefficient_energy: 1073725951
+track_saturation_events: 0
+track_all_counter_gates_passed: true
+track_result_released: true
+
+counter_delta_admitted: 1
+counter_delta_completed_capture: 1
+counter_delta_capture_published: 1
+counter_delta_engine_consumed: 1
+counter_delta_reducer_processed: 1
+counter_delta_reducer_emitted: 1
+counter_delta_result_published: 1
+counter_delta_result_consumed: 1
+counter_error_deltas_all_zero: true
+
+ambient_input_controlled: false
+deterministic_hardware_injection_performed: false
+over_the_air_starlink_pss_detected: false
+live_signal_qualified: false
+sss_qualified: false
+
+recovery_receipt_schema: pluto-plus-utils.release-candidate-recovery-receipt.v2
+recovery_receipt_id: 6a46c5505b3e4203b3590b826510a78c
+recovery_receipt_sha256: 9a99190d68d23ddb3fc2e7fcbde31827b2e96a47d149af0c377d37f76a083d5c
+recovery_action: persistent-reset
+recovery_persistent_write: false
+recovery_pre_reset_usb_departure_verified: true
+recovery_qspi_unchanged: true
+recovery_cleanup_verified: true
+recovery_route_release_verified: true
+recovered_firmware: v0.48-plutoplus-spf-iq-direct-async-v3
+recovered_runtime_target: ad9363a-1r1t
+
+final_setup_receipt_schema: 4
+final_setup_receipt_id: 7f1062bfb2994ffaa5cde7061d08056c
+final_setup_receipt_sha256: adb26f1ba17d5b2a00a21d2e297d7678a9d3db4f7ab5793d167a3ccc7863b798
+final_setup_target: ad9361-2r2t
+final_setup_outcome: VERIFIED
+final_boot_provenance: qspi_reboot_verified
+final_persistent_fit_sha256: db777ac93d5c6f0be0cf2799808a4d06fe39264ee1e99e76001509394d75f1df
+final_live_phy_model: ad9361
+final_uboot_compatible: ad9361
+final_uboot_mode: 2r2t
+final_rx_scan_channels: [voltage0, voltage1, voltage2, voltage3]
+final_tx_hardwaregain_db: [-80.0, -80.0]
+final_tx_safe: true
+final_route_release_verified: true
+final_control_daemon_stopped: true
+
+radio_contacted: true
+dfu_transfer_performed: true
+ram_boot_performed: true
+persistent_flash_performed: false
+ram_lifecycle_qualified: true
+native_ad9363a_profile_qualified: true
+source_locked_rate_qualified: true
+tracker_transaction_qualified: true
+hardware_injection_qualified: false
+hardware_qualified: false
+persistent_qualified: false
