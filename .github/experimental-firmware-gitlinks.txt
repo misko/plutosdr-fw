@@ -18,3 +18,4 @@ buildroot daf5ec3fe6b394337379394fa98a52815520d886 starlink-pss15-injection-abi1
 hdl 1e36384bbf54798a7778b22cd1a54bfb6828dc53 starlink-pss15-phase-map-hdl-v1
 hdl 77aefb265a88f1d1b746b7d6df4e45d0a3f10627 starlink-pss15-phase-map-hdl-v2
 hdl d291871923c6dc6cc2f30745d2e9d8a6abd3188f starlink-pss15-phase-map-hdl-v3
+hdl 2c9e564350e1c42d9aa5b14e7ee61929a754f1fd starlink-pss15-overlap-scheduler-hdl-v1
