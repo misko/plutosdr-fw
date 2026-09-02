@@ -82,6 +82,59 @@ def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:
         assert name not in design
 
 
+def test_abi12_injection_is_the_shared_tracker_and_dma_boundary() -> None:
+    design = _read("hdl/projects/pluto/system_bd.tcl")
+    manifest = _read(
+        "manifests/starlink-pss15-injection-abi12-dnm-v1-source.yaml"
+    )
+    wrapper = _read(
+        "hdl/library/axi_starlink_pss_tracker/axi_starlink_pss_tracker.v"
+    )
+    mux = _read(
+        "hdl/library/axi_starlink_pss_tracker/starlink_pss_injection_mux.v"
+    )
+    provenance = _read(
+        "hdl/library/axi_starlink_pss_tracker/"
+        "tb/real_071200_wrapper_replay_provenance.json"
+    )
+
+    assert "VERSION = 32'h0001_0002" in wrapper
+    assert "CAPABILITIES = 32'h0000_003d" in wrapper
+    assert "starlink_pss_injection_mux" in wrapper
+    for signal in ("i", "q", "enable", "index", "timestamp"):
+        assert f".i_sample_{signal}" in wrapper
+        assert f"selected_sample_{signal}" in wrapper
+    assert ".i_sample_valid" in wrapper
+    assert "selected_sample_strobe" in wrapper
+
+    for connection in (
+        "starlink_pss_tracker/selected_sample_i",
+        "starlink_pss_tracker/selected_sample_q",
+        "starlink_pss_tracker/selected_sample_strobe",
+        "starlink_pss_tracker/selected_sample_enable",
+        "starlink_pss_tracker/selected_sample_timestamp",
+    ):
+        assert connection in design
+    assert "rx_fir_decimator/data_out_0 cpack/fifo_wr_data_0" not in design
+    assert "rx_fir_decimator/valid_out_0 cpack/fifo_wr_en" not in design
+
+    assert "selected_sample_i <= selection_injected_stage" in mux
+    assert "selected_sample_strobe <= source_sample_strobe_stage" in mux
+    assert "selected_sample_index <= source_sample_index_stage" in mux
+    assert "sample_mismatch_toggle <= ~sample_mismatch_toggle" in mux
+    assert '(* ram_style = "block" *)' in mux
+    assert 'ram_style = "distributed"' not in mux
+    assert "real_071200_window0_samples_ci16.mem" in provenance
+
+    assert "do_not_merge: true" in manifest
+    assert "persistent_flash_eligible: false" in manifest
+    assert "tracker_version: 0x00010002" in manifest
+    assert "tracker_capabilities: 0x0000003d" in manifest
+    assert "injection_shared_consumers: tracker-and-rx-dma-cpack" in manifest
+    assert "hardware_injection_qualified: false" in manifest
+    assert "over_the_air_starlink_pss_detected: false" in manifest
+
+
 def test_top_level_holds_digital_tx_bus_static() -> None:
     top = _read("hdl/projects/pluto/system_top.v")
 

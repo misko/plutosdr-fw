@@ -160,16 +160,16 @@ int pss_read_current_index(const struct pss_io *io, uint64_t *index,
 	return 0;
 }
 
-int pss_read_ci16_file(const char *path,
-	struct pss_ci16 coefficients[PSS_COEFFICIENT_COUNT],
+static int read_ci16_file(const char *path, struct pss_ci16 *values,
+	unsigned int expected_count, const char *kind,
 	char *error, size_t error_size)
 {
 	FILE *input;
 	char line[128];
 	unsigned int count = 0;
 
-	if (!path || !coefficients)
-		return fail(error, error_size, "missing coefficient file or destination");
+	if (!path || !values || !kind)
+		return fail(error, error_size, "missing CI16 file input or destination");
 	input = fopen(path, "r");
 	if (!input)
 		return fail(error, error_size, "cannot open %s: %s", path,
@@ -191,14 +191,14 @@ int pss_read_ci16_file(const char *path,
 			return fail(error, error_size, "%s: invalid CI16 word on line %u",
 				path, count + 1U);
 		}
-		if (count >= PSS_COEFFICIENT_COUNT) {
+		if (count >= expected_count) {
 			fclose(input);
-			return fail(error, error_size, "%s: expected exactly %u words",
-				path, PSS_COEFFICIENT_COUNT);
+			return fail(error, error_size,
+				"%s: expected exactly %u %s words", path, expected_count, kind);
 		}
 		/* Fixture files are I in bits 31:16 and Q in bits 15:0. */
-		coefficients[count].i = (int16_t)(uint16_t)(word >> 16);
-		coefficients[count].q = (int16_t)(uint16_t)word;
+		values[count].i = (int16_t)(uint16_t)(word >> 16);
+		values[count].q = (int16_t)(uint16_t)word;
 		++count;
 	}
 	if (ferror(input)) {
@@ -208,10 +208,26 @@ int pss_read_ci16_file(const char *path,
 			strerror(saved_errno));
 	}
 	fclose(input);
-	if (count != PSS_COEFFICIENT_COUNT)
-		return fail(error, error_size, "%s: expected %u words, got %u", path,
-			PSS_COEFFICIENT_COUNT, count);
+	if (count != expected_count)
+		return fail(error, error_size, "%s: expected %u %s words, got %u",
+			path, expected_count, kind, count);
 	return 0;
+}
+
+int pss_read_ci16_file(const char *path,
+	struct pss_ci16 coefficients[PSS_COEFFICIENT_COUNT],
+	char *error, size_t error_size)
+{
+	return read_ci16_file(path, coefficients, PSS_COEFFICIENT_COUNT,
+		"coefficient", error, error_size);
+}
+
+int pss_read_injection_file(const char *path,
+	struct pss_ci16 samples[PSS_INJECTION_SAMPLES],
+	char *error, size_t error_size)
+{
+	return read_ci16_file(path, samples, PSS_INJECTION_SAMPLES,
+		"injection", error, error_size);
 }
 
 int pss_load_coefficients(const struct pss_io *io,
@@ -301,6 +317,219 @@ int pss_load_coefficients(const struct pss_io *io,
 			"coefficient write-overrun counter changed (%" PRIu32 " -> %" PRIu32 ")",
 			overrun_before, overrun_after);
 	return 0;
+}
+
+int pss_read_injection_status(const struct pss_io *io,
+	struct pss_injection_status *status, char *error, size_t error_size)
+{
+	uint32_t start_low, start_high;
+
+	if (!status)
+		return fail(error, error_size, "missing injection-status destination");
+	memset(status, 0, sizeof(*status));
+	if (read32(io, PSS_REG_INJECTION_START_LO, &start_low,
+			error, error_size) < 0 ||
+	    read32(io, PSS_REG_INJECTION_START_HI, &start_high,
+			error, error_size) < 0 ||
+	    read32(io, PSS_REG_INJECTION_GENERATION, &status->generation_stage,
+			error, error_size) < 0 ||
+	    read32(io, PSS_REG_INJECTION_STATUS, &status->raw_status,
+			error, error_size) < 0 ||
+	    read32(io, PSS_REG_INJECTION_LAST_GENERATION,
+			&status->last_completed_generation, error, error_size) < 0)
+		return -1;
+	status->start_index = combine_u64(start_low, start_high);
+	status->fixture_count = (uint8_t)(status->raw_status >> 8);
+	return 0;
+}
+
+static int reject_bad_injection_status(const struct pss_injection_status *status,
+	char *error, size_t error_size)
+{
+	if (status->raw_status & PSS_INJECTION_REJECTED)
+		return fail(error, error_size,
+			"injection hardware reports a rejected command (status=0x%08" PRIx32 ")",
+			status->raw_status);
+	if (status->raw_status & PSS_INJECTION_MISMATCH)
+		return fail(error, error_size,
+			"injection hardware reports an accepted-index mismatch "
+			"(status=0x%08" PRIx32 ")", status->raw_status);
+	return 0;
+}
+
+int pss_load_injection_fixture(const struct pss_io *io,
+	const struct pss_ci16 samples[PSS_INJECTION_SAMPLES],
+	uint32_t generation, unsigned int timeout_ms,
+	struct pss_injection_status *status, char *error, size_t error_size)
+{
+	struct pss_info info;
+	struct pss_injection_status observed;
+	struct pss_injection_status *destination = status ? status : &observed;
+	uint64_t deadline;
+	unsigned int index;
+
+	if (!samples)
+		return fail(error, error_size, "missing injection samples");
+	if (!generation)
+		return fail(error, error_size, "injection generation must be nonzero");
+	if (!timeout_ms)
+		return fail(error, error_size, "injection timeout must be nonzero");
+	if (pss_require_contract(io, &info, error, error_size) < 0 ||
+	    pss_read_injection_status(io, destination, error, error_size) < 0)
+		return -1;
+	if (destination->raw_status &
+	    (PSS_INJECTION_ARM_PENDING | PSS_INJECTION_ACTIVE |
+	     PSS_INJECTION_INFLIGHT))
+		return fail(error, error_size, "cannot load while injection is active");
+
+	deadline = monotonic_milliseconds() + timeout_ms;
+	if (write32(io, PSS_REG_INJECTION_CONTROL, 1U, error, error_size) < 0)
+		return -1;
+	for (;;) {
+		if (pss_read_injection_status(io, destination,
+				error, error_size) < 0)
+			return -1;
+		if (destination->fixture_count == 0 &&
+		    !(destination->raw_status &
+		      (PSS_INJECTION_FIXTURE_VALID | PSS_INJECTION_REJECTED |
+		       PSS_INJECTION_MISMATCH)))
+			break;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size, "injection fixture clear timed out");
+		poll_delay();
+	}
+
+	for (index = 0; index < PSS_INJECTION_SAMPLES; ++index) {
+		uint32_t packed = (uint32_t)(uint16_t)samples[index].i |
+			(uint32_t)(uint16_t)samples[index].q << 16;
+
+		if (write32(io, PSS_REG_INJECTION_DATA, packed,
+				error, error_size) < 0)
+			return -1;
+		for (;;) {
+			if (pss_read_injection_status(io, destination,
+					error, error_size) < 0 ||
+			    reject_bad_injection_status(destination,
+					error, error_size) < 0)
+				return -1;
+			if (destination->fixture_count == index + 1U)
+				break;
+			if (monotonic_milliseconds() >= deadline)
+				return fail(error, error_size,
+					"injection sample %u was not accepted", index);
+			poll_delay();
+		}
+	}
+
+	if (write32(io, PSS_REG_INJECTION_GENERATION, generation,
+			error, error_size) < 0 ||
+	    write32(io, PSS_REG_INJECTION_CONTROL, 2U,
+			error, error_size) < 0)
+		return -1;
+	for (;;) {
+		if (pss_read_injection_status(io, destination,
+				error, error_size) < 0 ||
+		    reject_bad_injection_status(destination, error, error_size) < 0)
+			return -1;
+		if ((destination->raw_status & PSS_INJECTION_FIXTURE_VALID) &&
+		    destination->fixture_count == PSS_INJECTION_SAMPLES &&
+		    destination->generation_stage == generation)
+			break;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size, "injection fixture commit timed out");
+		poll_delay();
+	}
+	return 0;
+}
+
+int pss_arm_injection(const struct pss_io *io, uint64_t start_index,
+	unsigned int timeout_ms, struct pss_injection_status *status,
+	char *error, size_t error_size)
+{
+	struct pss_injection_status observed;
+	struct pss_injection_status *destination = status ? status : &observed;
+	uint64_t current, deadline;
+
+	if (!timeout_ms)
+		return fail(error, error_size, "injection timeout must be nonzero");
+	if (pss_require_contract(io, NULL, error, error_size) < 0 ||
+	    pss_read_current_index(io, &current, error, error_size) < 0)
+		return -1;
+	if (start_index < current || start_index - current < PSS_MINIMUM_HOST_LEAD)
+		return fail(error, error_size,
+			"injection start needs at least %" PRIu64
+			" samples of host lead (current=%" PRIu64 ", start=%" PRIu64 ")",
+			PSS_MINIMUM_HOST_LEAD, current, start_index);
+	if (UINT64_MAX - start_index < PSS_INJECTION_SAMPLES - 1U)
+		return fail(error, error_size,
+			"injection window overflows the accepted-sample index");
+	if (write32(io, PSS_REG_INJECTION_START_LO, (uint32_t)start_index,
+			error, error_size) < 0 ||
+	    write32(io, PSS_REG_INJECTION_START_HI, (uint32_t)(start_index >> 32),
+			error, error_size) < 0)
+		return -1;
+
+	deadline = monotonic_milliseconds() + timeout_ms;
+	for (;;) {
+		if (pss_read_injection_status(io, destination,
+				error, error_size) < 0 ||
+		    reject_bad_injection_status(destination, error, error_size) < 0)
+			return -1;
+		if (destination->start_index == start_index &&
+		    (destination->raw_status & PSS_INJECTION_ARM_READY))
+			break;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size, "injection arm-ready timed out");
+		poll_delay();
+	}
+	if (write32(io, PSS_REG_INJECTION_CONTROL, 4U,
+			error, error_size) < 0)
+		return -1;
+	for (;;) {
+		if (pss_read_injection_status(io, destination,
+				error, error_size) < 0 ||
+		    reject_bad_injection_status(destination, error, error_size) < 0)
+			return -1;
+		if ((destination->raw_status & PSS_INJECTION_INFLIGHT) &&
+		    !(destination->raw_status & PSS_INJECTION_ARM_PENDING))
+			return 0;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size, "injection arm handshake timed out");
+		poll_delay();
+	}
+}
+
+int pss_wait_injection_complete(const struct pss_io *io,
+	uint32_t expected_generation, unsigned int timeout_ms,
+	struct pss_injection_status *status, char *error, size_t error_size)
+{
+	struct pss_injection_status observed;
+	struct pss_injection_status *destination = status ? status : &observed;
+	uint64_t deadline;
+
+	if (!expected_generation)
+		return fail(error, error_size,
+			"expected injection generation must be nonzero");
+	if (!timeout_ms)
+		return fail(error, error_size, "injection timeout must be nonzero");
+	deadline = monotonic_milliseconds() + timeout_ms;
+	for (;;) {
+		if (pss_read_injection_status(io, destination,
+				error, error_size) < 0 ||
+		    reject_bad_injection_status(destination, error, error_size) < 0)
+			return -1;
+		if ((destination->raw_status & PSS_INJECTION_COMPLETED) &&
+		    !(destination->raw_status &
+		      (PSS_INJECTION_ARM_PENDING | PSS_INJECTION_ACTIVE |
+		       PSS_INJECTION_INFLIGHT)) &&
+		    destination->last_completed_generation == expected_generation)
+			return 0;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size,
+				"injection completion timed out for generation 0x%08" PRIx32,
+				expected_generation);
+		poll_delay();
+	}
 }
 
 int pss_snapshot_counters(const struct pss_io *io,

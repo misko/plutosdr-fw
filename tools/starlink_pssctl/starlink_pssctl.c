@@ -35,6 +35,9 @@ static void usage(FILE *stream)
 		"  counters [--timeout-ms N]\n"
 		"  load --coeff FILE --generation N [--timeout-ms N]\n"
 		"  track --request N [--lead N | --center N] [--timeout-ms N]\n"
+		"  inject-status\n"
+		"  inject-load --samples FILE --generation N [--timeout-ms N]\n"
+		"  inject-track --request N [--lead N | --start N] [--timeout-ms N]\n"
 		"\n"
 		"The tool always maps the source-locked tracker at 0x%08" PRIx64
 		" and refuses any serial or ABI mismatch.\n", PSS_MMIO_BASE);
@@ -263,6 +266,85 @@ static void print_track_result(const char *serial,
 	printf("]\n}\n");
 }
 
+static void print_injection_status(const char *serial,
+	const struct pss_injection_status *status)
+{
+	printf("{\n"
+	       "  \"serial\": \"%s\",\n"
+	       "  \"injection_status\": \"0x%08" PRIx32 "\",\n"
+	       "  \"fixture_count\": %u,\n"
+	       "  \"fixture_generation\": \"0x%08" PRIx32 "\",\n"
+	       "  \"start_index\": %" PRIu64 ",\n"
+	       "  \"last_completed_generation\": \"0x%08" PRIx32 "\",\n"
+	       "  \"fixture_valid\": %s,\n"
+	       "  \"arm_ready\": %s,\n"
+	       "  \"arm_pending\": %s,\n"
+	       "  \"active\": %s,\n"
+	       "  \"completed\": %s,\n"
+	       "  \"rejected\": %s,\n"
+	       "  \"mismatch\": %s,\n"
+	       "  \"inflight\": %s\n"
+	       "}\n",
+	       serial, status->raw_status, status->fixture_count,
+	       status->generation_stage, status->start_index,
+	       status->last_completed_generation,
+	       status->raw_status & PSS_INJECTION_FIXTURE_VALID ? "true" : "false",
+	       status->raw_status & PSS_INJECTION_ARM_READY ? "true" : "false",
+	       status->raw_status & PSS_INJECTION_ARM_PENDING ? "true" : "false",
+	       status->raw_status & PSS_INJECTION_ACTIVE ? "true" : "false",
+	       status->raw_status & PSS_INJECTION_COMPLETED ? "true" : "false",
+	       status->raw_status & PSS_INJECTION_REJECTED ? "true" : "false",
+	       status->raw_status & PSS_INJECTION_MISMATCH ? "true" : "false",
+	       status->raw_status & PSS_INJECTION_INFLIGHT ? "true" : "false");
+}
+
+static void print_injected_track_result(const char *serial,
+	const struct pss_track_result *result,
+	const struct pss_injection_status *injection)
+{
+	unsigned int index;
+
+	printf("{\n"
+	       "  \"serial\": \"%s\",\n"
+	       "  \"execution_path\": \"accepted-sample-injection\",\n"
+	       "  \"injection_start\": %" PRIu64 ",\n"
+	       "  \"injection_samples\": %u,\n"
+	       "  \"injection_generation\": \"0x%08" PRIx32 "\",\n"
+	       "  \"injection_status\": \"0x%08" PRIx32 "\",\n"
+	       "  \"injection_completed\": true,\n"
+	       "  \"injection_rejected\": false,\n"
+	       "  \"injection_mismatch\": false,\n"
+	       "  \"request_id\": \"0x%08" PRIx32 "\",\n"
+	       "  \"scheduled_center\": %" PRIu64 ",\n"
+	       "  \"winner_lag\": %" PRId32 ",\n"
+	       "  \"winner_timestamp\": %" PRIu64 ",\n"
+	       "  \"coefficient_generation\": \"0x%08" PRIx32 "\",\n"
+	       "  \"correlation_real\": %" PRId64 ",\n"
+	       "  \"correlation_imag\": %" PRId64 ",\n"
+	       "  \"sample_energy\": %" PRId64 ",\n"
+	       "  \"coefficient_energy\": %" PRId64 ",\n"
+	       "  \"saturation_events\": %" PRIu32 ",\n"
+	       "  \"telemetry_generation_before\": %" PRIu32 ",\n"
+	       "  \"telemetry_generation_after\": %" PRIu32 ",\n"
+	       "  \"all_counter_gates_passed\": true,\n"
+	       "  \"result_released\": true,\n"
+	       "  \"packet_words\": [",
+	       serial, injection->start_index, PSS_INJECTION_SAMPLES,
+	       injection->last_completed_generation, injection->raw_status,
+	       result->packet.request_id, result->scheduled_center,
+	       result->packet.lag, result->packet.winner_timestamp,
+	       result->packet.coefficient_generation,
+	       result->packet.correlation_real, result->packet.correlation_imag,
+	       result->packet.sample_energy, result->packet.coefficient_energy,
+	       result->packet.saturation_events,
+	       result->before.telemetry_generation,
+	       result->after.telemetry_generation);
+	for (index = 0; index < PSS_RESULT_WORDS; ++index)
+		printf("%s\"0x%08" PRIx32 "\"", index ? ", " : "",
+			result->packet.words[index]);
+	printf("]\n}\n");
+}
+
 static int option_value(int argc, char **argv, int *index, const char **value)
 {
 	if (*index + 1 >= argc) {
@@ -362,6 +444,140 @@ int main(int argc, char **argv)
 		}
 		print_counters(&counters);
 		return_code = EXIT_SUCCESS;
+	} else if (!strcmp(command, "inject-status")) {
+		struct pss_injection_status injection;
+
+		if (argument != argc) {
+			fprintf(stderr, "inject-status takes no arguments\n");
+			goto out;
+		}
+		if (pss_read_injection_status(&io, &injection,
+				error, sizeof(error)) < 0) {
+			fprintf(stderr, "injection status failed: %s\n", error);
+			goto out;
+		}
+		print_injection_status(expected_serial, &injection);
+		return_code = EXIT_SUCCESS;
+	} else if (!strcmp(command, "inject-load")) {
+		const char *sample_path = NULL;
+		struct pss_ci16 samples[PSS_INJECTION_SAMPLES];
+		struct pss_injection_status injection;
+		uint32_t generation = 0;
+		unsigned int timeout_ms = 2000U;
+
+		while (argument < argc) {
+			const char *value;
+			if (option_value(argc, argv, &argument, &value) < 0)
+				goto out;
+			if (!strcmp(argv[argument - 1], "--samples"))
+				sample_path = value;
+			else if (!strcmp(argv[argument - 1], "--generation")) {
+				if (parse_u32(value, &generation) < 0) {
+					fprintf(stderr, "invalid injection generation\n");
+					goto out;
+				}
+			} else if (!strcmp(argv[argument - 1], "--timeout-ms")) {
+				if (parse_timeout(value, &timeout_ms) < 0) {
+					fprintf(stderr, "invalid injection timeout\n");
+					goto out;
+				}
+			} else {
+				fprintf(stderr, "unknown inject-load option: %s\n",
+					argv[argument - 1]);
+				goto out;
+			}
+			++argument;
+		}
+		if (!sample_path || !generation) {
+			fprintf(stderr,
+				"inject-load requires --samples and nonzero --generation\n");
+			goto out;
+		}
+		if (pss_read_injection_file(sample_path, samples,
+				error, sizeof(error)) < 0 ||
+		    pss_load_injection_fixture(&io, samples, generation, timeout_ms,
+				&injection, error, sizeof(error)) < 0) {
+			fprintf(stderr, "injection load failed: %s\n", error);
+			goto out;
+		}
+		print_injection_status(expected_serial, &injection);
+		return_code = EXIT_SUCCESS;
+	} else if (!strcmp(command, "inject-track")) {
+		struct pss_track_request request = {
+			.lead_samples = PSS_DEFAULT_LEAD_SAMPLES,
+			.timeout_ms = 5000U,
+		};
+		struct pss_track_result result;
+		struct pss_injection_status injection;
+		uint64_t current, start = 0;
+		bool lead_seen = false;
+		bool start_seen = false;
+
+		while (argument < argc) {
+			const char *value;
+			if (option_value(argc, argv, &argument, &value) < 0)
+				goto out;
+			if (!strcmp(argv[argument - 1], "--request")) {
+				if (parse_u32(value, &request.request_id) < 0)
+					goto invalid_inject_track;
+			} else if (!strcmp(argv[argument - 1], "--lead")) {
+				if (start_seen || parse_u64(value, &request.lead_samples) < 0)
+					goto invalid_inject_track;
+				lead_seen = true;
+			} else if (!strcmp(argv[argument - 1], "--start")) {
+				if (lead_seen || parse_u64(value, &start) < 0)
+					goto invalid_inject_track;
+				start_seen = true;
+			} else if (!strcmp(argv[argument - 1], "--timeout-ms")) {
+				if (parse_timeout(value, &request.timeout_ms) < 0)
+					goto invalid_inject_track;
+			} else {
+				goto invalid_inject_track;
+			}
+			++argument;
+		}
+		if (!request.request_id)
+			goto invalid_inject_track;
+		if (pss_read_injection_status(&io, &injection,
+				error, sizeof(error)) < 0 ||
+		    !(injection.raw_status & PSS_INJECTION_FIXTURE_VALID) ||
+		    !injection.generation_stage) {
+			fprintf(stderr, "no valid injection fixture is loaded: %s\n", error);
+			goto out;
+		}
+		if (!start_seen) {
+			if (pss_read_current_index(&io, &current,
+					error, sizeof(error)) < 0 ||
+			    UINT64_MAX - current < request.lead_samples) {
+				fprintf(stderr, "cannot derive injection start: %s\n", error);
+				goto out;
+			}
+			start = current + request.lead_samples;
+		}
+		if (UINT64_MAX - start < PSS_INJECTION_SAMPLES - 1U) {
+			fprintf(stderr, "injection window overflows the accepted-sample index\n");
+			goto out;
+		}
+		if (pss_arm_injection(&io, start, request.timeout_ms,
+				&injection, error, sizeof(error)) < 0) {
+			fprintf(stderr, "injection arm failed: %s\n", error);
+			goto out;
+		}
+		request.center = start + 32U;
+		request.center_is_explicit = true;
+		if (pss_track_one(&io, &request, &result,
+				error, sizeof(error)) < 0 ||
+		    pss_wait_injection_complete(&io, injection.generation_stage,
+				request.timeout_ms, &injection,
+				error, sizeof(error)) < 0) {
+			fprintf(stderr, "injected track failed: %s\n", error);
+			goto out;
+		}
+		print_injected_track_result(expected_serial, &result, &injection);
+		return_code = EXIT_SUCCESS;
+		goto out;
+invalid_inject_track:
+		fprintf(stderr, "invalid inject-track arguments\n");
 	} else if (!strcmp(command, "load")) {
 		const char *coefficient_path = NULL;
 		struct pss_ci16 coefficients[PSS_COEFFICIENT_COUNT];

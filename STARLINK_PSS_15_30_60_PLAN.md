@@ -56,6 +56,24 @@ negative controls, and live multi-frame PSS evidence. Those items remain
 mandatory before the 15-MS/s engineering-advancement state can authorize Stage
 30.
 
+ABI 1.2 now closes the offline portion of the deterministic accepted-sample
+injection gate. A committed 130-sample fixture substitutes only I/Q at a future
+absolute accepted-sample index while retaining source-derived strobe, enable,
+index, and timestamp. That selected stream fans out to both the exact tracker
+and the RX DMA packer. The standalone mux covers pass-through, clean completion,
+incomplete/late/overlap rejection, and accepted-index mismatch; the real wrapper
+replay matches all 210 frozen packets and drives window zero solely through the
+injection mux. A clean non-incremental route passes timing and hold, all three
+bundled-CDC skew checks, zero tracker-critical CDC rows, and a one-RAMB18
+dual-clock fixture implementation. The corresponding immutable source graph is
+`manifests/starlink-pss15-injection-abi12-dnm-v1-source.yaml`.
+
+That is routed-FPGA and offline arithmetic evidence only. The Gate-3 radio pass
+still requires exact positive packet invariants, a predeclared oracle-rejection
+window, byte-exact observation of the injected 130 samples in RX DMA, sustained
+error-free scheduled operation, and the mandatory persistent 2R2T recovery.
+It is not an over-the-air PSS, frame-alignment, or SSS result.
+
 The earlier compatibility-profile index is
 `manifests/starlink-pss15-track-one-dnm-v3-hardware.yaml`; the native,
 rate-locked successor is
@@ -137,6 +155,10 @@ Current control-plane evidence:
   HDL pins, passed all five checks, and merged to firmware `main` as
   `7a646abc591fbeb6f1c32a1addcebced2e8b1517` before the experimental parent
   advanced its HDL gitlink;
+- guard PR #81 appended the exact ABI 1.2 injection HDL source/evidence pins
+  and Buildroot controller/package pins, passed all five checks, and merged to
+  firmware `main` as `3c9dea6d8f061f55b2615689783dd0e6aa4999c5`
+  before the experimental parent advanced either gitlink;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -679,14 +701,17 @@ Current status ledger:
   ABI 1.1 has 210/210 corrected wrapper replay, a tested static-ARM host API,
   source lock, a passing fresh route and package, exact RX-only runtime layout,
   and one passing hardware tracker transaction. Full DMA equivalence and the
-  advanced CFO/trace modes remain pending;
+  advanced CFO/trace modes remain pending. ABI 1.2 deterministic injection has
+  passing standalone and 210-window real replay, a tested static-ARM host API,
+  and a passing full route; firmware packaging and target-radio evidence remain
+  pending;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
 - Gate 3: **PARTIAL RATE-LOCKED SAFE CHECKPOINT** for native
   `ad9363a-1r1t`; its RAM lifecycle, exact 15 MS/s PHY/capture path, factor-1
   FPGA path, and one tracker transaction passed. RF/filter/timestamp-slope,
-  sustained-queue, deterministic-injection, negative-control, and live-signal
-  evidence remain pending;
+  sustained-queue, deterministic-injection hardware, negative-control, and
+  live-signal evidence remain pending;
 - Gate 6 epilogue for both Stage-15 trials: **COMPLETE** with verified persistent
   2R2T restoration and unchanged QSPI;
 - every 30 MS/s, 60 MS/s, full campaign-close, and SSS gate: pending.
@@ -758,9 +783,12 @@ exact qualification-policy digest.
 - Superseded for the v1.0 shell: OOC reports, full RX-only timing/hold/CDC,
   resources, and the source-locked package remain audit evidence but are not
   reusable radio artifacts. Complete for ABI 1.1: fresh OOC/full route, scoped
-  CDC and telemetry-bus skew, exact resources, and absence of TX DMA. Pending:
-  source-locked package, DMA/device-tree runtime equivalence, and target-radio
-  evidence.
+  CDC and telemetry-bus skew, exact resources, and absence of TX DMA. Complete
+  offline for ABI 1.2: deterministic 130-sample accepted-path injection, shared
+  tracker/RX-DMA fan-out structure, fail-closed arm/mismatch behavior,
+  real-window injection replay, block-RAM CDC implementation, and a fresh full
+  route. Pending: source-locked package, byte-exact DMA observation, and
+  target-radio evidence.
 - If the exact engine misses its budget, reduce parallelism or scheduling while
   preserving numerical behavior. Do not weaken oracle agreement.
 

@@ -1,0 +1,133 @@
+# Immutable source graph for the Stage-15 deterministic accepted-sample
+# injection ABI 1.2.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This graph is eligible only
+# for a serial-locked, RAM-only Gate-3 lifecycle after packaging and runtime
+# preflight. It proves neither an over-the-air Starlink PSS detection nor SSS,
+# 30 MS/s, or 60 MS/s operation.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+supersedes_manifest: starlink-pss15-track-one-dnm-v2-source.yaml
+supersedes_reason: "ABI 1.2 adds a deterministic 130-sample accepted-path injection fixture shared by the tracker and RX DMA"
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/iq-direct-async-v3-source/libiio-v1
+libiio_0_25_archive_sha256: 66ccc7230ebe75c477c4dfc147aa86289c3f896c0a0d6b3b6c964e152d89c266
+
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+metadata_repo: https://github.com/misko/plutosdr-fw.git
+metadata_ref: refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1
+
+submodule_hdl: ecf2ee383e86dced8189964ab4c6b28a47ee208f
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3-evidence
+submodule_hdl_rtl_source: e106eabf79245f394fe1ef43fc4a274779e9fc0a
+submodule_hdl_rtl_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3
+
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/starlink-rx-only-dnm-v1-source/linux-v2
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3-evidence
+versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1
+versions_linux: starlink-rx-only-dnm-v1-source/linux-v2
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+
+tracker_identification: 0x50535354
+tracker_version: 0x00010002
+tracker_rate_msps: 15
+tracker_geometry: 0x003d8242
+tracker_capabilities: 0x0000003d
+tracker_mmio_base: 0x79030000
+tracker_raw_lags: 65
+tracker_qualified_lags: 61
+tracker_capture_samples: 130
+tracker_taps: 66
+injection_samples: 130
+injection_start_minimum_hardware_lead_samples: 64
+injection_start_minimum_host_lead_samples: 65536
+injection_fixture_storage: one-dual-clock-RAMB18E1
+injection_shared_consumers: tracker-and-rx-dma-cpack
+injection_substituted_fields: iq-only
+injection_source_derived_fields: strobe-enable-index-timestamp
+
+retained_capture_manifest_sha256: be6a196eaf0894667b835a73afe3aa83ff3200eadc0349b4a45cc5420f7b6f09
+retained_chunk_compressed_sha256: 68732179d9e147e0f173677f810e032d5240fc3ba024cb9045fe17dff9f38946
+retained_chunk_uncompressed_sha256: fd922ab9913b72e545ff526d99ebe884170170d2c817a6a56384740316d661ae
+retained_timing_replay_sha256: 3e324d8841cd4d806de9963049c7a18f2042abd59eaa0549bcdd22ac86f88d70
+coefficient_fixture_sha256: c660bf9a60fc112697a5939db4682e55a0ce9b5ef8c99f2e4dee7e2b328d62c2
+positive_injection_fixture_sha256: ae29a3fa0bcc63ea55c4a2ae87ecb90f3e28a13d9a7c6f51c8b4640f5029e083
+wrapper_samples_fixture_sha256: 91025be8a7a773ee0707dd2edf7b25364c349dcc41889da0636a5fabcd221d08
+wrapper_packets_fixture_sha256: 5fb9baed1bad14ec64097fd4bd7a8515d130f2d2e079ca779ddaef8829d42164
+wrapper_replay_provenance_sha256: 861950266dd8dff60b886afb20863c98f8fad1c7f7509724ba40770a015d3422
+positive_packet0_first_26_lines_sha256: ab4c2b0292d951ec5ad35bd536249fc90ab3ecd8f2d182a54fa672bf1c7fdfc6
+oracle_rejection_window1_lines_131_260_sha256: 83006877c4827e9b23a9fe9d8e774863b4e3533c9c2e6f978d92d5fcb27df283
+oracle_rejection_packet1_lines_27_52_sha256: d7a8a21afbe73671592afc97efdf5e8e8ac3249790f04a86bd64e6c5e64fc9a3
+oracle_rejection_rule: "window 1 must match packet 1 invariants and must not match packet 0 invariants"
+wrapper_replay_windows: 210
+wrapper_replay_frozen_lag_matches: 210
+
+host_header_sha256: e9314bced1fe401cc45d1618497188113a2d7bdb69df598d3bd69ea7a66e20bd
+host_library_sha256: 2a5ffe2270ac5bad94224e52100dbec55db23bdd957078c45bc3576aa024c816
+host_cli_sha256: 7d419540cfb4875dc5ac0c83125506281a9892605648dfbab85064e1205d7f59
+host_selftest_sha256: af4d1cc898c513c4340029b07a7e01f8aa28713e34bdaaac8990121e8469bf75
+host_makefile_sha256: 5478b893c5e1b591e610521d83cb48d540df93102770726684a0721ddffc002b
+
+routed_dcp_sha256: c8631df82584b7b2c418603e936a700bb6c7c5ce66d2bf8446a7eb18a421eae6
+fpga_bitstream_sha256: a92415ed08d03c9fccbcdac0d24c91835c7d8f701058d8383e257f0f0381bbf6
+xsa_sha256: b8270e4789a9164b78dbccac19de0a6219083a65e736be045cbfc92fdf22b657
+routed_wns_ns: 0.328
+routed_whs_ns: 0.009
+gray_index_skew_ns: 1.851
+telemetry_payload_skew_ns: 1.692
+injection_start_payload_skew_ns: 1.740
+tracker_critical_cdc_rows: 0
+route_errors: 0
+tx_dma_hierarchies: 0
+tracker_dsp48e1: 3
+tracker_ramb18e1: 4
+tracker_ramb36e1: 4
+shell_luts: 9740
+shell_registers: 14961
+shell_bram_tiles: 9
+shell_dsps: 31
+
+standalone_injection_mux_verdict: PASS
+real_wrapper_replay_verdict: PASS
+host_api_selftest_verdict: PASS
+integrated_route_verdict: PASS
+hardware_qualified: false
+hardware_injection_qualified: false
+over_the_air_starlink_pss_detected: false
+sss_qualified: false

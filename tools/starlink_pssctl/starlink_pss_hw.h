@@ -10,13 +10,14 @@
 #define PSS_MMIO_SPAN 4096U
 
 #define PSS_IDENTIFICATION UINT32_C(0x50535354)
-#define PSS_VERSION UINT32_C(0x00010001)
+#define PSS_VERSION UINT32_C(0x00010002)
 #define PSS_RATE_MSPS UINT32_C(15)
 #define PSS_GEOMETRY UINT32_C(0x003d8242)
-#define PSS_CAPABILITIES UINT32_C(0x0000001d)
+#define PSS_CAPABILITIES UINT32_C(0x0000003d)
 
 #define PSS_COEFFICIENT_COUNT 66U
 #define PSS_RESULT_WORDS 26U
+#define PSS_INJECTION_SAMPLES 130U
 #define PSS_FIRST_LAG (-30)
 #define PSS_LAST_LAG 30
 #define PSS_DEFAULT_LEAD_SAMPLES UINT64_C(1000000)
@@ -76,6 +77,13 @@ enum pss_register {
 	PSS_REG_RESULT_PUBLISHED = 0xd8,
 	PSS_REG_RESULT_OVERRUN = 0xdc,
 	PSS_REG_RESULT_CONSUMED = 0xe0,
+	PSS_REG_INJECTION_DATA = 0xe4,
+	PSS_REG_INJECTION_CONTROL = 0xe8,
+	PSS_REG_INJECTION_START_LO = 0xec,
+	PSS_REG_INJECTION_START_HI = 0xf0,
+	PSS_REG_INJECTION_GENERATION = 0xf4,
+	PSS_REG_INJECTION_STATUS = 0xf8,
+	PSS_REG_INJECTION_LAST_GENERATION = 0xfc,
 };
 
 enum pss_status_bit {
@@ -86,6 +94,17 @@ enum pss_status_bit {
 	PSS_STATUS_COEFFICIENT_READY = 1U << 4,
 	PSS_STATUS_COEFFICIENT_COMMIT_READY = 1U << 5,
 	PSS_STATUS_RESULT_AVAILABLE = 1U << 6,
+};
+
+enum pss_injection_status_bit {
+	PSS_INJECTION_FIXTURE_VALID = 1U << 0,
+	PSS_INJECTION_ARM_READY = 1U << 1,
+	PSS_INJECTION_ARM_PENDING = 1U << 2,
+	PSS_INJECTION_ACTIVE = 1U << 3,
+	PSS_INJECTION_COMPLETED = 1U << 4,
+	PSS_INJECTION_REJECTED = 1U << 5,
+	PSS_INJECTION_MISMATCH = 1U << 6,
+	PSS_INJECTION_INFLIGHT = 1U << 7,
 };
 
 struct pss_io {
@@ -170,6 +189,14 @@ struct pss_track_result {
 	struct pss_counters after;
 };
 
+struct pss_injection_status {
+	uint32_t raw_status;
+	uint32_t generation_stage;
+	uint32_t last_completed_generation;
+	uint64_t start_index;
+	uint8_t fixture_count;
+};
+
 int pss_read_info(const struct pss_io *io, struct pss_info *info,
 	char *error, size_t error_size);
 int pss_require_contract(const struct pss_io *io, struct pss_info *info,
@@ -178,6 +205,9 @@ int pss_read_current_index(const struct pss_io *io, uint64_t *index,
 	char *error, size_t error_size);
 int pss_read_ci16_file(const char *path,
 	struct pss_ci16 coefficients[PSS_COEFFICIENT_COUNT],
+	char *error, size_t error_size);
+int pss_read_injection_file(const char *path,
+	struct pss_ci16 samples[PSS_INJECTION_SAMPLES],
 	char *error, size_t error_size);
 int pss_load_coefficients(const struct pss_io *io,
 	const struct pss_ci16 coefficients[PSS_COEFFICIENT_COUNT],
@@ -193,5 +223,17 @@ int pss_validate_packet(const uint32_t words[PSS_RESULT_WORDS],
 int pss_track_one(const struct pss_io *io,
 	const struct pss_track_request *request, struct pss_track_result *result,
 	char *error, size_t error_size);
+int pss_read_injection_status(const struct pss_io *io,
+	struct pss_injection_status *status, char *error, size_t error_size);
+int pss_load_injection_fixture(const struct pss_io *io,
+	const struct pss_ci16 samples[PSS_INJECTION_SAMPLES],
+	uint32_t generation, unsigned int timeout_ms,
+	struct pss_injection_status *status, char *error, size_t error_size);
+int pss_arm_injection(const struct pss_io *io, uint64_t start_index,
+	unsigned int timeout_ms, struct pss_injection_status *status,
+	char *error, size_t error_size);
+int pss_wait_injection_complete(const struct pss_io *io,
+	uint32_t expected_generation, unsigned int timeout_ms,
+	struct pss_injection_status *status, char *error, size_t error_size);
 
 #endif

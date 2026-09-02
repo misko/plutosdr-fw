@@ -13,6 +13,7 @@ struct mock_device {
 	uint32_t registers[MOCK_REGISTERS];
 	uint32_t result[PSS_RESULT_WORDS];
 	uint32_t loaded[PSS_COEFFICIENT_COUNT];
+	uint32_t injected[PSS_INJECTION_SAMPLES];
 	uint64_t current_index;
 	uint64_t index_snapshot;
 	uint64_t center;
@@ -21,6 +22,9 @@ struct mock_device {
 	uint32_t generation_stage;
 	uint32_t result_index;
 	unsigned int loaded_count;
+	unsigned int injection_count;
+	unsigned int injection_status_reads;
+	uint32_t injection_flags;
 	bool inject_rejected;
 };
 
@@ -104,6 +108,21 @@ static int mock_read32(void *context, uint32_t offset, uint32_t *value)
 		*value = mock->result[mock->result_index];
 		return 0;
 	}
+	if (offset == PSS_REG_INJECTION_STATUS) {
+		*value = mock->injection_flags | mock->injection_count << 8;
+		if (mock->injection_flags & PSS_INJECTION_INFLIGHT) {
+			if (mock->injection_status_reads++) {
+				mock->injection_flags =
+					PSS_INJECTION_FIXTURE_VALID |
+					PSS_INJECTION_ARM_READY |
+					PSS_INJECTION_COMPLETED;
+				*mock_register(mock,
+					PSS_REG_INJECTION_LAST_GENERATION) =
+					*mock_register(mock, PSS_REG_INJECTION_GENERATION);
+			}
+		}
+		return 0;
+	}
 	*value = *mock_register(mock, offset);
 	return 0;
 }
@@ -169,6 +188,33 @@ static int mock_write32(void *context, uint32_t offset, uint32_t value)
 			*mock_register(mock, PSS_REG_TELEMETRY_STATUS) = 1U;
 		}
 		break;
+	case PSS_REG_INJECTION_DATA:
+		if (!(mock->injection_flags & PSS_INJECTION_FIXTURE_VALID) &&
+		    mock->injection_count < PSS_INJECTION_SAMPLES)
+			mock->injected[mock->injection_count++] = value;
+		else
+			mock->injection_flags |= PSS_INJECTION_REJECTED;
+		break;
+	case PSS_REG_INJECTION_CONTROL:
+		if (value == 1U) {
+			mock->injection_count = 0;
+			mock->injection_flags = 0;
+			mock->injection_status_reads = 0;
+			*mock_register(mock, PSS_REG_INJECTION_LAST_GENERATION) = 0;
+		} else if (value == 2U &&
+			   mock->injection_count == PSS_INJECTION_SAMPLES &&
+			   *mock_register(mock, PSS_REG_INJECTION_GENERATION)) {
+			mock->injection_flags =
+				PSS_INJECTION_FIXTURE_VALID | PSS_INJECTION_ARM_READY;
+		} else if (value == 4U &&
+			   (mock->injection_flags & PSS_INJECTION_ARM_READY)) {
+			mock->injection_flags =
+				PSS_INJECTION_FIXTURE_VALID | PSS_INJECTION_INFLIGHT;
+			mock->injection_status_reads = 0;
+		} else {
+			mock->injection_flags |= PSS_INJECTION_REJECTED;
+		}
+		break;
 	default:
 		*mock_register(mock, offset) = value;
 		break;
@@ -224,6 +270,8 @@ int main(int argc, char **argv)
 	struct pss_io io;
 	struct pss_info info;
 	struct pss_ci16 coefficients[PSS_COEFFICIENT_COUNT];
+	struct pss_ci16 injection_samples[PSS_INJECTION_SAMPLES];
+	struct pss_injection_status injection;
 	struct pss_track_request request = {
 		.request_id = UINT32_C(0x12345678),
 		.lead_samples = PSS_DEFAULT_LEAD_SAMPLES,
@@ -235,8 +283,8 @@ int main(int argc, char **argv)
 	uint64_t fixture_timestamp;
 	char error[256] = {0};
 
-	if (argc != 3) {
-		fprintf(stderr, "usage: %s COEFFICIENTS PACKETS\n", argv[0]);
+	if (argc != 4) {
+		fprintf(stderr, "usage: %s COEFFICIENTS PACKETS INJECTION\n", argv[0]);
 		return EXIT_FAILURE;
 	}
 	mock_initialize(&mock);
@@ -262,6 +310,32 @@ int main(int argc, char **argv)
 		"AXI coefficient I/Q packing is wrong");
 	CHECK(*mock_register(&mock, PSS_REG_ACTIVE_COEFFICIENT_GENERATION) ==
 	      UINT32_C(0x07120001), "coefficient generation did not commit");
+
+	CHECK(pss_read_injection_file(argv[3], injection_samples,
+		error, sizeof(error)) == 0, error);
+	CHECK(pss_load_injection_fixture(&io, injection_samples,
+		UINT32_C(0x1a120001), 100U, &injection,
+		error, sizeof(error)) == 0, error);
+	CHECK(mock.injected[0] ==
+	      ((uint32_t)(uint16_t)injection_samples[0].i |
+	       (uint32_t)(uint16_t)injection_samples[0].q << 16),
+		"injection I/Q packing is wrong");
+	CHECK(pss_arm_injection(&io,
+		mock.current_index + PSS_DEFAULT_LEAD_SAMPLES,
+		100U, &injection, error, sizeof(error)) == 0, error);
+	CHECK(pss_wait_injection_complete(&io, UINT32_C(0x1a120001),
+		100U, &injection, error, sizeof(error)) == 0, error);
+	CHECK((injection.raw_status & PSS_INJECTION_COMPLETED) &&
+	      !(injection.raw_status &
+	        (PSS_INJECTION_REJECTED | PSS_INJECTION_MISMATCH |
+	         PSS_INJECTION_INFLIGHT)),
+		"injection terminal status is not clean");
+	CHECK(pss_arm_injection(&io,
+		UINT64_MAX - (PSS_INJECTION_SAMPLES - 2U),
+		100U, &injection, error, sizeof(error)) < 0,
+		"overflowing injection window was accepted");
+	CHECK(strstr(error, "overflows the accepted-sample index") != NULL,
+		"overflowing injection window returned the wrong error");
 
 	CHECK(pss_track_one(&io, &request, &result, error, sizeof(error)) == 0,
 		error);
@@ -293,8 +367,9 @@ int main(int argc, char **argv)
 	CHECK(*mock_register(&mock, PSS_REG_RESULT_STATUS) & 1U,
 		"failed-gate result should remain retained");
 
-	printf("STARLINK_PSSCTL_SELFTEST_PASS contract=1.1 taps=66 lags=61 "
+	printf("STARLINK_PSSCTL_SELFTEST_PASS contract=1.2 taps=66 lags=61 "
 	       "coefficient_iq_swap=1 atomic_telemetry=1 packet_fixture=1 "
+	       "injection_samples=130 injection_iq_swap=1 "
 	       "failure_retains_result=1\n");
 	return EXIT_SUCCESS;
 }
