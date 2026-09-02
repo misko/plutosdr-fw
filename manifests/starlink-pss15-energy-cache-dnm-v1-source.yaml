@@ -1,0 +1,122 @@
+# Source contract for the exact CI16 sliding-energy cache.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint implements indexed energy retention; it does not instantiate
+# FFT IP, join correlation results, normalize scores, or detect PSS.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-spectrum-product-dnm-v1-source.yaml
+supersedes_reason: "implement and synthesize exact absolute-indexed CI16 window energy without claiming a correlation join or normalized score"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: 8282a4a7b2aef1ff05f40f2342cca71e20521fd5
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-energy-cache-v1
+submodule_hdl_quantulum: 237f444c28007e28272c3ac6d96243f6f3296067
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/85
+firmware_main_gitlink_guard_merge_commit: dfe129b6eed7c7d9adbe4bd1d5451442284dce81
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+energy_cache_schema: starlink-pss15-energy-cache-v1
+energy_cache_input_format: ci16
+energy_cache_window_samples: 66
+energy_cache_sample_power_bits: 32
+energy_cache_window_energy_bits: 38
+energy_cache_entries: 2048
+energy_cache_addressing: absolute-index-range-plus-power-of-two-circular-address
+energy_cache_input_backpressured: false
+energy_cache_lookup_protocol: ready_valid
+energy_cache_same_cycle_newest_bypass: true
+energy_cache_oldest_overwrite_collision_found: false
+energy_cache_gap_restart_fail_closed: true
+energy_cache_index_restart_fail_closed: true
+energy_cache_flush_fail_closed: true
+energy_cache_disable_fail_closed: true
+energy_cache_stale_alias_rejected: true
+
+energy_cache_simulation_verdict: PASS
+energy_cache_primary_segment_samples: 2500
+energy_cache_primary_windows_checked: 2435
+energy_cache_total_writes_checked: 2443
+energy_cache_full_rollover_checked: true
+energy_cache_oldest_newest_lookup_checked: true
+energy_cache_stale_future_miss_checked: true
+energy_cache_backpressure_stability_checked: true
+energy_cache_same_cycle_newest_bypass_checked: true
+energy_cache_oldest_overwrite_refusal_checked: true
+energy_cache_gap_restart_checked: true
+energy_cache_index_restart_checked: true
+energy_cache_disable_checked: true
+
+energy_cache_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 1.960
+ooc_hold_whs_ns: 0.056
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 469
+ooc_total_ffs: 534
+ooc_ramb36e1: 2
+ooc_ramb18e1: 1
+ooc_bram_tiles: 2.5
+ooc_dsp48e1: 2
+
+isolated_planning_total_luts: 5882
+isolated_planning_total_ffs: 10101
+isolated_planning_total_bram_tiles: 35.5
+isolated_planning_total_dsp48e1: 28
+isolated_planning_total_includes: two_xfft_cores_phase_map_overlap_scheduler_spectrum_product_energy_cache
+isolated_planning_total_excludes: kernel_rom_fft_controller_result_fifo_exponent_restoration_normalizer_axi_cdc_shell_and_route_margin
+
+energy_cache_rtl_sha256: 6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009
+energy_cache_testbench_sha256: b700381314a0ce5e8245e0282ed3a4c8ff4488b8a4f68695c9c307665e5616b3
+acquisition_test_runner_sha256: e40dd5c756a3d204b61eaf52b7397d858446eda8cdc5bc8f49f352723d24cd4a
+energy_cache_ooc_runner_sha256: 6422a72a8ec15070b122aa478d4e87f6cd80db6bceb7f86b38e5e4b273719d52
+energy_cache_ooc_xdc_sha256: c073e2cf44e379656342ac45a0b34c043c04356747ead40c9db4871aaa0703fc
+energy_cache_ooc_tcl_sha256: 36dd5c709c04b0f5b438152f67c9794554a50a1779c2187ff0bbd86247e65eda
+acquisition_hdl_readme_sha256: 80bcdfaa2db13f8d366807b774867d57aec691f289be0f031241fc7dad86a857
+energy_cache_ooc_summary_sha256: f0720542c1f2dddb86b1717ecb4d0b6b76d61ec431c2b6d4f1688c59f3ae456c
+energy_cache_report_sha256: 84e77abece3c6e9cf8486575c782ff9287fa45c74ee286fb3f4ad47679a53f20
+energy_cache_evidence_test_sha256: 728cb77b1ac7bcfb9f4d320cd0275305aa7146a111002424819bb514a51a34a0
+starlink_plan_sha256: 025a1770345ac97f7963ee281fa2708c1d46a27c84c8d145976bc904e9dcb844
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_energy_cache_implemented: true
+rtl_score_frontend_implemented: false
+rtl_fft_instantiated: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

@@ -105,9 +105,6 @@ def test_spectrum_product_manifest_is_safe_and_binds_sources() -> None:
             "hdl/library/starlink_pss_acquisition/tb/"
             "tb_starlink_pss_spectrum_product.sv"
         ),
-        "acquisition_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
-        ),
         "spectrum_product_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/"
             "run_spectrum_product_ooc.sh"
@@ -120,19 +117,12 @@ def test_spectrum_product_manifest_is_safe_and_binds_sources() -> None:
             "hdl/library/starlink_pss_acquisition/"
             "synthesize_spectrum_product_ooc.tcl"
         ),
-        "acquisition_hdl_readme_sha256": (
-            "hdl/library/starlink_pss_acquisition/README.md"
-        ),
         "spectrum_product_ooc_summary_sha256": (
             "reports/starlink-pss15-spectrum-product-ooc-summary.txt"
         ),
         "spectrum_product_report_sha256": (
             "reports/STARLINK_PSS15_SPECTRUM_PRODUCT_V1.md"
         ),
-        "spectrum_product_evidence_test_sha256": (
-            "tests/test_starlink_spectrum_product_evidence.py"
-        ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
 
     assert "do_not_merge: true" in manifest
@@ -160,3 +150,26 @@ def test_spectrum_product_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # Shared acquisition sources and the living plan advance with the next
+    # independently checkpointed slice. Preserve this manifest's historical
+    # digests instead of rewriting the product checkpoint.
+    assert (
+        "acquisition_test_runner_sha256: "
+        "ba7820c4b9cb8ccefaa9957aca79d49985db8dd5c350c7d40521f21986527e39"
+        in manifest
+    )
+    assert (
+        "acquisition_hdl_readme_sha256: "
+        "43ca8d9d049705ae0c7339dcaef7f3f0aaa3ec1ef3f65a438501aa4984982068"
+        in manifest
+    )
+    assert (
+        "spectrum_product_evidence_test_sha256: "
+        "72d18939da8eeca86fca0d2880e02944b533140f2fd00d26e5f2d0f28fe7c1ef"
+        in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "0dae1b70ffe2ddfa51799e78f774a3912078e3830b965460c5d72c68b0724cd8"
+        in manifest
+    )

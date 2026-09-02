@@ -628,6 +628,25 @@ normalizer, phase-map connection, and complete route remain pending. Detailed
 evidence is in `reports/STARLINK_PSS15_SPECTRUM_PRODUCT_V1.md`; no radio was
 contacted.
 
+The exact 66-sample CI16 energy path is now implemented and source-locked at
+HDL commit `8282a4a7b2aef1ff05f40f2342cca71e20521fd5`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-energy-cache-v1`. It calculates the
+unsigned 38-bit sliding sum of `I^2 + Q^2`, retains 2,048 results by absolute
+candidate-start index, and exposes a ready/valid lookup for the later IFFT
+join. Full oldest/newest metadata rejects stale circular aliases; same-cycle
+newest writes bypass exactly, while an oldest-entry overwrite collision fails
+closed. A 2,500-sample, 15-MS/s-equivalent simulation compares all 2,435
+initial windows exactly and also covers rollover boundaries, lookup stalls,
+gap/index restarts, disable, two concurrent read/write cases, and 2,443 total
+energy writes. Vivado 2022.2 post-opt OOC at 100 MHz uses 469 LUTs, 534
+registers, two RAMB36E1 plus one RAMB18E1 (2.5 tiles), and two DSP48E1s, with
+setup WNS `+1.960 ns`, hold WHS `+0.056 ns`, zero methodology violations, and
+no nonempty `check_timing` category. The isolated planning subtotal is now
+5,882 LUTs, 10,101 registers, 35.5 BRAM tiles, and 28 DSPs. The correlation
+join, result FIFO, normalizer, FFT binding/controller, phase-map connection,
+and complete route remain pending. Detailed evidence is in
+`reports/STARLINK_PSS15_ENERGY_CACHE_V1.md`; no radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -972,6 +991,11 @@ builds. Starlink code is not part of any PPU commit.
   cross-language replay, eight-DSP inference, and 100 MHz post-opt OOC timing.
   FFT binding, coefficient ROM packaging, energy, exponent restoration,
   normalization, and score-to-map composition remain pending.
+- Complete for the exact input-energy checkpoint: every 66-sample CI16 window,
+  38-bit rolling arithmetic, 2,048-result absolute-index retention, stale/future
+  miss rejection, newest-write bypass, oldest-overwrite refusal, lookup stalls,
+  fail-closed lifecycle restarts, two-DSP/2.5-BRAM inference, and 100 MHz
+  post-opt OOC timing. Correlation joining and normalization remain pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

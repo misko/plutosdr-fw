@@ -1,0 +1,16 @@
+vivado_version=2022.2
+part=xc7z010clg400-1
+window_samples=66
+cache_entries=2048
+energy_bits=38
+clock_period_ns=10.000
+timing_scope=post_opt_unplaced
+setup_wns_ns=1.960
+hold_whs_ns=0.056
+methodology_violations=0
+check_timing_nonzero_categories=0
+total_luts=469
+total_ffs=534
+ramb36e1=2
+ramb18e1=1
+dsp48e1=2
