@@ -26,6 +26,33 @@ establish full-band Starlink reception. Full-band Gates 4 and 5 need a second
 serial-bound radio with physical AD9361/AD9364 attestation; otherwise those
 full-band pass states remain open by design.
 
+## 2026-09-02 Stage-15 hardware checkpoint
+
+The corrected ABI 1.1 image has now completed one exact-radio RAM lifecycle and
+one scheduled live tracker transaction under the `ad9361-1r1t` driver
+personality. The candidate boot, RX-only layout, controller contract,
+coefficient commit, sample-clock advance, one capture/correlation/reduction
+transaction, success-counter deltas, zero error-counter deltas, recovery, and
+final 2R2T restoration all passed. The candidate never wrote QSPI; the full
+QSPI partition SHA-256 was identical before, during, and after the RAM trial.
+
+This checkpoint is deliberately labeled
+`STAGE15_RAM_LIFECYCLE_AND_TRACKER_TRANSACTION_PASS`. Ambient samples were not
+controlled, so the reported winning lag is not a Starlink detection. Gate 3 is
+still open for the native `ad9363a-1r1t` profile, exact PHY/capture-rate and RF
+readbacks, deterministic accepted-sample injection, frozen negative controls,
+and live multi-frame PSS evidence. Those items remain mandatory before the
+15-MS/s engineering-advancement state can authorize Stage 30.
+
+The durable evidence index is
+`manifests/starlink-pss15-track-one-dnm-v3-hardware.yaml`. Its PPU operation
+commit is `fee84440efa7ac2f51100f61ffa2e3fb35ddb499`; post-trial PPU `main`
+is `f22f3c98aeec5284f123262ab0ce63b050841289`, including the tested
+180-second CLI window for the two-profile canonical setup path. The selected
+radio ended on persistent
+`v0.48-plutoplus-spf-iq-direct-async-v3`, verified `ad9361-2r2t`, four RX scan
+elements, and quiescent TX outputs.
+
 The authoritative device limits used by these gates are Analog Devices'
 [AD9363 data sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/AD9363.pdf)
 (up to 20 MHz channel bandwidth) and
@@ -624,19 +651,26 @@ proved.
 
 Current status ledger:
 
-- Gate 0: **COMPLETE - SOFTWARE ONLY / HARDWARE UNTESTED**;
+- Gate 0: **COMPLETE / HARDWARE-EXERCISED** on the selected unit through PPU
+  `fee8444`, with post-trial CLI timeout hardening on PPU `main` at `f22f3c9`;
 - Gate 2A diagnostic monitor: **COMPLETE OFFLINE** at the source-bound trusted
   run above; it is status plumbing, not PSS;
 - Gate 2B one-bank Stage-15 `TRACK_ONE`: the HDL `d30e7b3c` / firmware
   `5cc58cc` ABI 1.0 route and package are **SUPERSEDED / RADIO-FORBIDDEN**.
   ABI 1.1 has 210/210 corrected wrapper replay, a tested static-ARM host API,
-  source lock, and a passing fresh route; package, DMA/device-tree runtime
-  equivalence, and hardware qualification remain pending;
+  source lock, a passing fresh route and package, exact RX-only runtime layout,
+  and one passing hardware tracker transaction. Full DMA equivalence and the
+  advanced CFO/trace modes remain pending;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
-- every target-radio, 30 MS/s, 60 MS/s, campaign-close, and SSS gate: pending.
+- Gate 3: **PARTIAL SAFE CHECKPOINT** for `ad9361-1r1t`; native-AD9363A,
+  deterministic-injection, negative-control, and live-signal evidence remain
+  pending;
+- Gate 6 epilogue for this Stage-15 trial: **COMPLETE** with verified persistent
+  2R2T restoration and unchanged QSPI;
+- every 30 MS/s, 60 MS/s, full campaign-close, and SSS gate: pending.
 
-### Gate 0: PPU foundation on `main` - COMPLETE SOFTWARE ONLY
+### Gate 0: PPU foundation on `main` - COMPLETE / HARDWARE-EXERCISED
 
 - PPU `origin/main` commit `8074b228083240860843b0fb4dd4d5b46f06805b`
   (PR #109) contains target-aware setup, including merge `d70bf14`, and RX-only
@@ -649,10 +683,14 @@ Current status ledger:
   boot begins without a canonical absent-only private operation/RAM-receipt
   destination and its recorded SHA-256 path.
 
-Pass artifact: PPU `main` `8074b22`, green CI, 1,311 local tests with 11 hardware
-or browser skips, target-profile tests, and offline receipt/recovery fixtures.
-Starlink code is not part of that commit. Attached-radio behavior remains
-untested until Gate 3.
+Original pass artifact: PPU `main` `8074b22`, green CI, 1,311 local tests with
+11 hardware or browser skips, target-profile tests, and offline
+receipt/recovery fixtures. The hardware checkpoint then exercised the generic
+path through exact-route leasing, sysfs-pinned IIO re-enumeration, host-key
+rotation, v2 RAM receipts/recovery, and verified 1R1T-to-2R2T restoration at
+`fee8444`. Post-trial `f22f3c9` raises only the synchronous setup-execution CLI
+window to 180 seconds and passes 1,320 tests with 11 skips, Ruff, mypy, and both
+package builds. Starlink code is not part of either PPU commit.
 
 ### Gate 1: frozen oracle and 15 MS/s offline acquisition
 
