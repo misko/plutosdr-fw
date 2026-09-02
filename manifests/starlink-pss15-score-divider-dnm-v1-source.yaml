@@ -1,0 +1,129 @@
+# Source contract for one exact 69-bit-to-eight-bit rational score lane.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint implements one divider lane; it does not form ratios, join
+# correlation to energy, instantiate FFT IP, feed the phase map, or detect PSS.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-energy-cache-dnm-v1-source.yaml
+supersedes_reason: "implement and synthesize one exact fixed-latency rational score lane without claiming ratio formation, correlation joining, or normalized score-stream composition"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: 8755d94eefb65cba6155a28c8a4c9c3f2ec69e41
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-score-divider-v1
+submodule_hdl_quantulum: d9063862d92c3990f671974f75f8121ac499c142
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/86
+firmware_main_gitlink_guard_merge_commit: 0c6f96ef4d95426da4c62a4b30828e5535b7b5c4
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+score_divider_schema: starlink-pss15-score-divider-v1
+score_divider_ratio_bits: 69
+score_divider_score_bits: 8
+score_divider_score_maximum: 255
+score_divider_algorithm: eight_step_restoring_division_plus_exact_remainder_round
+score_divider_rounding: round_to_nearest_ties_to_even
+score_divider_zero_numerator_score: 0
+score_divider_zero_denominator_score: 0
+score_divider_numerator_ge_denominator_score: 255
+score_divider_calculation_iterations: 8
+score_divider_acceptance_interval_clocks_per_lane: 9
+score_divider_lane_clock_mhz: 100
+score_divider_planned_lane_count: 2
+score_divider_planned_aggregate_scores_per_second: 22222222.222222
+score_divider_start_index_bits: 64
+score_divider_output_stall_stable: true
+score_divider_flush_fail_closed: true
+
+score_divider_simulation_verdict: PASS
+score_divider_directed_vectors: 16
+score_divider_random_vectors: 4096
+score_divider_total_vectors: 4112
+score_divider_even_halfway_checked: true
+score_divider_odd_halfway_checked: true
+score_divider_zero_denominator_checked: true
+score_divider_saturation_checked: true
+score_divider_full_width_random_checked: true
+score_divider_backpressure_checked: true
+score_divider_mid_calculation_flush_checked: true
+score_divider_stalled_output_flush_checked: true
+score_divider_metadata_order_checked: true
+
+score_divider_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 0.962
+ooc_hold_whs_ns: 0.284
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts_per_lane: 599
+ooc_total_ffs_per_lane: 378
+ooc_ramb36e1_per_lane: 0
+ooc_ramb18e1_per_lane: 0
+ooc_bram_tiles_per_lane: 0
+ooc_dsp48e1_per_lane: 0
+
+isolated_planning_total_luts: 7080
+isolated_planning_total_ffs: 10857
+isolated_planning_total_bram_tiles: 35.5
+isolated_planning_total_dsp48e1: 28
+isolated_planning_total_includes: two_xfft_cores_phase_map_overlap_scheduler_spectrum_product_energy_cache_and_two_score_divider_lanes
+isolated_planning_total_excludes: kernel_rom_fft_controller_raw_result_fifo_score_preprocessor_dispatcher_ordered_merge_axi_cdc_shell_and_route_margin
+
+score_divider_rtl_sha256: 3d4b2f4e68fa44d227550d613c3d44bc7254177679a490835ac64adaefccb652
+score_divider_testbench_sha256: cc0f1a366472f46d68d1ac10576ba6446e4fe7c13df6faa523a7b0cd32dd4713
+score_divider_vector_generator_sha256: 25c7967aa0c317f314f58c17b06805d10aac0c4d9de081d26f4171f0092758a9
+acquisition_test_runner_sha256: 27071641be2d78ad4ea694fbba3d9238b6470d737ff1c605741e37e624d7921e
+score_divider_ooc_runner_sha256: f7c8c334ce60d9a517e0152ce1fe6b00b033d9101720a0e0d7626fa277a6136e
+score_divider_ooc_xdc_sha256: 0b1f0b62e703dde3b442abc31e66f96376d56d59b5b792e13f714b9a0ddb9fc8
+score_divider_ooc_tcl_sha256: b65ddda0b7a65470ff30b037d50a446942c557c95a5605ec881b34669f0c45b0
+acquisition_hdl_readme_sha256: ac490312c7f1053584fc2520db9d21f800f2184e78ff59abd2c337135b3b3d40
+score_divider_ooc_summary_sha256: 01be7ab19505f349e420825a412cb73038609ab3a4b96d0f12471e3469610374
+score_divider_report_sha256: ea26e515a59b16da1944d154fcd359a8ac63848c1c705c5aab5fb9812a94dc4e
+score_divider_evidence_test_sha256: a3e9043674fda44021db33eaa04a0896fc6b964cdeb574f46114263977f7b4fa
+starlink_plan_sha256: 0378d1fe2809196e595de1ee4f72c52f6b15b066428da58284efe1005b9298d4
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_energy_cache_implemented: true
+rtl_score_divider_lane_implemented: true
+rtl_score_preprocessor_implemented: false
+rtl_score_frontend_implemented: false
+rtl_raw_result_fifo_implemented: false
+rtl_two_lane_dispatch_implemented: false
+rtl_ordered_score_merge_implemented: false
+rtl_fft_instantiated: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

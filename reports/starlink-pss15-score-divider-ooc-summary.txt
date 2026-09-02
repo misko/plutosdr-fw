@@ -1,0 +1,16 @@
+vivado_version=2022.2
+part=xc7z010clg400-1
+ratio_bits=69
+score_bits=8
+restoring_iterations=8
+clock_period_ns=10.000
+timing_scope=post_opt_unplaced
+setup_wns_ns=0.962
+hold_whs_ns=0.284
+methodology_violations=0
+check_timing_nonzero_categories=0
+total_luts=599
+total_ffs=378
+ramb36e1=0
+ramb18e1=0
+dsp48e1=0

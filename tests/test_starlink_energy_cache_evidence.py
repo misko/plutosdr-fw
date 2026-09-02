@@ -4,16 +4,12 @@ import hashlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST = (
-    ROOT / "manifests" / "starlink-pss15-energy-cache-dnm-v1-source.yaml"
-)
+MANIFEST = ROOT / "manifests" / "starlink-pss15-energy-cache-dnm-v1-source.yaml"
 REPORT = ROOT / "reports" / "STARLINK_PSS15_ENERGY_CACHE_V1.md"
 SUMMARY = ROOT / "reports" / "starlink-pss15-energy-cache-ooc-summary.txt"
 PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 HDL_COMMIT = "8282a4a7b2aef1ff05f40f2342cca71e20521fd5"
-SUMMARY_SHA256 = (
-    "f0720542c1f2dddb86b1717ecb4d0b6b76d61ec431c2b6d4f1688c59f3ae456c"
-)
+SUMMARY_SHA256 = "f0720542c1f2dddb86b1717ecb4d0b6b76d61ec431c2b6d4f1688c59f3ae456c"
 
 
 def _sha256(path: Path) -> str:
@@ -55,18 +51,12 @@ def test_energy_cache_ooc_summary_is_frozen_and_passing() -> None:
 
 def test_energy_cache_contract_and_simulation_are_explicit() -> None:
     rtl = (
-        ROOT
-        / "hdl/library/starlink_pss_acquisition/"
-        "starlink_pss_energy_cache.v"
+        ROOT / "hdl/library/starlink_pss_acquisition/starlink_pss_energy_cache.v"
     ).read_text()
     testbench = (
-        ROOT
-        / "hdl/library/starlink_pss_acquisition/tb/"
-        "tb_starlink_pss_energy_cache.sv"
+        ROOT / "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_energy_cache.sv"
     ).read_text()
-    runner = (
-        ROOT / "hdl/library/starlink_pss_acquisition/run_tests.sh"
-    ).read_text()
+    runner = (ROOT / "hdl/library/starlink_pss_acquisition/run_tests.sh").read_text()
 
     assert "parameter integer WINDOW_SAMPLES = 66" in rtl
     assert "parameter integer CACHE_ENTRIES = 2048" in rtl
@@ -88,40 +78,24 @@ def test_energy_cache_manifest_is_safe_and_binds_sources() -> None:
     manifest = MANIFEST.read_text()
     bound_files = {
         "energy_cache_rtl_sha256": (
-            "hdl/library/starlink_pss_acquisition/"
-            "starlink_pss_energy_cache.v"
+            "hdl/library/starlink_pss_acquisition/starlink_pss_energy_cache.v"
         ),
         "energy_cache_testbench_sha256": (
-            "hdl/library/starlink_pss_acquisition/tb/"
-            "tb_starlink_pss_energy_cache.sv"
-        ),
-        "acquisition_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
+            "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_energy_cache.sv"
         ),
         "energy_cache_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/run_energy_cache_ooc.sh"
         ),
         "energy_cache_ooc_xdc_sha256": (
-            "hdl/library/starlink_pss_acquisition/"
-            "starlink_pss_energy_cache_ooc.xdc"
+            "hdl/library/starlink_pss_acquisition/starlink_pss_energy_cache_ooc.xdc"
         ),
         "energy_cache_ooc_tcl_sha256": (
-            "hdl/library/starlink_pss_acquisition/"
-            "synthesize_energy_cache_ooc.tcl"
-        ),
-        "acquisition_hdl_readme_sha256": (
-            "hdl/library/starlink_pss_acquisition/README.md"
+            "hdl/library/starlink_pss_acquisition/synthesize_energy_cache_ooc.tcl"
         ),
         "energy_cache_ooc_summary_sha256": (
             "reports/starlink-pss15-energy-cache-ooc-summary.txt"
         ),
-        "energy_cache_report_sha256": (
-            "reports/STARLINK_PSS15_ENERGY_CACHE_V1.md"
-        ),
-        "energy_cache_evidence_test_sha256": (
-            "tests/test_starlink_energy_cache_evidence.py"
-        ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
+        "energy_cache_report_sha256": ("reports/STARLINK_PSS15_ENERGY_CACHE_V1.md"),
     }
 
     assert "do_not_merge: true" in manifest
@@ -131,7 +105,10 @@ def test_energy_cache_manifest_is_safe_and_binds_sources() -> None:
     assert "radio_contacted_by_this_revision: false" in manifest
     assert f"submodule_hdl: {HDL_COMMIT}" in manifest
     assert "firmware_main_gitlink_guard_required: true" in manifest
-    assert "firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/85" in manifest
+    assert (
+        "firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/85"
+        in manifest
+    )
     assert (
         "firmware_main_gitlink_guard_merge_commit: "
         "dfe129b6eed7c7d9adbe4bd1d5451442284dce81" in manifest
@@ -149,3 +126,22 @@ def test_energy_cache_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # Shared acquisition sources and the living plan advance with the next
+    # independently checkpointed slice. Preserve this manifest's historical
+    # digests instead of rewriting the energy-cache checkpoint.
+    assert (
+        "acquisition_test_runner_sha256: "
+        "e40dd5c756a3d204b61eaf52b7397d858446eda8cdc5bc8f49f352723d24cd4a" in manifest
+    )
+    assert (
+        "acquisition_hdl_readme_sha256: "
+        "80bcdfaa2db13f8d366807b774867d57aec691f289be0f031241fc7dad86a857" in manifest
+    )
+    assert (
+        "energy_cache_evidence_test_sha256: "
+        "728cb77b1ac7bcfb9f4d320cd0275305aa7146a111002424819bb514a51a34a0" in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "025a1770345ac97f7963ee281fa2708c1d46a27c84c8d145976bc904e9dcb844" in manifest
+    )

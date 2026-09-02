@@ -263,6 +263,18 @@ Current control-plane evidence:
   five checks, and merged to firmware `main` as
   `fed8a275c21abac4360b2a55a2f0bda8828efa4e` before this parent advanced to
   the scheduler pin;
+- guard PR #84 appended the exact spectrum-product HDL pin, passed all five
+  checks, and merged to firmware `main` as
+  `60169ef8c35cca1ce18c062625141c78a4bb2d3b` before this parent advanced to
+  the spectrum-product pin;
+- guard PR #85 appended the exact energy-cache HDL pin, passed all five checks,
+  and merged to firmware `main` as
+  `dfe129b6eed7c7d9adbe4bd1d5451442284dce81` before this parent advanced to
+  the energy-cache pin;
+- guard PR #86 appended the exact rational score-divider HDL pin, passed all
+  five checks, and merged to firmware `main` as
+  `0c6f96ef4d95426da4c62a4b30828e5535b7b5c4` before this parent advanced to
+  the divider pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -647,6 +659,26 @@ join, result FIFO, normalizer, FFT binding/controller, phase-map connection,
 and complete route remain pending. Detailed evidence is in
 `reports/STARLINK_PSS15_ENERGY_CACHE_V1.md`; no radio was contacted.
 
+The exact eight-bit rational divider lane is now implemented and source-locked
+at HDL commit `8755d94eefb65cba6155a28c8a4c9c3f2ec69e41`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-score-divider-v1`. It accepts a
+69-bit normalized-power numerator and denominator, performs eight restoring
+iterations, and computes `round_ties_even(255*numerator/denominator)` exactly.
+Zero-denominator, zero-numerator, and unity-or-greater cases retain the same
+fixed calculation latency; output stalls and flushes are fail closed. A
+Python-generated 4,112-vector replay covers both directions of half-way ties,
+full-width random ratios, zero, saturation, metadata order, backpressure, and
+flush. Vivado 2022.2 post-opt OOC at 100 MHz uses 599 LUTs, 378 registers, no
+BRAM, and no DSP48E1s, with setup WNS `+0.962 ns`, hold WHS `+0.284 ns`, zero
+methodology violations, and no nonempty `check_timing` category. Two lanes
+therefore add 1,198 LUTs and 756 registers and have an aggregate initiation
+capacity of 22.22 million scores/s. The isolated two-lane planning subtotal is
+7,080 LUTs, 10,857 registers, 35.5 BRAM tiles, and 28 DSPs. The correlation
+power/exponent preprocessor, denominator product, raw-result FIFO, two-lane
+dispatcher/ordered merge, FFT binding/controller, phase-map connection, and
+complete route remain pending. Detailed evidence is in
+`reports/STARLINK_PSS15_SCORE_DIVIDER_V1.md`; no radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -996,6 +1028,13 @@ builds. Starlink code is not part of any PPU commit.
   miss rejection, newest-write bypass, oldest-overwrite refusal, lookup stalls,
   fail-closed lifecycle restarts, two-DSP/2.5-BRAM inference, and 100 MHz
   post-opt OOC timing. Correlation joining and normalization remain pending.
+- Complete for one exact rational score-divider lane: 69-bit numerator and
+  denominator, exact eight-bit ties-to-even quantization, fixed eight-iteration
+  calculation latency including zero/saturation cases, 4,112-vector
+  cross-language replay, stalls, flush, zero-DSP/zero-BRAM inference, and
+  100 MHz post-opt OOC timing. The wide score preprocessor, raw-result FIFO,
+  second lane, dispatcher, ordered merge, and IQ-to-score composition remain
+  pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run
