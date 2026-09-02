@@ -49,12 +49,7 @@ The native checkpoint is deliberately labeled
 `STAGE15_NATIVE_AD9363A_RATE_LOCKED_TRACKER_TRANSACTION_PASS`. It supersedes the
 trial-eligibility record, but does not upgrade the earlier `ad9361-1r1t` trial
 to an exact-rate claim. Both transactions used uncontrolled ambient samples,
-so neither winning lag is a Starlink detection. Gate 3 remains open for frozen
-RF-bandwidth/filter/gain and timestamp-slope evidence, sustained queue and
-continuity qualification, deterministic accepted-sample injection, frozen
-negative controls, and live multi-frame PSS evidence. Those items remain
-mandatory before the 15-MS/s engineering-advancement state can authorize Stage
-30.
+so neither winning lag is a Starlink detection.
 
 ABI 1.2 now closes the offline portion of the deterministic accepted-sample
 injection gate. A committed 130-sample fixture substitutes only I/Q at a future
@@ -68,19 +63,39 @@ bundled-CDC skew checks, zero tracker-critical CDC rows, and a one-RAMB18
 dual-clock fixture implementation. The corresponding immutable source graph is
 `manifests/starlink-pss15-injection-abi12-dnm-v1-source.yaml`.
 
-That is routed-FPGA and offline arithmetic evidence only. The Gate-3 radio pass
-still requires exact positive packet invariants, a predeclared oracle-rejection
-window, byte-exact observation of the injected 130 samples in RX DMA, sustained
-error-free scheduled operation, and the mandatory persistent 2R2T recovery.
-It is not an over-the-air PSS, frame-alignment, or SSS result.
+The exact ABI 1.2 bytes have now completed a native-AD9363A RAM lifecycle at
+15,000,000 S/s. Window zero matched all 19 frozen packet invariants; during a
+second transaction its 520 encoded bytes appeared exactly once in a concurrent
+4,000,000-sample RX DMA capture while the tracker again matched its oracle.
+Independent window one matched all 19 of its own invariants and differed from
+window zero at eight static packet words. Eight further sequential scheduled
+window-zero transactions were deterministic, all eight pipeline flow counters
+advanced by eight, and all 19 error counters remained zero. This closes the
+deterministic accepted-sample hardware, shared-DMA, oracle-rejection, and short
+sequential-repeat portions of Gate 3.
+
+The hardware checkpoint is deliberately labeled
+`STAGE15_NATIVE_AD9363A_HARDWARE_INJECTION_AND_DMA_PASS` and indexed by
+`manifests/starlink-pss15-injection-abi12-dnm-v2-hardware.yaml`, SHA-256
+`2f0aa755e92a34fa77ebed3bca7d57b4ffe93d347ffad52ccf028044a19ce5ad`.
+Its external-evidence checksum list has SHA-256
+`dd284b22aa89f0f315175e08ad4f2c35f316c6bf5608e105f96a213404c37927`.
+It does not claim prequeued queue-depth margin: the eight repeat requests were
+submitted sequentially. Gate 3 remains open for frozen
+RF-bandwidth/filter/gain and timestamp-slope evidence, prequeued 750-Hz
+queue-depth and continuity qualification, and live multi-frame PSS evidence.
+Those items remain mandatory before Stage 30. This is not an over-the-air PSS,
+frame-alignment, or SSS result.
 
 The ABI 1.2 source-locked RAM-only package also passes offline container
 qualification. Its DFU SHA-256 is
 `e407f7366e8745713ce582217fdcdae90fea2dbce271017cb5638c14fc2a1a7a`;
 the extracted FPGA payload is byte-identical to the qualified XSA bitstream,
 the packed rootfs contains the exact ABI 1.2 controller and fixtures, and
-`/opt/VERSIONS` names the immutable DNM source locks. The package remains
-hardware-unqualified and persistent-flash-ineligible.
+`/opt/VERSIONS` names the immutable DNM source locks. The package now has the
+scoped hardware-injection/DMA checkpoint above, but the complete firmware and
+Gate 3 remain hardware-unqualified and the package remains
+persistent-flash-ineligible.
 
 The earlier compatibility-profile index is
 `manifests/starlink-pss15-track-one-dnm-v3-hardware.yaml`; the native,
@@ -708,18 +723,20 @@ Current status ledger:
   `5cc58cc` ABI 1.0 route and package are **SUPERSEDED / RADIO-FORBIDDEN**.
   ABI 1.1 has 210/210 corrected wrapper replay, a tested static-ARM host API,
   source lock, a passing fresh route and package, exact RX-only runtime layout,
-  and one passing hardware tracker transaction. Full DMA equivalence and the
-  advanced CFO/trace modes remain pending. ABI 1.2 deterministic injection has
-  passing standalone and 210-window real replay, a tested static-ARM host API,
-  a passing full route, and a source-locked RAM-only package; target-radio
-  evidence remains pending;
+  and one passing hardware tracker transaction. The advanced CFO/trace modes
+  remain pending. ABI 1.2 deterministic injection has passing standalone and
+  210-window real replay, a tested static-ARM host API, a passing full route, a
+  source-locked RAM-only package, exact positive and independent-window packet
+  invariants on the target radio, one byte-exact shared RX-DMA observation, and
+  eight passing sequential repeat transactions;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
-- Gate 3: **PARTIAL RATE-LOCKED SAFE CHECKPOINT** for native
+- Gate 3: **PARTIAL HARDWARE-INJECTION/DMA CHECKPOINT** for native
   `ad9363a-1r1t`; its RAM lifecycle, exact 15 MS/s PHY/capture path, factor-1
-  FPGA path, and one tracker transaction passed. RF/filter/timestamp-slope,
-  sustained-queue, deterministic-injection hardware, negative-control, and
-  live-signal evidence remain pending;
+  FPGA path, deterministic injection, independent-window negative control,
+  byte-exact shared RX-DMA observation, and eight sequential repeat
+  transactions passed. RF/filter/timestamp-slope, prequeued 750-Hz queue-depth
+  and continuity, and live-signal evidence remain pending;
 - Gate 6 epilogue for both Stage-15 trials: **COMPLETE** with verified persistent
   2R2T restoration and unchanged QSPI;
 - every 30 MS/s, 60 MS/s, full campaign-close, and SSS gate: pending.
@@ -795,8 +812,10 @@ exact qualification-policy digest.
   offline for ABI 1.2: deterministic 130-sample accepted-path injection, shared
   tracker/RX-DMA fan-out structure, fail-closed arm/mismatch behavior,
   real-window injection replay, block-RAM CDC implementation, and a fresh full
-  route and package. Pending: byte-exact DMA observation and target-radio
-  evidence.
+  route and package. Complete on the exact target radio for ABI 1.2: positive
+  and independent-window packet invariants, byte-exact injected-sample
+  observation in a concurrent RX DMA capture, and short sequential
+  repeatability. Prequeued queue-depth and live-RF work remain Gate-3 items.
 - If the exact engine misses its budget, reduce parallelism or scheduling while
   preserving numerical behavior. Do not weaken oracle agreement.
 

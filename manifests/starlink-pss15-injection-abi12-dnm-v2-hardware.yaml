@@ -1,0 +1,237 @@
+# Exact-radio hardware evidence for the Stage-15 deterministic accepted-sample
+# injection ABI 1.2 firmware package. This is an evidence record, not a release
+# manifest.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. The candidate ran only from
+# RAM on the exact radio below. Deterministic injection proves the accepted-IQ
+# FPGA path shared by the tracker and RX DMA; it is not an over-the-air
+# Starlink PSS detection, frame-alignment result, or SSS result.
+
+schema: plutosdr-fw.hardware-evidence
+schema_version: 1
+release_state: ram-only-hardware-checkpoint
+do_not_merge: true
+do_not_release: true
+ram_boot_eligible: true
+persistent_flash_eligible: false
+
+evidence_label: STAGE15_NATIVE_AD9363A_HARDWARE_INJECTION_AND_DMA_PASS
+offline_manifest: starlink-pss15-injection-abi12-dnm-v1-offline.yaml
+offline_manifest_sha256: 72e50239ef6728a25677979cd62714b1dd24b2186e6e38891ace6519e723d25c
+gate_3_complete: false
+gate_3_remaining:
+  - frozen-rf-bandwidth-filter-gain-and-timestamp-slope-attestation
+  - prequeued-750hz-queue-depth-and-continuity-qualification
+  - live-multiframe-pss-qualification
+stage_30_authorized: false
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_usb_topology: 5-2
+qualification_usb_sysfs_path: /sys/bus/usb/devices/5-2
+qualification_usb_interface: enx00e0221686a8
+qualification_runtime_target: ad9363a-1r1t
+qualification_physical_rfic_record: AD9363A
+peer_radios_contacted: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_source: 279cc4f1a5a3dbcea1eda31d8eec29ed5b4857b7
+firmware_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-injection-abi12-v1
+device_fw: starlink-rx-only-dnm-v1-source/firmware-pss15-injection-abi12-v1
+image_sha256: e407f7366e8745713ce582217fdcdae90fea2dbce271017cb5638c14fc2a1a7a
+image_size: 12843983
+fit_body_sha256: 327a70f2faf865f40573ed479cbb2be93c1ad0ac2f33362446f08124d2092b5b
+fit_body_size: 12843967
+
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_commit: c70d46bb420de05112f2e60052025606321fc8f0
+qualification_utility_branch: main
+qualification_utility_clean: true
+qualification_utility_version: 0.1.0
+
+private_evidence_root: /home/mouse9911/.local/state/pluto-plus-utils/starlink-pss15-injection-abi12-v1-20260902
+native_setup_receipt_id: 38b0c40dceb54ba9bcb284239d46fedc
+native_setup_receipt_sha256: 4a913c9c2bfa412340bd86fda60a3ab7937d0b9b92955737e3680b395f2eeb35
+native_setup_target: ad9363a-1r1t
+native_setup_outcome: VERIFIED
+
+candidate_plan_schema: pluto-plus-utils.release-candidate-plan.v2
+candidate_plan_sha256: 4c4fc6392b6e10bbb94d5c651db1e02180afa7b2ba176a9afca18af532f36ada
+operation_plan_schema: pluto-plus-utils.release-candidate-operation-plan.v2
+operation_plan_id: 2109f926ace34bcdb658ba18e102814d
+operation_plan_sha256: c012b53ac111fe29da17ce18b32015d435a3f1caaf1726405f08cf108f9cabc1
+ram_receipt_schema: pluto-plus-utils.release-candidate-ram-receipt.v2
+ram_receipt_id: cc8b9df1e9d44016bbf0ad4beab9e0db
+ram_receipt_sha256: ff300c547f8891d4810b24414cc4a245c61529058773380b54351e7dfdf960cc
+ram_receipt_started_at: 2026-09-02T09:17:41.449507Z
+ram_receipt_completed_at: 2026-09-02T09:18:25.035947Z
+ram_receipt_outcome: PASS
+ram_transition: download-then-detach-e
+ram_transition_persistent_write: false
+ram_cleanup_verified: true
+ram_route_release_verified: true
+candidate_boot_id: a12f504f-1956-41fd-abb2-5b836c7cd77d
+
+persistent_qspi_partition: /dev/mtdblock3
+persistent_qspi_bytes: 31457280
+persistent_qspi_sha256_before: 07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7
+persistent_qspi_sha256_during_candidate: 07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7
+persistent_qspi_sha256_after_recovery: 07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7
+
+candidate_layout: rx-only
+candidate_root_device_tree_marker: misko,rx-only-fpga
+candidate_rx_dma_device: cf-ad9361-lpc
+candidate_tx_dma_device: null
+candidate_dds_device: null
+candidate_tandem_device: null
+candidate_phy_model: ad9363a
+candidate_rx_scan_channels: [voltage0, voltage1]
+candidate_tx_gain_db: -80.0
+candidate_tx_lo_powerdown: true
+
+source_rate_evidence_sha256: 0c2bda923e2b61500eb40d0c5801e68083a726f17313f432a2cc624f5e1c2e9f
+source_rate_evidence_access_path: direct-libiio
+requested_rate_hz: 15000000
+readback_phy_rate_hz: 15000000
+readback_capture_rate_hz: 15000000
+capture_rates_available_hz: [15000000, 1875000]
+fpga_decimation_factor: 1
+fpga_decimation_bypass: true
+adc_gp_control: 0x00000000
+
+tracker_info_sha256: 342fa33b664b23ec240967cf349e7683943d43456efd2ba7e086ae8d78c252f5
+tracker_identification: 0x50535354
+tracker_version: 0x00010002
+tracker_rate_msps: 15
+tracker_taps: 66
+tracker_capture_samples: 130
+tracker_raw_lags: 65
+tracker_qualified_lags: 61
+tracker_lag_min: -30
+tracker_lag_max: 30
+tracker_capabilities: 0x0000003d
+tracker_mmio_base: 0x79030000
+tracker_contract_valid: true
+
+coefficient_fixture_sha256: c660bf9a60fc112697a5939db4682e55a0ce9b5ef8c99f2e4dee7e2b328d62c2
+coefficient_generation: 0x07120001
+coefficient_load_evidence_sha256: ce9bbab1c88436c218e132636575e339bec270f8b12fdd7f74c8fdce4ef2fa82
+
+positive_window: 0
+positive_fixture_samples: 130
+positive_fixture_generation: 0x1a120001
+positive_track_request_id: 0x1a120001
+positive_track_result_sha256: f4d025008fd2d3b6e35a3d106f2c96f83bb993524f74fac1b9baab7a2b0bac60
+positive_oracle_verdict_sha256: e4c703dce0b4105de4b8a5ff6e7e46e15aead02a0f43404d0db76d4460b5de41
+positive_oracle_verdict: PASS
+positive_invariant_words_matched: 19
+positive_dynamic_words: [2, 3, 4, 5, 6, 8, 9]
+positive_winner_lag: -17
+positive_correlation_real: -2677861
+positive_correlation_imag: -18494852
+positive_sample_energy: 3747673
+positive_coefficient_energy: 1073725951
+positive_saturation_events: 0
+
+dma_layout_bytes_per_ci16_sample: 4
+dma_layout_probe_sha256: e4ef8165b8b147a47a5fef7451f078b8f52fdb1937b4e49770d95e175d2b3ec2
+dma_concurrent_capture_bytes: 16000000
+dma_concurrent_capture_samples: 4000000
+dma_concurrent_capture_sha256: ce92158bf1e568731f468e5602489e0ecea54759d794be03e35756fb39ce9414
+dma_injected_fixture_bytes: 520
+dma_injected_fixture_binary_sha256: 93cf482c63ac9ca94f11b7e1d55430d0ac09387e16217e684c8f6a2da3e0337e
+dma_injected_fixture_match_count: 1
+dma_injected_fixture_match_byte_offset: 15011712
+dma_injected_fixture_match_sample_offset: 3752928
+dma_verdict_sha256: 01a1c03d2e619d952379cdfb17caf48bb0b40f8a09b9074ac190dd2ea42e23f7
+dma_verdict: PASS
+dma_concurrent_track_request_id: 0x1a120002
+dma_concurrent_track_result_sha256: 12f9a46acdc88dd4ed93484e915455aa195406a2a8dac7a97485ba546e821f8e
+dma_concurrent_track_oracle_verdict_sha256: b1a12e122514531d832bcb7f6dce7021bb2eb8658db294e8244482da6db8cbfa
+dma_concurrent_track_oracle_verdict: PASS
+
+negative_control: independent-window-oracle-rejection
+negative_window: 1
+negative_fixture_text_sha256: 83006877c4827e9b23a9fe9d8e774863b4e3533c9c2e6f978d92d5fcb27df283
+negative_fixture_generation: 0x1a120002
+negative_track_request_id: 0x1a120003
+negative_track_result_sha256: 6dedff9a7ebe609c8f502f2310f55752e6a70075393ca6309464ffe994965b51
+negative_oracle_verdict_sha256: 66f72cade94ac19eaac8239d048fb6bfb3340901dcd8d79b681b2d1069d94385
+negative_oracle_verdict: PASS
+negative_window1_invariant_words_matched: 19
+negative_window0_static_mismatch_words: [7, 11, 13, 14, 15, 20, 21, 23]
+negative_winner_lag: -19
+negative_correlation_real: -18753545
+negative_correlation_imag: 5180566
+
+repeat_scope: eight-sequential-scheduled-transactions-not-queue-depth
+repeat_fixture_generation: 0x1a120003
+repeat_transactions: 8
+repeat_verdict_sha256: 8739bc3abc76d85ff1a7d14787b5879b50f161b486a84820c75368fa3c0169db
+repeat_verdict: PASS
+repeat_all_oracle_invariants_match: true
+repeat_deterministic_winner_lag: -17
+repeat_deterministic_correlation_real: -2677861
+repeat_deterministic_correlation_imag: -18494852
+repeat_success_counter_delta_each: 8
+repeat_error_counters_all_zero: true
+final_total_admitted: 11
+final_total_completed_capture: 11
+final_total_result_consumed: 11
+final_tracker_counters_sha256: 6a28c6eac551919c1cbcbb642d028d2f274ee461e463a7706c9a7fd12e1f1a44
+final_injection_status_sha256: 3bb175200f4d509015d0447eb8e8b41010e17aeffc1acd13cec0709b9678f772
+final_injection_active: false
+final_injection_rejected: false
+final_injection_mismatch: false
+
+recovery_receipt_schema: pluto-plus-utils.release-candidate-recovery-receipt.v2
+recovery_receipt_id: 387191c66e0448a5aee90e92e23b12fa
+recovery_receipt_sha256: b70f248c4059aa6c74eff13c5a883c25b4d5c7108d932a91cd68fd614f5b7f32
+recovery_action: persistent-reset
+recovery_persistent_write: false
+recovery_pre_reset_usb_departure_verified: true
+recovery_qspi_unchanged: true
+recovery_cleanup_verified: true
+recovery_route_release_verified: true
+recovered_firmware: v0.48-plutoplus-spf-iq-direct-async-v3
+recovered_runtime_target: ad9363a-1r1t
+recovered_boot_id: 989c61bd-220e-46ad-a570-82d6fcd8961e
+
+final_setup_receipt_schema: 4
+final_setup_receipt_id: a04194a3c6eb4f3c83308ff8c8ec97af
+final_setup_receipt_sha256: 34af9128a3a5365cb6c97333a53b1397f5deeeebd90f8bc05789c1dae6dae7b4
+final_setup_response_sha256: a8b044c96942f929378d37fdb12d1fa00cd1b23eb4ac74ec7525fded97b25d99
+final_setup_target: ad9361-2r2t
+final_setup_outcome: VERIFIED
+final_boot_provenance: qspi_reboot_verified
+final_setup_fit_sha256: db777ac93d5c6f0be0cf2799808a4d06fe39264ee1e99e76001509394d75f1df
+final_live_phy_model: ad9361
+final_uboot_compatible: ad9361
+final_uboot_mode: 2r2t
+final_rx_scan_channels: [voltage0, voltage1, voltage2, voltage3]
+final_rx_lo_5g8_readback_hz: 5800000000
+final_tx_hardwaregain_db: [-80.0, -80.0]
+final_tx_safe: true
+final_route_absent: true
+final_control_daemon_stopped: true
+
+execution_path: exact-target-radio-routed-fpga
+stimulus_source: internal-accepted-sample-test-mux
+claim_scope: accepted-sample-path-hardware-and-shared-rx-dma
+radio_contacted: true
+dfu_transfer_performed: true
+ram_boot_performed: true
+persistent_flash_performed: false
+ram_lifecycle_qualified: true
+native_ad9363a_profile_qualified: true
+source_locked_rate_qualified: true
+tracker_transaction_qualified: true
+hardware_injection_qualified: true
+hardware_dma_injection_qualified: true
+negative_control_qualified: true
+sequential_repeat_qualified: true
+queue_depth_qualified: false
+hardware_qualified: false
+persistent_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
