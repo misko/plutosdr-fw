@@ -169,6 +169,33 @@ def test_abi12_batch_and_clock_contract_is_frozen_without_rtl_changes() -> None:
     assert "clock_slope=1" in selftest
 
 
+def test_abi12_batch_hardware_evidence_keeps_rt_and_live_signal_boundaries() -> None:
+    evidence = _read(
+        "manifests/starlink-pss15-batch-clock-dnm-v2-hardware.yaml"
+    )
+    plan = _read("STARLINK_PSS_15_30_60_PLAN.md")
+
+    assert "do_not_merge: true" in evidence
+    assert "persistent_flash_eligible: false" in evidence
+    assert "stage_30_authorized: false" in evidence
+    assert "passing_scheduler_policy: SCHED_FIFO" in evidence
+    assert "passing_scheduler_priority: 80" in evidence
+    assert "passing_primary_request_count: 45000" in evidence
+    assert "passing_primary_maximum_inflight: 7" in evidence
+    assert "passing_primary_all_error_counter_deltas_zero: true" in evidence
+    assert "ordinary_scheduler_qualified: false" in evidence
+    assert "queue_depth_conditionally_qualified: true" in evidence
+    assert "live_multiframe_pss_qualified: false" in evidence
+    assert "over_the_air_starlink_pss_detected: false" in evidence
+    assert "final_setup_target: ad9361-2r2t" in evidence
+    assert "final_route_absent: true" in evidence
+    assert "final_control_daemon_stopped: true" in evidence
+
+    assert "SCHED_FIFO` priority 80" in plan
+    assert "ordinary best-effort Linux scheduling is explicitly unqualified" in plan
+    assert "does not authorize Stage 30" in plan
+
+
 def test_top_level_holds_digital_tx_bus_static() -> None:
     top = _read("hdl/projects/pluto/system_top.v")
 

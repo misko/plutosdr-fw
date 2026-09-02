@@ -87,15 +87,16 @@ queue-depth and continuity qualification, and live multi-frame PSS evidence.
 Those items remain mandatory before Stage 30. This is not an over-the-air PSS,
 frame-alignment, or SSS result.
 
-The next Gate-3 revision is now source-frozen in
+The next Gate-3 revision was source-frozen in
 `manifests/starlink-pss15-batch-clock-dnm-v1-source.yaml`. It reuses the exact
 ABI 1.2 RTL and routed XSA and adds a fail-closed host controller for seven-deep
 prequeue/refill, ordered NDJSON result capture, aggregate counter gates, and
 accepted-sample clock-slope measurements. The offline mock fills all seven
 usable command slots, drains and refills twelve ordered requests, rejects
 overlapping geometry, overflowing request IDs, saturated counters, bad clock
-slope, and immediate next-result publication after release. This source state
-has not contacted a radio and makes no hardware claim.
+slope, and immediate next-result publication after release. The immutable
+source tag itself predates radio contact; its subsequent exact-radio evidence is
+recorded separately below.
 
 The frozen hardware qualification is 15,000,000 S/s, 15 MHz RF bandwidth,
 factor-one FPGA capture, FIR disabled, slow-attack gain, five one-second clock
@@ -107,6 +108,30 @@ runs. Every flow counter must advance by exactly 45,000, every error-counter
 delta must be zero, and all request/center/timestamp steps must be exact. This
 closes only RF-path, clock, queue, and continuity evidence; live multi-frame PSS
 remains a separate open Gate-3 item.
+
+That hardware run is now complete and indexed by
+`manifests/starlink-pss15-batch-clock-dnm-v2-hardware.yaml`, SHA-256
+`de8f1d37c16992a0e6729fc125a440649c1c561d1f3b40172f1b6a68afc52d0b`.
+Its external-evidence checksum list has SHA-256
+`2d4f61732cbbdea4778620b2dfc6f43ce35a6f0ff30f1f0b58329b2584848b38`.
+The 750-result smoke filled all seven usable entries and passed. Five one-second PPU counter
+observations and five tracker-counter observations passed before/after the
+primary work, together with exact 15 MHz RF-bandwidth, FIR-off, slow-attack
+gain, and factor-one capture readbacks. The final primary run produced 45,000
+ordered results over 60.065 seconds while four 4,000,000-sample DMA segments
+completed; every success counter advanced exactly 45,000 and all error
+counters remained zero.
+
+The scheduling condition is material. Streaming result JSON over USB Ethernet
+failed with four result overruns. Moving JSON to radio-local tmpfs under the
+ordinary scheduler still failed at ordinal 232 when lead fell below 65,536
+samples, again with four result overruns. Radio-local spooling under
+`SCHED_FIFO` priority 80 passed with a minimum measured lead of 128,727 samples.
+Therefore the seven-entry queue is qualified only with that real-time policy;
+ordinary best-effort Linux scheduling is explicitly unqualified. This is useful
+Stage-15 implementation/transport evidence, not live Starlink detection. Live
+multi-frame PSS remains open, and this plan does not authorize Stage 30 until
+that final Stage-15 item is reviewed.
 
 The ABI 1.2 source-locked RAM-only package also passes offline container
 qualification. Its DFU SHA-256 is
@@ -758,13 +783,16 @@ Current status ledger:
   eight passing sequential repeat transactions;
 - Gate 1 and the remaining Gate 2 modes/equivalence bundle: in progress or
   pending;
-- Gate 3: **PARTIAL HARDWARE-INJECTION/DMA CHECKPOINT** for native
+- Gate 3: **IMPLEMENTATION/RADIO-TRANSPORT PASS WITH MANDATORY RT POLICY; LIVE
+  PSS OPEN** for native
   `ad9363a-1r1t`; its RAM lifecycle, exact 15 MS/s PHY/capture path, factor-1
   FPGA path, deterministic injection, independent-window negative control,
-  byte-exact shared RX-DMA observation, and eight sequential repeat
-  transactions passed. RF/filter/timestamp-slope, prequeued 750-Hz queue-depth
-  and continuity, and live-signal evidence remain pending;
-- Gate 6 epilogue for both Stage-15 trials: **COMPLETE** with verified persistent
+  byte-exact shared RX-DMA observation, RF/filter/timestamp-slope, seven-entry
+  prequeue, and 45,000-result 750-Hz continuity with four concurrent DMA
+  segments passed. Queue continuity requires radio-local result spooling and
+  `SCHED_FIFO` priority 80; ordinary scheduling failed. Live multi-frame PSS
+  evidence remains pending;
+- Gate 6 epilogue for all Stage-15 trials: **COMPLETE** with verified persistent
   2R2T restoration and unchanged QSPI;
 - every 30 MS/s, 60 MS/s, full campaign-close, and SSS gate: pending.
 
