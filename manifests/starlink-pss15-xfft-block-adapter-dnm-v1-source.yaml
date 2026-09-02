@@ -1,0 +1,153 @@
+# Source contract for one strict generated-XFFT protocol boundary adapter.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# No generated XFFT, coefficient ROM, complete IQ replay, phase-map connection,
+# RX-only shell, or hardware qualification is included in this checkpoint.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-candidate-score-path-dnm-v1-source.yaml
+supersedes_reason: "add a timing-clean, fail-closed forward/inverse generated-XFFT control and metadata boundary without claiming transform instantiation or IQ-to-score completion"
+superseded_manifest_metadata_correction: "the candidate-score-path manifest accidentally recorded its HDL annotated-tag object as submodule_hdl_quantulum; this superseding manifest restores the unchanged hdl-quantulum gitlink"
+superseded_manifest_recorded_hdl_quantulum: 70142c3d495b787857173d0dc8cc59da67bcf242
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: b8657819e56c9a2b836319e9b9b8596fc4ce3204
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-xfft-block-adapter-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/90
+firmware_main_gitlink_guard_merge_commit: 68ef649d2fd76b62f437148a222f0881d50ea7f2
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+xfft_block_adapter_schema: starlink-pss15-xfft-block-adapter-v1
+xfft_block_adapter_transform_samples: 512
+xfft_block_adapter_data_bits: 24
+xfft_block_adapter_tuser_bits: 24
+xfft_block_adapter_status_bits: 8
+xfft_block_adapter_maximum_blocks_inflight: 1
+xfft_block_adapter_core_reset_low_cycles_after_flush: 2
+xfft_block_adapter_forward_config_word: 1
+xfft_block_adapter_inverse_config_word: 0
+xfft_block_adapter_natural_order_index_checked: true
+xfft_block_adapter_input_tlast_checked: true
+xfft_block_adapter_output_tlast_checked: true
+xfft_block_adapter_block_start_identity_checked: true
+xfft_block_adapter_status_padding_checked: true
+xfft_block_adapter_tuser_padding_checked: true
+xfft_block_adapter_status_exponent_matches_tuser: true
+xfft_block_adapter_missing_status_publishes_output: false
+xfft_block_adapter_fault_quarantine_sticky_until_flush: true
+xfft_block_adapter_data_halt_events_are_telemetry: true
+xfft_block_adapter_status_halt_is_fault: true
+
+xfft_block_adapter_simulation_verdict: PASS
+acquisition_simulation_suite_tests: 14
+xfft_block_adapter_complete_input_blocks_checked: 2
+xfft_block_adapter_complete_output_blocks_checked: 1
+xfft_block_adapter_exact_inputs_checked: 512
+xfft_block_adapter_exact_outputs_published: 512
+xfft_block_adapter_forward_direction_checked: true
+xfft_block_adapter_inverse_direction_checked: true
+xfft_block_adapter_configuration_before_data_checked: true
+xfft_block_adapter_status_before_output_checked: true
+xfft_block_adapter_input_and_output_stalls_checked: true
+xfft_block_adapter_nonfatal_data_halt_events_checked: 2
+xfft_block_adapter_input_fault_cases_checked: 1
+xfft_block_adapter_output_fault_cases_checked: 1
+xfft_block_adapter_status_fault_cases_checked: 2
+xfft_block_adapter_core_tlast_fault_cases_checked: 1
+xfft_block_adapter_flush_recovery_checked: true
+
+xfft_block_adapter_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 2.328
+ooc_hold_whs_ns: 0.269
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 103
+ooc_total_ffs: 111
+ooc_ramb36e1: 0
+ooc_ramb18e1: 0
+ooc_dsp48e1: 0
+ooc_initial_overcoupled_design_rejected: true
+ooc_initial_overcoupled_setup_wns_ns: -1.018
+ooc_initial_overcoupled_methodology_rule: TIMING-16
+ooc_complete_route_required: true
+
+two_adapter_planning_luts: 206
+two_adapter_planning_ffs: 222
+two_adapter_planning_bram_tiles: 0
+two_adapter_planning_dsp48e1: 0
+isolated_planning_total_luts: 8056
+isolated_planning_total_ffs: 12150
+isolated_planning_total_bram_tiles: 37.5
+isolated_planning_total_dsp48e1: 32
+isolated_planning_total_includes: two_xfft_cores_two_xfft_adapters_phase_map_overlap_scheduler_spectrum_product_energy_cache_and_composed_candidate_score_path
+isolated_planning_total_excludes: coefficient_rom_generated_xfft_composition_control_ci16_conversion_phase_generator_axi_cdc_control_shell_debug_telemetry_and_route_margin
+isolated_planning_total_is_additive_ooc_only: true
+
+xfft_block_adapter_rtl_sha256: 6f04bdd6b5333a2ce47c68c2d0b173e5eaf2a4fb79473f74ce33dc81caced6f7
+xfft_block_adapter_testbench_sha256: 9be35f745a5c70e0bbfab12605b0c0043d6267263f3b69d75e1e9b203e30aeff
+acquisition_test_runner_sha256: ab44c095326f8b57fba91ab67a1e2d3d8951d389dcd2d8e156ae334176682726
+acquisition_hdl_readme_sha256: 6ef866a0caf63ca9dea6f70e10a277d1c3ba35b022a27f4801a02b3a7acc7ae8
+xfft_block_adapter_ooc_runner_sha256: b09624524589caaf7fd8b9b0b31e083287f1a7b561100e12c1f116be28a64c97
+xfft_block_adapter_ooc_xdc_sha256: 5958f1af448c0c498301cac5388893f73532735bbd2010ec511d0ca252fc2cb5
+xfft_block_adapter_ooc_tcl_sha256: 370e66dd64277560968485f52589e9e7a99214a935cb988d9ce7b338435a4d3d
+xfft_block_adapter_ooc_summary_sha256: 599ca4afa10a9164227834956e45f7e34d8084a4436fa267aa52563cc0570501
+candidate_path_historical_evidence_test_sha256: 4023a8838578a61f01f1a23a4f58189074b49303be4bd212ff05780d6a09c8c2
+xfft_block_adapter_report_sha256: 442e0ca5bc093f299dc2b466cb157c3474dab5d2b9097297cce1cc1b1642fd5f
+xfft_block_adapter_evidence_test_sha256: a56ca4d989c56d1bec8f700930e042d9ddc20c23677a58c97d3734a540da1149
+starlink_plan_sha256: 289fe67191017d07da02dab83389a2467d7a06f9140f31f98d2f4b60ed00f571
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_energy_cache_implemented: true
+rtl_score_divider_lane_implemented: true
+rtl_score_preprocessor_implemented: true
+rtl_raw_result_fifo_implemented: true
+rtl_ifft_qualifier_implemented: true
+rtl_energy_join_implemented: true
+rtl_two_lane_dispatch_implemented: true
+rtl_ordered_score_merge_implemented: true
+rtl_candidate_score_path_composed: true
+rtl_xfft_block_adapter_implemented: true
+rtl_xfft_forward_inverse_config_qualified: true
+rtl_fft_instantiated: false
+rtl_coefficient_rom_packaged: false
+rtl_raw_iq_to_score_complete: false
+rtl_phase_map_connected_to_score_path: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

@@ -87,7 +87,10 @@ def test_candidate_score_path_contract_and_simulation_are_explicit() -> None:
     assert "score_valid = lane_score_valid && !path_fault" in score_path
     assert "dense 512-result IFFT block was backpressured" in integration_test
     assert "CANDIDATE_SCORE_PATH_PASS" in integration_test
-    assert "missing energy did not fail closed before score publication" in integration_test
+    assert (
+        "missing energy did not fail closed before score publication"
+        in integration_test
+    )
     assert "def exact_score(" in integration_oracle
     assert "quotient, remainder = divmod(255 * numerator, denominator)" in score_oracle
     assert "tb_starlink_pss_candidate_score_path" in runner
@@ -205,5 +208,31 @@ def test_candidate_score_path_manifest_is_safe_and_binds_sources() -> None:
     assert "hardware_qualified: false" in manifest
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
+    historical_shared_files = {
+        "acquisition_test_runner_sha256",
+        "acquisition_hdl_readme_sha256",
+        "candidate_score_path_evidence_test_sha256",
+        "starlink_plan_sha256",
+    }
     for field, relative in bound_files.items():
+        if field in historical_shared_files:
+            continue
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # These living files advance with later independently checkpointed slices.
+    # Preserve the candidate-score checkpoint's reviewed historical digests.
+    assert (
+        "acquisition_test_runner_sha256: "
+        "76dd8e7c6e416cfa83f1c7e3655bec0bfce4197d2f93dccbc38221d17a9246ce" in manifest
+    )
+    assert (
+        "acquisition_hdl_readme_sha256: "
+        "ba1fc66e0b3b7b298ad0ad4db777ba12e0122650175d8a6e00dba924a232ae84" in manifest
+    )
+    assert (
+        "candidate_score_path_evidence_test_sha256: "
+        "9ba381d60db9cd24cca03997f79ceb8d85ea80f4fde22c866cf61301d267a184" in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "af9c68d7e7444b9b2da1e37767868e9d6a613a4af3dbcbdc662f9440b007944e" in manifest
+    )

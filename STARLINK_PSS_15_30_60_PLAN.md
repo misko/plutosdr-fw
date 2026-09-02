@@ -287,6 +287,10 @@ Current control-plane evidence:
   passed all five checks, and merged to firmware `main` as
   `e1966f5fe20370aa841e16143eb05c94152ea8eb` before this parent advanced to
   the candidate-score-path pin;
+- guard PR #90 appended the exact strict XFFT block-adapter HDL pin, passed all
+  five checks, and merged to firmware `main` as
+  `68ef649d2fd76b62f437148a222f0881d50ea7f2` before this parent advanced to
+  the XFFT-adapter pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -760,6 +764,30 @@ and 32 DSPs. The generated XFFT wrapper/controller, coefficient ROM, complete
 CI16 IQ-to-score replay, phase-map connection, full RX-only route, and hardware
 qualification remain pending. Detailed evidence is in
 `reports/STARLINK_PSS15_CANDIDATE_SCORE_PATH_V1.md`; no radio was contacted.
+
+The strict generated-XFFT protocol boundary is now implemented and
+source-locked at HDL commit `b8657819e56c9a2b836319e9b9b8596fc4ce3204`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-xfft-block-adapter-v1`. One adapter
+stretches generated-core reset, sends a fixed forward or inverse configuration
+before data, permits one 512-sample block in flight, and binds its absolute
+start identity to natural-order TUSER indexes, TLAST, and the independently
+reported block exponent. Missing status stalls publication; malformed input,
+output, status, or hard XFFT events latch quarantine until explicit common
+flush. A mock-core simulation covers 512 exact inputs and outputs through
+independent stalls, both direction words, status-before-output, five fault
+classes, nonfatal halt telemetry, and flush recovery. The first over-coupled
+fault gate correctly failed timing at `-1.018 ns`; the final one-block-aware
+architecture passes Vivado 2022.2 post-opt OOC at 100 MHz using 103 LUTs, 111
+registers, no BRAM/DSP, setup WNS `+2.328 ns`, hold WHS `+0.269 ns`, zero
+methodology violations, and no nonempty `check_timing` category. Two adapters
+raise the isolated planning subtotal to 8,056 LUTs, 12,150 registers, 37.5 BRAM
+tiles, and 32 DSPs. No generated core is instantiated yet. Detailed evidence
+is in `reports/STARLINK_PSS15_XFFT_BLOCK_ADAPTER_V1.md`; no radio was contacted.
+Its superseding manifest also corrects the prior candidate-score manifest's
+provenance-only `hdl-quantulum` field from the accidentally recorded HDL tag
+object `70142c3d...` to the unchanged gitlink
+`364b3dc7e770c3971d1f41a75c00e6cae76e2e6d`; the immutable older tag is not
+rewritten.
 
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
