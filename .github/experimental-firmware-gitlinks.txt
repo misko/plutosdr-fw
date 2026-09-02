@@ -22,3 +22,4 @@ hdl 2c9e564350e1c42d9aa5b14e7ee61929a754f1fd starlink-pss15-overlap-scheduler-hd
 hdl 5b2cdd3ba81e98ab3f752f334a34054d0b48f237 starlink-pss15-spectrum-product-hdl-v1
 hdl 8282a4a7b2aef1ff05f40f2342cca71e20521fd5 starlink-pss15-energy-cache-hdl-v1
 hdl 8755d94eefb65cba6155a28c8a4c9c3f2ec69e41 starlink-pss15-score-divider-hdl-v1
+hdl 078e725389c8c790e1f3c3c612b242697f87de77 starlink-pss15-score-prepare-hdl-v1
