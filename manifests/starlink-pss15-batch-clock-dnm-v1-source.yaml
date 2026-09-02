@@ -1,0 +1,172 @@
+# Immutable source and qualification contract for the Stage-15 ABI 1.2
+# prequeued 750 Hz continuity controller.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. The FPGA ABI and routed XSA
+# are unchanged from the deterministic injection checkpoint. This revision
+# adds only a serial-locked userspace batch/clock controller and offline tests.
+# Hardware use is eligible only through the PPU RAM-candidate lifecycle on the
+# exact radio below, followed by mandatory persistent recovery and 2R2T setup.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_usb_topology: 5-2
+qualification_usb_sysfs_path: /sys/bus/usb/devices/5-2
+qualification_usb_interface: enx00e0221686a8
+qualification_runtime_target: ad9363a-1r1t
+qualification_physical_rfic_record: AD9363A
+peer_radios_required: false
+peer_radios_contacted_by_source_work: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-injection-abi12-dnm-v1-source.yaml
+supersedes_reason: "add fail-closed batch scheduling and accepted-sample clock evidence without changing ABI 1.2 RTL"
+
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_branch: main
+qualification_utility_version: 0.1.0
+qualification_utility_required_api: configure_exact_usb_rx_only_source_locked_rate
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/iq-direct-async-v3-source/libiio-v1
+libiio_0_25_archive_sha256: 66ccc7230ebe75c477c4dfc147aa86289c3f896c0a0d6b3b6c964e152d89c266
+
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+metadata_repo: https://github.com/misko/plutosdr-fw.git
+metadata_ref: refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1
+submodule_hdl: ecf2ee383e86dced8189964ab4c6b28a47ee208f
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3-evidence
+submodule_hdl_rtl_source: e106eabf79245f394fe1ef43fc4a274779e9fc0a
+submodule_hdl_rtl_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/starlink-rx-only-dnm-v1-source/linux-v2
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-injection-abi12-v3-evidence
+versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1
+versions_linux: starlink-rx-only-dnm-v1-source/linux-v2
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+
+tracker_identification: 0x50535354
+tracker_version: 0x00010002
+tracker_rate_msps: 15
+tracker_geometry: 0x003d8242
+tracker_capabilities: 0x0000003d
+tracker_mmio_base: 0x79030000
+tracker_taps: 66
+tracker_capture_samples: 130
+tracker_qualified_lags: 61
+tracker_command_fifo_storage: 8
+tracker_command_fifo_usable: 7
+tracker_rtl_changed: false
+tracker_xsa_reused: true
+
+host_batch_command: track-batch
+host_batch_output: ndjson-results-plus-summary
+host_batch_result_words_each: 26
+host_batch_maximum_count: 1000000
+host_batch_fail_closed_packet_validation: true
+host_batch_fail_closed_saturation_rejection: true
+host_batch_fail_closed_counter_headroom: true
+host_batch_success_counter_gate: exact-count
+host_batch_error_counter_gate: exact-zero-delta
+host_batch_radio_serial_guard: mandatory-before-devmem
+
+host_header_sha256: cc72464fdf31ac9f242672ba4fd0dba8d5ba5f24ddee4fb1fe523424b0b9aaf8
+host_library_sha256: 1f8f36234f88c98d28534e91509c56f44a8cd63ddd6d835caab2ddb4fedc1dfe
+host_cli_sha256: 6b3005acd624b53dbd7ff005a1f6570da8effb8d9fb67f44646b0e0af6da529d
+host_selftest_sha256: 9cfbe2eed836f0d62ffa83b175e0a27faed5bae319ba24b1fff7a5556902ade6
+host_makefile_sha256: 5478b893c5e1b591e610521d83cb48d540df93102770726684a0721ddffc002b
+host_readme_sha256: c90d46b5467fcbe530c7213d9daa0563effbaf633ed8279a5a04434f36712cf8
+
+stage15_sample_rate_requested_hz: 15000000
+stage15_sample_rate_readback_hz: 15000000
+stage15_fpga_decimation_factor: 1
+stage15_fpga_decimation_bypass: true
+stage15_rf_bandwidth_requested_hz: 15000000
+stage15_rf_bandwidth_readback_hz: 15000000
+stage15_fir_enabled_requested: false
+stage15_fir_enabled_readback: false
+stage15_gain_mode_requested: slow_attack
+stage15_gain_mode_readback: slow_attack
+stage15_hardware_gain: observational-under-agc
+stage15_rx_path_rates_required: nonempty
+stage15_trx_rate_governor_required: nonempty
+
+ppu_counter_register: 0x800000b8
+ppu_counter_width_bits: 32
+tracker_counter_width_bits: 64
+clock_observation_duration_ms: 1000
+clock_observation_repeats_each_path: 5
+clock_expected_rate_hz: 15000000
+clock_tolerance_ppm: 5000
+clock_host_timestamp: CLOCK_MONOTONIC-midpoint
+clock_mmio_read_span_recorded: true
+
+batch_smoke_count: 750
+batch_primary_count: 45000
+batch_request_id_base: 0x75000000
+batch_period_samples: 20000
+batch_expected_rate_hz: 750
+batch_initial_lead_samples: 1000000
+batch_minimum_post_submit_lead_samples: 65536
+batch_queue_target: 7
+batch_required_maximum_inflight: 7
+batch_required_completed: 45000
+batch_required_success_counter_delta_each: 45000
+batch_required_error_counter_delta_each: 0
+batch_required_result_order: request-and-center-exact
+batch_required_timestamp_step_samples: 20000
+batch_live_starlink_claim: false
+
+concurrent_dma_segments: 4
+concurrent_dma_samples_per_segment: 4000000
+concurrent_dma_bytes_per_ci16_sample: 4
+concurrent_dma_expected_bytes_per_segment: 16000000
+concurrent_dma_overlap_required: true
+concurrent_dma_full_duration_required: false
+accepted_sample_continuity_full_duration_required: true
+
+mandatory_recovery: persistent-reset
+mandatory_qspi_sha256_unchanged: true
+mandatory_final_setup_target: ad9361-2r2t
+mandatory_final_route_absent: true
+mandatory_final_control_daemon_stopped: true
+
+offline_host_api_selftest_verdict: pending
+offline_sanitizer_verdict: pending
+offline_package_verdict: pending
+hardware_qualified: false
+queue_depth_qualified: false
+timestamp_slope_qualified: false
+signal_path_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+persistent_flash_performed: false
+radio_contacted_by_this_revision: false

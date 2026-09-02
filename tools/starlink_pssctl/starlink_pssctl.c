@@ -6,6 +6,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <math.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -13,6 +14,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #define SERIAL_FILE "/etc/serial"
@@ -32,9 +34,13 @@ static void usage(FILE *stream)
 		"Commands:\n"
 		"  info\n"
 		"  snapshot\n"
+		"  clock-slope [--duration-ms N] [--tolerance-ppm N]\n"
 		"  counters [--timeout-ms N]\n"
 		"  load --coeff FILE --generation N [--timeout-ms N]\n"
 		"  track --request N [--lead N | --center N] [--timeout-ms N]\n"
+		"  track-batch --request-base N --count N [--period N]\n"
+		"              [--lead N | --first-center N] [--queue-target N]\n"
+		"              [--timeout-ms N]\n"
 		"  inject-status\n"
 		"  inject-load --samples FILE --generation N [--timeout-ms N]\n"
 		"  inject-track --request N [--lead N | --start N] [--timeout-ms N]\n"
@@ -75,6 +81,46 @@ static int parse_timeout(const char *text, unsigned int *value)
 	if (parse_u32(text, &parsed) < 0 || !parsed)
 		return -1;
 	*value = parsed;
+	return 0;
+}
+
+static int parse_double(const char *text, double *value)
+{
+	char *end;
+	double parsed;
+
+	if (!text || !*text)
+		return -1;
+	errno = 0;
+	parsed = strtod(text, &end);
+	if (errno || *end || !isfinite(parsed))
+		return -1;
+	*value = parsed;
+	return 0;
+}
+
+static int monotonic_nanoseconds(uint64_t *value)
+{
+	struct timespec now;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now) < 0)
+		return -1;
+	*value = (uint64_t)now.tv_sec * UINT64_C(1000000000) +
+		(uint64_t)now.tv_nsec;
+	return 0;
+}
+
+static int sleep_milliseconds(uint32_t duration_ms)
+{
+	struct timespec remaining = {
+		.tv_sec = duration_ms / 1000U,
+		.tv_nsec = (long)(duration_ms % 1000U) * 1000000L,
+	};
+
+	while (nanosleep(&remaining, &remaining) < 0) {
+		if (errno != EINTR)
+			return -1;
+	}
 	return 0;
 }
 
@@ -171,6 +217,41 @@ static void unmap_mmio(struct mapped_mmio *mmio)
 		close(mmio->fd);
 }
 
+struct clock_observation {
+	uint64_t index;
+	uint64_t before_ns;
+	uint64_t after_ns;
+	uint64_t midpoint_ns;
+	uint64_t read_span_ns;
+};
+
+static int read_clock_observation(const struct pss_io *io,
+	struct clock_observation *observation, char *error, size_t error_size)
+{
+	if (monotonic_nanoseconds(&observation->before_ns) < 0) {
+		snprintf(error, error_size, "host monotonic clock read failed: %s",
+			strerror(errno));
+		return -1;
+	}
+	if (pss_read_current_index(io, &observation->index,
+			error, error_size) < 0)
+		return -1;
+	if (monotonic_nanoseconds(&observation->after_ns) < 0) {
+		snprintf(error, error_size, "host monotonic clock read failed: %s",
+			strerror(errno));
+		return -1;
+	}
+	if (observation->after_ns < observation->before_ns) {
+		snprintf(error, error_size, "host monotonic clock moved backwards");
+		return -1;
+	}
+	observation->read_span_ns =
+		observation->after_ns - observation->before_ns;
+	observation->midpoint_ns = observation->before_ns +
+		observation->read_span_ns / 2U;
+	return 0;
+}
+
 static void print_info(const char *serial, const struct pss_info *info)
 {
 	printf("{\n"
@@ -264,6 +345,112 @@ static void print_track_result(const char *serial,
 		printf("%s\"0x%08" PRIx32 "\"", index ? ", " : "",
 			result->packet.words[index]);
 	printf("]\n}\n");
+}
+
+static void print_clock_slope(const char *serial, uint32_t duration_ms,
+	const struct clock_observation *start,
+	const struct clock_observation *end,
+	const struct pss_clock_slope *slope, bool passed)
+{
+	printf("{\"serial\":\"%s\",\"kind\":\"accepted_sample_clock_slope\","
+	       "\"expected_rate_hz\":%u,\"requested_duration_ms\":%" PRIu32 ","
+	       "\"start_index\":%" PRIu64 ",\"end_index\":%" PRIu64 ","
+	       "\"sample_delta\":%" PRIu64 ",\"elapsed_ns\":%" PRIu64 ","
+	       "\"start_read_span_ns\":%" PRIu64 ","
+	       "\"end_read_span_ns\":%" PRIu64 ","
+	       "\"measured_rate_hz\":%.3f,\"error_ppm\":%.3f,"
+	       "\"tolerance_ppm\":%.3f,\"passed\":%s}\n",
+	       serial, PSS_RATE_MSPS * 1000000U, duration_ms,
+	       slope->start_index, slope->end_index, slope->sample_delta,
+	       slope->elapsed_ns, start->read_span_ns, end->read_span_ns,
+	       slope->measured_rate_hz, slope->error_ppm, slope->tolerance_ppm,
+	       passed ? "true" : "false");
+}
+
+struct batch_print_context {
+	const char *serial;
+};
+
+static int print_batch_packet(void *context,
+	const struct pss_batch_packet *completed)
+{
+	const struct batch_print_context *printer = context;
+	unsigned int index;
+
+	printf("{\"serial\":\"%s\",\"kind\":\"batch_result\","
+	       "\"ordinal\":%" PRIu32 ",\"request_id\":\"0x%08" PRIx32 "\","
+	       "\"center\":%" PRIu64 ",\"submit_lead_samples\":%" PRIu64 ","
+	       "\"winner_lag\":%" PRId32 ",\"winner_timestamp\":%" PRIu64 ","
+	       "\"coefficient_generation\":\"0x%08" PRIx32 "\","
+	       "\"correlation_real\":%" PRId64 ","
+	       "\"correlation_imag\":%" PRId64 ","
+	       "\"sample_energy\":%" PRId64 ","
+	       "\"coefficient_energy\":%" PRId64 ","
+	       "\"saturation_events\":%" PRIu32 ",\"packet_words\":[",
+	       printer->serial, completed->ordinal, completed->packet.request_id,
+	       completed->packet.center_index, completed->submit_lead_samples,
+	       completed->packet.lag, completed->packet.winner_timestamp,
+	       completed->packet.coefficient_generation,
+	       completed->packet.correlation_real,
+	       completed->packet.correlation_imag,
+	       completed->packet.sample_energy,
+	       completed->packet.coefficient_energy,
+	       completed->packet.saturation_events);
+	for (index = 0; index < PSS_RESULT_WORDS; ++index)
+		printf("%s\"0x%08" PRIx32 "\"", index ? "," : "",
+			completed->packet.words[index]);
+	printf("]}\n");
+	return ferror(stdout) ? -1 : 0;
+}
+
+static uint32_t cli_counter_delta(uint32_t before, uint32_t after)
+{
+	return after - before;
+}
+
+static void print_batch_summary(const char *serial,
+	const struct pss_batch_result *result)
+{
+	printf("{\"serial\":\"%s\",\"kind\":\"batch_summary\","
+	       "\"initial_index\":%" PRIu64 ",\"first_center\":%" PRIu64 ","
+	       "\"period_samples\":%" PRIu64 ",\"requested\":%" PRIu32 ","
+	       "\"submitted\":%" PRIu32 ",\"completed\":%" PRIu32 ","
+	       "\"queue_target\":%u,\"maximum_inflight\":%u,"
+	       "\"minimum_queue_room\":%u,"
+	       "\"minimum_submit_lead_samples\":%" PRIu64 ","
+	       "\"maximum_submit_lead_samples\":%" PRIu64 ","
+	       "\"monotonic_duration_ns\":%" PRIu64 ","
+	       "\"admitted_delta\":%" PRIu32 ","
+	       "\"completed_capture_delta\":%" PRIu32 ","
+	       "\"capture_published_delta\":%" PRIu32 ","
+	       "\"engine_consumed_delta\":%" PRIu32 ","
+	       "\"reducer_processed_delta\":%" PRIu32 ","
+	       "\"reducer_emitted_delta\":%" PRIu32 ","
+	       "\"result_published_delta\":%" PRIu32 ","
+	       "\"result_consumed_delta\":%" PRIu32 ","
+	       "\"all_error_counter_deltas_zero\":true,"
+	       "\"all_counter_gates_passed\":true}\n",
+	       serial, result->initial_index, result->first_center,
+	       result->period_samples, result->requested, result->submitted,
+	       result->completed, result->queue_target, result->maximum_inflight,
+	       result->minimum_queue_room, result->minimum_submit_lead_samples,
+	       result->maximum_submit_lead_samples,
+	       result->monotonic_end_ns - result->monotonic_start_ns,
+	       cli_counter_delta(result->before.admitted, result->after.admitted),
+	       cli_counter_delta(result->before.completed_capture,
+			result->after.completed_capture),
+	       cli_counter_delta(result->before.capture_published,
+			result->after.capture_published),
+	       cli_counter_delta(result->before.engine_consumed,
+			result->after.engine_consumed),
+	       cli_counter_delta(result->before.reducer_processed,
+			result->after.reducer_processed),
+	       cli_counter_delta(result->before.reducer_emitted,
+			result->after.reducer_emitted),
+	       cli_counter_delta(result->before.result_published,
+			result->after.result_published),
+	       cli_counter_delta(result->before.result_consumed,
+			result->after.result_consumed));
 }
 
 static void print_injection_status(const char *serial,
@@ -422,6 +609,56 @@ int main(int argc, char **argv)
 		printf("{\"serial\":\"%s\",\"current_index\":%" PRIu64 "}\n",
 			expected_serial, index);
 		return_code = EXIT_SUCCESS;
+	} else if (!strcmp(command, "clock-slope")) {
+		struct clock_observation start, end;
+		struct pss_clock_slope slope = {0};
+		uint32_t duration_ms = 1000U;
+		double tolerance_ppm = 5000.0;
+		int slope_status;
+
+		while (argument < argc) {
+			const char *value;
+
+			if (option_value(argc, argv, &argument, &value) < 0)
+				goto out;
+			if (!strcmp(argv[argument - 1], "--duration-ms")) {
+				if (parse_u32(value, &duration_ms) < 0 ||
+				    duration_ms < 100U || duration_ms > 60000U)
+					goto invalid_clock_slope;
+			} else if (!strcmp(argv[argument - 1], "--tolerance-ppm")) {
+				if (parse_double(value, &tolerance_ppm) < 0 ||
+				    tolerance_ppm <= 0.0 || tolerance_ppm > 100000.0)
+					goto invalid_clock_slope;
+			} else {
+				goto invalid_clock_slope;
+			}
+			++argument;
+		}
+		if (read_clock_observation(&io, &start, error, sizeof(error)) < 0 ||
+		    sleep_milliseconds(duration_ms) < 0 ||
+		    read_clock_observation(&io, &end, error, sizeof(error)) < 0) {
+			if (!error[0])
+				snprintf(error, sizeof(error), "observation sleep failed: %s",
+					strerror(errno));
+			fprintf(stderr, "clock-slope observation failed: %s\n", error);
+			goto out;
+		}
+		slope_status = pss_calculate_clock_slope(start.index, end.index,
+			start.midpoint_ns, end.midpoint_ns,
+			PSS_RATE_MSPS * 1000000U, tolerance_ppm,
+			&slope, error, sizeof(error));
+		if (slope.elapsed_ns)
+			print_clock_slope(expected_serial, duration_ms,
+				&start, &end, &slope, slope_status == 0);
+		if (slope_status < 0) {
+			fprintf(stderr, "clock-slope gate failed: %s\n", error);
+			goto out;
+		}
+		return_code = EXIT_SUCCESS;
+		goto out;
+invalid_clock_slope:
+		fprintf(stderr,
+			"invalid clock-slope arguments (duration must be 100..60000 ms)\n");
 	} else if (!strcmp(command, "counters")) {
 		struct pss_counters counters;
 		unsigned int timeout_ms = 2000U;
@@ -621,6 +858,70 @@ invalid_inject_track:
 		       "\"0x%08" PRIx32 "\",\"taps_loaded\":%u}\n",
 		       expected_serial, generation, PSS_COEFFICIENT_COUNT);
 		return_code = EXIT_SUCCESS;
+	} else if (!strcmp(command, "track-batch")) {
+		struct pss_batch_request request = {
+			.period_samples = 20000U,
+			.lead_samples = PSS_DEFAULT_LEAD_SAMPLES,
+			.queue_target = PSS_DEFAULT_QUEUE_TARGET,
+			.timeout_ms = 5000U,
+		};
+		struct pss_batch_result result;
+		struct batch_print_context printer = {.serial = expected_serial};
+		bool lead_seen = false;
+
+		while (argument < argc) {
+			const char *value;
+			uint32_t parsed;
+
+			if (option_value(argc, argv, &argument, &value) < 0)
+				goto out;
+			if (!strcmp(argv[argument - 1], "--request-base")) {
+				if (parse_u32(value, &request.request_id_base) < 0)
+					goto invalid_track_batch;
+			} else if (!strcmp(argv[argument - 1], "--count")) {
+				if (parse_u32(value, &request.count) < 0)
+					goto invalid_track_batch;
+			} else if (!strcmp(argv[argument - 1], "--period")) {
+				if (parse_u64(value, &request.period_samples) < 0)
+					goto invalid_track_batch;
+			} else if (!strcmp(argv[argument - 1], "--lead")) {
+				if (request.first_center_is_explicit ||
+				    parse_u64(value, &request.lead_samples) < 0)
+					goto invalid_track_batch;
+				lead_seen = true;
+			} else if (!strcmp(argv[argument - 1], "--first-center")) {
+				if (lead_seen || parse_u64(value, &request.first_center) < 0)
+					goto invalid_track_batch;
+				request.first_center_is_explicit = true;
+			} else if (!strcmp(argv[argument - 1], "--queue-target")) {
+				if (parse_u32(value, &parsed) < 0 ||
+				    !parsed || parsed > PSS_COMMAND_FIFO_USABLE)
+					goto invalid_track_batch;
+				request.queue_target = parsed;
+			} else if (!strcmp(argv[argument - 1], "--timeout-ms")) {
+				if (parse_timeout(value, &request.timeout_ms) < 0)
+					goto invalid_track_batch;
+			} else {
+				goto invalid_track_batch;
+			}
+			++argument;
+		}
+		if (!request.request_id_base || !request.count)
+			goto invalid_track_batch;
+		if (pss_track_batch(&io, &request, print_batch_packet, &printer,
+				&result, error, sizeof(error)) < 0) {
+			fprintf(stderr, "track-batch failed: %s\n", error);
+			goto out;
+		}
+		print_batch_summary(expected_serial, &result);
+		if (fflush(stdout) < 0) {
+			fprintf(stderr, "track-batch output failed: %s\n", strerror(errno));
+			goto out;
+		}
+		return_code = EXIT_SUCCESS;
+		goto out;
+invalid_track_batch:
+		fprintf(stderr, "invalid track-batch arguments\n");
 	} else if (!strcmp(command, "track")) {
 		struct pss_track_request request = {
 			.lead_samples = PSS_DEFAULT_LEAD_SAMPLES,

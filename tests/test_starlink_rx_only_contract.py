@@ -135,6 +135,40 @@ def test_abi12_injection_is_the_shared_tracker_and_dma_boundary() -> None:
     assert "over_the_air_starlink_pss_detected: false" in manifest
 
 
+def test_abi12_batch_and_clock_contract_is_frozen_without_rtl_changes() -> None:
+    manifest = _read("manifests/starlink-pss15-batch-clock-dnm-v1-source.yaml")
+    header = _read("tools/starlink_pssctl/starlink_pss_hw.h")
+    library = _read("tools/starlink_pssctl/starlink_pss_hw.c")
+    controller = _read("tools/starlink_pssctl/starlink_pssctl.c")
+    selftest = _read("tools/starlink_pssctl/test_starlink_pss_hw.c")
+
+    assert "do_not_merge: true" in manifest
+    assert "persistent_flash_eligible: false" in manifest
+    assert "qualification_utility_branch: main" in manifest
+    assert "qualification_utility_main_commit: 4ca3451" in manifest
+    assert "tracker_version: 0x00010002" in manifest
+    assert "tracker_rtl_changed: false" in manifest
+    assert "tracker_xsa_reused: true" in manifest
+    assert "batch_primary_count: 45000" in manifest
+    assert "batch_period_samples: 20000" in manifest
+    assert "batch_queue_target: 7" in manifest
+    assert "clock_observation_repeats_each_path: 5" in manifest
+    assert "stage15_rf_bandwidth_requested_hz: 15000000" in manifest
+    assert "mandatory_final_setup_target: ad9361-2r2t" in manifest
+    assert "live_multiframe_pss_qualified: false" in manifest
+
+    assert "PSS_COMMAND_FIFO_USABLE 7U" in header
+    assert "PSS_MINIMUM_HOST_LEAD UINT64_C(65536)" in header
+    assert "pss_track_batch" in header
+    assert "pss_calculate_clock_slope" in header
+    assert "validate_batch_counter_capacity" in library
+    assert "validate_batch_deltas" in library
+    assert '"track-batch"' in controller
+    assert '"clock-slope"' in controller
+    assert "batch_fifo=7 batch_refill=1" in selftest
+    assert "clock_slope=1" in selftest
+
+
 def test_top_level_holds_digital_tx_bus_static() -> None:
     top = _read("hdl/projects/pluto/system_top.v")
 

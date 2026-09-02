@@ -21,6 +21,10 @@
 #define PSS_FIRST_LAG (-30)
 #define PSS_LAST_LAG 30
 #define PSS_DEFAULT_LEAD_SAMPLES UINT64_C(1000000)
+#define PSS_MINIMUM_HOST_LEAD UINT64_C(65536)
+#define PSS_COMMAND_FIFO_USABLE 7U
+#define PSS_DEFAULT_QUEUE_TARGET 7U
+#define PSS_MAX_BATCH_COUNT UINT32_C(1000000)
 
 enum pss_register {
 	PSS_REG_IDENTIFICATION = 0x00,
@@ -189,6 +193,56 @@ struct pss_track_result {
 	struct pss_counters after;
 };
 
+struct pss_batch_request {
+	uint32_t request_id_base;
+	uint32_t count;
+	uint64_t period_samples;
+	uint64_t first_center;
+	uint64_t lead_samples;
+	bool first_center_is_explicit;
+	unsigned int queue_target;
+	unsigned int timeout_ms;
+};
+
+struct pss_batch_packet {
+	uint32_t ordinal;
+	uint64_t submit_lead_samples;
+	struct pss_packet packet;
+};
+
+struct pss_batch_result {
+	uint64_t initial_index;
+	uint64_t first_center;
+	uint64_t minimum_submit_lead_samples;
+	uint64_t maximum_submit_lead_samples;
+	uint64_t monotonic_start_ns;
+	uint64_t monotonic_end_ns;
+	uint64_t period_samples;
+	uint32_t requested;
+	uint32_t submitted;
+	uint32_t completed;
+	unsigned int queue_target;
+	unsigned int maximum_inflight;
+	unsigned int minimum_queue_room;
+	struct pss_counters before;
+	struct pss_counters after;
+};
+
+struct pss_clock_slope {
+	uint64_t start_index;
+	uint64_t end_index;
+	uint64_t start_monotonic_ns;
+	uint64_t end_monotonic_ns;
+	uint64_t sample_delta;
+	uint64_t elapsed_ns;
+	double measured_rate_hz;
+	double error_ppm;
+	double tolerance_ppm;
+};
+
+typedef int (*pss_batch_packet_callback)(void *context,
+	const struct pss_batch_packet *packet);
+
 struct pss_injection_status {
 	uint32_t raw_status;
 	uint32_t generation_stage;
@@ -223,6 +277,14 @@ int pss_validate_packet(const uint32_t words[PSS_RESULT_WORDS],
 int pss_track_one(const struct pss_io *io,
 	const struct pss_track_request *request, struct pss_track_result *result,
 	char *error, size_t error_size);
+int pss_track_batch(const struct pss_io *io,
+	const struct pss_batch_request *request,
+	pss_batch_packet_callback callback, void *callback_context,
+	struct pss_batch_result *result, char *error, size_t error_size);
+int pss_calculate_clock_slope(uint64_t start_index, uint64_t end_index,
+	uint64_t start_monotonic_ns, uint64_t end_monotonic_ns,
+	uint32_t expected_rate_hz, double tolerance_ppm,
+	struct pss_clock_slope *slope, char *error, size_t error_size);
 int pss_read_injection_status(const struct pss_io *io,
 	struct pss_injection_status *status, char *error, size_t error_size);
 int pss_load_injection_fixture(const struct pss_io *io,

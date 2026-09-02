@@ -87,6 +87,27 @@ queue-depth and continuity qualification, and live multi-frame PSS evidence.
 Those items remain mandatory before Stage 30. This is not an over-the-air PSS,
 frame-alignment, or SSS result.
 
+The next Gate-3 revision is now source-frozen in
+`manifests/starlink-pss15-batch-clock-dnm-v1-source.yaml`. It reuses the exact
+ABI 1.2 RTL and routed XSA and adds a fail-closed host controller for seven-deep
+prequeue/refill, ordered NDJSON result capture, aggregate counter gates, and
+accepted-sample clock-slope measurements. The offline mock fills all seven
+usable command slots, drains and refills twelve ordered requests, rejects
+overlapping geometry, overflowing request IDs, saturated counters, bad clock
+slope, and immediate next-result publication after release. This source state
+has not contacted a radio and makes no hardware claim.
+
+The frozen hardware qualification is 15,000,000 S/s, 15 MHz RF bandwidth,
+factor-one FPGA capture, FIR disabled, slow-attack gain, five one-second clock
+observations on both PPU's capture-counter path and the tracker's 64-bit path,
+a 750-request smoke batch, then 45,000 centers at exactly 20,000 samples with
+queue target seven and at least 65,536 post-submit samples of lead. Four
+overlapping 4,000,000-sample DMA segments must complete while the primary batch
+runs. Every flow counter must advance by exactly 45,000, every error-counter
+delta must be zero, and all request/center/timestamp steps must be exact. This
+closes only RF-path, clock, queue, and continuity evidence; live multi-frame PSS
+remains a separate open Gate-3 item.
+
 The ABI 1.2 source-locked RAM-only package also passes offline container
 qualification. Its DFU SHA-256 is
 `e407f7366e8745713ce582217fdcdae90fea2dbce271017cb5638c14fc2a1a7a`;
@@ -110,6 +131,12 @@ passes 1,328 tests with 11 skips, Ruff, mypy, and package builds. The selected
 radio ended on persistent
 `v0.48-plutoplus-spf-iq-direct-async-v3`, verified `ad9361-2r2t`, four RX scan
 elements, and quiescent TX outputs.
+
+The reusable signal-path and sample-clock attestation extension passed 1,330
+tests with 11 skips plus Python 3.11/3.12/3.13 and browser CI, and merged through
+PPU PR #110 to clean PPU `main` commit
+`4ca3451ae6de233b00eb31c38c7d4b29ba6b249a`. All later Stage-15 plans and
+receipts bind that commit; no radio trial depends on the deleted feature branch.
 
 The authoritative device limits used by these gates are Analog Devices'
 [AD9363 data sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/AD9363.pdf)

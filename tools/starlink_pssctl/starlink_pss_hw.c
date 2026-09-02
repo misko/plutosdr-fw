@@ -13,7 +13,6 @@
 
 #define PSS_PACKET_MAGIC UINT32_C(0x31535350)
 #define PSS_PACKET_HEADER UINT32_C(0x1a010001)
-#define PSS_MINIMUM_HOST_LEAD UINT64_C(65536)
 
 static int fail(char *error, size_t error_size, const char *format, ...)
 {
@@ -62,6 +61,16 @@ static uint64_t monotonic_milliseconds(void)
 	if (clock_gettime(CLOCK_MONOTONIC, &value) < 0)
 		return 0;
 	return (uint64_t)value.tv_sec * 1000U + (uint64_t)value.tv_nsec / 1000000U;
+}
+
+static uint64_t monotonic_nanoseconds(void)
+{
+	struct timespec value;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &value) < 0)
+		return 0;
+	return (uint64_t)value.tv_sec * UINT64_C(1000000000) +
+		(uint64_t)value.tv_nsec;
 }
 
 static void poll_delay(void)
@@ -816,5 +825,408 @@ int pss_track_one(const struct pss_io *io,
 		return -1;
 	if (status & PSS_STATUS_RESULT_AVAILABLE)
 		return fail(error, error_size, "result remained available after release");
+	return 0;
+}
+
+struct pending_candidate {
+	uint32_t ordinal;
+	uint32_t request_id;
+	uint64_t center;
+	uint64_t submit_lead_samples;
+};
+
+static int submit_batch_candidate(const struct pss_io *io,
+	const struct pending_candidate *candidate, unsigned int timeout_ms,
+	unsigned int *queue_room, uint64_t *accepted_index,
+	char *error, size_t error_size)
+{
+	uint32_t status;
+	uint64_t deadline = monotonic_milliseconds() + timeout_ms;
+
+	for (;;) {
+		if (read32(io, PSS_REG_STATUS, &status, error, error_size) < 0)
+			return -1;
+		*queue_room = (status >> 17) & 0x7U;
+		if ((status & PSS_STATUS_CANDIDATE_READY) &&
+		    !(status & PSS_STATUS_COMMAND_BUFFERED) && *queue_room)
+			break;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size,
+				"candidate queue did not become writable");
+		poll_delay();
+	}
+
+	if (write32(io, PSS_REG_CANDIDATE_REQUEST, candidate->request_id,
+			error, error_size) < 0 ||
+	    write32(io, PSS_REG_CANDIDATE_CENTER_LO, (uint32_t)candidate->center,
+			error, error_size) < 0 ||
+	    write32(io, PSS_REG_CANDIDATE_CENTER_HI,
+			(uint32_t)(candidate->center >> 32), error, error_size) < 0 ||
+	    write32(io, PSS_REG_CANDIDATE_TIMESTAMP_LO,
+			(uint32_t)candidate->center, error, error_size) < 0 ||
+	    write32(io, PSS_REG_CANDIDATE_TIMESTAMP_HI,
+			(uint32_t)(candidate->center >> 32), error, error_size) < 0 ||
+	    write32(io, PSS_REG_CANDIDATE_CONTROL, 1U, error, error_size) < 0)
+		return -1;
+
+	for (;;) {
+		if (read32(io, PSS_REG_STATUS, &status, error, error_size) < 0)
+			return -1;
+		if (!(status & PSS_STATUS_COMMAND_BUFFERED))
+			break;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size,
+				"candidate command remained buffered");
+		poll_delay();
+	}
+	return pss_read_current_index(io, accepted_index, error, error_size);
+}
+
+static int receive_batch_candidate(const struct pss_io *io,
+	const struct pending_candidate *candidate, uint32_t generation,
+	unsigned int timeout_ms, struct pss_packet *packet,
+	char *error, size_t error_size)
+{
+	uint32_t result_status, consumed_before, consumed_after;
+	uint32_t words[PSS_RESULT_WORDS];
+	uint64_t deadline = monotonic_milliseconds() + timeout_ms;
+	unsigned int index;
+
+	for (;;) {
+		if (read32(io, PSS_REG_RESULT_STATUS, &result_status,
+				error, error_size) < 0)
+			return -1;
+		if ((result_status & 1U) &&
+		    ((result_status >> 24) & 0x1fU) == PSS_RESULT_WORDS)
+			break;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size,
+				"batch candidate 0x%08" PRIx32 " timed out",
+				candidate->request_id);
+		poll_delay();
+	}
+
+	for (index = 0; index < PSS_RESULT_WORDS; ++index) {
+		if (write32(io, PSS_REG_RESULT_WORD_INDEX, index,
+				error, error_size) < 0 ||
+		    read32(io, PSS_REG_RESULT_WORD_DATA, &words[index],
+				error, error_size) < 0)
+			return -1;
+	}
+	if (pss_validate_packet(words, candidate->request_id,
+			candidate->center, candidate->center, generation,
+			packet, error, error_size) < 0)
+		return -1;
+	if (packet->saturation_events)
+		return fail(error, error_size,
+			"batch packet reports %" PRIu32
+			" saturation events; result retained",
+			packet->saturation_events);
+	if (read32(io, PSS_REG_RESULT_CONSUMED, &consumed_before,
+			error, error_size) < 0)
+		return -1;
+	if (consumed_before == UINT32_MAX)
+		return fail(error, error_size,
+			"result-consumed counter is saturated; result retained");
+	if (write32(io, PSS_REG_RESULT_CONTROL, 1U, error, error_size) < 0)
+		return -1;
+	for (;;) {
+		if (read32(io, PSS_REG_RESULT_STATUS, &result_status,
+				error, error_size) < 0 ||
+		    read32(io, PSS_REG_RESULT_CONSUMED, &consumed_after,
+				error, error_size) < 0)
+			return -1;
+		if (counter_delta(consumed_before, consumed_after) == 1U)
+			return 0;
+		if (monotonic_milliseconds() >= deadline)
+			return fail(error, error_size,
+				"batch result release timed out");
+		poll_delay();
+	}
+}
+
+static int validate_batch_deltas(const struct pss_counters *before,
+	const struct pss_counters *after, uint32_t count,
+	char *error, size_t error_size)
+{
+#define EXPECT_BATCH_DELTA(member, expected) \
+	do { \
+		if (require_delta(#member, before->member, after->member, (expected), \
+				error, error_size) < 0) \
+			return -1; \
+	} while (0)
+	EXPECT_BATCH_DELTA(candidate_command_overrun, 0);
+	EXPECT_BATCH_DELTA(coefficient_write_overrun, 0);
+	EXPECT_BATCH_DELTA(queue_overrun, 0);
+	EXPECT_BATCH_DELTA(admitted, count);
+	EXPECT_BATCH_DELTA(completed_capture, count);
+	EXPECT_BATCH_DELTA(rejected, 0);
+	EXPECT_BATCH_DELTA(late, 0);
+	EXPECT_BATCH_DELTA(duplicate, 0);
+	EXPECT_BATCH_DELTA(overlap, 0);
+	EXPECT_BATCH_DELTA(aborted, 0);
+	EXPECT_BATCH_DELTA(valid_gap_abort, 0);
+	EXPECT_BATCH_DELTA(index_jump_abort, 0);
+	EXPECT_BATCH_DELTA(timestamp_abort, 0);
+	EXPECT_BATCH_DELTA(capture_published, count);
+	EXPECT_BATCH_DELTA(capture_abort_discard, 0);
+	EXPECT_BATCH_DELTA(capture_buffer_overrun, 0);
+	EXPECT_BATCH_DELTA(capture_protocol_error, 0);
+	EXPECT_BATCH_DELTA(engine_consumed, count);
+	EXPECT_BATCH_DELTA(correlator_bound_error, 0);
+	EXPECT_BATCH_DELTA(reducer_processed, count);
+	EXPECT_BATCH_DELTA(reducer_emitted, count);
+	EXPECT_BATCH_DELTA(reducer_invalid, 0);
+	EXPECT_BATCH_DELTA(reducer_bound_error, 0);
+	EXPECT_BATCH_DELTA(reducer_protocol_error, 0);
+	EXPECT_BATCH_DELTA(result_published, count);
+	EXPECT_BATCH_DELTA(result_overrun, 0);
+	EXPECT_BATCH_DELTA(result_consumed, count);
+#undef EXPECT_BATCH_DELTA
+	return 0;
+}
+
+static int validate_batch_counter_capacity(const struct pss_counters *before,
+	uint32_t count, char *error, size_t error_size)
+{
+#define REQUIRE_BATCH_HEADROOM(member, needed) \
+	do { \
+		if (before->member > UINT32_MAX - (needed)) \
+			return fail(error, error_size, \
+				"counter %s lacks batch headroom", #member); \
+	} while (0)
+	REQUIRE_BATCH_HEADROOM(candidate_command_overrun, 1U);
+	REQUIRE_BATCH_HEADROOM(coefficient_write_overrun, 1U);
+	REQUIRE_BATCH_HEADROOM(queue_overrun, 1U);
+	REQUIRE_BATCH_HEADROOM(admitted, count);
+	REQUIRE_BATCH_HEADROOM(completed_capture, count);
+	REQUIRE_BATCH_HEADROOM(rejected, 1U);
+	REQUIRE_BATCH_HEADROOM(late, 1U);
+	REQUIRE_BATCH_HEADROOM(duplicate, 1U);
+	REQUIRE_BATCH_HEADROOM(overlap, 1U);
+	REQUIRE_BATCH_HEADROOM(aborted, 1U);
+	REQUIRE_BATCH_HEADROOM(valid_gap_abort, 1U);
+	REQUIRE_BATCH_HEADROOM(index_jump_abort, 1U);
+	REQUIRE_BATCH_HEADROOM(timestamp_abort, 1U);
+	REQUIRE_BATCH_HEADROOM(capture_published, count);
+	REQUIRE_BATCH_HEADROOM(capture_abort_discard, 1U);
+	REQUIRE_BATCH_HEADROOM(capture_buffer_overrun, 1U);
+	REQUIRE_BATCH_HEADROOM(capture_protocol_error, 1U);
+	REQUIRE_BATCH_HEADROOM(engine_consumed, count);
+	REQUIRE_BATCH_HEADROOM(correlator_bound_error, 1U);
+	REQUIRE_BATCH_HEADROOM(reducer_processed, count);
+	REQUIRE_BATCH_HEADROOM(reducer_emitted, count);
+	REQUIRE_BATCH_HEADROOM(reducer_invalid, 1U);
+	REQUIRE_BATCH_HEADROOM(reducer_bound_error, 1U);
+	REQUIRE_BATCH_HEADROOM(reducer_protocol_error, 1U);
+	REQUIRE_BATCH_HEADROOM(result_published, count);
+	REQUIRE_BATCH_HEADROOM(result_overrun, 1U);
+	REQUIRE_BATCH_HEADROOM(result_consumed, count);
+#undef REQUIRE_BATCH_HEADROOM
+	return 0;
+}
+
+int pss_track_batch(const struct pss_io *io,
+	const struct pss_batch_request *request,
+	pss_batch_packet_callback callback, void *callback_context,
+	struct pss_batch_result *result, char *error, size_t error_size)
+{
+	struct pending_candidate pending[PSS_COMMAND_FIFO_USABLE];
+	struct pss_info info;
+	uint32_t status;
+	uint64_t current, first_center;
+	unsigned int head = 0, tail = 0, inflight = 0;
+
+	if (!request || !result)
+		return fail(error, error_size, "missing batch request or destination");
+	memset(result, 0, sizeof(*result));
+	result->minimum_submit_lead_samples = UINT64_MAX;
+	result->minimum_queue_room = PSS_COMMAND_FIFO_USABLE;
+	if (!request->request_id_base)
+		return fail(error, error_size, "batch request base must be nonzero");
+	if (!request->count || request->count > PSS_MAX_BATCH_COUNT)
+		return fail(error, error_size,
+			"batch count must be between 1 and %" PRIu32,
+			PSS_MAX_BATCH_COUNT);
+	if (request->count - 1U > UINT32_MAX - request->request_id_base)
+		return fail(error, error_size, "batch request IDs overflow");
+	if (request->period_samples < PSS_INJECTION_SAMPLES)
+		return fail(error, error_size,
+			"batch period must be at least %u samples",
+			PSS_INJECTION_SAMPLES);
+	if (!request->queue_target ||
+	    request->queue_target > PSS_COMMAND_FIFO_USABLE)
+		return fail(error, error_size,
+			"batch queue target must be between 1 and %u",
+			PSS_COMMAND_FIFO_USABLE);
+	if (!request->timeout_ms)
+		return fail(error, error_size, "batch timeout must be nonzero");
+	if (pss_require_contract(io, &info, error, error_size) < 0)
+		return -1;
+	if (!(info.status & PSS_STATUS_COEFFICIENT_VALID) ||
+	    !info.active_generation)
+		return fail(error, error_size,
+			"no committed coefficient bank is active");
+	if (!(info.status & PSS_STATUS_CANDIDATE_READY) ||
+	    (info.status & (PSS_STATUS_COMMAND_BUFFERED |
+			PSS_STATUS_RESULT_AVAILABLE)))
+		return fail(error, error_size,
+			"tracker is not idle/ready or has an unread result");
+	if (pss_read_current_index(io, &current, error, error_size) < 0)
+		return -1;
+	first_center = request->first_center_is_explicit ? request->first_center :
+		current + (request->lead_samples ? request->lead_samples :
+			PSS_DEFAULT_LEAD_SAMPLES);
+	if (!request->first_center_is_explicit && first_center < current)
+		return fail(error, error_size, "batch first-center derivation overflowed");
+	if (first_center < current ||
+	    first_center - current < PSS_MINIMUM_HOST_LEAD)
+		return fail(error, error_size,
+			"batch first center needs at least %" PRIu64
+			" samples of host lead", PSS_MINIMUM_HOST_LEAD);
+	if (request->count > 1U &&
+	    request->period_samples >
+		(UINT64_MAX - first_center) / (request->count - 1U))
+		return fail(error, error_size, "batch center sequence overflows");
+	result->initial_index = current;
+	result->first_center = first_center;
+	result->period_samples = request->period_samples;
+	result->requested = request->count;
+	result->queue_target = request->queue_target;
+	result->monotonic_start_ns = monotonic_nanoseconds();
+	if (!result->monotonic_start_ns)
+		return fail(error, error_size, "host monotonic clock read failed");
+	if (pss_snapshot_counters(io, &result->before, request->timeout_ms,
+			error, error_size) < 0)
+		return -1;
+	if (validate_batch_counter_capacity(&result->before, request->count,
+			error, error_size) < 0)
+		return -1;
+
+	while (result->completed < request->count) {
+		while (result->submitted < request->count &&
+		       inflight < request->queue_target) {
+			struct pending_candidate *candidate = &pending[tail];
+			unsigned int queue_room;
+			uint64_t accepted_index;
+
+			if (pss_read_current_index(io, &current,
+					error, error_size) < 0)
+				return -1;
+			candidate->ordinal = result->submitted;
+			candidate->request_id = request->request_id_base +
+				result->submitted;
+			candidate->center = first_center +
+				(uint64_t)result->submitted * request->period_samples;
+			if (candidate->center < current ||
+			    candidate->center - current < PSS_MINIMUM_HOST_LEAD)
+				return fail(error, error_size,
+					"batch lead fell below %" PRIu64
+					" samples at ordinal %" PRIu32,
+					PSS_MINIMUM_HOST_LEAD, result->submitted);
+			if (submit_batch_candidate(io, candidate, request->timeout_ms,
+					&queue_room, &accepted_index,
+					error, error_size) < 0)
+				return -1;
+			if (candidate->center < accepted_index ||
+			    candidate->center - accepted_index < PSS_MINIMUM_HOST_LEAD)
+				return fail(error, error_size,
+					"batch accepted lead fell below %" PRIu64
+					" samples at ordinal %" PRIu32,
+					PSS_MINIMUM_HOST_LEAD, result->submitted);
+			candidate->submit_lead_samples =
+				candidate->center - accepted_index;
+			if (queue_room < result->minimum_queue_room)
+				result->minimum_queue_room = queue_room;
+			if (candidate->submit_lead_samples <
+			    result->minimum_submit_lead_samples)
+				result->minimum_submit_lead_samples =
+					candidate->submit_lead_samples;
+			if (candidate->submit_lead_samples >
+			    result->maximum_submit_lead_samples)
+				result->maximum_submit_lead_samples =
+					candidate->submit_lead_samples;
+			tail = (tail + 1U) % PSS_COMMAND_FIFO_USABLE;
+			++inflight;
+			++result->submitted;
+			if (inflight > result->maximum_inflight)
+				result->maximum_inflight = inflight;
+		}
+
+		if (!inflight)
+			return fail(error, error_size,
+				"batch made no progress with no inflight candidate");
+		{
+			struct pss_batch_packet completed;
+
+			memset(&completed, 0, sizeof(completed));
+			completed.ordinal = pending[head].ordinal;
+			completed.submit_lead_samples =
+				pending[head].submit_lead_samples;
+			if (receive_batch_candidate(io, &pending[head],
+					info.active_generation, request->timeout_ms,
+					&completed.packet, error, error_size) < 0)
+				return -1;
+			if (callback && callback(callback_context, &completed) < 0)
+				return fail(error, error_size,
+					"batch packet callback failed at ordinal %" PRIu32,
+					completed.ordinal);
+		}
+		head = (head + 1U) % PSS_COMMAND_FIFO_USABLE;
+		--inflight;
+		++result->completed;
+	}
+
+	if (pss_snapshot_counters(io, &result->after, request->timeout_ms,
+			error, error_size) < 0 ||
+	    validate_batch_deltas(&result->before, &result->after,
+			request->count, error, error_size) < 0)
+		return -1;
+	if (read32(io, PSS_REG_STATUS, &status, error, error_size) < 0)
+		return -1;
+	if (status & (PSS_STATUS_COMMAND_BUFFERED | PSS_STATUS_RESULT_AVAILABLE))
+		return fail(error, error_size,
+			"tracker retained a command or result after the batch");
+	result->monotonic_end_ns = monotonic_nanoseconds();
+	if (result->monotonic_end_ns <= result->monotonic_start_ns)
+		return fail(error, error_size, "batch monotonic duration is invalid");
+	return 0;
+}
+
+int pss_calculate_clock_slope(uint64_t start_index, uint64_t end_index,
+	uint64_t start_monotonic_ns, uint64_t end_monotonic_ns,
+	uint32_t expected_rate_hz, double tolerance_ppm,
+	struct pss_clock_slope *slope, char *error, size_t error_size)
+{
+	if (!slope)
+		return fail(error, error_size, "missing clock-slope destination");
+	if (!expected_rate_hz)
+		return fail(error, error_size, "expected clock rate must be nonzero");
+	if (!(tolerance_ppm > 0.0 && tolerance_ppm <= 100000.0))
+		return fail(error, error_size,
+			"clock-slope tolerance must be in (0, 100000] ppm");
+	if (end_index <= start_index)
+		return fail(error, error_size, "accepted-sample index did not advance");
+	if (end_monotonic_ns <= start_monotonic_ns)
+		return fail(error, error_size, "host monotonic clock did not advance");
+
+	memset(slope, 0, sizeof(*slope));
+	slope->start_index = start_index;
+	slope->end_index = end_index;
+	slope->start_monotonic_ns = start_monotonic_ns;
+	slope->end_monotonic_ns = end_monotonic_ns;
+	slope->sample_delta = end_index - start_index;
+	slope->elapsed_ns = end_monotonic_ns - start_monotonic_ns;
+	slope->measured_rate_hz = (double)slope->sample_delta * 1000000000.0 /
+		(double)slope->elapsed_ns;
+	slope->error_ppm = (slope->measured_rate_hz - expected_rate_hz) *
+		1000000.0 / expected_rate_hz;
+	slope->tolerance_ppm = tolerance_ppm;
+	if (slope->error_ppm < -tolerance_ppm ||
+	    slope->error_ppm > tolerance_ppm)
+		return fail(error, error_size,
+			"accepted-sample clock slope %.3f Hz is %.3f ppm from %" PRIu32
+			" Hz", slope->measured_rate_hz, slope->error_ppm,
+			expected_rate_hz);
 	return 0;
 }

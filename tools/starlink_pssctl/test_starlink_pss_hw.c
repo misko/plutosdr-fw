@@ -9,11 +9,18 @@
 
 #define MOCK_REGISTERS (PSS_MMIO_SPAN / sizeof(uint32_t))
 
+struct mock_candidate {
+	uint32_t request;
+	uint64_t center;
+	uint64_t timestamp;
+};
+
 struct mock_device {
 	uint32_t registers[MOCK_REGISTERS];
 	uint32_t result[PSS_RESULT_WORDS];
 	uint32_t loaded[PSS_COEFFICIENT_COUNT];
 	uint32_t injected[PSS_INJECTION_SAMPLES];
+	struct mock_candidate candidates[PSS_COMMAND_FIFO_USABLE];
 	uint64_t current_index;
 	uint64_t index_snapshot;
 	uint64_t center;
@@ -24,6 +31,9 @@ struct mock_device {
 	unsigned int loaded_count;
 	unsigned int injection_count;
 	unsigned int injection_status_reads;
+	unsigned int candidate_head;
+	unsigned int candidate_tail;
+	unsigned int candidate_count;
 	uint32_t injection_flags;
 	bool inject_rejected;
 };
@@ -35,8 +45,11 @@ static uint32_t *mock_register(struct mock_device *mock, uint32_t offset)
 
 static void mock_status(struct mock_device *mock)
 {
-	uint32_t status = PSS_STATUS_RESET_RELEASED | PSS_STATUS_CANDIDATE_READY;
+	unsigned int queue_room = PSS_COMMAND_FIFO_USABLE - mock->candidate_count;
+	uint32_t status = PSS_STATUS_RESET_RELEASED;
 
+	if (queue_room)
+		status |= PSS_STATUS_CANDIDATE_READY;
 	if (*mock_register(mock, PSS_REG_ACTIVE_COEFFICIENT_GENERATION))
 		status |= PSS_STATUS_COEFFICIENT_VALID;
 	if (mock->loaded_count < PSS_COEFFICIENT_COUNT)
@@ -46,22 +59,24 @@ static void mock_status(struct mock_device *mock)
 	if (*mock_register(mock, PSS_REG_RESULT_STATUS) & 1U)
 		status |= PSS_STATUS_RESULT_AVAILABLE;
 	status |= mock->loaded_count << 8;
+	status |= queue_room << 17;
 	*mock_register(mock, PSS_REG_STATUS) = status;
 }
 
-static void mock_make_result(struct mock_device *mock)
+static void mock_make_result(struct mock_device *mock,
+	const struct mock_candidate *candidate)
 {
 	int32_t lag = -7;
-	uint64_t winner = mock->timestamp + lag;
+	uint64_t winner = candidate->timestamp + lag;
 
 	memset(mock->result, 0, sizeof(mock->result));
 	mock->result[0] = UINT32_C(0x31535350);
 	mock->result[1] = UINT32_C(0x1a010001);
-	mock->result[2] = mock->request;
-	mock->result[3] = (uint32_t)mock->center;
-	mock->result[4] = (uint32_t)(mock->center >> 32);
-	mock->result[5] = (uint32_t)mock->timestamp;
-	mock->result[6] = (uint32_t)(mock->timestamp >> 32);
+	mock->result[2] = candidate->request;
+	mock->result[3] = (uint32_t)candidate->center;
+	mock->result[4] = (uint32_t)(candidate->center >> 32);
+	mock->result[5] = (uint32_t)candidate->timestamp;
+	mock->result[6] = (uint32_t)(candidate->timestamp >> 32);
 	mock->result[7] = (uint32_t)lag;
 	mock->result[8] = (uint32_t)winner;
 	mock->result[9] = (uint32_t)(winner >> 32);
@@ -87,6 +102,20 @@ static void mock_make_result(struct mock_device *mock)
 		++*mock_register(mock, PSS_REG_REJECTED);
 }
 
+static void mock_publish_next_result(struct mock_device *mock)
+{
+	struct mock_candidate *candidate;
+
+	if ((*mock_register(mock, PSS_REG_RESULT_STATUS) & 1U) ||
+	    !mock->candidate_count)
+		return;
+	candidate = &mock->candidates[mock->candidate_head];
+	mock_make_result(mock, candidate);
+	mock->candidate_head =
+		(mock->candidate_head + 1U) % PSS_COMMAND_FIFO_USABLE;
+	--mock->candidate_count;
+}
+
 static int mock_read32(void *context, uint32_t offset, uint32_t *value)
 {
 	struct mock_device *mock = context;
@@ -108,6 +137,8 @@ static int mock_read32(void *context, uint32_t offset, uint32_t *value)
 		*value = mock->result[mock->result_index];
 		return 0;
 	}
+	if (offset == PSS_REG_RESULT_STATUS)
+		mock_publish_next_result(mock);
 	if (offset == PSS_REG_INJECTION_STATUS) {
 		*value = mock->injection_flags | mock->injection_count << 8;
 		if (mock->injection_flags & PSS_INJECTION_INFLIGHT) {
@@ -169,8 +200,21 @@ static int mock_write32(void *context, uint32_t offset, uint32_t value)
 			(uint64_t)value << 32;
 		break;
 	case PSS_REG_CANDIDATE_CONTROL:
-		if (value & 1U)
-			mock_make_result(mock);
+		if (value & 1U) {
+			struct mock_candidate *candidate;
+
+			if (mock->candidate_count == PSS_COMMAND_FIFO_USABLE) {
+				++*mock_register(mock, PSS_REG_CANDIDATE_COMMAND_OVERRUN);
+				break;
+			}
+			candidate = &mock->candidates[mock->candidate_tail];
+			candidate->request = mock->request;
+			candidate->center = mock->center;
+			candidate->timestamp = mock->timestamp;
+			mock->candidate_tail =
+				(mock->candidate_tail + 1U) % PSS_COMMAND_FIFO_USABLE;
+			++mock->candidate_count;
+		}
 		break;
 	case PSS_REG_RESULT_WORD_INDEX:
 		mock->result_index = value < PSS_RESULT_WORDS ? value :
@@ -264,6 +308,31 @@ static int load_packet_file(const char *path, uint32_t words[PSS_RESULT_WORDS])
 		} \
 	} while (0)
 
+struct batch_observer {
+	uint32_t request_id_base;
+	uint32_t received;
+	uint64_t first_center;
+	uint64_t period_samples;
+};
+
+static int observe_batch_packet(void *context,
+	const struct pss_batch_packet *packet)
+{
+	struct batch_observer *observer = context;
+	uint64_t expected_center = observer->first_center +
+		(uint64_t)observer->received * observer->period_samples;
+
+	if (packet->ordinal != observer->received ||
+	    packet->packet.request_id !=
+		observer->request_id_base + observer->received ||
+	    packet->packet.center_index != expected_center ||
+	    packet->packet.center_timestamp != expected_center ||
+	    packet->submit_lead_samples < PSS_MINIMUM_HOST_LEAD)
+		return -1;
+	++observer->received;
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
 	struct mock_device mock;
@@ -278,6 +347,22 @@ int main(int argc, char **argv)
 		.timeout_ms = 100U,
 	};
 	struct pss_track_result result;
+	struct pss_batch_request batch_request = {
+		.request_id_base = UINT32_C(0x20000000),
+		.count = 12U,
+		.period_samples = 20000U,
+		.lead_samples = PSS_DEFAULT_LEAD_SAMPLES,
+		.queue_target = PSS_DEFAULT_QUEUE_TARGET,
+		.timeout_ms = 100U,
+	};
+	struct pss_batch_result batch_result;
+	struct batch_observer batch_observer = {
+		.request_id_base = UINT32_C(0x20000000),
+		.first_center = UINT64_C(0x0000000200010000) +
+			PSS_DEFAULT_LEAD_SAMPLES,
+		.period_samples = 20000U,
+	};
+	struct pss_clock_slope slope;
 	struct pss_packet fixture_packet;
 	uint32_t fixture_words[PSS_RESULT_WORDS];
 	uint64_t fixture_timestamp;
@@ -348,6 +433,57 @@ int main(int argc, char **argv)
 	CHECK(result.after.result_consumed - result.before.result_consumed == 1U,
 		"result-consumed gate is wrong");
 
+	CHECK(pss_track_batch(&io, &batch_request, observe_batch_packet,
+		&batch_observer, &batch_result, error, sizeof(error)) == 0, error);
+	CHECK(batch_observer.received == batch_request.count,
+		"batch callback did not receive every result");
+	CHECK(batch_result.submitted == batch_request.count &&
+	      batch_result.completed == batch_request.count,
+		"batch submit/completion totals are wrong");
+	CHECK(batch_result.maximum_inflight == PSS_COMMAND_FIFO_USABLE,
+		"batch did not fill the seven-entry command FIFO");
+	CHECK(batch_result.minimum_queue_room == 1U,
+		"batch did not observe the final writable FIFO slot");
+	CHECK(batch_result.minimum_submit_lead_samples >= PSS_MINIMUM_HOST_LEAD,
+		"batch violated the minimum host lead");
+	CHECK(batch_result.after.result_consumed -
+	      batch_result.before.result_consumed == batch_request.count,
+		"batch result-consumed aggregate gate is wrong");
+	CHECK(!mock.candidate_count &&
+	      !(*mock_register(&mock, PSS_REG_RESULT_STATUS) & 1U),
+		"batch did not drain the mock command/result queues");
+
+	batch_request.period_samples = PSS_INJECTION_SAMPLES - 1U;
+	CHECK(pss_track_batch(&io, &batch_request, NULL, NULL, &batch_result,
+		error, sizeof(error)) < 0,
+		"batch accepted overlapping candidate geometry");
+	batch_request.period_samples = 20000U;
+	batch_request.request_id_base = UINT32_MAX - 1U;
+	CHECK(pss_track_batch(&io, &batch_request, NULL, NULL, &batch_result,
+		error, sizeof(error)) < 0,
+		"batch accepted overflowing request IDs");
+	batch_request.request_id_base = UINT32_C(0x30000000);
+	*mock_register(&mock, PSS_REG_QUEUE_OVERRUN) = UINT32_MAX;
+	CHECK(pss_track_batch(&io, &batch_request, NULL, NULL, &batch_result,
+		error, sizeof(error)) < 0,
+		"batch accepted a saturated error counter");
+	CHECK(strstr(error, "lacks batch headroom") != NULL,
+		"saturated batch counter returned the wrong error");
+	*mock_register(&mock, PSS_REG_QUEUE_OVERRUN) = 0;
+
+	CHECK(pss_calculate_clock_slope(100U, UINT64_C(15000100),
+		UINT64_C(1000000000), UINT64_C(2000000000), 15000000U,
+		100.0, &slope, error, sizeof(error)) == 0,
+		"exact 15 MS/s clock slope was rejected");
+	CHECK(slope.sample_delta == UINT64_C(15000000) &&
+	      slope.elapsed_ns == UINT64_C(1000000000) &&
+	      slope.error_ppm == 0.0,
+		"clock-slope calculation is wrong");
+	CHECK(pss_calculate_clock_slope(100U, UINT64_C(14900100),
+		UINT64_C(1000000000), UINT64_C(2000000000), 15000000U,
+		1000.0, &slope, error, sizeof(error)) < 0,
+		"out-of-tolerance clock slope was accepted");
+
 	CHECK(load_packet_file(argv[2], fixture_words) == 0,
 		"could not load retained replay packet");
 	fixture_timestamp = (uint64_t)fixture_words[5] |
@@ -370,6 +506,7 @@ int main(int argc, char **argv)
 	printf("STARLINK_PSSCTL_SELFTEST_PASS contract=1.2 taps=66 lags=61 "
 	       "coefficient_iq_swap=1 atomic_telemetry=1 packet_fixture=1 "
 	       "injection_samples=130 injection_iq_swap=1 "
-	       "failure_retains_result=1\n");
+	       "failure_retains_result=1 batch_fifo=7 batch_refill=1 "
+	       "clock_slope=1\n");
 	return EXIT_SUCCESS;
 }
