@@ -1,0 +1,150 @@
+# Immutable offline evidence for the corrected Stage-15 exact-PSS TRACK_ONE
+# ABI 1.1 firmware package.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This package is eligible only
+# for the pluto-plus-utils candidate-plan.v2 RAM lifecycle, on the one serial
+# below, with the explicit ad9361-1r1t prerequisite and mandatory rollback.
+# Hardware qualification has not happened yet.
+
+schema: plutosdr-fw.build-manifest
+schema_version: 1
+release_state: ram-only-candidate
+do_not_merge: true
+do_not_release: true
+ram_boot_eligible: true
+persistent_flash_eligible: false
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9361-1r1t
+qualification_candidate_schema: pluto-plus-utils.release-candidate-plan.v2
+qualification_policy_profile: rx-only-v1
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_main_commit: 8074b228083240860843b0fb4dd4d5b46f06805b
+qualification_utility_version: 0.1.0
+
+# This source-lock tag existed before packaging, so /opt/VERSIONS names it
+# exactly. It is not a release or persistent-promotion tag.
+release_tag: starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v2
+asset_name: pluto.dfu
+image_url: unpublished-local-only
+image_sha256: 850c05de612549eb10b3572a3f36ac2e4d550fdc7288b4ce80803a52b2e37cb1
+image_size: 12837531
+fit_body_sha256: 6d2aaab891a1ffd115e5bc8ba5610a7e3b4f6c14ce42fc0e9680343f52323279
+fit_body_size: 12837515
+device_fw: starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v2
+
+frm_asset_name: pluto.frm
+frm_sha256: 87b6d37b17b3c3fc9a0f8c60b0b119f711af901dc44dc520fbedddba36cf7243
+frm_size: 12837548
+itb_sha256: 6d2aaab891a1ffd115e5bc8ba5610a7e3b4f6c14ce42fc0e9680343f52323279
+itb_md5: bc54b49c65c8b49cc5e97f1e2254069b
+itb_size: 12837515
+
+source_manifest_name: starlink-pss15-track-one-dnm-v2-source.yaml
+source_manifest_sha256: abfa3594259bc554062018de5f88a438a4100133f89fa415892a0298da0173df
+
+firmware_source: df111429a56292011eefc66d3fae23fded0a80c5
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-track-one-v2
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+
+submodule_buildroot: 875844d0dd2c2e9fa6cbf27f4fc7001f853e9d56
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_hdl: e2938b72b410a5d6c1969b498ad249026e0dea27
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+
+versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-track-one-v2-evidence
+versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-pss15-v2
+versions_linux: starlink-rx-only-dnm-v1-source/linux-v2
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx
+versions_file_sha256: 86994685dec67a61e8f5a446820d9d9ec456432e44a6b60faea643ecd28b712c
+
+tracker_identification: 0x50535354
+tracker_version: 0x00010001
+tracker_rate_msps: 15
+tracker_geometry: 0x003d8242
+tracker_capabilities: 0x0000001d
+tracker_mmio_base: 0x79030000
+tracker_raw_lags: 65
+tracker_qualified_lags: 61
+tracker_lag_min: -30
+tracker_lag_max: 30
+tracker_capture_samples: 130
+tracker_taps: 66
+tracker_minimum_lead_samples: 64
+tracker_command_fifo_depth: 8
+
+wrapper_replay_windows: 210
+wrapper_replay_frozen_lag_matches: 210
+wrapper_replay_verdict: PASS
+host_api_selftest_verdict: PASS
+host_api_contract: "1.1"
+host_api_radio_serial_guard: mandatory-before-devmem
+host_api_default_lead_samples: 1000000
+host_api_minimum_lead_samples: 65536
+host_api_binary_sha256: 819497752d6b748dfb6d827791c9833d9246828ab8b785cd06c9499b204acae4
+host_api_binary_size: 25916
+coefficient_fixture_sha256: c660bf9a60fc112697a5939db4682e55a0ce9b5ef8c99f2e4dee7e2b328d62c2
+wrapper_replay_provenance_sha256: c30f89b988dea47e5d6f0d889fff0fe9bbc67cee58de5a4e8f5883ae4ee5159f
+
+fpga_bitstream_md5: 8216d5102c736aa5cd53038a767b0ce7
+fpga_bitstream_sha256: a1c3e01a78cc71f2984290f98677e9b44acb3f7e2bdf4a86405916a537fb83fe
+fpga_bitstream_size: 969428
+xsa_sha256: eee9d8fd5ade10dfcee674a2dba1acfb413662ff915c9b21b33519a28a2b3a9c
+xsa_size: 706202
+linux_kernel_md5: 793c0d3f2a770ff9dd80c4d3b9723f51
+linux_kernel_sha256: 3eb081ede0e6155969c5b1ff215f6cc8280f2d6256d9af33bcf610cd439c8fd9
+linux_kernel_size: 4570928
+ramdisk_md5: 9c10138c406213c3b3f2ea88e4eeb4b7
+rootfs_sha256: 07185dea4b29863ada5c9b9c939335798f010ac6c8104e918826f426abc79043
+rootfs_size: 7221220
+dtb_reva_sha256: 360455e7bb0ab1c5d080a61dbb6bf7481d50a6b510e7e9887eb74922e9d290a6
+dtb_revb_sha256: d2255d934e611cfb63f288f6767c3300d9f1d430ae15987c04ce4ce3c59e6c49
+dtb_revc_sha256: 909c8499e492abb3269e5521511c55c29a514380c11e7f1145d19c83f414f01d
+fit_description: Configuration to load fpga before Kernel
+dfu_vendor_id: 0x0456
+dfu_product_id: 0xb673
+dfu_suffix_crc: 0x6c94009e
+
+root_device_tree_marker: misko,rx-only-fpga
+rx_dma_dt_state: enabled
+tx_dma_dt_state: disabled
+dds_dt_state: disabled
+tandem_dt_state: disabled
+tx_dma_hierarchies: 0
+kernel_devmem_enabled: true
+
+integrated_route_verdict: PASS
+routed_wns_ns: 0.314
+routed_whs_ns: 0.024
+gray_index_skew_ns: 1.235
+telemetry_payload_skew_ns: 1.880
+tracker_critical_cdc_rows: 0
+route_errors: 0
+packaging_verdict: PASS_OFFLINE
+container_verification_verdict: PASS_OFFLINE
+runtime_contract_verdict: PASS_OFFLINE
+
+build_xsa_mode: prebuilt-source-locked
+build_command: make HAVE_VIVADO=0 XSA_FILE=hdl/projects/pluto/pluto.sdk/system_top.xsa build/pluto.frm build/pluto.dfu
+host_gcc: gcc-15.2.0
+host_make: make-4.4.1
+host_dfu_suffix: dfu-util-0.11
+host_m4_compatibility: "host-m4 1.4.19 built once with HOST_CFLAGS='-O2 -std=gnu17 ...', then normal flags restored before remaining target-side tools"
+
+hardware_qualified: false
+hardware_units: 0
+ram_boot_performed: false
+persistent_qualified: false
+persistent_flash_performed: false
+radio_contacted: false
+dfu_transfer_performed: false
