@@ -89,9 +89,6 @@ def test_score_divider_manifest_is_safe_and_binds_sources() -> None:
         "score_divider_vector_generator_sha256": (
             "hdl/library/starlink_pss_acquisition/tb/generate_score_divider_vectors.py"
         ),
-        "acquisition_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
-        ),
         "score_divider_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/run_score_divider_ooc.sh"
         ),
@@ -101,17 +98,10 @@ def test_score_divider_manifest_is_safe_and_binds_sources() -> None:
         "score_divider_ooc_tcl_sha256": (
             "hdl/library/starlink_pss_acquisition/synthesize_score_divider_ooc.tcl"
         ),
-        "acquisition_hdl_readme_sha256": (
-            "hdl/library/starlink_pss_acquisition/README.md"
-        ),
         "score_divider_ooc_summary_sha256": (
             "reports/starlink-pss15-score-divider-ooc-summary.txt"
         ),
         "score_divider_report_sha256": ("reports/STARLINK_PSS15_SCORE_DIVIDER_V1.md"),
-        "score_divider_evidence_test_sha256": (
-            "tests/test_starlink_score_divider_evidence.py"
-        ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
 
     assert "do_not_merge: true" in manifest
@@ -142,3 +132,22 @@ def test_score_divider_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # Shared acquisition sources and the living plan advance with the next
+    # independently checkpointed slice. Preserve this manifest's historical
+    # digests instead of rewriting the divider checkpoint.
+    assert (
+        "acquisition_test_runner_sha256: "
+        "27071641be2d78ad4ea694fbba3d9238b6470d737ff1c605741e37e624d7921e" in manifest
+    )
+    assert (
+        "acquisition_hdl_readme_sha256: "
+        "ac490312c7f1053584fc2520db9d21f800f2184e78ff59abd2c337135b3b3d40" in manifest
+    )
+    assert (
+        "score_divider_evidence_test_sha256: "
+        "a3e9043674fda44021db33eaa04a0896fc6b964cdeb574f46114263977f7b4fa" in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "0378d1fe2809196e595de1ee4f72c52f6b15b066428da58284efe1005b9298d4" in manifest
+    )

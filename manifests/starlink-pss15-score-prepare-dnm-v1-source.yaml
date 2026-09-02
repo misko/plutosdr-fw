@@ -1,0 +1,138 @@
+# Source contract for exact exponent-aware PSS score-ratio preparation.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint forms ratios; it does not join the energy cache, instantiate
+# the result FIFO/second divider lane, bind FFT IP, feed the map, or detect PSS.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-score-divider-dnm-v1-source.yaml
+supersedes_reason: "implement and synthesize exact correlation-power exponent restoration and denominator formation without claiming the indexed energy join or score-stream composition"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: 078e725389c8c790e1f3c3c612b242697f87de77
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-score-prepare-v1
+submodule_hdl_quantulum: 33e327e530c7ecc146f8f436467149f9c173aa97
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/87
+firmware_main_gitlink_guard_merge_commit: bfb0247a374724efde0589dcb259bb1396cf4abd
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+score_prepare_schema: starlink-pss15-score-prepare-v1
+score_prepare_correlation_format: signed_q1_23
+score_prepare_correlation_component_bits: 24
+score_prepare_correlation_power_bits: 48
+score_prepare_sample_energy_bits: 38
+score_prepare_coefficient_energy_bits: 31
+score_prepare_coefficient_energy: 1073742825
+score_prepare_template_edge: upper
+score_prepare_lower_edge_coefficient_energy: 1073776498
+score_prepare_lower_edge_parameter_override_qualified: false
+score_prepare_ratio_bits: 69
+score_prepare_forward_exponent_bits: 5
+score_prepare_inverse_exponent_bits: 5
+score_prepare_power_shift_formula: 2_times_1_plus_forward_plus_inverse_exponent
+score_prepare_numerator_overflow_action: saturate_to_69_bit_maximum
+score_prepare_numerator_saturation_score_equivalent: 255
+score_prepare_denominator_overflow_possible: false
+score_prepare_pipeline_stages: 3
+score_prepare_pipeline_elastic: true
+score_prepare_steady_state_results_per_clock: 1
+score_prepare_start_index_bits: 64
+score_prepare_output_stall_stable: true
+score_prepare_flush_fail_closed: true
+
+score_prepare_simulation_verdict: PASS
+score_prepare_directed_vectors: 16
+score_prepare_random_vectors: 4096
+score_prepare_total_vectors: 4112
+score_prepare_actual_exponent_range_vectors_included: true
+score_prepare_full_five_bit_exponent_range_checked: true
+score_prepare_signed_extrema_checked: true
+score_prepare_zero_full_energy_checked: true
+score_prepare_numerator_saturation_vectors: 2862
+score_prepare_zero_denominator_vectors: 2
+score_prepare_backpressure_checked: true
+score_prepare_middle_stage_flush_checked: true
+score_prepare_stalled_output_flush_checked: true
+score_prepare_metadata_order_checked: true
+
+score_prepare_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 0.396
+ooc_hold_whs_ns: 0.269
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 561
+ooc_total_ffs: 581
+ooc_ramb36e1: 0
+ooc_ramb18e1: 0
+ooc_bram_tiles: 0
+ooc_dsp48e1: 4
+ooc_complete_route_risk_due_narrow_unplaced_setup_margin: true
+
+isolated_planning_total_luts: 7641
+isolated_planning_total_ffs: 11438
+isolated_planning_total_bram_tiles: 35.5
+isolated_planning_total_dsp48e1: 32
+isolated_planning_total_includes: two_xfft_cores_phase_map_overlap_scheduler_spectrum_product_energy_cache_score_prepare_and_two_score_divider_lanes
+isolated_planning_total_excludes: kernel_rom_fft_controller_raw_result_fifo_energy_join_dispatcher_ordered_merge_axi_cdc_shell_and_route_margin
+
+score_prepare_rtl_sha256: 5c9028fb9b1ea4dfef0968269834cb5d6c511e6326cd2cc544f7d89d66790ab5
+score_prepare_testbench_sha256: 5130f2123bce2df64a19ea6df4bb1afca79c5c68bc646fd5e7fc150fa83586eb
+score_prepare_vector_generator_sha256: 15d819372f94f813315a02b0d1057379f5c92ce438350bfeeee7636e8f9bfac4
+acquisition_test_runner_sha256: f4e0b6646827c0d53e218787dc904d8bce58323a1d5c4a6661ee878fa088b130
+score_prepare_ooc_runner_sha256: 0ebc8add219cc2b3cd9783e403302b8011e4469dee058fc56cad527e67813a1e
+score_prepare_ooc_xdc_sha256: 6eec28a2d3de3c108aed5d52669dcb3c041d5653f537511ed9bcbbfb8cc5cea5
+score_prepare_ooc_tcl_sha256: c1bb9180bcc3745ebea4a281d7779f75f1df52e75a198fb590d41ef5e88a5182
+acquisition_hdl_readme_sha256: 29ed1eefa0e6d2c60bde948f87c96f1b8f5fa182f62ee164c30faf66a732e2cf
+score_prepare_ooc_summary_sha256: b2f50c5122f2341e3569844e902e488943ac763507e04300d1e5c1e495ac6311
+score_prepare_report_sha256: 6d92cb9759573ebc721d2447ce6d0d6cec1fe0b5fb80e2e489a7ff2bc37bf848
+score_prepare_evidence_test_sha256: 8cfa7b1ef78b7a874551899f6a562c3416cdf2022a167a5e2e3151c1531ddfa7
+starlink_plan_sha256: 785eac0bce06cff4f8b97488386ffc8ccbb493e68f10a0949aecb5dc8326289d
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_energy_cache_implemented: true
+rtl_score_divider_lane_implemented: true
+rtl_score_preprocessor_implemented: true
+rtl_score_frontend_implemented: false
+rtl_raw_result_fifo_implemented: false
+rtl_energy_join_implemented: false
+rtl_two_lane_dispatch_implemented: false
+rtl_ordered_score_merge_implemented: false
+rtl_fft_instantiated: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

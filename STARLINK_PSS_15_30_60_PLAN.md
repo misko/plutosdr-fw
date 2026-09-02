@@ -275,6 +275,10 @@ Current control-plane evidence:
   five checks, and merged to firmware `main` as
   `0c6f96ef4d95426da4c62a4b30828e5535b7b5c4` before this parent advanced to
   the divider pin;
+- guard PR #87 appended the exact exponent-aware score-preparation HDL pin,
+  passed all five checks, and merged to firmware `main` as
+  `bfb0247a374724efde0589dcb259bb1396cf4abd` before this parent advanced to
+  the preparation pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -679,6 +683,31 @@ dispatcher/ordered merge, FFT binding/controller, phase-map connection, and
 complete route remain pending. Detailed evidence is in
 `reports/STARLINK_PSS15_SCORE_DIVIDER_V1.md`; no radio was contacted.
 
+The exponent-aware score-ratio preparation pipeline is now implemented and
+source-locked at HDL commit
+`078e725389c8c790e1f3c3c612b242697f87de77`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-score-prepare-v1`. Three elastic
+stages square signed Q1.23 IFFT components, form exact correlation power,
+restore it by `2^(2*(1 + Ef + Ei))`, and multiply the unsigned 38-bit window
+energy by the selected upper-edge template's 31-bit coefficient energy
+`1073742825`. The lower-edge value is `1073776498`; although the RTL parameter
+can represent it, lower-edge integration remains unauthorized until a separate
+parameter-override replay and OOC gate pass. A numerator that
+mathematically exceeds 69 bits becomes all ones, which is exactly equivalent
+to `numerator >= denominator` because the denominator always fits 69 bits; no
+wrap is permitted. A Python-generated 4,112-vector replay covers signed
+extrema, actual `0..2` and full `0..31` block exponents, zero/full energy,
+2,862 deliberate numerator saturations, exact metadata, sustained stalls, and
+flush. Vivado 2022.2 post-opt OOC at 100 MHz uses 561 LUTs, 581 registers,
+exactly four DSP48E1s, and no BRAM, with setup WNS `+0.396 ns`, hold WHS
+`+0.269 ns`, zero methodology violations, and no nonempty `check_timing`
+category. The isolated planning subtotal is now 7,641 LUTs, 11,438 registers,
+35.5 BRAM tiles, and 32 DSPs. The positive but narrow unplaced setup margin is
+an explicit complete-route risk. The raw-result FIFO, indexed-energy join,
+two-lane dispatcher/ordered merge, FFT binding/controller, phase-map
+connection, and complete route remain pending. Detailed evidence is in
+`reports/STARLINK_PSS15_SCORE_PREPARE_V1.md`; no radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -1034,6 +1063,14 @@ builds. Starlink code is not part of any PPU commit.
   cross-language replay, stalls, flush, zero-DSP/zero-BRAM inference, and
   100 MHz post-opt OOC timing. The wide score preprocessor, raw-result FIFO,
   second lane, dispatcher, ordered merge, and IQ-to-score composition remain
+  pending.
+- Complete for the exact exponent-aware ratio-preparation pipeline: signed
+  Q1.23 correlation power, full XFFT exponent range, exact power-of-two
+  restoration, exact 38-by-31-bit denominator, fail-closed 69-bit numerator
+  saturation, 4,112-vector cross-language replay, elastic stalls/flush, four
+  DSPs/no BRAM, and positive 100 MHz post-opt OOC setup/hold timing. Its narrow
+  unplaced setup margin remains a composed-route risk; the raw-result FIFO,
+  indexed-energy join, two-lane dispatch/merge, and IQ-to-score replay remain
   pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
