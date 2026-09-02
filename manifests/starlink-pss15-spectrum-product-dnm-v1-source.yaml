@@ -1,0 +1,122 @@
+# Source contract for the exact Q1.23 PSS spectrum-product pipeline.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint implements one arithmetic bridge; it does not instantiate
+# FFT IP, calculate normalized scores, connect the phase map, or detect PSS.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-overlap-scheduler-dnm-v1-source.yaml
+supersedes_reason: "implement and synthesize the exact Q1.23 spectrum product without claiming an integrated FFT or score path"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: 5b2cdd3ba81e98ab3f752f334a34054d0b48f237
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-spectrum-product-v1
+submodule_hdl_quantulum: 9eef83b9a6ce39121246d44f0ace981612aa10be
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/84
+firmware_main_gitlink_guard_merge_commit: 60169ef8c35cca1ce18c062625141c78a4bb2d3b
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+spectrum_product_schema: starlink-pss15-spectrum-product-v1
+spectrum_product_input_format: signed-q1.23-complex
+spectrum_product_kernel_format: signed-q1.23-complex
+spectrum_product_component_bits: 24
+spectrum_product_fraction_bits: 23
+spectrum_product_complex_multiplications_per_bin: 4
+spectrum_product_exact_sum_bits: 49
+spectrum_product_safety_shift_bits: 1
+spectrum_product_total_right_shift_bits: 24
+spectrum_product_rounding: signed-nearest-ties-even
+spectrum_product_output_format: saturated-signed-q1.23-complex
+spectrum_product_pipeline_stages: 3
+spectrum_product_input_protocol: ready_valid
+spectrum_product_output_protocol: ready_valid
+spectrum_product_bins_per_clock: 1
+spectrum_product_metadata_bin_index_bits: 9
+spectrum_product_metadata_block_exponent_bits: 5
+spectrum_product_metadata_block_start_index_bits: 64
+spectrum_product_flush_fail_closed: true
+
+spectrum_product_simulation_verdict: PASS
+spectrum_product_directed_vectors: 16
+spectrum_product_random_vectors: 4096
+spectrum_product_total_vectors: 4112
+spectrum_product_saturating_vectors: 1
+spectrum_product_halfway_rounding_checked: true
+spectrum_product_full_signed_range_checked: true
+spectrum_product_backpressure_stability_checked: true
+spectrum_product_input_backpressure_checked: true
+spectrum_product_metadata_order_checked: true
+spectrum_product_stalled_output_flush_checked: true
+
+spectrum_product_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 2.362
+ooc_hold_whs_ns: 0.284
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 220
+ooc_total_ffs: 456
+ooc_ramb36e1: 0
+ooc_ramb18e1: 0
+ooc_dsp48e1: 8
+
+isolated_planning_total_luts: 5413
+isolated_planning_total_ffs: 9567
+isolated_planning_total_bram_tiles: 33
+isolated_planning_total_dsp48e1: 26
+isolated_planning_total_includes: two_xfft_cores_phase_map_overlap_scheduler_spectrum_product
+isolated_planning_total_excludes: kernel_rom_energy_window_result_fifo_exponent_restoration_normalizer_axi_cdc_shell_and_route_margin
+
+spectrum_product_rtl_sha256: 0eff2eab4ed9f5ee89f5bae2d5aeaa89079fc2e84ef0edf5bd1160153841b475
+spectrum_product_vector_generator_sha256: 31e089d11adb30bf7dd7f1104fb7b836af3420a5ba0bea2f4c439de58bfe576d
+spectrum_product_testbench_sha256: 60ed7807f9cc4217df2d9b617284fd398f4e84c5837fd8b07d5ca7c935823d5d
+acquisition_test_runner_sha256: ba7820c4b9cb8ccefaa9957aca79d49985db8dd5c350c7d40521f21986527e39
+spectrum_product_ooc_runner_sha256: 4ec4efeebdc82afe290f8863e0b8d075308ac1da716ceb9eacea62cbf2b55196
+spectrum_product_ooc_xdc_sha256: 77d253c8b5f5eea8e863aa945350c6bd6b7b972e2fd93b501e5038055508fa29
+spectrum_product_ooc_tcl_sha256: d696d45104d7f8bcd13d84adf0abe3772698aaa9d10aed94d33a34cf53c26390
+acquisition_hdl_readme_sha256: 43ca8d9d049705ae0c7339dcaef7f3f0aaa3ec1ef3f65a438501aa4984982068
+spectrum_product_ooc_summary_sha256: 4939369a6d6f2e10e98b0583c6efaa76f18feb6feac1df271f60b11aa48f5ac4
+spectrum_product_report_sha256: c00a0e32334696fdb7a647a59c7d6779506761c25b870740b1778e95acf4e16d
+spectrum_product_evidence_test_sha256: 72d18939da8eeca86fca0d2880e02944b533140f2fd00d26e5f2d0f28fe7c1ef
+starlink_plan_sha256: 0dae1b70ffe2ddfa51799e78f774a3912078e3830b965460c5d72c68b0724cd8
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_score_frontend_implemented: false
+rtl_fft_instantiated: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

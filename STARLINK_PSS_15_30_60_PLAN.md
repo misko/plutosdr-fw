@@ -610,6 +610,24 @@ shell. This remains slice evidence: no XFFT is yet instantiated in the RTL, no
 score reaches the map, and no radio was contacted. Detailed evidence is in
 `reports/STARLINK_PSS15_OVERLAP_SCHEDULER_V1.md`.
 
+The exact Q1.23 spectrum-product stage is now implemented and source-locked at
+HDL commit `5b2cdd3ba81e98ab3f752f334a34054d0b48f237`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-spectrum-product-v1`. Its three-stage
+elastic pipeline calculates the four signed 24-by-24 products, applies the
+frozen one-bit safety shift, rounds signed results to nearest with ties to even,
+saturates to Q1.23, and carries bin, block-exponent, last, and absolute-start
+metadata through stalls. A Python-generated 4,112-vector replay covers signed
+half-way ties, extremes, saturation, sustained backpressure, exact metadata,
+and fail-closed flush; every result is bit-exact. Vivado 2022.2 post-opt OOC at
+100 MHz uses 220 LUTs, 456 registers, exactly eight DSP48E1s, and no BRAM, with
+setup WNS `+2.362 ns`, hold WHS `+0.284 ns`, zero methodology violations, and
+no nonempty `check_timing` category. The isolated planning subtotal is now
+5,413 LUTs, 9,567 registers, 33 BRAM tiles, and 26 DSPs. FFT RTL binding, the
+kernel ROM, block-exponent restoration, energy window, result FIFO,
+normalizer, phase-map connection, and complete route remain pending. Detailed
+evidence is in `reports/STARLINK_PSS15_SPECTRUM_PRODUCT_V1.md`; no radio was
+contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -948,6 +966,12 @@ builds. Starlink code is not part of any PPU commit.
   ready/valid output stalls, absolute start indexes, fail-closed lifecycle and
   capacity restarts, two-RAMB36 inference, and 100 MHz post-opt OOC timing.
   Binding generated XFFT IP and producing normalized scores remain pending.
+- Complete for the exact spectrum-product checkpoint: Q1.23 complex multiply,
+  frozen one-bit safety shift, signed nearest/ties-even rounding, saturation,
+  overflow telemetry, transform metadata, elastic stalls, flush, 4,112-vector
+  cross-language replay, eight-DSP inference, and 100 MHz post-opt OOC timing.
+  FFT binding, coefficient ROM packaging, energy, exponent restoration,
+  normalization, and score-to-map composition remain pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

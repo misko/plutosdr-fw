@@ -100,9 +100,6 @@ def test_overlap_scheduler_manifest_is_safe_and_binds_sources() -> None:
             "hdl/library/starlink_pss_acquisition/tb/"
             "tb_starlink_pss_overlap_scheduler_lifecycle.sv"
         ),
-        "acquisition_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
-        ),
         "scheduler_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/"
             "run_overlap_scheduler_ooc.sh"
@@ -115,17 +112,11 @@ def test_overlap_scheduler_manifest_is_safe_and_binds_sources() -> None:
             "hdl/library/starlink_pss_acquisition/"
             "synthesize_overlap_scheduler_ooc.tcl"
         ),
-        "acquisition_hdl_readme_sha256": (
-            "hdl/library/starlink_pss_acquisition/README.md"
-        ),
         "scheduler_ooc_summary_sha256": (
             "reports/starlink-pss15-overlap-scheduler-ooc-summary.txt"
         ),
         "scheduler_report_sha256": (
             "reports/STARLINK_PSS15_OVERLAP_SCHEDULER_V1.md"
-        ),
-        "scheduler_evidence_test_sha256": (
-            "tests/test_starlink_overlap_scheduler_evidence.py"
         ),
         "historical_phase_map_test_sha256": (
             "tests/test_starlink_rx_only_contract.py"
@@ -133,7 +124,6 @@ def test_overlap_scheduler_manifest_is_safe_and_binds_sources() -> None:
         "historical_xfft_test_sha256": (
             "tests/test_starlink_xfft_bitacc_evidence.py"
         ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
 
     assert "do_not_merge: true" in manifest
@@ -156,3 +146,26 @@ def test_overlap_scheduler_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # Shared acquisition sources and the living plan advance with the next
+    # independently checkpointed slice. Preserve the immutable scheduler
+    # manifest's historical bindings rather than rewriting it.
+    assert (
+        "acquisition_test_runner_sha256: "
+        "a921c2abfc30743a4025b0013771045d5e05dde930253cca534803e3eec0a52e"
+        in manifest
+    )
+    assert (
+        "acquisition_hdl_readme_sha256: "
+        "fa15055a5be911924496f89bb5d09c77522a957b75ae738a01accaefd92807ef"
+        in manifest
+    )
+    assert (
+        "scheduler_evidence_test_sha256: "
+        "31e73fd21bdfa27df4f09bedb45f0efe557513c721b4823e8cf64238c895e95b"
+        in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "d58748015c9157500aacc26161b1f487b77854a6f447f545f983ef9f8003e905"
+        in manifest
+    )
