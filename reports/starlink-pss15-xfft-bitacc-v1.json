@@ -1,0 +1,266 @@
+{
+  "analysis_kind": "offline-xilinx-xfft-finite-width-acquisition-study",
+  "candidate_only": true,
+  "captures": [
+    {
+      "difference": {
+        "map_cell_count": 60000,
+        "map_delta_max": 2,
+        "map_delta_min": -2,
+        "map_equal_count": 59402,
+        "phase_cadence_and_classification_equal": true,
+        "score_delta_max": 1,
+        "score_delta_mean_absolute": 0.00015640501173156798,
+        "score_delta_min": -1,
+        "score_equal_count": 4193583,
+        "score_error_count": 656,
+        "score_error_fraction": 0.00015640501173156798
+      },
+      "exact_integer_reference": {
+        "candidate": {
+          "combined_median": 755.0,
+          "combined_score": 1462,
+          "drift_bins_per_tile": 12.0,
+          "estimated_frame_period_samples": 20000.1875,
+          "passes_existing_epoch_gates": true,
+          "peak_to_median": 1.9364238410596026,
+          "phase_bin": 1173,
+          "phase_bin_start_sample": 1173,
+          "robust_z": 12.549078077630337
+        },
+        "maximum_fft_rounding_residual": 1.1175870895385742e-08
+      },
+      "finite_width": {
+        "block_count": 9384,
+        "candidate": {
+          "combined_median": 755.0,
+          "combined_score": 1462,
+          "drift_bins_per_tile": 12.0,
+          "estimated_frame_period_samples": 20000.1875,
+          "passes_existing_epoch_gates": true,
+          "peak_to_median": 1.9364238410596026,
+          "phase_bin": 1173,
+          "phase_bin_start_sample": 1173,
+          "robust_z": 12.549078077630337
+        },
+        "forward_block_exponents": {
+          "0": 1,
+          "1": 9355,
+          "2": 28
+        },
+        "forward_overflow_blocks": 0,
+        "inverse_block_exponents": {
+          "0": 11,
+          "1": 4230,
+          "2": 5143
+        },
+        "inverse_overflow_blocks": 0,
+        "product_overflow_blocks": 0,
+        "score_count": 4194239
+      },
+      "gates": {
+        "frozen_oracle_reproduced": true,
+        "maximum_score_error_at_most_one": true,
+        "no_arithmetic_overflow": true,
+        "phase_cadence_and_classification_equal": true
+      },
+      "input": {
+        "compressed_sha256": "68732179d9e147e0f173677f810e032d5240fc3ba024cb9045fe17dff9f38946",
+        "first_sample_index": 0,
+        "path": "/srv/bulk/leo/recordings/2026/08/31/cap-20260831T071200-9184cf0ad6cc/radio-10400056f695001322002d0010ad1719f2/iq-000000.ci16.zst",
+        "sample_count": 4194304
+      },
+      "oracle_report": "reports/starlink-pss-acquisition-oracle-v1.json",
+      "passes": true,
+      "template": {
+        "coefficient_energy": 1073742825,
+        "edge": "upper",
+        "kernel_q23_int32le_sha256": "d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b"
+      }
+    },
+    {
+      "difference": {
+        "map_cell_count": 40000,
+        "map_delta_max": 2,
+        "map_delta_min": -2,
+        "map_equal_count": 39269,
+        "phase_cadence_and_classification_equal": true,
+        "score_delta_max": 1,
+        "score_delta_mean_absolute": 0.000293101962924827,
+        "score_delta_min": -1,
+        "score_equal_count": 3144741,
+        "score_error_count": 922,
+        "score_error_fraction": 0.000293101962924827
+      },
+      "exact_integer_reference": {
+        "candidate": {
+          "combined_median": 502.0,
+          "combined_score": 778,
+          "drift_bins_per_tile": 0.0,
+          "estimated_frame_period_samples": 20000.0,
+          "passes_existing_epoch_gates": true,
+          "peak_to_median": 1.549800796812749,
+          "phase_bin": 2755,
+          "phase_bin_start_sample": 2755,
+          "robust_z": 6.205314987184677
+        },
+        "maximum_fft_rounding_residual": 5.820766091346741e-10
+      },
+      "finite_width": {
+        "block_count": 7038,
+        "candidate": {
+          "combined_median": 502.0,
+          "combined_score": 778,
+          "drift_bins_per_tile": 0.0,
+          "estimated_frame_period_samples": 20000.0,
+          "passes_existing_epoch_gates": true,
+          "peak_to_median": 1.549800796812749,
+          "phase_bin": 2755,
+          "phase_bin_start_sample": 2755,
+          "robust_z": 6.205314987184677
+        },
+        "forward_block_exponents": {
+          "0": 7038
+        },
+        "forward_overflow_blocks": 0,
+        "inverse_block_exponents": {
+          "0": 7038
+        },
+        "inverse_overflow_blocks": 0,
+        "product_overflow_blocks": 0,
+        "score_count": 3145663
+      },
+      "gates": {
+        "frozen_oracle_reproduced": true,
+        "maximum_score_error_at_most_one": true,
+        "no_arithmetic_overflow": true,
+        "phase_cadence_and_classification_equal": true
+      },
+      "input": {
+        "compressed_sha256": "fd6bc878e76d52671c5ea1c8f3ceae773e2539da285363c52118f698581bdaae",
+        "first_sample_index": 546308096,
+        "path": "/srv/bulk/leo/recordings/2026/08/31/cap-20260831T044729-6a598698a226/radio-1040005e0b100007100010000bf33a5d4d/iq-000278.ci16.zst",
+        "sample_count": 3145728
+      },
+      "oracle_report": "reports/starlink-pss-acquisition-oracle-v1-independent-positive.json",
+      "passes": true,
+      "template": {
+        "coefficient_energy": 1073742825,
+        "edge": "upper",
+        "kernel_q23_int32le_sha256": "d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b"
+      }
+    },
+    {
+      "difference": {
+        "map_cell_count": 80000,
+        "map_delta_max": 2,
+        "map_delta_min": -2,
+        "map_equal_count": 78741,
+        "phase_cadence_and_classification_equal": true,
+        "score_delta_max": 1,
+        "score_delta_mean_absolute": 0.00024853060807981974,
+        "score_delta_min": -1,
+        "score_equal_count": 5241512,
+        "score_error_count": 1303,
+        "score_error_fraction": 0.00024853060807981974
+      },
+      "exact_integer_reference": {
+        "candidate": {
+          "combined_median": 1005.0,
+          "combined_score": 1289,
+          "drift_bins_per_tile": 12.0,
+          "estimated_frame_period_samples": 20000.1875,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.2825870646766169,
+          "phase_bin": 10646,
+          "phase_bin_start_sample": 10646,
+          "robust_z": 4.5608422783655485
+        },
+        "maximum_fft_rounding_residual": 6.984919309616089e-10
+      },
+      "finite_width": {
+        "block_count": 11729,
+        "candidate": {
+          "combined_median": 1005.0,
+          "combined_score": 1289,
+          "drift_bins_per_tile": 12.0,
+          "estimated_frame_period_samples": 20000.1875,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.2825870646766169,
+          "phase_bin": 10646,
+          "phase_bin_start_sample": 10646,
+          "robust_z": 4.5608422783655485
+        },
+        "forward_block_exponents": {
+          "0": 11729
+        },
+        "forward_overflow_blocks": 0,
+        "inverse_block_exponents": {
+          "0": 11729
+        },
+        "inverse_overflow_blocks": 0,
+        "product_overflow_blocks": 0,
+        "score_count": 5242815
+      },
+      "gates": {
+        "frozen_oracle_reproduced": true,
+        "maximum_score_error_at_most_one": true,
+        "no_arithmetic_overflow": true,
+        "phase_cadence_and_classification_equal": true
+      },
+      "input": {
+        "compressed_sha256": "d33e16b72bb64a7718fbdc3063fcce7d92ea1d33cb3f3077ac78edc010cedb50",
+        "first_sample_index": 0,
+        "path": "/srv/bulk/leo/recordings/2026/08/31/cap-20260831T052807-77e01d5101ea/radio-1040005e0b100007100010000bf33a5d4d/iq-000000.ci16.zst",
+        "sample_count": 5242880
+      },
+      "oracle_report": "reports/starlink-pss-acquisition-oracle-v1-independent-negative.json",
+      "passes": true,
+      "template": {
+        "coefficient_energy": 1073742825,
+        "edge": "upper",
+        "kernel_q23_int32le_sha256": "d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b"
+      }
+    }
+  ],
+  "cmodel": {
+    "archive_sha256": "0f264e0e15f93fcf5df9c60e715fe51c9bcd9639b578a5ae67be4df5cf2d5f87",
+    "installed_archive": "/opt/Xilinx/Vivado/2022.2/data/ip/xilinx/xfft_v9_1/cmodel/xfft_v9_1_bitacc_cmodel_lin64.zip",
+    "proprietary_files_retained_in_source": false,
+    "vivado_version": "2022.2",
+    "xfft_version": "9.1"
+  },
+  "configuration": {
+    "architecture": "radix_4_burst",
+    "data_bits": 24,
+    "output_ordering": "natural",
+    "phase_factor_bits": 16,
+    "pss_kernel_q23_int32le_sha256": {
+      "lower": "ba7189f2648e62116a49b51028ae08671ae3856fff5dc4f6965611eeaa967f33",
+      "upper": "d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b"
+    },
+    "rounding": "convergent_ties_to_even",
+    "scaling": "block_floating_point",
+    "spectrum_product_shift": 1,
+    "target_clock_mhz": 100,
+    "target_throughput_msps": 20,
+    "template_scaling_schedule": [
+      2,
+      0,
+      0,
+      0,
+      0
+    ],
+    "transform_samples": 512,
+    "valid_outputs_per_block": 447
+  },
+  "gates": {
+    "every_capture_passes": true,
+    "positive_and_negative_present": true
+  },
+  "generated_at_utc": "2026-09-02T19:55:00+00:00",
+  "hardware_qualified": false,
+  "live_pss_qualified": false,
+  "passes": true,
+  "schema": "starlink-xfft-bitacc-acquisition-v1"
+}

@@ -407,7 +407,9 @@ Consequently:
    overflow reporting independently of all detector logic.
 2. Continuously acquire in FPGA at the canonical 15 MS/s rate. A shared
    512-sample overlap-save front end produces 447 valid score positions per
-   block for each enabled lower/upper PSS template. Normalized power is
+   block for the RF-plan-selected lower or upper PSS template. The first image
+   permits exactly one enabled template bank; any concurrent two-edge mode
+   requires a new routed resource gate. Normalized power is
    quantized to eight bits and accumulated at full one-sample phase resolution
    into 20,000-bin, 64-frame maps. The ARM sees bounded maps, applies the
    frozen robust epoch policy and a small explicitly trial-corrected cadence
@@ -560,6 +562,31 @@ claim. The RX DMA path is unchanged. Immutable v1 and v2 tags are retained but
 superseded after review found, respectively, a shared two-bank read-address mux
 and clean-bank reservation leaks across disable; neither was advanced into this
 parent graph, built into an image, or used on a radio.
+
+The next offline arithmetic checkpoint is now complete as
+`starlink-xfft-bitacc-acquisition-v1`. The selected one-template front end uses
+two dedicated 512-point radix-4 burst XFFT v9.1 cores with 24-bit data, 16-bit
+phase factors, block-floating scaling, convergent rounding, natural-order
+output, and a one-bit Q1.23 spectrum-product safety shift. Across 12,582,717
+frozen real score positions, 2,881 differ from the exact integer oracle
+(0.02290%), every difference is at most one eight-bit count, and all three
+phase/cadence/classification decisions are exactly unchanged. All structural
+overlap-boundary PSS injections score 255 and no modeled arithmetic block
+overflows. This is a deliberately bounded finite-width acquisition contract,
+not a claim that FFT correlations are bit-identical to direct dot products;
+the sparse direct tracker remains the exact confirmation stage.
+
+Vivado 2022.2 selects radix-4 burst at the required 20 MS/s target. One 24-bit
+core uses 2,189 LUTs, 3,847 registers, 11 RAMB18E1s (5.5 BRAM tiles), and nine
+DSPs with post-synthesis setup/hold slack of `+6.411/+0.203 ns` at 100 MHz. Two
+cores plus the measured one-template phase map total 4,920 LUTs, 8,416
+registers, 31 BRAM tiles, and 18 DSPs before the multiplier, energy window,
+FIFOs, normalizer, and shell. The first image therefore enables exactly one
+RF-plan-selected lower/upper edge template at a time. Concurrent two-edge
+search would duplicate the inverse path and 20-RAMB36 map and is deferred
+unless a complete-shell resource study justifies it. Detailed evidence is in
+`reports/STARLINK_PSS15_XFFT_BITACC_V1.md`; no Xilinx proprietary C-model file
+or generated IP is retained in source.
 
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
@@ -747,9 +774,12 @@ Every rate must pass all of these common gates:
 
 - source closure: immutable parent/submodule commits, tool versions, waveform
   and template digests, generated-image hashes, and reproducible commands;
-- functional closure: bit-exact oracle agreement for score, hypothesis, index,
-  timestamp mapping, ties, overflow, saturation, zero energy, valid gaps,
-  enable changes, index jumps, wrong cadence, and negative recordings;
+- functional closure: for the acquisition FFT, the separately frozen
+  finite-width score-error bound plus exact phase/cadence/classification
+  agreement; for the sparse confirmation tracker, bit-exact oracle agreement;
+  both paths cover index and timestamp mapping, ties, overflow, saturation,
+  zero energy, valid gaps, enable changes, index jumps, wrong cadence, and
+  negative recordings;
 - policy closure: before held-out evaluation, freeze a versioned
   `qualification-policy` containing positive/negative partition IDs and digests,
   raw-index/timestamp tolerance, minimum frames, allowed misses, confirmation
@@ -886,6 +916,11 @@ builds. Starlink code is not part of any PPU commit.
   independent real positive chunks, one independent RF-negative chunk, and
   deterministic scrambled controls. The retained default is one-sample phase
   resolution; coarse phase bins are rejected by the weaker positive.
+- Complete for the finite-width arithmetic checkpoint: 24-bit block-floating
+  XFFT v9.1 replay, fixed kernel and product scaling, every structural FFT
+  boundary, both kernel digests, all three real captures, maximum one-count
+  score error, exact final phase/cadence/classification agreement, zero modeled
+  overflow, and a generated one-core OOC resource/timing report.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

@@ -49,9 +49,19 @@ library must emit identical low bits.
 `acquisition.py` defines `starlink-pss-acquisition-oracle-v1`.  It uses a
 512-sample overlap-save FFT to accelerate the exact CI16/Q1.15 correlation,
 rounds every complex result back to the integer dot-product lattice, and then
-quantizes normalized power with exact rational ties-to-even arithmetic.  The
-FFT is a host acceleration technique, not yet the arithmetic contract of a
-future fixed-point RTL FFT.
+quantizes normalized power with exact rational ties-to-even arithmetic. The
+binary64 FFT remains a host acceleration technique rather than an RTL
+arithmetic contract.
+
+`xfft_bitacc.py` separately defines the offline candidate
+`starlink-xfft-bitacc-acquisition-v1`. It binds 24-bit block-floating arithmetic
+to the pinned Xilinx FFT v9.1 C model from Vivado 2022.2, models the Q1.23
+spectrum product and block exponents, and returns scores through the same exact
+rational quantizer. It validates and extracts the installed proprietary
+runtime into ignored `build/` storage; no Xilinx library or header is retained
+in source. The finite-width result is explicitly compared with the direct
+integer contract and is not mislabeled bit-exact where one-count score
+differences remain.
 
 The FPGA-facing reduction keeps the maximum score in each coarse phase bin for
 one nominal frame and sums those maxima across a configurable tile.  Complete
@@ -80,6 +90,17 @@ PYTHONPATH=. python tools/starlink_pss_acquisition_study.py \
 
 Pin `--generated-at-utc` when the report itself must reproduce byte for byte;
 omit it for an ordinary run that should record its actual generation time.
+
+Run the complete retained finite-width replay with:
+
+```sh
+uv run --no-project --with numpy tools/starlink_xfft_bitacc_study.py \
+  --oracle-report reports/starlink-pss-acquisition-oracle-v1.json \
+  --oracle-report reports/starlink-pss-acquisition-oracle-v1-independent-positive.json \
+  --oracle-report reports/starlink-pss-acquisition-oracle-v1-independent-negative.json \
+  --generated-at-utc 2026-09-02T19:55:00Z \
+  --output reports/starlink-pss15-xfft-bitacc-v1.json
+```
 
 The report includes a deterministic frame-scrambled score control.  That
 control preserves the marginal score distribution while destroying repeated

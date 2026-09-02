@@ -1,0 +1,116 @@
+# Source contract for the finite-width 15 MS/s acquisition arithmetic study.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint contains an offline XFFT C-model harness and OOC IP estimate;
+# it does not add an FFT or scorer to the HDL source graph.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-phase-map-dnm-v1-source.yaml
+supersedes_reason: "freeze and qualify finite-width IQ-to-score arithmetic without claiming integrated RTL"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: d291871923c6dc6cc2f30745d2e9d8a6abd3188f
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-phase-map-v3
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: false
+firmware_main_gitlink_guard_required: false
+firmware_main_gitlink_guard_reason: "HDL pin is unchanged and already protected by firmware main PR 82"
+
+acquisition_sample_rate_hz: 15000000
+acquisition_template_mode: one_rf_plan_selected_edge
+acquisition_template_edges_available: [lower, upper]
+acquisition_templates_concurrent: 1
+acquisition_fft_samples: 512
+acquisition_valid_outputs_per_fft: 447
+acquisition_score_bits: 8
+acquisition_phase_bins: 20000
+acquisition_tile_frames: 64
+
+xfft_schema: starlink-xfft-bitacc-acquisition-v1
+xfft_vivado_version: 2022.2
+xfft_ip_version: 9.1
+xfft_architecture: radix_4_burst
+xfft_data_bits: 24
+xfft_phase_factor_bits: 16
+xfft_scaling: block_floating_point
+xfft_rounding: convergent_ties_to_even
+xfft_output_order: natural
+xfft_template_scaling_schedule: [2, 0, 0, 0, 0]
+xfft_spectrum_product_shift: 1
+xfft_target_clock_mhz: 100
+xfft_target_throughput_msps: 20
+xfft_required_throughput_msps: 17.181208053691276
+xfft_cmodel_archive_sha256: 0f264e0e15f93fcf5df9c60e715fe51c9bcd9639b578a5ae67be4df5cf2d5f87
+xfft_proprietary_files_retained_in_source: false
+xfft_lower_kernel_q23_int32le_sha256: ba7189f2648e62116a49b51028ae08671ae3856fff5dc4f6965611eeaa967f33
+xfft_upper_kernel_q23_int32le_sha256: d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b
+
+real_replay_verdict: PASS
+real_replay_score_count: 12582717
+real_replay_exact_score_count: 12579836
+real_replay_one_count_difference_count: 2881
+real_replay_maximum_score_error: 1
+real_replay_maximum_map_cell_error: 2
+real_replay_phase_cadence_classification_equal: true
+real_replay_forward_overflow_blocks: 0
+real_replay_inverse_overflow_blocks: 0
+real_replay_product_overflow_blocks: 0
+structural_overlap_boundary_peaks_full_scale: true
+
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_synthesis_unplaced
+ooc_setup_wns_ns: 6.411
+ooc_hold_whs_ns: 0.203
+ooc_total_luts_per_core: 2189
+ooc_total_ffs_per_core: 3847
+ooc_ramb36e1_per_core: 0
+ooc_ramb18e1_per_core: 11
+ooc_dsp48e1_per_core: 9
+
+xfft_bitacc_model_sha256: a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e
+xfft_bitacc_unit_test_sha256: e2aa774a6c919c0354f03aa658bb4179d079e564a4f86b8607825623fcad9f28
+starlink_oracle_init_sha256: d5031be98444c73d1f9a29a241637e64caadea276f46981be31785535474f67e
+starlink_oracle_readme_sha256: 33d38f61c21c3d835fb9f0bad3eb3360ee5d2a605e9c72792801918a3db83632
+xfft_evidence_test_sha256: 72e0555322c57720219847f9652440503f7c7e25075df6fffa112a09860a03dd
+xfft_study_tool_sha256: d8a919679178ce3ca808a5d60368081344ac62226e797bca502a9849c3a8c1f4
+xfft_ooc_tcl_sha256: 88a18820a5b10882bea09e0876658b183a5c5f1d53d35b37c301d991805bd72a
+xfft_ooc_runner_sha256: 1532c7ab7684fb50d484af646ea583d3d80c6ae9b9e9948146b51d48d103e5cd
+xfft_replay_evidence_sha256: 2b2f54c37461a653f6c50bf5c68fec769b3b8fb6d300d82859de75949ab01a87
+xfft_ooc_summary_sha256: c96095a10f07739358c38ff3ae55cb0879ce42c0ae019499dc3bf9de69a3f5c1
+xfft_report_sha256: 63ee762fdfe2f94280eafce194d9caa9af26e36081f910e314480852107b98b4
+starlink_plan_sha256: b837bbb92b1b6f9239761912b3cef7fbc785e720787428e04061c2011e5754e8
+
+rtl_phase_map_implemented: true
+rtl_score_frontend_implemented: false
+rtl_fft_implemented: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false
