@@ -83,6 +83,49 @@ index, and timestamp remain source-derived. A late start, incomplete fixture,
 overlapping command, or accepted-index discontinuity is sticky and fail-closed.
 This is deterministic hardware-path evidence, not live Starlink evidence.
 
+## Continuous-acquisition library checkpoint
+
+`starlink_pss_acquisition.c` is the source-only ARM policy layer for the
+separate `PSMA` ABI 1.0 phase-map bridge. It accepts only the fixed 15 MS/s
+geometry: 20,000 one-sample phase bins, 64 frames per map, 16-bit map words,
+two immutable banks, and capability word `0x1f`. It is compiled as a strict
+ARM EABI object by `make check`; it is not yet linked into `starlink_pssctl`,
+installed in the root filesystem, or assigned an MMIO aperture. Those steps
+wait for RX-shell integration and a complete linked-system route.
+
+The copy sequence takes one atomic hardware snapshot, reads exactly 20,000
+zero-extended words, brackets the copy with a second atomic snapshot, and
+releases the selected bank only after its generation, start index, command
+status, and all acquisition/bridge fault epochs remain coherent. Failed copies
+retain FPGA ownership. Each successful copy carries its before/after health
+epochs; `pss_map_copies_contiguous()` accepts only adjacent generations and
+1,280,000-sample start-index steps with unchanged, nonsaturated fault counters.
+
+Candidate extraction keeps three consecutive maps and evaluates at most seven
+strictly increasing shift-and-sum hypotheses. The production bank is
+`[-12, -8, -4, 0, 4, 8, 12]` bins per 64-frame tile: approximately
+`[-9.375, -6.25, -3.125, 0, 3.125, 6.25, 9.375]` ppm around the nominal
+20,000-sample period. It preserves the Python oracle's tie order (smallest
+drift, then smallest phase), exact odd/even median and MAD construction,
+peak-to-median ratio, robust z score, and estimated frame period.
+
+The fixed working set is about 320 kB: 120 kB for three maps, 160 kB for two
+20,000-word `uint32_t` scratch arrays, and 40 kB for the incoming immutable
+copy buffer. The state controller is explicitly
+`ACQUIRE -> CONFIRM -> LOCK -> TRACK -> HOLDOVER -> ACQUIRE`. A lock requires
+multiple threshold-passing, phase/cadence-consistent observations. Metadata or
+hardware-health discontinuity resets acquisition without consuming the current
+candidate; bounded misses enter holdover and then return to acquisition.
+
+The native C test covers the complete 20,000-word transfer, no-release failure
+paths, fault-epoch and map continuity, fixed-memory drift extraction, tie and
+finite/zero-MAD cases, unsafe-bound rejection, and the complete state path.
+`tests/test_starlink_pss_acquisition_c.py` additionally compares C against the
+frozen Python acquisition oracle across randomized odd/even map sizes and a
+zero-MAD tie. This checkpoint is candidate-selection and policy logic, not a
+shell connection, autonomous scheduler, on-radio result, live PSS detection,
+or demonstrated frame lock.
+
 This controller and FPGA belong only on
 `codex/starlink-rx-only-do-not-merge`. They must not be merged into HDL or
 firmware main. Generic PPU radio-mode support remains separate and mergeable to
