@@ -36,10 +36,10 @@ def test_multirate_manifest_is_immutable_dnm_and_records_all_routes() -> None:
         assert boundary in manifest
     assert "starlink_pss_supported_rates_msps: 15,30,60" in manifest
     assert "starlink_pss_shared_xfft_instances: 1" in manifest
-    assert "submodule_hdl: 592a736fc8ee534e257751e6eb3c48677546a4b1" in manifest
+    assert "submodule_hdl: a3cc9592207e5600f617e5d82686c1c6671a8d67" in manifest
     assert (
         "submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/"
-        "hdl-pss15-30-60-acquisition-v1"
+        "hdl-pss15-30-60-acquisition-v2"
     ) in manifest
     assert "submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886" in manifest
     for rate in (15, 30, 60):
@@ -100,6 +100,20 @@ def test_multirate_builder_runs_current_rtl_and_only_selected_vendor_replay() ->
     )
     assert rejected.returncode == 2
     assert "{30|60}" in rejected.stderr
+
+
+def test_only_60_msps_selects_the_timing_oriented_implementation_strategy() -> None:
+    project = _read("hdl/projects/pluto/system_project.tcl")
+    normalized = " ".join(project.replace("#", "").split())
+
+    assert '$::env(STARLINK_PSS_RATE_MSPS) eq "60"' in project
+    assert (
+        "set_property strategy Performance_ExplorePostRoutePhysOpt "
+        "[get_runs impl_1]"
+    ) in project
+    assert "does not reuse a prior checkpoint" in normalized
+    assert "relax any timing constraint" in normalized
+    assert project.count("Performance_ExplorePostRoutePhysOpt") == 1
 
 
 def test_packager_dispatches_new_exact_route_gate_and_keeps_legacy_gate() -> None:
