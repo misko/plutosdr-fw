@@ -195,7 +195,11 @@ if [[ "$CHECK_WORKTREE" == 1 &&
     expected_libiio_archive_sha="$(m libiio_0_25_archive_sha256)"
     libiio_hash="buildroot/package/libiio/libiio.hash"
     if [[ -n "$expected_libiio_archive_sha" && -f "$libiio_hash" ]]; then
-        expected_hash_line="sha256 ${expected_libiio_archive_sha}  libiio-${expected_libiio}.tar.gz"
+        libiio_archive_suffix=".tar.gz"
+        if grep -Eq '^LIBIIO_SITE_METHOD[[:space:]]*=[[:space:]]*git([[:space:]]|$)' "$recipe"; then
+            libiio_archive_suffix="-br1.tar.gz"
+        fi
+        expected_hash_line="sha256 ${expected_libiio_archive_sha}  libiio-${expected_libiio}${libiio_archive_suffix}"
         if grep -Fqx "$expected_hash_line" "$libiio_hash"; then
             ok "Buildroot libiio archive hash ${expected_libiio_archive_sha:0:12}"
         else

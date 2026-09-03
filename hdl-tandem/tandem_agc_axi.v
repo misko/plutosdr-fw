@@ -78,7 +78,7 @@ module tandem_agc_axi #(
   // configuration registers, held in the AXI domain
   // ---------------------------------------------------------------------------
   localparam integer CFGW = 140;
-  localparam integer STAW = 30;
+  localparam integer STAW = 94;
 
   reg [7:0]  r_pulse_hi, r_pulse_lo;
   reg [15:0] r_blank_guard;
@@ -183,7 +183,7 @@ module tandem_agc_axi #(
   // hold and destination registers on an already full XC7Z010.
   // ---------------------------------------------------------------------------
   wire [STAW-1:0] status_bundle = {
-      cnt_trans, fault, fpga_owns, cooldown_active, pulse_busy,
+      sample_counter, cnt_trans, fault, fpga_owns, cooldown_active, pulse_busy,
       expected_index, state };
 
   wire       snap_busy;
@@ -209,6 +209,7 @@ module tandem_agc_axi #(
   wire        a_owns    = status_axi[13];
   wire [7:0]  a_fault   = status_axi[21:14];
   wire [7:0]  a_trans   = status_axi[29:22];
+  wire [63:0] a_sample_counter = status_axi[93:30];
 
   wire [2:0] a_public_state =
       (a_state == 3'd6) ? 3'd4 :
@@ -302,8 +303,8 @@ module tandem_agc_axi #(
         rvalid <= 1'b1;
         case (s_axi_araddr)
           8'h00: rdata_q <= 32'h5441_4732;                 // "TAG2"
-          8'h04: rdata_q <= 32'd1;
-          8'h08: rdata_q <= {16'h0007, 16'd64};
+          8'h04: rdata_q <= 32'd2;
+          8'h08: rdata_q <= {16'h000f, 16'd64};
           8'h0C: rdata_q <= {23'd0, r_fault_clear, 6'd0, r_mode[1], |r_mode};
           8'h10: rdata_q <= {23'd0, |a_fault, 5'd0, a_public_state};
           8'h14: rdata_q <= r_epoch;
@@ -323,8 +324,8 @@ module tandem_agc_axi #(
           8'h4C: rdata_q <= evt_rdata[95:64];
           8'h50: begin rdata_q <= evt_rdata[127:96];
                        if (evt_valid) evt_pop <= 1'b1; end
-          8'h54: rdata_q <= 32'd0;
-          8'h58: rdata_q <= 32'd0;
+          8'h54: rdata_q <= a_sample_counter[31:0];
+          8'h58: rdata_q <= a_sample_counter[63:32];
           8'h5C: rdata_q <= 32'd0;
           default: rdata_q <= 32'd0;
         endcase
