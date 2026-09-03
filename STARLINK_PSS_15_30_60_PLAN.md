@@ -917,6 +917,25 @@ has no shell MMIO aperture, built image, radio result, live-PSS claim, or frame
 alignment qualification. No PPU or HDL source changed and no radio was
 contacted.
 
+The loss-aware acquisition boundary now supersedes that source-only checkpoint
+at coherent firmware commit
+`3fa1b1ba3a3bd7f115231ae8ffb8983300259d8e`, tagged
+`starlink-rx-only-dnm-v1-source/firmware-pss15-health-abi11-v1`, with HDL commit
+`b7b564dd5e6a66a5c1ddf8f144d3bb6a9f8fc86a`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-health-abi11-v1`. A 128-entry
+Gray-pointer RX-to-acquisition FIFO never backpressures RX DMA and turns every
+drop into a saturating count, sticky flag, and explicit recovered-stream gap.
+PSMA 1.1 atomically adds ingress occupancy/loss, scheduler, detector, phase,
+denominator, and candidate-FIFO telemetry while retaining exact ABI 1.0
+compatibility in ARM software. The bounded functional rerun, 100 MHz
+acquisition OOC gate, and fully routed isolated AXI/CDC gate pass. Firmware-main
+PR #96 merged only the two append-only experimental HDL denylist entries as
+`4e443ec0463c5814e39819c4162ac9e94276ff78`; it did not merge experiment code
+or a gitlink. The complete evidence is in
+`reports/STARLINK_PSS15_HEALTH_ABI11_V1.md`. Full one-RX shell routing, image
+packaging, and RAM-only hardware qualification remain pending. No radio was
+contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:

@@ -189,13 +189,22 @@ def test_arm_acquisition_manifest_binds_evidence_and_preserves_boundaries() -> N
         "arm_acquisition_report_sha256": (
             "reports/STARLINK_PSS15_ARM_ACQUISITION_V1.md"
         ),
-        "arm_acquisition_evidence_test_sha256": (
-            "tests/test_starlink_arm_acquisition_evidence.py"
-        ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
     for field, relative in current_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    # This source checkpoint is now superseded by the loss-aware PSMA 1.1
+    # checkpoint. Preserve the exact evidence-test and living-plan digests that
+    # were reviewed with v1 instead of rewriting its historical manifest.
+    assert (
+        "arm_acquisition_evidence_test_sha256: "
+        "4a8c62195110fb33bf59dea54923005ac95e42f9c043e0dea36f1b7c55095c8f"
+        in manifest
+    )
+    assert (
+        "starlink_plan_sha256: "
+        "3905a0bc7383f6db1ce5f5dea15f16d64a4a625d7855698b4a617b27c2059cf0"
+        in manifest
+    )
     assert SOURCE_COMMIT in report
     assert SOURCE_TAG in report
     assert SUMMARY_SHA256 in report

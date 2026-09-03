@@ -1,0 +1,180 @@
+# Source contract for loss-aware Stage-15 ingress, PSMA 1.1, and ARM policy.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_source_commit: 3fa1b1ba3a3bd7f115231ae8ffb8983300259d8e
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-health-abi11-v1
+supersedes_manifest: starlink-pss15-arm-acquisition-dnm-v1-source.yaml
+supersedes_reason: "bind loss-detecting RX ingress, complete acquisition health epochs, atomic PSMA 1.1 telemetry, and backward-compatible ARM handling without claiming shell integration, an image, radio operation, or frame alignment"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: b7b564dd5e6a66a5c1ddf8f144d3bb6a9f8fc86a
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-health-abi11-v1
+ingress_hdl_source_commit: 883e9824cebc2c8eaac0ad818cde22595dfd65e0
+ingress_hdl_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-sample-cdc-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/96
+firmware_main_gitlink_guard_merge_commit: 4e443ec0463c5814e39819c4162ac9e94276ff78
+firmware_main_gitlink_guard_all_five_checks_passed: true
+firmware_main_gitlink_guard_changed_only_denylist: true
+experimental_source_merged_to_firmware_main: false
+
+sample_rate_hz: 15000000
+acquisition_clock_hz: 100000000
+sample_cdc_payload_bits: 97
+sample_cdc_fifo_depth: 128
+sample_cdc_nonbackpressured: true
+sample_cdc_drop_counter_saturating: true
+sample_cdc_drop_recovery_gap_tagged: true
+sample_cdc_independent_reset_purge: true
+
+phase_map_identification: 0x50534d41
+phase_map_version: 0x00010001
+phase_map_capabilities: 0x0000003f
+phase_map_abi10_version: 0x00010000
+phase_map_abi10_capabilities: 0x0000001f
+phase_map_abi10_prefix_last_offset: 0x84
+phase_map_abi11_last_offset: 0xac
+phase_map_snapshot_words: 26
+phase_map_snapshot_source_bits: 790
+phase_map_snapshot_synchronizer_bits: 1580
+phase_map_snapshot_destination_bits: 790
+phase_map_health_known_mask: 0x00001fff
+phase_map_health_continuity_mask: 0x000017ff
+phase_map_health_sticky_causes: 13
+phase_map_phase_bins: 20000
+phase_map_tile_frames: 64
+phase_map_word_bits: 16
+phase_map_banks: 2
+phase_map_words_per_copy: 20000
+phase_map_bytes_per_copy: 40000
+phase_map_start_step_samples: 1280000
+
+arm_accepts_exact_abi_pairs: ["1.0/0x1f", "1.1/0x3f"]
+arm_abi10_reads_abi11_registers: false
+arm_unknown_health_flags_rejected: true
+arm_candidate_reserved_bits_rejected: true
+arm_data_integrity_epochs_fail_closed: true
+arm_mutable_occupancy_telemetry_allowed: true
+arm_denominator_zero_is_continuity_failure: false
+arm_window_maps: 3
+arm_drift_hypotheses: 7
+arm_lock_state_path: ACQUIRE-CONFIRM-LOCK-TRACK-HOLDOVER-ACQUIRE
+
+functional_verdict: PASS
+functional_health_counter_saturation: true
+functional_health_detector_fault_episodes: 2
+functional_health_sticky_causes: 12
+functional_sample_cdc_depths: [4, 128]
+functional_sample_cdc_injected_drops_per_depth: 6
+functional_sample_cdc_independent_reset_purges: 2
+functional_axi_integrated_clock_cases: 4
+functional_axi_snapshot_words: 26
+functional_arm_python_c_differential_cases: 13
+functional_asan_ubsan_verdict: PASS
+functional_arm_eabi_cross_build_verdict: PASS
+
+sample_cdc_ooc_verdict: PASS
+sample_cdc_ooc_vivado_version: 2022.2
+sample_cdc_ooc_part: xc7z010clg400-1
+sample_cdc_ooc_timing_scope: post_opt_unplaced
+sample_cdc_ooc_source_clock_period_ns: 16.270
+sample_cdc_ooc_acquisition_clock_period_ns: 10.000
+sample_cdc_ooc_setup_wns_ns: 2.025
+sample_cdc_ooc_hold_whs_ns: 0.137
+sample_cdc_ooc_critical_cdc_paths: 0
+sample_cdc_ooc_gray_bus_skew_constraints: 3
+sample_cdc_ooc_total_luts: 148
+sample_cdc_ooc_total_ffs: 242
+sample_cdc_ooc_ramb36e1: 1
+sample_cdc_ooc_ramb18e1: 1
+sample_cdc_ooc_dsp48e1: 0
+
+iq_map_ooc_verdict: PASS
+iq_map_ooc_timing_scope: post_opt_unplaced
+iq_map_ooc_setup_wns_ns: 0.364
+iq_map_ooc_hold_whs_ns: 0.011
+iq_map_ooc_total_luts: 8079
+iq_map_ooc_total_ffs: 12463
+iq_map_ooc_bram_tiles: 38.5
+iq_map_ooc_dsp48e1: 32
+
+axi_ooc_verdict: PASS
+axi_ooc_timing_scope: post_route
+axi_ooc_setup_wns_ns: 2.520
+axi_ooc_hold_whs_ns: 0.019
+axi_ooc_critical_cdc_rows: 0
+axi_ooc_bus_skew_met: 3
+axi_ooc_bus_skew_violated: 0
+axi_ooc_total_luts: 504
+axi_ooc_total_ffs: 3687
+axi_ooc_ramb36e1: 0
+axi_ooc_ramb18e1: 0
+axi_ooc_dsp48e1: 0
+
+sample_cdc_rtl_sha256: e70c686701030fba054a8ff8af986078f5e9361e6858e866a6fcb07f95d6bf5a
+sample_cdc_constraints_sha256: 507d2190ff261bf141f5b879d924f9935cf495f6483d684e018b704012207556
+sample_cdc_ooc_constraints_sha256: 74bf78ef625aab345ed98283350ccb08705d4d394b695a33935a974fd0a78009
+sample_cdc_ooc_tcl_sha256: dc2988f7cd3cbf721da7bf1af7711f3c90b6af761b0d656469f8a890896365ce
+sample_cdc_ooc_runner_sha256: 4904c314e15634d7e6b97fa2c7fa5986e1b4038d62c9daefa508c27996d99a09
+sample_cdc_testbench_sha256: abbababa7a3dc87c357ebace77ab2c39b462fa3e504ede815981f698c1b038a0
+acquisition_health_rtl_sha256: 9c0a81f1487ee6c254dc7a5ece9049c5bc3f7aed47f6ba95ffb62df550ff3e36
+acquisition_health_testbench_sha256: 7cb4d4e1c1ac55f0b522300098330673b36e7d86b102f2ad748ecb280bb3e1da
+iq_to_phase_map_rtl_sha256: 11cf874b9c41dc1f426486223a6d631135d84bbf8bcfc94b88475719ae9a720e
+phase_map_axi_rtl_sha256: 07be49bf862c7ddc79c0ba6d5c60a301727d5e43506efe64ac6d36db71bdec95
+phase_map_axi_snapshot_testbench_sha256: 75ae8ca091050315fe144b88869ee0cabb64719314edb71bd2b70432637e92a7
+arm_acquisition_library_sha256: 72616d2af5bf9b4f02470d28049cd7cde27c55305ac0b0671533293415707081
+arm_acquisition_header_sha256: b3cf0c695fdebd0629c20c5bfb242a58b395fd159c2eed3f05ad1a70d097b958
+arm_acquisition_selftest_sha256: 63748dcb33f88a1f556bee4d79d47ba1f39b80fb2f9d85a004b9a46c9fa2f09c
+arm_acquisition_readme_sha256: 0befef0aa5f92ae6e2767f77ade3671c7c1f917ff287f46bdac5702d7b329cf0
+arm_acquisition_differential_test_sha256: e1cbd226e5cc6b31cb0d22982c7325870d7354db089c6978657979e8e488c429
+arm_acquisition_runner_sha256: 1ca766e11fa6ffc6e0752bc99ddff7bb04384bf143963757d784a80fa120b1e4
+health_abi11_functional_summary_sha256: f8128625db2bf916c1e6b1288a80c6a1c3cb7cffe98a6df616e91c404a68d63b
+sample_cdc_ooc_summary_sha256: c922c847c3049c1aef70fa24f1bc6a0acb0c6da3343cb7cd877add26f052fa1f
+health_abi11_iq_map_ooc_summary_sha256: 3fdf00e63a955c45a69c923c6e377bd10ad2f3400568321b008c082f84273db2
+health_abi11_axi_ooc_summary_sha256: 3efa46b7a9c140c4379c6958dfcd02d424e63c8bcb27893141ca800564a4f952
+health_abi11_report_sha256: 0407892beda104329e03cb920781c2a3771c6a9fc60896d17250fa692b162417
+health_abi11_evidence_test_sha256: c1ff63e14489cd666b0c033d7a2a1714c8596554c0af5683fffaa4c69d368c3e
+starlink_plan_sha256: 2d682bda0ad7e885bb35b74481b41992cf362401b9054c71cdfcef3302b6be35
+
+rtl_sample_cdc_implemented: true
+rtl_complete_acquisition_health_implemented: true
+rtl_phase_map_implemented: true
+rtl_axi_cdc_control_implemented: true
+arm_candidate_extraction_implemented: true
+arm_lock_state_machine_implemented: true
+arm_target_executable_linked: false
+rtl_rx_shell_connected: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+firmware_image_built: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false
