@@ -1,0 +1,160 @@
+# Source contract for the continuous 15 MS/s CI16-to-bounded-phase-map path.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# This checkpoint is optimized but unplaced. It has no RX-shell connection,
+# AXI/CDC/control boundary, ARM candidate selection, or hardware qualification.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-iq-to-score-xfft-dnm-v1-source.yaml
+supersedes_reason: "connect the exact generated-XFFT score stream to event-driven phase tagging and the bounded two-bank phase map without claiming RX-shell integration or frame lock"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: c85a88109ef68020c5d318e045b7ad91660a8960
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-iq-to-phase-map-v2
+superseded_submodule_hdl_v1: af16286da82584421a1230c46aa70ed2db9dac7f
+superseded_submodule_hdl_v1_reason: "timing cut changed an already checkpointed shared FIFO; v2 restores it byte-for-byte and owns the fail-closed boundary in the IQ composition"
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/94
+firmware_main_gitlink_guard_merge_commit: f0161837c11c39acb81fa7c45a3714d2dd4d2321
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+pipeline_vector_schema: starlink-pss15-generated-xfft-pipeline-vectors-v1
+pipeline_oracle_schema: starlink-xfft-bitacc-acquisition-v1
+sample_rate_hz: 15000000
+acquisition_clock_hz: 100000000
+fft_points: 512
+overlap_samples: 65
+valid_scores_per_block: 447
+kernel_selection: upper_edge
+kernel_component_format: signed_q1_23
+kernel_canonical_binary_sha256: d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b
+kernel_memory_text_sha256: 7c89ff2a026f5fab91e655ab969ac07c11bf9715215173dadec07084527aea7d
+
+generated_xfft_version: 9.1
+generated_xfft_instances: 2
+generated_xfft_points: 512
+generated_xfft_data_bits: 24
+generated_xfft_phase_factor_bits: 16
+generated_xfft_architecture: radix_4_burst
+generated_xfft_scaling: block_floating_point
+generated_xfft_rounding: convergent
+generated_xfft_output_order: natural
+generated_xfft_phase_map_replay_verdict: PASS
+generated_xfft_replay_samples: 1406
+generated_xfft_replay_scores_checked: 1341
+generated_xfft_replay_phase_bins: 447
+generated_xfft_replay_tile_frames: 3
+generated_xfft_replay_map_words_checked: 447
+generated_xfft_replay_map_peak_phase: 0
+generated_xfft_replay_map_peak_value: 264
+generated_xfft_replay_map_publish_count: 1
+generated_xfft_replay_discarded_scores: 0
+generated_xfft_replay_discontinuity_aborts: 0
+generated_xfft_proprietary_model_files_retained: false
+
+phase_tagger_first_good_score_is_phase_zero: true
+phase_tagger_advances_on_valid_score_only: true
+phase_tagger_absolute_index_checked: true
+phase_tagger_mismatched_score_suppressed: true
+phase_tagger_following_consecutive_score_rebases_zero: true
+phase_tagger_simulation_accepted_scores: 14
+phase_tagger_simulation_wrap_checked: true
+phase_tagger_simulation_valid_gaps_checked: true
+phase_tagger_simulation_explicit_discontinuity_checked: true
+phase_tagger_simulation_disable_flush_restart_checked: true
+
+phase_map_phase_bins: 20000
+phase_map_tile_frames: 64
+phase_map_word_bits: 16
+phase_map_banks: 2
+phase_map_bytes_per_bank: 40000
+phase_map_tile_period_ms: 85.333333
+phase_map_sustained_handoff_bytes_per_second: 468750
+phase_map_complete_tiles_only: true
+phase_map_score_input_backpressure: false
+phase_map_score_register_boundary_throughput_per_clock: 1
+inverse_xfft_output_backpressure: false
+candidate_backpressure_violation_fail_closed: true
+acquisition_simulation_suite_tests: 17
+
+iq_to_phase_map_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 0.364
+ooc_hold_whs_ns: 0.011
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 8018
+ooc_total_ffs: 12290
+ooc_ramb36e1: 26
+ooc_ramb18e1: 25
+ooc_bram_tiles: 38.5
+ooc_dsp48e1: 32
+ooc_complete_route_required: true
+
+iq_to_phase_map_rtl_sha256: b69a1d130708cc0562510884f23754915c3cd57c541b86986681975af501b473
+score_phase_tagger_rtl_sha256: a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e
+iq_to_score_rtl_sha256: 78209615116f77c62e02d4379d1a01dad270168f5ec3114ce143e46cbab65d6c
+raw_result_fifo_rtl_sha256: 146215dea3ab7fe9ffa1aceed84b8bd898968c53dc510386e8b4ccb71da73a68
+iq_to_phase_map_testbench_sha256: 195e64850cbc98579ba331a5c34597ed1036f12db4a32262c220b769d327717b
+score_phase_tagger_testbench_sha256: 8a9dd23691d82cf62f87cb5a12d45c0af4afaa05bd1b966a6c53bce5b381903d
+iq_to_phase_map_simulation_tcl_sha256: 63e5f17d39377a6c23369f42d758ec9596a0e8411c7168037e5acedf68a48393
+iq_to_phase_map_ooc_tcl_sha256: ec795e1c90874d21acaf9d13c919728852a7d5299225f952a7b830ead8ca18ac
+iq_to_phase_map_ooc_xdc_sha256: 5958f1af448c0c498301cac5388893f73532735bbd2010ec511d0ca252fc2cb5
+acquisition_test_runner_sha256: 15ea28a0e4392ca8d0cc5871a3534bcc78abde1a491f8d9f856dcdaf699fdd13
+acquisition_readme_sha256: e6f5345e81b2330226e95e18b806e25787efffe1789cf7d895dba919aeed9c37
+pipeline_vector_evidence_sha256: 6eaf98f478b1222042aca89e76828984f6bde6e486f0eacc06b5067f3b5d296d
+phase_map_simulation_summary_sha256: 9c819b7128f60bf19ae623741d4a0cd0008ce0f4d7ab989f4ba81d3da2cfda24
+phase_map_ooc_summary_sha256: 92af1c40a05c64cf5181d0f66492cd1b3da45654c6bc7b6953d3f8738a48dd9d
+phase_map_simulation_runner_sha256: a6f310bd9adc1f5a886d75b1c4c173ef76a89ceae7db909f4a6f13d0eb3a24d8
+phase_map_ooc_runner_sha256: 8f81089bea856ae74a2532a2ad2b0bfa437bc42ec7186a5961d7d158b71a8e2e
+phase_map_report_sha256: 8a7d0cc90285b0d0e94c243eafe43af6cc39202a9c2d5dd1127d93d89104bfef
+phase_map_evidence_test_sha256: a6ac65c2b503d43b938934495aa3280bf9889e5fd8d1dc00379f0c93eddf743b
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_energy_cache_implemented: true
+rtl_score_normalization_implemented: true
+rtl_xfft_forward_inverse_instantiated: true
+rtl_raw_iq_to_score_complete: true
+rtl_score_phase_tagger_implemented: true
+rtl_phase_map_connected_to_score_path: true
+rtl_bounded_map_handoff_complete: true
+rtl_candidate_selection_implemented: false
+rtl_axi_cdc_control_implemented: false
+rtl_rx_shell_connected: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

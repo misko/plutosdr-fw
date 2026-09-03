@@ -295,6 +295,14 @@ Current control-plane evidence:
   passed all five checks, and merged to firmware `main` as
   `250fc46cc57f38aec6a8321990f84460fb73d749` before this parent advanced to
   the kernel-ROM pin;
+- guard PR #92 appended the exact generated-XFFT IQ-to-score HDL pin, passed
+  all five checks, and merged to firmware `main` as
+  `eb0fe23673e5318b42dbe9bf3e972cb9a0be217c` before this parent advanced to
+  the IQ-to-score pin;
+- guard PR #94 appended both immutable IQ-to-phase-map HDL pins, passed all
+  five checks, and merged to firmware `main` as
+  `f0161837c11c39acb81fa7c45a3714d2dd4d2321` before this parent advanced to
+  the selected v2 pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -846,6 +854,31 @@ full placement/routing, and hardware qualification remain pending. Detailed
 evidence is in `reports/STARLINK_PSS15_IQ_TO_SCORE_XFFT_V1.md`; no radio was
 contacted.
 
+The score stream is now connected to the bounded phase-map datapath at HDL
+commit `c85a88109ef68020c5d318e045b7ad91660a8960`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-iq-to-phase-map-v2`. The immutable v1
+commit `af16286da82584421a1230c46aa70ed2db9dac7f` is retained but superseded:
+regression review moved its timing cut out of the already checkpointed shared
+FIFO and into a composition-local, fail-closed nonbackpressured inverse-XFFT
+boundary. A dedicated
+phase tagger advances only on valid consecutive absolute score indexes,
+preserves phase across wall-clock valid gaps, suppresses an index jump, and
+rebases the following consecutive score at phase zero. The composed wrapper
+consumes every score locally and inserts a one-cycle, one-score-per-clock
+register boundary before the phase map. A three-block actual-XFFT replay checks
+all 1,341 scores and every value in the resulting 447-bin by three-frame map;
+the exact peak is phase 0 with value 264. The production-geometry OOC gate
+instantiates 20,000 bins and 64 frames and closes 100 MHz post-opt unplaced
+timing at setup WNS `+0.364 ns` and hold WHS `+0.011 ns`, with zero methodology
+violations and no nonempty `check_timing` category. The complete composition
+uses 8,018 LUTs, 12,290 registers, 26 RAMB36E1 plus 25 RAMB18E1 blocks (38.5
+BRAM tiles), and 32 DSPs. Each published immutable map is 40,000 bytes per
+64-frame tile, roughly 468.75 kB/s at the 750 Hz frame rate, instead of a
+continuous 60 MB/s CI16 host stream. This proves bounded preprocessing, not
+PSS frame lock: robust ARM candidate selection, AXI/CDC/control integration,
+the real RX tap, complete placement/routing, and RAM-only hardware
+qualification remain pending. No radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -1246,6 +1279,14 @@ builds. Starlink code is not part of any PPU commit.
   positive 100 MHz post-opt OOC setup/hold timing. The narrow OOC margins make
   complete placement/routing mandatory; phase-map wiring, RX-shell integration,
   firmware packaging, and hardware qualification remain pending.
+- Complete for the IQ-to-phase-map composition: valid-event phase tagging,
+  absolute score-index discontinuity rejection and rebase, one-score-per-clock
+  timing isolation, exact three-frame actual-XFFT map replay, exhaustive map
+  readback, default 20,000-bin/64-frame linked resource accounting, bounded
+  40,000-byte immutable-map handoff, and positive 100 MHz post-opt unplaced
+  timing with clean reports. ARM peak/cadence selection, AXI/CDC/control, the
+  RX-shell tap, complete route, firmware packaging, and hardware qualification
+  remain pending; this checkpoint does not claim frame lock.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run
