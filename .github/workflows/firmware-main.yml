@@ -38,6 +38,7 @@ jobs:
         github.ref == 'refs/heads/main') ||
        (github.event_name == 'workflow_dispatch' &&
         (github.ref == 'refs/heads/main' ||
+         github.ref == 'refs/heads/codex/persistent-hop-duty-fw' ||
          github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m' ||
          github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' ||
          github.ref == 'refs/heads/codex/ddr-capacity-test' ||
@@ -95,6 +96,8 @@ jobs:
       # usable only for reproducing independently locked candidates.
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
+          github.ref == 'refs/heads/codex/persistent-hop-duty-fw' &&
+          'persistent-hop-duty-v1-source.yaml' ||
           (github.ref == 'refs/heads/main' ||
           github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m') &&
           'iq-direct-async-v4-source.yaml' ||
@@ -196,7 +199,9 @@ jobs:
           'tandem-agc-v2-source.yaml' ||
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
-        ${{ (github.ref == 'refs/heads/main' ||
+        ${{ github.ref == 'refs/heads/codex/persistent-hop-duty-fw' &&
+          'plutoplus-spf-persistent-hop-duty-v1-rc1' ||
+          (github.ref == 'refs/heads/main' ||
           github.ref == 'refs/heads/codex/iq-direct-async-v4-exact-200m') &&
           'plutoplus-spf-iq-direct-async-v4' ||
           github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
@@ -320,6 +325,14 @@ jobs:
         id: names
         run: |
           echo "artifact_name=plutoplus-main-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_OUTPUT"
+
+      - name: Require the exact persistent-hop duty candidate identity
+        if: github.ref == 'refs/heads/codex/persistent-hop-duty-fw'
+        env:
+          REQUESTED_RELEASE_VERSION: ${{ inputs.release_version || '' }}
+        run: |
+          test "$REQUESTED_RELEASE_VERSION" = \
+            'v0.50-plutoplus-spf-persistent-hop-duty-v1-rc1'
 
       - name: Require the exact protected RC6 reproduction identity
         if: github.ref == 'refs/heads/codex/firmware-tandem-agc-v8-rc6'
