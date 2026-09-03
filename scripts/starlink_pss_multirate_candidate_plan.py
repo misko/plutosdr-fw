@@ -17,6 +17,7 @@ import os
 import re
 import stat
 import struct
+import subprocess
 import tarfile
 from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO
@@ -84,6 +85,42 @@ def _stable_owned_file(path: Path, *, maximum: int, label: str) -> tuple[int, st
     finally:
         os.close(descriptor)
     return size, digest
+
+
+def _verify_clean_source_repository(
+    repository: Path, *, commit: str, expected_slug: str, label: str
+) -> Path:
+    selected = repository.absolute()
+
+    def git(*arguments: str) -> str:
+        try:
+            result = subprocess.run(
+                ("git", "-C", str(selected), *arguments),
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise CandidatePlanError(
+                f"{label} repository cannot be attested"
+            ) from error
+        return result.stdout.strip()
+
+    root = Path(git("rev-parse", "--show-toplevel")).absolute()
+    head = git("rev-parse", "HEAD")
+    status = git("status", "--porcelain=v1", "--untracked-files=all")
+    remote = git("remote", "get-url", "origin")
+    remote_path = remote.removesuffix(".git").replace(":", "/")
+    if (
+        root != selected
+        or head != commit
+        or status
+        or not remote_path.endswith(f"/{expected_slug}")
+    ):
+        raise CandidatePlanError(
+            f"{label} repository is not the exact clean expected source checkout"
+        )
+    return selected
 
 
 def _parse_sums(payload: bytes, *, label: str) -> dict[str, str]:
@@ -327,6 +364,14 @@ def prepare_candidate(
     sidecar = sidecar_path.absolute()
     archive_bytes, archive_sha256 = _verify_sidecar(archive, sidecar)
     retained, member_sums = _verified_members(archive)
+    final_archive_bytes, final_archive_sha256 = _stable_owned_file(
+        archive, maximum=MAX_ARCHIVE_BYTES, label="candidate archive"
+    )
+    if (final_archive_bytes, final_archive_sha256) != (
+        archive_bytes,
+        archive_sha256,
+    ):
+        raise CandidatePlanError("candidate archive changed during verification")
 
     dfu_names = sorted(name for name in retained if name.endswith("-pluto.dfu"))
     provenance_names = sorted(
@@ -549,6 +594,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--rate", type=int, choices=SUPPORTED_RATES, required=True)
     parser.add_argument("--ppu-commit", required=True)
+    parser.add_argument("--ppu-repository", type=Path, required=True)
     parser.add_argument("--generator-commit", required=True)
     parser.add_argument(
         "--qualification-manifest",
@@ -561,6 +607,18 @@ def main(argv: list[str] | None = None) -> int:
     if sidecar is None:
         sidecar = Path(str(args.archive) + ".sha256")
     try:
+        _verify_clean_source_repository(
+            ROOT,
+            commit=args.generator_commit,
+            expected_slug=FIRMWARE_REPOSITORY,
+            label="generator",
+        )
+        _verify_clean_source_repository(
+            args.ppu_repository,
+            commit=args.ppu_commit,
+            expected_slug=PPU_REPOSITORY,
+            label="PPU",
+        )
         result = prepare_candidate(
             args.archive,
             sidecar,

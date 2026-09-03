@@ -6,6 +6,7 @@ import io
 import json
 import stat
 import struct
+import subprocess
 import tarfile
 from pathlib import Path
 
@@ -14,6 +15,7 @@ import pytest
 from scripts.starlink_pss_multirate_candidate_plan import (
     ALLOCATED_SERIAL,
     CandidatePlanError,
+    _verify_clean_source_repository,
     prepare_candidate,
 )
 
@@ -208,3 +210,44 @@ def test_rejects_non_basename_archive_member(tmp_path: Path) -> None:
         )
 
     assert not output.exists()
+
+
+def test_source_repository_attestor_requires_exact_clean_head(tmp_path: Path) -> None:
+    repository = tmp_path / "ppu"
+    repository.mkdir()
+
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ("git", "-C", str(repository), *arguments),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    git("init")
+    git("config", "user.name", "Candidate Test")
+    git("config", "user.email", "candidate@example.invalid")
+    (repository / "README").write_text("clean\n")
+    git("add", "README")
+    git("commit", "-m", "fixture")
+    git("remote", "add", "origin", "git@github.com:misko/pluto-plus-utils.git")
+    commit = git("rev-parse", "HEAD")
+
+    assert (
+        _verify_clean_source_repository(
+            repository,
+            commit=commit,
+            expected_slug="misko/pluto-plus-utils",
+            label="PPU",
+        )
+        == repository.absolute()
+    )
+    (repository / "dirty").write_text("reject\n")
+    with pytest.raises(CandidatePlanError, match="exact clean expected"):
+        _verify_clean_source_repository(
+            repository,
+            commit=commit,
+            expected_slug="misko/pluto-plus-utils",
+            label="PPU",
+        )
