@@ -1298,6 +1298,20 @@ Current status ledger:
 - current 15/30/60 continuous-acquisition RTL and full routed images:
   **COMPLETE OFFLINE / HARDWARE UNTESTED**, with the authoritative evidence and
   hashes recorded in the 2026-09-03 checkpoint above;
+- the branch-only staged build contract is now implemented under
+  `starlink-pss-multirate-rx-only-dnm-v1-source.yaml`. It pins HDL
+  `592a736fc8ee` with immutable tag
+  `starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v1`, requires one
+  explicit build rate from `15`, `30`, or `60`, stamps a rate-specific v0.50
+  identity, runs the four current acquisition/tracker RTL suites, and runs the
+  selected Xilinx-XFFT replay. The package gate requires the exact reviewed
+  272-row CDC summary/detail inventory and exactly six met bus-skew constraints.
+  All three existing routed checkpoints pass that new gate, and the new 30/60
+  runner passes both vendor-model replays. The historical v0.49 manifest,
+  builder path, and three-constraint validator remain unchanged for
+  reproduction. No experimental push or manual dispatch targets firmware
+  `main`; remote source-locked package builds remain staged 15, then 30, then
+  60 and are still pending;
 - every new-image RAM boot, 30/60 MS/s radio-transport/injection/live-RF gate,
   full campaign-close, full-band RFIC qualification, and SSS gate: pending.
 

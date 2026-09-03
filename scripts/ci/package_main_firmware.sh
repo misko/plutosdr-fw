@@ -13,6 +13,7 @@ PACKAGE_STEM_PREFIX="${SPF_PACKAGE_STEM_PREFIX:-plutoplus-spf-main}"
 RELEASE_STATE="${SPF_RELEASE_STATE:-main-ci}"
 REQUIRED_BUS_SKEW_CONSTRAINTS=4
 STARLINK_RX_ONLY_BUILD=false
+STARLINK_PSS_MULTIRATE_BUILD=false
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -57,6 +58,26 @@ if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; 
         fail "RX-only manifest differs from its committed HEAD blob"
     STARLINK_RX_ONLY_BUILD=true
     REQUIRED_BUS_SKEW_CONSTRAINTS=3
+fi
+
+# The shared-XFFT experiment is a separate, explicitly non-promotable source
+# graph. It has three acquisition CDC constraints, one tracker sample-index
+# constraint, and the RX timestamp FIFO's write/read pointer constraints.
+if [[ "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ]]; then
+    starlink_multirate_manifest="${ROOT}/manifests/starlink-pss-multirate-rx-only-dnm-v1-source.yaml"
+    [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
+        fail "multirate PSS build must use the canonical manifest: ${starlink_multirate_manifest}"
+    git --no-replace-objects -C "$ROOT" \
+        show 'HEAD:manifests/starlink-pss-multirate-rx-only-dnm-v1-source.yaml' |
+        cmp -s - "$starlink_multirate_manifest" ||
+        fail "multirate PSS manifest differs from its committed HEAD blob"
+    case "${STARLINK_PSS_RATE_MSPS:-}" in
+    15|30|60) ;;
+    *) fail "STARLINK_PSS_RATE_MSPS must be exactly 15, 30, or 60" ;;
+    esac
+    STARLINK_PSS_MULTIRATE_BUILD=true
+    REQUIRED_BUS_SKEW_CONSTRAINTS=6
 fi
 
 [[ -n "$ARTIFACT_ROOT" ]] ||
@@ -384,6 +405,9 @@ iq-direct-async-v3-source.yaml:final-release)
 starlink-rx-only-dnm-v1-source.yaml:candidate)
     protected_version='v0.49-plutoplus-starlink-rx-only-dnm-v1'
     ;;
+starlink-pss-multirate-rx-only-dnm-v1-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v1"
+    ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
     ;;
@@ -534,6 +558,11 @@ if [[ "$STARLINK_RX_ONLY_BUILD" == true ]]; then
         --cdc-report "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
         --bus-skew-report "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
 fi
+if [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
+    python3 scripts/ci/validate_starlink_pss_multirate_route_reports.py \
+        "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
+        "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
+fi
 
 if [[ -n "$INTEGRATED_WAIVERS" ]]; then
     python3 scripts/validate_integrated_release.py \
@@ -607,6 +636,11 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
     echo "github_run_attempt=${GITHUB_RUN_ATTEMPT:-local}"
     echo "build_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "build_duration_seconds=${CI_BUILD_DURATION_SECONDS:-unknown}"
+    if [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
+        echo "starlink_pss_rate_msps=$STARLINK_PSS_RATE_MSPS"
+        echo 'do_not_merge=true'
+        echo 'persistent_flash_eligible=false'
+    fi
     echo "builder_host=$(hostname)"
     echo "builder_arch=$(uname -m)"
     echo "source_date_epoch=${SOURCE_DATE_EPOCH:-unset}"

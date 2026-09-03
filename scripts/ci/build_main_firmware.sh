@@ -119,6 +119,29 @@ if [[ "$(basename -- "$source_manifest")" == \
                 "$artifact_real/starlink-pss-ooc-${rate}m-synthesized.dcp"
         done
     )
+elif [[ "$(basename -- "$source_manifest")" == \
+        "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ]]; then
+    case "${STARLINK_PSS_RATE_MSPS:-}" in
+    15|30|60) ;;
+    *) fail "STARLINK_PSS_RATE_MSPS must be exactly 15, 30, or 60 for the multirate PSS build" ;;
+    esac
+    export STARLINK_PSS_RATE_MSPS
+    {
+        bash hdl/library/axi_starlink_pss_acquisition/run_tests.sh
+        bash hdl/library/starlink_pss_acquisition/run_tests.sh
+        bash hdl/library/starlink_pss_raw_correlator/run_tests.sh
+        bash hdl/library/axi_starlink_pss_tracker/run_tests.sh
+    } 2>&1 | tee "$artifact_real/starlink-pss-multirate-rtl-simulation.log"
+    if [[ "$STARLINK_PSS_RATE_MSPS" == 15 ]]; then
+        bash run_starlink_pss15_iq_to_score_xfft.sh \
+            "$artifact_real/starlink-pss15-iq-to-score-xfft" \
+            2>&1 | tee "$artifact_real/starlink-pss15-vendor-xfft-replay.log"
+    else
+        bash run_starlink_pss_multirate_ddc_to_score_xfft.sh \
+            "$STARLINK_PSS_RATE_MSPS" \
+            "$artifact_real/starlink-pss${STARLINK_PSS_RATE_MSPS}-ddc-to-score-xfft" \
+            2>&1 | tee "$artifact_real/starlink-pss${STARLINK_PSS_RATE_MSPS}-vendor-xfft-replay.log"
+    fi
 fi
 scripts/build_gain_series_candidate.sh image \
     2>&1 | tee "$artifact_real/image-build.log"
