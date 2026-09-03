@@ -459,3 +459,31 @@ def test_retained_offline_candidate_evidence_is_sealed_and_non_authorizing() -> 
     assert "rate_30_candidate_plan_sha256: d4dfcc02" in text
     assert "rate_60_candidate_plan_sha256: 561249fe" in text
     assert "explicit_operator_authorization_required: true" in text
+
+
+def test_controller_candidate_evidence_is_sealed_and_non_authorizing() -> None:
+    name = "starlink-pss-multirate-ram-candidates-dnm-v2-offline.yaml"
+    manifest = ROOT / "manifests" / name
+    sidecar = ROOT / "manifests" / f"{name.removesuffix('.yaml')}-SHA256SUMS"
+    payload = manifest.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
+
+    assert sidecar.read_text() == f"{digest}  {name}\n"
+    text = payload.decode()
+    assert "do_not_merge: true" in text
+    assert "persistent_flash_eligible: false" in text
+    assert "hardware_accessed: false" in text
+    assert "operation_plans_created: false" in text
+    assert f"allocated_radio_serial: {ALLOCATED_SERIAL}" in text
+    assert "package_firmware_source: 205884182c2e" in text
+    assert "generator_source_commit: ee8fe286d136" in text
+    assert "ppu_main_commit: 5790a39705e9" in text
+    assert "rate_15_github_run: 33790840756" in text
+    assert "rate_30_github_run: 33792849042" in text
+    assert "rate_60_github_run: 33795030770" in text
+    assert "rate_15_candidate_plan_sha256: 773e12ae" in text
+    assert "rate_30_candidate_plan_sha256: d671c254" in text
+    assert "rate_60_candidate_plan_sha256: d467eb2e" in text
+    assert "controller_present_all_rates: true" in text
+    assert "all_package_checksums_verified: true" in text
+    assert "explicit_operator_authorization_required: true" in text

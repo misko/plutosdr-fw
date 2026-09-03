@@ -1,0 +1,114 @@
+# Offline preparation evidence for the packaged-controller 15/30/60 MS/s
+# RX-only RAM candidates.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. These records authorize no
+# hardware access. A fresh serial-scoped USB inventory, reviewed operation
+# plan, explicit operator authorization, and mandatory persistent recovery are
+# still required independently for every rate.
+
+schema: plutosdr-fw.ram-candidate-preparation
+schema_version: 2
+release_state: ram-only-candidate-offline
+do_not_merge: true
+merge_target: none
+persistent_flash_eligible: false
+hardware_accessed: false
+operation_plans_created: false
+
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9363a-1r1t
+physical_rfic_record: AD9363A
+full_band_30_60_qualified: false
+
+package_firmware_source: 205884182c2ed6ac9409b1a591e712e20fdcea84
+package_source_tag: starlink-rx-only-dnm-v1-source/firmware-pss15-30-60-acqctl-v1
+generator_source_commit: ee8fe286d136ee487c078a91ddf3c74f9745a603
+generator_source_tag: starlink-rx-only-dnm-v1-source/firmware-pss15-30-60-controller-ram-plan-v3
+package_source_attestation: clean-generator-descendant-identical-manifest-v1
+generator_focused_tests: 36 passed
+generator_full_tests: 1677 passed, 5 hardware-gated skipped, 1 unchanged tandem assertion failed
+generator_lint: PASS
+
+ppu_repository: https://github.com/misko/pluto-plus-utils.git
+ppu_main_commit: 5790a39705e9e598ef048ec773e0227cf9ac1808
+ppu_version: 0.1.0
+ppu_worktree_clean: true
+ppu_changed: false
+ppu_candidate_schema: pluto-plus-utils.release-candidate-plan.v2
+
+qualification_manifest_sha256: a5d762108a4009d5807c2abb82ef7d2e08b3c11d308fb77e70f82c847bda4433
+qualification_manifest_bytes: 5690
+candidate_root: /home/mouse9911/pluto-state/starlink-rx-only-dnm/ram-candidates-v2-controller-20260903
+
+rate_15_github_run: 33790840756
+rate_15_firmware_source: 205884182c2ed6ac9409b1a591e712e20fdcea84
+rate_15_archive_bytes: 119815515
+rate_15_archive_sha256: 58d8cb5b5586f5729b21d153f99430b869088b127daf5d5da9cc5cec60cc5808
+rate_15_wns_ns: 0.180
+rate_15_whs_ns: 0.021
+rate_15_xsa_sha256: 3bbbf44fe93ca8b433928c35d2be5ff0ea209c4f0de744255cd6abbec4b7463a
+rate_15_bit_sha256: 33d2dd22f683cd4f29558d999fd06ba057f1687731b67794466499468649d993
+rate_15_candidate_id: dc4c5452a5cef3593259da25caf359eb
+rate_15_candidate_plan_bytes: 1561
+rate_15_candidate_plan_sha256: 773e12ae23c1336fff93c315a5e2a30ea3c932c83da6afd4c6ab6b153c96b47a
+rate_15_candidate_index_bytes: 1890
+rate_15_candidate_index_sha256: 528da3fc79cf32e618ca781afb85c940a371657fd0906751eda9940210d22ad0
+rate_15_dfu_bytes: 12972723
+rate_15_dfu_sha256: eaf46306f2e5092ad6e6a5829b30ecb633c8aee49e0fbda302acadbf1a8ddfd4
+rate_15_fit_bytes: 12972707
+rate_15_fit_sha256: a156d9b0daf332b8d3f0ddc16b25eb73c121f2cf576d981121f7d118f4848250
+rate_15_candidate_sums_sha256: 0ebef68fee1ad567520e335a30f71007b15602d9528ae86fa2cd5bfe5567ffef
+
+rate_30_github_run: 33792849042
+rate_30_firmware_source: 205884182c2ed6ac9409b1a591e712e20fdcea84
+rate_30_archive_bytes: 122852243
+rate_30_archive_sha256: 8dc54a2475943754289be3e681bd1d5c3bb41062712a9d7c535dace028536882
+rate_30_wns_ns: 0.258
+rate_30_whs_ns: 0.009
+rate_30_xsa_sha256: 0fe8cf0c557ace1dd7b7ae400ab3e490d515f9b4fe8fbf608bd93014f5f5c275
+rate_30_bit_sha256: 50fd9518b58d7e9e990e9705b8a9ba52970bda31d00c3598b047057a93cf44d0
+rate_30_candidate_id: ec594f6550b7cb163211ddad8e7b3444
+rate_30_candidate_plan_bytes: 1561
+rate_30_candidate_plan_sha256: d671c254627ac6010f9fc22b51cb9a68d55bd6e05d1eb8a1356e0dd815cb3a61
+rate_30_candidate_index_bytes: 1890
+rate_30_candidate_index_sha256: 8e286139cef55a20294f2c3faa780487c6ff8ec9c64f71e564085a337a401f2d
+rate_30_dfu_bytes: 12993083
+rate_30_dfu_sha256: d9950049cc3bf471f80d8a63d1d5464fc41ede39918e903d23c0d2cb6ae3f337
+rate_30_fit_bytes: 12993067
+rate_30_fit_sha256: 550d8abf0d2cf3544c9ac09bbcc60cb74d028862b1763876af2dc2a2ed3c2100
+rate_30_candidate_sums_sha256: 91faed1514666638d2693135ddd5d195897d8a69b47b2eb77155a853bfba7396
+
+rate_60_github_run: 33795030770
+rate_60_firmware_source: 205884182c2ed6ac9409b1a591e712e20fdcea84
+rate_60_archive_bytes: 142531608
+rate_60_archive_sha256: bd00608c144dea3fabb089135e77b978979e9b4d55057bb6b3a6c1e59f2a9474
+rate_60_wns_ns: 0.227
+rate_60_whs_ns: 0.020
+rate_60_xsa_sha256: 33a6a06081b9ff2e8837625a01a00cc5adaf20bef817134202ff9108945ca099
+rate_60_bit_sha256: 9ad53973430cb00f3c698ec58aca8e9782f381b99d3114adaf4636082f6684e3
+rate_60_candidate_id: d10ad9cbf3c89ea2b844a12ad7b9778e
+rate_60_candidate_plan_bytes: 1561
+rate_60_candidate_plan_sha256: d467eb2e5dcec05d01cc9b0f198922b498752d82bc1b551e2eebbdac5db2330e
+rate_60_candidate_index_bytes: 1890
+rate_60_candidate_index_sha256: b6bf53f728c0994d47ab6099aa25b63699b54845c2b05e12edcbe39d7a395d54
+rate_60_dfu_bytes: 12974823
+rate_60_dfu_sha256: 003fcb665a5511142bc7927b7ac743f1459fe5fafba69e0b42463f5f7a7c77a6
+rate_60_fit_bytes: 12974807
+rate_60_fit_sha256: fc8903e93fd30f4a3419a641d5333da9578a8f2dfe271023906a7cf8277be38f
+rate_60_candidate_sums_sha256: 6cc7ebc5642304a30a1da5a2f8446f5f1d2336d7fd2b7f8cc2c8d902eeff9335
+
+controller_cli_sha256: c740fd2e42c8c3ff4e0dfa2f6c3ac4b0391fe152ecf643c36ab7ec7bb1a9e4c6
+controller_present_all_rates: true
+all_package_checksums_verified: true
+all_candidate_checksums_verified: true
+all_routed_timing_met: true
+
+fresh_inventory_required: true
+fresh_inventory_hardware_access: none-beyond-local-usb-enumeration
+historical_inventory_authorizing: false
+expected_persistent_firmware_must_be_observed_fresh: true
+explicit_operator_authorization_required: true
+mandatory_recovery_after_each_rate: true
+final_restore_target: ad9361-2r2t
+live_pss_qualified: false
+sss_qualified: false

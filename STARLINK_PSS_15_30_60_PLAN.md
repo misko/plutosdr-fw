@@ -224,6 +224,41 @@ then 60 order before any authorized radio work. No radio was enumerated,
 opened, rebooted, RAM-booted, or flashed for this checkpoint, and neither PPU
 nor firmware/HDL main was changed.
 
+## 2026-09-03 packaged-controller RAM-candidate checkpoint
+
+The serialized v2 package ladder is complete from immutable firmware source
+`205884182c2ed6ac9409b1a591e712e20fdcea84`. Each GitHub artifact, outer
+sidecar, internal `SHA256SUMS`, payload inventory, packaged source manifest,
+runtime version, DFU/XSA bit equivalence, routed timing report, and rootfs
+controller was independently verified before the next rate began.
+
+| Rate | GitHub run | WNS / WHS | RAM candidate-plan SHA-256 |
+| --- | ---: | ---: | --- |
+| 15 MS/s | 33790840756 | +0.180 / +0.021 ns | `773e12ae23c1336fff93c315a5e2a30ea3c932c83da6afd4c6ab6b153c96b47a` |
+| 30 MS/s | 33792849042 | +0.258 / +0.009 ns | `d671c254627ac6010f9fc22b51cb9a68d55bd6e05d1eb8a1356e0dd815cb3a61` |
+| 60 MS/s | 33795030770 | +0.227 / +0.020 ns | `d467eb2e5dcec05d01cc9b0f198922b498752d82bc1b551e2eebbdac5db2330e` |
+
+Candidate generation initially failed closed because v2 incorrectly compared
+a fresh routed bitstream against an earlier reference-build digest. Generator
+commit `ee8fe286d136ee487c078a91ddf3c74f9745a603`, immutably tagged
+`starlink-rx-only-dnm-v1-source/firmware-pss15-30-60-controller-ram-plan-v3`,
+retains strict v1 behavior while proving for v2 that package source `205884...`
+is its ancestor and the packaged manifest is byte-identical at that commit.
+The verified package checksum graph binds the exact rebuilt bitstream. Focused
+tests report 37 passes; the full suite
+reports 1,677 passes and five hardware-gated skips, with only the unchanged
+pre-existing tandem `--cdc-report` count assertion failing.
+
+All three candidate checksum inventories and fail-closed policy fields pass.
+They are bound to clean PPU commit
+`5790a39705e9e598ef048ec773e0227cf9ac1808` and allocated serial
+`104000bac4950008230026001b440a003a`. The authoritative sealed record is
+`manifests/starlink-pss-multirate-ram-candidates-dnm-v2-offline.yaml`. It
+explicitly records no hardware access, no operation plan, no persistent-flash
+eligibility, and no PSS/SSS qualification. A fresh serial-scoped USB inventory,
+reviewed operation plan, and explicit operator authorization remain mandatory
+before the first 15 MS/s RAM lifecycle.
+
 ## 2026-09-02 Stage-15 hardware checkpoints
 
 The corrected ABI 1.1 image has now completed one exact-radio RAM lifecycle and
