@@ -23,19 +23,23 @@ $(BUILD)/test_starlink_pss_acquisition: starlink_pss_acquisition.c starlink_pss_
 $(BUILD)/test_starlink_pss_acquisition_sanitize: starlink_pss_acquisition.c starlink_pss_acquisition.h test_starlink_pss_acquisition.c | $(BUILD)
 	$(HOST_CC) -O1 -g $(WARNINGS) -fsanitize=address,undefined -fno-omit-frame-pointer starlink_pss_acquisition.c test_starlink_pss_acquisition.c -lm -o $@
 
+$(BUILD)/starlink_pss_acqctl-host: starlink_pss_acquisition.c starlink_pss_acquisition.h starlink_pss_acqctl.c | $(BUILD)
+	$(HOST_CC) $(CFLAGS) $(WARNINGS) starlink_pss_acquisition.c starlink_pss_acqctl.c -lm -o $@
+
 $(BUILD)/starlink_pssctl: starlink_pss_hw.c starlink_pss_hw.h starlink_pssctl.c | $(BUILD)
 	$(CROSS_CC) $(CFLAGS) $(WARNINGS) -static starlink_pss_hw.c starlink_pssctl.c -o $@
 
-$(BUILD)/starlink_pss_acquisition.o: starlink_pss_acquisition.c starlink_pss_acquisition.h | $(BUILD)
-	$(CROSS_CC) $(CFLAGS) $(WARNINGS) -c starlink_pss_acquisition.c -o $@
+$(BUILD)/starlink_pss_acqctl: starlink_pss_acquisition.c starlink_pss_acquisition.h starlink_pss_acqctl.c | $(BUILD)
+	$(CROSS_CC) $(CFLAGS) $(WARNINGS) -static starlink_pss_acquisition.c starlink_pss_acqctl.c -lm -o $@
 
-test: $(BUILD)/test_starlink_pss_hw $(BUILD)/test_starlink_pss_acquisition
+test: $(BUILD)/test_starlink_pss_hw $(BUILD)/test_starlink_pss_acquisition $(BUILD)/starlink_pss_acqctl-host
 	$(BUILD)/test_starlink_pss_hw $(COEFFICIENT_FIXTURE) $(PACKET_FIXTURE) $(INJECTION_FIXTURE)
 	$(BUILD)/test_starlink_pss_acquisition
+	$(BUILD)/starlink_pss_acqctl-host --help >/dev/null
 
-arm: $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acquisition.o
+arm: $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acqctl
 	file $(BUILD)/starlink_pssctl
-	file $(BUILD)/starlink_pss_acquisition.o
+	file $(BUILD)/starlink_pss_acqctl
 
 sanitize: $(BUILD)/test_starlink_pss_acquisition_sanitize
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/test_starlink_pss_acquisition_sanitize
@@ -45,4 +49,5 @@ check: test arm
 clean:
 	rm -f $(BUILD)/test_starlink_pss_hw $(BUILD)/test_starlink_pss_acquisition
 	rm -f $(BUILD)/test_starlink_pss_acquisition_sanitize
-	rm -f $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acquisition.o
+	rm -f $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acqctl
+	rm -f $(BUILD)/starlink_pss_acqctl-host

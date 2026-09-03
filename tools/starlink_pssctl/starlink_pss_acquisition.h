@@ -264,6 +264,10 @@ int pss_map_copy_and_release(const struct pss_map_io *io,
 	uint16_t *destination, size_t destination_words,
 	struct pss_map_copy *copy, unsigned int timeout_ms,
 	char *error, size_t error_size);
+int pss_map_wait_copy(const struct pss_map_io *io,
+	uint16_t *destination, size_t destination_words,
+	struct pss_map_copy *copy, unsigned int timeout_ms,
+	char *error, size_t error_size);
 bool pss_map_copies_contiguous(const struct pss_map_copy *previous,
 	const struct pss_map_copy *current);
 

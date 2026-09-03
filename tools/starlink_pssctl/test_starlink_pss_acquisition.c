@@ -365,6 +365,51 @@ done:
 	free(mock);
 }
 
+static void test_wait_copy_selects_oldest_ready_bank(void)
+{
+	struct mock_map *mock = calloc(1U, sizeof(*mock));
+	struct pss_map_io io;
+	struct pss_map_copy copy;
+	uint16_t *destination = calloc(PSS_MAP_PHASE_BINS, sizeof(*destination));
+	char error[ERROR_SIZE] = {0};
+
+	CHECK(mock && destination, "allocation failed");
+	if (!mock || !destination)
+		goto done;
+	mock_init(mock);
+	io = mock_io(mock);
+	CHECK(pss_map_wait_copy(&io, destination, PSS_MAP_PHASE_BINS,
+		&copy, 10U, error, sizeof(error)) < 0,
+		"wait-copy accepted a disabled acquisition engine");
+	CHECK(strstr(error, "not enabled") != NULL,
+		"disabled wait-copy failed for the wrong reason");
+	CHECK(pss_map_set_enabled(&io, true, false, error, sizeof(error)) == 0,
+		error);
+	CHECK(pss_map_wait_copy(&io, destination, PSS_MAP_PHASE_BINS,
+		&copy, 10U, error, sizeof(error)) == 0, error);
+	CHECK(copy.bank == 0U && copy.generation == 10U,
+		"wait-copy did not select the oldest ready bank");
+	CHECK(destination[0] == 0U && destination[100] == 100U,
+		"wait-copy returned the wrong bank contents");
+	CHECK(mock->releases == 1U && mock->ready_mask == 2U,
+		"wait-copy did not release exactly its selected bank");
+
+	mock_init(mock);
+	io = mock_io(mock);
+	mock->map_generation[1] = mock->map_generation[0];
+	CHECK(pss_map_set_enabled(&io, true, false, error, sizeof(error)) == 0,
+		error);
+	CHECK(pss_map_wait_copy(&io, destination, PSS_MAP_PHASE_BINS,
+		&copy, 10U, error, sizeof(error)) < 0,
+		"wait-copy accepted ambiguous equal ready generations");
+	CHECK(strstr(error, "same generation") != NULL && mock->releases == 0U,
+		"ambiguous wait-copy did not fail closed before release");
+
+done:
+	free(destination);
+	free(mock);
+}
+
 static void test_copy_fail_closed_on_metadata_change(void)
 {
 	struct mock_map *mock = calloc(1U, sizeof(*mock));
@@ -871,6 +916,7 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	test_contract_snapshot_copy_and_release();
+	test_wait_copy_selects_oldest_ready_bank();
 	test_copy_fail_closed_on_metadata_change();
 	test_ddc_rate_contracts();
 	test_snapshot_and_contract_fail_closed();

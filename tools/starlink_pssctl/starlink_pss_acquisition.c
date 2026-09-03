@@ -610,6 +610,74 @@ int pss_map_copy_and_release(const struct pss_map_io *io,
 	return 0;
 }
 
+static int remaining_timeout(uint64_t start, unsigned int timeout_ms,
+	unsigned int *remaining, char *error, size_t error_size)
+{
+	uint64_t now, elapsed;
+
+	if (!remaining || monotonic_milliseconds(&now) < 0)
+		return fail(error, error_size, "CLOCK_MONOTONIC read failed");
+	if (now < start)
+		return fail(error, error_size, "CLOCK_MONOTONIC moved backwards");
+	elapsed = now - start;
+	if (elapsed >= timeout_ms)
+		return fail(error, error_size, "phase-map wait timed out");
+	*remaining = timeout_ms - (unsigned int)elapsed;
+	return 0;
+}
+
+int pss_map_wait_copy(const struct pss_map_io *io,
+	uint16_t *destination, size_t destination_words,
+	struct pss_map_copy *copy, unsigned int timeout_ms,
+	char *error, size_t error_size)
+{
+	struct pss_map_info info;
+	struct pss_map_snapshot snapshot;
+	uint64_t start;
+	unsigned int remaining, bank;
+
+	if (!destination || !copy)
+		return fail(error, error_size, "missing phase-map wait destination");
+	if (!timeout_ms)
+		return fail(error, error_size, "phase-map wait timeout must be nonzero");
+	if (pss_map_require_contract(io, &info, error, error_size) < 0)
+		return -1;
+	if (!(info.status & PSS_MAP_STATUS_ENABLED))
+		return fail(error, error_size, "phase-map acquisition is not enabled");
+	if (destination_words < info.phase_bins)
+		return fail(error, error_size,
+			"phase-map destination has %zu words; needs %" PRIu32,
+			destination_words, info.phase_bins);
+	if (monotonic_milliseconds(&start) < 0)
+		return fail(error, error_size, "CLOCK_MONOTONIC read failed");
+
+	for (;;) {
+		if (remaining_timeout(start, timeout_ms, &remaining,
+				error, error_size) < 0)
+			return -1;
+		if (pss_map_take_snapshot(io, &snapshot, remaining,
+				error, error_size) < 0)
+			return -1;
+		if (snapshot.ready_mask)
+			break;
+		poll_delay();
+	}
+
+	if (snapshot.ready_mask == 3U) {
+		if (snapshot.map_generation[0] == snapshot.map_generation[1])
+			return fail(error, error_size,
+				"ready phase-map banks have the same generation");
+		bank = snapshot.map_generation[0] < snapshot.map_generation[1] ? 0U : 1U;
+	} else {
+		bank = (snapshot.ready_mask & 1U) ? 0U : 1U;
+	}
+	if (remaining_timeout(start, timeout_ms, &remaining,
+			error, error_size) < 0)
+		return -1;
+	return pss_map_copy_and_release(io, &snapshot, bank, destination,
+		destination_words, copy, remaining, error, error_size);
+}
+
 bool pss_map_copies_contiguous(const struct pss_map_copy *previous,
 	const struct pss_map_copy *current)
 {

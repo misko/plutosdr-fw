@@ -85,8 +85,8 @@ This is deterministic hardware-path evidence, not live Starlink evidence.
 
 ## Continuous-acquisition library checkpoint
 
-`starlink_pss_acquisition.c` is the source-only ARM policy layer for the
-separate `PSMA` phase-map bridge. All supported images expose the same
+`starlink_pss_acquisition.c` is the ARM policy layer for the separate `PSMA`
+phase-map bridge. All supported images expose the same
 post-conditioning geometry: 20,000 one-sample phase bins at 15 MS/s, 64
 frames per map, 16-bit map words, and two immutable banks. The parser accepts
 exactly ABI 1.0/capability `0x1f` and ABI 1.1/capability `0x3f` for the 15 MS/s
@@ -95,10 +95,23 @@ path, ABI 1.2/capability `0x7f` for the 30-to-15 MS/s x2 DDC, and ABI
 versions or mismatched capability words fail closed. For ABI 1.2/1.3 the
 library additionally requires the exact input rate, stage configuration,
 raw-input group delay, coefficient energy, and complete 256-bit Python-oracle
-contract hash before acquisition can be enabled. It is compiled as a strict
-ARM EABI object by `make check`; it is not yet linked into `starlink_pssctl`,
-installed in the root filesystem, or assigned an MMIO aperture. Those steps
-wait for controlled RX-shell hardware integration.
+contract hash before acquisition can be enabled. The dedicated
+`starlink_pss_acqctl` executable links this layer without changing the older
+sparse-tracker CLI. It maps only the integrated acquisition aperture at
+`0x79040000`, requires an exact `/etc/serial` match before opening `/dev/mem`,
+and is installed only by the experimental DNM Buildroot package.
+
+`starlink_pss_acqctl info` validates and reports the immutable rate-specific
+contract. `snapshot` reports one atomic telemetry view. `candidate` owns a
+bounded lifecycle: flush/enable, require a clean health epoch, copy and release
+exactly three consecutive maps in oldest-generation order, run the fixed
+seven-drift search on the ARM, take a final health/DDC observation, and
+disable/flush before emitting JSON. Failure and handled interruption also
+attempt disable/flush. Its output is deliberately labelled
+`candidate_measurement_only`; it has no thresholds and therefore cannot claim
+PSS detection or frame lock. A later frozen qualification policy can consume
+these measurements through the already-tested lock controller without
+silently promoting an exploratory threshold into a detector contract.
 
 The copy sequence takes one atomic hardware snapshot, reads exactly 20,000
 zero-extended words, brackets the copy with a second atomic snapshot, and
@@ -136,15 +149,15 @@ candidate; bounded misses enter holdover and then return to acquisition.
 The native C test covers all four supported ABI contracts, exact x2/x4 DDC
 metadata and hash rejection, the extended health-word unpacking, proof that
 ABI 1.0 never reads ABI 1.1 registers, the complete
-20,000-word transfer, no-release failure paths, ingress/base fault epochs and
+20,000-word transfer, oldest-ready-bank selection, disabled/ambiguous wait
+rejection, no-release failure paths, ingress/base fault epochs and
 map continuity, mutable non-fault telemetry, fixed-memory drift extraction,
 tie and finite/zero-MAD cases, unsafe-bound rejection, and the complete state
 path.
 `tests/test_starlink_pss_acquisition_c.py` additionally compares C against the
 frozen Python acquisition oracle across randomized odd/even map sizes and a
-zero-MAD tie. This checkpoint is candidate-selection and policy logic, not a
-shell connection, autonomous scheduler, on-radio result, live PSS detection,
-or demonstrated frame lock.
+zero-MAD tie. This checkpoint is packaged candidate-selection and policy logic,
+not an on-radio result, live PSS detection, or demonstrated frame lock.
 
 This controller and FPGA belong only on
 `codex/starlink-rx-only-do-not-merge`. They must not be merged into HDL or
