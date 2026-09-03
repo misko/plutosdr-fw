@@ -164,7 +164,7 @@ module tb_tandem_agc_axi;
     end
   endtask
 
-  reg [31:0] v;
+  reg [31:0] v, counter_lo, counter_hi;
 
   initial begin
     $display("== tb_tandem_agc_axi (dual clock, 100 MHz / 61.44 MHz) ==");
@@ -174,8 +174,15 @@ module tb_tandem_agc_axi;
     tick(20);
 
     axi_read(8'h00, v); check(v == 32'h5441_4732, "TAG2 identity matches the kernel ABI");
-    axi_read(8'h04, v); check(v == 32'd1, "FPGA ABI version is one");
+    axi_read(8'h04, v); check(v == 32'd2, "FPGA ABI version is two");
     axi_read(8'h08, v); check(v[15:0] == 16'd64, "capabilities report FIFO depth");
+    check(v[19], "capabilities report coherent 64-bit sample counter");
+    sample_counter = 64'h1234_5678_0000_0100;
+    tick(100);
+    axi_read(8'h54, counter_lo);
+    axi_read(8'h58, counter_hi);
+    check(counter_hi == 32'h1234_5678 && counter_lo >= 32'h0000_0100,
+          "coherent full sample counter crosses into reserved ABI registers");
     axi_read(8'h10, v); check(v[2:0] == 3'd0, "public state is IDLE after reset");
     axi_read(8'h18, v);
     check(v[7:0] == 8'd0 && v[15:8] == 8'd76,

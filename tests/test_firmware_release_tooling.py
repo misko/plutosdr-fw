@@ -113,6 +113,7 @@ def test_protected_package_routes_require_exact_declared_identities() -> None:
     assert "iq-direct-async-v2-source.yaml:final-release" in package
     assert "iq-direct-async-v3-source.yaml:final-release" in package
     assert "iq-direct-async-v4-source.yaml:*" in package
+    assert "persistent-hop-duty-v1-source.yaml:candidate" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:candidate" in package
     assert "iio-throughput-coverage-window-v6-rc1-source.yaml:final-release" in package
     assert "tandem-agc-v8-source.yaml:final-release" in package
@@ -135,6 +136,25 @@ def test_single_rx_metadata_candidate_has_an_exact_protected_route() -> None:
     assert "Require the exact single-RX metadata candidate identity" in workflow
     for source in (builder, package):
         assert "single-rx-metadata-rc1-source.yaml" in source
+
+
+def test_persistent_hop_duty_has_an_exact_candidate_build_route() -> None:
+    workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
+    builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
+    branch = "refs/heads/codex/persistent-hop-duty-fw"
+    manifest_name = "persistent-hop-duty-v1-source.yaml"
+    version = "v0.50-plutoplus-spf-persistent-hop-duty-v1-rc1"
+
+    assert workflow.count(branch) == 4
+    assert workflow.count(f"'{manifest_name}'") == 1
+    assert workflow.count("'plutoplus-spf-persistent-hop-duty-v1-rc1'") == 1
+    assert workflow.count(f"'{version}'") == 1
+    assert "Require the exact persistent-hop duty candidate identity" in workflow
+    assert f"{manifest_name}:candidate" in package
+    assert version in package
+    for source in (builder, package):
+        assert manifest_name in source
 
 
 def test_ddr_burst_rc5_keeps_its_exact_candidate_route() -> None:
@@ -356,7 +376,7 @@ def test_direct_async_v4_has_exact_candidate_and_main_release_routes() -> None:
         and "SOURCE_GRAPH_CHECK_WORKTREE=0" not in line
     ]
     assert current_worktree_checks == [
-        f"./scripts/check_source_graph.sh manifests/{manifest_name}"
+        "./scripts/check_source_graph.sh manifests/persistent-hop-duty-v1-source.yaml"
     ]
     for source in (builder, package, checker):
         assert manifest_name in source

@@ -127,7 +127,8 @@ run_source_graph() {
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-ring-v1-rc1-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-v2-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-v3-source.yaml
-    ./scripts/check_source_graph.sh manifests/iq-direct-async-v4-source.yaml
+    SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iq-direct-async-v4-source.yaml
+    ./scripts/check_source_graph.sh manifests/persistent-hop-duty-v1-source.yaml
     SOURCE_GRAPH_CHECK_WORKTREE=0 ./scripts/check_source_graph.sh manifests/iio-throughput-coverage-window-v6-rc1-source.yaml
     ./buildroot/board/pluto/test_iiod_supervisor.sh
     ./scripts/test_legal_info_network.sh
