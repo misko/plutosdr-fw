@@ -1,0 +1,119 @@
+# Source contract for the 15 MS/s phase-map AXI/CDC bridge.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-iq-to-phase-map-xfft-dnm-v1-source.yaml
+supersedes_reason: "add the isolated AXI4-Lite and CDC processor boundary without claiming ARM selection, RX-shell integration, frame lock, or hardware qualification"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: e2e1b87fccfb7efbeb3612e2a3b5a0fea919ba93
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-phase-map-axi-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/95
+firmware_main_gitlink_guard_merge_commit: d2fcc1175dbf0c866288b0c369cc2cfb314979ba
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+sample_rate_hz: 15000000
+axi_data_bits: 32
+axi_address_bits: 8
+axi_outstanding_reads: 1
+axi_outstanding_writes: 1
+phase_map_phase_bins: 20000
+phase_map_tile_frames: 64
+phase_map_word_bits: 16
+phase_map_banks: 2
+phase_map_bytes_per_bank: 40000
+phase_map_tile_period_ms: 85.333333
+phase_map_sustained_handoff_bytes_per_second: 468750
+snapshot_register_words: 16
+snapshot_cdc_payload_bits: 482
+
+simulation_verdict: PASS
+simulation_iverilog_version: 12.0
+simulation_integrated_clock_cases: 4
+simulation_snapshot_stress_map_clock_hz: 10000000
+simulation_snapshot_stress_axi_clock_hz: 100000000
+simulation_maximum_map_read_axi_cycles: 18
+simulation_atomic_snapshot_sets_checked: 2
+simulation_split_aw_w_orders_checked: 2
+simulation_concurrent_read_retarget_checked: true
+simulation_response_backpressure_checked: true
+simulation_map_reset_abort_checked: true
+
+ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_map_clock_mhz: 100
+ooc_axi_clock_mhz: 100
+ooc_timing_scope: post_route
+ooc_setup_wns_ns: 2.648
+ooc_hold_whs_ns: 0.037
+ooc_methodology_violations: 0
+ooc_critical_cdc_rows: 0
+ooc_bus_skew_met: 3
+ooc_bus_skew_violated: 0
+ooc_total_luts: 398
+ooc_total_ffs: 2455
+ooc_ramb36e1: 0
+ooc_ramb18e1: 0
+ooc_dsp48e1: 0
+
+axi_bridge_rtl_sha256: 700441a18ab21aec814db796947bbc8438ad9cb94ea11a1ad4b4486da8722d9a
+axi_lite_rtl_sha256: 7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c
+axi_bridge_constraints_sha256: b5907b45890c1ee81273be65e198c452d0c0aec06808e7e0acd8ea0ea646f467
+axi_bridge_ip_tcl_sha256: 3214982e44d6a74f8a50d4e0b64d7d3266c07da381d2cdd0e05353520240de63
+axi_bridge_ooc_xdc_sha256: 194209204bc1582753d03f7ada4c4e7d9c58ef12054c6515d4fddfed9d5ed683
+axi_bridge_ooc_runner_sha256: 089ea0e2203d9282b942a64c38934089c1aef45d364c008e58b958ce5bd7fe94
+axi_bridge_test_runner_sha256: b70aa89cb99f52d5d677dcdea0b978a4cb734a72a41b88425eb35d78593cadd7
+axi_bridge_ooc_tcl_sha256: 402b1e2103b2c58e20d5db44b780e331ab2de337e229a214cf1b4c9a1e057808
+axi_bridge_testbench_sha256: d0459a8a338f9aab992849e641227cc2ba647463aec9b5c3606ce7ea15f9bff8
+axi_bridge_snapshot_testbench_sha256: 4b454ff82f534851a8f184e5d38f11e1cc9cbac5b76ba787c8fb10caa373899f
+axi_bridge_structure_verifier_sha256: f93dc2c476e5a08ffabe3c31e04b7f401d7184541d274d4018a34e0b440e6a4c
+axi_bridge_readme_sha256: b0ac574051461c5c22caa1571a3f6bf58aaeb1ea7f1693cf3a5aa039f1a43706
+phase_map_axi_simulation_summary_sha256: a9d3773e1facb112402536e4bde83d046b393dd81bd7d4808c0c945303542469
+phase_map_axi_ooc_summary_sha256: c7ad80b1debcbbc7f204728508398e21acbff34c57671dba7b4c7d7067755e0f
+phase_map_axi_simulation_runner_sha256: 86b10a7d86543123a00b93fa310ef6068b5b46a8a64f4433ff7378d1dc271d8d
+phase_map_axi_ooc_parent_runner_sha256: 1a760c5f6427029b93326338249dbee6946932333a1a11d2b3cec46eab00805e
+phase_map_axi_report_sha256: e82fa5dce63310b18546c0770f8aa4198460222d1e84e5081cc2e1e6d2391068
+phase_map_axi_evidence_test_sha256: f567dbaf3e54c0e3cbf52acfe59a6e66d2d89d90e4dd37c5cd9b39415c89d8f8
+
+rtl_phase_map_implemented: true
+rtl_bounded_map_handoff_complete: true
+rtl_axi_cdc_control_implemented: true
+rtl_atomic_telemetry_snapshot_implemented: true
+rtl_long_latency_axi_transport_implemented: true
+rtl_candidate_selection_implemented: false
+rtl_frame_lock_state_machine_implemented: false
+rtl_rx_shell_connected: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

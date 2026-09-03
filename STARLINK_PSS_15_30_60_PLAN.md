@@ -879,6 +879,28 @@ PSS frame lock: robust ARM candidate selection, AXI/CDC/control integration,
 the real RX tap, complete placement/routing, and RAM-only hardware
 qualification remain pending. No radio was contacted.
 
+The isolated phase-map AXI/CDC boundary is now implemented and source-locked
+at HDL commit `e2e1b87fccfb7efbeb3612e2a3b5a0fea919ba93`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-phase-map-axi-v1`. Its custom
+single-outstanding AXI4-Lite front end accepts AW and W independently, retains
+responses under backpressure, honors byte strobes, and permits a legal
+map-clock round trip without the earlier helper's short timeout. Toggle
+mailboxes transfer map reads, releases, snapshots, and flushes; enable crosses
+as a synchronized level. The 482-bit atomic telemetry mailbox exposes all 16
+software-visible snapshot words, while map-reset abort returns a bounded zero
+response without resetting the AXI transport. Four integrated asynchronous-
+clock simulations, a 10 MHz map-clock snapshot stress test, and concurrent
+read/retarget coverage pass. A Vivado 2022.2 XC7Z010 bridge-only route closes
+both clocks at 100 MHz with setup WNS `+2.648 ns`, hold WHS `+0.037 ns`, zero
+methodology violations, zero critical CDC rows, all three bundled-data skew
+constraints met, 398 LUTs, 2,455 registers, and no BRAM or DSP. Firmware-main
+guard PR #95 protects the exact pin before this experimental parent advances;
+all five checks passed and it merged as
+`d2fcc1175dbf0c866288b0c369cc2cfb314979ba`.
+This is bounded map transport, not frame lock: ARM candidate extraction, lock
+state semantics, the real RX tap, full linked-system routing, and RAM-only
+radio qualification remain pending. No radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
