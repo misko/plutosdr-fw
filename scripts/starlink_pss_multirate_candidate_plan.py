@@ -24,7 +24,11 @@ from typing import Any, BinaryIO
 
 SUPPORTED_RATES = (15, 30, 60)
 ALLOCATED_SERIAL = "104000bac4950008230026001b440a003a"
-SOURCE_MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v1-source.yaml"
+SOURCE_MANIFEST_REVISIONS = {
+    "starlink-pss-multirate-rx-only-dnm-v1-source.yaml": "v1",
+    "starlink-pss-multirate-rx-only-dnm-v2-source.yaml": "v2",
+}
+SOURCE_MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_QUALIFICATION_MANIFEST = ROOT / "manifests" / SOURCE_MANIFEST_NAME
 PPU_REPOSITORY = "misko/pluto-plus-utils"
@@ -214,11 +218,16 @@ def _verified_members(path: Path) -> tuple[dict[str, bytes], dict[str, str]]:
                     "archive must contain unique, non-empty regular basename members only"
                 )
             infos[member.name] = member
+        manifest_names = set(infos).intersection(SOURCE_MANIFEST_REVISIONS)
+        if len(manifest_names) != 1:
+            raise CandidatePlanError(
+                "archive must contain exactly one supported multirate source manifest"
+            )
         required = {
             "SHA256SUMS",
             "PAYLOAD_SHA256SUMS",
             "packed-VERSIONS.txt",
-            SOURCE_MANIFEST_NAME,
+            next(iter(manifest_names)),
         }
         if not required.issubset(infos):
             missing = sorted(required - infos.keys())
@@ -257,7 +266,7 @@ def _verified_members(path: Path) -> tuple[dict[str, bytes], dict[str, str]]:
                 )
             if (
                 name.endswith(("-pluto.dfu", "-provenance.txt"))
-                or name == SOURCE_MANIFEST_NAME
+                or name in SOURCE_MANIFEST_REVISIONS
             ):
                 retained[name] = payload
         return retained, checksums
@@ -382,7 +391,14 @@ def prepare_candidate(
             "archive must contain exactly one candidate DFU and provenance"
         )
     dfu_name = dfu_names[0]
-    if f"-{rate}m-rx-only-dnm-v1-" not in dfu_name:
+    source_manifest_names = [
+        name for name in SOURCE_MANIFEST_REVISIONS if name in retained
+    ]
+    if len(source_manifest_names) != 1:
+        raise CandidatePlanError("verified archive lost its source-manifest identity")
+    source_manifest_name = source_manifest_names[0]
+    source_revision = SOURCE_MANIFEST_REVISIONS[source_manifest_name]
+    if f"-{rate}m-rx-only-dnm-{source_revision}-" not in dfu_name:
         raise CandidatePlanError(
             "candidate DFU identity does not match the requested rate"
         )
@@ -390,7 +406,7 @@ def prepare_candidate(
     fit_bytes, fit_sha256 = _verify_dfu(dfu_payload)
 
     provenance = _parse_key_values(retained[provenance_names[0]], label="provenance")
-    packaged_manifest_payload = retained[SOURCE_MANIFEST_NAME]
+    packaged_manifest_payload = retained[source_manifest_name]
     packaged_manifest = _parse_key_values(
         packaged_manifest_payload, label="packaged source manifest"
     )
@@ -415,9 +431,16 @@ def prepare_candidate(
     expected_source = qualification_manifest.get(f"route_{rate}_firmware_source")
     expected_bit = qualification_manifest.get(f"route_{rate}_bit_sha256")
     firmware_version = versions.get("device-fw", "")
+    source_identity_matches = (
+        source_commit == expected_source
+        if source_revision == "v1"
+        else source_commit == generator_commit
+        and qualification_path.name == source_manifest_name
+        and packaged_manifest_payload == qualification_manifest_payload
+    )
     if (
         HEX_40.fullmatch(source_commit) is None
-        or source_commit != expected_source
+        or not source_identity_matches
         or provenance.get("starlink_pss_rate_msps") != str(rate)
         or provenance.get("do_not_merge") != "true"
         or provenance.get("persistent_flash_eligible") != "false"
@@ -430,7 +453,8 @@ def prepare_candidate(
         or qualification_manifest.get("allocated_radio_serial") != ALLOCATED_SERIAL
         or qualification_manifest.get("starlink_pss_supported_rates_msps") != "15,30,60"
         or expected_bit != member_sums.get("system_top.bit")
-        or firmware_version != f"v0.50-plutoplus-starlink-pss-{rate}m-rx-only-dnm-v1"
+        or firmware_version
+        != f"v0.50-plutoplus-starlink-pss-{rate}m-rx-only-dnm-{source_revision}"
         or versions.get("hdl") != packaged_manifest.get("versions_hdl")
         or versions.get("buildroot") != packaged_manifest.get("versions_buildroot")
         or versions.get("linux") != packaged_manifest.get("versions_linux")
@@ -483,6 +507,8 @@ def prepare_candidate(
             "persistent_flash_eligible": False,
             "ppu_source_commit": ppu_commit,
             "rate_msps": rate,
+            "source_manifest_name": source_manifest_name,
+            "source_manifest_revision": source_revision,
             "runtime_target": "ad9363a-1r1t",
             "source_commit": source_commit,
             "packaged_source_manifest": {

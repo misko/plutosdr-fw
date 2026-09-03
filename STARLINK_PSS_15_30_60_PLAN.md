@@ -179,6 +179,46 @@ sequence begin at 30 MS/s; 60 MS/s remains last. Final campaign closure restores
 and verifies `ad9361-2r2t`. No radio was enumerated, opened, rebooted, RAM-booted,
 or flashed while producing this checkpoint.
 
+## 2026-09-03 packaged acquisition-controller checkpoint
+
+The missing PL-to-PS operational layer is now implemented offline as the
+separate `starlink_pss_acqctl` executable at firmware source
+`06476707f6fa7c87565a18d7f9633322d55533cb`. It leaves the older sparse-tracker
+CLI unchanged, maps only the integrated PSMA aperture at `0x79040000`, and
+requires an exact local `/etc/serial` match before opening `/dev/mem`. The
+Buildroot DNM source is `6971a8c1fb5f8422cf5f32e239efe49c2cea08ec`, tagged
+`starlink-rx-only-dnm-v1-source/buildroot-pss-acqctl-v1`.
+
+The one-shot `candidate` transaction flushes and enables acquisition, requires
+a clean health epoch, chooses the oldest immutable ready bank, copies and
+releases exactly three consecutive 20,000-word maps, runs the bounded seven-
+drift shift-and-sum/median/MAD search on the Zynq ARM, captures final health and
+DDC counters, and disables/flushes before emitting JSON. Timeout, continuity,
+fault-epoch, saturation, serial, ABI, DDC-contract, and handled-interruption
+paths fail closed. Output is explicitly marked `candidate_measurement_only`,
+has no threshold decision, and cannot be cited as PSS detection or frame lock.
+Raw complex IQ never crosses to the ARM for this search: even at 60 MS/s the
+PL reduces the stream to about 468.75 kB/s of map traffic, the ARM holds a
+fixed approximately 320 kB working set, and one observation emits only the
+candidate/telemetry JSON.
+
+Strict host and static ARM EABI builds, the Buildroot target build/install,
+native mock-MMIO serial/contract/cleanup tests, the existing Python-oracle
+comparison, and ASan/UBSan all pass. The current focused Python set reports 29
+passes. The superseding source graph is
+`manifests/starlink-pss-multirate-rx-only-dnm-v2-source.yaml`; v1 remains
+immutable for reproduction. Candidate preparation accepts both revisions but
+requires v2 packages to carry a source-identical v2 manifest and to have been
+built from the exact generator checkout.
+
+The previously retained v1 RAM candidates remain valid historical route and
+packaging evidence, but they do not contain `starlink_pss_acqctl` and are no
+longer the images to use for an acquisition transaction. Fresh DNM-v2 packages
+must therefore be built and independently verified in the same 15, then 30,
+then 60 order before any authorized radio work. No radio was enumerated,
+opened, rebooted, RAM-booted, or flashed for this checkpoint, and neither PPU
+nor firmware/HDL main was changed.
+
 ## 2026-09-02 Stage-15 hardware checkpoints
 
 The corrected ABI 1.1 image has now completed one exact-radio RAM lifecycle and
@@ -1385,8 +1425,9 @@ Current status ledger:
 - current 15/30/60 continuous-acquisition RTL and full routed images:
   **COMPLETE OFFLINE / HARDWARE UNTESTED**, with the authoritative evidence and
   hashes recorded in the 2026-09-03 checkpoint above;
-- the branch-only staged build contract is now implemented under
-  `starlink-pss-multirate-rx-only-dnm-v1-source.yaml`. It pins HDL
+- the branch-only staged build contract now selects
+  `starlink-pss-multirate-rx-only-dnm-v2-source.yaml` for new packages while
+  retaining v1 as immutable history. It pins HDL
   `a3cc9592207e` with immutable tag
   `starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2`, requires one
   explicit build rate from `15`, `30`, or `60`, stamps a rate-specific v0.50

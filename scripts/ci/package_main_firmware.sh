@@ -64,12 +64,15 @@ fi
 # graph. It has three acquisition CDC constraints, one tracker sample-index
 # constraint, and the RX timestamp FIFO's write/read pointer constraints.
 if [[ "$(basename -- "$MANIFEST")" == \
-      "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ]]; then
-    starlink_multirate_manifest="${ROOT}/manifests/starlink-pss-multirate-rx-only-dnm-v1-source.yaml"
+      "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ||
+      "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v2-source.yaml" ]]; then
+    starlink_multirate_name="$(basename -- "$MANIFEST")"
+    starlink_multirate_manifest="${ROOT}/manifests/${starlink_multirate_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
         fail "multirate PSS build must use the canonical manifest: ${starlink_multirate_manifest}"
     git --no-replace-objects -C "$ROOT" \
-        show 'HEAD:manifests/starlink-pss-multirate-rx-only-dnm-v1-source.yaml' |
+        show "HEAD:manifests/${starlink_multirate_name}" |
         cmp -s - "$starlink_multirate_manifest" ||
         fail "multirate PSS manifest differs from its committed HEAD blob"
     case "${STARLINK_PSS_RATE_MSPS:-}" in
@@ -407,6 +410,9 @@ starlink-rx-only-dnm-v1-source.yaml:candidate)
     ;;
 starlink-pss-multirate-rx-only-dnm-v1-source.yaml:candidate)
     protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v1"
+    ;;
+starlink-pss-multirate-rx-only-dnm-v2-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v2"
     ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'

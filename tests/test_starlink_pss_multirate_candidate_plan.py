@@ -37,30 +37,43 @@ def _package(
     *,
     rate: int = 15,
     unsafe_member: bool = False,
+    revision: str = "v1",
+    source_commit: str = SOURCE_COMMIT,
 ) -> tuple[Path, Path]:
-    dfu_name = f"plutoplus-starlink-pss-{rate}m-rx-only-dnm-v1-source-pluto.dfu"
+    assert revision in {"v1", "v2"}
+    dfu_name = (
+        f"plutoplus-starlink-pss-{rate}m-rx-only-dnm-{revision}-source-pluto.dfu"
+    )
+    manifest_name = f"starlink-pss-multirate-rx-only-dnm-{revision}-source.yaml"
+    buildroot_version = (
+        "starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1"
+        if revision == "v1"
+        else "starlink-rx-only-dnm-v1-source/buildroot-pss-acqctl-v1"
+    )
     members: dict[str, bytes] = {
         "packed-VERSIONS.txt": (
-            f"device-fw v0.50-plutoplus-starlink-pss-{rate}m-rx-only-dnm-v1\n"
+            f"device-fw v0.50-plutoplus-starlink-pss-{rate}m-rx-only-dnm-{revision}\n"
             "hdl starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2\n"
-            "buildroot starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1\n"
+            f"buildroot {buildroot_version}\n"
             "linux starlink-rx-only-dnm-v1-source/linux-v2\n"
             "u-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\n"
         ).encode(),
-        "starlink-pss-multirate-rx-only-dnm-v1-source.yaml": (
+        manifest_name: (
             "do_not_merge: true\n"
             "persistent_flash_eligible: false\n"
             f"allocated_radio_serial: {ALLOCATED_SERIAL}\n"
             "starlink_pss_supported_rates_msps: 15,30,60\n"
+            f"route_{rate}_firmware_source: {source_commit}\n"
+            f"route_{rate}_bit_sha256: {hashlib.sha256(b'bit').hexdigest()}\n"
             "versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2\n"
-            "versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-pss15-abi12-v1\n"
+            f"versions_buildroot: {buildroot_version}\n"
             "versions_linux: starlink-rx-only-dnm-v1-source/linux-v2\n"
             "versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx\n"
         ).encode(),
-        f"plutoplus-starlink-pss-{rate}m-rx-only-dnm-v1-source-provenance.txt": (
+        f"plutoplus-starlink-pss-{rate}m-rx-only-dnm-{revision}-source-provenance.txt": (
             "release_state=candidate\n"
             "hardware_accessed=false\n"
-            f"firmware_source={SOURCE_COMMIT}\n"
+            f"firmware_source={source_commit}\n"
             "build_utc=2026-09-03T12:34:56Z\n"
             f"starlink_pss_rate_msps={rate}\n"
             "do_not_merge=true\n"
@@ -153,6 +166,39 @@ def test_prepares_canonical_ppu_v2_plan_without_hardware(tmp_path: Path) -> None
     assert index["persistent_flash_eligible"] is False
     assert stat.S_IMODE(output.stat().st_mode) == 0o700
     assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in output.iterdir())
+
+
+def test_prepares_controller_v2_only_from_identical_source_checkout(
+    tmp_path: Path,
+) -> None:
+    archive, sidecar = _package(
+        tmp_path, revision="v2", source_commit=GENERATOR_COMMIT
+    )
+    manifest_name = "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
+    qualification = tmp_path / manifest_name
+    with tarfile.open(archive, mode="r:gz") as bundle:
+        stream = bundle.extractfile(manifest_name)
+        assert stream is not None
+        qualification.write_bytes(stream.read())
+    output = _output_parent(tmp_path) / "15-v2"
+
+    result = prepare_candidate(
+        archive,
+        sidecar,
+        output,
+        rate=15,
+        ppu_commit=PPU_COMMIT,
+        generator_commit=GENERATOR_COMMIT,
+        qualification_manifest_path=qualification,
+    )
+
+    plan = json.loads((output / "candidate-plan-v2.json").read_bytes())
+    index = json.loads((output / "candidate-artifact-index.json").read_bytes())
+    assert result["verdict"] == "PASS_OFFLINE"
+    assert plan["source_commit"] == GENERATOR_COMMIT
+    assert plan["expected_runtime"]["firmware_version"].endswith("dnm-v2")
+    assert index["source_manifest_name"] == manifest_name
+    assert index["source_manifest_revision"] == "v2"
 
 
 def test_rejects_archive_sidecar_mismatch_before_output(tmp_path: Path) -> None:
