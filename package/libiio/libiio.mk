@@ -8,8 +8,9 @@
 #LIBIIO_VERSION = 0.25
 #LIBIIO_SITE = $(call github,analogdevicesinc,libiio,v$(LIBIIO_VERSION))
 
-LIBIIO_VERSION = 5cb2389719d46d12463daa0371d1fda19eb25fa7
-LIBIIO_SITE = $(call github,misko,libiio,$(LIBIIO_VERSION))
+LIBIIO_VERSION = 625e079bc696eb0d0910d401a605f8cc1d53204c
+LIBIIO_SITE = https://github.com/misko/libiio.git
+LIBIIO_SITE_METHOD = git
 
 LIBIIO_INSTALL_STAGING = YES
 LIBIIO_LICENSE = LGPL-2.1+
@@ -58,16 +59,20 @@ endif
 
 ifeq ($(BR2_PACKAGE_LIBIIO_IIOD),y)
 LIBIIO_DEPENDENCIES += host-flex host-bison libaio spf_metadata_source
-define LIBIIO_INSTALL_TANDEM_AGC_UAPI
+define LIBIIO_INSTALL_TANDEM_UAPIS
 	$(INSTALL) -D -m 0644 \
 		$(TOPDIR)/../linux/include/uapi/linux/adi_tandem_agc.h \
 		$(STAGING_DIR)/usr/include/linux/adi_tandem_agc.h
+	$(INSTALL) -D -m 0644 \
+		$(TOPDIR)/../linux/include/uapi/linux/adi_persistent_hop.h \
+		$(STAGING_DIR)/usr/include/linux/adi_persistent_hop.h
 endef
-LIBIIO_PRE_CONFIGURE_HOOKS += LIBIIO_INSTALL_TANDEM_AGC_UAPI
+LIBIIO_PRE_CONFIGURE_HOOKS += LIBIIO_INSTALL_TANDEM_UAPIS
 LIBIIO_CONF_OPTS += \
 	-DWITH_IIOD=ON \
 	-DWITH_AIO=ON \
 	-DIIOD_BUFFER_METADATA_PROVIDER=$(@D)/iiod/spf-buffer-metadata.c \
+	-DIIOD_BUFFER_PERSISTENT_HOP_DEVICE_PROVIDER=$(@D)/iiod/spf-hop-device-local.c \
 	-DIIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES="$(@D)/iiod/spf-tandem-session.c;$(@D)/iiod/spf-tandem-metadata.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_gain_sampler.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_rssi_read.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_radio_frame_v3.c;$(STAGING_DIR)/usr/share/spf-metadata-source/spf_thread_join.c" \
 	-DIIOD_BUFFER_METADATA_INCLUDE_DIRS=$(STAGING_DIR)/usr/include/spf
 else
