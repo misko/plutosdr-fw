@@ -901,6 +901,22 @@ This is bounded map transport, not frame lock: ARM candidate extraction, lock
 state semantics, the real RX tap, full linked-system routing, and RAM-only
 radio qualification remain pending. No radio was contacted.
 
+The bounded ARM policy layer is now implemented and source-locked at firmware
+commit `b26ed7a685d9d994b89fa9159af751825835270b`, tagged
+`starlink-rx-only-dnm-v1-source/firmware-pss15-arm-acquisition-v1`. It validates
+the fixed `PSMA` ABI, copies exactly 20,000 immutable words without releasing a
+faulted bank, derives continuity from bracketed hardware-health epochs, retains
+three adjacent maps, and searches the seven frozen
+`[-12,-8,-4,0,4,8,12]` drift hypotheses. Its median, MAD, tie, score, phase,
+drift, and period outputs match the Python oracle in 13 randomized/edge cases.
+The fixed working allocation is at most 320 kB, strict host and ARM EABI builds
+pass, ASan/UBSan passes, and the explicit state path is
+`ACQUIRE -> CONFIRM -> LOCK -> TRACK -> HOLDOVER -> ACQUIRE`. This remains a
+source-only processor checkpoint: it is not linked into the target controller,
+has no shell MMIO aperture, built image, radio result, live-PSS claim, or frame
+alignment qualification. No PPU or HDL source changed and no radio was
+contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -1181,8 +1197,9 @@ Current status ledger:
   invariants on the target radio, one byte-exact shared RX-DMA observation, and
   eight passing sequential repeat transactions;
 - Gate 1 acquisition oracle: **FIRST REAL-DATA ARCHITECTURE CHECKPOINT
-  COMPLETE; PRODUCTION CORPUS POLICY OPEN**. The remaining Gate 2
-  modes/equivalence bundle is in progress or pending;
+  COMPLETE; BOUNDED ARM POLICY PASS OFFLINE; PRODUCTION CORPUS POLICY OPEN**.
+  The remaining Gate 2 shell integration, route, and modes/equivalence bundle
+  is in progress or pending;
 - Gate 3: **IMPLEMENTATION/RADIO-TRANSPORT PASS WITH MANDATORY RT POLICY; LIVE
   PSS OPEN** for native
   `ad9363a-1r1t`; its RAM lifecycle, exact 15 MS/s PHY/capture path, factor-1
@@ -1306,9 +1323,11 @@ builds. Starlink code is not part of any PPU commit.
   timing isolation, exact three-frame actual-XFFT map replay, exhaustive map
   readback, default 20,000-bin/64-frame linked resource accounting, bounded
   40,000-byte immutable-map handoff, and positive 100 MHz post-opt unplaced
-  timing with clean reports. ARM peak/cadence selection, AXI/CDC/control, the
-  RX-shell tap, complete route, firmware packaging, and hardware qualification
-  remain pending; this checkpoint does not claim frame lock.
+  timing with clean reports. The isolated AXI/CDC/control bridge and bounded
+  source-only ARM peak/cadence/state policy now pass their separate offline
+  checkpoints. The RX-shell tap, linked controller/MMIO integration, complete
+  route, firmware packaging, and hardware qualification remain pending; none
+  of these checkpoints claims frame lock.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

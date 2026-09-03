@@ -1,0 +1,105 @@
+# Source contract for bounded Stage-15 ARM phase-map acquisition.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_source_commit: b26ed7a685d9d994b89fa9159af751825835270b
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-arm-acquisition-v1
+supersedes_manifest: starlink-pss15-phase-map-axi-dnm-v1-source.yaml
+supersedes_reason: "add bounded ARM map copying, candidate extraction, and lock-state semantics without claiming shell integration, radio operation, or frame alignment"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: e2e1b87fccfb7efbeb3612e2a3b5a0fea919ba93
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-phase-map-axi-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: false
+
+firmware_main_gitlink_guard_required: false
+firmware_main_gitlink_guard_reason: "all component gitlinks are unchanged; the existing DNM branch/content guard still rejects this parent source"
+existing_hdl_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/95
+existing_hdl_gitlink_guard_merge_commit: d2fcc1175dbf0c866288b0c369cc2cfb314979ba
+
+sample_rate_hz: 15000000
+phase_map_identification: 0x50534d41
+phase_map_version: 0x00010000
+phase_map_capabilities: 0x0000001f
+phase_map_phase_bins: 20000
+phase_map_tile_frames: 64
+phase_map_word_bits: 16
+phase_map_banks: 2
+phase_map_words_per_copy: 20000
+phase_map_bytes_per_copy: 40000
+phase_map_start_step_samples: 1280000
+phase_map_tile_period_ms: 85.333333
+phase_map_sustained_handoff_bytes_per_second: 468750
+
+arm_window_maps: 3
+arm_window_storage_bytes: 120000
+arm_scratch_storage_bytes: 160000
+arm_incoming_copy_storage_bytes: 40000
+arm_maximum_working_storage_bytes: 320000
+arm_drift_hypotheses: 7
+arm_drift_bins_per_tile: [-12, -8, -4, 0, 4, 8, 12]
+arm_drift_ppm: [-9.375, -6.25, -3.125, 0, 3.125, 6.25, 9.375]
+arm_tie_rule: smallest-drift-then-smallest-phase
+arm_statistics: exact-odd-even-median-and-mad
+arm_candidate_gates: peak-to-median-and-robust-z
+arm_lock_state_path: ACQUIRE-CONFIRM-LOCK-TRACK-HOLDOVER-ACQUIRE
+arm_copy_failure_retains_bank: true
+arm_continuity_uses_hardware_fault_epochs: true
+arm_fault_counter_saturation_rejected: true
+
+offline_strict_warning_build_verdict: PASS
+offline_arm_eabi_cross_build_verdict: PASS
+offline_asan_ubsan_verdict: PASS
+offline_python_c_differential_verdict: PASS
+offline_python_c_differential_cases: 13
+offline_full_map_successful_copies: 2
+
+arm_acquisition_runner_sha256: 1ca766e11fa6ffc6e0752bc99ddff7bb04384bf143963757d784a80fa120b1e4
+arm_acquisition_differential_test_sha256: e1cbd226e5cc6b31cb0d22982c7325870d7354db089c6978657979e8e488c429
+arm_acquisition_makefile_sha256: 313a8fbba99ee6d0593568f54d18c27dc6be88a93388f0b94ad30a8496478e87
+arm_acquisition_readme_sha256: 8d9bd03ab06c304d5de8d1365bb552db7d7b6c04dff60bd363291cca397058c1
+arm_acquisition_library_sha256: 30ce4596f184e32aeddb1ed915450045a725226596b55049ea9f79fb7fed3937
+arm_acquisition_header_sha256: 0dbf604cc5dbe4fe5ed8b5ae3e822d1e8d4de7d873607265d65e4f7b2bae48b9
+arm_acquisition_selftest_sha256: b70fd9d0b51cadb8d2dddfd342f05642b28a47dab82b81116a007877d79478bd
+arm_acquisition_summary_sha256: 7ce4cb62daa63503b8a34270a330344036f3662da5be1cb4ff074eee02b87c6d
+arm_acquisition_report_sha256: ad5fd27239e8ae99d5faa35cccd24eb191eb1e30b702ef0fe4e055d0acb5d269
+arm_acquisition_evidence_test_sha256: 4a8c62195110fb33bf59dea54923005ac95e42f9c043e0dea36f1b7c55095c8f
+starlink_plan_sha256: 3905a0bc7383f6db1ce5f5dea15f16d64a4a625d7855698b4a617b27c2059cf0
+
+rtl_phase_map_implemented: true
+rtl_axi_cdc_control_implemented: true
+arm_candidate_extraction_implemented: true
+arm_lock_state_machine_implemented: true
+arm_target_executable_linked: false
+rtl_rx_shell_connected: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+firmware_image_built: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false
