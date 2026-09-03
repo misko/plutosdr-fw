@@ -44,6 +44,22 @@ library must emit identical low bits.
 - No real 30 or 60 MS/s validation capture was found. Tests at those rates are
   synthetic. Real-capture replay is deliberately outside this first slice.
 
+## Acquisition rate conditioning
+
+`ddc.py` freezes the acquisition-only fixed-point conditioners. At 30 MS/s,
+one absolute-indexed +/-Fs/4 quadrant mixer and 15-tap Q1.15 half-band FIR
+decimates to 15 MS/s. At 60 MS/s, two identical stages cascade 60→30→15 MS/s.
+Each stage rounds ties to even, saturates to CI16, purges history on any gap or
+index discontinuity, and emits a gap only after fifteen new consecutive input
+samples. The x4 output index `k` names raw source center `4*k`; the two-stage
+pipeline has 21 raw-input samples of group delay.
+
+The 30 MS/s contract SHA-256 is
+`731426047077b036f9213db3574e4a556fd424b97a293843bd6ee085c2bf33af`.
+The 60 MS/s cascade contract SHA-256 is
+`8e807d15d5372b0a9669d1190d899697e7c2911a73ddfb23095806c2a31de5b2`.
+Both are synthetic arithmetic contracts, not RF qualification.
+
 ## Acquisition oracle
 
 `acquisition.py` defines `starlink-pss-acquisition-oracle-v1`.  It uses a

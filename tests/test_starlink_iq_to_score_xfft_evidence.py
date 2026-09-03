@@ -17,6 +17,7 @@ OOC_SUMMARY = ROOT / "reports/starlink-pss15-iq-to-score-xfft-ooc-summary.txt"
 PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 
 HDL_COMMIT = "c6b55bd5e9afb2da293b2b08fb36cc0609586868"
+FIRMWARE_COMMIT = "adec7003b18edd06c65534386cf536cb21293d8e"
 GUARD_MERGE_COMMIT = "eb0fe23673e5318b42dbe9bf3e972cb9a0be217c"
 VECTOR_EVIDENCE_SHA256 = (
     "6eaf98f478b1222042aca89e76828984f6bde6e486f0eacc06b5067f3b5d296d"
@@ -47,6 +48,15 @@ def _summary(path: Path) -> dict[str, str]:
 def _hdl_at_checkpoint(relative: str) -> bytes:
     return subprocess.run(
         ["git", "-C", str(HDL), "show", f"{HDL_COMMIT}:{relative}"],
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _firmware_at_checkpoint(relative: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{FIRMWARE_COMMIT}:{relative}"],
+        cwd=ROOT,
         check=True,
         stdout=subprocess.PIPE,
     ).stdout
@@ -196,7 +206,7 @@ def test_checkpoint_tree_contains_real_generated_xfft_composition() -> None:
 
 def test_checkpoint_manifest_is_safe_and_binds_immutable_evidence() -> None:
     manifest = MANIFEST.read_text()
-    current_bound_files = {
+    firmware_checkpoint_files = {
         "pipeline_vector_generator_sha256": (
             "tools/generate_starlink_pss15_pipeline_vectors.py"
         ),
@@ -274,8 +284,9 @@ def test_checkpoint_manifest_is_safe_and_binds_immutable_evidence() -> None:
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
     assert f"starlink_plan_historical_sha256: {PLAN_HISTORICAL_SHA256}" in manifest
-    for field, relative in current_bound_files.items():
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    for field, relative in firmware_checkpoint_files.items():
+        digest = _sha256_bytes(_firmware_at_checkpoint(relative))
+        assert f"{field}: {digest}" in manifest
     for field, relative in checkpoint_bound_files.items():
         assert f"{field}: {_sha256_bytes(_hdl_at_checkpoint(relative))}" in manifest
     assert HDL_COMMIT in PLAN.read_text()

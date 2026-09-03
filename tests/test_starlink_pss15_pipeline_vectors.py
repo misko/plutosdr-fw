@@ -9,17 +9,17 @@ EXPECTED_FILES = {
         "lines": 1406,
         "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723",
     },
-    "forward_q23.mem": {
+    "forward_q17.mem": {
         "lines": 1536,
-        "sha256": "92240f871d3d59e66923e412d7d933fe9938438c6eabdd005182d2e8daf109cc",
+        "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd",
     },
-    "product_q23.mem": {
+    "product_q17.mem": {
         "lines": 1536,
-        "sha256": "63f6c4ba900b25d5cfc9ec8161765b8e9776e6711eedc94edef2d43d46a92615",
+        "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7",
     },
-    "inverse_q23.mem": {
+    "inverse_q17.mem": {
         "lines": 1536,
-        "sha256": "3fdebbc406d6cc3e9bfdc199820416c56fcde640777ee7cd7da0bc75078f8884",
+        "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1",
     },
     "forward_exponents.mem": {
         "lines": 3,
@@ -31,7 +31,7 @@ EXPECTED_FILES = {
     },
     "scores_u8.mem": {
         "lines": 1341,
-        "sha256": "a8c5596bdea4f7a618082467e222c6088d589174bb69f96238df83def2ce02a0",
+        "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d",
     },
 }
 
@@ -41,12 +41,13 @@ def test_generated_xfft_pipeline_vectors_are_exact_and_self_cleaning(
 ) -> None:
     evidence = generate(tmp_path)
 
-    assert evidence["schema"] == "starlink-pss15-generated-xfft-pipeline-vectors-v1"
+    assert evidence["schema"] == "starlink-pss15-generated-xfft-pipeline-vectors-v2"
     assert evidence["sample_rate_hz"] == 15_000_000
     assert evidence["acquisition_clock_hz"] == 100_000_000
     assert evidence["sample_count"] == 1406
     assert evidence["block_count"] == 3
     assert evidence["fft_samples"] == 512
+    assert evidence["data_bits"] == 18
     assert evidence["valid_scores_per_block"] == 447
     assert evidence["score_count"] == 1341
     assert evidence["first_sample_index"] == 1_000_000
@@ -56,7 +57,7 @@ def test_generated_xfft_pipeline_vectors_are_exact_and_self_cleaning(
     assert evidence["inverse_block_exponents"] == [3, 4, 4]
     assert evidence["score_minimum"] == 0
     assert evidence["score_maximum"] == 255
-    assert evidence["nonzero_score_count"] == 1071
+    assert evidence["nonzero_score_count"] == 1072
     assert evidence["random_seed"] == 0x15F17E
     assert evidence["files"] == EXPECTED_FILES
     assert {path.name for path in tmp_path.iterdir()} == {

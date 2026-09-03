@@ -27,6 +27,71 @@ establish full-band Starlink reception. Full-band Gates 4 and 5 need a second
 serial-bound radio with physical AD9361/AD9364 attestation; otherwise those
 full-band pass states remain open by design.
 
+## 2026-09-03 authoritative 15/30/60 offline implementation checkpoint
+
+This section supersedes earlier chronological notes below that describe two
+XFFT instances, missing score/map composition, or pending 15/30/60 full route.
+Those notes remain as an audit trail of incremental development, not current
+status. The current experimental source is still confined to parent and HDL
+branches named `codex/starlink-rx-only-do-not-merge`; it has not been merged or
+cherry-picked to firmware `main`, and this checkpoint made no PPU change and
+contacted no radio.
+
+The selected implementation uses one serially shared 512-point Xilinx XFFT v9.1
+for forward and inverse transforms. A 512x36 atomic intermediate buffer retains
+the complete frequency-domain product between directions. Native 15 MS/s
+bypasses DDC; 30 MS/s uses one 15-tap, eight-DSP, ties-to-even, saturating
+`+/-Fs/4` halfband x2 DDC; and 60 MS/s cascades two identical stages. Blind
+acquisition therefore always enters the canonical 15 MS/s, 66-sample
+overlap-save search, while the direct tracker retains exact full-rate source
+geometry. A registered inverse-output boundary and explicitly bounded
+512-entry result FIFO cut long ready chains without changing one-result-per-clock
+IFFT acceptance. Unexpected stage backpressure or FIFO overflow remains a
+sticky fail-closed detector fault.
+
+Fresh Vivado 2022.2 non-OOC full builds of the same final RTL all pass the
+100 MHz implementation gate, hold timing, DRC, and all six constrained bus-skew
+checks:
+
+| Source rate | Setup WNS / TNS | Hold WHS / THS | LUT | FF | BRAM tiles | DSP | XSA SHA-256 | bit SHA-256 |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- | --- |
+| 15 MS/s | `+0.452 ns / 0` | `+0.021 ns / 0` | 11,584 (65.82%) | 17,499 (49.71%) | 46.0 (76.67%) | 30 (37.50%) | `3aec7cb6bf2dbc932f3b630e9f75cabb43adeef22db60d49c1bd03ff9bdd5f3c` | `5a733310f9f30345e1b59c4c20e5ea862e8a7b76674718ee7014a1286e4826d6` |
+| 30 MS/s | `+0.170 ns / 0` | `+0.025 ns / 0` | 12,154 (69.06%) | 18,229 (51.79%) | 47.5 (79.17%) | 38 (47.50%) | `04c5b3816122eafa5b1b71f6af190134fb85e9a9a7360aa4b37463ce192ed3a8` | `8277fd1ea3e65707680d7e67ade88c33a1336e0f858745eddb76b284cece9243` |
+| 60 MS/s | `+0.176 ns / 0` | `+0.018 ns / 0` | 13,131 (74.61%) | 18,974 (53.90%) | 52.5 (87.50%) | 46 (57.50%) | `b03e02e5cd3f3d3eb5bd52c132f33d5bef0c793ee345fbff0650324c86c0b863` | `3d52b1fae16196c3dd56550a17b9f64f5324432fa77f0e27d937738472a4cc11` |
+
+The shared-XFFT post-opt OOC gate passes at `+1.040 ns` setup and
+`+0.011 ns` hold with 3,858 LUTs, 6,366 FFs, 11 BRAM tiles, and 27 DSPs. Real
+vendor-model replay at 30 and 60 MS/s produces 1,406 canonical-rate samples,
+three overlap-save blocks, 1,341 exact scores, and all three injected PSS peaks
+at 255. The final FIFO high-water marks are 356/512 at 30 MS/s and 355/512 at
+60 MS/s. Source-level acquisition tests, all-rate tracker tests, a 27,300-sample
+real tracker replay, 36 focused Python/C contract tests, and native plus
+ASan/UBSan host-library tests all pass.
+
+The superseded slice-evidence tests now validate every manifest-bound source
+against the immutable firmware and HDL commit blobs for that slice instead of
+comparing a frozen digest with the evolving 15/30/60 worktree. All 36 affected
+evidence tests pass without changing any historical manifest. A repository-wide
+offline `pytest -q` run reports 1,658 passed and five explicitly hardware-gated
+skips; its only failure is the unrelated committed tandem-AGC packaging
+assertion that expects one `--cdc-report` occurrence while both the current
+worktree and its unchanged `HEAD` contain two. Neither packaging file involved
+in that baseline mismatch is modified by this experiment.
+
+The rate-specific fail-closed software/RTL contracts are:
+
+| Rate | ABI | Config | Raw-sample DDC delay | Coefficient energy | Oracle SHA-256 |
+| --- | --- | --- | ---: | ---: | --- |
+| 15 MS/s | 1.1 | `0x000f0202` | 0 | 1,073,742,825 | native 15 MS/s frozen contract |
+| 30 MS/s | 1.2 | `0x000f0203` | 7 | 1,073,744,004 | `731426047077b036f9213db3574e4a556fd424b97a293843bd6ee085c2bf33af` |
+| 60 MS/s | 1.3 | `0x020f0403` | 21 | 1,073,765,335 | `8e807d15d5372b0a9669d1190d899697e7c2911a73ddfb23095806c2a31de5b2` |
+
+This closes the offline implementation milestone at 15, 30, and 60 MS/s. It
+does not close RAM-boot, RF transport, hardware injection, ambient live-PSS,
+full-band RFIC, or SSS qualification for these new images. Any such step still
+requires an explicit serial-scoped operation plan and user authorization; the
+primary target remains `104000bac4950008230026001b440a003a`.
+
 ## 2026-09-02 Stage-15 hardware checkpoints
 
 The corrected ABI 1.1 image has now completed one exact-radio RAM lifecycle and
@@ -1230,7 +1295,11 @@ Current status ledger:
   evidence remains pending;
 - Gate 6 epilogue for all Stage-15 trials: **COMPLETE** with verified persistent
   2R2T restoration and unchanged QSPI;
-- every 30 MS/s, 60 MS/s, full campaign-close, and SSS gate: pending.
+- current 15/30/60 continuous-acquisition RTL and full routed images:
+  **COMPLETE OFFLINE / HARDWARE UNTESTED**, with the authoritative evidence and
+  hashes recorded in the 2026-09-03 checkpoint above;
+- every new-image RAM boot, 30/60 MS/s radio-transport/injection/live-RF gate,
+  full campaign-close, full-band RFIC qualification, and SSS gate: pending.
 
 ### Gate 0: PPU foundation on `main` - COMPLETE / HARDWARE-EXERCISED
 

@@ -17,6 +17,7 @@ PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 
 FIRMWARE_COMMIT = "3fa1b1ba3a3bd7f115231ae8ffb8983300259d8e"
 FIRMWARE_TAG = "starlink-rx-only-dnm-v1-source/firmware-pss15-health-abi11-v1"
+EVIDENCE_COMMIT = "05ce2ab941cd41d6d27b56e7aad9c816ee831cd0"
 HDL_COMMIT = "b7b564dd5e6a66a5c1ddf8f144d3bb6a9f8fc86a"
 HDL_TAG = "starlink-rx-only-dnm-v1-source/hdl-pss15-health-abi11-v1"
 INGRESS_COMMIT = "883e9824cebc2c8eaac0ad818cde22595dfd65e0"
@@ -256,13 +257,16 @@ def test_health_abi11_guard_and_manifest_preserve_boundaries() -> None:
     for field, digest in SUMMARY_SHA256.items():
         assert f"{field}: {digest}" in manifest
 
-    current = {
-        "health_abi11_report_sha256": REPORT,
-        "health_abi11_evidence_test_sha256": Path(__file__),
-        "starlink_plan_sha256": PLAN,
+    checkpoint_files = {
+        "health_abi11_report_sha256": "reports/STARLINK_PSS15_HEALTH_ABI11_V1.md",
+        "health_abi11_evidence_test_sha256": (
+            "tests/test_starlink_health_abi11_evidence.py"
+        ),
+        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
-    for field, path in current.items():
-        assert f"{field}: {_sha256(path)}" in manifest
+    for field, relative in checkpoint_files.items():
+        digest = _sha256_bytes(_git_blob(EVIDENCE_COMMIT, relative))
+        assert f"{field}: {digest}" in manifest
 
     report = REPORT.read_text()
     plan = PLAN.read_text()

@@ -1,19 +1,45 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+HDL = ROOT / "hdl"
 MANIFEST = ROOT / "manifests" / "starlink-pss15-score-prepare-dnm-v1-source.yaml"
 REPORT = ROOT / "reports" / "STARLINK_PSS15_SCORE_PREPARE_V1.md"
 SUMMARY = ROOT / "reports" / "starlink-pss15-score-prepare-ooc-summary.txt"
 PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 HDL_COMMIT = "078e725389c8c790e1f3c3c612b242697f87de77"
+FIRMWARE_COMMIT = "801dd4557f6e5c722b529255fbf3dd5ed0bde9d7"
 SUMMARY_SHA256 = "b2f50c5122f2341e3569844e902e488943ac763507e04300d1e5c1e495ac6311"
 
 
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def _git_blob(commit: str, relative: str, cwd: Path = ROOT) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=cwd,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _checkpoint_blob(relative: str) -> bytes:
+    if relative.startswith("hdl/"):
+        return _git_blob(HDL_COMMIT, relative.removeprefix("hdl/"), HDL)
+    return _git_blob(FIRMWARE_COMMIT, relative)
+
+
+def _checkpoint_text(relative: str) -> str:
+    return _checkpoint_blob(relative).decode()
 
 
 def test_score_prepare_ooc_summary_is_frozen_and_passing() -> None:
@@ -53,18 +79,11 @@ def test_score_prepare_ooc_summary_is_frozen_and_passing() -> None:
 
 
 def test_score_prepare_contract_and_simulation_are_explicit() -> None:
-    rtl = (
-        ROOT / "hdl/library/starlink_pss_acquisition/starlink_pss_score_prepare.v"
-    ).read_text()
-    testbench = (
-        ROOT / "hdl/library/starlink_pss_acquisition/tb/"
-        "tb_starlink_pss_score_prepare.sv"
-    ).read_text()
-    generator = (
-        ROOT / "hdl/library/starlink_pss_acquisition/tb/"
-        "generate_score_prepare_vectors.py"
-    ).read_text()
-    runner = (ROOT / "hdl/library/starlink_pss_acquisition/run_tests.sh").read_text()
+    prefix = "hdl/library/starlink_pss_acquisition/"
+    rtl = _checkpoint_text(prefix + "starlink_pss_score_prepare.v")
+    testbench = _checkpoint_text(prefix + "tb/tb_starlink_pss_score_prepare.sv")
+    generator = _checkpoint_text(prefix + "tb/generate_score_prepare_vectors.py")
+    runner = _checkpoint_text(prefix + "run_tests.sh")
 
     assert "COEFFICIENT_ENERGY = 31'd1073742825" in rtl
     assert rtl.count('use_dsp = "yes"') == 2
@@ -139,23 +158,20 @@ def test_score_prepare_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
-    # Shared acquisition sources and the living plan advance with the next
-    # independently checkpointed slice. Preserve this manifest's historical
-    # digests instead of rewriting the preparation checkpoint.
-    assert (
-        "acquisition_test_runner_sha256: "
-        "f4e0b6646827c0d53e218787dc904d8bce58323a1d5c4a6661ee878fa088b130" in manifest
-    )
-    assert (
-        "acquisition_hdl_readme_sha256: "
-        "29ed1eefa0e6d2c60bde948f87c96f1b8f5fa182f62ee164c30faf66a732e2cf" in manifest
-    )
-    assert (
-        "score_prepare_evidence_test_sha256: "
-        "8cfa7b1ef78b7a874551899f6a562c3416cdf2022a167a5e2e3151c1531ddfa7" in manifest
-    )
-    assert (
-        "starlink_plan_sha256: "
-        "785eac0bce06cff4f8b97488386ffc8ccbb493e68f10a0949aecb5dc8326289d" in manifest
-    )
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest
+
+    for field, relative in {
+        "acquisition_test_runner_sha256": (
+            "hdl/library/starlink_pss_acquisition/run_tests.sh"
+        ),
+        "acquisition_hdl_readme_sha256": (
+            "hdl/library/starlink_pss_acquisition/README.md"
+        ),
+        "score_prepare_evidence_test_sha256": (
+            "tests/test_starlink_score_prepare_evidence.py"
+        ),
+        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
+    }.items():
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest

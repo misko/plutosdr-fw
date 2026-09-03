@@ -1,4 +1,5 @@
 import hashlib
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +11,15 @@ def _read(relative: str) -> str:
 
 def _sha256(relative: str) -> str:
     return hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
+
+
+def _git_sha256(repository: str, revision: str, relative: str) -> str:
+    blob = subprocess.run(
+        ["git", "-C", str(ROOT / repository), "show", f"{revision}:{relative}"],
+        check=True,
+        capture_output=True,
+    ).stdout
+    return hashlib.sha256(blob).hexdigest()
 
 
 def test_experiment_is_marked_do_not_merge_and_ram_only() -> None:
@@ -103,8 +113,10 @@ def test_abi12_injection_is_the_shared_tracker_and_dma_boundary() -> None:
         "tb/real_071200_wrapper_replay_provenance.json"
     )
 
-    assert "VERSION = 32'h0001_0002" in wrapper
-    assert "CAPABILITIES = 32'h0000_003d" in wrapper
+    assert "localparam [31:0] VERSION = (RATE_MSPS == 15) ?" in wrapper
+    assert "32'h0001_0002 : 32'h0001_0003;" in wrapper
+    assert "localparam [31:0] CAPABILITIES = ENABLE_INJECTION ?" in wrapper
+    assert "32'h0000_003d : 32'h0000_001d;" in wrapper
     assert "starlink_pss_injection_mux" in wrapper
     for signal in ("i", "q", "enable", "index", "timestamp"):
         assert f".i_sample_{signal}" in wrapper
@@ -312,7 +324,15 @@ def test_continuous_phase_map_checkpoint_is_isolated_and_source_locked() -> None
         "phase_map_report_sha256": "reports/STARLINK_PSS15_PHASE_MAP_V1.md",
     }
     for field, relative in hdl_bound_files.items():
-        assert f"{field}: {_sha256(relative)}" in manifest
+        if relative.startswith("hdl/"):
+            digest = _git_sha256(
+                "hdl",
+                "d291871923c6dc6cc2f30745d2e9d8a6abd3188f",
+                relative.removeprefix("hdl/"),
+            )
+        else:
+            digest = _sha256(relative)
+        assert f"{field}: {digest}" in manifest
 
     # The shared runner grows as later independently tested slices are added.
     # Keep the phase-map checkpoint bound to its historical runner digest

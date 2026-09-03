@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 from tests.starlink_oracle import (
@@ -20,10 +21,20 @@ EVIDENCE_SHA256 = "2b2f54c37461a653f6c50bf5c68fec769b3b8fb6d300d82859de75949ab01
 OOC_SUMMARY_SHA256 = (
     "c96095a10f07739358c38ff3ae55cb0879ce42c0ae019499dc3bf9de69a3f5c1"
 )
+FIRMWARE_COMMIT = "9fa9f31210500fd1527c9e80402a7c3f374674a7"
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _firmware_at_checkpoint(relative: str) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{FIRMWARE_COMMIT}:{relative}"],
+        cwd=ROOT,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
 
 
 def test_xfft_bitaccurate_evidence_is_frozen_and_passing() -> None:
@@ -104,6 +115,10 @@ def test_xfft_source_manifest_is_safe_and_binds_every_input() -> None:
             "reports/starlink-pss15-xfft24-ooc-summary.txt"
         ),
         "xfft_report_sha256": "reports/STARLINK_PSS15_XFFT_BITACC_V1.md",
+        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
+        "xfft_evidence_test_sha256": (
+            "tests/test_starlink_xfft_bitacc_evidence.py"
+        ),
     }
 
     assert "do_not_merge: true" in manifest
@@ -116,16 +131,5 @@ def test_xfft_source_manifest_is_safe_and_binds_every_input() -> None:
     assert "rtl_fft_implemented: false" in manifest
     assert "hardware_qualified: false" in manifest
     for field, relative in bound_files.items():
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
-    # The living 15/30/60 plan advances after this arithmetic-only checkpoint;
-    # its historical digest remains immutable in the superseded manifest.
-    assert (
-        "starlink_plan_sha256: "
-        "b837bbb92b1b6f9239761912b3cef7fbc785e720787428e04061c2011e5754e8"
-        in manifest
-    )
-    assert (
-        "xfft_evidence_test_sha256: "
-        "72e0555322c57720219847f9652440503f7c7e25075df6fffa112a09860a03dd"
-        in manifest
-    )
+        digest = hashlib.sha256(_firmware_at_checkpoint(relative)).hexdigest()
+        assert f"{field}: {digest}" in manifest

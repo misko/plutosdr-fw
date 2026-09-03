@@ -1,21 +1,47 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+HDL = ROOT / "hdl"
 ACQUISITION = ROOT / "hdl/library/starlink_pss_acquisition"
 MANIFEST = ROOT / "manifests/starlink-pss15-xfft-block-adapter-dnm-v1-source.yaml"
 REPORT = ROOT / "reports/STARLINK_PSS15_XFFT_BLOCK_ADAPTER_V1.md"
 SUMMARY = ROOT / "reports/starlink-pss15-xfft-block-adapter-ooc-summary.txt"
 PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 HDL_COMMIT = "b8657819e56c9a2b836319e9b9b8596fc4ce3204"
+FIRMWARE_COMMIT = "aca2cc30e477a749dda58f447f602c6c5b93cadd"
 SUMMARY_SHA256 = "599ca4afa10a9164227834956e45f7e34d8084a4436fa267aa52563cc0570501"
 GUARD_MERGE_COMMIT = "68ef649d2fd76b62f437148a222f0881d50ea7f2"
 
 
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def _git_blob(commit: str, relative: str, cwd: Path = ROOT) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=cwd,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _checkpoint_blob(relative: str) -> bytes:
+    if relative.startswith("hdl/"):
+        return _git_blob(HDL_COMMIT, relative.removeprefix("hdl/"), HDL)
+    return _git_blob(FIRMWARE_COMMIT, relative)
+
+
+def _checkpoint_text(relative: str) -> str:
+    return _checkpoint_blob(relative).decode()
 
 
 def test_xfft_block_adapter_ooc_summary_is_frozen_and_passing() -> None:
@@ -58,10 +84,11 @@ def test_xfft_block_adapter_ooc_summary_is_frozen_and_passing() -> None:
 
 
 def test_xfft_block_adapter_contract_and_simulation_are_explicit() -> None:
-    adapter = (ACQUISITION / "starlink_pss_xfft_block_adapter.v").read_text()
-    testbench = (ACQUISITION / "tb/tb_starlink_pss_xfft_block_adapter.sv").read_text()
-    runner = (ACQUISITION / "run_tests.sh").read_text()
-    ooc_gate = (ACQUISITION / "synthesize_xfft_block_adapter_ooc.tcl").read_text()
+    prefix = "hdl/library/starlink_pss_acquisition/"
+    adapter = _checkpoint_text(prefix + "starlink_pss_xfft_block_adapter.v")
+    testbench = _checkpoint_text(prefix + "tb/tb_starlink_pss_xfft_block_adapter.sv")
+    runner = _checkpoint_text(prefix + "run_tests.sh")
+    ooc_gate = _checkpoint_text(prefix + "synthesize_xfft_block_adapter_ooc.tcl")
 
     assert "parameter integer FORWARD_TRANSFORM = 1" in adapter
     assert "reset_release_count == 2" in adapter
@@ -118,19 +145,17 @@ def test_xfft_block_adapter_manifest_is_safe_and_binds_sources() -> None:
             "reports/STARLINK_PSS15_XFFT_BLOCK_ADAPTER_V1.md"
         ),
     }
-    historical_shared_hashes = {
+    historical_shared_files = {
         "acquisition_test_runner_sha256": (
-            "ab44c095326f8b57fba91ab67a1e2d3d8951d389dcd2d8e156ae334176682726"
+            "hdl/library/starlink_pss_acquisition/run_tests.sh"
         ),
         "acquisition_hdl_readme_sha256": (
-            "6ef866a0caf63ca9dea6f70e10a277d1c3ba35b022a27f4801a02b3a7acc7ae8"
+            "hdl/library/starlink_pss_acquisition/README.md"
         ),
         "xfft_block_adapter_evidence_test_sha256": (
-            "a56ca4d989c56d1bec8f700930e042d9ddc20c23677a58c97d3734a540da1149"
+            "tests/test_starlink_xfft_block_adapter_evidence.py"
         ),
-        "starlink_plan_sha256": (
-            "289fe67191017d07da02dab83389a2467d7a06f9140f31f98d2f4b60ed00f571"
-        ),
+        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
     }
 
     assert "do_not_merge: true" in manifest
@@ -170,6 +195,8 @@ def test_xfft_block_adapter_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
-    for field, digest in historical_shared_hashes.items():
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest
+    for field, relative in historical_shared_files.items():
+        digest = _sha256_bytes(_checkpoint_blob(relative))
         assert f"{field}: {digest}" in manifest

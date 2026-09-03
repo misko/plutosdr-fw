@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MOCK_REGISTER_WORDS ((PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO / 4U) + 1U)
+#define MOCK_REGISTER_WORDS ((PSS_MAP_REG_DDC_SATURATION / 4U) + 1U)
 #define ERROR_SIZE 256U
 
 struct mock_map {
@@ -55,6 +55,51 @@ static void mock_status(struct mock_map *mock)
 	if (mock->ready_mask)
 		status |= PSS_MAP_STATUS_IRQ;
 	*mock_register(mock, PSS_MAP_REG_STATUS) = status;
+}
+
+static void mock_rate_contract(struct mock_map *mock, uint32_t rate_msps)
+{
+	static const uint32_t contract_30[8] = {
+		UINT32_C(0x73142604), UINT32_C(0x7077b036),
+		UINT32_C(0xf9213db3), UINT32_C(0x574e4a55),
+		UINT32_C(0x6fd424b9), UINT32_C(0x7a293843),
+		UINT32_C(0xbd6ee085), UINT32_C(0xc2bf33af),
+	};
+	static const uint32_t contract_60[8] = {
+		UINT32_C(0x8e807d15), UINT32_C(0xd5372b0a),
+		UINT32_C(0x9669d119), UINT32_C(0x0d899697),
+		UINT32_C(0xe7c2911a), UINT32_C(0x73ddfb23),
+		UINT32_C(0x095806c2), UINT32_C(0xa31de5b2),
+	};
+	const uint32_t *contract;
+	size_t index;
+
+	if (rate_msps == 30U) {
+		*mock_register(mock, PSS_MAP_REG_VERSION) = PSS_MAP_VERSION_1_2;
+		*mock_register(mock, PSS_MAP_REG_CAPABILITIES) =
+			PSS_MAP_CAPABILITIES_1_2;
+		*mock_register(mock, PSS_MAP_REG_DDC_CONFIG) =
+			UINT32_C(0x000f0203);
+		*mock_register(mock, PSS_MAP_REG_DDC_GROUP_DELAY) = 7U;
+		*mock_register(mock, PSS_MAP_REG_COEFFICIENT_ENERGY) =
+			UINT32_C(1073744004);
+		contract = contract_30;
+	} else {
+		CHECK(rate_msps == 60U, "mock DDC rate must be 30 or 60 MS/s");
+		*mock_register(mock, PSS_MAP_REG_VERSION) = PSS_MAP_VERSION_1_3;
+		*mock_register(mock, PSS_MAP_REG_CAPABILITIES) =
+			PSS_MAP_CAPABILITIES_1_3;
+		*mock_register(mock, PSS_MAP_REG_DDC_CONFIG) =
+			UINT32_C(0x020f0403);
+		*mock_register(mock, PSS_MAP_REG_DDC_GROUP_DELAY) = 21U;
+		*mock_register(mock, PSS_MAP_REG_COEFFICIENT_ENERGY) =
+			UINT32_C(1073765335);
+		contract = contract_60;
+	}
+	*mock_register(mock, PSS_MAP_REG_INPUT_RATE_MSPS) = rate_msps;
+	for (index = 0; index < 8U; ++index)
+		*mock_register(mock, PSS_MAP_REG_DDC_CONTRACT_0 +
+			(uint32_t)(4U * index)) = contract[index];
 }
 
 static void mock_capture_snapshot(struct mock_map *mock)
@@ -126,7 +171,7 @@ static int mock_read32(void *context, uint32_t offset, uint32_t *value)
 {
 	struct mock_map *mock = context;
 
-	if (!value || offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO ||
+	if (!value || offset > PSS_MAP_REG_DDC_SATURATION ||
 	    (offset & 3U))
 		return -1;
 	if (offset >= PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS)
@@ -177,7 +222,7 @@ static int mock_write32(void *context, uint32_t offset, uint32_t value)
 {
 	struct mock_map *mock = context;
 
-	if (offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO || (offset & 3U))
+	if (offset > PSS_MAP_REG_DDC_SATURATION || (offset & 3U))
 		return -1;
 	switch (offset) {
 	case PSS_MAP_REG_CONTROL:
@@ -374,6 +419,65 @@ done:
 	free(mock);
 }
 
+static void test_ddc_rate_contracts(void)
+{
+	struct mock_map *mock = calloc(1U, sizeof(*mock));
+	struct pss_map_io io;
+	struct pss_map_info info;
+	struct pss_map_snapshot snapshot;
+	char error[ERROR_SIZE] = {0};
+
+	CHECK(mock != NULL, "allocation failed");
+	if (!mock)
+		return;
+	mock_init(mock);
+	io = mock_io(mock);
+	mock_rate_contract(mock, 30U);
+	CHECK(pss_map_require_contract(&io, &info, error, sizeof(error)) == 0,
+		error);
+	CHECK(info.version == PSS_MAP_VERSION_1_2 &&
+		info.input_rate_msps == 30U &&
+		info.ddc_config == UINT32_C(0x000f0203) &&
+		info.ddc_group_delay == 7U &&
+		info.coefficient_energy == UINT32_C(1073744004),
+		"ABI 1.2 did not expose the exact x2 DDC contract");
+	CHECK(info.ddc_contract[0] == UINT32_C(0x73142604) &&
+		info.ddc_contract[7] == UINT32_C(0xc2bf33af),
+		"ABI 1.2 DDC oracle hash was unpacked incorrectly");
+	*mock_register(mock, PSS_MAP_REG_DDC_GROUP_DELAY) ^= 1U;
+	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
+		"ABI 1.2 accepted the wrong DDC group delay");
+	*mock_register(mock, PSS_MAP_REG_DDC_GROUP_DELAY) ^= 1U;
+	*mock_register(mock, PSS_MAP_REG_DDC_CONTRACT_4) ^= 1U;
+	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
+		"ABI 1.2 accepted the wrong DDC oracle hash");
+
+	mock_init(mock);
+	mock_rate_contract(mock, 60U);
+	CHECK(pss_map_require_contract(&io, &info, error, sizeof(error)) == 0,
+		error);
+	CHECK(info.version == PSS_MAP_VERSION_1_3 &&
+		info.input_rate_msps == 60U &&
+		info.ddc_config == UINT32_C(0x020f0403) &&
+		info.ddc_group_delay == 21U &&
+		info.coefficient_energy == UINT32_C(1073765335),
+		"ABI 1.3 did not expose the exact x4 DDC contract");
+	CHECK(info.ddc_contract[0] == UINT32_C(0x8e807d15) &&
+		info.ddc_contract[7] == UINT32_C(0xa31de5b2),
+		"ABI 1.3 DDC oracle hash was unpacked incorrectly");
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS) |=
+		PSS_MAP_HEALTH_DDC_SATURATION;
+	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U,
+		error, sizeof(error)) == 0, error);
+	CHECK(snapshot.health_flags & PSS_MAP_HEALTH_DDC_SATURATION,
+		"ABI 1.3 rejected or lost the DDC saturation health bit");
+	*mock_register(mock, PSS_MAP_REG_CAPABILITIES) =
+		PSS_MAP_CAPABILITIES_1_1;
+	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
+		"ABI 1.3 accepted pre-DDC capabilities");
+	free(mock);
+}
+
 static void test_abi_1_0_backward_compatibility(void)
 {
 	struct mock_map *mock = calloc(1U, sizeof(*mock));
@@ -419,7 +523,7 @@ static void test_abi_1_0_backward_compatibility(void)
 		PSS_MAP_CAPABILITIES_1_1;
 	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
 		"ABI 1.0 accepted ABI 1.1 capabilities");
-	*mock_register(mock, PSS_MAP_REG_VERSION) = UINT32_C(0x00010002);
+	*mock_register(mock, PSS_MAP_REG_VERSION) = UINT32_C(0x00010004);
 	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
 		"unknown future ABI was accepted");
 done:
@@ -768,6 +872,7 @@ int main(int argc, char **argv)
 	}
 	test_contract_snapshot_copy_and_release();
 	test_copy_fail_closed_on_metadata_change();
+	test_ddc_rate_contracts();
 	test_snapshot_and_contract_fail_closed();
 	test_abi_1_0_backward_compatibility();
 	test_window_and_extractor();
@@ -778,7 +883,8 @@ int main(int argc, char **argv)
 			failures);
 		return EXIT_FAILURE;
 	}
-	printf("STARLINK_PSS_ACQUISITION_PASS abi=1.0,1.1 map_words=%u map_reads=%u "
+	printf("STARLINK_PSS_ACQUISITION_PASS abi=1.0,1.1,1.2,1.3 "
+		"map_words=%u map_reads=%u "
 		"window_maps=%u drift_hypotheses=7 state_path="
 		"ACQUIRE-CONFIRM-LOCK-TRACK-HOLDOVER-ACQUIRE\n",
 		PSS_MAP_PHASE_BINS, PSS_MAP_PHASE_BINS,

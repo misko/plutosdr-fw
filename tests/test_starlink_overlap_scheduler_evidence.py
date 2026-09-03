@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+HDL = ROOT / "hdl"
 MANIFEST = (
     ROOT / "manifests" / "starlink-pss15-overlap-scheduler-dnm-v1-source.yaml"
 )
@@ -14,10 +16,34 @@ SUMMARY_SHA256 = (
     "37682496c3f6edcee513c6c775aa42e0a5837defd5da98b791eda88baa4a60b3"
 )
 HDL_COMMIT = "2c9e564350e1c42d9aa5b14e7ee61929a754f1fd"
+FIRMWARE_COMMIT = "afc91c7bb280126e02140d9013b493d17be182e1"
+
+
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def _git_blob(commit: str, relative: str, cwd: Path = ROOT) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=cwd,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _checkpoint_blob(relative: str) -> bytes:
+    if relative.startswith("hdl/"):
+        return _git_blob(HDL_COMMIT, relative.removeprefix("hdl/"), HDL)
+    return _git_blob(FIRMWARE_COMMIT, relative)
+
+
+def _checkpoint_text(relative: str) -> str:
+    return _checkpoint_blob(relative).decode()
 
 
 def test_overlap_scheduler_ooc_summary_is_frozen_and_passing() -> None:
@@ -56,19 +82,12 @@ def test_overlap_scheduler_ooc_summary_is_frozen_and_passing() -> None:
 
 
 def test_overlap_scheduler_contract_and_tests_are_explicit() -> None:
-    rtl = (
-        ROOT
-        / "hdl/library/starlink_pss_acquisition/"
-        "starlink_pss_overlap_scheduler.v"
-    ).read_text()
-    runner = (
-        ROOT / "hdl/library/starlink_pss_acquisition/run_tests.sh"
-    ).read_text()
-    lifecycle = (
-        ROOT
-        / "hdl/library/starlink_pss_acquisition/tb/"
-        "tb_starlink_pss_overlap_scheduler_lifecycle.sv"
-    ).read_text()
+    prefix = "hdl/library/starlink_pss_acquisition/"
+    rtl = _checkpoint_text(prefix + "starlink_pss_overlap_scheduler.v")
+    runner = _checkpoint_text(prefix + "run_tests.sh")
+    lifecycle = _checkpoint_text(
+        prefix + "tb/tb_starlink_pss_overlap_scheduler_lifecycle.sv"
+    )
 
     assert "parameter integer FFT_SAMPLES = 512" in rtl
     assert "parameter integer OVERLAP_SAMPLES = 65" in rtl
@@ -145,27 +164,20 @@ def test_overlap_scheduler_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
-    # Shared acquisition sources and the living plan advance with the next
-    # independently checkpointed slice. Preserve the immutable scheduler
-    # manifest's historical bindings rather than rewriting it.
-    assert (
-        "acquisition_test_runner_sha256: "
-        "a921c2abfc30743a4025b0013771045d5e05dde930253cca534803e3eec0a52e"
-        in manifest
-    )
-    assert (
-        "acquisition_hdl_readme_sha256: "
-        "fa15055a5be911924496f89bb5d09c77522a957b75ae738a01accaefd92807ef"
-        in manifest
-    )
-    assert (
-        "scheduler_evidence_test_sha256: "
-        "31e73fd21bdfa27df4f09bedb45f0efe557513c721b4823e8cf64238c895e95b"
-        in manifest
-    )
-    assert (
-        "starlink_plan_sha256: "
-        "d58748015c9157500aacc26161b1f487b77854a6f447f545f983ef9f8003e905"
-        in manifest
-    )
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest
+
+    for field, relative in {
+        "acquisition_test_runner_sha256": (
+            "hdl/library/starlink_pss_acquisition/run_tests.sh"
+        ),
+        "acquisition_hdl_readme_sha256": (
+            "hdl/library/starlink_pss_acquisition/README.md"
+        ),
+        "scheduler_evidence_test_sha256": (
+            "tests/test_starlink_overlap_scheduler_evidence.py"
+        ),
+        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
+    }.items():
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest

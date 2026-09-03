@@ -1,21 +1,47 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+HDL = ROOT / "hdl"
 ACQUISITION = ROOT / "hdl/library/starlink_pss_acquisition"
 MANIFEST = ROOT / "manifests/starlink-pss15-candidate-score-path-dnm-v1-source.yaml"
 REPORT = ROOT / "reports/STARLINK_PSS15_CANDIDATE_SCORE_PATH_V1.md"
 SUMMARY = ROOT / "reports/starlink-pss15-candidate-score-path-ooc-summary.txt"
 PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 HDL_COMMIT = "e12355ec0572c0637932fed0b3846c6a0b52a99c"
+FIRMWARE_COMMIT = "f8941474f5e10f4c2d3764b1f12695501daa9b44"
 SUMMARY_SHA256 = "7b40dbc2e4df1b0bc9adc91b8eac07ed388a57c2aad07bce29da2cb745be45a6"
 GUARD_MERGE_COMMIT = "e1966f5fe20370aa841e16143eb05c94152ea8eb"
 
 
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def _git_blob(commit: str, relative: str, cwd: Path = ROOT) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=cwd,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _checkpoint_blob(relative: str) -> bytes:
+    if relative.startswith("hdl/"):
+        return _git_blob(HDL_COMMIT, relative.removeprefix("hdl/"), HDL)
+    return _git_blob(FIRMWARE_COMMIT, relative)
+
+
+def _checkpoint_text(relative: str) -> str:
+    return _checkpoint_blob(relative).decode()
 
 
 def test_candidate_score_path_ooc_summary_is_frozen_and_passing() -> None:
@@ -55,18 +81,21 @@ def test_candidate_score_path_ooc_summary_is_frozen_and_passing() -> None:
 
 
 def test_candidate_score_path_contract_and_simulation_are_explicit() -> None:
-    qualifier = (ACQUISITION / "starlink_pss_ifft_qualifier.v").read_text()
-    energy_join = (ACQUISITION / "starlink_pss_energy_join.v").read_text()
-    score_lanes = (ACQUISITION / "starlink_pss_score_lanes.v").read_text()
-    score_path = (ACQUISITION / "starlink_pss_candidate_score_path.v").read_text()
-    runner = (ACQUISITION / "run_tests.sh").read_text()
-    integration_test = (
-        ACQUISITION / "tb/tb_starlink_pss_candidate_score_path.sv"
-    ).read_text()
-    integration_oracle = (
-        ACQUISITION / "tb/generate_candidate_score_path_vectors.py"
-    ).read_text()
-    score_oracle = (ACQUISITION / "tb/generate_score_pipeline_vectors.py").read_text()
+    prefix = "hdl/library/starlink_pss_acquisition/"
+    qualifier = _checkpoint_text(prefix + "starlink_pss_ifft_qualifier.v")
+    energy_join = _checkpoint_text(prefix + "starlink_pss_energy_join.v")
+    score_lanes = _checkpoint_text(prefix + "starlink_pss_score_lanes.v")
+    score_path = _checkpoint_text(prefix + "starlink_pss_candidate_score_path.v")
+    runner = _checkpoint_text(prefix + "run_tests.sh")
+    integration_test = _checkpoint_text(
+        prefix + "tb/tb_starlink_pss_candidate_score_path.sv"
+    )
+    integration_oracle = _checkpoint_text(
+        prefix + "tb/generate_candidate_score_path_vectors.py"
+    )
+    score_oracle = _checkpoint_text(
+        prefix + "tb/generate_score_pipeline_vectors.py"
+    )
 
     assert "localparam integer INVALID_PREFIX_RESULTS = 65" in qualifier
     assert "input_ifft_index != expected_ifft_index" in qualifier
@@ -208,31 +237,6 @@ def test_candidate_score_path_manifest_is_safe_and_binds_sources() -> None:
     assert "hardware_qualified: false" in manifest
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
-    historical_shared_files = {
-        "acquisition_test_runner_sha256",
-        "acquisition_hdl_readme_sha256",
-        "candidate_score_path_evidence_test_sha256",
-        "starlink_plan_sha256",
-    }
     for field, relative in bound_files.items():
-        if field in historical_shared_files:
-            continue
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
-    # These living files advance with later independently checkpointed slices.
-    # Preserve the candidate-score checkpoint's reviewed historical digests.
-    assert (
-        "acquisition_test_runner_sha256: "
-        "76dd8e7c6e416cfa83f1c7e3655bec0bfce4197d2f93dccbc38221d17a9246ce" in manifest
-    )
-    assert (
-        "acquisition_hdl_readme_sha256: "
-        "ba1fc66e0b3b7b298ad0ad4db777ba12e0122650175d8a6e00dba924a232ae84" in manifest
-    )
-    assert (
-        "candidate_score_path_evidence_test_sha256: "
-        "9ba381d60db9cd24cca03997f79ceb8d85ea80f4fde22c866cf61301d267a184" in manifest
-    )
-    assert (
-        "starlink_plan_sha256: "
-        "af9c68d7e7444b9b2da1e37767868e9d6a613a4af3dbcbdc662f9440b007944e" in manifest
-    )
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest

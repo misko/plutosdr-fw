@@ -1,19 +1,45 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+HDL = ROOT / "hdl"
 MANIFEST = ROOT / "manifests" / "starlink-pss15-raw-result-fifo-dnm-v1-source.yaml"
 REPORT = ROOT / "reports" / "STARLINK_PSS15_RAW_RESULT_FIFO_V1.md"
 SUMMARY = ROOT / "reports" / "starlink-pss15-raw-result-fifo-ooc-summary.txt"
 PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 HDL_COMMIT = "7cba0eac1cd83e29846b812caca0f0dfee2523d4"
+FIRMWARE_COMMIT = "bf2d345e1937bcb5febbfa99c969dd5e99be8359"
 SUMMARY_SHA256 = "8226e38e2c7739350173a335129cd2398e4eb038091fc7d1ea6312f70abe5a38"
 
 
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def _git_blob(commit: str, relative: str, cwd: Path = ROOT) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=cwd,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _checkpoint_blob(relative: str) -> bytes:
+    if relative.startswith("hdl/"):
+        return _git_blob(HDL_COMMIT, relative.removeprefix("hdl/"), HDL)
+    return _git_blob(FIRMWARE_COMMIT, relative)
+
+
+def _checkpoint_text(relative: str) -> str:
+    return _checkpoint_blob(relative).decode()
 
 
 def test_raw_result_fifo_ooc_summary_is_frozen_and_passing() -> None:
@@ -51,14 +77,10 @@ def test_raw_result_fifo_ooc_summary_is_frozen_and_passing() -> None:
 
 
 def test_raw_result_fifo_contract_and_simulation_are_explicit() -> None:
-    rtl = (
-        ROOT / "hdl/library/starlink_pss_acquisition/starlink_pss_raw_result_fifo.v"
-    ).read_text()
-    testbench = (
-        ROOT / "hdl/library/starlink_pss_acquisition/tb/"
-        "tb_starlink_pss_raw_result_fifo.sv"
-    ).read_text()
-    runner = (ROOT / "hdl/library/starlink_pss_acquisition/run_tests.sh").read_text()
+    prefix = "hdl/library/starlink_pss_acquisition/"
+    rtl = _checkpoint_text(prefix + "starlink_pss_raw_result_fifo.v")
+    testbench = _checkpoint_text(prefix + "tb/tb_starlink_pss_raw_result_fifo.sv")
+    runner = _checkpoint_text(prefix + "run_tests.sh")
 
     assert "parameter integer FIFO_DEPTH = 512" in rtl
     assert "localparam integer PAYLOAD_BITS = 123" in rtl
@@ -136,35 +158,6 @@ def test_raw_result_fifo_manifest_is_safe_and_binds_sources() -> None:
     assert "hardware_qualified: false" in manifest
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
-    historical_shared_files = {
-        "acquisition_test_runner_sha256",
-        "acquisition_hdl_readme_sha256",
-        "raw_result_fifo_evidence_test_sha256",
-        "starlink_plan_sha256",
-    }
     for field, relative in bound_files.items():
-        if field in historical_shared_files:
-            continue
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
-    # These living files advance with later independently checkpointed slices.
-    # Preserve the raw-FIFO checkpoint's reviewed historical digests instead
-    # of comparing those records to the current branch tips.
-    assert (
-        "acquisition_test_runner_sha256: "
-        "d8b1adb8152919f90b927c0026dd78da4293fee0356750272e225ec86063d688" in manifest
-    )
-    assert (
-        "acquisition_hdl_readme_sha256: "
-        "b571ce8e2b039b320b0a140ea4806f8c6daec0caac019a4b9fd9eabae79b0b6f"
-        in manifest
-    )
-    assert (
-        "raw_result_fifo_evidence_test_sha256: "
-        "c5bddbfe7d8211a5dc39eb6afeb49f445422e29b5088b9a7db2acd9267924cd3"
-        in manifest
-    )
-    assert (
-        "starlink_plan_sha256: "
-        "3871e0af0fe9c5de86b6d78cb1cd38c92e47cb3bf3bfa0e0901c2403db1fe33c"
-        in manifest
-    )
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest

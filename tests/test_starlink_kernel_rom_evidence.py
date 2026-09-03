@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import struct
+import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+HDL = ROOT / "hdl"
 ACQUISITION = ROOT / "hdl/library/starlink_pss_acquisition"
 MANIFEST = ROOT / "manifests/starlink-pss15-kernel-rom-dnm-v1-source.yaml"
 REPORT = ROOT / "reports/STARLINK_PSS15_KERNEL_ROM_V1.md"
@@ -12,14 +14,38 @@ SUMMARY = ROOT / "reports/starlink-pss15-kernel-rom-ooc-summary.txt"
 PLAN = ROOT / "STARLINK_PSS_15_30_60_PLAN.md"
 MEMORY = ACQUISITION / "tb/upper_edge_pss_kernel_q23.mem"
 HDL_COMMIT = "a7985ea3ab5b5b867caf8a34f72601c816874041"
+FIRMWARE_COMMIT = "e1a734e9ebd415387982b74aac335044629dc482"
 CANONICAL_SHA256 = "d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b"
 MEMORY_SHA256 = "7c89ff2a026f5fab91e655ab969ac07c11bf9715215173dadec07084527aea7d"
 SUMMARY_SHA256 = "a0129ef6fc12c441fd8562ddd24dd98399f0b25075157702ac88b4360b36d32d"
 GUARD_MERGE_COMMIT = "250fc46cc57f38aec6a8321990f84460fb73d749"
 
 
+def _sha256_bytes(payload: bytes) -> str:
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _sha256(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return _sha256_bytes(path.read_bytes())
+
+
+def _git_blob(commit: str, relative: str, cwd: Path = ROOT) -> bytes:
+    return subprocess.run(
+        ["git", "show", f"{commit}:{relative}"],
+        cwd=cwd,
+        check=True,
+        stdout=subprocess.PIPE,
+    ).stdout
+
+
+def _checkpoint_blob(relative: str) -> bytes:
+    if relative.startswith("hdl/"):
+        return _git_blob(HDL_COMMIT, relative.removeprefix("hdl/"), HDL)
+    return _git_blob(FIRMWARE_COMMIT, relative)
+
+
+def _checkpoint_text(relative: str) -> str:
+    return _checkpoint_blob(relative).decode()
 
 
 def _signed_q23(value: int) -> int:
@@ -27,7 +53,9 @@ def _signed_q23(value: int) -> int:
 
 
 def test_kernel_memory_has_exact_independent_identity() -> None:
-    raw = MEMORY.read_bytes()
+    raw = _checkpoint_blob(
+        "hdl/library/starlink_pss_acquisition/tb/upper_edge_pss_kernel_q23.mem"
+    )
     lines = raw.decode("ascii").splitlines()
     canonical = bytearray()
     coefficients: list[int] = []
@@ -90,11 +118,12 @@ def test_kernel_rom_ooc_summary_is_frozen_and_passing() -> None:
 
 
 def test_kernel_rom_contract_and_simulation_are_explicit() -> None:
-    rom = (ACQUISITION / "starlink_pss_kernel_rom.v").read_text()
-    verifier = (ACQUISITION / "tb/verify_upper_edge_pss_kernel.py").read_text()
-    testbench = (ACQUISITION / "tb/tb_starlink_pss_kernel_rom.sv").read_text()
-    runner = (ACQUISITION / "run_tests.sh").read_text()
-    ooc_gate = (ACQUISITION / "synthesize_kernel_rom_ooc.tcl").read_text()
+    prefix = "hdl/library/starlink_pss_acquisition/"
+    rom = _checkpoint_text(prefix + "starlink_pss_kernel_rom.v")
+    verifier = _checkpoint_text(prefix + "tb/verify_upper_edge_pss_kernel.py")
+    testbench = _checkpoint_text(prefix + "tb/tb_starlink_pss_kernel_rom.sv")
+    runner = _checkpoint_text(prefix + "run_tests.sh")
+    ooc_gate = _checkpoint_text(prefix + "synthesize_kernel_rom_ooc.tcl")
 
     assert 'parameter ROM_FILE = "upper_edge_pss_kernel_q23.mem"' in rom
     assert '(* rom_style = "block" *) reg [47:0] kernel_memory [0:511]' in rom
@@ -196,6 +225,7 @@ def test_kernel_rom_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_30_authorized: false" in manifest
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
-        assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+        digest = _sha256_bytes(_checkpoint_blob(relative))
+        assert f"{field}: {digest}" in manifest
     for field, digest in historical_shared_hashes.items():
         assert f"{field}: {digest}" in manifest

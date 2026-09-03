@@ -18,7 +18,6 @@ sys.path.insert(0, str(ROOT))
 from tests.starlink_oracle import (
     INSTALLED_CMODEL_ARCHIVE,
     XFFT_BITACC_SCHEMA,
-    XFFT_DATA_BITS,
     XFFT_SAMPLES,
     XFFT_VALID_OUTPUTS,
     XfftBitAccModel,
@@ -27,13 +26,15 @@ from tests.starlink_oracle import (
     quantize_q15,
     xfft_bitacc_match_scores,
 )
+from tests.starlink_oracle import xfft_bitacc as xfft_model
 from tests.starlink_oracle.xfft_bitacc import (
     _complex_to_fixed,
     _fixed_to_complex,
     _multiply_spectrum,
 )
 
-SCHEMA = "starlink-pss15-generated-xfft-pipeline-vectors-v1"
+SCHEMA = "starlink-pss15-generated-xfft-pipeline-vectors-v2"
+DEFAULT_DATA_BITS = 18
 SAMPLE_COUNT = 1406
 BLOCK_COUNT = 3
 SCORE_COUNT = BLOCK_COUNT * XFFT_VALID_OUTPUTS
@@ -59,7 +60,16 @@ def _write_lines(path: Path, lines: list[str]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="ascii")
 
 
-def generate(output_directory: Path) -> dict[str, object]:
+def generate(
+    output_directory: Path, *, data_bits: int = DEFAULT_DATA_BITS
+) -> dict[str, object]:
+    if data_bits < 17 or data_bits > 24:
+        raise ValueError("data_bits must use the XFFT 24-bit AXI component slot")
+    # The frozen v1 model exposes its width as module configuration. Keep the
+    # arithmetic implementation unchanged while selecting the measured width
+    # before either fixed or block-floating C-model state is constructed.
+    xfft_model.XFFT_DATA_BITS = data_bits
+    xfft_model.XFFT_FRACTION_BITS = data_bits - 1
     output_directory.mkdir(parents=True, exist_ok=True)
     coefficients = quantize_q15(projected_pss(15_000_000, "upper"))
     rng = np.random.default_rng(RANDOM_SEED)
@@ -76,7 +86,7 @@ def generate(output_directory: Path) -> dict[str, object]:
                 model,
                 first_sample_index=FIRST_SAMPLE_INDEX,
             )
-            kernel_complex = _fixed_to_complex(result.kernel_iq, XFFT_DATA_BITS)
+            kernel_complex = _fixed_to_complex(result.kernel_iq, data_bits)
             forward_blocks: list[np.ndarray] = []
             product_blocks: list[np.ndarray] = []
             inverse_blocks: list[np.ndarray] = []
@@ -92,15 +102,15 @@ def generate(output_directory: Path) -> dict[str, object]:
                 )
                 if forward_overflow:
                     raise RuntimeError(f"forward block {block_number} overflowed")
-                forward_iq = _complex_to_fixed(forward, XFFT_DATA_BITS)
+                forward_iq = _complex_to_fixed(forward, data_bits)
                 product = _multiply_spectrum(forward, kernel_complex)
-                product_iq = _complex_to_fixed(product, XFFT_DATA_BITS)
+                product_iq = _complex_to_fixed(product, data_bits)
                 inverse, inverse_exponent, inverse_overflow = (
                     model.block_floating_transform(product, direction=0)
                 )
                 if inverse_overflow:
                     raise RuntimeError(f"inverse block {block_number} overflowed")
-                inverse_iq = _complex_to_fixed(inverse, XFFT_DATA_BITS)
+                inverse_iq = _complex_to_fixed(inverse, data_bits)
                 forward_blocks.append(forward_iq)
                 product_blocks.append(product_iq)
                 inverse_blocks.append(inverse_iq)
@@ -119,9 +129,15 @@ def generate(output_directory: Path) -> dict[str, object]:
 
     payloads = {
         "samples_ci16.mem": _packed_hex_lines(samples, 16),
-        "forward_q23.mem": _packed_hex_lines(np.vstack(forward_blocks), 24),
-        "product_q23.mem": _packed_hex_lines(np.vstack(product_blocks), 24),
-        "inverse_q23.mem": _packed_hex_lines(np.vstack(inverse_blocks), 24),
+        f"forward_q{data_bits-1}.mem": _packed_hex_lines(
+            np.vstack(forward_blocks), data_bits
+        ),
+        f"product_q{data_bits-1}.mem": _packed_hex_lines(
+            np.vstack(product_blocks), data_bits
+        ),
+        f"inverse_q{data_bits-1}.mem": _packed_hex_lines(
+            np.vstack(inverse_blocks), data_bits
+        ),
         "forward_exponents.mem": [f"{value:02x}" for value in forward_exponents],
         "inverse_exponents.mem": [f"{value:02x}" for value in inverse_exponents],
         "scores_u8.mem": [f"{int(value):02x}" for value in result.stream.scores],
@@ -144,6 +160,7 @@ def generate(output_directory: Path) -> dict[str, object]:
         "sample_count": SAMPLE_COUNT,
         "block_count": BLOCK_COUNT,
         "fft_samples": XFFT_SAMPLES,
+        "data_bits": data_bits,
         "valid_scores_per_block": XFFT_VALID_OUTPUTS,
         "score_count": SCORE_COUNT,
         "first_sample_index": FIRST_SAMPLE_INDEX,
@@ -176,8 +193,9 @@ def generate(output_directory: Path) -> dict[str, object]:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("output_directory", type=Path)
+    parser.add_argument("--data-bits", type=int, default=DEFAULT_DATA_BITS)
     arguments = parser.parse_args()
-    generate(arguments.output_directory.resolve())
+    generate(arguments.output_directory.resolve(), data_bits=arguments.data_bits)
 
 
 if __name__ == "__main__":

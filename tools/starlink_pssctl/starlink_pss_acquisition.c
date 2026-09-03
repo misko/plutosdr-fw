@@ -34,7 +34,7 @@ static int map_read32(const struct pss_map_io *io, uint32_t offset,
 {
 	if (!io || !io->read32 || !value)
 		return fail(error, error_size, "invalid phase-map read arguments");
-	if (offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO || (offset & 3U))
+	if (offset > PSS_MAP_REG_DDC_SATURATION || (offset & 3U))
 		return fail(error, error_size,
 			"invalid phase-map read offset 0x%08" PRIx32, offset);
 	if (io->read32(io->context, offset, value) < 0)
@@ -48,7 +48,7 @@ static int map_write32(const struct pss_map_io *io, uint32_t offset,
 {
 	if (!io || !io->write32)
 		return fail(error, error_size, "invalid phase-map write arguments");
-	if (offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO || (offset & 3U))
+	if (offset > PSS_MAP_REG_DDC_SATURATION || (offset & 3U))
 		return fail(error, error_size,
 			"invalid phase-map write offset 0x%08" PRIx32, offset);
 	if (io->write32(io->context, offset, value) < 0)
@@ -97,7 +97,78 @@ static bool known_contract(uint32_t version, uint32_t capabilities)
 	return (version == PSS_MAP_VERSION_1_0 &&
 		capabilities == PSS_MAP_CAPABILITIES_1_0) ||
 		(version == PSS_MAP_VERSION_1_1 &&
-		 capabilities == PSS_MAP_CAPABILITIES_1_1);
+		 capabilities == PSS_MAP_CAPABILITIES_1_1) ||
+		(version == PSS_MAP_VERSION_1_2 &&
+		 capabilities == PSS_MAP_CAPABILITIES_1_2) ||
+		(version == PSS_MAP_VERSION_1_3 &&
+		 capabilities == PSS_MAP_CAPABILITIES_1_3);
+}
+
+static int require_ddc_contract(const struct pss_map_io *io,
+	struct pss_map_info *info, char *error, size_t error_size)
+{
+	static const uint32_t contract_30[8] = {
+		UINT32_C(0x73142604), UINT32_C(0x7077b036),
+		UINT32_C(0xf9213db3), UINT32_C(0x574e4a55),
+		UINT32_C(0x6fd424b9), UINT32_C(0x7a293843),
+		UINT32_C(0xbd6ee085), UINT32_C(0xc2bf33af),
+	};
+	static const uint32_t contract_60[8] = {
+		UINT32_C(0x8e807d15), UINT32_C(0xd5372b0a),
+		UINT32_C(0x9669d119), UINT32_C(0x0d899697),
+		UINT32_C(0xe7c2911a), UINT32_C(0x73ddfb23),
+		UINT32_C(0x095806c2), UINT32_C(0xa31de5b2),
+	};
+	const uint32_t *expected_contract;
+	uint32_t expected_rate, expected_config, expected_delay, expected_energy;
+	size_t index;
+
+	if (info->version == PSS_MAP_VERSION_1_2) {
+		expected_rate = 30U;
+		expected_config = UINT32_C(0x000f0203);
+		expected_delay = 7U;
+		expected_energy = UINT32_C(1073744004);
+		expected_contract = contract_30;
+	} else if (info->version == PSS_MAP_VERSION_1_3) {
+		expected_rate = 60U;
+		expected_config = UINT32_C(0x020f0403);
+		expected_delay = 21U;
+		expected_energy = UINT32_C(1073765335);
+		expected_contract = contract_60;
+	} else {
+		return 0;
+	}
+	if (map_read32(io, PSS_MAP_REG_INPUT_RATE_MSPS,
+			&info->input_rate_msps, error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_DDC_CONFIG, &info->ddc_config,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_DDC_GROUP_DELAY, &info->ddc_group_delay,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_COEFFICIENT_ENERGY,
+			&info->coefficient_energy, error, error_size) < 0)
+		return -1;
+	for (index = 0; index < 8U; ++index) {
+		if (map_read32(io, PSS_MAP_REG_DDC_CONTRACT_0 +
+				(uint32_t)(4U * index), &info->ddc_contract[index],
+				error, error_size) < 0)
+			return -1;
+	}
+	if (info->input_rate_msps != expected_rate ||
+	    info->ddc_config != expected_config ||
+	    info->ddc_group_delay != expected_delay ||
+	    info->coefficient_energy != expected_energy)
+		return fail(error, error_size,
+			"wrong DDC contract for ABI 0x%08" PRIx32
+			": rate=%" PRIu32 " config=0x%08" PRIx32
+			" delay=%" PRIu32 " energy=%" PRIu32,
+			info->version, info->input_rate_msps, info->ddc_config,
+			info->ddc_group_delay, info->coefficient_energy);
+	if (memcmp(info->ddc_contract, expected_contract,
+			sizeof(info->ddc_contract)) != 0)
+		return fail(error, error_size,
+			"wrong DDC oracle-contract hash for ABI 0x%08" PRIx32,
+			info->version);
+	return 0;
 }
 
 int pss_map_require_contract(const struct pss_map_io *io,
@@ -125,7 +196,9 @@ int pss_map_require_contract(const struct pss_map_io *io,
 			"wrong phase-map ID: expected 0x%08" PRIx32 ", got 0x%08" PRIx32,
 			PSS_MAP_IDENTIFICATION, destination->identification);
 	if (destination->version != PSS_MAP_VERSION_1_0 &&
-	    destination->version != PSS_MAP_VERSION_1_1)
+	    destination->version != PSS_MAP_VERSION_1_1 &&
+	    destination->version != PSS_MAP_VERSION_1_2 &&
+	    destination->version != PSS_MAP_VERSION_1_3)
 		return fail(error, error_size,
 			"unsupported phase-map version 0x%08" PRIx32,
 			destination->version);
@@ -141,6 +214,8 @@ int pss_map_require_contract(const struct pss_map_io *io,
 			destination->capabilities, destination->version);
 	if (!(destination->status & PSS_MAP_STATUS_CONTROL_EPOCH_LIVE))
 		return fail(error, error_size, "phase-map control epoch is not live");
+	if (require_ddc_contract(io, destination, error, error_size) < 0)
+		return -1;
 	return 0;
 }
 
@@ -197,7 +272,9 @@ static int read_snapshot_payload(const struct pss_map_io *io,
 	snapshot->map_start_index[1] = combine_u64(start_low[1], start_high[1]);
 	if (abi_version == PSS_MAP_VERSION_1_0)
 		return 0;
-	if (abi_version != PSS_MAP_VERSION_1_1)
+	if (abi_version != PSS_MAP_VERSION_1_1 &&
+	    abi_version != PSS_MAP_VERSION_1_2 &&
+	    abi_version != PSS_MAP_VERSION_1_3)
 		return fail(error, error_size,
 			"unsupported phase-map snapshot version 0x%08" PRIx32,
 			abi_version);
@@ -227,10 +304,15 @@ static int read_snapshot_payload(const struct pss_map_io *io,
 	    map_read32(io, PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO,
 			&candidate_levels, error, error_size) < 0)
 		return -1;
-	if (snapshot->health_flags & ~PSS_MAP_HEALTH_KNOWN_MASK)
+	if (snapshot->health_flags &
+	    ~((abi_version == PSS_MAP_VERSION_1_1) ?
+	      PSS_MAP_HEALTH_KNOWN_MASK_1_1 : PSS_MAP_HEALTH_KNOWN_MASK_DDC))
 		return fail(error, error_size,
 			"phase-map snapshot has unknown health flags 0x%08" PRIx32,
-			snapshot->health_flags & ~PSS_MAP_HEALTH_KNOWN_MASK);
+			snapshot->health_flags &
+			~((abi_version == PSS_MAP_VERSION_1_1) ?
+			  PSS_MAP_HEALTH_KNOWN_MASK_1_1 :
+			  PSS_MAP_HEALTH_KNOWN_MASK_DDC));
 	if (candidate_levels & UINT32_C(0xfc00fc00))
 		return fail(error, error_size,
 			"phase-map candidate FIFO snapshot has nonzero reserved bits");
@@ -356,10 +438,18 @@ static bool fault_counters_unchanged(const struct pss_map_snapshot *before,
 		return false;
 	if (before->abi_version == PSS_MAP_VERSION_1_0)
 		return true;
-	if (before->abi_version != PSS_MAP_VERSION_1_1)
+	if (before->abi_version != PSS_MAP_VERSION_1_1 &&
+	    before->abi_version != PSS_MAP_VERSION_1_2 &&
+	    before->abi_version != PSS_MAP_VERSION_1_3)
 		return false;
-	return (before->health_flags & PSS_MAP_HEALTH_CONTINUITY_MASK) ==
-		(after->health_flags & PSS_MAP_HEALTH_CONTINUITY_MASK) &&
+	return (before->health_flags &
+		((before->abi_version == PSS_MAP_VERSION_1_1) ?
+		 PSS_MAP_HEALTH_CONTINUITY_MASK_1_1 :
+		 PSS_MAP_HEALTH_CONTINUITY_MASK_DDC)) ==
+		(after->health_flags &
+		 ((before->abi_version == PSS_MAP_VERSION_1_1) ?
+		  PSS_MAP_HEALTH_CONTINUITY_MASK_1_1 :
+		  PSS_MAP_HEALTH_CONTINUITY_MASK_DDC)) &&
 		before->ingress_dropped_sample_count != UINT32_MAX &&
 		before->scheduler_gap_count != UINT32_MAX &&
 		before->scheduler_index_error_count != UINT32_MAX &&
