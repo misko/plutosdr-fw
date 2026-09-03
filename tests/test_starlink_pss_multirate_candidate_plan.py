@@ -486,4 +486,7 @@ def test_controller_candidate_evidence_is_sealed_and_non_authorizing() -> None:
     assert "rate_60_candidate_plan_sha256: d467eb2e" in text
     assert "controller_present_all_rates: true" in text
     assert "all_package_checksums_verified: true" in text
+    assert "ppu_offline_schema_dfu_builder_verdict: PASS_ALL_RATES" in text
+    assert "ppu_offline_builder_operation_written: false" in text
+    assert "ppu_offline_builder_hardware_accessed: false" in text
     assert "explicit_operator_authorization_required: true" in text

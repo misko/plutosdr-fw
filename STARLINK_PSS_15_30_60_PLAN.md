@@ -250,6 +250,11 @@ reports 1,677 passes and five hardware-gated skips, with only the unchanged
 pre-existing tandem `--cdc-report` count assertion failing.
 
 All three candidate checksum inventories and fail-closed policy fields pass.
+The exact pinned PPU checkout also parses every real candidate, verifies each
+artifact-index identity and complete DFU/FIT container, and constructs the
+AD9363A 1R1T operation contract in memory for the allocated serial. This used
+only a retained historical inventory as non-authorizing fixture data and wrote
+no operation plan.
 They are bound to clean PPU commit
 `5790a39705e9e598ef048ec773e0227cf9ac1808` and allocated serial
 `104000bac4950008230026001b440a003a`. The authoritative sealed record is

@@ -35,6 +35,10 @@ ppu_version: 0.1.0
 ppu_worktree_clean: true
 ppu_changed: false
 ppu_candidate_schema: pluto-plus-utils.release-candidate-plan.v2
+ppu_offline_schema_dfu_builder_verdict: PASS_ALL_RATES
+ppu_offline_builder_inventory: historical-fixture-only
+ppu_offline_builder_operation_written: false
+ppu_offline_builder_hardware_accessed: false
 
 qualification_manifest_sha256: a5d762108a4009d5807c2abb82ef7d2e08b3c11d308fb77e70f82c847bda4433
 qualification_manifest_bytes: 5690
