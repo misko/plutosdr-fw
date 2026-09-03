@@ -30,3 +30,4 @@ hdl a7985ea3ab5b5b867caf8a34f72601c816874041 starlink-pss15-kernel-rom-hdl-v1
 hdl c6b55bd5e9afb2da293b2b08fb36cc0609586868 starlink-pss15-iq-to-score-xfft-hdl-v1
 hdl af16286da82584421a1230c46aa70ed2db9dac7f starlink-pss15-iq-to-phase-map-xfft-hdl-v1
 hdl c85a88109ef68020c5d318e045b7ad91660a8960 starlink-pss15-iq-to-phase-map-xfft-hdl-v2
+hdl e2e1b87fccfb7efbeb3612e2a3b5a0fea919ba93 starlink-pss15-phase-map-axi-hdl-v1
