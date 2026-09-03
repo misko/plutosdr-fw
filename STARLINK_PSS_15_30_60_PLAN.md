@@ -92,6 +92,50 @@ full-band RFIC, or SSS qualification for these new images. Any such step still
 requires an explicit serial-scoped operation plan and user authorization; the
 primary target remains `104000bac4950008230026001b440a003a`.
 
+## 2026-09-03 staged remote package-build ledger
+
+The branch-only package campaign ran in the declared 15, then 30, then 60
+MS/s order. Each successful artifact was downloaded independently; its outer
+sidecar, complete `SHA256SUMS`, `PAYLOAD_SHA256SUMS`, and bitstream sidecar all
+verified. The extracted route was fully routed with zero routing errors, met
+setup and hold timing, passed the exact 272-row CDC inventory and all six
+bus-skew constraints, and carried `do_not_merge=true`,
+`persistent_flash_eligible=false`, and `hardware_accessed=false` provenance.
+
+| Rate | GitHub run | Firmware / HDL source | WNS / WHS | LUT / FF / BRAM / DSP | XSA SHA-256 | bit SHA-256 | DFU SHA-256 | uploaded-artifact SHA-256 |
+| --- | --- | --- | ---: | ---: | --- | --- | --- | --- |
+| 15 MS/s | `33776239805` | `dd398a44c7da` / `592a736fc8ee` (v1) | `+0.180 / +0.021 ns` | 11,741 / 17,487 / 46.0 / 30 | `05d6c64832e2ea2c3d91f38e3587a661198e1130eaa8a01387941f2e316d4475` | `90976c6609eb4a1d41375ca0a4743dcdd42008d004ccbb3162016be00a601930` | `dec27ea3b1c31a353f0c339c5cbfcb0fc0bae6e754052c51a08456efe3f5bdc4` | `dd07fbcd17eb4aee98b02b8cca74af09da4a3331df0ee6029b26a11ab4a81535` |
+| 30 MS/s | `33778480406` | `dd398a44c7da` / `592a736fc8ee` (v1) | `+0.258 / +0.009 ns` | 12,309 / 18,242 / 47.5 / 38 | `f3e69bd7351df705f192ec3ad058a757030fa0607c80995988f72932bc04c663` | `cb4ee5e1a0b564d69c260873f614b143a09bc28532eb708335b09c62538a64b5` | `51e6944e8e7deb28ab6568b0261b2f45d7c380870a76d9b4309af70f2b9f50d3` | `dade12e7b19d37d5a67f8e962399155d78af2f4022a6d0531f5d4c6d2ea67822` |
+| 60 MS/s | `33783129529` | `6e9bedd69eca` / `a3cc9592207e` (v2) | `+0.227 / +0.020 ns` | 13,176 / 18,984 / 52.5 / 46 | `435a2deee1604a4830d6fc10c26e00e23e4c35786210a8c32250a7ef7002ccbc` | `878cf524b514b8640245714d855a31f7dbd1d9a780c5b7451b446533a4633bd2` | `235ad75a3d5efb7e2d678e7671417bdcdae456f4ac5ac33228bdf219779a29b2` | `f8ab8af2b238d7fc4993099c3cdb966093ac3d057df59fccc49794cc5500be64` |
+
+The first 60 MS/s attempt, run `33780622277` at HDL v1, is retained as a
+negative result. Its source and functional gates passed, including the x4-DDC
+vendor-XFFT replay, but the default implementation flow failed setup timing at
+WNS `-0.149 ns`, TNS `-0.583 ns`, seven failing endpoints; hold still passed at
+WHS `+0.024 ns`. The failing paths were routing-dominated control paths in the
+shared XFFT adapter. They were not DDC arithmetic failures.
+
+HDL v2 changes no RTL or lower-rate flow. It selects Vivado
+`Performance_ExplorePostRoutePhysOpt` only when
+`STARLINK_PSS_RATE_MSPS=60`, preserving the default strategy at 15/30 MS/s and
+all non-60 builds. A controlled local implementation of the exact design first
+closed at WNS `+0.080 ns`, WHS `+0.050 ns`; the independent clean remote build
+then closed at the stronger values in the table. Its archived implementation
+script and log prove `Explore` opt/place/route and the post-route `Explore`
+physical-optimization pass. No constraint was relaxed and no prior checkpoint
+was reused. The passing 60 MS/s build's immutable locks are HDL
+`a3cc9592207e5600f617e5d82686c1c6671a8d67` tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2` and firmware
+`6e9bedd69eca33922fe05243775fcfe3b56d4094` tagged
+`starlink-rx-only-dnm-v1-source/firmware-pss15-30-60-build-gate-v3`.
+
+The successful vendor-XFFT replays retained the exact acquisition geometry:
+15 MS/s produced three complete blocks and 1,341 scores directly; 30 MS/s
+reduced 2,826 source samples to 1,406 through x2 DDC; 60 MS/s reduced 5,666 to
+1,406 through cascaded x4 DDC. Both reduced-rate runs found all three injected
+PSS peaks at score 255. These are complete offline package-build results, not
+radio, RF-bandwidth, live-PSS, persistent-flash, or SSS qualification.
+
 ## 2026-09-02 Stage-15 hardware checkpoints
 
 The corrected ABI 1.1 image has now completed one exact-radio RAM lifecycle and
@@ -1300,8 +1344,8 @@ Current status ledger:
   hashes recorded in the 2026-09-03 checkpoint above;
 - the branch-only staged build contract is now implemented under
   `starlink-pss-multirate-rx-only-dnm-v1-source.yaml`. It pins HDL
-  `592a736fc8ee` with immutable tag
-  `starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v1`, requires one
+  `a3cc9592207e` with immutable tag
+  `starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2`, requires one
   explicit build rate from `15`, `30`, or `60`, stamps a rate-specific v0.50
   identity, runs the four current acquisition/tracker RTL suites, and runs the
   selected Xilinx-XFFT replay. The package gate requires the exact reviewed
@@ -1314,8 +1358,12 @@ Current status ledger:
   60. The first 15 MS/s dispatch, GitHub run `33775930057`, passed source locks,
   preflight, and the existing HDL smoke tests, then stopped before the new RTL
   suites or Vivado because the clean runner PATH had no `uv`. The branch-only
-  workflow now installs pinned setup-uv v6.8.0 and uv 0.12.5; the corrected
-  remote package builds are still pending;
+  workflow now installs pinned setup-uv v6.8.0 and uv 0.12.5. Corrected runs
+  `33776239805` and `33778480406` produced independently verified 15/30 MS/s
+  packages. The first 60 MS/s run `33780622277` was correctly rejected at WNS
+  `-0.149 ns`; the narrowly scoped timing-strategy revision then produced and
+  independently verified the passing run `33783129529` at WNS `+0.227 ns` and
+  WHS `+0.020 ns`. The full ledger above is authoritative;
 - every new-image RAM boot, 30/60 MS/s radio-transport/injection/live-RF gate,
   full campaign-close, full-band RFIC qualification, and SSS gate: pending.
 

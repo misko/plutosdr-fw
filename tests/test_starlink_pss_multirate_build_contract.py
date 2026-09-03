@@ -43,6 +43,9 @@ def test_multirate_manifest_is_immutable_dnm_and_records_all_routes() -> None:
     ) in manifest
     assert "submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886" in manifest
     for rate in (15, 30, 60):
+        assert f"route_{rate}_github_run:" in manifest
+        assert f"route_{rate}_firmware_source:" in manifest
+        assert f"route_{rate}_hdl_source:" in manifest
         assert f"route_{rate}_wns_ns:" in manifest
         assert f"route_{rate}_whs_ns:" in manifest
         assert f"route_{rate}_xsa_sha256:" in manifest
