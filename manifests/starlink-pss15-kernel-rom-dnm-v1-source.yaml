@@ -1,0 +1,152 @@
+# Source contract for the selected upper-edge 512-bin PSS kernel ROM.
+#
+# DO NOT MERGE, RELEASE, BUILD INTO A RADIO IMAGE, OR PERSISTENTLY FLASH.
+# No generated XFFT pair, complete IQ replay, phase-map connection, RX-only
+# shell, or hardware qualification is included in this checkpoint.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+build_eligible: false
+radio_eligible: false
+radio_contacted_by_this_revision: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+supersedes_manifest: starlink-pss15-xfft-block-adapter-dnm-v1-source.yaml
+supersedes_reason: "package and independently verify the selected upper-edge PSS frequency-domain kernel in a timing-clean fail-closed block ROM without claiming generated-XFFT composition or IQ-to-score completion"
+
+qualification_radio_serial: 104000bac4950008230026001b440a003a
+qualification_runtime_target: ad9363a-1r1t
+qualification_utility_repo: https://github.com/misko/pluto-plus-utils.git
+qualification_utility_branch: main
+qualification_utility_main_commit: 4ca3451ae6de233b00eb31c38c7d4b29ba6b249a
+qualification_utility_changed: false
+
+submodule_buildroot: daf5ec3fe6b394337379394fa98a52815520d886
+submodule_hdl: a7985ea3ab5b5b867caf8a34f72601c816874041
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-kernel-rom-v1
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_sources_changed: true
+
+firmware_main_gitlink_guard_required: true
+firmware_main_gitlink_guard_pr: https://github.com/misko/plutosdr-fw/pull/91
+firmware_main_gitlink_guard_merge_commit: 250fc46cc57f38aec6a8321990f84460fb73d749
+firmware_main_gitlink_guard_all_five_checks_passed: true
+
+kernel_rom_schema: starlink-pss15-kernel-rom-v1
+kernel_selection: upper_edge
+kernel_bins: 512
+kernel_component_format: signed_q1_23
+kernel_memory_word_bits: 48
+kernel_memory_word_format: q_then_i
+kernel_min_component: -4727221
+kernel_max_component: 5434212
+kernel_canonical_serialization: little_endian_signed_i32_i_then_q_per_bin
+kernel_canonical_binary_sha256: d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b
+kernel_memory_text_sha256: 7c89ff2a026f5fab91e655ab969ac07c11bf9715215173dadec07084527aea7d
+kernel_open_standard_library_verifier: true
+kernel_xfft_bitaccurate_oracle_identity_matched: true
+kernel_carries_forward_iq: false
+kernel_composition_requires_paired_iq_register: true
+
+kernel_rom_expected_first_bin: 0
+kernel_rom_expected_last_bin: 511
+kernel_rom_tlast_bin: 511
+kernel_rom_block_stride_samples: 447
+kernel_rom_exponent_stable_within_block: true
+kernel_rom_block_identity_stable_within_block: true
+kernel_rom_malformed_input_published: false
+kernel_rom_fault_quarantine_sticky_until_flush: true
+kernel_rom_one_bin_per_clock: true
+
+kernel_rom_simulation_verdict: PASS
+acquisition_simulation_suite_tests: 15
+kernel_rom_valid_outputs_checked: 1539
+kernel_rom_complete_blocks_checked: 3
+kernel_rom_all_512_coefficients_replayed_per_complete_block: true
+kernel_rom_longest_uninterrupted_acceptance_cycles: 512
+kernel_rom_output_backpressure_stability_checked: true
+kernel_rom_fault_cases_checked: 5
+kernel_rom_index_fault_checked: true
+kernel_rom_tlast_fault_checked: true
+kernel_rom_exponent_fault_checked: true
+kernel_rom_block_identity_fault_checked: true
+kernel_rom_next_stride_fault_checked: true
+kernel_rom_flush_recovery_checked: true
+
+kernel_rom_ooc_verdict: PASS
+ooc_vivado_version: 2022.2
+ooc_part: xc7z010clg400-1
+ooc_clock_mhz: 100
+ooc_timing_scope: post_opt_unplaced
+ooc_setup_wns_ns: 3.634
+ooc_hold_whs_ns: 0.056
+ooc_methodology_violations: 0
+ooc_check_timing_nonzero_categories: 0
+ooc_total_luts: 88
+ooc_total_ffs: 229
+ooc_ramb36e1: 0
+ooc_ramb18e1: 2
+ooc_bram_tiles: 1.0
+ooc_nonzero_init_words: 128
+ooc_dsp48e1: 0
+ooc_initial_split_iq_lut_rom_rejected: true
+ooc_final_single_48bit_memory_read: true
+ooc_complete_route_required: true
+
+isolated_planning_total_luts: 8144
+isolated_planning_total_ffs: 12379
+isolated_planning_total_bram_tiles: 38.5
+isolated_planning_total_dsp48e1: 32
+isolated_planning_total_includes: two_xfft_cores_two_xfft_adapters_phase_map_overlap_scheduler_spectrum_product_energy_cache_composed_candidate_score_path_and_upper_edge_kernel_rom
+isolated_planning_total_excludes: generated_xfft_composition_control_ci16_conversion_paired_iq_register_phase_generator_axi_cdc_control_shell_debug_telemetry_and_route_margin
+isolated_planning_total_is_additive_ooc_only: true
+
+kernel_rom_rtl_sha256: fcd38a887311cf58a2acd15209cc3bc8008211ccde8ded68f925712ad6ac2439
+kernel_memory_sha256: 7c89ff2a026f5fab91e655ab969ac07c11bf9715215173dadec07084527aea7d
+kernel_verifier_sha256: cc6757fb054ed43f94b1cb17854997efe7eb13e1fdf9ef5c852fc8f7efd70a82
+kernel_rom_testbench_sha256: eb5cdab53464b7ee159f4580facdd1ee4cc039cdacdabbacf26332d66658e286
+acquisition_test_runner_sha256: 279b7029618f8703ab5a17753a1e8e3a12e774563ee2aeff9f55de2d2e596331
+acquisition_hdl_readme_sha256: f6dd7fd77ad26d49029999b669d9ee562eee007ad173fbb1b1e28d7a0ad0d972
+kernel_rom_ooc_runner_sha256: 2c7e3b1ff4261c61f5fbcf90ced0acb5c8490dd5f6af0bce364256269e91f74a
+kernel_rom_ooc_xdc_sha256: 5958f1af448c0c498301cac5388893f73532735bbd2010ec511d0ca252fc2cb5
+kernel_rom_ooc_tcl_sha256: cba5fd377d9cd920c72e1f1c9533edcd0c82ac5b4466035275a2ab5289a7a40b
+kernel_rom_ooc_summary_sha256: a0129ef6fc12c441fd8562ddd24dd98399f0b25075157702ac88b4360b36d32d
+xfft_adapter_historical_evidence_test_sha256: 73b428e3a41a454bf02bb82ac52484c085e673bdb6a26bb04671a4da529476ff
+kernel_rom_report_sha256: 5e84086cb603d2ac72bc9fbfec98ed9b7c3c58ab11809dce091ab12706f15710
+kernel_rom_evidence_test_sha256: d0162f2f710bad4ba3f511f1e12b31e819ebe66e1d2f670fb8f9afe91993dd4f
+starlink_plan_sha256: 1a69cc25d4e6d6439921cd41275adb7d509f3f016e99ea4eac6fa85a5e398ddb
+
+rtl_phase_map_implemented: true
+rtl_overlap_scheduler_implemented: true
+rtl_spectrum_product_implemented: true
+rtl_energy_cache_implemented: true
+rtl_score_divider_lane_implemented: true
+rtl_score_preprocessor_implemented: true
+rtl_raw_result_fifo_implemented: true
+rtl_ifft_qualifier_implemented: true
+rtl_energy_join_implemented: true
+rtl_two_lane_dispatch_implemented: true
+rtl_ordered_score_merge_implemented: true
+rtl_candidate_score_path_composed: true
+rtl_xfft_block_adapter_implemented: true
+rtl_xfft_forward_inverse_config_qualified: true
+rtl_coefficient_rom_packaged: true
+rtl_fft_instantiated: false
+rtl_raw_iq_to_score_complete: false
+rtl_phase_map_connected_to_score_path: false
+rtl_detector_integrated: false
+rx_dma_changed: false
+autonomous_recurrence_implemented: false
+hardware_qualified: false
+live_multiframe_pss_qualified: false
+over_the_air_starlink_pss_detected: false
+frame_alignment_qualified: false
+sss_qualified: false
+stage_30_authorized: false
+stage_60_authorized: false

@@ -291,6 +291,10 @@ Current control-plane evidence:
   five checks, and merged to firmware `main` as
   `68ef649d2fd76b62f437148a222f0881d50ea7f2` before this parent advanced to
   the XFFT-adapter pin;
+- guard PR #91 appended the exact hash-locked upper-edge kernel-ROM HDL pin,
+  passed all five checks, and merged to firmware `main` as
+  `250fc46cc57f38aec6a8321990f84460fb73d749` before this parent advanced to
+  the kernel-ROM pin;
 - firmware `main` strictly requires `experimental firmware merge guard` from
   GitHub Actions app `15368`, in addition to the four preserved checks; and
 - active no-bypass tag rulesets protect the
@@ -789,6 +793,34 @@ object `70142c3d...` to the unchanged gitlink
 `364b3dc7e770c3971d1f41a75c00e6cae76e2e6d`; the immutable older tag is not
 rewritten.
 
+The selected upper-edge PSS frequency-domain kernel is now packaged and
+source-locked at HDL commit `a7985ea3ab5b5b867caf8a34f72601c816874041`,
+tagged `starlink-rx-only-dnm-v1-source/hdl-pss15-kernel-rom-v1`. The 512
+complex signed-Q1.23 bins are packed as `{Q,I}` in one synchronous ROM image.
+An independent standard-library verifier freezes both the canonical
+little-endian signed-I/Q byte stream at SHA-256
+`d96c56b3d6bcd03419a57f23f3ce4929f1e478663119f5cb5ec9b14327b7ff2b`
+and the exact memory-file text at SHA-256
+`7c89ff2a026f5fab91e655ab969ac07c11bf9715215173dadec07084527aea7d`.
+The streaming boundary checks all 512 bin indexes, TLAST, exponent stability,
+absolute block identity, and the 447-sample next-block stride before emitting
+a coefficient; malformed input latches a fail-closed quarantine until common
+flush. Simulation replays all coefficients across three complete blocks,
+proves a 512-cycle continuous acceptance run and output stability under stalls,
+and injects five separately recovered sequence/metadata faults. The first
+split I/Q read form correctly failed the resource gate by duplicating the ROM
+in LUT fabric; the final single 48-bit read passes Vivado 2022.2 post-opt OOC
+at 100 MHz using 88 LUTs, 229 registers, exactly two initialized RAMB18E1s
+(one BRAM tile), and no DSPs, with setup WNS `+3.634 ns`, hold WHS `+0.056 ns`,
+zero methodology violations, and no nonempty `check_timing` category. The
+isolated planning subtotal is now 8,144 LUTs, 12,379 registers, 38.5 BRAM
+tiles, and 32 DSPs. The ROM is a coefficient/metadata sidecar and deliberately
+does not carry forward-XFFT I/Q; the composition gate must register the
+accepted complex bin beside its lookup and join the pair fail closed.
+Generated-XFFT instantiation, CI16-to-Q1.23 conversion, complete 447-score
+replay, phase-map connection, full route, and hardware qualification remain
+pending. No radio was contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -1131,8 +1163,8 @@ builds. Starlink code is not part of any PPU commit.
   frozen one-bit safety shift, signed nearest/ties-even rounding, saturation,
   overflow telemetry, transform metadata, elastic stalls, flush, 4,112-vector
   cross-language replay, eight-DSP inference, and 100 MHz post-opt OOC timing.
-  FFT binding, coefficient ROM packaging, energy, exponent restoration,
-  normalization, and score-to-map composition remain pending.
+  FFT binding, exponent restoration through the composed chain, and
+  score-to-map composition remain pending.
 - Complete for the exact input-energy checkpoint: every 66-sample CI16 window,
   38-bit rolling arithmetic, 2,048-result absolute-index retention, stale/future
   miss rejection, newest-write bypass, oldest-overwrite refusal, lookup stalls,
@@ -1165,8 +1197,21 @@ builds. Starlink code is not part of any PPU commit.
   exact exponent-aware ratio, two ordered divider lanes, 4,112-vector integer
   oracle replay, real-energy-cache one-block composition, bounded 344-entry
   measured occupancy, and positive 100 MHz post-opt OOC setup/hold timing. The
-  XFFT wrapper/controller, coefficient ROM, CI16 IQ-to-score composition,
-  phase-map connection, and full route remain pending.
+  generated-XFFT instantiation, CI16 IQ-to-score composition, phase-map
+  connection, and full route remain pending.
+- Complete for the strict generated-XFFT boundary: forward/inverse fixed
+  configuration, reset stretch, one-block identity, natural-order indexes,
+  TLAST, block-floating status/TUSER agreement, padding checks, same-cycle
+  malformed-output gating, hard-event quarantine, nonfatal halt telemetry,
+  mock-core replay, and positive 100 MHz post-opt OOC timing. Instantiating and
+  replaying the generated transform pair remains pending.
+- Complete for the selected upper-edge coefficient-ROM boundary: 512 exact
+  signed-Q1.23 complex bins, canonical binary and textual SHA-256 locks, one
+  synchronous 48-bit read, one-bin-per-clock elastic flow, bin/TLAST/exponent/
+  block/stride quarantine, three complete-frame replays, five fault classes,
+  one-BRAM-tile inference with nonzero initialization, and positive 100 MHz
+  post-opt OOC timing. Generated-XFFT composition and complete CI16-to-score
+  equivalence remain pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

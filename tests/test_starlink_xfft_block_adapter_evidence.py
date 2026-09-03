@@ -98,12 +98,6 @@ def test_xfft_block_adapter_manifest_is_safe_and_binds_sources() -> None:
             "hdl/library/starlink_pss_acquisition/tb/"
             "tb_starlink_pss_xfft_block_adapter.sv"
         ),
-        "acquisition_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
-        ),
-        "acquisition_hdl_readme_sha256": (
-            "hdl/library/starlink_pss_acquisition/README.md"
-        ),
         "xfft_block_adapter_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/run_xfft_block_adapter_ooc.sh"
         ),
@@ -123,10 +117,20 @@ def test_xfft_block_adapter_manifest_is_safe_and_binds_sources() -> None:
         "xfft_block_adapter_report_sha256": (
             "reports/STARLINK_PSS15_XFFT_BLOCK_ADAPTER_V1.md"
         ),
-        "xfft_block_adapter_evidence_test_sha256": (
-            "tests/test_starlink_xfft_block_adapter_evidence.py"
+    }
+    historical_shared_hashes = {
+        "acquisition_test_runner_sha256": (
+            "ab44c095326f8b57fba91ab67a1e2d3d8951d389dcd2d8e156ae334176682726"
         ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
+        "acquisition_hdl_readme_sha256": (
+            "6ef866a0caf63ca9dea6f70e10a277d1c3ba35b022a27f4801a02b3a7acc7ae8"
+        ),
+        "xfft_block_adapter_evidence_test_sha256": (
+            "a56ca4d989c56d1bec8f700930e042d9ddc20c23677a58c97d3734a540da1149"
+        ),
+        "starlink_plan_sha256": (
+            "289fe67191017d07da02dab83389a2467d7a06f9140f31f98d2f4b60ed00f571"
+        ),
     }
 
     assert "do_not_merge: true" in manifest
@@ -167,3 +171,5 @@ def test_xfft_block_adapter_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    for field, digest in historical_shared_hashes.items():
+        assert f"{field}: {digest}" in manifest
