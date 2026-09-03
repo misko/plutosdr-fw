@@ -208,8 +208,13 @@ comparison, and ASan/UBSan all pass. The current focused Python set reports 29
 passes. The superseding source graph is
 `manifests/starlink-pss-multirate-rx-only-dnm-v2-source.yaml`; v1 remains
 immutable for reproduction. Candidate preparation accepts both revisions but
-requires v2 packages to carry a source-identical v2 manifest and to have been
-built from the exact generator checkout.
+requires v2 packages to carry a source-identical v2 manifest, proves their
+package source is an ancestor of the clean generator checkout, and verifies
+that the manifest blob is byte-identical at that package commit. The v2 route
+bit hashes remain immutable reference-build evidence; the package's verified
+checksum graph binds each exact fresh Vivado bitstream because independently
+routed builds are not assumed to be byte-reproducible. Historical v1 candidate
+preparation retains its stricter exact-reference-bit requirement.
 
 The previously retained v1 RAM candidates remain valid historical route and
 packaging evidence, but they do not contain `starlink_pss_acqctl` and are no

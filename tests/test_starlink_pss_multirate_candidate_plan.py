@@ -39,6 +39,8 @@ def _package(
     unsafe_member: bool = False,
     revision: str = "v1",
     source_commit: str = SOURCE_COMMIT,
+    actual_bit: bytes = b"bit",
+    manifest_payload: bytes | None = None,
 ) -> tuple[Path, Path]:
     assert revision in {"v1", "v2"}
     dfu_name = (
@@ -58,7 +60,8 @@ def _package(
             "linux starlink-rx-only-dnm-v1-source/linux-v2\n"
             "u-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\n"
         ).encode(),
-        manifest_name: (
+        manifest_name: manifest_payload
+        or (
             "do_not_merge: true\n"
             "persistent_flash_eligible: false\n"
             f"allocated_radio_serial: {ALLOCATED_SERIAL}\n"
@@ -80,7 +83,7 @@ def _package(
             "persistent_flash_eligible=false\n"
         ).encode(),
         dfu_name: _dfu(),
-        "system_top.bit": b"bit",
+        "system_top.bit": actual_bit,
     }
     payload_names = (dfu_name, "system_top.bit")
     members["PAYLOAD_SHA256SUMS"] = "".join(
@@ -106,6 +109,48 @@ def _package(
     sidecar = Path(str(archive) + ".sha256")
     sidecar.write_text(f"{digest}  {archive.name}\n")
     return archive, sidecar
+
+
+def _manifest_from_archive(archive: Path, *, revision: str = "v2") -> bytes:
+    name = f"starlink-pss-multirate-rx-only-dnm-{revision}-source.yaml"
+    with tarfile.open(archive, mode="r:gz") as bundle:
+        stream = bundle.extractfile(name)
+        assert stream is not None
+        return stream.read()
+
+
+def _generator_repository(
+    root: Path, manifest_payload: bytes
+) -> tuple[Path, str, str]:
+    repository = root / "generator"
+    repository.mkdir()
+
+    def git(*arguments: str) -> str:
+        result = subprocess.run(
+            ("git", "-C", str(repository), *arguments),
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    git("init")
+    git("config", "user.name", "Candidate Test")
+    git("config", "user.email", "candidate@example.invalid")
+    git("remote", "add", "origin", "git@github.com:misko/plutosdr-fw.git")
+    manifests = repository / "manifests"
+    manifests.mkdir()
+    (manifests / "starlink-pss-multirate-rx-only-dnm-v2-source.yaml").write_bytes(
+        manifest_payload
+    )
+    git("add", "manifests")
+    git("commit", "-m", "package source")
+    package_commit = git("rev-parse", "HEAD")
+    (repository / "README").write_text("generator descendant\n")
+    git("add", "README")
+    git("commit", "-m", "generator fix")
+    generator_commit = git("rev-parse", "HEAD")
+    return repository, package_commit, generator_commit
 
 
 def _qualification_manifest(
@@ -171,15 +216,23 @@ def test_prepares_canonical_ppu_v2_plan_without_hardware(tmp_path: Path) -> None
 def test_prepares_controller_v2_only_from_identical_source_checkout(
     tmp_path: Path,
 ) -> None:
+    provisional, _ = _package(
+        tmp_path, revision="v2", actual_bit=b"fresh-vivado-route"
+    )
+    packaged_manifest = _manifest_from_archive(provisional)
+    repository, package_commit, generator_commit = _generator_repository(
+        tmp_path, packaged_manifest
+    )
     archive, sidecar = _package(
-        tmp_path, revision="v2", source_commit=GENERATOR_COMMIT
+        tmp_path,
+        revision="v2",
+        source_commit=package_commit,
+        actual_bit=b"fresh-vivado-route",
+        manifest_payload=packaged_manifest,
     )
     manifest_name = "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
     qualification = tmp_path / manifest_name
-    with tarfile.open(archive, mode="r:gz") as bundle:
-        stream = bundle.extractfile(manifest_name)
-        assert stream is not None
-        qualification.write_bytes(stream.read())
+    qualification.write_bytes(packaged_manifest)
     output = _output_parent(tmp_path) / "15-v2"
 
     result = prepare_candidate(
@@ -188,17 +241,103 @@ def test_prepares_controller_v2_only_from_identical_source_checkout(
         output,
         rate=15,
         ppu_commit=PPU_COMMIT,
-        generator_commit=GENERATOR_COMMIT,
+        generator_commit=generator_commit,
+        generator_repository=repository,
         qualification_manifest_path=qualification,
     )
 
     plan = json.loads((output / "candidate-plan-v2.json").read_bytes())
     index = json.loads((output / "candidate-artifact-index.json").read_bytes())
     assert result["verdict"] == "PASS_OFFLINE"
-    assert plan["source_commit"] == GENERATOR_COMMIT
+    assert plan["source_commit"] == package_commit
     assert plan["expected_runtime"]["firmware_version"].endswith("dnm-v2")
     assert index["source_manifest_name"] == manifest_name
     assert index["source_manifest_revision"] == "v2"
+    assert index["package_source_attestation"] == (
+        "clean-generator-descendant-identical-manifest-v1"
+    )
+
+
+def test_rejects_v2_package_source_outside_generator_history(tmp_path: Path) -> None:
+    provisional, _ = _package(tmp_path, revision="v2")
+    packaged_manifest = _manifest_from_archive(provisional)
+    repository, _, generator_commit = _generator_repository(
+        tmp_path, packaged_manifest
+    )
+    archive, sidecar = _package(
+        tmp_path,
+        revision="v2",
+        source_commit="7" * 40,
+        manifest_payload=packaged_manifest,
+    )
+    qualification = tmp_path / "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
+    qualification.write_bytes(packaged_manifest)
+    output = _output_parent(tmp_path) / "outside-history"
+
+    with pytest.raises(CandidatePlanError, match="not an ancestor"):
+        prepare_candidate(
+            archive,
+            sidecar,
+            output,
+            rate=15,
+            ppu_commit=PPU_COMMIT,
+            generator_commit=generator_commit,
+            generator_repository=repository,
+            qualification_manifest_path=qualification,
+        )
+
+    assert not output.exists()
+
+
+def test_rejects_v2_manifest_not_present_at_package_source(tmp_path: Path) -> None:
+    provisional, _ = _package(tmp_path, revision="v2")
+    source_manifest = _manifest_from_archive(provisional)
+    repository, package_commit, generator_commit = _generator_repository(
+        tmp_path, source_manifest
+    )
+    packaged_manifest = source_manifest + b"# post-source divergence\n"
+    archive, sidecar = _package(
+        tmp_path,
+        revision="v2",
+        source_commit=package_commit,
+        manifest_payload=packaged_manifest,
+    )
+    qualification = tmp_path / "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
+    qualification.write_bytes(packaged_manifest)
+    output = _output_parent(tmp_path) / "manifest-divergence"
+
+    with pytest.raises(CandidatePlanError, match="not byte-identical"):
+        prepare_candidate(
+            archive,
+            sidecar,
+            output,
+            rate=15,
+            ppu_commit=PPU_COMMIT,
+            generator_commit=generator_commit,
+            generator_repository=repository,
+            qualification_manifest_path=qualification,
+        )
+
+    assert not output.exists()
+
+
+def test_v1_still_rejects_non_reference_bitstream(tmp_path: Path) -> None:
+    archive, sidecar = _package(tmp_path, actual_bit=b"fresh-vivado-route")
+    qualification = _qualification_manifest(tmp_path)
+    output = _output_parent(tmp_path) / "v1-bit-mismatch"
+
+    with pytest.raises(CandidatePlanError, match="provenance, manifest"):
+        prepare_candidate(
+            archive,
+            sidecar,
+            output,
+            rate=15,
+            ppu_commit=PPU_COMMIT,
+            generator_commit=GENERATOR_COMMIT,
+            qualification_manifest_path=qualification,
+        )
+
+    assert not output.exists()
 
 
 def test_rejects_archive_sidecar_mismatch_before_output(tmp_path: Path) -> None:

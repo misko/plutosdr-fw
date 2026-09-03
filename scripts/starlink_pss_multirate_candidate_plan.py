@@ -127,6 +127,48 @@ def _verify_clean_source_repository(
     return selected
 
 
+def _verify_v2_package_source(
+    repository: Path,
+    *,
+    package_commit: str,
+    generator_commit: str,
+    manifest_name: str,
+    manifest_payload: bytes,
+) -> None:
+    """Bind a v2 package to an immutable ancestor of the generator checkout."""
+
+    selected = repository.absolute()
+    if HEX_40.fullmatch(package_commit) is None:
+        raise CandidatePlanError("v2 package source is not one 40-hex commit")
+
+    def git_bytes(
+        *arguments: str, check: bool = True
+    ) -> subprocess.CompletedProcess[bytes]:
+        try:
+            return subprocess.run(
+                ("git", "-C", str(selected), *arguments),
+                check=check,
+                capture_output=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise CandidatePlanError(
+                "v2 package source cannot be attested from the generator repository"
+            ) from error
+
+    ancestry = git_bytes(
+        "merge-base", "--is-ancestor", package_commit, generator_commit, check=False
+    )
+    if ancestry.returncode != 0:
+        raise CandidatePlanError(
+            "v2 package source is not an ancestor of the generator commit"
+        )
+    blob = git_bytes("show", f"{package_commit}:manifests/{manifest_name}").stdout
+    if blob != manifest_payload:
+        raise CandidatePlanError(
+            "v2 packaged manifest is not byte-identical at its package source commit"
+        )
+
+
 def _parse_sums(payload: bytes, *, label: str) -> dict[str, str]:
     try:
         lines = payload.decode("ascii").splitlines()
@@ -355,6 +397,7 @@ def prepare_candidate(
     rate: int,
     ppu_commit: str,
     generator_commit: str,
+    generator_repository: Path = ROOT,
     qualification_manifest_path: Path = DEFAULT_QUALIFICATION_MANIFEST,
 ) -> dict[str, Any]:
     """Verify and prepare one archive without performing any hardware access."""
@@ -431,13 +474,35 @@ def prepare_candidate(
     expected_source = qualification_manifest.get(f"route_{rate}_firmware_source")
     expected_bit = qualification_manifest.get(f"route_{rate}_bit_sha256")
     firmware_version = versions.get("device-fw", "")
-    source_identity_matches = (
-        source_commit == expected_source
-        if source_revision == "v1"
-        else source_commit == generator_commit
-        and qualification_path.name == source_manifest_name
-        and packaged_manifest_payload == qualification_manifest_payload
-    )
+    if source_revision == "v2":
+        _verify_clean_source_repository(
+            generator_repository,
+            commit=generator_commit,
+            expected_slug=FIRMWARE_REPOSITORY,
+            label="generator",
+        )
+        _verify_v2_package_source(
+            generator_repository,
+            package_commit=source_commit,
+            generator_commit=generator_commit,
+            manifest_name=source_manifest_name,
+            manifest_payload=packaged_manifest_payload,
+        )
+    source_identity_matches = source_commit == expected_source
+    route_identity_matches = expected_bit == member_sums.get("system_top.bit")
+    if source_revision == "v2":
+        # v2 route hashes are immutable reference-build evidence. A fresh
+        # Vivado route can differ byte-for-byte while the locked HDL and routed
+        # timing remain equivalent, so the package checksum graph binds the
+        # exact rebuilt bitstream instead.
+        source_identity_matches = (
+            qualification_path.name == source_manifest_name
+            and packaged_manifest_payload == qualification_manifest_payload
+        )
+        route_identity_matches = (
+            HEX_40.fullmatch(expected_source or "") is not None
+            and HEX_64.fullmatch(expected_bit or "") is not None
+        )
     if (
         HEX_40.fullmatch(source_commit) is None
         or not source_identity_matches
@@ -452,7 +517,7 @@ def prepare_candidate(
         or qualification_manifest.get("persistent_flash_eligible") != "false"
         or qualification_manifest.get("allocated_radio_serial") != ALLOCATED_SERIAL
         or qualification_manifest.get("starlink_pss_supported_rates_msps") != "15,30,60"
-        or expected_bit != member_sums.get("system_top.bit")
+        or not route_identity_matches
         or firmware_version
         != f"v0.50-plutoplus-starlink-pss-{rate}m-rx-only-dnm-{source_revision}"
         or versions.get("hdl") != packaged_manifest.get("versions_hdl")
@@ -504,6 +569,11 @@ def prepare_candidate(
             "firmware_version": firmware_version,
             "hardware_accessed": False,
             "generator_source_commit": generator_commit,
+            "package_source_attestation": (
+                "exact-reference-route-v1"
+                if source_revision == "v1"
+                else "clean-generator-descendant-identical-manifest-v1"
+            ),
             "persistent_flash_eligible": False,
             "ppu_source_commit": ppu_commit,
             "rate_msps": rate,
@@ -652,6 +722,7 @@ def main(argv: list[str] | None = None) -> int:
             rate=args.rate,
             ppu_commit=args.ppu_commit,
             generator_commit=args.generator_commit,
+            generator_repository=ROOT,
             qualification_manifest_path=args.qualification_manifest,
         )
     except (OSError, ValueError, CandidatePlanError, tarfile.TarError) as error:
