@@ -821,6 +821,31 @@ Generated-XFFT instantiation, CI16-to-Q1.23 conversion, complete 447-score
 replay, phase-map connection, full route, and hardware qualification remain
 pending. No radio was contacted.
 
+The complete source-only 15 MS/s IQ-to-normalized-score path is now
+implemented and source-locked at HDL commit
+`c6b55bd5e9afb2da293b2b08fb36cc0609586868`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-iq-to-score-xfft-v1`. It fans the
+continuous CI16 stream to the overlap scheduler and exact energy cache,
+converts Q1.15 to Q1.23, instantiates the actual regenerated forward/inverse
+XFFT v9.1 pair, aligns every forward bin with the hash-locked kernel, preserves
+both block exponents, and emits all 447 exact normalized timing scores per
+block. A three-block Vivado behavioral replay checks every one of 1,536
+forward bins, products, and inverse bins plus all 1,341 final scores; three
+inserted PSS controls at relative starts 100, 447, and 1,000 each score 255.
+It also exercises output stalls, observes a bounded 345-of-512 result-FIFO
+peak, and proves registered global fault quarantine plus disable/re-enable
+recovery. The first full synthesis exposed a 19-level global ready/fault path
+at `-3.933 ns`; separating local same-cycle suppression from registered global
+quarantine closes the Vivado 2022.2 100 MHz post-opt OOC gate at setup WNS
+`+0.099 ns`, hold WHS `+0.011 ns`, zero methodology violations, and no nonempty
+`check_timing` category. The linked two-XFFT composition uses 7,340 LUTs,
+11,362 registers, 18.5 BRAM tiles, and 32 DSPs before the phase map. Adding the
+separately qualified phase-map slice yields a planning-only 7,882 LUTs, 12,084
+registers, 38.5 BRAM tiles, and 32 DSPs. Phase-map wiring, RX shell integration,
+full placement/routing, and hardware qualification remain pending. Detailed
+evidence is in `reports/STARLINK_PSS15_IQ_TO_SCORE_XFFT_V1.md`; no radio was
+contacted.
+
 The existing wide-arithmetic repeated-delay diagnostic core has these Vivado
 2022.2 post-synthesis out-of-context results at a common 16.666 ns constraint.
 They prove neither exact-PSS sensitivity nor full-design routing closure:
@@ -1212,6 +1237,15 @@ builds. Starlink code is not part of any PPU commit.
   one-BRAM-tile inference with nonzero initialization, and positive 100 MHz
   post-opt OOC timing. Generated-XFFT composition and complete CI16-to-score
   equivalence remain pending.
+- Complete for the generated-XFFT IQ-to-score composition: continuous CI16
+  fanout, exact Q1.15-to-Q1.23 conversion, two actual regenerated XFFT v9.1
+  instances, paired forward-bin/kernel lookup, exponent preservation, exact
+  energy association, three-block checking of 1,536 forward/product/inverse
+  bins and 1,341 final scores, boundary-position PSS controls, backpressure,
+  registered global quarantine/recovery, linked resource accounting, and
+  positive 100 MHz post-opt OOC setup/hold timing. The narrow OOC margins make
+  complete placement/routing mandatory; phase-map wiring, RX-shell integration,
+  firmware packaging, and hardware qualification remain pending.
 - Freeze native and edge-projected templates, CI16 quantization, capture hashes,
   CFO grid, tie rules, cadence rules, and expected output for the real replay.
 - Reproduce the known 750 Hz lattice and robust exact-template peaks; run

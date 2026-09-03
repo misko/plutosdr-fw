@@ -134,12 +134,6 @@ def test_kernel_rom_manifest_is_safe_and_binds_sources() -> None:
         "kernel_rom_testbench_sha256": (
             "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_kernel_rom.sv"
         ),
-        "acquisition_test_runner_sha256": (
-            "hdl/library/starlink_pss_acquisition/run_tests.sh"
-        ),
-        "acquisition_hdl_readme_sha256": (
-            "hdl/library/starlink_pss_acquisition/README.md"
-        ),
         "kernel_rom_ooc_runner_sha256": (
             "hdl/library/starlink_pss_acquisition/run_kernel_rom_ooc.sh"
         ),
@@ -156,10 +150,20 @@ def test_kernel_rom_manifest_is_safe_and_binds_sources() -> None:
             "tests/test_starlink_xfft_block_adapter_evidence.py"
         ),
         "kernel_rom_report_sha256": "reports/STARLINK_PSS15_KERNEL_ROM_V1.md",
-        "kernel_rom_evidence_test_sha256": (
-            "tests/test_starlink_kernel_rom_evidence.py"
+    }
+    historical_shared_hashes = {
+        "acquisition_test_runner_sha256": (
+            "279b7029618f8703ab5a17753a1e8e3a12e774563ee2aeff9f55de2d2e596331"
         ),
-        "starlink_plan_sha256": "STARLINK_PSS_15_30_60_PLAN.md",
+        "acquisition_hdl_readme_sha256": (
+            "f6dd7fd77ad26d49029999b669d9ee562eee007ad173fbb1b1e28d7a0ad0d972"
+        ),
+        "kernel_rom_evidence_test_sha256": (
+            "d0162f2f710bad4ba3f511f1e12b31e819ebe66e1d2f670fb8f9afe91993dd4f"
+        ),
+        "starlink_plan_sha256": (
+            "1a69cc25d4e6d6439921cd41275adb7d509f3f016e99ea4eac6fa85a5e398ddb"
+        ),
     }
 
     assert "do_not_merge: true" in manifest
@@ -193,3 +197,5 @@ def test_kernel_rom_manifest_is_safe_and_binds_sources() -> None:
     assert "stage_60_authorized: false" in manifest
     for field, relative in bound_files.items():
         assert f"{field}: {_sha256(ROOT / relative)}" in manifest
+    for field, digest in historical_shared_hashes.items():
+        assert f"{field}: {digest}" in manifest

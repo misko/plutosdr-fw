@@ -1,0 +1,72 @@
+{
+  "acquisition_clock_hz": 100000000,
+  "block_count": 3,
+  "fft_samples": 512,
+  "files": {
+    "forward_exponents.mem": {
+      "lines": 3,
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    "forward_q23.mem": {
+      "lines": 1536,
+      "sha256": "92240f871d3d59e66923e412d7d933fe9938438c6eabdd005182d2e8daf109cc"
+    },
+    "inverse_exponents.mem": {
+      "lines": 3,
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    "inverse_q23.mem": {
+      "lines": 1536,
+      "sha256": "3fdebbc406d6cc3e9bfdc199820416c56fcde640777ee7cd7da0bc75078f8884"
+    },
+    "product_q23.mem": {
+      "lines": 1536,
+      "sha256": "63f6c4ba900b25d5cfc9ec8161765b8e9776e6711eedc94edef2d43d46a92615"
+    },
+    "samples_ci16.mem": {
+      "lines": 1406,
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    "scores_u8.mem": {
+      "lines": 1341,
+      "sha256": "a8c5596bdea4f7a618082467e222c6088d589174bb69f96238df83def2ce02a0"
+    }
+  },
+  "first_sample_index": 1000000,
+  "forward_block_exponents": [
+    5,
+    4,
+    4
+  ],
+  "installed_cmodel_archive": "/opt/Xilinx/Vivado/2022.2/data/ip/xilinx/xfft_v9_1/cmodel/xfft_v9_1_bitacc_cmodel_lin64.zip",
+  "inverse_block_exponents": [
+    3,
+    4,
+    4
+  ],
+  "nonzero_score_count": 1071,
+  "oracle_schema": "starlink-xfft-bitacc-acquisition-v1",
+  "pss_scores": [
+    255,
+    255,
+    255
+  ],
+  "pss_starts_absolute": [
+    1000100,
+    1000447,
+    1001000
+  ],
+  "pss_starts_relative": [
+    100,
+    447,
+    1000
+  ],
+  "random_seed": 1438078,
+  "sample_count": 1406,
+  "sample_rate_hz": 15000000,
+  "schema": "starlink-pss15-generated-xfft-pipeline-vectors-v1",
+  "score_count": 1341,
+  "score_maximum": 255,
+  "score_minimum": 0,
+  "valid_scores_per_block": 447
+}
