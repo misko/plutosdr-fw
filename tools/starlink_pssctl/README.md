@@ -163,3 +163,64 @@ This controller and FPGA belong only on
 `codex/starlink-rx-only-do-not-merge`. They must not be merged into HDL or
 firmware main. Generic PPU radio-mode support remains separate and mergeable to
 PPU main.
+
+## Receipt-bound hardware probe
+
+`scripts/starlink_pss_hardware_probe.py` closes the gap between a passing PPU
+RX-only v2 RAM receipt and one bounded acquisition-controller measurement. The
+Starlink-specific probe remains on `codex/starlink-rx-only-do-not-merge`; it
+imports an exact clean PPU checkout for its serial-scoped radio/route locks,
+USB target revalidation, RX-only runtime attestation, and SSH policy. It accepts
+only serial `104000bac4950008230026001b440a003a`, runtime target
+`ad9363a-1r1t`, and the 15, 30, or 60 MS/s v2 candidate matching the plan.
+
+The workflow has three deliberately separate commands:
+
+1. `plan` is offline. It validates the byte-exact candidate plan, reviewed PPU
+   operation plan, and passing/cleaned RAM receipt, then writes a new mode-0600
+   probe plan into an owned mode-0700 directory.
+2. `execute` requires the plan's exact confirmation phrase. It reacquires PPU's
+   locks and `/32` route, reattests the same RX-only candidate, opens only that
+   radio's concrete `usb:bus.device.5` IIO context, sets and reads back the PHY
+   and capture rates, proves factor-one capture, caps AD9363A RF bandwidth at
+   20 MHz, and runs `info`, `snapshot`, `candidate`, `snapshot`, `info`. The
+   controller must start and finish disabled and may emit only a
+   `candidate_measurement_only` result—never a threshold or frame-lock claim.
+3. `verify` is offline. It validates the resulting receipt against the exact
+   plan bytes. A separate PPU `candidate-ram recover` remains mandatory after
+   every attempted execution, including a passing one.
+
+Example after a separately authorized PPU RAM lifecycle has produced its three
+private handoff files:
+
+```sh
+PPU_PY=/home/mouse9911/gits/pluto-plus-utils-starlink-qualification/.venv/bin/python
+PPU_REPO=/home/mouse9911/gits/pluto-plus-utils-starlink-qualification
+PRIVATE=/private/starlink-pss/15msps
+
+"$PPU_PY" scripts/starlink_pss_hardware_probe.py plan \
+  --ppu-repository "$PPU_REPO" \
+  --ppu-commit 5790a39705e9e598ef048ec773e0227cf9ac1808 \
+  --candidate-plan "$PRIVATE/candidate-plan.json" \
+  --operation-plan "$PRIVATE/operation-plan.json" \
+  --ram-receipt "$PRIVATE/ram-receipt.json" \
+  --rate 15 --rf-bandwidth-hz 15000000 \
+  --receipt "$PRIVATE/probe-receipt.json" \
+  --output "$PRIVATE/probe-plan.json"
+
+"$PPU_PY" scripts/starlink_pss_hardware_probe.py execute \
+  --plan "$PRIVATE/probe-plan.json" \
+  --ssh-password-file /private/pluto-password \
+  --state-root /private/ppu-state \
+  --confirm "RUN STARLINK PSS CANDIDATE 104000bac4950008230026001b440a003a 15 MSPS" \
+  --output "$PRIVATE/probe-receipt.json"
+
+"$PPU_PY" scripts/starlink_pss_hardware_probe.py verify \
+  --plan "$PRIVATE/probe-plan.json" \
+  --receipt "$PRIVATE/probe-receipt.json"
+```
+
+The probe never invokes DFU, loads RAM, writes QSPI, or changes the radio
+personality. At 30 and 60 MS/s on the physical AD9363A, the maximum requested
+RF bandwidth remains 20 MHz; those stages qualify sample-rate/FPGA processing
+before any physically wider-band AD9361/AD9364 campaign.

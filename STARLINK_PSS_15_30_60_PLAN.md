@@ -1347,6 +1347,36 @@ candidate must be rebuilt from a later source-locked exact-engine integration
 commit with the diagnostic monitor compiled out, then consumed by the merged
 PPU v2 RAM-qualification path.
 
+### 2026-09-03 receipt-bound hardware-probe checkpoint
+
+The next live acquisition measurement now has a branch-only, fail-closed
+harness in `scripts/starlink_pss_hardware_probe.py`. Its offline `plan` command
+accepts only a byte-exact PPU RX-only v2 bundle ending in a passing, cleaned RAM
+receipt for serial `104000bac4950008230026001b440a003a`; `execute` revalidates
+that bundle and the clean pinned PPU checkout, takes PPU's shared radio and route
+locks, reattests the exact `ad9363a-1r1t` candidate, and uses only the concrete
+USB-IIO context from the reviewed operation plan.
+
+For each stage it programs the AD936x source before the FPGA capture child,
+requires exact PHY/capture rate readbacks and the advertised `[rate, rate/8]`
+capture alternatives, proves the FPGA decimator is bypassed, and limits the
+physical AD9363A RF bandwidth to 20 MHz. It then runs a fixed
+`info -> snapshot -> candidate -> snapshot -> info` controller sequence. Both
+info records must show the engine disabled; the candidate must be continuous
+and fault-free and must explicitly contain neither a threshold decision nor a
+frame-lock claim. RX rate/bandwidth values and the host route are restored
+before a new private receipt is emitted. The harness cannot invoke DFU, load a
+RAM image, write QSPI, or perform recovery; the ordinary PPU
+`candidate-ram recover` remains the mandatory next operation.
+
+The 18-test offline suite covers all three staged rates, bandwidth and serial
+policy rejection, canonical exclusive private files, exact IIO/controller
+sequence and restoration, a non-bypassed FPGA decimator, forbidden lock claims,
+a controller left enabled, partial-configuration cleanup order, pass/failure
+receipts, route release, and offline receipt verification. This checkpoint
+touched no radio or USB/IIO context. It does not authorize a RAM lifecycle,
+prove Starlink PSS, or advance any 15/30/60 live-signal gate.
+
 ## RX-only shell and common qualification gates
 
 The experimental shell compiles `MODE_1R1T=1`, disables the AD936x FPGA DAC

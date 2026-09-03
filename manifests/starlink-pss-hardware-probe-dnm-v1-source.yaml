@@ -1,0 +1,57 @@
+# Immutable source graph for the receipt-bound 15/30/60 MS/s acquisition
+# measurement harness.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This manifest records offline
+# source only. It authorizes no USB/IIO access, RAM lifecycle, radio mutation,
+# Starlink PSS detection claim, frame lock, SSS result, or rate advancement.
+
+schema: plutosdr-fw.starlink-pss-hardware-probe-source
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+pss_detected: false
+frame_lock_qualified: false
+sss_qualified: false
+
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9363a-1r1t
+supported_sample_rates_msps: 15-30-60
+ad9363a_maximum_requested_rf_bandwidth_hz: 20000000
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: cac82b1e7e7116bb6256447e5748eedac5cc0689
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss-hardware-probe-v1
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 5790a39705e9e598ef048ec773e0227cf9ac1808
+
+candidate_evidence_path: manifests/starlink-pss-multirate-ram-candidates-dnm-v2-offline.yaml
+candidate_evidence_sha256: 5fffd38e84800c5a55b7a4ae516adcefe0c0928ead2a6b4bb0d634b242cd473e
+
+probe_script_path: scripts/starlink_pss_hardware_probe.py
+probe_script_sha256: 7e91e36c9dd37022b7f6d45c17d5caa3d35f3c58aa5f19c652a9c840497f17e6
+probe_test_path: tests/test_starlink_pss_hardware_probe.py
+probe_test_sha256: 9508bf038f396133a2f075b193838134a62c050d41e72225dd2cdee521ecc113
+controller_readme_path: tools/starlink_pssctl/README.md
+controller_readme_sha256: a938c55c286b8c2c5123b7b7850c6fc5cdf7656557209f6ef6556be33be70f85
+plan_path: STARLINK_PSS_15_30_60_PLAN.md
+plan_sha256: d8508ea1202f183938c42f62120f50aaa96fa00f978717682c53d39493cad279
+
+plan_command_hardware_access: false
+execute_requires_explicit_confirmation: true
+execute_requires_passing_ppu_ram_receipt: true
+execute_reuses_ppu_radio_and_route_locks: true
+execute_loads_volatile_ram: false
+execute_writes_qspi: false
+execute_changes_radio_personality: false
+execute_claim_scope: candidate_measurement_only
+execute_requires_engine_disabled_before_and_after: true
+execute_restores_rx_attributes: true
+execute_releases_host_route: true
+separate_ppu_ram_recovery_required: true
+
+offline_test_verdict: PASS
+offline_test_count: 18
