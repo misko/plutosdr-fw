@@ -34,7 +34,7 @@ static int map_read32(const struct pss_map_io *io, uint32_t offset,
 {
 	if (!io || !io->read32 || !value)
 		return fail(error, error_size, "invalid phase-map read arguments");
-	if (offset > PSS_MAP_REG_SNAPSHOT_REQUEST_OVERRUN || (offset & 3U))
+	if (offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO || (offset & 3U))
 		return fail(error, error_size,
 			"invalid phase-map read offset 0x%08" PRIx32, offset);
 	if (io->read32(io->context, offset, value) < 0)
@@ -48,7 +48,7 @@ static int map_write32(const struct pss_map_io *io, uint32_t offset,
 {
 	if (!io || !io->write32)
 		return fail(error, error_size, "invalid phase-map write arguments");
-	if (offset > PSS_MAP_REG_SNAPSHOT_REQUEST_OVERRUN || (offset & 3U))
+	if (offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO || (offset & 3U))
 		return fail(error, error_size,
 			"invalid phase-map write offset 0x%08" PRIx32, offset);
 	if (io->write32(io->context, offset, value) < 0)
@@ -92,6 +92,14 @@ static void poll_delay(void)
 		;
 }
 
+static bool known_contract(uint32_t version, uint32_t capabilities)
+{
+	return (version == PSS_MAP_VERSION_1_0 &&
+		capabilities == PSS_MAP_CAPABILITIES_1_0) ||
+		(version == PSS_MAP_VERSION_1_1 &&
+		 capabilities == PSS_MAP_CAPABILITIES_1_1);
+}
+
 int pss_map_require_contract(const struct pss_map_io *io,
 	struct pss_map_info *info, char *error, size_t error_size)
 {
@@ -116,21 +124,21 @@ int pss_map_require_contract(const struct pss_map_io *io,
 		return fail(error, error_size,
 			"wrong phase-map ID: expected 0x%08" PRIx32 ", got 0x%08" PRIx32,
 			PSS_MAP_IDENTIFICATION, destination->identification);
-	if (destination->version != PSS_MAP_VERSION)
+	if (destination->version != PSS_MAP_VERSION_1_0 &&
+	    destination->version != PSS_MAP_VERSION_1_1)
 		return fail(error, error_size,
-			"wrong phase-map version: expected 0x%08" PRIx32
-			", got 0x%08" PRIx32,
-			PSS_MAP_VERSION, destination->version);
+			"unsupported phase-map version 0x%08" PRIx32,
+			destination->version);
 	if (destination->phase_bins != PSS_MAP_PHASE_BINS ||
 	    destination->tile_geometry != PSS_MAP_TILE_GEOMETRY)
 		return fail(error, error_size,
 			"wrong phase-map geometry: bins=%" PRIu32 " geometry=0x%08" PRIx32,
 			destination->phase_bins, destination->tile_geometry);
-	if (destination->capabilities != PSS_MAP_CAPABILITIES)
+	if (!known_contract(destination->version, destination->capabilities))
 		return fail(error, error_size,
-			"wrong phase-map capabilities: expected 0x%08" PRIx32
-			", got 0x%08" PRIx32,
-			PSS_MAP_CAPABILITIES, destination->capabilities);
+			"wrong phase-map capabilities 0x%08" PRIx32
+			" for version 0x%08" PRIx32,
+			destination->capabilities, destination->version);
 	if (!(destination->status & PSS_MAP_STATUS_CONTROL_EPOCH_LIVE))
 		return fail(error, error_size, "phase-map control epoch is not live");
 	return 0;
@@ -146,9 +154,10 @@ int pss_map_set_enabled(const struct pss_map_io *io, bool enabled, bool flush,
 }
 
 static int read_snapshot_payload(const struct pss_map_io *io,
-	struct pss_map_snapshot *snapshot, char *error, size_t error_size)
+	struct pss_map_snapshot *snapshot, uint32_t abi_version,
+	char *error, size_t error_size)
 {
-	uint32_t start_low[2], start_high[2];
+	uint32_t start_low[2], start_high[2], fifo_levels, candidate_levels;
 
 	if (map_read32(io, PSS_MAP_REG_SNAPSHOT_READY, &snapshot->ready_mask,
 			error, error_size) < 0 ||
@@ -186,6 +195,51 @@ static int read_snapshot_payload(const struct pss_map_io *io,
 	snapshot->ready_mask &= 3U;
 	snapshot->map_start_index[0] = combine_u64(start_low[0], start_high[0]);
 	snapshot->map_start_index[1] = combine_u64(start_low[1], start_high[1]);
+	if (abi_version == PSS_MAP_VERSION_1_0)
+		return 0;
+	if (abi_version != PSS_MAP_VERSION_1_1)
+		return fail(error, error_size,
+			"unsupported phase-map snapshot version 0x%08" PRIx32,
+			abi_version);
+	if (map_read32(io, PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS,
+			&snapshot->health_flags, error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_INGRESS_DROPPED,
+			&snapshot->ingress_dropped_sample_count,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_INGRESS_FIFO, &fifo_levels,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_SCHEDULER_GAP,
+			&snapshot->scheduler_gap_count, error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_SCHEDULER_INDEX_ERROR,
+			&snapshot->scheduler_index_error_count,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_SCHEDULER_OVERFLOW,
+			&snapshot->scheduler_overflow_count,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_DETECTOR_FAULT,
+			&snapshot->detector_fault_count, error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_PHASE_DISCONTINUITY,
+			&snapshot->score_phase_index_discontinuity_count,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_DENOMINATOR_ZERO,
+			&snapshot->score_denominator_zero_count,
+			error, error_size) < 0 ||
+	    map_read32(io, PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO,
+			&candidate_levels, error, error_size) < 0)
+		return -1;
+	if (snapshot->health_flags & ~PSS_MAP_HEALTH_KNOWN_MASK)
+		return fail(error, error_size,
+			"phase-map snapshot has unknown health flags 0x%08" PRIx32,
+			snapshot->health_flags & ~PSS_MAP_HEALTH_KNOWN_MASK);
+	if (candidate_levels & UINT32_C(0xfc00fc00))
+		return fail(error, error_size,
+			"phase-map candidate FIFO snapshot has nonzero reserved bits");
+	snapshot->ingress_fifo_level = (uint16_t)fifo_levels;
+	snapshot->ingress_maximum_fifo_level = (uint16_t)(fifo_levels >> 16);
+	snapshot->candidate_fifo_stored_count =
+		(uint16_t)(candidate_levels & UINT32_C(0x3ff));
+	snapshot->candidate_fifo_maximum_stored_count =
+		(uint16_t)((candidate_levels >> 16) & UINT32_C(0x3ff));
 	return 0;
 }
 
@@ -193,6 +247,7 @@ int pss_map_take_snapshot(const struct pss_map_io *io,
 	struct pss_map_snapshot *snapshot, unsigned int timeout_ms,
 	char *error, size_t error_size)
 {
+	struct pss_map_info info;
 	uint32_t generation_before, generation_after, generation_final;
 	uint32_t status, status_final;
 	uint32_t overrun_before, overrun_after;
@@ -204,7 +259,7 @@ int pss_map_take_snapshot(const struct pss_map_io *io,
 	if (!timeout_ms)
 		return fail(error, error_size, "phase-map snapshot timeout must be nonzero");
 	memset(snapshot, 0, sizeof(*snapshot));
-	if (pss_map_require_contract(io, NULL, error, error_size) < 0 ||
+	if (pss_map_require_contract(io, &info, error, error_size) < 0 ||
 	    map_read32(io, PSS_MAP_REG_SNAPSHOT_STATUS, &status,
 			error, error_size) < 0 ||
 	    map_read32(io, PSS_MAP_REG_SNAPSHOT_GENERATION, &generation_before,
@@ -245,7 +300,9 @@ int pss_map_take_snapshot(const struct pss_map_io *io,
 			return fail(error, error_size, "phase-map snapshot timed out");
 		poll_delay();
 	}
-	if (read_snapshot_payload(io, snapshot, error, error_size) < 0 ||
+	snapshot->abi_version = info.version;
+	if (read_snapshot_payload(io, snapshot, info.version,
+			error, error_size) < 0 ||
 	    map_read32(io, PSS_MAP_REG_SNAPSHOT_REQUEST_OVERRUN, &overrun_after,
 			error, error_size) < 0 ||
 	    map_read32(io, PSS_MAP_REG_SNAPSHOT_STATUS, &status_final,
@@ -275,7 +332,8 @@ static bool bank_unchanged(const struct pss_map_snapshot *before,
 static bool fault_counters_unchanged(const struct pss_map_snapshot *before,
 	const struct pss_map_snapshot *after)
 {
-	return before && after &&
+	bool base_unchanged = before && after &&
+		before->abi_version == after->abi_version &&
 		before->discarded_score_count != UINT32_MAX &&
 		before->discontinuity_abort_count != UINT32_MAX &&
 		before->map_overrun_count != UINT32_MAX &&
@@ -293,6 +351,30 @@ static bool fault_counters_unchanged(const struct pss_map_snapshot *before,
 			before->arithmetic_overflow_count &&
 		after->map_read_error_count == before->map_read_error_count &&
 		after->map_release_error_count == before->map_release_error_count;
+
+	if (!base_unchanged)
+		return false;
+	if (before->abi_version == PSS_MAP_VERSION_1_0)
+		return true;
+	if (before->abi_version != PSS_MAP_VERSION_1_1)
+		return false;
+	return (before->health_flags & PSS_MAP_HEALTH_CONTINUITY_MASK) ==
+		(after->health_flags & PSS_MAP_HEALTH_CONTINUITY_MASK) &&
+		before->ingress_dropped_sample_count != UINT32_MAX &&
+		before->scheduler_gap_count != UINT32_MAX &&
+		before->scheduler_index_error_count != UINT32_MAX &&
+		before->scheduler_overflow_count != UINT32_MAX &&
+		before->detector_fault_count != UINT32_MAX &&
+		before->score_phase_index_discontinuity_count != UINT32_MAX &&
+		after->ingress_dropped_sample_count ==
+			before->ingress_dropped_sample_count &&
+		after->scheduler_gap_count == before->scheduler_gap_count &&
+		after->scheduler_index_error_count ==
+			before->scheduler_index_error_count &&
+		after->scheduler_overflow_count == before->scheduler_overflow_count &&
+		after->detector_fault_count == before->detector_fault_count &&
+		after->score_phase_index_discontinuity_count ==
+			before->score_phase_index_discontinuity_count;
 }
 
 static bool copy_is_coherent(const struct pss_map_copy *copy)
@@ -344,6 +426,11 @@ int pss_map_copy_and_release(const struct pss_map_io *io,
 		return fail(error, error_size, "phase-map copy timeout must be nonzero");
 	if (pss_map_require_contract(io, &info, error, error_size) < 0)
 		return -1;
+	if (snapshot->abi_version != info.version)
+		return fail(error, error_size,
+			"phase-map ABI changed before copy (0x%08" PRIx32
+			" -> 0x%08" PRIx32 ")",
+			snapshot->abi_version, info.version);
 	if (destination_words < info.phase_bins)
 		return fail(error, error_size,
 			"phase-map destination has %zu words; needs %" PRIu32,

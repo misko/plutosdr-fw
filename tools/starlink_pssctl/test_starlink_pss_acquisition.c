@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MOCK_REGISTER_WORDS ((PSS_MAP_REG_SNAPSHOT_REQUEST_OVERRUN / 4U) + 1U)
+#define MOCK_REGISTER_WORDS ((PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO / 4U) + 1U)
 #define ERROR_SIZE 256U
 
 struct mock_map {
@@ -25,6 +25,9 @@ struct mock_map {
 	uint32_t flushes;
 	uint32_t mutate_after_read;
 	uint32_t fault_after_read;
+	uint32_t health_fault_after_read;
+	uint32_t telemetry_after_read;
+	uint32_t health_reads;
 };
 
 static unsigned int failures;
@@ -92,6 +95,19 @@ static void mock_init(struct mock_map *mock)
 	*mock_register(mock, PSS_MAP_REG_PHASE_BINS) = PSS_MAP_PHASE_BINS;
 	*mock_register(mock, PSS_MAP_REG_TILE_GEOMETRY) = PSS_MAP_TILE_GEOMETRY;
 	*mock_register(mock, PSS_MAP_REG_CAPABILITIES) = PSS_MAP_CAPABILITIES;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS) =
+		PSS_MAP_HEALTH_DETECTOR_FAULT | PSS_MAP_HEALTH_INGRESS_OVERFLOW;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_INGRESS_DROPPED) = 7U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_INGRESS_FIFO) =
+		(42U << 16) | 3U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_SCHEDULER_GAP) = 11U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_SCHEDULER_INDEX_ERROR) = 12U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_SCHEDULER_OVERFLOW) = 13U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_DETECTOR_FAULT) = 14U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_PHASE_DISCONTINUITY) = 15U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_DENOMINATOR_ZERO) = 16U;
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO) =
+		(17U << 16) | 5U;
 	mock->ready_mask = 3U;
 	mock->map_generation[0] = 10U;
 	mock->map_generation[1] = 11U;
@@ -110,9 +126,11 @@ static int mock_read32(void *context, uint32_t offset, uint32_t *value)
 {
 	struct mock_map *mock = context;
 
-	if (!value || offset > PSS_MAP_REG_SNAPSHOT_REQUEST_OVERRUN ||
+	if (!value || offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO ||
 	    (offset & 3U))
 		return -1;
+	if (offset >= PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS)
+		mock->health_reads++;
 	if (offset == PSS_MAP_REG_STATUS)
 		mock_status(mock);
 	if (offset == PSS_MAP_REG_DATA) {
@@ -136,6 +154,19 @@ static int mock_read32(void *context, uint32_t offset, uint32_t *value)
 		if (mock->fault_after_read &&
 		    mock->data_reads == mock->fault_after_read)
 			(*mock_register(mock, PSS_MAP_REG_SNAPSHOT_DISCARDED))++;
+		if (mock->health_fault_after_read &&
+		    mock->data_reads == mock->health_fault_after_read)
+			(*mock_register(mock,
+				PSS_MAP_REG_SNAPSHOT_INGRESS_DROPPED))++;
+		if (mock->telemetry_after_read &&
+		    mock->data_reads == mock->telemetry_after_read) {
+			(*mock_register(mock,
+				PSS_MAP_REG_SNAPSHOT_DENOMINATOR_ZERO))++;
+			*mock_register(mock, PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS) |=
+				PSS_MAP_HEALTH_DENOMINATOR_ZERO;
+			*mock_register(mock, PSS_MAP_REG_SNAPSHOT_INGRESS_FIFO) =
+				(42U << 16) | 4U;
+		}
 		return 0;
 	}
 	*value = *mock_register(mock, offset);
@@ -146,7 +177,7 @@ static int mock_write32(void *context, uint32_t offset, uint32_t value)
 {
 	struct mock_map *mock = context;
 
-	if (offset > PSS_MAP_REG_SNAPSHOT_REQUEST_OVERRUN || (offset & 3U))
+	if (offset > PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO || (offset & 3U))
 		return -1;
 	switch (offset) {
 	case PSS_MAP_REG_CONTROL:
@@ -216,16 +247,39 @@ static void test_contract_snapshot_copy_and_release(void)
 	CHECK(pss_map_require_contract(&io, &info, error, sizeof(error)) == 0,
 		error);
 	CHECK(info.phase_bins == PSS_MAP_PHASE_BINS, "wrong contract bin count");
+	CHECK(info.version == PSS_MAP_VERSION_1_1,
+		"latest mock did not expose ABI 1.1");
 	CHECK(pss_map_set_enabled(&io, true, true, error, sizeof(error)) == 0,
 		error);
 	CHECK(mock->flushes == 1U, "flush did not cross exactly once");
 	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U, error, sizeof(error)) == 0,
 		error);
 	CHECK(snapshot.snapshot_generation == 1U, "wrong snapshot generation");
+	CHECK(snapshot.abi_version == PSS_MAP_VERSION_1_1,
+		"snapshot lost its ABI version");
 	CHECK(snapshot.ready_mask == 3U, "wrong snapshot ready mask");
 	CHECK(snapshot.map_generation[0] == 10U, "wrong bank generation");
 	CHECK(snapshot.map_start_index[0] == UINT64_C(0x1234567800000000),
 		"64-bit map start was not coherent");
+	CHECK(snapshot.health_flags ==
+		(PSS_MAP_HEALTH_DETECTOR_FAULT | PSS_MAP_HEALTH_INGRESS_OVERFLOW),
+		"wrong detector health flags");
+	CHECK(snapshot.ingress_dropped_sample_count == 7U &&
+		snapshot.ingress_fifo_level == 3U &&
+		snapshot.ingress_maximum_fifo_level == 42U,
+		"wrong ingress health snapshot");
+	CHECK(snapshot.scheduler_gap_count == 11U &&
+		snapshot.scheduler_index_error_count == 12U &&
+		snapshot.scheduler_overflow_count == 13U,
+		"wrong scheduler health snapshot");
+	CHECK(snapshot.detector_fault_count == 14U &&
+		snapshot.score_phase_index_discontinuity_count == 15U &&
+		snapshot.score_denominator_zero_count == 16U,
+		"wrong detector counter snapshot");
+	CHECK(snapshot.candidate_fifo_stored_count == 5U &&
+		snapshot.candidate_fifo_maximum_stored_count == 17U,
+		"wrong candidate FIFO snapshot");
+	mock->telemetry_after_read = 100U;
 	CHECK(pss_map_copy_and_release(&io, &snapshot, 0U, destination,
 		PSS_MAP_PHASE_BINS, &copy, 10U, error, sizeof(error)) == 0, error);
 	CHECK(copy.bank == 0U && copy.generation == 10U,
@@ -303,6 +357,71 @@ static void test_copy_fail_closed_on_metadata_change(void)
 	CHECK(mock->releases == 0U && (mock->ready_mask & 1U),
 		"faulted map copy released source ownership");
 
+	mock_init(mock);
+	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U, error, sizeof(error)) == 0,
+		error);
+	mock->health_fault_after_read = 100U;
+	CHECK(pss_map_copy_and_release(&io, &snapshot, 0U, destination,
+		PSS_MAP_PHASE_BINS, &copy, 10U, error, sizeof(error)) < 0,
+		"copy spanning an ingress loss was accepted");
+	CHECK(strstr(error, "fault counters changed") != NULL,
+		"ingress-loss mutation failed for the wrong reason");
+	CHECK(mock->releases == 0U && (mock->ready_mask & 1U),
+		"ingress-loss map copy released source ownership");
+
+done:
+	free(destination);
+	free(mock);
+}
+
+static void test_abi_1_0_backward_compatibility(void)
+{
+	struct mock_map *mock = calloc(1U, sizeof(*mock));
+	struct pss_map_io io;
+	struct pss_map_info info;
+	struct pss_map_snapshot snapshot;
+	struct pss_map_copy copy;
+	uint16_t *destination = calloc(PSS_MAP_PHASE_BINS, sizeof(*destination));
+	char error[ERROR_SIZE] = {0};
+
+	CHECK(mock && destination, "allocation failed");
+	if (!mock || !destination)
+		goto done;
+	mock_init(mock);
+	io = mock_io(mock);
+	*mock_register(mock, PSS_MAP_REG_VERSION) = PSS_MAP_VERSION_1_0;
+	*mock_register(mock, PSS_MAP_REG_CAPABILITIES) =
+		PSS_MAP_CAPABILITIES_1_0;
+	CHECK(pss_map_require_contract(&io, &info, error, sizeof(error)) == 0,
+		error);
+	CHECK(info.version == PSS_MAP_VERSION_1_0,
+		"ABI 1.0 contract reported the wrong version");
+	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U,
+		error, sizeof(error)) == 0, error);
+	CHECK(snapshot.abi_version == PSS_MAP_VERSION_1_0,
+		"ABI 1.0 snapshot lost its version");
+	CHECK(snapshot.health_flags == 0U &&
+		snapshot.ingress_dropped_sample_count == 0U &&
+		snapshot.scheduler_gap_count == 0U &&
+		snapshot.detector_fault_count == 0U,
+		"ABI 1.0 synthesized nonzero health telemetry");
+	CHECK(pss_map_copy_and_release(&io, &snapshot, 0U, destination,
+		PSS_MAP_PHASE_BINS, &copy, 10U, error, sizeof(error)) == 0,
+		error);
+	CHECK(copy.before.abi_version == PSS_MAP_VERSION_1_0 &&
+		copy.after.abi_version == PSS_MAP_VERSION_1_0 &&
+		mock->releases == 1U,
+		"ABI 1.0 did not complete a coherent copy and release");
+	CHECK(mock->health_reads == 0U,
+		"ABI 1.0 accessed registers introduced by ABI 1.1");
+
+	*mock_register(mock, PSS_MAP_REG_CAPABILITIES) =
+		PSS_MAP_CAPABILITIES_1_1;
+	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
+		"ABI 1.0 accepted ABI 1.1 capabilities");
+	*mock_register(mock, PSS_MAP_REG_VERSION) = UINT32_C(0x00010002);
+	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
+		"unknown future ABI was accepted");
 done:
 	free(destination);
 	free(mock);
@@ -333,6 +452,20 @@ static void test_snapshot_and_contract_fail_closed(void)
 	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_GENERATION) = UINT32_MAX;
 	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U, error, sizeof(error)) < 0,
 		"saturated snapshot generation was accepted");
+
+	mock_init(mock);
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS) |= 1U << 31;
+	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U, error, sizeof(error)) < 0,
+		"unknown health flag was accepted");
+	CHECK(strstr(error, "unknown health flags") != NULL,
+		"unknown health flag failed for the wrong reason");
+
+	mock_init(mock);
+	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO) |= 1U << 15;
+	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U, error, sizeof(error)) < 0,
+		"nonzero candidate FIFO reserved bit was accepted");
+	CHECK(strstr(error, "reserved bits") != NULL,
+		"candidate FIFO reserved bit failed for the wrong reason");
 	free(mock);
 }
 
@@ -636,6 +769,7 @@ int main(int argc, char **argv)
 	test_contract_snapshot_copy_and_release();
 	test_copy_fail_closed_on_metadata_change();
 	test_snapshot_and_contract_fail_closed();
+	test_abi_1_0_backward_compatibility();
 	test_window_and_extractor();
 	test_lock_state_machine();
 
@@ -644,7 +778,7 @@ int main(int argc, char **argv)
 			failures);
 		return EXIT_FAILURE;
 	}
-	printf("STARLINK_PSS_ACQUISITION_PASS map_words=%u map_reads=%u "
+	printf("STARLINK_PSS_ACQUISITION_PASS abi=1.0,1.1 map_words=%u map_reads=%u "
 		"window_maps=%u drift_hypotheses=7 state_path="
 		"ACQUIRE-CONFIRM-LOCK-TRACK-HOLDOVER-ACQUIRE\n",
 		PSS_MAP_PHASE_BINS, PSS_MAP_PHASE_BINS,

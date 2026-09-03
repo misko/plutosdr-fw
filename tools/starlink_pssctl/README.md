@@ -86,17 +86,26 @@ This is deterministic hardware-path evidence, not live Starlink evidence.
 ## Continuous-acquisition library checkpoint
 
 `starlink_pss_acquisition.c` is the source-only ARM policy layer for the
-separate `PSMA` ABI 1.0 phase-map bridge. It accepts only the fixed 15 MS/s
-geometry: 20,000 one-sample phase bins, 64 frames per map, 16-bit map words,
-two immutable banks, and capability word `0x1f`. It is compiled as a strict
-ARM EABI object by `make check`; it is not yet linked into `starlink_pssctl`,
-installed in the root filesystem, or assigned an MMIO aperture. Those steps
-wait for RX-shell integration and a complete linked-system route.
+separate `PSMA` phase-map bridge. It accepts the fixed 15 MS/s geometry:
+20,000 one-sample phase bins, 64 frames per map, 16-bit map words, and two
+immutable banks. The parser accepts exactly ABI 1.0/capability `0x1f` and ABI
+1.1/capability `0x3f`; unknown versions or mismatched capability words fail
+closed. It is compiled as a strict ARM EABI object by `make check`; it is not
+yet linked into `starlink_pssctl`, installed in the root filesystem, or
+assigned an MMIO aperture. Those steps wait for RX-shell integration and a
+complete linked-system route.
 
 The copy sequence takes one atomic hardware snapshot, reads exactly 20,000
 zero-extended words, brackets the copy with a second atomic snapshot, and
 releases the selected bank only after its generation, start index, command
-status, and all acquisition/bridge fault epochs remain coherent. Failed copies
+status, and all acquisition/bridge fault epochs remain coherent. ABI 1.1 adds
+one atomic snapshot of ingress drops/FIFO occupancy, scheduler gaps/index
+errors/overflows, detector faults, phase discontinuities, zero denominators,
+candidate FIFO occupancy, and sticky cause flags. Continuity checks reject a
+copy when any data-integrity fault epoch changes or saturates; changing queue
+occupancy and zero-denominator telemetry remain observable but do not falsely
+invalidate an otherwise coherent copy. ABI 1.0 snapshots synthesize zero for
+the absent health fields and never access the new register range. Failed copies
 retain FPGA ownership. Each successful copy carries its before/after health
 epochs; `pss_map_copies_contiguous()` accepts only adjacent generations and
 1,280,000-sample start-index steps with unchanged, nonsaturated fault counters.
@@ -117,9 +126,12 @@ multiple threshold-passing, phase/cadence-consistent observations. Metadata or
 hardware-health discontinuity resets acquisition without consuming the current
 candidate; bounded misses enter holdover and then return to acquisition.
 
-The native C test covers the complete 20,000-word transfer, no-release failure
-paths, fault-epoch and map continuity, fixed-memory drift extraction, tie and
-finite/zero-MAD cases, unsafe-bound rejection, and the complete state path.
+The native C test covers both supported ABI contracts, the ABI 1.1 health-word
+unpacking, proof that ABI 1.0 never reads ABI 1.1 registers, the complete
+20,000-word transfer, no-release failure paths, ingress/base fault epochs and
+map continuity, mutable non-fault telemetry, fixed-memory drift extraction,
+tie and finite/zero-MAD cases, unsafe-bound rejection, and the complete state
+path.
 `tests/test_starlink_pss_acquisition_c.py` additionally compares C against the
 frozen Python acquisition oracle across randomized odd/even map sizes and a
 zero-MAD tie. This checkpoint is candidate-selection and policy logic, not a

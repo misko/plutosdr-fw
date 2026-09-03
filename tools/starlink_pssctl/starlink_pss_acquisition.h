@@ -7,12 +7,16 @@
 #include <stdint.h>
 
 #define PSS_MAP_IDENTIFICATION UINT32_C(0x50534d41)
-#define PSS_MAP_VERSION UINT32_C(0x00010000)
+#define PSS_MAP_VERSION_1_0 UINT32_C(0x00010000)
+#define PSS_MAP_VERSION_1_1 UINT32_C(0x00010001)
+#define PSS_MAP_VERSION PSS_MAP_VERSION_1_1
 #define PSS_MAP_PHASE_BINS 20000U
 #define PSS_MAP_TILE_FRAMES 64U
 #define PSS_MAP_WORD_BITS 16U
 #define PSS_MAP_BANKS 2U
-#define PSS_MAP_CAPABILITIES UINT32_C(0x0000001f)
+#define PSS_MAP_CAPABILITIES_1_0 UINT32_C(0x0000001f)
+#define PSS_MAP_CAPABILITIES_1_1 UINT32_C(0x0000003f)
+#define PSS_MAP_CAPABILITIES PSS_MAP_CAPABILITIES_1_1
 #define PSS_MAP_TILE_GEOMETRY UINT32_C(0x00401002)
 #define PSS_ACQUISITION_WINDOW_MAPS 3U
 #define PSS_ACQUISITION_DRIFT_HYPOTHESES 7U
@@ -56,7 +60,36 @@ enum pss_map_register {
 	PSS_MAP_REG_BRIDGE_READ_ERROR = 0x7c,
 	PSS_MAP_REG_BRIDGE_RELEASE_ERROR = 0x80,
 	PSS_MAP_REG_SNAPSHOT_REQUEST_OVERRUN = 0x84,
+	PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS = 0x88,
+	PSS_MAP_REG_SNAPSHOT_INGRESS_DROPPED = 0x8c,
+	PSS_MAP_REG_SNAPSHOT_INGRESS_FIFO = 0x90,
+	PSS_MAP_REG_SNAPSHOT_SCHEDULER_GAP = 0x94,
+	PSS_MAP_REG_SNAPSHOT_SCHEDULER_INDEX_ERROR = 0x98,
+	PSS_MAP_REG_SNAPSHOT_SCHEDULER_OVERFLOW = 0x9c,
+	PSS_MAP_REG_SNAPSHOT_DETECTOR_FAULT = 0xa0,
+	PSS_MAP_REG_SNAPSHOT_PHASE_DISCONTINUITY = 0xa4,
+	PSS_MAP_REG_SNAPSHOT_DENOMINATOR_ZERO = 0xa8,
+	PSS_MAP_REG_SNAPSHOT_CANDIDATE_FIFO = 0xac,
 };
+
+enum pss_map_health_bit {
+	PSS_MAP_HEALTH_DETECTOR_FAULT = 1U << 0,
+	PSS_MAP_HEALTH_SCHEDULER_GAP = 1U << 1,
+	PSS_MAP_HEALTH_SCHEDULER_INDEX_ERROR = 1U << 2,
+	PSS_MAP_HEALTH_SCHEDULER_OVERFLOW = 1U << 3,
+	PSS_MAP_HEALTH_FORWARD_FFT = 1U << 4,
+	PSS_MAP_HEALTH_KERNEL_JOIN = 1U << 5,
+	PSS_MAP_HEALTH_PRODUCT_OVERFLOW = 1U << 6,
+	PSS_MAP_HEALTH_INVERSE_FFT = 1U << 7,
+	PSS_MAP_HEALTH_FORWARD_EXPONENT = 1U << 8,
+	PSS_MAP_HEALTH_CANDIDATE_PATH = 1U << 9,
+	PSS_MAP_HEALTH_PHASE_DISCONTINUITY = 1U << 10,
+	PSS_MAP_HEALTH_DENOMINATOR_ZERO = 1U << 11,
+	PSS_MAP_HEALTH_INGRESS_OVERFLOW = 1U << 12,
+};
+
+#define PSS_MAP_HEALTH_KNOWN_MASK UINT32_C(0x00001fff)
+#define PSS_MAP_HEALTH_CONTINUITY_MASK UINT32_C(0x000017ff)
 
 enum pss_map_status_bit {
 	PSS_MAP_STATUS_CONTROL_EPOCH_LIVE = 1U << 0,
@@ -89,6 +122,7 @@ struct pss_map_info {
 };
 
 struct pss_map_snapshot {
+	uint32_t abi_version;
 	uint32_t snapshot_generation;
 	uint32_t ready_mask;
 	uint32_t map_generation[2];
@@ -102,6 +136,18 @@ struct pss_map_snapshot {
 	uint32_t arithmetic_overflow_count;
 	uint32_t map_read_error_count;
 	uint32_t map_release_error_count;
+	uint32_t health_flags;
+	uint32_t ingress_dropped_sample_count;
+	uint16_t ingress_fifo_level;
+	uint16_t ingress_maximum_fifo_level;
+	uint32_t scheduler_gap_count;
+	uint32_t scheduler_index_error_count;
+	uint32_t scheduler_overflow_count;
+	uint32_t detector_fault_count;
+	uint32_t score_phase_index_discontinuity_count;
+	uint32_t score_denominator_zero_count;
+	uint16_t candidate_fifo_stored_count;
+	uint16_t candidate_fifo_maximum_stored_count;
 };
 
 struct pss_map_copy {
