@@ -14,6 +14,7 @@ import pytest
 
 from scripts.starlink_pss_multirate_candidate_plan import (
     ALLOCATED_SERIAL,
+    ROOT,
     CandidatePlanError,
     _verify_clean_source_repository,
     prepare_candidate,
@@ -251,3 +252,25 @@ def test_source_repository_attestor_requires_exact_clean_head(tmp_path: Path) ->
             expected_slug="misko/pluto-plus-utils",
             label="PPU",
         )
+
+
+def test_retained_offline_candidate_evidence_is_sealed_and_non_authorizing() -> None:
+    name = "starlink-pss-multirate-ram-candidates-dnm-v1-offline.yaml"
+    manifest = ROOT / "manifests" / name
+    sidecar = ROOT / "manifests" / f"{name.removesuffix('.yaml')}-SHA256SUMS"
+    payload = manifest.read_bytes()
+    digest = hashlib.sha256(payload).hexdigest()
+
+    assert sidecar.read_text() == f"{digest}  {name}\n"
+    text = payload.decode()
+    assert "do_not_merge: true" in text
+    assert "persistent_flash_eligible: false" in text
+    assert "hardware_accessed: false" in text
+    assert "operation_plans_created: false" in text
+    assert f"allocated_radio_serial: {ALLOCATED_SERIAL}" in text
+    assert "generator_source_commit: 0a2ccd2f8c7826742541112eac9b5842965a1544" in text
+    assert "ppu_main_commit: 5790a39705e9e598ef048ec773e0227cf9ac1808" in text
+    assert "rate_15_candidate_plan_sha256: 8fe7e216" in text
+    assert "rate_30_candidate_plan_sha256: d4dfcc02" in text
+    assert "rate_60_candidate_plan_sha256: 561249fe" in text
+    assert "explicit_operator_authorization_required: true" in text

@@ -136,6 +136,49 @@ reduced 2,826 source samples to 1,406 through x2 DDC; 60 MS/s reduced 5,666 to
 PSS peaks at score 255. These are complete offline package-build results, not
 radio, RF-bandwidth, live-PSS, persistent-flash, or SSS qualification.
 
+## 2026-09-03 offline RAM-candidate preparation checkpoint
+
+The three verified package archives now also pass a source-attested,
+firmware-side preparation step for PPU's existing
+`release-candidate-plan.v2` lifecycle. Generator commit `0a2ccd2f8c78`, tagged
+`starlink-rx-only-dnm-v1-source/firmware-pss15-30-60-ram-plan-v2`, verifies the
+outer archive sidecar, every internally indexed archive member, both checksum
+inventories, packaged and qualification manifests, exact rate/source/bitstream
+binding, `/opt/VERSIONS`, and the DFU suffix and CRC. It extracts only the
+RAM-candidate DFU and manifests into a new mode-0700 directory, creates files
+mode 0600 with exclusive creation, and emits a canonical PPU v2 candidate plan.
+Its five focused tests and Ruff checks pass. The current repository-wide run
+reports 1,670 passed and five explicitly hardware-gated skips; its sole failure
+is the same pre-existing tandem packaging assertion described above, which
+expects one `--cdc-report` occurrence although the unchanged packaged script
+contains two.
+
+PPU `main` commit `5790a39705e9e598ef048ec773e0227cf9ac1808` was checked out
+separately and cleanly; all 46 focused RX-only candidate contract, lifecycle,
+recovery, and CLI tests pass. PPU then independently parsed each exact generated
+plan, revalidated each DFU/FIT, and constructed an in-memory v2 operation plan
+for the allocated serial from a retained historical inventory. The last action
+is a nonauthorizing schema/builder test only: no operation plan was written and
+the historical inventory is forbidden for execution.
+
+The authoritative offline preparation record is
+`manifests/starlink-pss-multirate-ram-candidates-dnm-v1-offline.yaml`. Candidate
+plan SHA-256 values are `8fe7e2164678e4bac2350237cec12f1f6c90c123363e248476bf961af58991c5`
+at 15 MS/s, `d4dfcc020f62745d89b089ebf9139f87b99d7381afd41a79eb02ab5c8ac046c9`
+at 30 MS/s, and `561249fe7c396da405469dad23fa4c5bf6e793d0b5e4dee473c4e2e0977dd3b8`
+at 60 MS/s. They remain hardware-untested and persistent-flash-ineligible.
+
+The next hardware boundary has deliberately not been crossed. For 15 MS/s,
+first obtain explicit authorization, confirm no unrelated IIO/USB owner, use
+the normal PPU setup workflow to establish and verify `ad9363a-1r1t`, capture a
+fresh USB inventory, observe the exact current persistent firmware, generate
+and review a new serial-scoped operation plan, RAM boot, qualify, and always
+recover to the same persistent 1R1T baseline. Only after its reviewed
+engineering-advancement bundle and rollback pass may the same indivisible
+sequence begin at 30 MS/s; 60 MS/s remains last. Final campaign closure restores
+and verifies `ad9361-2r2t`. No radio was enumerated, opened, rebooted, RAM-booted,
+or flashed while producing this checkpoint.
+
 ## 2026-09-02 Stage-15 hardware checkpoints
 
 The corrected ABI 1.1 image has now completed one exact-radio RAM lifecycle and

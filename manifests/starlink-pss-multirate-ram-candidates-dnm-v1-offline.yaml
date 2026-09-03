@@ -1,0 +1,93 @@
+# Offline preparation evidence for the 15/30/60 MS/s RX-only RAM candidates.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. These records authorize no
+# hardware access. A fresh serial-scoped USB inventory, reviewed operation
+# plan, explicit operator authorization, and mandatory persistent recovery are
+# still required independently for every rate.
+
+schema: plutosdr-fw.ram-candidate-preparation
+schema_version: 1
+release_state: ram-only-candidate-offline
+do_not_merge: true
+merge_target: none
+persistent_flash_eligible: false
+hardware_accessed: false
+operation_plans_created: false
+
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9363a-1r1t
+physical_rfic_record: AD9363A
+full_band_30_60_qualified: false
+
+generator_source_commit: 0a2ccd2f8c7826742541112eac9b5842965a1544
+generator_source_tag: starlink-rx-only-dnm-v1-source/firmware-pss15-30-60-ram-plan-v2
+generator_tests: 5 passed
+generator_lint: PASS
+
+ppu_repository: https://github.com/misko/pluto-plus-utils.git
+ppu_main_commit: 5790a39705e9e598ef048ec773e0227cf9ac1808
+ppu_version: 0.1.0
+ppu_focused_tests: 46 passed
+ppu_worktree_clean: true
+ppu_candidate_schema: pluto-plus-utils.release-candidate-plan.v2
+ppu_offline_schema_dfu_builder_verdict: PASS_ALL_RATES
+
+qualification_manifest_sha256: 60a92083e0cc8c35d4e9ee74ae2e99c70b5e88309a83d50e4d9f86aba28f0d8a
+qualification_manifest_bytes: 4837
+candidate_root: /home/mouse9911/pluto-state/starlink-rx-only-dnm/ram-candidates-20260903-final
+
+rate_15_github_run: 33776239805
+rate_15_firmware_source: dd398a44c7daf32834aa14ad0823894df95b16a0
+rate_15_archive_bytes: 119731645
+rate_15_archive_sha256: d8bfd102bcca29a11dc3c847c02864b5268fa5a51cbdcd555b7208d471ea116e
+rate_15_candidate_id: c46a4a580ac7b1a29b71f4a9d4afcb05
+rate_15_candidate_plan_bytes: 1545
+rate_15_candidate_plan_sha256: 8fe7e2164678e4bac2350237cec12f1f6c90c123363e248476bf961af58991c5
+rate_15_candidate_index_bytes: 1747
+rate_15_candidate_index_sha256: 790354d5dea1c3297eeb491ec95a790125d5147563f931f54879fe6c88529b4e
+rate_15_dfu_bytes: 12955279
+rate_15_dfu_sha256: dec27ea3b1c31a353f0c339c5cbfcb0fc0bae6e754052c51a08456efe3f5bdc4
+rate_15_fit_bytes: 12955263
+rate_15_fit_sha256: 0123c14103aa84e99d18ffa4104c73a778a434eb1910cb3b43d15a0fbe8d3181
+rate_15_candidate_sums_sha256: 37a918eeea3a3800c95ea92b5225ab90df5f04cd67141449b18cec6622729681
+
+rate_30_github_run: 33778480406
+rate_30_firmware_source: dd398a44c7daf32834aa14ad0823894df95b16a0
+rate_30_archive_bytes: 122768921
+rate_30_archive_sha256: 69a47ac019dc1f049e13e0ea3f047961f259efa9bec775da18ecf7b5d41af400
+rate_30_candidate_id: 0a9c5588b2486f62a6bc5f7b741bb887
+rate_30_candidate_plan_bytes: 1545
+rate_30_candidate_plan_sha256: d4dfcc020f62745d89b089ebf9139f87b99d7381afd41a79eb02ab5c8ac046c9
+rate_30_candidate_index_bytes: 1747
+rate_30_candidate_index_sha256: 94ec53d6212e5a89a40a678c5e7a3ab0e184c12ba8e512601ffca165667ecbfd
+rate_30_dfu_bytes: 12975471
+rate_30_dfu_sha256: 51e6944e8e7deb28ab6568b0261b2f45d7c380870a76d9b4309af70f2b9f50d3
+rate_30_fit_bytes: 12975455
+rate_30_fit_sha256: 9278b0c87ec0aac72722078ac676e75b78848cc08dc23d0c36214506d932c1eb
+rate_30_candidate_sums_sha256: 1f4d50780d3d6b6b17693cb1f4a27348f165fdc4d3298236e7f2c5d0f4c11f29
+
+rate_60_github_run: 33783129529
+rate_60_firmware_source: 6e9bedd69eca33922fe05243775fcfe3b56d4094
+rate_60_archive_bytes: 142484087
+rate_60_archive_sha256: 5ebb6bad5741d184535d07334fda0d1159f7908ce6f94a4e755d79e85474afd1
+rate_60_candidate_id: 3a7018d95311a681ed7a1b6c73c19755
+rate_60_candidate_plan_bytes: 1545
+rate_60_candidate_plan_sha256: 561249fe7c396da405469dad23fa4c5bf6e793d0b5e4dee473c4e2e0977dd3b8
+rate_60_candidate_index_bytes: 1747
+rate_60_candidate_index_sha256: 298ae6e80cfc5daab52c9e809f008ac4bf73554325081380c8e699dc3a8fa8dc
+rate_60_dfu_bytes: 12957803
+rate_60_dfu_sha256: 235ad75a3d5efb7e2d678e7671417bdcdae456f4ac5ac33228bdf219779a29b2
+rate_60_fit_bytes: 12957787
+rate_60_fit_sha256: 58a14fb165cfaad375d1bcfb47bb1b3150a09a15ed1bd84bcbe2561dd4c6a142
+rate_60_candidate_sums_sha256: 7ea37157a74ee4f5ee6e517155162b5ea8632a1d47274ef708980f2d2c2f17a6
+
+fresh_inventory_required: true
+fresh_inventory_hardware_access: none-beyond-local-usb-enumeration
+historical_inventory_used_for_offline_builder_test_only: true
+historical_inventory_authorizing: false
+expected_persistent_firmware_must_be_observed_fresh: true
+explicit_operator_authorization_required: true
+mandatory_recovery_after_each_rate: true
+final_restore_target: ad9361-2r2t
+live_pss_qualified: false
+sss_qualified: false
