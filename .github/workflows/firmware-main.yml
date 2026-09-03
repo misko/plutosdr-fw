@@ -325,6 +325,13 @@ jobs:
           clean: true
           persist-credentials: false
 
+      - name: Install pinned uv for Starlink model-vector tests
+        if: github.ref == 'refs/heads/codex/starlink-rx-only-do-not-merge'
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          version: '0.12.5'
+          enable-cache: true
+
       - name: Reset persistent nested worktrees
         run: |
           git submodule foreach --recursive \

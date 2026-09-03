@@ -60,6 +60,9 @@ def test_manual_dispatch_selects_one_rate_only_on_the_dnm_branch() -> None:
     assert "format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v1'" in workflow
     assert "STARLINK_PSS_RATE_MSPS:" in workflow
     assert "15|30|60" in workflow
+    assert "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e" in workflow
+    assert "version: '0.12.5'" in workflow
+    assert "Install pinned uv for Starlink model-vector tests" in workflow
     assert (
         'expected="v0.50-plutoplus-starlink-pss-'
         '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v1"'

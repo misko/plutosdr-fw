@@ -1311,7 +1311,11 @@ Current status ledger:
   builder path, and three-constraint validator remain unchanged for
   reproduction. No experimental push or manual dispatch targets firmware
   `main`; remote source-locked package builds remain staged 15, then 30, then
-  60 and are still pending;
+  60. The first 15 MS/s dispatch, GitHub run `33775930057`, passed source locks,
+  preflight, and the existing HDL smoke tests, then stopped before the new RTL
+  suites or Vivado because the clean runner PATH had no `uv`. The branch-only
+  workflow now installs pinned setup-uv v6.8.0 and uv 0.12.5; the corrected
+  remote package builds are still pending;
 - every new-image RAM boot, 30/60 MS/s radio-transport/injection/live-RF gate,
   full campaign-close, full-band RFIC qualification, and SSS gate: pending.
 
