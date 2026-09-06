@@ -907,6 +907,25 @@ done:
 	return result;
 }
 
+static void test_public_snapshot_health_predicate(void)
+{
+	struct pss_map_snapshot snapshot = {
+		.abi_version = PSS_MAP_VERSION_1_1,
+	};
+
+	CHECK(pss_map_snapshot_fault_free(&snapshot),
+		"clean public snapshot-health predicate failed");
+	snapshot.map_overrun_count = 1U;
+	CHECK(!pss_map_snapshot_fault_free(&snapshot),
+		"public snapshot-health predicate accepted an overrun");
+	snapshot.map_overrun_count = 0U;
+	snapshot.health_flags = PSS_MAP_HEALTH_SCHEDULER_GAP;
+	CHECK(!pss_map_snapshot_fault_free(&snapshot),
+		"public snapshot-health predicate accepted a health flag");
+	CHECK(!pss_map_snapshot_fault_free(NULL),
+		"public snapshot-health predicate accepted NULL");
+}
+
 int main(int argc, char **argv)
 {
 	if (argc == 2 && strcmp(argv[1], "--extract-stdin") == 0)
@@ -923,6 +942,7 @@ int main(int argc, char **argv)
 	test_abi_1_0_backward_compatibility();
 	test_window_and_extractor();
 	test_lock_state_machine();
+	test_public_snapshot_health_predicate();
 
 	if (failures) {
 		fprintf(stderr, "STARLINK_PSS_ACQUISITION_FAIL failures=%u\n",

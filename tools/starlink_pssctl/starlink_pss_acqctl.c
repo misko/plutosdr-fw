@@ -303,31 +303,6 @@ static int read_ddc_counters(const struct pss_map_io *io,
 			&counters->saturation) < 0 ? -1 : 0;
 }
 
-static bool snapshot_fault_free(const struct pss_map_snapshot *snapshot)
-{
-	uint32_t continuity_mask;
-
-	if (!snapshot)
-		return false;
-	continuity_mask = snapshot->abi_version == PSS_MAP_VERSION_1_1 ?
-		PSS_MAP_HEALTH_CONTINUITY_MASK_1_1 :
-		PSS_MAP_HEALTH_CONTINUITY_MASK_DDC;
-	return !(snapshot->health_flags & continuity_mask) &&
-		!snapshot->discarded_score_count &&
-		!snapshot->discontinuity_abort_count &&
-		!snapshot->map_overrun_count &&
-		!snapshot->score_protocol_error_count &&
-		!snapshot->arithmetic_overflow_count &&
-		!snapshot->map_read_error_count &&
-		!snapshot->map_release_error_count &&
-		!snapshot->ingress_dropped_sample_count &&
-		!snapshot->scheduler_gap_count &&
-		!snapshot->scheduler_index_error_count &&
-		!snapshot->scheduler_overflow_count &&
-		!snapshot->detector_fault_count &&
-		!snapshot->score_phase_index_discontinuity_count;
-}
-
 static void print_double_or_null(double value)
 {
 	if (isfinite(value))
@@ -411,7 +386,8 @@ static void print_snapshot(const char *serial,
 	       snapshot->map_generation[1], snapshot->map_start_index[0],
 	       snapshot->map_start_index[1], snapshot->accepted_score_count,
 	       snapshot->map_publish_count,
-	       snapshot->health_flags, snapshot_fault_free(snapshot) ? "true" : "false",
+	       snapshot->health_flags,
+	       pss_map_snapshot_fault_free(snapshot) ? "true" : "false",
 	       snapshot->discarded_score_count,
 	       snapshot->discontinuity_abort_count, snapshot->map_overrun_count,
 	       snapshot->score_protocol_error_count,
@@ -496,7 +472,7 @@ static void print_progress(const char *serial, const struct pss_map_info *info,
 	       after->ready_mask, before->accepted_score_count,
 	       after->accepted_score_count, before->map_publish_count,
 	       after->map_publish_count, after->health_flags,
-	       snapshot_fault_free(after) ? "true" : "false",
+	       pss_map_snapshot_fault_free(after) ? "true" : "false",
 	       after->ingress_dropped_sample_count, after->ingress_fifo_level,
 	       after->ingress_maximum_fifo_level, after->scheduler_gap_count,
 	       after->scheduler_index_error_count, after->scheduler_overflow_count,
@@ -627,7 +603,7 @@ static void print_candidate(const char *serial, const struct pss_map_info *info,
 	       ddc_after->accepted, ddc_after->emitted,
 	       ddc_after->discontinuity, ddc_after->saturation,
 	       final_snapshot->snapshot_generation, final_snapshot->health_flags,
-	       snapshot_fault_free(final_snapshot) ? "true" : "false");
+	       pss_map_snapshot_fault_free(final_snapshot) ? "true" : "false");
 }
 
 static int run_candidate(const char *serial, const struct pss_map_io *io,
@@ -663,7 +639,7 @@ static int run_candidate(const char *serial, const struct pss_map_io *io,
 	if (pss_map_take_snapshot(io, &initial_snapshot, timeout_ms,
 			error, error_size) < 0)
 		goto done;
-	if (!snapshot_fault_free(&initial_snapshot)) {
+	if (!pss_map_snapshot_fault_free(&initial_snapshot)) {
 		snprintf(error, error_size,
 			"acquisition health epoch was already faulted before capture");
 		goto done;
@@ -705,7 +681,7 @@ static int run_candidate(const char *serial, const struct pss_map_io *io,
 	    pss_map_take_snapshot(io, &final_snapshot, timeout_ms,
 			error, error_size) < 0)
 		goto done;
-	if (!snapshot_fault_free(&final_snapshot)) {
+	if (!pss_map_snapshot_fault_free(&final_snapshot)) {
 		snprintf(error, error_size,
 			"acquisition health epoch faulted during capture");
 		goto done;
@@ -781,7 +757,7 @@ static int print_monitor_map(const char *serial, uint32_t sequence,
 	       serial, sequence, copy->bank, copy->generation, copy->start_index,
 	       copy->after.accepted_score_count, copy->after.map_publish_count,
 	       copy->after.health_flags,
-	       snapshot_fault_free(&copy->after) ? "true" : "false",
+	       pss_map_snapshot_fault_free(&copy->after) ? "true" : "false",
 	       candidate ? "true" : "false");
 	if (candidate) {
 		printf(",\"phase_bin\":%" PRIu32
@@ -890,8 +866,8 @@ static void print_monitor_summary(const char *serial,
 	       ddc_before->accepted, ddc_after->accepted,
 	       ddc_before->emitted, ddc_after->emitted,
 	       ddc_after->discontinuity, ddc_after->saturation,
-	       snapshot_fault_free(cutoff) ? "true" : "false",
-	       snapshot_fault_free(post_loop_snapshot) ? "true" : "false");
+	       pss_map_snapshot_fault_free(cutoff) ? "true" : "false",
+	       pss_map_snapshot_fault_free(post_loop_snapshot) ? "true" : "false");
 }
 
 static int run_monitor(const char *serial, const struct pss_map_io *io,
@@ -939,7 +915,7 @@ static int run_monitor(const char *serial, const struct pss_map_io *io,
 	enabled = true;
 	if (pss_map_take_snapshot(io, &initial_snapshot, timeout_ms,
 			error, error_size) < 0 ||
-	    !snapshot_fault_free(&initial_snapshot) ||
+	    !pss_map_snapshot_fault_free(&initial_snapshot) ||
 	    read_ddc_counters(io, &ddc_before) < 0 ||
 	    monotonic_milliseconds(&started_ms) < 0) {
 		snprintf(error, error_size,
@@ -1022,8 +998,8 @@ static int run_monitor(const char *serial, const struct pss_map_io *io,
 	    previous_copy.start_index != first_start_index +
 		(uint64_t)(maps_copied - 1U) *
 		PSS_MAP_PHASE_BINS * PSS_MAP_TILE_FRAMES ||
-	    !snapshot_fault_free(&previous_copy.after) ||
-	    !snapshot_fault_free(&final_snapshot) ||
+	    !pss_map_snapshot_fault_free(&previous_copy.after) ||
+	    !pss_map_snapshot_fault_free(&final_snapshot) ||
 	    previous_copy.after.accepted_score_count == UINT32_MAX ||
 	    previous_copy.after.map_publish_count == UINT32_MAX ||
 	    previous_copy.after.accepted_score_count <

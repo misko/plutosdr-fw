@@ -270,6 +270,7 @@ int pss_map_wait_copy(const struct pss_map_io *io,
 	char *error, size_t error_size);
 bool pss_map_copies_contiguous(const struct pss_map_copy *previous,
 	const struct pss_map_copy *current);
+bool pss_map_snapshot_fault_free(const struct pss_map_snapshot *snapshot);
 
 int pss_map_window_init(struct pss_map_window *window, uint16_t *storage,
 	size_t storage_words, uint32_t phase_bins, uint32_t tile_frames,

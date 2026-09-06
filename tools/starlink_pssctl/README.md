@@ -169,6 +169,35 @@ frozen Python acquisition oracle across randomized odd/even map sizes and a
 zero-MAD tie. This checkpoint is packaged candidate-selection and policy logic,
 not an on-radio result, live PSS detection, or demonstrated frame lock.
 
+## M2 deterministic timing qualifier
+
+`starlink_pss_m2ctl` is a separate, stripped static controller for the
+15 MS/s `acquisition-injection` profile. It requires both the exact PSMA v1.1
+contract at `0x79040000` and the exact PSSI v1.0 contract at `0x79030000`.
+The host supplies the sealed 130-word `IIIIQQQQ` fixture and 20,000-word score
+profile; the controller converts the fixture to PSSI's `{Q,I}` register order.
+
+For each requested phase, the controller consumes a baseline map, calculates a
+future acquisition-map boundary with 500,000 samples of host scheduling margin,
+and arms the fixture so its known score peak lands at that phase. It keeps
+copying and releasing every intervening map, compares all 20,000 target words
+against `64 * periodic_score[(phase + injection_delta) mod 20000]`, and requires
+one unique peak at the requested phase. The default phase set is the zero edge,
+wrap edge, and deterministic interior phase `0,19999,7311`.
+
+Every copied map must have adjacent generation/start metadata and completely
+zero fault/health telemetry. PSSI must report the same sealed generation and
+exactly 130 completed repetitions. On any error or handled signal the tool
+disables and flushes PSMA and exits without a success summary. Its NDJSON says
+`stimulus=deterministic_internal`, distinguishes the hardware timing result
+from live reception, and always keeps SSS and frame-lock claims false.
+
+The native tests independently cover the PSSI ABI/load/arm/completion contract,
+edge-phase scheduling, exact 20,000-bin map construction, one-word rejection,
+and overflow/geometry failures. `make sanitize` applies ASAN/UBSAN to these
+layers. The deployment controller is statically linked and stripped for the
+radio's bounded `/tmp`; it is not installed into persistent firmware.
+
 This controller and FPGA belong only on
 `codex/starlink-rx-only-do-not-merge`. They must not be merged into HDL or
 firmware main. Generic PPU radio-mode support remains separate and mergeable to

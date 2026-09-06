@@ -467,6 +467,31 @@ static bool fault_counters_unchanged(const struct pss_map_snapshot *before,
 			before->score_phase_index_discontinuity_count;
 }
 
+bool pss_map_snapshot_fault_free(const struct pss_map_snapshot *snapshot)
+{
+	uint32_t continuity_mask;
+
+	if (!snapshot)
+		return false;
+	continuity_mask = snapshot->abi_version == PSS_MAP_VERSION_1_1 ?
+		PSS_MAP_HEALTH_CONTINUITY_MASK_1_1 :
+		PSS_MAP_HEALTH_CONTINUITY_MASK_DDC;
+	return !(snapshot->health_flags & continuity_mask) &&
+		!snapshot->discarded_score_count &&
+		!snapshot->discontinuity_abort_count &&
+		!snapshot->map_overrun_count &&
+		!snapshot->score_protocol_error_count &&
+		!snapshot->arithmetic_overflow_count &&
+		!snapshot->map_read_error_count &&
+		!snapshot->map_release_error_count &&
+		!snapshot->ingress_dropped_sample_count &&
+		!snapshot->scheduler_gap_count &&
+		!snapshot->scheduler_index_error_count &&
+		!snapshot->scheduler_overflow_count &&
+		!snapshot->detector_fault_count &&
+		!snapshot->score_phase_index_discontinuity_count;
+}
+
 static bool copy_is_coherent(const struct pss_map_copy *copy)
 {
 	return copy && copy->bank < PSS_MAP_BANKS &&
