@@ -60,7 +60,7 @@ if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; 
     REQUIRED_BUS_SKEW_CONSTRAINTS=3
 fi
 
-# The shared-XFFT experiment is a separate, explicitly non-promotable source
+# The multirate PSS experiment is a separate, explicitly non-promotable source
 # graph. It has three acquisition CDC constraints, one tracker sample-index
 # constraint, and the RX timestamp FIFO's write/read pointer constraints.
 if [[ "$(basename -- "$MANIFEST")" == \
@@ -70,7 +70,9 @@ if [[ "$(basename -- "$MANIFEST")" == \
       "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v3-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
-      "starlink-pss-multirate-rx-only-dnm-v4-source.yaml" ]]; then
+      "starlink-pss-multirate-rx-only-dnm-v4-source.yaml" ||
+      "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v5-source.yaml" ]]; then
     starlink_multirate_name="$(basename -- "$MANIFEST")"
     starlink_multirate_manifest="${ROOT}/manifests/${starlink_multirate_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
@@ -423,6 +425,9 @@ starlink-pss-multirate-rx-only-dnm-v3-source.yaml:candidate)
     ;;
 starlink-pss-multirate-rx-only-dnm-v4-source.yaml:candidate)
     protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v4"
+    ;;
+starlink-pss-multirate-rx-only-dnm-v5-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v5"
     ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'

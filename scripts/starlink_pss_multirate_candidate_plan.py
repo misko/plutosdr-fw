@@ -29,8 +29,9 @@ SOURCE_MANIFEST_REVISIONS = {
     "starlink-pss-multirate-rx-only-dnm-v2-source.yaml": "v2",
     "starlink-pss-multirate-rx-only-dnm-v3-source.yaml": "v3",
     "starlink-pss-multirate-rx-only-dnm-v4-source.yaml": "v4",
+    "starlink-pss-multirate-rx-only-dnm-v5-source.yaml": "v5",
 }
-SOURCE_MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v4-source.yaml"
+SOURCE_MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v5-source.yaml"
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_QUALIFICATION_MANIFEST = ROOT / "manifests" / SOURCE_MANIFEST_NAME
 PPU_REPOSITORY = "misko/pluto-plus-utils"
@@ -476,7 +477,7 @@ def prepare_candidate(
     expected_source = qualification_manifest.get(f"route_{rate}_firmware_source")
     expected_bit = qualification_manifest.get(f"route_{rate}_bit_sha256")
     firmware_version = versions.get("device-fw", "")
-    if source_revision in {"v2", "v3", "v4"}:
+    if source_revision in {"v2", "v3", "v4", "v5"}:
         _verify_clean_source_repository(
             generator_repository,
             commit=generator_commit,
@@ -492,7 +493,7 @@ def prepare_candidate(
         )
     source_identity_matches = source_commit == expected_source
     route_identity_matches = expected_bit == member_sums.get("system_top.bit")
-    if source_revision in {"v2", "v3", "v4"}:
+    if source_revision in {"v2", "v3", "v4", "v5"}:
         # Locked route hashes are immutable reference-build evidence. A fresh
         # Vivado route can differ byte-for-byte while the locked HDL and routed
         # timing remain equivalent, so the package checksum graph binds the
