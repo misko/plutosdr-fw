@@ -27,6 +27,86 @@ establish full-band Starlink reception. Full-band Gates 4 and 5 need a second
 serial-bound radio with physical AD9361/AD9364 attestation; otherwise those
 full-band pass states remain open by design.
 
+## 2026-09-06 authoritative dual-XFFT and staged-image checkpoint
+
+This section supersedes the 2026-09-03 claim below that the serially shared
+XFFT implementation closed continuous acquisition. That implementation passed
+short replay and routing but could not sustain the 2,980-clock block cadence:
+the shared transform completed blocks no faster than 3,367 clocks and the
+hardware detector faulted after 12 blocks (5,364 scores). The older sections
+remain an audit trail, not the current design authority.
+
+HDL v5 replaces the shared transform with dedicated forward and inverse
+512-point XFFT cores separated by a four-entry registered transform FIFO. The
+FIFO validates position, TLAST, and the complete 64-bit block identity before
+admission, fails closed on protocol error, and participates in common flush
+recovery. Real Xilinx-model replay passes 64 continuous blocks: 28,673 input
+samples, 32,768 forward/product/inverse bins, and 28,608 ordered scores with no
+fault. Steady-state completion is exactly one block every 2,980 clocks. The
+source is HDL `59bc0578c9e1016144048559cc460048fcd86b7f` and firmware
+`27d87e598375e0ca830a4309cd354f37b2520b06`, both tagged as v5 on the
+`codex/starlink-rx-only-do-not-merge` branch.
+
+The combined v5 tracker plus dual-XFFT acquisition shell is functionally sound
+but not placeable on the Zynq-7010. Default placement needs 2,542 slices where
+only 2,520 are available after fixed resources; all six controlled
+optimization/placement strategies fail. The design has 466 control sets and
+16,553 total LUTs. This is a reproducible capacity result, not a timing or PSS
+algorithm failure.
+
+HDL v6 therefore adds an explicit compile-time profile boundary:
+
+- `STARLINK_PSS_PROFILE=full` preserves the tracker, injection/telemetry path,
+  acquisition engine, and RX DMA.
+- `STARLINK_PSS_PROFILE=acquisition-only` omits the tracker IP, its AXI
+  aperture, and its interrupt. Unmodified RX0 CI16 samples and their counter
+  index fan out directly to acquisition and the retained IIO RX DMA.
+- `STARLINK_PSS_RATE_MSPS=15|30|60` remains an independent compile-time
+  geometry choice. Acquisition remains armed through its fail-closed MMIO
+  control and does not require an active IIO buffer.
+
+The first fresh 15 MS/s acquisition-only route passes Vivado 2022.2 placement,
+routing, bitstream/XSA generation, and all timing constraints:
+
+| Gate | Result |
+| --- | ---: |
+| Setup WNS / TNS | `+0.543 ns / 0` |
+| Hold WHS / THS | `+0.009 ns / 0` |
+| Routing errors | `0` |
+| LUT / FF | `9,217 / 16,082` |
+| Slices / control sets | `4,079 / 387` |
+| BRAM tiles / DSP | `42.5 / 44` |
+| Tracker hierarchies | `0` |
+| Acquisition hierarchies | `1` |
+| Bus-skew constraints | `5 met, 0 violated` |
+
+The exact acquisition-only routed inventory contains 97 CDC rows: the two
+reviewed timestamp-mailbox Critical rows, three acquisition Gray-code CDC-6
+rows, and no tracker path. A separate fail-closed validator binds the exact CDC
+summary and the five bus-skew source/endpoint inventories. HDL v6 is
+`aac10563f4b6b77a21a40d42c0114330d296139e`, tagged
+`starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v6`.
+
+The staged execution order is now:
+
+1. Freeze the firmware v6 source graph and reproduce the 15 MS/s
+   acquisition-only image from that clean commit.
+2. Require all RTL, real-XFFT short and 64-block replays, source-graph,
+   placement, route, timing, DRC, CDC, bus-skew, packaging, and checksum gates.
+3. Prepare a serial-bound, RAM-only candidate for
+   `104000bac4950008230026001b440a003a`; never write QSPI and always recover to
+   its persistent AD9363A 1R1T baseline.
+4. On hardware, first prove sustained ingress and score/map production without
+   faults or drops, then run deterministic injected-PSS timing recovery, and
+   only then collect ambient candidate measurements. No candidate score is an
+   SSS or Starlink frame-lock claim.
+5. Begin the 30 MS/s build and RAM-only gate only after the 15 MS/s evidence
+   and rollback are accepted. Repeat at 60 MS/s only after 30 MS/s. Full-band
+   RF qualification still requires a physically attested AD9361/AD9364 radio.
+
+No radio was touched while producing this checkpoint, and PPU was not changed.
+All experimental HDL/firmware remains explicitly non-mergeable to main.
+
 ## 2026-09-03 authoritative 15/30/60 offline implementation checkpoint
 
 This section supersedes earlier chronological notes below that describe two

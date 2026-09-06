@@ -14,6 +14,7 @@ RELEASE_STATE="${SPF_RELEASE_STATE:-main-ci}"
 REQUIRED_BUS_SKEW_CONSTRAINTS=4
 STARLINK_RX_ONLY_BUILD=false
 STARLINK_PSS_MULTIRATE_BUILD=false
+STARLINK_PSS_ACQUISITION_ONLY_BUILD=false
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -61,8 +62,10 @@ if [[ "$(basename -- "$MANIFEST")" == "starlink-rx-only-dnm-v1-source.yaml" ]]; 
 fi
 
 # The multirate PSS experiment is a separate, explicitly non-promotable source
-# graph. It has three acquisition CDC constraints, one tracker sample-index
-# constraint, and the RX timestamp FIFO's write/read pointer constraints.
+# graph. Historical full-profile revisions have three acquisition constraints,
+# one tracker sample-index constraint, and two RX timestamp-FIFO constraints.
+# The v6 acquisition-only profile has the same acquisition/FIFO inventory but
+# deliberately omits the tracker constraint.
 if [[ "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
@@ -72,7 +75,9 @@ if [[ "$(basename -- "$MANIFEST")" == \
       "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v4-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
-      "starlink-pss-multirate-rx-only-dnm-v5-source.yaml" ]]; then
+      "starlink-pss-multirate-rx-only-dnm-v5-source.yaml" ||
+      "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
     starlink_multirate_name="$(basename -- "$MANIFEST")"
     starlink_multirate_manifest="${ROOT}/manifests/${starlink_multirate_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
@@ -86,7 +91,15 @@ if [[ "$(basename -- "$MANIFEST")" == \
     *) fail "STARLINK_PSS_RATE_MSPS must be exactly 15, 30, or 60" ;;
     esac
     STARLINK_PSS_MULTIRATE_BUILD=true
-    REQUIRED_BUS_SKEW_CONSTRAINTS=6
+    if [[ "$starlink_multirate_name" == \
+          "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
+        [[ "${STARLINK_PSS_PROFILE:-}" == "acquisition-only" ]] ||
+            fail "v6 multirate PSS build requires STARLINK_PSS_PROFILE=acquisition-only"
+        STARLINK_PSS_ACQUISITION_ONLY_BUILD=true
+        REQUIRED_BUS_SKEW_CONSTRAINTS=5
+    else
+        REQUIRED_BUS_SKEW_CONSTRAINTS=6
+    fi
 fi
 
 [[ -n "$ARTIFACT_ROOT" ]] ||
@@ -429,6 +442,9 @@ starlink-pss-multirate-rx-only-dnm-v4-source.yaml:candidate)
 starlink-pss-multirate-rx-only-dnm-v5-source.yaml:candidate)
     protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v5"
     ;;
+starlink-pss-multirate-rx-only-dnm-v6-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v6"
+    ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
     ;;
@@ -579,7 +595,11 @@ if [[ "$STARLINK_RX_ONLY_BUILD" == true ]]; then
         --cdc-report "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
         --bus-skew-report "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
 fi
-if [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
+if [[ "$STARLINK_PSS_ACQUISITION_ONLY_BUILD" == true ]]; then
+    python3 scripts/ci/validate_starlink_pss_acquisition_only_route_reports.py \
+        "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
+        "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
+elif [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
     python3 scripts/ci/validate_starlink_pss_multirate_route_reports.py \
         "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
         "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
@@ -659,6 +679,7 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
     echo "build_duration_seconds=${CI_BUILD_DURATION_SECONDS:-unknown}"
     if [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
         echo "starlink_pss_rate_msps=$STARLINK_PSS_RATE_MSPS"
+        echo "starlink_pss_profile=${STARLINK_PSS_PROFILE:-full}"
         echo 'do_not_merge=true'
         echo 'persistent_flash_eligible=false'
     fi

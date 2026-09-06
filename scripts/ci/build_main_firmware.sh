@@ -128,12 +128,20 @@ elif [[ "$(basename -- "$source_manifest")" == \
         "$(basename -- "$source_manifest")" == \
         "starlink-pss-multirate-rx-only-dnm-v4-source.yaml" ||
         "$(basename -- "$source_manifest")" == \
-        "starlink-pss-multirate-rx-only-dnm-v5-source.yaml" ]]; then
+        "starlink-pss-multirate-rx-only-dnm-v5-source.yaml" ||
+        "$(basename -- "$source_manifest")" == \
+        "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
     case "${STARLINK_PSS_RATE_MSPS:-}" in
     15|30|60) ;;
     *) fail "STARLINK_PSS_RATE_MSPS must be exactly 15, 30, or 60 for the multirate PSS build" ;;
     esac
     export STARLINK_PSS_RATE_MSPS
+    if [[ "$(basename -- "$source_manifest")" == \
+          "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
+        export STARLINK_PSS_PROFILE=acquisition-only
+    else
+        export STARLINK_PSS_PROFILE=full
+    fi
     {
         bash hdl/library/axi_ad9361/run_tests.sh
         bash hdl/library/axi_starlink_pss_acquisition/run_tests.sh

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v5-source.yaml"
+MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v6-source.yaml"
 
 
 def _read(relative: str) -> str:
@@ -39,15 +39,18 @@ def test_multirate_manifest_is_immutable_dnm_and_records_all_routes() -> None:
     assert "starlink_pss_xfft_topology: dedicated-forward-inverse" in manifest
     assert "starlink_pss_transform_fifo_depth: 4" in manifest
     assert "starlink_pss_sustained_simulation_blocks: 64" in manifest
-    assert "source_change: sustained-dedicated-forward-inverse-xfft-pipeline" in manifest
+    assert "starlink_pss_profile: acquisition-only" in manifest
+    assert "starlink_pss_tracker_included: false" in manifest
+    assert "starlink_pss_rx0_fanout: direct-to-acquisition-and-rx-dma" in manifest
+    assert "source_change: selectable-acquisition-only-profile" in manifest
     assert "pss_sample_enable_source: constant-one" in manifest
     assert "linux_iio_buffer_required_for_pss: false" in manifest
     assert "rx_only_adc_aperture_acknowledged_by_tx: false" in manifest
-    assert "route_evidence_scope: pre-dual-xfft-reference-only" in manifest
-    assert "submodule_hdl: 59bc0578c9e1016144048559cc460048fcd86b7f" in manifest
+    assert "route_evidence_scope: pre-firmware-freeze-local-diagnostic-only" in manifest
+    assert "submodule_hdl: aac10563f4b6b77a21a40d42c0114330d296139e" in manifest
     assert (
         "submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/"
-        "hdl-pss15-30-60-acquisition-v5"
+        "hdl-pss15-30-60-acquisition-v6"
     ) in manifest
     assert "submodule_buildroot: 6971a8c1fb5f8422cf5f32e239efe49c2cea08ec" in manifest
     assert "controller_packaged: true" in manifest
@@ -71,15 +74,17 @@ def test_manual_dispatch_selects_one_rate_only_on_the_dnm_branch() -> None:
     for rate in ("'15'", "'30'", "'60'"):
         assert f"- {rate}" in workflow
     assert MANIFEST_NAME in workflow
-    assert "format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v5'" in workflow
+    assert "format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v6'" in workflow
     assert "STARLINK_PSS_RATE_MSPS:" in workflow
+    assert "STARLINK_PSS_PROFILE:" in workflow
+    assert "'acquisition-only' || ''" in workflow
     assert "15|30|60" in workflow
     assert "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e" in workflow
     assert "version: '0.12.5'" in workflow
     assert "Install pinned uv for Starlink model-vector tests" in workflow
     assert (
         'expected="v0.50-plutoplus-starlink-pss-'
-        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v5"'
+        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v6"'
     ) in workflow
     assert "push:\n    branches: [main]" in workflow
     assert "pull_request:" not in workflow
@@ -101,6 +106,7 @@ def test_multirate_builder_runs_current_rtl_and_only_selected_vendor_replay() ->
     ):
         assert suite in builder
     assert 'if [[ "$STARLINK_PSS_RATE_MSPS" == 15 ]]' in builder
+    assert "export STARLINK_PSS_PROFILE=acquisition-only" in builder
     assert "run_starlink_pss15_iq_to_score_xfft.sh" in builder
     assert "run_starlink_pss15_iq_to_score_xfft_longrun.sh" in builder
     assert "run_starlink_pss_multirate_ddc_to_score_xfft.sh" in builder
@@ -141,12 +147,14 @@ def test_packager_dispatches_new_exact_route_gate_and_keeps_legacy_gate() -> Non
     assert 'show "HEAD:manifests/${starlink_multirate_name}"' in packager
     assert MANIFEST_NAME in packager
     assert "REQUIRED_BUS_SKEW_CONSTRAINTS=3" in packager
+    assert "REQUIRED_BUS_SKEW_CONSTRAINTS=5" in packager
     assert "REQUIRED_BUS_SKEW_CONSTRAINTS=6" in packager
     assert "validate_starlink_rx_only_route_reports.py" in packager
     assert "validate_starlink_pss_multirate_route_reports.py" in packager
+    assert "validate_starlink_pss_acquisition_only_route_reports.py" in packager
     assert (
         'protected_version="v0.50-plutoplus-starlink-pss-'
-        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v5"'
+        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v6"'
     ) in packager
     assert "persistent_flash_eligible=false" in packager
 
