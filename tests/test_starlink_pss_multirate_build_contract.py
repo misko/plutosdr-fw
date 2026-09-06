@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
+MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v3-source.yaml"
 
 
 def _read(relative: str) -> str:
@@ -36,10 +36,13 @@ def test_multirate_manifest_is_immutable_dnm_and_records_all_routes() -> None:
         assert boundary in manifest
     assert "starlink_pss_supported_rates_msps: 15,30,60" in manifest
     assert "starlink_pss_shared_xfft_instances: 1" in manifest
-    assert "submodule_hdl: a3cc9592207e5600f617e5d82686c1c6671a8d67" in manifest
+    assert "source_change: rx-only-axi-aperture-decode-fix" in manifest
+    assert "rx_only_adc_aperture_acknowledged_by_tx: false" in manifest
+    assert "route_evidence_scope: prior-v2-reference-only" in manifest
+    assert "submodule_hdl: e96b0e24801fe1e4a2ac2df841efccf7c6b5b64a" in manifest
     assert (
         "submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/"
-        "hdl-pss15-30-60-acquisition-v2"
+        "hdl-pss15-30-60-acquisition-v3"
     ) in manifest
     assert "submodule_buildroot: 6971a8c1fb5f8422cf5f32e239efe49c2cea08ec" in manifest
     assert "controller_packaged: true" in manifest
@@ -63,7 +66,7 @@ def test_manual_dispatch_selects_one_rate_only_on_the_dnm_branch() -> None:
     for rate in ("'15'", "'30'", "'60'"):
         assert f"- {rate}" in workflow
     assert MANIFEST_NAME in workflow
-    assert "format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v2'" in workflow
+    assert "format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v3'" in workflow
     assert "STARLINK_PSS_RATE_MSPS:" in workflow
     assert "15|30|60" in workflow
     assert "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e" in workflow
@@ -71,7 +74,7 @@ def test_manual_dispatch_selects_one_rate_only_on_the_dnm_branch() -> None:
     assert "Install pinned uv for Starlink model-vector tests" in workflow
     assert (
         'expected="v0.50-plutoplus-starlink-pss-'
-        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v2"'
+        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v3"'
     ) in workflow
     assert "push:\n    branches: [main]" in workflow
     assert "pull_request:" not in workflow
@@ -85,6 +88,7 @@ def test_multirate_builder_runs_current_rtl_and_only_selected_vendor_replay() ->
     assert MANIFEST_NAME in builder
     assert MANIFEST_NAME in image_builder
     for suite in (
+        "hdl/library/axi_ad9361/run_tests.sh",
         "hdl/library/axi_starlink_pss_acquisition/run_tests.sh",
         "hdl/library/starlink_pss_acquisition/run_tests.sh",
         "hdl/library/starlink_pss_raw_correlator/run_tests.sh",
@@ -136,7 +140,7 @@ def test_packager_dispatches_new_exact_route_gate_and_keeps_legacy_gate() -> Non
     assert "validate_starlink_pss_multirate_route_reports.py" in packager
     assert (
         'protected_version="v0.50-plutoplus-starlink-pss-'
-        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v2"'
+        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v3"'
     ) in packager
     assert "persistent_flash_eligible=false" in packager
 

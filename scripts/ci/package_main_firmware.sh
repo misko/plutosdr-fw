@@ -66,7 +66,9 @@ fi
 if [[ "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
-      "starlink-pss-multirate-rx-only-dnm-v2-source.yaml" ]]; then
+      "starlink-pss-multirate-rx-only-dnm-v2-source.yaml" ||
+      "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v3-source.yaml" ]]; then
     starlink_multirate_name="$(basename -- "$MANIFEST")"
     starlink_multirate_manifest="${ROOT}/manifests/${starlink_multirate_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
@@ -413,6 +415,9 @@ starlink-pss-multirate-rx-only-dnm-v1-source.yaml:candidate)
     ;;
 starlink-pss-multirate-rx-only-dnm-v2-source.yaml:candidate)
     protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v2"
+    ;;
+starlink-pss-multirate-rx-only-dnm-v3-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v3"
     ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'

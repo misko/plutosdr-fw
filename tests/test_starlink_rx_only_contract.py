@@ -78,6 +78,8 @@ def test_rx_only_packaging_requires_fifo_and_monitor_mailbox_crossings() -> None
 
 def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:
     design = _read("hdl/projects/pluto/system_bd.tcl")
+    transceiver = _read("hdl/library/axi_ad9361/axi_ad9361.v")
+    tx_null = _read("hdl/library/axi_ad9361/axi_ad9361_tx_null.v")
 
     assert "CONFIG.MODE_1R1T 1" in design
     assert "CONFIG.TDD_DISABLE 1" in design
@@ -95,6 +97,13 @@ def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:
     )
     for name in forbidden:
         assert name not in design
+
+    assert "axi_ad9361_tx_null" in transceiver
+    assert "assign up_rack_tx_s = up_rreq_s;" not in transceiver
+    assert "assign up_wack_tx_s = up_wreq_s;" not in transceiver
+    assert "up_raddr[13:7] == {6'h10, 1'b0}" in tx_null
+    assert "up_raddr[13:8] == 6'h11" in tx_null
+    assert "up_raddr[13:8] == 6'h00" not in tx_null
 
 
 def test_abi12_injection_is_the_shared_tracker_and_dma_boundary() -> None:

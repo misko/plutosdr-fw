@@ -42,7 +42,7 @@ def _package(
     actual_bit: bytes = b"bit",
     manifest_payload: bytes | None = None,
 ) -> tuple[Path, Path]:
-    assert revision in {"v1", "v2"}
+    assert revision in {"v1", "v2", "v3"}
     dfu_name = (
         f"plutoplus-starlink-pss-{rate}m-rx-only-dnm-{revision}-source-pluto.dfu"
     )
@@ -52,10 +52,15 @@ def _package(
         if revision == "v1"
         else "starlink-rx-only-dnm-v1-source/buildroot-pss-acqctl-v1"
     )
+    hdl_version = (
+        "starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v3"
+        if revision == "v3"
+        else "starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2"
+    )
     members: dict[str, bytes] = {
         "packed-VERSIONS.txt": (
             f"device-fw v0.50-plutoplus-starlink-pss-{rate}m-rx-only-dnm-{revision}\n"
-            "hdl starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2\n"
+            f"hdl {hdl_version}\n"
             f"buildroot {buildroot_version}\n"
             "linux starlink-rx-only-dnm-v1-source/linux-v2\n"
             "u-boot-xlnx gain-series-v4-rc2-source/u-boot-xlnx\n"
@@ -68,7 +73,7 @@ def _package(
             "starlink_pss_supported_rates_msps: 15,30,60\n"
             f"route_{rate}_firmware_source: {source_commit}\n"
             f"route_{rate}_bit_sha256: {hashlib.sha256(b'bit').hexdigest()}\n"
-            "versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2\n"
+            f"versions_hdl: {hdl_version}\n"
             f"versions_buildroot: {buildroot_version}\n"
             "versions_linux: starlink-rx-only-dnm-v1-source/linux-v2\n"
             "versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx\n"
@@ -120,7 +125,7 @@ def _manifest_from_archive(archive: Path, *, revision: str = "v2") -> bytes:
 
 
 def _generator_repository(
-    root: Path, manifest_payload: bytes
+    root: Path, manifest_payload: bytes, *, revision: str = "v2"
 ) -> tuple[Path, str, str]:
     repository = root / "generator"
     repository.mkdir()
@@ -140,7 +145,7 @@ def _generator_repository(
     git("remote", "add", "origin", "git@github.com:misko/plutosdr-fw.git")
     manifests = repository / "manifests"
     manifests.mkdir()
-    (manifests / "starlink-pss-multirate-rx-only-dnm-v2-source.yaml").write_bytes(
+    (manifests / f"starlink-pss-multirate-rx-only-dnm-{revision}-source.yaml").write_bytes(
         manifest_payload
     )
     git("add", "manifests")
@@ -213,27 +218,28 @@ def test_prepares_canonical_ppu_v2_plan_without_hardware(tmp_path: Path) -> None
     assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in output.iterdir())
 
 
-def test_prepares_controller_v2_only_from_identical_source_checkout(
-    tmp_path: Path,
+@pytest.mark.parametrize("revision", ["v2", "v3"])
+def test_prepares_locked_controller_only_from_identical_source_checkout(
+    tmp_path: Path, revision: str
 ) -> None:
     provisional, _ = _package(
-        tmp_path, revision="v2", actual_bit=b"fresh-vivado-route"
+        tmp_path, revision=revision, actual_bit=b"fresh-vivado-route"
     )
-    packaged_manifest = _manifest_from_archive(provisional)
+    packaged_manifest = _manifest_from_archive(provisional, revision=revision)
     repository, package_commit, generator_commit = _generator_repository(
-        tmp_path, packaged_manifest
+        tmp_path, packaged_manifest, revision=revision
     )
     archive, sidecar = _package(
         tmp_path,
-        revision="v2",
+        revision=revision,
         source_commit=package_commit,
         actual_bit=b"fresh-vivado-route",
         manifest_payload=packaged_manifest,
     )
-    manifest_name = "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
+    manifest_name = f"starlink-pss-multirate-rx-only-dnm-{revision}-source.yaml"
     qualification = tmp_path / manifest_name
     qualification.write_bytes(packaged_manifest)
-    output = _output_parent(tmp_path) / "15-v2"
+    output = _output_parent(tmp_path) / f"15-{revision}"
 
     result = prepare_candidate(
         archive,
@@ -250,9 +256,9 @@ def test_prepares_controller_v2_only_from_identical_source_checkout(
     index = json.loads((output / "candidate-artifact-index.json").read_bytes())
     assert result["verdict"] == "PASS_OFFLINE"
     assert plan["source_commit"] == package_commit
-    assert plan["expected_runtime"]["firmware_version"].endswith("dnm-v2")
+    assert plan["expected_runtime"]["firmware_version"].endswith(f"dnm-{revision}")
     assert index["source_manifest_name"] == manifest_name
-    assert index["source_manifest_revision"] == "v2"
+    assert index["source_manifest_revision"] == revision
     assert index["package_source_attestation"] == (
         "clean-generator-descendant-identical-manifest-v1"
     )

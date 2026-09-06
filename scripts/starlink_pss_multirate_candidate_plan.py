@@ -27,8 +27,9 @@ ALLOCATED_SERIAL = "104000bac4950008230026001b440a003a"
 SOURCE_MANIFEST_REVISIONS = {
     "starlink-pss-multirate-rx-only-dnm-v1-source.yaml": "v1",
     "starlink-pss-multirate-rx-only-dnm-v2-source.yaml": "v2",
+    "starlink-pss-multirate-rx-only-dnm-v3-source.yaml": "v3",
 }
-SOURCE_MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v2-source.yaml"
+SOURCE_MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v3-source.yaml"
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_QUALIFICATION_MANIFEST = ROOT / "manifests" / SOURCE_MANIFEST_NAME
 PPU_REPOSITORY = "misko/pluto-plus-utils"
@@ -127,7 +128,7 @@ def _verify_clean_source_repository(
     return selected
 
 
-def _verify_v2_package_source(
+def _verify_locked_package_source(
     repository: Path,
     *,
     package_commit: str,
@@ -135,11 +136,11 @@ def _verify_v2_package_source(
     manifest_name: str,
     manifest_payload: bytes,
 ) -> None:
-    """Bind a v2 package to an immutable ancestor of the generator checkout."""
+    """Bind a locked package to an immutable generator ancestor."""
 
     selected = repository.absolute()
     if HEX_40.fullmatch(package_commit) is None:
-        raise CandidatePlanError("v2 package source is not one 40-hex commit")
+        raise CandidatePlanError("locked package source is not one 40-hex commit")
 
     def git_bytes(
         *arguments: str, check: bool = True
@@ -152,7 +153,7 @@ def _verify_v2_package_source(
             )
         except (OSError, subprocess.CalledProcessError) as error:
             raise CandidatePlanError(
-                "v2 package source cannot be attested from the generator repository"
+                "locked package source cannot be attested from the generator repository"
             ) from error
 
     ancestry = git_bytes(
@@ -160,12 +161,12 @@ def _verify_v2_package_source(
     )
     if ancestry.returncode != 0:
         raise CandidatePlanError(
-            "v2 package source is not an ancestor of the generator commit"
+            "locked package source is not an ancestor of the generator commit"
         )
     blob = git_bytes("show", f"{package_commit}:manifests/{manifest_name}").stdout
     if blob != manifest_payload:
         raise CandidatePlanError(
-            "v2 packaged manifest is not byte-identical at its package source commit"
+            "locked packaged manifest is not byte-identical at its package source commit"
         )
 
 
@@ -474,14 +475,14 @@ def prepare_candidate(
     expected_source = qualification_manifest.get(f"route_{rate}_firmware_source")
     expected_bit = qualification_manifest.get(f"route_{rate}_bit_sha256")
     firmware_version = versions.get("device-fw", "")
-    if source_revision == "v2":
+    if source_revision in {"v2", "v3"}:
         _verify_clean_source_repository(
             generator_repository,
             commit=generator_commit,
             expected_slug=FIRMWARE_REPOSITORY,
             label="generator",
         )
-        _verify_v2_package_source(
+        _verify_locked_package_source(
             generator_repository,
             package_commit=source_commit,
             generator_commit=generator_commit,
@@ -490,8 +491,8 @@ def prepare_candidate(
         )
     source_identity_matches = source_commit == expected_source
     route_identity_matches = expected_bit == member_sums.get("system_top.bit")
-    if source_revision == "v2":
-        # v2 route hashes are immutable reference-build evidence. A fresh
+    if source_revision in {"v2", "v3"}:
+        # Locked route hashes are immutable reference-build evidence. A fresh
         # Vivado route can differ byte-for-byte while the locked HDL and routed
         # timing remain equivalent, so the package checksum graph binds the
         # exact rebuilt bitstream instead.
