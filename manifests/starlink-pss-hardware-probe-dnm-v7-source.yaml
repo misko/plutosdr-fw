@@ -1,0 +1,70 @@
+# Immutable source graph for the acquisition-only v6-candidate 15/30/60 MS/s
+# measurement harness.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This manifest records offline
+# source only. It authorizes no USB/IIO access, RAM lifecycle, radio mutation,
+# Starlink PSS detection claim, frame lock, SSS result, or rate advancement.
+
+schema: plutosdr-fw.starlink-pss-hardware-probe-source
+schema_version: 7
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+pss_detected: false
+frame_lock_qualified: false
+sss_qualified: false
+
+supersedes_manifest: starlink-pss-hardware-probe-dnm-v6-source.yaml
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9363a-1r1t
+candidate_profile: acquisition-only
+supported_candidate_revisions: v2,v3,v4,v5,v6
+supported_sample_rates_msps: 15-30-60
+ad9363a_maximum_requested_rf_bandwidth_hz: 20000000
+post_ram_usb_reenumeration: exact-stable-identity-only
+dependent_attribute_snapshot: before-any-write
+linux_iio_buffer_required_for_pss: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: 4dd46af19479474cc6cfd88b525ab33afa49ad7d
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss-v6-candidate-probe-v7
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 4661bd41533ae2a22601782b40e7e556e96d01cf
+
+candidate_source_path: manifests/starlink-pss-multirate-rx-only-dnm-v6-source.yaml
+candidate_source_sha256: 6ed30ee981aad2a3fba01dc2863a05a761bb79e38721e8f9e0d57adc12ea1b73
+probe_script_path: scripts/starlink_pss_hardware_probe_v7.py
+probe_script_sha256: 5f8f6259e58b56068a01d4e7369cc8826af7e4c01dde0e80cd9a971e11eb4c2c
+probe_test_path: tests/test_starlink_pss_hardware_probe_v7.py
+probe_test_sha256: 3318ec1e2395a4848e270a69a2a91a4196723a8315ce22818fad9e94fa697bc1
+inherited_v5_probe_script_path: scripts/starlink_pss_hardware_probe_v5.py
+inherited_v5_probe_script_sha256: d5db94009d1a9230244f9a8a328c488760aed7f7636e685ca92cf7604f554116
+inherited_v5_probe_test_path: tests/test_starlink_pss_hardware_probe_v5.py
+inherited_v5_probe_test_sha256: 0c3b5d7ea45d0c2663d38b69d0bcfd9237636d99a0b949e687bc158c03065d65
+inherited_v6_manifest_path: manifests/starlink-pss-hardware-probe-dnm-v6-source.yaml
+inherited_v6_manifest_sha256: 968df8a0f6ad223b84e0d53d9eae1ba2896b062e19ae2f07557661db8753a279
+controller_readme_path: tools/starlink_pssctl/README.md
+controller_readme_sha256: 3cee617de6c5802efc776d944fbd37bcc8f3860c80be756fa4e75c3c3fbd0a05
+plan_path: STARLINK_PSS_15_30_60_PLAN.md
+plan_sha256: 3d553b04ff574c37c42b81d9398fdfd1cecc2244654cf73857b6211d7b0d9d22
+
+plan_command_hardware_access: false
+execute_requires_explicit_confirmation: true
+execute_requires_passing_ppu_ram_receipt: true
+execute_reuses_ppu_radio_and_route_locks: true
+execute_resolves_one_stable_post_ram_identity: true
+execute_revalidates_full_live_identity_before_iio: true
+execute_loads_volatile_ram: false
+execute_writes_qspi: false
+execute_changes_radio_personality: false
+execute_claim_scope: candidate_measurement_only
+execute_snapshots_parent_and_child_before_rate_write: true
+execute_restores_rx_attributes: true
+execute_releases_host_route: true
+separate_ppu_ram_recovery_required: true
+
+offline_test_verdict: PASS
+focused_v7_test_count: 4
