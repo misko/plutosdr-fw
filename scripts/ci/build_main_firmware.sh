@@ -130,13 +130,20 @@ elif [[ "$(basename -- "$source_manifest")" == \
         "$(basename -- "$source_manifest")" == \
         "starlink-pss-multirate-rx-only-dnm-v5-source.yaml" ||
         "$(basename -- "$source_manifest")" == \
-        "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
+        "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ||
+        "$(basename -- "$source_manifest")" == \
+        "starlink-pss-multirate-rx-only-dnm-v7-source.yaml" ]]; then
     case "${STARLINK_PSS_RATE_MSPS:-}" in
     15|30|60) ;;
     *) fail "STARLINK_PSS_RATE_MSPS must be exactly 15, 30, or 60 for the multirate PSS build" ;;
     esac
     export STARLINK_PSS_RATE_MSPS
     if [[ "$(basename -- "$source_manifest")" == \
+          "starlink-pss-multirate-rx-only-dnm-v7-source.yaml" ]]; then
+        [[ "$STARLINK_PSS_RATE_MSPS" == 15 ]] ||
+            fail "v7 acquisition-injection qualification is gated to 15 MS/s"
+        export STARLINK_PSS_PROFILE=acquisition-injection
+    elif [[ "$(basename -- "$source_manifest")" == \
           "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
         export STARLINK_PSS_PROFILE=acquisition-only
     else
@@ -149,6 +156,23 @@ elif [[ "$(basename -- "$source_manifest")" == \
         bash hdl/library/starlink_pss_raw_correlator/run_tests.sh
         bash hdl/library/axi_starlink_pss_tracker/run_tests.sh
     } 2>&1 | tee "$artifact_real/starlink-pss-multirate-rtl-simulation.log"
+    if [[ "$(basename -- "$source_manifest")" == \
+          "starlink-pss-multirate-rx-only-dnm-v7-source.yaml" ]]; then
+        {
+            bash hdl/library/axi_starlink_pss_periodic_injector/run_tests.sh
+            make -C tools/starlink_pssctl check
+            make -C tools/starlink_pssctl sanitize
+        } 2>&1 | tee "$artifact_real/starlink-pss-m2-offline-qualification.log"
+        bash run_starlink_pss15_m2_periodic_xfft.sh \
+            "$artifact_real/starlink-pss15-m2-periodic-xfft" \
+            2>&1 | tee "$artifact_real/starlink-pss15-m2-vendor-xfft-replay.log"
+        cp tools/starlink_pssctl/build/starlink_pss_m2ctl \
+            "$artifact_real/starlink_pss_m2ctl"
+        cp hdl/library/axi_starlink_pss_periodic_injector/tb/upper_edge_pss_periodic_fixture_ci16.mem \
+            "$artifact_real/upper_edge_pss_periodic_fixture_ci16.mem"
+        cp hdl/library/axi_starlink_pss_periodic_injector/tb/m2_period_scores_u8.mem \
+            "$artifact_real/m2_period_scores_u8.mem"
+    fi
     if [[ "$STARLINK_PSS_RATE_MSPS" == 15 ]]; then
         bash run_starlink_pss15_iq_to_score_xfft.sh \
             "$artifact_real/starlink-pss15-iq-to-score-xfft" \

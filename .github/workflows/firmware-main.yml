@@ -107,7 +107,7 @@ jobs:
       SPF_GAIN_SERIES_MANIFEST: >-
         ${{ format('{0}/manifests/{1}', github.workspace,
           github.ref == 'refs/heads/codex/starlink-rx-only-do-not-merge' &&
-          'starlink-pss-multirate-rx-only-dnm-v6-source.yaml' ||
+          'starlink-pss-multirate-rx-only-dnm-v7-source.yaml' ||
           github.ref == 'refs/heads/main' &&
           'iq-direct-async-v3-source.yaml' ||
           github.ref == 'refs/heads/codex/iq-direct-async-main-refresh' &&
@@ -209,7 +209,7 @@ jobs:
           'libiio-frame-metadata-v6-rc4-source.yaml') }}
       SPF_PACKAGE_STEM_PREFIX: >-
         ${{ github.ref == 'refs/heads/codex/starlink-rx-only-do-not-merge' &&
-          format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v6',
+          format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v7',
             inputs.starlink_rate_msps || '15') ||
           github.ref == 'refs/heads/main' &&
           'plutoplus-spf-iq-direct-async-v3' ||
@@ -319,7 +319,7 @@ jobs:
           (inputs.starlink_rate_msps || '15') || '' }}
       STARLINK_PSS_PROFILE: >-
         ${{ github.ref == 'refs/heads/codex/starlink-rx-only-do-not-merge' &&
-          'acquisition-only' || '' }}
+          'acquisition-injection' || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -488,7 +488,8 @@ jobs:
             15|30|60) ;;
             *) echo "invalid Starlink PSS rate: $STARLINK_PSS_RATE_MSPS" >&2; exit 1 ;;
           esac
-          expected="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v6"
+          test "$STARLINK_PSS_RATE_MSPS" = 15
+          expected="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v7"
           test "$REQUESTED_RELEASE_VERSION" = "$expected"
 
       - name: Require the exact IIO throughput HOLD v1 RC1 identity

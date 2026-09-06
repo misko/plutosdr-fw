@@ -6,6 +6,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v6-source.yaml"
+ACTIVE_MANIFEST_NAME = "starlink-pss-multirate-rx-only-dnm-v7-source.yaml"
 
 
 def _read(relative: str) -> str:
@@ -73,18 +74,18 @@ def test_manual_dispatch_selects_one_rate_only_on_the_dnm_branch() -> None:
     assert "starlink_rate_msps:" in workflow
     for rate in ("'15'", "'30'", "'60'"):
         assert f"- {rate}" in workflow
-    assert MANIFEST_NAME in workflow
-    assert "format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v6'" in workflow
+    assert ACTIVE_MANIFEST_NAME in workflow
+    assert "format('plutoplus-starlink-pss-{0}m-rx-only-dnm-v7'" in workflow
     assert "STARLINK_PSS_RATE_MSPS:" in workflow
     assert "STARLINK_PSS_PROFILE:" in workflow
-    assert "'acquisition-only' || ''" in workflow
+    assert "'acquisition-injection' || ''" in workflow
     assert "15|30|60" in workflow
     assert "astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e" in workflow
     assert "version: '0.12.5'" in workflow
     assert "Install pinned uv for Starlink model-vector tests" in workflow
     assert (
         'expected="v0.50-plutoplus-starlink-pss-'
-        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v6"'
+        '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v7"'
     ) in workflow
     assert "push:\n    branches: [main]" in workflow
     assert "pull_request:" not in workflow

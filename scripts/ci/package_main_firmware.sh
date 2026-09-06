@@ -15,6 +15,7 @@ REQUIRED_BUS_SKEW_CONSTRAINTS=4
 STARLINK_RX_ONLY_BUILD=false
 STARLINK_PSS_MULTIRATE_BUILD=false
 STARLINK_PSS_ACQUISITION_ONLY_BUILD=false
+STARLINK_PSS_ACQUISITION_INJECTION_BUILD=false
 
 fail() {
     printf 'FAIL: %s\n' "$*" >&2
@@ -65,7 +66,8 @@ fi
 # graph. Historical full-profile revisions have three acquisition constraints,
 # one tracker sample-index constraint, and two RX timestamp-FIFO constraints.
 # The v6 acquisition-only profile has the same acquisition/FIFO inventory but
-# deliberately omits the tracker constraint.
+# deliberately omits the tracker constraint. The v7 15 MS/s qualifier adds
+# the two reviewed injector mailbox constraints.
 if [[ "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
@@ -77,7 +79,9 @@ if [[ "$(basename -- "$MANIFEST")" == \
       "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v5-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
-      "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
+      "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ||
+      "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v7-source.yaml" ]]; then
     starlink_multirate_name="$(basename -- "$MANIFEST")"
     starlink_multirate_manifest="${ROOT}/manifests/${starlink_multirate_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
@@ -92,6 +96,14 @@ if [[ "$(basename -- "$MANIFEST")" == \
     esac
     STARLINK_PSS_MULTIRATE_BUILD=true
     if [[ "$starlink_multirate_name" == \
+          "starlink-pss-multirate-rx-only-dnm-v7-source.yaml" ]]; then
+        [[ "$STARLINK_PSS_RATE_MSPS" == 15 ]] ||
+            fail "v7 acquisition-injection qualification is gated to 15 MS/s"
+        [[ "${STARLINK_PSS_PROFILE:-}" == "acquisition-injection" ]] ||
+            fail "v7 multirate PSS build requires STARLINK_PSS_PROFILE=acquisition-injection"
+        STARLINK_PSS_ACQUISITION_INJECTION_BUILD=true
+        REQUIRED_BUS_SKEW_CONSTRAINTS=7
+    elif [[ "$starlink_multirate_name" == \
           "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
         [[ "${STARLINK_PSS_PROFILE:-}" == "acquisition-only" ]] ||
             fail "v6 multirate PSS build requires STARLINK_PSS_PROFILE=acquisition-only"
@@ -150,6 +162,17 @@ required_outputs=(
 for required in "${required_outputs[@]}"; do
     [[ -s "$required" ]] || fail "required build output is missing: $required"
 done
+if [[ "$STARLINK_PSS_ACQUISITION_INJECTION_BUILD" == true ]]; then
+    for required in \
+        "$ARTIFACT_ROOT/starlink_pss_m2ctl" \
+        "$ARTIFACT_ROOT/upper_edge_pss_periodic_fixture_ci16.mem" \
+        "$ARTIFACT_ROOT/m2_period_scores_u8.mem" \
+        "$ARTIFACT_ROOT/starlink-pss-m2-offline-qualification.log" \
+        "$ARTIFACT_ROOT/starlink-pss15-m2-vendor-xfft-replay.log"; do
+        [[ -s "$required" ]] ||
+            fail "required M2 qualification artifact is missing: $required"
+    done
+fi
 
 cmp hdl/projects/pluto/pluto.sdk/system_top.xsa build/system_top.xsa
 cp build/pluto.dfu "$dfu"
@@ -445,6 +468,9 @@ starlink-pss-multirate-rx-only-dnm-v5-source.yaml:candidate)
 starlink-pss-multirate-rx-only-dnm-v6-source.yaml:candidate)
     protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v6"
     ;;
+starlink-pss-multirate-rx-only-dnm-v7-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v7"
+    ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
     ;;
@@ -595,7 +621,11 @@ if [[ "$STARLINK_RX_ONLY_BUILD" == true ]]; then
         --cdc-report "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
         --bus-skew-report "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
 fi
-if [[ "$STARLINK_PSS_ACQUISITION_ONLY_BUILD" == true ]]; then
+if [[ "$STARLINK_PSS_ACQUISITION_INJECTION_BUILD" == true ]]; then
+    python3 scripts/ci/validate_starlink_pss_acquisition_injection_route_reports.py \
+        "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
+        "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
+elif [[ "$STARLINK_PSS_ACQUISITION_ONLY_BUILD" == true ]]; then
     python3 scripts/ci/validate_starlink_pss_acquisition_only_route_reports.py \
         "$ARTIFACT_ROOT/system_top_cdc_routed.rpt" \
         "$ARTIFACT_ROOT/system_top_bus_skew_routed.rpt"
@@ -658,6 +688,15 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
     )
     if [[ -n "$INTEGRATED_WAIVERS" ]]; then
         payload_files+=("$(basename "$integrated_verdict")" "$(basename "$waiver_copy")")
+    fi
+    if [[ "$STARLINK_PSS_ACQUISITION_INJECTION_BUILD" == true ]]; then
+        payload_files+=(
+            starlink_pss_m2ctl
+            upper_edge_pss_periodic_fixture_ci16.mem
+            m2_period_scores_u8.mem
+            starlink-pss-m2-offline-qualification.log
+            starlink-pss15-m2-vendor-xfft-replay.log
+        )
     fi
     mapfile -t payload_files < <(
         printf '%s\n' "${payload_files[@]}" | LC_ALL=C sort
