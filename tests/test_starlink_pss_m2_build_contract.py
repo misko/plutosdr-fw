@@ -84,3 +84,15 @@ def test_candidate_planner_defaults_to_the_v7_manifest() -> None:
     assert f'SOURCE_MANIFEST_NAME = "{MANIFEST_NAME}"' in planner
     assert f'"{MANIFEST_NAME}": "v7"' in planner
     assert '{"v2", "v3", "v4", "v5", "v6", "v7"}' in planner
+
+
+def test_m2_controller_treats_abi_1_1_as_fixed_15_msps() -> None:
+    controller = _read("tools/starlink_pssctl/starlink_pss_m2ctl.c")
+
+    assert "static uint32_t input_rate_msps(const struct pss_map_info *info)" in controller
+    assert "if (info->version == PSS_MAP_VERSION_1_2)\n\t\treturn 30U;" in controller
+    assert "if (info->version == PSS_MAP_VERSION_1_3)\n\t\treturn 60U;" in controller
+    assert "return 15U;" in controller
+    assert "serial, input_rate_msps(map_info), map_info->version" in controller
+    assert "input_rate_msps(map_info) != 15U" in controller
+    assert "map_info->input_rate_msps != 15U" not in controller

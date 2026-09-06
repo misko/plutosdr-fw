@@ -267,17 +267,62 @@ def test_m2_script_is_executable() -> None:
     assert Path(m2.__file__).stat().st_mode & 0o111
 
 
-def test_m2_source_manifest_is_offline_dnm_and_byte_exact() -> None:
-    root = Path(__file__).resolve().parents[1]
-    manifest = root / "manifests/starlink-pss-m2-probe-dnm-v1-source.yaml"
-    values = {
+def _manifest_values(path: Path) -> dict[str, str]:
+    return {
         key.strip(): value.strip().strip('"')
-        for line in manifest.read_text().splitlines()
+        for line in path.read_text().splitlines()
         if line and not line.startswith("#") and ":" in line
         for key, value in (line.split(":", 1),)
     }
+
+
+def test_m2_v1_source_manifest_preserves_the_failed_probe_provenance() -> None:
+    root = Path(__file__).resolve().parents[1]
+    manifest = root / "manifests/starlink-pss-m2-probe-dnm-v1-source.yaml"
+    values = _manifest_values(manifest)
     assert values["schema"] == "plutosdr-fw.starlink-pss-m2-probe-source"
     assert values["schema_version"] == "1"
+    assert values["do_not_merge"] == "true"
+    assert values["persistent_flash_eligible"] == "false"
+    assert values["hardware_accessed"] == "false"
+    assert values["runtime_target"] == "ad9361-1r1t"
+    assert values["supported_sample_rate_msps"] == "15"
+    assert values["test_phases"] == m2.PHASE_TEXT
+    assert values["controller_sha256"] == (
+        "135ff46e857d733a0508e6d41f66ec9f31c46d0bd8d9e4aec545b7cdc8d4aa1d"
+    )
+    assert values["host_test_sha256"] == (
+        "1e2768d351aa2483902c6f50671e8ee2f3b51b7eefca1f97b5250c17a2fbba4a"
+    )
+    assert values["plan_sha256"] == (
+        "c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1"
+    )
+    for prefix in (
+        "host_probe",
+        "v9_probe",
+        "v9_probe_manifest",
+        "fixture_vector",
+        "score_vector",
+        "candidate_source_manifest",
+    ):
+        member = root / values[f"{prefix}_path"]
+        assert member.is_file()
+        assert m2.hashlib.sha256(member.read_bytes()).hexdigest() == values[
+            f"{prefix}_sha256"
+        ]
+
+
+def test_m2_v2_source_manifest_supersedes_v1_and_is_byte_exact() -> None:
+    root = Path(__file__).resolve().parents[1]
+    manifest = root / "manifests/starlink-pss-m2-probe-dnm-v2-source.yaml"
+    values = _manifest_values(manifest)
+
+    assert values["schema"] == "plutosdr-fw.starlink-pss-m2-probe-source"
+    assert values["schema_version"] == "2"
+    assert values["supersedes_manifest"] == (
+        "starlink-pss-m2-probe-dnm-v1-source.yaml"
+    )
+    assert values["source_change"] == "abi-1.1-fixed-rate-controller-correction"
     assert values["do_not_merge"] == "true"
     assert values["persistent_flash_eligible"] == "false"
     assert values["hardware_accessed"] == "false"
@@ -293,7 +338,6 @@ def test_m2_source_manifest_is_offline_dnm_and_byte_exact() -> None:
         "fixture_vector",
         "score_vector",
         "candidate_source_manifest",
-        "plan",
     ):
         member = root / values[f"{prefix}_path"]
         assert member.is_file()

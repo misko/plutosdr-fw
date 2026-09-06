@@ -391,6 +391,15 @@ static void print_case(const char *serial, size_t case_index,
 	fflush(stdout);
 }
 
+static uint32_t input_rate_msps(const struct pss_map_info *info)
+{
+	if (info->version == PSS_MAP_VERSION_1_2)
+		return 30U;
+	if (info->version == PSS_MAP_VERSION_1_3)
+		return 60U;
+	return 15U;
+}
+
 static int print_info(const char *serial, const struct pss_map_info *map_info,
 	const struct pss_injection_io *injection_io,
 	const struct pss_injection_info *injection_info,
@@ -421,7 +430,7 @@ static int print_info(const char *serial, const struct pss_map_info *map_info,
 	       ",\"pssi_fault_free\":%s,"
 	       "\"live_pss_detected\":false,\"sss_detected\":false,"
 	       "\"frame_lock_claim\":false}\n",
-	       serial, map_info->input_rate_msps, map_info->version,
+	       serial, input_rate_msps(map_info), map_info->version,
 	       map_info->status,
 	       (map_info->status & PSS_MAP_STATUS_ENABLED) ? "true" : "false",
 	       injection_info->identification, injection_info->version,
@@ -449,7 +458,7 @@ static int run_qualification(const char *serial,
 	int result = -1;
 
 	if (map_info->version != PSS_MAP_VERSION_1_1 ||
-	    map_info->input_rate_msps != 15U ||
+	    input_rate_msps(map_info) != 15U ||
 	    (map_info->status & PSS_MAP_STATUS_ENABLED)) {
 		snprintf(error, error_size,
 			"M2 requires a disabled exact 15 MS/s PSMA v1.1 engine");
