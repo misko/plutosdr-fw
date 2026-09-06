@@ -42,7 +42,7 @@ def _package(
     actual_bit: bytes = b"bit",
     manifest_payload: bytes | None = None,
 ) -> tuple[Path, Path]:
-    assert revision in {"v1", "v2", "v3"}
+    assert revision in {"v1", "v2", "v3", "v4"}
     dfu_name = (
         f"plutoplus-starlink-pss-{rate}m-rx-only-dnm-{revision}-source-pluto.dfu"
     )
@@ -53,8 +53,8 @@ def _package(
         else "starlink-rx-only-dnm-v1-source/buildroot-pss-acqctl-v1"
     )
     hdl_version = (
-        "starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v3"
-        if revision == "v3"
+        f"starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-{revision}"
+        if revision in {"v3", "v4"}
         else "starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v2"
     )
     members: dict[str, bytes] = {
@@ -218,7 +218,7 @@ def test_prepares_canonical_ppu_v2_plan_without_hardware(tmp_path: Path) -> None
     assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in output.iterdir())
 
 
-@pytest.mark.parametrize("revision", ["v2", "v3"])
+@pytest.mark.parametrize("revision", ["v2", "v3", "v4"])
 def test_prepares_locked_controller_only_from_identical_source_checkout(
     tmp_path: Path, revision: str
 ) -> None:

@@ -161,6 +161,18 @@ def test_abi12_injection_is_the_shared_tracker_and_dma_boundary() -> None:
     assert "over_the_air_starlink_pss_detected: false" in manifest
 
 
+def test_continuous_pss_acquisition_is_independent_of_dma_scan_enable() -> None:
+    design = _read("hdl/projects/pluto/system_bd.tcl")
+
+    assert "ad_connect VCC starlink_pss_acquisition/sample_enable" in design
+    assert (
+        "ad_connect starlink_pss_tracker/selected_sample_enable "
+        "starlink_pss_acquisition/sample_enable"
+    ) not in design
+    assert "adc_enable_i0/q0 reset low" in design
+    assert "Acquisition is armed by its own fail-closed MMIO control" in design
+
+
 def test_abi12_batch_and_clock_contract_is_frozen_without_rtl_changes() -> None:
     manifest = _read("manifests/starlink-pss15-batch-clock-dnm-v1-source.yaml")
     header = _read("tools/starlink_pssctl/starlink_pss_hw.h")

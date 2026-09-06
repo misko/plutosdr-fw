@@ -124,7 +124,9 @@ elif [[ "$(basename -- "$source_manifest")" == \
         "$(basename -- "$source_manifest")" == \
         "starlink-pss-multirate-rx-only-dnm-v2-source.yaml" ||
         "$(basename -- "$source_manifest")" == \
-        "starlink-pss-multirate-rx-only-dnm-v3-source.yaml" ]]; then
+        "starlink-pss-multirate-rx-only-dnm-v3-source.yaml" ||
+        "$(basename -- "$source_manifest")" == \
+        "starlink-pss-multirate-rx-only-dnm-v4-source.yaml" ]]; then
     case "${STARLINK_PSS_RATE_MSPS:-}" in
     15|30|60) ;;
     *) fail "STARLINK_PSS_RATE_MSPS must be exactly 15, 30, or 60 for the multirate PSS build" ;;
