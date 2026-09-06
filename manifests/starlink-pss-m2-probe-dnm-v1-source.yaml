@@ -1,0 +1,82 @@
+# Immutable source graph for the receipt-bound deterministic M2 probe.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. The probe qualifies only the
+# internal deterministic 15 MS/s FPGA timing path. It does not qualify live
+# Starlink PSS detection, SSS, frame lock, or 30/60 MS/s operation.
+
+schema: plutosdr-fw.starlink-pss-m2-probe-source
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9361-1r1t
+live_runtime_model: Analog Devices PlutoSDR Rev.C (Z7010-AD9361)
+physical_rfic_attestation: ad9363a
+candidate_profile: acquisition-injection
+supported_candidate_revision: v7
+supported_sample_rate_msps: 15
+rf_bandwidth_upper_bound_hz: 15000000
+test_phases: 0,19999,7311
+phase_bins: 20000
+tile_frames: 64
+fixture_samples: 130
+fixture_repetitions: 130
+expected_peak_value: 16320
+expected_runner_up_value: 7424
+timing_tolerance_canonical_samples: 0
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: 02ae824f53bec4495ba8f902d5d26a8958c2d397
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-m2-host-v9
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+host_probe_path: scripts/starlink_pss_m2_probe_v1.py
+host_probe_sha256: 0f9a1819ec1f19e99b2a9e1fa72581cf86ef807a2aedbabeddd03a8c39e9be92
+host_test_path: tests/test_starlink_pss_m2_probe_v1.py
+host_test_sha256: 1e2768d351aa2483902c6f50671e8ee2f3b51b7eefca1f97b5250c17a2fbba4a
+v9_probe_path: scripts/starlink_pss_hardware_probe_v9.py
+v9_probe_sha256: ed7a8e594255fdbe78c65c680e7fb029af81984573822877e631a7e0e496139b
+v9_probe_manifest_path: manifests/starlink-pss-hardware-probe-dnm-v9-source.yaml
+v9_probe_manifest_sha256: 04ddb2a311af2062bcbdedc3d22ae453cb0056a12968c0cf32c3d81306792a2d
+controller_path: tools/starlink_pssctl/starlink_pss_m2ctl.c
+controller_sha256: 135ff46e857d733a0508e6d41f66ec9f31c46d0bd8d9e4aec545b7cdc8d4aa1d
+fixture_vector_path: hdl/library/axi_starlink_pss_periodic_injector/tb/upper_edge_pss_periodic_fixture_ci16.mem
+fixture_vector_sha256: a983f90ccc0c4e8717ff40a5b0717a4abbea54aaacdd4fb7815adcb86f2dc6f3
+score_vector_path: hdl/library/axi_starlink_pss_periodic_injector/tb/m2_period_scores_u8.mem
+score_vector_sha256: cc3904e652c80ed51bca28f4dd110caaae1dceef33b95a0d827698c4063f468b
+candidate_source_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-source.yaml
+candidate_source_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
+plan_path: FPGA_tracker_60MS.md
+plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
+
+plan_command_hardware_access: false
+execute_requires_explicit_confirmation: true
+execute_requires_passing_ppu_ram_receipt: true
+execute_requires_exact_v7_profile_manifest: true
+execute_reuses_ppu_radio_and_route_locks: true
+execute_resolves_one_stable_post_ram_identity: true
+execute_revalidates_full_live_identity_before_iio: true
+execute_loads_volatile_ram: false
+execute_writes_qspi: false
+execute_changes_radio_personality: false
+execute_upload_scope: tmp-only
+execute_upload_count: 3
+execute_verifies_upload_hashes: true
+execute_removes_all_uploads: true
+execute_restores_rx_attributes: true
+execute_requires_disabled_engine_after: true
+execute_exact_map_comparison: true
+execute_claim_scope: deterministic_internal_timing_only
+live_pss_detected: false
+sss_detected: false
+frame_lock_claim: false
+separate_ppu_ram_recovery_required: true
+
+offline_test_verdict: PASS
+focused_m2_test_count: 12
