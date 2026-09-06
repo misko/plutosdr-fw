@@ -1,0 +1,65 @@
+# Immutable source graph for the bounded acquisition-only v6 datapath-progress
+# probe.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This source authorizes only a
+# receipt-bound temporary /tmp upload after a separately passing PPU RAM boot.
+# It makes no PSS, frame-lock, SSS, or rate-advancement claim.
+
+schema: plutosdr-fw.starlink-pss-progress-diagnostic-source
+schema_version: 2
+release_state: diagnostic
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+pss_detected: false
+frame_lock_qualified: false
+sss_qualified: false
+
+supersedes_manifest: starlink-pss-progress-diagnostic-dnm-v1-source.yaml
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9363a-1r1t
+candidate_profile: acquisition-only
+supported_candidate_revision: v6
+supported_sample_rates_msps: 15-30-60
+maximum_observation_ms: 10000
+diagnostic_claim_scope: datapath-progress-diagnostic-only
+diagnostic_remote_storage: volatile-/tmp-only
+diagnostic_remote_removal_required: true
+separate_ppu_recovery_required: true
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: 7b369ae273c5bca285d59445992c219a414c01d3
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss-v6-progress-diagnostic-v2
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 4661bd41533ae2a22601782b40e7e556e96d01cf
+
+host_probe_path: scripts/starlink_pss_progress_probe_v2.py
+host_probe_sha256: c11e2423266279c854acdf874dd38bcfd89eea5ef49bb5747d9829db31f6b52d
+host_test_path: tests/test_starlink_pss_progress_probe_v2.py
+host_test_sha256: 5f815850aa15f8c533e75ac9739c8add868250e6520bdb585ac1cc9122031502
+inherited_progress_probe_path: scripts/starlink_pss_progress_probe_v1.py
+inherited_progress_probe_sha256: ae0178540bbea2b48320e4887f668ba174adaa8810981451acb1ee63d78b024f
+inherited_progress_manifest_path: manifests/starlink-pss-progress-diagnostic-dnm-v1-source.yaml
+inherited_progress_manifest_sha256: 42a73c22a29c18f0ce2cd1fa9ed11ff6d499222691d659e87fb11d412b52be0a
+hardware_probe_manifest_path: manifests/starlink-pss-hardware-probe-dnm-v7-source.yaml
+hardware_probe_manifest_sha256: 09498890fea4a55029b90436497104fea5093aee77a19985ed7bc6a1158eb2cc
+candidate_source_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v6-source.yaml
+candidate_source_manifest_sha256: 6ed30ee981aad2a3fba01dc2863a05a761bb79e38721e8f9e0d57adc12ea1b73
+
+plan_command_hardware_access: false
+execute_requires_explicit_confirmation: true
+execute_requires_passing_ppu_ram_receipt: true
+execute_revalidates_exact_post_ram_identity: true
+execute_uses_ppu_radio_and_route_locks: true
+execute_uploads_hash_attested_static_arm_elf: true
+execute_upload_path: volatile-/tmp-only
+execute_removes_uploaded_binary: true
+execute_restores_rx_attributes: true
+execute_releases_host_route: true
+execute_writes_qspi: false
+execute_loads_firmware: false
+
+offline_test_verdict: PASS
+focused_v2_test_count: 3
