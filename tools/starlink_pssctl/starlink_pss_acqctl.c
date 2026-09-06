@@ -16,10 +16,14 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #define PSS_ACQUISITION_MMIO_BASE UINT64_C(0x79040000)
 #define PSS_ACQUISITION_MMIO_SPAN 0x1000U
+#define AD9361_ADC_MMIO_BASE UINT64_C(0x79020000)
+#define AD9361_ADC_MMIO_SPAN 0x1000U
+#define AD9361_ADC_GPIO_IN_OFFSET 0x00b8U
 #ifndef STARLINK_PSS_SERIAL_FILE
 #define STARLINK_PSS_SERIAL_FILE "/etc/serial"
 #endif
@@ -52,13 +56,16 @@ static void usage(FILE *stream)
 		"  info\n"
 		"  snapshot [--timeout-ms N]\n"
 		"  candidate [--timeout-ms N]\n"
+		"  progress [--timeout-ms N]\n"
 		"\n"
 		"candidate flushes and enables the FPGA acquisition engine, copies exactly\n"
 		"three contiguous 20,000-bin maps, runs the fixed seven-drift search on the\n"
 		"Zynq ARM, prints one candidate-measurement JSON object, then disables and\n"
 		"flushes the engine. It makes no threshold, PSS-detection, or lock claim.\n"
 		"The tool always maps PSMA at 0x%08" PRIx64
-		" and refuses any serial or ABI mismatch.\n",
+		" and refuses any serial or ABI mismatch. progress enables the engine for\n"
+		"one bounded interval and reports datapath counters without making a PSS\n"
+		"or frame-lock claim.\n",
 		PSS_ACQUISITION_MMIO_BASE);
 }
 
@@ -187,7 +194,8 @@ static int mapped_write32(void *context, uint32_t offset, uint32_t value)
 	return 0;
 }
 
-static int map_mmio(struct mapped_mmio *mmio, const char *path)
+static int map_mmio_at(struct mapped_mmio *mmio, const char *path,
+	uint64_t base, size_t span, const char *label)
 {
 	long page_size = sysconf(_SC_PAGESIZE);
 	off_t aligned_base;
@@ -200,11 +208,11 @@ static int map_mmio(struct mapped_mmio *mmio, const char *path)
 		fprintf(stderr, "cannot determine a power-of-two system page size\n");
 		return -1;
 	}
-	aligned_base = (off_t)(PSS_ACQUISITION_MMIO_BASE &
+	aligned_base = (off_t)(base &
 		~((uint64_t)page_size - 1U));
-	page_offset = (size_t)(PSS_ACQUISITION_MMIO_BASE -
+	page_offset = (size_t)(base -
 		(uint64_t)aligned_base);
-	mmio->mapping_size = page_offset + PSS_ACQUISITION_MMIO_SPAN;
+	mmio->mapping_size = page_offset + span;
 	mmio->fd = open(path, O_RDWR | O_SYNC | O_CLOEXEC);
 	if (mmio->fd < 0) {
 		fprintf(stderr, "cannot open %s: %s\n", path, strerror(errno));
@@ -213,7 +221,7 @@ static int map_mmio(struct mapped_mmio *mmio, const char *path)
 	mmio->mapping = mmap(NULL, mmio->mapping_size, PROT_READ | PROT_WRITE,
 		MAP_SHARED, mmio->fd, aligned_base);
 	if (mmio->mapping == MAP_FAILED) {
-		fprintf(stderr, "cannot map acquisition MMIO: %s\n", strerror(errno));
+		fprintf(stderr, "cannot map %s MMIO: %s\n", label, strerror(errno));
 		close(mmio->fd);
 		mmio->fd = -1;
 		return -1;
@@ -221,6 +229,12 @@ static int map_mmio(struct mapped_mmio *mmio, const char *path)
 	mmio->registers = (volatile uint32_t *)
 		((uint8_t *)mmio->mapping + page_offset);
 	return 0;
+}
+
+static int map_mmio(struct mapped_mmio *mmio, const char *path)
+{
+	return map_mmio_at(mmio, path, PSS_ACQUISITION_MMIO_BASE,
+		PSS_ACQUISITION_MMIO_SPAN, "acquisition");
 }
 
 static void unmap_mmio(struct mapped_mmio *mmio)
@@ -377,6 +391,136 @@ static void print_snapshot(const char *serial,
 	       snapshot->score_denominator_zero_count,
 	       snapshot->candidate_fifo_stored_count,
 	       snapshot->candidate_fifo_maximum_stored_count);
+}
+
+static int wait_milliseconds(unsigned int duration_ms,
+	char *error, size_t error_size)
+{
+	struct timespec remaining = {
+		.tv_sec = (time_t)(duration_ms / 1000U),
+		.tv_nsec = (long)(duration_ms % 1000U) * 1000000L,
+	};
+
+	while (nanosleep(&remaining, &remaining) < 0) {
+		if (errno != EINTR)
+			return snprintf(error, error_size,
+				"progress interval failed: %s", strerror(errno)), -1;
+		if (interrupted)
+			return snprintf(error, error_size,
+				"progress interval interrupted"), -1;
+	}
+	return 0;
+}
+
+static void print_progress(const char *serial, const struct pss_map_info *info,
+	unsigned int duration_ms, uint32_t adc_before, uint32_t adc_after,
+	const struct pss_map_snapshot *before,
+	const struct pss_map_snapshot *after,
+	const struct ddc_counters *ddc_before,
+	const struct ddc_counters *ddc_after)
+{
+	printf("{\n"
+	       "  \"schema\": \"starlink-pss-acqctl.progress.v1\",\n"
+	       "  \"claim_scope\": \"datapath_progress_diagnostic_only\",\n"
+	       "  \"serial\": \"%s\",\n"
+	       "  \"input_rate_msps\": %" PRIu32 ",\n"
+	       "  \"duration_ms\": %u,\n"
+	       "  \"adc_valid_counter_before\": %" PRIu32 ",\n"
+	       "  \"adc_valid_counter_after\": %" PRIu32 ",\n"
+	       "  \"adc_valid_counter_delta\": %" PRIu32 ",\n"
+	       "  \"snapshot_generation_before\": %" PRIu32 ",\n"
+	       "  \"snapshot_generation_after\": %" PRIu32 ",\n"
+	       "  \"ready_mask_after\": %" PRIu32 ",\n"
+	       "  \"accepted_scores_before\": %" PRIu32 ",\n"
+	       "  \"accepted_scores_after\": %" PRIu32 ",\n"
+	       "  \"published_maps_before\": %" PRIu32 ",\n"
+	       "  \"published_maps_after\": %" PRIu32 ",\n"
+	       "  \"health_flags_after\": \"0x%08" PRIx32 "\",\n"
+	       "  \"fault_free_epoch_after\": %s,\n"
+	       "  \"ingress_dropped_after\": %" PRIu32 ",\n"
+	       "  \"ingress_fifo_level_after\": %u,\n"
+	       "  \"ingress_fifo_maximum_after\": %u,\n"
+	       "  \"scheduler_gaps_after\": %" PRIu32 ",\n"
+	       "  \"scheduler_index_errors_after\": %" PRIu32 ",\n"
+	       "  \"scheduler_overflows_after\": %" PRIu32 ",\n"
+	       "  \"detector_faults_after\": %" PRIu32 ",\n"
+	       "  \"phase_discontinuities_after\": %" PRIu32 ",\n"
+	       "  \"candidate_fifo_level_after\": %u,\n"
+	       "  \"candidate_fifo_maximum_after\": %u,\n"
+	       "  \"ddc_accepted_before\": %" PRIu32 ",\n"
+	       "  \"ddc_accepted_after\": %" PRIu32 ",\n"
+	       "  \"ddc_emitted_before\": %" PRIu32 ",\n"
+	       "  \"ddc_emitted_after\": %" PRIu32 ",\n"
+	       "  \"ddc_discontinuity_after\": %" PRIu32 ",\n"
+	       "  \"ddc_saturation_after\": %" PRIu32 ",\n"
+	       "  \"pss_detected\": false,\n"
+	       "  \"frame_lock_claim\": false\n"
+	       "}\n",
+	       serial, input_rate_msps(info), duration_ms,
+	       adc_before, adc_after, adc_after - adc_before,
+	       before->snapshot_generation, after->snapshot_generation,
+	       after->ready_mask, before->accepted_score_count,
+	       after->accepted_score_count, before->map_publish_count,
+	       after->map_publish_count, after->health_flags,
+	       snapshot_fault_free(after) ? "true" : "false",
+	       after->ingress_dropped_sample_count, after->ingress_fifo_level,
+	       after->ingress_maximum_fifo_level, after->scheduler_gap_count,
+	       after->scheduler_index_error_count, after->scheduler_overflow_count,
+	       after->detector_fault_count,
+	       after->score_phase_index_discontinuity_count,
+	       after->candidate_fifo_stored_count,
+	       after->candidate_fifo_maximum_stored_count,
+	       ddc_before->accepted, ddc_after->accepted,
+	       ddc_before->emitted, ddc_after->emitted,
+	       ddc_after->discontinuity, ddc_after->saturation);
+}
+
+static int run_progress(const char *serial, const struct pss_map_io *io,
+	const struct pss_map_info *info, struct mapped_mmio *adc_mmio,
+	unsigned int duration_ms, char *error, size_t error_size)
+{
+	struct pss_map_snapshot before, after;
+	struct ddc_counters ddc_before = {0}, ddc_after = {0};
+	uint32_t adc_before, adc_after;
+	bool enabled = false;
+	int result = -1;
+
+	if (info->status & PSS_MAP_STATUS_ENABLED) {
+		snprintf(error, error_size,
+			"progress requires the acquisition engine to be disabled");
+		return -1;
+	}
+	if (pss_map_set_enabled(io, true, true, error, error_size) < 0)
+		return -1;
+	enabled = true;
+	if (pss_map_take_snapshot(io, &before, duration_ms,
+			error, error_size) < 0 ||
+	    read_ddc_counters(io, &ddc_before) < 0 ||
+	    mapped_read32(adc_mmio, AD9361_ADC_GPIO_IN_OFFSET, &adc_before) < 0) {
+		snprintf(error, error_size, "cannot capture initial progress counters");
+		goto done;
+	}
+	if (wait_milliseconds(duration_ms, error, error_size) < 0)
+		goto done;
+	if (mapped_read32(adc_mmio, AD9361_ADC_GPIO_IN_OFFSET, &adc_after) < 0 ||
+	    pss_map_take_snapshot(io, &after, duration_ms,
+			error, error_size) < 0 ||
+	    read_ddc_counters(io, &ddc_after) < 0) {
+		snprintf(error, error_size, "cannot capture final progress counters");
+		goto done;
+	}
+	if (pss_map_set_enabled(io, false, true, error, error_size) < 0)
+		goto done;
+	enabled = false;
+	print_progress(serial, info, duration_ms, adc_before, adc_after,
+		&before, &after, &ddc_before, &ddc_after);
+	result = 0;
+
+done:
+	if (enabled && pss_map_set_enabled(io, false, true,
+			error, error_size) < 0)
+		result = -1;
+	return result;
 }
 
 static void print_candidate(const char *serial, const struct pss_map_info *info,
@@ -593,6 +737,7 @@ int main(int argc, char **argv)
 	const char *devmem = "/dev/mem";
 	const char *command;
 	struct mapped_mmio mmio;
+	struct mapped_mmio adc_mmio = {.fd = -1};
 	struct pss_map_io io;
 	struct pss_map_info info;
 	char error[ERROR_SIZE] = {0};
@@ -622,7 +767,8 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	command = argv[argument++];
-	if (!strcmp(command, "snapshot") || !strcmp(command, "candidate")) {
+	if (!strcmp(command, "snapshot") || !strcmp(command, "candidate") ||
+	    !strcmp(command, "progress")) {
 		while (argument < argc) {
 			const char *value;
 
@@ -681,9 +827,20 @@ int main(int argc, char **argv)
 			goto done;
 		}
 		return_code = EXIT_SUCCESS;
+	} else if (!strcmp(command, "progress")) {
+		if (map_mmio_at(&adc_mmio, devmem, AD9361_ADC_MMIO_BASE,
+				AD9361_ADC_MMIO_SPAN, "AD9361 ADC") < 0)
+			goto done;
+		if (run_progress(expected_serial, &io, &info, &adc_mmio,
+				timeout_ms, error, sizeof(error)) < 0) {
+			fprintf(stderr, "progress diagnostic failed: %s\n", error);
+			goto done;
+		}
+		return_code = EXIT_SUCCESS;
 	}
 
 done:
+	unmap_mmio(&adc_mmio);
 	unmap_mmio(&mmio);
 	return return_code;
 }

@@ -113,6 +113,16 @@ PSS detection or frame lock. A later frozen qualification policy can consume
 these measurements through the already-tested lock controller without
 silently promoting an exploratory threshold into a detector contract.
 
+`progress --timeout-ms N` is the bounded failure-analysis path. It first
+requires a disabled engine, flushes and enables acquisition for one observation
+interval, atomically snapshots telemetry on both sides of that interval, and
+then disables and flushes the engine. Its JSON reports the AD9361 ADC-valid
+counter at `0x790200b8`, acquisition ingress occupancy/drops, score and map
+progress, DDC counters, and every existing fault class. The command is
+diagnostic only: `pss_detected` and `frame_lock_claim` are always false. This
+makes a no-map timeout distinguishable as no ADC strobes, no CDC ingress, a
+detector quarantine, or a merely slow map without opening an IIO DMA buffer.
+
 The copy sequence takes one atomic hardware snapshot, reads exactly 20,000
 zero-extended words, brackets the copy with a second atomic snapshot, and
 releases the selected bank only after its generation, start index, command

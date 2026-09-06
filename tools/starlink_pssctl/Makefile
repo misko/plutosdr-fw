@@ -32,14 +32,19 @@ $(BUILD)/starlink_pssctl: starlink_pss_hw.c starlink_pss_hw.h starlink_pssctl.c 
 $(BUILD)/starlink_pss_acqctl: starlink_pss_acquisition.c starlink_pss_acquisition.h starlink_pss_acqctl.c | $(BUILD)
 	$(CROSS_CC) $(CFLAGS) $(WARNINGS) -static starlink_pss_acquisition.c starlink_pss_acqctl.c -lm -o $@
 
+$(BUILD)/starlink_pss_progress_diag: starlink_pss_acquisition.c starlink_pss_acquisition.h starlink_pss_acqctl.c | $(BUILD)
+	$(CROSS_CC) -O2 -s $(WARNINGS) -static starlink_pss_acquisition.c starlink_pss_acqctl.c -lm -o $@
+	chmod 0755 $@
+
 test: $(BUILD)/test_starlink_pss_hw $(BUILD)/test_starlink_pss_acquisition $(BUILD)/starlink_pss_acqctl-host
 	$(BUILD)/test_starlink_pss_hw $(COEFFICIENT_FIXTURE) $(PACKET_FIXTURE) $(INJECTION_FIXTURE)
 	$(BUILD)/test_starlink_pss_acquisition
 	$(BUILD)/starlink_pss_acqctl-host --help >/dev/null
 
-arm: $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acqctl
+arm: $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acqctl $(BUILD)/starlink_pss_progress_diag
 	file $(BUILD)/starlink_pssctl
 	file $(BUILD)/starlink_pss_acqctl
+	file $(BUILD)/starlink_pss_progress_diag
 
 sanitize: $(BUILD)/test_starlink_pss_acquisition_sanitize
 	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 UBSAN_OPTIONS=halt_on_error=1 $(BUILD)/test_starlink_pss_acquisition_sanitize
@@ -50,4 +55,5 @@ clean:
 	rm -f $(BUILD)/test_starlink_pss_hw $(BUILD)/test_starlink_pss_acquisition
 	rm -f $(BUILD)/test_starlink_pss_acquisition_sanitize
 	rm -f $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acqctl
+	rm -f $(BUILD)/starlink_pss_progress_diag
 	rm -f $(BUILD)/starlink_pss_acqctl-host
