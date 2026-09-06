@@ -27,6 +27,59 @@ establish full-band Starlink reception. Full-band Gates 4 and 5 need a second
 serial-bound radio with physical AD9361/AD9364 attestation; otherwise those
 full-band pass states remain open by design.
 
+## 2026-09-06 v6 15 MS/s RAM hardware checkpoint
+
+The immutable 15 MS/s acquisition-only v6 package passed the complete clean
+build and package graph. Its exact runtime identity is
+`v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v6`; DFU SHA-256 is
+`1945e583b4c3b0cccd274ce57240fa145a4793b3bc5d6c1e2784b7db5aa59427`.
+The fresh route meets setup and hold timing at `+0.543 ns` and `+0.009 ns`,
+respectively, with zero routing errors, 9,217 LUTs, 16,082 FFs, 42.5 BRAM
+tiles, 44 DSPs, and the exact reviewed 97-row CDC/five-constraint bus-skew
+inventory.
+
+Three guarded PPU v2 RAM lifecycles touched only serial
+`104000bac4950008230026001b440a003a` at topology `5-2`. Every boot attested
+the RX-only marker, AD9363A 1R1T target, absent DDS/TX-DMA/tandem devices,
+-80 dB TX gain, powered-down shared TX LO, and the candidate version. Every
+rollback returned through persistent QSPI to
+`v0.48-plutoplus-spf-iq-direct-async-v3`, verified USB departure and host-route
+release, and reproduced the unchanged 31,457,280-byte QSPI SHA-256
+`07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`.
+PPU itself was not modified; the lifecycle was bound to published `main`
+commit `4661bd41533ae2a22601782b40e7e556e96d01cf`.
+
+The final one-second, receipt-bound progress observation selected and restored
+15 MS/s/15 MHz through exact USB IIO. It measured 15,001,419 valid ADC samples,
+2,560,000 accepted scores, two published maps, ready mask 3, ingress FIFO
+maximum 2, and transform/candidate FIFO maximum 354. The map starts were
+1,824,274,674 and 1,825,554,674: exactly one 1,280,000-score map apart. All
+actual datapath fault counters were zero: detector, forward/inverse FFT,
+kernel/product/candidate path, scheduler gap/index/overflow, phase
+discontinuity, protocol, arithmetic overflow, zero denominator, ingress drop,
+map read, and map release. Native 15 MS/s correctly had no DDC activity.
+
+The diagnostic deliberately did not consume either ready bank after both maps
+filled. The remaining 12,441,315 scores were therefore discarded and one
+map-overrun latched. This is why the legacy aggregate `fault_free_epoch` was
+false even though every transform and scheduler fault was zero. It is a
+consumer/backpressure result, not recurrence of v4's 5,364-score detector
+failure. The earlier generic probe also completed the controller candidate
+command but rejected its post-disable aggregate snapshot; future acquisition-
+only probes must distinguish disabled/full-bank discards from active-epoch
+datapath faults.
+
+This closes the v6 15 MS/s **ingress, sustained-score, and map-publication**
+hardware gate. It does not claim that ambient input contained Starlink PSS,
+does not establish a detection threshold, and makes no PSS timing, frame-lock,
+or SSS claim. The next gate is a deterministic known-PSS timing trial. Because
+the acquisition-only image intentionally omits the tracker/injection block,
+that stimulus must use either a very small acquisition-only internal replay
+mux in a separate diagnostic image or a separately authorized, physically
+contained external RF source. Only after recovered timing and phase-bin/index
+mapping match the oracle should the 30 MS/s acquisition-only build begin; 60
+MS/s remains strictly after 30 MS/s.
+
 ## 2026-09-06 authoritative dual-XFFT and staged-image checkpoint
 
 This section supersedes the 2026-09-03 claim below that the serially shared

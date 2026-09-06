@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from pathlib import Path
 
 import scripts.starlink_pss_hardware_probe_v7 as probe
@@ -57,6 +58,7 @@ def test_v7_probe_manifest_is_offline_and_byte_exact() -> None:
     assert values["hardware_accessed"] == "false"
     assert values["supported_candidate_revisions"] == "v2,v3,v4,v5,v6"
     assert values["candidate_profile"] == "acquisition-only"
+    source_ref = values["firmware_source_ref"]
     for prefix in (
         "candidate_source",
         "probe_script",
@@ -69,6 +71,12 @@ def test_v7_probe_manifest_is_offline_and_byte_exact() -> None:
     ):
         member = root / values[f"{prefix}_path"]
         assert member.is_file()
-        assert hashlib.sha256(member.read_bytes()).hexdigest() == values[
+        frozen = subprocess.run(
+            ["git", "show", f"{source_ref}:{member.relative_to(root)}"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+        ).stdout
+        assert hashlib.sha256(frozen).hexdigest() == values[
             f"{prefix}_sha256"
         ]
