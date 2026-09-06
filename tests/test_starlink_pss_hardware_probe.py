@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
@@ -507,9 +508,16 @@ def test_hardware_probe_source_manifest_is_dnm_offline_and_byte_exact() -> None:
     assert values["ppu_source_commit"] == (
         "5790a39705e9e598ef048ec773e0227cf9ac1808"
     )
+    source_ref = values["firmware_source_ref"]
     for prefix in ("probe_script", "probe_test", "controller_readme", "plan"):
         member = REPOSITORY / values[f"{prefix}_path"]
         assert member.is_file()
-        assert hashlib.sha256(member.read_bytes()).hexdigest() == values[
+        frozen = subprocess.run(
+            ["git", "show", f"{source_ref}:{member.relative_to(REPOSITORY)}"],
+            cwd=REPOSITORY,
+            check=True,
+            capture_output=True,
+        ).stdout
+        assert hashlib.sha256(frozen).hexdigest() == values[
             f"{prefix}_sha256"
         ]

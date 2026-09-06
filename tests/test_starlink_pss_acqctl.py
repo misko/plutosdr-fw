@@ -174,3 +174,70 @@ def test_candidate_timeout_still_disables_and_flushes(
     assert completed.stdout == ""
     assert "timed out" in completed.stderr
     assert _read32(devmem, REG_CONTROL) == 2
+
+
+def test_help_documents_bounded_continuous_monitor(
+    acqctl_fixture: tuple[Path, Path, Path],
+) -> None:
+    binary, _, _ = acqctl_fixture
+    completed = subprocess.run(
+        [str(binary), "--help"],
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+
+    assert "monitor [--duration-ms N] [--timeout-ms N]" in completed.stdout
+    assert "at most 120 seconds" in completed.stdout
+    assert "no PSS-detection or frame-lock claim" in completed.stdout
+
+
+@pytest.mark.parametrize("duration", ["0", "999", "120001", "-1", "garbage"])
+def test_monitor_rejects_out_of_contract_duration_before_hardware_access(
+    acqctl_fixture: tuple[Path, Path, Path], tmp_path: Path, duration: str
+) -> None:
+    binary, _, _ = acqctl_fixture
+    completed = subprocess.run(
+        [
+            str(binary),
+            "--expect-serial",
+            SERIAL,
+            "--devmem",
+            str(tmp_path / "does-not-exist"),
+            "monitor",
+            "--duration-ms",
+            duration,
+        ],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode != 0
+    assert "invalid monitor duration option" in completed.stderr
+    assert "cannot open" not in completed.stderr
+
+
+def test_monitor_rejects_noncanonical_rate_without_enabling_engine(
+    acqctl_fixture: tuple[Path, Path, Path],
+) -> None:
+    binary, devmem, _ = acqctl_fixture
+    completed = subprocess.run(
+        [
+            str(binary),
+            "--expect-serial",
+            SERIAL,
+            "--devmem",
+            str(devmem),
+            "monitor",
+            "--duration-ms",
+            "1000",
+        ],
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+
+    assert completed.returncode != 0
+    assert "qualifies only the canonical 15 MS/s input" in completed.stderr
+    assert _read32(devmem, REG_CONTROL) == 0

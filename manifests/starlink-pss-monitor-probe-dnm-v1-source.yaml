@@ -1,0 +1,92 @@
+# Immutable source graph for the AD9361-personality, continuous 15 MS/s phase-
+# map monitor.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This source authorizes only a
+# receipt-bound temporary /tmp controller after a separately passing PPU RAM
+# boot. It proves map transport and health only, never PSS, SSS, or frame lock.
+
+schema: plutosdr-fw.starlink-pss-monitor-probe-source
+schema_version: 1
+release_state: diagnostic
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+pss_detected: false
+sss_qualified: false
+frame_lock_qualified: false
+
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9361-1r1t
+live_runtime_model: Analog Devices PlutoSDR Rev.C (Z7010-AD9361)
+physical_rfic_attestation: ad9363a
+candidate_profile: acquisition-only
+supported_candidate_revision: v6
+supported_sample_rate_msps: 15
+maximum_observation_ms: 120000
+map_phase_bins: 20000
+map_tile_frames: 64
+map_canonical_samples: 1280000
+expected_maps_per_120_seconds: approximately-1406
+monitor_claim_scope: continuous-map-transport-only
+threshold_decision: absent
+monitor_remote_storage: volatile-/tmp-only
+monitor_remote_removal_required: true
+separate_ppu_recovery_required: true
+hardware_counter_contract: saturating-not-wrapping
+counter_headroom_15_msps_120_seconds: sufficient
+counter_headroom_60_msps_120_seconds: insufficient-future-rtl-change-required
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: 24d282bec638e52ca84ba6734f77bb3f66147426
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss-v6-ad9361-monitor-v1
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+host_probe_path: scripts/starlink_pss_monitor_probe_v1.py
+host_probe_sha256: 7359bcbbf952193b5be4d77782e2413dd81dbe19c5910fe2c3a2f2f24d4c6270
+host_test_path: tests/test_starlink_pss_monitor_probe_v1.py
+host_test_sha256: 19566eb3eb94a969e010ed331f7f30d340b8f503fb01344d0780eb4e019e44aa
+controller_path: tools/starlink_pssctl/starlink_pss_acqctl.c
+controller_sha256: 0e62e04e656c95b6f08be73a70f54a80423f36905a2c087bf7c6aeaf6692d723
+controller_test_path: tests/test_starlink_pss_acqctl.py
+controller_test_sha256: 96d962e81f68d524e2906a1849d5218ac6a0138091ad538e666e34d6c680f44b
+acquisition_library_path: tools/starlink_pssctl/starlink_pss_acquisition.c
+acquisition_library_sha256: c3a676c384508a18a392f23456b777cd8ad6f9c5061cc1d0c8d1b2c95fca33b4
+acquisition_header_path: tools/starlink_pssctl/starlink_pss_acquisition.h
+acquisition_header_sha256: 1320fec8e970b357a55904a0850e62b135315411c4fee4fbff298e68a025faf8
+acquisition_native_test_path: tools/starlink_pssctl/test_starlink_pss_acquisition.c
+acquisition_native_test_sha256: bb1bfb45bfd47bf2f33da84947a055b37e0eb96c73c3a88fcc6988faad9179c5
+inherited_binary_helper_path: scripts/starlink_pss_progress_probe_v1.py
+inherited_binary_helper_sha256: ae0178540bbea2b48320e4887f668ba174adaa8810981451acb1ee63d78b024f
+inherited_ad9361_probe_manifest_path: manifests/starlink-pss-hardware-probe-dnm-v8-source.yaml
+inherited_ad9361_probe_manifest_sha256: f2480a31f6b4552285a7e553e4a7594ac66fde70420f4c45d2106ffb9254669f
+candidate_source_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v6-source.yaml
+candidate_source_manifest_sha256: 6ed30ee981aad2a3fba01dc2863a05a761bb79e38721e8f9e0d57adc12ea1b73
+plan_path: FPGA_tracker_60MS.md
+plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
+
+plan_command_hardware_access: false
+execute_requires_explicit_confirmation: true
+execute_requires_passing_ppu_ram_receipt: true
+execute_revalidates_exact_post_ram_identity: true
+execute_uses_ppu_radio_and_route_locks: true
+execute_uploads_hash_attested_static_arm_elf: true
+execute_upload_path: volatile-/tmp-only
+execute_copies_and_releases_every_observed_map: true
+execute_requires_generation_and_index_continuity: true
+execute_requires_zero_fault_epoch: true
+execute_emits_no_detection_or_lock_claim: true
+execute_restores_rx_attributes: true
+execute_verifies_engine_disabled: true
+execute_releases_host_route: true
+execute_writes_qspi: false
+execute_loads_firmware: false
+
+offline_test_verdict: PASS
+focused_monitor_probe_test_count: 9
+focused_controller_cli_test_count: 10
+c_acquisition_contract_test: PASS
+static_arm_build_test: PASS
+asan_ubsan_test: PASS

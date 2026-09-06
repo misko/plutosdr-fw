@@ -127,13 +127,15 @@ scheduler, FIFO, arithmetic, read, release, and overrun health fields.
    - writes append-only candidate/health records.
 4. Send full maps or summaries over Ethernet. Never require continuous raw-IQ
    transfer for acquisition.
-5. Extend 32-bit hardware counters monotonically on the host so wrap is
-   unambiguous, especially for a 120-second 60 MS/s run.
+5. Treat the current 32-bit counters as saturating, not wrapping. The 15 MS/s
+   accepted-score counter has enough headroom for this 120-second gate. Before
+   a 60 MS/s soak, add a versioned 64-bit or explicitly clearable observation
+   counter; a host cannot reconstruct samples hidden after hardware saturates.
 
 ### Test
 
-- Unit-test bank selection, generation rollover, counter wrap, delayed reader,
-  duplicate map, missing map, and malformed telemetry handling.
+- Unit-test bank selection, generation adjacency, saturated-counter rejection,
+  delayed reader, duplicate map, missing map, and malformed telemetry handling.
 - Run a 120-second hardware soak with no RF detection requirement.
 - Deliberately stall the reader in a separate negative test and prove the
   overrun/discard counters detect it.
@@ -273,8 +275,9 @@ Reuse the validated 30 MS/s stage:
    PSS positions.
 6. Evaluate only the declared timing and CFO neighborhood; do not instantiate
    an 80,000-bin map or a blind full-rate bank per CFO hypothesis.
-7. Extend hardware counters on the host because 120 seconds contains
-   7.2 billion source samples and exceeds one 32-bit wrap.
+7. Widen or add explicitly resettable observation counters before this gate.
+   The present DDC accepted counter saturates after about 71.6 seconds at
+   60 MS/s; host-side polling cannot recover the hidden count after saturation.
 
 ### Test
 

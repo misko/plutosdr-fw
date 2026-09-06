@@ -218,6 +218,60 @@ def test_prepares_canonical_ppu_v2_plan_without_hardware(tmp_path: Path) -> None
     assert all(stat.S_IMODE(path.stat().st_mode) == 0o600 for path in output.iterdir())
 
 
+def test_prepares_explicit_ad9361_1r1t_plan_without_relabeling_package(
+    tmp_path: Path,
+) -> None:
+    archive, sidecar = _package(tmp_path)
+    qualification = _qualification_manifest(tmp_path)
+    output = _output_parent(tmp_path) / "15-ad9361"
+
+    result = prepare_candidate(
+        archive,
+        sidecar,
+        output,
+        rate=15,
+        ppu_commit=PPU_COMMIT,
+        generator_commit=GENERATOR_COMMIT,
+        qualification_manifest_path=qualification,
+        runtime_target="ad9361-1r1t",
+    )
+
+    plan = json.loads((output / "candidate-plan-v2.json").read_bytes())
+    index = json.loads((output / "candidate-artifact-index.json").read_bytes())
+    assert result["runtime_target"] == "ad9361-1r1t"
+    assert index["runtime_target"] == "ad9361-1r1t"
+    assert plan["expected_runtime"]["hardware_model"] == (
+        "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)"
+    )
+    assert plan["expected_runtime"]["firmware_version"].endswith(
+        "15m-rx-only-dnm-v1"
+    )
+    assert plan["attestation_policy"]["supported_runtime_targets"] == [
+        "ad9361-1r1t",
+        "ad9363a-1r1t",
+    ]
+
+
+def test_rejects_unknown_runtime_target_before_creating_output(tmp_path: Path) -> None:
+    archive, sidecar = _package(tmp_path)
+    qualification = _qualification_manifest(tmp_path)
+    output = _output_parent(tmp_path) / "bad-target"
+
+    with pytest.raises(CandidatePlanError, match="runtime target must be exactly"):
+        prepare_candidate(
+            archive,
+            sidecar,
+            output,
+            rate=15,
+            ppu_commit=PPU_COMMIT,
+            generator_commit=GENERATOR_COMMIT,
+            qualification_manifest_path=qualification,
+            runtime_target="ad9361-2r2t",
+        )
+
+    assert not output.exists()
+
+
 @pytest.mark.parametrize("revision", ["v2", "v3", "v4", "v5", "v6"])
 def test_prepares_locked_controller_only_from_identical_source_checkout(
     tmp_path: Path, revision: str

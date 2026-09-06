@@ -65,6 +65,7 @@ def test_progress_diagnostic_manifest_is_offline_and_byte_exact() -> None:
     assert values["do_not_merge"] == "true"
     assert values["persistent_flash_eligible"] == "false"
     assert values["hardware_accessed"] == "false"
+    source_ref = values["firmware_source_ref"]
     for prefix in (
         "controller",
         "acquisition_library",
@@ -78,6 +79,12 @@ def test_progress_diagnostic_manifest_is_offline_and_byte_exact() -> None:
     ):
         member = ROOT / values[f"{prefix}_path"]
         assert member.is_file()
-        assert hashlib.sha256(member.read_bytes()).hexdigest() == values[
+        frozen = subprocess.run(
+            ["git", "show", f"{source_ref}:{member.relative_to(ROOT)}"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+        ).stdout
+        assert hashlib.sha256(frozen).hexdigest() == values[
             f"{prefix}_sha256"
         ]

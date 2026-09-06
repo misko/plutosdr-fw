@@ -23,6 +23,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO
 
 SUPPORTED_RATES = (15, 30, 60)
+SUPPORTED_RUNTIME_TARGETS = ("ad9363a-1r1t", "ad9361-1r1t")
 ALLOCATED_SERIAL = "104000bac4950008230026001b440a003a"
 SOURCE_MANIFEST_REVISIONS = {
     "starlink-pss-multirate-rx-only-dnm-v1-source.yaml": "v1",
@@ -38,7 +39,12 @@ DEFAULT_QUALIFICATION_MANIFEST = ROOT / "manifests" / SOURCE_MANIFEST_NAME
 PPU_REPOSITORY = "misko/pluto-plus-utils"
 PPU_VERSION = "0.1.0"
 FIRMWARE_REPOSITORY = "misko/plutosdr-fw"
-HARDWARE_MODEL = "Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)"
+RUNTIME_HARDWARE_MODELS = {
+    "ad9363a-1r1t": "Analog Devices PlutoSDR Rev.C (Z7010-AD9363A)",
+    "ad9361-1r1t": "Analog Devices PlutoSDR Rev.C (Z7010-AD9361)",
+}
+# Compatibility export for existing callers and frozen historical tests.
+HARDWARE_MODEL = RUNTIME_HARDWARE_MODELS["ad9363a-1r1t"]
 METADATA_ABI = "frame-metadata-v3"
 MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
 MAX_MEMBER_BYTES = 256 * 1024 * 1024
@@ -403,11 +409,16 @@ def prepare_candidate(
     generator_commit: str,
     generator_repository: Path = ROOT,
     qualification_manifest_path: Path = DEFAULT_QUALIFICATION_MANIFEST,
+    runtime_target: str = "ad9363a-1r1t",
 ) -> dict[str, Any]:
     """Verify and prepare one archive without performing any hardware access."""
 
     if rate not in SUPPORTED_RATES:
         raise CandidatePlanError("rate must be exactly one of 15, 30, or 60 MS/s")
+    if runtime_target not in SUPPORTED_RUNTIME_TARGETS:
+        raise CandidatePlanError(
+            "runtime target must be exactly ad9363a-1r1t or ad9361-1r1t"
+        )
     if HEX_40.fullmatch(ppu_commit) is None:
         raise CandidatePlanError(
             "PPU commit must be one lowercase 40-hex source identity"
@@ -583,7 +594,7 @@ def prepare_candidate(
             "rate_msps": rate,
             "source_manifest_name": source_manifest_name,
             "source_manifest_revision": source_revision,
-            "runtime_target": "ad9363a-1r1t",
+            "runtime_target": runtime_target,
             "source_commit": source_commit,
             "packaged_source_manifest": {
                 "path": str(packaged_manifest_path),
@@ -604,6 +615,8 @@ def prepare_candidate(
             + ppu_commit.encode()
             + generator_commit.encode()
             + str(rate).encode()
+            + b"\0"
+            + runtime_target.encode()
         ).hexdigest()[:32]
         plan: dict[str, Any] = {
             "schema": "pluto-plus-utils.release-candidate-plan.v2",
@@ -624,7 +637,7 @@ def prepare_candidate(
             "fit": index["fit"],
             "expected_runtime": {
                 "firmware_version": firmware_version,
-                "hardware_model": HARDWARE_MODEL,
+                "hardware_model": RUNTIME_HARDWARE_MODELS[runtime_target],
                 "metadata_abi": METADATA_ABI,
                 "capabilities": [],
             },
@@ -676,7 +689,7 @@ def prepare_candidate(
         "will_load_volatile_ram": False,
         "rate_msps": rate,
         "allocated_radio_serial": ALLOCATED_SERIAL,
-        "runtime_target": "ad9363a-1r1t",
+        "runtime_target": runtime_target,
         "candidate_plan": str(plan_path),
         "candidate_plan_sha256": hashlib.sha256(plan_payload).hexdigest(),
         "candidate_artifact_index": str(index_path),
@@ -693,6 +706,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--archive-sha256", type=Path)
     parser.add_argument("--output-directory", type=Path, required=True)
     parser.add_argument("--rate", type=int, choices=SUPPORTED_RATES, required=True)
+    parser.add_argument(
+        "--runtime-target",
+        choices=SUPPORTED_RUNTIME_TARGETS,
+        default="ad9363a-1r1t",
+        help="Exact persistent driver/channel target expected after RAM boot.",
+    )
     parser.add_argument("--ppu-commit", required=True)
     parser.add_argument("--ppu-repository", type=Path, required=True)
     parser.add_argument("--generator-commit", required=True)
@@ -728,6 +747,7 @@ def main(argv: list[str] | None = None) -> int:
             generator_commit=args.generator_commit,
             generator_repository=ROOT,
             qualification_manifest_path=args.qualification_manifest,
+            runtime_target=args.runtime_target,
         )
     except (OSError, ValueError, CandidatePlanError, tarfile.TarError) as error:
         parser.error(str(error))
