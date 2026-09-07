@@ -261,6 +261,14 @@ Deterministic stimulus identities:
 - source manifest:
   `manifests/starlink-pss-m3-cabled-dnm-v1-source.yaml`.
 
+The source checkpoint is commit
+`b65f66021e9a77aa807b1cbf350d3c59b6462036`, frozen and pushed as
+`starlink-rx-only-dnm-v1-source/firmware-pss15-m3-offline-v1`. The generated
+mode-0600 waveform and evidence are retained at
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m3-cabled-20260907/offline-v1/waveform`;
+the evidence JSON SHA-256 is
+`3fe6b082c567569cb7f41bedbbb76c0ca850a2884ebf375eae605d6890128f1e`.
+
 Focused offline tests include an end-to-end synthetic campaign, strict v7/v1
 scope restoration, insufficient-attenuation and antenna rejection, reversed
 or inconsistent state rejection, final-mute enforcement, and recomputation
