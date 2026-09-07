@@ -8,7 +8,9 @@ Authorized receiver: `104000bac4950008230026001b440a003a` only.
 
 Reserved cabled-bench transmitter: `1040007c4a94000211000b009186843ef2`
 at USB topology `3-11` and host interface `enx00e02297811f`. It remains
-blocked from access until the physical fixture gate below is attested.
+blocked from access until the physical fixture gate below is attested. Its
+physical `TX1` port is not part of the experimental receiver image; it is a
+separate ordinary-firmware signal source connected only by attenuated coax.
 
 ## Current baseline
 
@@ -334,3 +336,29 @@ of a direct `TX1 -> attenuator chain -> RX1` path, no antenna, and at least
 execution plan expose its exact one-time confirmation phrase. After the three
 receiver dwells, qualification remains offline and PPU recovery of the
 allocated receiver remains mandatory. SSS and frame lock stay false.
+
+### Deterministic receiver-context follow-up
+
+An additional offline audit found that the installed legacy pylibiio exposes
+neither public `Context.close()` nor `Buffer.close()`. The v2 receiver monitor
+previously restored all RX attributes but treated context closure as best
+effort. That is acceptable for eventual Python reference cleanup, but too weak
+for three back-to-back evidence dwells.
+
+Source commit `3f302560d11bc7daeec66cd24dacc43e738bc288` therefore adds versioned
+operational entry points without changing the frozen v1/v2 source graphs:
+
+- `scripts/starlink_pss_monitor_probe_v3.py` wraps the receiver context with
+  the modern/legacy deterministic closer from the exact attested PPU checkout;
+- a monitor that otherwise succeeds is forced to fail if exactly one context
+  was not deterministically closed, including when the inherited cleanup path
+  suppresses the close exception; and
+- `scripts/starlink_pss_m3_execute_v2.py` forces all three receiver dwells
+  through monitor v3 and writes an adjacent mode-0600 runner receipt binding
+  the base execution receipt and exact runner/monitor source identities.
+
+The immutable graph is
+`manifests/starlink-pss-m3-cabled-dnm-v3-source.yaml`. Eleven focused cleanup
+tests and the full 325-test Starlink Python regression pass. No hardware was
+accessed, and PPU remains unchanged on clean `main` commit
+`7210cda9b0b2452cb607b5e49e689e2d60b6a8b7`.
