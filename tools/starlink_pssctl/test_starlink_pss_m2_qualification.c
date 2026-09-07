@@ -38,8 +38,12 @@ static void test_edge_phase_plans(void)
 		CHECK(plan.target_map_start > latest, "target map is not future");
 		CHECK((plan.target_map_start - latest) % tile == 0U,
 			"target lost acquisition-map boundary");
-		CHECK(plan.injection_start + expected_delta == plan.target_map_start,
+		CHECK(plan.injection_start + PSS_M2_WARMUP_SAMPLES +
+			expected_delta == plan.target_map_start,
 			"injection start does not map to target");
+		CHECK(plan.target_map_start - plan.injection_start >=
+			PSS_M2_WARMUP_SAMPLES,
+			"target lacks a complete deterministic warm-up period");
 		CHECK(plan.injection_start >= current + PSS_M2_TARGET_SAFETY_LEAD,
 			"target lacks host scheduling safety lead");
 	}
@@ -54,7 +58,7 @@ static void test_expected_map_and_exact_check(void)
 		.requested_phase = 19999U,
 		.injection_delta = 33U,
 		.injection_start = UINT64_C(10000000),
-		.target_map_start = UINT64_C(10000033),
+		.target_map_start = UINT64_C(10020033),
 	};
 	struct pss_m2_map_result result;
 	char error[ERROR_SIZE] = {0};

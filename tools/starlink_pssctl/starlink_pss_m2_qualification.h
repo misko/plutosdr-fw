@@ -10,6 +10,7 @@
 #include "starlink_pss_periodic_injection.h"
 
 #define PSS_M2_TEMPLATE_OFFSET 32U
+#define PSS_M2_WARMUP_SAMPLES UINT64_C(20000)
 #define PSS_M2_TARGET_SAFETY_LEAD UINT64_C(500000)
 
 struct pss_m2_case_plan {

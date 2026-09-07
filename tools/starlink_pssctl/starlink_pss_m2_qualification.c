@@ -24,7 +24,7 @@ int pss_m2_plan_case(uint64_t current_index, uint64_t latest_map_start,
 {
 	const uint64_t tile_samples =
 		(uint64_t)PSS_MAP_PHASE_BINS * PSS_MAP_TILE_FRAMES;
-	uint64_t target, minimum_start;
+	uint64_t target, minimum_start, injection_lead;
 	uint32_t delta;
 
 	if (!plan)
@@ -38,22 +38,25 @@ int pss_m2_plan_case(uint64_t current_index, uint64_t latest_map_start,
 	minimum_start = current_index + PSS_M2_TARGET_SAFETY_LEAD;
 	delta = (PSS_M2_TEMPLATE_OFFSET + PSS_MAP_PHASE_BINS -
 		requested_phase) % PSS_MAP_PHASE_BINS;
+	injection_lead = PSS_M2_WARMUP_SAMPLES + delta;
 	if (latest_map_start > UINT64_MAX - tile_samples)
 		return fail(error, error_size, "M2 next target-map start overflows");
 	target = latest_map_start + tile_samples;
 	for (;;) {
-		if (target >= delta && target - delta >= minimum_start)
+		if (target >= injection_lead &&
+		    target - injection_lead >= minimum_start)
 			break;
 		if (target > UINT64_MAX - tile_samples)
 			return fail(error, error_size,
 				"M2 cannot find a future target-map boundary");
 		target += tile_samples;
 	}
-	if (target - delta > UINT64_MAX - PSS_INJECTION_LAST_SAMPLE_OFFSET)
+	if (target - injection_lead >
+	    UINT64_MAX - PSS_INJECTION_LAST_SAMPLE_OFFSET)
 		return fail(error, error_size, "M2 injection interval overflows");
 	plan->requested_phase = requested_phase;
 	plan->injection_delta = delta;
-	plan->injection_start = target - delta;
+	plan->injection_start = target - injection_lead;
 	plan->target_map_start = target;
 	return 0;
 }
@@ -70,7 +73,10 @@ int pss_m2_build_expected_map(const uint8_t *period_scores,
 		return fail(error, error_size, "invalid M2 expected-map geometry");
 	if (plan->requested_phase >= PSS_MAP_PHASE_BINS ||
 	    plan->injection_delta >= PSS_MAP_PHASE_BINS ||
-	    plan->injection_start + plan->injection_delta != plan->target_map_start)
+	    plan->injection_start > UINT64_MAX - PSS_M2_WARMUP_SAMPLES -
+		plan->injection_delta ||
+	    plan->injection_start + PSS_M2_WARMUP_SAMPLES +
+		plan->injection_delta != plan->target_map_start)
 		return fail(error, error_size, "invalid M2 case-plan relationship");
 	for (phase = 0; phase < PSS_MAP_PHASE_BINS; ++phase) {
 		size_t profile_index =

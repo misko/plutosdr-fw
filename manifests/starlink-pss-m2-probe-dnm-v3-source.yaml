@@ -1,0 +1,85 @@
+# Immutable source graph for the deterministic-pipeline-warmup M2 probe.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. The v2 hardware attempt proved
+# that ABI 1.1 was reached but exposed pre-injection history in the first target
+# map. This revision starts the same periodic stimulus one period earlier. It
+# changes only the temporary userspace controller; the v7 FPGA image is intact.
+
+schema: plutosdr-fw.starlink-pss-m2-probe-source
+schema_version: 3
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+
+supersedes_manifest: starlink-pss-m2-probe-dnm-v2-source.yaml
+source_change: one-period-deterministic-pipeline-warmup
+v2_outcome: rejected-exact-map-mismatch
+v2_first_mismatch_phase: 66
+v2_mismatch_count: 870
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9361-1r1t
+live_runtime_model: Analog Devices PlutoSDR Rev.C (Z7010-AD9361)
+physical_rfic_attestation: ad9363a
+candidate_profile: acquisition-injection
+supported_candidate_revision: v7
+supported_sample_rate_msps: 15
+rf_bandwidth_upper_bound_hz: 15000000
+test_phases: 0,19999,7311
+phase_bins: 20000
+tile_frames: 64
+fixture_samples: 130
+fixture_repetitions: 130
+pipeline_warmup_samples: 20000
+pipeline_warmup_periods: 1
+expected_peak_value: 16320
+expected_runner_up_value: 7424
+timing_tolerance_canonical_samples: 0
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: 635cce031c1e49d1971c735d7bbbb367e5a4a776
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-m2-host-v11
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+host_probe_path: scripts/starlink_pss_m2_probe_v1.py
+host_probe_sha256: 0f9a1819ec1f19e99b2a9e1fa72581cf86ef807a2aedbabeddd03a8c39e9be92
+manifest_test_path: tests/test_starlink_pss_m2_probe_v3_manifest.py
+manifest_test_sha256: 6c65a444c02d7d36d3cba82679219a7a57311f0930f719846585ea8df596a259
+controller_path: tools/starlink_pssctl/starlink_pss_m2ctl.c
+controller_sha256: f7b26e2b68d4dfa7afe471d55fb34c82696f6a719a2b0a64bd35594de5b57029
+qualification_library_path: tools/starlink_pssctl/starlink_pss_m2_qualification.c
+qualification_library_sha256: 17e855ebbd8db30bd5ead4b36662412f3009aed9fef37447902b43343fe13de0
+qualification_header_path: tools/starlink_pssctl/starlink_pss_m2_qualification.h
+qualification_header_sha256: d11374b11e1ab8485cb259ff64fde704e45a3c50d7b6ab5def82eae0c0bd78b9
+qualification_test_path: tools/starlink_pssctl/test_starlink_pss_m2_qualification.c
+qualification_test_sha256: 3efa1e96e64f0c38f636292d2022838beef0d98a464d55e06a509b3f32a67e8a
+controller_arm_binary_sha256: 3fc72fe09820f412dce35f216ae445c7abd20463766391d4e5eb35450921ed21
+fixture_vector_path: hdl/library/axi_starlink_pss_periodic_injector/tb/upper_edge_pss_periodic_fixture_ci16.mem
+fixture_vector_sha256: a983f90ccc0c4e8717ff40a5b0717a4abbea54aaacdd4fb7815adcb86f2dc6f3
+score_vector_path: hdl/library/axi_starlink_pss_periodic_injector/tb/m2_period_scores_u8.mem
+score_vector_sha256: cc3904e652c80ed51bca28f4dd110caaae1dceef33b95a0d827698c4063f468b
+candidate_source_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-source.yaml
+candidate_source_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
+
+fpga_image_changed: false
+rf_configuration_changed: false
+controller_rate_contract_abi_1_1: fixed-15-msps
+controller_plan_relationship: injection-start-plus-warmup-plus-phase-delta-equals-target-map-start
+execute_loads_volatile_ram: false
+execute_writes_qspi: false
+execute_upload_scope: tmp-only
+execute_upload_count: 3
+execute_restores_rx_attributes: true
+execute_requires_disabled_engine_after: true
+execute_exact_map_comparison: true
+execute_claim_scope: deterministic_internal_timing_only
+live_pss_detected: false
+sss_detected: false
+frame_lock_claim: false
+separate_ppu_ram_recovery_required: true
+
+offline_test_verdict: PASS
