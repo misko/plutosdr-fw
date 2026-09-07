@@ -844,3 +844,46 @@ M8 is therefore complete for synthetic cabled 60 MS/s full-rate PSS timing
 within one source sample. This is not a 60 MHz analog-bandwidth result, live
 Starlink evidence, SSS detection, or frame lock. M9 still requires the outdoor
 LNB positive/off-channel/positive sequence.
+
+## Native IIO result transport (experimental, do not merge)
+
+The first native-IIO implementation was added on 2026-09-07 without changing
+the routed v11 FPGA. Two dedicated kernel IIO devices own the existing
+AXI-Lite apertures and interrupts:
+
+- `starlink-pss-track` at `0x79030000`, GIC SPI 56, transports one atomic
+  26-word fine result per scan and supplies the local Q32.32 periodic scheduler;
+- `starlink-pss-map` at `0x79040000`, GIC SPI 54, transports each 20,000-bin
+  coarse map as 200 self-describing scans of 100 `u16` bins.
+
+The coarse chunking is an ABI requirement, not compression: Linux 5.15 stores
+`scan_type.repeat` in eight bits, so 20,000 cannot be represented as one IIO
+channel repetition. Every chunk carries magic, ABI, map generation, chunk
+ordinal/count, 64-bit source start index, first bin, and valid-bin count. A
+host can therefore reject missing, duplicated, reordered, or interleaved map
+generations. The FPGA map bank is released only after all 200 scans have been
+accepted by the IIO kfifo.
+
+Both drivers fail closed. Packet-envelope errors, coefficient-generation
+changes, hardware health faults, map-coherence changes, kfifo exhaustion, or
+release errors stop local scheduling/acquisition and retain the unread FPGA
+bank. Fine scheduling is local to the Zynq: software stages first center,
+Q32.32 period, request base, count, and queue target, then the driver maintains
+the seven-entry FPGA queue. Raw 60 MS/s IQ never enters the ARM or Ethernet
+path.
+
+Reusable host support is in PPU main commit
+`4f4867d47169466c5d6dbce5b82b74e71ed1f2c7`. It discovers and validates both
+devices, loads rate-matched CI16 coefficients, reads fine packets, and strictly
+reassembles maps. Its complete repository gate passed 1,431 tests with 11
+explicit hardware/browser skips, plus Ruff and strict mypy. Experimental
+kernel support is isolated on Linux commit
+`8da0bc6073d145ceff5cdff6e25ebf28a4d4bc25`; it is not eligible for Linux or
+firmware main.
+
+The first 60 MS/s IIO RAM candidate is stamped
+`starlink-pss-iio-v1-dnm`. Before radio access its kernel linked both drivers,
+its Rev-C DTB proved the two exact MMIO/IRQ bindings, and its DFU SHA-256 was
+`999842c83580646fdaf042120f5bde846025bdf6ce1cec8f9b64289ca980dcd9`.
+Target discovery, iiOD XML repeat compatibility, native USB/Ethernet result
+streaming, and cabled timing equivalence remain hardware gates at this point.
