@@ -1,9 +1,12 @@
 # Stage-15 PSS tracker controller — experimental firmware only
 
-`starlink_pssctl` is the fail-closed userspace boundary for the RX-only
-Stage-15 FPGA tracker. It accepts only hardware ID `PSST`, ABI 1.2, 15 MS/s,
-66 taps, a 130-sample capture, 61 lags (`-30..+30`), and capability word
-`0x3d`. It maps only the fixed tracker aperture at `0x79030000`.
+`starlink_pssctl` is the fail-closed userspace boundary for the RX-only FPGA
+fine tracker. Each executable is specialized at build time for exactly one
+rate and never negotiates geometry at run time: 15 MS/s uses 66 taps, 130
+capture samples, and 61 lags (`-30..+30`); 30 MS/s uses 132/260/121; and
+60 MS/s uses 264/520/241 (`-120..+120`). The 15 MS/s ABI retains deterministic
+sample injection, while the higher-rate ABI deliberately omits it. All three
+map only the fixed tracker aperture at `0x79030000`.
 
 Every invocation also requires `--expect-serial`. The value must exactly match
 the radio's hardware-derived `/etc/serial` before `/dev/mem` is opened. This is
@@ -16,6 +19,12 @@ Build and run the native mock/fixture test plus the static ARM target:
 make check
 ```
 
+`make check` exercises both the original 15 MS/s contract and the 60 MS/s
+contract. `make build/starlink_pss60ctl` emits the statically linked ARM
+executable used for the 60 MS/s candidate. Buildroot instead compiles the
+installed `starlink_pssctl` for the candidate's immutable
+`STARLINK_PSS_RATE_MSPS` value.
+
 The test verifies strict ABI rejection, fixture I/Q conversion, coefficient
 loading/commit, exact 130-sample injection loading and I/Q conversion, atomic
 telemetry, future scheduling, every success-counter delta, retained packet
@@ -24,8 +33,9 @@ ordered batch delivery, and accepted-sample clock-slope arithmetic. It does not
 access a radio.
 
 The source coefficient memory format is one eight-digit hex `IIIIQQQQ` word
-per line. Exactly 66 lines are required. The controller deliberately converts
-that fixture convention to the AXI register convention `{Q[15:0], I[15:0]}`.
+per line. Exactly `66 * rate/15` lines are required. The controller deliberately
+converts that fixture convention to the AXI register convention
+`{Q[15:0], I[15:0]}`.
 Injection fixtures use the same source convention and require exactly 130
 lines.
 

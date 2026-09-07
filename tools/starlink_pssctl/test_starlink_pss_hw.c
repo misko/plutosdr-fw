@@ -59,7 +59,7 @@ static void mock_status(struct mock_device *mock)
 	if (*mock_register(mock, PSS_REG_RESULT_STATUS) & 1U)
 		status |= PSS_STATUS_RESULT_AVAILABLE;
 	status |= mock->loaded_count << 8;
-	status |= queue_room << 17;
+	status |= queue_room << PSS_STATUS_QUEUE_ROOM_SHIFT;
 	*mock_register(mock, PSS_REG_STATUS) = status;
 }
 
@@ -350,7 +350,7 @@ int main(int argc, char **argv)
 	struct pss_batch_request batch_request = {
 		.request_id_base = UINT32_C(0x20000000),
 		.count = 12U,
-		.period_samples = 20000U,
+		.period_samples = PSS_FRAME_PERIOD_SAMPLES,
 		.lead_samples = PSS_DEFAULT_LEAD_SAMPLES,
 		.queue_target = PSS_DEFAULT_QUEUE_TARGET,
 		.timeout_ms = 100U,
@@ -360,7 +360,7 @@ int main(int argc, char **argv)
 		.request_id_base = UINT32_C(0x20000000),
 		.first_center = UINT64_C(0x0000000200010000) +
 			PSS_DEFAULT_LEAD_SAMPLES,
-		.period_samples = 20000U,
+		.period_samples = PSS_FRAME_PERIOD_SAMPLES,
 	};
 	struct pss_clock_slope slope;
 	struct pss_packet fixture_packet;
@@ -396,6 +396,7 @@ int main(int argc, char **argv)
 	CHECK(*mock_register(&mock, PSS_REG_ACTIVE_COEFFICIENT_GENERATION) ==
 	      UINT32_C(0x07120001), "coefficient generation did not commit");
 
+	#if PSS_HAS_INJECTION
 	CHECK(pss_read_injection_file(argv[3], injection_samples,
 		error, sizeof(error)) == 0, error);
 	CHECK(pss_load_injection_fixture(&io, injection_samples,
@@ -421,6 +422,11 @@ int main(int argc, char **argv)
 		"overflowing injection window was accepted");
 	CHECK(strstr(error, "overflows the accepted-sample index") != NULL,
 		"overflowing injection window returned the wrong error");
+	#else
+	(void)injection_samples;
+	(void)injection;
+	(void)argv[3];
+	#endif
 
 	CHECK(pss_track_one(&io, &request, &result, error, sizeof(error)) == 0,
 		error);
@@ -453,11 +459,11 @@ int main(int argc, char **argv)
 	      !(*mock_register(&mock, PSS_REG_RESULT_STATUS) & 1U),
 		"batch did not drain the mock command/result queues");
 
-	batch_request.period_samples = PSS_INJECTION_SAMPLES - 1U;
+	batch_request.period_samples = PSS_CAPTURE_SAMPLES - 1U;
 	CHECK(pss_track_batch(&io, &batch_request, NULL, NULL, &batch_result,
 		error, sizeof(error)) < 0,
 		"batch accepted overlapping candidate geometry");
-	batch_request.period_samples = 20000U;
+	batch_request.period_samples = PSS_FRAME_PERIOD_SAMPLES;
 	batch_request.request_id_base = UINT32_MAX - 1U;
 	CHECK(pss_track_batch(&io, &batch_request, NULL, NULL, &batch_result,
 		error, sizeof(error)) < 0,
@@ -471,16 +477,22 @@ int main(int argc, char **argv)
 		"saturated batch counter returned the wrong error");
 	*mock_register(&mock, PSS_REG_QUEUE_OVERRUN) = 0;
 
-	CHECK(pss_calculate_clock_slope(100U, UINT64_C(15000100),
-		UINT64_C(1000000000), UINT64_C(2000000000), 15000000U,
+	CHECK(pss_calculate_clock_slope(100U,
+		UINT64_C(100) + PSS_RATE_MSPS * UINT64_C(1000000),
+		UINT64_C(1000000000), UINT64_C(2000000000),
+		PSS_RATE_MSPS * 1000000U,
 		100.0, &slope, error, sizeof(error)) == 0,
-		"exact 15 MS/s clock slope was rejected");
-	CHECK(slope.sample_delta == UINT64_C(15000000) &&
+		"exact configured-rate clock slope was rejected");
+	CHECK(slope.sample_delta ==
+	      PSS_RATE_MSPS * UINT64_C(1000000) &&
 	      slope.elapsed_ns == UINT64_C(1000000000) &&
 	      slope.error_ppm == 0.0,
 		"clock-slope calculation is wrong");
-	CHECK(pss_calculate_clock_slope(100U, UINT64_C(14900100),
-		UINT64_C(1000000000), UINT64_C(2000000000), 15000000U,
+	CHECK(pss_calculate_clock_slope(100U,
+		UINT64_C(100) +
+		PSS_RATE_MSPS * UINT64_C(1000000) - UINT64_C(100000),
+		UINT64_C(1000000000), UINT64_C(2000000000),
+		PSS_RATE_MSPS * 1000000U,
 		1000.0, &slope, error, sizeof(error)) < 0,
 		"out-of-tolerance clock slope was accepted");
 
@@ -503,10 +515,14 @@ int main(int argc, char **argv)
 	CHECK(*mock_register(&mock, PSS_REG_RESULT_STATUS) & 1U,
 		"failed-gate result should remain retained");
 
-	printf("STARLINK_PSSCTL_SELFTEST_PASS contract=1.2 taps=66 lags=61 "
+	printf("STARLINK_PSSCTL_SELFTEST_PASS contract=%u.%u rate_msps=%u "
+	       "taps=%u lags=%u "
 	       "coefficient_iq_swap=1 atomic_telemetry=1 packet_fixture=1 "
-	       "injection_samples=130 injection_iq_swap=1 "
+	       "injection=%u "
 	       "failure_retains_result=1 batch_fifo=7 batch_refill=1 "
-	       "clock_slope=1\n");
+	       "clock_slope=1\n",
+	       PSS_VERSION >> 16, PSS_VERSION & 0xffffU, PSS_RATE_MSPS,
+	       PSS_COEFFICIENT_COUNT, PSS_QUALIFIED_LAG_COUNT,
+	       PSS_HAS_INJECTION);
 	return EXIT_SUCCESS;
 }

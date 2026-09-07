@@ -41,12 +41,16 @@ static void usage(FILE *stream)
 		"  track-batch --request-base N --count N [--period N]\n"
 		"              [--lead N | --first-center N] [--queue-target N]\n"
 		"              [--timeout-ms N]\n"
+
+#if PSS_HAS_INJECTION
 		"  inject-status\n"
 		"  inject-load --samples FILE --generation N [--timeout-ms N]\n"
 		"  inject-track --request N [--lead N | --start N] [--timeout-ms N]\n"
+#endif
 		"\n"
-		"The tool always maps the source-locked tracker at 0x%08" PRIx64
-		" and refuses any serial or ABI mismatch.\n", PSS_MMIO_BASE);
+		"The tool always maps the source-locked %u MS/s tracker at 0x%08" PRIx64
+		" and refuses any serial or ABI mismatch.\n",
+		PSS_RATE_MSPS, PSS_MMIO_BASE);
 }
 
 static int parse_u64(const char *text, uint64_t *value)
@@ -270,8 +274,8 @@ static void print_info(const char *serial, const struct pss_info *info)
 	       "}\n",
 	       serial, PSS_MMIO_BASE, info->identification,
 	       info->version >> 16, info->version & 0xffffU, info->rate_msps,
-	       info->geometry & 0xffU, (info->geometry >> 8) & 0xffU,
-	       (info->geometry >> 16) & 0xffU, info->capabilities,
+	       PSS_COEFFICIENT_COUNT, PSS_CAPTURE_SAMPLES,
+	       PSS_QUALIFIED_LAG_COUNT, info->capabilities,
 	       info->status, info->active_generation);
 }
 
@@ -576,6 +580,12 @@ int main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 	command = argv[argument++];
+	if (!PSS_HAS_INJECTION && !strncmp(command, "inject-", 7U)) {
+		fprintf(stderr,
+			"%u MS/s tracker was compiled without deterministic injection\n",
+			PSS_RATE_MSPS);
+		return EXIT_FAILURE;
+	}
 	if (verify_local_serial(expected_serial) < 0)
 		return EXIT_FAILURE;
 	if (map_mmio(&mmio, devmem) < 0)
@@ -860,7 +870,7 @@ invalid_inject_track:
 		return_code = EXIT_SUCCESS;
 	} else if (!strcmp(command, "track-batch")) {
 		struct pss_batch_request request = {
-			.period_samples = 20000U,
+			.period_samples = PSS_FRAME_PERIOD_SAMPLES,
 			.lead_samples = PSS_DEFAULT_LEAD_SAMPLES,
 			.queue_target = PSS_DEFAULT_QUEUE_TARGET,
 			.timeout_ms = 5000U,

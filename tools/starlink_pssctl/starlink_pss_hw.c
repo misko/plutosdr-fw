@@ -273,7 +273,7 @@ int pss_load_coefficients(const struct pss_io *io,
 	for (;;) {
 		if (read32(io, PSS_REG_STATUS, &status, error, error_size) < 0)
 			return -1;
-		if (((status >> 8) & 0x7fU) == 0U &&
+		if (((status >> 8) & PSS_STATUS_COEFFICIENT_COUNT_MASK) == 0U &&
 		    (status & PSS_STATUS_COEFFICIENT_READY))
 			break;
 		if (monotonic_milliseconds() >= deadline)
@@ -291,7 +291,8 @@ int pss_load_coefficients(const struct pss_io *io,
 		for (;;) {
 			if (read32(io, PSS_REG_STATUS, &status, error, error_size) < 0)
 				return -1;
-			if (((status >> 8) & 0x7fU) == index + 1U)
+			if (((status >> 8) & PSS_STATUS_COEFFICIENT_COUNT_MASK) ==
+			    index + 1U)
 				break;
 			if (monotonic_milliseconds() >= deadline)
 				return fail(error, error_size,
@@ -312,7 +313,7 @@ int pss_load_coefficients(const struct pss_io *io,
 			return -1;
 		if (active == generation &&
 		    (status & PSS_STATUS_COEFFICIENT_VALID) &&
-		    ((status >> 8) & 0x7fU) == 0U)
+		    ((status >> 8) & PSS_STATUS_COEFFICIENT_COUNT_MASK) == 0U)
 			break;
 		if (monotonic_milliseconds() >= deadline)
 			return fail(error, error_size, "coefficient commit timed out");
@@ -846,7 +847,8 @@ static int submit_batch_candidate(const struct pss_io *io,
 	for (;;) {
 		if (read32(io, PSS_REG_STATUS, &status, error, error_size) < 0)
 			return -1;
-		*queue_room = (status >> 17) & 0x7U;
+		*queue_room =
+			(status >> PSS_STATUS_QUEUE_ROOM_SHIFT) & 0x7U;
 		if ((status & PSS_STATUS_CANDIDATE_READY) &&
 		    !(status & PSS_STATUS_COMMAND_BUFFERED) && *queue_room)
 			break;
@@ -1050,10 +1052,10 @@ int pss_track_batch(const struct pss_io *io,
 			PSS_MAX_BATCH_COUNT);
 	if (request->count - 1U > UINT32_MAX - request->request_id_base)
 		return fail(error, error_size, "batch request IDs overflow");
-	if (request->period_samples < PSS_INJECTION_SAMPLES)
+	if (request->period_samples < PSS_CAPTURE_SAMPLES)
 		return fail(error, error_size,
 			"batch period must be at least %u samples",
-			PSS_INJECTION_SAMPLES);
+			PSS_CAPTURE_SAMPLES);
 	if (!request->queue_target ||
 	    request->queue_target > PSS_COMMAND_FIFO_USABLE)
 		return fail(error, error_size,
