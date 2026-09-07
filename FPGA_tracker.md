@@ -852,19 +852,25 @@ the routed v11 FPGA. Two dedicated kernel IIO devices own the existing
 AXI-Lite apertures and interrupts:
 
 - `starlink-pss-track` at `0x79030000`, GIC SPI 56, transports one atomic
-  26-word fine result per scan and supplies the local Q32.32 periodic scheduler;
+  26-word fine result in one zero-padded 32-word scan and supplies the local
+  Q32.32 periodic scheduler;
 - `starlink-pss-map` at `0x79040000`, GIC SPI 54, transports each 20,000-bin
-  coarse map as 200 self-describing 236-byte scans, each containing nine
-  metadata words followed by 100 packed `u16` bins.
+  coarse map as 200 self-describing 256-byte scans. The first 236 bytes contain
+  nine metadata words followed by 100 packed `u16` bins; the final 20 bytes are
+  required-zero transport padding.
 
 The coarse chunking is an ABI requirement, not compression: Linux 5.15 stores
 `scan_type.repeat` in eight bits, so 20,000 cannot be represented as one IIO
-channel repetition. The compact transport uses one indivisible 59-word IIO
-channel. Splitting metadata and bins into separate repeated channels is not
-valid here because IIO aligns each channel by its full repeated byte width,
-which turns the logical 236-byte record into a 400-byte scan. Every chunk
-carries magic, ABI, map generation, chunk ordinal/count, 64-bit source start
-index, first bin, and valid-bin count. A host can therefore reject missing,
+channel repetition. The transport uses one indivisible 64-word IIO channel.
+Splitting metadata and bins into separate repeated channels is not valid here
+because IIO aligns each channel by its full repeated byte width, which turns
+the logical 236-byte record into a 400-byte scan. A 59-word channel is also not
+valid: Linux 5.15 passes its 236-byte width to `ALIGN()`, whose alignment input
+must be a power of two, and computes a 276-byte kernel stride while libiio
+correctly computes 236 bytes. Padding the envelope to 64 words makes both
+sides use 256 bytes without changing the logical record. Every chunk carries
+magic, ABI, map generation, chunk ordinal/count, 64-bit source start index,
+first bin, and valid-bin count. PPU rejects nonzero padding and missing,
 duplicated, reordered, or interleaved map generations. The FPGA map bank is
 released only after all 200 scans have been accepted by the IIO kfifo.
 
@@ -877,13 +883,13 @@ the seven-entry FPGA queue. Raw 60 MS/s IQ never enters the ARM or Ethernet
 path.
 
 Reusable host support is in PPU main commit
-`5aff93777ee4f616f4d3527bea083eb5306d80e7`. It discovers and validates both
+`b4056896b5cf7b0d34b853344363f0e67dd7d408`. It discovers and validates both
 devices, strictly parses rate-matched packed-CI16 coefficient files, reads fine
 packets, strictly reassembles maps, and deterministically destroys modern or
 legacy pylibiio buffers and contexts. Its complete repository gate passed
-1,436 tests with 11 explicit hardware/browser skips, plus Ruff and strict
+1,439 tests with 11 explicit hardware/browser skips, plus Ruff and strict
 mypy. Experimental kernel support is isolated on Linux commit
-`4617b1f978dd4411123f2242c791b861f30195a5`; it is not eligible for Linux or
+`caa4b3a13c750dfa06eac02e9889e4163f81e4cd`; it is not eligible for Linux or
 firmware main.
 
 The first 60 MS/s IIO RAM candidate is stamped
@@ -930,6 +936,20 @@ buffer request exposed the separate-channel alignment error: hardware produced
 three maps and 600 chunks with zero driver faults, but iiOD correctly expected
 400 bytes per scan while the driver supplied 236. Acquisition was disabled and
 the original RX settings were restored. No result from that attempt is a valid
-map transport claim. The corrected single-channel layout keeps each scan at
-236 bytes and removes unused soft timestamps; it requires a freshly built and
-RAM-deployed candidate before native map/fine streaming can be qualified.
+map transport claim.
+
+The v4 candidate loaded both passive modules successfully before iiOD on the
+allocated `.17` receiver. Its boot receipt was `overall=PASS`, the tracker and
+map devices exposed logical ABI 1.3 and 1.4 with zero faults, TX remained
+quiesced, and QSPI remained byte-for-byte unchanged. The first 60 MS/s PPU map
+request and an independent local `iio_readdev` request both failed `EINVAL`.
+In each case the driver itself delivered six maps and 1,200 chunks to its kfifo
+with no push or FPGA fault, proving that the rejection was at the scan read
+boundary rather than in map production. The deployed scan types were
+`u32X26` (104 bytes) and `u32X59` (236 bytes); Linux computed 136- and 276-byte
+strides because those total widths are not powers of two. The next candidate
+uses `u32X32` (128 bytes) and `u32X64` (256 bytes), preserving and validating
+the original 26- and 59-word logical payloads. A deliberate wrong-rate local
+test also confirmed fail-closed behavior: 30.72 MS/s against the 60 MS/s image
+latched hardware-health fault `0x40` and stopped acquisition. That contaminated
+epoch was recovered to persistent firmware rather than force-cleared.
