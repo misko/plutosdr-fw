@@ -207,14 +207,24 @@ def test_monitor_source_manifest_is_offline_dnm_and_byte_exact() -> None:
     assert values["runtime_target"] == "ad9361-1r1t"
     assert values["supported_sample_rate_msps"] == "15"
     assert values["maximum_observation_ms"] == "120000"
+    assert values["host_test_sha256"] == (
+        "19566eb3eb94a969e010ed331f7f30d340b8f503fb01344d0780eb4e019e44aa"
+    )
+    assert values["controller_sha256"] == (
+        "0e62e04e656c95b6f08be73a70f54a80423f36905a2c087bf7c6aeaf6692d723"
+    )
+    assert values["acquisition_library_sha256"] == (
+        "c3a676c384508a18a392f23456b777cd8ad6f9c5061cc1d0c8d1b2c95fca33b4"
+    )
+    assert values["acquisition_header_sha256"] == (
+        "1320fec8e970b357a55904a0850e62b135315411c4fee4fbff298e68a025faf8"
+    )
+    assert values["acquisition_native_test_sha256"] == (
+        "bb1bfb45bfd47bf2f33da84947a055b37e0eb96c73c3a88fcc6988faad9179c5"
+    )
     for prefix in (
         "host_probe",
-        "host_test",
-        "controller",
         "controller_test",
-        "acquisition_library",
-        "acquisition_header",
-        "acquisition_native_test",
         "inherited_binary_helper",
         "inherited_ad9361_probe_manifest",
         "candidate_source_manifest",
