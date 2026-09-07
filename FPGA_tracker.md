@@ -4,7 +4,11 @@ Canonical design specification: [FPGA_tracker_60MS.md](FPGA_tracker_60MS.md)
 
 Status: active experimental implementation. **DO NOT MERGE INTO FIRMWARE MAIN.**
 
-Authorized radio: `104000bac4950008230026001b440a003a` only.
+Authorized receiver: `104000bac4950008230026001b440a003a` only.
+
+Reserved cabled-bench transmitter: `1040007c4a94000211000b009186843ef2`
+at USB topology `3-11` and host interface `enx00e02297811f`. It remains
+blocked from access until the physical fixture gate below is attested.
 
 ## Current baseline
 
@@ -27,7 +31,7 @@ Authorized radio: `104000bac4950008230026001b440a003a` only.
 | M0: AD9361-personality DNM lifecycle | Complete | Offline plan tests, exact-target RAM boot, recovery to persistent `ad9361-1r1t` |
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
-| M3: cabled-RF 15 MS/s timing | In progress: offline contract complete | Positive/negative cabled receipts |
+| M3: cabled-RF 15 MS/s timing | In progress: offline contract and guarded executor complete | Positive/negative cabled receipts |
 | M4: live-LNB 15 MS/s timing | Pending | Repeated on-channel trajectory and off-channel control |
 | M5: 30-to-15 decimator/index mapping | Pending | Bit-exact oracle and routed evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
@@ -284,3 +288,49 @@ the active acquisition process. If the two radio clocks differ by more than
 the current seven-hypothesis drift bank covers, first perform a separate
 low-power cabled clock calibration, then freeze a transmitter sample rate
 within +/-100 ppm in the final M3 campaign plan.
+
+## M3 guarded executor offline checkpoint
+
+The fail-closed bench executor was completed offline at source commit
+`f03666c330d0b5255cf63725a4331947dd59af96`. It is bound in
+`manifests/starlink-pss-m3-cabled-dnm-v2-source.yaml` and hard-codes the one
+reserved spare transmitter: serial `1040007c4a94000211000b009186843ef2`, USB
+topology `3-11`, and host interface `enx00e02297811f`. A fixture naming any
+other transmitter cannot produce a valid execution plan.
+
+The executor adds two layers:
+
+1. a low-level single-TX libiio primitive that begins and ends muted, accepts
+   only an exact 1R1T CI16 scan layout, validates the complete mode-0600
+   waveform before DMA, powers the LO and enables gain only after a verified
+   cyclic-buffer push, and mutes gain/selectors/DDS/LO before buffer release;
+2. a plan/execute/verify orchestrator that attests the clean PPU checkout,
+   resolves the exact serial/topology/interface twice around PPU's shared
+   serial lock, rejects another process holding the exact USB device, uses the
+   fresh bus/device IIO URI, runs positive-A / muted-negative / positive-B,
+   and unconditionally attempts a final mute and deterministic context close.
+
+The installed legacy pylibiio has no public `Context.close()` and no
+`Buffer.close()`. The executor therefore uses the same deterministic native
+context-destroy pattern already present in PPU, clears the wrapper pointer to
+prevent a later double destroy, and uses buffer cancellation followed by
+reference release. Both legacy and modern cleanup paths have fake-IIO tests.
+
+Offline evidence for this checkpoint:
+
+- 20 focused transmitter/executor tests: PASS;
+- both M3 source-manifest suites (four tests): PASS;
+- complete Starlink Python regression: 312 passed;
+- strict native C self-tests: PASS;
+- ASAN/UBSAN acquisition, injection, and M2 qualification tests: PASS;
+- static ARM controller builds: PASS; and
+- PPU remained unchanged on clean `main` commit
+  `7210cda9b0b2452cb607b5e49e689e2d60b6a8b7`.
+
+No radio was opened, configured, flashed, or keyed while creating this
+checkpoint. M3 still has no PSS result. The next gate is operator confirmation
+of a direct `TX1 -> attenuator chain -> RX1` path, no antenna, and at least
+30 dB measured/effective attenuation (40 dB recommended). Only then may an
+execution plan expose its exact one-time confirmation phrase. After the three
+receiver dwells, qualification remains offline and PPU recovery of the
+allocated receiver remains mandatory. SSS and frame lock stay false.
