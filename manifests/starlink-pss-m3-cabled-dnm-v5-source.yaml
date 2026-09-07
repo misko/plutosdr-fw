@@ -1,0 +1,85 @@
+# Source and hardware-evidence graph for repeatable 15 MS/s cabled PSS timing.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. The experimental receiver
+# image contains no TX DMA/DDS path. The separate bench transmitter was used
+# only through the operator-attested TX1 -> 30 dB attenuator -> RX1 fixture.
+
+schema: plutosdr-fw.starlink-pss-m3-cabled-source
+schema_version: 5
+release_state: hardware-qualified-cabled-pss-acquisition-only
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+persistent_write: false
+hardware_accessed: true
+hardware_qualified: true
+
+allocated_receiver_serial: 104000bac4950008230026001b440a003a
+allocated_receiver_topology: 5-2
+experimental_receiver_rx_only: true
+experimental_receiver_tx_logic_present: false
+separate_bench_transmitter: true
+separate_bench_transmitter_serial: 1040007c4a94000211000b009186843ef2
+separate_bench_transmitter_topology: 3-11
+
+cabled_only: true
+antenna_absent: true
+over_the_air_transmission: false
+effective_attenuation_db: 30
+transmitter_hardwaregain_db: -30
+transmitter_lo_hz: 2400000000
+transmitter_sample_rate_hz: 15000000
+
+immutable_fpga_abi: PSMA-1.1
+observed_restart_residue: deliberate-shutdown-discontinuity-abort-counter
+monitor_v2_policy: baseline-only-discard-and-abort-require-all-new-fault-deltas-zero
+strict_in_observation_fault_deltas: true
+stale_ready_map_rejected: true
+saturated_baseline_rejected: true
+
+monitor_v2_source_path: tools/starlink_pssctl/starlink_pss_acqctl_monitor_v2.c
+monitor_v2_source_sha256: 5ba222ce7a19c0153e6fb215e10f5d3cef17d03aa01c87e5498b97dce2aecca6
+monitor_v2_native_test_path: tools/starlink_pssctl/test_starlink_pss_acqctl_monitor_v2.c
+monitor_v2_native_test_sha256: 2ed54221f381e62d1455923281caf052d6a6ab0b6f3293d59910379a754adde0
+monitor_makefile_path: tools/starlink_pssctl/Makefile
+monitor_makefile_sha256: 3de583b2bb3961db3bf6fdf8a011685a6630d8b15baee57b2d42ac44597adf47
+manifest_test_path: tests/test_starlink_pss_m3_monitor_epoch_manifest_v5.py
+manifest_test_sha256: a13f67eca3ab5c77f640ecf432bb50d5da493fde96aab31431baa1c732d5df67
+inherited_m3_v4_manifest_path: manifests/starlink-pss-m3-cabled-dnm-v4-source.yaml
+inherited_m3_v4_manifest_sha256: 2e44d2a7753c26ae3e95c562f41cbf4041064c7182e9bacb6491f03f2ff9d1d7
+
+native_monitor_v2_test_verdict: PASS
+hardware_campaign_verdict: PASS_M3_CABLED_PSS_ACQUISITION_ONLY
+hardware_campaign_receipt: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m3-cabled-20260907/hardware-attempt3/receipts/campaign-qualification.json
+hardware_campaign_receipt_sha256: 4a866a8e0ef2f7467eb15a5e8050210d21df19d50747fc97bb646cf992e08a31
+execution_receipt_sha256: 052900765fc5930eb4caa1888eefc4301df6e42ff3848c8ea6734df65b2cd34b
+recovery_receipt_sha256: 97d7238c318fac7f1b021b331cea56e8cab0ef93e4e575e7ef5606ea52d59da5
+
+positive_a_candidate_windows: 56
+positive_a_passing_windows: 56
+positive_b_candidate_windows: 56
+positive_b_passing_windows: 56
+negative_candidate_windows: 56
+negative_passing_windows: 1
+positive_a_median_peak_to_median: 4.4651857060952445
+positive_b_median_peak_to_median: 4.467979034896089
+negative_median_peak_to_median: 1.349685534591195
+positive_to_negative_median_ratio: 3.308315597712693
+positive_tracks_consecutive_windows: 56
+negative_track_consecutive_windows: 1
+
+transmitter_final_mute_verified: true
+transmitter_final_gain_db: -89.75
+transmitter_final_lo_powerdown: true
+transmitter_final_buffer_inactive: true
+receiver_recovery_verified: true
+receiver_persistent_firmware: v0.48-plutoplus-spf-iq-direct-async-v3
+receiver_runtime_target: ad9361-1r1t
+receiver_qspi_unchanged: true
+
+cabled_pss_detected: true
+timing_trajectory_qualified: true
+negative_control_rejected: true
+sss_detected: false
+frame_lock_claim: false
