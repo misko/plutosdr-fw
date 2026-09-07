@@ -4,8 +4,8 @@
 The offline ``plan`` binds a passing v7 RAM receipt, the exact static ARM
 controller, and both deterministic vector files.  ``execute`` acquires PPU's
 exact radio and route locks, selects the factor-one 15 MS/s RX path, uploads
-the three sealed inputs only to ``/tmp``, checks three exact 20,000-bin FPGA
-maps, removes every upload, restores IIO attributes, and writes a receipt.
+the three sealed inputs only to ``/tmp``, checks three exact FPGA timing
+signatures, removes every upload, restores IIO attributes, and writes a receipt.
 It never writes persistent storage and makes no live-PSS, SSS, or frame-lock
 claim.
 """
@@ -35,10 +35,10 @@ if str(ROOT) not in sys.path:
 import scripts.starlink_pss_hardware_probe_v9 as probe_v9
 import scripts.starlink_pss_progress_probe_v1 as progress_v1
 
-PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m2-probe-plan.v1"
-RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m2-probe-receipt.v1"
-CASE_SCHEMA = "starlink-pss-m2ctl.case.v1"
-SUMMARY_SCHEMA = "starlink-pss-m2ctl.summary.v1"
+PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m2-probe-plan.v2"
+RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m2-probe-receipt.v2"
+CASE_SCHEMA = "starlink-pss-m2ctl.case.v2"
+SUMMARY_SCHEMA = "starlink-pss-m2ctl.summary.v2"
 INFO_SCHEMA = "starlink-pss-m2ctl.info.v1"
 CLAIM_SCOPE = "deterministic_internal_timing_only"
 INFO_CLAIM_SCOPE = "deterministic_qualification_contract_only"
@@ -50,6 +50,7 @@ SCORES_SHA256 = "cc3904e652c80ed51bca28f4dd110caaae1dceef33b95a0d827698c4063f468
 FIXTURE_BYTES = 130 * 9
 SCORES_BYTES = 20_000 * 3
 TILE_SAMPLES = 20_000 * 64
+WARMUP_SAMPLES = 20_000
 PSSI_FIXTURE_GENERATION = 0x15020001
 PSSI_FORBIDDEN_STATUS = 0xEC
 MAXIMUM_VECTOR_BYTES = 128 * 1024
@@ -120,6 +121,7 @@ SUMMARY_FIELDS = {
     "final_health_flags",
     "fault_free_epoch",
     "continuity_ok",
+    "full_map_exactness_claimed",
     "pss_timing_qualified",
     "live_pss_detected",
     "sss_detected",
@@ -296,7 +298,7 @@ def _validate_plan(plan: dict[str, Any]) -> None:
     timeout = plan.get("controller_timeout_ms")
     if (
         plan.get("schema") != PLAN_SCHEMA
-        or plan.get("schema_version") != 1
+        or plan.get("schema_version") != 2
         or probe_v1.HEX_32.fullmatch(str(plan.get("plan_id", ""))) is None
         or not str(plan.get("created_at", "")).endswith("Z")
         or created.tzinfo != UTC
@@ -374,7 +376,7 @@ def build_plan(args: Any) -> dict[str, Any]:
     probe_v1._require_new_private_output(args.receipt)
     plan = {
         "schema": PLAN_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "plan_id": uuid.uuid4().hex,
         "created_at": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         "hardware_accessed": False,
@@ -463,16 +465,16 @@ def _validate_qualification_records(
             or record.get("requested_phase") != phase
             or not _is_uint(record.get("injection_start_index"))
             or not _is_uint(record.get("target_map_start_index"))
-            or record["injection_start_index"] + delta
+            or record["injection_start_index"] + WARMUP_SAMPLES + delta
             != record["target_map_start_index"]
-            or record["target_map_start_index"] % TILE_SAMPLES
             or not _is_uint(record.get("map_generation"), (1 << 32) - 1)
             or record.get("actual_peak_phase") != phase
             or record.get("actual_peak_value") != 16_320
             or record.get("actual_runner_up_value") != 7_424
-            or record.get("mismatch_count") != 0
+            or not _is_uint(record.get("mismatch_count"), 20_000)
             or record.get("unique_peak") is not True
-            or record.get("exact_map") is not True
+            or record.get("exact_map")
+            is not (record.get("mismatch_count") == 0)
             or record.get("completed_generation") != PSSI_FIXTURE_GENERATION
             or record.get("completed_repetitions") != 130
             or record.get("pss_timing_qualified") is not True
@@ -480,15 +482,17 @@ def _validate_qualification_records(
             or record.get("sss_detected") is not False
             or record.get("frame_lock_claim") is not False
         ):
-            raise ProbeError(f"M2 case {index} violates its exact-map contract")
+            raise ProbeError(f"M2 case {index} violates its timing-signature contract")
         if previous is not None:
-            tile_delta = (
+            target_delta = (
                 record["target_map_start_index"]
                 - previous["target_map_start_index"]
-            ) // TILE_SAMPLES
+            )
+            tile_delta = target_delta // TILE_SAMPLES
             if (
                 record["target_map_start_index"]
                 <= previous["target_map_start_index"]
+                or target_delta % TILE_SAMPLES
                 or record["map_generation"] <= previous["map_generation"]
                 or record["map_generation"] - previous["map_generation"] != tile_delta
             ):
@@ -513,12 +517,13 @@ def _validate_qualification_records(
         or summary.get("final_health_flags") != "0x00000000"
         or summary.get("fault_free_epoch") is not True
         or summary.get("continuity_ok") is not True
+        or summary.get("full_map_exactness_claimed") is not False
         or summary.get("pss_timing_qualified") is not True
         or summary.get("live_pss_detected") is not False
         or summary.get("sss_detected") is not False
         or summary.get("frame_lock_claim") is not False
     ):
-        raise ProbeError("M2 summary violates the exact timing qualification contract")
+        raise ProbeError("M2 summary violates the timing-signature contract")
     return {"cases": cases, "summary": summary}
 
 
@@ -728,7 +733,8 @@ def _execute_measurement(
             "qualifier_stderr": qualifier_stderr,
             "controller_info_after": info_after,
             "engine_disable_verified": True,
-            "exact_maps_verified": True,
+            "timing_signatures_verified": True,
+            "full_map_exactness_claimed": False,
         }
     finally:
         cleanup_errors: list[str] = []
@@ -879,7 +885,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     completed = datetime.now(UTC)
     receipt = {
         "schema": RECEIPT_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "receipt_id": uuid.uuid4().hex,
         "outcome": "pass" if failure is None else "failed",
         "started_at": started.isoformat().replace("+00:00", "Z"),
@@ -961,7 +967,7 @@ def verify_receipt(args: Any) -> dict[str, Any]:
     if (
         set(receipt) != required
         or receipt.get("schema") != RECEIPT_SCHEMA
-        or receipt.get("schema_version") != 1
+        or receipt.get("schema_version") != 2
         or probe_v1.HEX_32.fullmatch(str(receipt.get("receipt_id", ""))) is None
         or not str(receipt.get("started_at", "")).endswith("Z")
         or not str(receipt.get("completed_at", "")).endswith("Z")
@@ -1000,11 +1006,14 @@ def verify_receipt(args: Any) -> dict[str, Any]:
             or measurement.get("uploads_removed") is not True
             or measurement.get("iio_restore_verified") is not True
             or measurement.get("engine_disable_verified") is not True
-            or measurement.get("exact_maps_verified") is not True
+            or measurement.get("timing_signatures_verified") is not True
+            or measurement.get("full_map_exactness_claimed") is not False
             or receipt.get("route_release_verified") is not True
             or receipt.get("error") is not None
         ):
-            raise ProbeError("passing M2 receipt lacks runtime, exact-map, or cleanup proof")
+            raise ProbeError(
+                "passing M2 receipt lacks runtime, timing-signature, or cleanup proof"
+            )
         info_before = measurement.get("controller_info_before")
         info_after = measurement.get("controller_info_after")
         records = measurement.get("qualification_records")

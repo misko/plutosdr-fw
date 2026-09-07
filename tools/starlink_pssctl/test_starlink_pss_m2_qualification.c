@@ -72,7 +72,7 @@ static void test_expected_map_and_exact_check(void)
 	CHECK(pss_m2_check_map(actual, PSS_MAP_PHASE_BINS,
 		expected, PSS_MAP_PHASE_BINS, 19999U, &result,
 		error, sizeof(error)) == 0, error);
-	CHECK(result.exact && result.unique_peak &&
+	CHECK(result.exact && result.timing_qualified && result.unique_peak &&
 		result.actual_peak_phase == 19999U &&
 		result.actual_peak_value == 16320U &&
 		result.actual_runner_up_value == 7424U,
@@ -81,9 +81,24 @@ static void test_expected_map_and_exact_check(void)
 	CHECK(pss_m2_check_map(actual, PSS_MAP_PHASE_BINS,
 		expected, PSS_MAP_PHASE_BINS, 19999U, &result,
 		error, sizeof(error)) == 0, error);
-	CHECK(!result.exact && result.mismatch_count == 1U &&
+	CHECK(!result.exact && result.timing_qualified &&
+		result.mismatch_count == 1U &&
 		result.first_mismatch_phase == 7U,
-		"one-word mismatch was not rejected exactly");
+		"one sidelobe mismatch changed the exact timing signature");
+	memcpy(actual, expected, sizeof(actual));
+	actual[19999U]--;
+	CHECK(pss_m2_check_map(actual, PSS_MAP_PHASE_BINS,
+		expected, PSS_MAP_PHASE_BINS, 19999U, &result,
+		error, sizeof(error)) == 0, error);
+	CHECK(!result.exact && !result.timing_qualified,
+		"wrong peak magnitude passed the exact timing signature");
+	memcpy(actual, expected, sizeof(actual));
+	actual[7U] = 8000U;
+	CHECK(pss_m2_check_map(actual, PSS_MAP_PHASE_BINS,
+		expected, PSS_MAP_PHASE_BINS, 19999U, &result,
+		error, sizeof(error)) == 0, error);
+	CHECK(!result.exact && !result.timing_qualified,
+		"wrong runner-up magnitude passed the exact timing signature");
 }
 
 static void test_invalid_inputs(void)

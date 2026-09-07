@@ -47,8 +47,8 @@ static void usage(FILE *stream)
 		"\n"
 		"Runs deterministic internal 15 MS/s PSS timing qualification. The "
 		"default phases are %s. It refuses serial, ABI, geometry, health, "
-		"continuity, or exact-map mismatches and never claims live PSS, SSS, "
-		"or frame lock.\n",
+		"continuity, or exact timing-signature mismatches and never claims "
+		"live PSS, SSS, or frame lock.\n",
 		DEFAULT_PHASES);
 }
 
@@ -363,7 +363,7 @@ static void print_case(const char *serial, size_t case_index,
 	const struct pss_m2_map_result *result,
 	const struct pss_injection_state *injection_state)
 {
-	printf("{\"schema\":\"starlink-pss-m2ctl.case.v1\","
+	printf("{\"schema\":\"starlink-pss-m2ctl.case.v2\","
 	       "\"stimulus\":\"deterministic_internal\","
 	       "\"serial\":\"%s\",\"case\":%zu,"
 	       "\"requested_phase\":%" PRIu32
@@ -387,7 +387,7 @@ static void print_case(const char *serial, size_t case_index,
 	       result->exact ? "true" : "false",
 	       injection_state->last_completed_generation,
 	       injection_state->last_completed_repetitions,
-	       result->exact ? "true" : "false");
+	       result->timing_qualified ? "true" : "false");
 	fflush(stdout);
 }
 
@@ -542,16 +542,20 @@ static int run_qualification(const char *serial,
 				expected_map, PSS_MAP_PHASE_BINS, phases[case_index],
 				&map_result, error, error_size) < 0)
 			goto done;
-		if (!map_result.exact) {
+		if (!map_result.timing_qualified) {
 			snprintf(error, error_size,
-				"M2 exact map mismatch at requested phase %" PRIu32
+				"M2 timing signature mismatch at requested phase %" PRIu32
 				": mismatches=%" PRIu32 " first=%" PRIu32
-				" expected=%u actual=%u peak=%" PRIu32,
+				" expected=%u actual=%u peak=%u@%" PRIu32
+				" runner=%u injection=%" PRIu64 " target=%" PRIu64,
 				phases[case_index], map_result.mismatch_count,
 				map_result.first_mismatch_phase,
 				map_result.first_mismatch_expected,
 				map_result.first_mismatch_actual,
-				map_result.actual_peak_phase);
+				map_result.actual_peak_value,
+				map_result.actual_peak_phase,
+				map_result.actual_runner_up_value,
+				plan.injection_start, plan.target_map_start);
 			goto done;
 		}
 		if (pss_injection_wait_complete(injection_io, fixture_generation,
@@ -572,7 +576,7 @@ static int run_qualification(const char *serial,
 	if (pss_map_set_enabled(map_io, false, true, error, error_size) < 0)
 		goto done;
 	enabled = false;
-	printf("{\"schema\":\"starlink-pss-m2ctl.summary.v1\","
+	printf("{\"schema\":\"starlink-pss-m2ctl.summary.v2\","
 	       "\"stimulus\":\"deterministic_internal\","
 	       "\"serial\":\"%s\",\"input_rate_msps\":15,"
 	       "\"cases_requested\":%zu,\"cases_passed\":%zu,"
@@ -581,6 +585,7 @@ static int run_qualification(const char *serial,
 	       ",\"last_map_generation\":%" PRIu32
 	       ",\"final_health_flags\":\"0x%08" PRIx32 "\","
 	       "\"fault_free_epoch\":true,\"continuity_ok\":true,"
+	       "\"full_map_exactness_claimed\":false,"
 	       "\"pss_timing_qualified\":true,"
 	       "\"live_pss_detected\":false,\"sss_detected\":false,"
 	       "\"frame_lock_claim\":false}\n",

@@ -30,6 +30,7 @@ struct pss_m2_map_result {
 	uint16_t first_mismatch_expected;
 	uint16_t first_mismatch_actual;
 	bool unique_peak;
+	bool timing_qualified;
 	bool exact;
 };
 

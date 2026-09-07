@@ -94,7 +94,7 @@ int pss_m2_check_map(const uint16_t *actual_map, size_t actual_words,
 	uint32_t requested_phase, struct pss_m2_map_result *result,
 	char *error, size_t error_size)
 {
-	uint16_t peak = 0U, runner = 0U;
+	uint16_t peak = 0U, runner = 0U, expected_peak, expected_runner = 0U;
 	uint32_t peak_phase = 0U, peak_count = 0U;
 	size_t phase;
 
@@ -105,8 +105,20 @@ int pss_m2_check_map(const uint16_t *actual_map, size_t actual_words,
 	memset(result, 0, sizeof(*result));
 	result->requested_phase = requested_phase;
 	result->first_mismatch_phase = UINT32_MAX;
+	expected_peak = expected_map[requested_phase];
+	if (!expected_peak)
+		return fail(error, error_size, "M2 expected timing peak is zero");
 	for (phase = 0; phase < PSS_MAP_PHASE_BINS; ++phase) {
 		uint16_t value = actual_map[phase];
+		uint16_t expected = expected_map[phase];
+
+		if (phase != requested_phase) {
+			if (expected >= expected_peak)
+				return fail(error, error_size,
+					"M2 expected timing peak is not unique");
+			if (expected > expected_runner)
+				expected_runner = expected;
+		}
 
 		if (value > peak) {
 			runner = peak;
@@ -131,7 +143,9 @@ int pss_m2_check_map(const uint16_t *actual_map, size_t actual_words,
 	result->actual_peak_value = peak;
 	result->actual_runner_up_value = runner;
 	result->unique_peak = peak_count == 1U;
-	result->exact = !result->mismatch_count && result->unique_peak &&
-		peak_phase == requested_phase;
+	result->timing_qualified = result->unique_peak &&
+		peak_phase == requested_phase && peak == expected_peak &&
+		runner == expected_runner;
+	result->exact = !result->mismatch_count && result->timing_qualified;
 	return 0;
 }

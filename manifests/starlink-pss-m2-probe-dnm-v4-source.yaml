@@ -1,0 +1,100 @@
+# Immutable source graph for block-cadence-aware M2 timing qualification.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. The v2 and fresh-epoch v3
+# attempts produced the same correct phase-zero peak and the same 870-bin
+# difference. A 20,000-sample period advances 332 positions in the 447-result
+# overlap-save cadence, so multiplying one block-floating score period by 64 is
+# not a valid full-map oracle. This contract verifies the exact global timing
+# signature and retains full-map differences as diagnostics without claiming
+# full-map equality.
+
+schema: plutosdr-fw.starlink-pss-m2-probe-source
+schema_version: 4
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+
+supersedes_manifest: starlink-pss-m2-probe-dnm-v3-source.yaml
+source_change: block-cadence-aware-timing-signature
+v3_fresh_epoch_outcome: rejected-invalid-full-map-oracle
+v3_first_mismatch_phase: 66
+v3_mismatch_count: 870
+period_samples_mod_valid_results: 332
+period_samples: 20000
+overlap_save_valid_results: 447
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9361-1r1t
+live_runtime_model: Analog Devices PlutoSDR Rev.C (Z7010-AD9361)
+physical_rfic_attestation: ad9363a
+candidate_profile: acquisition-injection
+supported_candidate_revision: v7
+supported_sample_rate_msps: 15
+rf_bandwidth_upper_bound_hz: 15000000
+test_phases: 0,19999,7311
+phase_bins: 20000
+tile_frames: 64
+fixture_samples: 130
+fixture_repetitions: 130
+pipeline_warmup_samples: 20000
+pipeline_warmup_periods: 1
+
+timing_signature_unique_global_peak: true
+timing_signature_peak_phase: exact-requested-phase
+timing_signature_peak_value: 16320
+timing_signature_runner_up_value: 7424
+timing_signature_tolerance_samples: 0
+full_map_mismatch_count_recorded: true
+full_map_exactness_claimed: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: edcaa4885fab9f1dd5dc90c46c146b0195e1354f
+firmware_source_ref: refs/tags/starlink-rx-only-dnm-v1-source/firmware-pss15-m2-host-v12
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+host_probe_path: scripts/starlink_pss_m2_probe_v1.py
+host_probe_sha256: e35acdd95434300dcc2235058241570fa4d3b3e207795915cbf50aee8b345810
+host_test_path: tests/test_starlink_pss_m2_probe_v1.py
+host_test_sha256: fe47e9e6b9f0caf31774566902ba81592cb0eafa6e35f40e979c97d314aef453
+manifest_test_path: tests/test_starlink_pss_m2_probe_v3_manifest.py
+manifest_test_sha256: 0040330e9396c981bce7eb795ed311e6bb5ceaf465d8626a0da87b4a47d28209
+controller_path: tools/starlink_pssctl/starlink_pss_m2ctl.c
+controller_sha256: 80e631b1dd77f89221f668cf4a5b42651247c0a0b78a4a560aa1464388423323
+qualification_library_path: tools/starlink_pssctl/starlink_pss_m2_qualification.c
+qualification_library_sha256: c3deb31f47b4fac3f2c3894e76b57d7dfb58ec3c0704e5cf115f2b17383f0aef
+qualification_header_path: tools/starlink_pssctl/starlink_pss_m2_qualification.h
+qualification_header_sha256: 69bb5354e1f06cc448d53c1a00ecdf5cfa4ad5d7dc046c611ded56e179902bd1
+qualification_test_path: tools/starlink_pssctl/test_starlink_pss_m2_qualification.c
+qualification_test_sha256: 65a8ba684af4ae9c79a11a4b7ea6723399115683c6edf5dca3211b98a051877c
+controller_arm_binary_sha256: 712d270fffeaa5884b4133a25997f6589a65e38fe57bad051a9a4e4126f0fecc
+fixture_vector_path: hdl/library/axi_starlink_pss_periodic_injector/tb/upper_edge_pss_periodic_fixture_ci16.mem
+fixture_vector_sha256: a983f90ccc0c4e8717ff40a5b0717a4abbea54aaacdd4fb7815adcb86f2dc6f3
+score_vector_path: hdl/library/axi_starlink_pss_periodic_injector/tb/m2_period_scores_u8.mem
+score_vector_sha256: cc3904e652c80ed51bca28f4dd110caaae1dceef33b95a0d827698c4063f468b
+candidate_source_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-source.yaml
+candidate_source_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
+
+plan_schema: plutosdr-fw.starlink-pss-m2-probe-plan.v2
+receipt_schema: plutosdr-fw.starlink-pss-m2-probe-receipt.v2
+controller_case_schema: starlink-pss-m2ctl.case.v2
+controller_summary_schema: starlink-pss-m2ctl.summary.v2
+fpga_image_changed: false
+rf_configuration_changed: false
+execute_loads_volatile_ram: false
+execute_writes_qspi: false
+execute_upload_scope: tmp-only
+execute_upload_count: 3
+execute_restores_rx_attributes: true
+execute_requires_disabled_engine_after: true
+execute_requires_fault_free_continuity: true
+execute_claim_scope: deterministic_internal_timing_only
+live_pss_detected: false
+sss_detected: false
+frame_lock_claim: false
+separate_ppu_ram_recovery_required: true
+
+offline_test_verdict: PASS
