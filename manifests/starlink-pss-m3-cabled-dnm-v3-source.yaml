@@ -1,0 +1,64 @@
+# Immutable offline source graph for the deterministic-cleanup M3 runner.
+#
+# DO NOT MERGE, RELEASE, PERSISTENTLY FLASH, OR TRANSMIT OVER THE AIR. The
+# experimental target remains receiver-only. TX1 below is the connector on a
+# physically separate spare radio and is still blocked by the cabled fixture
+# attestation and exact one-time execution confirmation.
+
+schema: plutosdr-fw.starlink-pss-m3-cabled-source
+schema_version: 3
+release_state: offline-deterministic-receiver-cleanup-runner
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+persistent_write: false
+hardware_accessed: false
+hardware_qualified: false
+
+allocated_receiver_serial: 104000bac4950008230026001b440a003a
+allocated_receiver_topology: 5-2
+experimental_receiver_rx_only: true
+experimental_receiver_tx_logic_present: false
+separate_bench_transmitter_serial: 1040007c4a94000211000b009186843ef2
+separate_bench_transmitter_topology: 3-11
+separate_bench_transmitter_interface: enx00e02297811f
+bench_transmitter_is_separate_radio: true
+
+cabled_only: true
+antenna_permitted: false
+over_the_air_authorized: false
+fixture_confirmation_state: pending-operator-attestation
+planned_physical_path: separate-spare-TX1-to-attenuators-to-experimental-RX1
+minimum_effective_attenuation_db: 30
+recommended_effective_attenuation_db: 40
+
+receiver_operational_entrypoint: scripts/starlink_pss_monitor_probe_v3.py
+campaign_operational_entrypoint: scripts/starlink_pss_m3_execute_v2.py
+deterministic_receiver_context_close_required: true
+deterministic_receiver_context_close_implementation: exact-attested-PPU-modern-or-legacy-helper
+suppressed_context_close_failure_is_fatal: true
+runner_receipt_required: true
+runner_receipt_path_rule: execution-receipt-stem-plus-runner-v2.json
+runner_receipt_schema: plutosdr-fw.starlink-pss-m3-runner-receipt.v2
+runner_claim_scope: cabled_campaign_transport_and_cleanup_only
+
+cabled_pss_detected_by_this_revision: false
+sss_detected: false
+frame_lock_claim: false
+
+receiver_monitor_v3_path: scripts/starlink_pss_monitor_probe_v3.py
+receiver_monitor_v3_sha256: 174a1d4d19e7e20b2600ecdad3952b97e9f559467224f8b5d194080a1b80f7a4
+receiver_monitor_v3_test_path: tests/test_starlink_pss_monitor_probe_v3.py
+receiver_monitor_v3_test_sha256: b88d14099d3ee19b2655ba2ba9de5956dbe3bd4422e9701617ab3f5fd742be7a
+campaign_runner_v2_path: scripts/starlink_pss_m3_execute_v2.py
+campaign_runner_v2_sha256: 25f1788566f7c5f7fe89a5fbe3fcd1eb6b7a4c80480c615e63ccaab2b75bc383
+campaign_runner_v2_test_path: tests/test_starlink_pss_m3_execute_v2.py
+campaign_runner_v2_test_sha256: 58507edf537b650c987448fb7500f0ec0931a4ed4c8c0ecc222cf580fe995596
+runner_manifest_test_path: tests/test_starlink_pss_m3_runner_manifest.py
+runner_manifest_test_sha256: 66d99b70f047f0c9af1c212d47de40d5e9251872f89fb80de8192afd2e70a49f
+inherited_m3_v2_manifest_path: manifests/starlink-pss-m3-cabled-dnm-v2-source.yaml
+inherited_m3_v2_manifest_sha256: 05cfcc879a3063c6079c0ae3e92f4346826817312f6eab81f85d6eeb4f24963d
+
+focused_deterministic_cleanup_tests: 11
+offline_test_verdict: PASS
