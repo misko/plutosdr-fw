@@ -2,7 +2,9 @@
 
 Canonical design specification: [FPGA_tracker_60MS.md](FPGA_tracker_60MS.md)
 
-Status: active experimental implementation. **DO NOT MERGE INTO FIRMWARE MAIN.**
+Status: 15/30/60 MS/s coarse acquisition implemented and cabled-tested.
+Full-rate refinement, live-LNB qualification, SSS, and frame lock remain open.
+**DO NOT MERGE INTO FIRMWARE MAIN.**
 
 Authorized receiver: `104000bac4950008230026001b440a003a` only.
 
@@ -15,8 +17,10 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 ## Current baseline
 
 - Firmware branch: `codex/starlink-rx-only-do-not-merge`
-- Routed 15 MS/s acquisition image:
-  `v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7`
+- Routed acquisition images:
+  - `v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7`
+  - `v0.50-plutoplus-starlink-pss-30m-rx-only-dnm-v9`
+  - `v0.50-plutoplus-starlink-pss-60m-rx-only-dnm-v10`
 - Physical RFIC evidence: AD9363A
 - Persistent runtime target: `ad9361-1r1t`
 - Persistent firmware:
@@ -35,11 +39,11 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
 | M4: live-LNB 15 MS/s timing | Offline ready | Repeated on-channel trajectory and off-channel control |
-| M5: 30-to-15 decimator/index mapping | Pending | Bit-exact oracle and routed evidence |
+| M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
-| M7: 60-to-30-to-15 cascade | Pending | Bit-exact cascade and routed evidence |
+| M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
 | M8: sparse 60 MS/s refinement | Pending | Direct-oracle timing within one source sample |
-| M9: live 60 MS/s narrowband run | Pending | 120-second receipt and rollback proof |
+| M9: live 60 MS/s narrowband run | Cabled complete; live pending | Passing 120-second cabled receipt and rollback proof; outdoor LNB evidence still required |
 | M10: SSS/final frame lock | Pending | Separate frozen policy and live qualification |
 
 ## M0/M1 implementation record
@@ -626,3 +630,116 @@ Evidence:
 The exact production continuous-role path is now cabled-qualified and approved
 for the live-LNB M4 run. This is still only a synthetic cabled PSS timing result:
 it is not live Starlink evidence, SSS detection, or a frame-lock claim.
+
+## M5 coarse 30 MS/s acquisition evidence
+
+The 30 MS/s acquisition-only v9 image implements one deterministic half-band
+decimator before the unchanged 15 MS/s correlator and 20,000-bin phase-map
+engine. The source-to-canonical observation counters and absolute indexes use
+factor two. The sparse direct 30 MS/s refinement tracker described by M6 is not
+present, so this result is a coarse PSS timing result with 15 MS/s resolution.
+
+The final routed image closes timing with WNS `+0.560 ns` and WHS `+0.028 ns`.
+Its Zynq-7010 utilization is 55.16% LUT, 47.80% registers, 70.83% BRAM, and
+65.00% DSP. The DFU SHA-256 is
+`69816bfbf997f9a6c0da343439b1539e31976d248e46d7391af682e4a9693a70`.
+
+On the declared 30 dB cabled fixture, two intended-edge observations produced
+peak-to-median values `11.7356` and `11.5921`, robust-z values `164.30` and
+`164.32`, and the exact 40,000-source-sample period. The muted background was
+`1.3768` peak-to-median. A separate wrong-edge observation remained visible at
+`4.0804`; frequency-hypothesis selectivity therefore remains a detector-policy
+follow-up and is not hidden by this coarse acquisition result.
+
+The 120-second transport run passed with 1,406 contiguous maps, 1,404 candidate
+windows, 3,601,299,373 accepted source samples, 1,800,649,686 emitted canonical
+samples, and zero DDC, ingress, FIFO, scheduler, detector, protocol, arithmetic,
+map, or continuity faults. PPU recovery then returned `.17` to the unchanged
+persistent v0.48 AD9361-1R1T runtime.
+
+Evidence:
+
+- cabled smoke summary SHA-256:
+  `1da16627dd91212dacf6c57d8f613813c3a5d4c3de72cf6082841543eef9671a`;
+- 120-second monitor receipt SHA-256:
+  `5725ea223653c51222399fa4d3b371e2e13667599b16393227380ecaec6874da`;
+- recovery receipt SHA-256:
+  `df9dd808a3edb20e1e7909a5c2e42f2e245d61db535978643623b3ed3dc22633`;
+  and
+- authoritative private directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9`.
+
+M5 is complete for coarse acquisition and index transport. M6 remains open
+until the sparse full-rate tracker resolves timing within one 30 MS/s source
+sample.
+
+## M7 coarse 60 MS/s acquisition and cabled soak
+
+The 60 MS/s acquisition-only v10 image cascades two deterministic half-band
+stages into the same canonical 15 MS/s correlator. ABI 1.4 adds coherent
+high-low-high reads of 64-bit accepted/emitted DDC counters, while discontinuity
+and saturation counters remain strict. This removes the former 32-bit
+71.6-second ceiling without inventing host-side samples after saturation.
+
+The packaged ARM controller initially exposed a stale Buildroot local-package
+stamp. Source commit `9fd0b60adbe4f44c71e3f61505f43d2ef5b368fa`
+now forces a clean controller package build and verifies staged source hashes,
+the Buildroot recipe hash, ARM EABI5 identity, and the exact packaged controller
+binary before a candidate is emitted. The corresponding HDL source is
+`b6a8cdf1a2f627b32b3f80d179802efe2ff2313f`.
+
+The final routed image closes timing with WNS `+0.138 ns` and WHS `+0.018 ns`.
+Zynq-7010 utilization is 60.47% LUT, 50.06% registers, 70.83% BRAM, and
+75.00% DSP. The RAM-only DFU SHA-256 is
+`28ec118f1c7a91c24b3702065e272cecc35389b39cdea9c9bcd334600bbf52ac`.
+
+The first fresh-epoch cabled spot measurement produced the exact
+80,000-source-sample period, peak-to-median `3.7198`, robust-z `61.27`, and zero
+in-observation faults, compared with a muted baseline of `1.3718` and robust-z
+`5.15`. The definitive combined TX/RX run then started the transmitter and
+monitor 24 microseconds apart and held the transmitter until the monitor
+completed. It passed for 120.041 seconds with:
+
+- 1,406 contiguous phase maps and 1,404 candidate windows;
+- 7,202,565,308 accepted 60 MS/s source samples and 1,800,641,326 emitted
+  canonical samples;
+- zero DDC discontinuity/saturation, ingress loss, FIFO loss, scheduler faults,
+  detector faults, protocol errors, arithmetic overflow, or map faults;
+- peak-to-median continuously between `3.5618` and `4.1258`, median `3.8260`;
+- robust-z continuously between `53.60` and `65.79`, median `59.98`; and
+- an independently fitted `1.250 ppm` relative TX/RX sample-clock slope with
+  `0.65` canonical-sample RMS timing residual.
+
+All 1,404 period estimates selected 80,000 source samples or the adjacent
+80,000.25-sample drift hypothesis. This is repeatable coarse PSS timing on the
+cabled synthetic waveform, not SSS or frame lock. It also directly exercises
+the 64-bit counter path beyond `2^32` accepted samples.
+
+Final safety and recovery passed. `.18` was independently re-opened after the
+run and verified with no active buffer, hardware gain `-89.75 dB`, TX LO
+powered down, DAC selectors 3/3, and all DDS sources zero. `.17` returned to
+persistent `v0.48-plutoplus-spf-iq-direct-async-v3`; USB departure/return,
+unchanged QSPI, AD9361 1R1T identity, and route release all passed.
+
+Evidence:
+
+- RAM receipt SHA-256:
+  `619168fb462696c5e117f698d393660b5c359b036a78710e787c5dcfc93ba50d`;
+- combined TX/RX lifecycle SHA-256:
+  `373685e689b6683f30ad6996aa6028466e5d959732c35fdc2b2c64bd7b0c4ad0`;
+- 120-second monitor NDJSON SHA-256:
+  `a8e12b5bf75aad41f8b2497ff38be4b0a08bb4072522e56e0e1dcf9501d049d6`;
+- validated monitor receipt SHA-256:
+  `ae2e85226895ed61fec66cfcf403e37228649675d7d5e770cfce23018df921a3`;
+- independent final TX-mute receipt SHA-256:
+  `1ba18bd75777f5d4873b3ac64c90af18836f5544042689172e8cf1c750299759`;
+- final recovery receipt SHA-256:
+  `4c3366cfc441bc6e43f9a4b30f15362167110f4bfeaa6246f142885f8464e7fe`;
+  and
+- authoritative private directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-live-20260907/candidate-60-v10/cabled-v4`.
+
+M7 is complete for coarse acquisition and 60-to-15 index transport. M8 remains
+open until the sparse full-rate tracker resolves timing within one 60 MS/s
+source sample. M9 still requires real outdoor LNB evidence; this cabled result
+does not satisfy that live-signal gate.
