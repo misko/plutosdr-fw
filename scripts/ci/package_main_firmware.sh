@@ -289,6 +289,14 @@ mkdir -p "$rootfs_check"
         usr/sbin/sdr_usb_gadget usr/sbin/sdr_ip_gadget \
         usr/sbin/pluto-mute-tx etc/init.d/S23udc
 )
+if [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
+    (
+        cd "$rootfs_check"
+        gzip -dc "$rootfs" | cpio --quiet -idm usr/sbin/starlink_pss_acqctl
+    )
+    [[ -x "$rootfs_check/usr/sbin/starlink_pss_acqctl" ]] ||
+        fail "packaged Starlink acquisition controller is missing or not executable"
+fi
 cp "$rootfs_check/opt/VERSIONS" "$ARTIFACT_ROOT/packed-VERSIONS.txt"
 
 # A source manifest may pin the human-readable component identities expected
@@ -299,6 +307,36 @@ manifest_value() {
     value="$(sed -n "s/^${key}:[[:space:]]*//p" "$MANIFEST" | head -1)"
     printf '%s' "${value%"${value##*[![:space:]]}"}"
 }
+if [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
+    for source_binding in \
+        "starlink_pss_acqctl.c:controller_cli_sha256" \
+        "starlink_pss_acquisition.c:controller_library_sha256" \
+        "starlink_pss_acquisition.h:controller_header_sha256"; do
+        IFS=: read -r source_name manifest_key <<<"$source_binding"
+        source_path="$ROOT/tools/starlink_pssctl/$source_name"
+        staged_path="$ROOT/buildroot/output/build/starlink_pssctl/$source_name"
+        expected_source_sha256="$(manifest_value "$manifest_key")"
+        observed_source_sha256="$(sha256sum "$source_path" | awk '{print $1}')"
+        [[ "$observed_source_sha256" == "$expected_source_sha256" ]] ||
+            fail "$source_name differs from manifest $manifest_key"
+        cmp "$source_path" "$staged_path" ||
+            fail "Buildroot staged a stale $source_name"
+    done
+    expected_recipe_sha256="$(manifest_value controller_buildroot_recipe_sha256)"
+    observed_recipe_sha256="$(sha256sum \
+        "$ROOT/buildroot/package/starlink_pssctl/starlink_pssctl.mk" | awk '{print $1}')"
+    [[ "$observed_recipe_sha256" == "$expected_recipe_sha256" ]] ||
+        fail "Starlink controller Buildroot recipe differs from its manifest"
+    file "$rootfs_check/usr/sbin/starlink_pss_acqctl" |
+        tee "$ARTIFACT_ROOT/packed-starlink-pss-acqctl.txt"
+    grep -q 'ELF 32-bit.*ARM.*EABI5' \
+        "$ARTIFACT_ROOT/packed-starlink-pss-acqctl.txt" ||
+        fail "packaged Starlink acquisition controller is not ARM EABI5"
+    (
+        cd "$rootfs_check"
+        sha256sum usr/sbin/starlink_pss_acqctl
+    ) > "$ARTIFACT_ROOT/packed-starlink-pss-acqctl.sha256"
+fi
 for identity in \
     "hdl:versions_hdl" \
     "buildroot:versions_buildroot" \
@@ -730,6 +768,12 @@ read -r wns tns tns_failing _ whs ths ths_failing _ wpws tpws tpws_failing _ \
             m2_period_scores_u8.mem
             starlink-pss-m2-offline-qualification.log
             starlink-pss15-m2-vendor-xfft-replay.log
+        )
+    fi
+    if [[ "$STARLINK_PSS_MULTIRATE_BUILD" == true ]]; then
+        payload_files+=(
+            packed-starlink-pss-acqctl.sha256
+            packed-starlink-pss-acqctl.txt
         )
     fi
     mapfile -t payload_files < <(

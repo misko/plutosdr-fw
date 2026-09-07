@@ -35,6 +35,14 @@ def test_v10_build_and_package_routes_are_exactly_60_msps() -> None:
     assert '${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v10"' in package
 
 
+def test_multirate_build_cannot_reuse_a_stale_local_controller() -> None:
+    candidate = (ROOT / "scripts/build_gain_series_candidate.sh").read_text()
+    package = (ROOT / "scripts/ci/package_main_firmware.sh").read_text()
+    assert "starlink_pssctl-dirclean" in candidate
+    assert 'fail "Buildroot staged a stale $source_name"' in package
+    assert "packed-starlink-pss-acqctl.sha256" in package
+
+
 def test_candidate_planner_admits_but_does_not_default_to_v10() -> None:
     planner = (ROOT / "scripts/starlink_pss_multirate_candidate_plan.py").read_text()
     assert f'"{MANIFEST_NAME}": "v10"' in planner

@@ -136,6 +136,17 @@ make -C "$ROOT/buildroot" ARCH=arm "${buildroot_make_args[@]}" \
     zynq_pluto_defconfig
 make -C "$ROOT/buildroot" "${buildroot_make_args[@]}" source
 
+# Buildroot local-package stamps do not notice edits below tools/starlink_pssctl.
+# A retained developer workspace could otherwise package an older controller
+# even though the current source and native tests passed.  Force the local
+# package to be recopied and rebuilt for every multirate candidate image.
+case "$manifest_name" in
+starlink-pss-multirate-rx-only-dnm-v*-source.yaml)
+    make -C "$ROOT/buildroot" "${buildroot_make_args[@]}" \
+        starlink_pssctl-dirclean
+    ;;
+esac
+
 (
     source "$VIVADO_SETTINGS"
     make -C "$ROOT/hdl/projects/pluto" clean
