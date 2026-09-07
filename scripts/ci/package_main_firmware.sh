@@ -67,7 +67,8 @@ fi
 # one tracker sample-index constraint, and two RX timestamp-FIFO constraints.
 # The v6 acquisition-only profile has the same acquisition/FIFO inventory but
 # deliberately omits the tracker constraint. The v7 15 MS/s qualifier adds
-# the two reviewed injector mailbox constraints.
+# the two reviewed injector mailbox constraints. V8 returns to the same
+# acquisition-only routed-constraint inventory and is gated to 30 MS/s.
 if [[ "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v1-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
@@ -81,7 +82,9 @@ if [[ "$(basename -- "$MANIFEST")" == \
       "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
-      "starlink-pss-multirate-rx-only-dnm-v7-source.yaml" ]]; then
+      "starlink-pss-multirate-rx-only-dnm-v7-source.yaml" ||
+      "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v8-source.yaml" ]]; then
     starlink_multirate_name="$(basename -- "$MANIFEST")"
     starlink_multirate_manifest="${ROOT}/manifests/${starlink_multirate_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
@@ -103,6 +106,14 @@ if [[ "$(basename -- "$MANIFEST")" == \
             fail "v7 multirate PSS build requires STARLINK_PSS_PROFILE=acquisition-injection"
         STARLINK_PSS_ACQUISITION_INJECTION_BUILD=true
         REQUIRED_BUS_SKEW_CONSTRAINTS=7
+    elif [[ "$starlink_multirate_name" == \
+          "starlink-pss-multirate-rx-only-dnm-v8-source.yaml" ]]; then
+        [[ "$STARLINK_PSS_RATE_MSPS" == 30 ]] ||
+            fail "v8 acquisition-only qualification is gated to 30 MS/s"
+        [[ "${STARLINK_PSS_PROFILE:-}" == "acquisition-only" ]] ||
+            fail "v8 multirate PSS build requires STARLINK_PSS_PROFILE=acquisition-only"
+        STARLINK_PSS_ACQUISITION_ONLY_BUILD=true
+        REQUIRED_BUS_SKEW_CONSTRAINTS=5
     elif [[ "$starlink_multirate_name" == \
           "starlink-pss-multirate-rx-only-dnm-v6-source.yaml" ]]; then
         [[ "${STARLINK_PSS_PROFILE:-}" == "acquisition-only" ]] ||
@@ -470,6 +481,9 @@ starlink-pss-multirate-rx-only-dnm-v6-source.yaml:candidate)
     ;;
 starlink-pss-multirate-rx-only-dnm-v7-source.yaml:candidate)
     protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v7"
+    ;;
+starlink-pss-multirate-rx-only-dnm-v8-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v8"
     ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
