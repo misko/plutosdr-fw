@@ -298,14 +298,18 @@ def _validate_fixture(fixture: dict[str, Any]) -> None:
 def _load_handoff(base: dict[str, Any]) -> Any:
     with monitor_v2._v7_monitor_contract():
         monitor_v1._validate_base_plan(base)
-        return monitor_v1.probe_v2._load_handoff(
-            ppu_repository=Path(base["ppu_repository"]),
-            ppu_commit=base["ppu_source_commit"],
-            candidate_path=Path(base["candidate_plan"]["path"]),
-            operation_path=Path(base["operation_plan"]["path"]),
-            ram_receipt_path=Path(base["ram_receipt"]["path"]),
-            rate_msps=15,
-        )
+        # The base-plan validator scopes the v7 AD9361 contract only for its
+        # own call.  Keep that contract active while loading the handoff too:
+        # it supplies both the AD9361 identity and the v7 profile verifier.
+        with monitor_v1._ad9361_v6_contract():
+            return monitor_v1.probe_v1._load_handoff(
+                ppu_repository=Path(base["ppu_repository"]),
+                ppu_commit=base["ppu_source_commit"],
+                candidate_path=Path(base["candidate_plan"]["path"]),
+                operation_path=Path(base["operation_plan"]["path"]),
+                ram_receipt_path=Path(base["ram_receipt"]["path"]),
+                rate_msps=15,
+            )
 
 
 def _validate_plan(plan: dict[str, Any]) -> None:

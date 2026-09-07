@@ -389,6 +389,40 @@ def test_fixture_requires_no_tx_and_ram_power_continuity() -> None:
         live._validate_fixture(invalid)
 
 
+def test_handoff_loader_keeps_ad9361_v7_profile_contract_active(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    observed: list[tuple[str, tuple[str, ...]]] = []
+    profiled: list[object] = []
+    handoff = SimpleNamespace(candidate=object())
+    base = {
+        "ppu_repository": "/tmp/pluto-plus-utils",
+        "ppu_source_commit": "b" * 40,
+        "candidate_plan": {"path": "/tmp/candidate.json"},
+        "operation_plan": {"path": "/tmp/operation.json"},
+        "ram_receipt": {"path": "/tmp/ram-receipt.json"},
+    }
+
+    def fake_loader(**_kwargs: object) -> object:
+        observed.append(
+            (
+                live.monitor_v1.probe_v1.RUNTIME_TARGET,
+                live.monitor_v2.probe_v9.probe_v2.SUPPORTED_SOURCE_REVISIONS,
+            )
+        )
+        return handoff
+
+    monkeypatch.setattr(live.monitor_v1, "_validate_base_plan", lambda _base: None)
+    monkeypatch.setattr(live.monitor_v1.probe_v1, "_load_handoff", fake_loader)
+    monkeypatch.setattr(
+        live.monitor_v2.probe_v9, "_require_acquisition_injection_profile", profiled.append
+    )
+
+    assert live._load_handoff(base) is handoff
+    assert observed == [("ad9361-1r1t", ("v2", "v3", "v4", "v5", "v6", "v7"))]
+    assert profiled == [handoff]
+
+
 def test_plan_is_exact_dnm_rx_only_and_has_nonoverlapping_control() -> None:
     plan = _plan()
     live._validate_plan(plan)
