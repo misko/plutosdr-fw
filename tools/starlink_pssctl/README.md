@@ -263,3 +263,64 @@ The probe never invokes DFU, loads RAM, writes QSPI, or changes the radio
 personality. At 30 and 60 MS/s on the physical AD9363A, the maximum requested
 RF bandwidth remains 20 MHz; those stages qualify sample-rate/FPGA processing
 before any physically wider-band AD9361/AD9364 campaign.
+
+## Ethernet-only live-LNB 15 MS/s gate
+
+`scripts/starlink_pss_m4_live_v1.py` is the fail-closed M4 runner for the
+already-qualified v7 RX-only image. It keeps continuous IQ in the FPGA and
+exports only phase-map records and their candidate statistics. It does not
+use or enable a transmitter.
+
+The runner freezes three 117.5-second roles. Each role interleaves 25 receiver
+LO offsets from 0 through +/-1.2 MHz in 100 kHz steps, with a 4.5-second map
+observation and 200 ms settling interval at each point. The order is
+`0,+100k,-100k,...` so monotonic Doppler does not alias directly into scan
+order. The positive roles observe channel 4's upper 15 MHz edge at nominal IF
+1,937,500,000 Hz for a 9.75 GHz low-side LNB. The middle control observes the
+non-overlapping slice 50 MHz inward at 1,887,500,000 Hz.
+
+The physical fixture must declare RX1 connected only to the powered outdoor
+LNB, no transmitter, uninterrupted RAM-candidate power, Ethernet host
+192.168.1.17 through `enp132s0`, exact LNB model, polarization, voltage, and
+power source. The plan additionally binds the immutable RAM receipt and boot
+ID, unchanged QSPI hash, exact controller binary, runner source, source
+manifest, fixture bytes, and clean PPU commit.
+
+```sh
+PPU_PY=/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python
+PRIVATE=/private/starlink-pss/m4-live-15
+ATTEST='receiver RX1 is connected only to the powered outdoor LNB; no transmitter or attenuated bench cable is connected'
+
+"$PPU_PY" scripts/starlink_pss_m4_live_v1.py fixture \
+  --lnb-model 'EXACT MODEL' \
+  --polarization horizontal \
+  --lnb-supply-volts 18 \
+  --lnb-power-source 'EXACT POWER SOURCE' \
+  --attest "$ATTEST" \
+  --output "$PRIVATE/fixture.json"
+
+"$PPU_PY" scripts/starlink_pss_m4_live_v1.py plan \
+  --probe-plan "$PRIVATE/base-probe-plan.json" \
+  --controller-binary "$PRIVATE/starlink_pss_acqctl_monitor_v2" \
+  --fixture-declaration "$PRIVATE/fixture.json" \
+  --receipt "$PRIVATE/live-receipt.json" \
+  --output "$PRIVATE/live-plan.json"
+
+"$PPU_PY" scripts/starlink_pss_m4_live_v1.py execute \
+  --plan "$PRIVATE/live-plan.json" \
+  --ssh-password-file /private/pluto-password \
+  --confirm 'OBSERVE LIVE STARLINK PSS 104000bac4950008230026001b440a003a CH4 UPPER 15 MSPS' \
+  --output "$PRIVATE/live-receipt.json"
+
+"$PPU_PY" scripts/starlink_pss_m4_live_v1.py verify \
+  --plan "$PRIVATE/live-plan.json" \
+  --receipt "$PRIVATE/live-receipt.json"
+```
+
+The positive-A/control/positive-B result must pass the frozen M3 trajectory
+statistics at one or more LO points in each positive role and at no control
+point. The minimum positive/control contrast is 1.10x, raw S12 rail fraction
+is at most 0.0001, every in-observation transport/fault delta is zero, settings
+are restored, the temporary controller is removed, and deterministic IIO
+closure is mandatory. A PPU recovery receipt is required afterward. A pass is
+live PSS acquisition and local timing only; SSS and frame lock remain false.

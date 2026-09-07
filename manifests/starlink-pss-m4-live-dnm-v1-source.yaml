@@ -1,0 +1,101 @@
+# Source graph for the Ethernet-only 15 MS/s live-LNB PSS gate.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This checkpoint contains only
+# the frozen M4 runner, verifier, and documentation. It does not contain live
+# PSS evidence and it does not claim SSS detection or frame lock.
+
+schema: plutosdr-fw.starlink-pss-m4-live-source
+schema_version: 1
+release_state: offline-ready-live-lnb-runner
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+persistent_write: false
+hardware_accessed: false
+
+allocated_receiver_serial: 104000bac4950008230026001b440a003a
+allocated_receiver_topology_last_verified: 5-2
+experimental_receiver_rx_only: true
+ethernet_only_observation: true
+ethernet_host: 192.168.1.17
+host_network_interface: enp132s0
+physical_rx_port: RX1
+transmitter_connected: false
+
+claim_scope: live_lnb_pss_acquisition_and_local_timing_only
+live_pss_detected: false
+sss_detected: false
+frame_lock_claim: false
+recovery_required_after_execution: true
+
+starlink_channel: 4
+starlink_edge: upper
+sample_rate_hz: 15000000
+rf_bandwidth_hz: 15000000
+lnb_lo_hz: 9750000000
+lnb_lo_side: low-side
+spectral_inversion: false
+nominal_on_if_hz: 1937500000
+nominal_on_rf_hz: 11687500000
+nominal_control_if_hz: 1887500000
+role_order: on_channel_a,off_slice_control,on_channel_b
+scan_offset_minimum_hz: -1200000
+scan_offset_maximum_hz: 1200000
+scan_offset_step_hz: 100000
+scan_point_count_per_role: 25
+point_duration_ms: 4500
+settle_ms: 200
+role_duration_ms: 117500
+
+minimum_candidate_windows_per_point: 32
+minimum_peak_to_median: 1.15
+minimum_robust_z: 6.0
+minimum_positive_pass_fraction: 0.80
+minimum_positive_consecutive_track_windows: 8
+minimum_passing_points_per_positive_role: 1
+maximum_control_passing_points: 0
+minimum_positive_to_control_ratio: 1.10
+rail_probe_samples: 32768
+maximum_rail_fraction: 0.0001
+
+runner_source_path: scripts/starlink_pss_m4_live_v1.py
+runner_source_sha256: 52b7b0640c7fc46c5d0630d98cf27b7ba700679c40f57fb9231f35f97b49610b
+runner_test_path: tests/test_starlink_pss_m4_live_v1.py
+runner_test_sha256: 9e6aebc2b2102985fa78aa8aa0f0a69971169b74b4dfa97cefbb8cd993030233
+manifest_test_path: tests/test_starlink_pss_m4_live_manifest_v1.py
+manifest_test_sha256: bfb99575efa184d41ebf3d2e076424d941c228adad831a276c0dfb0a50acd4c4
+
+m3_policy_source_path: scripts/starlink_pss_m3_campaign_v1.py
+m3_policy_source_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444
+monitor_probe_v1_source_path: scripts/starlink_pss_monitor_probe_v1.py
+monitor_probe_v1_source_sha256: 7359bcbbf952193b5be4d77782e2413dd81dbe19c5910fe2c3a2f2f24d4c6270
+monitor_probe_v2_source_path: scripts/starlink_pss_monitor_probe_v2.py
+monitor_probe_v2_source_sha256: cbdc3c8ce60b2db3fdce1a3f3cb152a6f597bc29b7dd255fda3591aac90d13ab
+progress_probe_source_path: scripts/starlink_pss_progress_probe_v1.py
+progress_probe_source_sha256: ae0178540bbea2b48320e4887f668ba174adaa8810981451acb1ee63d78b024f
+numerology_oracle_path: tests/starlink_oracle/numerology.py
+numerology_oracle_sha256: c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015
+
+monitor_v2_controller_source_path: tools/starlink_pssctl/starlink_pss_acqctl_monitor_v2.c
+monitor_v2_controller_source_sha256: 5ba222ce7a19c0153e6fb215e10f5d3cef17d03aa01c87e5498b97dce2aecca6
+acquisition_library_source_path: tools/starlink_pssctl/starlink_pss_acquisition.c
+acquisition_library_source_sha256: c2fd427e1cbf757531bf96b36975a7fc78dcffc0d2f0bf35a90097d21dcffa48
+acquisition_header_path: tools/starlink_pssctl/starlink_pss_acquisition.h
+acquisition_header_sha256: ebd4c5ab820926e7631b3f6a43f8bfc0b1c492cd19b012726df4f72190a13243
+controller_makefile_path: tools/starlink_pssctl/Makefile
+controller_makefile_sha256: 3de583b2bb3961db3bf6fdf8a011685a6630d8b15baee57b2d42ac44597adf47
+
+inherited_m3_manifest_path: manifests/starlink-pss-m3-cabled-dnm-v5-source.yaml
+inherited_m3_manifest_sha256: c0dcfcb966ff4cbb13fbda2b667eb0c8b2b29c3dd955485de2e68c4bc67c7a64
+inherited_monitor_manifest_path: manifests/starlink-pss-monitor-probe-dnm-v1-source.yaml
+inherited_monitor_manifest_sha256: cb87c73f1bd8fd0a933d8aabce9dad35e470076a4ebd54cab0393907de307b13
+inherited_fpga_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-source.yaml
+inherited_fpga_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
+
+tracker_ledger_path: FPGA_tracker.md
+tracker_ledger_sha256: 53fce7c680de85a2adfc09ef8f1fcf985a5d185623238be9570495e799044749
+canonical_plan_path: FPGA_tracker_60MS.md
+canonical_plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
+controller_readme_path: tools/starlink_pssctl/README.md
+controller_readme_sha256: 55fa41ae0bbd66039268ad71b445103ef43ab55eeefafc4ca5fe39397c58d359

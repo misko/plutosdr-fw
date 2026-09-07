@@ -34,7 +34,7 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
-| M4: live-LNB 15 MS/s timing | Next | Repeated on-channel trajectory and off-channel control |
+| M4: live-LNB 15 MS/s timing | Offline ready | Repeated on-channel trajectory and off-channel control |
 | M5: 30-to-15 decimator/index mapping | Pending | Bit-exact oracle and routed evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
 | M7: 60-to-30-to-15 cascade | Pending | Bit-exact cascade and routed evidence |
@@ -444,3 +444,41 @@ The authoritative private campaign directory is:
 The hardware verdict is `PASS_M3_CABLED_PSS_ACQUISITION_ONLY`. It validates
 the RX/TX coaxial setup and 15 MS/s PSS acquisition/timing. It is not an SSS
 result or a frame-lock claim. M4 live-LNB 15 MS/s observation is the next gate.
+
+## M4 live-LNB runner offline checkpoint
+
+The Ethernet-only M4 runner is implemented as
+`scripts/starlink_pss_m4_live_v1.py`. It reuses the immutable v7 15 MS/s FPGA
+image and the monitor-v2 ARM controller; no FPGA or persistent-radio state is
+changed by this checkpoint. Full-rate IQ remains inside the radio. The host
+receives only complete phase maps, candidate statistics, health telemetry, and
+one bounded 32,768-sample clipping probe whose IQ payload is immediately
+discarded.
+
+One execution consists of three approximately 120-second roles:
+
+1. channel-4 upper-edge on-channel scan A;
+2. a non-overlapping same-channel control slice 50 MHz inward; and
+3. the same on-channel scan B.
+
+Each role uses 25 interleaved receiver-LO points at 100 kHz spacing over
++/-1.2 MHz. A point observes maps for 4.5 seconds after 200 ms of settling,
+yielding about 50 candidate windows. This bounded scan covers the 225--525 kHz
+CFO modes seen in prior live captures while avoiding the false assumption that
+one fixed LO remains aligned throughout a 120-second observation.
+
+The runner and offline verifier require the exact receiver serial, LAN host
+`192.168.1.17`, interface `enp132s0`, AD9361 1R1T runtime, fresh RAM boot ID,
+unchanged QSPI hash, RX-only device-tree surface, 15 MS/s sample and bandwidth
+readback, factor-one FPGA path, chronological scan records, zero transport
+fault deltas, positive/control/positive contrast, complete restoration, and a
+subsequent PPU recovery. The plan binds its own runner source and the M4 source
+manifest so execution cannot silently drift after sealing.
+
+The remaining M4 hardware prerequisite is physical: remove the attenuated
+bench cable, connect only RX1 to the powered outdoor 9.75 GHz LNB, and preserve
+power continuously after the fresh volatile v7 RAM boot while moving to the
+Ethernet-only location. Fixture sealing also requires the exact LNB model,
+polarization, supply voltage, and power-source description. M4 remains open
+until the resulting live receipt and recovery receipt pass offline
+verification.
