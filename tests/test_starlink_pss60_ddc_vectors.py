@@ -90,7 +90,7 @@ def test_x4_ddc_to_xfft_vectors_are_exact(tmp_path: Path) -> None:
     assert evidence["ddc_x4_contract_sha256"] == (
         "8e807d15d5372b0a9669d1190d899697e7c2911a73ddfb23095806c2a31de5b2"
     )
-    assert evidence["ddc_discontinuities"] == 1
+    assert evidence["ddc_discontinuities"] == 0
     assert evidence["ddc_saturation_events"] == 0
     assert evidence["score_count"] == 1341
     assert evidence["score_minimum"] == 0

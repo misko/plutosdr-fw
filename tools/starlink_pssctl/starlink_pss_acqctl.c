@@ -41,8 +41,8 @@ struct mapped_mmio {
 };
 
 struct ddc_counters {
-	uint32_t accepted;
-	uint32_t emitted;
+	uint64_t accepted;
+	uint64_t emitted;
 	uint32_t discontinuity;
 	uint32_t saturation;
 };
@@ -283,7 +283,8 @@ static uint32_t input_rate_msps(const struct pss_map_info *info)
 {
 	if (info->version == PSS_MAP_VERSION_1_2)
 		return 30U;
-	if (info->version == PSS_MAP_VERSION_1_3)
+	if (info->version == PSS_MAP_VERSION_1_3 ||
+	    info->version == PSS_MAP_VERSION_1_4)
 		return 60U;
 	return 15U;
 }
@@ -291,16 +292,66 @@ static uint32_t input_rate_msps(const struct pss_map_info *info)
 static int read_ddc_counters(const struct pss_map_io *io,
 	struct ddc_counters *counters)
 {
+	uint32_t version, accepted_low, accepted_high_before = 0U;
+	uint32_t accepted_high_after = 0U, emitted_low;
+	uint32_t emitted_high_before = 0U, emitted_high_after = 0U;
+	unsigned int attempt;
+
 	if (!io || !io->read32 || !counters)
 		return -1;
-	return io->read32(io->context, PSS_MAP_REG_DDC_ACCEPTED,
-			&counters->accepted) < 0 ||
-		io->read32(io->context, PSS_MAP_REG_DDC_EMITTED,
-			&counters->emitted) < 0 ||
-		io->read32(io->context, PSS_MAP_REG_DDC_DISCONTINUITY,
+	if (io->read32(io->context, PSS_MAP_REG_VERSION, &version) < 0)
+		return -1;
+	if (version == PSS_MAP_VERSION_1_4) {
+		for (attempt = 0U; attempt < 4U; ++attempt) {
+			if (io->read32(io->context, PSS_MAP_REG_DDC_ACCEPTED_HI,
+					&accepted_high_before) < 0 ||
+			    io->read32(io->context, PSS_MAP_REG_DDC_ACCEPTED,
+					&accepted_low) < 0 ||
+			    io->read32(io->context, PSS_MAP_REG_DDC_ACCEPTED_HI,
+					&accepted_high_after) < 0)
+				return -1;
+			if (accepted_high_before == accepted_high_after)
+				break;
+		}
+		if (accepted_high_before != accepted_high_after)
+			return -1;
+		for (attempt = 0U; attempt < 4U; ++attempt) {
+			if (io->read32(io->context, PSS_MAP_REG_DDC_EMITTED_HI,
+					&emitted_high_before) < 0 ||
+			    io->read32(io->context, PSS_MAP_REG_DDC_EMITTED,
+					&emitted_low) < 0 ||
+			    io->read32(io->context, PSS_MAP_REG_DDC_EMITTED_HI,
+					&emitted_high_after) < 0)
+				return -1;
+			if (emitted_high_before == emitted_high_after)
+				break;
+		}
+		if (emitted_high_before != emitted_high_after)
+			return -1;
+		counters->accepted =
+			(uint64_t)accepted_high_after << 32 | accepted_low;
+		counters->emitted =
+			(uint64_t)emitted_high_after << 32 | emitted_low;
+	} else {
+		if (io->read32(io->context, PSS_MAP_REG_DDC_ACCEPTED,
+				&accepted_low) < 0 ||
+		    io->read32(io->context, PSS_MAP_REG_DDC_EMITTED,
+				&emitted_low) < 0)
+			return -1;
+		counters->accepted = accepted_low;
+		counters->emitted = emitted_low;
+	}
+	return io->read32(io->context, PSS_MAP_REG_DDC_DISCONTINUITY,
 			&counters->discontinuity) < 0 ||
 		io->read32(io->context, PSS_MAP_REG_DDC_SATURATION,
 			&counters->saturation) < 0 ? -1 : 0;
+}
+
+static bool ddc_counter_saturated(const struct pss_map_info *info,
+	uint64_t value)
+{
+	return info && ((info->version == PSS_MAP_VERSION_1_4) ?
+		value == UINT64_MAX : value >= UINT32_MAX);
 }
 
 static void print_double_or_null(double value)
@@ -457,10 +508,10 @@ static void print_progress(const char *serial, const struct pss_map_info *info,
 	       "  \"phase_discontinuities_after\": %" PRIu32 ",\n"
 	       "  \"candidate_fifo_level_after\": %u,\n"
 	       "  \"candidate_fifo_maximum_after\": %u,\n"
-	       "  \"ddc_accepted_before\": %" PRIu32 ",\n"
-	       "  \"ddc_accepted_after\": %" PRIu32 ",\n"
-	       "  \"ddc_emitted_before\": %" PRIu32 ",\n"
-	       "  \"ddc_emitted_after\": %" PRIu32 ",\n"
+	       "  \"ddc_accepted_before\": %" PRIu64 ",\n"
+	       "  \"ddc_accepted_after\": %" PRIu64 ",\n"
+	       "  \"ddc_emitted_before\": %" PRIu64 ",\n"
+	       "  \"ddc_emitted_after\": %" PRIu64 ",\n"
 	       "  \"ddc_discontinuity_after\": %" PRIu32 ",\n"
 	       "  \"ddc_saturation_after\": %" PRIu32 ",\n"
 	       "  \"pss_detected\": false,\n"
@@ -587,11 +638,11 @@ static void print_candidate(const char *serial, const struct pss_map_info *info,
 	       "  \"candidate_start_index_source_center\": %" PRIu64 ",\n"
 	       "  \"threshold_decision\": null,\n"
 	       "  \"frame_lock_claim\": false,\n"
-	       "  \"ddc_counters_before\": {\"accepted\": %" PRIu32
-	       ", \"emitted\": %" PRIu32 ", \"discontinuity\": %" PRIu32
+	       "  \"ddc_counters_before\": {\"accepted\": %" PRIu64
+	       ", \"emitted\": %" PRIu64 ", \"discontinuity\": %" PRIu32
 	       ", \"saturation\": %" PRIu32 "},\n"
-	       "  \"ddc_counters_after\": {\"accepted\": %" PRIu32
-	       ", \"emitted\": %" PRIu32 ", \"discontinuity\": %" PRIu32
+	       "  \"ddc_counters_after\": {\"accepted\": %" PRIu64
+	       ", \"emitted\": %" PRIu64 ", \"discontinuity\": %" PRIu32
 	       ", \"saturation\": %" PRIu32 "},\n"
 	       "  \"final_snapshot_generation\": %" PRIu32 ",\n"
 	       "  \"final_health_flags\": \"0x%08" PRIx32 "\",\n"
@@ -693,7 +744,8 @@ static int run_candidate(const char *serial, const struct pss_map_io *io,
 	if (ddc_after.discontinuity || ddc_after.saturation ||
 	    ddc_after.accepted < ddc_before.accepted ||
 	    ddc_after.emitted < ddc_before.emitted ||
-	    ddc_after.accepted == UINT32_MAX || ddc_after.emitted == UINT32_MAX) {
+	    ddc_counter_saturated(info, ddc_after.accepted) ||
+	    ddc_counter_saturated(info, ddc_after.emitted)) {
 		snprintf(error, error_size,
 			"DDC counters faulted, regressed, or saturated during capture");
 		goto done;
@@ -830,10 +882,10 @@ static void print_monitor_summary(const char *serial,
 	       ",\"candidate_fifo_level_at_cutoff\":%u"
 	       ",\"candidate_fifo_maximum_at_cutoff\":%u"
 	       ",\"health_flags_at_cutoff\":\"0x%08" PRIx32 "\","
-	       "\"ddc_accepted_before\":%" PRIu32
-	       ",\"ddc_accepted_after\":%" PRIu32
-	       ",\"ddc_emitted_before\":%" PRIu32
-	       ",\"ddc_emitted_after\":%" PRIu32
+	       "\"ddc_accepted_before\":%" PRIu64
+	       ",\"ddc_accepted_after\":%" PRIu64
+	       ",\"ddc_emitted_before\":%" PRIu64
+	       ",\"ddc_emitted_after\":%" PRIu64
 	       ",\"ddc_discontinuity_after\":%" PRIu32
 	       ",\"ddc_saturation_after\":%" PRIu32
 	       ",\"continuity_ok\":true,\"fault_free_epoch\":%s,"

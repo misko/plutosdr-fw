@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MOCK_REGISTER_WORDS ((PSS_MAP_REG_DDC_SATURATION / 4U) + 1U)
+#define MOCK_REGISTER_WORDS ((PSS_MAP_REG_DDC_EMITTED_HI / 4U) + 1U)
 #define ERROR_SIZE 256U
 
 struct mock_map {
@@ -86,9 +86,9 @@ static void mock_rate_contract(struct mock_map *mock, uint32_t rate_msps)
 		contract = contract_30;
 	} else {
 		CHECK(rate_msps == 60U, "mock DDC rate must be 30 or 60 MS/s");
-		*mock_register(mock, PSS_MAP_REG_VERSION) = PSS_MAP_VERSION_1_3;
+		*mock_register(mock, PSS_MAP_REG_VERSION) = PSS_MAP_VERSION_1_4;
 		*mock_register(mock, PSS_MAP_REG_CAPABILITIES) =
-			PSS_MAP_CAPABILITIES_1_3;
+			PSS_MAP_CAPABILITIES_1_4;
 		*mock_register(mock, PSS_MAP_REG_DDC_CONFIG) =
 			UINT32_C(0x020f0403);
 		*mock_register(mock, PSS_MAP_REG_DDC_GROUP_DELAY) = 21U;
@@ -171,7 +171,7 @@ static int mock_read32(void *context, uint32_t offset, uint32_t *value)
 {
 	struct mock_map *mock = context;
 
-	if (!value || offset > PSS_MAP_REG_DDC_SATURATION ||
+	if (!value || offset > PSS_MAP_REG_DDC_EMITTED_HI ||
 	    (offset & 3U))
 		return -1;
 	if (offset >= PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS)
@@ -222,7 +222,7 @@ static int mock_write32(void *context, uint32_t offset, uint32_t value)
 {
 	struct mock_map *mock = context;
 
-	if (offset > PSS_MAP_REG_DDC_SATURATION || (offset & 3U))
+	if (offset > PSS_MAP_REG_DDC_EMITTED_HI || (offset & 3U))
 		return -1;
 	switch (offset) {
 	case PSS_MAP_REG_CONTROL:
@@ -501,25 +501,25 @@ static void test_ddc_rate_contracts(void)
 	mock_rate_contract(mock, 60U);
 	CHECK(pss_map_require_contract(&io, &info, error, sizeof(error)) == 0,
 		error);
-	CHECK(info.version == PSS_MAP_VERSION_1_3 &&
+	CHECK(info.version == PSS_MAP_VERSION_1_4 &&
 		info.input_rate_msps == 60U &&
 		info.ddc_config == UINT32_C(0x020f0403) &&
 		info.ddc_group_delay == 21U &&
 		info.coefficient_energy == UINT32_C(1073765335),
-		"ABI 1.3 did not expose the exact x4 DDC contract");
+		"ABI 1.4 did not expose the exact x4 DDC contract");
 	CHECK(info.ddc_contract[0] == UINT32_C(0x8e807d15) &&
 		info.ddc_contract[7] == UINT32_C(0xa31de5b2),
-		"ABI 1.3 DDC oracle hash was unpacked incorrectly");
+		"ABI 1.4 DDC oracle hash was unpacked incorrectly");
 	*mock_register(mock, PSS_MAP_REG_SNAPSHOT_HEALTH_FLAGS) |=
 		PSS_MAP_HEALTH_DDC_SATURATION;
 	CHECK(pss_map_take_snapshot(&io, &snapshot, 10U,
 		error, sizeof(error)) == 0, error);
 	CHECK(snapshot.health_flags & PSS_MAP_HEALTH_DDC_SATURATION,
-		"ABI 1.3 rejected or lost the DDC saturation health bit");
+		"ABI 1.4 rejected or lost the DDC saturation health bit");
 	*mock_register(mock, PSS_MAP_REG_CAPABILITIES) =
 		PSS_MAP_CAPABILITIES_1_1;
 	CHECK(pss_map_require_contract(&io, NULL, error, sizeof(error)) < 0,
-		"ABI 1.3 accepted pre-DDC capabilities");
+		"ABI 1.4 accepted pre-DDC capabilities");
 	free(mock);
 }
 
@@ -949,7 +949,7 @@ int main(int argc, char **argv)
 			failures);
 		return EXIT_FAILURE;
 	}
-	printf("STARLINK_PSS_ACQUISITION_PASS abi=1.0,1.1,1.2,1.3 "
+	printf("STARLINK_PSS_ACQUISITION_PASS abi=1.0,1.1,1.2,1.3,1.4 "
 		"map_words=%u map_reads=%u "
 		"window_maps=%u drift_hypotheses=7 state_path="
 		"ACQUIRE-CONFIRM-LOCK-TRACK-HOLDOVER-ACQUIRE\n",

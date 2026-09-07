@@ -91,8 +91,9 @@ post-conditioning geometry: 20,000 one-sample phase bins at 15 MS/s, 64
 frames per map, 16-bit map words, and two immutable banks. The parser accepts
 exactly ABI 1.0/capability `0x1f` and ABI 1.1/capability `0x3f` for the 15 MS/s
 path, ABI 1.2/capability `0x7f` for the 30-to-15 MS/s x2 DDC, and ABI
-1.3/capability `0x7f` for the cascaded 60-to-30-to-15 MS/s x4 DDC. Unknown
-versions or mismatched capability words fail closed. For ABI 1.2/1.3 the
+1.4/capability `0xff` for the cascaded 60-to-30-to-15 MS/s x4 DDC with
+coherent 64-bit accepted/emitted counters. Unknown versions or mismatched
+capability words fail closed. For ABI 1.2/1.3/1.4 the
 library additionally requires the exact input rate, stage configuration,
 raw-input group delay, coefficient energy, and complete 256-bit Python-oracle
 contract hash before acquisition can be enabled. The dedicated
@@ -129,13 +130,13 @@ releases the selected bank only after its generation, start index, command
 status, and all acquisition/bridge fault epochs remain coherent. ABI 1.1 adds
 one atomic snapshot of ingress drops/FIFO occupancy, scheduler gaps/index
 errors/overflows, detector faults, phase discontinuities, zero denominators,
-candidate FIFO occupancy, and sticky cause flags. ABI 1.2/1.3 also recognize
+candidate FIFO occupancy, and sticky cause flags. ABI 1.2/1.3/1.4 also recognize
 DDC arithmetic saturation as a continuity fault. Continuity checks reject a
 copy when any data-integrity fault epoch changes or saturates; changing queue
 occupancy and zero-denominator telemetry remain observable but do not falsely
 invalidate an otherwise coherent copy. ABI 1.0 snapshots synthesize zero for
 the absent health fields and never access the newer register ranges. ABI 1.1
-likewise never reads the ABI 1.2/1.3 DDC contract range. Failed copies retain
+likewise never reads the ABI 1.2/1.3/1.4 DDC contract range. Failed copies retain
 FPGA ownership. Each successful copy carries its before/after health
 epochs; `pss_map_copies_contiguous()` accepts only adjacent generations and
 1,280,000-sample start-index steps with unchanged, nonsaturated fault counters.

@@ -397,6 +397,8 @@ static uint32_t input_rate_msps(const struct pss_map_info *info)
 		return 30U;
 	if (info->version == PSS_MAP_VERSION_1_3)
 		return 60U;
+	if (info->version == PSS_MAP_VERSION_1_4)
+		return 60U;
 	return 15U;
 }
 

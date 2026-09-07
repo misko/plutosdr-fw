@@ -157,10 +157,10 @@ static void print_monitor_summary_v3(const char *serial,
 	       ",\"candidate_fifo_level_at_cutoff\":%u"
 	       ",\"candidate_fifo_maximum_at_cutoff\":%u"
 	       ",\"health_flags_at_cutoff\":\"0x%08" PRIx32 "\"," 
-	       "\"ddc_accepted_before\":%" PRIu32
-	       ",\"ddc_accepted_after\":%" PRIu32
-	       ",\"ddc_emitted_before\":%" PRIu32
-	       ",\"ddc_emitted_after\":%" PRIu32
+	       "\"ddc_accepted_before\":%" PRIu64
+	       ",\"ddc_accepted_after\":%" PRIu64
+	       ",\"ddc_emitted_before\":%" PRIu64
+	       ",\"ddc_emitted_after\":%" PRIu64
 	       ",\"ddc_discontinuity_after\":%" PRIu32
 	       ",\"ddc_saturation_after\":%" PRIu32
 	       ",\"continuity_ok\":true,\"fault_free_epoch\":%s,"
@@ -360,7 +360,8 @@ static int run_monitor_v3(const char *serial, const struct pss_map_io *io,
 		previous_copy.after.map_publish_count ||
 	    ddc_after.discontinuity || ddc_after.saturation ||
 	    (rate > 15U &&
-	     (ddc_after.accepted == UINT32_MAX || ddc_after.emitted == UINT32_MAX ||
+	     (ddc_counter_saturated(info, ddc_after.accepted) ||
+	      ddc_counter_saturated(info, ddc_after.emitted) ||
 	      ddc_after.accepted <= ddc_before.accepted ||
 	      ddc_after.emitted <= ddc_before.emitted))) {
 		snprintf(error, error_size,

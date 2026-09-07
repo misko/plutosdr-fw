@@ -34,7 +34,7 @@ static int map_read32(const struct pss_map_io *io, uint32_t offset,
 {
 	if (!io || !io->read32 || !value)
 		return fail(error, error_size, "invalid phase-map read arguments");
-	if (offset > PSS_MAP_REG_DDC_SATURATION || (offset & 3U))
+	if (offset > PSS_MAP_REG_DDC_EMITTED_HI || (offset & 3U))
 		return fail(error, error_size,
 			"invalid phase-map read offset 0x%08" PRIx32, offset);
 	if (io->read32(io->context, offset, value) < 0)
@@ -48,7 +48,7 @@ static int map_write32(const struct pss_map_io *io, uint32_t offset,
 {
 	if (!io || !io->write32)
 		return fail(error, error_size, "invalid phase-map write arguments");
-	if (offset > PSS_MAP_REG_DDC_SATURATION || (offset & 3U))
+	if (offset > PSS_MAP_REG_DDC_EMITTED_HI || (offset & 3U))
 		return fail(error, error_size,
 			"invalid phase-map write offset 0x%08" PRIx32, offset);
 	if (io->write32(io->context, offset, value) < 0)
@@ -101,7 +101,9 @@ static bool known_contract(uint32_t version, uint32_t capabilities)
 		(version == PSS_MAP_VERSION_1_2 &&
 		 capabilities == PSS_MAP_CAPABILITIES_1_2) ||
 		(version == PSS_MAP_VERSION_1_3 &&
-		 capabilities == PSS_MAP_CAPABILITIES_1_3);
+		 capabilities == PSS_MAP_CAPABILITIES_1_3) ||
+		(version == PSS_MAP_VERSION_1_4 &&
+		 capabilities == PSS_MAP_CAPABILITIES_1_4);
 }
 
 static int require_ddc_contract(const struct pss_map_io *io,
@@ -129,7 +131,8 @@ static int require_ddc_contract(const struct pss_map_io *io,
 		expected_delay = 7U;
 		expected_energy = UINT32_C(1073744004);
 		expected_contract = contract_30;
-	} else if (info->version == PSS_MAP_VERSION_1_3) {
+	} else if (info->version == PSS_MAP_VERSION_1_3 ||
+		info->version == PSS_MAP_VERSION_1_4) {
 		expected_rate = 60U;
 		expected_config = UINT32_C(0x020f0403);
 		expected_delay = 21U;
@@ -198,7 +201,8 @@ int pss_map_require_contract(const struct pss_map_io *io,
 	if (destination->version != PSS_MAP_VERSION_1_0 &&
 	    destination->version != PSS_MAP_VERSION_1_1 &&
 	    destination->version != PSS_MAP_VERSION_1_2 &&
-	    destination->version != PSS_MAP_VERSION_1_3)
+	    destination->version != PSS_MAP_VERSION_1_3 &&
+	    destination->version != PSS_MAP_VERSION_1_4)
 		return fail(error, error_size,
 			"unsupported phase-map version 0x%08" PRIx32,
 			destination->version);
@@ -274,7 +278,8 @@ static int read_snapshot_payload(const struct pss_map_io *io,
 		return 0;
 	if (abi_version != PSS_MAP_VERSION_1_1 &&
 	    abi_version != PSS_MAP_VERSION_1_2 &&
-	    abi_version != PSS_MAP_VERSION_1_3)
+	    abi_version != PSS_MAP_VERSION_1_3 &&
+	    abi_version != PSS_MAP_VERSION_1_4)
 		return fail(error, error_size,
 			"unsupported phase-map snapshot version 0x%08" PRIx32,
 			abi_version);
@@ -440,7 +445,8 @@ static bool fault_counters_unchanged(const struct pss_map_snapshot *before,
 		return true;
 	if (before->abi_version != PSS_MAP_VERSION_1_1 &&
 	    before->abi_version != PSS_MAP_VERSION_1_2 &&
-	    before->abi_version != PSS_MAP_VERSION_1_3)
+	    before->abi_version != PSS_MAP_VERSION_1_3 &&
+	    before->abi_version != PSS_MAP_VERSION_1_4)
 		return false;
 	return (before->health_flags &
 		((before->abi_version == PSS_MAP_VERSION_1_1) ?

@@ -174,10 +174,10 @@ static void print_monitor_summary_v2(const char *serial,
 	       ",\"candidate_fifo_level_at_cutoff\":%u"
 	       ",\"candidate_fifo_maximum_at_cutoff\":%u"
 	       ",\"health_flags_at_cutoff\":\"0x%08" PRIx32 "\","
-	       "\"ddc_accepted_before\":%" PRIu32
-	       ",\"ddc_accepted_after\":%" PRIu32
-	       ",\"ddc_emitted_before\":%" PRIu32
-	       ",\"ddc_emitted_after\":%" PRIu32
+	       "\"ddc_accepted_before\":%" PRIu64
+	       ",\"ddc_accepted_after\":%" PRIu64
+	       ",\"ddc_emitted_before\":%" PRIu64
+	       ",\"ddc_emitted_after\":%" PRIu64
 	       ",\"ddc_discontinuity_after\":%" PRIu32
 	       ",\"ddc_saturation_after\":%" PRIu32
 	       ",\"continuity_ok\":true,\"fault_free_epoch\":%s,"
