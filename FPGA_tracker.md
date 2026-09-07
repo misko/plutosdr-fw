@@ -873,7 +873,7 @@ the seven-entry FPGA queue. Raw 60 MS/s IQ never enters the ARM or Ethernet
 path.
 
 Reusable host support is in PPU main commit
-`4f4867d47169466c5d6dbce5b82b74e71ed1f2c7`. It discovers and validates both
+`4f4867d4386d0fd0db5d0fb24a74151b3052e57d`. It discovers and validates both
 devices, loads rate-matched CI16 coefficients, reads fine packets, and strictly
 reassembles maps. Its complete repository gate passed 1,431 tests with 11
 explicit hardware/browser skips, plus Ruff and strict mypy. Experimental
@@ -887,3 +887,22 @@ its Rev-C DTB proved the two exact MMIO/IRQ bindings, and its DFU SHA-256 was
 `999842c83580646fdaf042120f5bde846025bdf6ce1cec8f9b64289ca980dcd9`.
 Target discovery, iiOD XML repeat compatibility, native USB/Ethernet result
 streaming, and cabled timing equivalence remain hardware gates at this point.
+
+The first controlled deployment completed its sealed DFU download and detach,
+but the runtime did not return. The lifecycle tool recorded an `UNKNOWN`
+receipt at the `wait-for-runtime` phase; it did not write QSPI. The candidate
+had both new platform drivers built in, so their probes ran before USB and SSH
+were available. With no serial console attached, that image did not provide a
+useful boundary between a base-boot fault and either individual probe.
+
+The next candidate therefore uses an intentionally staged deployment. Both
+drivers are kernel modules and are packaged under `/opt/starlink-pss-iio`, but
+neither is loaded automatically. Qualification proceeds in three observable
+steps: attest the normal RAM runtime, load and validate the fine tracker alone,
+then load and validate the coarse-map device. This is a diagnostic staging
+rule, not the intended final startup policy. Automatic loading can be enabled
+only after each isolated probe and combined streaming pass without changing
+the persistent QSPI image. Linux commit
+`2f771649ea4e3fa2e6a33fa095c60f627c7e68f6` and Buildroot commit
+`7da3744c9fe33791bd3e8a5970924030439f11aa` implement this opt-in packaging;
+both remain on explicitly do-not-merge branches.

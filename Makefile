@@ -10,6 +10,8 @@ TOOLCHAIN = $(CURDIR)/buildroot/output/host/bin/$(CROSS_COMPILE)gcc
 NCORES = $(shell grep -c ^processor /proc/cpuinfo)
 VIVADO_SETTINGS ?= /opt/Xilinx/Vivado/$(VIVADO_VERSION)/settings64.sh
 VSUBDIRS = hdl buildroot linux u-boot-xlnx
+PSS_IIO_MODULES = linux/drivers/iio/adc/adi_starlink_pss_tracker.ko \
+	linux/drivers/iio/adc/adi_starlink_pss_map.ko
 
 # The string stamped into /opt/VERSIONS as `device-fw`, which is what a radio
 # reports about itself and what scripts/verify_release.sh checks.
@@ -105,9 +107,12 @@ build/uboot-env.bin: build/uboot-env.txt
 
 linux/arch/arm/boot/zImage: TOOLCHAIN
 	$(TOOLS_PATH) make -C linux ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) zynq_$(TARGET)_defconfig
-	$(TOOLS_PATH) make -C linux -j $(NCORES) ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) zImage UIMAGE_LOADADDR=0x8000
+	$(TOOLS_PATH) make -C linux -j $(NCORES) ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) zImage modules UIMAGE_LOADADDR=0x8000
 
 .PHONY: linux/arch/arm/boot/zImage
+
+$(PSS_IIO_MODULES): linux/arch/arm/boot/zImage
+	@test -f $@
 
 
 build/zImage: linux/arch/arm/boot/zImage | build
@@ -123,7 +128,7 @@ build/%.dtb: linux/arch/arm/boot/dts/%.dtb | build
 
 ### Buildroot ###
 
-buildroot/output/images/rootfs.cpio.gz:
+buildroot/output/images/rootfs.cpio.gz: $(PSS_IIO_MODULES)
 	@echo device-fw $(VERSION)> $(CURDIR)/buildroot/board/$(TARGET)/VERSIONS
 	@$(foreach dir,$(VSUBDIRS),echo $(dir) $(shell cd $(dir) && git describe --abbrev=4 --dirty --always --tags) >> $(CURDIR)/buildroot/board/$(TARGET)/VERSIONS;)
 	make -C buildroot ARCH=arm zynq_$(TARGET)_defconfig
