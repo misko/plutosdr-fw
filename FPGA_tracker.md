@@ -2,8 +2,9 @@
 
 Canonical design specification: [FPGA_tracker_60MS.md](FPGA_tracker_60MS.md)
 
-Status: 15/30/60 MS/s coarse acquisition implemented and cabled-tested.
-Full-rate refinement, live-LNB qualification, SSS, and frame lock remain open.
+Status: 15/30/60 MS/s coarse acquisition and 60 MS/s full-rate refinement are
+implemented and cabled-tested. 30 MS/s refinement, live-LNB qualification,
+SSS, and frame lock remain open.
 **DO NOT MERGE INTO FIRMWARE MAIN.**
 
 Authorized receiver: `104000bac4950008230026001b440a003a` only.
@@ -17,10 +18,11 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 ## Current baseline
 
 - Firmware branch: `codex/starlink-rx-only-do-not-merge`
-- Routed acquisition images:
+- Routed acquisition/tracker images:
   - `v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7`
   - `v0.50-plutoplus-starlink-pss-30m-rx-only-dnm-v9`
   - `v0.50-plutoplus-starlink-pss-60m-rx-only-dnm-v10`
+  - `starlink-pss60-fullrate-tracker-dnm-v11`
 - Physical RFIC evidence: AD9363A
 - Persistent runtime target: `ad9361-1r1t`
 - Persistent firmware:
@@ -42,7 +44,7 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
 | M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
-| M8: sparse 60 MS/s refinement | Pending | Direct-oracle timing within one source sample |
+| M8: sparse 60 MS/s refinement | Complete | Direct full-rate timing within one source sample on the cabled positive/control/positive fixture |
 | M9: live 60 MS/s narrowband run | Cabled complete; live pending | Passing 120-second cabled receipt and rollback proof; outdoor LNB evidence still required |
 | M10: SSS/final frame lock | Pending | Separate frozen policy and live qualification |
 
@@ -739,7 +741,106 @@ Evidence:
 - authoritative private directory:
   `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-live-20260907/candidate-60-v10/cabled-v4`.
 
-M7 is complete for coarse acquisition and 60-to-15 index transport. M8 remains
-open until the sparse full-rate tracker resolves timing within one 60 MS/s
-source sample. M9 still requires real outdoor LNB evidence; this cabled result
-does not satisfy that live-signal gate.
+M7 is complete for coarse acquisition and 60-to-15 index transport. At this
+checkpoint M8 remained open; the following section records its later sparse
+full-rate completion. M9 still requires real outdoor LNB evidence; neither
+cabled result satisfies that live-signal gate.
+
+## M8 full-rate 60 MS/s cabled refinement
+
+M8 completed on 2026-09-07 with the detector-only v11 RAM image. The image
+combines the already-qualified 60-to-30-to-15 MS/s coarse acquisition path
+with a direct 60 MS/s sparse tracker. The tracker loads exactly 264 complex
+taps, captures 520 source samples around a host-scheduled center, and selects
+one exact winner from 241 qualified lags (`-120..+120`). It exports one compact
+26-word result packet rather than source IQ.
+
+The final runner uses coarse acquisition only once in a fresh FPGA epoch. It
+projects that rough source index into a future frame, corrects it with one
+full-rate probe, then submits 256 predicted centers through the seven-entry
+FPGA command queue. Positive B is predicted from positive A's fitted full-rate
+period; it does not consume a second coarse epoch. A one-second host scheduling
+lead avoids making a center stale while a new SSH transport is established.
+
+The declared fixture remained:
+
+`1040007c4a94000211000b009186843ef2 TX1 -> exact 30 dB attenuator -> 104000bac4950008230026001b440a003a RX1`
+
+Both radios used 60,000,000 S/s, a 20 MHz RF bandwidth, and a 2.4 GHz LO. The
+positive TX hardware gain was `-30 dB`. The phase-continuous negative control
+reduced only TX hardware gain to the AD9361 minimum `-89.75 dB`, 59.75 dB below
+the positive, while retaining the cyclic DMA selector and powered TX LO. This
+bounded control is intentionally distinct from final safety cleanup: changing
+the DAC selector or destroying the cyclic buffer resets the synthetic
+waveform's unknown phase and prevents positive B from testing the same timing
+trajectory. Final cleanup and a separate independent check still required and
+proved the complete gain, selector, DDS, LO, and buffer mute.
+
+The coarse source anchor was `962,068,500`, with an 80,000-source-sample period.
+The first fine probe scheduled center `1,052,468,500` and returned winner
+timestamp `1,052,468,608`, a `+108` source-sample rough-to-fine correction
+inside the declared aperture. After the negative control, positive B's
+prediction probe required zero correction.
+
+| Role | Results | Fitted period (source samples) | Relative TX/RX slope | RMS residual (source samples) | Worst residual | Median normalized score | Winner-lag range |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Positive A | 256 | 80,000.096285 | +1.2036 ppm | 0.2908 | 0.5309 sample / 8.85 ns | 0.43615 | 85..110 |
+| Minimum-gain control | 64 | not timing-qualified | not timing-qualified | 64.2783 | 134.0282 samples / 2.234 us | 0.02172 | -120..119 |
+| Positive B | 256 | 80,000.096455 | +1.2057 ppm | 0.2902 | 0.5035 sample / 8.39 ns | 0.43533 | 85..110 |
+
+The positive median normalized scores were approximately 20 times the control.
+Both positive runs had zero aperture-edge winners. Each positive batch recorded
+exactly 256 admitted, captured, capture-published, engine-consumed,
+reducer-processed, reducer-emitted, result-published, and result-consumed jobs,
+with every error-counter delta zero. The accepted-sample clock preflight
+measured 60,000,910.220 Hz (`+15.170 ppm`) and passed its independent bound.
+
+The exact full route closed setup and hold timing with WNS `+0.049 ns` and WHS
+`+0.007 ns`. Complete-shell utilization was 71.18% LUT, 56.72% registers,
+99.93% slices, 90.83% BRAM, and 91.25% DSP. The image remained RAM-only and
+used the detector-only PPU profile: RX ADC present, no RX DMA, no DDS device,
+no TX DMA, and no tandem block.
+
+Source and evidence:
+
+- v11 firmware source commit:
+  `751d2a4296402ad62c98b4174c538a7b0447793b`;
+- HDL source commit:
+  `c53503566e0156b5f7585bf72b883b2beb1f18ed`;
+- guarded cabled-runner commit:
+  `9e61b0eb531a725e10a47fc152df6a77328b8a51`;
+- runner source SHA-256:
+  `602827e331c0d0aeff882bea7e2f01b6f905d051a0b8ab22996989602406c39a`;
+- PPU main commit:
+  `e37ebc717e1c1da1a07d5fc664331f8309cc1c3f`;
+- v11 DFU SHA-256:
+  `a54d83c3c2e62f091701734cc9c7bb7f0eca5d639e53b9ecf09de39aa00de5c7`;
+- final RAM receipt SHA-256:
+  `f8bb97003eedc75e47f5daf166c1447842c35c9255933d37e36e2d0c8c8f682a`;
+- passing run receipt SHA-256:
+  `266c7d9a176ce6633f7444e199f979082332ef01cb10b2453731b97b0b37cac9`;
+- positive-A, control, and positive-B artifact SHA-256 values:
+  `5c0c87e4758b9d5156b33f08314a672336d1f7bc937c29b4e2b35b868d54f998`,
+  `03c99acca8bffad11b289e767c5770b732a1fcca5b9fb8f81ab22514d571d982`,
+  and `fa4f4adaa11edaf0b23d1184b9850c39dfc66f6fd7700c0d737a4213074dfa93`;
+- independent final TX-mute receipt SHA-256:
+  `169afc0f6287fa3ae5cb3c724f2c039e9b20013d874ad317c20f7ab98fd5e7d5`;
+- passing recovery receipt SHA-256:
+  `f8a46695d425189d51bb7448f4f576c2248469c8f0b58186f567223373f791c4`;
+- post-recovery serial-restricted inventory SHA-256:
+  `fb04733d86bd03d066d78526fa565a166665c4215491bc932eca126764be9778`;
+  and
+- authoritative private directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m8-fullrate-60-20260907/fine-cabled-run8`.
+
+Independent final TX inspection found no active buffer, gain `-89.75 dB`, TX
+LO powered down, DAC selectors `3/3`, and all DDS sources zero. PPU recovery
+proved pre-reset USB departure, a new boot ID, unchanged `qspi-linux` SHA-256
+`07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`,
+persistent `v0.48-plutoplus-spf-iq-direct-async-v3`, AD9361 1R1T identity,
+TX-safe state, and route release.
+
+M8 is therefore complete for synthetic cabled 60 MS/s full-rate PSS timing
+within one source sample. This is not a 60 MHz analog-bandwidth result, live
+Starlink evidence, SSS detection, or frame lock. M9 still requires the outdoor
+LNB positive/off-channel/positive sequence.
