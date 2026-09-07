@@ -10,7 +10,7 @@ Authorized radio: `104000bac4950008230026001b440a003a` only.
 
 - Firmware branch: `codex/starlink-rx-only-do-not-merge`
 - Routed 15 MS/s acquisition image:
-  `v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v6`
+  `v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7`
 - Physical RFIC evidence: AD9363A
 - Persistent runtime target: `ad9361-1r1t`
 - Persistent firmware:
@@ -26,7 +26,7 @@ Authorized radio: `104000bac4950008230026001b440a003a` only.
 | --- | --- | --- |
 | M0: AD9361-personality DNM lifecycle | Complete | Offline plan tests, exact-target RAM boot, recovery to persistent `ad9361-1r1t` |
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
-| M2: deterministic 15 MS/s timing | Pending | Simulation and FPGA injection timing within one canonical sample |
+| M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Pending | Positive/negative cabled receipts |
 | M4: live-LNB 15 MS/s timing | Pending | Repeated on-channel trajectory and off-channel control |
 | M5: 30-to-15 decimator/index mapping | Pending | Bit-exact oracle and routed evidence |
@@ -141,3 +141,85 @@ All private artifacts are under:
 
 A gate changes to `Complete` only when every corresponding requirement in
 `FPGA_tracker_60MS.md` has direct evidence.
+
+## M2 implementation and evidence log
+
+M2 completed on 2026-09-07 using only the allocated radio. The v7 RX-only FPGA
+candidate adds a bounded periodic sample injector ahead of the continuous
+15 MS/s acquisition path. The temporary static ARM controller loads a
+130-sample fixture, substitutes it every 20,000 samples for 130 repetitions,
+and tests phase zero, the 19,999-to-zero wrap, and phase 7,311. The controller
+starts the deterministic stream one complete period before each target map so
+the overlap-save pipeline is warm before any qualified score.
+
+The first hardware attempt exposed a controller-only ABI interpretation bug:
+ABI 1.1 has an implicit fixed 15 MS/s rate and therefore no populated DDC rate
+register. The corrected controller derives 15/30/60 MS/s from ABI 1.1/1.2/1.3
+in the same way as the general acquisition controller.
+
+The next exact-map attempt revealed an oracle error rather than an FPGA timing
+error. The XFFT emits 447 valid overlap-save results per block, while a Starlink
+period is 20,000 samples; `20000 mod 447 = 332`. Block-floating scaling
+therefore sees the periodic fixture at different locations in successive FFT
+blocks. Multiplying the first 20,000-score profile by 64 is not a valid oracle
+for every low-level map bin. This is explicitly retained in the receipt:
+full-map exactness is not claimed, and the mismatch counts remain diagnostics.
+
+The M2 pass criterion is the timing result required by the canonical plan. For
+each requested phase, the FPGA must produce a globally unique peak at exactly
+that phase, the exact 64-frame peak magnitude `16320`, the exact runner-up
+magnitude `7424`, a completed 130-repetition injection, contiguous map
+generations, and a fault-free health epoch. The host independently validates
+the strict version-2 NDJSON records and receipt. It still makes no live-PSS,
+SSS, or frame-lock claim.
+
+Passing FPGA cases:
+
+| Requested phase | Observed phase | Peak | Runner-up | Diagnostic differing bins | Map generation |
+| ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 0 | 16,320 | 7,424 | 870 | 3 |
+| 19,999 | 19,999 | 16,320 | 7,424 | 873 | 6 |
+| 7,311 | 7,311 | 16,320 | 7,424 | 857 | 9 |
+
+All nine maps copied by the controller were generation-contiguous. Final
+health flags were zero; the acquisition engine was disabled and flushed after
+the run; all three `/tmp` uploads were removed; RX sampling and bandwidth were
+restored from 30.72/18 MHz to their original values; and the exact host route
+was released.
+
+Source and build evidence:
+
+- FPGA candidate source commit: `02ae824f53bec4495ba8f902d5d26a8958c2d397`
+- HDL source commit: `9f3851d33c171a29b28a7b6a5a5469759ad5c79f`
+- final M2 host source commit: `392585326cea7ebacbbf438071cb5e4d70a123fc`
+- frozen source tag:
+  `starlink-rx-only-dnm-v1-source/firmware-pss15-m2-host-v12`
+- v7 package SHA-256:
+  `8e0e2bfbe8a6c645fe26cb12a24fc3dc89487ad4ba0ea29f4af7cfa8d58c7f9b`
+- packaged bitstream SHA-256:
+  `7502d3b14516b52a54a66c289c832c3e83859284d657954c158a6e678d325828`
+- routed checkpoint SHA-256:
+  `34ebbb324746811a3cb45e4da859eba3abc842a4a52d8434a120ef0d1064636e`
+- final static ARM controller SHA-256:
+  `712d270fffeaa5884b4133a25997f6589a65e38fe57bad051a9a4e4126f0fecc`
+- M2 plan SHA-256:
+  `ae12d1022c57d607da86c7bd5cce1c7f1fbec4ca481f3c96707056c04883b07a`
+- passing M2 receipt SHA-256:
+  `9670c8887ed84262f221346ad8acca5554bd3b10a3e589fcbb32e385c2aa8bf9`
+- passing recovery receipt SHA-256:
+  `fc7d3904424639c44011eb8d88be3925e8eecf1597f27e1485b5296e543efcfb`
+- post-recovery serial-restricted inventory SHA-256:
+  `b1b36943aaba451197859a09662082a481fb3fc6fa85ee1cf02610f2e6160cd9`
+
+The final recovery proved USB departure and return, a new boot ID, unchanged
+`qspi-linux` SHA-256
+`07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`,
+the persistent `ad9361-1r1t` target, firmware
+`v0.48-plutoplus-spf-iq-direct-async-v3`, TX-safe state, and a released route.
+The final inventory was restricted to serial
+`104000bac4950008230026001b440a003a`; it scanned four attached radios and
+retained exactly that one.
+
+M3 is the next open gate: repeatable cabled-RF 15 MS/s timing with a separately
+declared positive path and negative control. M2 evidence must not be presented
+as a live-signal detection result.
