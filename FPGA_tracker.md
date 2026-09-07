@@ -895,14 +895,25 @@ had both new platform drivers built in, so their probes ran before USB and SSH
 were available. With no serial console attached, that image did not provide a
 useful boundary between a base-boot fault and either individual probe.
 
-The next candidate therefore uses an intentionally staged deployment. Both
-drivers are kernel modules and are packaged under `/opt/starlink-pss-iio`, but
-neither is loaded automatically. Qualification proceeds in three observable
-steps: attest the normal RAM runtime, load and validate the fine tracker alone,
-then load and validate the coarse-map device. This is a diagnostic staging
-rule, not the intended final startup policy. Automatic loading can be enabled
-only after each isolated probe and combined streaming pass without changing
-the persistent QSPI image. Linux commit
+The v2 candidate therefore used an intentionally staged deployment. Both
+drivers were kernel modules packaged under `/opt/starlink-pss-iio`, with no
+automatic load. Its base RAM runtime passed exact-radio attestation with
+unchanged QSPI. Loading the fine tracker alone then succeeded: the platform
+driver bound to `79030000.pss-tracker`, registered `starlink-pss-track`, and
+the runtime remained responsive. The running iiOD process did not expose the
+new device because it snapshots the IIO inventory at process startup. Killing
+its child to force re-enumeration disconnected the FunctionFS USB gadget; this
+does not implicate the already successful tracker probe, but it proves that a
+live iiOD restart is not a safe discovery mechanism on this image.
+
+The v3 policy therefore loads and verifies both passive modules from
+`S22starlink_pss_iio`, before `S23udc` launches iiOD and binds the composite
+USB gadget. The loader writes an atomic PASS/FAIL record at
+`/run/starlink-pss-iio-load`, is idempotent, and never enables coarse
+acquisition or fine scheduling. Its host test covers initial load, repeated
+start, and a partial-load failure. A failed module remains diagnosable while
+the following boot stages can still expose the recovery interfaces. Linux
+commit
 `2f771649ea4e3fa2e6a33fa095c60f627c7e68f6` and Buildroot commit
-`7da3744c9fe33791bd3e8a5970924030439f11aa` implement this opt-in packaging;
-both remain on explicitly do-not-merge branches.
+`41a2a806d97ec04a4d92f3f96c9d6d973dc3c8e6` implement the modular drivers and
+boot-before-iiOD policy; both remain on explicitly do-not-merge branches.
