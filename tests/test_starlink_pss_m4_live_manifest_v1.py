@@ -24,7 +24,10 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     values = _values()
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
     assert values["schema_version"] == "1"
-    assert values["release_state"] == "offline-ready-live-lnb-runner"
+    assert values["release_state"] == "bench-preflight-revision-required"
+    assert values["bench_preflight_completed"] == "true"
+    assert values["live_execution_approved"] == "false"
+    assert values["required_revision"] == "continuous-role-v2"
     for field in (
         "do_not_merge",
         "do_not_release",

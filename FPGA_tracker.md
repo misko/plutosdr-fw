@@ -482,3 +482,80 @@ Ethernet-only location. Fixture sealing also requires the exact LNB model,
 polarization, supply voltage, and power-source description. M4 remains open
 until the resulting live receipt and recovery receipt pass offline
 verification.
+
+### M4 cabled scan preflight and required continuous-role revision
+
+On 2026-09-07 the exact M3 fixture was reused for an M4 scan preflight:
+
+```text
+1040007c4a94000211000b009186843ef2 TX1
+  -> one 30 dB fixed attenuator
+  -> 104000bac4950008230026001b440a003a RX1
+```
+
+The test exposed and corrected two hardware-only assumptions in the offline
+M4 runner. The AD9361 PHY clock must be written before the FPGA capture-rate
+attribute when entering 15 MS/s from 30.72 MS/s; commit `42e215cf0` adds that
+ordering and a regression test. The v7 detector must also remain enabled for
+the complete receiver-LO scan. Starting and stopping it once per LO point can
+eventually set the sticky candidate-path health bit during pipeline shutdown.
+A single continuous observation with receiver retunes between map groups avoids
+that fault and preserves zero-loss map accounting.
+
+Two 119-second continuous scans passed on one fresh RAM epoch:
+
+| Role | Stable windows | Passing windows | Passing LO points | Longest false track | Median point peak/background |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Active PSS A | 1,250 | 1,200 | 17 / 25 | n/a | 4.2795 |
+| TX-muted control | 1,250 | 7 | 0 / 25 | 1 | 1.3485 |
+
+Each role copied 1,394 contiguous maps in 119.017 seconds and produced 1,392
+global candidate windows. Every ingress, scheduler, detector, arithmetic, map,
+protocol, and DDC fault counter was zero. Active clipping was zero with maximum
+absolute S12 component 1,441. The median active-to-muted point contrast was
+`3.1736x`. TX cleanup proved -89.75 dB gain, TX LO powerdown, DAC selectors 3/3,
+zero DDS sources, no active buffer, and deterministic context close. RX settings
+were restored exactly and the Ethernet boot/QSPI identity was unchanged.
+
+The active response is deliberately not interpreted as one contiguous CFO
+bandwidth. The sparse, high-SNR synthetic PSS produces repeatable matched-filter
+lobes: the central 0 and +/-100 kHz points track strongly, +200 kHz is the
+largest peak, -200 kHz is rejected, and additional stable lobes occur farther
+out. The production search must rank LO hypotheses and retain timing continuity;
+it must not label the full -1.2 to +1.2 MHz passing-offset extent as capture
+bandwidth.
+
+A third 119-second active repeat produced all 25 point measurements but was
+correctly rejected by its global gate because the persistent 32-bit
+`accepted_scores` counter saturated at `0xffffffff`. At 15 MS/s one PL epoch can
+represent about 286.3 seconds before that counter saturates. Therefore the
+current 3 x 117.5-second live plan and the current per-point start/stop executor
+are not approved for the outdoor run.
+
+The required M4 revision is three continuous roles of approximately 80.5
+seconds each. Each LO point retains exactly 32 stable candidate windows after
+five discarded retune/rolling-window maps. The three roles then consume about
+241.5 seconds of one PL epoch, below the 32-bit counter bound, while preserving
+the frozen minimum-window policy. The M4 live runner, plan schema, receipt
+schema, and verifier must encode this map-count schedule before an LNB is
+connected.
+
+Private evidence:
+
+- active-A receipt SHA-256:
+  `1133b692a64b96757ceab254a1c3b86552319547c5435fab830181456b7b3ffa`;
+- muted-control receipt SHA-256:
+  `00cccaf8575a03670dbebae723f3de62c54bb26a1b78344ee475b860dcc7dada`;
+- expected saturation failure receipt SHA-256:
+  `d6d4514208d05ad502442e6846fc8fa1f4c8eb61dc6c0e9f33ac09bc47e21e88`;
+- first cleanup/recovery receipt SHA-256:
+  `cbbd306ff3ac060941938505687b3614075c0395d478d57d1ada5f102053817d`;
+- final cleanup/recovery receipt SHA-256:
+  `04bf41cb0ffad490f361e046a1bfa6c358b03997baf7ca4b5a2ec6b21db26bb8`.
+
+The authoritative scan directory is
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m4-live-20260907/attempt2`.
+After testing, `.17` was recovered to persistent
+`v0.48-plutoplus-spf-iq-direct-async-v3` with unchanged QSPI, and `.18` remained
+positively muted. PPU remained unchanged on clean `main` commit
+`7210cda9b0b2452cb607b5e49e689e2d60b6a8b7`.
