@@ -40,11 +40,14 @@ from pluto_plus.hardware.pss_iio import (
 )
 from pluto_plus.radio_lock import acquire_radio_lock
 
+from scripts.starlink_pss_m3_iio_tx_v1 import DAC_SELECT_ZERO
 from scripts.starlink_pss_m3_iio_tx_v2 import (
     close_iio_context,
     load_exact_payload,
 )
-from scripts.starlink_pss_m8_cabled_v1 import PhaseContinuousSingleTx
+from scripts.starlink_pss_m8_cabled_v1 import (
+    PhaseContinuousSingleTx as _PhaseContinuousSingleTx,
+)
 
 RX_SERIAL = "104000bac4950008230026001b440a003a"
 TX_SERIAL = "1040007c4a94000211000b009186843ef2"
@@ -73,6 +76,19 @@ WAVEFORM_SHA256 = "be24d054510c8d5ec7bb5d122d8a0604e2d3c742f00cb2582de312a406114
 
 class QualificationError(RuntimeError):
     """The fixed cabled qualification failed a required contract."""
+
+
+class PhaseContinuousSingleTx(_PhaseContinuousSingleTx):
+    """Retain phase gating and make final zero selection survive buffer release."""
+
+    def mute(self) -> dict[str, Any]:
+        evidence = super().mute()
+        # Legacy buffer destruction can restore the DDS selector after the base
+        # mute readback. Reassert ZERO only after that destruction is complete.
+        evidence["selector_i"] = self._write_selector(0, DAC_SELECT_ZERO)
+        evidence["selector_q"] = self._write_selector(1, DAC_SELECT_ZERO)
+        evidence["selectors_verified_after_buffer_release"] = True
+        return evidence
 
 
 def _now() -> str:
