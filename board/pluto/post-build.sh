@@ -67,6 +67,7 @@ ${INSTALL} -D -m 0755 ${BOARD_DIR}/S14diagnostics ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S15watchdog ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S20urandom ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S21misc ${TARGET_DIR}/etc/init.d/
+${INSTALL} -D -m 0755 ${BOARD_DIR}/S22starlink_pss_iio ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S23udc ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S40network ${TARGET_DIR}/etc/init.d/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/S41network ${TARGET_DIR}/etc/init.d/
@@ -87,9 +88,9 @@ ${INSTALL} -D -m 0755 ${BOARD_DIR}/automounter.sh ${TARGET_DIR}/lib/mdev/automou
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/ifupdown.sh ${TARGET_DIR}/lib/mdev/ifupdown.sh
 ${INSTALL} -D -m 0644 ${BOARD_DIR}/input-event-daemon.conf ${TARGET_DIR}/etc/
 
-# Keep the experimental PSS IIO drivers opt-in.  Packaging them without an
-# automatic boot-time probe lets RAM qualification attest the base runtime,
-# then load tracker and map independently to isolate any integration fault.
+# The experimental PSS IIO modules stay separate from the kernel image so a
+# base boot remains diagnosable. S22 loads and verifies both passive transport
+# devices before S23 starts iiOD; neither FPGA engine is enabled at boot.
 ${INSTALL} -D -m 0644 ${FW_DIR}/linux/drivers/iio/adc/adi_starlink_pss_tracker.ko \
 	${TARGET_DIR}/opt/starlink-pss-iio/adi_starlink_pss_tracker.ko
 ${INSTALL} -D -m 0644 ${FW_DIR}/linux/drivers/iio/adc/adi_starlink_pss_map.ko \

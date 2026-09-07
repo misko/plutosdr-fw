@@ -1,0 +1,81 @@
+#!/bin/sh
+
+# Experimental DO-NOT-MERGE firmware only.  iiOD snapshots the IIO device
+# inventory when it starts, so both passive PSS transport devices must bind
+# before S23udc launches iiOD.  Loading these drivers does not enable coarse
+# acquisition or fine-candidate scheduling.
+
+MODULE_DIR=${STARLINK_PSS_MODULE_DIR:-/opt/starlink-pss-iio}
+IIO_ROOT=${STARLINK_PSS_IIO_ROOT:-/sys/bus/iio/devices}
+PROC_MODULES=${STARLINK_PSS_PROC_MODULES:-/proc/modules}
+RUN_DIR=${STARLINK_PSS_RUN_DIR:-/run}
+INSMOD=${STARLINK_PSS_INSMOD:-/sbin/insmod}
+LOGGER=${STARLINK_PSS_LOGGER:-logger}
+STATUS_FILE=${RUN_DIR}/starlink-pss-iio-load
+
+iio_device_present()
+{
+	expected_name=$1
+	for device in "${IIO_ROOT}"/iio:device*; do
+		[ -r "${device}/name" ] || continue
+		[ "$(cat "${device}/name")" = "${expected_name}" ] && return 0
+	done
+	return 1
+}
+
+case "$1" in
+  start)
+	mkdir -p "${RUN_DIR}"
+	tmp_status="${STATUS_FILE}.tmp.$$"
+	: > "${tmp_status}"
+	overall=PASS
+
+	for binding in \
+		adi_starlink_pss_tracker:starlink-pss-track \
+		adi_starlink_pss_map:starlink-pss-map
+	do
+		module=${binding%%:*}
+		device_name=${binding#*:}
+		state=already-present
+
+		if ! iio_device_present "${device_name}"; then
+			state=loaded
+			if grep -q "^${module} " "${PROC_MODULES}" 2>/dev/null; then
+				state=loaded-without-device
+			elif ! "${INSMOD}" "${MODULE_DIR}/${module}.ko"; then
+				state=insmod-failed
+			fi
+
+			if ! iio_device_present "${device_name}"; then
+				overall=FAIL
+			fi
+		fi
+
+		printf 'module=%s device=%s state=%s present=%s\n' \
+			"${module}" "${device_name}" "${state}" \
+			"$(iio_device_present "${device_name}" && echo yes || echo no)" \
+			>> "${tmp_status}"
+	done
+
+	printf 'overall=%s\n' "${overall}" >> "${tmp_status}"
+	mv "${tmp_status}" "${STATUS_FILE}"
+	"${LOGGER}" -t S22starlink-pss-iio \
+		"PSS IIO boot binding ${overall}; status=${STATUS_FILE}"
+
+	if [ "${overall}" != PASS ]; then
+		echo "PSS IIO boot binding failed; see ${STATUS_FILE}" >&2
+		exit 1
+	fi
+	echo "PSS IIO boot binding OK"
+	;;
+  stop)
+	# Devices stay passive until userspace enables their buffers and controls.
+	# Keep them bound until reboot so a shutdown cannot race an IIO consumer.
+	;;
+  *)
+	echo "Usage: $0 {start|stop}" >&2
+	exit 1
+	;;
+esac
+
+exit 0
