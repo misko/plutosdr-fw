@@ -21,6 +21,7 @@ grep -q mtd2 ${TARGET_DIR}/etc/fstab || echo "mtd2 /mnt/jffs2 jffs2 rw,noatime 0
 
 BOARD_DIR="$(dirname $0)"
 BOARD_NAME="$(basename ${BOARD_DIR})"
+FW_DIR="$(cd "${BOARD_DIR}/../../.." && pwd)"
 GENIMAGE_CFG="${BOARD_DIR}/genimage-msd.cfg"
 GENIMAGE_TMP="${BUILD_DIR}/genimage.tmp"
 GCC_VERSION=$(${BR2_TOOLCHAIN_EXTERNAL_PREFIX}-gcc --version | head -1 | sed 's/.*(\(.*\))/\1/')
@@ -85,6 +86,14 @@ ${INSTALL} -D -m 0644 ${BOARD_DIR}/mdev.conf ${TARGET_DIR}/etc/
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/automounter.sh ${TARGET_DIR}/lib/mdev/automounter.sh
 ${INSTALL} -D -m 0755 ${BOARD_DIR}/ifupdown.sh ${TARGET_DIR}/lib/mdev/ifupdown.sh
 ${INSTALL} -D -m 0644 ${BOARD_DIR}/input-event-daemon.conf ${TARGET_DIR}/etc/
+
+# Keep the experimental PSS IIO drivers opt-in.  Packaging them without an
+# automatic boot-time probe lets RAM qualification attest the base runtime,
+# then load tracker and map independently to isolate any integration fault.
+${INSTALL} -D -m 0644 ${FW_DIR}/linux/drivers/iio/adc/adi_starlink_pss_tracker.ko \
+	${TARGET_DIR}/opt/starlink-pss-iio/adi_starlink_pss_tracker.ko
+${INSTALL} -D -m 0644 ${FW_DIR}/linux/drivers/iio/adc/adi_starlink_pss_map.ko \
+	${TARGET_DIR}/opt/starlink-pss-iio/adi_starlink_pss_map.ko
 
 ${INSTALL} -D -m 0644 ${BOARD_DIR}/msd/img/* ${TARGET_DIR}/www/img/
 ${INSTALL} -D -m 0644 ${BOARD_DIR}/msd/*.html ${TARGET_DIR}/www/
