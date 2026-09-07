@@ -1,0 +1,53 @@
+# Immutable source graph for the cleanup-aware 15/30/60 MS/s continuous map
+# monitor. DO NOT MERGE OR RELEASE. Hardware qualification is recorded in a
+# separate receipt-bound evidence manifest after execution.
+
+schema: plutosdr-fw.starlink-pss-multirate-monitor-source
+schema_version: 3
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+pss_detected: false
+frame_lock_qualified: false
+sss_qualified: false
+
+allocated_receiver_serial: 104000bac4950008230026001b440a003a
+supported_input_rates_msps: 15,30,60
+canonical_rate_msps: 15
+map_phase_bins: 20000
+map_tile_frames: 64
+maximum_duration_ms: 120000
+counter_policy: reject-saturation-or-regression
+cleanup_policy: inherit-only-discard-and-abort-require-all-observation-deltas-zero
+source_index_policy: canonical-times-exact-decimation-factor
+output_schema_map: starlink-pss-acqctl.monitor-map.v2
+output_schema_summary: starlink-pss-acqctl.monitor-summary.v2
+claim_scope: continuous_multirate_map_transport_only
+
+firmware_parent_source: 88514d5eec30026004a6951e2e77c85bcf12b434
+hdl_source: 74d4d38a1df5438199c2306a84be56da900ffd96
+ppu_source: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+monitor_v3_source_path: tools/starlink_pssctl/starlink_pss_acqctl_monitor_v3.c
+monitor_v3_source_sha256: 138a022df26b8f25afad146911ba02b56392b644b96afbf0594d1558c4c9f87a
+monitor_v3_test_path: tools/starlink_pssctl/test_starlink_pss_acqctl_monitor_v3.c
+monitor_v3_test_sha256: 4c4a9660fcd9f2d46b27a76b465bd975dc267f16c5274abbe0b14aa36b7b9e8e
+inherited_monitor_v2_source_path: tools/starlink_pssctl/starlink_pss_acqctl_monitor_v2.c
+inherited_monitor_v2_source_sha256: 5ba222ce7a19c0153e6fb215e10f5d3cef17d03aa01c87e5498b97dce2aecca6
+inherited_monitor_v2_test_path: tools/starlink_pssctl/test_starlink_pss_acqctl_monitor_v2.c
+inherited_monitor_v2_test_sha256: 2ed54221f381e62d1455923281caf052d6a6ab0b6f3293d59910379a754adde0
+makefile_path: tools/starlink_pssctl/Makefile
+makefile_sha256: a60999e570a8f5f534010bbd28d3032fb001e7face0d412491d4c31941557fc2
+
+cross_compiler: arm-linux-gnueabihf-gcc-7.3.1-linaro
+cross_linkage: static
+cross_binary_bytes: 410880
+cross_binary_sha256: cd8bc9537c90107e82d8c9a059d324ac73add6980cd299f4cf85984eff5208fa
+native_v3_test_verdict: PASS
+native_v3_test_cases: 8
+native_v2_regression_verdict: PASS
+native_v2_regression_cases: 10
+full_pssctl_native_test_verdict: PASS

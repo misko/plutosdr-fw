@@ -29,6 +29,9 @@ $(BUILD)/test_starlink_pss_m2_qualification: starlink_pss_m2_qualification.c sta
 $(BUILD)/test_starlink_pss_acqctl_monitor_v2: starlink_pss_acquisition.c starlink_pss_acquisition.h starlink_pss_acqctl.c starlink_pss_acqctl_monitor_v2.c test_starlink_pss_acqctl_monitor_v2.c | $(BUILD)
 	$(HOST_CC) $(CFLAGS) $(WARNINGS) starlink_pss_acquisition.c test_starlink_pss_acqctl_monitor_v2.c -lm -o $@
 
+$(BUILD)/test_starlink_pss_acqctl_monitor_v3: starlink_pss_acquisition.c starlink_pss_acquisition.h starlink_pss_acqctl.c starlink_pss_acqctl_monitor_v2.c starlink_pss_acqctl_monitor_v3.c test_starlink_pss_acqctl_monitor_v3.c | $(BUILD)
+	$(HOST_CC) $(CFLAGS) $(WARNINGS) starlink_pss_acquisition.c test_starlink_pss_acqctl_monitor_v3.c -lm -o $@
+
 $(BUILD)/test_starlink_pss_acquisition_sanitize: starlink_pss_acquisition.c starlink_pss_acquisition.h test_starlink_pss_acquisition.c | $(BUILD)
 	$(HOST_CC) -O1 -g $(WARNINGS) -fsanitize=address,undefined -fno-omit-frame-pointer starlink_pss_acquisition.c test_starlink_pss_acquisition.c -lm -o $@
 
@@ -62,12 +65,17 @@ $(BUILD)/starlink_pss_progress_diag_v2: starlink_pss_acquisition.c starlink_pss_
 	$(CROSS_CC) -O2 -s $(WARNINGS) -static starlink_pss_acquisition.c starlink_pss_acqctl_monitor_v2.c -lm -o $@
 	chmod 0755 $@
 
-test: $(BUILD)/test_starlink_pss_hw $(BUILD)/test_starlink_pss_acquisition $(BUILD)/test_starlink_pss_periodic_injection $(BUILD)/test_starlink_pss_m2_qualification $(BUILD)/test_starlink_pss_acqctl_monitor_v2 $(BUILD)/starlink_pss_acqctl-host $(BUILD)/starlink_pss_m2ctl-host
+$(BUILD)/starlink_pss_acqctl_monitor_v3: starlink_pss_acquisition.c starlink_pss_acquisition.h starlink_pss_acqctl.c starlink_pss_acqctl_monitor_v2.c starlink_pss_acqctl_monitor_v3.c | $(BUILD)
+	$(CROSS_CC) -O2 -s $(WARNINGS) -static starlink_pss_acquisition.c starlink_pss_acqctl_monitor_v3.c -lm -o $@
+	chmod 0755 $@
+
+test: $(BUILD)/test_starlink_pss_hw $(BUILD)/test_starlink_pss_acquisition $(BUILD)/test_starlink_pss_periodic_injection $(BUILD)/test_starlink_pss_m2_qualification $(BUILD)/test_starlink_pss_acqctl_monitor_v2 $(BUILD)/test_starlink_pss_acqctl_monitor_v3 $(BUILD)/starlink_pss_acqctl-host $(BUILD)/starlink_pss_m2ctl-host
 	$(BUILD)/test_starlink_pss_hw $(COEFFICIENT_FIXTURE) $(PACKET_FIXTURE) $(INJECTION_FIXTURE)
 	$(BUILD)/test_starlink_pss_acquisition
 	$(BUILD)/test_starlink_pss_periodic_injection
 	$(BUILD)/test_starlink_pss_m2_qualification
 	$(BUILD)/test_starlink_pss_acqctl_monitor_v2
+	$(BUILD)/test_starlink_pss_acqctl_monitor_v3
 	$(BUILD)/starlink_pss_acqctl-host --help >/dev/null
 	$(BUILD)/starlink_pss_m2ctl-host --help >/dev/null
 
@@ -93,8 +101,10 @@ clean:
 	rm -f $(BUILD)/test_starlink_pss_periodic_injection
 	rm -f $(BUILD)/test_starlink_pss_m2_qualification
 	rm -f $(BUILD)/test_starlink_pss_acqctl_monitor_v2
+	rm -f $(BUILD)/test_starlink_pss_acqctl_monitor_v3
 	rm -f $(BUILD)/starlink_pssctl $(BUILD)/starlink_pss_acqctl
 	rm -f $(BUILD)/starlink_pss_progress_diag
 	rm -f $(BUILD)/starlink_pss_progress_diag_v2
+	rm -f $(BUILD)/starlink_pss_acqctl_monitor_v3
 	rm -f $(BUILD)/starlink_pss_acqctl-host
 	rm -f $(BUILD)/starlink_pss_m2ctl $(BUILD)/starlink_pss_m2ctl-host
