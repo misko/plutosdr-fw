@@ -68,7 +68,7 @@ starlink_pss_group_delay_15_source_samples: 0
 starlink_pss_group_delay_30_source_samples: 7
 starlink_pss_group_delay_60_source_samples: 21
 
-route_evidence_scope: pending-fresh-v10-60m-acquisition-only-route
+route_evidence_scope: fresh-v10-60m-acquisition-only-prehardware-route
 route_15_github_run: inherited-v7-15m-reference
 route_15_firmware_source: 6f7b2e436577c2a73658f462826436f460630fe6
 route_15_hdl_source: 9f3851d33c171a29b28a7b6a5a5469759ad5c79f
@@ -94,13 +94,17 @@ route_30_bram36_percent: 70.83
 route_30_dsp_percent: 65.00
 route_30_dfu_sha256: 69816bfbf997f9a6c0da343439b1539e31976d248e46d7391af682e4a9693a70
 
-route_60_github_run: pending-fresh-v10-package
-route_60_firmware_source: pending
+route_60_github_run: local-20260907-v10-acquisition-only-prehardware
+route_60_firmware_source: 3d25cbce458c112070dbabc3e1c0cdf9f68fa850
 route_60_hdl_source: b6a8cdf1a2f627b32b3f80d179802efe2ff2313f
-route_60_wns_ns: pending
-route_60_whs_ns: pending
-route_60_xsa_sha256: pending
-route_60_bit_sha256: pending
+route_60_wns_ns: 0.138
+route_60_whs_ns: 0.018
+route_60_lut_percent: 60.47
+route_60_ff_percent: 50.06
+route_60_bram36_percent: 70.83
+route_60_dsp_percent: 75.00
+route_60_xsa_sha256: ac5c7225425dff4ad2962cab2dd40317f52683cc8e1ce0df3dfe5a729e7e1248
+route_60_bit_sha256: 7b0c584b0f712cf866c3dc9ac2d9bf8927d01e67160e12a098701c7c882aa3cf
 
 firmware_repo: https://github.com/misko/plutosdr-fw.git
 
