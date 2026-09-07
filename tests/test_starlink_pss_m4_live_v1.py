@@ -209,6 +209,7 @@ def _point(
         "hardwaregain_before_db": 40.0,
         "hardwaregain_after_db": 40.0,
         "monitor_stderr": "",
+        "monitor_start_attempts": 1,
         "monitor_records": records,
         "metrics": live._point_metrics(records, plan),
     }
@@ -578,6 +579,43 @@ def test_apply_settings_moves_phy_clock_before_capture_rate(
         (objects["phy_rx"], "sampling_frequency"),
         (objects["capture_i"], "sampling_frequency"),
     ]
+
+
+def test_monitor_retries_only_the_bounded_clean_start_race(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = 0
+
+    def fake_run(*_args: object, **_kwargs: object) -> SimpleNamespace:
+        nonlocal calls
+        calls += 1
+        if calls < 3:
+            raise live.ProbeError(
+                "continuous monitor-v2 failed: cannot establish one clean "
+                "monitor-v2 observation"
+            )
+        return SimpleNamespace(stdout=b"{}\n", stderr=b"clean pass", returncode=0)
+
+    monkeypatch.setattr(live, "_run", fake_run)
+    monkeypatch.setattr(live.time, "sleep", lambda _seconds: None)
+    monkeypatch.setattr(
+        live.monitor_v2, "_validate_monitor_records", lambda _records, _plan: None
+    )
+
+    records, stderr, attempts = live._run_monitor_point(
+        {
+            "serial": live.RECEIVER_SERIAL,
+            "point_duration_ms": 4_500,
+            "host_network_interface": live.DEFAULT_LAN_INTERFACE,
+            "ethernet_host": live.DEFAULT_LAN_HOST,
+        },
+        Path("/tmp/password"),
+        "/tmp/controller",
+    )
+
+    assert records == [{}]
+    assert stderr == "clean_start_retries=2\nclean pass"
+    assert attempts == 3
 
 
 def test_remote_identity_keeps_multiline_shell_script(monkeypatch: pytest.MonkeyPatch) -> None:

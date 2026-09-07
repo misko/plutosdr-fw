@@ -69,6 +69,8 @@ DEFAULT_LAN_INTERFACE = "enp132s0"
 DEFAULT_GAIN_MODE = "slow_attack"
 DEFAULT_POINT_DURATION_MS = 4_500
 DEFAULT_SETTLE_MS = 200
+MAX_MONITOR_START_ATTEMPTS = 5
+MONITOR_START_RETRY_DELAY_S = 0.05
 DEFAULT_OFF_SLICE_SHIFT_HZ = -50_000_000
 RAIL_PROBE_SAMPLES = 32_768
 MAXIMUM_RAIL_FRACTION = 0.0001
@@ -1189,15 +1191,32 @@ def _controller_info(
 
 def _run_monitor_point(
     plan: dict[str, Any], password_path: Path, remote: str
-) -> tuple[list[dict[str, Any]], str]:
+) -> tuple[list[dict[str, Any]], str, int]:
     command = (
         f"{remote} --expect-serial {plan['serial']} monitor "
         f"--duration-ms {plan['point_duration_ms']} --timeout-ms 1000"
     )
-    completed = _run(
-        _ssh_argv(plan, password_path, command),
-        timeout_s=plan["point_duration_ms"] / 1_000.0 + 60.0,
-    )
+    clean_start_failures: list[str] = []
+    completed = None
+    for attempt in range(1, MAX_MONITOR_START_ATTEMPTS + 1):
+        try:
+            completed = _run(
+                _ssh_argv(plan, password_path, command),
+                timeout_s=plan["point_duration_ms"] / 1_000.0 + 60.0,
+            )
+            break
+        except ProbeError as error:
+            detail = str(error)
+            if "cannot establish one clean monitor-v2 observation" not in detail:
+                raise
+            clean_start_failures.append(detail[-4_000:])
+            if attempt == MAX_MONITOR_START_ATTEMPTS:
+                raise ProbeError(
+                    "M4 monitor exhausted its clean-start retry bound"
+                ) from error
+            time.sleep(MONITOR_START_RETRY_DELAY_S)
+    if completed is None:
+        raise ProbeError("M4 monitor produced no bounded child result")
     try:
         records = [
             json.loads(line, object_pairs_hook=monitor_v1.probe_v1._json_no_duplicates)
@@ -1209,7 +1228,12 @@ def _run_monitor_point(
     if not all(isinstance(record, dict) for record in records):
         raise ProbeError("M4 monitor point contains a non-object record")
     monitor_v2._validate_monitor_records(records, _monitor_plan_view(plan))
-    return records, completed.stderr.decode(errors="replace")[-4_000:]
+    stderr = completed.stderr.decode(errors="replace")[-4_000:]
+    if clean_start_failures:
+        stderr = (
+            f"clean_start_retries={len(clean_start_failures)}\n" + stderr
+        )[-4_000:]
+    return records, stderr, len(clean_start_failures) + 1
 
 
 def _rail_probe(plan: dict[str, Any]) -> dict[str, Any]:
@@ -1289,7 +1313,9 @@ def _scan_role(
         gain_before = _read_number(
             objects["phy_rx"], "hardwaregain", label="PHY RX1"
         )
-        records, stderr = _run_monitor_point(plan, password_path, remote)
+        records, stderr, attempts = _run_monitor_point(
+            plan, password_path, remote
+        )
         rssi_after = _read_number(objects["phy_rx"], "rssi", label="PHY RX1")
         gain_after = _read_number(
             objects["phy_rx"], "hardwaregain", label="PHY RX1"
@@ -1313,6 +1339,7 @@ def _scan_role(
                 "hardwaregain_before_db": gain_before,
                 "hardwaregain_after_db": gain_after,
                 "monitor_stderr": stderr,
+                "monitor_start_attempts": attempts,
                 "monitor_records": records,
                 "metrics": metrics,
             }
@@ -1337,6 +1364,7 @@ def _verify_point(point: dict[str, Any], plan: dict[str, Any], role: str, ordina
         "hardwaregain_before_db",
         "hardwaregain_after_db",
         "monitor_stderr",
+        "monitor_start_attempts",
         "monitor_records",
         "metrics",
     }
@@ -1359,6 +1387,9 @@ def _verify_point(point: dict[str, Any], plan: dict[str, Any], role: str, ordina
         or point.get("settle_ms") != plan["settle_ms"]
         or point.get("duration_ms") != plan["point_duration_ms"]
         or not isinstance(point.get("monitor_stderr"), str)
+        or not isinstance(point.get("monitor_start_attempts"), int)
+        or isinstance(point.get("monitor_start_attempts"), bool)
+        or not 1 <= point["monitor_start_attempts"] <= MAX_MONITOR_START_ATTEMPTS
         or any(
             not isinstance(point.get(key), (int, float))
             or isinstance(point.get(key), bool)
