@@ -1,0 +1,67 @@
+# Immutable source graph for the 30 MS/s acquisition-only v8 probe under the
+# explicit AD9361/1R1T driver personality.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This revision changes only the
+# guarded candidate admission and verifies that both retained source manifests
+# name the exact 30 MS/s acquisition-only profile.
+
+schema: plutosdr-fw.starlink-pss-hardware-probe-source
+schema_version: 10
+release_state: candidate
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+pss_detected: false
+frame_lock_qualified: false
+sss_qualified: false
+
+supersedes_manifest: starlink-pss-hardware-probe-dnm-v9-source.yaml
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+runtime_target: ad9361-1r1t
+live_runtime_model: Analog Devices PlutoSDR Rev.C (Z7010-AD9361)
+physical_rfic_attestation: ad9363a
+candidate_profile: acquisition-only
+supported_candidate_revision: v8
+supported_sample_rates_msps: 30
+maximum_in_spec_physical_rf_bandwidth_hz: 20000000
+post_ram_usb_reenumeration: exact-stable-identity-only
+independent_attribute_snapshot: before-any-write
+linux_iio_buffer_required_for_pss: false
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+firmware_parent_source: 208b29d80c60591b66e1d1f4fd6f030e39210582
+ppu_repo: https://github.com/misko/pluto-plus-utils.git
+ppu_source_commit: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+probe_script_path: scripts/starlink_pss_hardware_probe_v10.py
+probe_script_sha256: bbd87ab7d2e94ccb0f1d81201f2cad071010380dc4d93bd30f614914297fc29f
+probe_test_path: tests/test_starlink_pss_hardware_probe_v10.py
+probe_test_sha256: f7d8b2273807bc361b64b86e94d90b8636236a475419414c17e605f1aabb5c2e
+inherited_v8_probe_script_path: scripts/starlink_pss_hardware_probe_v8.py
+inherited_v8_probe_script_sha256: 1b6749a01f735f1f17c1382f0b99c235eb21fdd627afdd7fdda5e59ec6208369
+inherited_v8_manifest_path: manifests/starlink-pss-hardware-probe-dnm-v8-source.yaml
+inherited_v8_manifest_sha256: f2480a31f6b4552285a7e553e4a7594ac66fde70420f4c45d2106ffb9254669f
+candidate_source_path: manifests/starlink-pss-multirate-rx-only-dnm-v8-source.yaml
+candidate_source_sha256: 5771d0da4d691c17042cb1833f1762ce380b6f1148726fb08be553c05d3f6680
+plan_path: FPGA_tracker_60MS.md
+plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
+
+plan_command_hardware_access: false
+execute_requires_explicit_confirmation: true
+execute_requires_passing_ppu_ram_receipt: true
+execute_reuses_ppu_radio_and_route_locks: true
+execute_resolves_one_stable_post_ram_identity: true
+execute_revalidates_full_live_identity_before_iio: true
+execute_loads_volatile_ram: false
+execute_writes_qspi: false
+execute_changes_radio_personality: false
+execute_claim_scope: candidate_measurement_only
+execute_snapshots_parent_and_child_before_rate_write: true
+execute_restores_rx_attributes: true
+execute_releases_host_route: true
+separate_ppu_ram_recovery_required: true
+
+offline_test_verdict: PASS
+focused_v10_test_count: 5
