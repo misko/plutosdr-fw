@@ -16,7 +16,7 @@ import statistics
 import sys
 import time
 from contextlib import ExitStack, nullcontext
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -53,25 +53,88 @@ RX_SERIAL = "104000bac4950008230026001b440a003a"
 TX_SERIAL = "1040007c4a94000211000b009186843ef2"
 RX_TOPOLOGY = "5-2"
 TX_TOPOLOGY = "3-11"
-RX_FIRMWARE = "starlink-pss-iio-v5-dnm"
-RATE_HZ = 60_000_000
-RATE_MSPS = 60
-BANDWIDTH_HZ = 20_000_000
 LO_HZ = 2_400_000_000
-PERIOD_SAMPLES = 80_000
-APERTURE_SAMPLES = 120
-HOST_LEAD_SAMPLES = 12_000_000
-COEFFICIENT_GENERATION = 0x60000016
-COEFFICIENT_PATH = Path(
-    "/home/mouse9911/pluto-state/starlink-rx-only-dnm/iio-v5-20260907/"
-    "candidate/starlink_pss60_upper_+0.000hz_coefficients_q15.mem"
-)
-COEFFICIENT_SHA256 = "6aed4f4883fce03982f12af0d28ea9186599daa5564e045cb9bc636c1fef3289"
-WAVEFORM_PATH = Path(
-    "/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-live-20260907/"
-    "candidate-60-v10/cabled-v1/waveform/starlink_pss60_upper_cabled_ci16le.bin"
-)
-WAVEFORM_SHA256 = "be24d054510c8d5ec7bb5d122d8a0604e2d3c742f00cb2582de312a40611458f"
+
+
+@dataclass(frozen=True, slots=True)
+class RateProfile:
+    """Immutable source-rate contract for one cabled qualification."""
+
+    rate_msps: int
+    firmware: str
+    bandwidth_hz: int
+    period_samples: int
+    aperture_samples: int
+    host_lead_samples: int
+    coefficient_generation: int
+    coefficient_path: Path
+    coefficient_sha256: str
+    waveform_path: Path
+    waveform_sha256: str
+    waveform_bytes: int
+
+    @property
+    def rate_hz(self) -> int:
+        return self.rate_msps * 1_000_000
+
+    @property
+    def request_prefix(self) -> int:
+        return 0x80000000 | (self.rate_msps << 20)
+
+
+RATE_PROFILES = {
+    30: RateProfile(
+        rate_msps=30,
+        firmware="starlink-pss30-iio-v1-dnm",
+        bandwidth_hz=20_000_000,
+        period_samples=40_000,
+        aperture_samples=60,
+        host_lead_samples=6_000_000,
+        coefficient_generation=0x30000017,
+        coefficient_path=Path(
+            "/home/mouse9911/pluto-state/starlink-rx-only-dnm/"
+            "m6-30-native-iio-20260907/coefficients/"
+            "starlink_pss30_upper_+0.000hz_coefficients_q15.mem"
+        ),
+        coefficient_sha256=(
+            "547aaae167be8c1b410adf5189b0e6f67b9ad26c6a5c68f072b959b833be3ec5"
+        ),
+        waveform_path=Path(
+            "/home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/"
+            "candidate-30-v9/cabled-smoke-v1/waveform/"
+            "starlink_pss30_upper_cabled_ci16le.bin"
+        ),
+        waveform_sha256=(
+            "ee13cf9d3214104c506944ef7ebe68e00aef17e8817fb9c961e907a6ac15619c"
+        ),
+        waveform_bytes=160_000,
+    ),
+    60: RateProfile(
+        rate_msps=60,
+        firmware="starlink-pss-iio-v5-dnm",
+        bandwidth_hz=20_000_000,
+        period_samples=80_000,
+        aperture_samples=120,
+        host_lead_samples=12_000_000,
+        coefficient_generation=0x60000016,
+        coefficient_path=Path(
+            "/home/mouse9911/pluto-state/starlink-rx-only-dnm/iio-v5-20260907/"
+            "candidate/starlink_pss60_upper_+0.000hz_coefficients_q15.mem"
+        ),
+        coefficient_sha256=(
+            "6aed4f4883fce03982f12af0d28ea9186599daa5564e045cb9bc636c1fef3289"
+        ),
+        waveform_path=Path(
+            "/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-live-20260907/"
+            "candidate-60-v10/cabled-v1/waveform/"
+            "starlink_pss60_upper_cabled_ci16le.bin"
+        ),
+        waveform_sha256=(
+            "be24d054510c8d5ec7bb5d122d8a0604e2d3c742f00cb2582de312a40611458f"
+        ),
+        waveform_bytes=320_000,
+    ),
+}
 
 
 class QualificationError(RuntimeError):
@@ -124,8 +187,10 @@ def _required_channel(device: Any, name: str, output: bool) -> Any:
     return channel
 
 
-def _future_center(anchor: float, current: int, period: float) -> int:
-    target = current + HOST_LEAD_SAMPLES
+def _future_center(
+    anchor: float, current: int, period: float, *, host_lead_samples: int
+) -> int:
+    target = current + host_lead_samples
     steps = max(0, math.ceil((target - anchor) / period))
     center = round(anchor + steps * period)
     while center < target:
@@ -152,7 +217,9 @@ def _packet_document(packet: PssFinePacket, ordinal: int) -> dict[str, Any]:
     }
 
 
-def _analyze(results: list[dict[str, Any]]) -> dict[str, Any]:
+def _analyze(
+    results: list[dict[str, Any]], *, period_samples: int, aperture_samples: int
+) -> dict[str, Any]:
     if len(results) < 2:
         raise QualificationError("fine result set is too short")
     xs = [float(item["ordinal"]) for item in results]
@@ -176,7 +243,7 @@ def _analyze(results: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "count": len(results),
         "fitted_period_source_samples": slope,
-        "relative_clock_error_ppm": (slope / PERIOD_SAMPLES - 1.0) * 1e6,
+        "relative_clock_error_ppm": (slope / period_samples - 1.0) * 1e6,
         "residual_max_abs_source_samples": max(abs(value) for value in residuals),
         "residual_rms_source_samples": math.sqrt(
             statistics.fmean(x * x for x in residuals)
@@ -184,7 +251,7 @@ def _analyze(results: list[dict[str, Any]]) -> dict[str, Any]:
         "winner_lag_min": min(lags),
         "winner_lag_median": statistics.median(lags),
         "winner_lag_max": max(lags),
-        "aperture_edge_hits": sum(abs(value) == APERTURE_SAMPLES for value in lags),
+        "aperture_edge_hits": sum(abs(value) == aperture_samples for value in lags),
         "normalized_score_min": min(scores),
         "normalized_score_median": statistics.median(scores),
         "normalized_score_max": max(scores),
@@ -214,7 +281,7 @@ def _read_fine(
     first_center: int,
     request_base: int,
     count: int,
-    period: float = PERIOD_SAMPLES,
+    period: float,
 ) -> list[dict[str, Any]]:
     client.open_fine(
         first_center=first_center,
@@ -242,11 +309,17 @@ def _current_index(client: PssIioClient) -> int:
 def _refine(
     client: PssIioClient,
     *,
+    profile: RateProfile,
     anchor: float,
     period: float,
     request_id: int,
 ) -> dict[str, Any]:
-    center = _future_center(anchor, _current_index(client), period)
+    center = _future_center(
+        anchor,
+        _current_index(client),
+        period,
+        host_lead_samples=profile.host_lead_samples,
+    )
     return _read_fine(
         client,
         first_center=center,
@@ -256,7 +329,9 @@ def _refine(
     )[0]
 
 
-def _configure_rx(client: PssIioClient) -> tuple[dict[str, Any], dict[str, Any]]:
+def _configure_rx(
+    client: PssIioClient, profile: RateProfile
+) -> tuple[dict[str, Any], dict[str, Any]]:
     context = client.context
     setter = getattr(context, "set_timeout", None)
     if not callable(setter):
@@ -267,7 +342,8 @@ def _configure_rx(client: PssIioClient) -> tuple[dict[str, Any], dict[str, Any]]
     adc = context.find_device("cf-ad9361-lpc")
     if (
         attrs.get("hw_serial") != RX_SERIAL
-        or attrs.get("fw_version") != RX_FIRMWARE
+        or attrs.get("fw_version") != profile.firmware
+        or client.rate_msps != profile.rate_msps
         or phy is None
         or adc is None
         or context.find_device("cf-ad9361-dds-core-lpc") is not None
@@ -288,21 +364,24 @@ def _configure_rx(client: PssIioClient) -> tuple[dict[str, Any], dict[str, Any]]
     }
     selected = {
         "phy_rate": _write_number(
-            phy_rx, "sampling_frequency", RATE_HZ, RATE_HZ * 100e-6
+            phy_rx, "sampling_frequency", profile.rate_hz, profile.rate_hz * 100e-6
         ),
         "adc_rate": _write_number(
-            capture_rx, "sampling_frequency", RATE_HZ, RATE_HZ * 100e-6
+            capture_rx,
+            "sampling_frequency",
+            profile.rate_hz,
+            profile.rate_hz * 100e-6,
         ),
-        "bandwidth": _write_number(phy_rx, "rf_bandwidth", BANDWIDTH_HZ, 2),
+        "bandwidth": _write_number(phy_rx, "rf_bandwidth", profile.bandwidth_hz, 2),
         "lo": _write_number(rx_lo, "frequency", LO_HZ, 2),
         "lo_powerdown": _write_number(rx_lo, "powerdown", 0, 0),
     }
     _attribute(phy_rx, "gain_control_mode").value = "slow_attack"
     selected["gain_mode"] = str(_attribute(phy_rx, "gain_control_mode").value)
     if selected != {
-        "phy_rate": RATE_HZ,
-        "adc_rate": RATE_HZ,
-        "bandwidth": BANDWIDTH_HZ,
+        "phy_rate": profile.rate_hz,
+        "adc_rate": profile.rate_hz,
+        "bandwidth": profile.bandwidth_hz,
         "gain_mode": "slow_attack",
         "lo": LO_HZ,
         "lo_powerdown": 0,
@@ -340,21 +419,27 @@ def _restore_rx(client: PssIioClient, before: dict[str, Any]) -> dict[str, Any]:
     return restored
 
 
-def run(output: Path) -> dict[str, Any]:
+def run(output: Path, *, profile: RateProfile) -> dict[str, Any]:
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     payload = load_exact_payload(
-        WAVEFORM_PATH,
-        expected_bytes=320_000,
-        expected_sha256=WAVEFORM_SHA256,
+        profile.waveform_path,
+        expected_bytes=profile.waveform_bytes,
+        expected_sha256=profile.waveform_sha256,
     )
-    if hashlib.sha256(COEFFICIENT_PATH.read_bytes()).hexdigest() != COEFFICIENT_SHA256:
+    if (
+        hashlib.sha256(profile.coefficient_path.read_bytes()).hexdigest()
+        != profile.coefficient_sha256
+    ):
         raise QualificationError("coefficient file identity differs")
     receipt: dict[str, Any] = {
-        "schema": "plutosdr-fw.starlink-pss-native-iio-cabled.v1",
+        "schema": "plutosdr-fw.starlink-pss-native-iio-cabled.v2",
         "started_at": _now(),
         "outcome": "started",
         "persistent_write": False,
+        "rate_msps": profile.rate_msps,
+        "sample_rate_hz": profile.rate_hz,
+        "period_source_samples": profile.period_samples,
         "fixture": {
             "path": ".18 TX1 -> exact 30 dB attenuator -> .17 RX1",
             "antennas": False,
@@ -363,13 +448,16 @@ def run(output: Path) -> dict[str, Any]:
         "receiver": {"serial": RX_SERIAL, "topology": RX_TOPOLOGY, "port": "RX1"},
         "transmitter": {"serial": TX_SERIAL, "topology": TX_TOPOLOGY, "port": "TX1"},
         "coefficient": {
-            "path": str(COEFFICIENT_PATH),
-            "sha256": COEFFICIENT_SHA256,
-            "generation": COEFFICIENT_GENERATION,
+            "path": str(profile.coefficient_path),
+            "sha256": profile.coefficient_sha256,
+            "generation": profile.coefficient_generation,
             "file_layout": "I-high-Q-low",
             "fpga_register_layout": "Q-high-I-low",
         },
-        "waveform": {"path": str(WAVEFORM_PATH), "sha256": WAVEFORM_SHA256},
+        "waveform": {
+            "path": str(profile.waveform_path),
+            "sha256": profile.waveform_sha256,
+        },
         "roles": {},
         "cleanup": {"errors": []},
     }
@@ -390,17 +478,17 @@ def run(output: Path) -> dict[str, Any]:
                 Path("/sys/bus/usb/devices") / TX_TOPOLOGY, TX_SERIAL
             )
             client = PssIioClient.connect(rx_uri, expected_serial=RX_SERIAL)
-            before, selected = _configure_rx(client)
+            before, selected = _configure_rx(client, profile)
             receipt["receiver"].update(
                 {
                     "uri": rx_uri,
-                    "firmware": RX_FIRMWARE,
+                    "firmware": profile.firmware,
                     "original": before,
                     "selected": selected,
                 }
             )
             client.load_coefficient_file(
-                COEFFICIENT_PATH, generation=COEFFICIENT_GENERATION
+                profile.coefficient_path, generation=profile.coefficient_generation
             )
             receipt["coefficient"]["active_generation"] = _number(
                 client.tracker, "active_coefficient_generation"
@@ -412,20 +500,22 @@ def run(output: Path) -> dict[str, Any]:
             receipt["transmitter"]["uri"] = tx_uri
             receipt["transmitter"]["initial_mute"] = tx.mute()
             receipt["transmitter"]["configuration"] = tx.configure(
-                sample_rate_hz=RATE_HZ,
-                rf_bandwidth_hz=BANDWIDTH_HZ,
+                sample_rate_hz=profile.rate_hz,
+                rf_bandwidth_hz=profile.bandwidth_hz,
                 tx_lo_hz=LO_HZ,
             )
 
             reassembler = PssMapReassembler()
             client.open_maps(refill_chunks=200)
             baseline_maps = _read_maps(client, reassembler, 3)
-            baseline = analyze_phase_maps(baseline_maps, rate_msps=RATE_MSPS)
+            baseline = analyze_phase_maps(baseline_maps, rate_msps=profile.rate_msps)
             receipt["roles"]["muted_coarse"] = _coarse_document(baseline)
             receipt["transmitter"]["positive_start"] = tx.start(payload, gain_db=-30.0)
             transition_maps = _read_maps(client, reassembler, 3)
             positive_maps = _read_maps(client, reassembler, 3)
-            positive_coarse = analyze_phase_maps(positive_maps, rate_msps=RATE_MSPS)
+            positive_coarse = analyze_phase_maps(
+                positive_maps, rate_msps=profile.rate_msps
+            )
             receipt["roles"]["transition_map_generations"] = [
                 phase_map.generation for phase_map in transition_maps
             ]
@@ -434,19 +524,29 @@ def run(output: Path) -> dict[str, Any]:
 
             probe_a = _refine(
                 client,
+                profile=profile,
                 anchor=float(positive_coarse.candidate_start_index_source_center),
                 period=positive_coarse.estimated_frame_period_source_samples,
-                request_id=0x87100001,
+                request_id=profile.request_prefix | 0x100001,
             )
             first_a = _future_center(
                 float(probe_a["winner_timestamp"]),
                 _current_index(client),
-                PERIOD_SAMPLES,
+                profile.period_samples,
+                host_lead_samples=profile.host_lead_samples,
             )
             results_a = _read_fine(
-                client, first_center=first_a, request_base=0x87110000, count=128
+                client,
+                first_center=first_a,
+                request_base=profile.request_prefix | 0x110000,
+                count=128,
+                period=profile.period_samples,
             )
-            analysis_a = _analyze(results_a)
+            analysis_a = _analyze(
+                results_a,
+                period_samples=profile.period_samples,
+                aperture_samples=profile.aperture_samples,
+            )
             receipt["roles"]["positive_a"] = {
                 "refinement_probe": probe_a,
                 "results": results_a,
@@ -459,11 +559,20 @@ def run(output: Path) -> dict[str, Any]:
                 float(results_a[-1]["winner_timestamp"]),
                 _current_index(client),
                 float(analysis_a["fitted_period_source_samples"]),
+                host_lead_samples=profile.host_lead_samples,
             )
             control_results = _read_fine(
-                client, first_center=first_control, request_base=0x87120000, count=64
+                client,
+                first_center=first_control,
+                request_base=profile.request_prefix | 0x120000,
+                count=64,
+                period=float(analysis_a["fitted_period_source_samples"]),
             )
-            control_analysis = _analyze(control_results)
+            control_analysis = _analyze(
+                control_results,
+                period_samples=profile.period_samples,
+                aperture_samples=profile.aperture_samples,
+            )
             receipt["roles"]["muted_control"] = {
                 "results": control_results,
                 "analysis": control_analysis,
@@ -475,19 +584,29 @@ def run(output: Path) -> dict[str, Any]:
             time.sleep(0.25)
             probe_b = _refine(
                 client,
+                profile=profile,
                 anchor=float(results_a[-1]["winner_timestamp"]),
                 period=float(analysis_a["fitted_period_source_samples"]),
-                request_id=0x87130001,
+                request_id=profile.request_prefix | 0x130001,
             )
             first_b = _future_center(
                 float(probe_b["winner_timestamp"]),
                 _current_index(client),
-                PERIOD_SAMPLES,
+                profile.period_samples,
+                host_lead_samples=profile.host_lead_samples,
             )
             results_b = _read_fine(
-                client, first_center=first_b, request_base=0x87140000, count=128
+                client,
+                first_center=first_b,
+                request_base=profile.request_prefix | 0x140000,
+                count=128,
+                period=profile.period_samples,
             )
-            analysis_b = _analyze(results_b)
+            analysis_b = _analyze(
+                results_b,
+                period_samples=profile.period_samples,
+                aperture_samples=profile.aperture_samples,
+            )
             receipt["roles"]["positive_b"] = {
                 "refinement_probe": probe_b,
                 "results": results_b,
@@ -511,11 +630,11 @@ def run(output: Path) -> dict[str, Any]:
                 ]
                 > 5.0 * control_analysis["normalized_score_median"],
                 "positive_a_period_within_one_sample": abs(
-                    analysis_a["fitted_period_source_samples"] - PERIOD_SAMPLES
+                    analysis_a["fitted_period_source_samples"] - profile.period_samples
                 )
                 <= 1.0,
                 "positive_b_period_within_one_sample": abs(
-                    analysis_b["fitted_period_source_samples"] - PERIOD_SAMPLES
+                    analysis_b["fitted_period_source_samples"] - profile.period_samples
                 )
                 <= 1.0,
                 "positive_a_residual_within_one_sample": analysis_a[
@@ -599,10 +718,13 @@ def run(output: Path) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--rate-msps", type=int, choices=tuple(RATE_PROFILES), default=60
+    )
     parser.add_argument("output", type=Path)
     arguments = parser.parse_args()
     try:
-        receipt = run(arguments.output)
+        receipt = run(arguments.output, profile=RATE_PROFILES[arguments.rate_msps])
     except BaseException as error:  # noqa: BLE001 - report guarded interruption
         print(
             json.dumps(
