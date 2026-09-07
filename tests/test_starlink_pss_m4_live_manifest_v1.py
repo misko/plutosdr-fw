@@ -24,10 +24,10 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     values = _values()
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
     assert values["schema_version"] == "1"
-    assert values["release_state"] == "continuous-role-v2-offline-ready"
+    assert values["release_state"] == "continuous-role-v2-cabled-qualified-live-ready"
     assert values["bench_preflight_completed"] == "true"
-    assert values["live_execution_approved"] == "false"
-    assert values["required_revision"] == "cabled-continuous-role-v2-requalification"
+    assert values["live_execution_approved"] == "true"
+    assert values["required_revision"] == "complete"
     for field in (
         "do_not_merge",
         "do_not_release",
@@ -46,6 +46,7 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
             "do_not_release",
             "experimental_receiver_rx_only",
             "ethernet_only_observation",
+            "hardware_accessed",
         } else "false"
         assert values[field] == expected
     assert values["allocated_receiver_serial"] == (
@@ -56,6 +57,12 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     assert values["claim_scope"] == (
         "live_lnb_pss_acquisition_and_local_timing_only"
     )
+    assert values["cabled_production_requalification_passed"] == "true"
+    assert values["cabled_over_the_air"] == "false"
+    assert values["cabled_control_passing_points"] == "0"
+    assert values["cabled_all_transport_fault_counters_zero"] == "true"
+    assert values["cabled_transmitter_final_mute_verified"] == "true"
+    assert values["cabled_receiver_recovery_verified"] == "true"
 
 
 def test_m4_manifest_binds_every_direct_source_and_contract() -> None:

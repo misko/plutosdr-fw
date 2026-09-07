@@ -1,21 +1,22 @@
-# Source graph for the Ethernet-only 15 MS/s live-LNB PSS gate.
+# Source and cabled-hardware evidence graph for the Ethernet-only 15 MS/s
+# live-LNB PSS gate.
 #
-# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This checkpoint contains only
-# the frozen M4 runner, verifier, and documentation. It does not contain live
-# PSS evidence and it does not claim SSS detection or frame lock.
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This checkpoint binds the
+# frozen M4 runner, verifier, documentation, and exact cabled qualification.
+# It does not contain live PSS evidence or claim SSS detection or frame lock.
 
 schema: plutosdr-fw.starlink-pss-m4-live-source
 schema_version: 1
-release_state: continuous-role-v2-offline-ready
+release_state: continuous-role-v2-cabled-qualified-live-ready
 do_not_merge: true
 do_not_release: true
 merge_target: none
 persistent_flash_eligible: false
 persistent_write: false
-hardware_accessed: false
+hardware_accessed: true
 bench_preflight_completed: true
-live_execution_approved: false
-required_revision: cabled-continuous-role-v2-requalification
+live_execution_approved: true
+required_revision: complete
 
 allocated_receiver_serial: 104000bac4950008230026001b440a003a
 allocated_receiver_topology_last_verified: 5-2
@@ -31,6 +32,24 @@ live_pss_detected: false
 sss_detected: false
 frame_lock_claim: false
 recovery_required_after_execution: true
+
+cabled_production_requalification_passed: true
+cabled_fixture: .18_TX1_to_30dB_attenuator_to_.17_RX1
+cabled_over_the_air: false
+cabled_positive_a_passing_points: 17
+cabled_control_passing_points: 0
+cabled_positive_b_passing_points: 19
+cabled_positive_to_control_ratio: 4.9276805700990876
+cabled_total_contiguous_maps: 2829
+cabled_final_accepted_score_count: 3623145066
+cabled_all_transport_fault_counters_zero: true
+cabled_rail_fraction: 0.0
+cabled_transmitter_final_mute_verified: true
+cabled_receiver_recovery_verified: true
+cabled_receipt_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m4-live-20260907/attempt3/bench-exact-v2/cabled-exact-production-scan-receipt.json
+cabled_receipt_sha256: 3419d6b46954742f6f76f1e4c3fc2428771b2d6813b41d3246f1a50a8175bbb3
+cabled_recovery_receipt_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m4-live-20260907/attempt3/receipts/104000bac4950008230026001b440a003a/recovery-after-exact-production-scan.json
+cabled_recovery_receipt_sha256: 86e9e1da3b17897c55ed8d522b5c762f4bcf3c8b4e146641dceb4b24894938d2
 
 starlink_channel: 4
 starlink_edge: upper
@@ -73,7 +92,7 @@ runner_source_sha256: b3e06b72145bf64f3a45276f62f2b305b7524e280428d62b58da629d25
 runner_test_path: tests/test_starlink_pss_m4_live_v1.py
 runner_test_sha256: 8a8e083d26b03d4baa3bacffdce238f4afdca6abe7835f9a1830a985484af619
 manifest_test_path: tests/test_starlink_pss_m4_live_manifest_v1.py
-manifest_test_sha256: 536788b9f79784182596c3e06ca410ec78f840272f284f65abedb96cce3474c6
+manifest_test_sha256: 8643321022833d6fb194274d46626b8ab1441b8e10675ad06faf912f969cbd3e
 
 m3_policy_source_path: scripts/starlink_pss_m3_campaign_v1.py
 m3_policy_source_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444
@@ -103,7 +122,7 @@ inherited_fpga_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-so
 inherited_fpga_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
 
 tracker_ledger_path: FPGA_tracker.md
-tracker_ledger_sha256: 90bb1eed7caafa2d3976b82b099f26aeb2fd9e446a9f9bbf7304deb17d90b572
+tracker_ledger_sha256: f6bb21ce6dc1da251cc6edf26414dc61455efb0d19e76776d145f1ebc9b131ef
 canonical_plan_path: FPGA_tracker_60MS.md
 canonical_plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
 controller_readme_path: tools/starlink_pssctl/README.md

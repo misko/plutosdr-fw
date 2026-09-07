@@ -569,3 +569,60 @@ After testing, `.17` was recovered to persistent
 `v0.48-plutoplus-spf-iq-direct-async-v3` with unchanged QSPI, and `.18` remained
 positively muted. PPU remained unchanged on clean `main` commit
 `7210cda9b0b2452cb607b5e49e689e2d60b6a8b7`.
+
+### M4 continuous-role v2 exact cabled qualification
+
+Commit `a439f70ce` completed the production M4 continuous-role executor. On
+2026-09-07 that committed `_scan_role` implementation—not a parallel
+calibration loop—ran the complete positive/control/positive schedule on the
+same exact cabled fixture. `.17` received a fresh volatile v7 RAM boot with boot
+ID `2dc4c604-8f16-422f-a6ef-91289a423b9f`; its persistent QSPI SHA-256 remained
+`07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`.
+
+Each of the three roles ran one 80.5-second FPGA observation, copied 943
+contiguous maps, and retained exactly 32 stable candidate windows at each of 25
+LO points. The production result was:
+
+| Role | Passing LO points | Best offset | Best track | Best median peak/background |
+| --- | ---: | ---: | ---: | ---: |
+| Active PSS A | 17 / 25 | +100 kHz | 32 / 32 | 6.6445 |
+| TX-muted 50 MHz control | 0 / 25 | -500 kHz | 1 / 32 | 1.3484 |
+| Active PSS B | 19 / 25 | +100 kHz | 32 / 32 | 6.6616 |
+
+The recomputed positive-to-control median ratio was `4.9277x`; the clipping
+probe had zero rail or near-rail components and maximum absolute S12 value
+1,236. All 2,829 global maps were contiguous. Every ingress, scheduler,
+detector, arithmetic, map, protocol, and DDC fault counter was zero in all
+three roles.
+
+The accepted-score boundaries were `0 -> 1,207,134,450`,
+`1,208,008,771 -> 2,415,143,510`, and
+`2,416,009,944 -> 3,623,145,066`. This directly validates the conservative
+3,632,640,000-score campaign budget and leaves the epoch below the
+`0xffffffff` saturation gate. The small gaps between roles occur while the
+newly enabled detector reaches the next initial snapshot; cross-role
+monotonicity and the full starting-count headroom gate both passed.
+
+The muted control and final TX receipt each proved -89.75 dB hardware gain, TX
+LO powerdown, DAC selectors 3/3, zero DDS raw/scale values, no active buffer,
+and deterministic IIO context release. RX settings were restored byte-for-byte
+at the attribute level. PPU then recovered `.17` to persistent
+`v0.48-plutoplus-spf-iq-direct-async-v3`, with pre-reset USB departure, route
+release, unchanged QSPI, and AD9361 1R1T runtime all verified. PPU itself stayed
+clean and unchanged on `main` commit `7210cda9b0b2452cb607b5e49e689e2d60b6a8b7`.
+
+Evidence:
+
+- exact production cabled receipt SHA-256:
+  `3419d6b46954742f6f76f1e4c3fc2428771b2d6813b41d3246f1a50a8175bbb3`;
+- RAM receipt SHA-256:
+  `109b4e0cd05f58ac03c366f8663cc118e2ca6b8b1db19f5a6b0059367eec223e`;
+- recovery receipt SHA-256:
+  `86e9e1da3b17897c55ed8d522b5c762f4bcf3c8b4e146641dceb4b24894938d2`;
+  and
+- authoritative private directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m4-live-20260907/attempt3`.
+
+The exact production continuous-role path is now cabled-qualified and approved
+for the live-LNB M4 run. This is still only a synthetic cabled PSS timing result:
+it is not live Starlink evidence, SSS detection, or a frame-lock claim.
