@@ -76,10 +76,12 @@ explicit hardware/browser skips. The commit is pushed to `origin/main`.
 
 ## Corrected cabled timing proof
 
-The guarded runner at firmware DNM commit `5fa73e9b1` used one continuous map
-session: three muted maps, three transition maps after TX start, and three
-positive maps. It then ran positive A, a phase-continuous minimum-gain control,
-and positive B using restartable fine streams.
+The guarded runner introduced at firmware DNM commit `5fa73e9b1` used one
+continuous map session: three muted maps, three transition maps after TX start,
+and three positive maps. It then ran positive A, a phase-continuous
+minimum-gain control, and positive B using restartable fine streams. Follow-up
+commit `637e50a0d` reasserts and verifies the hardware ZERO source only after
+cyclic-buffer destruction, so teardown cannot restore the DDS selector.
 
 The positive coarse maps measured peak-to-median `3.7084` and robust-z `59.51`,
 compared with muted `1.3411` and `4.79`.
@@ -95,10 +97,14 @@ Both fitted periods were within one source sample of 80,000; both positive
 worst-case residuals were within one source sample; neither positive run hit
 the search-aperture edge. All map/tracker/push/validation fault gates passed.
 
-Cleanup restored `.17` to 30.72 MS/s and 18 MHz bandwidth. `.18` was verified
-at `-89.75 dB`, with TX LO powered down, all DDS amplitudes zero, zero-source
-selectors selected, and its cyclic buffer released. Final PPU recovery proved
-USB departure/return, route release, persistent AD9361 1R1T identity, firmware
+Cleanup restored `.17` to 30.72 MS/s and 18 MHz bandwidth. The cabled-run
+receipt proved `.18` safe through minimum gain, TX LO power-down, zero DDS
+amplitudes, and buffer release. Its selector readback preceded buffer release,
+however, so a separate post-fix close-and-reopen inspection was performed.
+That independent inspection proved stable selectors `[3, 3]` (hardware ZERO),
+gain `-89.75 dB`, TX LO power-down, and four zero DDS raw values after buffer
+release. Final PPU recovery proved USB departure/return, route release,
+persistent AD9361 1R1T identity, firmware
 `v0.48-plutoplus-spf-iq-direct-async-v3`, and unchanged QSPI SHA-256
 `07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`.
 
@@ -121,8 +127,10 @@ not claim 60 MHz analog bandwidth, live Starlink reception, SSS, or frame lock.
   `0d0b63019574808e293612d8621ff4d895b96d7243da4cfdc9575987893618ef`
 - final recovery:
   `ea43484679438c71e4d3313195ac0f4fe3344f7585d57396b6cb476342fa1ee6`
+- independent post-release TX mute verification:
+  `e2f553307a92b4362c645d3dbe670a04ba3bf259013e2748c9e04e7269ff3b6e`
 - guarded runner source:
-  `7ffb253e20a4b0526bf4016a149c4f8df11ebffd9d4cdb97bc011d97894d636f`
+  `322b754f48fb8b10ad7faaffb78834bb4ce4ee14aa8e77ed069bfcd6eafdd65f`
 
 Evidence root:
 
