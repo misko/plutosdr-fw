@@ -33,8 +33,8 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M0: AD9361-personality DNM lifecycle | Complete | Offline plan tests, exact-target RAM boot, recovery to persistent `ad9361-1r1t` |
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
-| M3: cabled-RF 15 MS/s timing | In progress: offline contract and guarded executor complete | Positive/negative cabled receipts |
-| M4: live-LNB 15 MS/s timing | Pending | Repeated on-channel trajectory and off-channel control |
+| M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
+| M4: live-LNB 15 MS/s timing | Next | Repeated on-channel trajectory and off-channel control |
 | M5: 30-to-15 decimator/index mapping | Pending | Bit-exact oracle and routed evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
 | M7: 60-to-30-to-15 cascade | Pending | Bit-exact cascade and routed evidence |
@@ -370,3 +370,77 @@ tests, including its legacy native-context destroy case. Operational commands
 must use `/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python` because that
 attested environment supplies NumPy and the installed pylibiio binding; direct
 execution through the host `/usr/bin/python3` is not an approved environment.
+
+## M3 hardware qualification and evidence log
+
+M3 completed on 2026-09-07 using only the two declared cabled-fixture radios:
+
+```text
+1040007c4a94000211000b009186843ef2 TX1
+  -> one 30 dB fixed attenuator
+  -> 104000bac4950008230026001b440a003a RX1
+```
+
+All other RF ports were disconnected and no antenna was present. The separate
+transmitter ran the sealed 15 MS/s cyclic PSS waveform at 2.4 GHz and -30 dB
+hardware gain for positive A and positive B. The intervening negative dwell
+was acquired only after the TX buffer, selectors, DDS sources, and TX LO were
+muted.
+
+The first hardware execution exposed that PSMA 1.1 retains its counters until
+PL reset. A successful monitor's deliberate shutdown can therefore leave one
+`discontinuity_abort_count` even though no observation fault occurred. The
+versioned monitor-v2 runner records that inherited shutdown baseline, rejects
+a stale ready map or saturated baseline, requires every other baseline fault
+field to be zero, and requires all fault fields to remain unchanged throughout
+the new observation. Its summary reports bounded-observation deltas. The v7
+FPGA image and the frozen v1 controller were not changed.
+
+Passing cabled results:
+
+| Dwell | Candidate windows | Passing windows | Longest track | Median peak/background | Median robust z |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Positive A | 56 | 56 | 56 | 4.4652 | 108.40 |
+| Muted negative | 56 | 1 | 1 | 1.3497 | 4.93 |
+| Positive B | 56 | 56 | 56 | 4.4680 | 108.75 |
+
+Both positive tracks had a median drift of four bins per 64 frames and a
+maximum model residual of eight canonical samples. The minimum positive to
+negative median contrast was `3.3083x`, exceeding the sealed `1.10x` gate.
+Every dwell copied 58 contiguous maps and produced 56 candidate windows with
+zero in-observation ingress, scheduler, detector, arithmetic, map, protocol,
+or DDC faults.
+
+Final safety and recovery:
+
+- the final TX receipt proves `-89.75 dB`, TX LO powerdown, no cyclic buffer,
+  no over-the-air transmission, and successful cleanup;
+- deterministic native IIO context closure passed for both radios;
+- PPU recovery proved pre-reset USB departure, a new persistent boot,
+  byte-identical QSPI, firmware `v0.48-plutoplus-spf-iq-direct-async-v3`,
+  runtime target `ad9361-1r1t`, TX-safe state, and released host route; and
+- no experimental image was written to persistent storage.
+
+Source and evidence identities:
+
+- monitor-v2 source commit: `a5f354918f276812cedfc6fe9a1b59671bcf1951`;
+- source manifest: `manifests/starlink-pss-m3-cabled-dnm-v5-source.yaml`;
+- static monitor-v2 binary SHA-256:
+  `61bbd6cd86ebb0a986aa62a57564da1748ce04fab0ad17c48a3ace22d5eaee1d`;
+- M3 qualification receipt SHA-256:
+  `4a866a8e0ef2f7467eb15a5e8050210d21df19d50747fc97bb646cf992e08a31`;
+- guarded execution receipt SHA-256:
+  `052900765fc5930eb4caa1888eefc4301df6e42ff3848c8ea6734df65b2cd34b`;
+- stable-TX runner receipt SHA-256:
+  `c7790ec968b87cbf1a4c3d325d84885eef1925fe49b5bc54e9626ec7658697a7`;
+  and
+- RX recovery receipt SHA-256:
+  `97d7238c318fac7f1b021b331cea56e8cab0ef93e4e575e7ef5606ea52d59da5`.
+
+The authoritative private campaign directory is:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m3-cabled-20260907/hardware-attempt3`
+
+The hardware verdict is `PASS_M3_CABLED_PSS_ACQUISITION_ONLY`. It validates
+the RX/TX coaxial setup and 15 MS/s PSS acquisition/timing. It is not an SSS
+result or a frame-lock claim. M4 live-LNB 15 MS/s observation is the next gate.
