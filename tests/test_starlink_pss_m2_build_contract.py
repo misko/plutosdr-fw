@@ -83,7 +83,7 @@ def test_candidate_planner_defaults_to_the_v7_manifest() -> None:
 
     assert f'SOURCE_MANIFEST_NAME = "{MANIFEST_NAME}"' in planner
     assert f'"{MANIFEST_NAME}": "v7"' in planner
-    assert '{"v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"}' in planner
+    assert '{"v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"}' in planner
 
 
 def test_m2_controller_treats_abi_1_1_as_fixed_15_msps() -> None:

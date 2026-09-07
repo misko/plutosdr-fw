@@ -62,7 +62,7 @@ def test_candidate_planner_admits_but_does_not_default_to_v9() -> None:
     planner = _read("scripts/starlink_pss_multirate_candidate_plan.py")
 
     assert f'"{MANIFEST_NAME}": "v9"' in planner
-    assert '{"v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9"}' in planner
+    assert '{"v2", "v3", "v4", "v5", "v6", "v7", "v8", "v9", "v10"}' in planner
     assert (
         'SOURCE_MANIFEST_NAME = '
         '"starlink-pss-multirate-rx-only-dnm-v7-source.yaml"'

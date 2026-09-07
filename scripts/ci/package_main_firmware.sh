@@ -86,7 +86,9 @@ if [[ "$(basename -- "$MANIFEST")" == \
       "$(basename -- "$MANIFEST")" == \
       "starlink-pss-multirate-rx-only-dnm-v8-source.yaml" ||
       "$(basename -- "$MANIFEST")" == \
-      "starlink-pss-multirate-rx-only-dnm-v9-source.yaml" ]]; then
+      "starlink-pss-multirate-rx-only-dnm-v9-source.yaml" ||
+      "$(basename -- "$MANIFEST")" == \
+      "starlink-pss-multirate-rx-only-dnm-v10-source.yaml" ]]; then
     starlink_multirate_name="$(basename -- "$MANIFEST")"
     starlink_multirate_manifest="${ROOT}/manifests/${starlink_multirate_name}"
     [[ -f "$MANIFEST" && "$(realpath -- "$MANIFEST")" == "$starlink_multirate_manifest" ]] ||
@@ -116,6 +118,14 @@ if [[ "$(basename -- "$MANIFEST")" == \
             fail "v8/v9 acquisition-only qualification is gated to 30 MS/s"
         [[ "${STARLINK_PSS_PROFILE:-}" == "acquisition-only" ]] ||
             fail "v8/v9 multirate PSS build requires STARLINK_PSS_PROFILE=acquisition-only"
+        STARLINK_PSS_ACQUISITION_ONLY_BUILD=true
+        REQUIRED_BUS_SKEW_CONSTRAINTS=5
+    elif [[ "$starlink_multirate_name" == \
+          "starlink-pss-multirate-rx-only-dnm-v10-source.yaml" ]]; then
+        [[ "$STARLINK_PSS_RATE_MSPS" == 60 ]] ||
+            fail "v10 acquisition-only qualification is gated to 60 MS/s"
+        [[ "${STARLINK_PSS_PROFILE:-}" == "acquisition-only" ]] ||
+            fail "v10 multirate PSS build requires STARLINK_PSS_PROFILE=acquisition-only"
         STARLINK_PSS_ACQUISITION_ONLY_BUILD=true
         REQUIRED_BUS_SKEW_CONSTRAINTS=5
     elif [[ "$starlink_multirate_name" == \
@@ -491,6 +501,9 @@ starlink-pss-multirate-rx-only-dnm-v8-source.yaml:candidate)
     ;;
 starlink-pss-multirate-rx-only-dnm-v9-source.yaml:candidate)
     protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v9"
+    ;;
+starlink-pss-multirate-rx-only-dnm-v10-source.yaml:candidate)
+    protected_version="v0.50-plutoplus-starlink-pss-${STARLINK_PSS_RATE_MSPS}m-rx-only-dnm-v10"
     ;;
 iio-throughput-hold-v1-rc1-source.yaml:candidate)
     protected_version='v0.45-plutoplus-spf-iio-throughput-hold-v1-rc1'
