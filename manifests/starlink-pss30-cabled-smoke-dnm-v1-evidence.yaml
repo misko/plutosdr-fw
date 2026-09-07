@@ -1,0 +1,79 @@
+# Hardware evidence index for the first 30 MS/s cabled acquisition smoke test.
+# DO NOT MERGE, RELEASE, OR USE AS A PSS/FRAME-LOCK QUALIFICATION CLAIM.
+
+schema: plutosdr-fw.starlink-pss30-cabled-smoke-evidence
+schema_version: 1
+release_state: engineering-evidence
+do_not_merge: true
+do_not_release: true
+persistent_flash_eligible: false
+hardware_accessed: true
+persistent_write: false
+pss_detected: false
+frame_lock_qualified: false
+sss_qualified: false
+gate_2_qualified: false
+
+receiver_serial: 104000bac4950008230026001b440a003a
+receiver_topology: 5-2
+transmitter_serial: 1040007c4a94000211000b009186843ef2
+transmitter_topology: 3-11
+fixture: .18 TX1 -> exact 30 dB attenuator -> .17 RX1
+over_the_air: false
+sample_rate_hz: 30000000
+canonical_sample_rate_hz: 15000000
+rf_bandwidth_hz: 20000000
+receiver_lo_hz: 2400000000
+intended_edge_transmitter_lo_hz: 2400000000
+wrong_edge_transmitter_lo_hz: 2385000000
+tx_hardwaregain_db: -30
+
+candidate_firmware: v0.50-plutoplus-starlink-pss-30m-rx-only-dnm-v9
+candidate_firmware_source: e146d0befdc65f4b824c596cb29c213da71d6a25
+probe_source: d0beee0bb
+waveform_source: 02befb2ed
+ppu_source: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+waveform_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9/cabled-smoke-v1/waveform/starlink_pss30_upper_cabled_ci16le.bin
+waveform_bytes: 160000
+waveform_sha256: ee13cf9d3214104c506944ef7ebe68e00aef17e8817fb9c961e907a6ac15619c
+background_receipt_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9/cleanup-proof-v12/probe/probe-receipt.json
+background_receipt_sha256: 994f0112df8f3e8e3cf79d6aedc35852bfc32d6e5c1102a6f127a2d2eae54d54
+positive_a_receipt_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9/cabled-smoke-v1/positive/cabled-positive-receipt.json
+positive_a_receipt_sha256: 02e46b4a66bf82dc8eca031b2e7cc019cded1784f4d0959cbcf124afdffd09f5
+wrong_edge_receipt_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9/cabled-smoke-v1/wrong-edge/cabled-wrong-edge-receipt.json
+wrong_edge_receipt_sha256: a3b6c44ff0fcb3f406663cfb34b3ed8544d8887624fe69a6e5e21b6cf0a72f70
+positive_b_receipt_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9/cabled-smoke-v1/positive-b/cabled-positive-b-receipt.json
+positive_b_receipt_sha256: ca6003c4dc85db684b7e1d156c31272775528c2e9c70604cc0dcb4b7c72e0034
+summary_path: /home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9/cabled-smoke-v1/cabled-smoke-summary.json
+summary_sha256: 1da16627dd91212dacf6c57d8f613813c3a5d4c3de72cf6082841543eef9671a
+
+muted_background_peak_to_median: 1.3768292682926828
+muted_background_robust_z: 4.9623248732920935
+positive_a_peak_to_median: 11.735571878279119
+positive_a_robust_z: 164.30273714773918
+positive_b_peak_to_median: 11.592132505175984
+positive_b_robust_z: 164.31879645153623
+wrong_edge_peak_to_median: 4.080389768574909
+wrong_edge_robust_z: 41.60456416381242
+positive_mean_peak_to_median: 11.663852191727551
+positive_peak_to_median_relative_spread: 0.012297770131626633
+intended_to_wrong_edge_peak_to_median_ratio: 2.858514223703976
+positive_a_to_background_peak_to_median_ratio: 8.523621736216898
+positive_b_to_background_peak_to_median_ratio: 8.419440792067588
+positive_a_frame_period_source_samples: 40000
+positive_b_frame_period_source_samples: 40000
+all_candidate_health_epochs_clean: true
+all_ddc_discontinuity_counts_zero: true
+all_ddc_saturation_counts_zero: true
+all_transmitter_cleanup_verified: true
+all_receiver_restoration_verified: true
+all_candidate_ram_recoveries_passed: true
+all_qspi_hashes_unchanged: true
+
+cabled_30m_pss_response_observed: true
+cabled_30m_frame_period_observed: true
+opposite_edge_leakage_observed: true
+wrong_edge_selectivity_followup_required: true
+result_scope: engineering-cabled-smoke-not-gate-qualification
+remaining_gate_2_work: predeclared fixture-bound controls; 120-second zero-loss soak; sparse 30 MS/s fine tracker; one-source-sample timing comparison
