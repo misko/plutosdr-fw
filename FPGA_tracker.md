@@ -362,3 +362,11 @@ The immutable graph is
 tests and the full 325-test Starlink Python regression pass. No hardware was
 accessed, and PPU remains unchanged on clean `main` commit
 `7210cda9b0b2452cb607b5e49e689e2d60b6a8b7`.
+
+The pushed deterministic-runner tag was independently expanded into a fresh
+temporary tree; all 40 focused M3 monitor/executor/manifest tests passed from
+the tagged archive. The exact PPU RX-only lifecycle suite also passes all 24
+tests, including its legacy native-context destroy case. Operational commands
+must use `/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python` because that
+attested environment supplies NumPy and the installed pylibiio binding; direct
+execution through the host `/usr/bin/python3` is not an approved environment.
