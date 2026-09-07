@@ -27,7 +27,7 @@ Authorized radio: `104000bac4950008230026001b440a003a` only.
 | M0: AD9361-personality DNM lifecycle | Complete | Offline plan tests, exact-target RAM boot, recovery to persistent `ad9361-1r1t` |
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
-| M3: cabled-RF 15 MS/s timing | Pending | Positive/negative cabled receipts |
+| M3: cabled-RF 15 MS/s timing | In progress: offline contract complete | Positive/negative cabled receipts |
 | M4: live-LNB 15 MS/s timing | Pending | Repeated on-channel trajectory and off-channel control |
 | M5: 30-to-15 decimator/index mapping | Pending | Bit-exact oracle and routed evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
@@ -223,3 +223,56 @@ retained exactly that one.
 M3 is the next open gate: repeatable cabled-RF 15 MS/s timing with a separately
 declared positive path and negative control. M2 evidence must not be presented
 as a live-signal detection result.
+
+## M3 offline implementation checkpoint
+
+The receiver-side cabled qualification contract was implemented without
+accessing any radio. It adds:
+
+- an absent-only generator for one 80,000-byte cyclic CI16 frame containing the
+  exact 66-sample upper-edge PSS at phase 4,096;
+- a scoped monitor v2 wrapper that admits the already-qualified v7 RAM image
+  while restoring every historical v1 module constant after each call;
+- an explicit physical-fixture declaration command that requires a different
+  transmitter serial, a direct coaxial path, no antenna, and at least 30 dB of
+  effective attenuation; and
+- a campaign qualifier that freezes transmitter sample rate, LO, gain, three
+  receiver-monitor plans, and the decision policy before measurement, then
+  independently recomputes a positive-A / muted-negative / positive-B result
+  and requires a final TX-mute receipt.
+
+The frozen M3 policy requires at least 32 candidate windows per dwell,
+peak-to-median at least 1.15, robust z at least 6.0, an 80% positive pass
+fraction, an eight-window continuous phase track, no more than a 5% negative
+pass fraction, no consecutive negative track, and at least 1.10x median
+positive/negative contrast. Phase evolution is checked against the reported
+drift hypothesis with a 16-sample residual tolerance. This is a cabled PSS
+acquisition/timing claim only; SSS and frame lock remain false.
+
+Deterministic stimulus identities:
+
+- waveform SHA-256:
+  `00a3f70878d48ed0f3d60967c41b6c280954270bc69e7af4754439a05afa5829`;
+- projected template SHA-256:
+  `3c4e6e36250c970c2905ae64d177e0d9d40e941702483f15f11cc57e88edaced`;
+- quantized template SHA-256:
+  `8037e79412eb6b887c9cd99c2d84a8263c80f0d94e7aec0b1a137f3eee7e2b30`;
+  and
+- source manifest:
+  `manifests/starlink-pss-m3-cabled-dnm-v1-source.yaml`.
+
+Focused offline tests include an end-to-end synthetic campaign, strict v7/v1
+scope restoration, insufficient-attenuation and antenna rejection, reversed
+or inconsistent state rejection, final-mute enforcement, and recomputation
+that rejects a modified qualification receipt. The complete
+`tests/test_starlink_pss*.py` suite passes 161 tests.
+
+M3 remains open. No transmitter was selected or keyed, and neither the
+allocated receiver nor any spare radio was accessed by this checkpoint. A
+hardware executor and its stimulus receipts must not be finalized or run until
+the physical fixture identifies one otherwise-unused transmitter, confirms
+the cabled attenuator chain, and confirms that the transmitter is not owned by
+the active acquisition process. If the two radio clocks differ by more than
+the current seven-hypothesis drift bank covers, first perform a separate
+low-power cabled clock calibration, then freeze a transmitter sample rate
+within +/-100 ppm in the final M3 campaign plan.

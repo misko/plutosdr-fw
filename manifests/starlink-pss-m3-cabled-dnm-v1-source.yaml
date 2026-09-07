@@ -1,0 +1,99 @@
+# Immutable offline source graph for the 15 MS/s cabled-RF M3 campaign.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. Nothing in this revision keys
+# a transmitter or accesses a radio. A future transmitter tool must emit the
+# separately sealed active/muted state receipts, and operation remains blocked
+# until a physical fixture declaration names an unused transmitter and proves
+# at least 30 dB effective attenuation with no antenna connected.
+
+schema: plutosdr-fw.starlink-pss-m3-cabled-source
+schema_version: 1
+release_state: offline-campaign-contract
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+hardware_accessed: false
+hardware_qualified: false
+transmitter_accessed: false
+receiver_accessed: false
+
+allocated_receiver_serial: 104000bac4950008230026001b440a003a
+transmitter_serial: unresolved-physical-fixture-input
+runtime_target: ad9361-1r1t
+live_runtime_model: Analog Devices PlutoSDR Rev.C (Z7010-AD9361)
+physical_rfic_attestation: ad9363a
+candidate_profile: acquisition-injection
+supported_candidate_revision: v7
+supported_sample_rate_msps: 15
+expected_firmware: v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7
+
+cabled_only: true
+antenna_permitted: false
+over_the_air_authorized: false
+minimum_effective_attenuation_db: 30
+maximum_tx_hardwaregain_db: -10
+transmitter_sample_rate_frozen_in_plan: true
+transmitter_sample_rate_maximum_offset_ppm: 100
+transmitter_lo_frozen_in_plan: true
+transmitter_gain_frozen_in_plan: true
+stimulus_sequence: positive-a,muted-negative,positive-b,final-mute
+minimum_dwell_ms: 5000
+minimum_candidate_windows: 32
+minimum_peak_to_median: 1.15
+minimum_robust_z: 6.0
+minimum_positive_pass_fraction: 0.80
+minimum_positive_consecutive_track_windows: 8
+phase_residual_tolerance_samples: 16
+drift_change_tolerance_bins_per_64_frames: 8
+maximum_negative_pass_fraction: 0.05
+maximum_negative_consecutive_track_windows: 1
+minimum_positive_to_negative_median_ratio: 1.10
+
+waveform_schema: plutosdr-fw.starlink-pss15-cabled-waveform.v1
+waveform_sample_format: signed-ci16-little-endian-interleaved-iq
+waveform_sample_rate_hz: 15000000
+waveform_frame_samples: 20000
+waveform_template_samples: 66
+waveform_template_phase_bin: 4096
+waveform_maximum_absolute_component: 6904
+waveform_bytes: 80000
+waveform_sha256: 00a3f70878d48ed0f3d60967c41b6c280954270bc69e7af4754439a05afa5829
+waveform_projected_template_sha256: 3c4e6e36250c970c2905ae64d177e0d9d40e941702483f15f11cc57e88edaced
+waveform_quantized_template_sha256: 8037e79412eb6b887c9cd99c2d84a8263c80f0d94e7aec0b1a137f3eee7e2b30
+
+waveform_generator_path: tools/generate_starlink_pss15_cabled_waveform.py
+waveform_generator_sha256: cbb2b6d0313bced0d35a4b66da4676af9566ed132f54ed069db983622fe7787d
+waveform_test_path: tests/test_starlink_pss15_cabled_waveform.py
+waveform_test_sha256: d1ab84d1c711fe39bdab8113e2b2ae99b7e44a71c81440c6f30f7cbecd0a9dd1
+monitor_v2_path: scripts/starlink_pss_monitor_probe_v2.py
+monitor_v2_sha256: cbdc3c8ce60b2db3fdce1a3f3cb152a6f597bc29b7dd255fda3591aac90d13ab
+monitor_v2_test_path: tests/test_starlink_pss_monitor_probe_v2.py
+monitor_v2_test_sha256: 3cfb9794339510cccb1cac5f4b4b6af499f70f5944c65e2e940170bfd046a292
+campaign_path: scripts/starlink_pss_m3_campaign_v1.py
+campaign_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444
+campaign_test_path: tests/test_starlink_pss_m3_campaign_v1.py
+campaign_test_sha256: d6a64990d30abefd6749137d371ac45abc7e070d482eeb61b305e5530ba43b0c
+manifest_test_path: tests/test_starlink_pss_m3_manifest.py
+manifest_test_sha256: 0dcb5c8247d207e6c18b0c6ee76d154009117219e90119c8c665349f5db37b1a
+inherited_monitor_v1_path: scripts/starlink_pss_monitor_probe_v1.py
+inherited_monitor_v1_sha256: 7359bcbbf952193b5be4d77782e2413dd81dbe19c5910fe2c3a2f2f24d4c6270
+inherited_v7_probe_path: scripts/starlink_pss_hardware_probe_v9.py
+inherited_v7_probe_sha256: ed7a8e594255fdbe78c65c680e7fb029af81984573822877e631a7e0e496139b
+candidate_source_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-source.yaml
+candidate_source_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
+
+monitor_plan_schema: plutosdr-fw.starlink-pss-monitor-probe-plan.v2
+monitor_receipt_schema: plutosdr-fw.starlink-pss-monitor-probe-receipt.v2
+campaign_plan_schema: plutosdr-fw.starlink-pss-m3-campaign-plan.v1
+campaign_receipt_schema: plutosdr-fw.starlink-pss-m3-campaign-receipt.v1
+fixture_schema: plutosdr-fw.starlink-pss15-cabled-fixture.v1
+stimulus_receipt_schema: plutosdr-fw.starlink-pss15-cabled-stimulus-receipt.v1
+qualifier_hardware_access: false
+qualifier_recomputes_all_metrics: true
+qualifier_requires_final_tx_shutdown: true
+cabled_pss_detected_by_this_revision: false
+sss_detected: false
+frame_lock_claim: false
+
+offline_test_verdict: PASS
