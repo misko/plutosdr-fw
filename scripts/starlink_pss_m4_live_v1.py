@@ -829,18 +829,21 @@ def _snapshot_settings(objects: dict[str, Any]) -> dict[str, Any]:
 def _apply_settings(objects: dict[str, Any], plan: dict[str, Any], center_hz: int) -> dict[str, Any]:
     _write_number(objects["rx_lo"], "powerdown", 0, tolerance=0.0, label="RX LO")
     _write_number(
-        objects["capture_i"],
-        "sampling_frequency",
-        plan["sample_rate_hz"],
-        tolerance=2.0,
-        label="capture I",
-    )
-    _write_number(
         objects["phy_rx"],
         "sampling_frequency",
         plan["sample_rate_hz"],
         tolerance=2.0,
         label="PHY RX1",
+    )
+    # The AD9361 clock must move before the FPGA capture-rate request.  Asking
+    # the capture core for 15 MS/s while the PHY remains at (for example)
+    # 30.72 MS/s is an invalid transient combination on the real runtime.
+    _write_number(
+        objects["capture_i"],
+        "sampling_frequency",
+        plan["sample_rate_hz"],
+        tolerance=2.0,
+        label="capture I",
     )
     _write_number(
         objects["phy_rx"],

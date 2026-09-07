@@ -536,6 +536,50 @@ def test_rail_probe_calculates_exact_s12_clipping(monkeypatch: pytest.MonkeyPatc
     )
 
 
+def test_apply_settings_moves_phy_clock_before_capture_rate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan = _plan()
+    objects = {
+        "rx_lo": object(),
+        "phy_rx": object(),
+        "capture_i": object(),
+        "rx": SimpleNamespace(reg_read=lambda _address: 0),
+    }
+    writes: list[tuple[object, str]] = []
+    selected = {
+        "phy_rx_sampling_frequency_hz": live.SAMPLE_RATE_HZ,
+        "capture_i_sampling_frequency_hz": live.SAMPLE_RATE_HZ,
+        "rf_bandwidth_hz": live.RF_BANDWIDTH_HZ,
+        "rx_port_select": plan["rx_port_select"],
+        "gain_mode": plan["gain_mode"],
+        "hardwaregain_db": 20.0,
+        "rx_lo_hz": plan["nominal_on_if_hz"],
+        "rx_lo_powerdown": 0,
+    }
+
+    def fake_write(owner: object, name: str, *_args: object, **_kwargs: object) -> float:
+        writes.append((owner, name))
+        return 0.0
+
+    monkeypatch.setattr(live, "_write_number", fake_write)
+    monkeypatch.setattr(live, "_write_text", lambda *_args, **_kwargs: "")
+    monkeypatch.setattr(
+        live,
+        "_read_text",
+        lambda *_args, **_kwargs: "15000000 1875000",
+    )
+    monkeypatch.setattr(live, "_snapshot_settings", lambda _objects: selected)
+
+    live._apply_settings(objects, plan, plan["nominal_on_if_hz"])
+
+    assert writes[:3] == [
+        (objects["rx_lo"], "powerdown"),
+        (objects["phy_rx"], "sampling_frequency"),
+        (objects["capture_i"], "sampling_frequency"),
+    ]
+
+
 def test_remote_identity_keeps_multiline_shell_script(monkeypatch: pytest.MonkeyPatch) -> None:
     plan = _plan()
     captured: dict[str, object] = {}
