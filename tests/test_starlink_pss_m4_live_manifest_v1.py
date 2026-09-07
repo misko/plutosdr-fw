@@ -24,10 +24,10 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     values = _values()
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
     assert values["schema_version"] == "1"
-    assert values["release_state"] == "bench-preflight-revision-required"
+    assert values["release_state"] == "continuous-role-v2-offline-ready"
     assert values["bench_preflight_completed"] == "true"
     assert values["live_execution_approved"] == "false"
-    assert values["required_revision"] == "continuous-role-v2"
+    assert values["required_revision"] == "cabled-continuous-role-v2-requalification"
     for field in (
         "do_not_merge",
         "do_not_release",
@@ -97,8 +97,15 @@ def test_m4_manifest_freezes_scan_geometry_and_decision_policy() -> None:
     assert values["scan_offset_maximum_hz"] == "1200000"
     assert values["scan_offset_step_hz"] == "100000"
     assert values["scan_point_count_per_role"] == "25"
-    assert values["point_duration_ms"] == "4500"
+    assert values["point_duration_ms"] == "2731"
     assert values["settle_ms"] == "200"
+    assert values["role_duration_ms"] == "80500"
+    assert values["stable_candidate_windows_per_point"] == "32"
+    assert values["initial_discard_maps"] == "2"
+    assert values["post_retune_discard_maps"] == "5"
+    assert values["maximum_role_maps"] == "946"
+    assert values["accepted_score_counter_budget"] == "3632640000"
+    assert values["accepted_score_counter_saturation"] == "4294967295"
     assert values["maximum_control_passing_points"] == "0"
     assert values["minimum_positive_to_control_ratio"] == "1.10"
     assert values["maximum_rail_fraction"] == "0.0001"

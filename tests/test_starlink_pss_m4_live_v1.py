@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
+import sys
 from copy import deepcopy
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -82,6 +84,13 @@ def _plan() -> dict[str, object]:
         "scan_offsets_hz": list(live.OFFSET_ORDER_HZ),
         "point_duration_ms": live.DEFAULT_POINT_DURATION_MS,
         "settle_ms": live.DEFAULT_SETTLE_MS,
+        "stable_candidate_windows_per_point": (
+            live.STABLE_CANDIDATE_WINDOWS_PER_POINT
+        ),
+        "initial_discard_maps": live.INITIAL_DISCARD_MAPS,
+        "post_retune_discard_maps": live.POST_RETUNE_DISCARD_MAPS,
+        "role_monitor_duration_ms": live.ROLE_MONITOR_DURATION_MS,
+        "accepted_score_counter_budget": live.ACCEPTED_SCORE_COUNTER_BUDGET,
         "role_order": list(live.ROLES),
         "policy": live.POLICY,
         "rail_probe_samples": live.RAIL_PROBE_SAMPLES,
@@ -95,8 +104,15 @@ def _plan() -> dict[str, object]:
     }
 
 
-def _records(*, positive: bool) -> list[dict[str, object]]:
-    map_count = 52
+def _records(
+    *,
+    positive: bool,
+    map_count: int = 52,
+    duration_ms: int | None = None,
+    accepted_before: int = 0,
+) -> list[dict[str, object]]:
+    if duration_ms is None:
+        duration_ms = live.DEFAULT_POINT_DURATION_MS
     maps: list[dict[str, object]] = []
     for sequence in range(1, map_count + 1):
         record: dict[str, object] = {
@@ -108,7 +124,7 @@ def _records(*, positive: bool) -> list[dict[str, object]]:
             "generation": 100 + sequence,
             "start_index_canonical": 5_000
             + (sequence - 1) * monitor.TILE_SAMPLES,
-            "accepted_scores": sequence * monitor.TILE_SAMPLES,
+            "accepted_scores": accepted_before + sequence * monitor.TILE_SAMPLES,
             "published_maps": 20 + sequence,
             "health_flags": "0x00000000",
             "fault_free_epoch": True,
@@ -144,17 +160,17 @@ def _records(*, positive: bool) -> list[dict[str, object]]:
         "serial": live.RECEIVER_SERIAL,
         "input_rate_msps": 15,
         "canonical_rate_msps": 15,
-        "duration_requested_ms": live.DEFAULT_POINT_DURATION_MS,
-        "duration_observed_ms": live.DEFAULT_POINT_DURATION_MS + 20,
+        "duration_requested_ms": duration_ms,
+        "duration_observed_ms": duration_ms + 20,
         "maps_copied": map_count,
         "candidate_windows": map_count - 2,
         "first_generation": maps[0]["generation"],
         "last_generation": last["generation"],
         "first_start_index_canonical": maps[0]["start_index_canonical"],
         "last_start_index_canonical": last["start_index_canonical"],
-        "accepted_scores_before": 0,
+        "accepted_scores_before": accepted_before,
         "accepted_scores_at_cutoff": last["accepted_scores"],
-        "accepted_scores_delta": last["accepted_scores"],
+        "accepted_scores_delta": last["accepted_scores"] - accepted_before,
         "published_maps_before": 20,
         "published_maps_at_cutoff": last["published_maps"],
         "published_maps_delta": map_count,
@@ -190,7 +206,10 @@ def _point(
         else plan["nominal_on_if_hz"]
     )
     offset = live.OFFSET_ORDER_HZ[ordinal - 1]
-    records = _records(positive=positive)
+    records = _records(
+        positive=positive,
+        map_count=live.STABLE_CANDIDATE_WINDOWS_PER_POINT + 2,
+    )[2:-1]
     return {
         "role": role,
         "ordinal": ordinal,
@@ -199,7 +218,9 @@ def _point(
         "requested_rx_lo_hz": base + offset,
         "readback_rx_lo_hz": base + offset,
         "started_at": started_at.isoformat().replace("+00:00", "Z"),
-        "completed_at": (started_at + timedelta(seconds=4.52))
+        "completed_at": (
+            started_at + timedelta(milliseconds=live.DEFAULT_POINT_DURATION_MS)
+        )
         .isoformat()
         .replace("+00:00", "Z"),
         "settle_ms": live.DEFAULT_SETTLE_MS,
@@ -231,8 +252,25 @@ def _roles(plan: dict[str, object]) -> dict[str, list[dict[str, object]]]:
                     started_at=now,
                 )
             )
-            now += timedelta(seconds=4.72)
+            now += timedelta(
+                milliseconds=live.DEFAULT_POINT_DURATION_MS + live.DEFAULT_SETTLE_MS
+            )
         result[role] = points
+    return result
+
+
+def _role_monitors() -> dict[str, dict[str, object]]:
+    result: dict[str, dict[str, object]] = {}
+    accepted_before = 0
+    for role in live.ROLES:
+        records = _records(
+            positive=role != "off_slice_control",
+            map_count=live.MAXIMUM_ROLE_MAPS - 3,
+            duration_ms=live.ROLE_MONITOR_DURATION_MS,
+            accepted_before=accepted_before,
+        )
+        result[role] = {"monitor_records": records, "monitor_stderr": ""}
+        accepted_before = int(records[-1]["accepted_scores_at_cutoff"])
     return result
 
 
@@ -302,6 +340,7 @@ def _settings(plan: dict[str, object]) -> tuple[dict[str, object], dict[str, obj
 
 def _receipt(plan: dict[str, object]) -> dict[str, object]:
     roles = _roles(plan)
+    role_monitors = _role_monitors()
     before, selected, restored = _settings(plan)
     partial = {"roles": roles, "rail_probe": _rail()}
     evaluation = live._evaluate_receipt(plan, partial)
@@ -333,6 +372,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
         "iio_selected": selected,
         "rail_probe": partial["rail_probe"],
         "roles": roles,
+        "role_monitors": role_monitors,
         "controller_info_after": {
             "schema": "starlink-pss-acqctl.info.v1",
             "serial": live.RECEIVER_SERIAL,
@@ -371,9 +411,15 @@ def test_scan_is_interleaved_symmetric_and_fits_one_120s_role() -> None:
     assert live.OFFSET_ORDER_HZ[:7] == (0, 100_000, -100_000, 200_000, -200_000, 300_000, -300_000)
     assert len(live.OFFSET_ORDER_HZ) == 25
     assert set(live.OFFSET_ORDER_HZ) == set(range(-1_200_000, 1_200_001, 100_000))
-    assert len(live.OFFSET_ORDER_HZ) * (
-        live.DEFAULT_POINT_DURATION_MS + live.DEFAULT_SETTLE_MS
-    ) == 117_500
+    consumed_maps = live.INITIAL_DISCARD_MAPS + live.STABLE_CANDIDATE_WINDOWS_PER_POINT
+    consumed_maps += (len(live.OFFSET_ORDER_HZ) - 1) * (
+        live.POST_RETUNE_DISCARD_MAPS + live.STABLE_CANDIDATE_WINDOWS_PER_POINT
+    )
+    assert consumed_maps == 922
+    assert live.ROLE_MONITOR_DURATION_MS == 80_500
+    assert live.ROLE_MONITOR_DURATION_MS < 120_000
+    assert live.ACCEPTED_SCORE_COUNTER_BUDGET == 3_632_640_000
+    assert live.ACCEPTED_SCORE_COUNTER_BUDGET < live.ACCEPTED_SCORE_COUNTER_SATURATION
 
 
 def test_fixture_requires_no_tx_and_ram_power_continuity() -> None:
@@ -433,6 +479,8 @@ def test_plan_is_exact_dnm_rx_only_and_has_nonoverlapping_control() -> None:
     assert plan["pss_detected"] is False
     assert plan["sss_detected"] is False
     assert plan["frame_lock_claim"] is False
+    assert plan["stable_candidate_windows_per_point"] == 32
+    assert plan["role_monitor_duration_ms"] == 80_500
 
 
 @pytest.mark.parametrize(
@@ -461,7 +509,7 @@ def test_positive_role_selects_the_single_tracked_offset() -> None:
     assert result["passing_point_count"] == 1
     assert result["passing_offsets_hz"] == [300_000]
     assert result["best_offset_hz"] == 300_000
-    assert result["best_metrics"]["longest_consecutive_track_windows"] == 50
+    assert result["best_metrics"]["longest_consecutive_track_windows"] == 32
 
 
 def test_complete_live_policy_requires_positive_control_positive() -> None:
@@ -481,7 +529,10 @@ def test_live_policy_rejects_equivalent_control_track() -> None:
     plan = _plan()
     receipt = _receipt(plan)
     control = receipt["roles"]["off_slice_control"][4]
-    records = _records(positive=True)
+    records = _records(
+        positive=True,
+        map_count=live.STABLE_CANDIDATE_WINDOWS_PER_POINT + 2,
+    )[2:-1]
     control["monitor_records"] = records
     control["metrics"] = live._point_metrics(records, plan)
     receipt["evaluation"] = live._evaluate_receipt(plan, receipt)
@@ -506,11 +557,88 @@ def test_live_policy_rejects_clipping() -> None:
 
 def test_point_rejects_faulted_transport_before_signal_decision() -> None:
     plan = _plan()
-    point = _roles(plan)["on_channel_a"][0]
-    point["monitor_records"][-1]["map_overruns_at_cutoff"] = 1
+    receipt = _receipt(plan)
+    receipt["role_monitors"]["on_channel_a"]["monitor_records"][-1][
+        "map_overruns_at_cutoff"
+    ] = 1
 
     with pytest.raises(live.ProbeError, match="zero-loss"):
-        live._verify_point(point, plan, "on_channel_a", 1)
+        live._validate_passing_receipt(receipt, plan)
+
+
+def test_campaign_rejects_insufficient_accepted_score_counter_headroom() -> None:
+    plan = _plan()
+    records = _records(
+        positive=True,
+        map_count=live.MAXIMUM_ROLE_MAPS - 3,
+        duration_ms=live.ROLE_MONITOR_DURATION_MS,
+        accepted_before=(
+            live.ACCEPTED_SCORE_COUNTER_SATURATION
+            - live.ACCEPTED_SCORE_COUNTER_BUDGET
+        ),
+    )
+
+    with pytest.raises(live.ProbeError, match="counter lacks campaign headroom"):
+        live._validate_counter_headroom(records, plan)
+
+
+def test_scan_role_partitions_one_continuous_stream_by_map_count(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    plan = _plan()
+    records = _records(
+        positive=True,
+        map_count=live.MAXIMUM_ROLE_MAPS - 3,
+        duration_ms=live.ROLE_MONITOR_DURATION_MS,
+    )
+    stream = tmp_path / "continuous-role.ndjson"
+    stream.write_text(
+        "".join(json.dumps(record, separators=(",", ":")) + "\n" for record in records),
+        encoding="utf-8",
+    )
+    writes: list[int] = []
+
+    monkeypatch.setattr(
+        live,
+        "_ssh_argv",
+        lambda *_args: (
+            sys.executable,
+            "-c",
+            "import pathlib,sys;sys.stdout.buffer.write(pathlib.Path(sys.argv[1]).read_bytes())",
+            str(stream),
+        ),
+    )
+
+    def fake_write(
+        _owner: object,
+        _name: str,
+        value: int,
+        **_kwargs: object,
+    ) -> float:
+        writes.append(value)
+        return float(value)
+
+    monkeypatch.setattr(live, "_write_number", fake_write)
+    monkeypatch.setattr(live, "_read_number", lambda *_args, **_kwargs: 40.0)
+
+    points, monitor_evidence = live._scan_role(
+        plan,
+        "on_channel_a",
+        {"rx_lo": object(), "phy_rx": object()},
+        Path("/tmp/password"),
+        "/tmp/controller",
+        sleeper=lambda _seconds: None,
+    )
+
+    assert writes == [
+        plan["nominal_on_if_hz"] + offset for offset in live.OFFSET_ORDER_HZ
+    ]
+    assert len(points) == 25
+    assert all(len(point["monitor_records"]) == 32 for point in points)
+    assert points[0]["monitor_records"][0]["sequence"] == 3
+    assert points[1]["monitor_records"][0]["sequence"] == 40
+    assert points[-1]["monitor_records"][-1]["sequence"] == 922
+    assert monitor_evidence["monitor_records"] == records
 
 
 def test_rail_probe_calculates_exact_s12_clipping(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -579,43 +707,6 @@ def test_apply_settings_moves_phy_clock_before_capture_rate(
         (objects["phy_rx"], "sampling_frequency"),
         (objects["capture_i"], "sampling_frequency"),
     ]
-
-
-def test_monitor_retries_only_the_bounded_clean_start_race(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    calls = 0
-
-    def fake_run(*_args: object, **_kwargs: object) -> SimpleNamespace:
-        nonlocal calls
-        calls += 1
-        if calls < 3:
-            raise live.ProbeError(
-                "continuous monitor-v2 failed: cannot establish one clean "
-                "monitor-v2 observation"
-            )
-        return SimpleNamespace(stdout=b"{}\n", stderr=b"clean pass", returncode=0)
-
-    monkeypatch.setattr(live, "_run", fake_run)
-    monkeypatch.setattr(live.time, "sleep", lambda _seconds: None)
-    monkeypatch.setattr(
-        live.monitor_v2, "_validate_monitor_records", lambda _records, _plan: None
-    )
-
-    records, stderr, attempts = live._run_monitor_point(
-        {
-            "serial": live.RECEIVER_SERIAL,
-            "point_duration_ms": 4_500,
-            "host_network_interface": live.DEFAULT_LAN_INTERFACE,
-            "ethernet_host": live.DEFAULT_LAN_HOST,
-        },
-        Path("/tmp/password"),
-        "/tmp/controller",
-    )
-
-    assert records == [{}]
-    assert stderr == "clean_start_retries=2\nclean pass"
-    assert attempts == 3
 
 
 def test_remote_identity_keeps_multiline_shell_script(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -455,25 +455,30 @@ receives only complete phase maps, candidate statistics, health telemetry, and
 one bounded 32,768-sample clipping probe whose IQ payload is immediately
 discarded.
 
-One execution consists of three approximately 120-second roles:
+One execution consists of three 80.5-second roles:
 
 1. channel-4 upper-edge on-channel scan A;
 2. a non-overlapping same-channel control slice 50 MHz inward; and
 3. the same on-channel scan B.
 
-Each role uses 25 interleaved receiver-LO points at 100 kHz spacing over
-+/-1.2 MHz. A point observes maps for 4.5 seconds after 200 ms of settling,
-yielding about 50 candidate windows. This bounded scan covers the 225--525 kHz
-CFO modes seen in prior live captures while avoiding the false assumption that
-one fixed LO remains aligned throughout a 120-second observation.
+Each role starts the FPGA detector only once and uses 25 interleaved receiver-LO
+points at 100 kHz spacing over +/-1.2 MHz. The first point discards the two maps
+needed to fill the rolling detector window. Every later retune waits 200 ms and
+discards five maps so RF settling and rolling-window contamination cannot enter
+the decision. Exactly 32 subsequent candidate windows are retained per point.
+The map-count schedule consumes 922 maps, about 78.7 seconds, and leaves a
+bounded tail inside the 80.5-second observation. This scan covers the CFO modes
+seen in prior live captures without assuming that one fixed LO remains aligned
+throughout the observation.
 
 The runner and offline verifier require the exact receiver serial, LAN host
 `192.168.1.17`, interface `enp132s0`, AD9361 1R1T runtime, fresh RAM boot ID,
 unchanged QSPI hash, RX-only device-tree surface, 15 MS/s sample and bandwidth
 readback, factor-one FPGA path, chronological scan records, zero transport
-fault deltas, positive/control/positive contrast, complete restoration, and a
-subsequent PPU recovery. The plan binds its own runner source and the M4 source
-manifest so execution cannot silently drift after sealing.
+fault deltas, conservative 32-bit accepted-score counter headroom,
+positive/control/positive contrast, complete restoration, and a subsequent PPU
+recovery. The plan binds its own runner source and the M4 source manifest so
+execution cannot silently drift after sealing.
 
 The remaining M4 hardware prerequisite is physical: remove the attenuated
 bench cable, connect only RX1 to the powered outdoor 9.75 GHz LNB, and preserve
@@ -483,7 +488,7 @@ polarization, supply voltage, and power-source description. M4 remains open
 until the resulting live receipt and recovery receipt pass offline
 verification.
 
-### M4 cabled scan preflight and required continuous-role revision
+### M4 cabled scan preflight and continuous-role revision
 
 On 2026-09-07 the exact M3 fixture was reused for an M4 scan preflight:
 
@@ -532,13 +537,18 @@ represent about 286.3 seconds before that counter saturates. Therefore the
 current 3 x 117.5-second live plan and the current per-point start/stop executor
 are not approved for the outdoor run.
 
-The required M4 revision is three continuous roles of approximately 80.5
-seconds each. Each LO point retains exactly 32 stable candidate windows after
-five discarded retune/rolling-window maps. The three roles then consume about
-241.5 seconds of one PL epoch, below the 32-bit counter bound, while preserving
-the frozen minimum-window policy. The M4 live runner, plan schema, receipt
-schema, and verifier must encode this map-count schedule before an LNB is
-connected.
+The resulting M4 revision uses three continuous roles of 80.5 seconds each.
+Each LO point retains exactly 32 stable candidate windows after the initial
+two-map fill or five discarded retune/rolling-window maps. The three roles
+consume 241.5 seconds of one PL epoch while preserving the frozen
+minimum-window policy. Its fail-closed budget permits the monitor validator's
+maximum map-count jitter: 946 maps per role, or 3,632,640,000 accepted scores
+for all three roles, strictly below the `0xffffffff` saturation value. After
+the first role, the runner combines the observed starting count with that full
+budget and refuses to continue without sufficient headroom. The plan schema,
+receipt schema, verifier, and direct continuous-stream unit test encode the
+same schedule. Cabled requalification of this exact production path is the
+remaining gate before an LNB is connected.
 
 Private evidence:
 

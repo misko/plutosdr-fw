@@ -25,9 +25,11 @@ import itertools
 import json
 import math
 import re
+import select
 import statistics
 import subprocess
 import sys
+import tempfile
 import time
 import uuid
 from collections.abc import Callable, Sequence
@@ -67,10 +69,21 @@ DEFAULT_EDGE = "upper"
 DEFAULT_LAN_HOST = "192.168.1.17"
 DEFAULT_LAN_INTERFACE = "enp132s0"
 DEFAULT_GAIN_MODE = "slow_attack"
-DEFAULT_POINT_DURATION_MS = 4_500
+ROLES = ("on_channel_a", "off_slice_control", "on_channel_b")
+STABLE_CANDIDATE_WINDOWS_PER_POINT = 32
+INITIAL_DISCARD_MAPS = 2
+POST_RETUNE_DISCARD_MAPS = 5
+ROLE_MONITOR_DURATION_MS = 80_500
+DEFAULT_POINT_DURATION_MS = 2_731
 DEFAULT_SETTLE_MS = 200
-MAX_MONITOR_START_ATTEMPTS = 5
-MONITOR_START_RETRY_DELAY_S = 0.05
+ACCEPTED_SCORE_COUNTER_SATURATION = (1 << 32) - 1
+MAXIMUM_ROLE_MAPS = (
+    ROLE_MONITOR_DURATION_MS * (SAMPLE_RATE_HZ // 1_000) // monitor_v1.TILE_SAMPLES
+    + 3
+)
+ACCEPTED_SCORE_COUNTER_BUDGET = (
+    MAXIMUM_ROLE_MAPS * monitor_v1.TILE_SAMPLES * len(ROLES)
+)
 DEFAULT_OFF_SLICE_SHIFT_HZ = -50_000_000
 RAIL_PROBE_SAMPLES = 32_768
 MAXIMUM_RAIL_FRACTION = 0.0001
@@ -86,7 +99,6 @@ OFFSET_ORDER_HZ = tuple(
     for magnitude in range(0, 1_200_001, 100_000)
     for value in ((0,) if magnitude == 0 else (magnitude, -magnitude))
 )
-ROLES = ("on_channel_a", "off_slice_control", "on_channel_b")
 HEX_32 = re.compile(r"^[0-9a-f]{32}$")
 HEX_40 = re.compile(r"^[0-9a-f]{40}$")
 HEX_64 = re.compile(r"^[0-9a-f]{64}$")
@@ -172,6 +184,11 @@ PLAN_FIELDS = {
     "scan_offsets_hz",
     "point_duration_ms",
     "settle_ms",
+    "stable_candidate_windows_per_point",
+    "initial_discard_maps",
+    "post_retune_discard_maps",
+    "role_monitor_duration_ms",
+    "accepted_score_counter_budget",
     "role_order",
     "policy",
     "rail_probe_samples",
@@ -373,6 +390,15 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         or plan.get("scan_offsets_hz") != list(OFFSET_ORDER_HZ)
         or plan.get("point_duration_ms") != DEFAULT_POINT_DURATION_MS
         or plan.get("settle_ms") != DEFAULT_SETTLE_MS
+        or plan.get("stable_candidate_windows_per_point")
+        != STABLE_CANDIDATE_WINDOWS_PER_POINT
+        or plan.get("initial_discard_maps") != INITIAL_DISCARD_MAPS
+        or plan.get("post_retune_discard_maps") != POST_RETUNE_DISCARD_MAPS
+        or plan.get("role_monitor_duration_ms") != ROLE_MONITOR_DURATION_MS
+        or plan.get("accepted_score_counter_budget")
+        != ACCEPTED_SCORE_COUNTER_BUDGET
+        or plan["accepted_score_counter_budget"]
+        >= ACCEPTED_SCORE_COUNTER_SATURATION
         or plan.get("role_order") != list(ROLES)
         or plan.get("policy") != POLICY
         or plan.get("rail_probe_samples") != RAIL_PROBE_SAMPLES
@@ -537,6 +563,11 @@ def build_plan(args: Any) -> dict[str, Any]:
         "scan_offsets_hz": list(OFFSET_ORDER_HZ),
         "point_duration_ms": DEFAULT_POINT_DURATION_MS,
         "settle_ms": DEFAULT_SETTLE_MS,
+        "stable_candidate_windows_per_point": STABLE_CANDIDATE_WINDOWS_PER_POINT,
+        "initial_discard_maps": INITIAL_DISCARD_MAPS,
+        "post_retune_discard_maps": POST_RETUNE_DISCARD_MAPS,
+        "role_monitor_duration_ms": ROLE_MONITOR_DURATION_MS,
+        "accepted_score_counter_budget": ACCEPTED_SCORE_COUNTER_BUDGET,
         "role_order": list(ROLES),
         "policy": POLICY,
         "rail_probe_samples": RAIL_PROBE_SAMPLES,
@@ -554,8 +585,7 @@ def build_plan(args: Any) -> dict[str, Any]:
         "verdict": "PASS_OFFLINE_M4_LIVE_PLAN_ONLY",
         "hardware_accessed": False,
         "persistent_write": False,
-        "scan_span_ms_per_role": len(OFFSET_ORDER_HZ)
-        * (DEFAULT_POINT_DURATION_MS + DEFAULT_SETTLE_MS),
+        "scan_span_ms_per_role": ROLE_MONITOR_DURATION_MS,
         "nominal_on_if_hz": geometry["nominal_on_if_hz"],
         "nominal_on_rf_hz": geometry["nominal_on_rf_hz"],
         "plan": identity,
@@ -563,18 +593,28 @@ def build_plan(args: Any) -> dict[str, Any]:
     }
 
 
-def _monitor_plan_view(plan: dict[str, Any]) -> dict[str, Any]:
-    """Return the minimal inherited-plan values consumed by record validation."""
-
-    return {
-        "serial": plan["serial"],
-        "duration_ms": plan["point_duration_ms"],
-    }
-
-
 def _point_metrics(records: list[dict[str, Any]], plan: dict[str, Any]) -> dict[str, Any]:
-    monitor_v2._validate_monitor_records(records, _monitor_plan_view(plan))
-    return m3.analyze_dwell(records, plan["policy"])
+    if len(records) != plan["stable_candidate_windows_per_point"] or not all(
+        record.get("candidate_available") is True for record in records
+    ):
+        raise ProbeError("M4 point lacks its exact stable candidate-window count")
+    return m3.analyze_dwell([{}, {}, *records, {}], plan["policy"])
+
+
+def _validate_counter_headroom(
+    records: list[dict[str, Any]], plan: dict[str, Any]
+) -> None:
+    if not records or records[-1].get("schema") != monitor_v1.SUMMARY_SCHEMA:
+        raise ProbeError("M4 continuous role lacks a counter summary")
+    initial = records[-1].get("accepted_scores_before")
+    if (
+        not isinstance(initial, int)
+        or isinstance(initial, bool)
+        or initial < 0
+        or initial + plan["accepted_score_counter_budget"]
+        >= ACCEPTED_SCORE_COUNTER_SATURATION
+    ):
+        raise ProbeError("M4 FPGA accepted-score counter lacks campaign headroom")
 
 
 def _positive_point(metrics: dict[str, Any], policy: dict[str, Any]) -> bool:
@@ -1189,53 +1229,6 @@ def _controller_info(
     return value
 
 
-def _run_monitor_point(
-    plan: dict[str, Any], password_path: Path, remote: str
-) -> tuple[list[dict[str, Any]], str, int]:
-    command = (
-        f"{remote} --expect-serial {plan['serial']} monitor "
-        f"--duration-ms {plan['point_duration_ms']} --timeout-ms 1000"
-    )
-    clean_start_failures: list[str] = []
-    completed = None
-    for attempt in range(1, MAX_MONITOR_START_ATTEMPTS + 1):
-        try:
-            completed = _run(
-                _ssh_argv(plan, password_path, command),
-                timeout_s=plan["point_duration_ms"] / 1_000.0 + 60.0,
-            )
-            break
-        except ProbeError as error:
-            detail = str(error)
-            if "cannot establish one clean monitor-v2 observation" not in detail:
-                raise
-            clean_start_failures.append(detail[-4_000:])
-            if attempt == MAX_MONITOR_START_ATTEMPTS:
-                raise ProbeError(
-                    "M4 monitor exhausted its clean-start retry bound"
-                ) from error
-            time.sleep(MONITOR_START_RETRY_DELAY_S)
-    if completed is None:
-        raise ProbeError("M4 monitor produced no bounded child result")
-    try:
-        records = [
-            json.loads(line, object_pairs_hook=monitor_v1.probe_v1._json_no_duplicates)
-            for line in completed.stdout.decode("utf-8").splitlines()
-            if line
-        ]
-    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
-        raise ProbeError("M4 monitor point did not return strict NDJSON") from error
-    if not all(isinstance(record, dict) for record in records):
-        raise ProbeError("M4 monitor point contains a non-object record")
-    monitor_v2._validate_monitor_records(records, _monitor_plan_view(plan))
-    stderr = completed.stderr.decode(errors="replace")[-4_000:]
-    if clean_start_failures:
-        stderr = (
-            f"clean_start_retries={len(clean_start_failures)}\n" + stderr
-        )[-4_000:]
-    return records, stderr, len(clean_start_failures) + 1
-
-
 def _rail_probe(plan: dict[str, Any]) -> dict[str, Any]:
     argv = (
         "iio_readdev",
@@ -1293,58 +1286,146 @@ def _scan_role(
     remote: str,
     *,
     sleeper: Callable[[float], None] = time.sleep,
-) -> list[dict[str, Any]]:
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     base_hz = (
         plan["nominal_off_if_hz"]
         if role == "off_slice_control"
         else plan["nominal_on_if_hz"]
     )
+    command = (
+        f"{remote} --expect-serial {plan['serial']} monitor "
+        f"--duration-ms {plan['role_monitor_duration_ms']} --timeout-ms 1000"
+    )
+    process: subprocess.Popen[bytes] | None = None
+    stderr_file: Any = None
     points: list[dict[str, Any]] = []
-    for ordinal, offset_hz in enumerate(plan["scan_offsets_hz"], 1):
-        requested = base_hz + offset_hz
-        readback = round(
-            _write_number(
-                objects["rx_lo"], "frequency", requested, tolerance=2.0, label="RX LO"
+    records: list[dict[str, Any]] = []
+    candidates: list[dict[str, Any]] = []
+    output_bytes = 0
+    discarded = plan["initial_discard_maps"]
+    point_index = 0
+    offset_hz = plan["scan_offsets_hz"][0]
+    requested = base_hz + offset_hz
+    readback = round(
+        _write_number(objects["rx_lo"], "frequency", requested, tolerance=2.0, label="RX LO")
+    )
+    sleeper(plan["settle_ms"] / 1_000.0)
+    started = _now()
+    rssi_before = _read_number(objects["phy_rx"], "rssi", label="PHY RX1")
+    gain_before = _read_number(objects["phy_rx"], "hardwaregain", label="PHY RX1")
+    deadline = time.monotonic() + 120.0
+    try:
+        # It must remain open through forced child cleanup in the finally block.
+        stderr_file = tempfile.TemporaryFile()  # noqa: SIM115
+        process = subprocess.Popen(
+            _ssh_argv(plan, password_path, command),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=stderr_file,
+            bufsize=0,
+        )
+        if process.stdout is None:
+            raise ProbeError("M4 continuous role lacks a stdout pipe")
+        while True:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise ProbeError("M4 continuous role exceeded 120 seconds")
+            ready, _, _ = select.select([process.stdout], [], [], min(2.0, remaining))
+            if not ready:
+                if process.poll() is not None:
+                    break
+                continue
+            line = process.stdout.readline()
+            if not line:
+                break
+            output_bytes += len(line)
+            if output_bytes > MAXIMUM_MONITOR_OUTPUT_BYTES:
+                raise ProbeError("M4 continuous role output exceeds the sealed size bound")
+            try:
+                record = json.loads(
+                    line, object_pairs_hook=monitor_v1.probe_v1._json_no_duplicates
+                )
+            except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+                raise ProbeError("M4 continuous role returned invalid NDJSON") from error
+            if not isinstance(record, dict):
+                raise ProbeError("M4 continuous role returned a non-object record")
+            records.append(record)
+            if record.get("schema") != monitor_v1.MAP_SCHEMA or point_index >= len(
+                plan["scan_offsets_hz"]
+            ):
+                continue
+            if discarded:
+                discarded -= 1
+                continue
+            candidates.append(record)
+            if len(candidates) != plan["stable_candidate_windows_per_point"]:
+                continue
+            rssi_after = _read_number(objects["phy_rx"], "rssi", label="PHY RX1")
+            gain_after = _read_number(
+                objects["phy_rx"], "hardwaregain", label="PHY RX1"
             )
+            points.append(
+                {
+                    "role": role,
+                    "ordinal": point_index + 1,
+                    "offset_hz": offset_hz,
+                    "base_if_hz": base_hz,
+                    "requested_rx_lo_hz": requested,
+                    "readback_rx_lo_hz": readback,
+                    "started_at": started,
+                    "completed_at": _now(),
+                    "settle_ms": plan["settle_ms"],
+                    "duration_ms": plan["point_duration_ms"],
+                    "rssi_before_db": rssi_before,
+                    "rssi_after_db": rssi_after,
+                    "hardwaregain_before_db": gain_before,
+                    "hardwaregain_after_db": gain_after,
+                    "monitor_stderr": "",
+                    "monitor_start_attempts": 1,
+                    "monitor_records": candidates,
+                    "metrics": _point_metrics(candidates, plan),
+                }
+            )
+            point_index += 1
+            if point_index >= len(plan["scan_offsets_hz"]):
+                continue
+            offset_hz = plan["scan_offsets_hz"][point_index]
+            requested = base_hz + offset_hz
+            readback = round(
+                _write_number(
+                    objects["rx_lo"], "frequency", requested, tolerance=2.0, label="RX LO"
+                )
+            )
+            sleeper(plan["settle_ms"] / 1_000.0)
+            started = _now()
+            rssi_before = _read_number(objects["phy_rx"], "rssi", label="PHY RX1")
+            gain_before = _read_number(
+                objects["phy_rx"], "hardwaregain", label="PHY RX1"
+            )
+            discarded = plan["post_retune_discard_maps"]
+            candidates = []
+        return_code = process.wait(timeout=5.0)
+        stderr_file.seek(0)
+        stderr = stderr_file.read().decode(errors="replace")[-4_000:]
+        if return_code:
+            raise ProbeError(f"M4 continuous role returned {return_code}: {stderr}")
+        monitor_v2._validate_monitor_records(
+            records,
+            {"serial": plan["serial"], "duration_ms": plan["role_monitor_duration_ms"]},
         )
-        sleeper(plan["settle_ms"] / 1_000.0)
-        started = _now()
-        rssi_before = _read_number(objects["phy_rx"], "rssi", label="PHY RX1")
-        gain_before = _read_number(
-            objects["phy_rx"], "hardwaregain", label="PHY RX1"
-        )
-        records, stderr, attempts = _run_monitor_point(
-            plan, password_path, remote
-        )
-        rssi_after = _read_number(objects["phy_rx"], "rssi", label="PHY RX1")
-        gain_after = _read_number(
-            objects["phy_rx"], "hardwaregain", label="PHY RX1"
-        )
-        completed = _now()
-        metrics = _point_metrics(records, plan)
-        points.append(
-            {
-                "role": role,
-                "ordinal": ordinal,
-                "offset_hz": offset_hz,
-                "base_if_hz": base_hz,
-                "requested_rx_lo_hz": requested,
-                "readback_rx_lo_hz": readback,
-                "started_at": started,
-                "completed_at": completed,
-                "settle_ms": plan["settle_ms"],
-                "duration_ms": plan["point_duration_ms"],
-                "rssi_before_db": rssi_before,
-                "rssi_after_db": rssi_after,
-                "hardwaregain_before_db": gain_before,
-                "hardwaregain_after_db": gain_after,
-                "monitor_stderr": stderr,
-                "monitor_start_attempts": attempts,
-                "monitor_records": records,
-                "metrics": metrics,
-            }
-        )
-    return points
+        if len(points) != len(plan["scan_offsets_hz"]):
+            raise ProbeError("M4 continuous role ended before all LO points")
+        return points, {"monitor_records": records, "monitor_stderr": stderr}
+    finally:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            with suppress(subprocess.TimeoutExpired):
+                process.wait(timeout=5.0)
+            if process.poll() is None:
+                process.kill()
+                process.wait(timeout=5.0)
+        if stderr_file is not None:
+            stderr_file.close()
 
 
 def _verify_point(point: dict[str, Any], plan: dict[str, Any], role: str, ordinal: int) -> None:
@@ -1389,7 +1470,7 @@ def _verify_point(point: dict[str, Any], plan: dict[str, Any], role: str, ordina
         or not isinstance(point.get("monitor_stderr"), str)
         or not isinstance(point.get("monitor_start_attempts"), int)
         or isinstance(point.get("monitor_start_attempts"), bool)
-        or not 1 <= point["monitor_start_attempts"] <= MAX_MONITOR_START_ATTEMPTS
+        or point["monitor_start_attempts"] != 1
         or any(
             not isinstance(point.get(key), (int, float))
             or isinstance(point.get(key), bool)
@@ -1472,6 +1553,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     restored: dict[str, Any] | None = None
     rail_probe: dict[str, Any] | None = None
     roles: dict[str, list[dict[str, Any]]] = {}
+    role_monitors: dict[str, dict[str, Any]] = {}
     route: dict[str, str] | None = None
     runtime_before: dict[str, str] | None = None
     runtime_after: dict[str, str] | None = None
@@ -1550,9 +1632,13 @@ def execute_plan(args: Any) -> dict[str, Any]:
 
             remote = _upload_controller(plan, password.path, payload)
             for role in ROLES:
-                roles[role] = _scan_role(
+                roles[role], role_monitors[role] = _scan_role(
                     plan, role, objects, password.path, remote
                 )
+                if role == ROLES[0]:
+                    _validate_counter_headroom(
+                        role_monitors[role]["monitor_records"], plan
+                    )
             final_info = _controller_info(plan, password.path, remote)
             _remove_controller(plan, password.path, remote)
             remote_removed = True
@@ -1574,6 +1660,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     completed = _now()
     preliminary = {
         "roles": roles,
+        "role_monitors": role_monitors,
         "rail_probe": rail_probe,
     }
     if failure is None:
@@ -1606,6 +1693,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
         "iio_selected": selected,
         "rail_probe": rail_probe,
         "roles": roles,
+        "role_monitors": role_monitors,
         "controller_info_after": final_info,
         "controller_binary_removed": remote_removed,
         "iio_restored": restored,
@@ -1660,6 +1748,7 @@ RECEIPT_FIELDS = {
     "iio_selected",
     "rail_probe",
     "roles",
+    "role_monitors",
     "controller_info_after",
     "controller_binary_removed",
     "iio_restored",
@@ -1863,7 +1952,33 @@ def _validate_passing_receipt(
     if not isinstance(roles, dict) or list(roles) != list(ROLES):
         raise ProbeError("M4 role evidence inventory differs from the plan")
     timeline: list[datetime] = []
+    role_monitors = receipt.get("role_monitors")
+    if not isinstance(role_monitors, dict) or list(role_monitors) != list(ROLES):
+        raise ProbeError("M4 continuous role-monitor inventory differs from the plan")
+    previous_accepted_score = 0
     for role in ROLES:
+        monitor = role_monitors[role]
+        if not isinstance(monitor, dict) or set(monitor) != {
+            "monitor_records",
+            "monitor_stderr",
+        }:
+            raise ProbeError(f"M4 {role} continuous monitor evidence is invalid")
+        records = monitor.get("monitor_records")
+        if (
+            not isinstance(records, list)
+            or not isinstance(monitor.get("monitor_stderr"), str)
+        ):
+            raise ProbeError(f"M4 {role} continuous monitor payload is invalid")
+        monitor_v2._validate_monitor_records(
+            records,
+            {"serial": plan["serial"], "duration_ms": plan["role_monitor_duration_ms"]},
+        )
+        summary = records[-1]
+        if role == ROLES[0]:
+            _validate_counter_headroom(records, plan)
+        elif summary["accepted_scores_before"] < previous_accepted_score:
+            raise ProbeError("M4 accepted-score counter is not monotonic across roles")
+        previous_accepted_score = summary["accepted_scores_at_cutoff"]
         points = roles[role]
         if not isinstance(points, list) or len(points) != len(OFFSET_ORDER_HZ):
             raise ProbeError(f"M4 {role} evidence has the wrong point count")
