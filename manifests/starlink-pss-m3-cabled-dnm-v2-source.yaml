@@ -1,0 +1,84 @@
+# Immutable offline source graph for the guarded 15 MS/s M3 bench executor.
+#
+# DO NOT MERGE, RELEASE, PERSISTENTLY FLASH, OR TRANSMIT OVER THE AIR. This
+# revision has not accessed either radio. Execution remains blocked until the
+# operator physically attests a direct TX1-to-RX1 coaxial path, no antenna, and
+# at least 30 dB of real attenuation (40 dB recommended).
+
+schema: plutosdr-fw.starlink-pss-m3-cabled-source
+schema_version: 2
+release_state: offline-guarded-executor
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+persistent_write: false
+hardware_accessed: false
+hardware_qualified: false
+transmitter_accessed: false
+receiver_accessed: false
+
+allocated_receiver_serial: 104000bac4950008230026001b440a003a
+allocated_receiver_topology: 5-2
+allocated_transmitter_serial: 1040007c4a94000211000b009186843ef2
+allocated_transmitter_topology: 3-11
+runtime_target: ad9361-1r1t
+expected_receiver_firmware: v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7
+ppu_repository: jpoirier/pluto-plus-utils
+ppu_source_commit: 7210cda9b0b2452cb607b5e49e689e2d60b6a8b7
+
+cabled_only: true
+antenna_permitted: false
+over_the_air_authorized: false
+fixture_confirmation_state: pending-operator-attestation
+planned_tx_port: TX1
+planned_rx_port: RX1
+minimum_effective_attenuation_db: 30
+recommended_effective_attenuation_db: 40
+transmitter_sample_rate_hz: 15000000
+transmitter_rf_bandwidth_hz: 15000000
+planned_tx_hardwaregain_db: -30
+maximum_tx_hardwaregain_db: -10
+stimulus_sequence: positive-a,muted-negative,positive-b,final-mute
+
+requires_explicit_confirmation: true
+requires_exact_transmitter_serial_and_topology: true
+requires_shared_ppu_serial_lock: true
+requires_clean_attested_ppu_source: true
+rejects_existing_usb_openers: true
+requires_exact_usb_iio_uri: true
+requires_single_tx_runtime_layout: true
+loads_only_mode_0600_owned_waveform: true
+gain_enabled_last: true
+final_tx_mute_unconditional: true
+deterministic_iio_context_close: true
+supported_context_close_methods: explicit-close,legacy-native-destroy
+receiver_recovery_required_after_monitor_attempt: true
+
+execution_plan_schema: plutosdr-fw.starlink-pss-m3-execution-plan.v1
+execution_receipt_schema: plutosdr-fw.starlink-pss-m3-execution-receipt.v1
+stimulus_receipt_schema: plutosdr-fw.starlink-pss15-cabled-stimulus-receipt.v1
+claim_scope: cabled_campaign_transport_only
+cabled_pss_detected_by_this_revision: false
+sss_detected: false
+frame_lock_claim: false
+
+transmitter_primitive_path: scripts/starlink_pss_m3_iio_tx_v1.py
+transmitter_primitive_sha256: 08f18da74d75e34dd4dee9ea8bad8b6c3321661caf5b07ced44ef4bebf450e8b
+transmitter_primitive_test_path: tests/test_starlink_pss_m3_iio_tx_v1.py
+transmitter_primitive_test_sha256: 869e058eae88aae63c4c8c3d7e89dc589c2b672a8fb611130b962128b245fa22
+execution_orchestrator_path: scripts/starlink_pss_m3_execute_v1.py
+execution_orchestrator_sha256: 77bc0e523cbb26a77381e5b5b48dde155b0dcbbf84e31b9e6739a67e76ea2d90
+execution_orchestrator_test_path: tests/test_starlink_pss_m3_execute_v1.py
+execution_orchestrator_test_sha256: 5373fda915457b6404f56dee0ba2dae3671ca952939bd3748567f3a93da877b9
+executor_manifest_test_path: tests/test_starlink_pss_m3_executor_manifest.py
+executor_manifest_test_sha256: d14c2cdc383e4ee51c5348a18d3207ee67e5f246639d8fbe1362c0c4153b7be7
+inherited_m3_source_manifest_path: manifests/starlink-pss-m3-cabled-dnm-v1-source.yaml
+inherited_m3_source_manifest_sha256: eff043090e4286a5e0f3c36517b07d7c311eea88d93173833a29dda698c885f2
+inherited_campaign_path: scripts/starlink_pss_m3_campaign_v1.py
+inherited_campaign_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444
+inherited_monitor_v2_path: scripts/starlink_pss_monitor_probe_v2.py
+inherited_monitor_v2_sha256: cbdc3c8ce60b2db3fdce1a3f3cb152a6f597bc29b7dd255fda3591aac90d13ab
+
+focused_executor_tests: 20
+offline_test_verdict: PASS
