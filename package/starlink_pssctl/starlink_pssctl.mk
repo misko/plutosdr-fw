@@ -7,10 +7,12 @@
 STARLINK_PSSCTL_SITE = $(TOPDIR)/../tools/starlink_pssctl
 STARLINK_PSSCTL_SITE_METHOD = local
 STARLINK_PSSCTL_LICENSE = GPL-2.0-or-later
+STARLINK_PSSCTL_RATE_CFLAGS = $(if $(STARLINK_PSS_RATE_MSPS),-DPSS_BUILD_RATE_MSPS=$(STARLINK_PSS_RATE_MSPS))
 
 define STARLINK_PSSCTL_BUILD_CMDS
 	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_LDFLAGS) \
 		-std=c11 -Wall -Wextra -Werror -Wpedantic \
+		$(STARLINK_PSSCTL_RATE_CFLAGS) \
 		$(@D)/starlink_pss_hw.c $(@D)/starlink_pssctl.c \
 		-o $(@D)/starlink_pssctl
 	$(TARGET_CC) $(TARGET_CFLAGS) $(TARGET_LDFLAGS) \
