@@ -854,15 +854,19 @@ AXI-Lite apertures and interrupts:
 - `starlink-pss-track` at `0x79030000`, GIC SPI 56, transports one atomic
   26-word fine result per scan and supplies the local Q32.32 periodic scheduler;
 - `starlink-pss-map` at `0x79040000`, GIC SPI 54, transports each 20,000-bin
-  coarse map as 200 self-describing scans of 100 `u16` bins.
+  coarse map as 200 self-describing 236-byte scans, each containing nine
+  metadata words followed by 100 packed `u16` bins.
 
 The coarse chunking is an ABI requirement, not compression: Linux 5.15 stores
 `scan_type.repeat` in eight bits, so 20,000 cannot be represented as one IIO
-channel repetition. Every chunk carries magic, ABI, map generation, chunk
-ordinal/count, 64-bit source start index, first bin, and valid-bin count. A
-host can therefore reject missing, duplicated, reordered, or interleaved map
-generations. The FPGA map bank is released only after all 200 scans have been
-accepted by the IIO kfifo.
+channel repetition. The compact transport uses one indivisible 59-word IIO
+channel. Splitting metadata and bins into separate repeated channels is not
+valid here because IIO aligns each channel by its full repeated byte width,
+which turns the logical 236-byte record into a 400-byte scan. Every chunk
+carries magic, ABI, map generation, chunk ordinal/count, 64-bit source start
+index, first bin, and valid-bin count. A host can therefore reject missing,
+duplicated, reordered, or interleaved map generations. The FPGA map bank is
+released only after all 200 scans have been accepted by the IIO kfifo.
 
 Both drivers fail closed. Packet-envelope errors, coefficient-generation
 changes, hardware health faults, map-coherence changes, kfifo exhaustion, or
@@ -873,12 +877,13 @@ the seven-entry FPGA queue. Raw 60 MS/s IQ never enters the ARM or Ethernet
 path.
 
 Reusable host support is in PPU main commit
-`4f4867d4386d0fd0db5d0fb24a74151b3052e57d`. It discovers and validates both
-devices, loads rate-matched CI16 coefficients, reads fine packets, and strictly
-reassembles maps. Its complete repository gate passed 1,431 tests with 11
-explicit hardware/browser skips, plus Ruff and strict mypy. Experimental
-kernel support is isolated on Linux commit
-`8da0bc6073d145ceff5cdff6e25ebf28a4d4bc25`; it is not eligible for Linux or
+`5aff93777ee4f616f4d3527bea083eb5306d80e7`. It discovers and validates both
+devices, strictly parses rate-matched packed-CI16 coefficient files, reads fine
+packets, strictly reassembles maps, and deterministically destroys modern or
+legacy pylibiio buffers and contexts. Its complete repository gate passed
+1,436 tests with 11 explicit hardware/browser skips, plus Ruff and strict
+mypy. Experimental kernel support is isolated on Linux commit
+`4617b1f978dd4411123f2242c791b861f30195a5`; it is not eligible for Linux or
 firmware main.
 
 The first 60 MS/s IIO RAM candidate is stamped
@@ -906,7 +911,7 @@ its child to force re-enumeration disconnected the FunctionFS USB gadget; this
 does not implicate the already successful tracker probe, but it proves that a
 live iiOD restart is not a safe discovery mechanism on this image.
 
-The v3 policy therefore loads and verifies both passive modules from
+The boot policy therefore loads and verifies both passive modules from
 `S22starlink_pss_iio`, before `S23udc` launches iiOD and binds the composite
 USB gadget. The loader writes an atomic PASS/FAIL record at
 `/run/starlink-pss-iio-load`, is idempotent, and never enables coarse
@@ -914,6 +919,17 @@ acquisition or fine scheduling. Its host test covers initial load, repeated
 start, and a partial-load failure. A failed module remains diagnosable while
 the following boot stages can still expose the recovery interfaces. Linux
 commit
-`2f771649ea4e3fa2e6a33fa095c60f627c7e68f6` and Buildroot commit
+`4617b1f978dd4411123f2242c791b861f30195a5` and Buildroot commit
 `41a2a806d97ec04a4d92f3f96c9d6d973dc3c8e6` implement the modular drivers and
 boot-before-iiOD policy; both remain on explicitly do-not-merge branches.
+
+An Ethernet-only v2 diagnostic then bound both modules and restarted only the
+already disconnected iiOD child so a fresh network context could enumerate
+them. PPU validated both exact FPGA contracts with zero faults. The first map
+buffer request exposed the separate-channel alignment error: hardware produced
+three maps and 600 chunks with zero driver faults, but iiOD correctly expected
+400 bytes per scan while the driver supplied 236. Acquisition was disabled and
+the original RX settings were restored. No result from that attempt is a valid
+map transport claim. The corrected single-channel layout keeps each scan at
+236 bytes and removes unused soft timestamps; it requires a freshly built and
+RAM-deployed candidate before native map/fine streaming can be qualified.
