@@ -1,0 +1,61 @@
+# Immutable source graph for the legacy-pylibiio TX identity correction.
+#
+# DO NOT MERGE, RELEASE, PERSISTENTLY FLASH, OR TRANSMIT OVER THE AIR. The
+# experimental radio remains RX-only. The separate bench radio may source only
+# the operator-attested direct 30 dB cabled fixture.
+
+schema: plutosdr-fw.starlink-pss-m3-cabled-source
+schema_version: 4
+release_state: hardware-observed-corrective-source-unqualified
+do_not_merge: true
+do_not_release: true
+merge_target: none
+persistent_flash_eligible: false
+persistent_write: false
+hardware_accessed: false
+hardware_qualified: false
+
+allocated_receiver_serial: 104000bac4950008230026001b440a003a
+allocated_receiver_topology: 5-2
+experimental_receiver_rx_only: true
+experimental_receiver_tx_logic_present: false
+separate_bench_transmitter_serial: 1040007c4a94000211000b009186843ef2
+separate_bench_transmitter_topology: 3-11
+separate_bench_transmitter_interface: enx00e02297811f
+bench_transmitter_required_target: ad9361-1r1t
+bench_transmitter_is_separate_radio: true
+
+cabled_only: true
+antenna_permitted: false
+over_the_air_authorized: false
+fixture_confirmation_state: operator-attested-30db
+planned_physical_path: separate-spare-TX1-to-30db-attenuator-to-experimental-RX1
+minimum_effective_attenuation_db: 30
+recommended_effective_attenuation_db: 40
+
+observed_failure: legacy-pylibiio-distinct-find-channel-and-channel-list-wrappers
+v1_failure_was_before_tx_start: true
+stable_channel_identity_policy: id-direction-and-complete-gain-inventory
+genuine_two_tx_layout_still_rejected: true
+v1_transmitter_driver_preserved: true
+v1_executor_preserved: true
+v2_cleanup_runner_preserved: true
+
+transmitter_driver_v2_path: scripts/starlink_pss_m3_iio_tx_v2.py
+transmitter_driver_v2_sha256: cf37cd5fa36932bab75ccfc56d6eb5dde119a161a3fa5e5bc2a68f0238fb57d2
+transmitter_driver_v2_test_path: tests/test_starlink_pss_m3_iio_tx_v2.py
+transmitter_driver_v2_test_sha256: ddc1235b6a3d5e46db7dec2192dc476181b44edb1b9b9fc6b69758d6daea12b2
+campaign_runner_v3_path: scripts/starlink_pss_m3_execute_v3.py
+campaign_runner_v3_sha256: 8f6d5a9ea0daa8a3343dfb11678e3e6170b7f46a093d3d85d8248bbde6a6c184
+campaign_runner_v3_test_path: tests/test_starlink_pss_m3_execute_v3.py
+campaign_runner_v3_test_sha256: 28b7d57a1b6a093567347ea3132242ded6fc1f0bf9401a503cde907d2c0310ca
+runner_manifest_v4_test_path: tests/test_starlink_pss_m3_runner_manifest_v4.py
+runner_manifest_v4_test_sha256: 897187d8e1b07ea02e271d7fc4e573267ae607fcc6f2102609a33b2c65bb935c
+inherited_m3_v3_manifest_path: manifests/starlink-pss-m3-cabled-dnm-v3-source.yaml
+inherited_m3_v3_manifest_sha256: 7e45de8d67f33bba9d228098522abc1dd1f8748185d29066c074ee3f0286c1ad
+
+focused_corrective_tests: 3
+offline_test_verdict: PASS
+cabled_pss_detected_by_this_revision: false
+sss_detected: false
+frame_lock_claim: false
