@@ -1,0 +1,154 @@
+# Immutable source graph for the corrected 30 MS/s acquisition-only cabled qualifier.
+#
+# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This revision is build-gated to
+# 30 MS/s. It preserves the v6 acquisition-only architecture while using the
+# current v8 HDL source graph; the periodic injector remains excluded.
+
+schema: plutosdr-fw.source-manifest
+schema_version: 1
+release_state: candidate
+do_not_merge: true
+merge_target: none
+persistent_flash_eligible: false
+hardware_qualified: false
+hardware_accessed_by_this_revision: false
+allocated_radio_serial: 104000bac4950008230026001b440a003a
+ppu_changed: false
+
+supersedes_manifest: starlink-pss-multirate-rx-only-dnm-v8-source.yaml
+source_change: separate-ddc-cold-start-index-from-real-gap
+starlink_pss_profile: acquisition-only
+starlink_pss_profile_rate_gate_msps: 30
+starlink_pss_tracker_included: false
+starlink_pss_tracker_axi_aperture_included: false
+starlink_pss_tracker_interrupt_included: false
+starlink_pss_rx0_fanout: direct-to-acquisition-and-rx-dma
+pss_sample_enable_source: constant-one
+pss_runtime_enable_source: fail-closed-mmio-control
+linux_iio_buffer_required_for_pss: false
+rx_dma_iio_retained: true
+rx_only_tx_null_response_scope: dac-common-and-enabled-dac-channels-only
+rx_only_adc_aperture_acknowledged_by_tx: false
+controller_firmware_source: 6f7b2e436577c2a73658f462826436f460630fe6
+controller_packaged: true
+controller_mmio_base: 0x79040000
+controller_candidate_claim_scope: candidate_measurement_only
+controller_hardware_qualified: false
+controller_cli_sha256: 2f343a2804e7414f26c4e2134ba5e827aed45124fa0fccf58d0915b704161923
+controller_library_sha256: c2fd427e1cbf757531bf96b36975a7fc78dcffc0d2f0bf35a90097d21dcffa48
+controller_header_sha256: ebd4c5ab820926e7631b3f6a43f8bfc0b1c492cd19b012726df4f72190a13243
+controller_native_test_sha256: 9db410bdd5dea1a537b74a66d7f30070aae9ada49e734c07dcbc4977fefd2d72
+controller_cli_test_sha256: f572e94722edf3fb608853d6cadb8cf950ad8d737da324f2257278ba5ce81766
+controller_buildroot_recipe_sha256: 557a633086375e188c82eaa09f5a1cbabb0595df245e32d95d4ffce6a756d316
+
+starlink_pss_rate_selection: required-at-build-time
+starlink_pss_supported_rates_msps: 15,30,60
+starlink_pss_canonical_rate_msps: 15
+starlink_pss_fft_length: 512
+starlink_pss_xfft_instances: 2
+starlink_pss_xfft_topology: dedicated-forward-inverse
+starlink_pss_transform_fifo_depth: 4
+starlink_pss_sustained_simulation_blocks: 64
+starlink_pss_30_ddc_stages: 1
+starlink_pss_clean_start_scheduler_gaps: 0
+starlink_pss_cold_start_absolute_index_load: true
+starlink_pss_real_gap_fail_closed: true
+starlink_pss_60_ddc_stages: 2
+starlink_pss_tracker_full_rate_geometry: retained-in-full-profile-only
+
+starlink_pss_abi_15: 1.1
+starlink_pss_abi_30: 1.2
+starlink_pss_abi_60: 1.3
+starlink_pss_config_15: 0x000f0202
+starlink_pss_config_30: 0x000f0203
+starlink_pss_config_60: 0x020f0403
+starlink_pss_group_delay_15_source_samples: 0
+starlink_pss_group_delay_30_source_samples: 7
+starlink_pss_group_delay_60_source_samples: 21
+
+# This reference route is the exact fresh v6 acquisition-only 30 MS/s build
+# which established timing and resource feasibility before this immutable v9
+# source freeze. Every v9 package must still rebuild and bind its own routed
+# checkpoint and reports to the package checksum graph.
+route_evidence_scope: pre-v9-freeze-v6-acquisition-only-reference
+route_15_github_run: inherited-v7-15m-reference
+route_15_firmware_source: 6f7b2e436577c2a73658f462826436f460630fe6
+route_15_hdl_source: 9f3851d33c171a29b28a7b6a5a5469759ad5c79f
+route_15_wns_ns: 0.530
+route_15_whs_ns: 0.008
+route_15_lut: 10032
+route_15_ff: 17647
+route_15_slice: 4259
+route_15_control_sets: 421
+route_15_bram36_equivalent: 43
+route_15_dsp: 44
+route_15_xsa_sha256: 303e1b26af9e13039da71d3fd28e21c4ee41767f7347c8a923be0317bddb6321
+route_15_bit_sha256: 491a7bd27812e27940c9887fbc4bfcc46650dc7e1beb731b748d7a8514612d2a
+
+route_30_github_run: local-20260907-v6-acquisition-only-reference
+route_30_firmware_source: 4dd46af19479474cc6cfd88b525ab33afa49ad7d
+route_30_hdl_source: aac10563f4b6b77a21a40d42c0114330d296139e
+route_30_wns_ns: 0.673
+route_30_whs_ns: 0.018
+route_30_lut: 9708
+route_30_ff: 16825
+route_30_slice: 4180
+route_30_control_sets: 397
+route_30_bram36_equivalent: 42.5
+route_30_dsp: 52
+route_30_xsa_sha256: 5cfb6525cbbc9765c12d908a498c4bcbb502c07fc674aad1fb4e9b33dc3d2d8b
+route_30_bit_sha256: b2d514607afccc18fa68f98bc57ac9b33ca9bea2fd28316b79b15339bdb7a2df
+route_30_cdc_report_sha256: 6a06dc31beb89d3f8cafc66bd50dfb9ba36ffbd4b710ccba273f31984c29b5d3
+route_30_bus_skew_report_sha256: cc49bc7e214c9860823d704fed444cea16d2596ea0ecc506a69eb66819f77f7b
+
+route_60_github_run: pending-after-30-hardware-gate
+route_60_firmware_source: pending
+route_60_hdl_source: 74d4d38a1df5438199c2306a84be56da900ffd96
+route_60_wns_ns: pending
+route_60_whs_ns: pending
+route_60_xsa_sha256: pending
+route_60_bit_sha256: pending
+
+firmware_repo: https://github.com/misko/plutosdr-fw.git
+
+libiio_0_25_source: 0d323080a0a1067da8c7adbadfd03ee186a40ec2
+libiio_0_25_repo: https://github.com/misko/libiio.git
+libiio_0_25_ref: refs/tags/iq-direct-async-v3-source/libiio-v1
+libiio_0_25_archive_sha256: 66ccc7230ebe75c477c4dfc147aa86289c3f896c0a0d6b3b6c964e152d89c266
+
+metadata_source: 3294365ff44da26b261be4a2ccb241b7896d23ad
+metadata_repo: https://github.com/misko/plutosdr-fw.git
+metadata_ref: refs/tags/iio-throughput-sampler-wake-v5-source/metadata-v1
+
+gadget_source: 1bbe9f0ee4a70374964804de09b7503da260b059
+gadget_repo: https://github.com/misko/plutosdr-fw.git
+gadget_ref: refs/tags/libiio-metadata-v6-rc4-source/gadget-v4
+
+ip_gadget_source: b066059e54817ad9a140c3549fcee0bf39dadc81
+ip_gadget_repo: https://github.com/misko/plutosdr-fw.git
+ip_gadget_ref: refs/tags/gain-series-v4-rc17-source/ip-gadget-final-v2
+
+submodule_buildroot: 6971a8c1fb5f8422cf5f32e239efe49c2cea08ec
+submodule_buildroot_repo: https://github.com/misko/plutosdr-fw.git
+submodule_buildroot_ref: refs/tags/starlink-rx-only-dnm-v1-source/buildroot-pss-acqctl-v1
+
+submodule_hdl: 74d4d38a1df5438199c2306a84be56da900ffd96
+submodule_hdl_repo: https://github.com/misko/plutosdr-hdl.git
+submodule_hdl_ref: refs/tags/starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v8
+
+submodule_hdl_quantulum: 364b3dc7e770c3971d1f41a75c00e6cae76e2e6d
+submodule_hdl_quantulum_repo: https://github.com/misko/plutosdr-hdl-quantulum
+submodule_hdl_quantulum_ref: refs/tags/ddr-burst-v1-rc5-source/hdl-quantulum-v1
+
+submodule_linux: 154bda793ee846c57421d07b722fae898f0ae134
+submodule_linux_repo: https://github.com/misko/plutosdr-linux.git
+submodule_linux_ref: refs/tags/starlink-rx-only-dnm-v1-source/linux-v2
+
+submodule_u_boot_xlnx: 1ff0468e9bea29b0a768a7bf52db8d025c521b9a
+submodule_u_boot_xlnx_repo: https://github.com/misko/plutosdr-u-boot-xlnx.git
+submodule_u_boot_xlnx_ref: refs/tags/gain-series-v4-rc2-source/u-boot-xlnx
+
+versions_hdl: starlink-rx-only-dnm-v1-source/hdl-pss15-30-60-acquisition-v8
+versions_buildroot: starlink-rx-only-dnm-v1-source/buildroot-pss-acqctl-v1
+versions_linux: starlink-rx-only-dnm-v1-source/linux-v2
+versions_u_boot_xlnx: gain-series-v4-rc2-source/u-boot-xlnx

@@ -84,11 +84,11 @@ def test_fixed_stream_index_gap_and_rounding_contract() -> None:
         samples, first_input_index=100, edge="upper"
     )
     assert result.accepted_samples == 100
-    assert result.discontinuities == 1
+    assert result.discontinuities == 0
     assert result.saturation_events == 0
     np.testing.assert_array_equal(result.output_indexes, np.arange(54, 97))
     np.testing.assert_array_equal(
-        result.output_gaps, np.asarray([True] + [False] * 42)
+        result.output_gaps, np.zeros(43, dtype=np.bool_)
     )
     assert hashlib.sha256(result.samples_iq.tobytes()).hexdigest() == (
         "2d3bd6aa911b2d8cc259143802e662ab7ef9238e26d213bffbac89aa56dcf9b2"
@@ -136,11 +136,11 @@ def test_x4_fixed_stream_index_and_stage_evidence() -> None:
     result = x4_ddc_ci16(samples, first_input_index=100, edge="upper")
     assert result.accepted_samples == 200
     assert result.emitted_samples == 39
-    assert result.discontinuities == 1
+    assert result.discontinuities == 0
     assert result.saturation_events == 0
     np.testing.assert_array_equal(result.output_indexes, np.arange(31, 70))
     np.testing.assert_array_equal(
-        result.output_gaps, np.asarray([True] + [False] * 38)
+        result.output_gaps, np.zeros(39, dtype=np.bool_)
     )
     assert hashlib.sha256(result.samples_iq.tobytes()).hexdigest() == (
         "3aa72adb3a6f4bfe2bc2987f11240cb66de2afa7eb26873715254e3a7cd1e9d0"

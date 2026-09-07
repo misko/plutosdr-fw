@@ -153,8 +153,6 @@ def x2_ddc_ci16(
         raise ValueError("edge must be 'lower' or 'upper'")
     if gap_before is None:
         gaps = np.zeros(samples.shape[0], dtype=np.bool_)
-        if gaps.size:
-            gaps[0] = True
     else:
         gaps = np.asarray(gap_before, dtype=np.bool_)
         if gaps.shape != (samples.shape[0],):
@@ -164,7 +162,7 @@ def x2_ddc_ci16(
     outputs: list[tuple[int, int]] = []
     indexes: list[int] = []
     output_gaps: list[bool] = []
-    gap_pending = True
+    gap_pending = False
     discontinuities = 0
     saturation_events = 0
 

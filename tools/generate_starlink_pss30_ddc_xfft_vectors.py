@@ -90,9 +90,9 @@ def generate(output_directory: Path) -> dict[str, object]:
         raise RuntimeError("unexpected DDC output geometry")
     if int(ddc.output_indexes[0]) != FIRST_ACQUISITION_INDEX:
         raise RuntimeError("unexpected first acquisition index")
-    if not bool(ddc.output_gaps[0]) or np.count_nonzero(ddc.output_gaps) != 1:
+    if np.count_nonzero(ddc.output_gaps) != 0:
         raise RuntimeError("unexpected DDC gap contract")
-    if ddc.discontinuities != 1 or ddc.saturation_events != 0:
+    if ddc.discontinuities != 0 or ddc.saturation_events != 0:
         raise RuntimeError("clean DDC replay was not clean")
 
     coefficients = quantize_q15(conditioned_pss("upper"))
