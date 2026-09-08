@@ -2,10 +2,9 @@
 
 Canonical design specification: [FPGA_tracker_60MS.md](FPGA_tracker_60MS.md)
 
-Status: 15/30/60 MS/s coarse acquisition and 60 MS/s full-rate refinement are
-implemented and cabled-tested. Live-LNB 15 MS/s PSS acquisition is qualified.
-30 MS/s refinement, live 30/60 MS/s qualification, SSS, and frame lock
-remain open.
+Status: 15/30/60 MS/s coarse acquisition and 30/60 MS/s full-rate refinement
+are implemented and cabled-tested. Live-LNB 15 MS/s PSS acquisition is
+qualified. Live 30/60 MS/s qualification, SSS, and frame lock remain open.
 **DO NOT MERGE INTO FIRMWARE MAIN.**
 
 Authorized receiver: `104000bac4950008230026001b440a003a` only.
@@ -43,7 +42,7 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
 | M4: live-LNB 15 MS/s timing | Complete | Both positive roles passed with a rejected below-band receiver-noise control and clean recovery |
 | M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
-| M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
+| M6: sparse 30 MS/s refinement | Complete | Direct full-rate timing within one source sample on the cabled positive/control/positive fixture |
 | M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
 | M8: sparse 60 MS/s refinement | Complete | Direct full-rate timing within one source sample on the cabled positive/control/positive fixture |
 | M9: live 60 MS/s narrowband run | Cabled complete; live pending | Outdoor LNB evidence with same-RF mismatched-template control and rollback proof |
@@ -872,9 +871,10 @@ Evidence:
 - authoritative private directory:
   `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m5-live-20260907/candidate-30-v9`.
 
-M5 is complete for coarse acquisition and index transport. M6 remains open
-until the sparse full-rate tracker resolves timing within one 30 MS/s source
-sample.
+M5 is complete for coarse acquisition and index transport. The later native-IIO
+M6 qualification resolved timing within one 30 MS/s source sample; its routed,
+cabled, transport, and recovery evidence is recorded in
+`FPGA_tracker_native_iio.md`.
 
 ## M7 coarse 60 MS/s acquisition and cabled soak
 

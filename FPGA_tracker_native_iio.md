@@ -620,12 +620,34 @@ Evidence root:
 
 ## Next gates
 
-1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
-   repeated on-channel roles over Ethernet. Keep one map stream open for the
-   complete reset epoch and record every candidate, miss, and health counter.
-2. Use the live coarse timing to test a small frequency-compensated coefficient
-   bank, then add cadence lock. Do not add SSS until PSS timing and CFO are
-   repeatable on live captures.
-3. Add SSS hypotheses and joint PSS/SSS consistency as a new gate, then define
-   final frame-lock acquisition/loss hysteresis. No earlier result is promoted
-   retroactively to frame lock.
+The original native live-runner design used a nearby `off_slice_control` for
+the middle role. That is not a valid Starlink-negative control: both LOs remain
+inside the same approximately 240 MHz downlink allocation, so changing the LO
+can select a different occupied slice rather than remove the signal class.
+Historical receipts remain immutable, but no future live claim may use that
+control.
+
+1. Promote exact native-IIO image bytes only through a separately reviewed PPU
+   canary/promotion profile with exact-image, RX-only topology, persistent
+   return, and rollback gates. Do not infer persistent authority from a
+   RAM-only candidate plan.
+2. Run 30 MS/s first, then 60 MS/s, as bounded on-channel / below-band receiver-
+   noise control / repeated on-channel roles over Ethernet. The control is
+   centered at RF 10.600 GHz (850 MHz IF with the declared 9.750 GHz LNB LO),
+   and its complete 20 MHz receive passband stays below the declared 10.700 GHz
+   Starlink/LNB boundary. Retain one continuous map epoch, discard ten complete
+   maps after each retune, and bind every map, counter, reboot, and QSPI
+   identity in independently replayable evidence.
+3. Treat that campaign only as coarse PSS acquisition and timing-seed evidence.
+   The coarse map detector has fixed coefficients, so loading a tracker
+   coefficient file cannot make the coarse map itself a mismatched-template
+   control.
+4. For fine timing, schedule full-rate tracker requests from the live coarse
+   seeds at the same RF. Compare the matched PSS coefficient bank with an
+   energy-matched, deliberately mismatched bank, and qualify normalized score,
+   sub-sample timing continuity, aperture margin, queue accounting, and fault
+   counters. Raw 30/60 MS/s IQ remains inside the FPGA.
+5. Add cadence/CFO tracking only after matched fine timing is repeatable at 30
+   and then 60 MS/s. Add SSS hypotheses and joint PSS/SSS consistency as a new
+   gate after that, followed by explicit frame-lock acquisition/loss
+   hysteresis. No earlier result is promoted retroactively to frame lock.
