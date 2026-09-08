@@ -482,3 +482,53 @@ the matched real IIO path on .18 and deploy .17 for fixed-frequency paired live
 proof before hopping/rate expansion. No radio access, flashing, TX, new PPU
 changes, live GLRT detection or FPGA live timing lock occurred in this checkpoint.
 The source-pinned aggregate is `reports/starlink-shared-xfft-candidate-20260908.json`.
+
+### Shared-transform receiver integration checkpoint — 2026-09-08
+
+The opt-in `STARLINK_PSS_SHARED_XFFT=1` build now connects the actual single
+200 MHz transform island through acquisition, phase-map wrapper, packaged IP
+and complete paired-receiver block design. The selector is restricted to
+`paired-pilot` at 15 MS/s; defaults preserve the two-core selection and their
+rate-dependent register ABIs. Both PSS stages and the exact 2.5 MS/s pilot DMA
+branch remain present. No feature was removed to obtain the resource savings.
+
+The experimental image identifies itself as PSMA ABI **1.5**, capabilities
+`0x13f`. Shared transform faults have a distinct sticky health bit 14, not the
+direction-specific forward/inverse bits. Existing kernel/host readers still
+reject 1.5 and must gain explicit tested support before deployment. There is
+no silent reinterpretation of a deployed ABI.
+
+The real two-clock shared phase-map replay passes 1341 exact scores and 447
+exact map reads at reduced test geometry. A fault after partial-tile score
+accumulation aborts that tile and publishes no partial map; its cause and
+episode count are verified. The dedicated-core regression also matches all
+scores/map entries. The offline oracle/plan/contract suite passes **311 tests**,
+including 22 new policy/health/ABI tests, and the acquisition module and
+all-rate wrapper suites pass. These tests do not establish live detection or
+production dwell sensitivity.
+
+The first full integration attempt exposed Vivado synthesis rejecting Tcl
+control flow inside packaged XDC. Declarative constraints replace it. A new
+pre-placement audit verifies actual 100/200 MHz endpoint clocks, exactly one
+transform core with coarse/fine/pilot DMA still present, all four ownership
+crossings, fault synchronization, and every bit of both 70/75-bit held metadata
+buses. This gate passes in the fresh full builds. CDC reports retain the held
+bus and reset-fanout diagnostics for explicit review; they are not blanket
+waived and do not yet constitute full integrated CDC qualification.
+
+The best properly constrained full build uses **13546 LUTs, 18856 FFs, 48.5
+BRAM tiles and 48 DSPs**, but still fails placement: 2372 unplaced slices need
+2361 remaining locations, an **11-slice shortfall**. The threshold-8 packing
+experiment is worse (22 short), so threshold 4 remains the baseline. The
+pre-integration complete receiver was 410 short. There is still no routed or
+deployable paired image. A real-XFFT 4096-block (~122 ms source span) capacity
+simulation has started and remains running at this checkpoint; do not count
+it as a pass or restart it merely because this task yields.
+
+Next: targeted full-receiver fit/timing and integrated CDC work, then explicit
+ABI 1.5 kernel/host support and matched real IIO qualification on .18, followed
+by serial-locked network deployment to .17 and same-observation blind live
+GLRT plus FPGA PSS timing-lock proof. The remaining eight-target/120 ms/300 s
+and 30/60 MS/s gates remain required. No radio, PPU, Linux, or default firmware
+image was changed in this checkpoint. Source/evidence pins are recorded in
+`reports/starlink-shared-xfft-integration-20260908.json`.
