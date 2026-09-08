@@ -141,6 +141,38 @@ def test_short_trajectory_is_ambiguous() -> None:
     assert metrics["minimum_window_count_met"] is False
 
 
+def test_campaign_evaluation_requires_duration_geometry_and_all_three_roles() -> None:
+    positive = qualify.trajectory_metrics(_windows(positive=True, count=40))
+    negative = qualify.trajectory_metrics(_windows(positive=False, count=40))
+    roles = {
+        "on_channel_a": {
+            "metrics": positive,
+            "requested_lo_hz": 1_937_500_000,
+            "requested_duration_seconds": 120.0,
+            "elapsed_seconds": 120.01,
+        },
+        "off_slice_control": {
+            "metrics": negative,
+            "requested_lo_hz": 1_887_500_000,
+            "requested_duration_seconds": 120.0,
+            "elapsed_seconds": 120.02,
+        },
+        "on_channel_b": {
+            "metrics": positive,
+            "requested_lo_hz": 1_937_500_000,
+            "requested_duration_seconds": 120.0,
+            "elapsed_seconds": 120.03,
+        },
+    }
+
+    result = qualify.campaign_evaluation(roles)
+
+    assert result["qualified"] is True
+    assert result["off_slice_separation_hz"] == 50_000_000
+    roles["on_channel_b"]["requested_duration_seconds"] = 1.0
+    assert qualify.campaign_evaluation(roles)["qualified"] is False
+
+
 def test_role_analysis_replays_complete_receipt(
     tmp_path: Path,
 ) -> None:
