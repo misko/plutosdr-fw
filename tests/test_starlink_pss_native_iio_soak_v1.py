@@ -164,11 +164,13 @@ def test_run_holds_rx_lock_through_restore_and_context_close(
         "connect",
         lambda *_args, **_kwargs: client,
     )
-    monkeypatch.setattr(
-        runner,
-        "_configure_rx",
-        lambda *_args: ({"before": 1}, {"selected": 1}),
-    )
+    configured_lo: list[int] = []
+
+    def configure(*_args: Any, **kwargs: Any) -> tuple[dict[str, int], dict[str, int]]:
+        configured_lo.append(kwargs["lo_hz"])
+        return {"before": 1}, {"selected": 1}
+
+    monkeypatch.setattr(runner, "_configure_rx", configure)
 
     def restore(*_args: Any) -> dict[str, bool]:
         assert lock_active
@@ -186,9 +188,27 @@ def test_run_holds_rx_lock_through_restore_and_context_close(
         profile=profile,
         receiver_transport="ethernet",
         duration_seconds=1.0,
+        rx_lo_hz=1_937_500_000,
     )
 
     assert receipt["outcome"] == "pass"
     assert receipt["transmitter_opened"] is False
+    assert receipt["receiver"]["requested_lo_hz"] == 1_937_500_000
+    assert configured_lo == [1_937_500_000]
     assert events[-3:] == ["restore", "context_close", "lock_exit"]
     assert not lock_active
+
+
+@pytest.mark.parametrize("rx_lo_hz", [True, 69_999_999, 6_000_000_001])
+def test_run_rejects_invalid_rx_lo_before_creating_output(
+    tmp_path: Path, rx_lo_hz: Any
+) -> None:
+    with pytest.raises(ValueError, match="RX LO"):
+        runner.run(
+            tmp_path / "must-not-exist",
+            profile=runner.RATE_PROFILES[30],
+            receiver_transport="ethernet",
+            duration_seconds=1.0,
+            rx_lo_hz=rx_lo_hz,
+        )
+    assert not (tmp_path / "must-not-exist").exists()

@@ -341,6 +341,33 @@ Evidence root:
 
 `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt4`
 
+## Live fixed-IF preparation
+
+The RX-only soak runner accepts an explicit `--rx-lo-hz`. The value is checked
+before an output directory or radio context is created and must lie in the
+AD9361 tuning interval from 70 MHz through 6 GHz. The cabled qualification path
+retains its 2.4 GHz default, so this does not change any earlier evidence.
+
+For the frozen channel-4 upper-edge geometry and a 9.75 GHz low-side LNB, the
+declared receiver IF is 1,937,500,000 Hz. After the matching 30 MS/s image has
+been RAM-booted and Ethernet readiness has passed, the first noise/live
+observation command is:
+
+```text
+scripts/starlink_pss_native_iio_soak_v1.py \
+  --rate-msps 30 \
+  --receiver-transport ethernet \
+  --duration-seconds 120 \
+  --rx-lo-hz 1937500000 \
+  OUTPUT_DIRECTORY
+```
+
+The receipt records both the requested LO and exact AD9361 readback, holds the
+`.17` lock through RF restoration and context destruction, opens no
+transmitter, and makes no PSS claim from a noise-only run. On-channel evidence
+must still be compared with the declared off-slice control and repeated
+on-channel role before promotion to M4/M9.
+
 ## Next gates
 
 1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and

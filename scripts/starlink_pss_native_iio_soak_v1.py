@@ -40,6 +40,7 @@ from pluto_plus.hardware.pss_iio import (
 from pluto_plus.radio_lock import acquire_radio_lock
 
 from scripts.starlink_pss_iio_cabled_v1 import (
+    LO_HZ,
     RATE_PROFILES,
     RX_SERIAL,
     QualificationError,
@@ -97,9 +98,16 @@ def run(
     profile: RateProfile,
     receiver_transport: str,
     duration_seconds: float,
+    rx_lo_hz: int = LO_HZ,
 ) -> dict[str, Any]:
     if not 1.0 <= duration_seconds <= 120.0:
         raise ValueError("soak duration must lie in [1, 120] seconds")
+    if (
+        isinstance(rx_lo_hz, bool)
+        or not isinstance(rx_lo_hz, int)
+        or not 70_000_000 <= rx_lo_hz <= 6_000_000_000
+    ):
+        raise ValueError("RX LO must be an integer in [70000000, 6000000000] Hz")
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     if (
@@ -116,6 +124,7 @@ def run(
         "receiver": {
             "serial": RX_SERIAL,
             "transport": receiver_transport,
+            "requested_lo_hz": rx_lo_hz,
         },
         "rate_msps": profile.rate_msps,
         "sample_rate_hz": profile.rate_hz,
@@ -136,7 +145,7 @@ def run(
         with nullcontext():
             uri = _receiver_uri(receiver_transport)
             client = PssIioClient.connect(uri, expected_serial=RX_SERIAL)
-            before, selected = _configure_rx(client, profile)
+            before, selected = _configure_rx(client, profile, lo_hz=rx_lo_hz)
             receipt["receiver"].update(
                 {
                     "uri": uri,
@@ -278,16 +287,25 @@ def main() -> int:
         "--receiver-transport", choices=("usb", "ethernet"), default="ethernet"
     )
     parser.add_argument("--duration-seconds", type=float, default=120.0)
+    parser.add_argument(
+        "--rx-lo-hz",
+        type=int,
+        default=LO_HZ,
+        help="receiver LO in Hz; use the LNB IF center for live observations",
+    )
     parser.add_argument("output", type=Path)
     arguments = parser.parse_args()
     if not 1.0 <= arguments.duration_seconds <= 120.0:
         parser.error("--duration-seconds must lie in [1, 120]")
+    if not 70_000_000 <= arguments.rx_lo_hz <= 6_000_000_000:
+        parser.error("--rx-lo-hz must lie in [70000000, 6000000000]")
     try:
         receipt = run(
             arguments.output,
             profile=RATE_PROFILES[arguments.rate_msps],
             receiver_transport=arguments.receiver_transport,
             duration_seconds=arguments.duration_seconds,
+            rx_lo_hz=arguments.rx_lo_hz,
         )
     except BaseException as error:  # noqa: BLE001 - guarded CLI boundary
         print(json.dumps({"outcome": "failed", "error": str(error)}, sort_keys=True))

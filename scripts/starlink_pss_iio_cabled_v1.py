@@ -424,8 +424,17 @@ def _refine(
 
 
 def _configure_rx(
-    client: PssIioClient, profile: RateProfile
+    client: PssIioClient,
+    profile: RateProfile,
+    *,
+    lo_hz: int = LO_HZ,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    if (
+        isinstance(lo_hz, bool)
+        or not isinstance(lo_hz, int)
+        or not 70_000_000 <= lo_hz <= 6_000_000_000
+    ):
+        raise ValueError("RX LO must be an integer in [70000000, 6000000000] Hz")
     context = client.context
     setter = getattr(context, "set_timeout", None)
     if not callable(setter):
@@ -467,7 +476,7 @@ def _configure_rx(
             profile.rate_hz * 100e-6,
         ),
         "bandwidth": _write_number(phy_rx, "rf_bandwidth", profile.bandwidth_hz, 2),
-        "lo": _write_number(rx_lo, "frequency", LO_HZ, 2),
+        "lo": _write_number(rx_lo, "frequency", lo_hz, 2),
         "lo_powerdown": _write_number(rx_lo, "powerdown", 0, 0),
     }
     _attribute(phy_rx, "gain_control_mode").value = "slow_attack"
@@ -477,7 +486,7 @@ def _configure_rx(
         "adc_rate": profile.rate_hz,
         "bandwidth": profile.bandwidth_hz,
         "gain_mode": "slow_attack",
-        "lo": LO_HZ,
+        "lo": lo_hz,
         "lo_powerdown": 0,
     }:
         raise QualificationError("RX selected setting readback differs")
