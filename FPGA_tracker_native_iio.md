@@ -467,6 +467,88 @@ Evidence root:
 
 `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt6-live-trajectory`
 
+## Single-epoch native live campaign
+
+The native live runner closes the Ethernet-only operational gap: `.17` can be
+RAM-booted while locally attached, moved outside without losing power, and then
+complete positive-A/off-slice-control/positive-B without another USB or FPGA
+reset. It opens the FPGA map buffer exactly once and retunes only the AD9361 RX
+LO between roles. Each retune waits 200 ms and drains five complete maps before
+the next role starts, preventing RF-settling and rolling-map contamination from
+entering the decision.
+
+Each role retains its complete rolling timing trajectory. Global accounting
+includes all role maps plus both five-map transition guards, and requires exact
+driver map/chunk counts, continuous generations and canonical/source indexes,
+the active coefficient generation, and zero map/tracker/validation/push faults.
+Signal classification does not control acquisition success. A PSS timing claim
+requires all three roles to last at least 120 seconds, both on-channel roles to
+pass the frozen positive-track policy, the off-slice role to pass the negative
+control policy, at least 30 MHz frequency separation, and at least `1.10x`
+median contrast. SSS and frame lock remain hard false.
+
+The separate replay verifier checks an exact field and gate inventory,
+coefficient identity, every role window, all ten transition maps, cross-retune
+continuity, receiver settings, cleanup, and synchronization claims. Unit tests
+prove one buffer open, cleanup before lock release, and rejection of forged PSS
+or omitted epoch gates.
+
+The committed path passed a short structural hardware campaign on `.17` at
+30 MS/s. One uninterrupted epoch followed
+`1,937,500,000 -> 1,887,500,000 -> 1,937,500,000 Hz`, delivering 46 contiguous
+maps and 9,200 exact chunks. The three one-second roles each retained 12 maps
+and 10 timing windows; both transition guards discarded exactly five maps.
+Every fault gate was zero and RF settings were restored. Independent replay
+passed but correctly kept `pss_detected=false` because the 120-second duration
+gate was false. This is structural/no-LNB evidence only.
+
+The production 30 MS/s command, after RAM boot and Ethernet readiness, is:
+
+```text
+scripts/starlink_pss_native_iio_live_campaign_v1.py \
+  --rate-msps 30 \
+  --on-lo-hz 1937500000 \
+  --off-lo-hz 1887500000 \
+  --role-duration-seconds 120 \
+  OUTPUT_DIRECTORY
+```
+
+The same runner accepts `--rate-msps 60` after the 60 MS/s detector image is
+RAM-booted. The frequency geometry and decision policy remain identical; map
+indexes are converted by the rate-aware native client.
+
+After the structural run, PPU recovery proved USB departure/return, route
+release, persistent AD9361 1R1T firmware, and unchanged QSPI. `.18` and all
+other radios were not opened. Thirty focused native acquisition, single-epoch,
+replay, campaign, and cabled tests pass.
+
+### Single-epoch campaign evidence identities
+
+- USB inventory:
+  `8a5e0723704241631a5682c1fff4c6c5df574205da6c84fa8d4a2c60a7d38b1c`
+- operation plan:
+  `33d419845086fdd55d31e460bdfec2f8def298722c0d5bfecbd00d80ad49d08f`
+- RAM deployment:
+  `eba0507f7f8f0cf09b59ceb7a0bbda1e2538e244bf3de3889b652c3d91dd628b`
+- structural campaign:
+  `11dd0e3de207893b283ba0f30b9be0277ab71090929c17b730b34c9b211c88bf`
+- independent campaign replay:
+  `e7273afa0117d6eddf7311da6c1f8cc879a7904d99c4ead3c6d60917add0dad6`
+- recovery:
+  `cf2f506c104695a835a10ac7c1382cff81a292402d6396749fcb840036f5d865`
+- single-epoch runner source:
+  `2d3edba6be0fded8ed3702ed37cf8cb715dbfbf41380d5f88692e8203c3a96ca`
+- replay/qualification source:
+  `f2684d1ffe0ba5069686b0593414ac86b4c73875cd029d522dae242a45fa85cd`
+- single-epoch test source:
+  `5174e440c791b417dec7c49f23dddfacb843543336ff9368e53aa44915abd168`
+- replay/qualification test source:
+  `c77af85f3df861644f0db9e6c96807bc2bd719ea35b4392d6c08c2970dd7c6e8`
+
+Evidence root:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt7-single-epoch`
+
 ## Next gates
 
 1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
