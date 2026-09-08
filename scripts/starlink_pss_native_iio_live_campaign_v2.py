@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import struct
+import subprocess
 import sys
 import time
 from collections import deque
@@ -111,6 +112,45 @@ def _validate_source_commit(value: str, *, label: str) -> str:
     ):
         raise ValueError(f"{label} must be one full lowercase Git commit")
     return value
+
+
+def _verify_source_checkout(
+    repository: Path,
+    commit: str,
+    *,
+    label: str,
+    expected_origin_suffix: str,
+) -> None:
+    """Prove a supplied source identity against its exact clean checkout."""
+    selected = repository.absolute()
+    commit = _validate_source_commit(commit, label=f"{label} commit")
+
+    def git(*arguments: str) -> str:
+        try:
+            completed = subprocess.run(
+                ("git", "-C", str(selected), *arguments),
+                check=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (
+            OSError,
+            subprocess.CalledProcessError,
+            subprocess.TimeoutExpired,
+        ) as error:
+            raise QualificationError(f"{label} checkout cannot be attested") from error
+        return completed.stdout.strip()
+
+    origin = git("remote", "get-url", "origin")
+    normalized_origin = origin.removesuffix(".git").replace(":", "/")
+    if (
+        Path(git("rev-parse", "--show-toplevel")).absolute() != selected
+        or git("rev-parse", "--verify", "HEAD^{commit}") != commit
+        or git("status", "--porcelain=v1", "--untracked-files=all")
+        or not normalized_origin.endswith(expected_origin_suffix)
+    ):
+        raise QualificationError(f"{label} checkout is not the exact clean source")
 
 
 def _validate_frequency_plan(on_if_hz: int) -> dict[str, int]:

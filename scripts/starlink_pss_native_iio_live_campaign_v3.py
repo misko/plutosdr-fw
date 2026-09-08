@@ -363,6 +363,18 @@ def run(
     ppu_source_commit = v2._validate_source_commit(
         ppu_source_commit, label="PPU source commit"
     )
+    v2._verify_source_checkout(
+        ROOT,
+        firmware_source_commit,
+        label="firmware source",
+        expected_origin_suffix="/misko/plutosdr-fw",
+    )
+    v2._verify_source_checkout(
+        PPU,
+        ppu_source_commit,
+        label="PPU source",
+        expected_origin_suffix="/misko/pluto-plus-utils",
+    )
     deployment = v2._deployment_binding(
         deployment_receipt,
         known_hosts_file,

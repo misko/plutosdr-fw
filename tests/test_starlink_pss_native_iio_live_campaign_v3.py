@@ -76,6 +76,39 @@ def test_campaign_requires_repeatable_positive_roles_and_a_clean_control() -> No
     assert result["gates"]["below_band_control_has_no_passing_points"] is False
 
 
+def test_source_checkout_attestation_rejects_a_mistyped_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commit = "a" * 40
+    responses: dict[tuple[str, ...], str] = {
+        ("remote", "get-url", "origin"): "git@github.com:misko/pluto-plus-utils.git\n",
+        ("rev-parse", "--show-toplevel"): f"{tmp_path}\n",
+        ("status", "--porcelain=v1", "--untracked-files=all"): "",
+    }
+
+    def invoke(command: tuple[str, ...], **_kwargs: Any) -> SimpleNamespace:
+        assert command[:3] == ("git", "-C", str(tmp_path))
+        if command[3:5] == ("rev-parse", "--verify"):
+            return SimpleNamespace(stdout=f"{commit}\n")
+        return SimpleNamespace(stdout=responses[command[3:]])
+
+    monkeypatch.setattr(runner.v2.subprocess, "run", invoke)
+    runner.v2._verify_source_checkout(
+        tmp_path,
+        commit,
+        label="PPU source",
+        expected_origin_suffix="/misko/pluto-plus-utils",
+    )
+
+    with pytest.raises(runner.QualificationError, match="exact clean source"):
+        runner.v2._verify_source_checkout(
+            tmp_path,
+            "b" * 40,
+            label="PPU source",
+            expected_origin_suffix="/misko/pluto-plus-utils",
+        )
+
+
 def test_scanned_campaign_uses_one_epoch_and_replays(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -238,6 +271,7 @@ def test_scanned_campaign_uses_one_epoch_and_replays(
             "current_boot_id": "11111111-1111-4111-8111-111111111111",
         },
     )
+    monkeypatch.setattr(runner.v2, "_verify_source_checkout", lambda *_a, **_k: None)
     monkeypatch.setattr(runner.PssIioClient, "connect", lambda *_a, **_k: client)
     monkeypatch.setattr(
         runner,

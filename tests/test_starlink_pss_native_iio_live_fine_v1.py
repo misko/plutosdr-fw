@@ -358,6 +358,7 @@ def test_no_trigger_run_consumes_one_complete_scan_and_restores_rx(
             "current_boot_id": "11111111-1111-4111-8111-111111111111",
         },
     )
+    monkeypatch.setattr(runner.v2, "_verify_source_checkout", lambda *_a, **_k: None)
     monkeypatch.setattr(
         runner,
         "_load_control_evidence",
