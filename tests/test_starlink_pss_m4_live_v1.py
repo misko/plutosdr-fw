@@ -615,6 +615,22 @@ def test_external_ppu_receipt_loader_rejects_duplicate_keys(tmp_path: Path) -> N
         live._load_external_receipt(path, label="persistent LAN receipt")
 
 
+def test_public_identity_accepts_executable_and_detects_a_later_change(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "controller"
+    path.write_bytes(b"sealed-controller\n")
+    path.chmod(0o755)
+
+    identity = live._public_identity(path, label="controller binary")
+
+    assert identity["bytes"] == len(b"sealed-controller\n")
+    live._require_public_unchanged(identity, label="controller binary")
+    path.write_bytes(b"changed-controller\n")
+    with pytest.raises(live.ProbeError, match="changed after plan sealing"):
+        live._require_public_unchanged(identity, label="controller binary")
+
+
 def test_persistent_lan_receipt_rejects_a_different_profile_or_tx_state() -> None:
     receipt = _persistent_lan_receipt()
     receipt["plan"]["mutation_profile_id"] = "persistent-canary"

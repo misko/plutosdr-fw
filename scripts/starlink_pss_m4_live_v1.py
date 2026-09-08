@@ -26,8 +26,10 @@ import ipaddress
 import itertools
 import json
 import math
+import os
 import re
 import select
+import stat
 import statistics
 import subprocess
 import sys
@@ -228,6 +230,35 @@ def _identity(path: Path, *, label: str) -> dict[str, Any]:
     return monitor_v1.probe_v1._identity(path.absolute(), label=label)
 
 
+def _public_identity(path: Path, *, label: str) -> dict[str, Any]:
+    selected = path.absolute()
+    try:
+        before = selected.lstat()
+        if (
+            not stat.S_ISREG(before.st_mode)
+            or before.st_uid != os.geteuid()
+            or before.st_nlink != 1
+            or before.st_size <= 0
+            or before.st_size > MAXIMUM_MONITOR_OUTPUT_BYTES
+        ):
+            raise ProbeError(f"M4 {label} is not one bounded owned regular file")
+        payload = selected.read_bytes()
+        after = selected.lstat()
+    except OSError as error:
+        raise ProbeError(f"M4 {label} cannot be read: {error}") from error
+    if (
+        monitor_v1.probe_v1._stat_identity(before)
+        != monitor_v1.probe_v1._stat_identity(after)
+        or len(payload) != after.st_size
+    ):
+        raise ProbeError(f"M4 {label} changed while being read")
+    return {
+        "path": str(selected),
+        "bytes": len(payload),
+        "sha256": hashlib.sha256(payload).hexdigest(),
+    }
+
+
 def _load(path: Path, *, label: str) -> dict[str, Any]:
     return monitor_v1.probe_v1._load_private_json(path.absolute(), label=label)
 
@@ -265,6 +296,12 @@ def _validate_identity(value: Any, *, label: str) -> None:
 def _require_unchanged(identity: dict[str, Any], *, label: str) -> None:
     _validate_identity(identity, label=label)
     if _identity(Path(identity["path"]), label=label) != identity:
+        raise ProbeError(f"M4 {label} changed after plan sealing")
+
+
+def _require_public_unchanged(identity: dict[str, Any], *, label: str) -> None:
+    _validate_identity(identity, label=label)
+    if _public_identity(Path(identity["path"]), label=label) != identity:
         raise ProbeError(f"M4 {label} changed after plan sealing")
 
 
@@ -817,8 +854,12 @@ def build_plan(args: Any) -> dict[str, Any]:
         "ppu_source_commit": ppu_source_commit,
         "probe_plan": _identity(base_path, label="M4 base PSS probe plan"),
         "deployment_receipt": deployment_identity,
-        "runner_source": _identity(Path(__file__).absolute(), label="M4 runner source"),
-        "source_manifest": _identity(SOURCE_MANIFEST, label="M4 source manifest"),
+        "runner_source": _public_identity(
+            Path(__file__).absolute(), label="M4 runner source"
+        ),
+        "source_manifest": _public_identity(
+            SOURCE_MANIFEST, label="M4 source manifest"
+        ),
         "expected_boot_id": expected_boot_id,
         "expected_qspi_sha256": expected_qspi_sha256,
         "controller_binary": binary,
@@ -1773,12 +1814,15 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
     for key, label in (
         ("probe_plan", "base PSS probe plan"),
         ("deployment_receipt", "deployment receipt"),
-        ("runner_source", "M4 runner source"),
-        ("source_manifest", "M4 source manifest"),
-        ("controller_binary", "controller binary"),
         ("fixture_declaration", "fixture declaration"),
     ):
         _require_unchanged(plan[key], label=label)
+    for key, label in (
+        ("runner_source", "M4 runner source"),
+        ("source_manifest", "M4 source manifest"),
+        ("controller_binary", "controller binary"),
+    ):
+        _require_public_unchanged(plan[key], label=label)
     base = _load(Path(plan["probe_plan"]["path"]), label="M4 base PSS probe plan")
     if plan["deployment_mode"] == "volatile_ram":
         handoff = _load_handoff(base)
