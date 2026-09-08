@@ -435,3 +435,50 @@ real IIO reader and matched image packaging, qualify .18, then deploy .17 via
 serial-locked PPU network flashing for the paired live proof. No radio has been
 accessed, flashed or reconfigured in this checkpoint; live GLRT/FPGA lock and
 the broader hopping/rate gates are still unproved.
+
+### Shared-transform candidate checkpoint — 2026-09-08
+
+A concrete replacement for the second coarse transform core is now implemented
+as an unselected experimental composition. `starlink_pss_iq_to_score_shared`
+keeps the canonical ingress, kernel multiplication, energy cache and score path
+at 100 MHz and uses a single 200 MHz XFFT through complete-block dual-clock RAM
+mailboxes. Both PSS stages and the pilot branch remain required. No existing
+receiver profile or default two-core implementation has been replaced yet.
+
+The actual two-clock coarse pipeline passes exact forward/product/inverse
+intermediates and all 1341 frozen numerical scores, including stalls and fault
+recovery. Independent FFT reset now explicitly quarantines active acquisition
+until disable/flush; reset release alone cannot silently erase lost work.
+The reset/recovery check passes. A separate canonical 15 MS/s run returns all
+28608 ordered scores across 64 overlap blocks, with FIFO high water 356/512
+and no faults. This approximately 1.96 ms simulation is not a full dwell or a
+300-second hardware soak.
+
+Earlier measurements establish why this candidate is worth integrating, not
+that it already fits the receiver: one unchanged radix-4 BFP18 FFT uses 1283 LUTs,
+3119 FFs, 17 DSPs and 11 RAMB18s and has +0.168/+0.053 ns internal setup/hold
+slack at a genuinely constrained 200 MHz. Each final 512x36 mailbox with 70-bit
+metadata uses 71 LUTs, 185 FFs and one RAMB18; internal setup/hold slack is
++0.904/+0.104 ns for 100->200 MHz and +0.227/+0.084 ns for 200->100 MHz.
+The service's actual return metadata is 75 bits and still needs integrated
+measurement. Unplaced boundary timing and held-bus CDC reports remain visible
+and unqualified for the receiver. The first 200 MHz mailbox write path failed
+timing; removing the wide validity comparator from unpublished RAM writes fixed
+it without weakening complete-block publication checks.
+
+Twelve mailbox tests cover independent clocks, stalls, malformed blocks, and
+resets during partial input, stalled output and partial reads. A real-XFFT
+service-only test passes 66 jobs/33792 exact words, including an in-flight fault
+after partial output buffering and both independent reset recoveries. These
+results are distinct from the complete coarse-pipeline replay above. See
+`hdl/library/starlink_pss_acquisition/SHARED_XFFT.md` for scope and reproduction.
+
+The next gate is **full paired-receiver integration and placement/routing/timing**
+with the real 200 MHz clock and properly scoped CDC constraints. Resolve the
+experimental shared-fault identity before any deployment; no production ABI is
+silently reinterpreted. The last actual complete-receiver placement still failed
+as recorded above, and the candidate has no full-receiver fit claim. Then finish
+the matched real IIO path on .18 and deploy .17 for fixed-frequency paired live
+proof before hopping/rate expansion. No radio access, flashing, TX, new PPU
+changes, live GLRT detection or FPGA live timing lock occurred in this checkpoint.
+The source-pinned aggregate is `reports/starlink-shared-xfft-candidate-20260908.json`.
