@@ -591,6 +591,30 @@ def test_persistent_lan_receipt_binds_exact_v7_return_and_qspi() -> None:
     assert qspi_sha256 == "3" * 64
 
 
+def test_external_ppu_receipt_loader_accepts_pretty_strict_private_json(
+    tmp_path: Path,
+) -> None:
+    tmp_path.chmod(0o700)
+    path = tmp_path / "ppu-receipt.json"
+    path.write_text(json.dumps({"schema_version": 2, "outcome": "success"}, indent=2))
+    path.chmod(0o600)
+
+    assert live._load_external_receipt(path, label="persistent LAN receipt") == {
+        "schema_version": 2,
+        "outcome": "success",
+    }
+
+
+def test_external_ppu_receipt_loader_rejects_duplicate_keys(tmp_path: Path) -> None:
+    tmp_path.chmod(0o700)
+    path = tmp_path / "ppu-receipt.json"
+    path.write_text('{"outcome":"success","outcome":"failed"}\n')
+    path.chmod(0o600)
+
+    with pytest.raises(live.ProbeError, match="duplicate key"):
+        live._load_external_receipt(path, label="persistent LAN receipt")
+
+
 def test_persistent_lan_receipt_rejects_a_different_profile_or_tx_state() -> None:
     receipt = _persistent_lan_receipt()
     receipt["plan"]["mutation_profile_id"] = "persistent-canary"

@@ -232,6 +232,21 @@ def _load(path: Path, *, label: str) -> dict[str, Any]:
     return monitor_v1.probe_v1._load_private_json(path.absolute(), label=label)
 
 
+def _load_external_receipt(path: Path, *, label: str) -> dict[str, Any]:
+    payload = monitor_v1.probe_v1._private_file(path.absolute(), label=label)
+    try:
+        value = json.loads(
+            payload,
+            object_pairs_hook=monitor_v1.probe_v1._json_no_duplicates,
+        )
+        json.dumps(value, allow_nan=False)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        raise ProbeError(f"M4 {label} is not strict JSON") from error
+    if not isinstance(value, dict):
+        raise ProbeError(f"M4 {label} is not one JSON object")
+    return value
+
+
 def _validate_identity(value: Any, *, label: str) -> None:
     if (
         not isinstance(value, dict)
@@ -770,7 +785,9 @@ def build_plan(args: Any) -> dict[str, Any]:
         with monitor_v2._v7_monitor_contract():
             monitor_v1._validate_base_plan(base)
         deployment_path = args.deployment_receipt.absolute()
-        deployment = _load(deployment_path, label="M4 persistent LAN receipt")
+        deployment = _load_external_receipt(
+            deployment_path, label="persistent LAN receipt"
+        )
         expected_boot_id, expected_qspi_sha256 = _validate_persistent_lan_receipt(
             deployment
         )
@@ -1782,9 +1799,9 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
         handoff = _load_ppu(
             Path(plan["ppu_repository"]), plan["ppu_source_commit"]
         )
-        deployment = _load(
+        deployment = _load_external_receipt(
             Path(plan["deployment_receipt"]["path"]),
-            label="M4 persistent LAN receipt",
+            label="persistent LAN receipt",
         )
         boot_id, qspi_sha256 = _validate_persistent_lan_receipt(deployment)
         if (
