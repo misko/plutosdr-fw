@@ -549,6 +549,75 @@ Evidence root:
 
 `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt7-single-epoch`
 
+## 60 MS/s single-epoch structural qualification
+
+The same committed runner and replay verifier passed the corresponding short
+structural campaign at 60 MS/s on `.17`. The sealed
+`starlink-pss-iio-v5-dnm` detector-only image was loaded into volatile RAM with
+the exact PPU commit bound by its candidate plan. The RAM lifecycle attested
+serial `104000bac4950008230026001b440a003a`, AD9361 1R1T, detector-only FPGA
+topology, TX quiesce, and unchanged persistent QSPI before the campaign began.
+
+One uninterrupted map epoch followed
+`1,937,500,000 -> 1,887,500,000 -> 1,937,500,000 Hz`. It delivered 46
+contiguous maps and exactly 9,200 transport chunks. Each one-second role
+retained 12 maps and 10 overlapping timing windows, while each retune guard
+discarded exactly five complete maps. The active coefficient, driver counts,
+role counts, epoch continuity, and every tracker/map fault and push-failure
+gate passed. Cleanup restored the receiver's prior 30.72 MS/s, 18 MHz, 2.4 GHz
+configuration before releasing the radio lock.
+
+Independent offline replay passed the exact receipt and 60 MS/s source-index
+conversion. It correctly retained `pss_detected=false`, `sss_detected=false`,
+and `frame_lock_claim=false`: the one-second roles do not satisfy the required
+120-second live duration, and this no-LNB structural run is not signal
+evidence. Recovery then proved USB departure/return, route release, the
+persistent AD9361 1R1T firmware, and the same QSPI SHA-256
+`07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`.
+`.18` and all other radios were not opened.
+
+The production 60 MS/s command, after RAM boot and Ethernet readiness, is:
+
+```text
+scripts/starlink_pss_native_iio_live_campaign_v1.py \
+  --rate-msps 60 \
+  --on-lo-hz 1937500000 \
+  --off-lo-hz 1887500000 \
+  --role-duration-seconds 120 \
+  OUTPUT_DIRECTORY
+```
+
+### 60 MS/s structural evidence identities
+
+- sealed candidate plan:
+  `646874991bfaac921b8cadc7ac7012773b9d37ee57eeac0c96a5143cb37001e0`
+- sealed RAM DFU:
+  `7c5f5c3b8307cc49fadbe416da5f19ceb86350c0ddd9e6bd15f98cd423dd1038`
+- USB inventory:
+  `cf8b5d75dc39e670e91f85ea530b5e759d7e83e3d820b2400dcf9c3455be795c`
+- operation plan:
+  `4429734417d4c24e01175cee91ab81e744b5b9b6ba68a85239bfc87453ca3e07`
+- RAM deployment:
+  `61bdd721b1d9d8db464e1f79409ff0bc8b0190747e5b3bc48c1b081e58ee0f6e`
+- structural campaign:
+  `77e51df046621fcbdcd55f53cc3dc3a48bd319d9f4cadd9fed181fc6697abcd1`
+- independent campaign replay:
+  `b19a2943474312136c85612499813efa7948bde59ba4c99005505f0a3e5a2f03`
+- recovery:
+  `3e3be85de78dc8b503735edf1d7262b99a8ef582d78f7fe45d5c37579c2d245d`
+- single-epoch runner source:
+  `2d3edba6be0fded8ed3702ed37cf8cb715dbfbf41380d5f88692e8203c3a96ca`
+- replay/qualification source:
+  `f2684d1ffe0ba5069686b0593414ac86b4c73875cd029d522dae242a45fa85cd`
+- single-epoch test source:
+  `5174e440c791b417dec7c49f23dddfacb843543336ff9368e53aa44915abd168`
+- replay/qualification test source:
+  `c77af85f3df861644f0db9e6c96807bc2bd719ea35b4392d6c08c2970dd7c6e8`
+
+Evidence root:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/iio-v5-20260907/hardware-attempt8-single-epoch`
+
 ## Next gates
 
 1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
