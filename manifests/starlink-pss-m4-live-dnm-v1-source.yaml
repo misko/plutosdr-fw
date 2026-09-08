@@ -7,8 +7,8 @@
 # detection or frame lock.
 
 schema: plutosdr-fw.starlink-pss-m4-live-source
-schema_version: 4
-release_state: reboot-chain-v4-live-repeat-ready
+schema_version: 5
+release_state: corrected-below-band-control-v5-live-repeat-ready
 do_not_merge: true
 do_not_release: true
 merge_target: none
@@ -46,6 +46,23 @@ lan_counter_reset_reboot_completed: true
 lan_counter_reset_reboot_receipt_sha256: afce345cbc6867ae96def806540967c4048d942422b0074574d2bcce5a79e5a4
 lan_counter_reset_post_boot_id: f3d9a11a-8089-4f8b-8677-d125d4f436ae
 ppu_network_reboot_commit: fc510b5565b1ee3801c72dffe726c11f0a09a277
+ordered_lan_reboot_chain_supported: true
+
+third_persistent_live_attempt_completed: true
+third_persistent_live_attempt_qualified: false
+third_persistent_live_plan_sha256: 57299b275e322c6491050a2eb3ccc282b638c2d820c08f13ae83d8709c1f817b
+third_persistent_live_receipt_sha256: 916839c1f440a6989920f77c443e28f11b65705af085533d731fc915864536f7
+third_persistent_live_positive_a_passing_points: 0
+third_persistent_live_old_control_passing_points: 2
+third_persistent_live_positive_b_passing_points: 3
+third_persistent_live_transport_fault_free: true
+third_persistent_live_cleanup_complete: true
+old_control_invalid_as_negative: true
+old_control_reason: 50MHz_retune_remained_inside_same_240MHz_starlink_channel
+scanner_complete_sessions_reviewed: 18
+scanner_target_session_presence_minimum: 17
+scanner_sparse_hit_rate_minimum: 0.210
+scanner_sparse_hit_rate_maximum: 0.444
 
 cabled_production_requalification_passed: true
 cabled_fixture: .18_TX1_to_30dB_attenuator_to_.17_RX1
@@ -74,8 +91,12 @@ lnb_lo_side: low-side
 spectral_inversion: false
 nominal_on_if_hz: 1937500000
 nominal_on_rf_hz: 11687500000
-nominal_control_if_hz: 1887500000
-role_order: on_channel_a,off_slice_control,on_channel_b
+control_kind: below_lnb_low_band_receiver_noise
+control_rf_hz: 10600000000
+control_if_hz: 850000000
+control_swept_passband_clearance_hz: 91300000
+minimum_control_passband_clearance_hz: 90000000
+role_order: on_channel_a,below_band_control,on_channel_b
 scan_offset_minimum_hz: -1200000
 scan_offset_maximum_hz: 1200000
 scan_offset_step_hz: 100000
@@ -84,7 +105,7 @@ point_duration_ms: 2731
 settle_ms: 200
 role_duration_ms: 80500
 stable_candidate_windows_per_point: 32
-initial_discard_maps: 2
+initial_discard_maps: 10
 post_retune_discard_maps: 5
 maximum_role_maps: 946
 accepted_score_counter_budget: 3632640000
@@ -102,11 +123,11 @@ rail_probe_samples: 32768
 maximum_rail_fraction: 0.0001
 
 runner_source_path: scripts/starlink_pss_m4_live_v1.py
-runner_source_sha256: dd0860d0a25beb2be7b45fac0673b56f32d5925bd12f2481815ee1f0642bf45a
+runner_source_sha256: bada83c438e4feb3b6d254bc5c6b0ff5c4008ea1a557a45c4952255f62b79f7a
 runner_test_path: tests/test_starlink_pss_m4_live_v1.py
-runner_test_sha256: 2ed017435c363771b11f20d45bae4d5b5be8e3eba65b7b9f213e9165809bcf3f
+runner_test_sha256: d8c2724e0684f51473f2bab5c7c450794d5a0cd763ea00a560285653e98dd974
 manifest_test_path: tests/test_starlink_pss_m4_live_manifest_v1.py
-manifest_test_sha256: 4e3a8a48b7295c69ad9bcbd22794e6a897a17e1dc9588c07d30bc24020fc510f
+manifest_test_sha256: a05ab49ffb8318cd45bdea61dc8a8bb66bbbf6f6f593717d234886d4ecd166d9
 
 m3_policy_source_path: scripts/starlink_pss_m3_campaign_v1.py
 m3_policy_source_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444
@@ -136,7 +157,7 @@ inherited_fpga_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-so
 inherited_fpga_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
 
 tracker_ledger_path: FPGA_tracker.md
-tracker_ledger_sha256: 81308535a0cdbc7d6521760f1c42b7179d8873c1ce13d3fa807f8f82035dc674
+tracker_ledger_sha256: 3405548c2eb24c55beb3a58999dda5e831b8f0fa1d1a1cf5f0f7639de5260024
 canonical_plan_path: FPGA_tracker_60MS.md
 canonical_plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
 controller_readme_path: tools/starlink_pssctl/README.md

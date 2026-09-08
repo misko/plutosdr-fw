@@ -3,11 +3,12 @@
 
 This DNM-only command reuses the immutable v7 FPGA image and monitor-v2 ARM
 controller. It accepts either the original volatile-RAM receipt or PPU's exact
-hardware-qualified persistent-LAN receipt as deployment evidence. It never
-transfers continuous IQ to the host. Each live role is
-one bounded 25-point receiver-LO scan; every point drains FPGA phase maps for
-4.5 seconds, yielding approximately 50 three-map candidate windows.  The scan
-handles the carrier offset that a single fixed PSS kernel cannot search.
+hardware-qualified persistent-LAN receipt as deployment evidence. Persistent
+plans may bind an ordered chain of guarded LAN-reboot receipts. It never
+transfers continuous IQ to the host. Each live role is one bounded 25-point
+receiver-LO scan retaining exactly 32 three-map candidate windows per point.
+The scan handles the carrier offset that a single fixed PSS kernel cannot
+search.
 
 The command is deliberately strict about claim scope.  A passing result is a
 live PSS acquisition and local timing-trajectory result only.  It is not SSS
@@ -54,8 +55,8 @@ import scripts.starlink_pss_progress_probe_v1 as progress_v1
 
 SOURCE_MANIFEST = ROOT / "manifests/starlink-pss-m4-live-dnm-v1-source.yaml"
 
-PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v4"
-RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v4"
+PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v5"
+RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v5"
 FIXTURE_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-fixture.v1"
 CLAIM_SCOPE = "live_lnb_pss_acquisition_and_local_timing_only"
 PERSISTENT_PROMOTION_PROFILE = "starlink-pss-15m-rx-only-dnm-v7-persistent-promotion"
@@ -78,9 +79,9 @@ DEFAULT_EDGE = "upper"
 DEFAULT_LAN_HOST = "192.168.1.17"
 DEFAULT_LAN_INTERFACE = "enp132s0"
 DEFAULT_GAIN_MODE = "slow_attack"
-ROLES = ("on_channel_a", "off_slice_control", "on_channel_b")
+ROLES = ("on_channel_a", "below_band_control", "on_channel_b")
 STABLE_CANDIDATE_WINDOWS_PER_POINT = 32
-INITIAL_DISCARD_MAPS = 2
+INITIAL_DISCARD_MAPS = 10
 POST_RETUNE_DISCARD_MAPS = 5
 ROLE_MONITOR_DURATION_MS = 80_500
 DEFAULT_POINT_DURATION_MS = 2_731
@@ -93,7 +94,14 @@ MAXIMUM_ROLE_MAPS = (
 ACCEPTED_SCORE_COUNTER_BUDGET = (
     MAXIMUM_ROLE_MAPS * monitor_v1.TILE_SAMPLES * len(ROLES)
 )
-DEFAULT_OFF_SLICE_SHIFT_HZ = -50_000_000
+STARLINK_DOWNLINK_MIN_RF_HZ = 10_700_000_000
+CONTROL_RF_HZ = 10_600_000_000
+CONTROL_IF_HZ = CONTROL_RF_HZ - LNB_LO_HZ
+MAXIMUM_SCAN_OFFSET_HZ = 1_200_000
+CONTROL_PASSBAND_CLEARANCE_HZ = (
+    STARLINK_DOWNLINK_MIN_RF_HZ
+    - (CONTROL_RF_HZ + MAXIMUM_SCAN_OFFSET_HZ + RF_BANDWIDTH_HZ // 2)
+)
 RAIL_PROBE_SAMPLES = 32_768
 MAXIMUM_RAIL_FRACTION = 0.0001
 MAXIMUM_MONITOR_OUTPUT_BYTES = 4 * 1024 * 1024
@@ -105,7 +113,7 @@ FIXTURE_ATTESTATION = (
 )
 OFFSET_ORDER_HZ = tuple(
     value
-    for magnitude in range(0, 1_200_001, 100_000)
+    for magnitude in range(0, MAXIMUM_SCAN_OFFSET_HZ + 1, 100_000)
     for value in ((0,) if magnitude == 0 else (magnitude, -magnitude))
 )
 HEX_32 = re.compile(r"^[0-9a-f]{32}$")
@@ -119,12 +127,12 @@ ProbeError = monitor_v1.ProbeError
 
 POLICY = {
     **m3.POLICY,
-    "scan_offset_minimum_hz": -1_200_000,
-    "scan_offset_maximum_hz": 1_200_000,
+    "scan_offset_minimum_hz": -MAXIMUM_SCAN_OFFSET_HZ,
+    "scan_offset_maximum_hz": MAXIMUM_SCAN_OFFSET_HZ,
     "scan_offset_step_hz": 100_000,
     "scan_point_count": 25,
     "maximum_rail_fraction": MAXIMUM_RAIL_FRACTION,
-    "minimum_off_slice_separation_hz": 30_000_000,
+    "minimum_control_passband_clearance_hz": 90_000_000,
     "minimum_passing_points_per_positive_role": 1,
     "maximum_passing_points_in_control_role": 0,
 }
@@ -168,7 +176,7 @@ PLAN_FIELDS = {
     "probe_plan",
     "deployment_mode",
     "deployment_receipt",
-    "reboot_receipt",
+    "reboot_receipts",
     "ssh_trust_mode",
     "ssh_known_hosts",
     "runner_source",
@@ -192,8 +200,10 @@ PLAN_FIELDS = {
     "edge_center_offset_hz_x2",
     "nominal_on_if_hz",
     "nominal_on_rf_hz",
-    "off_slice_shift_hz",
-    "nominal_off_if_hz",
+    "control_kind",
+    "control_rf_hz",
+    "control_if_hz",
+    "control_passband_clearance_hz",
     "scan_offsets_hz",
     "point_duration_ms",
     "settle_ms",
@@ -621,12 +631,20 @@ def _validate_persistent_lan_receipt(receipt: dict[str, Any]) -> tuple[str, str]
 
 
 def _validate_lan_reboot_receipt(
-    receipt: dict[str, Any], deployment: dict[str, Any]
-) -> tuple[str, Path]:
-    """Bind a PPU network reboot to the persistent image and rotated SSH trust."""
+    receipt: dict[str, Any],
+    *,
+    expected_before_boot_id: str,
+    expected_known_hosts_sha256: str,
+) -> tuple[str, Path, str]:
+    """Advance one exact PPU network-reboot boot/trust chain link."""
 
-    deployment_boot_id, _qspi_sha256 = _validate_persistent_lan_receipt(deployment)
-    deployment_rotation = deployment["host_key_rotation"]
+    if (
+        not isinstance(expected_before_boot_id, str)
+        or BOOT_ID.fullmatch(expected_before_boot_id) is None
+        or not isinstance(expected_known_hosts_sha256, str)
+        or HEX_64.fullmatch(expected_known_hosts_sha256) is None
+    ):
+        raise ProbeError("M4 LAN reboot chain anchor is invalid")
     before = receipt.get("before")
     after = receipt.get("after")
     plan = receipt.get("plan")
@@ -724,7 +742,7 @@ def _validate_lan_reboot_receipt(
         or plan.get("confirmation_phrase") != f"REBOOT LAN {RECEIVER_SERIAL}"
         or plan.get("before") != before
         or plan.get("known_hosts_sha256")
-        != deployment_rotation["replacement_known_hosts_sha256"]
+        != expected_known_hosts_sha256
         or not isinstance(rotation, dict)
         or set(rotation) != rotation_fields
         or rotation.get("previous_known_hosts_sha256")
@@ -757,7 +775,7 @@ def _validate_lan_reboot_receipt(
             raise ProbeError(f"M4 LAN reboot {label} attestation is invalid")
     iio_before = plan.get("iio_before")
     if (
-        before["boot_id"] != deployment_boot_id
+        before["boot_id"] != expected_before_boot_id
         or after["boot_id"] == before["boot_id"]
         or after["capabilities"] != before["capabilities"]
         or not isinstance(iio_before, dict)
@@ -776,12 +794,16 @@ def _validate_lan_reboot_receipt(
     created = _parse_time(plan.get("created_at"), label="LAN reboot plan created_at")
     if not created <= started <= finished:
         raise ProbeError("M4 LAN reboot timestamps are reversed")
-    return after["boot_id"], Path(rotation["known_hosts_file"])
+    return (
+        after["boot_id"],
+        Path(rotation["known_hosts_file"]),
+        rotation["replacement_known_hosts_sha256"],
+    )
 
 
 def _validate_plan(plan: dict[str, Any]) -> None:
     if set(plan) != PLAN_FIELDS:
-        raise ProbeError("M4 plan fields differ from the v4 schema")
+        raise ProbeError("M4 plan fields differ from the v5 schema")
     try:
         host = ipaddress.ip_address(plan.get("ethernet_host"))
     except (TypeError, ValueError) as error:
@@ -789,7 +811,7 @@ def _validate_plan(plan: dict[str, Any]) -> None:
     manual = plan.get("manual_gain_db")
     if (
         plan.get("schema") != PLAN_SCHEMA
-        or plan.get("schema_version") != 4
+        or plan.get("schema_version") != 5
         or not isinstance(plan.get("plan_id"), str)
         or HEX_32.fullmatch(plan["plan_id"]) is None
         or plan.get("hardware_accessed") is not False
@@ -831,11 +853,13 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         or plan.get("starlink_channel") != DEFAULT_CHANNEL
         or plan.get("starlink_edge") != DEFAULT_EDGE
         or plan.get("lnb_lo_hz") != LNB_LO_HZ
-        or plan.get("off_slice_shift_hz") != DEFAULT_OFF_SLICE_SHIFT_HZ
-        or plan.get("nominal_off_if_hz")
-        != plan.get("nominal_on_if_hz", 0) + DEFAULT_OFF_SLICE_SHIFT_HZ
-        or abs(plan["off_slice_shift_hz"])
-        < POLICY["minimum_off_slice_separation_hz"]
+        or plan.get("control_kind") != "below_lnb_low_band_receiver_noise"
+        or plan.get("control_rf_hz") != CONTROL_RF_HZ
+        or plan.get("control_if_hz") != CONTROL_IF_HZ
+        or plan.get("control_passband_clearance_hz")
+        != CONTROL_PASSBAND_CLEARANCE_HZ
+        or plan["control_passband_clearance_hz"]
+        < POLICY["minimum_control_passband_clearance_hz"]
         or plan.get("scan_offsets_hz") != list(OFFSET_ORDER_HZ)
         or plan.get("point_duration_ms") != DEFAULT_POINT_DURATION_MS
         or plan.get("settle_ms") != DEFAULT_SETTLE_MS
@@ -861,7 +885,7 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         or plan.get("sss_detected") is not False
         or plan.get("frame_lock_claim") is not False
     ):
-        raise ProbeError("M4 plan values violate the v4 live-LNB contract")
+        raise ProbeError("M4 plan values violate the v5 live-LNB contract")
     _parse_time(plan.get("created_at"), label="plan created_at")
     for label in (
         "probe_plan",
@@ -878,18 +902,21 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         ):
             raise ProbeError("M4 persistent plan does not bind pinned SSH trust")
         _validate_identity(plan["ssh_known_hosts"], label="SSH known-hosts file")
-        if plan.get("reboot_receipt") is not None:
-            _validate_identity(plan["reboot_receipt"], label="LAN reboot receipt")
+        receipts = plan.get("reboot_receipts")
+        if not isinstance(receipts, list):
+            raise ProbeError("M4 persistent plan reboot chain is not a list")
+        for index, receipt in enumerate(receipts):
+            _validate_identity(receipt, label=f"LAN reboot receipt {index + 1}")
     elif (
         plan.get("ssh_trust_mode") != "legacy_unpinned"
         or plan.get("ssh_known_hosts") is not None
-        or plan.get("reboot_receipt") is not None
+        or plan.get("reboot_receipts") != []
     ):
         raise ProbeError("M4 volatile plan SSH trust fields are inconsistent")
     expected_geometry = live_geometry(DEFAULT_CHANNEL, DEFAULT_EDGE, LNB_LO_HZ)
     if any(plan.get(key) != value for key, value in expected_geometry.items()):
         raise ProbeError("M4 plan frequency geometry differs from the exact oracle")
-    if not 70_000_000 <= plan["nominal_off_if_hz"] <= 6_000_000_000:
+    if not 70_000_000 <= plan["control_if_hz"] <= 6_000_000_000:
         raise ProbeError("M4 control IF is outside the AD9361 tuning range")
 
 
@@ -912,7 +939,13 @@ def parser() -> argparse.ArgumentParser:
     plan = commands.add_parser("plan", help="seal one three-role live campaign")
     plan.add_argument("--probe-plan", type=Path, required=True)
     plan.add_argument("--deployment-receipt", type=Path)
-    plan.add_argument("--reboot-receipt", type=Path)
+    plan.add_argument(
+        "--reboot-receipt",
+        type=Path,
+        action="append",
+        default=[],
+        help="ordered guarded LAN-reboot receipt; repeat once per reboot epoch",
+    )
     plan.add_argument("--controller-binary", type=Path, required=True)
     plan.add_argument("--fixture-declaration", type=Path, required=True)
     plan.add_argument("--host-network-interface", default=DEFAULT_LAN_INTERFACE)
@@ -980,7 +1013,12 @@ def build_plan(args: Any) -> dict[str, Any]:
         raise ProbeError("manual gain mode requires --manual-gain-db")
     if args.gain_mode != "manual" and args.manual_gain_db is not None:
         raise ProbeError("--manual-gain-db is valid only with manual gain mode")
-    if args.reboot_receipt is not None and args.deployment_receipt is None:
+    reboot_paths = args.reboot_receipt or []
+    if not isinstance(reboot_paths, list) or not all(
+        isinstance(path, Path) for path in reboot_paths
+    ):
+        raise ProbeError("--reboot-receipt must be an ordered list of paths")
+    if reboot_paths and args.deployment_receipt is None:
         raise ProbeError("--reboot-receipt requires --deployment-receipt")
     if args.deployment_receipt is None:
         deployment_mode = "volatile_ram"
@@ -998,7 +1036,7 @@ def build_plan(args: Any) -> dict[str, Any]:
         ppu_source_commit = base["ppu_source_commit"]
         ssh_trust_mode = "legacy_unpinned"
         ssh_known_hosts = None
-        reboot_identity = None
+        reboot_identities: list[dict[str, Any]] = []
     else:
         deployment_mode = "persistent_lan"
         with monitor_v2._v7_monitor_contract():
@@ -1019,19 +1057,32 @@ def build_plan(args: Any) -> dict[str, Any]:
         ppu_repository = str(handoff.repository)
         ssh_trust_mode = "pinned"
         known_hosts_path = Path(deployment["host_key_rotation"]["known_hosts_file"])
-        reboot_identity = None
-        if args.reboot_receipt is not None:
-            reboot_path = args.reboot_receipt.absolute()
+        expected_known_hosts_sha256 = deployment["host_key_rotation"][
+            "replacement_known_hosts_sha256"
+        ]
+        reboot_identities = []
+        seen_reboot_paths: set[Path] = set()
+        for index, selected_reboot_path in enumerate(reboot_paths, 1):
+            reboot_path = selected_reboot_path.absolute()
+            if reboot_path in seen_reboot_paths:
+                raise ProbeError("--reboot-receipt paths must be unique and ordered")
+            seen_reboot_paths.add(reboot_path)
             reboot = _load_external_receipt(reboot_path, label="LAN reboot receipt")
-            expected_boot_id, known_hosts_path = _validate_lan_reboot_receipt(
-                reboot, deployment
+            expected_boot_id, known_hosts_path, expected_known_hosts_sha256 = (
+                _validate_lan_reboot_receipt(
+                    reboot,
+                    expected_before_boot_id=expected_boot_id,
+                    expected_known_hosts_sha256=expected_known_hosts_sha256,
+                )
             )
-            reboot_identity = _identity(reboot_path, label="M4 LAN reboot receipt")
+            reboot_identities.append(
+                _identity(reboot_path, label=f"M4 LAN reboot receipt {index}")
+            )
         ssh_known_hosts = _identity(known_hosts_path, label="SSH known-hosts file")
     geometry = live_geometry(DEFAULT_CHANNEL, DEFAULT_EDGE, LNB_LO_HZ)
     plan = {
         "schema": PLAN_SCHEMA,
-        "schema_version": 4,
+        "schema_version": 5,
         "plan_id": uuid.uuid4().hex,
         "created_at": _now(),
         "hardware_accessed": False,
@@ -1049,7 +1100,7 @@ def build_plan(args: Any) -> dict[str, Any]:
         "ppu_source_commit": ppu_source_commit,
         "probe_plan": _identity(base_path, label="M4 base PSS probe plan"),
         "deployment_receipt": deployment_identity,
-        "reboot_receipt": reboot_identity,
+        "reboot_receipts": reboot_identities,
         "runner_source": _public_identity(
             Path(__file__).absolute(), label="M4 runner source"
         ),
@@ -1071,8 +1122,10 @@ def build_plan(args: Any) -> dict[str, Any]:
         "starlink_edge": DEFAULT_EDGE,
         "lnb_lo_hz": LNB_LO_HZ,
         **geometry,
-        "off_slice_shift_hz": DEFAULT_OFF_SLICE_SHIFT_HZ,
-        "nominal_off_if_hz": geometry["nominal_on_if_hz"] + DEFAULT_OFF_SLICE_SHIFT_HZ,
+        "control_kind": "below_lnb_low_band_receiver_noise",
+        "control_rf_hz": CONTROL_RF_HZ,
+        "control_if_hz": CONTROL_IF_HZ,
+        "control_passband_clearance_hz": CONTROL_PASSBAND_CLEARANCE_HZ,
         "scan_offsets_hz": list(OFFSET_ORDER_HZ),
         "point_duration_ms": DEFAULT_POINT_DURATION_MS,
         "settle_ms": DEFAULT_SETTLE_MS,
@@ -1101,6 +1154,8 @@ def build_plan(args: Any) -> dict[str, Any]:
         "scan_span_ms_per_role": ROLE_MONITOR_DURATION_MS,
         "nominal_on_if_hz": geometry["nominal_on_if_hz"],
         "nominal_on_rf_hz": geometry["nominal_on_rf_hz"],
+        "control_if_hz": CONTROL_IF_HZ,
+        "control_rf_hz": CONTROL_RF_HZ,
         "plan": identity,
         "next_confirmation": plan["confirmation_phrase"],
     }
@@ -1173,13 +1228,13 @@ def analyze_role(role: str, points: list[dict[str, Any]], policy: dict[str, Any]
 
 def _evaluate_receipt(plan: dict[str, Any], receipt: dict[str, Any]) -> dict[str, Any]:
     roles = receipt.get("roles")
-    if not isinstance(roles, dict) or list(roles) != list(ROLES):
+    if not isinstance(roles, dict) or set(roles) != set(ROLES):
         raise ProbeError("M4 receipt role inventory or order differs from the plan")
     analyses = {
         role: analyze_role(role, roles[role], plan["policy"]) for role in ROLES
     }
     positive_a = analyses["on_channel_a"]
-    control = analyses["off_slice_control"]
+    control = analyses["below_band_control"]
     positive_b = analyses["on_channel_b"]
     contrast = min(
         positive_a["best_metrics"]["median_peak_to_median"],
@@ -1959,8 +2014,8 @@ def _scan_role(
     sleeper: Callable[[float], None] = time.sleep,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     base_hz = (
-        plan["nominal_off_if_hz"]
-        if role == "off_slice_control"
+        plan["control_if_hz"]
+        if role == "below_band_control"
         else plan["nominal_on_if_hz"]
     )
     command = (
@@ -2120,7 +2175,11 @@ def _verify_point(point: dict[str, Any], plan: dict[str, Any], role: str, ordina
         "monitor_records",
         "metrics",
     }
-    base = plan["nominal_off_if_hz"] if role == "off_slice_control" else plan["nominal_on_if_hz"]
+    base = (
+        plan["control_if_hz"]
+        if role == "below_band_control"
+        else plan["nominal_on_if_hz"]
+    )
     offset = plan["scan_offsets_hz"][ordinal - 1]
     numeric = (
         "rssi_before_db",
@@ -2171,8 +2230,10 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
         _require_unchanged(plan[key], label=label)
     if plan["ssh_trust_mode"] == "pinned":
         _require_unchanged(plan["ssh_known_hosts"], label="SSH known-hosts file")
-    if plan["reboot_receipt"] is not None:
-        _require_unchanged(plan["reboot_receipt"], label="LAN reboot receipt")
+    for index, receipt_identity in enumerate(plan["reboot_receipts"], 1):
+        _require_unchanged(
+            receipt_identity, label=f"LAN reboot receipt {index}"
+        )
     for key, label in (
         ("runner_source", "M4 runner source"),
         ("source_manifest", "M4 source manifest"),
@@ -2204,16 +2265,24 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
             label="persistent LAN receipt",
         )
         boot_id, qspi_sha256 = _validate_persistent_lan_receipt(deployment)
-        if plan["reboot_receipt"] is not None:
+        expected_known_hosts_sha256 = deployment["host_key_rotation"][
+            "replacement_known_hosts_sha256"
+        ]
+        known_hosts_path = Path(deployment["host_key_rotation"]["known_hosts_file"])
+        for index, receipt_identity in enumerate(plan["reboot_receipts"], 1):
             reboot = _load_external_receipt(
-                Path(plan["reboot_receipt"]["path"]),
-                label="LAN reboot receipt",
+                Path(receipt_identity["path"]),
+                label=f"LAN reboot receipt {index}",
             )
-            boot_id, known_hosts_path = _validate_lan_reboot_receipt(
-                reboot, deployment
+            boot_id, known_hosts_path, expected_known_hosts_sha256 = (
+                _validate_lan_reboot_receipt(
+                    reboot,
+                    expected_before_boot_id=boot_id,
+                    expected_known_hosts_sha256=expected_known_hosts_sha256,
+                )
             )
-            if Path(plan["ssh_known_hosts"]["path"]) != known_hosts_path:
-                raise ProbeError("M4 LAN reboot and plan bind different SSH trust files")
+        if Path(plan["ssh_known_hosts"]["path"]) != known_hosts_path:
+            raise ProbeError("M4 LAN reboot chain and plan bind different SSH trust files")
         if (
             boot_id != plan["expected_boot_id"]
             or qspi_sha256 != plan["expected_qspi_sha256"]
@@ -2383,7 +2452,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     outcome = "pass" if qualified else ("unqualified" if failure is None else "failed")
     receipt = {
         "schema": RECEIPT_SCHEMA,
-        "schema_version": 4,
+        "schema_version": 5,
         "receipt_id": uuid.uuid4().hex,
         "started_at": started,
         "completed_at": completed,
@@ -2413,7 +2482,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
         "evaluation": evaluation,
         "live_pss_acquired": qualified,
         "timing_trajectory_qualified": qualified,
-        "off_slice_control_rejected": qualified,
+        "below_band_control_rejected": qualified,
         "pss_detected": qualified,
         "sss_detected": False,
         "frame_lock_claim": False,
@@ -2469,7 +2538,7 @@ RECEIPT_FIELDS = {
     "evaluation",
     "live_pss_acquired",
     "timing_trajectory_qualified",
-    "off_slice_control_rejected",
+    "below_band_control_rejected",
     "pss_detected",
     "sss_detected",
     "frame_lock_claim",
@@ -2666,11 +2735,11 @@ def _validate_passing_receipt(
         raise ProbeError("M4 receipt lacks its FPGA preflight snapshot")
     _validate_preflight_snapshot(snapshot, plan)
     roles = receipt.get("roles")
-    if not isinstance(roles, dict) or list(roles) != list(ROLES):
+    if not isinstance(roles, dict) or set(roles) != set(ROLES):
         raise ProbeError("M4 role evidence inventory differs from the plan")
     timeline: list[datetime] = []
     role_monitors = receipt.get("role_monitors")
-    if not isinstance(role_monitors, dict) or list(role_monitors) != list(ROLES):
+    if not isinstance(role_monitors, dict) or set(role_monitors) != set(ROLES):
         raise ProbeError("M4 continuous role-monitor inventory differs from the plan")
     previous_accepted_score = 0
     for role in ROLES:
@@ -2732,7 +2801,7 @@ def _validate_passing_receipt(
         or receipt.get("iio_context_close_verified") is not True
         or receipt.get("live_pss_acquired") is not True
         or receipt.get("timing_trajectory_qualified") is not True
-        or receipt.get("off_slice_control_rejected") is not True
+        or receipt.get("below_band_control_rejected") is not True
         or receipt.get("pss_detected") is not True
         or receipt.get("sss_detected") is not False
         or receipt.get("frame_lock_claim") is not False
@@ -2757,7 +2826,7 @@ def verify_receipt(args: Any) -> dict[str, Any]:
     if (
         set(receipt) != RECEIPT_FIELDS
         or receipt.get("schema") != RECEIPT_SCHEMA
-        or receipt.get("schema_version") != 4
+        or receipt.get("schema_version") != 5
         or not isinstance(receipt_id, str)
         or HEX_32.fullmatch(receipt_id) is None
         or receipt.get("plan") != _identity(plan_path, label="M4 live plan")

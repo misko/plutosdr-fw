@@ -40,12 +40,12 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
-| M4: live-LNB 15 MS/s timing | Live attempted; repeat ready | Repeated on-channel trajectory and off-channel control |
+| M4: live-LNB 15 MS/s timing | Live unqualified; corrected repeat ready | Repeated on-channel trajectory and below-band receiver-noise control |
 | M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
 | M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
 | M8: sparse 60 MS/s refinement | Complete | Direct full-rate timing within one source sample on the cabled positive/control/positive fixture |
-| M9: live 60 MS/s narrowband run | Cabled complete; live pending | Passing 120-second cabled receipt and rollback proof; outdoor LNB evidence still required |
+| M9: live 60 MS/s narrowband run | Cabled complete; live pending | Outdoor LNB evidence with same-RF mismatched-template control and rollback proof |
 | M10: SSS/final frame lock | Pending | Separate frozen policy and live qualification |
 
 ## M0/M1 implementation record
@@ -464,18 +464,27 @@ discarded.
 One execution consists of three 80.5-second roles:
 
 1. channel-4 upper-edge on-channel scan A;
-2. a non-overlapping same-channel control slice 50 MHz inward; and
+2. a below-LNB-band receiver-noise control centered at 10.600 GHz RF; and
 3. the same on-channel scan B.
 
 Each role starts the FPGA detector only once and uses 25 interleaved receiver-LO
-points at 100 kHz spacing over +/-1.2 MHz. The first point discards the two maps
-needed to fill the rolling detector window. Every later retune waits 200 ms and
+points at 100 kHz spacing over +/-1.2 MHz. The first point discards ten maps to
+cover detector fill, RF retune, and AGC settling. Every later retune waits 200 ms and
 discards five maps so RF settling and rolling-window contamination cannot enter
 the decision. Exactly 32 subsequent candidate windows are retained per point.
-The map-count schedule consumes 922 maps, about 78.7 seconds, and leaves a
+The map-count schedule consumes 930 maps, about 79.4 seconds, and leaves a
 bounded tail inside the 80.5-second observation. This scan covers the CFO modes
 seen in prior live captures without assuming that one fixed LO remains aligned
 throughout the observation.
+
+The complete swept control aperture, including the 15 MHz RF bandwidth and the
++1.2 MHz scan extreme, ends at 10.6087 GHz RF. It is therefore at least
+91.3 MHz below both the declared 10.7 GHz Starlink downlink boundary and this
+LNB's specified 10.7 GHz low-band input. This is a receiver-noise control: it
+tests false alarms under the same AD9361 rate, bandwidth, gain mode, FPGA
+detector, and host policy, but cannot rule out every structured in-band
+interferer. A same-RF mismatched-template control becomes the stronger design
+when native IIO coefficient loading is available.
 
 The runner and offline verifier require the exact receiver serial, LAN host
 `192.168.1.17`, interface `enp132s0`, AD9361 1R1T runtime, fresh RAM boot ID,
@@ -486,13 +495,10 @@ positive/control/positive contrast, complete restoration, and a subsequent PPU
 recovery. The plan binds its own runner source and the M4 source manifest so
 execution cannot silently drift after sealing.
 
-The remaining M4 hardware prerequisite is physical: remove the attenuated
-bench cable, connect only RX1 to the powered outdoor 9.75 GHz LNB, and preserve
-power continuously after the fresh volatile v7 RAM boot while moving to the
-Ethernet-only location. Fixture sealing also requires the exact LNB model,
-polarization, supply voltage, and power-source description. M4 remains open
-until the resulting live receipt and recovery receipt pass offline
-verification.
+The physical M4 prerequisite is now in place: only RX1 is connected to the
+externally powered 13 V outdoor 9.75 GHz LNB, tone is disabled, and every other
+RF port is terminated. M4 remains open until one corrected live receipt passes
+offline verification; no unqualified attempt is promoted into a PSS claim.
 
 ### M4 cabled scan preflight and continuous-role revision
 
@@ -693,6 +699,50 @@ persistent deployment: old boot and old trust hash must match the flash
 receipt, while the new boot and replacement trust hash become the campaign
 identity. A fresh outdoor repeat is now ready; no PSS, SSS, or frame-lock claim
 is made at this checkpoint.
+
+### M4 attempt 4 and corrected negative-control design
+
+The schema-v4 outdoor repeat completed on the guarded reboot epoch with boot ID
+`f3d9a11a-8089-4f8b-8677-d125d4f436ae`. All three continuous 80.5-second roles
+completed, every transport and FPGA health counter remained clean, the clipping
+probe passed, the temporary controller was removed, and original IIO settings
+were restored. Offline verification passed, but the scientific outcome was
+correctly `unqualified`: on-channel A had zero passing points, the nominal
+control had two, and on-channel B had three. The strongest B point had median
+peak/background `3.7739`, robust z `36.70`, all 32 windows in one track, and a
+worst local timing residual of one 15 MS/s sample. The positive-to-control
+median ratio was only `0.8306`.
+
+The immutable schema-v4 evidence is:
+
+- plan SHA-256:
+  `57299b275e322c6491050a2eb3ccc282b638c2d820c08f13ae83d8709c1f817b`;
+- receipt SHA-256:
+  `916839c1f440a6989920f77c443e28f11b65705af085533d731fc915864536f7`;
+- authoritative directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-17-20260908/live-attempt4`.
+
+The repeated control-to-B timing was initially interesting but exposed a design
+error in the label, not a negative result. Starlink's eight Ku downlink channels
+are 240 MHz wide on 250 MHz spacing. Retuning only 50 MHz inward leaves the
+receiver inside the same active channel, so the old "off-slice control" was an
+additional positive observation and could never prove signal disappearance.
+Production persistent-hop scanner data independently reinforces that conclusion:
+across the 18 newest complete roughly five-minute sessions, every channel/edge
+target produced PSS-like sparse decisions in 17 or 18 sessions. Per-visit hit
+rates ranged from about 21% to 44%; even the quietest target had no defensible
+status as a negative control. Those read-only scanner artifacts remain under
+`/srv/bulk/leo/scanner-hop-analysis` and were not modified.
+
+Schema v5 corrects the campaign before another live execution. Its role order is
+`on_channel_a`, `below_band_control`, `on_channel_b`; the control is the bounded
+10.600 GHz receiver-noise aperture described above. It also raises initial
+discard from two to ten maps and generalizes the singular reboot receipt into
+an ordered list. Every list element must continue both the prior boot ID and
+the prior rotated known-host hash, so repeated safe counter-reset reboots form
+one cryptographically checked deployment epoch. The earlier schema-v4 plan and
+receipt remain immutable and verifiable at source commit
+`7029b8deb6c57d38f4672791816c418325eb05f3`.
 
 ## M5 coarse 30 MS/s acquisition evidence
 
@@ -903,8 +953,12 @@ TX-safe state, and route release.
 
 M8 is therefore complete for synthetic cabled 60 MS/s full-rate PSS timing
 within one source sample. This is not a 60 MHz analog-bandwidth result, live
-Starlink evidence, SSS detection, or frame lock. M9 still requires the outdoor
-LNB positive/off-channel/positive sequence.
+Starlink evidence, SSS detection, or frame lock. M9 still requires an outdoor
+LNB positive/control/positive sequence. Once native IIO coefficient loading is
+qualified, the control should stay at the same RF tuning and load a deliberately
+mismatched, receipt-bound coefficient set. That separates template selectivity
+from time-varying satellite occupancy without transporting raw 60 MS/s IQ to
+the ARM or host.
 
 ## Native IIO result transport (experimental, do not merge)
 

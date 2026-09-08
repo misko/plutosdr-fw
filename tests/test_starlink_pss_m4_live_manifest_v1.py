@@ -23,8 +23,10 @@ def _sha256(path: Path) -> str:
 def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     values = _values()
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
-    assert values["schema_version"] == "4"
-    assert values["release_state"] == "reboot-chain-v4-live-repeat-ready"
+    assert values["schema_version"] == "5"
+    assert values["release_state"] == (
+        "corrected-below-band-control-v5-live-repeat-ready"
+    )
     assert values["bench_preflight_completed"] == "true"
     assert values["live_execution_approved"] == "true"
     assert values["required_revision"] == "complete"
@@ -55,7 +57,9 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
         "104000bac4950008230026001b440a003a"
     )
     assert values["ethernet_host"] == "192.168.1.17"
-    assert values["role_order"] == "on_channel_a,off_slice_control,on_channel_b"
+    assert values["role_order"] == (
+        "on_channel_a,below_band_control,on_channel_b"
+    )
     assert values["claim_scope"] == (
         "live_lnb_pss_acquisition_and_local_timing_only"
     )
@@ -69,6 +73,12 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     assert values["first_persistent_live_attempt_qualified"] == "false"
     assert values["second_persistent_live_attempt_counter_failure"] == "true"
     assert values["lan_counter_reset_reboot_completed"] == "true"
+    assert values["ordered_lan_reboot_chain_supported"] == "true"
+    assert values["third_persistent_live_attempt_completed"] == "true"
+    assert values["third_persistent_live_attempt_qualified"] == "false"
+    assert values["third_persistent_live_transport_fault_free"] == "true"
+    assert values["third_persistent_live_cleanup_complete"] == "true"
+    assert values["old_control_invalid_as_negative"] == "true"
 
 
 def test_m4_manifest_binds_every_direct_source_and_contract() -> None:
@@ -105,7 +115,11 @@ def test_m4_manifest_freezes_scan_geometry_and_decision_policy() -> None:
     assert values["lnb_lo_hz"] == "9750000000"
     assert values["nominal_on_if_hz"] == "1937500000"
     assert values["nominal_on_rf_hz"] == "11687500000"
-    assert values["nominal_control_if_hz"] == "1887500000"
+    assert values["control_kind"] == "below_lnb_low_band_receiver_noise"
+    assert values["control_rf_hz"] == "10600000000"
+    assert values["control_if_hz"] == "850000000"
+    assert values["control_swept_passband_clearance_hz"] == "91300000"
+    assert values["minimum_control_passband_clearance_hz"] == "90000000"
     assert values["scan_offset_minimum_hz"] == "-1200000"
     assert values["scan_offset_maximum_hz"] == "1200000"
     assert values["scan_offset_step_hz"] == "100000"
@@ -114,7 +128,7 @@ def test_m4_manifest_freezes_scan_geometry_and_decision_policy() -> None:
     assert values["settle_ms"] == "200"
     assert values["role_duration_ms"] == "80500"
     assert values["stable_candidate_windows_per_point"] == "32"
-    assert values["initial_discard_maps"] == "2"
+    assert values["initial_discard_maps"] == "10"
     assert values["post_retune_discard_maps"] == "5"
     assert values["maximum_role_maps"] == "946"
     assert values["accepted_score_counter_budget"] == "3632640000"

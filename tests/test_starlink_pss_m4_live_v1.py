@@ -216,7 +216,7 @@ def _plan() -> dict[str, object]:
     geometry = live.live_geometry(live.DEFAULT_CHANNEL, live.DEFAULT_EDGE, live.LNB_LO_HZ)
     return {
         "schema": live.PLAN_SCHEMA,
-        "schema_version": 4,
+        "schema_version": 5,
         "plan_id": "1" * 32,
         "created_at": "2026-09-07T12:01:00Z",
         "hardware_accessed": False,
@@ -234,7 +234,7 @@ def _plan() -> dict[str, object]:
         "ppu_source_commit": "b" * 40,
         "probe_plan": _identity("/tmp/m4-probe.json"),
         "deployment_receipt": _identity("/tmp/m4-ram.json"),
-        "reboot_receipt": None,
+        "reboot_receipts": [],
         "runner_source": _identity("/tmp/m4-runner.py"),
         "source_manifest": _identity("/tmp/m4-source.yaml"),
         "expected_boot_id": "11111111-1111-4111-8111-111111111111",
@@ -252,9 +252,10 @@ def _plan() -> dict[str, object]:
         "starlink_edge": live.DEFAULT_EDGE,
         "lnb_lo_hz": live.LNB_LO_HZ,
         **geometry,
-        "off_slice_shift_hz": live.DEFAULT_OFF_SLICE_SHIFT_HZ,
-        "nominal_off_if_hz": geometry["nominal_on_if_hz"]
-        + live.DEFAULT_OFF_SLICE_SHIFT_HZ,
+        "control_kind": "below_lnb_low_band_receiver_noise",
+        "control_rf_hz": live.CONTROL_RF_HZ,
+        "control_if_hz": live.CONTROL_IF_HZ,
+        "control_passband_clearance_hz": live.CONTROL_PASSBAND_CLEARANCE_HZ,
         "scan_offsets_hz": list(live.OFFSET_ORDER_HZ),
         "point_duration_ms": live.DEFAULT_POINT_DURATION_MS,
         "settle_ms": live.DEFAULT_SETTLE_MS,
@@ -375,8 +376,8 @@ def _point(
     started_at: datetime,
 ) -> dict[str, object]:
     base = (
-        plan["nominal_off_if_hz"]
-        if role == "off_slice_control"
+        plan["control_if_hz"]
+        if role == "below_band_control"
         else plan["nominal_on_if_hz"]
     )
     offset = live.OFFSET_ORDER_HZ[ordinal - 1]
@@ -438,7 +439,7 @@ def _role_monitors() -> dict[str, dict[str, object]]:
     accepted_before = 0
     for role in live.ROLES:
         records = _records(
-            positive=role != "off_slice_control",
+            positive=role != "below_band_control",
             map_count=live.MAXIMUM_ROLE_MAPS - 3,
             duration_ms=live.ROLE_MONITOR_DURATION_MS,
             accepted_before=accepted_before,
@@ -556,7 +557,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
     runtime = _runtime(plan)
     return {
         "schema": live.RECEIPT_SCHEMA,
-        "schema_version": 4,
+        "schema_version": 5,
         "receipt_id": "e" * 32,
         "started_at": "2026-09-07T13:00:00Z",
         "completed_at": "2026-09-07T13:06:00Z",
@@ -595,7 +596,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
         "evaluation": evaluation,
         "live_pss_acquired": True,
         "timing_trajectory_qualified": True,
-        "off_slice_control_rejected": True,
+        "below_band_control_rejected": True,
         "pss_detected": True,
         "sss_detected": False,
         "frame_lock_claim": False,
@@ -625,7 +626,7 @@ def test_scan_is_interleaved_symmetric_and_fits_one_120s_role() -> None:
     consumed_maps += (len(live.OFFSET_ORDER_HZ) - 1) * (
         live.POST_RETUNE_DISCARD_MAPS + live.STABLE_CANDIDATE_WINDOWS_PER_POINT
     )
-    assert consumed_maps == 922
+    assert consumed_maps == 930
     assert live.ROLE_MONITOR_DURATION_MS == 80_500
     assert live.ROLE_MONITOR_DURATION_MS < 120_000
     assert live.ACCEPTED_SCORE_COUNTER_BUDGET == 3_632_640_000
@@ -680,11 +681,19 @@ def test_handoff_loader_keeps_ad9361_v7_profile_contract_active(
     assert profiled == [handoff]
 
 
-def test_plan_is_exact_dnm_rx_only_and_has_nonoverlapping_control() -> None:
+def test_plan_is_exact_dnm_rx_only_and_has_below_band_control() -> None:
     plan = _plan()
     live._validate_plan(plan)
 
-    assert plan["nominal_on_if_hz"] - plan["nominal_off_if_hz"] == 50_000_000
+    assert plan["control_rf_hz"] == 10_600_000_000
+    assert plan["control_if_hz"] == 850_000_000
+    assert plan["control_passband_clearance_hz"] == 91_300_000
+    control_sweep_upper_edge = (
+        plan["control_rf_hz"]
+        + live.MAXIMUM_SCAN_OFFSET_HZ
+        + plan["rf_bandwidth_hz"] // 2
+    )
+    assert live.STARLINK_DOWNLINK_MIN_RF_HZ - control_sweep_upper_edge == 91_300_000
     assert plan["do_not_merge"] is True
     assert plan["pss_detected"] is False
     assert plan["sss_detected"] is False
@@ -703,12 +712,44 @@ def test_persistent_lan_receipt_binds_exact_v7_return_and_qspi() -> None:
 
 
 def test_lan_reboot_receipt_continues_deployment_boot_and_rotated_trust() -> None:
-    boot_id, known_hosts = live._validate_lan_reboot_receipt(
-        _lan_reboot_receipt(), _persistent_lan_receipt()
+    boot_id, known_hosts, known_hosts_sha256 = live._validate_lan_reboot_receipt(
+        _lan_reboot_receipt(),
+        expected_before_boot_id="11111111-1111-4111-8111-111111111111",
+        expected_known_hosts_sha256="2" * 64,
     )
 
     assert boot_id == "22222222-2222-4222-8222-222222222222"
     assert known_hosts == Path("/private/radio.known_hosts")
+    assert known_hosts_sha256 == "6" * 64
+
+
+def test_lan_reboot_receipts_form_an_ordered_boot_and_trust_chain() -> None:
+    first = _lan_reboot_receipt()
+    boot_id, known_hosts, known_hosts_sha256 = live._validate_lan_reboot_receipt(
+        first,
+        expected_before_boot_id="11111111-1111-4111-8111-111111111111",
+        expected_known_hosts_sha256="2" * 64,
+    )
+    second = deepcopy(first)
+    second["receipt_id"] = "d" * 32
+    second["plan"]["plan_id"] = "c" * 32
+    second["before"] = deepcopy(first["after"])
+    second["after"] = deepcopy(second["before"])
+    second["after"]["boot_id"] = "33333333-3333-4333-8333-333333333333"
+    second["plan"]["before"] = deepcopy(second["before"])
+    second["plan"]["known_hosts_sha256"] = known_hosts_sha256
+    second["host_key_rotation"]["previous_known_hosts_sha256"] = known_hosts_sha256
+    second["host_key_rotation"]["replacement_known_hosts_sha256"] = "7" * 64
+
+    boot_id, known_hosts, known_hosts_sha256 = live._validate_lan_reboot_receipt(
+        second,
+        expected_before_boot_id=boot_id,
+        expected_known_hosts_sha256=known_hosts_sha256,
+    )
+
+    assert boot_id == "33333333-3333-4333-8333-333333333333"
+    assert known_hosts == Path("/private/radio.known_hosts")
+    assert known_hosts_sha256 == "7" * 64
 
 
 def test_lan_reboot_receipt_rejects_wrong_deployment_epoch_or_key() -> None:
@@ -716,12 +757,20 @@ def test_lan_reboot_receipt_rejects_wrong_deployment_epoch_or_key() -> None:
     receipt["before"]["boot_id"] = "33333333-3333-4333-8333-333333333333"
     receipt["plan"]["before"] = receipt["before"]
     with pytest.raises(live.ProbeError, match="continue the deployment epoch"):
-        live._validate_lan_reboot_receipt(receipt, _persistent_lan_receipt())
+        live._validate_lan_reboot_receipt(
+            receipt,
+            expected_before_boot_id="11111111-1111-4111-8111-111111111111",
+            expected_known_hosts_sha256="2" * 64,
+        )
 
     receipt = _lan_reboot_receipt()
     receipt["plan"]["known_hosts_sha256"] = "7" * 64
     with pytest.raises(live.ProbeError, match="network-return contract"):
-        live._validate_lan_reboot_receipt(receipt, _persistent_lan_receipt())
+        live._validate_lan_reboot_receipt(
+            receipt,
+            expected_before_boot_id="11111111-1111-4111-8111-111111111111",
+            expected_known_hosts_sha256="2" * 64,
+        )
 
 
 def test_external_ppu_receipt_loader_accepts_pretty_strict_private_json(
@@ -812,7 +861,7 @@ def test_persistent_ssh_uses_only_the_receipt_bound_host_key() -> None:
         ("serial", "wrong-radio"),
         ("ethernet_host", "192.168.1.20"),
         ("expected_firmware", "main"),
-        ("off_slice_shift_hz", -10_000_000),
+        ("control_rf_hz", 10_650_000_000),
         ("do_not_merge", False),
     ],
 )
@@ -843,7 +892,7 @@ def test_complete_live_policy_requires_positive_control_positive() -> None:
 
     assert result["qualified"] is True
     assert result["role_analyses"]["on_channel_a"]["passing_point_count"] == 1
-    assert result["role_analyses"]["off_slice_control"]["passing_point_count"] == 0
+    assert result["role_analyses"]["below_band_control"]["passing_point_count"] == 0
     assert result["role_analyses"]["on_channel_b"]["passing_point_count"] == 1
     assert result["positive_to_control_median_ratio"] > 3.0
 
@@ -851,7 +900,7 @@ def test_complete_live_policy_requires_positive_control_positive() -> None:
 def test_live_policy_rejects_equivalent_control_track() -> None:
     plan = _plan()
     receipt = _receipt(plan)
-    control = receipt["roles"]["off_slice_control"][4]
+    control = receipt["roles"]["below_band_control"][4]
     records = _records(
         positive=True,
         map_count=live.STABLE_CANDIDATE_WINDOWS_PER_POINT + 2,
@@ -967,9 +1016,9 @@ def test_scan_role_partitions_one_continuous_stream_by_map_count(
     ]
     assert len(points) == 25
     assert all(len(point["monitor_records"]) == 32 for point in points)
-    assert points[0]["monitor_records"][0]["sequence"] == 3
-    assert points[1]["monitor_records"][0]["sequence"] == 40
-    assert points[-1]["monitor_records"][-1]["sequence"] == 922
+    assert points[0]["monitor_records"][0]["sequence"] == 11
+    assert points[1]["monitor_records"][0]["sequence"] == 48
+    assert points[-1]["monitor_records"][-1]["sequence"] == 930
     assert monitor_evidence["monitor_records"] == records
 
 
