@@ -7,8 +7,8 @@
 # detection or frame lock.
 
 schema: plutosdr-fw.starlink-pss-m4-live-source
-schema_version: 2
-release_state: persistent-receipt-v2-cabled-qualified-live-ready
+schema_version: 3
+release_state: pinned-ssh-v3-cabled-qualified-live-ready
 do_not_merge: true
 do_not_release: true
 merge_target: none
@@ -89,11 +89,11 @@ rail_probe_samples: 32768
 maximum_rail_fraction: 0.0001
 
 runner_source_path: scripts/starlink_pss_m4_live_v1.py
-runner_source_sha256: 59dbccaf29eff380cd82ebea9bfee28d173f11c699807d2f9a32411eefbc2ead
+runner_source_sha256: 75a8b9b89ef4c60fec30617f337cf67bcbf142dd5f3ff3c737511991a975e7dd
 runner_test_path: tests/test_starlink_pss_m4_live_v1.py
-runner_test_sha256: a4d0da02bda65268c79b231ff6395677b775cd4c9c2ab52cc569554f4db179d4
+runner_test_sha256: c31fd93f925f71c8d7b3d098f26994abbe0aaba476dc7b48def4355099ed5e85
 manifest_test_path: tests/test_starlink_pss_m4_live_manifest_v1.py
-manifest_test_sha256: a0e765e9cd29dae39e7308245d2cd1fb2066c35324aa3b67e99ababc132a92a5
+manifest_test_sha256: ff004257a8dbef18d936f1e5c703b0d0c117f7b47bd3c2d61429f79215f709c4
 
 m3_policy_source_path: scripts/starlink_pss_m3_campaign_v1.py
 m3_policy_source_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444

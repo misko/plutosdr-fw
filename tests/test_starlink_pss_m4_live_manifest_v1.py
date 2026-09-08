@@ -23,8 +23,8 @@ def _sha256(path: Path) -> str:
 def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     values = _values()
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
-    assert values["schema_version"] == "2"
-    assert values["release_state"] == "persistent-receipt-v2-cabled-qualified-live-ready"
+    assert values["schema_version"] == "3"
+    assert values["release_state"] == "pinned-ssh-v3-cabled-qualified-live-ready"
     assert values["bench_preflight_completed"] == "true"
     assert values["live_execution_approved"] == "true"
     assert values["required_revision"] == "complete"

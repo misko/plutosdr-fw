@@ -144,13 +144,15 @@ def _plan() -> dict[str, object]:
     geometry = live.live_geometry(live.DEFAULT_CHANNEL, live.DEFAULT_EDGE, live.LNB_LO_HZ)
     return {
         "schema": live.PLAN_SCHEMA,
-        "schema_version": 2,
+        "schema_version": 3,
         "plan_id": "1" * 32,
         "created_at": "2026-09-07T12:01:00Z",
         "hardware_accessed": False,
         "persistent_write": False,
         "do_not_merge": True,
         "deployment_mode": "volatile_ram",
+        "ssh_trust_mode": "legacy_unpinned",
+        "ssh_known_hosts": None,
         "serial": live.RECEIVER_SERIAL,
         "runtime_target": live.RUNTIME_TARGET,
         "expected_firmware": live.EXPECTED_FIRMWARE,
@@ -446,7 +448,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
     runtime = _runtime(plan)
     return {
         "schema": live.RECEIPT_SCHEMA,
-        "schema_version": 2,
+        "schema_version": 3,
         "receipt_id": "e" * 32,
         "started_at": "2026-09-07T13:00:00Z",
         "completed_at": "2026-09-07T13:06:00Z",
@@ -656,6 +658,21 @@ def test_persistent_live_receipt_does_not_claim_recovery_is_required() -> None:
     live._validate_passing_receipt(receipt, plan)
 
     assert receipt["recovery_required"] is False
+
+
+def test_persistent_ssh_uses_only_the_receipt_bound_host_key() -> None:
+    plan = _plan()
+    plan["deployment_mode"] = "persistent_lan"
+    plan["ssh_trust_mode"] = "pinned"
+    plan["ssh_known_hosts"] = _identity("/private/radio.known_hosts")
+
+    argv = live._ssh_argv(plan, Path("/private/radio.password"), "true")
+
+    assert "StrictHostKeyChecking=yes" in argv
+    assert "UserKnownHostsFile=/private/radio.known_hosts" in argv
+    assert "GlobalKnownHostsFile=/dev/null" in argv
+    assert "CheckHostIP=yes" in argv
+    assert "StrictHostKeyChecking=no" not in argv
 
 
 @pytest.mark.parametrize(

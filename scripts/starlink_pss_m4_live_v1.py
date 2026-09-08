@@ -54,8 +54,8 @@ import scripts.starlink_pss_progress_probe_v1 as progress_v1
 
 SOURCE_MANIFEST = ROOT / "manifests/starlink-pss-m4-live-dnm-v1-source.yaml"
 
-PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v2"
-RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v2"
+PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v3"
+RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v3"
 FIXTURE_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-fixture.v1"
 CLAIM_SCOPE = "live_lnb_pss_acquisition_and_local_timing_only"
 PERSISTENT_PROMOTION_PROFILE = "starlink-pss-15m-rx-only-dnm-v7-persistent-promotion"
@@ -168,6 +168,8 @@ PLAN_FIELDS = {
     "probe_plan",
     "deployment_mode",
     "deployment_receipt",
+    "ssh_trust_mode",
+    "ssh_known_hosts",
     "runner_source",
     "source_manifest",
     "expected_boot_id",
@@ -619,7 +621,7 @@ def _validate_persistent_lan_receipt(receipt: dict[str, Any]) -> tuple[str, str]
 
 def _validate_plan(plan: dict[str, Any]) -> None:
     if set(plan) != PLAN_FIELDS:
-        raise ProbeError("M4 plan fields differ from the v2 schema")
+        raise ProbeError("M4 plan fields differ from the v3 schema")
     try:
         host = ipaddress.ip_address(plan.get("ethernet_host"))
     except (TypeError, ValueError) as error:
@@ -627,7 +629,7 @@ def _validate_plan(plan: dict[str, Any]) -> None:
     manual = plan.get("manual_gain_db")
     if (
         plan.get("schema") != PLAN_SCHEMA
-        or plan.get("schema_version") != 2
+        or plan.get("schema_version") != 3
         or not isinstance(plan.get("plan_id"), str)
         or HEX_32.fullmatch(plan["plan_id"]) is None
         or plan.get("hardware_accessed") is not False
@@ -699,7 +701,7 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         or plan.get("sss_detected") is not False
         or plan.get("frame_lock_claim") is not False
     ):
-        raise ProbeError("M4 plan values violate the v2 live-LNB contract")
+        raise ProbeError("M4 plan values violate the v3 live-LNB contract")
     _parse_time(plan.get("created_at"), label="plan created_at")
     for label in (
         "probe_plan",
@@ -710,6 +712,17 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         "fixture_declaration",
     ):
         _validate_identity(plan.get(label), label=label)
+    if plan["deployment_mode"] == "persistent_lan":
+        if plan.get("ssh_trust_mode") != "pinned" or not isinstance(
+            plan.get("ssh_known_hosts"), dict
+        ):
+            raise ProbeError("M4 persistent plan does not bind pinned SSH trust")
+        _validate_identity(plan["ssh_known_hosts"], label="SSH known-hosts file")
+    elif (
+        plan.get("ssh_trust_mode") != "legacy_unpinned"
+        or plan.get("ssh_known_hosts") is not None
+    ):
+        raise ProbeError("M4 volatile plan SSH trust fields are inconsistent")
     expected_geometry = live_geometry(DEFAULT_CHANNEL, DEFAULT_EDGE, LNB_LO_HZ)
     if any(plan.get(key) != value for key, value in expected_geometry.items()):
         raise ProbeError("M4 plan frequency geometry differs from the exact oracle")
@@ -817,6 +830,8 @@ def build_plan(args: Any) -> dict[str, Any]:
         expected_qspi_sha256 = post.qspi.sha256
         ppu_repository = base["ppu_repository"]
         ppu_source_commit = base["ppu_source_commit"]
+        ssh_trust_mode = "legacy_unpinned"
+        ssh_known_hosts = None
     else:
         deployment_mode = "persistent_lan"
         with monitor_v2._v7_monitor_contract():
@@ -835,16 +850,23 @@ def build_plan(args: Any) -> dict[str, Any]:
             Path(base["ppu_repository"])
         )
         ppu_repository = str(handoff.repository)
+        ssh_trust_mode = "pinned"
+        ssh_known_hosts = _identity(
+            Path(deployment["host_key_rotation"]["known_hosts_file"]),
+            label="SSH known-hosts file",
+        )
     geometry = live_geometry(DEFAULT_CHANNEL, DEFAULT_EDGE, LNB_LO_HZ)
     plan = {
         "schema": PLAN_SCHEMA,
-        "schema_version": 2,
+        "schema_version": 3,
         "plan_id": uuid.uuid4().hex,
         "created_at": _now(),
         "hardware_accessed": False,
         "persistent_write": False,
         "do_not_merge": True,
         "deployment_mode": deployment_mode,
+        "ssh_trust_mode": ssh_trust_mode,
+        "ssh_known_hosts": ssh_known_hosts,
         "serial": RECEIVER_SERIAL,
         "runtime_target": RUNTIME_TARGET,
         "expected_firmware": EXPECTED_FIRMWARE,
@@ -1340,6 +1362,29 @@ def _restore_settings(objects: dict[str, Any], original: dict[str, Any]) -> dict
 def _ssh_argv(plan: dict[str, Any], password_path: Path, command: str) -> tuple[str, ...]:
     if not command or "\x00" in command:
         raise ProbeError("M4 fixed SSH command is malformed")
+    trust_options = (
+        (
+            "-o",
+            "StrictHostKeyChecking=yes",
+            "-o",
+            f"UserKnownHostsFile={plan['ssh_known_hosts']['path']}",
+            "-o",
+            "GlobalKnownHostsFile=/dev/null",
+            "-o",
+            "CheckHostIP=yes",
+        )
+        if plan["ssh_trust_mode"] == "pinned"
+        else (
+            "-o",
+            "StrictHostKeyChecking=no",
+            "-o",
+            "UserKnownHostsFile=/dev/null",
+            "-o",
+            "GlobalKnownHostsFile=/dev/null",
+            "-o",
+            "CheckHostIP=no",
+        )
+    )
     return (
         "sshpass",
         "-f",
@@ -1361,14 +1406,7 @@ def _ssh_argv(plan: dict[str, Any], password_path: Path, command: str) -> tuple[
         "PubkeyAuthentication=no",
         "-o",
         "KbdInteractiveAuthentication=no",
-        "-o",
-        "StrictHostKeyChecking=no",
-        "-o",
-        "UserKnownHostsFile=/dev/null",
-        "-o",
-        "GlobalKnownHostsFile=/dev/null",
-        "-o",
-        "CheckHostIP=no",
+        *trust_options,
         "-o",
         "UpdateHostKeys=no",
         f"root@{plan['ethernet_host']}",
@@ -1817,6 +1855,8 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
         ("fixture_declaration", "fixture declaration"),
     ):
         _require_unchanged(plan[key], label=label)
+    if plan["ssh_trust_mode"] == "pinned":
+        _require_unchanged(plan["ssh_known_hosts"], label="SSH known-hosts file")
     for key, label in (
         ("runner_source", "M4 runner source"),
         ("source_manifest", "M4 source manifest"),
@@ -2013,7 +2053,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     outcome = "pass" if qualified else ("unqualified" if failure is None else "failed")
     receipt = {
         "schema": RECEIPT_SCHEMA,
-        "schema_version": 2,
+        "schema_version": 3,
         "receipt_id": uuid.uuid4().hex,
         "started_at": started,
         "completed_at": completed,
@@ -2379,7 +2419,7 @@ def verify_receipt(args: Any) -> dict[str, Any]:
     if (
         set(receipt) != RECEIPT_FIELDS
         or receipt.get("schema") != RECEIPT_SCHEMA
-        or receipt.get("schema_version") != 2
+        or receipt.get("schema_version") != 3
         or not isinstance(receipt_id, str)
         or HEX_32.fullmatch(receipt_id) is None
         or receipt.get("plan") != _identity(plan_path, label="M4 live plan")
