@@ -404,6 +404,69 @@ Evidence root:
 
 `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt5-live-if-smoke`
 
+## Complete live timing trajectory and replay qualification
+
+The native soak now analyzes every rolling three-map window while the one map
+session remains open. Its receipt retains all timing estimates and requires the
+estimate count to equal `complete_maps - 2`. The large trajectory remains in
+the evidence file; the terminal output is a bounded summary. A local benchmark
+processed 28.3 windows/s versus the fixed 11.72-map/s FPGA production rate.
+
+The committed implementation then ran for 120.039 seconds at 30 MS/s and the
+channel-4 upper-edge IF of 1,937,500,000 Hz. It received 1,406 contiguous maps,
+281,200 exact transport chunks, and exactly 1,404 rolling timing estimates.
+All map, tracker, validation, and push-failure counters remained zero while the
+host performed the analysis in real time. The complete logical-map digest was
+`6934e1a29b714b66e0a84d537d2ff3c782f79963a56c7f76182a981e6e94ee39`.
+
+The separate replay-only qualifier validates every overlapping window's
+generation, canonical start, source-rate scaling, drift hypothesis, period,
+coefficient identity, map/chunk accounting, cleanup, and source-receipt hash.
+It applies the frozen M3/M4 thresholds without opening a radio. It also accepts
+three exact role analyses and permits a PSS-timing claim only for a passing
+positive-A/off-slice-control/positive-B campaign with at least 30 MHz control
+separation and `1.10x` positive-to-control median contrast. SSS and frame-lock
+claims remain hard false.
+
+Applied to this no-LNB run, the replay result is a passing negative control:
+10 of 1,404 instantaneous windows passed (`0.7123%`), the longest consistent
+track was one window, median peak-to-median was `1.34474`, and median robust-z
+was `4.84568`. The positive-track policy rejected it. This is the measured
+false-alarm baseline for the corresponding live observation, not Starlink
+evidence.
+
+After the run, PPU recovery proved USB departure/return, route release,
+persistent AD9361 1R1T firmware, and unchanged QSPI. `.18` and all other radios
+were not opened. Twenty-six focused acquisition, replay, campaign, and cabled
+tests pass.
+
+### Complete trajectory evidence identities
+
+- USB inventory:
+  `ccf5245debb4e75bd3c31c5b39a3f467de306b91518e77a72acb3290fc4435c2`
+- operation plan:
+  `b3196df2e28f9a10f8fc086130649bf1234a05db81208118727b6d3e83690068`
+- RAM deployment:
+  `fed4bc3d0bd3bc38429c17b7c368b9b4a38df22850dd5656b7bac85908ce4362`
+- 120-second trajectory receipt:
+  `1e9305dc39143774537887b8e7a063f74dbe7403182b94b3aafb47de5a8f5440`
+- replayed noise-control analysis:
+  `b9ad7339cccc98a2adec1b00cd7752417f679ee5759669482be7d777647b6d83`
+- recovery:
+  `010d87483b5b0ed49588d24decc938d4cef55c1720921e38ec913240dbd3f57d`
+- trajectory-capable soak source:
+  `e98742018bf4023ad37432095aebd7e916480fd19e12fbcb9a7707d463866615`
+- soak test source:
+  `b4fdbccf6c1a4a8dd0965f9e321b8aa445518e4b7e2a98b436ee9a4ed3f6128d`
+- replay/campaign qualifier source:
+  `3c0677ea2cba0b2a788fac4259ab7e9fbaeaa28371d17a8b9c69161ef6db126e`
+- replay/campaign test source:
+  `22d50e8dd5f68fe3e36aa7bdef758ba5906bea016976f857aa45099e3b51222b`
+
+Evidence root:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt6-live-trajectory`
+
 ## Next gates
 
 1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
