@@ -1,7 +1,7 @@
 # FPGA tracker native-IIO completion record
 
-Status: 60 MS/s native USB/Ethernet result transport and cabled fine timing
-complete. Experimental firmware: **DO NOT MERGE INTO FIRMWARE MAIN**.
+Status: 30 and 60 MS/s native result transport and cabled fine timing complete.
+Experimental firmware: **DO NOT MERGE INTO FIRMWARE MAIN**.
 
 This append-only record supplements the historically sealed
 `FPGA_tracker.md` and `FPGA_tracker_60MS.md` files. It does not alter or weaken
@@ -81,7 +81,9 @@ continuous map session: three muted maps, three transition maps after TX start,
 and three positive maps. It then ran positive A, a phase-continuous
 minimum-gain control, and positive B using restartable fine streams. Follow-up
 commit `637e50a0d` reasserts and verifies the hardware ZERO source only after
-cyclic-buffer destruction, so teardown cannot restore the DDS selector.
+cyclic-buffer destruction. A separate post-context enforcement and reopen is
+still required to cover the later IIO-context teardown, as the 30 MS/s work
+below demonstrates.
 
 The positive coarse maps measured peak-to-median `3.7084` and robust-z `59.51`,
 compared with muted `1.3411` and `4.79`.
@@ -136,17 +138,107 @@ Evidence root:
 
 `/home/mouse9911/pluto-state/starlink-rx-only-dnm/iio-v5-20260907`
 
+## 30 MS/s routed and cabled qualification
+
+M6 used the same detector-only acquisition/tracker architecture at a 30 MS/s
+source rate. The rate-specific tracker contains 132 Q15 taps and searches 121
+full-rate lags (`-60..+60`). The acquisition engine retains its factor-two DDC,
+so its canonical map rate is 15 MS/s and the host converts map candidates back
+to 30 MS/s source indexes before scheduling fine requests.
+
+The fresh Vivado 2022.2 routed build passed with setup WNS `+0.341 ns`, hold WHS
+`+0.015 ns`, no routing errors, 12,047 LUTs, 19,562 registers, 4,392 of 4,400
+slices, 49.5 BRAMs, and 55 DSPs. The routed structural validator found the
+expected tracker and acquisition structures, no RX or TX DMA hierarchy, no
+tracker critical CDC paths, and exact rate parameters of 30 MS/s.
+
+The rate-identified `starlink-pss30-iio-v1-dnm` image was RAM-booted only on
+`.17`. Its deployment attested the detector-only device tree, AD9361 1R1T
+identity, frame-metadata-v3, and the expected empty TX/RX-DMA layout. The
+canonical cabled repeat used one continuous coarse-map session followed by
+positive A, a phase-continuous minimum-gain control, and positive B.
+
+| Role | Results | Fitted period (source samples) | Worst residual | Median normalized score | Winner lag |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Positive A | 128 | 40,000.045928 | 0.5059 sample / 16.86 ns | 0.72139 | 7..13 |
+| Minimum-gain control | 64 | not qualified | 60.4827 samples | 0.04197 | -59..51 |
+| Positive B | 128 | 40,000.044331 | 0.5091 sample / 16.97 ns | 0.73175 | 7..12 |
+
+The positive coarse peak-to-median was `12.3837` with robust-z `167.35`, versus
+muted `1.3395` and `4.67`. Both positive fine scores exceeded the control by
+more than 17 times. Both fitted periods and worst residuals were within one
+30 MS/s source sample (`33.33 ns`), neither positive role touched the
+search-aperture edge, and all map, tracker, validation, and push fault gates
+were zero.
+
+An independent reopen after the first numerical pass caught that destruction
+of the TX streaming context could still restore DAC selectors to `[0, 0]`.
+Gain remained at `-89.75 dB`, the TX LO remained powered down, and all DDS
+values remained zero, but the strict hardware-ZERO invariant was not satisfied.
+The guarded runner now creates a separate post-teardown context to enforce ZERO,
+destroys it, opens a second fresh context, and makes exact serial, selectors
+`[3, 3]`, four zero DDS raw/scale values, minimum gain, and TX LO power-down a
+mandatory pass gate. The same fail-safe barrier is attempted on every error
+path. Eleven focused runner tests pass, including rejection of each unsafe
+field and the two-fresh-context lifecycle.
+
+The complete firmware-branch test suite reported 1,922 passed, five skipped,
+and five failed. The five failed assertions consume branch-head files untouched
+by this work: the wide-metadata synthesis-option contract, two historical
+manifest hashes for `tools/starlink_pssctl/Makefile`, the sealed ABI-12
+minimum-host-lead contract, and the integrated-release CDC-argument count. The
+three files changed for this qualification do not overlap any failed test input;
+the focused runner suite remains 11 of 11 passing. Historical manifests were
+not rewritten to conceal that drift.
+
+The corrected hardware repeat passed that new gate. A further read-only reopen
+after the complete run again observed selectors `[3, 3]`, four zero DDS raw and
+scale values, gain `-89.75 dB`, and TX LO power-down. Cleanup restored `.17` to
+30.72 MS/s and 18 MHz bandwidth. Recovery proved USB departure/return, route
+release, persistent firmware `v0.48-plutoplus-spf-iq-direct-async-v3`, AD9361
+1R1T identity, and unchanged QSPI SHA-256
+`07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`.
+
+This proves synthetic cabled 30 MS/s PSS timing and native result transport. It
+does not claim live Starlink reception, SSS, or final frame lock.
+
+### 30 MS/s evidence identities
+
+- candidate artifact index:
+  `435bae84f53902793ba02f2120785c0966bc411b56fd3aa25eeae2c1291e2199`
+- candidate plan:
+  `a9eec9dc68eb3e7ed15a14dd9a2b3e64d9322d2d1f9ec0a7f5ab44516bb0a4ac`
+- routed-validator log:
+  `7cbd479b2685e42cea15d47a66e90fd84e1e0b9919e5c8e68b09bfc37beb768c`
+- DFU image:
+  `ec00dfcbcc999f6011c980c98ffc5ee21f61172296b7865df795a7c28dd28931`
+- corrected-repeat USB inventory:
+  `8adb5d1997e9a594935536f739d8e1de583d3493e7ade69f24ddd7270106fc63`
+- corrected-repeat operation plan:
+  `11708551c78ed8db6b31a0fe573380a91ff09aaa5920c6f194961814311094f3`
+- corrected-repeat RAM deployment:
+  `4aaa0290a96c8458eaf6a9a93559b6ef3667325a40a045ec5627e5a4f312706f`
+- corrected-repeat cabled run:
+  `7ec27f5a3cab308667ee6217eb49a8839cdd64e46e7fc26691fea3097434d60f`
+- corrected-repeat recovery:
+  `3afe13be1c99c2e79d1d4df0a881e09ba6f85b11b787335a6f5a24550acecd61`
+- corrected guarded runner source:
+  `1e21370e1f2a185bc9115c046d212c75007cb0cc96a1b70752781ed908bd1904`
+- focused runner test source:
+  `4059c3e024c944c8380f9541ba3547a696bd2bd0f2df8c530914f01793203169`
+
+Evidence root:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907`
+
 ## Next gates
 
-1. Complete M6 by running the parameterized sparse tracker at 30 MS/s through
-   the same positive/control/positive cabled test and proving at-most-one
-   30 MS/s source-sample timing error.
-2. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
+1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
    repeated on-channel roles over Ethernet. Keep one map stream open for the
    complete reset epoch and record every candidate, miss, and health counter.
-3. Use the live coarse timing to test a small frequency-compensated coefficient
+2. Use the live coarse timing to test a small frequency-compensated coefficient
    bank, then add cadence lock. Do not add SSS until PSS timing and CFO are
    repeatable on live captures.
-4. Add SSS hypotheses and joint PSS/SSS consistency as a new gate, then define
+3. Add SSS hypotheses and joint PSS/SSS consistency as a new gate, then define
    final frame-lock acquisition/loss hysteresis. No earlier result is promoted
    retroactively to frame lock.

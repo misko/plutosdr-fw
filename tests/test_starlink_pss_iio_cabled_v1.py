@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import pytest
 
+import scripts.starlink_pss_iio_cabled_v1 as runner
 from scripts.starlink_pss_iio_cabled_v1 import (
     RATE_PROFILES,
     _analyze,
     _future_center,
+    _tx_state_is_safe,
 )
 
 
@@ -67,3 +69,82 @@ def test_fine_analysis_uses_selected_rate_period_and_aperture() -> None:
     assert analysis["residual_max_abs_source_samples"] == 0
     assert analysis["aperture_edge_hits"] == 0
     assert analysis["normalized_score_median"] == 1
+
+
+def _safe_tx_state() -> dict[str, object]:
+    return {
+        "serial": runner.TX_SERIAL,
+        "dac_selectors": [3, 3],
+        "dds_raw": [0, 0, 0, 0],
+        "dds_scale": [0.0, 0.0, 0.0, 0.0],
+        "tx_hardwaregain_db": -89.75,
+        "tx_lo_powerdown": 1,
+    }
+
+
+@pytest.mark.parametrize(
+    ("field", "unsafe"),
+    [
+        ("serial", "peer-radio"),
+        ("dac_selectors", [0, 0]),
+        ("dds_raw", [1, 0, 0, 0]),
+        ("dds_scale", [0.01, 0.0, 0.0, 0.0]),
+        ("tx_hardwaregain_db", -79.75),
+        ("tx_lo_powerdown", 0),
+    ],
+)
+def test_tx_state_requires_every_independent_mute_barrier(
+    field: str, unsafe: object
+) -> None:
+    state = _safe_tx_state()
+
+    assert _tx_state_is_safe(state, expected_serial=runner.TX_SERIAL)
+    state[field] = unsafe
+    assert not _tx_state_is_safe(state, expected_serial=runner.TX_SERIAL)
+
+
+def test_independent_final_mute_uses_two_fresh_contexts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    contexts = [object(), object()]
+    opened: list[tuple[str, object]] = []
+    released: list[object] = []
+
+    def open_context(uri: str) -> object:
+        context = contexts[len(opened)]
+        opened.append((uri, context))
+        return context
+
+    class Finalizer:
+        def __init__(self, _iio: object, context: object, *, expected_serial: str):
+            assert context is contexts[0]
+            assert expected_serial == runner.TX_SERIAL
+
+        def close(self) -> dict[str, bool]:
+            released.append(contexts[0])
+            return {"verified": True}
+
+    class VerificationContext:
+        def set_timeout(self, timeout_ms: int) -> None:
+            assert timeout_ms == 5_000
+
+    contexts[1] = VerificationContext()
+    monkeypatch.setattr(runner.iio, "Context", open_context)
+    monkeypatch.setattr(runner, "PhaseContinuousSingleTx", Finalizer)
+    monkeypatch.setattr(
+        runner,
+        "_read_tx_safe_state",
+        lambda context, *, expected_serial: {**_safe_tx_state(), "verified": True},
+    )
+    monkeypatch.setattr(
+        runner,
+        "close_iio_context",
+        lambda _iio, context: (released.append(context), "released")[1],
+    )
+
+    result = runner._independent_final_tx_mute("usb:3.81.5")
+
+    assert opened == [("usb:3.81.5", contexts[0]), ("usb:3.81.5", contexts[1])]
+    assert released == [contexts[0], contexts[1]]
+    assert result["verified"] is True
+    assert result["independent_reopen"]["dac_selectors"] == [3, 3]

@@ -40,7 +40,7 @@ from pluto_plus.hardware.pss_iio import (
 )
 from pluto_plus.radio_lock import acquire_radio_lock
 
-from scripts.starlink_pss_m3_iio_tx_v1 import DAC_SELECT_ZERO
+from scripts.starlink_pss_m3_iio_tx_v1 import DAC_SELECT_ZERO, dac_selector_register
 from scripts.starlink_pss_m3_iio_tx_v2 import (
     close_iio_context,
     load_exact_payload,
@@ -152,6 +152,89 @@ class PhaseContinuousSingleTx(_PhaseContinuousSingleTx):
         evidence["selector_q"] = self._write_selector(1, DAC_SELECT_ZERO)
         evidence["selectors_verified_after_buffer_release"] = True
         return evidence
+
+
+def _tx_state_is_safe(state: dict[str, Any], *, expected_serial: str) -> bool:
+    """Return whether an independently reopened TX satisfies every mute barrier."""
+
+    return (
+        state.get("serial") == expected_serial
+        and state.get("dac_selectors") == [DAC_SELECT_ZERO, DAC_SELECT_ZERO]
+        and state.get("dds_raw") == [0, 0, 0, 0]
+        and state.get("dds_scale") == [0.0, 0.0, 0.0, 0.0]
+        and float(state.get("tx_hardwaregain_db", 0.0)) <= -80.0
+        and state.get("tx_lo_powerdown") == 1
+    )
+
+
+def _read_tx_safe_state(context: Any, *, expected_serial: str) -> dict[str, Any]:
+    """Read all independent TX barriers from one already-open fresh context."""
+
+    attrs = {str(key): str(value) for key, value in context.attrs.items()}
+    serial = attrs.get("hw_serial", attrs.get("usb,serial", attrs.get("serial", "")))
+    dds = context.find_device("cf-ad9361-dds-core-lpc")
+    phy = context.find_device("ad9361-phy")
+    if serial != expected_serial or dds is None or phy is None:
+        raise QualificationError("independent TX identity or IIO layout differs")
+    gain = _required_channel(phy, "voltage0", True)
+    tx_lo = _required_channel(phy, "altvoltage1", True)
+    dds_channels = [
+        _required_channel(dds, f"altvoltage{index}", True) for index in range(4)
+    ]
+    state = {
+        "serial": serial,
+        "dac_selectors": [
+            int(dds.reg_read(dac_selector_register(index))) & 0xF for index in range(2)
+        ],
+        "dds_raw": [
+            round(float(str(_attribute(channel, "raw").value).split()[0]))
+            for channel in dds_channels
+        ],
+        "dds_scale": [
+            float(str(_attribute(channel, "scale").value).split()[0])
+            for channel in dds_channels
+        ],
+        "tx_hardwaregain_db": float(
+            str(_attribute(gain, "hardwaregain").value).split()[0]
+        ),
+        "tx_lo_powerdown": round(
+            float(str(_attribute(tx_lo, "powerdown").value).split()[0])
+        ),
+    }
+    state["verified"] = _tx_state_is_safe(state, expected_serial=expected_serial)
+    return state
+
+
+def _independent_final_tx_mute(tx_uri: str) -> dict[str, Any]:
+    """Enforce ZERO after teardown, then prove it through a second fresh context."""
+
+    enforcement_context = iio.Context(tx_uri)
+    try:
+        finalizer = PhaseContinuousSingleTx(
+            iio, enforcement_context, expected_serial=TX_SERIAL
+        )
+    except BaseException:
+        close_iio_context(iio, enforcement_context)
+        raise
+    enforced = finalizer.close()
+
+    verification_context = iio.Context(tx_uri)
+    try:
+        setter = getattr(verification_context, "set_timeout", None)
+        if not callable(setter):
+            raise QualificationError("independent TX context cannot set a timeout")
+        setter(5_000)
+        reopened = _read_tx_safe_state(verification_context, expected_serial=TX_SERIAL)
+    finally:
+        verification_release = close_iio_context(iio, verification_context)
+    if reopened.get("verified") is not True:
+        raise QualificationError("independent post-teardown TX mute did not persist")
+    return {
+        "enforcement": enforced,
+        "independent_reopen": reopened,
+        "verification_context_release": verification_release,
+        "verified": True,
+    }
 
 
 def _now() -> str:
@@ -616,6 +699,8 @@ def run(output: Path, *, profile: RateProfile) -> dict[str, Any]:
             final_tx_mute = tx.close()
             tx = None
             receipt["cleanup"]["tx_final_mute"] = final_tx_mute
+            independent_tx_mute = _independent_final_tx_mute(tx_uri)
+            receipt["cleanup"]["tx_independent_final_mute"] = independent_tx_mute
             tracker_fault = _number(client.tracker, "fault_flags")
             map_fault = _number(client.phase_map, "fault_flags")
             gates = {
@@ -662,6 +747,10 @@ def run(output: Path, *, profile: RateProfile) -> dict[str, Any]:
                 )
                 == 0,
                 "tx_final_mute_verified": final_tx_mute.get("verified") is True,
+                "tx_independent_final_mute_verified": independent_tx_mute.get(
+                    "verified"
+                )
+                is True,
             }
             receipt["gates"] = gates
             failed = [name for name, passed in gates.items() if not passed]
@@ -686,6 +775,16 @@ def run(output: Path, *, profile: RateProfile) -> dict[str, Any]:
                 )
             except BaseException as error:  # noqa: BLE001 - continue fail-safe cleanup
                 cleanup_errors.append(f"TX context close: {error}")
+        if (
+            "uri" in receipt["transmitter"]
+            and "tx_independent_final_mute" not in receipt["cleanup"]
+        ):
+            try:
+                receipt["cleanup"]["tx_independent_final_mute_after_error"] = (
+                    _independent_final_tx_mute(receipt["transmitter"]["uri"])
+                )
+            except BaseException as error:  # noqa: BLE001 - continue cleanup
+                cleanup_errors.append(f"TX independent final mute: {error}")
         if client is not None:
             try:
                 client.close_fine()
