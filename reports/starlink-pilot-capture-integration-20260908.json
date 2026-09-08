@@ -1,0 +1,126 @@
+{
+  "schema": "starlink-pilot-capture-integration-checkpoint-v1",
+  "date_utc": "2026-09-08",
+  "hdl_commit": "4ad06bc6b7958193de282b8fb6c1bb8c9e10dc28",
+  "linux_commit": "5d706586c591d4c9f5fc8a308b2b248693c0d279",
+  "firmware_parent": "ba5ffcad16d24b4ca2beb6590aa6f26dab7dcfab",
+  "profile": "paired-pilot",
+  "integrated_edge": "upper-only",
+  "hardware_accessed": false,
+  "deployed": false,
+  "receiver_fit_qualified": false,
+  "iio_capture_qualified": false,
+  "live_glrt_evidence": false,
+  "fpga_pss_lock": false,
+  "ppu_changed": false,
+  "tests": {
+    "command": "python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py tests/test_starlink_pss_multirate_build_contract.py tests/test_starlink_pilot_iio_contract.py",
+    "passed": 259,
+    "capture_rtl_tests": 60,
+    "compiled_device_tree_and_frontend_contract_tests": 8,
+    "acquisition_wrapper_command": "bash hdl/library/axi_starlink_pss_acquisition/run_tests.sh",
+    "acquisition_wrapper_passed": true,
+    "acquisition_wrapper_modes": [
+      "map-only",
+      "pilot-only"
+    ],
+    "source_rates_msps": [
+      15,
+      30,
+      60
+    ],
+    "capture_stimulus_coordinate": "canonical 15 MS/s; per-rate output geometry tested separately from upstream conditioners",
+    "finite_capture_limits_tested": [
+      1,
+      32,
+      300
+    ],
+    "full_120ms_integrated_capture_tested": false
+  },
+  "kernel": {
+    "module_cross_compiled": true,
+    "device_tree_compiled": true,
+    "checkpatch_errors": 0,
+    "checkpatch_warnings": 0,
+    "runtime_tested": false,
+    "enabled_in_default_defconfig": false,
+    "rootfs_installed": false,
+    "build_command": "make -C linux ARCH=arm CROSS_COMPILE=/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/buildroot/output/host/bin/arm-linux-gnueabihf- CONFIG_ADI_STARLINK_PILOT=m -j4 drivers/iio/adc/adi_starlink_pilot.ko zynq-pluto-sdr-paired-pilot.dtb",
+    "qualification_pending": [
+      "real DMA completions versus AXIS counts",
+      "IIO start/stop and scan-mask runtime checks",
+      "partial descriptor accounting",
+      "bounded cancellation/fault recovery",
+      "PPU reader and immutable persisted metadata"
+    ]
+  },
+  "full_receiver_builds": [
+    {
+      "label": "initial-paired-pilot",
+      "source_state": "initial integration before the halfband RAM-ring change; generated source copies retained locally",
+      "synthesis_passed": true,
+      "luts": 15697,
+      "flip_flops": 23151,
+      "bram_tiles": 53,
+      "dsps": 65,
+      "placement_passed": false,
+      "unplaced_slices_needed": 2752,
+      "remaining_slices_available": 2082,
+      "routed": false
+    },
+    {
+      "label": "halfband-ring",
+      "synthesis_passed": true,
+      "luts": 15300,
+      "flip_flops": 21922,
+      "bram_tiles": 53,
+      "dsps": 65,
+      "placement_passed": false,
+      "unplaced_slices_needed": 2606,
+      "remaining_slices_available": 2133,
+      "routed": false
+    }
+  ],
+  "halfband_change": {
+    "coefficients_changed": false,
+    "bit_exact_tests_passed": true,
+    "lut_reduction": 397,
+    "flip_flop_reduction": 1229,
+    "source_timing_constraints_relaxed": false
+  },
+  "placement_diagnostic": {
+    "directives": [
+      "ExploreArea",
+      "Explore"
+    ],
+    "placement_passed": false,
+    "timing_qualified": false,
+    "limitation": "Opened synthesis checkpoint lacks project-generated clocks; diagnostic timing must not be used as receiver qualification."
+  },
+  "synthetic_glrt_replay": {
+    "rtl_reference_bit_exact": true,
+    "independent_acquisition": true,
+    "pss_seeds_used": false,
+    "output_epoch": 1622,
+    "cfo_hz": 42000.93991871901,
+    "margin": 0.877051434098486,
+    "unchanged_from_preoptimization": true,
+    "live": false,
+    "fpga_pss_lock": false
+  },
+  "next_required_gate": "Further whole-receiver resource/packing reduction, preserving both PSS stages and pilot evidence; full route/timing closure before any deployment.",
+  "sha256": {
+    "hdl/library/axi_starlink_pilot_capture/axi_starlink_pilot_capture.v": "68a0bae5665bcb73a819ae91b3e5a43fced7c8fad90975d4faad90477023b22b",
+    "hdl/library/starlink_pss_acquisition/starlink_pilot_halfband2.v": "8c9ba5a39a47ef72007fe42807ff6e9d33f400f41ade7ce833d8b0314df867bc",
+    "hdl/projects/pluto/system_bd.tcl": "1562f4a21ca7dcb0731b6e15d37b7add9a43a2565d07b7bbe0a8df0036f1c9c3",
+    "linux/drivers/iio/adc/adi_starlink_pilot.c": "3df422297e5a35664274ebf83d4dc5868216a0f9e81b10c05bbf287e8c609c21",
+    "linux/arch/arm/boot/dts/zynq-pluto-sdr-paired-pilot.dts": "dcbe721f959bc1ef6ad9618e32f18e21c2ef3d74b9dfd2c9b22f2d908e69798a",
+    "linux/drivers/iio/adc/adi_starlink_pilot.ko": "de9c9fc091a6d0c08ea290565ebd5546f796b77ed68a9bec173ac9e25fdadb9f",
+    "linux/arch/arm/boot/dts/zynq-pluto-sdr-paired-pilot.dtb": "53ff3a25efb3fac8b82444fcd0dcf5bc88e62cb68dc7f9826be2f68c741420cb",
+    "reports/starlink-pilot-glrt-upper-ring-rtl-20260908.json": "4360353412fc686ddeaef47217a100f27bc2f6ab9f69c1f14e640c8c1ec7f907",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn/pluto.runs/synth_1/system_top_utilization_synth.rpt": "8a5ba3ad72a6f3aac01080334bb44da154250307ea56187c36bde3e11229e3a9",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn/pluto.runs/impl_1/runme.log": "9b6eefaa2e67debbe32415336384af973807f7e62e2ea5eeccc579b9ad88424c",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELhalfband-ring/pluto.runs/synth_1/system_top_utilization_synth.rpt": "1921c19d7927491c772b10efc42ceb339682a46488972ea06cd4c432241fa8bf",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELhalfband-ring/pluto.runs/impl_1/runme.log": "8264772cb30725350a28c897de29b06be21fd1a7ba895c9503051dd9713cca56"
+  }
+}

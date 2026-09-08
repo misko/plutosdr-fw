@@ -292,3 +292,53 @@ The next implementation step is the opt-in paired pilot capture profile: expose
 the existing canonical tap, add a single-RX post-decimation DMA and its truthful
 2.5 MS/s IIO device/counter contract, then close full-shell timing before .18.
 Do not replace that integration gate with more standalone arithmetic passes.
+
+### Paired receiver integration checkpoint — 2026-09-08
+
+The opt-in `paired-pilot` block design now connects the existing canonical tap
+to a complete pilot exporter and AXIS-to-DDR DMA, preserving both coarse PSS
+and the full-rate tracker. The new PIL1 AXI control exposes atomic snapshots,
+immutable visit identity, exact contiguous-prefix counters, bounded output
+FIFO loss detection, and an optional hardware-supported-sample limit. Its
+initial integrated profile is explicitly upper-edge-only, not eight-target
+hopping. See `hdl/library/axi_starlink_pilot_capture/CAPTURE_ABI.md`.
+
+`linux/drivers/iio/adc/adi_starlink_pilot.c` and the separate opt-in
+`zynq-pluto-sdr-paired-pilot.dts` compile with the workspace ARM toolchain.
+The module is not enabled in the default defconfig or installed/autoloaded in
+the root filesystem yet. This is a compiled frontend, not an IIO capture pass.
+Source clock admission, both-IQ scan-mask admission, explicit DEV_TO_MEM DMA,
+pre-arm DMA submission checks, serialized snapshots, and stop-before-DMA-abort
+are implemented. Queue-drain failure is reported and blocks re-arm; bounded
+hardware recovery, partial descriptor accounting, and fault propagation to the
+host reader still need execution tests before deployment.
+
+Verification now includes 60 real-DDC/AXI/AXIS capture tests (rate reporting at
+15/30/60; canonical stimulus remains 15 MS/s), plus compiled device-tree
+isolation and driver-contract checks. Existing acquisition-wrapper tests pass
+at all three rates with map-only and pilot-only enable ownership. Replayed
+upper-edge published pilot/PSS IQ still matches the integer oracle exactly;
+blind host GLRT recovers epoch 1622 and CFO 42000.9399187 Hz, with unchanged
+margin 0.877051434. This remains a synthetic result, not an FPGA PSS lock.
+
+The **complete 15 MS/s receiver** has now been synthesized and placement has
+been attempted twice. First synthesis: 15697 LUTs, 23151 FFs, 53 BRAM tiles,
+65 DSPs. Placement failed packing (2752 unplaced slices needed vs 2082 available).
+A bounded ExploreArea/Explore diagnostic also failed; that diagnostic opens a
+synthesis checkpoint without the project-generated clocks and is **not timing
+evidence**. Do not interpret its timing report as receiver qualification.
+
+The halfband implementation was then changed from parallel history/pair
+registers to even/odd RAM rings and shared pair arithmetic, preserving the
+frozen coefficients, exact samples, and external latency. Fresh full synthesis
+uses 15300 LUTs and 21922 FFs (397 LUTs / 1229 FFs saved), still 53 BRAM tiles
+and 65 DSPs. Full placement still fails: 2606 unplaced slices needed vs 2133
+available. Neither attempt reached routing or produced a deployable image.
+
+The next required work is further whole-receiver packing/resource reduction,
+while preserving both PSS stages and bit-exact pilot evidence, followed by full
+route/timing closure. Do not flash either radio or bypass that gate. After fit:
+finish the matched rootfs/PPU reader and test real DMA/IIO lifecycle and recovery
+on .18, then qualify paired digital replay before outdoor .17 deployment.
+No PPU files or radios were changed in this integration checkpoint. All source
+and source pins remain on their experimental do-not-merge branches.
