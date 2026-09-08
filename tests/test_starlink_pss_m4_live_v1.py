@@ -42,16 +42,92 @@ def _fixture() -> dict[str, object]:
     }
 
 
+def _persistent_lan_receipt() -> dict[str, object]:
+    return {
+        "schema_version": 2,
+        "transport": "lan_ssh_frm",
+        "outcome": "success",
+        "phases": [
+            "preflight_revalidated",
+            "remote_preflight_attested",
+            "remote_tx_safe_read_only_attested",
+            "pluto_frm_staged",
+            "staged_hash_verified",
+            "updater_reported_done",
+            "mtd3_fit_verified",
+            "remote_stage_removed",
+            "reboot_dispatched",
+            "lan_iio_disappeared",
+            "lan_iio_reappeared",
+            "return_attested",
+            "tx_safe_attested",
+            "lan_ssh_host_key_rotated",
+            "remote_return_tx_safe_read_only_attested",
+        ],
+        "error": None,
+        "returned_serial": live.RECEIVER_SERIAL,
+        "returned_firmware": live.EXPECTED_FIRMWARE,
+        "returned_phy": "ad9361",
+        "plan": {
+            "host": live.DEFAULT_LAN_HOST,
+            "target_serial": live.RECEIVER_SERIAL,
+            "before_firmware": "v0.48-plutoplus-spf-iq-direct-async-v3",
+            "before_phy": "ad9361",
+            "image_sha256": live.EXPECTED_DFU_SHA256,
+            "fit_sha256": live.EXPECTED_FIT_SHA256,
+            "fit_size": live.EXPECTED_FIT_SIZE,
+            "expected_firmware": live.EXPECTED_FIRMWARE,
+            "mutation_profile_id": live.PERSISTENT_PROMOTION_PROFILE,
+            "expected_metadata_abi": 3,
+            "expected_tandem_agc": False,
+            "trust_model": "explicit_lan_tofu",
+            "source_iio_layout": "tx-capable-1r1t-v1",
+            "return_iio_layout": "rx-only-1r1t-v1",
+        },
+        "host_key_rotation": {
+            "previous_known_hosts_sha256": "1" * 64,
+            "replacement_known_hosts_sha256": "2" * 64,
+            "previous_fingerprint": "SHA256:old",
+            "replacement_fingerprint": "SHA256:new",
+            "previous_known_hosts_backup": "/private/radio.known_hosts.pre-reboot",
+            "known_hosts_file": "/private/radio.known_hosts",
+        },
+        "read_only_return_attestation": {
+            "serial": live.RECEIVER_SERIAL,
+            "firmware": live.EXPECTED_FIRMWARE,
+            "boot_id": "11111111-1111-4111-8111-111111111111",
+            "qspi_bytes": "33554432",
+            "qspi_sha256": "3" * 64,
+            "fit_sha256": live.EXPECTED_FIT_SHA256,
+            "all_buffer_enable": "0",
+            "dds_present": "0",
+            "tandem_present": "0",
+            "tx_hardwaregain_db": "-80.000000",
+            "tx_lo_powerdown": "1",
+            "tx_buffer_enable": "",
+            "tx_scan_enable": "",
+            "tx_dds_raw": "",
+            "tx_dds_scale": "",
+            "root_marker_present": "1",
+            "rx_dma_dt_state": "enabled",
+            "dds_dt_state": "disabled",
+            "tx_dma_dt_state": "disabled",
+            "tandem_dt_state": "disabled",
+        },
+    }
+
+
 def _plan() -> dict[str, object]:
     geometry = live.live_geometry(live.DEFAULT_CHANNEL, live.DEFAULT_EDGE, live.LNB_LO_HZ)
     return {
         "schema": live.PLAN_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "plan_id": "1" * 32,
         "created_at": "2026-09-07T12:01:00Z",
         "hardware_accessed": False,
         "persistent_write": False,
         "do_not_merge": True,
+        "deployment_mode": "volatile_ram",
         "serial": live.RECEIVER_SERIAL,
         "runtime_target": live.RUNTIME_TARGET,
         "expected_firmware": live.EXPECTED_FIRMWARE,
@@ -60,7 +136,7 @@ def _plan() -> dict[str, object]:
         "ppu_repository": "/tmp/pluto-plus-utils",
         "ppu_source_commit": "b" * 40,
         "probe_plan": _identity("/tmp/m4-probe.json"),
-        "ram_receipt": _identity("/tmp/m4-ram.json"),
+        "deployment_receipt": _identity("/tmp/m4-ram.json"),
         "runner_source": _identity("/tmp/m4-runner.py"),
         "source_manifest": _identity("/tmp/m4-source.yaml"),
         "expected_boot_id": "11111111-1111-4111-8111-111111111111",
@@ -347,7 +423,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
     runtime = _runtime(plan)
     return {
         "schema": live.RECEIPT_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "receipt_id": "e" * 32,
         "started_at": "2026-09-07T13:00:00Z",
         "completed_at": "2026-09-07T13:06:00Z",
@@ -389,7 +465,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
         "pss_detected": True,
         "sss_detected": False,
         "frame_lock_claim": False,
-        "recovery_required": True,
+        "recovery_required": plan["deployment_mode"] == "volatile_ram",
         "cleanup_errors": [],
         "error": None,
     }
@@ -481,6 +557,37 @@ def test_plan_is_exact_dnm_rx_only_and_has_nonoverlapping_control() -> None:
     assert plan["frame_lock_claim"] is False
     assert plan["stable_candidate_windows_per_point"] == 32
     assert plan["role_monitor_duration_ms"] == 80_500
+
+
+def test_persistent_lan_receipt_binds_exact_v7_return_and_qspi() -> None:
+    receipt = _persistent_lan_receipt()
+
+    boot_id, qspi_sha256 = live._validate_persistent_lan_receipt(receipt)
+
+    assert boot_id == "11111111-1111-4111-8111-111111111111"
+    assert qspi_sha256 == "3" * 64
+
+
+def test_persistent_lan_receipt_rejects_a_different_profile_or_tx_state() -> None:
+    receipt = _persistent_lan_receipt()
+    receipt["plan"]["mutation_profile_id"] = "persistent-canary"
+    with pytest.raises(live.ProbeError, match="persistent LAN receipt"):
+        live._validate_persistent_lan_receipt(receipt)
+
+    receipt = _persistent_lan_receipt()
+    receipt["read_only_return_attestation"]["tx_lo_powerdown"] = "0"
+    with pytest.raises(live.ProbeError, match="persistent LAN receipt"):
+        live._validate_persistent_lan_receipt(receipt)
+
+
+def test_persistent_live_receipt_does_not_claim_recovery_is_required() -> None:
+    plan = _plan()
+    plan["deployment_mode"] = "persistent_lan"
+    receipt = _receipt(plan)
+
+    live._validate_passing_receipt(receipt, plan)
+
+    assert receipt["recovery_required"] is False
 
 
 @pytest.mark.parametrize(

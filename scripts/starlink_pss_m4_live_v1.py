@@ -2,15 +2,17 @@
 """Plan, run, and qualify the Ethernet-only 15 MS/s live-LNB PSS gate.
 
 This DNM-only command reuses the immutable v7 FPGA image and monitor-v2 ARM
-controller.  It never transfers continuous IQ to the host.  Each live role is
+controller. It accepts either the original volatile-RAM receipt or PPU's exact
+hardware-qualified persistent-LAN receipt as deployment evidence. It never
+transfers continuous IQ to the host. Each live role is
 one bounded 25-point receiver-LO scan; every point drains FPGA phase maps for
 4.5 seconds, yielding approximately 50 three-map candidate windows.  The scan
 handles the carrier offset that a single fixed PSS kernel cannot search.
 
 The command is deliberately strict about claim scope.  A passing result is a
 live PSS acquisition and local timing-trajectory result only.  It is not SSS
-detection and it is not final frame lock.  Firmware remains RAM-only and the
-allocated receiver must be recovered through PPU after the outdoor campaign.
+detection and it is not final frame lock. Volatile deployments still require
+recovery through PPU; persistent deployments do not.
 """
 
 from __future__ import annotations
@@ -36,6 +38,7 @@ from collections.abc import Callable, Sequence
 from contextlib import ExitStack, suppress
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,10 +52,14 @@ import scripts.starlink_pss_progress_probe_v1 as progress_v1
 
 SOURCE_MANIFEST = ROOT / "manifests/starlink-pss-m4-live-dnm-v1-source.yaml"
 
-PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v1"
-RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v1"
+PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v2"
+RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v2"
 FIXTURE_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-fixture.v1"
 CLAIM_SCOPE = "live_lnb_pss_acquisition_and_local_timing_only"
+PERSISTENT_PROMOTION_PROFILE = "starlink-pss-15m-rx-only-dnm-v7-persistent-promotion"
+EXPECTED_DFU_SHA256 = "dfd38e9e687f881599a3e4dea0070430e3731193debda64e313305a90dfd833d"
+EXPECTED_FIT_SHA256 = "9a16418d04b3955f96ef6d903175450c1fb9de485d4a98de29612b3a8e6039cd"
+EXPECTED_FIT_SIZE = 12_975_455
 EXPECTED_FIRMWARE = monitor_v2.EXPECTED_FIRMWARE
 RECEIVER_SERIAL = monitor_v1.probe_v1.ALLOCATED_SERIAL
 RUNTIME_TARGET = monitor_v1.probe_v8.RUNTIME_TARGET
@@ -157,7 +164,8 @@ PLAN_FIELDS = {
     "ppu_repository",
     "ppu_source_commit",
     "probe_plan",
-    "ram_receipt",
+    "deployment_mode",
+    "deployment_receipt",
     "runner_source",
     "source_manifest",
     "expected_boot_id",
@@ -331,9 +339,172 @@ def _load_handoff(base: dict[str, Any]) -> Any:
             )
 
 
+def _load_ppu(repository: Path, commit: str) -> Any:
+    selected = monitor_v1.probe_v1._verify_ppu_repository(repository, commit)
+    return SimpleNamespace(
+        ppu=monitor_v1.probe_v1._import_ppu(selected),
+        repository=selected,
+    )
+
+
+def _current_ppu_handoff(repository: Path) -> tuple[str, Any]:
+    try:
+        completed = subprocess.run(
+            ("git", "-C", str(repository), "rev-parse", "HEAD"),
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as error:
+        raise ProbeError(f"M4 cannot resolve the current PPU commit: {error}") from error
+    commit = completed.stdout.strip()
+    if HEX_40.fullmatch(commit) is None:
+        raise ProbeError("M4 current PPU commit is invalid")
+    return commit, _load_ppu(repository, commit)
+
+
+def _validate_persistent_lan_receipt(receipt: dict[str, Any]) -> tuple[str, str]:
+    plan = receipt.get("plan")
+    returned = receipt.get("read_only_return_attestation")
+    rotation = receipt.get("host_key_rotation")
+    expected_phases = [
+        "preflight_revalidated",
+        "remote_preflight_attested",
+        "remote_tx_safe_read_only_attested",
+        "pluto_frm_staged",
+        "staged_hash_verified",
+        "updater_reported_done",
+        "mtd3_fit_verified",
+        "remote_stage_removed",
+        "reboot_dispatched",
+        "lan_iio_disappeared",
+        "lan_iio_reappeared",
+        "return_attested",
+        "tx_safe_attested",
+        "lan_ssh_host_key_rotated",
+        "remote_return_tx_safe_read_only_attested",
+    ]
+    rotation_fields = {
+        "previous_known_hosts_sha256",
+        "replacement_known_hosts_sha256",
+        "previous_fingerprint",
+        "replacement_fingerprint",
+        "previous_known_hosts_backup",
+        "known_hosts_file",
+    }
+    return_fields = {
+        "serial",
+        "firmware",
+        "boot_id",
+        "qspi_bytes",
+        "qspi_sha256",
+        "fit_sha256",
+        "all_buffer_enable",
+        "dds_present",
+        "tandem_present",
+        "tx_hardwaregain_db",
+        "tx_lo_powerdown",
+        "tx_buffer_enable",
+        "tx_scan_enable",
+        "tx_dds_raw",
+        "tx_dds_scale",
+        "root_marker_present",
+        "rx_dma_dt_state",
+        "dds_dt_state",
+        "tx_dma_dt_state",
+        "tandem_dt_state",
+    }
+    try:
+        gains = (
+            [float(value) for value in returned["tx_hardwaregain_db"].split(",")]
+            if isinstance(returned, dict)
+            and isinstance(returned.get("tx_hardwaregain_db"), str)
+            else []
+        )
+    except (TypeError, ValueError):
+        gains = []
+    if (
+        receipt.get("schema_version") != 2
+        or receipt.get("transport") != "lan_ssh_frm"
+        or receipt.get("outcome") != "success"
+        or receipt.get("phases") != expected_phases
+        or receipt.get("error") is not None
+        or receipt.get("returned_serial") != RECEIVER_SERIAL
+        or receipt.get("returned_firmware") != EXPECTED_FIRMWARE
+        or receipt.get("returned_phy") != "ad9361"
+        or not isinstance(plan, dict)
+        or plan.get("host") != DEFAULT_LAN_HOST
+        or plan.get("target_serial") != RECEIVER_SERIAL
+        or plan.get("before_firmware")
+        not in {
+            "v0.48-plutoplus-spf-iq-direct-async-v3",
+            "v0.49-plutoplus-spf-iq-direct-async-v4",
+        }
+        or plan.get("before_phy") != "ad9361"
+        or plan.get("image_sha256") != EXPECTED_DFU_SHA256
+        or plan.get("fit_sha256") != EXPECTED_FIT_SHA256
+        or plan.get("fit_size") != EXPECTED_FIT_SIZE
+        or plan.get("expected_firmware") != EXPECTED_FIRMWARE
+        or plan.get("mutation_profile_id") != PERSISTENT_PROMOTION_PROFILE
+        or plan.get("expected_metadata_abi") != 3
+        or plan.get("expected_tandem_agc") is not False
+        or plan.get("trust_model") != "explicit_lan_tofu"
+        or plan.get("source_iio_layout") != "tx-capable-1r1t-v1"
+        or plan.get("return_iio_layout") != "rx-only-1r1t-v1"
+        or not isinstance(rotation, dict)
+        or set(rotation) != rotation_fields
+        or any(
+            not isinstance(rotation.get(key), str)
+            or HEX_64.fullmatch(rotation[key]) is None
+            for key in (
+                "previous_known_hosts_sha256",
+                "replacement_known_hosts_sha256",
+            )
+        )
+        or rotation["previous_known_hosts_sha256"]
+        == rotation["replacement_known_hosts_sha256"]
+        or not isinstance(rotation.get("previous_known_hosts_backup"), str)
+        or not Path(rotation["previous_known_hosts_backup"]).is_absolute()
+        or not isinstance(rotation.get("known_hosts_file"), str)
+        or not Path(rotation["known_hosts_file"]).is_absolute()
+        or not isinstance(returned, dict)
+        or set(returned) != return_fields
+        or returned.get("serial") != RECEIVER_SERIAL
+        or returned.get("firmware") != EXPECTED_FIRMWARE
+        or not isinstance(returned.get("boot_id"), str)
+        or BOOT_ID.fullmatch(returned["boot_id"]) is None
+        or not isinstance(returned.get("qspi_bytes"), str)
+        or not returned["qspi_bytes"].isdigit()
+        or int(returned["qspi_bytes"]) <= 0
+        or not isinstance(returned.get("qspi_sha256"), str)
+        or HEX_64.fullmatch(returned["qspi_sha256"]) is None
+        or returned.get("fit_sha256") != EXPECTED_FIT_SHA256
+        or returned.get("dds_present") != "0"
+        or returned.get("tandem_present") != "0"
+        or len(gains) != 1
+        or gains[0] > -80.0
+        or returned.get("tx_lo_powerdown") != "1"
+        or returned.get("tx_buffer_enable") != ""
+        or returned.get("tx_scan_enable") != ""
+        or returned.get("tx_dds_raw") != ""
+        or returned.get("tx_dds_scale") != ""
+        or returned.get("root_marker_present") != "1"
+        or returned.get("rx_dma_dt_state") != "enabled"
+        or returned.get("dds_dt_state") != "disabled"
+        or returned.get("tx_dma_dt_state") != "disabled"
+        or returned.get("tandem_dt_state") != "disabled"
+        or not isinstance(returned.get("all_buffer_enable"), str)
+        or not returned["all_buffer_enable"]
+        or any(value != "0" for value in returned["all_buffer_enable"].split(","))
+    ):
+        raise ProbeError("M4 persistent LAN receipt violates the qualified v7 contract")
+    return returned["boot_id"], returned["qspi_sha256"]
+
+
 def _validate_plan(plan: dict[str, Any]) -> None:
     if set(plan) != PLAN_FIELDS:
-        raise ProbeError("M4 plan fields differ from the v1 schema")
+        raise ProbeError("M4 plan fields differ from the v2 schema")
     try:
         host = ipaddress.ip_address(plan.get("ethernet_host"))
     except (TypeError, ValueError) as error:
@@ -341,12 +512,13 @@ def _validate_plan(plan: dict[str, Any]) -> None:
     manual = plan.get("manual_gain_db")
     if (
         plan.get("schema") != PLAN_SCHEMA
-        or plan.get("schema_version") != 1
+        or plan.get("schema_version") != 2
         or not isinstance(plan.get("plan_id"), str)
         or HEX_32.fullmatch(plan["plan_id"]) is None
         or plan.get("hardware_accessed") is not False
         or plan.get("persistent_write") is not False
         or plan.get("do_not_merge") is not True
+        or plan.get("deployment_mode") not in {"volatile_ram", "persistent_lan"}
         or plan.get("serial") != RECEIVER_SERIAL
         or plan.get("runtime_target") != RUNTIME_TARGET
         or plan.get("expected_firmware") != EXPECTED_FIRMWARE
@@ -412,11 +584,11 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         or plan.get("sss_detected") is not False
         or plan.get("frame_lock_claim") is not False
     ):
-        raise ProbeError("M4 plan values violate the v1 live-LNB contract")
+        raise ProbeError("M4 plan values violate the v2 live-LNB contract")
     _parse_time(plan.get("created_at"), label="plan created_at")
     for label in (
         "probe_plan",
-        "ram_receipt",
+        "deployment_receipt",
         "runner_source",
         "source_manifest",
         "controller_binary",
@@ -448,6 +620,7 @@ def parser() -> argparse.ArgumentParser:
 
     plan = commands.add_parser("plan", help="seal one three-role live campaign")
     plan.add_argument("--probe-plan", type=Path, required=True)
+    plan.add_argument("--deployment-receipt", type=Path)
     plan.add_argument("--controller-binary", type=Path, required=True)
     plan.add_argument("--fixture-declaration", type=Path, required=True)
     plan.add_argument("--host-network-interface", default=DEFAULT_LAN_INTERFACE)
@@ -505,7 +678,6 @@ def build_fixture(args: Any) -> dict[str, Any]:
 def build_plan(args: Any) -> dict[str, Any]:
     base_path = args.probe_plan.absolute()
     base = _load(base_path, label="M4 base PSS probe plan")
-    handoff = _load_handoff(base)
     fixture_path = args.fixture_declaration.absolute()
     fixture = _load(fixture_path, label="M4 fixture declaration")
     _validate_fixture(fixture)
@@ -516,35 +688,59 @@ def build_plan(args: Any) -> dict[str, Any]:
         raise ProbeError("manual gain mode requires --manual-gain-db")
     if args.gain_mode != "manual" and args.manual_gain_db is not None:
         raise ProbeError("--manual-gain-db is valid only with manual gain mode")
-    ram_path = Path(base["ram_receipt"]["path"])
-    ram_identity = _identity(ram_path, label="M4 RAM receipt")
-    if ram_identity != base["ram_receipt"]:
-        raise ProbeError("M4 base plan binds a changed RAM receipt")
-    post = handoff.receipt.post_runtime
-    if post is None:
-        raise ProbeError("M4 RAM receipt lacks the candidate runtime")
+    if args.deployment_receipt is None:
+        deployment_mode = "volatile_ram"
+        handoff = _load_handoff(base)
+        deployment_path = Path(base["ram_receipt"]["path"])
+        deployment_identity = _identity(deployment_path, label="M4 RAM receipt")
+        if deployment_identity != base["ram_receipt"]:
+            raise ProbeError("M4 base plan binds a changed RAM receipt")
+        post = handoff.receipt.post_runtime
+        if post is None:
+            raise ProbeError("M4 RAM receipt lacks the candidate runtime")
+        expected_boot_id = post.boot_id
+        expected_qspi_sha256 = post.qspi.sha256
+        ppu_repository = base["ppu_repository"]
+        ppu_source_commit = base["ppu_source_commit"]
+    else:
+        deployment_mode = "persistent_lan"
+        with monitor_v2._v7_monitor_contract():
+            monitor_v1._validate_base_plan(base)
+        deployment_path = args.deployment_receipt.absolute()
+        deployment = _load(deployment_path, label="M4 persistent LAN receipt")
+        expected_boot_id, expected_qspi_sha256 = _validate_persistent_lan_receipt(
+            deployment
+        )
+        deployment_identity = _identity(
+            deployment_path, label="M4 persistent LAN receipt"
+        )
+        ppu_source_commit, handoff = _current_ppu_handoff(
+            Path(base["ppu_repository"])
+        )
+        ppu_repository = str(handoff.repository)
     geometry = live_geometry(DEFAULT_CHANNEL, DEFAULT_EDGE, LNB_LO_HZ)
     plan = {
         "schema": PLAN_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "plan_id": uuid.uuid4().hex,
         "created_at": _now(),
         "hardware_accessed": False,
         "persistent_write": False,
         "do_not_merge": True,
+        "deployment_mode": deployment_mode,
         "serial": RECEIVER_SERIAL,
         "runtime_target": RUNTIME_TARGET,
         "expected_firmware": EXPECTED_FIRMWARE,
         "expected_model": EXPECTED_MODEL,
         "claim_scope": CLAIM_SCOPE,
-        "ppu_repository": base["ppu_repository"],
-        "ppu_source_commit": base["ppu_source_commit"],
+        "ppu_repository": ppu_repository,
+        "ppu_source_commit": ppu_source_commit,
         "probe_plan": _identity(base_path, label="M4 base PSS probe plan"),
-        "ram_receipt": ram_identity,
+        "deployment_receipt": deployment_identity,
         "runner_source": _identity(Path(__file__).absolute(), label="M4 runner source"),
         "source_manifest": _identity(SOURCE_MANIFEST, label="M4 source manifest"),
-        "expected_boot_id": post.boot_id,
-        "expected_qspi_sha256": post.qspi.sha256,
+        "expected_boot_id": expected_boot_id,
+        "expected_qspi_sha256": expected_qspi_sha256,
         "controller_binary": binary,
         "fixture_declaration": _identity(fixture_path, label="M4 fixture declaration"),
         "ethernet_host": fixture["ethernet_host"],
@@ -1162,7 +1358,9 @@ def _remote_identity(plan: dict[str, Any], handoff: Any, password_path: Path) ->
         or fields["tx_dma_dt_state"] != "disabled"
         or fields["tandem_dt_state"] != "disabled"
     ):
-        raise ProbeError("M4 remote boot/QSPI/topology identity differs from the RAM receipt")
+        raise ProbeError(
+            "M4 remote boot/QSPI/topology identity differs from the deployment receipt"
+        )
     return fields
 
 
@@ -1494,7 +1692,7 @@ def _verify_point(point: dict[str, Any], plan: dict[str, Any], role: str, ordina
 def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
     for key, label in (
         ("probe_plan", "base PSS probe plan"),
-        ("ram_receipt", "RAM receipt"),
+        ("deployment_receipt", "deployment receipt"),
         ("runner_source", "M4 runner source"),
         ("source_manifest", "M4 source manifest"),
         ("controller_binary", "controller binary"),
@@ -1502,20 +1700,39 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
     ):
         _require_unchanged(plan[key], label=label)
     base = _load(Path(plan["probe_plan"]["path"]), label="M4 base PSS probe plan")
-    handoff = _load_handoff(base)
-    if base["ram_receipt"] != plan["ram_receipt"]:
-        raise ProbeError("M4 base PSS plan and live plan bind different RAM receipts")
+    if plan["deployment_mode"] == "volatile_ram":
+        handoff = _load_handoff(base)
+        if base["ram_receipt"] != plan["deployment_receipt"]:
+            raise ProbeError("M4 base PSS plan and live plan bind different RAM receipts")
+        post = handoff.receipt.post_runtime
+        if (
+            post is None
+            or post.boot_id != plan["expected_boot_id"]
+            or post.qspi.sha256 != plan["expected_qspi_sha256"]
+        ):
+            raise ProbeError("M4 RAM receipt runtime identity changed from the live plan")
+    else:
+        with monitor_v2._v7_monitor_contract():
+            monitor_v1._validate_base_plan(base)
+        if Path(plan["ppu_repository"]).resolve() != Path(base["ppu_repository"]).resolve():
+            raise ProbeError("M4 persistent plan changed the base PPU repository")
+        handoff = _load_ppu(
+            Path(plan["ppu_repository"]), plan["ppu_source_commit"]
+        )
+        deployment = _load(
+            Path(plan["deployment_receipt"]["path"]),
+            label="M4 persistent LAN receipt",
+        )
+        boot_id, qspi_sha256 = _validate_persistent_lan_receipt(deployment)
+        if (
+            boot_id != plan["expected_boot_id"]
+            or qspi_sha256 != plan["expected_qspi_sha256"]
+        ):
+            raise ProbeError("M4 persistent deployment identity changed from the live plan")
     fixture = _load(Path(plan["fixture_declaration"]["path"]), label="M4 fixture")
     _validate_fixture(fixture)
     if fixture["ethernet_host"] != plan["ethernet_host"]:
         raise ProbeError("M4 fixture and live plan Ethernet hosts differ")
-    post = handoff.receipt.post_runtime
-    if (
-        post is None
-        or post.boot_id != plan["expected_boot_id"]
-        or post.qspi.sha256 != plan["expected_qspi_sha256"]
-    ):
-        raise ProbeError("M4 RAM receipt runtime identity changed from the live plan")
     return base, handoff
 
 
@@ -1672,7 +1889,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     outcome = "pass" if qualified else ("unqualified" if failure is None else "failed")
     receipt = {
         "schema": RECEIPT_SCHEMA,
-        "schema_version": 1,
+        "schema_version": 2,
         "receipt_id": uuid.uuid4().hex,
         "started_at": started,
         "completed_at": completed,
@@ -1705,7 +1922,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
         "pss_detected": qualified,
         "sss_detected": False,
         "frame_lock_claim": False,
-        "recovery_required": True,
+        "recovery_required": plan["deployment_mode"] == "volatile_ram",
         "cleanup_errors": cleanup_errors,
         "error": None if failure is None else f"{type(failure).__name__}: {failure}",
     }
@@ -1720,7 +1937,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
         "pss_detected": True,
         "sss_detected": False,
         "frame_lock_claim": False,
-        "recovery_required": True,
+        "recovery_required": plan["deployment_mode"] == "volatile_ram",
         "receipt": identity,
     }
 
@@ -2017,7 +2234,8 @@ def _validate_passing_receipt(
         or receipt.get("pss_detected") is not True
         or receipt.get("sss_detected") is not False
         or receipt.get("frame_lock_claim") is not False
-        or receipt.get("recovery_required") is not True
+        or receipt.get("recovery_required")
+        is not (plan["deployment_mode"] == "volatile_ram")
         or receipt.get("cleanup_errors") != []
         or receipt.get("error") is not None
     ):
@@ -2037,7 +2255,7 @@ def verify_receipt(args: Any) -> dict[str, Any]:
     if (
         set(receipt) != RECEIPT_FIELDS
         or receipt.get("schema") != RECEIPT_SCHEMA
-        or receipt.get("schema_version") != 1
+        or receipt.get("schema_version") != 2
         or not isinstance(receipt_id, str)
         or HEX_32.fullmatch(receipt_id) is None
         or receipt.get("plan") != _identity(plan_path, label="M4 live plan")
@@ -2063,7 +2281,7 @@ def verify_receipt(args: Any) -> dict[str, Any]:
             "pss_detected": True,
             "sss_detected": False,
             "frame_lock_claim": False,
-            "recovery_required": True,
+            "recovery_required": plan["deployment_mode"] == "volatile_ram",
             "positive_to_control_median_ratio": evaluation[
                 "positive_to_control_median_ratio"
             ],
@@ -2077,7 +2295,7 @@ def verify_receipt(args: Any) -> dict[str, Any]:
         "pss_detected": False,
         "sss_detected": False,
         "frame_lock_claim": False,
-        "recovery_required": True,
+        "recovery_required": plan["deployment_mode"] == "volatile_ram",
         "receipt_sha256": hashlib.sha256(args.receipt.read_bytes()).hexdigest(),
     }
 

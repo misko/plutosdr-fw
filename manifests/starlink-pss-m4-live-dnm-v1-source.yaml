@@ -1,17 +1,18 @@
 # Source and cabled-hardware evidence graph for the Ethernet-only 15 MS/s
 # live-LNB PSS gate.
 #
-# DO NOT MERGE, RELEASE, OR PERSISTENTLY FLASH. This checkpoint binds the
-# frozen M4 runner, verifier, documentation, and exact cabled qualification.
-# It does not contain live PSS evidence or claim SSS detection or frame lock.
+# DO NOT MERGE OR RELEASE. This checkpoint binds the M4 runner, verifier,
+# documentation, exact cabled qualification, and PPU-gated persistent
+# deployment evidence. It does not contain live PSS evidence or claim SSS
+# detection or frame lock.
 
 schema: plutosdr-fw.starlink-pss-m4-live-source
-schema_version: 1
-release_state: continuous-role-v2-cabled-qualified-live-ready
+schema_version: 2
+release_state: persistent-receipt-v2-cabled-qualified-live-ready
 do_not_merge: true
 do_not_release: true
 merge_target: none
-persistent_flash_eligible: false
+persistent_flash_eligible: true
 persistent_write: false
 hardware_accessed: true
 bench_preflight_completed: true
@@ -31,7 +32,7 @@ claim_scope: live_lnb_pss_acquisition_and_local_timing_only
 live_pss_detected: false
 sss_detected: false
 frame_lock_claim: false
-recovery_required_after_execution: true
+recovery_required_after_execution: deployment-dependent
 
 cabled_production_requalification_passed: true
 cabled_fixture: .18_TX1_to_30dB_attenuator_to_.17_RX1
@@ -88,11 +89,11 @@ rail_probe_samples: 32768
 maximum_rail_fraction: 0.0001
 
 runner_source_path: scripts/starlink_pss_m4_live_v1.py
-runner_source_sha256: b3e06b72145bf64f3a45276f62f2b305b7524e280428d62b58da629d251ee95a
+runner_source_sha256: 28828e3ef63c28384bae70cc56346c683b7435652a0756855011b3eafdb021fa
 runner_test_path: tests/test_starlink_pss_m4_live_v1.py
-runner_test_sha256: 8a8e083d26b03d4baa3bacffdce238f4afdca6abe7835f9a1830a985484af619
+runner_test_sha256: 3eb431fa77e0b8b89327702535d412fa692d4391e64bbb88655652a40e2c4d94
 manifest_test_path: tests/test_starlink_pss_m4_live_manifest_v1.py
-manifest_test_sha256: 8643321022833d6fb194274d46626b8ab1441b8e10675ad06faf912f969cbd3e
+manifest_test_sha256: a0e765e9cd29dae39e7308245d2cd1fb2066c35324aa3b67e99ababc132a92a5
 
 m3_policy_source_path: scripts/starlink_pss_m3_campaign_v1.py
 m3_policy_source_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444
@@ -112,7 +113,7 @@ acquisition_library_source_sha256: 1d4242f4325781f8a091c00edef874beef46681d2680f
 acquisition_header_path: tools/starlink_pssctl/starlink_pss_acquisition.h
 acquisition_header_sha256: edacd943487ea0a39c1c097e6f1578fa35dd0d3a8291cb8b36c33756c5b82e10
 controller_makefile_path: tools/starlink_pssctl/Makefile
-controller_makefile_sha256: a60999e570a8f5f534010bbd28d3032fb001e7face0d412491d4c31941557fc2
+controller_makefile_sha256: b512b4dbbf61b4899d6f89f8fcb37fe441080d4a307d74638c9afc9206064b34
 
 inherited_m3_manifest_path: manifests/starlink-pss-m3-cabled-dnm-v5-source.yaml
 inherited_m3_manifest_sha256: 313e99cd3ae70a84c054e717324e9423e7e37ba9ed31d85d4cc2a6e9047ede5a
@@ -122,8 +123,8 @@ inherited_fpga_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-so
 inherited_fpga_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
 
 tracker_ledger_path: FPGA_tracker.md
-tracker_ledger_sha256: e16a1a8900e9832f07f3f826677efa46ed05e30124feebeaab9746d430f731fa
+tracker_ledger_sha256: 6f868d9422981de4d8f1cbf9abca742245d9f6bbc1e005ed310fe34d2260aded
 canonical_plan_path: FPGA_tracker_60MS.md
 canonical_plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
 controller_readme_path: tools/starlink_pssctl/README.md
-controller_readme_sha256: e48ea47a17445f39922bdeda3f6880436a5ed33a059535f3a39f9f85bb66f4cd
+controller_readme_sha256: 60c90c1a5dfd9059ce44a4928561be668107508fc316e4190b4ce9327bed51e9
