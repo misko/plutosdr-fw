@@ -3,8 +3,9 @@
 Canonical design specification: [FPGA_tracker_60MS.md](FPGA_tracker_60MS.md)
 
 Status: 15/30/60 MS/s coarse acquisition and 30/60 MS/s full-rate refinement
-are implemented and cabled-tested. Live-LNB 15 MS/s PSS acquisition is
-qualified. Live 30/60 MS/s qualification, SSS, and frame lock remain open.
+are implemented and cabled-tested. Live-LNB coarse PSS acquisition is
+qualified at 15 and 30 MS/s. Live full-rate refinement, live 60 MS/s, SSS, and
+frame lock remain open.
 **DO NOT MERGE INTO FIRMWARE MAIN.**
 
 Authorized receiver: `104000bac4950008230026001b440a003a` only.
@@ -25,12 +26,13 @@ separate ordinary-firmware signal source connected only by attenuated coax.
   - `starlink-pss60-fullrate-tracker-dnm-v11`
 - Physical RFIC evidence: AD9363A
 - Persistent runtime target: `ad9361-1r1t`
-- Persistent firmware:
-  `v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7`
-- Persistent QSPI FIT SHA-256:
-  `9a16418d04b3955f96ef6d903175450c1fb9de485d4a98de29612b3a8e6039cd`
-- PPU setup receipt:
-  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/setup-ad9361-1r1t-20260906/state/setup/receipts/e1ded32ce93644efbfe8b1274a13a204.json`
+- Persistent firmware: `starlink-pss30-iio-v1-dnm`
+- Persistent FIT SHA-256:
+  `ca1ba8b794f9a91d8bf4674aa7121498a92758bf00453884d33b8b427fa26e95`
+- Full persistent QSPI SHA-256:
+  `031c065580492a026f838fcd7fafe4f70a2744c61e34ec77e03201f676accd02`
+- PPU persistent deployment receipt:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-30-native-iio-17-20260908/forward-retry/6e8509ec-5a9a-4b76-90a5-4a316f944e6a.json`
 
 ## Gate ledger
 
@@ -41,7 +43,7 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
 | M4: live-LNB 15 MS/s timing | Complete | Both positive roles passed with a rejected below-band receiver-noise control and clean recovery |
-| M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
+| M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, 120-second transport, and repeated live-LNB coarse acquisition evidence |
 | M6: sparse 30 MS/s refinement | Complete | Direct full-rate timing within one source sample on the cabled positive/control/positive fixture |
 | M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
 | M8: sparse 60 MS/s refinement | Complete | Direct full-rate timing within one source sample on the cabled positive/control/positive fixture |
@@ -875,6 +877,62 @@ M5 is complete for coarse acquisition and index transport. The later native-IIO
 M6 qualification resolved timing within one 30 MS/s source sample; its routed,
 cabled, transport, and recovery evidence is recorded in
 `FPGA_tracker_native_iio.md`.
+
+### Live 30 MS/s coarse acquisition
+
+The exact detector-only `starlink-pss30-iio-v1-dnm` image was promoted through
+PPU's canary, rollback, and persistent LAN gates and returned on `.17` as
+AD9361 1R1T with no DDS, TX DMA, or RX DMA surface. The full persistent QSPI
+SHA-256 is
+`031c065580492a026f838fcd7fafe4f70a2744c61e34ec77e03201f676accd02`.
+Every later counter-reset reboot was non-persistent and formed a checked boot-ID
+and SSH-known-host chain from that deployment.
+
+The corrected live runner kept one native-IIO map stream open across 25
+interleaved receiver-LO offsets from 0 through +/-1.2 MHz for each of
+on-channel A, a below-band receiver-noise control, and on-channel B. Every point
+discarded ten maps after retuning and retained 34 maps for exactly 32 trajectory
+windows. Even at its upper scan edge, the control's complete 20 MHz passband
+remained 88.8 MHz below the declared 10.700 GHz Starlink boundary.
+
+The first two scanned epochs were transport-clean but scientifically
+unqualified, as required for intermittent observations that did not satisfy the
+frozen repeated-positive policy. The third scanned epoch qualified without any
+policy or source change. A passed at -100 and -200 kHz and B passed at -100
+and -200 kHz. Each role's best point formed a 32-of-32 track. Their median
+peak/background ratios were `1.80574` and `1.67678`, median robust-z values
+were `10.94` and `8.98`, and worst local canonical timing residuals were seven
+and six 15 MS/s samples (approximately 467 ns and 400 ns). The control had
+zero passing points, and the conservative positive-to-control median contrast
+was `1.2400x` against the frozen `1.10x` minimum.
+
+All 3,300 maps and 660,000 IIO chunks were continuous and exactly accounted
+for. The run transported 168,960,000 bytes of FPGA map packets rather than raw
+IQ, reported zero map/tracker/validation/push faults, and restored all settable
+RX attributes exactly. Independent replay returned a positive coarse-PSS
+acquisition result without accessing hardware.
+
+Qualifying evidence, frozen against source commit
+`b2bd98fe58fc9b82d8bdf05a3026bd6e3f9ee493`, is:
+
+- final boot ID: `63282ec0-f2dc-475d-a202-f6aa7e28be76`;
+- PPU source commit: `07591644a1523515e1094ac05c197b718b5dede8`;
+- deployment receipt SHA-256:
+  `104474f2b1905be02039535814720c08828752d58cbc5204e4e817159efbe2f1`;
+- final reboot receipt SHA-256:
+  `f62bfc6f5546551e01b80ce228dde412ae19fa15e3da7522fb9048c427fcc58b`;
+- campaign receipt SHA-256:
+  `f9fbd5aaf99cdb66b7df2fc63868307d106759aecd9929fd1e873a4761107294`;
+- independent replay SHA-256:
+  `a2470ef11e0f62f7d0ed1b629772790956c02cea8f77e7fa71afbe129bbc482f`;
+  and
+- authoritative directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-30-native-iio-17-20260908/live-scan-attempt5-v3`.
+
+This completes live 30 MS/s coarse acquisition only. It does not claim
+full-rate template selectivity, SSS identity, or frame lock. The next gate is
+same-RF matched/mismatched/matched full-rate refinement at 30 MS/s before the
+equivalent 60 MS/s promotion and live campaign.
 
 ## M7 coarse 60 MS/s acquisition and cabled soak
 

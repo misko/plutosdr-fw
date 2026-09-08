@@ -1,18 +1,20 @@
 # FPGA tracker native-IIO completion record
 
-Status: 30 and 60 MS/s native result transport and cabled fine timing complete.
-Experimental firmware: **DO NOT MERGE INTO FIRMWARE MAIN**.
+Status: 30 and 60 MS/s native result transport and cabled fine timing complete;
+live-LNB 30 MS/s coarse PSS acquisition complete. Experimental firmware:
+**DO NOT MERGE INTO FIRMWARE MAIN**.
 
 This append-only record supplements the historically sealed
 `FPGA_tracker.md` and `FPGA_tracker_60MS.md` files. It does not alter or weaken
 their 15/30/60 MS/s gate definitions.
 
-Authorized receiver: `104000bac4950008230026001b440a003a` at topology `5-2`.
+Authorized receiver: `104000bac4950008230026001b440a003a` at
+`192.168.1.17`; its USB gadget is absent at the outdoor location.
 
 Cabled transmitter: `1040007c4a94000211000b009186843ef2` TX1 at topology
-`3-11`, connected only through the declared exact 30 dB attenuator to receiver
-RX1. Both radios were left in their persistent runtimes; no experimental image
-was written to QSPI.
+`3-11`. It was used only for the historical 30 dB attenuated cabled sections;
+it was not connected or opened for the outdoor live campaigns. Later sections
+record the separately authorized persistent experimental image on `.17`.
 
 ## Native transport result
 
@@ -618,6 +620,93 @@ Evidence root:
 
 `/home/mouse9911/pluto-state/starlink-rx-only-dnm/iio-v5-20260907/hardware-attempt8-single-epoch`
 
+## Persistent 30 MS/s live coarse acquisition
+
+PPU `main` gained reusable, exact-image lifecycle support for the detector-only
+30 MS/s image. A local `.18` canary completed 30 MS/s persistent deployment, a
+five-second native-IIO functional soak, and exact rollback to its prior v7
+firmware. PPU then promoted the LAN profile, learned to attest an RX-only source
+that intentionally has no DDS, and added detector-only guarded network reboots.
+The complete PPU suite passed after each change; the final bound PPU commit is
+`07591644a1523515e1094ac05c197b718b5dede8` on pushed `main`.
+
+The promoted network operation wrote only the authorized `.17`, returned exact
+serial and AD9361 1R1T identity, and attested firmware
+`starlink-pss30-iio-v1-dnm`, FIT SHA-256
+`ca1ba8b794f9a91d8bf4674aa7121498a92758bf00453884d33b8b427fa26e95`,
+full QSPI SHA-256
+`031c065580492a026f838fcd7fafe4f70a2744c61e34ec77e03201f676accd02`,
+and the intended absence of DDS, TX DMA, and RX DMA. Every subsequent map-counter
+reset used the guarded non-persistent PPU reboot and continued both the prior
+boot ID and prior SSH-known-host hash.
+
+The first corrected fixed-LO campaign transferred 4,238 maps, 847,600 chunks,
+and 216,985,600 bytes without a fault, restored RX exactly, and replayed
+independently. It remained unqualified: short on-channel excursions did not
+meet the frozen 80 percent trajectory-occupancy policy. That result showed the
+need for the same interleaved LO scan that had qualified the intermittent live
+signal at 15 MS/s.
+
+Schema v3 therefore scans 25 offsets in the sealed order
+`0,+100k,-100k,...,+1.2M,-1.2M` for on-channel A, the below-band control, and
+on-channel B. Each point waits 200 ms, discards ten complete maps, and retains
+34 maps for exactly 32 rolling trajectory windows. One map epoch covers all 75
+points. Even at the positive edge of its scan, the control's complete 20 MHz
+passband ends 88.8 MHz below the declared 10.700 GHz Starlink boundary. The
+runner binds the exact persistent-deployment receipt, every ordered reboot,
+current known-host identity, coefficient, firmware and PPU source commits,
+continuous generations/indexes, all driver counters, and exact cleanup. Its
+full mocked 3,300-map epoch, independent replay, and tamper rejection pass.
+
+The first two v3 epochs were retained as clean unqualified observations. The
+first had no positive point in either on-channel role. The second showed an
+intermittent event—A reached 17/32 passing windows at +600 kHz and B reached
+16/32 at -200 kHz—but correctly remained below the frozen 26/32 and eight-
+consecutive-window gates. No threshold or scan parameter was changed afterward.
+
+The third v3 epoch qualified. A passed at -100 and -200 kHz and B passed at
+-100 and -200 kHz. Each role's best trajectory was 32/32 with a 32-window
+continuous timing track. The best A/B median peak-to-background ratios were
+`1.805738` and `1.676775`, median robust z scores were `10.9403` and `8.9822`,
+and worst local timing residuals were seven and six canonical samples. At 15
+MS/s canonical resolution those bounds are approximately 467 ns and 400 ns;
+they are coarse seeds, not the final 30 MS/s timing bound. The below-band
+control had zero passing points, and the conservative positive-to-control
+median contrast was `1.240001`, above the frozen `1.10` gate.
+
+All 3,300 maps, 660,000 chunks, 132,000,000 logical bytes, and 168,960,000
+transport bytes were exact. Every map, tracker, validation, and push-failure
+counter was zero. Cleanup restored 30.72 MS/s, 18 MHz bandwidth, 2.4 GHz LO,
+slow-attack AGC, and LO power state exactly. Independent offline replay passed
+and reproduced the PSS claim without hardware access. SSS and frame lock
+remain hard false.
+
+Evidence identities:
+
+- deployment receipt:
+  `104474f2b1905be02039535814720c08828752d58cbc5204e4e817159efbe2f1`;
+- final guarded reboot receipt:
+  `f62bfc6f5546551e01b80ce228dde412ae19fa15e3da7522fb9048c427fcc58b`;
+- fixed-LO receipt and replay:
+  `ff706ce52e712b2ee4e99677fd4f210f4cc647ab3da4255d8151de31c27e026e`,
+  `e7099c323951b6988b9621a68c46ed7ff1a222cc4b21f2fcfe2740b33aa6a241`;
+- v3 unqualified receipts:
+  `d5c980ee11559ac473c5c552d7ebe9b16c495d8ca5f4170735b647d4c19b2e65`,
+  `997b59188bd8b93c32309583561d8628a537ba1eaa6919c5cac78a61a7a6aa76`;
+- qualifying receipt and independent replay:
+  `f9fbd5aaf99cdb66b7df2fc63868307d106759aecd9929fd1e873a4761107294`,
+  `a2470ef11e0f62f7d0ed1b629772790956c02cea8f77e7fa71afbe129bbc482f`;
+- v3 runner and focused-test source:
+  `f9990fdb29a46a6b1c4493fe5a0c84a93757610566f6efd19d4a65431132747a`,
+  `003196c03416fd7f359fe97cea2a03366ee88d1e8b14a88254ca6cf88680aa73`;
+- frozen firmware source commit:
+  `b2bd98fe58fc9b82d8bdf05a3026bd6e3f9ee493`; and
+- authoritative root:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-30-native-iio-17-20260908`.
+
+This completes live 30 MS/s coarse acquisition only. It does not prove fine
+template selectivity, SSS identity, or frame lock.
+
 ## Next gates
 
 The original native live-runner design used a nearby `off_slice_control` for
@@ -627,21 +716,18 @@ can select a different occupied slice rather than remove the signal class.
 Historical receipts remain immutable, but no future live claim may use that
 control.
 
-1. Promote exact native-IIO image bytes only through a separately reviewed PPU
-   canary/promotion profile with exact-image, RX-only topology, persistent
-   return, and rollback gates. Do not infer persistent authority from a
-   RAM-only candidate plan.
-2. Run 30 MS/s first, then 60 MS/s, as bounded on-channel / below-band receiver-
-   noise control / repeated on-channel roles over Ethernet. The control is
-   centered at RF 10.600 GHz (850 MHz IF with the declared 9.750 GHz LNB LO),
-   and its complete 20 MHz receive passband stays below the declared 10.700 GHz
-   Starlink/LNB boundary. Retain one continuous map epoch, discard ten complete
-   maps after each retune, and bind every map, counter, reboot, and QSPI
-   identity in independently replayable evidence.
-3. Treat that campaign only as coarse PSS acquisition and timing-seed evidence.
-   The coarse map detector has fixed coefficients, so loading a tracker
-   coefficient file cannot make the coarse map itself a mismatched-template
-   control.
+1. Preserve the qualified persistent 30 MS/s deployment and its PPU rollback
+   path. Promote exact 60 MS/s native-IIO bytes only through the same separately
+   reviewed local canary, exact-image RX-only topology, persistent return, LAN
+   deployment, and rollback gates.
+2. Reuse the qualified v3 on-channel / below-band control / repeated on-channel
+   scan at 60 MS/s. Retain one continuous map epoch, ten post-retune discard
+   maps, exact stream/counter accounting, and the complete ordered PPU reboot
+   chain in independently replayable evidence.
+3. Treat both 30 and future 60 MS/s campaigns only as coarse PSS acquisition
+   and timing-seed evidence. The coarse map detector has fixed coefficients, so
+   loading a tracker coefficient file cannot make the coarse map itself a
+   mismatched-template control.
 4. For fine timing, schedule full-rate tracker requests from the live coarse
    seeds at the same RF. Compare the matched PSS coefficient bank with an
    energy-matched, deliberately mismatched bank, and qualify normalized score,
