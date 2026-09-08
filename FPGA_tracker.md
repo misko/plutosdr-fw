@@ -3,8 +3,9 @@
 Canonical design specification: [FPGA_tracker_60MS.md](FPGA_tracker_60MS.md)
 
 Status: 15/30/60 MS/s coarse acquisition and 60 MS/s full-rate refinement are
-implemented and cabled-tested. 30 MS/s refinement, live-LNB qualification,
-SSS, and frame lock remain open.
+implemented and cabled-tested. Live-LNB 15 MS/s PSS acquisition is qualified.
+30 MS/s refinement, live 30/60 MS/s qualification, SSS, and frame lock
+remain open.
 **DO NOT MERGE INTO FIRMWARE MAIN.**
 
 Authorized receiver: `104000bac4950008230026001b440a003a` only.
@@ -40,7 +41,7 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
-| M4: live-LNB 15 MS/s timing | Corrected control verified; positive repeat needed | Both positive roles plus rejected below-band receiver-noise control |
+| M4: live-LNB 15 MS/s timing | Complete | Both positive roles passed with a rejected below-band receiver-noise control and clean recovery |
 | M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
 | M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
@@ -778,6 +779,60 @@ Attempt-5 evidence, frozen against source commit
 This result removes the negative-control blocker but does not close M4. Another
 guarded reboot and repeated live campaign are required to obtain both positive
 roles under the unchanged decision policy.
+
+### M4 frozen-policy repeats and live qualification
+
+The policy and role geometry remained byte-identical while additional guarded
+epochs sampled the intermittent live channel. The outcomes were:
+
+| Attempt | On A passing points | Control passing points | On B passing points | Contrast | Outcome |
+| --- | ---: | ---: | ---: | ---: | --- |
+| 6 | 0 | 0 | 1 | 1.1648 | Unqualified; A's best track was 7 windows, one below the frozen minimum |
+| 7 | 1 | 0 | 0 | 1.0901 | Unqualified; B's best pass fraction was 22/32 |
+| 8 | n/a | n/a | n/a | n/a | Failed closed at the control-role start after one clean 943-map A role |
+| 9 | 0 | 0 | 2 | 1.0079 | Unqualified; A was quiet |
+| 10 | 3 | 0 | 3 | 1.3413 | **PASS** |
+
+Attempt 8's one transient monitor-start failure made no detection claim. Its
+cleanup still removed the controller, closed IIO, and restored every settable
+RX attribute. Attempts 6, 7, 9, and 10 each transported 2,829 contiguous maps
+with zero FPGA health flags, continuity faults, clipping, or cleanup errors.
+No decision threshold was relaxed and no favorable partial result was selected.
+
+Attempt 10 is the qualifying M4 result. On-channel A passed at -100, -200, and
+-300 kHz; on-channel B passed at 0, -100, and -200 kHz. The best A and B points
+each formed a complete 32-of-32 timing track. Their median peak/background
+ratios were `1.8200` and `2.7501`, robust z values were `11.42` and `23.44`, and
+worst local timing residuals were three and two 15 MS/s samples. The below-band
+control had zero passing points, a one-window longest false track, median
+peak/background `1.3569`, and robust z `4.99`. The positive-to-control median
+contrast was `1.3413x`, above the frozen `1.10x` minimum.
+
+The execution and independent offline verifier both returned
+`PASS_M4_LIVE_LNB_PSS_ACQUISITION_ONLY`. All three roles delivered exactly 943
+maps; their generations were `1..943`, `944..1886`, and `1887..2829`. The final
+accepted-score count was `3,623,153,443`, all health flags and fault counters
+were zero, and the rail probe had no clipped or near-clipped components. The
+temporary controller was removed, IIO contexts closed, settable RX attributes
+were restored, and the boot ID, RX-only device-tree surface, AD9361 1R1T
+personality, firmware, and full-QSPI hash remained unchanged.
+
+Qualifying evidence, frozen against source commit
+`101ae2b6db00dd4c8aa70bf24a80bb56325a9f05`, is:
+
+- boot ID: `1ccc5798-6d92-49ce-816c-dced7b6c5de3`;
+- final guarded-reboot receipt SHA-256:
+  `68b90eea14e77ac157c9fbca3e7eb607d2239c8d903c45f095fc998f9ca1fe64`;
+- plan SHA-256:
+  `668ad1f3fe93a156ddf5e371ad8656f55d6fc79eaa4b7833912d6440afb28233`;
+- receipt SHA-256:
+  `d2842bdb4c4068c6b45202b5767d1f0a87eefe69348d0cc58df4a0567b895030`;
+- authoritative directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-17-20260908/live-attempt10`.
+
+M4 is complete for live Starlink PSS acquisition and local timing trajectory at
+15 MS/s. This evidence does not claim SSS, decoded frame identity, final frame
+lock, or a 30/60 MS/s live result.
 
 ## M5 coarse 30 MS/s acquisition evidence
 

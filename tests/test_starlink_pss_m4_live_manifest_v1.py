@@ -24,9 +24,7 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     values = _values()
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
     assert values["schema_version"] == "5"
-    assert values["release_state"] == (
-        "corrected-control-v5-observed-positive-repeat-needed"
-    )
+    assert values["release_state"] == "m4-live-lnb-qualified-v5"
     assert values["bench_preflight_completed"] == "true"
     assert values["live_execution_approved"] == "true"
     assert values["required_revision"] == "complete"
@@ -51,6 +49,7 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
             "ethernet_only_observation",
             "hardware_accessed",
             "persistent_flash_eligible",
+            "live_pss_detected",
         } else "false"
         assert values[field] == expected
     assert values["allocated_receiver_serial"] == (
@@ -86,6 +85,15 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     assert values["corrected_control_transport_fault_free"] == "true"
     assert values["corrected_control_cleanup_complete"] == "true"
     assert values["corrected_control_qspi_unchanged"] == "true"
+    assert values["m4_live_gate_complete"] == "true"
+    assert values["qualifying_live_attempt"] == "10"
+    assert values["qualifying_live_positive_a_passing_points"] == "3"
+    assert values["qualifying_live_control_passing_points"] == "0"
+    assert values["qualifying_live_positive_b_passing_points"] == "3"
+    assert values["qualifying_live_transport_fault_free"] == "true"
+    assert values["qualifying_live_cleanup_complete"] == "true"
+    assert values["qualifying_live_qspi_unchanged"] == "true"
+    assert values["guarded_lan_reboot_chain_length"] == "7"
 
 
 def test_m4_manifest_binds_every_direct_source_and_contract() -> None:
