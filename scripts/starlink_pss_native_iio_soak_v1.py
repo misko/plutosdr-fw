@@ -163,6 +163,7 @@ def run(
             first_records: list[dict[str, int]] = []
             last_records: deque[dict[str, int]] = deque(maxlen=8)
             last_maps: deque[PssPhaseMap] = deque(maxlen=3)
+            coarse_windows: list[dict[str, Any]] = []
             previous: PssPhaseMap | None = None
             map_count = 0
 
@@ -180,6 +181,14 @@ def run(
                         first_records.append(record)
                     last_records.append(record)
                     last_maps.append(phase_map)
+                    if len(last_maps) == 3:
+                        coarse_windows.append(
+                            asdict(
+                                analyze_phase_maps(
+                                    tuple(last_maps), rate_msps=profile.rate_msps
+                                )
+                            )
+                        )
                     previous = phase_map
                     map_count += 1
             elapsed = time.monotonic() - started
@@ -201,7 +210,6 @@ def run(
             client.close_maps()
             if len(last_maps) != 3:
                 raise QualificationError("soak produced fewer than three complete maps")
-            coarse = analyze_phase_maps(tuple(last_maps), rate_msps=profile.rate_msps)
             transport_bytes = map_count * PSS_MAP_CHUNKS * PSS_MAP_SCAN_BYTES
             minimum_maps = _minimum_complete_maps(duration_seconds)
             gates = {
@@ -210,6 +218,7 @@ def run(
                 "driver_map_count_exact": counters["maps_delivered"] == map_count,
                 "driver_chunk_count_exact": counters["chunks_delivered"]
                 == map_count * PSS_MAP_CHUNKS,
+                "coarse_window_count_exact": len(coarse_windows) == map_count - 2,
                 "active_coefficient_exact": active_generation
                 == profile.coefficient_generation,
                 "map_push_failure_free": counters["map_buffer_push_failures"] == 0,
@@ -232,7 +241,9 @@ def run(
                 "map_digest_sha256": digest.hexdigest(),
                 "first_maps": first_records,
                 "last_maps": list(last_records),
-                "last_three_coarse_estimate": asdict(coarse),
+                "coarse_window_count": len(coarse_windows),
+                "coarse_windows": coarse_windows,
+                "last_three_coarse_estimate": coarse_windows[-1],
                 "counters": counters,
             }
             receipt["gates"] = gates
@@ -316,7 +327,11 @@ def main() -> int:
                 "outcome": receipt["outcome"],
                 "receiver": receipt["receiver"],
                 "rate_msps": receipt["rate_msps"],
-                "stream": receipt["stream"],
+                "stream": {
+                    key: value
+                    for key, value in receipt["stream"].items()
+                    if key != "coarse_windows"
+                },
                 "gates": receipt["gates"],
                 "cleanup": receipt["cleanup"],
                 "receipt": receipt["receipt"],

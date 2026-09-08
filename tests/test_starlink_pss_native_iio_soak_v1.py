@@ -156,6 +156,12 @@ def test_run_holds_rx_lock_through_restore_and_context_close(
     class Coarse:
         marker: str = "last-three"
 
+    analysis_windows: list[tuple[int, int, int]] = []
+
+    def analyze(maps: tuple[PssPhaseMap, ...], **_kwargs: Any) -> Coarse:
+        analysis_windows.append(tuple(item.generation for item in maps))
+        return Coarse()
+
     clock = iter((0.0, 0.0, 1.1, 1.2))
     monkeypatch.setattr(runner, "acquire_radio_lock", locked)
     monkeypatch.setattr(runner, "_receiver_uri", lambda _transport: "ip:192.0.2.1")
@@ -178,9 +184,7 @@ def test_run_holds_rx_lock_through_restore_and_context_close(
         return {"verified": True}
 
     monkeypatch.setattr(runner, "_restore_rx", restore)
-    monkeypatch.setattr(
-        runner, "analyze_phase_maps", lambda *_args, **_kwargs: Coarse()
-    )
+    monkeypatch.setattr(runner, "analyze_phase_maps", analyze)
     monkeypatch.setattr(runner.time, "monotonic", lambda: next(clock))
 
     receipt = runner.run(
@@ -195,6 +199,19 @@ def test_run_holds_rx_lock_through_restore_and_context_close(
     assert receipt["transmitter_opened"] is False
     assert receipt["receiver"]["requested_lo_hz"] == 1_937_500_000
     assert configured_lo == [1_937_500_000]
+    assert receipt["stream"]["coarse_window_count"] == 7
+    assert receipt["stream"]["coarse_windows"] == [{"marker": "last-three"}] * 7
+    assert receipt["stream"]["last_three_coarse_estimate"] == {"marker": "last-three"}
+    assert receipt["gates"]["coarse_window_count_exact"] is True
+    assert analysis_windows == [
+        (1, 2, 3),
+        (2, 3, 4),
+        (3, 4, 5),
+        (4, 5, 6),
+        (5, 6, 7),
+        (6, 7, 8),
+        (7, 8, 9),
+    ]
     assert events[-3:] == ["restore", "context_close", "lock_exit"]
     assert not lock_active
 
