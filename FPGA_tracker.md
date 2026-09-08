@@ -26,9 +26,9 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 - Physical RFIC evidence: AD9363A
 - Persistent runtime target: `ad9361-1r1t`
 - Persistent firmware:
-  `v0.48-plutoplus-spf-iq-direct-async-v3`
+  `v0.50-plutoplus-starlink-pss-15m-rx-only-dnm-v7`
 - Persistent QSPI FIT SHA-256:
-  `db777ac93d5c6f0be0cf2799808a4d06fe39264ee1e99e76001509394d75f1df`
+  `9a16418d04b3955f96ef6d903175450c1fb9de485d4a98de29612b3a8e6039cd`
 - PPU setup receipt:
   `/home/mouse9911/pluto-state/starlink-rx-only-dnm/setup-ad9361-1r1t-20260906/state/setup/receipts/e1ded32ce93644efbfe8b1274a13a204.json`
 
@@ -40,7 +40,7 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
-| M4: live-LNB 15 MS/s timing | Offline ready | Repeated on-channel trajectory and off-channel control |
+| M4: live-LNB 15 MS/s timing | Live attempted; repeat ready | Repeated on-channel trajectory and off-channel control |
 | M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
 | M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
@@ -632,6 +632,67 @@ Evidence:
 The exact production continuous-role path is now cabled-qualified and approved
 for the live-LNB M4 run. This is still only a synthetic cabled PSS timing result:
 it is not live Starlink evidence, SSS detection, or a frame-lock claim.
+
+### M4 persistent outdoor attempts and guarded epoch reset
+
+On 2026-09-08 PPU persistently installed the exact v7 RX-only image on `.17`
+over its unique LAN address. The successful receipt proves the exact serial,
+AD9361 1R1T personality, RX-only device tree, TX-safe state, staged and `mtd3`
+FIT hashes, full-QSPI readback, IIOD disappearance/return, and rotated SSH trust.
+The persistent deployment receipt is:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-17-20260908/ppu-flash-receipts/0e28e56f-8839-4283-aac4-2e95e9408bff.json`
+
+Its SHA-256 is
+`9d6125ad5abb745221864546c09986ee0fe744dc7c65219b55cb889df9c00df8`.
+The returned boot ID was `48f99c17-87a9-4a66-b736-eac727d10322` and the
+full-QSPI SHA-256 was
+`bd15030f3d4d18a396d6bbdd0a80893fcc11a8a70d6e835f8adf8ba6c5f6c849`.
+
+The first schema-v3 outdoor campaign completed all three roles and restored
+the receiver cleanly, but was scientifically unqualified under the frozen
+policy. On-channel A had no passing LO points. The control and on-channel B
+each had four passing points, and the positive/control median ratio was
+`0.8507`. The strongest event began near the end of the control interval and
+continued for roughly 50 seconds into on-channel B. At -100 and -200 kHz,
+on-channel B produced all 32 candidate windows with median peak/background
+near 2.0, robust z approximately 13.6--13.9, and local timing residuals of five
+and three canonical samples. That is useful transient evidence, but it cannot
+be labeled PSS because the non-overlapping control also passed. The immutable
+receipt SHA-256 is
+`ebf0379182e7fa887c35d925fdc02b4ef3515c4ba65ad9a5b7c2a5a488edd970`.
+
+A second attempt correctly failed in its first role when the persistent
+32-bit accepted-score counter approached saturation. Its receipt SHA-256 is
+`1740e2491b799da205fa018293de162ad45c2e471e377dc7b144192f62846628`;
+cleanup still removed the controller, closed IIO, and restored the original RF
+settings. The previous implementation learned counter headroom only from the
+first 80.5-second monitor summary. Schema v4 now reads a zero-duration FPGA
+snapshot immediately after controller upload and refuses insufficient full-
+campaign headroom before starting any role.
+
+PPU `main` commits `d6ed864` and `fc510b5` add a reusable network-return reboot
+for radios that cannot appear on local USB. It binds the old pinned SSH key,
+SSH identity, IIOD identity/topology, metadata ABI, and TX-safe state; proves
+IIOD disappearance and return; rotates and verifies the new SSH key; and then
+requires a changed boot ID with unchanged firmware and capabilities plus a
+second TX-safe attestation. The complete PPU suite passed 1,476 tests with 11
+explicit skips.
+
+That guarded reboot succeeded on `.17` without a QSPI write. The boot ID
+changed to `f3d9a11a-8089-4f8b-8677-d125d4f436ae`; v7 firmware, AD9361 PHY,
+two-channel RX scan layout, and no-tandem/no-TX topology remained unchanged.
+The mode-0600 receipt is:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-17-20260908/reboot-receipts/lan-network-50dc2b64150243f49e5a4f5e848f90b3.json`
+
+Its SHA-256 is
+`afce345cbc6867ae96def806540967c4048d942422b0074574d2bcce5a79e5a4`.
+M4 schema v4 accepts this only as a cryptographic continuation of the original
+persistent deployment: old boot and old trust hash must match the flash
+receipt, while the new boot and replacement trust hash become the campaign
+identity. A fresh outdoor repeat is now ready; no PSS, SSS, or frame-lock claim
+is made at this checkpoint.
 
 ## M5 coarse 30 MS/s acquisition evidence
 

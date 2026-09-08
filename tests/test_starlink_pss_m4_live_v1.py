@@ -140,11 +140,83 @@ def _persistent_lan_receipt() -> dict[str, object]:
     }
 
 
+def _lan_reboot_receipt() -> dict[str, object]:
+    capabilities = {
+        "board_model": "Analog Devices PlutoSDR Rev.C (Z7010/AD9363)",
+        "phy_model": "ad9361",
+        "rx_scan_channels": ["voltage0", "voltage1"],
+        "tandem_agc": False,
+    }
+    before = {
+        "serial": live.RECEIVER_SERIAL,
+        "firmware": live.EXPECTED_FIRMWARE,
+        "boot_id": "11111111-1111-4111-8111-111111111111",
+        "capabilities": capabilities,
+    }
+    after = {
+        **before,
+        "boot_id": "22222222-2222-4222-8222-222222222222",
+    }
+    return {
+        "schema_version": 2,
+        "receipt_id": "f" * 32,
+        "plan": {
+            "schema_version": 3,
+            "plan_id": "e" * 32,
+            "created_at": "2026-09-08T09:26:56Z",
+            "serial": live.RECEIVER_SERIAL,
+            "ssh_host": live.DEFAULT_LAN_HOST,
+            "known_hosts_sha256": "2" * 64,
+            "expected_metadata_abi": 3,
+            "before": before,
+            "iio_before": {
+                "serial": live.RECEIVER_SERIAL,
+                "firmware": live.EXPECTED_FIRMWARE,
+                "metadata_abi": 3,
+                "board_model": live.EXPECTED_MODEL,
+                "phy_model": "ad9361",
+                "rx_scan_channels": ["voltage0", "voltage1"],
+                "tandem_agc": False,
+            },
+            "confirmation_phrase": f"REBOOT LAN {live.RECEIVER_SERIAL}",
+        },
+        "started_at": "2026-09-08T09:26:56Z",
+        "finished_at": "2026-09-08T09:27:47Z",
+        "outcome": "success",
+        "completed_phases": [
+            "usb_absence_reattested",
+            "remote_identity_reattested",
+            "lan_iiod_identity_reattested",
+            "tx_safe_before_reboot",
+            "reboot_dispatch_attempted",
+            "reboot_dispatched",
+            "lan_iio_disappeared",
+            "lan_iio_reappeared",
+            "lan_ssh_host_key_rotated",
+            "post_reboot_identity_attested",
+            "tx_safe_after_reboot",
+        ],
+        "before": before,
+        "after": after,
+        "host_key_rotation": {
+            "previous_known_hosts_sha256": "2" * 64,
+            "replacement_known_hosts_sha256": "6" * 64,
+            "previous_fingerprint": "SHA256:old",
+            "replacement_fingerprint": "SHA256:new",
+            "previous_known_hosts_backup": "/private/radio.known_hosts.pre-reboot",
+            "known_hosts_file": "/private/radio.known_hosts",
+        },
+        "dispatch_error": None,
+        "error": None,
+        "receipt_path": "/private/lan-network-reboot.json",
+    }
+
+
 def _plan() -> dict[str, object]:
     geometry = live.live_geometry(live.DEFAULT_CHANNEL, live.DEFAULT_EDGE, live.LNB_LO_HZ)
     return {
         "schema": live.PLAN_SCHEMA,
-        "schema_version": 3,
+        "schema_version": 4,
         "plan_id": "1" * 32,
         "created_at": "2026-09-07T12:01:00Z",
         "hardware_accessed": False,
@@ -162,6 +234,7 @@ def _plan() -> dict[str, object]:
         "ppu_source_commit": "b" * 40,
         "probe_plan": _identity("/tmp/m4-probe.json"),
         "deployment_receipt": _identity("/tmp/m4-ram.json"),
+        "reboot_receipt": None,
         "runner_source": _identity("/tmp/m4-runner.py"),
         "source_manifest": _identity("/tmp/m4-source.yaml"),
         "expected_boot_id": "11111111-1111-4111-8111-111111111111",
@@ -415,6 +488,41 @@ def _rail() -> dict[str, object]:
     }
 
 
+def _snapshot(*, accepted_scores: int = 0) -> dict[str, object]:
+    return {
+        "schema": "starlink-pss-acqctl.snapshot.v1",
+        "claim_scope": "acquisition_telemetry_only",
+        "serial": live.RECEIVER_SERIAL,
+        "abi_version": "0x00010001",
+        "snapshot_generation": 0,
+        "ready_mask": 0,
+        "map_generations": [0, 0],
+        "map_start_indexes": [0, 0],
+        "accepted_scores": accepted_scores,
+        "published_maps": 0,
+        "health_flags": "0x00000000",
+        "fault_free_epoch": True,
+        "discarded_scores": 0,
+        "discontinuity_aborts": 0,
+        "map_overruns": 0,
+        "protocol_errors": 0,
+        "arithmetic_overflows": 0,
+        "map_read_errors": 0,
+        "map_release_errors": 0,
+        "ingress_dropped_samples": 0,
+        "ingress_fifo_level": 0,
+        "ingress_fifo_maximum": 0,
+        "scheduler_gaps": 0,
+        "scheduler_index_errors": 0,
+        "scheduler_overflows": 0,
+        "detector_faults": 0,
+        "phase_discontinuities": 0,
+        "zero_denominators": 0,
+        "candidate_fifo_level": 0,
+        "candidate_fifo_maximum": 0,
+    }
+
+
 def _settings(plan: dict[str, object]) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
     before = {
         "phy_rx_sampling_frequency_hz": 30_720_000,
@@ -448,7 +556,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
     runtime = _runtime(plan)
     return {
         "schema": live.RECEIPT_SCHEMA,
-        "schema_version": 3,
+        "schema_version": 4,
         "receipt_id": "e" * 32,
         "started_at": "2026-09-07T13:00:00Z",
         "completed_at": "2026-09-07T13:06:00Z",
@@ -474,6 +582,7 @@ def _receipt(plan: dict[str, object]) -> dict[str, object]:
         "rail_probe": partial["rail_probe"],
         "roles": roles,
         "role_monitors": role_monitors,
+        "controller_snapshot_before": _snapshot(),
         "controller_info_after": {
             "schema": "starlink-pss-acqctl.info.v1",
             "serial": live.RECEIVER_SERIAL,
@@ -591,6 +700,28 @@ def test_persistent_lan_receipt_binds_exact_v7_return_and_qspi() -> None:
 
     assert boot_id == "11111111-1111-4111-8111-111111111111"
     assert qspi_sha256 == "3" * 64
+
+
+def test_lan_reboot_receipt_continues_deployment_boot_and_rotated_trust() -> None:
+    boot_id, known_hosts = live._validate_lan_reboot_receipt(
+        _lan_reboot_receipt(), _persistent_lan_receipt()
+    )
+
+    assert boot_id == "22222222-2222-4222-8222-222222222222"
+    assert known_hosts == Path("/private/radio.known_hosts")
+
+
+def test_lan_reboot_receipt_rejects_wrong_deployment_epoch_or_key() -> None:
+    receipt = _lan_reboot_receipt()
+    receipt["before"]["boot_id"] = "33333333-3333-4333-8333-333333333333"
+    receipt["plan"]["before"] = receipt["before"]
+    with pytest.raises(live.ProbeError, match="continue the deployment epoch"):
+        live._validate_lan_reboot_receipt(receipt, _persistent_lan_receipt())
+
+    receipt = _lan_reboot_receipt()
+    receipt["plan"]["known_hosts_sha256"] = "7" * 64
+    with pytest.raises(live.ProbeError, match="network-return contract"):
+        live._validate_lan_reboot_receipt(receipt, _persistent_lan_receipt())
 
 
 def test_external_ppu_receipt_loader_accepts_pretty_strict_private_json(
@@ -772,6 +903,15 @@ def test_campaign_rejects_insufficient_accepted_score_counter_headroom() -> None
 
     with pytest.raises(live.ProbeError, match="counter lacks campaign headroom"):
         live._validate_counter_headroom(records, plan)
+
+    snapshot = _snapshot(
+        accepted_scores=(
+            live.ACCEPTED_SCORE_COUNTER_SATURATION
+            - live.ACCEPTED_SCORE_COUNTER_BUDGET
+        )
+    )
+    with pytest.raises(live.ProbeError, match="preflight snapshot"):
+        live._validate_preflight_snapshot(snapshot, plan)
 
 
 def test_scan_role_partitions_one_continuous_stream_by_map_count(

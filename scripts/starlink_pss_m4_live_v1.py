@@ -54,8 +54,8 @@ import scripts.starlink_pss_progress_probe_v1 as progress_v1
 
 SOURCE_MANIFEST = ROOT / "manifests/starlink-pss-m4-live-dnm-v1-source.yaml"
 
-PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v3"
-RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v3"
+PLAN_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-plan.v4"
+RECEIPT_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-receipt.v4"
 FIXTURE_SCHEMA = "plutosdr-fw.starlink-pss-m4-live-fixture.v1"
 CLAIM_SCOPE = "live_lnb_pss_acquisition_and_local_timing_only"
 PERSISTENT_PROMOTION_PROFILE = "starlink-pss-15m-rx-only-dnm-v7-persistent-promotion"
@@ -168,6 +168,7 @@ PLAN_FIELDS = {
     "probe_plan",
     "deployment_mode",
     "deployment_receipt",
+    "reboot_receipt",
     "ssh_trust_mode",
     "ssh_known_hosts",
     "runner_source",
@@ -619,9 +620,168 @@ def _validate_persistent_lan_receipt(receipt: dict[str, Any]) -> tuple[str, str]
     return returned["boot_id"], returned["qspi_sha256"]
 
 
+def _validate_lan_reboot_receipt(
+    receipt: dict[str, Any], deployment: dict[str, Any]
+) -> tuple[str, Path]:
+    """Bind a PPU network reboot to the persistent image and rotated SSH trust."""
+
+    deployment_boot_id, _qspi_sha256 = _validate_persistent_lan_receipt(deployment)
+    deployment_rotation = deployment["host_key_rotation"]
+    before = receipt.get("before")
+    after = receipt.get("after")
+    plan = receipt.get("plan")
+    rotation = receipt.get("host_key_rotation")
+    outer_fields = {
+        "schema_version",
+        "receipt_id",
+        "plan",
+        "started_at",
+        "finished_at",
+        "outcome",
+        "completed_phases",
+        "before",
+        "after",
+        "host_key_rotation",
+        "dispatch_error",
+        "error",
+        "receipt_path",
+    }
+    attestation_fields = {"serial", "firmware", "boot_id", "capabilities"}
+    capability_fields = {
+        "board_model",
+        "phy_model",
+        "rx_scan_channels",
+        "tandem_agc",
+    }
+    plan_fields = {
+        "schema_version",
+        "plan_id",
+        "created_at",
+        "serial",
+        "ssh_host",
+        "known_hosts_sha256",
+        "expected_metadata_abi",
+        "before",
+        "iio_before",
+        "confirmation_phrase",
+    }
+    iio_fields = {
+        "serial",
+        "firmware",
+        "metadata_abi",
+        "board_model",
+        "phy_model",
+        "rx_scan_channels",
+        "tandem_agc",
+    }
+    rotation_fields = {
+        "previous_known_hosts_sha256",
+        "replacement_known_hosts_sha256",
+        "previous_fingerprint",
+        "replacement_fingerprint",
+        "previous_known_hosts_backup",
+        "known_hosts_file",
+    }
+    phases = [
+        "usb_absence_reattested",
+        "remote_identity_reattested",
+        "lan_iiod_identity_reattested",
+        "tx_safe_before_reboot",
+        "reboot_dispatch_attempted",
+        "reboot_dispatched",
+        "lan_iio_disappeared",
+        "lan_iio_reappeared",
+        "lan_ssh_host_key_rotated",
+        "post_reboot_identity_attested",
+        "tx_safe_after_reboot",
+    ]
+    if (
+        set(receipt) != outer_fields
+        or receipt.get("schema_version") != 2
+        or receipt.get("outcome") != "success"
+        or receipt.get("completed_phases") != phases
+        or receipt.get("error") is not None
+        or (
+            receipt.get("dispatch_error") is not None
+            and not isinstance(receipt.get("dispatch_error"), str)
+        )
+        or not isinstance(receipt.get("receipt_id"), str)
+        or HEX_32.fullmatch(receipt["receipt_id"]) is None
+        or not isinstance(receipt.get("receipt_path"), str)
+        or not Path(receipt["receipt_path"]).is_absolute()
+        or not isinstance(before, dict)
+        or set(before) != attestation_fields
+        or not isinstance(after, dict)
+        or set(after) != attestation_fields
+        or not isinstance(plan, dict)
+        or set(plan) != plan_fields
+        or plan.get("schema_version") != 3
+        or not isinstance(plan.get("plan_id"), str)
+        or HEX_32.fullmatch(plan["plan_id"]) is None
+        or plan.get("serial") != RECEIVER_SERIAL
+        or plan.get("ssh_host") != DEFAULT_LAN_HOST
+        or plan.get("expected_metadata_abi") != 3
+        or plan.get("confirmation_phrase") != f"REBOOT LAN {RECEIVER_SERIAL}"
+        or plan.get("before") != before
+        or plan.get("known_hosts_sha256")
+        != deployment_rotation["replacement_known_hosts_sha256"]
+        or not isinstance(rotation, dict)
+        or set(rotation) != rotation_fields
+        or rotation.get("previous_known_hosts_sha256")
+        != plan.get("known_hosts_sha256")
+        or not isinstance(rotation.get("replacement_known_hosts_sha256"), str)
+        or HEX_64.fullmatch(rotation["replacement_known_hosts_sha256"]) is None
+        or rotation["replacement_known_hosts_sha256"]
+        == rotation["previous_known_hosts_sha256"]
+        or not isinstance(rotation.get("previous_known_hosts_backup"), str)
+        or not Path(rotation["previous_known_hosts_backup"]).is_absolute()
+        or not isinstance(rotation.get("known_hosts_file"), str)
+        or not Path(rotation["known_hosts_file"]).is_absolute()
+    ):
+        raise ProbeError("M4 LAN reboot receipt violates the network-return contract")
+    for label, attestation in (("before", before), ("after", after)):
+        capabilities = attestation.get("capabilities")
+        if (
+            attestation.get("serial") != RECEIVER_SERIAL
+            or attestation.get("firmware") != EXPECTED_FIRMWARE
+            or not isinstance(attestation.get("boot_id"), str)
+            or BOOT_ID.fullmatch(attestation["boot_id"]) is None
+            or not isinstance(capabilities, dict)
+            or set(capabilities) != capability_fields
+            or not isinstance(capabilities.get("board_model"), str)
+            or not capabilities["board_model"]
+            or capabilities.get("phy_model") != "ad9361"
+            or capabilities.get("rx_scan_channels") != ["voltage0", "voltage1"]
+            or capabilities.get("tandem_agc") is not False
+        ):
+            raise ProbeError(f"M4 LAN reboot {label} attestation is invalid")
+    iio_before = plan.get("iio_before")
+    if (
+        before["boot_id"] != deployment_boot_id
+        or after["boot_id"] == before["boot_id"]
+        or after["capabilities"] != before["capabilities"]
+        or not isinstance(iio_before, dict)
+        or set(iio_before) != iio_fields
+        or iio_before.get("serial") != RECEIVER_SERIAL
+        or iio_before.get("firmware") != EXPECTED_FIRMWARE
+        or iio_before.get("metadata_abi") != 3
+        or iio_before.get("board_model") != EXPECTED_MODEL
+        or iio_before.get("phy_model") != "ad9361"
+        or iio_before.get("rx_scan_channels") != ["voltage0", "voltage1"]
+        or iio_before.get("tandem_agc") is not False
+    ):
+        raise ProbeError("M4 LAN reboot identity does not continue the deployment epoch")
+    started = _parse_time(receipt.get("started_at"), label="LAN reboot started_at")
+    finished = _parse_time(receipt.get("finished_at"), label="LAN reboot finished_at")
+    created = _parse_time(plan.get("created_at"), label="LAN reboot plan created_at")
+    if not created <= started <= finished:
+        raise ProbeError("M4 LAN reboot timestamps are reversed")
+    return after["boot_id"], Path(rotation["known_hosts_file"])
+
+
 def _validate_plan(plan: dict[str, Any]) -> None:
     if set(plan) != PLAN_FIELDS:
-        raise ProbeError("M4 plan fields differ from the v3 schema")
+        raise ProbeError("M4 plan fields differ from the v4 schema")
     try:
         host = ipaddress.ip_address(plan.get("ethernet_host"))
     except (TypeError, ValueError) as error:
@@ -629,7 +789,7 @@ def _validate_plan(plan: dict[str, Any]) -> None:
     manual = plan.get("manual_gain_db")
     if (
         plan.get("schema") != PLAN_SCHEMA
-        or plan.get("schema_version") != 3
+        or plan.get("schema_version") != 4
         or not isinstance(plan.get("plan_id"), str)
         or HEX_32.fullmatch(plan["plan_id"]) is None
         or plan.get("hardware_accessed") is not False
@@ -701,7 +861,7 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         or plan.get("sss_detected") is not False
         or plan.get("frame_lock_claim") is not False
     ):
-        raise ProbeError("M4 plan values violate the v3 live-LNB contract")
+        raise ProbeError("M4 plan values violate the v4 live-LNB contract")
     _parse_time(plan.get("created_at"), label="plan created_at")
     for label in (
         "probe_plan",
@@ -718,9 +878,12 @@ def _validate_plan(plan: dict[str, Any]) -> None:
         ):
             raise ProbeError("M4 persistent plan does not bind pinned SSH trust")
         _validate_identity(plan["ssh_known_hosts"], label="SSH known-hosts file")
+        if plan.get("reboot_receipt") is not None:
+            _validate_identity(plan["reboot_receipt"], label="LAN reboot receipt")
     elif (
         plan.get("ssh_trust_mode") != "legacy_unpinned"
         or plan.get("ssh_known_hosts") is not None
+        or plan.get("reboot_receipt") is not None
     ):
         raise ProbeError("M4 volatile plan SSH trust fields are inconsistent")
     expected_geometry = live_geometry(DEFAULT_CHANNEL, DEFAULT_EDGE, LNB_LO_HZ)
@@ -749,6 +912,7 @@ def parser() -> argparse.ArgumentParser:
     plan = commands.add_parser("plan", help="seal one three-role live campaign")
     plan.add_argument("--probe-plan", type=Path, required=True)
     plan.add_argument("--deployment-receipt", type=Path)
+    plan.add_argument("--reboot-receipt", type=Path)
     plan.add_argument("--controller-binary", type=Path, required=True)
     plan.add_argument("--fixture-declaration", type=Path, required=True)
     plan.add_argument("--host-network-interface", default=DEFAULT_LAN_INTERFACE)
@@ -816,6 +980,8 @@ def build_plan(args: Any) -> dict[str, Any]:
         raise ProbeError("manual gain mode requires --manual-gain-db")
     if args.gain_mode != "manual" and args.manual_gain_db is not None:
         raise ProbeError("--manual-gain-db is valid only with manual gain mode")
+    if args.reboot_receipt is not None and args.deployment_receipt is None:
+        raise ProbeError("--reboot-receipt requires --deployment-receipt")
     if args.deployment_receipt is None:
         deployment_mode = "volatile_ram"
         handoff = _load_handoff(base)
@@ -832,6 +998,7 @@ def build_plan(args: Any) -> dict[str, Any]:
         ppu_source_commit = base["ppu_source_commit"]
         ssh_trust_mode = "legacy_unpinned"
         ssh_known_hosts = None
+        reboot_identity = None
     else:
         deployment_mode = "persistent_lan"
         with monitor_v2._v7_monitor_contract():
@@ -851,14 +1018,20 @@ def build_plan(args: Any) -> dict[str, Any]:
         )
         ppu_repository = str(handoff.repository)
         ssh_trust_mode = "pinned"
-        ssh_known_hosts = _identity(
-            Path(deployment["host_key_rotation"]["known_hosts_file"]),
-            label="SSH known-hosts file",
-        )
+        known_hosts_path = Path(deployment["host_key_rotation"]["known_hosts_file"])
+        reboot_identity = None
+        if args.reboot_receipt is not None:
+            reboot_path = args.reboot_receipt.absolute()
+            reboot = _load_external_receipt(reboot_path, label="LAN reboot receipt")
+            expected_boot_id, known_hosts_path = _validate_lan_reboot_receipt(
+                reboot, deployment
+            )
+            reboot_identity = _identity(reboot_path, label="M4 LAN reboot receipt")
+        ssh_known_hosts = _identity(known_hosts_path, label="SSH known-hosts file")
     geometry = live_geometry(DEFAULT_CHANNEL, DEFAULT_EDGE, LNB_LO_HZ)
     plan = {
         "schema": PLAN_SCHEMA,
-        "schema_version": 3,
+        "schema_version": 4,
         "plan_id": uuid.uuid4().hex,
         "created_at": _now(),
         "hardware_accessed": False,
@@ -876,6 +1049,7 @@ def build_plan(args: Any) -> dict[str, Any]:
         "ppu_source_commit": ppu_source_commit,
         "probe_plan": _identity(base_path, label="M4 base PSS probe plan"),
         "deployment_receipt": deployment_identity,
+        "reboot_receipt": reboot_identity,
         "runner_source": _public_identity(
             Path(__file__).absolute(), label="M4 runner source"
         ),
@@ -1586,6 +1760,146 @@ def _controller_info(
     return value
 
 
+def _controller_snapshot(
+    plan: dict[str, Any], password_path: Path, remote: str
+) -> dict[str, Any]:
+    completed = _run(
+        _ssh_argv(
+            plan,
+            password_path,
+            f"{remote} --expect-serial {plan['serial']} snapshot --timeout-ms 1000",
+        ),
+        timeout_s=15.0,
+        maximum_stdout_bytes=32 * 1024,
+    )
+    try:
+        value = json.loads(
+            completed.stdout, object_pairs_hook=monitor_v1.probe_v1._json_no_duplicates
+        )
+    except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as error:
+        raise ProbeError("M4 controller snapshot is not strict JSON") from error
+    if not isinstance(value, dict):
+        raise ProbeError("M4 controller snapshot is not an object")
+    _validate_preflight_snapshot(value, plan)
+    return value
+
+
+def _validate_preflight_snapshot(
+    snapshot: dict[str, Any], plan: dict[str, Any]
+) -> None:
+    fields = {
+        "schema",
+        "claim_scope",
+        "serial",
+        "abi_version",
+        "snapshot_generation",
+        "ready_mask",
+        "map_generations",
+        "map_start_indexes",
+        "accepted_scores",
+        "published_maps",
+        "health_flags",
+        "fault_free_epoch",
+        "discarded_scores",
+        "discontinuity_aborts",
+        "map_overruns",
+        "protocol_errors",
+        "arithmetic_overflows",
+        "map_read_errors",
+        "map_release_errors",
+        "ingress_dropped_samples",
+        "ingress_fifo_level",
+        "ingress_fifo_maximum",
+        "scheduler_gaps",
+        "scheduler_index_errors",
+        "scheduler_overflows",
+        "detector_faults",
+        "phase_discontinuities",
+        "zero_denominators",
+        "candidate_fifo_level",
+        "candidate_fifo_maximum",
+    }
+    hard_zero = {
+        "map_overruns",
+        "protocol_errors",
+        "arithmetic_overflows",
+        "map_read_errors",
+        "map_release_errors",
+        "ingress_dropped_samples",
+        "scheduler_gaps",
+        "scheduler_index_errors",
+        "scheduler_overflows",
+        "detector_faults",
+        "phase_discontinuities",
+        "zero_denominators",
+    }
+    accepted = snapshot.get("accepted_scores")
+    discarded = snapshot.get("discarded_scores")
+    aborts = snapshot.get("discontinuity_aborts")
+    u32_fields = {
+        "snapshot_generation",
+        "accepted_scores",
+        "published_maps",
+        "discarded_scores",
+        "discontinuity_aborts",
+        "ingress_fifo_level",
+        "ingress_fifo_maximum",
+        "candidate_fifo_level",
+        "candidate_fifo_maximum",
+    } | hard_zero
+    map_generations = snapshot.get("map_generations")
+    map_start_indexes = snapshot.get("map_start_indexes")
+    if (
+        set(snapshot) != fields
+        or snapshot.get("schema") != "starlink-pss-acqctl.snapshot.v1"
+        or snapshot.get("claim_scope") != "acquisition_telemetry_only"
+        or snapshot.get("serial") != plan["serial"]
+        or snapshot.get("abi_version") != "0x00010001"
+        or snapshot.get("ready_mask") != 0
+        or snapshot.get("health_flags") != "0x00000000"
+        or any(
+            not isinstance(snapshot.get(field), int)
+            or isinstance(snapshot.get(field), bool)
+            or not 0 <= snapshot[field] <= ACCEPTED_SCORE_COUNTER_SATURATION
+            for field in u32_fields
+        )
+        or not isinstance(map_generations, list)
+        or len(map_generations) != 2
+        or any(
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or not 0 <= value <= ACCEPTED_SCORE_COUNTER_SATURATION
+            for value in map_generations
+        )
+        or not isinstance(map_start_indexes, list)
+        or len(map_start_indexes) != 2
+        or any(
+            not isinstance(value, int)
+            or isinstance(value, bool)
+            or not 0 <= value <= (1 << 64) - 1
+            for value in map_start_indexes
+        )
+        or snapshot.get("ingress_fifo_level", 1)
+        > snapshot.get("ingress_fifo_maximum", 0)
+        or snapshot.get("candidate_fifo_level", 1)
+        > snapshot.get("candidate_fifo_maximum", 0)
+        or not isinstance(accepted, int)
+        or isinstance(accepted, bool)
+        or accepted < 0
+        or accepted + plan["accepted_score_counter_budget"]
+        >= ACCEPTED_SCORE_COUNTER_SATURATION
+        or not isinstance(discarded, int)
+        or isinstance(discarded, bool)
+        or not 0 <= discarded < ACCEPTED_SCORE_COUNTER_SATURATION
+        or not isinstance(aborts, int)
+        or isinstance(aborts, bool)
+        or not 0 <= aborts < ACCEPTED_SCORE_COUNTER_SATURATION
+        or any(snapshot.get(field) != 0 for field in hard_zero)
+        or snapshot.get("fault_free_epoch") is not (discarded == 0 and aborts == 0)
+    ):
+        raise ProbeError("M4 FPGA preflight snapshot lacks clean campaign headroom")
+
+
 def _rail_probe(plan: dict[str, Any]) -> dict[str, Any]:
     argv = (
         "iio_readdev",
@@ -1857,6 +2171,8 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
         _require_unchanged(plan[key], label=label)
     if plan["ssh_trust_mode"] == "pinned":
         _require_unchanged(plan["ssh_known_hosts"], label="SSH known-hosts file")
+    if plan["reboot_receipt"] is not None:
+        _require_unchanged(plan["reboot_receipt"], label="LAN reboot receipt")
     for key, label in (
         ("runner_source", "M4 runner source"),
         ("source_manifest", "M4 source manifest"),
@@ -1888,6 +2204,16 @@ def _verify_inputs(plan: dict[str, Any]) -> tuple[dict[str, Any], Any]:
             label="persistent LAN receipt",
         )
         boot_id, qspi_sha256 = _validate_persistent_lan_receipt(deployment)
+        if plan["reboot_receipt"] is not None:
+            reboot = _load_external_receipt(
+                Path(plan["reboot_receipt"]["path"]),
+                label="LAN reboot receipt",
+            )
+            boot_id, known_hosts_path = _validate_lan_reboot_receipt(
+                reboot, deployment
+            )
+            if Path(plan["ssh_known_hosts"]["path"]) != known_hosts_path:
+                raise ProbeError("M4 LAN reboot and plan bind different SSH trust files")
         if (
             boot_id != plan["expected_boot_id"]
             or qspi_sha256 != plan["expected_qspi_sha256"]
@@ -1939,6 +2265,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     runtime_before: dict[str, str] | None = None
     runtime_after: dict[str, str] | None = None
     final_info: dict[str, Any] | None = None
+    controller_snapshot_before: dict[str, Any] | None = None
     remote: str | None = None
     remote_removed = False
     context_close_verified = False
@@ -2012,6 +2339,9 @@ def execute_plan(args: Any) -> dict[str, Any]:
                     raise ProbeError("M4 rail probe changed a selected RF setting")
 
             remote = _upload_controller(plan, password.path, payload)
+            controller_snapshot_before = _controller_snapshot(
+                plan, password.path, remote
+            )
             for role in ROLES:
                 roles[role], role_monitors[role] = _scan_role(
                     plan, role, objects, password.path, remote
@@ -2053,7 +2383,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
     outcome = "pass" if qualified else ("unqualified" if failure is None else "failed")
     receipt = {
         "schema": RECEIPT_SCHEMA,
-        "schema_version": 3,
+        "schema_version": 4,
         "receipt_id": uuid.uuid4().hex,
         "started_at": started,
         "completed_at": completed,
@@ -2075,6 +2405,7 @@ def execute_plan(args: Any) -> dict[str, Any]:
         "rail_probe": rail_probe,
         "roles": roles,
         "role_monitors": role_monitors,
+        "controller_snapshot_before": controller_snapshot_before,
         "controller_info_after": final_info,
         "controller_binary_removed": remote_removed,
         "iio_restored": restored,
@@ -2130,6 +2461,7 @@ RECEIPT_FIELDS = {
     "rail_probe",
     "roles",
     "role_monitors",
+    "controller_snapshot_before",
     "controller_info_after",
     "controller_binary_removed",
     "iio_restored",
@@ -2329,6 +2661,10 @@ def _validate_passing_receipt(
         raise ProbeError("M4 route receipt source is not private IPv4")
     _validate_settings(receipt, plan)
     _validate_rail_probe(receipt.get("rail_probe"), plan)
+    snapshot = receipt.get("controller_snapshot_before")
+    if not isinstance(snapshot, dict):
+        raise ProbeError("M4 receipt lacks its FPGA preflight snapshot")
+    _validate_preflight_snapshot(snapshot, plan)
     roles = receipt.get("roles")
     if not isinstance(roles, dict) or list(roles) != list(ROLES):
         raise ProbeError("M4 role evidence inventory differs from the plan")
@@ -2357,6 +2693,8 @@ def _validate_passing_receipt(
         summary = records[-1]
         if role == ROLES[0]:
             _validate_counter_headroom(records, plan)
+            if summary["accepted_scores_before"] != snapshot["accepted_scores"]:
+                raise ProbeError("M4 FPGA counter changed between preflight and campaign")
         elif summary["accepted_scores_before"] < previous_accepted_score:
             raise ProbeError("M4 accepted-score counter is not monotonic across roles")
         previous_accepted_score = summary["accepted_scores_at_cutoff"]
@@ -2419,7 +2757,7 @@ def verify_receipt(args: Any) -> dict[str, Any]:
     if (
         set(receipt) != RECEIPT_FIELDS
         or receipt.get("schema") != RECEIPT_SCHEMA
-        or receipt.get("schema_version") != 3
+        or receipt.get("schema_version") != 4
         or not isinstance(receipt_id, str)
         or HEX_32.fullmatch(receipt_id) is None
         or receipt.get("plan") != _identity(plan_path, label="M4 live plan")

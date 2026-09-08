@@ -282,20 +282,24 @@ already-qualified v7 RX-only image. It keeps continuous IQ in the FPGA and
 exports only phase-map records and their candidate statistics. It does not
 use or enable a transmitter.
 
-The runner freezes three 117.5-second roles. Each role interleaves 25 receiver
-LO offsets from 0 through +/-1.2 MHz in 100 kHz steps, with a 4.5-second map
-observation and 200 ms settling interval at each point. The order is
+The runner freezes three 80.5-second roles. Each role interleaves 25 receiver
+LO offsets from 0 through +/-1.2 MHz in 100 kHz steps, retaining 32 stable map
+windows per point after the initial/retune discard and 200 ms settling. The order is
 `0,+100k,-100k,...` so monotonic Doppler does not alias directly into scan
 order. The positive roles observe channel 4's upper 15 MHz edge at nominal IF
 1,937,500,000 Hz for a 9.75 GHz low-side LNB. The middle control observes the
 non-overlapping slice 50 MHz inward at 1,887,500,000 Hz.
 
 The physical fixture must declare RX1 connected only to the powered outdoor
-LNB, no transmitter, uninterrupted RAM-candidate power, Ethernet host
+LNB, no transmitter, uninterrupted candidate power, Ethernet host
 192.168.1.17 through `enp132s0`, exact LNB model, polarization, voltage, and
-power source. The plan additionally binds the immutable RAM receipt and boot
-ID, unchanged QSPI hash, exact controller binary, runner source, source
-manifest, fixture bytes, and clean PPU commit.
+power source. The plan binds either the immutable RAM receipt or PPU persistent
+flash receipt, the active boot ID, unchanged QSPI hash, exact controller binary,
+runner source, source manifest, fixture bytes, and clean PPU commit. A later
+network-only reboot is admitted only through `--reboot-receipt`: its old boot
+and SSH-key hash must continue the flash receipt, while its new boot and rotated
+key become the campaign identity. Before the first role, a read-only FPGA
+snapshot refuses insufficient 32-bit accepted-score counter headroom.
 
 ```sh
 PPU_PY=/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python
@@ -312,6 +316,8 @@ ATTEST='receiver RX1 is connected only to the powered outdoor LNB; no transmitte
 
 "$PPU_PY" scripts/starlink_pss_m4_live_v1.py plan \
   --probe-plan "$PRIVATE/base-probe-plan.json" \
+  --deployment-receipt "$PRIVATE/persistent-flash-receipt.json" \
+  --reboot-receipt "$PRIVATE/lan-network-reboot-receipt.json" \
   --controller-binary "$PRIVATE/starlink_pss_acqctl_monitor_v2" \
   --fixture-declaration "$PRIVATE/fixture.json" \
   --receipt "$PRIVATE/live-receipt.json" \
@@ -333,5 +339,7 @@ statistics at one or more LO points in each positive role and at no control
 point. The minimum positive/control contrast is 1.10x, raw S12 rail fraction
 is at most 0.0001, every in-observation transport/fault delta is zero, settings
 are restored, the temporary controller is removed, and deterministic IIO
-closure is mandatory. A PPU recovery receipt is required afterward. A pass is
-live PSS acquisition and local timing only; SSS and frame lock remain false.
+closure is mandatory. A volatile run requires PPU recovery afterward; a
+persistent run restores its RF settings without another firmware operation. A
+pass is live PSS acquisition and local timing only; SSS and frame lock remain
+false.

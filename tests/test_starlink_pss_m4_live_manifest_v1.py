@@ -23,11 +23,12 @@ def _sha256(path: Path) -> str:
 def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     values = _values()
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
-    assert values["schema_version"] == "3"
-    assert values["release_state"] == "pinned-ssh-v3-cabled-qualified-live-ready"
+    assert values["schema_version"] == "4"
+    assert values["release_state"] == "reboot-chain-v4-live-repeat-ready"
     assert values["bench_preflight_completed"] == "true"
     assert values["live_execution_approved"] == "true"
     assert values["required_revision"] == "complete"
+    assert values["fpga_counter_preflight_snapshot"] == "true"
     for field in (
         "do_not_merge",
         "do_not_release",
@@ -64,6 +65,10 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     assert values["cabled_all_transport_fault_counters_zero"] == "true"
     assert values["cabled_transmitter_final_mute_verified"] == "true"
     assert values["cabled_receiver_recovery_verified"] == "true"
+    assert values["first_persistent_live_attempt_completed"] == "true"
+    assert values["first_persistent_live_attempt_qualified"] == "false"
+    assert values["second_persistent_live_attempt_counter_failure"] == "true"
+    assert values["lan_counter_reset_reboot_completed"] == "true"
 
 
 def test_m4_manifest_binds_every_direct_source_and_contract() -> None:
