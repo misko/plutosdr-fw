@@ -4,6 +4,19 @@ This is a pure NumPy, test-only numerical oracle for the experimental
 RX-only firmware branch. It is not firmware, a decoder, a deployment tool, or
 evidence of a received Starlink signal.
 
+## Paired-scanner pilot export oracle
+
+`pilot_ddc.py` defines the proposed canonical 15 -> 2.5 MS/s pilot tap for
+[the paired scanner plan](../../FPGA_scanner_300s.md). It adds no radio access.
+A 64-phase Q16 mixer, Q17 31-tap halfband /2, and Q17 255-tap FIR /3 have
+hash-pinned coefficients, ties-even rounding, explicit CI16 saturation, and
+chunk-invariant source indexing. Filter delay is 269 canonical input samples;
+the first 538 input samples after an epoch reset do not have complete support.
+The numerical passband/alias tests do not qualify RTL, RF response, or GLRT.
+
+Run `python -m pytest -q tests/starlink_oracle/test_pilot_ddc.py` in the same
+NumPy/pytest environment as the other oracle tests. No SciPy dependency is used.
+
 ## Provenance
 
 Sequence authority is the clean worktree

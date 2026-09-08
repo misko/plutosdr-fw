@@ -2,6 +2,12 @@
 
 Canonical design specification: [FPGA_tracker_60MS.md](FPGA_tracker_60MS.md)
 
+Current execution objective: [paired 300-second FPGA PSS / host GLRT scanner](FPGA_scanner_300s.md).
+The new scanner allocation is .18 as the local RX canary and .17 as the
+Ethernet-only outdoor LNB receiver. It supersedes the historical bench/USB
+allocation below; no TX cable or transmitter authorization is inferred.
+The scanner must preserve paired IQ evidence, not export only detector results.
+
 Status: 15/30/60 MS/s coarse acquisition and 30/60 MS/s full-rate refinement
 are implemented and cabled-tested. Live-LNB coarse PSS acquisition is
 qualified at 15 and 30 MS/s. Live full-rate refinement, live 60 MS/s, SSS, and

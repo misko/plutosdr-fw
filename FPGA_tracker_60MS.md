@@ -2,6 +2,12 @@
 
 Status: experimental, RX-only, and **DO NOT MERGE INTO FIRMWARE MAIN**.
 
+Current execution extension: [FPGA_scanner_300s.md](FPGA_scanner_300s.md).
+That plan supersedes the historical USB-only and radio-allocation instructions
+below for the paired scanner: .18 is the local canary, .17 is network-only, and
+the host receives 2.5 MS/s IQ in addition to FPGA evidence. Earlier evidence
+and qualification criteria remain historical records, not scanner qualification.
+
 This document is the canonical execution plan for implementing, testing,
 deploying, and verifying the FPGA PSS timing tracker. Work advances through
 15 MS/s, 30 MS/s, and 60 MS/s gates. A later stage may reuse an earlier stage,
