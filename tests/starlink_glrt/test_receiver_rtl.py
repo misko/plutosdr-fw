@@ -36,6 +36,7 @@ wire [8:0] export_fault,exact_cfo_bin,control_cfo_bin;
 wire [21:0] detector_fault;
 wire [63:0] selected_candidates,merged_proposals;
 wire selection_pending;
+wire [2:0] processing_pending;
 wire [16:0] exact_score_q16,control_score_q16;
 wire [54:0] exact_energy,control_energy;
 wire [50:0] exact_peak,control_peak;
@@ -59,10 +60,13 @@ initial begin
   if(rc!=7) $fatal(1,"bad input");
   input_valid=vi;input_gap=ga;flush=fl;input_index=ix;
   input_phase=ph;input_i=si;input_q=sq;
-  @(posedge clk);#1;
+  @(posedge clk);
+  // Admission is a handshake at this edge. Sampling ready after nonblocking
+  // source-index updates can instead observe the next cycle's bounds check.
+  if(dut.selected_valid) $display("C %h %d %d",dut.selected_epoch,dut.admit,dut.reject_busy);
+  #1;
   if(iq_valid) $display("O %h %d %d %d",iq_index,iq_i,iq_q,iq_support);
   if(dut.proposal_valid) $display("P %h",dut.proposal_epoch);
-  if(dut.selected_valid) $display("C %h %d %d",dut.selected_epoch,dut.admit,dut.reject_busy);
   if(result_valid) $display("G %h %d %d %d %d %d %d %d %d %d %d %d %d",
    result_epoch,detected,exact_score_q16,control_score_q16,exact_cfo_bin,control_cfo_bin,
    exact_energy,control_energy,exact_peak,control_peak,result_block_shift,zero_energy,ratio_clamped);

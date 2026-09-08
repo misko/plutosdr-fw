@@ -27,7 +27,8 @@ are read-only and will not become runtime dependencies.
 One pilot-centered RX1 source, with a free-running absolute source counter,
 feeds both native-rate FPGA GLRT and an independent continuous 2.5 MS/s IQ
 exporter. The new GLRT core contains no coarse or fine PSS computation. Its dedicated
-board profile, still pending, must exclude both PSS IPs entirely.
+board profile excludes both PSS IPs; the implemented-netlist audit has zero
+PSS cells and one GLRT IQ DMA. Full timing/physical-boundary qualification is pending.
 The exporter uses unity at 2.5, a final 5-to-2.5 FIR at higher rates, and an
 additional 10/25/60-to-5 FIR where needed. Fixed pilot-centered tuning makes
 the initial digital translation zero, explicitly recorded in the frequency plan.
@@ -43,7 +44,7 @@ is considered implemented. The proposed schedule is not yet a throughput proof.
 
 | Source MS/s | Numerical reference | RTL verified | Synthesized | Full route | Hardware | Live agreement |
 |---|---|---|---|---|---|---|
-| 2.5 | frozen arithmetic | blind core + export | combined core, timing fails | pending | pending | pending |
+| 2.5 | frozen arithmetic | blind core + ADC/AXI export | combined core +0.212 ns setup | v1 -0.873 ns; v2 running | pending | pending |
 | 5 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
 | 10 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
 | 25 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
@@ -51,8 +52,8 @@ is considered implemented. The proposed schedule is not yet a throughput proof.
 
 RTL entries now include blind fabric acquisition, native GLRT and continuous
 IQ export together, with no candidate timing input. Synthetic positives pass
-at all rates. A deployable GLRT-only board profile and real RF qualification
-remain pending. These are engineering tests, not held-out sensitivity claims.
+at all rates. The GLRT-only board profile is implemented; its timing, I/O boundary and real RF
+qualification remain pending. These are engineering tests, not held-out sensitivity claims.
 
 ## Coordination
 
@@ -195,3 +196,53 @@ continuous IQ DMA, then full 2.5 MS/s board placement/timing. Complete the
 remaining full rate builds, kernel/host lifecycle and independent validation
 before requesting the coordinated .18 canary window. The persistent goal remains
 active and all hardware/live gates remain pending.
+
+## GLR1 integration checkpoint, 2026-09-08 23:00 UTC
+
+HDL `99e7e9ae` contains the complete GLR1 AXI register/snapshot/event ABI,
+independent IQ/event FIFOs, ADC CDC/pacer, autonomous receiver, and the dedicated
+no-PSS board profile. The combined 2.5 MS/s OOC core v5 passed internal setup/hold
+at +0.212/+0.052 ns: 7220 LUTs, 6247 FFs, 48 DSPs, 2 BRAM. Before/after source
+hashes match. OOC v4 is explicitly disqualified because its source changed during
+execution; its apparent timing pass is diagnostic only.
+
+The first full 2.5 MS/s board (HDL `4197f788`) placed/routed but failed setup at
+-0.873 ns, hold +0.010 ns. It used 11088 LUTs and 12088 FFs at placement. Synthesis
+also found a CLEAR/result-valid combinational loop. Registered core reset fixes
+that loop in `99e7e9ae`; all **23 capture RTL tests pass** after this change.
+A fresh isolated v2 board build is running. The full v1 audit reports zero PSS
+cells, zero native RX DMA cells, one GLRT IP and one GLRT DMA, but is not eligible
+for hardware. Complete timing, CDC, exceptions and I/O reports are retained in
+`artifacts/board-2500000-v1/full-audit/`.
+
+The new Linux `adi_starlink_glrt` driver compiles built-in with a dedicated
+`zynq_pluto_glrt_defconfig` and `zynq-pluto-sdr-glrt.dts`; kernel zImage, modules
+and DTB build completed in `artifacts/kernel-glrt-v1`. PSS kernel options are
+explicitly off and PSS nodes are deleted from this DTB. RX1 RF setup remains
+available, with one 2.5 MS/s IQ DMA consumer and a separate 16-word GLRT event
+IIO kfifo. Actual clock checks, source-settle admission, promised-IQ drain,
+stable final snapshot and explicit cumulative CPU event-loss counters are
+implemented. Driver W=1 compilation has no driver warnings; inherited host
+build-tool warnings remain. **No driver lifecycle or DMA hardware pass is claimed.**
+
+The stdlib host GLR1 decoder rejects malformed headers, wrong rates/visits,
+inconsistent source endpoints, missing host bytes, corrupt raw scores, event
+sequence losses and CPU/fabric event loss. **44 adversarial metadata tests pass**;
+**7 real RTL tests** also exercise decoder checks against all five IQ rates and
+2.5/60 MS/s autonomous events. Their kernel header is constructed explicitly:
+these tests do not execute Linux or IIO. Evidence:
+`glrt-host-abi-tests-20260908.xml`, `glrt-host-rtl-decode-20260908.xml` and
+`glrt-capture-tests-v3-20260909.xml` (the latter filename's date is a label error;
+execution was 2026-09-08 UTC).
+
+Next required integration work: review/fix the full routed I/O constraints and
+CDC findings; expose AD9361 frame/valid discontinuities rather than relying only
+on post-ADC accepted-word counters; qualify source-clock stoppage and clipping
+visibility; finish the GLRT rootfs/image profile and host IIO capture lifecycle;
+then all five full builds, independent blind host GLRT, holdouts and coordinated
+.18/.17 hardware. The inherited CMOS receiver has no input-delay constraints;
+these boundaries cannot be counted as a qualified board pass. The AD9361 Rev.G
+1.8 V CMOS table gives data/frame delays 0..1.5/0..1.0 ns relative to DATA_CLK:
+https://www.analog.com/media/en/technical-documentation/data-sheets/AD9361.pdf
+Actual board skew, programmable interface delay and the runtime RF eye still
+need explicit qualification. No radio has been accessed by this task.

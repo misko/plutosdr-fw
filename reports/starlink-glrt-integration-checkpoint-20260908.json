@@ -1,0 +1,115 @@
+{
+  "board_v1": {
+    "combinational_loop": true,
+    "glrt_ip_cells": 1,
+    "glrt_iq_dma_cells": 1,
+    "hardware_eligible": false,
+    "hdl_commit": "4197f788f1144b367863d8f97026fc24370afdb3",
+    "native_iq_dma_cells": 0,
+    "pss_cells": 0,
+    "whs_ns": 0.01,
+    "wns_ns": -0.873
+  },
+  "board_v2": "running, source 99e7e9ae",
+  "core_v4_source_identity_disqualified": true,
+  "core_v5_ooc": {
+    "bram36": 2,
+    "dsp": 48,
+    "ff": 6247,
+    "lut": 7220,
+    "source_before_after_verified": true,
+    "unplaced_boundaries_qualified": false,
+    "whs_ns": 0.052,
+    "wns_ns": 0.212
+  },
+  "date_utc": "2026-09-08",
+  "files_sha256": {
+    "artifacts/board-2500000-v1/full-audit/audit.tsv": "784738e0b8503bdbb02ce80d2f666b2cddc4f41ea0abd63f4da21c094b9306ee",
+    "artifacts/board-2500000-v1/full-audit/bus_skew.rpt": "10cdc078e697b0d9b8d292af9af3fdfd9872664daab09afead8b6c1e906702bd",
+    "artifacts/board-2500000-v1/full-audit/cdc.rpt": "0877727a9c07c3c91bbd64023422a10a248d437b5795dbf1f050d844fc2cb989",
+    "artifacts/board-2500000-v1/full-audit/cells.tsv": "727d680f3cc1575e8bde17155713c2e490406ff1dad93d585d1d55b4f9924d7e",
+    "artifacts/board-2500000-v1/full-audit/timing_summary.rpt": "f00cb6a56868823e5f9eb441ea6c236143efc41b645732762137d9095627424a",
+    "artifacts/glrt-capture-tests-v3-20260909.xml": "8ae3e68bba40cb3d45832c35e92e1041c27dcea8fff110cda409e9b46047d97a",
+    "artifacts/glrt-host-abi-tests-20260908.xml": "11174b8a11104c143a5010014202836da33b51ddb70ec69185157e3da5abf022",
+    "artifacts/glrt-host-rtl-decode-20260908.xml": "d04ce80c174b9f772835b87a3333dd54d7e05c275b7a3a251d3fc9c27c9e51b9",
+    "artifacts/kernel-build-glrt-v1.log": "eaf8b721a03d8011ec9b8c0b5d199c5ab62f36856eb5170207ed921abbd8718f",
+    "artifacts/kernel-driver-w1-glrt-v1.log": "f2df0d21329a8c774a46e9c4924373e150fc3cfe43a5097c37561ccbd640278c",
+    "artifacts/kernel-glrt-v1/.config": "ace241295dfd331e65af1938d81a21a0cc2f652e413333bcb9cebd9ec47f153b",
+    "artifacts/kernel-glrt-v1/arch/arm/boot/dts/zynq-pluto-sdr-glrt.dtb": "2de1879d635a8d4c19d0ed982b814689de77c3f3b9aecc41d028181b6445d3a2",
+    "artifacts/kernel-glrt-v1/arch/arm/boot/zImage": "bb09eca29c4697ffb6ffb4f509c4a875abba4b1066b923f5bc9236e5ca2862b9",
+    "artifacts/receiver-2500000-v5/routed.dcp": "04a8c83b7eec883a0cffd237466dd9f1dddda7c9de6b535a1288b6ab9a0dbaf0",
+    "artifacts/receiver-2500000-v5/source_before.sha256": "ae5b936401eb9bb9491942828d07fad73cd2089f4faff1478703f5e0a0fcc51c",
+    "artifacts/receiver-2500000-v5/source_validation.log": "9eaf90f83f53b3319fa5cae8b8bb329e0d9fa47f4cdcad63bd454b9f8374e3fe",
+    "artifacts/receiver-2500000-v5/summary.txt": "3e0c9b1934f0ebd91f70bdc3686ecd4b832ce69fb1b89375a62a6408fbba7a76",
+    "scripts/build_glrt_board.sh": "8382e47ade2f78073e5f0e0a04fa5750c1a4fee4c9c715088aa9d9f5281467f4",
+    "scripts/build_glrt_core_ooc.sh": "edb93ac73a6f674cd9394046486fb0b57747091eebeef756a2fa2a526fa3ade1",
+    "scripts/report_glrt_board.tcl": "336771cfd43682b873c96ae55d164f3c7f6f73e4dedd89a2a9dbc4a3ad9a776d",
+    "tests/starlink_glrt/test_abi.py": "dfb5c86a885728597d5d1023ce18cf3d78fec03725954e82ba5db9cb07515850",
+    "tests/starlink_glrt/test_capture_rtl.py": "e6e6a63546dd749f6c9ac5cebe334b4dab2735565da32bed98e450cdc84a8f41",
+    "tools/starlink_glrt_abi.py": "b9a7b2f87fade6186dd493ccf2c2c565e3246a572cb948c3959288c929eeba79"
+  },
+  "firmware_parent_commit": "6b0647048f02fd443b71092076b89ac91d186e7a",
+  "hdl_commit": "99e7e9aef2c3aff4e4c8f6321d0169aa231a371e",
+  "kernel": {
+    "compiler_read_only_reference": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/buildroot/output/host/opt/ext-toolchain/bin/arm-linux-gnueabihf-gcc",
+    "driver_w1_warning_free": true,
+    "hardware_lifecycle_tested": false,
+    "output_directory": "artifacts/kernel-glrt-v1",
+    "zimage_modules_dtb_built": true
+  },
+  "limitations": [
+    "No hardware accessed",
+    "No physical input timing qualification",
+    "No ADC frame-gap visibility yet",
+    "GLRT rootfs/image profile incomplete",
+    "No libiio capture lifecycle test",
+    "No independent host GLRT live comparison",
+    "No held-out detector qualification",
+    "Only first rate full board attempted",
+    "Capture JUnit filename date differs from actual execution date",
+    "RTL decoder tests construct kernel header; Linux is not simulated"
+  ],
+  "linux_commit": "119b261b93bfbd4b367d15e61689d1aa9d366f8b",
+  "qualification": {
+    "all_five_boards_built": false,
+    "full_board_timing": false,
+    "hardware": false,
+    "live_glrt_agreement": false
+  },
+  "schema": "starlink-glrt-integration-checkpoint-v1",
+  "test_suites": [
+    {
+      "artifact": "artifacts/glrt-capture-tests-v3-20260909.xml",
+      "errors": "0",
+      "failures": "0",
+      "hostname": "gauss",
+      "name": "pytest",
+      "skipped": "0",
+      "tests": "23",
+      "time": "109.351",
+      "timestamp": "2026-09-08T22:42:27.075283+00:00"
+    },
+    {
+      "artifact": "artifacts/glrt-host-abi-tests-20260908.xml",
+      "errors": "0",
+      "failures": "0",
+      "hostname": "gauss",
+      "name": "pytest",
+      "skipped": "0",
+      "tests": "44",
+      "time": "0.064",
+      "timestamp": "2026-09-08T22:55:22.176852+00:00"
+    },
+    {
+      "artifact": "artifacts/glrt-host-rtl-decode-20260908.xml",
+      "errors": "0",
+      "failures": "0",
+      "hostname": "gauss",
+      "name": "pytest",
+      "skipped": "0",
+      "tests": "7",
+      "time": "116.104",
+      "timestamp": "2026-09-08T22:54:25.499035+00:00"
+    }
+  ]
+}

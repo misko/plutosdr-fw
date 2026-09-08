@@ -9,7 +9,7 @@ BENCH = r'''
 `timescale 1ns/1ps
 module tb;
 localparam integer RATE_VALUE=(RATE);
-reg clk=0,sample_clk=0,resetn=0,sample_reset=1,sample_valid=0,sample_gap=0;
+reg clk=0,sample_clk=0,resetn=0,sample_reset=1,sample_valid=0,sample_gap=0,flush_pacer=0;
 reg signed [15:0] sample_i=0,sample_q=0;
 always #5 clk=~clk;
 always #(250000000.0/RATE_VALUE) sample_clk=~sample_clk;
@@ -42,6 +42,9 @@ initial begin
  for(j=0;j<1100;j=j+1) send(j);
  repeat(100) @(negedge sample_clk);
  if(count!=1100) $fatal(1,"first segment did not drain");
+ @(negedge clk);flush_pacer=1;
+ repeat(3) @(negedge clk);
+ flush_pacer=0;
  // A radio reset/tune creates a gap marker but preserves absolute phase and
  // sample index. The source counter is independent of AD9361's data reset.
  sample_reset=1;
