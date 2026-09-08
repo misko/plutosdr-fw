@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from .ddc import BANK_ROOT, RATES
-from .pilot import acquisition_surface, frame, score, symbol_samples, templates
+from .pilot import acquisition_fixed, acquisition_surface, frame, score, symbol_samples, templates
 
 
 def test_native_rom_freeze_matches_numerical_spec():
@@ -54,3 +54,24 @@ def test_blind_proposal_recovers_unseeded_epoch(edge):
     surface = acquisition_surface(noise, edge)
     assert int(np.argmax(surface)) == epoch
     assert surface[epoch] > .8
+
+
+@pytest.mark.parametrize("edge",["upper","lower"])
+def test_fixed_acquisition_energy_model_and_roll_ambiguity(edge):
+    rng=np.random.default_rng(14903)
+    base=2000*(rng.normal(size=5000)+1j*rng.normal(size=5000))
+    epoch=331
+    for roll in (0,17):
+        values=base.copy()
+        pilot=frame(2500000,edge,roll=roll)
+        values[epoch:epoch+len(pilot)]+=5000*pilot
+        iq=np.rint(np.column_stack((values.real,values.imag))).astype(np.int16)
+        numerator,energy=acquisition_fixed(iq,edge)
+        fixed=numerator/(44*np.maximum(energy,1))
+        floating=acquisition_surface(iq[:,0].astype(float)+1j*iq[:,1],edge)
+        bank=templates(2500000,edge)[:16].astype(float)
+        coefficient_energy=np.sum(bank**2,axis=(1,2))/(11*32**2)
+        relative_bound=float(max(abs(coefficient_energy-1)))
+        assert np.all(abs(fixed[22:]-floating) <= relative_bound*floating+2e-5)
+        # This is a known sequence at a shifted timing, NOT a blind negative.
+        assert int(np.argmax(fixed))-22==epoch+roll*11

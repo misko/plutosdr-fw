@@ -1,0 +1,724 @@
+{
+  "schema": "starlink-glrt-source-checkpoint-1",
+  "task_id": "01a0821a-7b4c-73f0-8b2c-47b4e95207f9",
+  "date_utc": "2026-09-08",
+  "goal_status": "active",
+  "hdl_commit": "766d42efcd8214ad098b29ff650e4add4da3083e",
+  "board_integrated": false,
+  "full_receiver_timing_qualified": false,
+  "hardware_used": false,
+  "independent_host_validated": false,
+  "thresholds_q16": {
+    "acquisition": 15729,
+    "glrt": 19661,
+    "margin": 9831,
+    "status": "provisional_engineering_configuration"
+  },
+  "engineering_cases": {
+    "source_rates_hz": [
+      2500000,
+      5000000,
+      10000000,
+      25000000,
+      60000000
+    ],
+    "positive_fixtures_with_detection": 5,
+    "positive_fixture_count": 5,
+    "cfo_hz": 42000,
+    "observation_seconds_each": 0.002,
+    "nonpilot_kinds": [
+      "noise",
+      "tone",
+      "scrambled_symbol_order"
+    ],
+    "nonpilot_detections": 0,
+    "nonpilot_fixture_count": 15,
+    "held_out": false,
+    "operational_false_alarm_rate_established": false,
+    "rolled_case": "Blind proposal at epoch +17 symbols; may be explicitly rejected while scorer busy. At least the 2.5 MS/s fixture exhibits this miss. Not a negative control."
+  },
+  "validation": [
+    {
+      "artifact": "artifacts/glrt-autonomous-tests-20260908.xml",
+      "sha256": "078d2a195e32b668cd43744fa6bfa59e7a39c3914902c9056c2bbce899148eaf",
+      "tests": 216,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 521.832
+    },
+    {
+      "artifact": "artifacts/glrt-ingress-tests-v2-20260908.xml",
+      "sha256": "cb1eced9d0da5e799fa4444303e76456167600ec36e485cf85c6735c19053388",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 2.806
+    },
+    {
+      "command": ".venv/bin/python -m pytest -q tests/starlink_glrt/test_pacer_rtl.py --maxfail=1",
+      "tests": 20,
+      "failures": 0,
+      "errors": 0,
+      "seconds": 25.13,
+      "evidence": "terminal_result_no_junit"
+    }
+  ],
+  "ooc": [
+    {
+      "artifact_directory": "artifacts/ddc-60000000-v4",
+      "scope": "standalone_ddc_register_to_register_only",
+      "source_rate_hz": 60000000,
+      "setup_wns_ns": 0.095,
+      "hold_whs_ns": 0.056,
+      "internal_timing_pass": true,
+      "boundary_timing_qualified": false,
+      "full_receiver_qualified": false,
+      "resources": {
+        "luts": 4143.0,
+        "registers": 1100.0,
+        "bram_tiles": 0.0,
+        "dsps": 24.0
+      },
+      "inputs": [
+        {
+          "file": "hdl/library/starlink_glrt/ddc_5000000_q17.mem",
+          "build_sha256": "7fb00c97a55a2741bc98647d9d51f0bdd339915a3d1ba409162c772f5dc7be5b",
+          "checkpoint_sha256": "7fb00c97a55a2741bc98647d9d51f0bdd339915a3d1ba409162c772f5dc7be5b"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/ddc_60000000_q17.mem",
+          "build_sha256": "b417aa18d9ec5f9803eda55793bafe31e46806f90e90e7507f5cbe112155ca61",
+          "checkpoint_sha256": "b417aa18d9ec5f9803eda55793bafe31e46806f90e90e7507f5cbe112155ca61"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_ddc.v",
+          "build_sha256": "17f557c1dc87b6aba555b14a9ecef1b7f27e00b8ab84664e34bd1425dab6faf8",
+          "checkpoint_sha256": "17f557c1dc87b6aba555b14a9ecef1b7f27e00b8ab84664e34bd1425dab6faf8"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_fir.v",
+          "build_sha256": "ef3e25c922ce015632f0d9f896d68ecea2edb7d516ea69b3e05764a1a2cd851b",
+          "checkpoint_sha256": "ef3e25c922ce015632f0d9f896d68ecea2edb7d516ea69b3e05764a1a2cd851b"
+        }
+      ],
+      "inputs_match_checkpoint": true,
+      "evidence_files": [
+        {
+          "file": "summary.txt",
+          "bytes": 4088,
+          "sha256": "6736d062c05ab7a819a71d8f1c955c608d8c91b67e9bc6853ae468aa2a5b46cc"
+        },
+        {
+          "file": "utilization.rpt",
+          "bytes": 10452,
+          "sha256": "32ed6e252bf1c4532115c9308bcee85b48df8a93f62901a01cddef2529eafea0"
+        },
+        {
+          "file": "timing.rpt",
+          "bytes": 192366,
+          "sha256": "dcded9a9afdd16b7937e766c504a7c114feee844cf16fe0e3a3bd144ca99b785"
+        },
+        {
+          "file": "check_timing.rpt",
+          "bytes": 3080,
+          "sha256": "65a20a5c6bd94890c9a739a1774f0df699b86c3f29ef10c20e55fb45a6a7defe"
+        },
+        {
+          "file": "methodology.rpt",
+          "bytes": 229618,
+          "sha256": "1b2b335fd9658eb967d8183209d0d15f9ce19258facbe43453132c39defa9e0b"
+        },
+        {
+          "file": "route_status.rpt",
+          "bytes": 714,
+          "sha256": "b15889d2a696e8153e24d0c462dff345cdc799f107aea760dba7d6ee11b74aae"
+        },
+        {
+          "file": "routed.dcp",
+          "bytes": 2815646,
+          "sha256": "de749ae2cd5ace735d5ee746a691c7ff6e4a237e4b16b93df4b012b5af42882c"
+        }
+      ],
+      "unavailable_reports": [
+        "internal_setup.rpt"
+      ]
+    },
+    {
+      "artifact_directory": "artifacts/correlator-60000000-v3",
+      "scope": "standalone_correlator_register_to_register_only",
+      "source_rate_hz": 60000000,
+      "setup_wns_ns": 0.115,
+      "hold_whs_ns": 0.147,
+      "internal_timing_pass": true,
+      "boundary_timing_qualified": false,
+      "full_receiver_qualified": false,
+      "resources": {
+        "luts": 672.0,
+        "registers": 684.0,
+        "bram_tiles": 24.0,
+        "dsps": 8.0
+      },
+      "inputs": [
+        {
+          "file": "hdl/library/starlink_glrt/pilot_60000000_upper_q7.mem",
+          "build_sha256": "f1491d3cfba1acfbcfcee1dabea1bd18da650ddf710d6c7ba85a46a0ed3c9112",
+          "checkpoint_sha256": "f1491d3cfba1acfbcfcee1dabea1bd18da650ddf710d6c7ba85a46a0ed3c9112"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_correlator.v",
+          "build_sha256": "6a3266348abad5cb279af7f1bd2e0b82f4578ca5ec3c2c83511749672d56fb8a",
+          "checkpoint_sha256": "c521221013ec2b534705ba9ba182fe5553186d2fd59de31605962386f83cefec"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_sample_ring.v",
+          "build_sha256": "d9f9a82b3b79a745217c00c455adb8ad35cdc75b907ad745340b9488e4e73e3d",
+          "checkpoint_sha256": "d9f9a82b3b79a745217c00c455adb8ad35cdc75b907ad745340b9488e4e73e3d"
+        }
+      ],
+      "inputs_match_checkpoint": false,
+      "evidence_files": [
+        {
+          "file": "summary.txt",
+          "bytes": 4641,
+          "sha256": "5a8f06c6b0c1662142c002ecaf6ded11ca41e8866cf1b427859785a0403594fd"
+        },
+        {
+          "file": "utilization.rpt",
+          "bytes": 10613,
+          "sha256": "4572f6db4f7f07e4e67f84b7b8212eb1117c9d21acb482e66614ad78c6dfbb5a"
+        },
+        {
+          "file": "timing.rpt",
+          "bytes": 247554,
+          "sha256": "8898f38f626b66797de2bfcf71d0c2de9ac4c67129fb396f4c9c000e2b15090d"
+        },
+        {
+          "file": "internal_setup.rpt",
+          "bytes": 84917,
+          "sha256": "7368b084036b0efcfbc23bdfab4071cb4a986b2a71a7c5f9f6345f18f3478b10"
+        },
+        {
+          "file": "check_timing.rpt",
+          "bytes": 3108,
+          "sha256": "dd61255980492cdfdba1d0df7460d3974036a07bb6ea1492fa1ec3ec9a344b00"
+        },
+        {
+          "file": "methodology.rpt",
+          "bytes": 98920,
+          "sha256": "8a3de899a87eaa5081173fc3546710f3e0cd1c74351bc4a59f44f50ca1173b03"
+        },
+        {
+          "file": "route_status.rpt",
+          "bytes": 651,
+          "sha256": "39b927acda8ccc93fa61883e195b33ee2279a068950c19ec805b3f5ca179f237"
+        },
+        {
+          "file": "routed.dcp",
+          "bytes": 1078154,
+          "sha256": "e3d87c2ea47e0204a7efdb46ce23c196f74b371532c22cc5bcb5856ebbd740aa"
+        }
+      ],
+      "unavailable_reports": []
+    },
+    {
+      "artifact_directory": "artifacts/score-common-v3",
+      "scope": "standalone_score_register_to_register_only",
+      "source_rate_hz": 60000000,
+      "setup_wns_ns": 0.181,
+      "hold_whs_ns": 0.069,
+      "internal_timing_pass": true,
+      "boundary_timing_qualified": false,
+      "full_receiver_qualified": false,
+      "resources": {
+        "luts": 2281.0,
+        "registers": 1617.0,
+        "bram_tiles": 0.5,
+        "dsps": 16.0
+      },
+      "inputs": [
+        {
+          "file": "hdl/library/starlink_glrt/glrt_dft512_q15.mem",
+          "build_sha256": "036d8cdd928f84655ae3d2736fd082b871091d6f34820800113be43d97f57028",
+          "checkpoint_sha256": "036d8cdd928f84655ae3d2736fd082b871091d6f34820800113be43d97f57028"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_ratio.v",
+          "build_sha256": "f2996d3270b78b0c4b243e87885d7f8d3584bb2e562d3c4a63584896f00d9171",
+          "checkpoint_sha256": "f2996d3270b78b0c4b243e87885d7f8d3584bb2e562d3c4a63584896f00d9171"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_score.v",
+          "build_sha256": "dfcea092077eb76fdd6d62fec4ff2eff0e649f0d93f6190aadb9b54c719228c5",
+          "checkpoint_sha256": "c0e1bbb75eebaeec171dea79a1ce034f602dde674a8767ea7a0dd16959e84794"
+        }
+      ],
+      "inputs_match_checkpoint": false,
+      "evidence_files": [
+        {
+          "file": "summary.txt",
+          "bytes": 4636,
+          "sha256": "cf62a7890347666cef17a3a5e635d4e9f23222a50826db621165236bdc990a37"
+        },
+        {
+          "file": "utilization.rpt",
+          "bytes": 10872,
+          "sha256": "ae1dad6edcfb82b9554e70c615f1026cb0002956c3531c3413af04b4a9bde8b3"
+        },
+        {
+          "file": "timing.rpt",
+          "bytes": 220213,
+          "sha256": "ede2ba80ca9aa572cad81816e860ed1f5dd2a81729a976d9eb2e615924d823e8"
+        },
+        {
+          "file": "internal_setup.rpt",
+          "bytes": 61334,
+          "sha256": "d6f569d475ea8023781ebb179696e4dd3b5261ab6b78d2714419eb985cb6343f"
+        },
+        {
+          "file": "check_timing.rpt",
+          "bytes": 3082,
+          "sha256": "9b49da26f6a04edf97c2ba4bee0191d1af8c3d563e328de2f405d059afeea93a"
+        },
+        {
+          "file": "methodology.rpt",
+          "bytes": 394355,
+          "sha256": "8ebf13711b15e409dc560c2072f3480a90e68e5d5a09401441411bd727481160"
+        },
+        {
+          "file": "route_status.rpt",
+          "bytes": 714,
+          "sha256": "7d5ddf0711fc948c7ab0371a441c3b60869ba6cb80b74f935cfe62a3b3c02dea"
+        },
+        {
+          "file": "routed.dcp",
+          "bytes": 1746061,
+          "sha256": "cfa3058c7b8ca807fa119a181b1124acf299768428e43d1ed2f2626b3748e9ac"
+        }
+      ],
+      "unavailable_reports": []
+    },
+    {
+      "artifact_directory": "artifacts/pilot-bank-v2",
+      "scope": "standalone_pilot-bank_register_to_register_only",
+      "source_rate_hz": 2500000,
+      "setup_wns_ns": 0.339,
+      "hold_whs_ns": 0.063,
+      "internal_timing_pass": true,
+      "boundary_timing_qualified": false,
+      "full_receiver_qualified": false,
+      "resources": {
+        "luts": 3012.0,
+        "registers": 1342.0,
+        "bram_tiles": 0.0,
+        "dsps": 18.0
+      },
+      "inputs": [
+        {
+          "file": "hdl/library/starlink_glrt/pilot_2500000_upper_q7.mem",
+          "build_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0",
+          "checkpoint_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_pilot_bank.v",
+          "build_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57",
+          "checkpoint_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57"
+        }
+      ],
+      "inputs_match_checkpoint": true,
+      "evidence_files": [
+        {
+          "file": "summary.txt",
+          "bytes": 5568,
+          "sha256": "82eff7c1db3ca8ff8fb4ec16acf94d3486d93c16cc8abb9076ccb6e14cbba1d0"
+        },
+        {
+          "file": "utilization.rpt",
+          "bytes": 10906,
+          "sha256": "3c5a39809295ed6f7573d52f59e44480b2a5da944a9772920005ac93c7618e9c"
+        },
+        {
+          "file": "timing.rpt",
+          "bytes": 173906,
+          "sha256": "0273e183093515d3ef2bd7dba72d7343de7893f78a347e06f7cb1a59c9199d24"
+        },
+        {
+          "file": "internal_setup.rpt",
+          "bytes": 48818,
+          "sha256": "cf7bfb31c2e48f3629043761337291ba0df49ac87b861b6841d06e8abe92fbcc"
+        },
+        {
+          "file": "check_timing.rpt",
+          "bytes": 3081,
+          "sha256": "859f9d814064af62fe0612caea1b2ff37ffcfed66258d6ecc1774c915b3fb70d"
+        },
+        {
+          "file": "methodology.rpt",
+          "bytes": 134867,
+          "sha256": "679cf7ff0c4020be1c46ea8cd9ed455d109ec04c607dc051ce6e3c4ea11504b6"
+        },
+        {
+          "file": "route_status.rpt",
+          "bytes": 714,
+          "sha256": "c3859e303bdbc469e7ca8f84b68ce763820cdae0913ee16bc8ad8665da4350f6"
+        },
+        {
+          "file": "routed.dcp",
+          "bytes": 2111922,
+          "sha256": "9a7a20f76cb7883221a7b1b042f7cc07a8cb085d1decd7ae1110a96da351ef3e"
+        }
+      ],
+      "unavailable_reports": []
+    },
+    {
+      "artifact_directory": "artifacts/acquisition-v1",
+      "scope": "standalone_acquisition_register_to_register_only",
+      "source_rate_hz": 2500000,
+      "setup_wns_ns": 0.357,
+      "hold_whs_ns": 0.054,
+      "internal_timing_pass": true,
+      "boundary_timing_qualified": false,
+      "full_receiver_qualified": false,
+      "resources": {
+        "luts": 4052.0,
+        "registers": 3498.0,
+        "bram_tiles": 0.0,
+        "dsps": 24.0
+      },
+      "inputs": [
+        {
+          "file": "hdl/library/starlink_glrt/pilot_2500000_upper_q7.mem",
+          "build_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0",
+          "checkpoint_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_acquisition.v",
+          "build_sha256": "acbc5e0878fa4c7f502d70e9d8a3f955250a0be8c9192188d62fca4869fa1cc3",
+          "checkpoint_sha256": "acbc5e0878fa4c7f502d70e9d8a3f955250a0be8c9192188d62fca4869fa1cc3"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_pilot_bank.v",
+          "build_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57",
+          "checkpoint_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_pilot_power.v",
+          "build_sha256": "4a7fb2289abef4b5c8b5465c79e27216d10dfd07c25563bc9998fb392498b201",
+          "checkpoint_sha256": "4a7fb2289abef4b5c8b5465c79e27216d10dfd07c25563bc9998fb392498b201"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_window_energy.v",
+          "build_sha256": "bd129084b1a4f336c9a2c2132febb1a026848db85a305fd9dc95aa455106d4b9",
+          "checkpoint_sha256": "bd129084b1a4f336c9a2c2132febb1a026848db85a305fd9dc95aa455106d4b9"
+        }
+      ],
+      "inputs_match_checkpoint": true,
+      "evidence_files": [
+        {
+          "file": "summary.txt",
+          "bytes": 5760,
+          "sha256": "d7c630a6409df696199af7d9096a34dd8d8ca9a86a59d2aa150f805b9c8af32d"
+        },
+        {
+          "file": "utilization.rpt",
+          "bytes": 10952,
+          "sha256": "e027a035532c18f137ab683778b09aa6d1cad9cc56c0c18b5dfd8f86982160a7"
+        },
+        {
+          "file": "timing.rpt",
+          "bytes": 195793,
+          "sha256": "71e214537f6cef025af884936bfa3bbde3c5811331e474034ed97f57b235b345"
+        },
+        {
+          "file": "internal_setup.rpt",
+          "bytes": 62001,
+          "sha256": "d65536caef79886aca98451377d0fe6ae3d7b9ea6d6b6b9ac03733b878ff336a"
+        },
+        {
+          "file": "check_timing.rpt",
+          "bytes": 3085,
+          "sha256": "f87ac0dfe79535f08bf325fea08498235f8098a9779cd273b197144e73a2db80"
+        },
+        {
+          "file": "methodology.rpt",
+          "bytes": 121917,
+          "sha256": "009a7177cd84bd3502cba700566094f48ab47ddf276e4dad07d9ed0f4d1a1a8c"
+        },
+        {
+          "file": "route_status.rpt",
+          "bytes": 714,
+          "sha256": "cbb212b45a4c0b2dfa5a80518584080ec4d3a1fac2a22781316d85e10a2a5688"
+        },
+        {
+          "file": "routed.dcp",
+          "bytes": 3300125,
+          "sha256": "e63e8cd7d5b5b092ab7ec7996bdd6d7414e80c0488fbf3a39ddc8be3d1388bac"
+        }
+      ],
+      "unavailable_reports": []
+    },
+    {
+      "artifact_directory": "artifacts/receiver-2500000-v1",
+      "scope": "standalone_receiver_register_to_register_only",
+      "source_rate_hz": 2500000,
+      "setup_wns_ns": -2.071,
+      "hold_whs_ns": 0.05,
+      "internal_timing_pass": false,
+      "boundary_timing_qualified": false,
+      "full_receiver_qualified": false,
+      "resources": {
+        "luts": 7404.0,
+        "registers": 6125.0,
+        "bram_tiles": 2.0,
+        "dsps": 48.0
+      },
+      "inputs": [
+        {
+          "file": "hdl/library/starlink_glrt/glrt_dft512_q15.mem",
+          "build_sha256": "036d8cdd928f84655ae3d2736fd082b871091d6f34820800113be43d97f57028",
+          "checkpoint_sha256": "036d8cdd928f84655ae3d2736fd082b871091d6f34820800113be43d97f57028"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/pilot_2500000_upper_q7.mem",
+          "build_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0",
+          "checkpoint_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_acquisition.v",
+          "build_sha256": "acbc5e0878fa4c7f502d70e9d8a3f955250a0be8c9192188d62fca4869fa1cc3",
+          "checkpoint_sha256": "acbc5e0878fa4c7f502d70e9d8a3f955250a0be8c9192188d62fca4869fa1cc3"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_candidate_select.v",
+          "build_sha256": "515a4bd4a8a0e54103922ce748ef9c0e467c1dffea1fd9307da58b807fc36845",
+          "checkpoint_sha256": "515a4bd4a8a0e54103922ce748ef9c0e467c1dffea1fd9307da58b807fc36845"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_correlator.v",
+          "build_sha256": "c521221013ec2b534705ba9ba182fe5553186d2fd59de31605962386f83cefec",
+          "checkpoint_sha256": "c521221013ec2b534705ba9ba182fe5553186d2fd59de31605962386f83cefec"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_ddc.v",
+          "build_sha256": "17f557c1dc87b6aba555b14a9ecef1b7f27e00b8ab84664e34bd1425dab6faf8",
+          "checkpoint_sha256": "17f557c1dc87b6aba555b14a9ecef1b7f27e00b8ab84664e34bd1425dab6faf8"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_fir.v",
+          "build_sha256": "ef3e25c922ce015632f0d9f896d68ecea2edb7d516ea69b3e05764a1a2cd851b",
+          "checkpoint_sha256": "ef3e25c922ce015632f0d9f896d68ecea2edb7d516ea69b3e05764a1a2cd851b"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_pilot_bank.v",
+          "build_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57",
+          "checkpoint_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_pilot_power.v",
+          "build_sha256": "4a7fb2289abef4b5c8b5465c79e27216d10dfd07c25563bc9998fb392498b201",
+          "checkpoint_sha256": "4a7fb2289abef4b5c8b5465c79e27216d10dfd07c25563bc9998fb392498b201"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_ratio.v",
+          "build_sha256": "f2996d3270b78b0c4b243e87885d7f8d3584bb2e562d3c4a63584896f00d9171",
+          "checkpoint_sha256": "f2996d3270b78b0c4b243e87885d7f8d3584bb2e562d3c4a63584896f00d9171"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_receiver.v",
+          "build_sha256": "ba8c1e0292e87b2c171f9c251fe46e87750049dbce7c3c3113677f48fa067855",
+          "checkpoint_sha256": "ba8c1e0292e87b2c171f9c251fe46e87750049dbce7c3c3113677f48fa067855"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_sample_ring.v",
+          "build_sha256": "d9f9a82b3b79a745217c00c455adb8ad35cdc75b907ad745340b9488e4e73e3d",
+          "checkpoint_sha256": "d9f9a82b3b79a745217c00c455adb8ad35cdc75b907ad745340b9488e4e73e3d"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_score.v",
+          "build_sha256": "dfcea092077eb76fdd6d62fec4ff2eff0e649f0d93f6190aadb9b54c719228c5",
+          "checkpoint_sha256": "c0e1bbb75eebaeec171dea79a1ce034f602dde674a8767ea7a0dd16959e84794"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_window_energy.v",
+          "build_sha256": "bd129084b1a4f336c9a2c2132febb1a026848db85a305fd9dc95aa455106d4b9",
+          "checkpoint_sha256": "bd129084b1a4f336c9a2c2132febb1a026848db85a305fd9dc95aa455106d4b9"
+        }
+      ],
+      "inputs_match_checkpoint": false,
+      "evidence_files": [
+        {
+          "file": "summary.txt",
+          "bytes": 5758,
+          "sha256": "4d3b77a6a1f5aade98c391b510c5e42a0ca61ce55d0de6ff1db0de4ec720dde6"
+        },
+        {
+          "file": "utilization.rpt",
+          "bytes": 11209,
+          "sha256": "863ca99362bc5d68a818930a7fea72f0d486435a819ccb6ebedc8d83fdabd98a"
+        },
+        {
+          "file": "timing.rpt",
+          "bytes": 249099,
+          "sha256": "9bc68b62954999a6ba76eb89fa08ca94f31deab4a0b3db925d98e2d5d13d711f"
+        },
+        {
+          "file": "internal_setup.rpt",
+          "bytes": 86238,
+          "sha256": "086856aae5866827a6dbc770a21f0ac9c0874a32126e101c69550d7fa28db275"
+        },
+        {
+          "file": "check_timing.rpt",
+          "bytes": 3097,
+          "sha256": "7a0ed0ede4291966f303fac87f335fab824b98464b5792a3c003a3cb7a18d436"
+        },
+        {
+          "file": "methodology.rpt",
+          "bytes": 122746,
+          "sha256": "ce77751c31ce06e7a2e7a26f06628b295e24021c97e7f5b59e0420fb8648b08e"
+        },
+        {
+          "file": "route_status.rpt",
+          "bytes": 714,
+          "sha256": "1e66205fe38a4ee5913aca10f6c376bb50dac19ef3b58f563b664cc3da70697c"
+        },
+        {
+          "file": "routed.dcp",
+          "bytes": 5829200,
+          "sha256": "aa2d70a85265959b8e6435cd08d507694664fbd7a50d167b92a6bcf51fadf8da"
+        }
+      ],
+      "unavailable_reports": []
+    },
+    {
+      "artifact_directory": "artifacts/receiver-2500000-v2",
+      "scope": "standalone_receiver_register_to_register_only",
+      "source_rate_hz": 2500000,
+      "setup_wns_ns": -0.06,
+      "hold_whs_ns": 0.051,
+      "internal_timing_pass": false,
+      "boundary_timing_qualified": false,
+      "full_receiver_qualified": false,
+      "resources": {
+        "luts": 7215.0,
+        "registers": 6119.0,
+        "bram_tiles": 2.0,
+        "dsps": 48.0
+      },
+      "inputs": [
+        {
+          "file": "hdl/library/starlink_glrt/glrt_dft512_q15.mem",
+          "build_sha256": "036d8cdd928f84655ae3d2736fd082b871091d6f34820800113be43d97f57028",
+          "checkpoint_sha256": "036d8cdd928f84655ae3d2736fd082b871091d6f34820800113be43d97f57028"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/pilot_2500000_upper_q7.mem",
+          "build_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0",
+          "checkpoint_sha256": "88c4e0dbebd4ee9526cb4fdff91f6f6e2f1c76bb178c552f012d3153b7299dc0"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_acquisition.v",
+          "build_sha256": "acbc5e0878fa4c7f502d70e9d8a3f955250a0be8c9192188d62fca4869fa1cc3",
+          "checkpoint_sha256": "acbc5e0878fa4c7f502d70e9d8a3f955250a0be8c9192188d62fca4869fa1cc3"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_candidate_select.v",
+          "build_sha256": "515a4bd4a8a0e54103922ce748ef9c0e467c1dffea1fd9307da58b807fc36845",
+          "checkpoint_sha256": "515a4bd4a8a0e54103922ce748ef9c0e467c1dffea1fd9307da58b807fc36845"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_correlator.v",
+          "build_sha256": "c521221013ec2b534705ba9ba182fe5553186d2fd59de31605962386f83cefec",
+          "checkpoint_sha256": "c521221013ec2b534705ba9ba182fe5553186d2fd59de31605962386f83cefec"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_ddc.v",
+          "build_sha256": "17f557c1dc87b6aba555b14a9ecef1b7f27e00b8ab84664e34bd1425dab6faf8",
+          "checkpoint_sha256": "17f557c1dc87b6aba555b14a9ecef1b7f27e00b8ab84664e34bd1425dab6faf8"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_fir.v",
+          "build_sha256": "ef3e25c922ce015632f0d9f896d68ecea2edb7d516ea69b3e05764a1a2cd851b",
+          "checkpoint_sha256": "ef3e25c922ce015632f0d9f896d68ecea2edb7d516ea69b3e05764a1a2cd851b"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_pilot_bank.v",
+          "build_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57",
+          "checkpoint_sha256": "37d99ae9cd5fb000e9246a9f9891b773139645af913aaa1bdc635ad2f33b5e57"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_pilot_power.v",
+          "build_sha256": "4a7fb2289abef4b5c8b5465c79e27216d10dfd07c25563bc9998fb392498b201",
+          "checkpoint_sha256": "4a7fb2289abef4b5c8b5465c79e27216d10dfd07c25563bc9998fb392498b201"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_ratio.v",
+          "build_sha256": "f2996d3270b78b0c4b243e87885d7f8d3584bb2e562d3c4a63584896f00d9171",
+          "checkpoint_sha256": "f2996d3270b78b0c4b243e87885d7f8d3584bb2e562d3c4a63584896f00d9171"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_receiver.v",
+          "build_sha256": "ba8c1e0292e87b2c171f9c251fe46e87750049dbce7c3c3113677f48fa067855",
+          "checkpoint_sha256": "ba8c1e0292e87b2c171f9c251fe46e87750049dbce7c3c3113677f48fa067855"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_sample_ring.v",
+          "build_sha256": "d9f9a82b3b79a745217c00c455adb8ad35cdc75b907ad745340b9488e4e73e3d",
+          "checkpoint_sha256": "d9f9a82b3b79a745217c00c455adb8ad35cdc75b907ad745340b9488e4e73e3d"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_score.v",
+          "build_sha256": "c0e1bbb75eebaeec171dea79a1ce034f602dde674a8767ea7a0dd16959e84794",
+          "checkpoint_sha256": "c0e1bbb75eebaeec171dea79a1ce034f602dde674a8767ea7a0dd16959e84794"
+        },
+        {
+          "file": "hdl/library/starlink_glrt/starlink_glrt_window_energy.v",
+          "build_sha256": "bd129084b1a4f336c9a2c2132febb1a026848db85a305fd9dc95aa455106d4b9",
+          "checkpoint_sha256": "bd129084b1a4f336c9a2c2132febb1a026848db85a305fd9dc95aa455106d4b9"
+        }
+      ],
+      "inputs_match_checkpoint": true,
+      "evidence_files": [
+        {
+          "file": "summary.txt",
+          "bytes": 6123,
+          "sha256": "74e770c758807f6de10b7415b046316a030bae8a17d03ec8a59e0b8073655b5a"
+        },
+        {
+          "file": "utilization.rpt",
+          "bytes": 11209,
+          "sha256": "7748f7c853c41d243cba891760ce27b0c0da84385846f5097375fb51fe75817c"
+        },
+        {
+          "file": "timing.rpt",
+          "bytes": 261696,
+          "sha256": "c33b02591e5621e144c5fa10600957cd35f7b66582e7c92c817d61000a5b8bad"
+        },
+        {
+          "file": "internal_setup.rpt",
+          "bytes": 91998,
+          "sha256": "c6959c466b24d7d53138ca42b2772e1e777a762061faea9f22305f304eae2db8"
+        },
+        {
+          "file": "check_timing.rpt",
+          "bytes": 3097,
+          "sha256": "487c3048d8793b1fe90a43bd8c54ca7c1c11bed42cce44b522f55218eb65a714"
+        },
+        {
+          "file": "methodology.rpt",
+          "bytes": 122355,
+          "sha256": "0b796b0813932bb066e67e63c61714c3adad7b2ecbf1f991afd783eb0762f0ec"
+        },
+        {
+          "file": "route_status.rpt",
+          "bytes": 714,
+          "sha256": "e9f1f73ac0247315989f0533dd6bfe2359901c381b034d6d061ba6d72ee50e5a"
+        },
+        {
+          "file": "routed.dcp",
+          "bytes": 5740647,
+          "sha256": "2679d260fede2fcc5178126b892f99f93f829c138ef8729fc580ce5517b2a1fb"
+        }
+      ],
+      "unavailable_reports": []
+    }
+  ]
+}

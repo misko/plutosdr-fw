@@ -103,6 +103,35 @@ def acquisition_surface(iq: np.ndarray, edge: str) -> np.ndarray:
     return numerator / np.maximum(denominator, 1e-20)
 
 
+def acquisition_fixed(iq: np.ndarray, edge: str) -> tuple[np.ndarray, np.ndarray]:
+    """Per-window integer proposal numerator and energy, 16 x 11 samples.
+
+    Returned window zero ends at sample 175 and implies frame epoch -22.
+    Coefficient quantization gives small per-symbol energy differences; the
+    proposal denominator deliberately uses common energy 11*32^2. This is
+    separate from the final native GLRT and its independent control lane.
+    """
+    raw = np.asarray(iq)
+    if raw.dtype != np.int16 or raw.ndim != 2 or raw.shape[1] != 2:
+        raise ValueError("acquisition input requires CI16")
+    if len(raw) < 176:
+        return np.empty(0, dtype=np.int64), np.empty(0, dtype=np.int64)
+    values = raw.astype(np.int64)
+    bank = templates(2_500_000, edge).astype(np.int64)
+    length = len(raw)-175
+    numerator = np.zeros(length, dtype=np.int64)
+    for symbol in range(16):
+        ti, tq = bank[symbol, :, 0], bank[symbol, :, 1]
+        real = np.correlate(values[:, 0], ti, "valid") + np.correlate(values[:, 1], tq, "valid")
+        imag = np.correlate(values[:, 1], ti, "valid") - np.correlate(values[:, 0], tq, "valid")
+        start = symbol*11
+        c = round_shift(np.column_stack((real[start:start+length], imag[start:start+length])), 4)
+        numerator += np.sum(c**2, axis=1)
+    energy = np.concatenate(([0], np.cumsum(np.sum(values**2, axis=1))))
+    denominator_energy = energy[176:]-energy[:-176]
+    return numerator, denominator_energy
+
+
 def round_shift(values: np.ndarray, shift: int) -> np.ndarray:
     floor = values >> shift
     remainder = values & ((1 << shift) - 1)
@@ -153,3 +182,31 @@ def score(iq: np.ndarray, rate: int, edge: str, epoch: int) -> Glrt:
     exact, frequency, best = evaluate(0)
     control, control_frequency, _ = evaluate(17)
     return Glrt(exact, control, exact-control, frequency, control_frequency, best)
+
+
+def fixed_score(exact: np.ndarray, control: np.ndarray) -> dict:
+    """Integer DFT/energy/division oracle for every FPGA score output field."""
+    inputs = [np.asarray(exact, dtype=np.int64), np.asarray(control, dtype=np.int64)]
+    if any(c.shape != (64, 2) or np.any(c < -(1 << 23)) or np.any(c >= 1 << 23) for c in inputs):
+        raise ValueError("scorer requires two 64-symbol CI24 vectors")
+    largest = max(int(abs(c).max()) for c in inputs)
+    shift = max(0, 21-largest.bit_length()) if largest else 0
+    words = np.array([int(word, 16) for word in (BANK_ROOT / "glrt_dft512_q15.mem").read_text().split()], dtype=np.int64)
+    twiddle = np.column_stack((words & 0x1ffff, words >> 17))
+    twiddle = np.where(twiddle & 0x10000, twiddle-0x20000, twiddle)
+    phases = np.arange(512)[:, None]*np.arange(64)[None, :] % 512
+    rotation = twiddle[phases]
+    output = {"block_shift": shift}
+    for name, c in zip(("exact", "control"), inputs):
+        c = c << shift
+        real = np.sum(c[None, :, 0]*rotation[:, :, 0] - c[None, :, 1]*rotation[:, :, 1], axis=1)
+        imag = np.sum(c[None, :, 0]*rotation[:, :, 1] + c[None, :, 1]*rotation[:, :, 0], axis=1)
+        rounded = round_shift(np.column_stack((real, imag)), 21)
+        powers = np.sum(rounded**2, axis=1)
+        best = int(np.argmax(powers))
+        peak = int(powers[best])
+        energy = int(np.sum(c**2))
+        ratio = (peak << 22)//energy if energy else 0
+        output[name] = dict(bin=best, peak=peak, energy=energy,
+                            score=min(ratio, 65536), clamped=int(ratio > 65536), zero=int(energy == 0))
+    return output

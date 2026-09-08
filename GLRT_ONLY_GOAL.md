@@ -140,3 +140,12 @@ issues. Send the coordinator your task id, confirmed model/effort, persistent
 goal status, initial architecture, and any real external dependency. Continue
 autonomously beyond checkpoints until the goal is achieved or a genuine blocker
 requires input; do not stop merely because one implementation attempt fails.
+
+## Execution record
+
+Persistent goal created without a token budget in task
+`01a0821a-7b4c-73f0-8b2c-47b4e95207f9`; Astra/xhigh configuration confirmed.
+The four pinned components were initialized in independent working directories.
+Tested source checkpoints and rate/component qualification are maintained in
+[GLRT_ONLY_STATUS.md](GLRT_ONLY_STATUS.md). The initial firmware/HDL checkpoint
+is `bc192bfdf` / `f0531f4e`. The goal remains active; no hardware has been used.

@@ -61,7 +61,8 @@ def correlators(tmp_path_factory):
                 '"TEMPLATE"', f'"{BANK_ROOT}/pilot_{rate}_{edge}_q7.mem"'))
             executable = root / f"sim_{rate}_{edge}"
             process = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable),
-                str(bench), str(BANK_ROOT / "starlink_glrt_correlator.v")], text=True, capture_output=True)
+                str(bench), str(BANK_ROOT / "starlink_glrt_sample_ring.v"),
+                str(BANK_ROOT / "starlink_glrt_correlator.v")], text=True, capture_output=True)
             assert process.returncode == 0, process.stdout + process.stderr
             cache[key] = executable
         return cache[key]
@@ -154,6 +155,20 @@ def test_missing_history_candidate_fails_closed(rate, correlators, tmp_path):
     values = np.ones((5000+72*n, 2), dtype=np.int16)
     cycle = (5000+18*n)*100_000_000//rate
     rows = records(values, rate, first=1000, candidates=[(cycle, 0)])
+    result, status, rejected = run(correlators(rate, "upper"), rows, tmp_path)
+    assert not result and rejected == 1
+    assert status[:3] == (1, 1, 1)
+
+
+@pytest.mark.parametrize("rate", RATES)
+def test_admission_accounts_for_same_cycle_ring_overwrite(rate, correlators, tmp_path):
+    n = symbol_samples(rate)
+    depth = 1 << ((rate//4000-1).bit_length())
+    values = np.ones((depth+72*n, 2), dtype=np.int16)
+    # The input on this edge overwrites the requested first pilot sample.
+    # Testing only the pre-edge newest_index against DEPTH would admit it.
+    cycle = (2*n+depth)*100_000_000//rate
+    rows = records(values, rate, candidates=[(cycle, 0)])
     result, status, rejected = run(correlators(rate, "upper"), rows, tmp_path)
     assert not result and rejected == 1
     assert status[:3] == (1, 1, 1)

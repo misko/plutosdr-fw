@@ -26,7 +26,8 @@ are read-only and will not become runtime dependencies.
 
 One pilot-centered RX1 source, with a free-running absolute source counter,
 feeds both native-rate FPGA GLRT and an independent continuous 2.5 MS/s IQ
-exporter. The new profile excludes the coarse and fine PSS IP entirely.
+exporter. The new GLRT core contains no coarse or fine PSS computation. Its dedicated
+board profile, still pending, must exclude both PSS IPs entirely.
 The exporter uses unity at 2.5, a final 5-to-2.5 FIR at higher rates, and an
 additional 10/25/60-to-5 FIR where needed. Fixed pilot-centered tuning makes
 the initial digital translation zero, explicitly recorded in the frequency plan.
@@ -42,11 +43,16 @@ is considered implemented. The proposed schedule is not yet a throughput proof.
 
 | Source MS/s | Numerical reference | RTL verified | Synthesized | Full route | Hardware | Live agreement |
 |---|---|---|---|---|---|---|
-| 2.5 | pending | pending | pending | pending | pending | pending |
-| 5 | pending | pending | pending | pending | pending | pending |
-| 10 | pending | pending | pending | pending | pending | pending |
-| 25 | pending | pending | pending | pending | pending | pending |
-| 60 | pending | pending | pending | pending | pending | pending |
+| 2.5 | frozen arithmetic | blind core + export | combined core, timing fails | pending | pending | pending |
+| 5 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
+| 10 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
+| 25 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
+| 60 | frozen arithmetic | blind core + export | separate components | pending | pending | pending |
+
+RTL entries now include blind fabric acquisition, native GLRT and continuous
+IQ export together, with no candidate timing input. Synthetic positives pass
+at all rates. A deployable GLRT-only board profile and real RF qualification
+remain pending. These are engineering tests, not held-out sensitivity claims.
 
 ## Coordination
 
@@ -60,9 +66,10 @@ Scanner task asked for saved positive and independent control/holdout locations.
 
 Inherited pilot replay proves host GLRT after a 15-to-2.5 DDC. It contains no
 FPGA GLRT and does not qualify any requested rate in this new profile.
-No sensitivity, false-positive rate, timing closure, transport headroom, or
-live agreement is claimed yet. Proposed resource counts are budgets, not
-measured utilization. No production deployment or source promotion is authorized.
+No sensitivity, false-positive rate, full-receiver timing closure, transport
+headroom, or live agreement is claimed yet. Component resource measurements
+below do not establish whole-design fit. No production deployment or source
+promotion is authorized.
 
 ## First digital implementation checkpoint
 
@@ -93,3 +100,98 @@ the host normalization difference, CFO alias interval, resource budget and
 native sample-ring admission. Native correlator synthesis is now running;
 FPGA DFT/scoring, blind acquisition, CDC/control/DMA, kernel and host integration,
 full receiver route and all hardware/live gates remain pending.
+
+## FPGA GLRT scoring implementation checkpoint
+
+The 512-bin exact/control frequency maximizer, independent power normalization,
+73-cycle integer Q16 divider, and fabric threshold decision are now implemented.
+Block scaling preserves low-amplitude numerical precision. Malformed symbol
+order or mixed epochs poison the result. Zero energy and clamped scores are
+explicit. Configuration is latched per vector. Gates remain provisional until
+training/holdout qualification; there is no host or ARM FFT in this scoring path.
+
+Connected native-IQ/correlator/scorer simulations pass at all five rates for
+published-pilot positives, noise and rolled-control waveforms. Their candidate
+epochs are intentionally testbench-supplied, so they do not prove blind FPGA
+acquisition. The direct integer reference matches the fabric score and CFO bins.
+
+The current 60 MS/s exporter (`ddc-60000000-v4`) uses 4143 LUTs, 1100 registers,
+24 DSPs and no BRAM, with internal setup/hold +0.095/+0.056 ns. Native correlator
+RAM inference first failed, then an isolated synchronous RAM boundary reduced
+logic and a guarded address-collision check removed its remaining critical
+path. Its `correlator-60000000-v3` route uses 672 LUTs, 684 registers, 8 DSPs and
+24 BRAM tiles, with internal setup/hold +0.115/+0.147 ns. These are separate
+OOC results; unplaced boundary timing and the complete receiver remain unqualified.
+
+The scorer's first OOC implementation synthesized to 2211 LUTs, 1615 registers,
+16 DSPs and half a BRAM tile, but failed internal setup by 0.697 ns between
+rounding and magnitude squaring. An additional pipeline boundary retains exact
+arithmetic and passes the score/integration tests. Registered fault fencing
+then closed `score-common-v3`: 2281 LUTs, 1617 registers, 16 DSPs, half a BRAM,
+and internal setup/hold +0.181/+0.069 ns. Its source is superseded by the
+magnitude-mask simplification described below; retain its exact hash identity.
+
+
+## Autonomous core and ingress checkpoint
+
+Blind acquisition now checks 16 symbol correlations on every exported sample,
+with exact 176-sample window energy, tagged arithmetic and explicit support.
+The bank/power/energy/threshold chain passes 43 tests across both edges and all
+source-index strides. `acquisition-v1` routes at 100 MHz using 4052 LUTs, 3498
+registers, 24 DSPs and no BRAM; internal setup/hold are +0.357/+0.054 ns.
+The six-lane pilot bank alone uses 18 DSPs after replacing a redundant multiply
+and registering its address schedule.
+
+The first connected blind fixture exposed a real scheduling miss: a weak
+onset peak occupied the scorer before the stronger true peak arrived. A fixed
+176-export-sample (70.4 us) selection window now retains the greatest eligible
+raw numerator. Native rings doubled to 1024/2048/4096/8192/16384 CI16 words.
+Counters distinguish raw/merged/selected proposals, admissions, busy rejections
+and complete results. The default ring change supersedes the earlier standalone
+correlator resource result; complete rate builds must remeasure it.
+
+The autonomous receiver passes published-pilot synthetic positives at all five
+rates with no candidate seed. Every exported IQ word, index, support flag and
+clipping count matches direct convolution; every completed native GLRT event
+matches the frozen integer score, raw powers, energies, CFO bins and flags.
+Noise, tone and scrambled-symbol controls produce no detections in their five
+2 ms fixtures each. This small development set does not establish an operational
+false-positive rate. Thresholds remain provisional.
+
+The rolled-pilot fixture is deliberately classified as an ambiguity experiment.
+Blind acquisition finds the known code 17 symbols later. At least the 2.5 MS/s
+fixture has an earlier unrelated candidate which occupies the scorer; the
+shifted true proposal is then explicitly busy-rejected. The test preserves
+this miss instead of counting it as a correctly rejected negative. The current
+single-candidate schedule has no claim of complete recovery in overlapping or
+busy windows; independent holdout and live comparisons must count those cases.
+
+The combined 2.5 MS/s core fits provisionally but has **not closed timing**.
+`receiver-2500000-v1` failed internal setup by 2.071 ns at the native-to-scorer
+magnitude comparison. Replacing repeated maxima with a bitwise magnitude mask
+preserves the exact common block scale. `receiver-2500000-v2` uses 7215 LUTs,
+6119 registers, 48 DSPs and two BRAM tiles, with setup/hold -0.060/+0.051 ns.
+Its remaining critical path is the selected epoch through native history
+admission arithmetic. These OOC routes do not include ADC, CDC, AXI or DMA,
+and their unplaced boundaries remain unqualified. No FPGA image was deployed.
+
+A bounded pacing buffer now absorbs ingress jitter, with minimum 39 fabric
+cycles across each 1/2/4/10/24 source-sample output group. Empty intervals do
+not accumulate burst credits. Twenty tests prove bit-exact DDC output at 99%,
+100% and 101% nominal pacing with bounded jitter, and explicit drop/gap
+accounting under overload. A generic dual-clock FIFO adapted from the inherited
+source carries CI16, full source index and phase; two tests cover independent
+reset purges, overflow, recovery and data/phase integrity. Five additional tests connect the source counter, FIFO and pacer at all
+native clocks, preserving absolute index and phase across radio resets. The
+ingress has not yet been connected to the board or full autonomous core.
+
+The aggregate autonomous-core regression passed **216 tests in 521.83 s**
+(`artifacts/glrt-autonomous-tests-20260908.xml`). The later pacing suite passed
+20 tests and the connected ingress/CDC suite passed seven tests
+(`artifacts/glrt-ingress-tests-v2-20260908.xml`).
+
+Next: close combined core admission timing, integrate ADC/CDC/control and the
+continuous IQ DMA, then full 2.5 MS/s board placement/timing. Complete the
+remaining full rate builds, kernel/host lifecycle and independent validation
+before requesting the coordinated .18 canary window. The persistent goal remains
+active and all hardware/live gates remain pending.
