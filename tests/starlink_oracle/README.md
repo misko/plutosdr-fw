@@ -24,6 +24,32 @@ See the HDL submodule's `library/starlink_pss_acquisition/PILOT_DDC.md` for its
 clock/phase/fault contract and the limited standalone synthesis gate. This does
 not yet test a complete receiver-to-IIO path or host GLRT evidence.
 
+`test_pilot_ddc_rtl.py` compares the assembled FIFO, absolute-phase mixer,
+halfband and FIR against the fixed-point oracle. It also composes the existing
+30/60 MS/s conditioners with that RTL and checks residual-CFO tone phase against
+the exact source-center mapping. The separate HDL `run_pilot_ddc_dwell.sh`
+checks a full 120 ms of supported output, not merely a short-vector count.
+
+For published pilot/PSS fixtures and independent host GLRT, use the explicit
+development-oracle replay below. The supplied Leo checkout is read-only; this
+does not add a production/runtime dependency from PPU or firmware into Leo.
+Use a Python >=3.12 environment with Leo's analysis dependencies and pytest.
+
+```sh
+python tools/starlink_pilot_glrt_replay.py \
+  --leo-source /path/to/leo-checkout --edge upper --rtl \
+  --output /path/to/new-upper-replay.json
+```
+
+Repeat with `--edge lower` and with `--kind noise`. The tool will not overwrite
+an existing report. It generates a known 20 ms fixture, verifies every RTL IQ
+sample/index/support flag against the integer reference, then runs blind host
+acquisition and GLRT with no PSS timing/CFO seed. Reports distinguish synthetic
+fixture verification from live RF evidence and FPGA PSS lock (both false).
+The positive fixture includes PSS and the 300 published pilot symbols but does
+not test the FPGA PSS detector itself. Full-rate and live paired qualification
+are still separate gates.
+
 ## Provenance
 
 Sequence authority is the clean worktree

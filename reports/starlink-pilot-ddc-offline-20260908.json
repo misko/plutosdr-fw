@@ -1,0 +1,86 @@
+{
+  "schema": "starlink-pilot-ddc-offline-checkpoint-v1",
+  "date_utc": "2026-09-08",
+  "hdl_commit": "72fef34f3ad5ec2cfed8bcc67cfe8bddabc6854a",
+  "scope": "canonical pilot DDC, source-rate composition and synthetic host GLRT",
+  "hardware_accessed": false,
+  "deployed": false,
+  "receiver_fit_qualified": false,
+  "iio_capture_qualified": false,
+  "live_glrt_evidence": false,
+  "fpga_pss_lock": false,
+  "tests": {
+    "command": "python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py",
+    "passed": 185,
+    "complete_ddc_rtl_tests": 52,
+    "source_rates_msps": [15, 30, 60],
+    "edges": ["lower", "upper"],
+    "source_chain_residual_cfo_tones_hz": [-100000, 0, 100000],
+    "fixed_point_mismatches": 0
+  },
+  "full_dwell_rtl_replay": {
+    "command": "bash hdl/library/starlink_pss_acquisition/run_pilot_ddc_dwell.sh",
+    "stimulus": "known upper-edge pilot-center CW at canonical 15 MS/s",
+    "passed": true,
+    "accepted_samples": 1800540,
+    "emitted_samples": 300090,
+    "startup_invalid_samples": 90,
+    "supported_samples": 300000,
+    "supported_duration_ms": 120,
+    "fifo_high_water": 1,
+    "saturation_events": 0,
+    "overflow_events": 0,
+    "all_indexes_visits_and_support_flags_checked": true
+  },
+  "standalone_experiment": {
+    "tool": "Vivado 2022.2",
+    "part": "xc7z010clg400-1",
+    "clock_period_ns": 10.0,
+    "slice_luts": 2514,
+    "slice_registers": 2551,
+    "dsp48e1": 14,
+    "ramb18e1": 8,
+    "ramb36e1": 0,
+    "internal_register_to_register_setup_wns_ns": 0.173,
+    "internal_register_to_register_hold_whs_ns": 0.053,
+    "internal_ooc_gate": "pass",
+    "boundary_timing_qualified": false,
+    "whole_design_hold_whs_ns": -1.197,
+    "boundary_limitation": "Unplaced OOC boundary hold failures remain reported; this is not a whole-receiver timing pass.",
+    "local_artifact_directory": "hdl/library/starlink_pss_acquisition/build/pilot-ddc-ooc",
+    "large_build_artifacts_pushed": false
+  },
+  "synthetic_glrt_checks": {
+    "independent_acquisition": true,
+    "pss_seeds_used": false,
+    "rtl_reference_bit_exact": true,
+    "positive_edges": ["lower", "upper"],
+    "negative_kind": "noise-only",
+    "positive_epoch_error_output_samples": [0.0, 0.0],
+    "positive_glrt_margins": [0.9079244802050692, 0.877051434098486],
+    "negative_best_glrt_margin": 0.008766928856088999,
+    "qualification_limitation": "Strong synthetic fixtures only; not live sensitivity, false-alarm calibration, or FPGA PSS detector qualification."
+  },
+  "source_sha256": {
+    "starlink_pilot_fir3.v": "8846e0a81714acb47320877aafce163de2bb5a12ad7c8870278cd0639f179e1f",
+    "pilot_fir3_q17.mem": "64581ef90abaf17e5855b80f85e15480979095ff3f75b87ec35041f0d6c371c3",
+    "starlink_pss_x2_ddc_ooc.xdc": "58b531fd0acb964ab4e56ea8908ab34f210f576463741e10a695d522192a25a1",
+    "starlink_pilot_halfband2.v": "ca07e81bd3652c680c8bd5ab552108987cb7539ba5bc5e76e1115825393b1447",
+    "starlink_pilot_ddc.v": "24420bace1e5a366f449ebc35180363721486cf4442fe41eb21190d7307aff1b",
+    "pilot_halfband2_q17.mem": "5c05bd36e2a19ce7c292427bf067ba1dbca008f57ed8f313688dfaa2943fe5cd",
+    "pilot_mixer_q16.mem": "2618a424eddcebb6ba5da48af13db0b0ad8a119bd48ac0760e1721a528979a11"
+  },
+  "artifact_sha256": {
+    "summary.txt": "a87a48e74e949357d9c14f6a955b1d5e7a1d3369e129aebbc2a39b508ac728d0",
+    "utilization.rpt": "8f1194cdd4b79a3c8a11a9812bbf13f45f0cefd9f3bb196dbc157a180c376142",
+    "timing.rpt": "732c5d79e0c00ed23a8feb63d897b87a08e6cd9856d0d0eb8315ba02e3af77c7",
+    "methodology.rpt": "298ce42510a23a5bd14931d2a2c339cafe6436326805e1402a437783d1c15705",
+    "check_timing.rpt": "b1042dae692bc396bc6d7a2e9c0e3cd23b33b3d64623e333378681b2f8197c9a",
+    "route_status.rpt": "35e3c2feb93e4863b56ac044111c7962565e8707a25d4e27262767124c87c4dd"
+  },
+  "glrt_report_sha256": {
+    "reports/starlink-pilot-glrt-upper-rtl-20260908.json": "7f195c0d8abc1a1e2cd2175378b7cf23711837c5395db5fa0c476ab260071a62",
+    "reports/starlink-pilot-glrt-lower-rtl-20260908.json": "c30861210ad7b325eb3e39fc71514ed415bdfb08fcc7f1674c876c886f6dc27c",
+    "reports/starlink-pilot-glrt-noise-rtl-20260908.json": "28417b03a708021814b7934fd86f92c6cb2c078e05641d1609829145034f1474"
+  }
+}

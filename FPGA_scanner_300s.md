@@ -162,6 +162,11 @@ snippets for that gate. Debug sampling must include negatives as well as trigger
   has space, and do not count already-removed TX resources a second time.
 - [x] Implement and bit-test the largest new stage: time-shared 255-tap /3 FIR,
   including rate/phase/fault fences. This is not the complete pilot DDC.
+- [x] Assemble the canonical FIFO/pacer, mixer and halfband with the /3 FIR;
+  bit-test 15/30/60 compositions and complete a 120 ms supported-output replay.
+- [x] Independently acquire and GLRT-score published pilot/PSS fixtures after
+  the complete canonical RTL export, including a noise-only control. This is
+  synthetic preservation evidence, not live GLRT or FPGA PSS-lock qualification.
 
 ### S2 — Paired fixed-frequency IIO capture on .18
 
@@ -262,3 +267,28 @@ The retained checkpoint is
 registers, eight DSPs, and eight RAMB18s. Internal routed setup/hold slack is
 +0.145/+0.104 ns at 100 MHz. Unplaced boundary hold failures remain reported;
 this is not a whole-design timing pass and does not authorize a deployment.
+
+The assembled canonical pilot DDC now passes 52 additional RTL tests, including
+the existing 30/60 conditioners upstream, for 185 tests in the full oracle/plan
+suite. A separate 120 ms CW replay accepted 1,800,540 inputs and emitted 300,090
+outputs: exactly 300,000 supported samples after 90 startup-invalid results,
+with zero overflow or saturation and FIFO high-water one. Standalone synthesis
+uses 2514 LUTs, 2551 registers, fourteen DSPs and eight RAMB18s. Internal routed
+setup/hold slack is +0.173/+0.053 ns at 100 MHz; boundary ports and whole-shell
+timing remain unqualified.
+
+Three 20 ms fixtures also pass exact RTL/reference agreement followed by blind
+host GLRT acquisition: lower-edge and upper-edge positives and noise-only.
+Positive GLRT margins are about 0.908/0.877, compared with 0.00877 for noise;
+both positives recover the known frame epoch on the output grid and CFO within
+1.2 Hz. These are strong synthetic fixtures, not a measured live sensitivity
+or false-alarm specification. Reports `starlink-pilot-glrt-*-rtl-20260908.json`
+retain source/IQ hashes, independent candidate scores, and explicit false live
+RF/PSS-lock flags. Receiver/DMA/IIO integration, runtime PSS edge banks, hop
+fences and short-dwell lock policy, full-shell timing, and .18/.17 deployments
+remain open. No radio has been touched during these scanner implementation gates.
+The aggregate checkpoint is `reports/starlink-pilot-ddc-offline-20260908.json`.
+The next implementation step is the opt-in paired pilot capture profile: expose
+the existing canonical tap, add a single-RX post-decimation DMA and its truthful
+2.5 MS/s IIO device/counter contract, then close full-shell timing before .18.
+Do not replace that integration gate with more standalone arithmetic passes.
