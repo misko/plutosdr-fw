@@ -366,11 +366,13 @@ def _current_ppu_handoff(repository: Path) -> tuple[str, Any]:
 
 def _validate_persistent_lan_receipt(receipt: dict[str, Any]) -> tuple[str, str]:
     plan = receipt.get("plan")
+    source = receipt.get("read_only_source_attestation")
     returned = receipt.get("read_only_return_attestation")
     rotation = receipt.get("host_key_rotation")
     expected_phases = [
         "preflight_revalidated",
         "remote_preflight_attested",
+        "source_tx_quiesced",
         "remote_tx_safe_read_only_attested",
         "pluto_frm_staged",
         "staged_hash_verified",
@@ -416,6 +418,35 @@ def _validate_persistent_lan_receipt(receipt: dict[str, Any]) -> tuple[str, str]
         "tandem_dt_state",
     }
     try:
+        source_gains = (
+            [float(value) for value in source["tx_hardwaregain_db"].split(",")]
+            if isinstance(source, dict)
+            and isinstance(source.get("tx_hardwaregain_db"), str)
+            else []
+        )
+        source_buffers = (
+            [float(value) for value in source["all_buffer_enable"].split(",")]
+            if isinstance(source, dict) and isinstance(source.get("all_buffer_enable"), str)
+            else []
+        )
+        source_scans = (
+            [float(value) for value in source["tx_scan_enable"].split(",")]
+            if isinstance(source, dict) and isinstance(source.get("tx_scan_enable"), str)
+            else []
+        )
+        source_raws = (
+            [float(value) for value in source["tx_dds_raw"].split(",")]
+            if isinstance(source, dict) and isinstance(source.get("tx_dds_raw"), str)
+            else []
+        )
+        source_scales = (
+            [float(value) for value in source["tx_dds_scale"].split(",")]
+            if isinstance(source, dict) and isinstance(source.get("tx_dds_scale"), str)
+            else []
+        )
+    except (TypeError, ValueError):
+        source_gains = source_buffers = source_scans = source_raws = source_scales = []
+    try:
         gains = (
             [float(value) for value in returned["tx_hardwaregain_db"].split(",")]
             if isinstance(returned, dict)
@@ -452,6 +483,38 @@ def _validate_persistent_lan_receipt(receipt: dict[str, Any]) -> tuple[str, str]
         or plan.get("trust_model") != "explicit_lan_tofu"
         or plan.get("source_iio_layout") != "tx-capable-1r1t-v1"
         or plan.get("return_iio_layout") != "rx-only-1r1t-v1"
+        or not isinstance(source, dict)
+        or set(source) != return_fields
+        or source.get("serial") != RECEIVER_SERIAL
+        or source.get("firmware") != plan.get("before_firmware")
+        or not isinstance(source.get("boot_id"), str)
+        or BOOT_ID.fullmatch(source["boot_id"]) is None
+        or not isinstance(source.get("qspi_bytes"), str)
+        or not source["qspi_bytes"].isdigit()
+        or int(source["qspi_bytes"]) <= 0
+        or not isinstance(source.get("qspi_sha256"), str)
+        or HEX_64.fullmatch(source["qspi_sha256"]) is None
+        or not isinstance(source.get("fit_sha256"), str)
+        or HEX_64.fullmatch(source["fit_sha256"]) is None
+        or source.get("dds_present") != "1"
+        or source.get("tandem_present") != "1"
+        or len(source_gains) != 1
+        or source_gains[0] > -80.0
+        or source.get("tx_lo_powerdown") != "1"
+        or source.get("tx_buffer_enable") != "0"
+        or len(source_buffers) < 2
+        or any(value != 0 for value in source_buffers)
+        or len(source_scans) != 2
+        or any(value != 0 for value in source_scans)
+        or len(source_raws) != 4
+        or any(value != 0 for value in source_raws)
+        or len(source_scales) != 4
+        or any(value != 0 for value in source_scales)
+        or source.get("root_marker_present") != "0"
+        or source.get("rx_dma_dt_state") != "enabled"
+        or source.get("dds_dt_state") != "enabled"
+        or source.get("tx_dma_dt_state") != "enabled"
+        or source.get("tandem_dt_state") != "enabled"
         or not isinstance(rotation, dict)
         or set(rotation) != rotation_fields
         or any(

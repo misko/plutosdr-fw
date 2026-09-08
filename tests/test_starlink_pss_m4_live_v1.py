@@ -50,6 +50,7 @@ def _persistent_lan_receipt() -> dict[str, object]:
         "phases": [
             "preflight_revalidated",
             "remote_preflight_attested",
+            "source_tx_quiesced",
             "remote_tx_safe_read_only_attested",
             "pluto_frm_staged",
             "staged_hash_verified",
@@ -91,6 +92,28 @@ def _persistent_lan_receipt() -> dict[str, object]:
             "replacement_fingerprint": "SHA256:new",
             "previous_known_hosts_backup": "/private/radio.known_hosts.pre-reboot",
             "known_hosts_file": "/private/radio.known_hosts",
+        },
+        "read_only_source_attestation": {
+            "serial": live.RECEIVER_SERIAL,
+            "firmware": "v0.48-plutoplus-spf-iq-direct-async-v3",
+            "boot_id": "11111111-1111-4111-8111-111111111111",
+            "qspi_bytes": "33554432",
+            "qspi_sha256": "4" * 64,
+            "fit_sha256": "5" * 64,
+            "all_buffer_enable": "0,0",
+            "dds_present": "1",
+            "tandem_present": "1",
+            "tx_hardwaregain_db": "-80.000000",
+            "tx_lo_powerdown": "1",
+            "tx_buffer_enable": "0",
+            "tx_scan_enable": "0,0",
+            "tx_dds_raw": "0,0,0,0",
+            "tx_dds_scale": "0.000000,0.000000,0.000000,0.000000",
+            "root_marker_present": "0",
+            "rx_dma_dt_state": "enabled",
+            "dds_dt_state": "enabled",
+            "tx_dma_dt_state": "enabled",
+            "tandem_dt_state": "enabled",
         },
         "read_only_return_attestation": {
             "serial": live.RECEIVER_SERIAL,
@@ -571,6 +594,11 @@ def test_persistent_lan_receipt_binds_exact_v7_return_and_qspi() -> None:
 def test_persistent_lan_receipt_rejects_a_different_profile_or_tx_state() -> None:
     receipt = _persistent_lan_receipt()
     receipt["plan"]["mutation_profile_id"] = "persistent-canary"
+    with pytest.raises(live.ProbeError, match="persistent LAN receipt"):
+        live._validate_persistent_lan_receipt(receipt)
+
+    receipt = _persistent_lan_receipt()
+    receipt["read_only_source_attestation"]["tx_lo_powerdown"] = "0"
     with pytest.raises(live.ProbeError, match="persistent LAN receipt"):
         live._validate_persistent_lan_receipt(receipt)
 
