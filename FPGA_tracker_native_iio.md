@@ -368,6 +368,42 @@ transmitter, and makes no PSS claim from a noise-only run. On-channel evidence
 must still be compared with the declared off-slice control and repeated
 on-channel role before promotion to M4/M9.
 
+Commit `7c89a4781` was then exercised on `.17` with a fresh RAM-only 30 MS/s
+boot and the requested 1,937,500,000 Hz IF. The AD9361 readback matched exactly.
+The 1.034-second Ethernet smoke delivered 12 continuous maps and 2,400 exact
+chunks with every map, tracker, validation, and push-failure counter at zero.
+It restored the prior 30.72 MS/s, 18 MHz, 2.4 GHz settings before closing the
+context. The final noise-only estimate was peak-to-median `1.3674` and robust-z
+`5.3048`, correctly below the frozen live-candidate thresholds and therefore
+not a PSS claim.
+
+The deployment receipt passed offline replay verification. PPU recovery then
+proved USB departure/return, route release, persistent AD9361 1R1T firmware,
+and unchanged QSPI. `.18` and all other radios were not opened.
+
+### Live-IF smoke evidence identities
+
+- USB inventory:
+  `3569e9c3271c9237081e03e641f85ecf900889a5e4070aa674dfcabbac7946a8`
+- operation plan:
+  `b0b4c5cdefc590ccea6aea1396438014f485713e9c788c2f5a4e78cea9590a92`
+- RAM deployment:
+  `c42b49ec8ce0de466b382c59f12fa6381a3612dcf3fa4f51ec3348b1e787bb74`
+- explicit-IF Ethernet smoke:
+  `42bf524c24417a7f14760dbd00065ed01579fb72038c2ca159259a360a9cbc02`
+- recovery:
+  `586f3cc4b9397ad0d33a3c43195c2fcc473876f316967dcd1abdfd84f2957af8`
+- LO-capable cabled/receiver helper source:
+  `9c45e3f92b86f24e33a65bae2caa4a005e1a88bac157af3d98bc071bccbe7aa9`
+- LO-capable soak runner source:
+  `488d6efe7de569c35596b16e46e1933083bada8e441556650e09cb57c4cad209`
+- focused soak test source:
+  `2bde1d155eb5689ee032636d51cd31b08fb539e4c9c5caf6b1dd8e35e34c8f50`
+
+Evidence root:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt5-live-if-smoke`
+
 ## Next gates
 
 1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
