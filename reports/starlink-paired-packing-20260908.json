@@ -1,0 +1,171 @@
+{
+  "schema": "starlink-paired-packing-checkpoint-v1",
+  "date_utc": "2026-09-08",
+  "firmware_parent": "5716b5a0f9b5049ca122ff130cbffeb81c9b6050",
+  "hdl_commit": "edb0f7070ac4fe01a9a08f9d7d98bc70d03114d4",
+  "linux_commit": "5d706586c591d4c9f5fc8a308b2b248693c0d279",
+  "ppu_main_commit": "b5e8f6fce588e786e4386583e1bb95af21b132f5",
+  "profile": "paired-pilot",
+  "source_rate_msps": 15,
+  "integrated_edge": "upper-only",
+  "priority": "fixed-frequency same-observation live FPGA PSS timing lock and independent blind host GLRT, before hopping/rates",
+  "hardware_accessed": false,
+  "deployed": false,
+  "receiver_fit_qualified": false,
+  "iio_capture_qualified": false,
+  "live_glrt_evidence": false,
+  "fpga_pss_lock": false,
+  "tests": {
+    "fw_oracle_plan_contract_passed": 277,
+    "pilot_rounding_direct_vectors": 1209792,
+    "pilot_capture_rtl_tests": 63,
+    "packing_policy_tests": 12,
+    "acquisition_wrapper_all_rates_map_and_pilot_only_passed": true,
+    "acquisition_module_suite_passed": true,
+    "ppu_pilot_parser_tests": 73,
+    "ppu_full_suite_passed": 1562,
+    "ppu_full_suite_explicit_skips": 11,
+    "ppu_ruff_passed": true,
+    "ppu_mypy_passed": true,
+    "ppu_preexisting_dirty_files_preserved_and_not_published": 4
+  },
+  "full_receiver_builds": [
+    {
+      "label": "signed-round",
+      "source_state": "before single-job score metadata optimization; generated source retained",
+      "control_set_threshold": 4,
+      "luts": 14778,
+      "flip_flops": 21922,
+      "bram_tiles": 53,
+      "dsps": 65,
+      "control_sets_at_failed_placement": 441,
+      "unplaced_slices_needed": 2632,
+      "remaining_slices_available": 2201,
+      "placement_passed": false,
+      "routed": false,
+      "build_directory": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELsigned-round"
+    },
+    {
+      "label": "signed-round-control16",
+      "source_state": "before single-job score metadata optimization; generated source retained",
+      "control_set_threshold": 16,
+      "luts": 15271,
+      "flip_flops": 21925,
+      "bram_tiles": 53,
+      "dsps": 65,
+      "control_sets_at_failed_placement": 289,
+      "unplaced_slices_needed": 2641,
+      "remaining_slices_available": 2206,
+      "placement_passed": false,
+      "routed": false,
+      "build_directory": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_STARLINKPSSCONTROLSETTHRESHOLD16_PILOTBUILDLABELsigned-round"
+    },
+    {
+      "label": "single-score-job",
+      "source_state": "current synthesizable HDL; later capture testbench additions do not enter the design",
+      "control_set_threshold": 4,
+      "luts": 14757,
+      "flip_flops": 21656,
+      "bram_tiles": 53,
+      "dsps": 65,
+      "control_sets_at_failed_placement": 442,
+      "unplaced_slices_needed": 2616,
+      "remaining_slices_available": 2206,
+      "placement_passed": false,
+      "routed": false,
+      "build_directory": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELsingle-score-job"
+    }
+  ],
+  "command_fifo": {
+    "scope": "standalone post-opt storage-only comparison; timing/CDC not qualified",
+    "block": {
+      "luts": 27,
+      "flip_flops": 31,
+      "bram_tiles": 2.5
+    },
+    "distributed": {
+      "luts": 131,
+      "flip_flops": 191,
+      "bram_tiles": 0
+    },
+    "selected_storage_unchanged": "block"
+  },
+  "coarse_score_metadata": {
+    "copies_removed_bits": 266,
+    "no_stall_admission_clocks": 4,
+    "clock_hz": 100000000,
+    "coefficients_changed": false,
+    "real_xfft_numerical_replay": {
+      "samples": 1406,
+      "blocks": 3,
+      "exact_forward_products_inverse_words_each": 1536,
+      "exact_scores": 1341,
+      "known_pss_score255_count": 3,
+      "max_fifo": 357,
+      "output_stalls_exercised": true,
+      "fault_recovery_exercised": true,
+      "passed": true
+    },
+    "real_xfft_capacity_replay": {
+      "samples": 28673,
+      "blocks": 64,
+      "scores": 28608,
+      "max_fifo": 356,
+      "fifo_capacity": 512,
+      "canonical_source_rate_hz": 15000000,
+      "passed": true
+    }
+  },
+  "pilot_glrt": {
+    "scope": "strong synthetic published-pilot/PSS fixture through bit-exact DDC RTL, independent blind acquisition; no live RF",
+    "source_samples": 300540,
+    "supported_samples": 50000,
+    "epoch_sample": 1622,
+    "cfo_hz": 42000.93991871901,
+    "margin": 0.877051434098486,
+    "unchanged": true,
+    "report": "reports/starlink-pilot-glrt-upper-signed-round-rtl-20260908.json"
+  },
+  "full_120ms_capture": {
+    "scope": "real RTL AXI/DDC/AXIS and PPU parser; synthetic kernel header; no DMA/IIO/hardware",
+    "supported_samples": 300000,
+    "axis_replay_bytes": 1200000,
+    "every_iq_sample_matches_oracle": true,
+    "hardware_auto_stop_verified": true,
+    "source_first_signal_center": 271,
+    "source_last_signal_center": 1800265,
+    "report": "reports/starlink-pilot-capture-dwell-rtl-20260908.json"
+  },
+  "remaining": [
+    "larger resource reduction while preserving both PSS stages and exact pilot IQ",
+    "full receiver placement and route/timing qualification",
+    "matched kernel/rootfs image packaging and real PPU IIO reader",
+    "identity-locked .18 DMA/IIO/cancellation/digital replay qualification before .17",
+    "serial-locked PPU network deployment to outdoor RX-only .17",
+    "same-observation live FPGA timing lock and independent blind GLRT agreement",
+    "runtime upper/lower banks, local hop fences, 120ms dwell policy, 300s recording, 30/60 rate qualification"
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/starlink_pilot_ddc.v": "5cac8cc8925739e3e66ab64f3634135ddb6641b2fe51569e88cffc1e4d2bedc0",
+    "hdl/library/starlink_pss_acquisition/starlink_pilot_halfband2.v": "c97fd51cced0fae5c8e938ce313f1c5b100f1e94a624099f636d38de6922a937",
+    "hdl/library/starlink_pss_acquisition/starlink_pilot_fir3.v": "506f40ec5a58350abaa8fbaf1e75ed29c98c414e36bee7d80518e3ec0854c49a",
+    "hdl/library/starlink_pss_acquisition/starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+    "hdl/projects/pluto/system_project.tcl": "283949ae573f5e6eba6c021e13dca2354b7955c280e184227561563871f0c314",
+    "hdl/library/starlink_pss_raw_correlator/measure_command_fifo_storage.tcl": "ef22c3a2ef8eadf4675c9bcf4936edce33a379f41868864eb0b8a906e3c8cf0c",
+    "tests/starlink_oracle/test_pilot_capture_rtl.py": "8a659410f1073abed623ee67a058600da88c23ab9b078a16b78757a3938251f3",
+    "tests/starlink_oracle/test_pilot_rounding_rtl.py": "095215e923e3b608e9980a5ea30caa85c5190445bae62cd96086348071319d4b",
+    "tests/test_starlink_paired_packing_policy.py": "255b0b420cdacd8d6f269cb3de6c47f880bb9aca2af66e3ff19b392874dc0c56",
+    "reports/starlink-pilot-capture-dwell-rtl-20260908.json": "88dcac58cfba6fb9347c1760bae28df29436dbff7f66efb350941f8f5dfabd30",
+    "reports/starlink-pilot-glrt-upper-signed-round-rtl-20260908.json": "7b08cd821cbc6a85dbee28d7036d27e697da3198cbc9545a304e3362ffe9918e",
+    "hdl/library/starlink_pss_acquisition/build/score-singlejob-longrun-vivado.log": "7e36e01f9dc1c060beb7dd23bbe96dc67792fd2e261965f275086c01d33ab463",
+    "hdl/library/starlink_pss_acquisition/build/score-singlejob-numeric-vivado.log": "862df477b93e85a0bf34aaf877cb08d01d662b4cdbf8051825331a996bb17b50",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELsigned-round/pluto_vivado.log": "4facb8dd8736ee0a614681275a522224164cd8c0d9c06d4cc24812391bd9a9bd",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELsigned-round/pluto.runs/synth_1/system_top_utilization_synth.rpt": "8e69f99c0c09e5a2a931f7f00c421be4d420df1a2e75c77006017dacf11a3799",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_STARLINKPSSCONTROLSETTHRESHOLD16_PILOTBUILDLABELsigned-round/pluto_vivado.log": "fd2975a6ba0266304282fb5f2c87499956a741cc01115fda20269682cadf83c5",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_STARLINKPSSCONTROLSETTHRESHOLD16_PILOTBUILDLABELsigned-round/pluto.runs/synth_1/system_top_utilization_synth.rpt": "2e0132ade3e4c8d1aa160b2b02cdda5672b63f4ed20fcea030a18debb9b9773e",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELsingle-score-job/pluto_vivado.log": "67b2a76d8e053dc3b9d56ce8878447ae133ed0bb62e05de547d89bf26fcc59af",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELsingle-score-job/pluto.runs/synth_1/system_top_utilization_synth.rpt": "3b15c945e7d73df30a94fd63ffca63e6c14b2257f59732e2508a24dc3d0364e6",
+    "hdl/library/starlink_pss_raw_correlator/build/command-storage/block_utilization.rpt": "d0b3eef8dd2f10691b7bdde66a7e9967b86b72a13398165cb46639a16d739536",
+    "hdl/library/starlink_pss_raw_correlator/build/command-storage/distributed_utilization.rpt": "c2d88a8bc3e9973997ba2122b4989eed0cecdecfbd8d307d3f14aa0497f4b3f5"
+  }
+}

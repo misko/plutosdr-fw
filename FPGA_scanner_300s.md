@@ -19,6 +19,24 @@ goal. No detection is an admissible recording outcome, not a lock claim.
 PSS timing lock is distinct from the legacy SSS-qualified `frame_lock_claim`;
 SSS is not silently added to this task, nor may its legacy gate be bypassed.
 
+### Immediate priority: fixed-frequency paired live proof
+
+Before expanding to hopping and higher rates, qualify one fixed upper-edge
+frequency at 15 MS/s: capture the same observation through both FPGA PSS stages
+and the independent 2.5 MS/s pilot IIO path, then run blind host GLRT without
+FPGA timing/frequency seeds. Preserve all negative visits and fault evidence.
+Report FPGA fit/timing separately from live PSS lock/GLRT agreement; passing
+synthetic replay does not satisfy the live gate. The eight-target, 120 ms dwell,
+300 s scanner and 30/60 MS/s qualification remain required later stages.
+
+Resource work proceeds first through (1) improved slice/control-set packing
+and suitable RAM-backed storage, and (2) shared/time-multiplexed arithmetic
+with demonstrated sustained throughput. Preserve both PSS stages, frozen
+coefficients, exact pilot samples, and timing/fault metadata. Measure full-design
+placement and timing after meaningful changes. Removing a detector or buying
+different hardware is not an approved shortcut. The .18-before-.17 deployment
+and exact-serial RX-only ownership gates below remain unchanged.
+
 ## Ownership and deployment
 
 - Firmware and firmware submodule changes stay on experimental do-not-merge
@@ -342,3 +360,78 @@ finish the matched rootfs/PPU reader and test real DMA/IIO lifecycle and recover
 on .18, then qualify paired digital replay before outdoor .17 deployment.
 No PPU files or radios were changed in this integration checkpoint. All source
 and source pins remain on their experimental do-not-merge branches.
+
+### Packing and independent accounting checkpoint — 2026-09-08
+
+The immediate priority is now the fixed-frequency paired live proof above.
+The approved resource approaches preserve both PSS stages and exact pilot IQ;
+neither detector removal nor a hardware purchase is part of this work.
+
+Pilot mixer/halfband/FIR rounding now operates directly on signed values instead
+of taking a magnitude and restoring its sign. All coefficients, rounding ties,
+saturation flags, sample values and external latency remain unchanged. Direct
+tests cover 1,209,792 integer-boundary/random cases across the three functions.
+The independent upper-edge RTL/GLRT fixture still returns epoch 1622, CFO
+42000.9399187 Hz and margin 0.877051434. This is synthetic validation, not live RF.
+
+Coarse score preparation now retains one denominator/index bank for a job
+instead of copying 133 unchanged bits through three stages. No-stall admission
+is once per four 100 MHz clocks. The real two-XFFT numerical replay matches
+all 1,341 scores and every transform intermediate; a 64-block capacity run
+produces all 28,608 ordered scores at canonical 15 MS/s with FIFO high water
+356/512. Stalls, flushing and protocol failures remain covered separately.
+
+Fresh **complete receiver** measurements, not standalone-fit claims:
+
+| Build | LUTs | FFs | Control sets at failed placement | Unplaced slices needed / available |
+|---|---:|---:|---:|---:|
+| Previous halfband RAM rings | 15300 | 21922 | 435 | 2606 / 2133 |
+| Signed pilot rounding | 14778 | 21922 | 441 | 2632 / 2201 |
+| Signed rounding, threshold 16 trial | 15271 | 21925 | 289 | 2641 / 2206 |
+| Signed rounding + single score job | 14757 | 21656 | 442 | 2616 / 2206 |
+
+Every row retains 53 BRAM tiles and 65 DSPs. Every row **fails placement**;
+none reaches routing or qualifies timing/deployment. Threshold 16 reduced
+control sets but increased LUTs and did not improve fit. Default remains 4;
+explicit 4/8/16 trials are bounded to `paired-pilot`, not other profiles.
+The command FIFO also stays in block RAM: a separate storage-only measurement
+used 27 LUTs/31 FFs/2.5 BRAM tiles versus 131 LUTs/191 FFs in distributed RAM.
+That comparison is not a CDC/timing gate and does not justify changing storage.
+
+PPU remote main now contains `b5e8f6f`, the offline `PilotSnapshot` parser and
+finite-prefix accounting checks. It preserves fault diagnostics, rejects
+malformed or inconsistent snapshots, checks expected visit/source/received-byte
+counts, and maps sample centers exactly back to the full-rate source counter.
+Its 73 new tests pass; PPU's full local suite passed 1562 tests with 11 explicit
+browser/hardware exclusions, plus lint and type checking. Four pre-existing
+PPU changes were preserved and were **not** committed or pushed. This parser
+does not open a radio, enable firmware, prove disk persistence or claim a lock.
+
+The firmware oracle/plan/contract suite passes 277 tests. The procedural CW
+capture runner `tools/starlink_pilot_capture_dwell.py` exercises the real AXI
+control, DDC and AXIS exporter with a finite supported-sample limit, comparing
+every exported sample against the integer oracle and feeding real RTL snapshot
+words through PPU. Its kernel header is explicitly synthetic: it is not an IIO,
+DMA, radio or live-GLRT test. The small runner test covers all three advertised
+source-rate geometries with canonical 15 MS/s stimulus.
+
+The full 120 ms integrated replay now passes as well:
+`reports/starlink-pilot-capture-dwell-rtl-20260908.json` records exactly 300,000
+supported outputs / 1,200,000 replay bytes, 90 unsupported startup results,
+first/last newest canonical indexes 540 / 1800534, and original-source signal
+centers 271 / 1800265. The DDC accepted 1,800,543 inputs before hardware auto-stop;
+additional driven samples were not admitted. Every output matches the oracle,
+all clip/fault counters are zero, and export FIFO high water is one. The real
+RTL snapshot passes PPU accounting. There is still no DMA, IIO or live-lock claim.
+
+The remaining fit gap requires a larger measured reduction, not another claim
+from a smaller standalone core. Next investigate sharing the wide exact-score
+arithmetic or a transform resource with demonstrated forward-plus-inverse
+throughput and appropriately frozen numerical references; simply sharing the
+existing 20 MS/s burst core cannot be assumed to sustain both transforms.
+Retain the current working design until a candidate passes exact replay,
+capacity/fault tests and fresh complete placement/timing. After fit, finish the
+real IIO reader and matched image packaging, qualify .18, then deploy .17 via
+serial-locked PPU network flashing for the paired live proof. No radio has been
+accessed, flashed or reconfigured in this checkpoint; live GLRT/FPGA lock and
+the broader hopping/rate gates are still unproved.

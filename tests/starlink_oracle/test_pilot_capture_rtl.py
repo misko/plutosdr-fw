@@ -6,15 +6,13 @@ import subprocess
 import numpy as np
 import pytest
 
-from .pilot_ddc import PilotDdcOracle
+from .pilot_ddc import PilotDdcOracle, mixer_lut
 
 LIB = Path(__file__).resolve().parents[2] / "hdl/library"
 
 
-@pytest.fixture(scope="module", params=[15, 30, 60])
-def simulator(request, tmp_path_factory):
+def compile_simulator(directory, rate_msps=15, *, watchdog_cycles=3_000_000):
     assert shutil.which("iverilog") and shutil.which("vvp"), "Icarus is required"
-    directory = tmp_path_factory.mktemp(f"pilot-capture-{request.param}")
     executable = directory / "capture.vvp"
     files = [LIB / "axi_starlink_pilot_capture/axi_starlink_pilot_capture.v",
              LIB / "axi_starlink_pilot_capture/tb/tb_starlink_pilot_capture.sv",
@@ -22,12 +20,19 @@ def simulator(request, tmp_path_factory):
     files += [LIB / "starlink_pss_acquisition" / name for name in
               ("starlink_pilot_ddc.v", "starlink_pilot_halfband2.v", "starlink_pilot_fir3.v")]
     subprocess.run(["iverilog", "-g2012", "-Wall", "-s", "tb_starlink_pilot_capture",
-                    "-P", f"tb_starlink_pilot_capture.SOURCE_RATE_MSPS={request.param}",
+                    "-P", f"tb_starlink_pilot_capture.SOURCE_RATE_MSPS={rate_msps}",
+                    "-P", f"tb_starlink_pilot_capture.WATCHDOG_CYCLES={watchdog_cycles}",
                     "-o", str(executable), *map(str, files)],
                    check=True, capture_output=True, text=True, timeout=60)
     for name in ("pilot_mixer_q16.mem", "pilot_halfband2_q17.mem", "pilot_fir3_q17.mem"):
         shutil.copyfile(LIB / "starlink_pss_acquisition" / name, directory / name)
-    return request.param, directory, executable
+    return rate_msps, directory, executable
+
+
+@pytest.fixture(scope="module", params=[15, 30, 60])
+def simulator(request, tmp_path_factory):
+    return compile_simulator(tmp_path_factory.mktemp(f"pilot-capture-{request.param}"),
+                             request.param)
 
 
 def write(address, value, *, strobe=15, skew=0):
@@ -51,13 +56,13 @@ def snapshot():
     return [write(8, 8), *(read(address) for address in range(0x30, 0x9c, 4))]
 
 
-def run(simulator, records):
+def run(simulator, records, *, timeout=60):
     _, directory, executable = simulator
     (directory / "stimulus.txt").write_text("".join(
         f"{delay} {op} {index:016x} {value:08x} {arg}\n"
         for delay, op, index, value, arg in records))
     result = subprocess.run(["vvp", str(executable)], cwd=directory, check=True,
-                            capture_output=True, text=True, timeout=60)
+                            capture_output=True, text=True, timeout=timeout)
     out, reads, final = [], [], None
     for line in result.stdout.splitlines():
         fields = line.split()
@@ -208,3 +213,23 @@ def test_periodic_dma_stalls_preserve_every_sample(simulator):
     np.testing.assert_array_equal(out, expected.samples_iq[expected.support_valid])
     regs = dict(reads)
     assert 1 < regs[0x84] < 32 and regs[0x78] == 0 and final == (0, 0)
+
+
+def cw_samples(count):
+    rotations = mixer_lut()[(12 * np.arange(count)) % 64]
+    return np.column_stack((rotations[:, 0] >> 3, (-rotations[:, 1]) >> 3)).astype(np.int16)
+
+
+def test_procedural_dwell_stimulus_and_auto_stop(simulator):
+    limit = 1000
+    count = 6 * limit + 600  # continue driving after the supported limit
+    out, reads, final = run(simulator, [write(8, 4), write(0x20, 17),
+                                       write(0x9c, limit), write(8, 1),
+                                       (1, 9, 0, count, 0), (2000, 7, 0, 0, 0),
+                                       *snapshot()])
+    expected = PilotDdcOracle("upper").process(cw_samples(count), first_index=0)
+    np.testing.assert_array_equal(out, expected.samples_iq[expected.support_valid][:limit])
+    regs = dict(reads)
+    assert u64(regs, 0x40) == u64(regs, 0x48) == limit
+    assert u64(regs, 0x30) == 540 and u64(regs, 0x38) == 540 + 6 * (limit - 1)
+    assert regs[0x78] == 0 and regs[0x70] == 0 and final == (0, 0)
