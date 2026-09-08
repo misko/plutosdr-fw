@@ -160,6 +160,8 @@ snippets for that gate. Debug sampling must include negatives as well as trigger
   and full-shell synthesis/route must demonstrate fit and timing margin with
   PSS plus the single-RX IQ DMA. Do not assume the current nearly full design
   has space, and do not count already-removed TX resources a second time.
+- [x] Implement and bit-test the largest new stage: time-shared 255-tap /3 FIR,
+  including rate/phase/fault fences. This is not the complete pilot DDC.
 
 ### S2 — Paired fixed-frequency IIO capture on .18
 
@@ -241,4 +243,22 @@ and greater than 70 dB modeled stopband rejection. The Q16 mixer uses a shared
 per canonical sample. Group delay is exactly 269 canonical samples; complete
 filter history spans 538 canonical samples. Tests cover both edges, arbitrary
 chunk splits, explicit hop resets, ties-even arithmetic, clipping accounting,
-and independent floating convolution. This is not an RTL fit or RF qualification.
+and independent floating convolution. This is not a complete RTL fit or RF
+qualification.
+
+The next checkpoint adds 26 RTL tests for the 255-tap /3 stage; the full oracle
+and scanner-plan suite now passes 133 tests. Direct integer convolution agrees
+exactly across minimum 13-clock input spacing, nominal 13/13/14 pacing, arbitrary
+initial phases, high source indexes, ring wraparound, clipping, invalid support,
+flush boundaries, and fail-closed index/phase/overspeed faults. The stage uses
+eight time-shared DSP MACs and four block-RAM tiles in the standalone synthesis
+experiment. Mixer/halfband/pacer RTL, whole-receiver fit/timing, IIO, host GLRT
+comparison, and all hardware deployments remain open. See the HDL submodule's
+`library/starlink_pss_acquisition/PILOT_DDC.md`; the standalone routed timing
+gate explicitly does not qualify the unplaced OOC boundary ports or the full
+receiver. No radio access has occurred as part of this new scanner work.
+The retained checkpoint is
+`reports/starlink-pilot-fir3-offline-20260908.json`: 1105 LUTs, 472 fabric
+registers, eight DSPs, and eight RAMB18s. Internal routed setup/hold slack is
++0.145/+0.104 ns at 100 MHz. Unplaced boundary hold failures remain reported;
+this is not a whole-design timing pass and does not authorize a deployment.

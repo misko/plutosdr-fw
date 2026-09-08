@@ -1,0 +1,53 @@
+{
+  "schema": "starlink-pilot-fir3-offline-checkpoint-v1",
+  "date_utc": "2026-09-08",
+  "scope": "partial pilot DDC; standalone arithmetic and internal timing only",
+  "hdl_commit": "1325c487de749937cfb27d415e65f7430fcbb4a9",
+  "hardware_accessed": false,
+  "deployed": false,
+  "complete_pilot_ddc_qualified": false,
+  "receiver_fit_qualified": false,
+  "iio_capture_qualified": false,
+  "host_glrt_evidence": false,
+  "fpga_pss_lock": false,
+  "tests": {
+    "command": "python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py",
+    "passed": 133,
+    "fir3_rtl_tests": 26,
+    "tools": "NumPy 2.4.6, pytest, Icarus Verilog",
+    "fixed_point_mismatches": 0
+  },
+  "standalone_experiment": {
+    "tool": "Vivado 2022.2",
+    "part": "xc7z010clg400-1",
+    "clock_period_ns": 10.0,
+    "input_beat_minimum_clocks": 13,
+    "output_latency_at_minimum_spacing_clocks": 39,
+    "slice_luts": 1105,
+    "slice_registers": 472,
+    "dsp48e1": 8,
+    "ramb18e1": 8,
+    "ramb36e1": 0,
+    "internal_register_to_register_setup_wns_ns": 0.145,
+    "internal_register_to_register_hold_whs_ns": 0.104,
+    "internal_ooc_gate": "pass",
+    "boundary_timing_qualified": false,
+    "whole_design_hold_whs_ns": -1.243,
+    "boundary_limitation": "OOC ports lack physical placement; reported boundary hold failures are retained, not qualified or hidden by timing exceptions. Full-shell timing remains mandatory.",
+    "local_artifact_directory": "hdl/library/starlink_pss_acquisition/build/pilot-fir3-ooc-v3",
+    "large_build_artifacts_pushed": false
+  },
+  "source_sha256": {
+    "starlink_pilot_fir3.v": "8846e0a81714acb47320877aafce163de2bb5a12ad7c8870278cd0639f179e1f",
+    "pilot_fir3_q17.mem": "64581ef90abaf17e5855b80f85e15480979095ff3f75b87ec35041f0d6c371c3",
+    "starlink_pss_x2_ddc_ooc.xdc": "58b531fd0acb964ab4e56ea8908ab34f210f576463741e10a695d522192a25a1"
+  },
+  "artifact_sha256": {
+    "summary.txt": "a0bfade1cc5eddc3ecd8b6243b1477a331cfc3547acbff22d53627036e9888eb",
+    "utilization.rpt": "65a06462cc76b21d5ffee59f4223cb65f194a9aa6fdfd9953ec963c8081332a5",
+    "timing.rpt": "d2779027a2eaff04ff1e299744186c1494a62e6c76edc11cd8ab9cf46fdf1962",
+    "methodology.rpt": "8e3a5d9f4d0c7f951e9e3274105ed44e61ebabcb438a09edaa8ffb4cfbbb4daf",
+    "check_timing.rpt": "f9190a9dc89ac78ce01aa4eb67a5e288b66b70af06b7f0841272f7d9ea4060c5",
+    "route_status.rpt": "0d6257579458c91d8001ed4d977dc2f8c3f155bd713480073ce8de2f383d4490"
+  }
+}

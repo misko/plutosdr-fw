@@ -17,6 +17,13 @@ The numerical passband/alias tests do not qualify RTL, RF response, or GLRT.
 Run `python -m pytest -q tests/starlink_oracle/test_pilot_ddc.py` in the same
 NumPy/pytest environment as the other oracle tests. No SciPy dependency is used.
 
+`test_pilot_fir3_rtl.py` additionally requires Icarus Verilog and compares the
+new time-shared 255-tap divide-by-three RTL stage against direct integer
+convolution. Missing Icarus is an explicit failure, not a skipped qualification.
+See the HDL submodule's `library/starlink_pss_acquisition/PILOT_DDC.md` for its
+clock/phase/fault contract and the limited standalone synthesis gate. This does
+not yet test a complete receiver-to-IIO path or host GLRT evidence.
+
 ## Provenance
 
 Sequence authority is the clean worktree
