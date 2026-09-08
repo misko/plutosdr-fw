@@ -231,6 +231,57 @@ Evidence root:
 
 `/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907`
 
+## 30 MS/s Ethernet result-transport qualification
+
+The guarded cabled runner accepts an explicit `usb` or `ethernet` receiver
+transport. Ethernet is fixed to `ip:192.168.1.17`; the PSS client still rejects
+the context unless its IIO serial is exactly `.17`. The transmitter remains
+bound to `.18` at USB topology `3-11`.
+
+After RAM boot, the first three-packet ping preceded LAN readiness. A bounded
+readiness retry then proved both ICMP and TCP port 30431 before the sole coarse
+map stream was opened. Tomorrow's live runner must retain this readiness gate:
+an early connection failure must never consume or restart the one-session map
+epoch.
+
+The complete positive/control/positive cabled qualification then passed with
+all `.17` map and fine-result data transported over Ethernet:
+
+| Role | Results | Fitted period (source samples) | Worst residual | Median normalized score | Winner lag |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Positive A | 128 | 40,000.044509 | 0.5435 sample / 18.12 ns | 0.73201 | 7..12 |
+| Minimum-gain control | 64 | not qualified | 67.5466 samples | 0.04061 | -59..59 |
+| Positive B | 128 | 40,000.045653 | 0.4942 sample / 16.47 ns | 0.72767 | 7..13 |
+
+The positive coarse peak-to-median was `12.1245` with robust-z `169.61`, versus
+muted `1.3947` and `5.24`. Both positive periods and residuals stayed within one
+30 MS/s source sample, no positive result touched an aperture edge, and every
+map, tracker, push, and validation fault gate remained zero. The mandatory
+post-context TX enforcement and independent reopen passed, and a further
+read-only `.18` reopen after the run again proved selectors `[3, 3]`, four zero
+DDS raw/scale values, `-89.75 dB` gain, and TX LO power-down.
+
+Recovery returned `.17` to persistent
+`v0.48-plutoplus-spf-iq-direct-async-v3`, AD9361 1R1T, and proved unchanged
+QSPI. The deployment receipt also passed offline replay verification.
+
+### 30 MS/s Ethernet evidence identities
+
+- USB inventory:
+  `ef05f3aa4ff7ddf4785ec22200bcccac79b9d98270d0901977face6979641906`
+- operation plan:
+  `738bc0e140c0860a80309ee96fe21a68d15cd06c757a0dde38974d217a66b9ce`
+- RAM deployment:
+  `7729587289991dd0646de5540830f5cc6a17c7b1feb64b9a1e88005b89a54ec1`
+- Ethernet cabled run:
+  `b676f2d220a859e792f1b9d19ce91371e18c0db08b4c603c11e0e724de07bcd6`
+- recovery:
+  `1e98fd7f5c497e9964e577a7d973da1845af70c2cb1f85d1032fc160264b035f`
+- Ethernet-capable guarded runner source:
+  `163571264beef0d9aefc9badc6e22e2cf7f174b78e97110e2f61f60081936750`
+- focused runner test source:
+  `031d9d2049141124884666f81534ecf221b7faa865de53368c0860d3efe88cca`
+
 ## Next gates
 
 1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and

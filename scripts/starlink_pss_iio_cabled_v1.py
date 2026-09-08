@@ -53,6 +53,7 @@ RX_SERIAL = "104000bac4950008230026001b440a003a"
 TX_SERIAL = "1040007c4a94000211000b009186843ef2"
 RX_TOPOLOGY = "5-2"
 TX_TOPOLOGY = "3-11"
+RX_ETHERNET_HOST = "192.168.1.17"
 LO_HZ = 2_400_000_000
 
 
@@ -239,6 +240,16 @@ def _independent_final_tx_mute(tx_uri: str) -> dict[str, Any]:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+def _receiver_uri(transport: str) -> str:
+    """Resolve the selected receiver transport without discovering peer radios."""
+
+    if transport == "usb":
+        return exact_usb_iio_uri(Path("/sys/bus/usb/devices") / RX_TOPOLOGY, RX_SERIAL)
+    if transport == "ethernet":
+        return f"ip:{RX_ETHERNET_HOST}"
+    raise QualificationError(f"unsupported receiver transport {transport!r}")
 
 
 def _attribute(owner: Any, name: str) -> Any:
@@ -502,7 +513,9 @@ def _restore_rx(client: PssIioClient, before: dict[str, Any]) -> dict[str, Any]:
     return restored
 
 
-def run(output: Path, *, profile: RateProfile) -> dict[str, Any]:
+def run(
+    output: Path, *, profile: RateProfile, receiver_transport: str = "usb"
+) -> dict[str, Any]:
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
     payload = load_exact_payload(
@@ -528,7 +541,12 @@ def run(output: Path, *, profile: RateProfile) -> dict[str, Any]:
             "antennas": False,
             "attenuation_db": 30,
         },
-        "receiver": {"serial": RX_SERIAL, "topology": RX_TOPOLOGY, "port": "RX1"},
+        "receiver": {
+            "serial": RX_SERIAL,
+            "topology": RX_TOPOLOGY,
+            "port": "RX1",
+            "transport": receiver_transport,
+        },
         "transmitter": {"serial": TX_SERIAL, "topology": TX_TOPOLOGY, "port": "TX1"},
         "coefficient": {
             "path": str(profile.coefficient_path),
@@ -554,9 +572,7 @@ def run(output: Path, *, profile: RateProfile) -> dict[str, Any]:
         lock_stack.enter_context(acquire_radio_lock(RX_SERIAL))
         lock_stack.enter_context(acquire_radio_lock(TX_SERIAL))
         with nullcontext():
-            rx_uri = exact_usb_iio_uri(
-                Path("/sys/bus/usb/devices") / RX_TOPOLOGY, RX_SERIAL
-            )
+            rx_uri = _receiver_uri(receiver_transport)
             tx_uri = exact_usb_iio_uri(
                 Path("/sys/bus/usb/devices") / TX_TOPOLOGY, TX_SERIAL
             )
@@ -820,10 +836,17 @@ def main() -> int:
     parser.add_argument(
         "--rate-msps", type=int, choices=tuple(RATE_PROFILES), default=60
     )
+    parser.add_argument(
+        "--receiver-transport", choices=("usb", "ethernet"), default="usb"
+    )
     parser.add_argument("output", type=Path)
     arguments = parser.parse_args()
     try:
-        receipt = run(arguments.output, profile=RATE_PROFILES[arguments.rate_msps])
+        receipt = run(
+            arguments.output,
+            profile=RATE_PROFILES[arguments.rate_msps],
+            receiver_transport=arguments.receiver_transport,
+        )
     except BaseException as error:  # noqa: BLE001 - report guarded interruption
         print(
             json.dumps(

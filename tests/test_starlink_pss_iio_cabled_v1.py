@@ -7,6 +7,7 @@ from scripts.starlink_pss_iio_cabled_v1 import (
     RATE_PROFILES,
     _analyze,
     _future_center,
+    _receiver_uri,
     _tx_state_is_safe,
 )
 
@@ -41,6 +42,17 @@ def test_future_center_honors_rate_specific_host_lead() -> None:
     assert center >= current + profile.host_lead_samples
     assert (center - anchor) % profile.period_samples == 0
     assert center - profile.period_samples < current + profile.host_lead_samples
+
+
+def test_ethernet_receiver_uri_is_fixed_and_does_not_discover_peers() -> None:
+    assert _receiver_uri("ethernet") == "ip:192.168.1.17"
+
+
+def test_receiver_uri_rejects_unknown_transport() -> None:
+    with pytest.raises(
+        runner.QualificationError, match="unsupported receiver transport"
+    ):
+        _receiver_uri("network")
 
 
 def test_fine_analysis_uses_selected_rate_period_and_aperture() -> None:
