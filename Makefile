@@ -12,6 +12,21 @@ VIVADO_SETTINGS ?= /opt/Xilinx/Vivado/$(VIVADO_VERSION)/settings64.sh
 VSUBDIRS = hdl buildroot linux u-boot-xlnx
 PSS_IIO_MODULES = linux/drivers/iio/adc/adi_starlink_pss_tracker.ko \
 	linux/drivers/iio/adc/adi_starlink_pss_map.ko
+KERNEL_DEFCONFIG = zynq_$(TARGET)_defconfig
+ROOTFS_DEFCONFIG = zynq_$(TARGET)_defconfig
+FIT_SOURCE = scripts/$(TARGET).its
+ifneq ($(strip $(STARLINK_GLRT_RATE_HZ)),)
+ifneq ($(words $(STARLINK_GLRT_RATE_HZ)),1)
+$(error STARLINK_GLRT_RATE_HZ requires exactly one source rate)
+endif
+ifeq ($(filter $(STARLINK_GLRT_RATE_HZ),2500000 5000000 10000000 25000000 60000000),)
+$(error STARLINK_GLRT_RATE_HZ must be 2500000/5000000/10000000/25000000/60000000)
+endif
+PSS_IIO_MODULES =
+KERNEL_DEFCONFIG = zynq_pluto_glrt_defconfig
+ROOTFS_DEFCONFIG = zynq_pluto_glrt_defconfig
+FIT_SOURCE = scripts/pluto-glrt.its
+endif
 
 # The string stamped into /opt/VERSIONS as `device-fw`, which is what a radio
 # reports about itself and what scripts/verify_release.sh checks.
@@ -30,7 +45,7 @@ RELEASE_VERSION ?=
 VERSION=$(if $(RELEASE_VERSION),$(RELEASE_VERSION),$(shell git describe --abbrev=4 --dirty --always --tags))
 LATEST_TAG=$(shell git describe --abbrev=0 --tags)
 UBOOT_VERSION=$(shell echo -n "PlutoSDR " && cd u-boot-xlnx && git describe --abbrev=0 --dirty --always --tags)
-HAVE_VIVADO= $(shell bash -c "source $(VIVADO_SETTINGS) > /dev/null 2>&1 && vivado -version > /dev/null 2>&1 && echo 1 || echo 0")
+HAVE_VIVADO= $(shell bash -c "source $(VIVADO_SETTINGS) > /dev/null 2>&1 && vivado -version 2>/dev/null | grep -q '^Vivado v' && echo 1 || echo 0")
 XSA_URL ?= https://github.com/pgreenland/plutosdr-fw/releases/download/${LATEST_TAG}/system_top.xsa
 
 ifeq (1, ${HAVE_VIVADO})
@@ -49,6 +64,12 @@ SUPPORTED_TARGETS:=pluto sidekiqz2
 
 # Include target specific constants
 include scripts/$(TARGET).mk
+ifneq ($(strip $(STARLINK_GLRT_RATE_HZ)),)
+ifneq ($(TARGET),pluto)
+$(error The experimental GLRT profile supports TARGET=pluto only)
+endif
+TARGET_DTS_FILES := zynq-pluto-sdr-glrt.dtb
+endif
 
 ifeq (, $(shell which dfu-suffix))
 $(warning "No dfu-utils in PATH consider doing: sudo apt-get install dfu-util")
@@ -76,7 +97,7 @@ endif
 TARGET_DTS_FILES:=$(foreach dts,$(TARGET_DTS_FILES),build/$(dts))
 
 TOOLCHAIN:
-	make -C buildroot ARCH=arm zynq_$(TARGET)_defconfig
+	make -C buildroot ARCH=arm $(ROOTFS_DEFCONFIG)
 	make -C buildroot toolchain
 
 build:
@@ -106,7 +127,7 @@ build/uboot-env.bin: build/uboot-env.txt
 ### Linux ###
 
 linux/arch/arm/boot/zImage: TOOLCHAIN
-	$(TOOLS_PATH) make -C linux ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) zynq_$(TARGET)_defconfig
+	$(TOOLS_PATH) make -C linux ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) $(KERNEL_DEFCONFIG)
 	$(TOOLS_PATH) make -C linux -j $(NCORES) ARCH=arm CROSS_COMPILE=$(CROSS_COMPILE) zImage modules UIMAGE_LOADADDR=0x8000
 
 .PHONY: linux/arch/arm/boot/zImage
@@ -131,7 +152,7 @@ build/%.dtb: linux/arch/arm/boot/dts/%.dtb | build
 buildroot/output/images/rootfs.cpio.gz: $(PSS_IIO_MODULES)
 	@echo device-fw $(VERSION)> $(CURDIR)/buildroot/board/$(TARGET)/VERSIONS
 	@$(foreach dir,$(VSUBDIRS),echo $(dir) $(shell cd $(dir) && git describe --abbrev=4 --dirty --always --tags) >> $(CURDIR)/buildroot/board/$(TARGET)/VERSIONS;)
-	make -C buildroot ARCH=arm zynq_$(TARGET)_defconfig
+	make -C buildroot ARCH=arm $(ROOTFS_DEFCONFIG)
 
 ifneq (1, ${SKIP_LEGAL})
 	make -C buildroot legal-info
@@ -146,17 +167,26 @@ endif
 build/rootfs.cpio.gz: buildroot/output/images/rootfs.cpio.gz | build
 	cp $< $@
 
-build/$(TARGET).itb: u-boot-xlnx/tools/mkimage build/zImage build/rootfs.cpio.gz $(TARGET_DTS_FILES) build/system_top.bit
-	u-boot-xlnx/tools/mkimage -f scripts/$(TARGET).its $@
+build/$(TARGET).itb: u-boot-xlnx/tools/mkimage build/zImage build/rootfs.cpio.gz $(TARGET_DTS_FILES) build/system_top.bit $(FIT_SOURCE)
+	u-boot-xlnx/tools/mkimage -f $(FIT_SOURCE) $@
 
 build/system_top.xsa:  | build
-ifeq (1, ${HAVE_VIVADO})
+ifneq ($(strip $(STARLINK_GLRT_RATE_HZ)),)
+	@test -n "$(XSA_FILE)" || { echo 'GLRT image requires XSA_FILE from an isolated build_glrt_board.sh run' >&2; exit 1; }
+	cp "$(XSA_FILE)" $@
+else ifeq (1, ${HAVE_VIVADO})
 	bash -c "source $(VIVADO_SETTINGS) && make -C hdl/projects/$(TARGET) && cp hdl/projects/$(TARGET)/$(TARGET).sdk/system_top.xsa $@"
 	unzip -l $@ | grep -q ps7_init || cp hdl/projects/$(TARGET)/$(TARGET).srcs/sources_1/bd/system/ip/system_sys_ps7_0/ps7_init* build/
 else ifneq ($(XSA_FILE),)
 	cp $(XSA_FILE) $@
 else ifneq ($(XSA_URL),)
 	wget -T 3 -t 1 -N --directory-prefix build $(XSA_URL)
+endif
+
+ifneq ($(strip $(STARLINK_GLRT_RATE_HZ)),)
+# A different rate/image must replace a previous build directory's XSA even
+# when its source file has an older modification time.
+.PHONY: build/system_top.xsa
 endif
 
 ### TODO: Build system_top.xsa from src if dl fails ...

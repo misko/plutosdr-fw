@@ -35,8 +35,9 @@ TARGET=$1
 TARGET_VERSIONS=$2
 
 MANIFEST=buildroot/output/legal-info/manifest.csv
-MANIFEST_SORT=/tmp/manifest.??
-sort ${MANIFEST} > ${MANIFEST_SORT}
+MANIFEST_SORT=$(mktemp -t pluto-legal-manifest.XXXXXXXX) || exit 1
+trap 'rm -f "$MANIFEST_SORT"' EXIT
+sort "${MANIFEST}" > "${MANIFEST_SORT}"
 
 PACKAGE=1
 VERSION=2

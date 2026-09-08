@@ -246,3 +246,64 @@ these boundaries cannot be counted as a qualified board pass. The AD9361 Rev.G
 https://www.analog.com/media/en/technical-documentation/data-sheets/AD9361.pdf
 Actual board skew, programmable interface delay and the runtime RF eye still
 need explicit qualification. No radio has been accessed by this task.
+
+## Source integrity, board and host checkpoint, 2026-09-08 23:42 UTC
+
+HDL `ecfe49ca` exposes the AD9361 frame/valid status, retains discontinuities
+that arrive without a sample, and refuses ARM or faults an active observation
+after 4095 fabric clocks without paced source data. Counter coordinates count
+valid source words; missing physical clock slots are not reconstructed.
+Thirteen continuous-source board tests pass, including frame failure, missing
+valid and stopped clock at 2.5/60 MS/s. Five ingress tests and the existing
+23-test capture regression also pass after gap retention.
+
+Full 2.5 MS/s board v3 routes at setup/hold **+0.059/+0.021 ns**, using
+11140 LUTs, 12114 FFs, 48 DSPs and 4.5 BRAM tiles. Its audit confirms zero
+PSS/native RX DMA cells, one GLRT IP and one IQ DMA. The routed design occupies
+4110 of 4400 slices; timing margin is small. The three reset-related critical
+CDC findings and inherited ADI control crossings still need documented review.
+The ADI CMOS interface intentionally relies on runtime delay/eye calibration;
+fixed input-delay exploration is not a measurement of that calibrated eye.
+Hardware eligibility remains false until the internal review and coordinated
+receive-interface qualification are complete.
+
+Full 60 MS/s v1 failed placement: 76/80 DSPs, 35/60 BRAM, and 166 more slices
+needed than available. HDL `4e428a90` bounds each FIR history by its tap window
+plus all arrivals possible during scheduled reads, halving the two largest
+buffers without changing arithmetic or coefficients. **84 DDC/pacing tests**
+and **22 burst/wrap and integrated positive/rolled-pilot tests** pass. Full
+60 MS/s v2 now passes placement and is routing; 5 and 10 MS/s builds are running.
+Evidence is in `glrt-fir-history-ddc-tests-20260908.xml` and
+`glrt-fir-history-receiver-tests-v2-20260908.xml`. The earlier receiver test run
+had a testbench substitution typo; its failed log is retained and superseded
+by v2, not counted as a pass.
+
+Linux GLR1 kernel/DTB and the dedicated Buildroot root filesystem build.
+Buildroot `5f9767e0c` selects the GLRT profile and fixes pinned host-m4 compilation
+with GCC 15 by using GNU C11. The rootfs contains GLRT verification init and
+iiod/libiio, with no PSS tool, init or modules. The exploratory rootfs still has
+an old dirty VERSIONS stamp and must be rebuilt with final component identities
+before packaging. The firmware Makefile selects the dedicated kernel/rootfs/FIT
+profile, requires an explicit board XSA, and refreshes it between rate builds.
+No FIT has been deployed or hardware opened.
+
+`tools/starlink_glrt_host.py` performs blind acquisition and scalar GLRT-64
+for every retained candidate in overlapping 20 ms windows, preserving short
+tails as insufficient when necessary. It accepts CI16, edge and explicit
+engineering gates; it has no FPGA-event input. The independent reference is
+clean Leo commit `5f25fc57cca3ea564ac42debe3561139592c82b0`, with native extension,
+source/input hashes and before/after integrity checks. Search is +/-100 kHz;
+integer timing has a 0.4 us grid. Its multi-frame coherent-ceiling score is not
+numerically identical to the FPGA's single-frame energy-normalized statistic.
+**Eight tests pass** in 4.28 s, including upper/lower pilot edges at +/-90 kHz,
+noise, tone, short support and truncated CI16. Evidence:
+`artifacts/glrt-blind-host-tests-20260908.xml`.
+
+All 48 records in the frozen 2.5 MS/s saved worker pack are being evaluated
+without prior timing/CFO seeds. This previously examined corpus is development
+data, not a fresh holdout or GLR1 transport qualification. The explicit .175
+exact/.025 margin gates remain engineering settings. Host IIO collection,
+full-rate ladder routing, numerical limitations/holdouts, actual transport
+headroom and coordinated .18/.17 hardware/live qualification remain required.
+Coordinator messaging currently fails because its local MCP transport is down;
+independent work continues and no bench window has been assumed.

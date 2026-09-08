@@ -19,25 +19,27 @@ IP_ROOT = BANK_ROOT.parent/"axi_starlink_glrt"
 def captures(tmp_path_factory):
     root = tmp_path_factory.mktemp("capture-compile")
     cache = {}
-    def get(rate):
-        if rate not in cache:
+    def get(rate, continuous=False):
+        key = rate, continuous
+        if key not in cache:
             source = (IP_ROOT/"tb/tb_starlink_glrt_capture.sv").read_text()
             for token, filename in {
                 "NATIVE_FILE": f"pilot_{rate}_upper_q7.mem", "ACQUISITION_FILE": "pilot_2500000_upper_q7.mem",
                 "FIRST_FILE": f"ddc_{rate}_q17.mem", "FINAL_FILE": "ddc_5000000_q17.mem", "TWIDDLE_FILE": "glrt_dft512_q15.mem",
             }.items():
                 source = source.replace(f'"{token}"', f'"{BANK_ROOT/filename}"')
-            bench, executable = root/f"tb_{rate}.sv", root/f"sim_{rate}"
+            bench, executable = root/f"tb_{rate}_{int(continuous)}.sv", root/f"sim_{rate}_{int(continuous)}"
             bench.write_text(source)
             top = "tb_starlink_glrt_capture"
             process = subprocess.run(["iverilog", "-g2012", "-s", top, f"-P{top}.SOURCE_RATE_HZ={rate}",
+                                      f"-P{top}.SOURCE_CONTINUOUS={int(continuous)}",
                                       "-o", str(executable), str(bench),
                                       *map(str, sorted(BANK_ROOT.glob("*.v"))),
                                       str(IP_ROOT/"axi_starlink_glrt.v"), str(IP_ROOT/"starlink_glrt_axi_lite.v")],
                                      capture_output=True, text=True)
             assert process.returncode == 0, process.stdout+process.stderr
-            cache[rate] = executable
-        return cache[rate]
+            cache[key] = executable
+        return cache[key]
     return get
 
 
@@ -224,3 +226,42 @@ def test_invalid_active_control_preserves_axis_promise(fault, captures, tmp_path
     regs = dict(reads)
     assert u64(regs, 0x90) == u64(regs, 0x98) == 16 and regs[0xc8] == 16
     assert final == (0, 1)
+
+
+def arm_continuous(limit=0):
+    return [(1, 11, 0, 3, 0), wait(2000), write(8, 4), wait(2000),
+            write(0x20, 87), write(0x30, limit), write(0x44, 2), write(8, 1)]
+
+
+@pytest.mark.parametrize('rate', RATES)
+def test_board_continuous_source_finite_prefix(rate, captures, tmp_path):
+    output, reads, final = run(captures(rate, True),
+        [*arm_continuous(limit=100), wait(20000), *snapshot()], tmp_path)
+    np.testing.assert_array_equal(output, np.tile([700, -200], (100, 1)))
+    regs = dict(reads)
+    decoded = decode_snapshot(regs, rate)
+    decoded.require_iq_prefix(expected_visit=87, expected_rate=rate,
+                              expected_samples=100, received_bytes=400)
+    assert regs[0xc8] == 0 and final == (0, 0)
+
+
+@pytest.mark.parametrize('rate', [2500000, 60000000])
+@pytest.mark.parametrize('bad', [(1, 11, 0, 1, 0), (1, 11, 0, 2, 0), (1, 13, 0, 0, 0)])
+def test_board_frame_error_missing_valid_or_stopped_clock_is_visible(rate, bad, captures, tmp_path):
+    output, reads, final = run(captures(rate, True),
+        [*arm_continuous(), wait(20000), bad, wait(6000), *snapshot()], tmp_path)
+    assert len(output) > 0
+    np.testing.assert_array_equal(output, np.tile([700, -200], (len(output), 1)))
+    regs = dict(reads)
+    assert regs[0xc8] == 2 and u64(regs, 0x90) == u64(regs, 0x98) == len(output)
+    assert u64(regs, 0x88)-u64(regs, 0x80) == (len(output)-1)*(rate//2500000)
+    assert final == (0, 1)
+
+
+@pytest.mark.parametrize('rate', [2500000, 60000000])
+def test_board_no_stale_source_arm_after_clock_stops(rate, captures, tmp_path):
+    rows = [(1, 11, 0, 3, 0), wait(2000), write(8, 4), wait(2000), write(0x20, 87),
+            (1, 13, 0, 0, 0), wait(6000), read(0x0c), write(8, 1), read(0x10)]
+    output, reads, final = run(captures(rate, True), rows, tmp_path)
+    assert not output and dict(reads)[0xc] & (1 << 11) == 0
+    assert dict(reads)[0x10] == 16 and final == (0, 0)
