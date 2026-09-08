@@ -282,6 +282,65 @@ QSPI. The deployment receipt also passed offline replay verification.
 - focused runner test source:
   `031d9d2049141124884666f81534ecf221b7faa865de53368c0860d3efe88cca`
 
+## 30 MS/s RX-only Ethernet soak
+
+The native map-soak runner exercises the live result path without opening a
+transmitter. It binds the IIO context to `.17` by exact serial, holds the radio
+lock through stream shutdown, RF restoration, and IIO context destruction, and
+uses one uninterrupted map session for the complete dwell. It hashes every
+logical map while retaining only compact first/last summaries, so evidence size
+does not grow with the raw map payload. Seventeen focused tests pass, including
+a lifecycle test proving that the lock is released only after cleanup.
+
+The 120-second Ethernet run passed at 30 MS/s:
+
+| Measurement | Result |
+| --- | ---: |
+| Elapsed time | 120.072824 s |
+| Complete maps | 1,407 (minimum 1,404) |
+| Driver chunks | 281,400, exact |
+| Logical map bytes | 56,280,000 |
+| Ethernet transport bytes | 72,038,400 |
+| Mean transport rate | 599,955.91 B/s / 4.80 Mbit/s |
+| Map generations | 1..1,407, continuous |
+| Canonical start increment | 1,280,000 samples, exact |
+| Source start increment | 2,560,000 samples, exact |
+| Fault and push-failure gates | all zero |
+
+The complete logical-map digest is
+`cf8dfcaa921754d13651b9dd32cb3fdad5a4c9b5cc5827ef26301a45860bc651`.
+The final three noise-only maps produced peak-to-median `1.3602` and robust-z
+`4.853`; this is transport-health evidence, not a PSS detection claim.
+
+Cleanup restored `.17` to 30.72 MS/s and 18 MHz bandwidth. Recovery proved
+USB departure/return, route release, persistent
+`v0.48-plutoplus-spf-iq-direct-async-v3`, AD9361 1R1T, and unchanged QSPI
+SHA-256
+`07e6163bb27837eef080a885d8b116b7524f3693f2455c86b1d56724eaa77eb7`.
+The candidate deployment receipt also passed offline replay verification. The
+run made no persistent write and never opened `.18` or any other transmitter.
+
+### 30 MS/s RX-only soak evidence identities
+
+- USB inventory:
+  `5494a3b471d74b68f5e48d5a56662880e14412a154bbbdc398849787222e995f`
+- operation plan:
+  `2d474a76a5ea50492f7fb10480949df9be905db11d089e1d976ccea57b29e331`
+- RAM deployment:
+  `a68119da35247f840802c71f7da9c12b4e7d2c59ed63b976bb31003fe24775cc`
+- 120-second Ethernet soak:
+  `faa76b13a49ff069eb99cfedef89ced6543139067483ce154b20b0ebd7d5a079`
+- recovery:
+  `8b9c826c2ddeeef847a67a624c117827eb074410272434e6dd948cc6ee80c970`
+- map-soak runner source:
+  `a51ea64953a2b57c13c93e30a5af88d397ca1d1565e0efc37d043e34bf2fe253`
+- focused soak test source:
+  `e70ae88b73d47b686d7f7d97c4f63a7bd4f7fdb075ee049303e0025b5b6fc557`
+
+Evidence root:
+
+`/home/mouse9911/pluto-state/starlink-rx-only-dnm/m6-30-native-iio-20260907/hardware-attempt4`
+
 ## Next gates
 
 1. When the LNB is available, run M4/M9 as bounded on-channel, off-channel, and
