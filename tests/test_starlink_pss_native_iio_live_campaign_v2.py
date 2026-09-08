@@ -43,6 +43,7 @@ def test_deployment_binding_rejects_old_or_unqualified_profiles(
     tmp_path: Path,
 ) -> None:
     expected = runner.EXPECTED_DEPLOYMENTS[30]
+    first_key_hash = "4" * 64
     receipt = {
         "schema_version": 2,
         "transport": "lan_ssh_frm",
@@ -77,11 +78,63 @@ def test_deployment_binding_rejects_old_or_unqualified_profiles(
             "boot_id": "11111111-1111-4111-8111-111111111111",
             "qspi_sha256": "3" * 64,
         },
-        "host_key_rotation": {"replacement_known_hosts_sha256": "4" * 64},
+        "host_key_rotation": {"replacement_known_hosts_sha256": first_key_hash},
     }
     path = tmp_path / "deployment.json"
     path.write_text(json.dumps(receipt))
     assert runner._validate_deployment(path, rate_msps=30) == receipt
+
+    known_hosts = tmp_path / "known_hosts"
+    known_hosts.write_text("replacement key\n")
+    final_key_hash = hashlib.sha256(known_hosts.read_bytes()).hexdigest()
+    reboot = {
+        "schema_version": 2,
+        "outcome": "success",
+        "error": None,
+        "dispatch_error": None,
+        "plan": {
+            "schema_version": 3,
+            "serial": runner.RX_SERIAL,
+            "ssh_host": "192.168.1.17",
+            "known_hosts_sha256": first_key_hash,
+        },
+        "before": {
+            "serial": runner.RX_SERIAL,
+            "firmware": expected["firmware"],
+            "boot_id": "11111111-1111-4111-8111-111111111111",
+            "capabilities": {
+                "phy_model": "ad9361",
+                "rx_scan_channels": [],
+                "tandem_agc": False,
+                "detector_only": True,
+            },
+        },
+        "after": {
+            "serial": runner.RX_SERIAL,
+            "firmware": expected["firmware"],
+            "boot_id": "22222222-2222-4222-8222-222222222222",
+            "capabilities": {
+                "phy_model": "ad9361",
+                "rx_scan_channels": [],
+                "tandem_agc": False,
+                "detector_only": True,
+            },
+        },
+        "host_key_rotation": {
+            "previous_known_hosts_sha256": first_key_hash,
+            "replacement_known_hosts_sha256": final_key_hash,
+        },
+    }
+    reboot_path = tmp_path / "reboot.json"
+    reboot_path.write_text(json.dumps(reboot))
+    binding = runner._deployment_binding(
+        path,
+        known_hosts,
+        rate_msps=30,
+        reboot_receipts=[reboot_path],
+    )
+    assert binding["current_boot_id"] == "22222222-2222-4222-8222-222222222222"
+    assert len(binding["reboots"]) == 1
 
     receipt["plan"]["mutation_profile_id"] = "nearby-off-slice-v1"
     path.write_text(json.dumps(receipt))
@@ -242,6 +295,8 @@ def test_corrected_campaign_uses_one_epoch_ten_map_discards_and_replays(
                 "bytes": 1,
                 "sha256": "3" * 64,
             },
+            "reboots": [],
+            "current_boot_id": "11111111-1111-4111-8111-111111111111",
         },
     )
     monkeypatch.setattr(
@@ -293,6 +348,7 @@ def test_corrected_campaign_uses_one_epoch_ten_map_discards_and_replays(
         on_if_hz=1_937_500_000,
         deployment_receipt=tmp_path / "unused-deployment.json",
         known_hosts_file=tmp_path / "unused-known-hosts",
+        reboot_receipts=[],
         firmware_source_commit="a" * 40,
         ppu_source_commit="b" * 40,
         role_duration_seconds=1.0,
@@ -340,6 +396,7 @@ def test_invalid_arguments_create_no_output(tmp_path: Path) -> None:
             on_if_hz=1_937_500_000,
             deployment_receipt=tmp_path / "none",
             known_hosts_file=tmp_path / "none",
+            reboot_receipts=[],
             firmware_source_commit="a" * 40,
             ppu_source_commit="b" * 40,
             role_duration_seconds=0.5,

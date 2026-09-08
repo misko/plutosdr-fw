@@ -180,20 +180,78 @@ def _validate_deployment(path: Path, *, rate_msps: int) -> dict[str, Any]:
 
 
 def _deployment_binding(
-    deployment_receipt: Path, known_hosts_file: Path, *, rate_msps: int
+    deployment_receipt: Path,
+    known_hosts_file: Path,
+    *,
+    rate_msps: int,
+    reboot_receipts: list[Path],
 ) -> dict[str, Any]:
     receipt = _validate_deployment(deployment_receipt, rate_msps=rate_msps)
+    expected = EXPECTED_DEPLOYMENTS[rate_msps]
     expected_key_hash = receipt["host_key_rotation"]["replacement_known_hosts_sha256"]
+    current_boot_id = receipt["read_only_return_attestation"]["boot_id"]
+    reboot_identities: list[dict[str, Any]] = []
+    for path in reboot_receipts:
+        reboot = _load(path, label="PPU detector-only reboot receipt")
+        plan = reboot.get("plan")
+        before = reboot.get("before")
+        after = reboot.get("after")
+        rotation = reboot.get("host_key_rotation")
+        before_capabilities = (
+            before.get("capabilities") if isinstance(before, dict) else None
+        )
+        after_capabilities = (
+            after.get("capabilities") if isinstance(after, dict) else None
+        )
+        if (
+            reboot.get("schema_version") != 2
+            or reboot.get("outcome") != "success"
+            or reboot.get("error") is not None
+            or reboot.get("dispatch_error") is not None
+            or not isinstance(plan, dict)
+            or plan.get("schema_version") != 3
+            or plan.get("serial") != RX_SERIAL
+            or plan.get("ssh_host") != "192.168.1.17"
+            or plan.get("known_hosts_sha256") != expected_key_hash
+            or not isinstance(before, dict)
+            or before.get("serial") != RX_SERIAL
+            or before.get("firmware") != expected["firmware"]
+            or before.get("boot_id") != current_boot_id
+            or not isinstance(before_capabilities, dict)
+            or before_capabilities.get("phy_model") != "ad9361"
+            or before_capabilities.get("rx_scan_channels") != []
+            or before_capabilities.get("tandem_agc") is not False
+            or before_capabilities.get("detector_only") is not True
+            or not isinstance(after, dict)
+            or after.get("serial") != RX_SERIAL
+            or after.get("firmware") != expected["firmware"]
+            or not isinstance(after.get("boot_id"), str)
+            or after.get("boot_id") == current_boot_id
+            or not isinstance(after_capabilities, dict)
+            or after_capabilities.get("phy_model") != "ad9361"
+            or after_capabilities.get("rx_scan_channels") != []
+            or after_capabilities.get("tandem_agc") is not False
+            or after_capabilities.get("detector_only") is not True
+            or not isinstance(rotation, dict)
+            or rotation.get("previous_known_hosts_sha256") != expected_key_hash
+            or len(str(rotation.get("replacement_known_hosts_sha256", ""))) != 64
+        ):
+            raise QualificationError(
+                "PPU reboot receipt breaks the detector-only boot chain"
+            )
+        expected_key_hash = rotation["replacement_known_hosts_sha256"]
+        current_boot_id = after["boot_id"]
+        reboot_identities.append(_identity(path))
     known_hosts = known_hosts_file.expanduser().resolve(strict=True)
     if _sha256(known_hosts) != expected_key_hash:
-        raise QualificationError(
-            "current known_hosts differs from the deployment rotation"
-        )
+        raise QualificationError("current known_hosts differs from the reboot chain")
     return {
         "receipt": _identity(deployment_receipt),
         "boot_id": receipt["read_only_return_attestation"]["boot_id"],
         "qspi_sha256": receipt["read_only_return_attestation"]["qspi_sha256"],
         "known_hosts": _identity(known_hosts),
+        "reboots": reboot_identities,
+        "current_boot_id": current_boot_id,
     }
 
 
@@ -375,6 +433,7 @@ def run(
     on_if_hz: int,
     deployment_receipt: Path,
     known_hosts_file: Path,
+    reboot_receipts: list[Path],
     firmware_source_commit: str,
     ppu_source_commit: str,
     role_duration_seconds: float = 120.0,
@@ -389,7 +448,10 @@ def run(
         ppu_source_commit, label="PPU source commit"
     )
     deployment = _deployment_binding(
-        deployment_receipt, known_hosts_file, rate_msps=profile.rate_msps
+        deployment_receipt,
+        known_hosts_file,
+        rate_msps=profile.rate_msps,
+        reboot_receipts=reboot_receipts,
     )
     output = output.resolve()
     output.mkdir(parents=True, exist_ok=False)
@@ -619,7 +681,17 @@ def replay(*, receipt_path: Path, output: Path) -> dict[str, Any]:
         or not isinstance(coefficient, dict)
         or set(coefficient) != {"path", "sha256", "generation"}
         or not isinstance(deployment, dict)
-        or set(deployment) != {"receipt", "boot_id", "qspi_sha256", "known_hosts"}
+        or set(deployment)
+        != {
+            "receipt",
+            "boot_id",
+            "qspi_sha256",
+            "known_hosts",
+            "reboots",
+            "current_boot_id",
+        }
+        or not isinstance(deployment.get("reboots"), list)
+        or not isinstance(deployment.get("current_boot_id"), str)
     ):
         raise QualificationError("corrected campaign violates its root contract")
     _validate_source_commit(
@@ -746,6 +818,13 @@ def parser() -> argparse.ArgumentParser:
     execute.add_argument("--role-duration-seconds", type=float, default=120.0)
     execute.add_argument("--deployment-receipt", type=Path, required=True)
     execute.add_argument("--known-hosts-file", type=Path, required=True)
+    execute.add_argument(
+        "--reboot-receipt",
+        type=Path,
+        action="append",
+        default=[],
+        help="ordered PPU reboot receipt; repeat for every reboot after deployment",
+    )
     execute.add_argument("--firmware-source-commit", required=True)
     execute.add_argument("--ppu-source-commit", required=True)
     execute.add_argument("output", type=Path)
@@ -767,6 +846,7 @@ def main() -> int:
                 on_if_hz=arguments.on_if_hz,
                 deployment_receipt=arguments.deployment_receipt,
                 known_hosts_file=arguments.known_hosts_file,
+                reboot_receipts=arguments.reboot_receipt,
                 firmware_source_commit=arguments.firmware_source_commit,
                 ppu_source_commit=arguments.ppu_source_commit,
                 role_duration_seconds=arguments.role_duration_seconds,
