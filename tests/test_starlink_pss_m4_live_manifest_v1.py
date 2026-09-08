@@ -25,7 +25,7 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     assert values["schema"] == "plutosdr-fw.starlink-pss-m4-live-source"
     assert values["schema_version"] == "5"
     assert values["release_state"] == (
-        "corrected-below-band-control-v5-live-repeat-ready"
+        "corrected-control-v5-observed-positive-repeat-needed"
     )
     assert values["bench_preflight_completed"] == "true"
     assert values["live_execution_approved"] == "true"
@@ -79,6 +79,13 @@ def test_m4_manifest_preserves_live_rx_only_claim_scope() -> None:
     assert values["third_persistent_live_transport_fault_free"] == "true"
     assert values["third_persistent_live_cleanup_complete"] == "true"
     assert values["old_control_invalid_as_negative"] == "true"
+    assert values["second_lan_counter_reset_reboot_completed"] == "true"
+    assert values["corrected_control_live_attempt_completed"] == "true"
+    assert values["corrected_control_live_attempt_qualified"] == "false"
+    assert values["corrected_control_passing_points"] == "0"
+    assert values["corrected_control_transport_fault_free"] == "true"
+    assert values["corrected_control_cleanup_complete"] == "true"
+    assert values["corrected_control_qspi_unchanged"] == "true"
 
 
 def test_m4_manifest_binds_every_direct_source_and_contract() -> None:

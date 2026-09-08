@@ -40,7 +40,7 @@ separate ordinary-firmware signal source connected only by attenuated coax.
 | M1: 120-second continuous map consumer | Complete | Controller tests, zero-loss hardware receipt, recovery proof |
 | M2: deterministic 15 MS/s timing | Complete | Simulation plus three exact FPGA timing signatures and verified QSPI recovery |
 | M3: cabled-RF 15 MS/s timing | Complete | Positive/muted/positive cabled receipts, final TX mute, RX recovery |
-| M4: live-LNB 15 MS/s timing | Live unqualified; corrected repeat ready | Repeated on-channel trajectory and below-band receiver-noise control |
+| M4: live-LNB 15 MS/s timing | Corrected control verified; positive repeat needed | Both positive roles plus rejected below-band receiver-noise control |
 | M5: 30-to-15 decimator/index mapping | Complete | Bit-exact oracle, routed image, cabled response, and 120-second transport evidence |
 | M6: sparse 30 MS/s refinement | Pending | Direct-oracle timing within one source sample |
 | M7: 60-to-30-to-15 cascade | Complete | Bit-exact cascade, routed image, cabled response, 64-bit telemetry, and 120-second transport evidence |
@@ -743,6 +743,41 @@ the prior rotated known-host hash, so repeated safe counter-reset reboots form
 one cryptographically checked deployment epoch. The earlier schema-v4 plan and
 receipt remain immutable and verifiable at source commit
 `7029b8deb6c57d38f4672791816c418325eb05f3`.
+
+The first schema-v5 execution used a second guarded network reboot to reset the
+accepted-score epoch. PPU changed the boot ID from
+`f3d9a11a-8089-4f8b-8677-d125d4f436ae` to
+`c4287267-ff7a-4314-8e43-d845c8c1264e`, retained the exact v7 firmware and
+AD9361 1R1T/RX-only capabilities, and rotated SSH trust without writing QSPI.
+The second reboot receipt SHA-256 is
+`fbb0a7632f002934696f635d4826320637b7b20dd2ba5bd586b4e51164d1fab1`.
+
+Attempt 5 then completed all 2,829 contiguous maps with zero health flags or
+transport faults and zero clipped or near-clipped rail samples. The below-band
+control had zero passing points, directly validating the corrected control
+behavior. On-channel A had zero passing points; on-channel B had two, at
+-100 and -200 kHz. B's best point formed one 32-of-32 track with median
+peak/background `2.5961`, robust z `21.98`, and a worst local timing residual
+of one 15 MS/s sample. Because A did not repeat the event, the frozen policy
+correctly returned `unqualified` and made no PSS claim. All settable IIO
+attributes were restored; slow-attack AGC gain remained live telemetry. The
+temporary controller was removed, both contexts closed, the boot ID and full
+QSPI hash were unchanged, and offline structure verification passed.
+
+Attempt-5 evidence, frozen against source commit
+`58785e9f855efd9e158213bea97b3fe013d7ae8d`, is:
+
+- plan SHA-256:
+  `c7d3a7c1eb859dbf8b53c2ec7d24c28cbcbcc4c8e9e10eacaacad92008074243`;
+- receipt SHA-256:
+  `920a3888341b28fad5420e8919fab4a614cca15becbaea457250bab5f3220f57`;
+- final accepted-score count: `3,623,144,412`; and
+- authoritative directory:
+  `/home/mouse9911/pluto-state/starlink-rx-only-dnm/persistent-17-20260908/live-attempt5`.
+
+This result removes the negative-control blocker but does not close M4. Another
+guarded reboot and repeated live campaign are required to obtain both positive
+roles under the unchanged decision policy.
 
 ## M5 coarse 30 MS/s acquisition evidence
 

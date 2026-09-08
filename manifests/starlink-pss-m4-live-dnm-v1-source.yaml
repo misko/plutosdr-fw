@@ -8,7 +8,7 @@
 
 schema: plutosdr-fw.starlink-pss-m4-live-source
 schema_version: 5
-release_state: corrected-below-band-control-v5-live-repeat-ready
+release_state: corrected-control-v5-observed-positive-repeat-needed
 do_not_merge: true
 do_not_release: true
 merge_target: none
@@ -47,6 +47,9 @@ lan_counter_reset_reboot_receipt_sha256: afce345cbc6867ae96def806540967c4048d942
 lan_counter_reset_post_boot_id: f3d9a11a-8089-4f8b-8677-d125d4f436ae
 ppu_network_reboot_commit: fc510b5565b1ee3801c72dffe726c11f0a09a277
 ordered_lan_reboot_chain_supported: true
+second_lan_counter_reset_reboot_completed: true
+second_lan_counter_reset_reboot_receipt_sha256: fbb0a7632f002934696f635d4826320637b7b20dd2ba5bd586b4e51164d1fab1
+second_lan_counter_reset_post_boot_id: c4287267-ff7a-4314-8e43-d845c8c1264e
 
 third_persistent_live_attempt_completed: true
 third_persistent_live_attempt_qualified: false
@@ -63,6 +66,20 @@ scanner_complete_sessions_reviewed: 18
 scanner_target_session_presence_minimum: 17
 scanner_sparse_hit_rate_minimum: 0.210
 scanner_sparse_hit_rate_maximum: 0.444
+
+corrected_control_live_attempt_completed: true
+corrected_control_live_attempt_qualified: false
+corrected_control_live_source_commit: 58785e9f855efd9e158213bea97b3fe013d7ae8d
+corrected_control_live_plan_sha256: c7d3a7c1eb859dbf8b53c2ec7d24c28cbcbcc4c8e9e10eacaacad92008074243
+corrected_control_live_receipt_sha256: 920a3888341b28fad5420e8919fab4a614cca15becbaea457250bab5f3220f57
+corrected_control_positive_a_passing_points: 0
+corrected_control_passing_points: 0
+corrected_control_positive_b_passing_points: 2
+corrected_control_total_contiguous_maps: 2829
+corrected_control_final_accepted_score_count: 3623144412
+corrected_control_transport_fault_free: true
+corrected_control_cleanup_complete: true
+corrected_control_qspi_unchanged: true
 
 cabled_production_requalification_passed: true
 cabled_fixture: .18_TX1_to_30dB_attenuator_to_.17_RX1
@@ -127,7 +144,7 @@ runner_source_sha256: bada83c438e4feb3b6d254bc5c6b0ff5c4008ea1a557a45c4952255f62
 runner_test_path: tests/test_starlink_pss_m4_live_v1.py
 runner_test_sha256: d8c2724e0684f51473f2bab5c7c450794d5a0cd763ea00a560285653e98dd974
 manifest_test_path: tests/test_starlink_pss_m4_live_manifest_v1.py
-manifest_test_sha256: a05ab49ffb8318cd45bdea61dc8a8bb66bbbf6f6f593717d234886d4ecd166d9
+manifest_test_sha256: a08f28463efdf38400e0835361f2da2044410c085488ed977744d8b9a300f2e2
 
 m3_policy_source_path: scripts/starlink_pss_m3_campaign_v1.py
 m3_policy_source_sha256: 53acd278bb119a5cf4349dde0124ae70c25bef7df3f9c0691d7b5d59c6ac4444
@@ -157,7 +174,7 @@ inherited_fpga_manifest_path: manifests/starlink-pss-multirate-rx-only-dnm-v7-so
 inherited_fpga_manifest_sha256: f56331dc57c4da465bf4e4b087acf32a535f6ce907d8507cc2f5a4be3263220e
 
 tracker_ledger_path: FPGA_tracker.md
-tracker_ledger_sha256: 3405548c2eb24c55beb3a58999dda5e831b8f0fa1d1a1cf5f0f7639de5260024
+tracker_ledger_sha256: 47ba682aae7e279dcd306056d76c9d2b1a74fd0bcaf259982236bbb8f9b379ff
 canonical_plan_path: FPGA_tracker_60MS.md
 canonical_plan_sha256: c9d4bb1848affb28c064a96c84a96d1e72d6114900c256d8543111afa7a163e1
 controller_readme_path: tools/starlink_pssctl/README.md
