@@ -85,14 +85,14 @@
   },
   "physical": {
     "build_label": "counter-retirement-v1",
-    "state_at_checkpoint": "terminal medium-spread placement fail; fresh saved-opt high-spread alternate running",
+    "state_at_checkpoint": "terminal medium placement fail; high-spread place/route pass, setup fail",
     "clock_mhz": 100,
     "fft_clock_mhz": 200,
     "source_rate_msps": 15,
     "constraints_relaxed": false,
     "coarse_fine_pilot_dma_retained": true,
-    "last_completed_route": "reports/starlink-paired-control-isolation-high-route-20260909.json",
-    "last_completed_route_source_is_prior_revision": true,
+    "last_completed_route": "reports/starlink-paired-counter-retirement-high-route-20260909.json",
+    "last_completed_route_source_is_prior_revision": false,
     "synthesis": {
       "lut": 13427,
       "ff": 19037,
@@ -113,10 +113,11 @@
     "alternate_trial": {
       "mode": "spread-high",
       "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/spread-high-v2",
-      "state": "running",
+      "state": "terminal setup fail",
       "rtl_and_constraints_changed": false,
       "hardware_qualified": false,
-      "explicit_shared_xfft_opt_in": true
+      "explicit_shared_xfft_opt_in": true,
+      "report": "reports/starlink-paired-counter-retirement-high-route-20260909.json"
     },
     "prior_alternate_attempt": {
       "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/spread-high-v1",
@@ -148,5 +149,12 @@
     "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pluto.runs/impl_1/system_top_opt.dcp": "572838ccf4cac1bcf0c27f16df73bcb289bfe642860d1acdce974f1e84f90e71",
     "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pluto.runs/synth_1/system_top_utilization_synth.rpt": "0f2a90960b080ef2c270f0f24836a27f217cac6112b91718a1b35584a2d26fe7",
     "/tmp/starlink-counter-retirement-spread-high-v1.log": "8151bca65cdc8c64d12ae987ac5d34fd1dada7415ae96488e75cd1bf3e336fdf"
+  },
+  "latest_combined_regression": {
+    "passed": 494,
+    "seconds": 73.05,
+    "ppu_main": "ffc41137f71c6156897148754c831c851b07bcf6",
+    "diagnostic_hdl_head": "718c32e0f195f94fd84cbe4d54177ae729652611",
+    "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py tests/test_starlink_pss_multirate_build_contract.py tests/test_starlink_pilot_iio_contract.py tests/test_starlink_paired_packing_policy.py tests/test_starlink_physical_trial_policy.py tests/test_starlink_realtime_probe_policy.py"
   }
 }

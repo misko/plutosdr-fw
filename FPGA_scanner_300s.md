@@ -197,6 +197,24 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 ### S2 — Paired fixed-frequency IIO capture on .18
 
 - [ ] Add the versioned single-RX IQ/metadata path and reusable PPU reader.
+- [ ] Build the concurrent finite paired recorder using independent bounded
+  pilot/map/fine contexts under one serial-attested owner. Open/flush maps
+  before pilot ARM; keep maps running while fine requests are submitted/read.
+  Preserve raw chunks before decoding/reassembly, negative observations,
+  partial/error payloads and durable manifests. Progress/origin events are
+  provisional until terminal identity, counts and health checks pass.
+- [ ] Add an explicit map stop receipt and drain protocol. For fixed frequency,
+  a stop-at-map-boundary request must finish the current tile and pending
+  publication, forbid the next tile, and acknowledge a stop ticket, terminal
+  generation and exact source-coordinate bound before coarse disable. Preserve
+  both ready banks and every real fault; absent scores must timeout, not imply
+  completion. Legacy immediate disable/flush semantics stay unchanged.
+- [ ] Keep map IRQ/readers alive until published, driver-enqueued and
+  host-reassembled terminal generations agree. Use 200-chunk/one-map refills
+  initially; a 400-chunk watermark can strand an odd final map after stop.
+  Drain finite fine request IDs/results too: disabling submissions does not
+  prove already-submitted work completed. Only then join readers and destroy
+  buffers, with fresh terminal health and restoration receipts.
 - [ ] Run deterministic digital replay through both branches; the existing
   short PSS-only injection fixture does NOT prove GLRT pilot capture.
 - [ ] Test split IIO buffers, exact sample counts, shared counter mapping,
@@ -212,6 +230,12 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   rate and analog bandwidth constant within each 300-second run.
 - [ ] Initially publish one complete 64-frame PSS map per 120 ms visit and all
   paired IQ. Explicitly discard/account for the unfinished map at the boundary.
+  A 120 ms visit is 90 canonical frames, not an integral number of 64-frame
+  maps. A versioned intentional-tail-discard receipt must name the visit/fence,
+  exact discarded start/count and last completed map. Keep intentional discard
+  distinct from genuine discontinuity, preserve concurrent faults and completed
+  tiles, and compare GLRT only on declared common coarse support while retaining
+  all 120 ms of pilot IQ. Do not subtract an assumed abort from aggregate health.
 - [ ] Tests: adjacent channels with distinguishable injected content; pulses
   immediately before/after every hop; no mixed-channel maps; no stale results;
   delayed recall; failed readback; counter discontinuity; lost events; disconnect;
@@ -264,6 +288,20 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ### Latest counter/retirement checkpoint — 2026-09-09
 
+PPU main `ffc41137f71c6156897148754c831c851b07bcf6` now exposes bounded
+immutable ARM/origin/IQ/terminal events from the finite pilot reader and an
+external cancellation token that survives startup. Queue overflow fails closed
+and preserves partial IQ/cleanup evidence; a terminal event is best-effort,
+never the sole completion authority. The new origin is published only after
+an actual refill. Review caught the driver's mandatory preenable CLEAR resetting
+snapshot generation: ARM now starts a new epoch, and only later snapshots must
+increase within it. The shared fake models that real lifecycle. Cancellation
+during final hashing also invalidates completion. Fifty-seven new tests bring
+PPU's offline suite to 1880 passed (one skip, ten deselections); 210 focused
+tests, Ruff and mypy pass. These hooks do not yet implement the paired recorder,
+disk persistence, live evidence or300s streaming. See
+`reports/starlink-pilot-iio-progress-ppu-20260909.json`.
+
 HDL `6b58ea9223402ef301be92c6c5930c9c0f0f8e4f` is committed and pushed
 only to the experimental DNM branch. The shared service advances its private
 output-position counter from the raw healthy-phase handshake; dedicated users
@@ -272,7 +310,8 @@ faults and final completion still use their original checked gates. Mailbox
 retirement additionally requires core readiness, removing malformed-input
 readiness from the retirement feedback path without delaying its adapter fault.
 
-The full firmware/oracle/contract regression passes 479 tests. Differential
+The combined firmware/oracle/contract regression now passes 494 tests, including
+the isolated realtime probe's admission guards. Differential
 adapter tests cover 30 first/middle/final faults in each identity-check mode.
 Real two-clock XFFT replay passes 82 jobs / 41984 exact words, including six
 malformed-input-under-stall cases: the adapter faults immediately while mailbox
@@ -285,11 +324,19 @@ bounds; this does not replace longer-duration qualification.
 Fresh full receiver build `counter-retirement-v1` synthesizes to 13427 LUTs,
 19037 FFs, 49 BRAM tiles and 48 DSPs. Medium-spread placement fails by thirteen
 slices (2378 available versus 2391 required, 446 control sets). A bounded
-high-spread trial of its saved opt DCP is now running, retaining the same
-100/200 MHz clocks, constraints, coarse/fine detectors and pilot DMA. No new
-routed timing verdict or deployment qualification exists yet. The completed route
-below belongs to the prior source; its independent vendor-internal failure
-means these wrapper changes alone do not establish closure. No radios accessed.
+high-spread trial of its saved opt DCP now places and routes all 33486 nets
+without route errors, retaining the same 100/200 MHz clocks, constraints,
+coarse/fine detectors and pilot DMA. Setup still fails:100MHz -0.421 ns /
+421 endpoints,200MHz -1.027 ns /303 endpoints. Hold +0.025 ns and bus-skew
+checks pass. Final resources:12943 LUTs,19070 FFs,49 BRAM tiles,44 DSPs.
+Total setup violations increased from315 to724 endpoints (TNS -133.855 ns),
+so this is NOT an overall timing win or deployment qualification. The routed
+worst200MHz input-retirement path still includes the metadata comparator;
+the intended Boolean simplification was not sufficient. Explicit transport
+readiness must separate that cone. Pilot FIFO/stop-to-DDC control and vendor
+BFP-RAM (-0.905 ns) / CE-prediction (-0.678 ns) paths remain independent gates.
+See `reports/starlink-paired-counter-retirement-high-route-20260909.json`.
+The older completed route below belongs to the prior source. No radios accessed.
 See `reports/starlink-shared-fft-counter-retirement-20260909.json`.
 
 ### Completed control-isolation checkpoint — 2026-09-09
@@ -376,6 +423,18 @@ Before considering it, prove input starvation handling, status/data ordering,
 unbackpressured output capture, exact numeric replay and full-service fences;
 then remeasure the full receiver. See
 `reports/starlink-shared-fft-realtime-feasibility-20260909.json`.
+
+A separate isolated actual-IP realtime observer now preserves seven healthy
+jobs / 3584 exact 36-bit complex words, exponents and framing, including three
+no-reset direction changes. It measures status arriving TWO 200 MHz cycles
+after the first data, so the current service's wait-for-status output
+backpressure cannot be reused. Withholding 64 ready input opportunities during
+an active frame produces 512 incorrect output words while index/TLAST/exponent
+checks still pass; the core emits 64 input-halt cycles, first observed two clocks
+after the gap. Explicit reset restores exact replay. This proves the need for
+qualified starvation quarantine and unbackpressured early-data retention, not
+a universal halt rule or integrated-service qualification. No production RTL
+or XCI changed. See `reports/starlink-shared-fft-realtime-protocol-20260909.json`.
 
 PPU main `18608952f76515c1e047dad0cf1d1690f24434a2` adds a pure, explicit
 paired15/shared-ABI1.5 source-support profile with 78 focused tests. It binds

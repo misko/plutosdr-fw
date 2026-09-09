@@ -1,0 +1,71 @@
+{
+  "schema": "starlink.pilot_iio.progress_checkpoint.v1",
+  "date_utc": "2026-09-09",
+  "scope": "Finite IIO reader progress and cancellation prerequisites, not a paired recorder, live DMA/RF qualification or300second scanner.",
+  "source": {
+    "ppu_main": "ffc41137f71c6156897148754c831c851b07bcf6",
+    "previous_main": "18608952f76515c1e047dad0cf1d1690f24434a2",
+    "owned_files": [
+      "src/pluto_plus/hardware/pilot_iio.py",
+      "tests/test_pilot_iio_client.py",
+      "tests/test_pilot_iio_progress.py",
+      "docs/pilot-iio-progress.md"
+    ]
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "dma_iio_hardware_qualified": false,
+  "fpga_pss_lock": false,
+  "live_glrt_evidence": false,
+  "features": {
+    "default_samples": 300000,
+    "max_finite_samples": 5000000,
+    "output_rate_hz": 2500000,
+    "queue_event_cap": 4096,
+    "max_iq_bytes_per_capture": 20000000,
+    "events": [
+      "verified ARM",
+      "first actual received-prefix origin",
+      "exact CI16 chunk+offset",
+      "best-effort terminal summary"
+    ],
+    "queue_full_policy": "fail capture; never wait for capacity or silently drop",
+    "cancellation": "external Event is never cleared; checks before capture I/O, each budget, after final copy/hash and before terminal decision",
+    "terminal_authority": "capture return or retained exception, not event delivery",
+    "no_progress_option_extra_snapshot_requests": 0,
+    "optional_origin_snapshot": "at most one after first refill when ARM has no delivered prefix",
+    "snapshot_generation": "ARM establishes a new post-CLEAR epoch; subsequent generation wrap/reset/staleness fails closed"
+  },
+  "review": {
+    "caught_and_fixed": "pilot_preenable resets generation to0; do not require ARM generation greater than previous pre-buffer epoch",
+    "base_fake_corrected": true,
+    "partial_bytes_faults_and_cleanup_retained": true,
+    "late_hash_cancellation_regression": true,
+    "independent_review": true
+  },
+  "verification": {
+    "new_progress_tests": 57,
+    "focused_passed": 210,
+    "root_repeat_seconds": 0.33,
+    "full_offline_passed": 1880,
+    "skipped": 1,
+    "deselected": 10,
+    "ruff": "pass",
+    "mypy_source_files": 76,
+    "mypy": "pass",
+    "unrelated_dirty_files_preserved": 4
+  },
+  "limitations": [
+    "Provisional events and cached context identity do not prove continuously authenticated boot/RF identity.",
+    "Enqueued bytes are not consumer-received or durably persisted bytes; reconcile final outcomes and disk receipts independently.",
+    "Queue count bounds caller-controlled event storage; final in-memory IQ/native buffers/copies consume additional memory.",
+    "Snapshot/raw batch error retention, concurrent paired coordinator, source-support coverage and explicit map-stop/drain contracts remain required.",
+    "Full same-source blind GLRT/FPGA timing lock, .18-before-.17 deployment, eight120ms visits over300s/>=95% duty and15/30/60MS/s remain open."
+  ],
+  "sha256": {
+    "src/pluto_plus/hardware/pilot_iio.py": "3d8c55c78802c7952a2fcc4351dca8bb5379d3280955d214058ba8bb478f0b55",
+    "tests/test_pilot_iio_progress.py": "26d4e2faae04ac391f265e9ce86ca49a9c4df3f0c55331a20932431fbcd12261",
+    "tests/test_pilot_iio_client.py": "5738a33a70ec5e844f32710993b8d0021a032ca03414668a995ed62df7b0d4b1",
+    "docs/pilot-iio-progress.md": "c2577a041e525a0da401f3ab363b64de187d7f30759a74bb92d34e59762bf114"
+  }
+}

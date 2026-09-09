@@ -1,0 +1,130 @@
+{
+  "schema": "starlink.shared_fft.realtime_protocol_observer.v1",
+  "date_utc": "2026-09-09",
+  "scope": "Standalone actual-generated realtime FFT numerical/protocol observation, not integrated service, physical timing, DMA/IIO or RF.",
+  "source": {
+    "diagnostic_commit": "718c32e0f195f94fd84cbe4d54177ae729652611",
+    "receiver_rtl_unchanged": "6b58ea9223402ef301be92c6c5930c9c0f0f8e4f",
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "runner": "hdl/library/starlink_pss_acquisition/simulate_realtime_xfft_protocol_probe.tcl",
+    "bench": "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_xfft_protocol_probe.sv",
+    "output": "hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1",
+    "vector_directory": "hdl/library/starlink_pss_acquisition/build/score-singlejob-numeric-vectors",
+    "isolated_ip_name": "starlink_pss_fft512_bfp18_rt_probe",
+    "checked_numeric_generics": 32,
+    "simulation_period_ns": 5,
+    "no_synthesis_or_implementation_run": true
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "production_service_qualified": false,
+  "universal_input_halt_fault_rule_qualified": false,
+  "results": {
+    "terminal": "pass_bounded_observer_only",
+    "healthy_jobs": 7,
+    "healthy_exact_36bit_words": 3584,
+    "healthy_word_exponent_index_tlast_and_padding_exact": true,
+    "healthy_independent_status_exponent_exact": true,
+    "no_reset_direction_changes": 3,
+    "reset_jobs_including_starvation_and_recovery": 5,
+    "reset_recovery_exact": true,
+    "status_after_first_data_cycles": 2,
+    "status_after_first_data_ns": 10,
+    "root_independent_csv_observations": [
+      {
+        "job": 0,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 0
+      },
+      {
+        "job": 1,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 0
+      },
+      {
+        "job": 2,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 0
+      },
+      {
+        "job": 3,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 0
+      },
+      {
+        "job": 4,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 0
+      },
+      {
+        "job": 5,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 0
+      },
+      {
+        "job": 6,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 64
+      },
+      {
+        "job": 7,
+        "output_words": 512,
+        "statuses": 1,
+        "status_after_first_data_cycles": 2,
+        "halt_cycles": 0
+      }
+    ],
+    "starvation": {
+      "job": 6,
+      "withheld_external_ready_input_opportunities": 64,
+      "after_input_handshakes": 128,
+      "total_input_handshakes": 448,
+      "output_words": 512,
+      "incorrect_words": 512,
+      "status_packets": 1,
+      "frame_events": 1,
+      "metadata_mismatches": 0,
+      "tlast_error_events": 0,
+      "input_halt_cycles": 64,
+      "first_missing_ready_cycle": 11668,
+      "first_halt_cycle": 11670,
+      "observed_halt_latency_cycles": 2
+    },
+    "healthy_phase_halts_observed": 0,
+    "healthy_phase_halt_limit": "Bounded observed active epochs only; not a universal reset/idle/latency guarantee."
+  },
+  "admission_tests": {
+    "passed": 15,
+    "root_seconds": 0.09,
+    "scope": "Actual Tcl admission up to mocked project API; no numerical/physical emulation."
+  },
+  "integration_requirements": [
+    "Existing wait-for-status/backpressured adapter cannot accept the first realtime data beats as written. Retain every emitted word and validate independently arriving status before whole-block publication.",
+    "Framing/index/exponent checks alone do not detect the observed starvation corruption. Define and qualify phase/event-latency-aware input starvation quarantine; preserve final completion and reset fences.",
+    "Reserve complete input/output storage, prove actual service demand and return capacity including stalls and consecutive jobs, then exact full pipeline/map replay and sustained backlog.",
+    "Repeat full-receiver fit/setup/hold/CDC/board-I/O; neither isolated numeric PASS nor standalone internal physical PASS permits deployment."
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1/scope.txt": "f3d8d2984ade15ce1502d2de2b9a81c033282ccb48f6da56e8a930bee53c5dc2",
+    "hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1/ip_properties.rpt": "6067547eb50271a604408d1a6b504e93331e3f88ea3906c996da6829b4f4c5d2",
+    "hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1/project/realtime_xfft_protocol_probe.sim/sim_1/behav/xsim/realtime_protocol_trace.csv": "ce404186baebf75130a459832a24322c0e851bcd1f889bc3186eabdcdbb59136",
+    "hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1-console.log": "ca978c954fd746bcc17b9d0b550114597aa88dd2a9fad6c133cd827b1a64015c",
+    "hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1/frozen_sources/probe_runner.tcl": "d94ac68770f3316a0d0adc970fb941066d369c678259d414c469c9d43f3430ce",
+    "hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1/frozen_sources/tb_starlink_pss_realtime_xfft_protocol_probe.sv": "aca3e6fd83cb457f9c857926701fea73043af79878e3a2828dcde3ff86458d1e",
+    "tests/test_starlink_realtime_probe_policy.py": "6d4570e507f2911598f49e0f810c8d9f65310e459023f823b7cc21bd72ff02f0"
+  }
+}
