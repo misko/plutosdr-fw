@@ -323,11 +323,20 @@ passes the production 20000-bin by 64-frame geometry: 1280000 accepted scores,
 the input continues through host-like reads/releases. It remains default-off
 and is not yet connected to native stop controls.
 
-The fresh full receiver build in `shared-realtime-publication-cut-v1` has passed
-synthesis and placement and is routing at the unchanged 100/200 MHz clocks.
-It does not enable the new map fence. Later controller work is not part of this
-frozen netlist. No radio has been accessed or flashed. See
+The full receiver build in `shared-realtime-publication-cut-v1` passed synthesis,
+placement and routing, but failed timing: 200 MHz setup WNS -3.186 ns with 646
+failing endpoints, plus seven reset-recovery failures at -0.501 ns. The 100 MHz
+setup WNS is +0.055 ns and hold WNS +0.015 ns. The worst setup path reaches
+output-bank metadata CE; independent vendor, validity and publication paths
+also fail. It does not enable the new map fence. Later controller work is not
+part of this frozen netlist. No radio has been accessed or flashed. See
 `reports/starlink-realtime-publication-cut-20260909.json`.
+
+One exact-net FFT direction-register replication attempt on that immutable
+final checkpoint was rejected by Vivado 2022.2: the selected force-replication
+option is not supported post-route. No rerouting or alternate mutation was
+attempted; the original checkpoint is unchanged. This is a retained negative
+experiment, not a timing fix. See `docs/starlink-xfft-direction-replication-trial.md`.
 
 ### Pure stop-receipt support in PPU — 2026-09-09
 

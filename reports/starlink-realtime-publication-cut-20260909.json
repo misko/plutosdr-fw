@@ -1,7 +1,7 @@
 {
   "schema": "starlink.paired_receiver.publication_cut_and_map_stop_core.v1",
   "date_utc": "2026-09-09",
-  "status": "BEHAVIORAL_AND_CORE_STOP_TESTS_PASS_FRESH_RECEIVER_IMPLEMENTATION_RUNNING",
+  "status": "BEHAVIORAL_AND_CORE_STOP_TESTS_PASS_FRESH_RECEIVER_TIMING_FAIL",
   "source": {
     "hdl_commit": "0463f887d592452c940d3c70589becc330d70a0c",
     "hdl_remote_verified": true,
@@ -200,7 +200,7 @@
     "log": "/tmp/starlink-realtime-publication-cut-acquisition-package-v1.log"
   },
   "fresh_build": {
-    "status": "RUNNING",
+    "status": "TERMINAL_TIMING_FAIL",
     "root_session": 99492,
     "base": "hdl/projects/pluto/shared-realtime-publication-cut-v1",
     "clean_hdl_at_launch": true,
@@ -213,7 +213,94 @@
     "fft_clock_mhz": 200,
     "ooc_synthesis": false,
     "reused_checkpoint": false,
-    "constraints_relaxed": false
+    "constraints_relaxed": false,
+    "terminal": true,
+    "exit_code": 1,
+    "authoritative_exit_source": "Root consumed exec session 99492.",
+    "completed_utc": "2026-09-09 08:41:21 UTC",
+    "synthesis": {
+      "status": "PASS",
+      "lut": 13294,
+      "ff": 18951,
+      "bram_tiles": 49,
+      "dsp": 48
+    },
+    "init_gate": {
+      "status": "PASS",
+      "report": "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/shared_xfft_init_gate.txt",
+      "clocks_and_crossing_bounds_unchanged": true,
+      "pilot_and_both_pss_stages_present": true
+    },
+    "placement": {
+      "status": "PASS",
+      "completed_utc": "2026-09-09 08:31:36 UTC",
+      "lut": 12808,
+      "ff": 18953,
+      "bram_tiles": 49,
+      "dsp": 44,
+      "control_sets": 444,
+      "used_slices": 4400
+    },
+    "final_resources": {
+      "lut": 12829,
+      "ff": 18956,
+      "bram_tiles": 49,
+      "dsp": 44,
+      "control_sets": 458,
+      "used_slices": 4400,
+      "available_slices": 4400
+    },
+    "final_timing": {
+      "report": "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/system_top_timing_summary_postroute_physopted.rpt",
+      "global_wns_ns": -3.186,
+      "global_tns_ns": -734.13,
+      "global_failing_endpoints": 653,
+      "fast_setup_wns_ns": -3.186,
+      "fast_setup_tns_ns": -730.623,
+      "fast_setup_failing_endpoints": 646,
+      "slow_setup_wns_ns": 0.055,
+      "slow_setup_failing_endpoints": 0,
+      "rx_setup_wns_ns": 2.407,
+      "rx_setup_failing_endpoints": 0,
+      "fast_async_recovery_wns_ns": -0.501,
+      "fast_async_recovery_tns_ns": -3.507,
+      "fast_async_recovery_failing_endpoints": 7,
+      "hold_wns_ns": 0.015,
+      "hold_failing_endpoints": 0,
+      "pulse_width_wns_ns": 0.264,
+      "pulse_width_failing_endpoints": 0,
+      "worst_setup": {
+        "source": "input_mailbox/read_output_position_reg[5]/C",
+        "destination": "output_mailbox/metadata_in_hold_reg[10]/CE",
+        "report_line": 1501,
+        "requirement_ns": 5,
+        "logic_levels": 9,
+        "data_delay_ns": 7.781,
+        "route_delay_ns": 6.01
+      },
+      "worst_recovery": {
+        "source": "slow_reset_fast_sync_reg[1]/C",
+        "destination": "input_guard/expected_position_reg[0]/CLR",
+        "report_line": 5969,
+        "requirement_ns": 5,
+        "logic_levels": 1,
+        "data_delay_ns": 4.829,
+        "route_delay_ns": 4.249
+      },
+      "interpretation": "Placement and complete routing succeeded; setup and recovery requirements failed. Private-register dependency removal is not timing closure; FFT-internal and immediate-publication/validity paths independently remain failing."
+    },
+    "final_route": {
+      "routable_nets": 33309,
+      "fully_routed_nets": 33309,
+      "routing_errors": 0
+    },
+    "final_checkpoint": "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/system_top_postroute_physopt.dcp",
+    "bitstream": "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/system_top.bit",
+    "hardware_export": "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.sdk/system_top_bad_timing.xsa",
+    "deployment_qualified": false,
+    "worktree_changes_after_frozen_synthesis": "Subsequent PSMA stop integration and separate diagnostic work do not alter the saved 0463 netlist. Audited runtime source was extracted from immutable git 0463, not the later worktree.",
+    "original_vivado_log": "hdl/projects/pluto/shared-realtime-publication-cut-v1/vivado_4080649.backup.log",
+    "original_vivado_journal": "hdl/projects/pluto/shared-realtime-publication-cut-v1/vivado_4080649.backup.jou"
   },
   "structural_audit": {
     "scope": "Read-only combinational fan-in, not path sensitization or timing closure. Source/checkpoint association is caller-attested build provenance.",
@@ -260,9 +347,132 @@
     "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_phase_map_stop.sv": "ab52d24a9b35c3c76600e37571282353867a26e5f09598add8ae7f18362c8530",
     "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_phase_map_stop_production.sv": "966f8520ffd45d2042dfa4f9496d7ea960cb8d2e9f7ac558e03710667bcdb04e",
     "tests/starlink_oracle/test_map_boundary_stop.py": "2311013de3da5c3bf519306b5629832bbf0e002a3c41d8d094abd7be1a5719ad",
-    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_final_veto_equivalence.sv": "e32da77a32f8b08825c1340d17ddb5ae3127026b42e71b36b94ef38121a1d1bf",
+    "hdl/library/starlink_pss_acquisition/build/publication-cut-0463-test-source/tb_starlink_pss_realtime_final_veto_equivalence.sv": "e32da77a32f8b08825c1340d17ddb5ae3127026b42e71b36b94ef38121a1d1bf",
     "tests/starlink_oracle/test_realtime_final_veto_equivalence.py": "7e30a45eb64dbe9e25ba8fbeeb43dc2aa034d8682f59aad2e196db7ba0f036ad",
     "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_private_return_payload.sv": "7d4571da352cb43046e4f8678691316caa6c2338b51440974941a5345bb4ec64",
-    "tests/starlink_oracle/test_realtime_private_return_payload.py": "0a3ed0cf96d67cc99ac89c04f1e425971263ce836631db91edfe817d6550345b"
+    "tests/starlink_oracle/test_realtime_private_return_payload.py": "0a3ed0cf96d67cc99ac89c04f1e425971263ce836631db91edfe817d6550345b",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/audit_source.tcl": "887a33261f30a679232caa1e87a51b5dc334103bd5a295920581f5696647f3a4",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/cdc.rpt": "6a6ad6bd971b27bce2d815b22fc171afd00201e23dd83a37dde60a3616a5fd61",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/check_timing.rpt": "1cab9fd152abf5c29ddb3689df0c0bf1a39fd0cec1fb638f81d1c0f39371f054",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/clocks.rpt": "a4f0f99aee25419f768086e430465460e871231f6d2c3dfe36e71f5ac4591675",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/exceptions.rpt": "2ccc26db11f30a978700cee37749845315a318ef98d47dac6bc296a8aaa0973a",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/ignored_exceptions.rpt": "3322f47f7b0c162c4d30168594a0a81665fc7c09de438a670c4131301b11ba70",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/output_mailbox_fault.rpt": "8a91118836762672e36bec63e0175c70c82a2d5e744aabf78ce42a674f0a2fd0",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/output_mailbox_payload_control.rpt": "c1b603c287e4447b99be9d5caf63d4cdd70aa9e35341cc07027fbd4735ad6a01",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/output_publication.rpt": "8fcdb8ca5437d96d59c851138ccfa8c1d067a55a58c6ce897ba725e443538172",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/return_slot.rpt": "e0c0e95ec3cf858b3a64aedcba48530040aeade4d6a9e69b8d97674312feb8a5",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/route_status.rpt": "1de1795be952bb98d69bdb3b325601568eb11016c5710b1c880071c7e7b8222c",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/starlink_pss_block_mailbox.v": "924eea7bfd66fd22ea37a6cb4babf14627aae8978efd09872fdda4b6cd119fe8",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/starlink_pss_realtime_input_guard.v": "7f46eb92ae6fbe5142625216652b7c9f14b4d7f5e8eead6b244720842cf29d5c",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/starlink_pss_realtime_result_guard.v": "88f1de9946a8291701f2c6e0ad331dfa0b4063367ef78a20720230d51e3e780b",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/starlink_pss_shared_realtime_xfft_service.v": "e07e601073edcb2bf92235883fc922091e73034769e270610333f7917923f3a3",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/sticky_fault_crossing.rpt": "a71bf37442c156dbe0144a03cc18b2d527789b685f7fe0ab6e9aa824b4be4c6a",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/sticky_fault_second_stage.rpt": "6a20f9b2f92e0a29b72f3849f694655051b91019ef692a2f2b5af414a7fc6cc2",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/summary.txt": "732981474aee18b8d162d33ffd3e3c7b86e67bf42036f5155456412a60269895",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/utilization.rpt": "6c1683779f7402a01ac0ca2e57c11693d3d29cf0f657f4d23f6328fef5aea114",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/vendor_internal.rpt": "f2952b9090b824e6b3458aeb6589c81625e53ada7436650c47d35a7db5c967d5",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v2-console.log": "14e20d7774d92b33747564e58ea8159c355c9435980e65e94bbbaea65a26c9fa",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v2-vivado.log": "527f5981217a89dd1fe665916125af72d2980ea98b97ea04f207610c82292389",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v2-vivado.jou": "735762ec12b110515577a4716af0f4d8ae0457ab882eda0bce7efe7e76df3c2b",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1-console.log": "263d53e97bb661b8cf603a60664493c21be4b5a7204264334d8e4700be104438",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/vivado_4080649.backup.log": "4fe1ae5e09831e78db18ac55daa717175cdcdb227c55f6098b9c3293108f800a",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/vivado_4080649.backup.jou": "4cc38523e4784f63da4d7f29f5c774c1bfc410d6912b264feef71cd92b398387",
+    "hdl/projects/pluto/audit_shared_realtime_routed.tcl": "887a33261f30a679232caa1e87a51b5dc334103bd5a295920581f5696647f3a4",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/synth_1/system_top_utilization_synth.rpt": "6a2e98d34a765e2cad1d1f9ed75c8f885c8bf6c29b733211d385bb828b1d5407",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/system_top_utilization_placed.rpt": "d220e7ec360ebb330620f824e59bb9aa376511d3a51f0b67908c5d1081dc9a51",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/system_top_timing_summary_postroute_physopted.rpt": "397bf9baed86c4189e431e1b119ff68cda19106f80c735fc7d86bfe9895da846",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/system_top_postroute_physopt.dcp": "bc9060040b8577c780b4df1b8ecf482986a744563c510e1bd13150c1b01e7e3a",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/system_top.bit": "61e48c96a79d335828465e6ef5ac45173da40659aef086672a9bf541c035a615",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.sdk/system_top_bad_timing.xsa": "424edcfbdef5c8ca44e7d5427a19748ae69f9d9f6459d1483d6b23723ab24102",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/console.log": "e6714a476b3ff3ce9bc84c4c1b8ab34bacc85e9fc60100f930da6cdf800f4d76",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/shared_xfft_init_gate.txt": "9ef553b17d9936e76ab9a9aa731e0ed5db6ea4fee1ee1f33e7ed81328e5d6f82",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/impl_1/runme.log": "10f912dcd3bdc29b97791d1c0ad9a533ee8e2140bae8da592a883c74c77b175b"
+  },
+  "routed_audit": {
+    "status": "COMPLETED_READ_ONLY_MEASUREMENTS_NOT_TIMING_PASS",
+    "exit_code": 0,
+    "session": 37452,
+    "completed_utc": "2026-09-09 08:44:50 UTC",
+    "base": "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1",
+    "summary": "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1/summary.txt",
+    "console": "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v2-console.log",
+    "script": "hdl/projects/pluto/audit_shared_realtime_routed.tcl",
+    "source_revision": "0463f887d592452c940d3c70589becc330d70a0c",
+    "source_association": "Caller-attested immutable build provenance; not derived from checkpoint.",
+    "checkpoint_hash_verified_before_and_after": true,
+    "hardware_qualified": false,
+    "named_paths": {
+      "vendor_internal": {
+        "sources": 3319,
+        "destinations": 3319,
+        "paths": 10,
+        "wns_ns": -2.305,
+        "requirement_ns": 5,
+        "worst": "shared_xfft output switch real sel1[0] to imaginary output switch mux register D"
+      },
+      "return_slot": {
+        "destinations": 52,
+        "paths": 10,
+        "wns_ns": -2.596,
+        "requirement_ns": 5,
+        "worst": "input mailbox read position to result guard return_valid D",
+        "private_payload_ce_worst_ns": -0.474
+      },
+      "output_publication": {
+        "destinations": 1,
+        "paths": 2,
+        "wns_ns": -2.032,
+        "requirement_ns": 5
+      },
+      "output_mailbox_fault": {
+        "destinations": 1,
+        "paths": 2,
+        "wns_ns": -2.051,
+        "requirement_ns": 5
+      },
+      "output_mailbox_payload_control": {
+        "destinations": 8,
+        "paths": 6,
+        "wns_ns": -2.525,
+        "worst_requirement_ns": 5,
+        "worst": "output mailbox payload_memory ENBWREN",
+        "scope": "RAM WE/EN pins; includes a separately timed 100 MHz read-enable path."
+      },
+      "sticky_fault_crossing": {
+        "sources": 1,
+        "destinations": 1,
+        "paths": 1,
+        "wns_ns": 1.832,
+        "requirement_ns": 5
+      },
+      "sticky_fault_second_stage": {
+        "sources": 1,
+        "destinations": 1,
+        "paths": 1,
+        "wns_ns": 3.675,
+        "requirement_ns": 5
+      }
+    },
+    "cdc": {
+      "classification_counts": {
+        "CDC-3": 31,
+        "CDC-6": 9,
+        "CDC-9": 7,
+        "CDC-15": 360,
+        "CDC-17": 7
+      },
+      "blanket_cdc_pass": false,
+      "note": "Bundled-data warning classifications retained; source/destination clocks, ASYNC_REG and explicit 5 ns sticky-fault bounds checked without modifying constraints.",
+      "no_input_delay_ports": 13,
+      "no_output_delay_ports": 2
+    },
+    "admission_retry": {
+      "first_session": 96293,
+      "first_exit_code": 1,
+      "first_console": "hdl/projects/pluto/shared-realtime-publication-cut-v1/routed-audit-v1-console.log",
+      "cause": "Tool -log/-journal options after -tclargs became excess script arguments; script rejected argc before output creation or checkpoint open.",
+      "retry": "Tool options moved before -tclargs; unchanged script and checkpoint, fresh artifact directory. No physical rebuild.",
+      "log_rotation": "The rejected invocation used Vivado default log names; Vivado preserved original completed build log/journal as vivado_4080649.backup.log/.jou. These original backups and both audit attempts are retained; no original evidence was deleted."
+    }
   }
 }
