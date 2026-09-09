@@ -390,8 +390,16 @@ the unchanged gate passes after the explicit final-handshake expansion.
 
 Fresh full receiver `hdl/projects/pluto/shared-realtime-phase-input-v1` launched
 at 21:15 UTC with both PSS stages, pilot DMA and boundary stop retained, global
-synthesis, unchanged constraints and no reference checkpoint. Physical result
-is pending. No radio or PPU operation occurred. Detailed evidence and hashes:
+synthesis, unchanged constraints and no reference checkpoint. It finished at
+21:29:59 UTC with exit 1: **timing failed**, WNS -0.956 ns, TNS -43.261 ns,
+223 setup failures and zero hold/reset-recovery failures. Final-checkpoint
+resources are 13094 LUT, 18503 FF, all 4400 slices, 53.5 BRAM tiles and 54 DSP.
+All 33990 routable nets routed. The 200 MHz worst path is now the input checker's
+ordinal comparator feeding its own position-counter enable. The 100 MHz domain
+has 72 remaining failures, WNS -0.124 ns; RX and reported inter-clock paths pass.
+The final audit completed at 21:31:25 UTC: vendor FFT -0.365 ns, publication
+-0.114 ns and output-mailbox fault -0.708 ns. Board-I/O/CDC obligations remain.
+No radio or PPU operation occurred. Detailed evidence and hashes:
 `reports/starlink-phase-input-contract-20260909.json`.
 
 ### Atomic map-counter summary — 2026-09-09

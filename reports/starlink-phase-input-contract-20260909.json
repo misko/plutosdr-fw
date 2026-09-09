@@ -89,13 +89,43 @@
     "phase-input-synth-v1 stopped on a Tcl filter quoting error; script corrected without changing RTL.",
     "phase-input-synth-v2 actually failed the structural acceptance gate: job_ready was cut but active_private still depended on all three raw inputs. The nonfinal/final reconvergence was then removed by explicitly expanding the same final handshake. The original gate was retained and all four endpoints passed v3."
   ],
-  "full_receiver": {"status": "launched", "directory": "hdl/projects/pluto/shared-realtime-phase-input-v1", "launch_utc_minute": "2026-09-09T21:15Z", "source_revision": "ccdf64365e8145113115f2e933ee8b2901f6d3e0", "configuration": "15MS/s paired-pilot, shared realtime XFFT, boundary stop, DSP fine tracker, pilot DMA, global synthesis, unchanged constraints, no reference DCP", "deployment_eligible": false},
+  "full_receiver": {
+    "status": "terminal_timing_failed", "exit_code": 1,
+    "directory": "hdl/projects/pluto/shared-realtime-phase-input-v1",
+    "launch_utc_minute": "2026-09-09T21:15Z", "finished_utc": "2026-09-09T21:29:59Z",
+    "source_revision": "ccdf64365e8145113115f2e933ee8b2901f6d3e0",
+    "configuration": "15MS/s paired-pilot, shared realtime XFFT, boundary stop, DSP fine tracker, pilot DMA, global synthesis, unchanged constraints, no reference DCP",
+    "deployment_eligible": false,
+    "WNS_ns": -0.956, "TNS_ns": -43.261, "setup_failing_endpoints": 223,
+    "WHS_ns": 0.024, "hold_failing_endpoints": 0,
+    "intra_clock": {"100MHz": {"WNS_ns": -0.124, "TNS_ns": -3.578, "setup_failing_endpoints": 72}, "200MHz": {"WNS_ns": -0.956, "TNS_ns": -39.682, "setup_failing_endpoints": 151}, "RX": {"WNS_ns": 2.349, "setup_failing_endpoints": 0}},
+    "inter_clock_setup_failures": 0, "reset_recovery_failures": 0,
+    "final_checkpoint_resources": {"LUT": 13094, "FF": 18503, "slices": 4400, "available_slices": 4400, "BRAM_tiles": 53.5, "DSP": 54},
+    "routable_nets": 33990, "routing_errors": 0,
+    "worst_path": "input_guard/expected_position_reg[1]/C -> input_guard/expected_position_reg[0]/CE",
+    "checkpoint_sha256": "dea018c140f427d22f81ea36179e152114ef38ba6312aaa3da3702416d862e27",
+    "postroute_physopt_timing_report_sha256": "453c02680e8187f2cb2092f4d99a9e8d1765ff85b0b02a94258288cd9725af3f",
+    "console_sha256": "452418d68e15e21e7486c01e93f8128d3e623d1ccb8f8dafd6cff9157b5d729c",
+    "init_gate_sha256": "eb8d39270b020180b8763b30be4177c7cf7f3aed96a768a4f7da6b8642dca574",
+    "artifact_warning": "Emitted bitstream and bad_timing XSA are not deployment-qualified."
+  },
+  "final_checkpoint_audit": {
+    "directory": "hdl/projects/pluto/shared-realtime-phase-input-v1/final-audit-v1",
+    "exit_code": 0, "finished_utc": "2026-09-09T21:31:25Z",
+    "category_worst_slack_ns": {"vendor_internal": -0.365, "return_slot": -0.273, "output_publication": -0.114, "output_mailbox_fault": -0.708, "output_payload_control": 0.194, "sticky_fault_crossing": 3.276, "sticky_fault_second_stage": 3.846},
+    "summary_sha256": "d3ab801b3890c3b2084e3f8c3929d7e8e305a4d0def5ac17c654490f09cb8d30",
+    "cdc_sha256": "f0efcd37ccc68092c76f8e78dfb14326f1eadb82ef233fb391f674ddf28fc42b",
+    "check_timing_sha256": "e1c372880c6774ec0bbc8dd7281939bb046fff7ed2cf8dd4fd8e1c413dcacd6f",
+    "missing_input_delays": 13, "missing_output_delays": 2,
+    "CDC_warnings": {"CDC-6": 9, "CDC-15": 199, "CDC-17": 7},
+    "limit": "Read-only exact-checkpoint audit; board-I/O and CDC obligations remain open."
+  },
   "preceding_receiver": "af96c48e failed full timing: WNS -2.183 ns, 335 failing endpoints, zero hold failures. Vendor-internal FFT, publication/fault paths, reset recovery and board-I/O/CDC obligations remain; see starlink-map-counter-summary-20260909.json.",
   "radio_accessed": false,
   "ppu_changed": false,
   "deployed": false,
   "next": [
-    "Observe the specific fresh complete receiver build to its terminal result. Do not restart because observation is slow.",
+    "Retain this failed timing result and qualify the input-checker ordinal-feedback path; separately tested final-only authorization is the next publication-path change.",
     "Audit the exact final checkpoint; structural fan-in improvement alone cannot authorize deployment.",
     "After physical qualification: exact-serial .18 finite/persistent IIO and causal coarse/fine integration, then PPU Ethernet .17 fixed-frequency paired live verification; eight-target 120ms/300s scanning and 30/60MS/s remain later gates."
   ]
