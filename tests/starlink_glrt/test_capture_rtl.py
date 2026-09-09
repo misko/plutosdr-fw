@@ -73,22 +73,24 @@ def extension_snapshot():
 
 
 @pytest.mark.parametrize("count", [350, 1100, 1500, 2300])
-def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(count, captures, tmp_path):
+@pytest.mark.parametrize("rate", [2500000, 60000000])
+def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(count, rate, captures, tmp_path):
     # The cutoffs span acquisition, partial native collection, staged/scoring
     # work and a completed result. No candidate epoch is fed into the fabric.
-    raw, _, _ = observation(2500000, "positive")
+    count *= rate//2500000
+    raw, _, _ = observation(rate, "positive")
     preparing = arm(visit=490)
     rows = [*preparing[:-1], *snapshot(), *extension_snapshot(), preparing[-1],
             *samples(raw[:count]), write(8, 2), wait(100000),
             (1, 10, 0, 0, 0), *snapshot(), *extension_snapshot()]
-    output, reads, final = run(captures(2500000), rows, tmp_path)
+    output, reads, final = run(captures(rate), rows, tmp_path)
     regs = dict(reads)
     baseline_regs = dict(reads[:84])
     assert all(baseline_regs[address] == 0 for address in range(0x300, 0x340, 4))
     event_words = [value for address, value in reads if 0x200 <= address < 0x240]
     assert len(event_words) % 16 == 0
     import json
-    evidence = {"rate": 2500000, "visit": 490,
+    evidence = {"rate": rate, "visit": 490,
         "source_samples": count, "iq_samples": len(output), "baseline_registers": baseline_regs,
         "final_registers": regs, "event_words": [event_words[index:index+16] for index in range(0, len(event_words), 16)]}
     (tmp_path / "closure-evidence.json").write_text(json.dumps(evidence, indent=2)+"\n")
