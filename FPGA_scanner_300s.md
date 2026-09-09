@@ -363,6 +363,31 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Private input-cursor retirement — 2026-09-09
+
+HDL `f96d0b0d89ee8a8d55a5107b464ebe1b957e789d` removes the metadata and
+ordinal validation chain from the private input counter's enable. All public
+delivery/certification checks still use the original pre-edge ordinal. A bad
+beat may advance the private cursor only on its quarantine edge; no later
+delivery or certificate can occur before the unchanged reset. The counter
+saturates at 511. No public ABI, arithmetic, coefficients or constraints change.
+
+All 11 targeted tests pass, including baseline/candidate synthesized checkers
+with identity checking disabled/enabled. The actual FFT service now shadows
+both input and result checkers against immutable references on real service
+pins: 284647 public result comparisons and 13312 exact words pass. Isolated
+synthesis removes 10/80 metadata/framing inputs from all nine cursor D/CE
+fan-ins, with LUT counts 34 -> 33 / 59 -> 59. This is not timing proof.
+
+The combined regression passes **877 tests**, with two previous-source netlist
+cases intentionally skipped. Current guard and all four cursor netlists pass.
+Numeric replay preserves 1341 scores and reset recovery; paired replay preserves
+894 scores, 447 map words and 2048 pilot bytes including a retained late fault.
+The finite burst/stall case delivers 28608 scores at FIFO high-water 358.
+Acquisition IP packaging passed. A fresh full-receiver route is the next gate;
+no radio or PPU operation occurred. Evidence:
+`reports/starlink-input-cursor-20260909.json`.
+
 ### Explicit final-only result authorization — 2026-09-09
 
 HDL `0a1af8933bb7d9bc4f0fa78b3350196e98045cda` exports the guard's existing

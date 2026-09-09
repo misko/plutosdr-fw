@@ -1,0 +1,76 @@
+{
+  "schema": "starlink-input-cursor-progress-v1",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "f96d0b0d89ee8a8d55a5107b464ebe1b957e789d",
+  "baseline_hdl_commit": "0a1af8933bb7d9bc4f0fa78b3350196e98045cda",
+  "scope": "Private input cursor dependency cut, combined with final-only result authorization. Functional and structural qualification does not establish receiver timing or hardware operation.",
+  "implementation": {
+    "change": "Retire the private position cursor on a presented, ready input while the slot is open, saturating at position 511, independently of checked-beat certification. A malformed or duplicate beat can advance this private cursor only on the same edge that unchanged fault logic quarantines the slot. Public checks use the original pre-edge position; no subsequent delivery or certificate is permitted before reset.",
+    "preserved": "All public checker outputs, core validity/data/last, framing/identity checks, certificates, completion, immediate faults, sticky reasons and common-reset behavior. No arithmetic, coefficients, ABI, clocks or constraints changed.",
+    "source_sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+    "baseline_source_sha256": "7f46eb92ae6fbe5142625216652b7c9f14b4d7f5e8eead6b244720842cf29d5c",
+    "result_guard_and_service_runtime_unchanged_from_baseline": true
+  },
+  "targeted_tests": {
+    "passed": 11,
+    "seconds": 21.86,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/input-cursor-contract-v2.log",
+    "sha256": "144addc6a0b8e6ee9ed9efd6c5a250ffe57cfdf2b62fe9c21647244230eca396",
+    "coverage": [
+      "Whole executable checker delta and immutable baseline source comparison.",
+      "All public checker outputs compared at both clock edges against the frozen 0a1af893 checker, identity checks disabled/enabled. Each mode requires at least 10000 comparisons and ten reachable private-cursor fault differences without internal deposits.",
+      "Existing actual input stimulus retains healthy/rejected counts: identity zero 5/22, identity one 4/26, including reset recovery.",
+      "All four actual synthesized checker netlists (baseline/candidate, identity zero/one) replay with vendor primitives and source/artifact hashes checked. Both designs use the same test-only GSR startup and observation margins; candidate-only private fault witnesses remain required.",
+      "Existing input-retirement tests remain passing."
+    ],
+    "limit": "Finite traces and source invariants, not exhaustive formal verification, placed/routed timing or RF evidence."
+  },
+  "isolated_synthesis": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/input-cursor-synth-v1",
+    "exit_code": 0,
+    "scope_sha256": "a4056306f8f7255dfd06e6a85a27103902cc36ea6bfa64a6c2c567b3c502660a",
+    "endpoint": "All nine expected_position register D and CE inputs",
+    "identity_zero": {"baseline_metadata_ports": 10, "candidate_metadata_ports": 0, "baseline_LUT": 34, "candidate_LUT": 33, "FF_each": 15, "baseline_netlist_sha256": "c47259c516e6494510c78f6ac84d7d069cf729ec9b98dc1221ce11626bca68de", "candidate_netlist_sha256": "d70c70bbb3762a57a545f533341c62887af64e2bc23cc3ca26830efad967b58e"},
+    "identity_one": {"baseline_metadata_ports": 80, "candidate_metadata_ports": 0, "baseline_LUT": 59, "candidate_LUT": 59, "FF_each": 85, "baseline_netlist_sha256": "489d603f4f567d901323891237ced828cf99b0f5d56f97ed2e6eb77116f22679", "candidate_netlist_sha256": "49998b3227d64db033b4165f0f2485a2321c6759c27566b9cfe7e30c53d60245"},
+    "DSP_or_RAM": 0,
+    "limit": "Standalone structural synthesis; not full receiver area or timing qualification."
+  },
+  "actual_FFT_service": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/input-cursor-service-v1",
+    "exit_code": 0,
+    "console_sha256": "30631d03edd21b982153cbac28afd0cf5159e633eb08de18bb129e05be2e22b6",
+    "public_result_guard_comparisons": 284647,
+    "qualified_final_rows": 67,
+    "ACK_rows": 75344,
+    "healthy_idle_rows": 156753,
+    "healthy_jobs": 26,
+    "exact_words": 13312,
+    "input_checker_shadow_on_actual_mailbox_and_core_pins": true,
+    "input_shadow_no_internal_deposits": true,
+    "fault_cases": {"starvation": 6, "final_vendor_veto": 3, "malformed_bank": 2, "independent_reset": 6, "configuration_reset": 2, "partial_input_reset": 2, "postcommit_ACK": 1, "duplicate_start_final": 1, "duplicate_start_ACK": 1},
+    "limit": "Actual generated FFT behavioral simulation, not ADC/DMA/IIO, full receiver timing or RF."
+  },
+  "numeric_pipeline": {"status": "passed", "exit_code": 0, "directory": "hdl/library/starlink_pss_raw_correlator/build/input-cursor-numeric-v1", "exact_scores": 1341, "independent_FFT_reset_quarantine_and_recovery": true, "console_sha256": "3752dfbd3098f837a2b632b82082319131d38a877f65489f6ccf03b8cf572803"},
+  "paired_actual_FFT": {"status": "passed", "exit_code": 0, "directory": "hdl/library/starlink_pss_raw_correlator/build/input-cursor-paired-v1", "exact_scores": 894, "exact_map_words": 447, "exact_pilot_bytes": 2048, "late_fault_retained": true, "console_sha256": "7547717e4c1558290b7d568e52ee441a6837d1ed386bca3de4e1663be8db5858", "limit": "Reduced 447x2 map geometry with actual digital shell/CDC/canonical/FFT/PSMA/PIL1; not ADC/DMA/IIO/fine/production-duration or RF."},
+  "capacity": {"status": "passed", "exit_code": 0, "directory": "hdl/library/starlink_pss_raw_correlator/build/input-cursor-capacity-v1", "profile": "bursty-stalled", "blocks": 64, "samples": 28673, "scores": 28608, "fifo_high_water": 358, "console_sha256": "7db42e96f848fc48a0f48b3015dba9bcb5e64b74cf7793c74bab67fb7e5ab370", "limit": "Finite nominal-15MS/s counts/order/backlog simulation; not numeric or live sustained-throughput qualification."},
+  "integrated_regression": {
+    "status": "passed", "exit_code": 0, "passed": 877, "skipped": 2, "seconds": 197.85,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/input-cursor-oracle-v1.log",
+    "sha256": "1969edf0c9d57d216be86f303109b9dfdb19ef4c8d6d257cded2ba3079b5ae98",
+    "skip_reason": "Two previous-source occupancy netlists not reused. Both current-source phase guard netlists and all four cursor netlists pass in this run.",
+    "guard_netlist_directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-guard-synth-v1",
+    "guard_netlist_reuse": "Actual guard source is unchanged from 0a1af893; source/artifact hashes are verified by the tests.",
+    "command": "STARLINK_PSS_PHASE_INPUT_NETLIST_DIR=/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-guard-synth-v1 STARLINK_PSS_INPUT_CURSOR_NETLIST_DIR=/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/input-cursor-synth-v1 /home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_realtime_constraint_gate.py tests/test_starlink_boundary_build_options.py tests/test_starlink_realtime_routed_audit_policy.py"
+  },
+  "acquisition_IP_package": {"exit_code": 0, "component_sha256": "954fd817c8eb7173e00017cac9b1ead9f9706359965efbf4978fe32511daec17", "console_sha256": "b183cecce708b5d14827d38e50349da6f46bb749279b98c71fffd02904f2c8d1"},
+  "full_receiver": {"status": "not_started", "deployment_eligible": false},
+  "preceding_full_receiver": "ccdf6436 failed at WNS -0.956ns, 223 setup failures, all 4400 slices occupied. Worst path was input-checker position feedback; 100MHz and other 200MHz failures remain separate obligations. See starlink-phase-input-contract-20260909.json.",
+  "radio_accessed": false,
+  "ppu_changed": false,
+  "deployed": false,
+  "next": [
+    "Fresh complete 15MS/s paired receiver implementation with both PSS stages, pilot DMA and boundary stop retained; original clocks/constraints and no reference checkpoint.",
+    "Inspect the exact final checkpoint and qualify all physical/board-I/O/CDC gates before accessing a radio.",
+    "Then exact-serial .18 finite/persistent IIO and causal coarse/fine scheduling, PPU Ethernet .17 fixed-frequency independent live GLRT/PSS verification, eight-target 120ms/300s scanning and the 30/60MS/s rate ladder."
+  ]
+}
