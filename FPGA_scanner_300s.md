@@ -363,6 +363,36 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Registered-quarantine occupancy cut — 2026-09-09
+
+HDL `52f921f69cbc1fd38e30db79911ef7ed761d229d` removes the complete
+current-fault tree from the private FFT return-occupancy register. Existing
+registered fault reasons mask effective active/return validity on the same
+edge; the hidden occupancy can clear later. Exact current publication vetoes,
+fault reasons, ACK ownership, payload/descriptor behavior and packet ABI remain.
+No clock, physical constraint, FFT arithmetic or coefficient changed.
+
+Actual isolated synthesis reduces the occupancy D-pin's raw validation-port
+fan-in from 41 to zero; its CE is constant high. Guard LUT primitives fall
+114 -> 110 with 180 FFs unchanged. This is not routed/full-receiver timing.
+The 51-test adversarial guard suite passes. A new public-only reachable test
+compares 256 complete jobs, 131072 words and all 254 faulted/two healthy ACK
+combinations with the immutable ff4229 golden; both actual synthesized guards
+also pass using the vendor's precompiled UNISIM models. Earlier source-model
+Icarus initialization failures and test-harness corrections remain recorded,
+not presented as receiver failures or omitted from the diagnostic trail.
+
+Actual FFT service, three-block exact numeric replay, bursty/stalled 64-block
+capacity and reduced paired digital PSMA/PIL1 shutdown tests pass. The complete
+integrated run passes 821 tests in 152.87 seconds, including actual guard
+netlists. None of these is native DMA/IIO, production-duration or live RF proof.
+The acquisition IP package was refreshed successfully. Fresh full receiver
+`hdl/projects/pluto/shared-realtime-guard-occupancy-v1` started at 20:07:51 UTC
+from the clean tracked HDL pin above, with boundary stop enabled, the DSP
+tracker retained, global synthesis and no reference checkpoint. It is running;
+no physical gate or radio promotion is claimed. See
+`reports/starlink-guard-occupancy-20260909.json`.
+
 ### Existing DSP tracker selected for shared paired image — 2026-09-09
 
 HDL `550c21172c8641472aa25797e830e4eb9eeb45e5` adds an explicit
@@ -392,7 +422,7 @@ both frozen baseline and candidate pass. No runtime failure was suppressed.
 The tracker IP package now makes its selector an explicit integer rather than
 an inferred derived boolean. Fresh full receiver
 `hdl/projects/pluto/shared-realtime-track-dsp-v1` has actual BD readback=1 and
-is running from the clean pin above. Its actual pre-placement gate passes,
+ran from the clean pin above. Its actual pre-placement gate passed,
 including the ten-DSP reducer inventory, absence of the serial subtree,
 both detector stages, pilot DMA and the original timing-path obligations.
 Physical qualification remains open. No radio or PPU was changed. See
@@ -402,8 +432,18 @@ At 19:35:38 UTC this receiver completed placement and saved its placed
 checkpoint. It uses 13132 Slice LUTs, 18501 fabric registers, all 4400 slices,
 53.5 BRAM tiles and 54 DSP48E1s, with 444 control sets. Placement has advanced
 beyond the previous three-slice failure, but post-placement estimated setup
-slack is still -2.763 ns. Implementation is continuing; this is not routed
+slack was -2.763 ns. This was a placement estimate, not routed
 timing closure and no hardware promotion is allowed from this checkpoint.
+
+The complete run finished at 19:46:00 UTC with timing failure: final WNS
+-1.386 ns, TNS -290.129 ns, 1082 failing setup endpoints and zero failing hold
+endpoints. The saved post-route checkpoint has 13226 LUTs, 18508 FFs and all
+4400 slices occupied, 34122 fully routed nets and zero routing errors. The
+read-only final audit measures vendor-internal -0.816 ns, return-slot -1.386 ns
+and output-publication -0.450 ns. Thirteen input and two output delay obligations
+and CDC-6/15/17 review remain open. An emitted bitstream is not a deployable
+image. The following guard refactor is a measured path cut, not a promise to
+resolve all these independent failures.
 
 ### Snapshot data-enable remap: replay passes, placement still fails — 2026-09-09
 

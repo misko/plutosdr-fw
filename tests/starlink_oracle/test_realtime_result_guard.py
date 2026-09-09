@@ -1,10 +1,12 @@
 """Isolated realtime result guard + real mailbox; not FFT/service qualification."""
-from pathlib import Path
+import os
 import subprocess
+from pathlib import Path
 
 import pytest
 
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_realtime_result_guard"
 
 
@@ -18,7 +20,7 @@ def test_private_result_publication_and_final_fault_fence(tmp_path, slow_half, p
         str(ACQ / "starlink_pss_block_mailbox.v"),
         str(ACQ / "tb" / f"{TOP}.sv"),
     ], check=True, capture_output=True, text=True, timeout=30)
-    result = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=30)
+    result = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=30, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "REALTIME_RESULT_GUARD_PASS healthy=23 rejected=37 independent_resets=12 " in result.stdout
     assert "private_words=511 held_slots=1 real_mailbox=1 ack_reuse=2 isolated_only=1" in result.stdout

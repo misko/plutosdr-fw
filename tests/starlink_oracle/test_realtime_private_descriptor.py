@@ -1,12 +1,14 @@
 """Speculative descriptor storage never grants admission or publication."""
 
 import hashlib
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_realtime_private_descriptor"
 GATE = "if (!active && !awaiting_ack && !protocol_fault && job_valid)"
 GOLDEN_SHA256 = "32585046dc3ef0eae35e36acb902d4d512fae44d21d0cdf6784a365f40b049af"

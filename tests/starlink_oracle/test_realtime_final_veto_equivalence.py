@@ -1,11 +1,13 @@
 """Conditional final-veto RTL algebra only; not service/timing qualification."""
-from pathlib import Path
+import os
 import re
 import subprocess
+from pathlib import Path
 
 import pytest
 
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_realtime_final_veto_equivalence"
 
 
@@ -16,10 +18,10 @@ def _run(tmp_path, *, watchdog=5, omit=-1):
         f"-P{TOP}.WATCHDOG_CYCLES={watchdog}", f"-P{TOP}.OMIT_VETO={omit}",
         "-o", str(executable), str(ACQ / "starlink_pss_realtime_result_guard.v"),
         str(ACQ / "tb" / f"{TOP}.sv"),
-    ], capture_output=True, text=True, timeout=30)
+    ], capture_output=True, text=True, timeout=30, check=False)
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
     return subprocess.run(
-        ["vvp", str(executable)], capture_output=True, text=True, timeout=60
+        ["vvp", str(executable)], capture_output=True, text=True, timeout=60, check=False
     )
 
 
@@ -31,7 +33,7 @@ def test_final_veto_equivalence_all_events_exponents_gates_and_actual_edges(tmp_
     assert not re.search(r"(?im)^\s*(fatal|error)(:|\s)", transcript)
     assert result.stdout.splitlines().count(
         f"FINAL_VETO_EQ_PASS watchdog={watchdog} rows=262656 edges=512 "
-        "mutation_witnesses=9 boundaries=10 reset=1"
+        "mutation_witnesses=9 boundaries=10 reset=1 quarantined_rows=131072"
     ) == 1
 
 

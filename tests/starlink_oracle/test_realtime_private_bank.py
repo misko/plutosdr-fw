@@ -2,13 +2,15 @@
 
 These RTL tests do not qualify actual FFT arithmetic, sustained load or timing.
 """
+import os
 import re
 import subprocess
 from pathlib import Path
 
 import pytest
 
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TB = ACQ / "tb/tb_starlink_pss_realtime_private_bank.sv"
 
 

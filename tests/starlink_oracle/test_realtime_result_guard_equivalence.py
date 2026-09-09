@@ -1,10 +1,12 @@
 """Old-vs-factored actual RTL behavior; no physical timing or FFT qualification."""
 import hashlib
-from pathlib import Path
+import os
 import re
 import subprocess
+from pathlib import Path
 
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_realtime_result_guard_equivalence"
 GOLDEN_NAME = "starlink_pss_realtime_result_guard_ff4229_golden"
 GOLDEN = ACQ / "tb" / f"{GOLDEN_NAME}.v"
@@ -29,9 +31,9 @@ def test_factored_guard_public_equivalence_and_exact_watchdog_boundaries(tmp_pat
         str(ACQ / "starlink_pss_block_mailbox.v"),
         str(ACQ / "tb/tb_starlink_pss_realtime_result_guard.sv"),
         str(ACQ / "tb" / f"{TOP}.sv"),
-    ], capture_output=True, text=True, timeout=30)
+    ], capture_output=True, text=True, timeout=30, check=False)
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
-    result = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=60)
+    result = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=60, check=False)
     assert result.returncode == 0, result.stdout + result.stderr
     assert not re.search(r"(?im)^\s*(fatal|error)(:|\s)", result.stdout + result.stderr)
     expected = (

@@ -1,11 +1,13 @@
 """Reachable private idle clearing plus immutable public golden equivalence."""
 
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_realtime_private_idle_clear"
 
 

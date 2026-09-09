@@ -1,12 +1,14 @@
 """Fault-edge private state is observable only in tests, never publication."""
 
 import hashlib
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_realtime_private_observations"
 MARKER = (
     "PRIVATE_OBSERVATIONS_PASS fault_edges=10 fields_witnessed=7 quarantine_rows=1408 "
@@ -56,7 +58,8 @@ def test_private_capture_exact_quarantine_and_reset_reuse(tmp_path):
     ("if (active && !protocol_fault) begin", "if (active && !protocol_fault && !fault_now) begin",
      "OBS_FAULT_CAPTURE_MISSING"),
     ("if (active && !protocol_fault) begin", "if (!protocol_fault) begin", "OBS_IDLE_CAPTURE"),
-    ("if (protocol_fault || fault_now) begin", "if (protocol_fault) begin", "OBS_PUBLIC_EQ"),
+    ("wire active = active_private && !protocol_fault;",
+     "wire active = active_private;", "OBS_PUBLIC_EQ"),
 ])
 def test_probe_rejects_capture_and_quarantine_regressions(tmp_path, old, new, witness):
     result = run_probe(tmp_path, (old, new))

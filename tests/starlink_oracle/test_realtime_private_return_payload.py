@@ -1,12 +1,13 @@
 """Private fault-edge captures with a real mailbox; not FPGA/FFT qualification."""
-from pathlib import Path
+import os
 import re
 import subprocess
+from pathlib import Path
 
 import pytest
 
-
-ACQ = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_realtime_private_return_payload"
 
 
@@ -25,10 +26,10 @@ def run_payload_probe(tmp_path, *, slow_half=5.0, phase=1.3, mutation=None):
         "-o", str(executable), str(runtime), str(ACQ / "starlink_pss_block_mailbox.v"),
         str(ACQ / "tb/tb_starlink_pss_realtime_result_guard.sv"),
         str(ACQ / "tb" / f"{TOP}.sv"),
-    ], capture_output=True, text=True, timeout=30)
+    ], capture_output=True, text=True, timeout=30, check=False)
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
     return subprocess.run(["vvp", str(executable)], capture_output=True,
-                          text=True, timeout=30)
+                          text=True, timeout=30, check=False)
 
 
 @pytest.mark.parametrize("slow_half,phase", [(5.0, 1.3), (3.1, 0.7), (6.7, 2.1)])
@@ -62,8 +63,8 @@ def test_faulted_private_payload_never_becomes_valid_or_reusable(tmp_path, slow_
         "PRIVATE_RETURN_CAPTURE_MISMATCH",
     ),
     (
-        "if (protocol_fault || fault_now) begin\n        active <= 0;\n        return_valid <= 0;",
-        "if (protocol_fault || fault_now) begin\n        active <= 0;\n        return_valid <= 1;",
+        "wire return_valid = return_occupied && active;",
+        "wire return_valid = return_occupied;",
         "PRIVATE_RETURN_FAULT_EDGE_ESCAPED",
     ),
     (
