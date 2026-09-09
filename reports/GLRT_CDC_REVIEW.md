@@ -22,8 +22,11 @@ That route removes CDC-10 and LUTAR-1. The remaining RAM examples have moved
 out of the ingress FIFO to native template reads and FIR histories: asynchronous
 FIFO readiness still feeds the receiver's fault/flush controls. Prototype
 82173e4d adds two CPU-clocked, synchronously reset stages to that external health
-signal. Its full 60 MS/s and 2.5 MS/s builds are running; DRC closure is not yet
-claimed. The main HDL checkout still points to ff42d5ab.
+signal. Its full 60 MS/s route passes at +0.029/+0.025 ns with no CDC-10,
+LUTAR-1 or RAMB asynchronous-control warning. Its 2.5 MS/s build also passes
+the normal build gate and is being audited. The main experimental HDL checkout
+has advanced to 82173e4d. CDC-11 and inherited ADI handshake warnings remain
+visible for the protocol review below; calibrated external I/O remains open.
 
 ## Reset and memory protocol
 

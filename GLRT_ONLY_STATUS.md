@@ -478,3 +478,26 @@ the passing v3 restores it. A full 60 MS/s board build is running in
 `artifacts/board-60000000-cdc-v1`. This prototype has not replaced the main HDL
 or been declared physically qualified. Real hardware transport, calibration,
 bench ownership and live RF agreement remain outstanding.
+
+The 1a0bafdc route subsequently passed at +0.094/+0.013 ns and removed the
+combinational-reset warning; its downstream RAM warnings identified a second
+path through the external source-health indication. Commit 82173e4d fences
+that indication through two CPU stages. All **61** ingress/capture tests pass
+in 206.03 s. Its full 60 MS/s route passes at +0.029/+0.025 ns and now has no
+CDC-10, LUTAR-1, REQP-1839 or REQP-1840 warning. Two reset-fanout CDC-11 patterns
+and inherited ADI handshakes remain for the documented protocol review. The main
+HDL checkout has advanced to 82173e4d; the 2.5 MS/s route is being audited.
+See [the CDC review](reports/GLRT_CDC_REVIEW.md).
+
+Separate prototype a9a4ca9a extends candidate grouping from 176 to 352 output
+samples, without a host seed or gate change. It recovers a correct event in the
+previously missed 60 MS/s zero-CFO case, reducing busy rejects from 18 to 9.
+The saved record-31 positive at gate .20 is preserved; at gate .16 it now also
+recovers one frame, with busy rejects reduced from 113 to 65. Original misses
+remain retained. Full receiver tests and the already examined 50-case matrix
+are running as development regressions, together with 5/25/60 board builds.
+The regression protocol preserves a corrected provenance statement and the
+original generated document: the copied generator initially inherited its
+first-run seed-description sentence. No case, gate, source hash or outcome
+was changed by that metadata correction. Future runs do not infer holdout status
+from fixed seeds. No hardware or fresh saved/live RF holdout is claimed.

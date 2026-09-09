@@ -85,6 +85,13 @@ multi-frame coherent-ceiling statistic and intra-symbol CFO correction; FPGA
 scores use single-frame symbol energy normalization without that correction.
 Raw scores must not be treated as identical estimators.
 
+Each retained host basin also has `frame_glrt64` entries, scoring every complete
+704-sample frame support separately at the host's own acquired coordinates.
+A positive multi-frame score does not imply every constituent frame is positive.
+The frame entries preserve their own score, control, CFO and engineering gate
+crossing. Applying the same engineering gates to individual frames does not
+establish a calibrated per-frame false-alarm rate.
+
 Compare FPGA events only after the blind output is finalized and hashed. Use
 `Snapshot.source_center()` and `Event.observable_interval()` for counter/filter
 mapping, never as acquisition seeds. A complete comparison, agreed tolerances,
@@ -94,3 +101,44 @@ fresh holdouts and live validation are still required by the firmware goal.
 LPP1 worker pack. It uses recorded CI16 and edge, preserving old labels solely
 as provenance. Those previously examined saved probes are development data;
 they are neither fresh holdouts nor GLR1 transport evidence.
+
+## Autonomous RTL replay
+
+`starlink_glrt_replay.py` accepts up to 20 ms of native-rate CI16 and executes
+the actual receiver RTL with no epoch/CFO seed. All exported IQ is compared with
+integer convolution and every completed native score with the frozen arithmetic
+oracle. A pre-existing blind host result is opened only after those checks and
+must identify the exact exported bytes. For an already analyzed 2.5 MS/s record:
+
+```sh
+.venv/bin/python tools/starlink_glrt_replay.py \
+  --iq artifacts/saved-blind-development-v1/record-031/iq.ci16 \
+  --source-rate 2500000 --edge upper --acquisition-q16 13107 \
+  --host-blind artifacts/saved-record031-host-perframe-v1 \
+  --output artifacts/new-record031-replay
+```
+
+The acquisition gate in this example is the experimental .20 setting; the CLI
+default remains .24. Exact and margin defaults remain .30/.15. The protocol
+records all three Q16 gates and source/input hashes before execution. Never
+pass exported 2.5 MS/s IQ as if it were a higher native-rate observation.
+
+Comparisons use an explicit engineering tolerance of five output samples and
+2 kHz, and retain every unmatched support and busy rejection. Frame scores are
+used when available; old analyses are labeled as aggregate multi-frame support
+whose individual-frame positivity is unknown. Neither representation supplies
+an RF-truth label or turns correlated support counts into independent trials.
+
+Replay v2 records the terminal native reader and scorer state. It permits a
+partial native frame only when the reader requires samples beyond the captured
+end and the scorer is idle or collecting that same frame. Completed work still
+must drain. The hardware ABI has fewer state details, so its event attestation
+continues to reject a pending scorer; this offline exception must not be copied
+to hardware without equivalent evidence. IQ attestation remains independent.
+
+`starlink_glrt_saved_rtl_development.py` covers every saved record of one edge
+in original order. `starlink_glrt_synthetic_qualification.py` runs a reproducible
+50-case, five-rate matrix through RTL and blind host analysis. Reusing its fixed
+seeds is a regression, not a new holdout. Both tools retain numerical misses,
+structured-control crossings and incomplete/failing runs instead of filtering
+them from the evidence.
