@@ -16,14 +16,15 @@ verified; it differs from the original active v0.48 RAM image.
 | Image | HDL | Linux | Routed setup / hold slack | Commissioning state |
 |---|---|---|---|---|
 | `glrt-eth-r2500000-v1` | `625a93e7` | `36c6561f` | +0.009 / +0.020 ns | Reconciled exact running FIT; PN and short/backlog captures passed |
-| `glrt-eth-r2500000-v2` | `625a93e7` | `93a343f2` | +0.009 / +0.020 ns | Full Ethernet deployment return passed; AD9361 verified; PN and 120 ms capture passed |
-| `glrt-eth-r5000000-v1` | `ec87261d` | `93a343f2` | +0.013 / +0.017 ns | Package verified; hardware checks pending |
+| `glrt-eth-r2500000-v2` | `625a93e7` | `93a343f2` | +0.009 / +0.020 ns | PN, short capture, two complete ten-second captures and 320-event control passed; exact original rollback passed |
+| `glrt-eth-r5000000-v1` | `ec87261d` | `93a343f2` | +0.013 / +0.017 ns | Deployed successfully from restored original v0.47; receive checks pending |
 | `glrt-eth-r10000000-v1` | `ec87261d` | `93a343f2` | +0.055 / +0.035 ns | Package verified; hardware checks pending |
+| `glrt-eth-r25000000-v1` | `4cd97a03` | `93a343f2` | +0.004 / +0.025 ns | Full build audit passed; package preparation underway |
 
 Each image exports continuous 2.5 MS/s CI16 IQ. Its source rate is attested from
 the public FPGA snapshot before any PHY rate change. The 25 and 60 MS/s ec872
-builds failed timing and are excluded from deployment. Fresh builds with the
-reviewed idle-payload timing change are underway.
+builds failed timing and are excluded from deployment. The reviewed idle-payload
+change now closes timing at 25 MS/s; the fresh 60 MS/s build remains in progress.
 
 The full 5/10 MS/s implementation audits were reviewed alongside the accepted
 2.5 MS/s canary. They contain one GLRT IP and DMA, no PSS and no native ADC DMA,
@@ -41,8 +42,8 @@ transport control with decisions disabled, a ten-second continuous IQ check,
 and independent host processing of retained IQ. Normal captures retain the
 frozen `glrt-upper-candidate-v1` gates. The separate event transport control is
 explicitly labeled custom development and cannot establish sensitivity.
-Exact original persistent rollback is then exercised before proceeding through
-the timing-passing rates. Every transition requires its own frozen source and
+Exact original persistent rollback was exercised successfully before returning
+to GLRT at 5 MS/s. Every transition requires its own frozen source and
 target FIT, serial, layout, idle-state and TX-safe checks.
 
 All completed captures so far use the observed post-boot 2.4 GHz LO, 2 MHz
@@ -58,6 +59,26 @@ timeout because the timeout was changed after buffer OPEN. The fix sets it
 before OPEN and disqualifies event transport on reader error even if counts
 match. Neither failed capture is relabeled as successful.
 
-The corrected image's short capture and independent host comparison contain no
-FPGA or host pilot positives. That verifies quiet transport and accounting;
-live pilot agreement remains unproven. Hardware-qualified flags remain false.
+The larger-buffer ten-second runs each saved all 25 million IQ samples in about
+10.07 seconds, with zero faults, clipping, busy rejections or pending work.
+They used 250,000-sample chunks and four requested kernel buffers. The earlier
+25,000-sample-chunk run overflowed the 256-word FPGA output FIFO. Its counters
+prove downstream backpressure, without identifying a host/kernel/DMA cause.
+The successful larger-buffer run's FIFO high water was one. Use the measured
+larger-buffer configuration for long commissioning; do not hide the failed run.
+
+The decisions-off 120 ms control transported all 320 native score records.
+Conditional integer recomputation from the same 2.5 MS/s saved IQ matched every
+event's energies, peaks, bins, flags, block shift and Q16 scores exactly, with no
+excluded events. Its absolute epoch origin exceeded 2^32. The report is
+`hardware-2500000-event-control-v2-oracle-v1/REPORT.md` under the evidence root.
+This is arithmetic verification using the recorded epochs, separate from the
+unseeded host detector. Busy/expiry counts induced by the artificial zero
+acquisition gate are explicitly retained.
+
+Independent blind host analysis of the normal ten-second capture completed all
+1,000 overlapping windows and found no pilot positives, matching the FPGA's
+quiet observation. The separate decisions-off control also had no multi-frame
+host positives, while 15 individual-frame engineering supports are retained in
+its comparison. These uncalibrated metrics do not establish live sensitivity.
+Live pilot agreement remains unproven; hardware-qualified flags remain false.
