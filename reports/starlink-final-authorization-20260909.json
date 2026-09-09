@@ -1,0 +1,87 @@
+{
+  "schema": "starlink-final-authorization-progress-v1",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "0a1af8933bb7d9bc4f0fa78b3350196e98045cda",
+  "baseline_hdl_commit": "ccdf64365e8145113115f2e933ee8b2901f6d3e0",
+  "scope": "Final-only publication authorization, structural guard/mailbox dependency measurement and integrated regression. Full receiver and hardware qualification remain separate.",
+  "implementation": {
+    "guard": "Export the existing fully qualified final predicate as mailbox_commit_valid. Final retirement remains that predicate AND mailbox_input_ready. Ordinary mailbox_input_valid, private writes, all fault predicates and reason accumulation are unchanged.",
+    "service": "Connect only mailbox_commit_valid to the explicit-commit output mailbox's authorization input. The mailbox already requires private acceptance, exact framing and final position before consulting authorization. Nonfinal result validation does not need to reconverge onto the publication toggle.",
+    "guard_sha256": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+    "service_sha256": "1b5538b945d48d8921fa78db500efc215aa73c0359400dad67a6afdd592420c5",
+    "mailbox_changed": false,
+    "input_checker_changed": false,
+    "arithmetic_coefficients_or_clocks_changed": false,
+    "constraints_changed": false,
+    "packet_ABI_changed": false
+  },
+  "targeted_tests": {
+    "passed": 36,
+    "skipped": 2,
+    "seconds": 31.17,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/final-auth-contract-v2.log",
+    "sha256": "15712fbcd0f22095beaf8c93d9dd24d0ffc4913fb11f351306944d96b851b1a1",
+    "coverage": [
+      "Whole guard/service token delta against ccdf6436; actual mailbox executable source unchanged. Previous phase-contract whitelist remains enforced against af96c48e after normalizing only this exact additive export.",
+      "New final output compared with the immutable ff4229 valid-AND-last public reference throughout the reachable 256-job/131072-word guard workload. Both current actual phase-mode synthesized netlists pass this workload with vendor primitive models.",
+      "New final output checked against every existing conditional final-veto row: 262656 rows, 512 clocked edges, all nine veto witnesses, boundaries, reset and quarantine. Removing the new output's immediate veto is detected.",
+      "New output drives the real explicit-commit mailbox in the unchanged adversarial workload at three clock pairs. Frozen public guard and legacy mailbox shadow compare publication/ownership/payload: 23 healthy, 37 rejected and 12 independent-reset cases per clock pair.",
+      "Late-ACK faults retain 1536 already-published words; six nonfinal/held-final private-link corruption cases retain exact same-edge reasons and cannot publish or falsely acknowledge.",
+      "Completed-input premise, phase-mode defaults, duplicate-start and external-fault mutation controls remain passing."
+    ],
+    "skip_reason": "Two previous-source occupancy-netlist tests are intentionally not reused; both actual current-source phase-mode netlists pass.",
+    "limit": "Finite executable traces and source invariants, not exhaustive formal proof or physical qualification."
+  },
+  "structural_composition": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-synth-v2",
+    "tool": "Vivado 2022.2, xc7z010clg400-1, actual result guard and actual explicit-commit output mailbox; old versus new authorization wiring only",
+    "scope_sha256": "ed599da164fa95b9749b27df458ecc16af84de80536f947ae080719fe84f86ce",
+    "endpoint": "output_mailbox/request_toggle_reg/D",
+    "old_wiring": {"raw_input_fault_ports": 3, "phase_input_ports": 1, "LUT": 185, "FF": 367, "RAMB18": 1, "DSP": 0, "netlist_sha256": "69bb29e0fa7511686372068f3a70458d43e268a7cef95dc0486d7230f02f3264"},
+    "new_wiring": {"raw_input_fault_ports": 0, "phase_input_ports": 1, "LUT": 179, "FF": 367, "RAMB18": 1, "DSP": 0, "netlist_sha256": "e28cb1d2f961fc5f3eaa24e2b0b38bf6fbae5d30e57b58c6c0bcce036807093d"},
+    "limit": "Standalone structural composition with externally supplied checker/core evidence; no actual input checker/FFT, full receiver placement/routing or CDC qualification."
+  },
+  "guard_netlists": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-guard-synth-v1",
+    "scope_sha256": "8568bf7efcf6b00cea28b8bafee3324f7f2a20d197970b52cc89c7dda29c9435",
+    "default_netlist_sha256": "772a5ec0816962536b536f1ad2a9b9544bb265ba5bc910bbea457c33f17be7bc",
+    "enabled_netlist_sha256": "33444c26fd5643d2c76351d833368c4829b3c06f19cbd01b6387971fe679064c",
+    "all_four_prior_phase_dependency_cuts_retained": true,
+    "functional_replay_passed": true
+  },
+  "actual_FFT_service": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-service-v1",
+    "exit_code": 0,
+    "console_sha256": "5d33b402f00ad5e7c03ef5ab2cdf5680beac08ce86c142883f854aac9d9fa06a",
+    "public_shadow_comparisons": 284647,
+    "qualified_final_rows": 67,
+    "ACK_rows": 75344,
+    "healthy_idle_rows": 156753,
+    "healthy_jobs": 26,
+    "exact_words": 13312,
+    "new_authorization_compared_to_frozen_valid_AND_last": true,
+    "coverage": "Existing starvation, delayed/final vendor events, malformed banks, independent resets, configuration/partial-input resets, postcommit ACK fault and duplicate starts at final/ACK retained.",
+    "limit": "Actual generated FFT behavioral simulation, not complete receiver timing, native IIO, ADC or RF."
+  },
+  "numeric_pipeline": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-numeric-v1",
+    "exit_code": 0,
+    "exact_scores": 1341,
+    "independent_FFT_reset_quarantine_and_recovery": true,
+    "console_sha256": "f28f2c52552235ad144acdd0ccfccc2dab4bb57518a33840e6e0463fffb81bc5"
+  },
+  "capacity": {"status": "passed", "exit_code": 0, "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-capacity-v1", "blocks": 64, "profile": "bursty-stalled", "scores": 28608, "fifo_high_water": 358, "console_sha256": "366b9c5f0efbb493acbba219a7d198e6c1c1f5da986af1749e6af73619e5de11", "limit": "Finite nominal-15MS/s counts/order/backlog simulation, not live sustained throughput."},
+  "paired_actual_FFT": {"status": "passed", "exit_code": 0, "directory": "hdl/library/starlink_pss_raw_correlator/build/final-auth-paired-v1", "exact_scores": 894, "exact_map_words": 447, "exact_pilot_bytes": 2048, "late_fault_retained": true, "console_sha256": "7d8601f219dacffa7e3eb2d4bfdd574c258f4def3f72417a4ad29a5548afaeec", "limit": "Reduced447x2 real digital shell/CDC/canonical/FFT/PSMA/PIL1, not ADC/DMA/IIO/fine/production duration or RF."},
+  "integrated_regression": {"status": "passed", "exit_code": 0, "passed": 870, "skipped": 2, "seconds": 163.67, "log": "hdl/library/starlink_pss_raw_correlator/build/final-auth-oracle-v1.log", "sha256": "5b4cbb508b82fba2649056d09647664ea03ccb92a214030b6d1f646a1eef786b", "skip_reason": "Old-source occupancy netlists not reused; both actual current-source phase-mode guard netlists pass."},
+  "acquisition_IP_package": {"exit_code": 0, "component_sha256": "b1a4d2c5cae991c98863daccf4103f4c236bedfe86e0960f8ff3ee3d684efca3", "console_sha256": "7e46affbe215c668984537d5dcb30be35ce611c4030f957e47535962a86ca393"},
+  "full_receiver": {"status": "not_started", "deployment_eligible": false},
+  "retained_failed_diagnostics": ["final-auth-synth-v1 stopped because the probe used SystemVerilog wildcard connections in a Verilog file. The wrapper was explicitly renamed and read as SystemVerilog; real guard/mailbox sources and the dependency gate were unchanged."],
+  "radio_accessed": false,
+  "ppu_changed": false,
+  "deployed": false,
+  "next": [
+    "The ccdf6436 receiver finished and its final audit identifies input_guard expected-position feedback as the new worst path (-0.956ns). Retain that exact failed source/checkpoint.",
+    "Qualify the separate private input-cursor change before the next combined full receiver build; do not claim a standalone routed result for this authorization-only revision.",
+    "Retain all physical gates, then .18 finite/persistent IIO and causal fine scheduling before PPU Ethernet .17 live verification, 120ms/300s scanning and 30/60MS/s qualification."
+  ]
+}

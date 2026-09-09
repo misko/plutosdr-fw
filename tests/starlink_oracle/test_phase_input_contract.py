@@ -35,6 +35,16 @@ def test_entire_guard_delta_preserves_full_faults_and_publication_checks():
     name = "starlink_pss_realtime_result_guard"
     baseline = frozen(name)
     candidate = tokens((ACQ / f"{name}.v").read_text())
+    if "outputwiremailbox_commit_valid," in candidate:
+        # Later additive final-only export is checked independently against
+        # ccdf6436. Normalize only its exact algebraic expansion here.
+        candidate = replace_once(candidate, "outputwiremailbox_commit_valid,", "")
+        candidate = replace_once(candidate,
+            ("assignmailbox_commit_valid=resetn&&active&&!protocol_fault&&return_valid&&"
+             "return_last&&final_qualified&&!final_fault_now;"
+             "wirefinal_commit=mailbox_commit_valid&&mailbox_input_ready;"),
+            ("wirefinal_commit=resetn&&active&&!protocol_fault&&return_valid&&return_last&&"
+             "final_qualified&&!final_fault_now&&mailbox_input_ready;"))
     for fragment in [",parameterintegerUSE_PHASE_INPUT_FAULT=0", "inputwirephase_input_fault_now,",
                      ('if(USE_PHASE_INPUT_FAULT!=0&&USE_PHASE_INPUT_FAULT!=1)'
                       '$fatal(1,"USE_PHASE_INPUT_FAULTmustbezeroorone");'),
@@ -57,6 +67,13 @@ def test_entire_service_delta_is_only_explicit_phase_contract_and_exact_fence():
     name = "starlink_pss_shared_realtime_xfft_service"
     baseline = frozen(name)
     candidate = tokens((ACQ / f"{name}.v").read_text())
+    if ".mailbox_commit_valid(return_commit_valid)," in candidate:
+        candidate = replace_once(candidate,
+            "wirereturn_valid,return_private_valid,return_commit_valid,return_last;",
+            "wirereturn_valid,return_private_valid,return_last;")
+        candidate = replace_once(candidate, ".mailbox_commit_valid(return_commit_valid),", "")
+        candidate = replace_once(candidate, ".input_commit_authorized(return_commit_valid),",
+            ".input_commit_authorized(return_valid),")
     for fragment in ["wirephase_input_fault_now=(core_aresetn&&input_job_start)||input_guard_fault||input_fault_fast_sync[1]||vendor_fault_now||fast_fault;",
                      "#(.USE_PHASE_INPUT_FAULT(1))", ".phase_input_fault_now(phase_input_fault_now),"]:
         candidate = replace_once(candidate, fragment, "")

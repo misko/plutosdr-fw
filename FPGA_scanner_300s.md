@@ -363,6 +363,31 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Explicit final-only result authorization — 2026-09-09
+
+HDL `0a1af8933bb7d9bc4f0fa78b3350196e98045cda` exports the guard's existing
+qualified-final predicate separately for the explicit-commit output mailbox.
+Ordinary result validity, private writes, actual mailbox checks, same-edge
+fault vetoes and packet ABI remain unchanged. This removes the excluded
+nonfinal input-validation branch from publication authorization.
+
+The actual guard/mailbox structural comparison removes all three raw-input
+fault ports from the publication register's fan-in. Composition LUTs fall
+185 -> 179; 367 FFs and one RAMB18 remain. The 36-test targeted qualification
+includes both current synthesized guard netlists, frozen public guard/mailbox
+comparisons, all final-veto rows, late ACKs and private-link corruption. Actual
+FFT replay matches 284647 public comparisons and 13312 words; numeric replay
+preserves 1341 scores; paired replay preserves 894 scores, 447 map words and
+2048 pilot bytes with late faults retained. A finite 64-block burst/stall run
+delivers 28608 scores at FIFO high-water 358. The full suite passes 870 tests
+with two intentionally unused previous-source netlist cases skipped.
+
+There is no standalone routed result for this revision. The preceding final
+checkpoint now identifies input-checker ordinal feedback as the worst path;
+that separate private-cursor change is being qualified before the next full
+receiver build. No radio or PPU operation occurred. Evidence:
+`reports/starlink-final-authorization-20260909.json`.
+
 ### Certified phase-specific input veto — 2026-09-09
 
 HDL `ccdf64365e8145113115f2e933ee8b2901f6d3e0` specializes input fault
