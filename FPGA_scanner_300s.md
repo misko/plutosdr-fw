@@ -387,11 +387,16 @@ or proves live RF detection.
 The preceding health-summary receiver (`84a1a358`) finished with placement
 failure: 2413 unplaced slices required versus 2408 available, a five-slice
 shortfall and 441 control sets. It has no routed timing result. The new
-snapshot-replication receiver is running in
-`hdl/projects/pluto/shared-realtime-snapshot-fanout-v1`, after refreshing the
-pilot IP package, with unchanged clocks, exceptions and paired/shared-realtime/
-boundary-stop profile. Physical promotion remains closed; neither .18 nor .17
-was accessed and PPU is unchanged. See
+snapshot-replication receiver in
+`hdl/projects/pluto/shared-realtime-snapshot-fanout-v1` also finished with
+placement failure: 2420 unplaced slices required versus 2411 available, a
+nine-slice shortfall and 458 control sets. Its pilot IP package was refreshed;
+clocks, exceptions and paired/shared-realtime/boundary-stop profile were
+unchanged. Local fanout improvement has not produced complete-receiver fit or
+timing improvement. Next reduce packing/control-set pressure without changing
+snapshot semantics or weakening the detector's publication fences; an unchanged
+rerun is not a demonstrated fix. Physical promotion remains closed; neither .18
+nor .17 was accessed and PPU is unchanged. See
 `reports/starlink-pilot-snapshot-fanout-20260909.json` and
 `reports/starlink-snapshot-fanout-dwell-rtl-20260909.json`.
 
