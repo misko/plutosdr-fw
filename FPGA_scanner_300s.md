@@ -363,6 +363,43 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Integrated stop-health simplification and final baseline timing — 2026-09-09
+
+HDL `84a1a3589a08f5af72323755d38b9d7ef9153846` implements the explicit
+same-epoch health-summary selection. Only the integrated stop-enabled wrapper
+opts in; independent counter inputs remain conservatively checked by default.
+Five redundant 32-bit counter reductions leave the stop-admission path, with
+no added cycle, no change to the snapshot ABI, and no change to fatal causes.
+Independent ingress loss stays checked; denominator-zero stays diagnostic.
+
+The actual AXI controller/map-core bench now uses the actual health producer
+before admission, after acceptance and around terminal retirement. Old/new
+public traces are byte-identical for 10029 default-mode and 9754 summary-mode
+cycles. Generic independent-counter and diagnostic-policy mutants fail as
+expected. These are tested RTL workloads, not formal or native-IIO proof.
+The integrated oracle/constraint suite passes 604 tests; acquisition wrapper
+15/30/60 MS/s and pilot-only regressions pass. Isolated actual-controller
+synthesis removes the counter-to-stop path, retaining the flag-to-stop path;
+LUT primitives fall 936 -> 928 and FFs 1441 -> 1439. That is not a full-design
+timing-improvement claim.
+
+The preceding descriptor-BRAM receiver at runtime `653a3205` is now terminal:
+its complete route has no routing errors, but post-route optimization still
+fails WNS -3.737 ns, TNS -12470.662 ns and 9941 setup endpoints. All 4400 slices
+remain occupied. Final read-only audits find pilot snapshot-enable fanout 649
+(-3.384 ns), the FFT return slot (-3.737 ns), vendor FFT internals (-2.711 ns),
+and a still-relevant health-counter-to-map-RAM-enable path (-3.351 ns).
+Thirteen input/two output delay obligations and CDC review remain open. The
+generated bitstream and `system_top_bad_timing.xsa` are not deployable.
+
+A fresh complete receiver at `84a1a358` is running in
+`hdl/projects/pluto/shared-realtime-stop-health-v1`, after refreshing its
+acquisition IP package. The profile, clocks and constraints are unchanged;
+no reference checkpoint is used. Neither .18 nor .17 was accessed. PPU is
+unchanged. Source pins, retained tests, isolated synthesis, final baseline
+audits and launch evidence are in
+`reports/starlink-stop-health-integration-20260909.json`.
+
 ### Read-only timing-pressure inventory and stop-summary premise — 2026-09-09
 
 The original descriptor-BRAM build is still live. It reached zero failed nets

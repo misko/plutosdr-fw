@@ -1,12 +1,13 @@
 """Actual AXI/core stop transactions; no Linux, physical timing, or RF claims."""
 
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-HDL = ROOT / "hdl/library"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", str(ROOT / "hdl"))) / "library"
 
 
 @pytest.mark.parametrize("enabled,shared,rate,allowed", [
@@ -14,19 +15,22 @@ HDL = ROOT / "hdl/library"
     (0, 0, 30, True), (0, 0, 60, True), (1, 0, 15, False),
     (1, 1, 30, False), (1, 1, 60, False), (2, 1, 15, False),
 ])
-def test_actual_psma_stop_transactions(tmp_path, enabled, shared, rate, allowed):
+@pytest.mark.parametrize("health_summary", [0, 1])
+def test_actual_psma_stop_transactions(tmp_path, enabled, shared, rate, allowed, health_summary):
     top = "tb_axi_starlink_pss_map_stop"
     executable = tmp_path / "psma-stop.vvp"
     subprocess.run([
         "iverilog", "-g2012", "-Wall", "-s", top,
         f"-P{top}.ENABLE_BOUNDARY_STOP={enabled}",
         f"-P{top}.USE_SHARED_XFFT={shared}", f"-P{top}.INPUT_RATE_MSPS={rate}",
+        f"-P{top}.HEALTH_COUNTERS_FROM_FLAGS={health_summary}",
         "-o", str(executable),
         str(HDL / "axi_starlink_pss_acquisition/tb/tb_axi_starlink_pss_map_stop.sv"),
         str(HDL / "axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v"),
         str(HDL / "axi_starlink_pss_phase_map/starlink_pss_axi_lite.v"),
         str(HDL / "starlink_pss_acquisition/starlink_pss_phase_map.v"),
         str(HDL / "starlink_pss_acquisition/starlink_pss_phase_map_bank.v"),
+        str(HDL / "starlink_pss_acquisition/starlink_pss_acquisition_health.v"),
     ], check=True, capture_output=True, text=True, timeout=30)
     result = subprocess.run(["vvp", str(executable)], cwd=tmp_path,
                             check=False, capture_output=True, text=True, timeout=30)
@@ -37,6 +41,9 @@ def test_actual_psma_stop_transactions(tmp_path, enabled, shared, rate, allowed)
     assert result.returncode == 0, result.stdout + result.stderr
     assert (f"PSMA_STOP_PASS enabled={enabled} shared={shared} rate={rate} "
             "actual_core=1 actual_axi=1 no_radio_claim=1") in result.stdout
+    if enabled:
+        assert (f"PSMA_STOP_HEALTH_PASS summary={health_summary} real_causes=5 "
+                f"generic_counter_fallback={1 - health_summary}") in result.stdout
 
 
 def test_real_stop_wiring_preserves_independent_canonical_tap(tmp_path):
