@@ -101,7 +101,7 @@ def run(scorer, exact, control, tmp_path, *, gap=1, fail=0):
     return outputs, statuses[0]
 
 
-@pytest.mark.parametrize("kind", ["zero", "exact_zero", "control_zero", "one", "tone", "offgrid", "noise", "extreme"])
+@pytest.mark.parametrize("kind", ["zero", "exact_zero", "control_zero", "one", "tone", "offgrid", "real_tie", "noise", "extreme"])
 @pytest.mark.parametrize("gap", [1, 11])
 def test_all_score_fields_bit_exact_and_bounded(kind, gap, scorer, tmp_path):
     rng = np.random.default_rng(83879)
@@ -119,6 +119,11 @@ def test_all_score_fields_bit_exact_and_bounded(kind, gap, scorer, tmp_path):
     elif kind in ("tone", "offgrid"):
         signal = 750000*np.exp(2j*np.pi*(421 if kind == "tone" else 95.3)*np.arange(64)/512)
         exact = np.rint(np.column_stack((signal.real, signal.imag))).astype(np.int64)
+    elif kind == "real_tie":
+        # Real bin-200 tone has exactly equal peaks at bins 200 and 312.
+        # Paired visitation reaches 312 first; the legacy winner must be 200.
+        signal = 750000*np.cos(2*np.pi*200*np.arange(64)/512)
+        exact = np.rint(np.column_stack((signal, np.zeros(64)))).astype(np.int64)
     elif kind == "noise":
         exact = rng.integers(-50000, 50001, (64, 2), dtype=np.int64)
     else:
@@ -134,9 +139,12 @@ def test_all_score_fields_bit_exact_and_bounded(kind, gap, scorer, tmp_path):
     fields = [e["score"], c["score"], e["bin"], c["bin"], e["energy"], c["energy"], e["peak"], c["peak"],
               expected["block_shift"], e["zero"] | (c["zero"] << 1), e["clamped"] | (c["clamped"] << 1), int(detected)]
     assert list(map(int, row[1:-1])) == fields
-    assert int(row[-1]) < 38000
-    if kind in ("tone", "offgrid", "one", "control_zero"):
+    # The native history deadline requires paired-bin service under 200 us.
+    assert int(row[-1]) < 20000
+    if kind in ("tone", "offgrid", "real_tie", "one", "control_zero"):
         assert detected
+    if kind == "real_tie":
+        assert e["bin"] == int(row[3]) == 200
     if kind in ("noise", "zero", "exact_zero", "extreme"):
         assert not detected
 
@@ -146,3 +154,18 @@ def test_partial_or_mixed_epoch_cannot_make_glrt_result(fail, scorer, tmp_path):
     values = np.ones((64, 2), dtype=np.int64)*500000
     output, status = run(scorer, values, values, tmp_path, fail=fail)
     assert not output and status[0] == 1
+
+
+def test_frozen_twiddles_have_exact_signed_halfturn_negation():
+    # Paired DFT products require this exact integer identity, not an assumed
+    # floating-point trigonometric symmetry or an approximate unit circle.
+    words = [int(line, 16) for line in (BANK_ROOT / "glrt_dft512_q15.mem").read_text().split()]
+    def signed17(word):
+        return word-(1 << 17) if word & (1 << 16) else word
+    twiddles = [(signed17(word & 0x1ffff), signed17(word >> 17)) for word in words]
+    assert len(twiddles) == 512
+    assert all(twiddles[index+256] == (-twiddles[index][0], -twiddles[index][1]) for index in range(256))
+    assert max(abs(component) for twiddle in twiddles for component in twiddle) <= 1 << 15
+    # Signed CI24 times two bounded Q15 components, across 64 signed terms,
+    # fits a signed 48-bit accumulator even without exploiting sin/cos bounds.
+    assert 64 * 2 * (1 << 23) * (1 << 15) < 1 << 47
