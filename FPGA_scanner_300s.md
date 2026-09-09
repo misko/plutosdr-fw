@@ -282,9 +282,12 @@ words; phase-map replay preserves 447 reads and rejects partial faulted maps.
 Bursty/stalled 64-block replay preserves 28608 scores with explicit backlog
 bounds; this does not replace longer-duration qualification.
 
-Fresh full receiver build `counter-retirement-v1` is running, with the same
+Fresh full receiver build `counter-retirement-v1` synthesizes to 13427 LUTs,
+19037 FFs, 49 BRAM tiles and 48 DSPs. Medium-spread placement fails by thirteen
+slices (2378 available versus 2391 required, 446 control sets). A bounded
+high-spread trial of its saved opt DCP is now running, retaining the same
 100/200 MHz clocks, constraints, coarse/fine detectors and pilot DMA. No new
-physical verdict or deployment qualification exists yet. The completed route
+routed timing verdict or deployment qualification exists yet. The completed route
 below belongs to the prior source; its independent vendor-internal failure
 means these wrapper changes alone do not establish closure. No radios accessed.
 See `reports/starlink-shared-fft-counter-retirement-20260909.json`.

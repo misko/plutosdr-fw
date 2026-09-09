@@ -85,14 +85,45 @@
   },
   "physical": {
     "build_label": "counter-retirement-v1",
-    "state_at_checkpoint": "fresh full receiver synthesis running; no timing verdict",
+    "state_at_checkpoint": "terminal medium-spread placement fail; fresh saved-opt high-spread alternate running",
     "clock_mhz": 100,
     "fft_clock_mhz": 200,
     "source_rate_msps": 15,
     "constraints_relaxed": false,
     "coarse_fine_pilot_dma_retained": true,
     "last_completed_route": "reports/starlink-paired-control-isolation-high-route-20260909.json",
-    "last_completed_route_source_is_prior_revision": true
+    "last_completed_route_source_is_prior_revision": true,
+    "synthesis": {
+      "lut": 13427,
+      "ff": 19037,
+      "bram_tiles": 49,
+      "dsp": 48
+    },
+    "medium_placement": {
+      "result": "fail",
+      "finished_utc": "2026-09-09T05:11:44Z",
+      "slices_available": 2378,
+      "slices_required": 2391,
+      "shortfall": 13,
+      "control_sets": 446,
+      "combined_lut": 13682,
+      "total_lut": 16503,
+      "ff": 19228
+    },
+    "alternate_trial": {
+      "mode": "spread-high",
+      "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/spread-high-v2",
+      "state": "running",
+      "rtl_and_constraints_changed": false,
+      "hardware_qualified": false,
+      "explicit_shared_xfft_opt_in": true
+    },
+    "prior_alternate_attempt": {
+      "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/spread-high-v1",
+      "terminal": true,
+      "result": "rejected_before_placement_missing_explicit_shared_xfft_environment_opt_in",
+      "preserved": true
+    }
   },
   "remaining": [
     "Fresh full-receiver setup/hold/CDC and board-I/O; independent vendor-internal and100MHz paths may remain.",
@@ -111,6 +142,11 @@
     "hdl/library/starlink_pss_acquisition/build/counter-retirement-service-v1-console.log": "9a2e5288dc582b2f1b10fb0632a132e7f4be492f0372ff07b6fca369e91b570b",
     "hdl/library/starlink_pss_acquisition/build/counter-retirement-numeric-v1-console.log": "a83882ab13721279d4198d3847c9b3976743093cc29f229a954d4057b1e35faf",
     "hdl/library/starlink_pss_acquisition/build/counter-retirement-phase-map-v1-console.log": "a7570ebba40884bbf0abe8fef5c4363b24df4b5f7c81796567ec6edf0f25cac9",
-    "hdl/library/starlink_pss_acquisition/build/counter-retirement-bursty64-v1-console.log": "8789fc75dc424896ffe67461712927edd68fbce787617f4c0a8d23884f494738"
+    "hdl/library/starlink_pss_acquisition/build/counter-retirement-bursty64-v1-console.log": "8789fc75dc424896ffe67461712927edd68fbce787617f4c0a8d23884f494738",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pluto_vivado.log": "152f4124d21798cac20ccdcfbad7a921f75d6a07fad459fdf7511938e03c703d",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pluto.runs/impl_1/runme.log": "9511ef4c0c927b70f8290e9ba3de8ab410e0f69d13ccc537a125c1c9461fdd81",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pluto.runs/impl_1/system_top_opt.dcp": "572838ccf4cac1bcf0c27f16df73bcb289bfe642860d1acdce974f1e84f90e71",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pluto.runs/synth_1/system_top_utilization_synth.rpt": "0f2a90960b080ef2c270f0f24836a27f217cac6112b91718a1b35584a2d26fe7",
+    "/tmp/starlink-counter-retirement-spread-high-v1.log": "8151bca65cdc8c64d12ae987ac5d34fd1dada7415ae96488e75cd1bf3e336fdf"
   }
 }
