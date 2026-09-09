@@ -5,11 +5,22 @@ HDL `a29fb9f7`; the standalone PPU receipt decoder is on main `5c78c01a`.
 Slice B's synchronous PSMA controller and wrapper wiring are implemented in
 HDL `8129e8a0`, with 10 dedicated RTL cases and independent review.
 Linux `4357f41a721d` adds the typed request and bracketed receipt attributes,
-with actual-C MMIO/IRQ-model tests and an ARM module build. The complete native
-controller/driver/recorder path below is not yet integrated or hardware-qualified.
+with actual-C MMIO/IRQ-model tests and an ARM module build. PPU main `dfd5e46a`
+now supports explicit ABI 1.6 admission and bounded native stop request/read
+operations, with 2,707 clean-copy tests passing, one skip and 10 deselections.
+The complete native controller/driver/recorder path below is not yet integrated
+or hardware-qualified.
 Slice D has a passing reduced real-FFT/native-PSMA test with an unfinished
 third FFT block at acknowledgment, exact map values and fault negatives.
-This does not yet include canonical-tap/PIL1 DMA or full source-support joins.
+HDL `32a1f12c` additionally tests the actual digital shell/CDC/canonical tap,
+real FFT/maps and PIL1 together: 894 exact scores, 447 exact map words and
+512 exact CI16 pilot words, using an independent integer pilot oracle. Pilot
+center bounds enclose the selected map's full FFT dependency envelope; the
+pilot continues after the map fence, and a real late bridge fault is retained.
+This is reduced 447x2 geometry with an explicit configuration pause, not a
+production-duration capture. No ADC formatting, DDR DMA, IIO, fine engine or
+live RF path is exercised. Evidence and retained failed attempts are in
+`reports/starlink-paired-realtime-psma-stop-and-ppu-20260909.json`.
 This is a bounded
 prerequisite for a fixed-frequency paired pilot-IQ/map/fine recorder, not a
 replacement for the 300 s scanner, independent GLRT, or subsequent 30/60 MS/s
@@ -104,8 +115,9 @@ finishes; it is explicitly outside this first increment.
 ## 3. Opt-in two-word PSMA ABI
 
 The default-disabled shared-15 implementation uses version `0x00010006`
-and capability bit 9 (`capabilities=0x0000033f`). Linux admits this exact
-contract; PPU native image admission and physical qualification remain open.
+and capability bit 9 (`capabilities=0x0000033f`). Linux and explicitly opted-in
+PPU admit this exact contract; physical qualification and the integrated
+recorder remain open.
 These values do not describe a deployed, qualified image. Keep all
 existing register offsets and STATUS bits unchanged. The aperture remains
 256 bytes; `0xf8` and `0xfc` are its only presently unused words.

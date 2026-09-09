@@ -229,8 +229,9 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 - [x] Add the default-disabled synchronous PSMA ticket/window/controller and
   wrapper wiring. Enabled shared-15 ABI 1.6 supports actual fence-edge ticket
   acceptance, frozen terminal bounds and retained IRQ/pilot wiring; dedicated
-  RTL tests pass. Reduced real-FFT shutdown-tail testing is recorded below;
-  full pilot-path integration and enabled-image timing remain open.
+  RTL tests pass. Reduced real-FFT/canonical/PIL1 shutdown-tail testing is
+  recorded below; production-duration integration and enabled-image timing
+  remain open.
 - [x] Add the pure PSST 1/12 receipt decoder in PPU, with explicit structural
   qualification and diagnostic failure retention. It does not admit a new
   firmware ABI or perform native stop/drain operations.
@@ -238,6 +239,13 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   admission, bounded acceptance/read phases and preserved healthy IRQ draining.
   Actual-C register/IRQ models and ARM compilation pass; real kernel scheduling,
   feature-enabled firmware and paired native PPU recording remain unqualified.
+- [x] Add explicit ABI 1.6/profile opt-in and bounded stop request/read APIs to
+  PPU main, retaining raw/error/timeout evidence and existing legacy defaults.
+  A completed API observation is not a healthy boundary or proof of delivery.
+- [x] Test the actual digital shell/CDC/canonical/real-FFT/PSMA/PIL1 pair at
+  reduced 447x2 geometry, including exact pilot bytes, independent source
+  support bounds, continuing pilot after stop and a retained real late fault.
+  This does not exercise ADC formatting, DDR DMA, native IIO or the fine engine.
 - [ ] Keep map IRQ/readers alive until published, driver-enqueued and
   host-reassembled terminal generations agree. Use 200-chunk/one-map refills
   initially; a 400-chunk watermark can strand an odd final map after stop.
@@ -370,6 +378,33 @@ live-pending vendor-fault and post-terminal bridge-fault negatives pass.
 The continued source is test stimulus, not canonical-tap/PIL1 DMA evidence;
 the full pilot/fine/source-support join and production-duration tests remain.
 
+### Paired digital stop and native PPU support — 2026-09-09
+
+HDL `32a1f12cf457b68d09c89bf0e9dd6e7997039c3c` is pushed to the
+do-not-merge branch. The actual digital acquisition shell now has a passing
+combined simulation: 894 exact PSS scores, 447 exact native map words and all
+2048 CI16 pilot bytes matched to an independent integer oracle. Pilot capture
+continues after map-boundary stop; a subsequent invalid bridge release retains
+its failed health and terminal coordinates. Two real idle bootstrap samples
+establish a clean held canonical gap before ARM. The test explicitly pauses
+for pre-roll configuration and uses reduced map geometry; neither is a live
+production-duration or transport claim.
+
+PPU main `dfd5e46a10f8edd7daf19b7172b28fbf8fb65579` is tested, pushed and
+remotely verified. Both explicit experimental flags admit the exact shared-15
+ABI 1.6 image/profile. Bounded native request/read calls retain raw PSST,
+identity/contract observations, unknown writes, budget and elapsed-time evidence.
+The immutable clean-copy suite passes 2707 tests (one skip, 10 deselections),
+changed-file Ruff and 80-source-file mypy. Unrelated dirty PPU work is preserved.
+
+The integrated terminal-generation drain ledger and paired pilot/map/fine
+recorder are still open. Full-image timing still fails at -1.722 ns on the
+preceding runtime route, which did not enable boundary stop. No radio was
+accessed or flashed. Next gates remain timing closure, a stop-enabled full
+build, production-duration tests, fixed-frequency same-support capture with
+blind GLRT, then .18-before-.17 qualification and the complete 15/30/60 MS/s
+scanner. See `reports/starlink-paired-realtime-psma-stop-and-ppu-20260909.json`.
+
 ### Native map-boundary stop driver — 2026-09-09
 
 Linux `4357f41a721df9d89a66be7a2a3f921a71d46bad` is pushed to its
@@ -384,7 +419,7 @@ errors, and independently changing receipt fields are retried or rejected.
 All six admitted legacy/new image contracts and health receipts are exercised.
 The ARM module builds, and the actual-C receipt passes PPU main's pure decoder.
 This does not qualify real kernel timing, IIO transport, paired capture or RF
-lock. PPU's native clients still do not admit ABI 1.6. See
+lock. PPU native admission was added subsequently as recorded above. See
 `reports/starlink-map-stop-native-driver-20260909.json`.
 
 ### Private return/publication timing cut and production map fence — 2026-09-09

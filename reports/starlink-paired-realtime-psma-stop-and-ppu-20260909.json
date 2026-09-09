@@ -1,0 +1,203 @@
+{
+  "schema": "starlink-paired-realtime-psma-stop-and-ppu-v1",
+  "status": "REDUCED_PAIRED_DIGITAL_SIMULATION_AND_NATIVE_HOST_API_PASS_NOT_HARDWARE_QUALIFIED",
+  "date_utc": "2026-09-09",
+  "firmware_branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "90c539cd4ea51bd0dbe3e8154177f62c388d394c",
+  "test_hdl_commit": "32a1f12cf457b68d09c89bf0e9dd6e7997039c3c",
+  "linux_commit": "4357f41a721df9d89a66be7a2a3f921a71d46bad",
+  "ppu_main_commit": "dfd5e46a10f8edd7daf19b7172b28fbf8fb65579",
+  "remote_refs_verified": true,
+  "runtime_hdl_changed_by_this_increment": false,
+  "hardware_access": false,
+  "deployment_performed": false,
+  "simulation": {
+    "tool": "Vivado 2022.2, actual generated realtime shared XFFT model",
+    "root_session": 27449,
+    "terminal_exit_code": 0,
+    "terminal_time_utc": "2026-09-09 14:35:25",
+    "simulated_time_ns": 305190,
+    "source_rate_msps": 15,
+    "pilot_rate_msps": 2.5,
+    "processing_clock_mhz": 100,
+    "fft_clock_mhz": 200,
+    "boundary": "Signed16 digital CI16 acquisition-shell input, not physical AD9361 sample formatting",
+    "actual_modules": [
+      "Sample CDC",
+      "Canonical tap",
+      "Shared realtime XFFT",
+      "Synchronous PSMA controller and map RAM",
+      "Pilot mixer/filter/decimator",
+      "PIL1 capture and AXIS formatter"
+    ],
+    "test_only_map_bins": 447,
+    "test_only_map_frames": 2,
+    "outer_index_bits": 15,
+    "source_words": 4096,
+    "inactive_bootstrap_words": 2,
+    "preroll_source_words": 768,
+    "exact_checked_score_prefix": 894,
+    "exact_native_map_words": 447,
+    "exact_pilot_words": 512,
+    "exact_axis_bytes": 2048,
+    "pilot_fixture_origin": "Independent integer oracle tests/starlink_oracle/pilot_ddc.py; no RTL-derived expected IQ",
+    "seven_frozen_score_vectors_unchanged": true,
+    "healthy_sequence": [
+      "Feed two actual contiguous idle bootstrap beats and require held canonical gap=0 before pilot ARM.",
+      "Empty stop ticket 1 preserves the armed pilot and conditioner.",
+      "Feed 768-sample pilot prehistory, explicitly pause and drain, then CONTROL enable=1 without flush.",
+      "Deliver the original numeric score fixture through the same actual source used by the pilot.",
+      "Request ticket 2 after 200 scores. Complete 894 scores and one 447-word map.",
+      "At acknowledgment the third FFT block has started but not returned; pilot remains active.",
+      "Read and release actual native map RAM with retained IRQ. Continue source and bounded-backpressure pilot AXIS delivery.",
+      "Compare every admitted pilot IQ/index/support/visit, every delivered CI16 word, the complete binary, and PIL1 accounting/health."
+    ],
+    "late_fault": "Actual invalid bridge release after drain sets failed joint health while retaining terminal coordinates and pilot bytes.",
+    "first_map_index": 8589934576,
+    "map_candidate_interval": [
+      8589934576,
+      8589935470
+    ],
+    "full_fft_dependency_interval": [
+      8589934576,
+      8589935535
+    ],
+    "pilot_center_bounds": [
+      8589934081,
+      8589937148
+    ],
+    "pilot_raw_filter_support": [
+      8589933812,
+      8589937417
+    ],
+    "pilot_newest_input_indexes": [
+      8589934350,
+      8589937416
+    ],
+    "pilot_center_step_source_samples": 6,
+    "pilot_filter_group_delay_source_samples": 269,
+    "support_meaning": "Pilot center bounds enclose the map FFT dependency interval; decimation does not record every full-rate sample or establish information equivalence.",
+    "pil1_snapshot_generation": 1,
+    "pil1_snapshot_raw_words": "ffffff0e 00000001 00000b08 00000002 00000200 00000000 00000200 00000000 0000005a 00000000 00000000 00000000 00000e21 00000000 0000025a 00000000 00000000 00000100 00000000 00000018 0000004d 00000001 00000000 00000000 00000000 00000000",
+    "final_gate": "PAIRED_REALTIME_PSMA_STOP_SIMULATION_VERIFIED exact_axis_bytes=2048 reduced_geometry_only=1"
+  },
+  "negative_attempts": [
+    {
+      "attempt": "paired-realtime-psma-stop-v1",
+      "outcome": "Simulation failed and was terminated; not a passing run.",
+      "cause": "Only one idle bootstrap beat left the canonical first-gap flag held after VALID dropped. Pilot ARM correctly faulted. The corrected bench uses two real contiguous beats and explicitly checks gap=0; runtime health logic was not changed.",
+      "termination_note": "Original bare $fatal(1) did not stop xsim; corrected bench adds a message and explicit $finish fallback."
+    },
+    {
+      "attempt": "paired-realtime-psma-stop-v2",
+      "root_session": 65250,
+      "terminal_exit_code": 1,
+      "outcome": "Actual numeric simulation passed, but the outer verifier failed.",
+      "cause": "Case-insensitive substring FAIL matched the deliberate negative-case PASS field failed_joint_health=1.",
+      "fix": "Anchor the explicit simulation-failure marker and retain existing fatal/error and required-marker checks. Three executable Tcl cases accept the intended negative-case PASS and reject exact/lowercase failure markers."
+    }
+  ],
+  "offline_policy_tests": {
+    "passed": 53,
+    "seconds": 0.81,
+    "ruff": "PASS",
+    "terminal_exit_code": 0
+  },
+  "ppu": {
+    "scope": "Strict explicit shared-15 PSMA ABI1.6 admission and bounded request/read API; not an integrated stop/drain recorder.",
+    "exact_contract": {
+      "abi": "0x00010006",
+      "capabilities": "0x0000033f",
+      "bins": 20000,
+      "frames": 64,
+      "chunks_per_map": 200,
+      "ddc_config": "0x000f0202",
+      "ddc_delay": 0
+    },
+    "legacy_defaults_unchanged": true,
+    "exact_serial_required": true,
+    "both_experimental_optins_required": true,
+    "retained_evidence": [
+      "Raw PSST status",
+      "Separate contract/identity reads",
+      "Write attempted/acknowledged/unknown states",
+      "Timeout, total budget and observed elapsed time",
+      "Errors, late faults and observation/context-epoch invalidation"
+    ],
+    "complete_is_io_observation_not_boundary_health_delivery_or_detection": true,
+    "immutable_clean_archive": "/tmp/ppu-native-stop-clean.gu0pq2",
+    "full_tests": {
+      "passed": 2707,
+      "skipped": 1,
+      "deselected": 10,
+      "seconds": 27.91,
+      "terminal_exit_code": 0,
+      "selection": "not hardware and not firmware and not browser",
+      "skip_reason": "Transmitter of record is not installed",
+      "warning": "Existing Starlette/httpx test-client deprecation"
+    },
+    "ruff_changed_python_files": "PASS",
+    "mypy": {
+      "source_files": 80,
+      "outcome": "PASS"
+    },
+    "earlier_clean_test_attempt": {
+      "failed": 1,
+      "passed": 2706,
+      "cause": "Archive tests ran from the live checkout; existing non-git source fallback selected cwd for DEFAULT_TOOL_REPOSITORY.",
+      "resolution": "Reran immutable archive source/tests from archive cwd. No runtime or test assertion weakened."
+    },
+    "unrelated_dirty_files_preserved": [
+      "README.md",
+      "src/pluto_plus/bootstrap_firmware.py",
+      "src/pluto_plus/doctor.py",
+      "tests/test_bootstrap_firmware.py"
+    ],
+    "recorder_requirements": [
+      "One-map 200-chunk bounded refills for finite drain",
+      "Open maps before pilot ARM; never mid-pilot flush",
+      "Retain every generation through actual terminal",
+      "Fresh acquisition health and independent complete-support joins",
+      "Finish/join readers before cleanup",
+      "Blind GLRT with no FPGA-derived search seed"
+    ]
+  },
+  "physical_gate": {
+    "status": "FAIL; deployment prohibited by qualification gate",
+    "evidence": "reports/starlink-realtime-private-observations-20260909.json",
+    "result_for_runtime_hdl": "90c539cd",
+    "full_image_boundary_stop_enabled": false,
+    "worst_200mhz_slack_ns": -1.722,
+    "total_negative_slack_ns": -278.791,
+    "failing_200mhz_endpoints": 361,
+    "positive_hold_slack_ns": 0.021,
+    "note": "This earlier full paired-image route does not qualify the new stop-enabled physical image."
+  },
+  "limitations": [
+    "Reduced447x2 map, finite512-sample pilot and explicit configuration pause; not production20000x64, continuous120ms, one-second paired capture or300s evidence.",
+    "No physical ADC formatting, DDR DMA, Linux module load, native IIO network transport, durable recorder or fine engine is exercised by this simulation.",
+    "Host fake-IIO tests and actual RTL simulation are separate evidence, not a live end-to-end stack.",
+    "No blind GLRT, RF detection, Starlink PSS timing lock or absolute timing-error claim.",
+    "No radio accessed, reserved, configured or flashed. .18 remains designated canary before outdoor .17.",
+    "30/60 MS/s stop profiles and complete scanner qualification remain open.",
+    "Independent review workers were unavailable; final combined run and PPU clean qualification were performed by the root agent."
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/simulate_paired_realtime_psma_stop.tcl": "1b2ecf0573ad739ca8e34499726590deadda2a85f3d7bf1beab59813ad6a9f69",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_paired_realtime_psma_stop.sv": "bd772f0a8d8a8dfbeb05c30a81795c993a233695a4dc851db4be561cc7512560",
+    "tests/test_starlink_paired_realtime_psma_stop_policy.py": "0d32227f97fb2f52ae48a59350bf3c1b3d835e29b9bb227b5d099f80ede028c9",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/scope.txt": "556faa6fcc124763238178b5bf01afd5a664453f2102affde17679fb914e0083",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/generated_ip.txt": "2154af24e1d4318ba038f4a9778238fcc821d40c8c41ca7d16d20bab7790ab42",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3-console.log": "3b970b37dcc985313c6b561c5dff2b188bd62020cde161d30a31888eacdf4da1",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/project/paired_realtime_psma_stop.sim/sim_1/behav/xsim/simulate.log": "bdc4d34f57aff02397a1a4c40bc221827f0f17b8c3c05342ae066bc417e1ac4a",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/project/paired_realtime_psma_stop.sim/sim_1/behav/xsim/paired_pilot_actual.ci16": "9ca24563bda3a3df6a0f780f3eb976eaac044d97ce752277b3781ba95942d1bd",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/frozen_sources/paired_oracle.json": "c1165154ab0bd9718065dadcb93fb641c59675bcf48c41e766254c2cf3db114e",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v1-console.log": "88e4240786644b3e378a9f5208e695c695ea0f2480fd0e285d6bd4efb27e483a",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v2-console.log": "ef9ff829337e8a8184641f51c5f7ea6269407fbdcbde820c7eeab8c6fd93a3bc",
+    "/tmp/paired-psma-stop-root-policy-v4.log": "54aa98ab17ab7c9599a408f11fd71b569f3439ca048378311a19acb1349b6372",
+    "/tmp/ppu-native-stop-clean-final-v1.log": "2d801aeebe8325e99088838e597efd1ed4ea6a573ecd34531d9a1557a99985e8",
+    "/tmp/ppu-native-stop-clean-final-v2.log": "bfb611aa93a8bfe5ce693748abede2133d07785b217c324e17afff0ff7d1c246",
+    "/tmp/ppu-native-stop-clean-ruff-v2.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "/tmp/ppu-native-stop-clean-mypy-v2.log": "2ee1bfc13507fda246a3220aaeaa3f3dd56dcc26a996aa35567c2871279b5ecd"
+  }
+}
