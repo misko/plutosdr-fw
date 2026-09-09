@@ -385,7 +385,24 @@ and 2048 pilot bytes, including the late invalid-release rejection.
 Packaging passed. A fresh complete receiver launched at **23:14 UTC** in
 `hdl/projects/pluto/shared-realtime-metadata-tree-v1`, at the original clocks
 and constraints with both detectors, pilot DMA and boundary stop retained.
-Its physical result is pending; revalidate the live process or terminal logs.
+It completed at **23:25:50 UTC**, exit1. All33977 nets route without errors,
+but setup failures increase from68 to **180**:100MHz **-0.044ns** (two failures),
+200MHz **-0.910ns** (178 failures), TNS **-46.554ns**. Hold passes at+0.014ns.
+Final resources are13099LUT,18532FF,all4400slices,53.5BRAM and54DSP.
+The final read-only audit confirms the targeted metadata-to-job-start path
+improves from-0.421 to **-0.183ns**, but still fails. The worst path is now
+output-mailbox write-position[2] to service state[1], with5.700ns data delay,
+of which4.438ns is routing. The input-cursor-to-result-fault path worsens to
+-0.508ns. These are not grounds to promote the emitted bitstream/bad-timing XSA.
+
+This is an unsuccessful complete-receiver timing-closure experiment, despite
+passing functional tests. Preserve18c as the best measured physical baseline;
+keep the candidate and netlists for reproducible comparison. The next control
+investigation is idle job-admission feedback from the active private-write
+framing checker. Any separation must first prove its real mailbox/guard phase
+premise and retain full same-edge active/final vetoes and sticky fault reasons.
+HDL `eb96c64738697c10b9c0abb379ab64f6a4a5c59c` adds only the tested read-only
+path audit after this build; its runtime RTL is identical to built65adf692.
 No radio has been accessed. Board-I/O/CDC/reset, native RX and paired IIO,
 causal refinement, .17 live GLRT/PSS agreement, 120ms/300s hopping and the
 15/30/60MS/s ladder remain required. Detailed evidence and replay instructions:

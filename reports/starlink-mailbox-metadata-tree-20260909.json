@@ -116,7 +116,7 @@
     "component_sha256": "8c275fa0a625ee4dbab2bd9185dd4d3f2776cb3363687ed39d1b4d41de54abfb"
   },
   "fresh_full_receiver": {
-    "status": "running",
+    "status": "terminal_failed_timing_not_deployable",
     "directory": "hdl/projects/pluto/shared-realtime-metadata-tree-v1",
     "hdl_revision": "65adf692da07422f10fea6c342b2711807ff7a89",
     "launch_utc_minute": "2026-09-09T23:14Z",
@@ -124,13 +124,71 @@
     "process_pid": 2243355,
     "configuration": "15MS/s paired-pilot, both detectors, exact DSP fine tracker, pilot DMA, boundary stop, shared realtime FFT, original100/200MHz clocks/constraints, global synthesis, control threshold4, medium placement, no checkpoint reuse.",
     "observation_rule": "Revalidate session/process and terminal artifacts; this stored running label is not proof of liveness.",
-    "deployment_eligible": false
+    "deployment_eligible": false,
+    "finished_utc": "2026-09-09T23:25:50Z",
+    "exit_code": 1,
+    "WNS_ns": -0.91,
+    "TNS_ns": -46.554,
+    "setup_failing_endpoints": 180,
+    "WHS_ns": 0.014,
+    "hold_failing_endpoints": 0,
+    "clock_100MHz": {
+      "WNS_ns": -0.044,
+      "TNS_ns": -0.078,
+      "setup_failing_endpoints": 2
+    },
+    "clock_200MHz": {
+      "WNS_ns": -0.91,
+      "TNS_ns": -46.476,
+      "setup_failing_endpoints": 178
+    },
+    "rx_clock_WNS_ns": 2.128,
+    "fully_routed_nets": 33977,
+    "routable_nets": 33977,
+    "routing_errors": 0,
+    "final_resources": {
+      "LUT": 13099,
+      "FF": 18532,
+      "slices": 4400,
+      "available_slices": 4400,
+      "BRAM_tiles": 53.5,
+      "DSP": 54
+    },
+    "console_sha256": "efc6c7be67a50061760bbcbf8845277faa68f1a9aba8187701edfdc807c16b9c",
+    "final_timing_sha256": "b174007b6566645e679b9d3dd8be87e4d32b01ced396dd5e8d9e525a6c26d000",
+    "final_checkpoint_sha256": "b2620cbd0dc3511daf06924518e053daf76a4bdbb9d9a9721b59a4a49df90eee",
+    "worst_path": "output_mailbox/write_position_reg[2]/C -> transform_service/state_reg[1]/D",
+    "worst_path_data_delay_ns": 5.7,
+    "worst_path_logic_delay_ns": 1.262,
+    "worst_path_route_delay_ns": 4.438,
+    "worst_path_logic_levels": "6 LUT levels:1LUT3+1LUT5+4LUT6",
+    "final_read_only_audit": {
+      "directory": "hdl/projects/pluto/shared-realtime-metadata-tree-v1/final-audit-v1",
+      "exit_code": 0,
+      "finished_utc": "2026-09-09T23:26:42Z",
+      "output_metadata_job_start_WNS_ns": -0.183,
+      "input_cursor_result_fault_WNS_ns": -0.508,
+      "vendor_internal_WNS_ns": -0.178,
+      "input_cursor_WNS_ns": 0.192,
+      "return_slot_WNS_ns": -0.287,
+      "output_publication_WNS_ns": -0.484,
+      "output_mailbox_fault_WNS_ns": -0.285,
+      "output_mailbox_payload_control_WNS_ns": -0.466,
+      "sticky_fault_crossing_WNS_ns": 2.567,
+      "sticky_fault_second_stage_WNS_ns": 4.193,
+      "summary_sha256": "c841d720fe890095d63d0a5e00e3652b9812160a3b9212a267691afa1cd01fea",
+      "utilization_sha256": "dcf038bf0774a15ab6f6d383072fa483fc731a3be8293d4c970124e1dc0aad53",
+      "route_status_sha256": "a2555b5410de08e2ce0c2264fe8f2b3e832e638e06c21ea95c37fd0bfc72cbd9",
+      "board_IO_limits": "13 RX input ports and two control outputs still lack board delay constraints. No unclocked or unconstrained internal endpoints. CDC/reset safety and actual native RX calibration remain open."
+    },
+    "decision": "Not a timing-closure improvement and not eligible for deployment. Targeted metadata path improves -0.421 -> -0.183ns, but remains failing. Whole-receiver setup failures increase68 ->180; WNS worsens -0.421 -> -0.910ns; previously passing100MHz regresses to -0.044ns. Preserve18c as the best measured physical baseline and retain this functionally qualified candidate only as an experiment.",
+    "next_physical_investigation": "The remaining current output-mailbox framing feedback reaches idle job admission/state control. Investigate separating idle admission from active private-write validation only after proving the actual guard/mailbox ownership premise. Preserve sticky errors, full fault reasons, same-edge active/final vetoes, both detectors, pilot output and original clocks/constraints. No such runtime separation is implemented or qualified by this report."
   },
   "radios_accessed": false,
   "ppu_changed": false,
   "hardware_qualified": false,
   "remaining": [
-    "Complete receiver timing including now-passing100MHz domain and remaining200MHz control/vendor paths.",
+    "Improve complete receiver control-path timing without hiding failures; preserve the18c best measured physical baseline, both detectors, pilot DMA and boundary stop. Current65ad candidate remains experimentally retained, not a timing-qualified release.",
     "Board-I/O/CDC/reset gates and native RX calibration; exact-serial .18 finite and persistent paired IIO.",
     "Causal coarse/CFO/fine scheduling, PPU Ethernet .17 deployment/rollback and independent live GLRT/PSS agreement.",
     "Eight targets,120ms valid dwells over300s; separately qualify15/30/60MS/s."
@@ -145,7 +203,8 @@
       "exit_code": 0,
       "log": "/tmp/starlink-metadata-equality.cihpiD/relocated-replay-v1.log",
       "directory": "/tmp/starlink-metadata-replay.4TbPrr",
-      "limit": "Follow-up tests rerun after making frozen-hash verification independent of the original temporary path. No RTL changes after the940-test regression."
+      "limit": "Follow-up tests rerun after making frozen-hash verification independent of the original temporary path. No RTL changes after the940-test regression.",
+      "sha256": "c5dbd21866fb2fa9e770e1a21e825b9eaf52820f94dfc5fbb00616d0642b54ec"
     }
   },
   "baseline_targeted_audit": {
@@ -153,12 +212,14 @@
     "exit_code": 0,
     "finished_utc": "2026-09-09T23:15:49Z",
     "directory": "/tmp/starlink-metadata-equality.cihpiD/baseline-path-audit-v1",
-    "runner": "/tmp/starlink-metadata-equality.cihpiD/hdl/projects/pluto/audit_shared_realtime_routed.tcl",
+    "runner": "hdl/projects/pluto/audit_shared_realtime_routed.tcl",
     "runner_sha256": "03c7ceb282bf744864bb94d6b05460d72a0f00545d5373d5a54836ea7dfc7a84",
     "summary_sha256": "b038546ca1f40d60dbb2bacfeb4e190beb655df1a5e929feeb0bd835b45a6cd9",
     "scope": "Added observation of all75 held output-metadata registers to job-start, and all9 input cursor registers to result fault reason5. No design/constraint mutation.",
     "output_metadata_job_start_WNS_ns": -0.421,
     "input_cursor_result_fault_WNS_ns": -0.396,
     "admission_policy_tests": 21
-  }
+  },
+  "audit_hdl_commit": "eb96c64738697c10b9c0abb379ab64f6a4a5c59c",
+  "audit_delta": "Only the read-only audit changed after built HDL65adf692; runtime RTL and constraints are identical."
 }
