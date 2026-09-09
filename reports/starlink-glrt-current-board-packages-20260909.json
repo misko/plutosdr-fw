@@ -1,0 +1,711 @@
+{
+  "created_utc": "2026-09-09T02:21:04Z",
+  "device_tool": {
+    "attestation_tests": {
+      "path": "artifacts/glrt-device-tool-attestation-tests-v3-20260909.xml",
+      "sha256": "c70063e772688d478d424f1c04d862bbd39ed013033cfdeef5cc86d9ce6e795a"
+    },
+    "base_commit": "5e3d6b91c18383c74d356fa490c8a245a96328b6",
+    "cli_tests": {
+      "path": "artifacts/glrt-device-tool-cli-tests-20260909.xml",
+      "sha256": "eaa973de11af90e4ac0ba0f5fff0e776acbbc2b27fcf25d75913897f9f7d5ee6"
+    },
+    "commit": "fa2f6e1d2ba1b6934ff0880f7e00914504d53dfb",
+    "path": "artifacts/device-tool-glrt-v1",
+    "policy": "rx-glrt-stream-v1",
+    "scope": "Independent owned clone; no shared checkout edits. Exact native-ADC-no-DMA plus custom CI16/event layout; not algorithm qualification."
+  },
+  "firmware_commit": "29d508bd61f8e06ea043f418a9e44426bed3d075",
+  "hardware_accessed": false,
+  "kernel_identity": {
+    "path": "artifacts/kernel-glrt-v3-identity-receipt.json",
+    "sha256": "b505c78916c4b202b51cbc322cf7b628f8dff19503a6a5fcd07620b68a77723f"
+  },
+  "limits": [
+    "60 MS/s has only +0.002 ns setup slack under the existing 100 MHz CPU clock and 0.300 ns input jitter. It is a constrained STA pass with very little additional margin, not a frequency-margin qualification.",
+    "The four lower-rate images were built at a9a4ca9a. The 60 MS/s image is 0d67920c: only synthesis fanout and 60 MS/s physical-optimization settings differ; no address sequencing, numerical gate or cycle count changed.",
+    "Two reset-fanout CDC-11 patterns, three Gray-bus warnings and inherited ADI CE/MUX handshakes remain visible. Protocol reasoning is in GLRT_CDC_REVIEW.md; analog metastability and external receive-eye measurements are not supplied by RTL tests.",
+    "The inherited 13 RX data/frame and two ENSM external timing paths still require runtime interface calibration and PN/eye evidence.",
+    "The new Linux device tree preserves Rev.C hardware identity and adds the GLRT marker. Earlier packages with the experimental model string are retained but are not these device-tool candidates.",
+    "The existing rootfs is reused with only copied VERSIONS stamping; new kernel and device tree identify Linux 2ca294936430. No QSPI/bootloader/flash or hardware operation was performed.",
+    "Candidate plans name an intended ad9361-1r1t runtime and exact expected model; they are not observations of current radio state and do not allocate a bench window.",
+    "Hardware-owner messaging remains unavailable at the local MCP transport endpoint. Exact serial, current setup/image, rollback and an owner window must be established before any radio operation."
+  ],
+  "live_detector_qualified": false,
+  "numerical_reference": {
+    "path": "reports/starlink-glrt-selector352-numerical-20260909.json",
+    "sha256": "1e303ab9c2e06787c4c805bae3dd4f12082d4c22eef36b0a076cb14c9936b53a"
+  },
+  "rates": [
+    {
+      "artifact": "artifacts/board-2500000-selector352-v1",
+      "build_outputs": {
+        "path": "artifacts/board-2500000-selector352-v1/outputs.sha256",
+        "sha256": "8e0058886e0f2443b81f1f95d38773db6e1df94ceddd3bc117c1b668fe8284d3"
+      },
+      "build_passed": true,
+      "hardware_eligible": false,
+      "hdl_commit": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+      "hold_slack_ns": 0.019,
+      "package": {
+        "candidate_plan": {
+          "path": "artifacts/ram-2500000-v4/contracts/candidate-plan-ad9361-1r1t.json",
+          "sha256": "11715b4c56dafdcdc2f6064be68178fec98b66fd9a1a264a62d394ca2b697893"
+        },
+        "dfu": {
+          "path": "artifacts/ram-2500000-v4/pluto.dfu",
+          "sha256": "5047f5b1f5287d70e4bdaef9650e2f0f03df49077a2fe86115a0ea589769f099"
+        },
+        "firmware_label": "glrt-ram-r2500000-v4",
+        "fit": {
+          "path": "artifacts/ram-2500000-v4/pluto.itb",
+          "sha256": "ceedf055057225fddf33ba846bc07fa2b1c302b25bffc4cc3cbb1fade1f0e04a"
+        },
+        "independent_verification": {
+          "path": "artifacts/ram-2500000-v4/independent-verification/receipt.json",
+          "sha256": "802e765ff7117a233f81ee3da17151eccc0f6a6708ed802fc490a2a73ba77c9a"
+        },
+        "manifest": {
+          "path": "artifacts/ram-2500000-v4/manifest.json",
+          "sha256": "40dfe337bffb02b8beebd802ea442e1e8240f8a24ede0bdb1629721582c772a3"
+        },
+        "ready_for_deployment": false,
+        "source_commits": {
+          "buildroot": "35d87ae5ba3109f6f4febdbdde6eb7b2449567f1",
+          "firmware": "29d508bd61f8e06ea043f418a9e44426bed3d075",
+          "hdl": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+          "linux": "2ca29493643016d137d094a85525c3f2dc290b34",
+          "u-boot-xlnx": "1ff0468e9bea29b0a768a7bf52db8d025c521b9a"
+        }
+      },
+      "removed_warning_classes_absent": {
+        "CDC-10": true,
+        "LUTAR-1": true,
+        "REQP-1839": true,
+        "REQP-1840": true
+      },
+      "reports": {
+        "audit.tsv": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/audit.tsv",
+          "sha256": "113ce35c9e6e6af812209cc8cfd09df46407cc06680bb11fa28b6f3468e0cd6e"
+        },
+        "bus_skew.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/bus_skew.rpt",
+          "sha256": "d26413d2b43729ddf6f22ed5f3d4abb097798579f2c06c1269e4d23bdfddc37d"
+        },
+        "cdc.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/cdc.rpt",
+          "sha256": "9bd30af838176bd52191be33821417c9b5bc19224619ea6da2de7a902981bb52"
+        },
+        "drc.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/drc.rpt",
+          "sha256": "70e401fe94618e7cd03f79313fcfe8acd00aed224259b84357c55bb0c0a211cd"
+        },
+        "exception_coverage.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/exception_coverage.rpt",
+          "sha256": "96f1eab21e4736a6cd0bc423a29af25cfa4e03f80c5b7c62ad2f6c7a2a709cec"
+        },
+        "ignored_exceptions.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/ignored_exceptions.rpt",
+          "sha256": "60458aa54a61db7c3f197df5fb5d52d8759d0d7497a588ec7d632adc03332789"
+        },
+        "io.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/io.rpt",
+          "sha256": "ad8a8cd510441496450a965db84fe7491487b86932e4664e076e854f8160ade3"
+        },
+        "methodology.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/methodology.rpt",
+          "sha256": "02723609803a57713688aeb985ff551ad9f3f4a7a67376333bb84ef608185982"
+        },
+        "timing_summary.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/timing_summary.rpt",
+          "sha256": "8930f1e0c181a39360a196e54cdbe415659f4a986100a6ec6ed8db3529549925"
+        },
+        "utilization.rpt": {
+          "path": "artifacts/board-2500000-selector352-v1/full-audit/utilization.rpt",
+          "sha256": "6d8f6d566d628c2f691f0a76a7d2e8c738fe6b88e32f67a9eac8cd389f6c3d28"
+        }
+      },
+      "resources": {
+        "bram_tiles": 4.5,
+        "dsps": 48,
+        "flip_flops": 12103,
+        "luts": 9708,
+        "slices": 3869
+      },
+      "setup_slack_ns": 0.112,
+      "source_rate_hz": 2500000,
+      "source_validation": {
+        "path": "artifacts/board-2500000-selector352-v1/source_validation.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "artifact": "artifacts/board-5000000-selector352-v1",
+      "build_outputs": {
+        "path": "artifacts/board-5000000-selector352-v1/outputs.sha256",
+        "sha256": "13a20c8948319711c3e487386c972bad6f42d252a781c8a365fd1acdf8daecb4"
+      },
+      "build_passed": true,
+      "hardware_eligible": false,
+      "hdl_commit": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+      "hold_slack_ns": 0.021,
+      "package": {
+        "candidate_plan": {
+          "path": "artifacts/ram-5000000-v3/contracts/candidate-plan-ad9361-1r1t.json",
+          "sha256": "35065e93158d4b7600615c6045e67bcc341b3d3b829d65acbd9e0df38c21349c"
+        },
+        "dfu": {
+          "path": "artifacts/ram-5000000-v3/pluto.dfu",
+          "sha256": "64c147df5f01d4f2b04ad1d8d10388cae4135cd94f9994f4ed83ed865bd4aa89"
+        },
+        "firmware_label": "glrt-ram-r5000000-v3",
+        "fit": {
+          "path": "artifacts/ram-5000000-v3/pluto.itb",
+          "sha256": "3d5a42d65c17e2f3774092b4326f94e5de452688e50a3ea8dd52fca2b9a67c2a"
+        },
+        "independent_verification": {
+          "path": "artifacts/ram-5000000-v3/independent-verification/receipt.json",
+          "sha256": "a1f09cc8f626ab85576602cd5fae10b4ded43c1a188c7d5d2582cedad9f19dc1"
+        },
+        "manifest": {
+          "path": "artifacts/ram-5000000-v3/manifest.json",
+          "sha256": "686aa27a33f9f54d8e54939ea7fa6d264deb4a3137eea270f57ed2e244b5bd28"
+        },
+        "ready_for_deployment": false,
+        "source_commits": {
+          "buildroot": "35d87ae5ba3109f6f4febdbdde6eb7b2449567f1",
+          "firmware": "29d508bd61f8e06ea043f418a9e44426bed3d075",
+          "hdl": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+          "linux": "2ca29493643016d137d094a85525c3f2dc290b34",
+          "u-boot-xlnx": "1ff0468e9bea29b0a768a7bf52db8d025c521b9a"
+        }
+      },
+      "removed_warning_classes_absent": {
+        "CDC-10": true,
+        "LUTAR-1": true,
+        "REQP-1839": true,
+        "REQP-1840": true
+      },
+      "reports": {
+        "audit.tsv": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/audit.tsv",
+          "sha256": "2be0fac02e783906f7c92fe28334825da2bad55d7ddf318cb385e621ee5ee252"
+        },
+        "bus_skew.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/bus_skew.rpt",
+          "sha256": "c9a556ccbb8e27c9c79d2e5550084bdc69a04cf1e290c6e9b607f5aa658a475b"
+        },
+        "cdc.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/cdc.rpt",
+          "sha256": "6da29003cee562fbc363c73d1f3d92dbdc21c321e95eaba75b7d9ec9f0cdb577"
+        },
+        "drc.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/drc.rpt",
+          "sha256": "d4f234733e76ce186e534ffb66c541242337dda935d6b9cf99f954c40c5f3776"
+        },
+        "exception_coverage.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/exception_coverage.rpt",
+          "sha256": "75735289a910922b7ce90ac13fad7951d80dc2e7514a6509d3bd0bd704ac5e05"
+        },
+        "ignored_exceptions.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/ignored_exceptions.rpt",
+          "sha256": "21d8ffa8c06759dda6f90d9a6a702c3a373732f9a349ce252493622039e1d214"
+        },
+        "io.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/io.rpt",
+          "sha256": "5739c8d7ce00768f110f2ea459c1d08a54dfc8d6a36243d05e2561a0bf705179"
+        },
+        "methodology.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/methodology.rpt",
+          "sha256": "b52382b0fef1c320c03fc5fce24e2b586aae90efccc38fcd13f444b3f491f423"
+        },
+        "timing_summary.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/timing_summary.rpt",
+          "sha256": "a336acfdbcc3383988919079f0039cb386ea57a9e0d87384ac5e8102642f636e"
+        },
+        "utilization.rpt": {
+          "path": "artifacts/board-5000000-selector352-v1/full-audit/utilization.rpt",
+          "sha256": "94cbc3ff931639213702c38f52e37b3c42dfbf079dd800f288d69cab31eb5caa"
+        }
+      },
+      "resources": {
+        "bram_tiles": 12,
+        "dsps": 56,
+        "flip_flops": 12615,
+        "luts": 10587,
+        "slices": 4104
+      },
+      "setup_slack_ns": 0.2,
+      "source_rate_hz": 5000000,
+      "source_validation": {
+        "path": "artifacts/board-5000000-selector352-v1/source_validation.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "artifact": "artifacts/board-10000000-selector352-v1",
+      "build_outputs": {
+        "path": "artifacts/board-10000000-selector352-v1/outputs.sha256",
+        "sha256": "2c834e32b86ad1694e53a5df4ea4a608bd1cd429a4b879b126f371479ee8a4f0"
+      },
+      "build_passed": true,
+      "hardware_eligible": false,
+      "hdl_commit": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+      "hold_slack_ns": 0.014,
+      "package": {
+        "candidate_plan": {
+          "path": "artifacts/ram-10000000-v3/contracts/candidate-plan-ad9361-1r1t.json",
+          "sha256": "6ed0bcf11ed9f281a812bc9530f63f49ece49a2b9e1ee7d2bc266ba3991c221f"
+        },
+        "dfu": {
+          "path": "artifacts/ram-10000000-v3/pluto.dfu",
+          "sha256": "3ca7bce4ab364666eafa16d4af618a1528637a95421636dc38c055d875d88397"
+        },
+        "firmware_label": "glrt-ram-r10000000-v3",
+        "fit": {
+          "path": "artifacts/ram-10000000-v3/pluto.itb",
+          "sha256": "02be57d463c85cf1c78342d581804abf9f81003cf794a5ea31af45c718f87cdd"
+        },
+        "independent_verification": {
+          "path": "artifacts/ram-10000000-v3/independent-verification/receipt.json",
+          "sha256": "e27fecb6d04ece85e5002bd28317fa374ae78adc6d5e1c5c80dad1fdc4278f05"
+        },
+        "manifest": {
+          "path": "artifacts/ram-10000000-v3/manifest.json",
+          "sha256": "b02466803c6bd44b5f9aa3df152dd9ba73279cf1454498a57e5af461c7772037"
+        },
+        "ready_for_deployment": false,
+        "source_commits": {
+          "buildroot": "35d87ae5ba3109f6f4febdbdde6eb7b2449567f1",
+          "firmware": "29d508bd61f8e06ea043f418a9e44426bed3d075",
+          "hdl": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+          "linux": "2ca29493643016d137d094a85525c3f2dc290b34",
+          "u-boot-xlnx": "1ff0468e9bea29b0a768a7bf52db8d025c521b9a"
+        }
+      },
+      "removed_warning_classes_absent": {
+        "CDC-10": true,
+        "LUTAR-1": true,
+        "REQP-1839": true,
+        "REQP-1840": true
+      },
+      "reports": {
+        "audit.tsv": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/audit.tsv",
+          "sha256": "244b6d0414e008e3241d36335e3277e2069b8c6683308c7c2cf0b1f9e4687fd1"
+        },
+        "bus_skew.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/bus_skew.rpt",
+          "sha256": "7fff41acda607ca46092b6f1046d2c9144b2eb8e1e9ad23a9358cb6c58b7f754"
+        },
+        "cdc.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/cdc.rpt",
+          "sha256": "bf892d517ef0f8fdaadd968d828f4b2adb3ccf9ca12a7af9dd764302741a5ea4"
+        },
+        "drc.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/drc.rpt",
+          "sha256": "1cca1946f5c5e0d929837aa192eb259dbed5667cb2063a481a10468109007d68"
+        },
+        "exception_coverage.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/exception_coverage.rpt",
+          "sha256": "37ff991bb96300d2ca39a4c410cc3069248f6812ee284e97492b4b2054af13e5"
+        },
+        "ignored_exceptions.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/ignored_exceptions.rpt",
+          "sha256": "70656bf305d65041a0f33c36b9d03f5b658e522c2a434da0d6a75f410e78cb26"
+        },
+        "io.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/io.rpt",
+          "sha256": "324b072e17d1ec8c97af43af5eb6078df0c07eee9f2cee07cc18f0715445d5e8"
+        },
+        "methodology.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/methodology.rpt",
+          "sha256": "37dde6f6e1fdb17dc5e44b046a706aab228d341cdbe589ff785abf75915b2e1d"
+        },
+        "timing_summary.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/timing_summary.rpt",
+          "sha256": "6f2a46bfa6d964d6ac2d57131409bec07f82ad2dc9d0837912eb2037a358d9a7"
+        },
+        "utilization.rpt": {
+          "path": "artifacts/board-10000000-selector352-v1/full-audit/utilization.rpt",
+          "sha256": "6091801937c051d1ac8893cfc84421928870c83de24862b7d08dc5a1b501e2f7"
+        }
+      },
+      "resources": {
+        "bram_tiles": 19.5,
+        "dsps": 64,
+        "flip_flops": 13094,
+        "luts": 11388,
+        "slices": 4179
+      },
+      "setup_slack_ns": 0.075,
+      "source_rate_hz": 10000000,
+      "source_validation": {
+        "path": "artifacts/board-10000000-selector352-v1/source_validation.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "artifact": "artifacts/board-25000000-selector352-v1",
+      "build_outputs": {
+        "path": "artifacts/board-25000000-selector352-v1/outputs.sha256",
+        "sha256": "ed305f811a237e484fb3ebb792d133138ba2a6262d61c67cb1fdb8c7c74ad5f8"
+      },
+      "build_passed": true,
+      "hardware_eligible": false,
+      "hdl_commit": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+      "hold_slack_ns": 0.024,
+      "package": {
+        "candidate_plan": {
+          "path": "artifacts/ram-25000000-v3/contracts/candidate-plan-ad9361-1r1t.json",
+          "sha256": "28bbfc78d937096eba6e0215c88b8a5c1bda5cf2f70396b6bf357782eea974cb"
+        },
+        "dfu": {
+          "path": "artifacts/ram-25000000-v3/pluto.dfu",
+          "sha256": "007188288cc7991838132062501abea4c959180ee472b069ea3f2776b5a23e48"
+        },
+        "firmware_label": "glrt-ram-r25000000-v3",
+        "fit": {
+          "path": "artifacts/ram-25000000-v3/pluto.itb",
+          "sha256": "033691e233505966c5895128f4b38e050c4734f81550b7b335ef84be9c610471"
+        },
+        "independent_verification": {
+          "path": "artifacts/ram-25000000-v3/independent-verification/receipt.json",
+          "sha256": "c165efb3e3b7068387a4d00e25a925d15c9fb947d320835f6979e0f5cc42db2d"
+        },
+        "manifest": {
+          "path": "artifacts/ram-25000000-v3/manifest.json",
+          "sha256": "eadf43ac1797aa346bba001c59423cd6e139517508eef9d3466b39159a75b0cd"
+        },
+        "ready_for_deployment": false,
+        "source_commits": {
+          "buildroot": "35d87ae5ba3109f6f4febdbdde6eb7b2449567f1",
+          "firmware": "29d508bd61f8e06ea043f418a9e44426bed3d075",
+          "hdl": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+          "linux": "2ca29493643016d137d094a85525c3f2dc290b34",
+          "u-boot-xlnx": "1ff0468e9bea29b0a768a7bf52db8d025c521b9a"
+        }
+      },
+      "removed_warning_classes_absent": {
+        "CDC-10": true,
+        "LUTAR-1": true,
+        "REQP-1839": true,
+        "REQP-1840": true
+      },
+      "reports": {
+        "audit.tsv": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/audit.tsv",
+          "sha256": "3587acd806dfca53b73b7e0bb153176ab9f11f74a963d8ba34bb4c5b2c5b350f"
+        },
+        "bus_skew.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/bus_skew.rpt",
+          "sha256": "be9f9c443c33d1a1cf446843b520927ff73bf5f9d7949a0b28e874cee56cf84c"
+        },
+        "cdc.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/cdc.rpt",
+          "sha256": "5eecd12392a0663da1e079049bbcdda78047e27c5c07b7519a0752e856dff26f"
+        },
+        "drc.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/drc.rpt",
+          "sha256": "bcba33a78747d3be85b569d00035acae96fe3bfa58a5772d2e7e905ab5be49de"
+        },
+        "exception_coverage.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/exception_coverage.rpt",
+          "sha256": "7f6eea93f550c52aeb98d509df36edf3d14685e9b1d56a2a85a47e21a0920314"
+        },
+        "ignored_exceptions.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/ignored_exceptions.rpt",
+          "sha256": "e8fa952291791b8d65b32d2cb19a621321e98fb80c48fc518f7c907f22cd0633"
+        },
+        "io.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/io.rpt",
+          "sha256": "9ac9423885e0befebcd699259950625b996c5306dc031f9cf7d7f098b2601187"
+        },
+        "methodology.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/methodology.rpt",
+          "sha256": "0511b6bd3c945de19a12b6c222205a6f8994210b7840f37fdca72fff6bc251ac"
+        },
+        "timing_summary.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/timing_summary.rpt",
+          "sha256": "3a15fe649a2f55133e47262e451b0840e9734bef4f18e9a25a2a6fafa7615d47"
+        },
+        "utilization.rpt": {
+          "path": "artifacts/board-25000000-selector352-v1/full-audit/utilization.rpt",
+          "sha256": "9b4a6bcca4f2f0beddb195c4df6163239bd7795dc06a0bb4832dfbecc6e779a1"
+        }
+      },
+      "resources": {
+        "bram_tiles": 31,
+        "dsps": 64,
+        "flip_flops": 13102,
+        "luts": 11408,
+        "slices": 4219
+      },
+      "setup_slack_ns": 0.041,
+      "source_rate_hz": 25000000,
+      "source_validation": {
+        "path": "artifacts/board-25000000-selector352-v1/source_validation.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "artifact": "artifacts/board-60000000-selector352-v3-fanout",
+      "build_outputs": {
+        "path": "artifacts/board-60000000-selector352-v3-fanout/outputs.sha256",
+        "sha256": "3a0d121cbfe815542499f77bf95b9a571e7ae4f03889b42299046944d035a162"
+      },
+      "build_passed": true,
+      "hardware_eligible": false,
+      "hdl_commit": "0d67920ce7462a5f1089292bbe9c10db8e658149",
+      "hold_slack_ns": 0.013,
+      "package": {
+        "candidate_plan": {
+          "path": "artifacts/ram-60000000-v2/contracts/candidate-plan-ad9361-1r1t.json",
+          "sha256": "c32594fc9f197bd977a28f5ca2da3fd7ac4622ae0d7d6e60815a5ae19b39ca0e"
+        },
+        "dfu": {
+          "path": "artifacts/ram-60000000-v2/pluto.dfu",
+          "sha256": "e12b3db63133e49f9601bb2fb2a583d5e5928ecfe4eab3c149c3fc166ebe64f6"
+        },
+        "firmware_label": "glrt-ram-r60000000-v2",
+        "fit": {
+          "path": "artifacts/ram-60000000-v2/pluto.itb",
+          "sha256": "fc8b177b0fe3b614a9c157fedc9f319c9baacf57e483dcb92fda5be3327ee54c"
+        },
+        "independent_verification": {
+          "path": "artifacts/ram-60000000-v2/independent-verification/receipt.json",
+          "sha256": "4f34149c56c8979a4296a36428d8c403d7aead86b91133051f49c146440fb89d"
+        },
+        "manifest": {
+          "path": "artifacts/ram-60000000-v2/manifest.json",
+          "sha256": "01859016b01e72b820af48208f6e09e51f6dd8a21760a6cf78819da6bf9d1c48"
+        },
+        "ready_for_deployment": false,
+        "source_commits": {
+          "buildroot": "35d87ae5ba3109f6f4febdbdde6eb7b2449567f1",
+          "firmware": "29d508bd61f8e06ea043f418a9e44426bed3d075",
+          "hdl": "0d67920ce7462a5f1089292bbe9c10db8e658149",
+          "linux": "2ca29493643016d137d094a85525c3f2dc290b34",
+          "u-boot-xlnx": "1ff0468e9bea29b0a768a7bf52db8d025c521b9a"
+        }
+      },
+      "removed_warning_classes_absent": {
+        "CDC-10": true,
+        "LUTAR-1": true,
+        "REQP-1839": true,
+        "REQP-1840": true
+      },
+      "reports": {
+        "audit.tsv": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/audit.tsv",
+          "sha256": "0d4bfdd70902398da846b1c58a814c82e076fc4ba6c4782a410d9e8168be0d63"
+        },
+        "bus_skew.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/bus_skew.rpt",
+          "sha256": "273e3f48f9e44312cae3188fa49fa2f6fbf5889beda2d62a4433d60974114709"
+        },
+        "cdc.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/cdc.rpt",
+          "sha256": "d8c0418f14e3ff8a85b6f2d3099b28131ff498331c3df61c0c6cdf529224185c"
+        },
+        "drc.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/drc.rpt",
+          "sha256": "b2db796da550ed1677354fec9e460c8073434d13199e051d32fce84349275582"
+        },
+        "exception_coverage.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/exception_coverage.rpt",
+          "sha256": "13483afb9cea12c72a82e1e354808e9ec40e9aea9a1e011e49eb5e1b551312e7"
+        },
+        "ignored_exceptions.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/ignored_exceptions.rpt",
+          "sha256": "c0eee7c2d52494e911f54e2390eb9c5f59265cda4cbb20db6b53b396ab67c827"
+        },
+        "io.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/io.rpt",
+          "sha256": "0c40668a9b286576526f73bcd3b013d69f69f8206ada60d0a423d360d15ac815"
+        },
+        "methodology.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/methodology.rpt",
+          "sha256": "eea7f5f095d20fb5e63882d0d8eb990527a029220c4e58b7e1a792ad76d71492"
+        },
+        "timing_summary.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/timing_summary.rpt",
+          "sha256": "f5cf97a3d7ca93c6560dfabf72ac4f91221191c3d8b742c20a09ab31fd5fc6b4"
+        },
+        "utilization.rpt": {
+          "path": "artifacts/board-60000000-selector352-v3-fanout/full-audit/utilization.rpt",
+          "sha256": "0dcd94c2d3682ea3d0a092207fc989b9f016f051ade940278a69572fb90df309"
+        }
+      },
+      "resources": {
+        "bram_tiles": 46.5,
+        "dsps": 72,
+        "flip_flops": 13378,
+        "luts": 12887,
+        "slices": 4355
+      },
+      "setup_slack_ns": 0.002,
+      "source_rate_hz": 60000000,
+      "source_validation": {
+        "path": "artifacts/board-60000000-selector352-v3-fanout/source_validation.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "retained_attempts": [
+    {
+      "artifact": "artifacts/board-60000000-selector352-v1",
+      "build_passed": false,
+      "hardware_eligible": false,
+      "hdl_commit": "a9a4ca9a23be4a4dc79e2907d430e4f0cc23260b",
+      "hold_slack_ns": 0.025,
+      "removed_warning_classes_absent": {
+        "CDC-10": true,
+        "LUTAR-1": true,
+        "REQP-1839": true,
+        "REQP-1840": true
+      },
+      "reports": {
+        "audit.tsv": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/audit.tsv",
+          "sha256": "490b39add231341e302250726657d20ca3d9fbd2a8de7b3d71e79462af9ecd7d"
+        },
+        "bus_skew.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/bus_skew.rpt",
+          "sha256": "76dd5b7cba01866694f8546d355f4bae5ed7ae2ab375a894a87beef86ddcb604"
+        },
+        "cdc.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/cdc.rpt",
+          "sha256": "2fcc5780bc5779e0fe9c971f8880d2bfca5ce670159389b8fefda95092caf036"
+        },
+        "drc.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/drc.rpt",
+          "sha256": "fb3f10864da3edbf64ff4650704fc641257f9d943f7cdd4cf510407322159962"
+        },
+        "exception_coverage.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/exception_coverage.rpt",
+          "sha256": "b85b77657753137e8a0fc8879d51e701e3c3cfbaac6e45095177ac97820bf83a"
+        },
+        "ignored_exceptions.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/ignored_exceptions.rpt",
+          "sha256": "4c247798d4f53b1bed545b0f29e037f56fbbce788dd5e4a2e90b04c3dc38f9d7"
+        },
+        "io.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/io.rpt",
+          "sha256": "f528696da1600b190664a551ee0ceac309492c826084fd4824aa862f7018fc6c"
+        },
+        "methodology.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/methodology.rpt",
+          "sha256": "cf9ab4216af08bbebf8e82cf925f29c930b5f0128f6aba104955f094d7db24f7"
+        },
+        "timing_summary.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/timing_summary.rpt",
+          "sha256": "7eee78f76051351524f85f9339821a04bb840434a3834c42b0d9173040dbd176"
+        },
+        "utilization.rpt": {
+          "path": "artifacts/board-60000000-selector352-v1/full-audit/utilization.rpt",
+          "sha256": "87cf2ad99f5e49b82b9e78e1a0c5f0f325acb24de193666e4ecfe0921df5b532"
+        }
+      },
+      "resources": {
+        "bram_tiles": 46.5,
+        "dsps": 72,
+        "flip_flops": 13331,
+        "luts": 12890,
+        "slices": 4317
+      },
+      "setup_slack_ns": -0.056,
+      "source_rate_hz": 60000000,
+      "source_validation": {
+        "path": "artifacts/board-60000000-selector352-v1/source_validation.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "artifact": "artifacts/board-60000000-selector352-v2-aggressive",
+      "build_outputs": {
+        "path": "artifacts/board-60000000-selector352-v2-aggressive/outputs.sha256",
+        "sha256": "94d63e997d254e10b64fd86794526c5ee4a09f18108c4d434f06b097c0eca50c"
+      },
+      "build_passed": true,
+      "hardware_eligible": false,
+      "hdl_commit": "25c9b1d19eaaf8d8c81133310e6cb6dcd9e4c922",
+      "hold_slack_ns": 0.038,
+      "removed_warning_classes_absent": {
+        "CDC-10": true,
+        "LUTAR-1": true,
+        "REQP-1839": true,
+        "REQP-1840": true
+      },
+      "reports": {
+        "audit.tsv": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/audit.tsv",
+          "sha256": "1c978f648c2ddd1f2309e521a84c530ce8da215ff4fce06af36635ed5fe9c88f"
+        },
+        "bus_skew.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/bus_skew.rpt",
+          "sha256": "e1cbc787249ecd0de2e572b0b1672e0c5bbad69e74cadeec048d03288ad71d84"
+        },
+        "cdc.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/cdc.rpt",
+          "sha256": "6a3589bb3df5bfb644ddc490a14ef58ef908a0630e5a37eaeab64ca11e94b79a"
+        },
+        "drc.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/drc.rpt",
+          "sha256": "ff325b5aa7fbb3b1ee04d6a9a6c8b3ff6a593b304a97d1512f2f3d5906d88c80"
+        },
+        "exception_coverage.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/exception_coverage.rpt",
+          "sha256": "2d3148e497a34aa0437522e3017fe8ef6a0441c149f4f4e6f134bd41078654a8"
+        },
+        "ignored_exceptions.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/ignored_exceptions.rpt",
+          "sha256": "f4b023efea56be7a0c2085976483da46390a9e4bdf8c4e997937d0986edb2d80"
+        },
+        "io.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/io.rpt",
+          "sha256": "743243249d1cca41ee8790d3777ef04c860d481f8161d4ecc460b0949a9938f1"
+        },
+        "methodology.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/methodology.rpt",
+          "sha256": "61634c731b259078b8c37e9f659ca6f915ab5997d69055b00cd1ce8ea8953db4"
+        },
+        "timing_summary.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/timing_summary.rpt",
+          "sha256": "98f2ef099fe78377955051c1b8e1d92f4f1d4e01ef04f94ce7aaf2d37c59bc15"
+        },
+        "utilization.rpt": {
+          "path": "artifacts/board-60000000-selector352-v2-aggressive/full-audit/utilization.rpt",
+          "sha256": "2ac663418396bbd93468743d2130c08d8543a1ee925bddd995b86cb37f670e11"
+        }
+      },
+      "resources": {
+        "bram_tiles": 46.5,
+        "dsps": 72,
+        "flip_flops": 13334,
+        "luts": 12886,
+        "slices": 4317
+      },
+      "setup_slack_ns": 0.001,
+      "source_rate_hz": 60000000,
+      "source_validation": {
+        "path": "artifacts/board-60000000-selector352-v2-aggressive/source_validation.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  ],
+  "runtime_rate_qualified": false,
+  "schema": "starlink-glrt-current-board-packages/v1",
+  "transport_qualified": false,
+  "validation": {
+    "bank_23_tests": {
+      "path": "artifacts/glrt-acquisition-fanout-tests-v2-20260909.xml",
+      "sha256": "3173e033b213e44fb55c26799db10223985aa6f8a372ae806a9904b77b1667e2"
+    },
+    "capture_38_tests": {
+      "path": "artifacts/glrt-selector352-capture-tests-20260909.xml",
+      "sha256": "cc8d523ca1df7aac45faf19290d50ed7f266382a59ffc38fc3f727037b32c0bf"
+    }
+  }
+}

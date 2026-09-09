@@ -4,12 +4,12 @@ Experimental branch `codex/starlink-glrt-only-do-not-merge`. Persistent task
 `01a0821a-7b4c-73f0-8b2c-47b4e95207f9`, gpt-6-astra / xhigh; unbudgeted objective
 unfinished. See [the completion gate](GLRT_ONLY_GOAL.md).
 
-Current HDL a9a4ca9a includes the reviewed CDC changes and 352-sample candidate
-grouping. Its 2.5/5/10/25 MS/s full-board routes and independently extracted RAM
-packages pass their local checks. Its first 60 MS/s route fails setup by 0.056 ns;
-an isolated physical-optimization attempt is running with identical RTL and
-unchanged timing constraints. The earlier ff42d5ab five-rate route/package
-checkpoint remains preserved, but is not the current detector implementation.
+Current HDL 0d67920c includes the reviewed CDC changes, 352-sample grouping and
+physical timing adjustments. All five rate-specific images pass full-board
+setup/hold, Gray-bus skew and the active netlist gate. Their corrected-model RAM
+packages pass independent extraction and identity checks. The 60 MS/s image has
+only +0.002 ns setup slack, a constrained pass with very little extra margin.
+The earlier failed/narrow-margin attempts and ff42d5ab checkpoint remain intact.
 
 A new fixed-seed, randomized-timing synthetic trial passes every strong-case
 and control-case criterion. It recovers 32/45 complete strong frames; all 13
@@ -18,7 +18,7 @@ positives agree with independent host GLRT. Weak/short-signal and saved-RF
 sensitivity limits remain. No hardware has been accessed: radio calibration,
 real transport headroom, owner allocation and live agreement are outstanding.
 See [current numerical evidence](reports/starlink-glrt-selector352-numerical-20260909.json),
-[the retained routing checkpoint](reports/starlink-glrt-five-rate-checkpoint-20260909.json)
+[current board/package evidence](reports/starlink-glrt-current-board-packages-20260909.json)
 and [the original numerical checkpoint](reports/starlink-glrt-numerical-checkpoint-20260909.json).
 
 ## Source isolation, 2026-09-08
@@ -59,19 +59,21 @@ positive internal slack still require actual DMA/transport qualification.
 
 ## Qualification ladder
 
-| Source MS/s | Current numerical/RTL evidence | a9a4ca9a full route, setup/hold ns | RAM package | Hardware/live |
+| Source MS/s | Current numerical/RTL evidence | Full route, setup/hold ns | RAM package | Hardware/live |
 |---|---|---|---|---|
-| 2.5 | exact IQ/statistics; strong 4/9 frames; controls quiet | +0.112 / +0.019 | ram-2500000-v3 verified | pending |
-| 5 | exact IQ/statistics; strong 4/9 frames; controls quiet | +0.200 / +0.021 | ram-5000000-v2 verified | pending |
-| 10 | exact IQ/statistics; strong 8/9 frames; controls quiet | +0.075 / +0.014 | ram-10000000-v2 verified | pending |
-| 25 | exact IQ/statistics; strong 8/9 frames; controls quiet | +0.041 / +0.024 | ram-25000000-v2 verified | pending |
-| 60 | exact IQ/statistics; strong 8/9 frames; controls quiet | -0.056 / +0.025; physical retry running | current image blocked by timing | pending |
+| 2.5 | exact IQ/statistics; strong 4/9 frames; controls quiet | +0.112 / +0.019 | ram-2500000-v4 verified | pending |
+| 5 | exact IQ/statistics; strong 4/9 frames; controls quiet | +0.200 / +0.021 | ram-5000000-v3 verified | pending |
+| 10 | exact IQ/statistics; strong 8/9 frames; controls quiet | +0.075 / +0.014 | ram-10000000-v3 verified | pending |
+| 25 | exact IQ/statistics; strong 8/9 frames; controls quiet | +0.041 / +0.024 | ram-25000000-v3 verified | pending |
+| 60 | exact IQ/statistics; strong 8/9 frames; controls quiet | +0.002 / +0.013 | ram-60000000-v2 verified | pending |
 
 RTL entries now include blind fabric acquisition, native GLRT and continuous
 IQ export together, with no candidate timing input. The counts above describe
 the new synthetic trial, with three CFO cases and nine complete strong frames
-per rate. The GLRT-only board profile is implemented; 60 MS/s timing, the external
-I/O boundary and real RF qualification remain open. These bounded synthetic
+per rate. The four lower-rate boards identify a9a4ca9a; 60 identifies 0d67920c,
+whose changes affect synthesis fanout and physical optimization without changing
+arithmetic or cycle counts. The external I/O boundary, additional 60 MS/s timing
+margin and real RF qualification remain open. These bounded synthetic
 observations are not a measured RF sensitivity curve.
 
 ## Coordination
@@ -555,3 +557,39 @@ physical-optimization directives to AggressiveExplore; all RTL and XDC bounds
 are identical. Its full build is in progress. Hardware coordination messaging
 still fails at the local MCP transport endpoint, and no ownership window has
 been assumed.
+
+## Current RAM candidates and deployment-tool compatibility, 2026-09-09
+
+Physical-only 60 MS/s attempt 25c9b1d1 passed at +0.001/+0.038 ns. Its successor
+0d67920c limits acquisition history-address fanout to 32 and passes the full
+audit at +0.002/+0.013 ns, 12887 LUTs, 13378 FFs, 4355/4400 slices, 72 DSPs and
+46.5 BRAM tiles. The worst path moves to the native reader's 64-bit availability
+comparison. No clock, jitter or CDC constraint was relaxed. This remains a very
+narrow setup margin. All 23 pilot-bank cadence/arithmetic tests pass; the first
+test invocation named a file not yet copied into the prototype and ran no tests.
+All 38 main AXI/IQ/event capture tests pass in 197.33 seconds on a9a4ca9a.
+
+Deployment preparation found that the GLRT device tree replaced physical board
+identity with a firmware-description string. Linux 2ca294936430 preserves the
+inherited Rev.C model and uses a separate `misko,glrt-fpga` marker. The new kernel
+build is `artifacts/kernel-glrt-v3`, release 5.15.0-00009-g2ca294936430. Compiled
+device-tree checks prove both markers, the exact GLRT DMA binding and no ADC
+DMA property. Earlier packages retain the experimental model and are superseded
+for the current device-tool workflow.
+
+The independent owned tool checkout `artifacts/device-tool-glrt-v1`, based on
+PPU 5e3d6b91 and committed at fa2f6e1, adds literal `rx-glrt-stream-v1`. The old
+native-IQ and detector-without-IQ policies retain their requirements. The new
+policy verifies the exact custom CI16/event formats, 2.5 MS/s export, GLR1 ABI,
+GLRT marker/DMA binding, no native ADC DMA, and no PSS or TX datapath. Existing
+board/setup/serial/boot/QSPI/TX-quiesce/recovery checks remain binding. **91**
+contract/backend/lifecycle tests and **13** CLI tests pass; lint and the two
+changed modules' type checks pass. One intermediate receipt fixture used the
+internal schema field instead of its JSON alias; its failed run is retained,
+and the corrected tests also match each intended rejection reason.
+
+All five new packages and candidate-plan hashes are in the
+[current board/package report](reports/starlink-glrt-current-board-packages-20260909.json).
+Plans live in owned mode-0700 `contracts/` directories and name the intended
+ad9361-1r1t setup, not an observed current radio state. No USB inventory or live
+operation has run. Owner messaging continues to fail at the local MCP endpoint.
