@@ -4,7 +4,7 @@
   "runtime_hdl_commit": "f284b9f5a909c1c64f9040ac3dd7b90e42e6e659",
   "build_hdl_commit": "af96c48ed34a58d54c548b4a2dc414aeff593c39",
   "baseline_hdl_commit": "52f921f69cbc1fd38e30db79911ef7ed761d229d",
-  "scope": "Same-edge producer summary and exact PSMA public behavior; isolated controller structural synthesis and reduced actual-FFT paired replay. No routed timing or hardware promotion for this candidate.",
+  "scope": "Same-edge producer summary and exact PSMA public behavior; isolated controller structural synthesis and reduced actual-FFT paired replay. Full receiver finished routing but failed timing; no hardware promotion.",
   "implementation": {
     "producer": "All 15 existing saturating map error increments atomically set map_counter_fault in the same nonblocking assignment. All original counters and current-event fault predicates remain. Common reset is the only clear; the arithmetic-overflow counter remains invariant zero under the unchanged width guard.",
     "controller": "MAP_COUNTERS_FROM_FLAG defaults to zero. Only the real same-clock/reset acquisition wrapper explicitly selects the flag with boundary stop enabled. Independent generic counters retain their conservative nonzero checks.",
@@ -72,23 +72,55 @@
     "console_sha256": "078f6ee56884b09a30f41c043c6d8bc13816d10aaf21fa021ba938a07921518f"
   },
   "full_receiver": {
-    "status": "synthesis_running",
+    "status": "terminal_timing_failed",
     "directory": "hdl/projects/pluto/shared-realtime-map-summary-v1",
     "launch_utc": "2026-09-09T20:41:03Z",
-    "process_confirmed_live_utc": "2026-09-09T20:43:25Z",
-    "parent_vivado_pid_as_observed": 1581052,
-    "synthesis_vivado_pid_as_observed": 1581613,
-    "tool_session": 12307,
+    "finished_utc": "2026-09-09T20:51:17Z",
+    "exit_code": 1,
     "source_revision": "af96c48ed34a58d54c548b4a2dc414aeff593c39",
     "configuration": "15MS/s paired-pilot, shared/realtime XFFT, boundary stop enabled, DSP tracker retained, global synthesis, clean tracked HDL, no reference checkpoint, unchanged constraints",
-    "deployment_eligible": false
+    "deployment_eligible": false,
+    "WNS_ns": -2.183,
+    "TNS_ns": -189.135,
+    "setup_failing_endpoints": 335,
+    "WHS_ns": 0.014,
+    "hold_failing_endpoints": 0,
+    "intra_clock": {
+      "100MHz": {"WNS_ns": 0.029, "setup_failing_endpoints": 0},
+      "200MHz": {"WNS_ns": -2.183, "TNS_ns": -188.069, "setup_failing_endpoints": 332},
+      "RX": {"WNS_ns": 2.200, "setup_failing_endpoints": 0}
+    },
+    "additional_inter_clock_setup_failures": 3,
+    "resources": {"LUT": 13092, "FF": 18502, "slices": 4397, "available_slices": 4400, "BRAM_tiles": 53.5, "DSP": 54},
+    "routable_nets": 33946,
+    "routing_errors": 0,
+    "worst_path": "transform_service/input_mailbox/read_output_position_reg[1]/C -> transform_service/result_guard/active_private_reg/D",
+    "checkpoint_sha256": "2a5383c37bc245daf74e038843072c18118a0f82091978a29e1bf500574e0dca",
+    "postroute_physopt_timing_report_sha256": "dda7d7d54f1e412aebc916195551526cf7bd519f4fe03f3af7ee3081b6a34537",
+    "console_sha256": "fdc8924721a2f199bfacd25295fbe581b9b1551a19f65ebab92544e60e53cc63",
+    "init_gate_sha256": "eb8d39270b020180b8763b30be4177c7cf7f3aed96a768a4f7da6b8642dca574",
+    "init_gate": "Passed original clock/ownership path and both-PSS/pilot-DMA checks; 10 reducer DSP, 67 stop-controller registers, four map fences, eight common-reset registers and one pilot-pacer RAMB18 retained.",
+    "artifact_warning": "An emitted bitstream and bad_timing XSA do not qualify this build for deployment."
+  },
+  "final_checkpoint_audit": {
+    "directory": "hdl/projects/pluto/shared-realtime-map-summary-v1/final-audit-v1",
+    "finished_utc": "2026-09-09T20:54:20Z",
+    "exit_code": 0,
+    "category_worst_slack_ns": {"vendor_internal": -1.202, "return_slot": -0.355, "output_publication": -1.818, "output_mailbox_fault": -1.127, "output_payload_control": 0.263, "sticky_fault_crossing": 3.412, "sticky_fault_second_stage": 3.738},
+    "summary_sha256": "703ae0d83df77203e2bc6a6e514dfab7a74c7e37c3a14f0195b9e7fd370ca5b6",
+    "cdc_sha256": "f1ee75079e1302b9a07b549874a78fb558676cac905295bc7f3cd5dabcb4c32f",
+    "check_timing_sha256": "8d515565ea918399439788ca1d04ba3923b1a0c73c723aade22814d572db86ba",
+    "missing_input_delays": 13,
+    "missing_output_delays": 2,
+    "CDC_warnings": {"CDC-6": 9, "CDC-15": 199, "CDC-17": 7},
+    "limit": "Read-only audit of the exact final checkpoint, not physical or hardware qualification. Board I/O and CDC obligations remain open."
   },
   "preceding_receiver": "52f921f6 is terminal: WNS -2.463ns, 543 setup failures, zero hold failures. Final route/audit and unresolved board-I/O/CDC obligations are in starlink-guard-occupancy-20260909.json.",
   "radio_accessed": false,
   "ppu_changed": false,
   "deployed": false,
   "next": [
-    "Observe the specific live receiver implementation to its terminal result and audit the exact final checkpoint; do not restart merely because observation is slow.",
+    "Retain the failed final receiver and its checkpoint audit; qualify the next bounded timing change before a fresh full build.",
     "Separately qualify the 200MHz input-checker-to-ACK/publication dependency; retain immediate fault vetoes and address the vendor-internal path, board-I/O and CDC obligations.",
     "After full physical gates: .18 finite/continuous native IIO, causal coarse/fine handoff, PPU Ethernet deployment and independent live GLRT/fine PSS on .17; then eight-target 120ms/300s scanning and the 30/60MS/s ladder."
   ]

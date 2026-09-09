@@ -390,9 +390,20 @@ The acquisition package was refreshed. Fresh receiver build
 `hdl/projects/pluto/shared-realtime-map-summary-v1` started at 20:41:03 UTC from
 clean tracked HDL `af96c48ed34a58d54c548b4a2dc414aeff593c39`, with both PSS
 stages, pilot DMA and boundary stop enabled, unchanged constraints, and no
-reference checkpoint. At 20:43:25 UTC the original synthesis process remained
-live. HDL is pushed to the experimental do-not-merge branch. No PPU or radio
-operation occurred. See `reports/starlink-map-counter-summary-20260909.json`.
+reference checkpoint. It finished at 20:51:17 UTC with exit 1: **timing failed**.
+Final WNS is -2.183 ns, TNS -189.135 ns, 335 setup failures and zero hold
+failures (WHS +0.014 ns). The 100 MHz domain passes at +0.029 ns and RX passes
+at +2.200 ns; 332 failures remain within 200 MHz plus three inter-clock failures.
+Resources are 13092 LUT, 18502 FF, 4397/4400 slices, 53.5 BRAM tiles and 54 DSP.
+All 33946 routable nets routed, but an emitted bitstream is not deployable.
+
+The final-checkpoint audit completed at 20:54:20 UTC. Worst categories include
+vendor-internal FFT -1.202 ns, publication -1.818 ns and mailbox fault -1.127 ns.
+The receiver's worst path is input-mailbox position to result-guard active state.
+Thirteen missing input delays, two missing output delays and CDC warning
+obligations remain. HDL is pushed to the experimental do-not-merge branch.
+No PPU or radio operation occurred. See
+`reports/starlink-map-counter-summary-20260909.json` for exact artifact hashes.
 
 ### Registered-quarantine occupancy cut — 2026-09-09
 
