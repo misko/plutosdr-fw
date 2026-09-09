@@ -145,7 +145,8 @@ retains its failure; no timing constraint is relaxed to call it a pass.
 
 The exact `4cd97a03` [five-rate synthetic matrix](/srv/bulk/leo/glrt-deployment-20260909/host-synthetic-five-rate-4cd97a03-seed29343-v1/summary.json)
 passes the strong-frame and quiet-control gates. Weak/short cases remain
-reported limits; diagnostic short-32 cases retain six unmatched host supports.
+reported limits; diagnostic short-32 cases retain six FPGA positive events
+without independent host matches.
 Rolled pilots retain cyclic timing ambiguity and are not a certified negative
 control or spacecraft/frame identity. Those limits are not erased by passing
 transport or arithmetic. All captures use the observed post-boot 2.4 GHz LO,
