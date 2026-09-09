@@ -1,0 +1,149 @@
+{
+  "schema": "starlink-private-descriptor-and-stop-residue-v1",
+  "date_utc": "2026-09-09",
+  "status": "OFFLINE_BEHAVIOR_PASS_PHYSICAL_EFFECT_NOT_MEASURED",
+  "hdl_commit": "deb9badcc9a521d4694ceebe0223c97344cb7566",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "hardware_access": false,
+  "radio_configuration_or_deployment": false,
+  "runtime_change": {
+    "file": "hdl/library/starlink_pss_acquisition/starlink_pss_realtime_result_guard.v",
+    "rationale": "Remove full active-job current-fault cone from private70-bit descriptor enable; prior physical worst path was expected_position[3] -> descriptor[25]/CE.",
+    "change": "Capture on !active && !awaiting_ack && !protocol_fault && job_valid; remove nested job_accept capture.",
+    "invariants": "Same admitted descriptor on same healthy edge; job_ready, job_accept, public validity, fault reasons, immediate veto, clocks and arithmetic unchanged.",
+    "private_difference": "Rejected idle requests may change invalid metadata. Current faults quarantine it; accepted active/held-final/ACK interval including ACK clearing edge hold the accepted value."
+  },
+  "focused_tests": {
+    "passed": 7,
+    "seconds": 0.42,
+    "mutants_rejected": 6,
+    "idle_rows": 2048,
+    "fault_rows": 2032,
+    "speculative_rejections": 1023,
+    "current_fault_captures": 1016,
+    "active_faults": 1,
+    "reset_challenges": 2,
+    "healthy_jobs": 3,
+    "exact_words": 1536,
+    "golden": "Immutable ff4229 public behavior and exact sticky reasons; no forced state.",
+    "limitation": "Modeled certificates, core beats and READY/ACK; no real XFFT/mailbox/CDC timing by this focused bench."
+  },
+  "root_regression": {
+    "passed": 802,
+    "seconds": 97.04,
+    "exit_code": 0,
+    "root_session": 29219,
+    "selection": "All tests/starlink_oracle plus11 explicit root contract/policy files including updated paired runner; not all firmware tests.",
+    "log": "/tmp/starlink-private-descriptor-regression-v1.log"
+  },
+  "root_actual_replays": [
+    {
+      "root_session": 73927,
+      "exit_code": 0,
+      "base": "shared-realtime-private-descriptor-service-v1",
+      "healthy_jobs": 26,
+      "exact_words": 13312,
+      "starvation_cases": 6,
+      "final_veto_cases": 3,
+      "malformed_banks": 2,
+      "independent_resets": 6,
+      "postcommit_ack_faults": 1
+    },
+    {
+      "root_session": 2954,
+      "exit_code": 0,
+      "base": "realtime-private-descriptor-numeric-v1",
+      "source_words": 1406,
+      "exact_scores": 1341,
+      "exact_forward_product_inverse_words_each": 1536
+    },
+    {
+      "root_session": 4868,
+      "exit_code": 0,
+      "base": "paired-realtime-private-descriptor-stop-v1",
+      "map_bins": 447,
+      "tile_frames": 2,
+      "exact_scores": 894,
+      "exact_map_words": 447,
+      "exact_pilot_bytes": 2048
+    }
+  ],
+  "stop_residue": {
+    "motivation": "Production tile1280000 mod447=239; original reduced894-score tile ended on a complete447-score block.",
+    "runtime_changes": false,
+    "default_geometry_unchanged": "447x2",
+    "new_explicit_geometry": "343x2",
+    "selected_scores": 686,
+    "residue": 239,
+    "agent_run": {
+      "session": 63359,
+      "exit_code": 0,
+      "base": "paired-realtime-psma-stop-residue-v1"
+    },
+    "default_requalification": {
+      "session": 15519,
+      "exit_code": 0,
+      "base": "paired-realtime-psma-stop-residue-default-v1"
+    },
+    "actual_residue_ack": {
+      "map_admitted_scores": 686,
+      "tagged_produced_scores": 687,
+      "exact_map_words": 343,
+      "candidate_fifo_entries": 203,
+      "second_block_started": true,
+      "third_block_started": true,
+      "third_block_returned": false,
+      "inverse_busy": false
+    },
+    "actual_default_ack": {
+      "map_admitted_scores": 894,
+      "tagged_produced_scores": 894,
+      "exact_map_words": 447,
+      "candidate_fifo_entries": 0,
+      "third_block_started": true,
+      "third_block_returned": false,
+      "inverse_busy": true
+    },
+    "pilot_bytes_sha256": "9ca24563bda3a3df6a0f780f3eb976eaac044d97ce752277b3781ba95942d1bd",
+    "both_cases": "Every produced score checked; exactly selected scores admitted to map; exact independent pilot2048bytes and support/index/health; pilot continues after stop; actual late bridge fault retained.",
+    "policy_tests": {
+      "passed": 68,
+      "seconds": 0.93,
+      "ruff": "PASS"
+    },
+    "invalid_bench_geometry": "344 rejected at cycle0 with exit1.",
+    "scope": "Reduced maps and configuration pause, not production-duration or DMA/IIO/fine/RF qualification."
+  },
+  "physical_gate": {
+    "new_build_launched": false,
+    "reason": "User requested specific25MS/s recorded-data test while this candidate was being qualified; current focus is offline capture replay.",
+    "latest_completed_hdl": "90c539cd4ea51bd0dbe3e8154177f62c388d394c",
+    "latest_200mhz_wns_ns": -1.722,
+    "latest_200mhz_failing_endpoints": 361,
+    "boundary_stop_in_latest_physical_image": false,
+    "timing_closed": false,
+    "next": "Fresh full-design synthesis/place/route, verify descriptor enable cone and every domain/hold/CDC gate; then a separately qualified stop-enabled image."
+  },
+  "independent_review": {
+    "descriptor": "fft_arch_review reviewed private/admission/ACK/reset invariants and wrote focused differential/mutation tests; root read source and ran regressions plus actual XFFT replays.",
+    "previous_paired_report": "pilot_contract_review independently verified all16 previous report hashes,35 runtime leaves, exact2048 pilot bytes,512 indexes and retained limitations before identifying and covering residue239."
+  },
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/starlink_pss_realtime_result_guard.v": "3b9d55d9252d6cab7cec904667db292a5b8e0beee582c1994f08faea9ec22041",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_private_descriptor.sv": "163697b7e4fd8d613d40b9b424bc9a38252b21da7bd5a0d3ac3be468eed6b115",
+    "tests/starlink_oracle/test_realtime_private_descriptor.py": "bbf9de713a856a0d89116577e248609dd745cde7c959b2c7d23937663fe13817",
+    "hdl/library/starlink_pss_acquisition/simulate_paired_realtime_psma_stop.tcl": "cf09ed0d5990591bbc08d12350b0c627b71c668b4c9cd5d41ab1b024be45d141",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_paired_realtime_psma_stop.sv": "9412be5b98997da6b94366b049b0e1586c2444793f0d1316080bb22eed2a2e2d",
+    "tests/test_starlink_paired_realtime_psma_stop_policy.py": "ce1c1d2cb86c79cb0330b6659c07ece220eedd98eb31c6ace0e2be76ef376d2b",
+    "/tmp/starlink-private-descriptor-regression-v1.log": "129cf33bdedf23659ca44d1d519f69512fc50d10d8a76912ed426dfcb40e29b8",
+    "/tmp/starlink-private-descriptor-existing-v1.log": "d0fc9847de06804a4ca98823e0cb104c240cf7bc72f31fb9fee6115075b33073",
+    "/tmp/starlink-paired-residue-policy-v1.log": "11cea4f725e0e535098a5b38179c7181a5d899574f666616299bc4194278383f",
+    "hdl/library/starlink_pss_acquisition/build/shared-realtime-private-descriptor-service-v1-console.log": "39be7de33f329fe044b2375bb72407e19c2db60350e08d0c8f4d25c160732b0f",
+    "hdl/library/starlink_pss_acquisition/build/realtime-private-descriptor-numeric-v1-console.log": "3fc8451e6980df6231bfb49ae46ee80566824b773a63dd0449faea4291ce9afa",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-private-descriptor-stop-v1-console.log": "26cab919d784575b8bafe87b1845c5b3cbc83ccb662c27e02791e07358141c53",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-residue-v1/project/paired_realtime_psma_stop.sim/sim_1/behav/xsim/simulate.log": "6cb726a65245bb7d3d52d121789846a1a5e5cca6f9516babb290aa7492a7cff5",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-residue-default-v1/project/paired_realtime_psma_stop.sim/sim_1/behav/xsim/simulate.log": "7b9ef2924520eb10e82466c9c30bf0f0d255ae63ff3583d6e0809b52592e82e2",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-residue-v1/scope.txt": "94fa7b8a30058cc41b544496517e5f6525dcdad62c3ed46773eb1387ae2e9ab8",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-residue-default-v1/scope.txt": "ab3c9608c63d95794180270ec4a72d27db992a89f2645fe089c502433b5a2087"
+  }
+}

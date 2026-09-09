@@ -183,9 +183,9 @@
     "Independent review workers were unavailable; final combined run and PPU clean qualification were performed by the root agent."
   ],
   "sha256": {
-    "hdl/library/starlink_pss_acquisition/simulate_paired_realtime_psma_stop.tcl": "1b2ecf0573ad739ca8e34499726590deadda2a85f3d7bf1beab59813ad6a9f69",
-    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_paired_realtime_psma_stop.sv": "bd772f0a8d8a8dfbeb05c30a81795c993a233695a4dc851db4be561cc7512560",
-    "tests/test_starlink_paired_realtime_psma_stop_policy.py": "0d32227f97fb2f52ae48a59350bf3c1b3d835e29b9bb227b5d099f80ede028c9",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/frozen_sources/simulate_paired_realtime_psma_stop.tcl": "1b2ecf0573ad739ca8e34499726590deadda2a85f3d7bf1beab59813ad6a9f69",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/frozen_sources/tb_starlink_pss_paired_realtime_psma_stop.sv": "bd772f0a8d8a8dfbeb05c30a81795c993a233695a4dc851db4be561cc7512560",
+    "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/frozen_sources/test_starlink_paired_realtime_psma_stop_policy.py": "0d32227f97fb2f52ae48a59350bf3c1b3d835e29b9bb227b5d099f80ede028c9",
     "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/scope.txt": "556faa6fcc124763238178b5bf01afd5a664453f2102affde17679fb914e0083",
     "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3/generated_ip.txt": "2154af24e1d4318ba038f4a9778238fcc821d40c8c41ca7d16d20bab7790ab42",
     "hdl/library/starlink_pss_acquisition/build/paired-realtime-psma-stop-v3-console.log": "3b970b37dcc985313c6b561c5dff2b188bd62020cde161d30a31888eacdf4da1",

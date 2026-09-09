@@ -47,8 +47,11 @@ def _words(path: Path, rows: int, width: int) -> list[int]:
     return [int(row, 16) for row in text]
 
 
-def generate_pilot_vectors(score_vectors: Path, output: Path) -> dict:
+def generate_pilot_vectors(score_vectors: Path, output: Path, *, geometry: str = "447x2") -> dict:
     """Keep the seven score inputs immutable; add prehistory and a known tail."""
+    if geometry not in ("447x2", "343x2"):
+        raise ValueError("geometry must be literal447x2 or343x2")
+    map_bins = 343 if geometry == "343x2" else 447
     if output.exists() or output.is_symlink():
         raise ValueError("refusing to overwrite pilot evidence")
     original = {name: _words(score_vectors / f"{name}.mem", rows, width)
@@ -88,7 +91,10 @@ def generate_pilot_vectors(score_vectors: Path, output: Path) -> dict:
         "digital_boundary": "signed16 CI16 acquisition-shell input, NOT physical AD9361 format",
         "source_count": SOURCE_COUNT, "preroll": PREROLL, "pilot_count": PILOT_COUNT,
         "first_map_index": FIRST, "pilot_first_input_index": FIRST - PREROLL,
-        "map_candidate_interval": [FIRST, FIRST + 894],
+        "selected_map_geometry": geometry,
+        "map_candidate_interval": [FIRST, FIRST + 2 * map_bins],
+        "selected_score_prefix": 2 * map_bins,
+        "selected_tile_end_residue": 2 * map_bins % 447,
         "map_full_fft_inputs": [FIRST, FIRST + 959],
         "pilot_center_bounds": [metadata[6], metadata[7] + 1],
         "pilot_raw_input_support": [metadata[8], metadata[9]],
@@ -147,10 +153,10 @@ def test_generator_does_not_overwrite(vectors):
         generate_pilot_vectors(scores, pilot)
 
 
-@pytest.mark.parametrize("count", [0, 1, 2, 4])
+@pytest.mark.parametrize("count", [0, 1, 2, 5])
 def test_wrong_arity_has_no_side_effect(tmp_path, count):
     output = tmp_path / "out"
-    result = probe([output, tmp_path / "scores", tmp_path / "pilot", "extra"][:count])
+    result = probe([output, tmp_path / "scores", tmp_path / "pilot", "extra", "extra"][:count])
     assert result.returncode == 2 and "expected NEW_OUTPUT" in result.stderr
     assert not output.exists()
 
@@ -245,25 +251,32 @@ def test_runner_does_not_weaken_runtime_or_physical_gates():
     for forbidden in ("launch_runs", "create_clock", "set_false_path", "set_max_delay"):
         assert forbidden not in source
     bench = BENCH.read_text()
-    assert "defparam dut.acquisition.PHASE_BINS = 447" in bench
-    assert "defparam dut.phase_map_control.PHASE_BINS = 447" in bench
+    assert "parameter integer MAP_BINS = 447" in bench
+    assert "defparam dut.acquisition.PHASE_BINS = MAP_BINS" in bench
+    assert "defparam dut.phase_map_control.PHASE_BINS = MAP_BINS" in bench
+    assert "set_property generic MAP_BINS=$map_bins" in source
     assert "NO_ADC_DMA_IIO_FINE_PRODUCTION_OR_PHYSICAL_CLAIM" in bench
 
 
+@pytest.mark.parametrize("map_bins", [447, 343])
 @pytest.mark.parametrize("failure", [None, "PAIRED_REALTIME_PSMA_STOP_FAIL mismatch",
                                     "  paired_realtime_psma_stop_fail mismatch"])
-def test_verifier_accepts_negative_case_pass_marker_but_rejects_actual_failure(tmp_path, failure):
+def test_verifier_accepts_negative_case_pass_marker_but_rejects_actual_failure(tmp_path, failure, map_bins):
     markers = [
         ("PAIRED_PREROLL_PASS real_shell=1 real_cdc=1 real_canonical=1 samples=768 "
          "empty_ticket=1 explicit_configuration_pause=1"),
-        ("PAIRED_MAP_PILOT_PASS exact_scores=894 exact_map_words=447 exact_pilot_words=512 "
+        (f"PAIRED_MAP_PILOT_PASS exact_scores={map_bins * 2} exact_map_words={map_bins} exact_pilot_words=512 "
          "exact_bytes=2048 shared_support_envelope=959 pilot_after_stop=1 healthy_snapshot=1"),
         ("PAIRED_LATE_FAULT_PASS actual_invalid_release=1 failed_joint_health=1 "
          "terminal_coordinates_retained=1 pilot_bytes_preserved=1"),
-        ("PAIRED_REALTIME_PSMA_STOP_PASS source_words=4096 pilot_words=512 map_words=447 "
+        (f"PAIRED_REALTIME_PSMA_STOP_PASS source_words=4096 pilot_words=512 map_words={map_bins} "
          "NO_ADC_DMA_IIO_FINE_PRODUCTION_OR_PHYSICAL_CLAIM"),
     ]
     log = markers + [f"PAIRED_PILOT_WORD ordinal={n}" for n in range(512)]
+    if map_bins == 343:
+        log += ["PAIRED_STOP_TAIL map_bins=343",
+                ("PAIRED_RESIDUE_PASS selected_scores=686 map_words=343 residue=239 "
+                 "post_fence_tail_not_map_admission=1")]
     if failure:
         log.insert(0, failure)
     (tmp_path / "simulate.log").write_text("\n".join(log) + "\n")
@@ -271,7 +284,7 @@ def test_verifier_accepts_negative_case_pass_marker_but_rejects_actual_failure(t
     binary.write_bytes(bytes(2048))
     procedure = RUNNER.read_text().split("# Actual digital CI16 shell/CDC", 1)[0]
     script = f"source {{{ACQ / 'verify_realtime_probe_result.tcl'}}}\n" + procedure
-    script += f"pss_verify_paired_outputs {{{tmp_path}}} {{{binary}}}\n"
+    script += f"pss_verify_paired_outputs {{{tmp_path}}} {{{binary}}} {map_bins}\n"
     # Tcl stdin does not fail its process merely because a top-level command
     # errors; wrap the actual verifier to make the subprocess result meaningful.
     script = "if {[catch {\n" + script + "} reason]} {puts stderr $reason; exit 2}\n"
@@ -283,9 +296,59 @@ def test_verifier_accepts_negative_case_pass_marker_but_rejects_actual_failure(t
         assert result.returncode == 0, result.stdout + result.stderr
 
 
+@pytest.mark.parametrize("geometry", ["", "343", "343X2", "343x3", "447x64", "343x2 ", "auto"])
+def test_invalid_selector_fails_before_sources_or_output(tmp_path, geometry):
+    output = tmp_path / "out"
+    result = probe([output, "missing_scores", "missing_pilot", geometry])
+    assert result.returncode == 2 and "paired geometry" in result.stderr
+    assert not output.exists()
+    with pytest.raises(ValueError, match="geometry"):
+        generate_pilot_vectors(tmp_path / "missing", output, geometry=geometry)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("geometry", [None, "447x2", "343x2"])
+def test_selected_geometry_is_frozen_before_project(tmp_path, vectors, geometry):
+    scores, pilot = vectors
+    if geometry == "343x2":
+        pilot = tmp_path / "residue"
+        generate_pilot_vectors(scores, pilot, geometry=geometry)
+    output = tmp_path / "out"
+    arguments = [output, scores, pilot] + ([] if geometry is None else [geometry])
+    result = probe(arguments)
+    assert result.returncode == 2 and "ADMITTED" in result.stderr
+    bins = 343 if geometry == "343x2" else 447
+    scope = (output / "scope.txt").read_text()
+    assert f"test_only_geometry={bins}x2 " in scope
+    assert f"selected_score_prefix={bins * 2} fft_stride=447 tile_end_residue={bins * 2 % 447}" in scope
+    assert (output / "frozen_sources" / BENCH.name).read_bytes() == BENCH.read_bytes()
+
+
+def test_residue_rejects_default_oracle_receipt(tmp_path, vectors):
+    scores, pilot = vectors
+    output = tmp_path / "out"
+    result = probe([output, scores, pilot, "343x2"])
+    assert result.returncode == 2 and "receipt geometry" in result.stderr
+    assert not output.exists()
+
+
+def test_residue_oracle_preserves_actual_source_pilot_and_score_bytes(tmp_path, vectors):
+    scores, default = vectors
+    residue = tmp_path / "residue"
+    manifest = generate_pilot_vectors(scores, residue, geometry="343x2")
+    assert manifest["selected_map_geometry"] == "343x2"
+    assert manifest["map_candidate_interval"] == [FIRST, FIRST + 686]
+    assert manifest["selected_tile_end_residue"] == 1_280_000 % 447 == 239
+    assert manifest["map_full_fft_inputs"] == [FIRST, FIRST + 959]
+    for name in [*(f"{name}.mem" for name in PILOT_GEOMETRY), "paired_pilot_expected.ci16"]:
+        assert (residue / name).read_bytes() == (default / name).read_bytes()
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--score-vectors", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--geometry", choices=("447x2", "343x2"), default="447x2")
     args = parser.parse_args()
-    print(json.dumps(generate_pilot_vectors(args.score_vectors, args.output), sort_keys=True))
+    print(json.dumps(generate_pilot_vectors(args.score_vectors, args.output,
+                                          geometry=args.geometry), sort_keys=True))

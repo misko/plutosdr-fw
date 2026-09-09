@@ -378,6 +378,30 @@ live-pending vendor-fault and post-terminal bridge-fault negatives pass.
 The continued source is test stimulus, not canonical-tap/PIL1 DMA evidence;
 the full pilot/fine/source-support join and production-duration tests remain.
 
+### Private descriptor and production-like stop residue — 2026-09-09
+
+HDL `deb9badcc9a521d4694ceebe0223c97344cb7566` separates private idle
+descriptor capture from public admission/fault authorization. Focused tests
+cover 2048 idle combinations, exact healthy metadata, active/final/ACK ownership,
+same-edge faults and reset; six deliberate mutations are rejected. The root
+regression passes 802 selected oracle/contract/policy tests, and actual real-FFT
+service, exact-score and paired-pilot replays pass. The physical timing effect
+has NOT been measured; the latest completed route remains the -1.722 ns failure.
+
+The paired test now also admits explicit reduced 343x2 geometry: 686 scores end
+at residue239 within a447-score block, matching production1280000 mod447. It
+checks 343 exact map sums, ignores no real faults and preserves all2048 pilot
+bytes. At acknowledgment,687 tagged scores have emerged but only686 entered
+the map; the extra score did not leak into another map. The unchanged default
+447x2 test also passes. These remain finite simulation tests, not full-duration
+recording or deployment evidence. See
+`reports/starlink-private-descriptor-and-stop-residue-20260909.json`.
+
+The current user-requested next diagnostic is an offline replay of25MS/s
+recording `cap-20260909T121248-414fb81f488c`. That does not add a25MS/s hardware
+profile or waive timing closure. Read only real continuity islands; retain the
+explicit translation/resampling, frequency-assistance and source-support limits.
+
 ### Paired digital stop and native PPU support — 2026-09-09
 
 HDL `32a1f12cf457b68d09c89bf0e9dd6e7997039c3c` is pushed to the
