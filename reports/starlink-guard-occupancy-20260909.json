@@ -3,7 +3,7 @@
   "branch": "codex/starlink-rx-only-do-not-merge",
   "runtime_hdl_commit": "52f921f69cbc1fd38e30db79911ef7ed761d229d",
   "baseline_hdl_commit": "550c21172c8641472aa25797e830e4eb9eeb45e5",
-  "scope": "Exact public guard behavior and synthesized private occupancy dependency cut; fresh complete receiver implementation is running. No native IIO or hardware promotion.",
+  "scope": "Exact public guard behavior and synthesized private occupancy dependency cut; complete receiver is terminal with failed timing. No native IIO or hardware promotion.",
   "implementation": {
     "private_state": "active_private and return_occupied are masked by the existing registered fault bank to preserve same-edge effective active/return_valid quarantine.",
     "publication": "Current full nonfinal and phase-qualified final publication vetoes, exact fault reason accumulation, descriptor/payload capture and packet ABI remain unchanged.",
@@ -107,8 +107,10 @@
   "fresh_receiver": {
     "directory": "hdl/projects/pluto/shared-realtime-guard-occupancy-v1",
     "source_revision": "52f921f69cbc1fd38e30db79911ef7ed761d229d",
-    "status": "synthesis_and_init_gate_passed_placement_running",
+    "status": "terminal_timing_failure",
     "launch_utc": "2026-09-09T20:07:51Z",
+    "finish_utc": "2026-09-09T20:21:18Z",
+    "exit_code": 1,
     "parent_vivado_pid_as_observed": 1275069,
     "implementation_vivado_pid_as_observed": 1277825,
     "process_confirmed_live_utc": "2026-09-09T20:12:27Z",
@@ -123,12 +125,46 @@
     "timing_qualified": false,
     "deployment_eligible": false
   },
+  "final_receiver_audit": {
+    "completed_utc": "2026-09-09T20:23:04Z",
+    "directory": "hdl/projects/pluto/shared-realtime-guard-occupancy-v1/final-audit-v1",
+    "checkpoint_sha256": "4fc654608d1481a11bf6a9f19e1c3d67a72e1f50621d3fc8b54261233c3ef96e",
+    "timing_report_sha256": "2006c0648d1528b51c5600110ca87e7827c3078ed9a32bcf08d4351b5a92b88b",
+    "console_sha256": "c681bf9c27c2130062fcd5d95474b4427529ba9f51df86f7377070950ee8207e",
+    "summary_sha256": "d69a826a52702ef5d3af4459b51f63bede9840f54c9e96f449e4e6ef4f00e6ff",
+    "cdc_sha256": "d54057f488ed5e4310d97f26126872d7471e840d98a655efd4a9c315819f12d8",
+    "check_timing_sha256": "d48d68ffc33f563cd5683b8d89589e7f616f785c8d7f887bad4c6bb72de1a980",
+    "WNS_ns": -2.463,
+    "TNS_ns": -147.397,
+    "setup_failing_endpoints": 543,
+    "WHS_ns": 0.048,
+    "hold_failing_endpoints": 0,
+    "clock_WNS_ns": {"100MHz": -0.364, "200MHz": -2.463, "RX": 2.583},
+    "worst_path": "200MHz input_guard/expected_position_reg[0]/C -> result_guard/awaiting_ack_reg/D, eight LUT levels, 7.172ns data path including 5.724ns routing",
+    "endpoint_WNS_ns": {
+      "vendor_internal": -0.884,
+      "return_slot": -0.636,
+      "output_publication": -1.899,
+      "output_mailbox_fault": -0.777,
+      "output_mailbox_payload_control": -0.298,
+      "sticky_fault_crossing": 3.088,
+      "sticky_fault_second_stage": 4.026
+    },
+    "resources": {"LUT": 13160, "FF": 18502, "slices": 4399, "BRAM_tiles": 53.5, "DSP": 54},
+    "fully_routed_nets": 34069,
+    "routing_error_nets": 0,
+    "missing_input_delays": 13,
+    "missing_output_delays": 2,
+    "CDC_warning_counts": {"CDC-6": 9, "CDC-15": 199, "CDC-17": 7},
+    "constraints_changed_by_audit": false,
+    "interpretation": "Failing setup endpoints decreased versus 550c2117, but worst slack worsened. This is not a timing win or deployment pass. Board-I/O and CDC obligations remain open."
+  },
   "preceding_final_route": "The 550c2117 receiver is terminal: WNS -1.386 ns, 1082 setup failing endpoints, zero hold failures. Exact final audit is recorded in starlink-track-dsp-selection-20260909.json, including vendor-internal -0.816 ns and unresolved board-I/O/CDC obligations.",
   "radio_accessed": false,
   "ppu_changed": false,
   "deployed": false,
   "next": [
-    "Observe the specific live full receiver process; audit its exact final checkpoint without altering constraints.",
+    "Qualify the isolated atomic map-counter summary for the independent 100MHz stop cone, and separately address the measured 200MHz ACK/publication path. No constraints or current-fault vetoes may be waived.",
     "After complete physical gates, qualify finite and continuous paired IIO on .18, causal coarse/fine frequency/timing handoff, PPU Ethernet deployment and independent live GLRT/fine PSS on .17.",
     "Complete eight-target 120 ms valid visits over 300 seconds and repeat all gates at 30/60 MS/s."
   ]

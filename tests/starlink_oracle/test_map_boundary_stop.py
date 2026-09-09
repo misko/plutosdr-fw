@@ -1,12 +1,14 @@
 """Execute optional map-core publication fencing; no wrapper/IIO/RF claims."""
 
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-LIB = ROOT / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", ROOT / "hdl"))
+LIB = HDL / "library/starlink_pss_acquisition"
 STOP_TB = LIB / "tb/tb_starlink_pss_phase_map_stop.sv"
 SOURCES = [LIB / "starlink_pss_phase_map.v", LIB / "starlink_pss_phase_map_bank.v"]
 
@@ -48,7 +50,7 @@ def test_enabled_stop_with_production_segmented_geometry(tmp_path):
         "-o", str(executable), *map(str, SOURCES),
         str(LIB / "tb/tb_starlink_pss_phase_map_stop_production.sv"),
     ], check=True, capture_output=True, text=True, timeout=30)
-    profile = ROOT / "hdl/library/axi_starlink_pss_periodic_injector/tb/m2_period_scores_u8.mem"
+    profile = HDL / "library/axi_starlink_pss_periodic_injector/tb/m2_period_scores_u8.mem"
     result = subprocess.run(["vvp", str(executable), f"+profile={profile}"],
                             cwd=tmp_path, check=False, capture_output=True,
                             text=True, timeout=120)

@@ -16,7 +16,8 @@ HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", str(ROOT / "hdl"))) / "librar
     (1, 1, 30, False), (1, 1, 60, False), (2, 1, 15, False),
 ])
 @pytest.mark.parametrize("health_summary", [0, 1])
-def test_actual_psma_stop_transactions(tmp_path, enabled, shared, rate, allowed, health_summary):
+@pytest.mark.parametrize("map_summary", [0, 1])
+def test_actual_psma_stop_transactions(tmp_path, enabled, shared, rate, allowed, health_summary, map_summary):
     top = "tb_axi_starlink_pss_map_stop"
     executable = tmp_path / "psma-stop.vvp"
     subprocess.run([
@@ -24,6 +25,7 @@ def test_actual_psma_stop_transactions(tmp_path, enabled, shared, rate, allowed,
         f"-P{top}.ENABLE_BOUNDARY_STOP={enabled}",
         f"-P{top}.USE_SHARED_XFFT={shared}", f"-P{top}.INPUT_RATE_MSPS={rate}",
         f"-P{top}.HEALTH_COUNTERS_FROM_FLAGS={health_summary}",
+        f"-P{top}.MAP_COUNTERS_FROM_FLAG={map_summary}",
         "-o", str(executable),
         str(HDL / "axi_starlink_pss_acquisition/tb/tb_axi_starlink_pss_map_stop.sv"),
         str(HDL / "axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v"),
@@ -42,6 +44,7 @@ def test_actual_psma_stop_transactions(tmp_path, enabled, shared, rate, allowed,
     assert (f"PSMA_STOP_PASS enabled={enabled} shared={shared} rate={rate} "
             "actual_core=1 actual_axi=1 no_radio_claim=1") in result.stdout
     if enabled:
+        assert f"PSMA_MAP_SUMMARY_PASS summary={map_summary}" in result.stdout
         assert (f"PSMA_STOP_HEALTH_PASS summary={health_summary} real_causes=5 "
                 f"generic_counter_fallback={1 - health_summary}") in result.stdout
 

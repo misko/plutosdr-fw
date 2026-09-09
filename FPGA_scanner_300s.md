@@ -363,6 +363,37 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Atomic map-counter summary — 2026-09-09
+
+HDL runtime `f284b9f5a909c1c64f9040ac3dd7b90e42e6e659` sets an exact sticky
+fault summary atomically at all 15 existing map error-counter increment sites.
+Counters, common-reset semantics and current-event vetoes are preserved. Only
+the real same-clock/reset paired stop controller opts into this summary;
+generic users retain all independent counter checks. No public ABI, FFT math,
+coefficients or receiver constraints changed.
+
+The 60 targeted tests pass: frozen full-map and public-controller comparisons,
+all 224 generic error-counter bits, unused 0/1/X/Z summary inputs, actual map
+errors before/during stop, rejected mutations, production 20000x64 map geometry
+and actual wrapper/canonical-tap wiring. Isolated controller synthesis removes
+224 counter inputs from stop admission's combinational fan-in, replacing them
+with one summary input. LUT primitives change 928 -> 835 and FFs 1439 -> 1441;
+this does not include new producer logic or prove whole-receiver timing.
+
+Actual reduced paired FFT/PSMA/PIL1 replay preserves 894 exact scores, 447 map
+words and 2048 pilot bytes, including the late-fault receipt. The complete
+regression passes 851 tests in 157.74 seconds. Its first run's 14 failures were
+legacy test-stub port mismatches; commit `af96c48e` updates that interface only,
+retaining rejection of enabled stop and all real-engine tests.
+
+The acquisition package was refreshed. Fresh receiver build
+`hdl/projects/pluto/shared-realtime-map-summary-v1` started at 20:41:03 UTC from
+clean tracked HDL `af96c48ed34a58d54c548b4a2dc414aeff593c39`, with both PSS
+stages, pilot DMA and boundary stop enabled, unchanged constraints, and no
+reference checkpoint. At 20:43:25 UTC the original synthesis process remained
+live. HDL is pushed to the experimental do-not-merge branch. No PPU or radio
+operation occurred. See `reports/starlink-map-counter-summary-20260909.json`.
+
 ### Registered-quarantine occupancy cut — 2026-09-09
 
 HDL `52f921f69cbc1fd38e30db79911ef7ed761d229d` removes the complete
@@ -389,11 +420,20 @@ netlists. None of these is native DMA/IIO, production-duration or live RF proof.
 The acquisition IP package was refreshed successfully. Fresh full receiver
 `hdl/projects/pluto/shared-realtime-guard-occupancy-v1` started at 20:07:51 UTC
 from the clean tracked HDL pin above, with boundary stop enabled, the DSP
-tracker retained, global synthesis and no reference checkpoint. It is running;
-no physical gate or radio promotion is claimed. By 20:12:27 UTC, synthesis and
+tracker retained, global synthesis and no reference checkpoint. By 20:12:27 UTC, synthesis and
 the actual INIT_DESIGN structure/clock checks passed, with both PSS stages,
 pilot DMA, ten reducer DSPs, 67 stop-controller and four map-fence registers.
-The generated guard source hash matches the tested runtime. Placement is active.
+The generated guard source hash matches the tested runtime. The build finished
+at 20:21:18 UTC with exit 1: WNS -2.463 ns, TNS -147.397 ns, 543 failing setup
+endpoints and zero hold failures. The final read-only audit finished at
+20:23:04 UTC. All 34069 routable nets are routed, but 4399/4400 slices are used;
+13 input and two output delay omissions plus CDC review remain unresolved.
+The worst 200 MHz path is input-guard expected position to result-guard ACK
+ownership; output publication is -1.899 ns and vendor-internal timing -0.884 ns.
+The return-slot category improves to -0.636 ns, but overall worst slack is worse
+than the preceding image. This is not a physical pass or radio promotion.
+The next isolated experiment summarizes map error counters atomically for the
+independent 100 MHz stop cone; it does not resolve the 200 MHz obligations.
 See
 `reports/starlink-guard-occupancy-20260909.json`.
 

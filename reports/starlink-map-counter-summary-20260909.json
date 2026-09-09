@@ -1,0 +1,95 @@
+{
+  "schema": "starlink-map-counter-summary-progress-v1",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "f284b9f5a909c1c64f9040ac3dd7b90e42e6e659",
+  "build_hdl_commit": "af96c48ed34a58d54c548b4a2dc414aeff593c39",
+  "baseline_hdl_commit": "52f921f69cbc1fd38e30db79911ef7ed761d229d",
+  "scope": "Same-edge producer summary and exact PSMA public behavior; isolated controller structural synthesis and reduced actual-FFT paired replay. No routed timing or hardware promotion for this candidate.",
+  "implementation": {
+    "producer": "All 15 existing saturating map error increments atomically set map_counter_fault in the same nonblocking assignment. All original counters and current-event fault predicates remain. Common reset is the only clear; the arithmetic-overflow counter remains invariant zero under the unchanged width guard.",
+    "controller": "MAP_COUNTERS_FROM_FLAG defaults to zero. Only the real same-clock/reset acquisition wrapper explicitly selects the flag with boundary stop enabled. Independent generic counters retain their conservative nonzero checks.",
+    "public_ABI_changed": false,
+    "constraints_changed": false,
+    "FFT_math_or_coefficients_changed": false,
+    "map_source_sha256": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89",
+    "controller_source_sha256": "4a31baedd4c1b990f766fc670d9bef5ceb59a698bb6838fc8c8be8ca5d0469fc"
+  },
+  "tests": {
+    "targeted": {
+      "passed": 60,
+      "seconds": 13.44,
+      "log": "hdl/library/starlink_pss_raw_correlator/build/map-summary-integration-v1.log",
+      "sha256": "4ec8e727202632811fa2096e04fe74b275ebaa9500d911712ccfe67b0cb00feb",
+      "coverage": [
+        "Whole-map token whitelist against frozen 52f921f6: exact counter arithmetic and current-event predicates preserved.",
+        "Frozen full-map public outputs and payload compared each half-cycle in legacy and three enabled geometries; same-edge summary compared with all seven real error counters.",
+        "Frozen 653a3205 controller public AXI/core traces are cycle-identical for all four health/map selector combinations under the same real-producer workload.",
+        "Every bit of all seven independent generic counters remains fatal without a summary; unused summary inputs 0/1/X/Z do not affect generic operation.",
+        "Real malformed maps before admission and during pending stop retain failures, counters and receipt reasons; omission and default-bypass mutations are rejected.",
+        "Production 20000-bin, 64-frame segmented map stop and actual acquisition-shell stop/canonical-tap wiring pass."
+      ],
+      "limit": "Executable finite RTL comparisons and source invariants, not formal proof, synthesized timing, native IIO or RF."
+    },
+    "paired_actual_FFT": {
+      "passed": true,
+      "directory": "hdl/library/starlink_pss_raw_correlator/build/map-summary-paired-v1",
+      "exact_scores": 894,
+      "exact_map_words": 447,
+      "exact_pilot_words": 512,
+      "exact_pilot_bytes": 2048,
+      "late_fault_retained": true,
+      "console_sha256": "e97cf8ad3d13e24a7e3daf00692dec83764a28476e7b0ded4be6e4270ec8c4fe",
+      "limit": "Actual digital shell/CDC/canonical/real-XFFT/PSMA/PIL1 at reduced 447x2 geometry, not ADC formatting, DDR DMA, IIO, fine engine, production duration or RF."
+    },
+    "integrated": {
+      "status": "passed",
+      "passed": 851,
+      "seconds": 157.74,
+      "exit_code": 0,
+      "log": "hdl/library/starlink_pss_raw_correlator/build/map-summary-oracle-v2.log",
+      "sha256": "62ddc7bb1a421ced4b5f212c93751f77695c0c75eb8d157bd770c95ad4280880",
+      "command": "STARLINK_PSS_OCCUPANCY_NETLIST_DIR=/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/guard-occupancy-synth-v1 /home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_realtime_constraint_gate.py tests/test_starlink_boundary_build_options.py tests/test_starlink_realtime_routed_audit_policy.py"
+    },
+    "retained_failed_diagnostics": [
+      "Producer v1: existing generation-exhaustion test seeded only the candidate counter. The test adapter now applies the same seed to both unchanged golden and candidate; v2 producer/PSMA passed 26 tests.",
+      "Integrated v1: 837 passed, 14 elaboration failures from the legacy acquisition test stub missing the newly wired internal output. af96c48e adds the zero-valued output only; its rejection of enabled boundary stop remains. All 49 affected counter/admission tests then passed."
+    ]
+  },
+  "isolated_synthesis": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/map-summary-synth-v1",
+    "tool": "Vivado 2022.2, actual PSMA controller, xc7z010clg400-1, boundary stop and existing health summary enabled, map summary mode 0 versus 1",
+    "baseline": {"LUT_primitives": 928, "FF_primitives": 1439, "counter_ports_in_stop_fanin": 224, "summary_ports_in_stop_fanin": 0},
+    "candidate": {"LUT_primitives": 835, "FF_primitives": 1441, "counter_ports_in_stop_fanin": 0, "summary_ports_in_stop_fanin": 1},
+    "scope_sha256": "e270da4a5c056d230fc55d51f073a4a5e55264295879cd7cbd4453e029b7e028",
+    "baseline_netlist_sha256": "f192c653d25c7fcd8c75653e6dd869861de548b3f9ad27130893910d72ff78e0",
+    "candidate_netlist_sha256": "0994438e6dcf8c60a0180911cedb2f732da8a8cae165a753b1b580f7a48dce5b",
+    "console_sha256": "776e00e8caaa425f4e3810c258452c91179197897949b4f4ac20f56a94837dd8",
+    "limit": "Controller-only structural synthesis; does not count the new map-producer logic or measure complete-receiver placement/routing. Synthetic zero-delay probe I/O constraints are not receiver constraints or physical qualification."
+  },
+  "acquisition_IP_package": {
+    "exit_code": 0,
+    "component_sha256": "e08400ffb699ad9ba5496eb80b6729b59a3ad47ceaf6e7b7e653172a6dd3a6b8",
+    "console_sha256": "078f6ee56884b09a30f41c043c6d8bc13816d10aaf21fa021ba938a07921518f"
+  },
+  "full_receiver": {
+    "status": "synthesis_running",
+    "directory": "hdl/projects/pluto/shared-realtime-map-summary-v1",
+    "launch_utc": "2026-09-09T20:41:03Z",
+    "process_confirmed_live_utc": "2026-09-09T20:43:25Z",
+    "parent_vivado_pid_as_observed": 1581052,
+    "synthesis_vivado_pid_as_observed": 1581613,
+    "tool_session": 12307,
+    "source_revision": "af96c48ed34a58d54c548b4a2dc414aeff593c39",
+    "configuration": "15MS/s paired-pilot, shared/realtime XFFT, boundary stop enabled, DSP tracker retained, global synthesis, clean tracked HDL, no reference checkpoint, unchanged constraints",
+    "deployment_eligible": false
+  },
+  "preceding_receiver": "52f921f6 is terminal: WNS -2.463ns, 543 setup failures, zero hold failures. Final route/audit and unresolved board-I/O/CDC obligations are in starlink-guard-occupancy-20260909.json.",
+  "radio_accessed": false,
+  "ppu_changed": false,
+  "deployed": false,
+  "next": [
+    "Observe the specific live receiver implementation to its terminal result and audit the exact final checkpoint; do not restart merely because observation is slow.",
+    "Separately qualify the 200MHz input-checker-to-ACK/publication dependency; retain immediate fault vetoes and address the vendor-internal path, board-I/O and CDC obligations.",
+    "After full physical gates: .18 finite/continuous native IIO, causal coarse/fine handoff, PPU Ethernet deployment and independent live GLRT/fine PSS on .17; then eight-target 120ms/300s scanning and the 30/60MS/s ladder."
+  ]
+}
