@@ -532,3 +532,113 @@ GLRT plus FPGA PSS timing-lock proof. The remaining eight-target/120 ms/300 s
 and 30/60 MS/s gates remain required. No radio, PPU, Linux, or default firmware
 image was changed in this checkpoint. Source/evidence pins are recorded in
 `reports/starlink-shared-xfft-integration-20260908.json`.
+
+### Complete route and targeted control-timing checkpoint — 2026-09-08
+
+The first complete paired receiver now places and routes, preserving both PSS
+stages and pilot DMA. This is progress beyond the prior 11-slice placement
+failure, but **not a deployable image**. Common service/mailbox reset release
+reduced the shortfall to two slices; forcing the existing synchronous pilot
+pacer memory to remain a real BRAM boundary closed placement. Synthesis uses
+13396 LUTs, 18841 FFs, 49 BRAM tiles and 48 DSPs. The routed `pilot-pacer-bram`
+checkpoint has all 33333 routable nets complete, no route errors, and passing
+declared bus-skew constraints, but setup slack is -3.109 ns (100 MHz) and
+-2.323 ns (200 MHz). Hold slack is +0.014 ns. The full build failed its timing
+gate as required. The new checkpoint audit reads the saved constraints without
+clock redefinitions or blanket waivers.
+
+The worst paths identify control logic rather than a changed numerical kernel:
+AXI command decode through pilot flush/fault controls into RAM write enable,
+and input-framing logic through the FFT output-state gate. A registered PIL1
+decode now acknowledges writes only after execution. Output-state gating is
+factored by its existing lifecycle predicates without removing the global
+fault checks. Tests cover command execution/acknowledgement ordering and every
+reserved command bit/partial strobe; 1048576 actual-adapter control/metadata
+combinations match the original output-state expression. Real-XFFT replay
+retains 1341 exact scores, 33792 exact service words, reset/fault recovery, and
+the same saturated service interval. That offline suite passed 361 tests.
+The fresh `registered-control-v1` build has the same synthesized LUT/RAM/DSP
+counts with seven additional FFs. Its completed route still fails setup:
+-1.851 ns at 100 MHz and -1.727 ns at 200 MHz; hold is +0.019 ns.
+
+The pilot BRAM change preserves all 300000 samples in the full 120 ms RTL
+export and the same IQ hash as the earlier integer oracle. Blind GLRT still
+acquires the exported synthetic pilot without FPGA seeds. These are separate
+software/RTL fixtures, not real DMA/IIO, live GLRT, or FPGA live lock evidence.
+The older 4096-block capacity simulation remains tied to HDL f85f0888, not the
+current reset/control revision; a running log must never be counted as a pass.
+
+Next remains timing closure and integrated CDC review, explicit matched ABI
+1.5 kernel/host support, real paired IIO on .18, then serial-locked PPU network
+deployment to .17 for same-observation blind live GLRT and qualified FPGA PSS
+timing lock. Lower/upper 120 ms hopping over 300 seconds and 30/60 MS/s gates
+are still required. No radio, Linux, or PPU was changed in this checkpoint.
+
+### Active admission, mailbox metadata, and explicit ABI support — 2026-09-08
+
+Further PIL1 factoring removes inactive ARM eligibility from active DDC/sample
+admission without changing the complete sticky fault checks. 262144 actual RTL
+gate comparisons and continuous capture-test assertions agree with the old
+predicates. The 120 ms replay still exports all 300000 exact IQ words with SHA256
+`d653ccfb1f3fb48d10c5c859b316074dc2b7e3229681294b611301043dda97a1`.
+
+The complete `active-admission-v1` build uses 13397 LUTs, 18848 FFs, 49 BRAM
+tiles and 48 DSPs, with all 33325 routable nets complete. Timing improves again
+but still FAILS: 100 MHz -1.208 ns, 200 MHz -1.478 ns, hold +0.011 ns. Its own
+saved-constraint audit passes all four declared bus-skew constraints and finds
+no unconstrained internal endpoints. Thirteen missing RX input delays and two
+missing enable/txnrx output delays still require board-I/O qualification.
+They are not removed or hidden by timing waivers.
+
+The latest 200 MHz path passes through the mailbox's full metadata comparison
+into first-word metadata capture. A new `metadata-load-v1` candidate factors
+the exact first-word predicate while retaining every subsequent framing check,
+fault and complete-block publication rule. Ninety-six mailbox cases now cover
+both actual metadata widths (70/75), three depths, four clock pairs and four
+reset-release geometries. Real-XFFT numerical and service replay pass with
+unchanged scores, words, reset recovery and service interval. Current 64-block
+capacity and reduced-geometry phase-map replay also pass, including partial-tile
+fault quarantine. The new full default implementation fails placement (Place
+46-13 / 30-99: more than 5% of movable instances require spiral search), using
+13429 LUTs, 18848 FFs, 49 BRAM tiles and 48 DSPs at synthesis. A separate
+spread-placement trial on that saved opt DCP is running; no route is yet proved
+for the latest source.
+The firmware offline suite passes 411 tests.
+
+Reusable PPU ABI support is committed and pushed to main at
+`5e3d6b91c18383c74d356fa490c8a245a96328b6`. It explicitly selects shared-XFFT
+ABI 1.5 only at 15 MS/s, requires a serial for opt-in connections, binds every
+map chunk to the admitted context ABI, and preserves legacy defaults and TAG2
+exclusions. The local suite passed 1578 tests, with one unavailable-transmitter
+skip and ten browser/hardware deselections; full lint and type checks pass.
+The four unrelated dirty PPU files remain untouched and uncommitted.
+
+Matched Linux `b0c3128f995b3e9a5bebc84aa9be04b8b3524184` is pushed only to the
+DNM branch. It requires 1.5/0x13f and canonical 15 MS/s geometry and rejects the
+shared-service health bit 14. The ARM module compiles; extracted real kernel
+contract/health functions pass 1408 register mutations and 2240 health-bit cases.
+These checks do not execute kernel IRQ/DMA/IIO or qualify hardware.
+
+Next: finish complete-receiver timing and board-I/O/CDC qualification, package
+the matched image and implement the real finite pilot IIO reader. The current
+kernel requires finite sample limits to be whole IIO buffers (for example,
+300000 samples in twelve 25000-sample refills), and STOP must drain before DMA
+abort. Qualify both products on .18 before serial-locked PPU network deployment
+to .17 for blind live GLRT plus FPGA PSS timing-lock agreement. Short-dwell L/U
+hopping over 300 seconds and 30/60 MS/s remain uncompleted requirements.
+No radio has been accessed or flashed in this checkpoint.
+
+The completed physical spread trial on the older `registered-control-v1` DCP
+routes all 33348 nets but still fails timing: 100 MHz -1.127 ns, 200 MHz -1.289
+ns, hold +0.014 ns. Clocks and exceptions were not relaxed; no bitstream was
+produced by that diagnostic runner. Do not attribute its timing to newer RTL.
+
+The older HDL f85f0888 full 4096-block coarse capacity simulation has now
+completed with its actual PASS marker: 1830977 input samples, 1830912 ordered
+scores, 2097152 words at each transform boundary and FIFO high water 356. This
+~122 ms simulation is not the current mailbox/control revision, paired pilot
+capture, hardware IIO or live GLRT/PSS lock evidence. Its completed log is
+preserved with that older source identity.
+
+Source pins, completed artifact digests, test scope and outstanding gates for
+this checkpoint are in `reports/starlink-paired-control-timing-20260908.json`.

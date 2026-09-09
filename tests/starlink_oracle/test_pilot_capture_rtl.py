@@ -163,6 +163,17 @@ def test_invalid_commands_fail_closed(simulator, command):
     assert reads == [(0x10, 32)] and final == (0, 1)
 
 
+def test_registered_command_decode_rejects_every_reserved_bit_and_partial_strobe(simulator):
+    commands = [write(8, 1 | (1 << bit), skew=bit % 4) for bit in range(1, 32)]
+    commands += [write(8, 4, strobe=strobe, skew=strobe % 4) for strobe in range(15)]
+    records = []
+    for command in commands:
+        records += [command, read(0x10), write(8, 4), read(0x10)]
+    _, reads, final = run(simulator, records)
+    assert reads == [(0x10, value) for _ in commands for value in (32, 0)]
+    assert final == (0, 0)
+
+
 def test_source_discontinuity_is_not_silently_stitched(simulator):
     values = np.ones((900, 2), dtype=np.int16)
     out, reads, final = run(simulator, [*arm(), *samples(values[:600]),
@@ -218,6 +229,21 @@ def test_periodic_dma_stalls_preserve_every_sample(simulator):
 def cw_samples(count):
     rotations = mixer_lut()[(12 * np.arange(count)) % 64]
     return np.column_stack((rotations[:, 0] >> 3, (-rotations[:, 1]) >> 3)).astype(np.int16)
+
+
+@pytest.mark.parametrize("command,fault", [(2, 0), (3, 32)])
+def test_registered_stop_or_bad_write_during_live_source_preserves_prefix(simulator, command, fault):
+    out, reads, final = run(simulator, [*arm(), (1, 10, 8, command, 15),
+                                      (2000, 7, 0, 0, 0), *snapshot()])
+    expected = PilotDdcOracle("upper").process(cw_samples(2400), first_index=0)
+    supported = expected.samples_iq[expected.support_valid]
+    assert 12 <= len(out) < len(supported), "command must stop a live supported stream"
+    np.testing.assert_array_equal(out, supported[:len(out)])
+    regs = dict(reads)
+    assert u64(regs, 0x40) == u64(regs, 0x48) == len(out)
+    assert u64(regs, 0x30) == 540
+    assert u64(regs, 0x38) == 540 + 6 * (len(out) - 1)
+    assert regs[0x78] == fault and final == (0, bool(fault))
 
 
 def test_procedural_dwell_stimulus_and_auto_stop(simulator):
