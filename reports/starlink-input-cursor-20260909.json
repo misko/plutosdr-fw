@@ -82,7 +82,7 @@
     "pre_placement_optimized_checkpoint_sha256": "d21fecfe96c9bf1ed2987894298556f18f4ff0ed9f3fc8319f987db1effd1457"
   },
   "baseline_cursor_audit": {
-    "audit_hdl_commit": "1082a1dd",
+    "audit_hdl_commit": "1082a1ddaeb877bd8e9076d1fb5294015fa5d44a",
     "directory": "hdl/projects/pluto/shared-realtime-phase-input-v1/cursor-audit-v1",
     "exit_code": 0,
     "checkpoint_source_revision": "ccdf64365e8145113115f2e933ee8b2901f6d3e0",
@@ -97,13 +97,65 @@
     "audit_admission_tests_passed": 21,
     "limit": "Read-only unchanged older routed checkpoint. Reproduces the prior failure, not a timing measurement of the new cursor design."
   },
+  "failed_candidate_pressure_inspection": {
+    "directory": "hdl/projects/pluto/shared-realtime-input-cursor-v1/pre-place-pressure-v1",
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T21:57:03Z",
+    "checkpoint_stage": "optimized, before placement; not the failed placer's in-memory state",
+    "resources": {"LUT": 13445, "FF": 18472, "BRAM_tiles": 53.5, "DSP": 54, "control_sets": 443},
+    "placement_failure_overflow_count": null,
+    "interpretation": "Raw resources are below chip capacities. The placer reported failed-to-commit instances without a numerical slice overflow; packing/placement pressure is an inference, not a measured exact overflow.",
+    "scope_sha256": "8bcb979db6832bf2724c5579dd7f41941cdfde52ee1d676223aa2058a128be9d",
+    "utilization_sha256": "1791f88b1a771ff121f9ecd939db142b9367a884a1deed545a0d099c3d4c295b",
+    "control_sets_sha256": "cfdc370f732fda6506313d05fb97ad33713766f631f28000ee1aece9a2e2b406",
+    "hierarchy_sha256": "089d2485f5e3bde77cacac60e3295c131366ce6f1f89b76d1cb16a060903876a"
+  },
+  "placement_diagnostic": {
+    "status": "terminal_placement_passed_not_routed",
+    "exit_code": 0,
+    "directory": "hdl/projects/pluto/shared-realtime-input-cursor-v1/medium-placement-probe-v1",
+    "launch_utc_minute": "2026-09-09T21:59Z",
+    "finished_utc": "2026-09-09T22:00:15Z",
+    "directive": "AltSpreadLogic_medium",
+    "source_checkpoint_sha256": "d21fecfe96c9bf1ed2987894298556f18f4ff0ed9f3fc8319f987db1effd1457",
+    "child_checkpoint_sha256": "3ba4b4e40f3db835627db721c68d547b15db33c87ed4fd97fd8a207af8b87fec",
+    "placed_resources": {"LUT": 13026, "FF": 18543, "slices": 4398, "available_slices": 4400, "BRAM_tiles": 53.5, "DSP": 54},
+    "pre_route_estimates_only": {"WNS_ns": -1.616, "setup_failing_endpoints": 1404, "WHS_ns": -0.237, "hold_failing_endpoints": 53},
+    "scope_sha256": "f6774b4871e88b0661bee0034d195f41f7ee39bda97a072f8175c92e19f41384",
+    "script_sha256": "865fbecb2c1d8d18f427748fe608e1387053c121c929bf5a8996288f7865a64f",
+    "utilization_sha256": "e3435c48bf9b54f402549de3831d90af31c30b16b8d57c2511c5ef52dbfd063b",
+    "control_sets_sha256": "8fc97a4dfee165222ed4637e33060f49fede75e9e2f3731bd611bee9766d28c4",
+    "pre_route_timing_sha256": "c2f426510a476a29c5b3dba3f3177642914b31239213c262d036ce5468d12249",
+    "limit": "One placement-only child of the failed receiver's exact optimized checkpoint, original constraints unchanged. Not fresh synthesis, routed timing, CDC or deployment qualification."
+  },
+  "medium_policy_qualification": {
+    "hdl_commit": "6090190c4442d2fd0e825136d87b692e2ad6deef",
+    "runtime_RTL_unchanged_from_f96d0b0d": true,
+    "change": "Select measured AltSpreadLogic_medium for the explicit shared paired 15MS/s receiver. Original synthesis policy, clocks, constraints, INIT gate, route strategy and post-route optimization remain. No diagnostic checkpoint is reused.",
+    "tests_passed": 291,
+    "seconds": 1.38,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/input-cursor-medium-policy-v1.log",
+    "sha256": "6cb40b436a00f145fe9f3de51b1cddd07aa23c79c59bd9865371f34d022351b5",
+    "coverage": "Actual Tcl option/packing-policy dispatch and rejection, placement-probe exact-hash/fresh-output admission, read-only audit admission, existing physical-trial policy, constraint policy and multirate build contract. Mocked command boundaries are not physical evidence."
+  },
+  "fresh_medium_full_receiver": {
+    "status": "running",
+    "directory": "hdl/projects/pluto/shared-realtime-input-cursor-medium-v1",
+    "launch_utc_minute": "2026-09-09T22:03Z",
+    "source_revision": "6090190c4442d2fd0e825136d87b692e2ad6deef",
+    "configuration": "15MS/s paired-pilot, shared realtime XFFT, boundary stop, DSP fine tracker, pilot DMA, global synthesis, original constraints, measured medium placement, no reference or diagnostic checkpoint reuse",
+    "exec_session": 84472,
+    "launch_process_pid": 2008744,
+    "deployment_eligible": false,
+    "observation_rule": "Revalidate this exact process/session or terminal artifacts; a persisted running label is not proof of liveness."
+  },
   "preceding_full_receiver": "ccdf6436 failed at WNS -0.956ns, 223 setup failures, all 4400 slices occupied. Worst path was input-checker position feedback; 100MHz and other 200MHz failures remain separate obligations. See starlink-phase-input-contract-20260909.json.",
   "radio_accessed": false,
   "ppu_changed": false,
   "deployed": false,
   "next": [
-    "Inspect the exact pre-placement optimized checkpoint to distinguish packing pressure from raw primitive capacity, and retain this terminal failed build without restarting it.",
-    "Qualify a measured resource/control-path improvement, then repeat a fresh full receiver build and all physical/board-I/O/CDC gates before accessing a radio.",
+    "Observe the fresh complete medium-policy receiver build separately from the retained failed high-policy build and successful placement-only diagnostic.",
+    "Require final routing/timing and exact-checkpoint physical/board-I/O/CDC qualification before accessing a radio; continue measured changes if that build still fails.",
     "Then exact-serial .18 finite/persistent IIO and causal coarse/fine scheduling, PPU Ethernet .17 fixed-frequency independent live GLRT/PSS verification, eight-target 120ms/300s scanning and the 30/60MS/s rate ladder."
   ]
 }

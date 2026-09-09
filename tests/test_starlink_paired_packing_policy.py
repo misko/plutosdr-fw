@@ -75,7 +75,7 @@ def test_spread_implementation_is_only_for_explicit_shared_receiver(shared, prof
             lines = result.stdout.splitlines()
             assert lines[:4] == [
                 "strategy Congestion_SpreadLogic_high impl_1",
-                "STEPS.PLACE_DESIGN.ARGS.DIRECTIVE AltSpreadLogic_high impl_1",
+                "STEPS.PLACE_DESIGN.ARGS.DIRECTIVE AltSpreadLogic_medium impl_1",
                 "STEPS.POST_ROUTE_PHYS_OPT_DESIGN.IS_ENABLED true impl_1",
                 "STEPS.POST_ROUTE_PHYS_OPT_DESIGN.ARGS.DIRECTIVE Explore impl_1",
             ]

@@ -390,8 +390,18 @@ both PSS stages, pilot DMA, boundary stop and the original constraints, with
 global synthesis and no reference checkpoint. It finished at 21:54:54 UTC with
 exit 1: **placement failed** (`Place 30-99`, could not commit all instances).
 The original structural/constraint INIT gate passed, but there is no new routed
-timing result. The failed candidate's pre-placement optimized checkpoint is
-being inspected; do not substitute its timing estimates for a routed result.
+timing result. The failed candidate's optimized checkpoint contains 13445 LUT,
+18472 FF, 53.5 BRAM tiles, 54 DSP and 443 control sets, below raw chip capacities.
+One bounded `AltSpreadLogic_medium` diagnostic placed that exact checkpoint in
+4398/4400 slices at 22:00:15 UTC. Pre-route estimates still fail and do not prove
+routed timing. No constraints or source checkpoint were changed. HDL
+`6090190c4442d2fd0e825136d87b692e2ad6deef` selects this measured policy for a
+fresh full build, keeping runtime RTL unchanged. All 291 policy/provenance/
+constraint/build-contract tests pass. The diagnostic checkpoint is not reused.
+The fresh complete receiver launched at 22:03 UTC in
+`hdl/projects/pluto/shared-realtime-input-cursor-medium-v1`; no final timing
+result is available at this checkpoint. Revalidate its recorded process before
+treating this historical launch entry as proof of liveness.
 The expanded read-only audit reproduces the older cursor's -0.956 ns path,
 inventorying nine registers and 18 D/CE pins. Its 21 admission/policy tests pass.
 No radio or PPU operation occurred. Evidence:
