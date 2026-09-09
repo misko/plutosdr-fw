@@ -25,6 +25,8 @@ else:
     from starlink_glrt_iio import Context, Library
     from starlink_glrt_profile import CANDIDATE, add_arguments, profile
 
+DEFAULT_PURPOSE = "whole finite continuous IQ prefix, independent of FPGA decisions"
+
 
 def save(path, value):
     with path.open("x") as stream:
@@ -177,7 +179,7 @@ def collect(args, *, library=None, context_factory=Context):
                     prefill=bool(getattr(args, "prefill", False)),
                     edge="upper", event_buffer_records=1, event_kernel_buffer_count=1024,
                     iq_kernel_buffer_count=4, hardware_qualification="not inferred by this collector",
-                    purpose="whole finite continuous IQ prefix, independent of FPGA decisions")
+                    purpose=getattr(args, "purpose", DEFAULT_PURPOSE))
     protocol["closure_extension_required"] = (protocol["detector_profile"]["name"] == CANDIDATE or
                                                bool(getattr(args, "require_closure", False)))
     source_files = [Path(__file__).resolve(), Path(__file__).with_name("starlink_glrt_abi.py").resolve(),
@@ -407,6 +409,8 @@ def main():
     add_arguments(parser, exact_option="--threshold-q16")
     parser.add_argument("--require-closure", action="store_true", help="require GLX1 also for custom development gates")
     parser.add_argument("--decisions-off", action="store_true")
+    parser.add_argument("--purpose", default=DEFAULT_PURPOSE,
+                        help="record the observation purpose without changing detector behavior")
     parser.add_argument("--libiio")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()

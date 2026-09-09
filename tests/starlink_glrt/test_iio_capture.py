@@ -235,6 +235,34 @@ def test_continuous_iq_and_short_event_tail_are_drained_before_context_close(tmp
     assert "drain_bytes_per_second_after_prefill" not in summary
 
 
+@pytest.mark.parametrize("purpose", [None,
+    "event transport control; decisions disabled; not detector qualification"])
+def test_protocol_purpose_preserves_default_or_records_explicit_observation(tmp_path, purpose):
+    from tools.starlink_glrt_capture import DEFAULT_PURPOSE
+    scenario, args = Scenario(), arguments(tmp_path)
+    if purpose is not None:
+        args.purpose = purpose
+    summary = collect(args, library=scenario, context_factory=scenario.context)
+    protocol = json.loads((args.output / "protocol.json").read_text())
+    assert protocol["purpose"] == (purpose if purpose is not None else DEFAULT_PURPOSE)
+    assert summary["status"] == "complete" and summary["live_detector_qualified"] is False
+    assert protocol["detector_profile"]["fpga_gates_q16"] == [15729, 19661, 9831]
+
+
+def test_cli_accepts_explicit_protocol_purpose_without_opening_hardware(monkeypatch, tmp_path):
+    import sys
+    from tools import starlink_glrt_capture as capture
+    purpose = "event transport control; decisions disabled; not detector qualification"
+    received = []
+    monkeypatch.setattr(capture, "collect", lambda args: received.append(args) or {"status": "complete"})
+    monkeypatch.setattr(sys, "argv", ["capture", "--uri", "fake:fixture", "--serial", "fixture",
+        "--firmware-version", "test", "--source-rate", "2500000", "--lo-hz", "2400000000",
+        "--bandwidth-hz", "2000000", "--visit", "1", "--output", str(tmp_path/"unused"),
+        "--purpose", purpose])
+    capture.main()
+    assert received[0].purpose == purpose and not (tmp_path/"unused").exists()
+
+
 def test_transport_error_disqualifies_events_even_when_all_counters_match(tmp_path, monkeypatch):
     from tools.starlink_glrt_capture import EventReader
     original_wait = EventReader.wait
