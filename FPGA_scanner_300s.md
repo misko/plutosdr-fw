@@ -158,6 +158,14 @@ snippets for that gate. Debug sampling must include negatives as well as trigger
 
 ## Stage gates
 
+Execution order: S3/S4 are coupled workstreams, not permission to deploy hops
+before the short-dwell policy is qualified. Start S4's offline policy comparisons
+in parallel with timing work. First fixed-frequency paired hardware capture
+should span at least one second, enough to exercise the existing three-map
+qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
+256 ms qualification. Complete the versioned short-dwell policy before the first
+120 ms hopping qualification; retain the full eight-target/rate-ladder scope.
+
 ### S0 — Offline contracts and source audit
 
 - [x] Implement this plan and a hardware-free frequency/schedule compiler.
@@ -253,6 +261,61 @@ snippets for that gate. Debug sampling must include negatives as well as trigger
   to their do-not-merge remotes. Seal artifact hashes and independent replay.
 
 ## Current progress
+
+### Latest implementation checkpoint — 2026-09-09
+
+The following supersedes the status of older, dated experiments below; it does
+not turn their source-specific results into evidence for a newer build.
+
+- HDL `728d2c873d882b148514c7a224c9193af289ab68` is pushed only to the DNM
+  branch. The FFT adapter's redundant first-input output-counter reset is gone;
+  registered return words retain their descriptor through an explicit final-word
+  completion fence. The pilot overflow bit is computed beside its decoded
+  counter from the same synchronized Gray word, with unchanged fault visibility.
+  Halfband folded read addresses now walk in registers without changing the
+  arithmetic, issue spacing, or 13-clock start-to-transfer latency. Paired-only
+  30 MS/s observation counters are widened for 300-second accounting.
+- The firmware regression suite passes 429 tests. Actual adapter/CDC/halfband
+  tests cover same-edge health, independent resets, absolute-index preservation,
+  address wraps, numerical samples and latency. Real-XFFT replay preserves all
+  1341 scores and transform words. Both 74-job service profiles pass final-word
+  fault/drain/reset tests. Measured pair service is 28.52 us without stalls and
+  29.74 us with the declared injected stalls; the latter is not intrinsic engine
+  headroom. Nominal and bursty/stalled 64-block coarse runs retain all 28608
+  scores and report bounded queue/retention ages. The current 4096-block run is
+  still pending, not interchangeable with the older long-run proof.
+- The full 120 ms PIL1 RTL replay exports 300000 exact supported samples,
+  1200000 CI16 bytes, zero faults/clips, and the same IQ SHA256
+  `d653ccfb1f3fb48d10c5c859b316074dc2b7e3229681294b611301043dda97a1`.
+  Independent blind GLRT again passes the synthetic signal and noise controls
+  after current RTL export. These are not DMA/IIO or live RF evidence.
+- Reusable PPU finite-reader support is pushed to main at
+  `953cc68475ff78b4b5f3fb4b6969bdf6928b1c01`: exact serial/rate/buffer admission,
+  bounded reads, complete/partial receipts, acknowledged-close-oriented cleanup
+  and restoration, plus rejection of silent partial-map restarts. Offline tests:
+  1660 passed, one unavailable-transmitter skip, ten hardware/browser/firmware
+  deselections; full Ruff and mypy pass. This API currently caps finite captures
+  at one second; persistent 30/300-second recording and paired upstream/PSS
+  health integration remain required. Four unrelated PPU edits were preserved.
+- Matched Linux `6e062f2ca4e133c88e9c010d53a22d8c06c8de99` is pushed only to
+  the DNM branch. It rejects odd/oversize/mismatched finite DMA geometry before
+  ARM and detects actual backend capping while preserving in-flight ownership.
+  Executable tests run the real driver lifecycle and DMA submit helper against
+  MMIO/controller mocks; ARM compilation and checkpatch pass. No fabricated
+  partial-descriptor completion or IRQ guarantee was introduced.
+- The completed `return-stage-v1` full build synthesizes to 13407 LUTs,
+  18908 FFs, 49 BRAM tiles and 48 DSPs. Its high-spread placement fails by
+  12 slices (2376 available versus 2388 required for remaining instances);
+  there is no new routed timing verdict. A bounded medium-spread trial on its
+  saved opt DCP is running with unchanged clocks/constraints. The last fully
+  routed earlier source remains failing at -0.304 ns (100 MHz) / -1.364 ns
+  (200 MHz); do not attribute those values to the new pipeline.
+
+No radio was held, accessed, or flashed in this checkpoint. Next remains
+complete-receiver placement/timing and board-I/O/CDC qualification, then matched
+paired .18 canary capture before PPU network deployment to .17. The full
+120 ms L/U hopping, 300-second duration, independent live agreement and 30/60
+MS/s gates remain open.
 
 Read-only source review is complete. No radio has been opened, retuned, or
 flashed during this scanner task. The S0 compiler and existing PSS geometry
