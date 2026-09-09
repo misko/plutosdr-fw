@@ -26,9 +26,10 @@ the public FPGA snapshot before any PHY rate change. The 25 and 60 MS/s ec872
 builds failed timing and are excluded from deployment. The reviewed idle-payload
 change closes timing at 25 MS/s. Its 60 MS/s build and one fixed physical retry
 both failed setup at -0.199 ns and were not deployed. A subsequent exact pilot
-bank row precomputation (`6099b304`) passed focused numerical, cycle-timing and
-finite-close checks; its fresh full 60 MS/s build and independent five-rate
-matrix are in progress. No clock or timing constraint has been relaxed.
+bank row precomputation (`6099b304`) passed the full fresh five-rate numerical
+matrix and finite-close checks, but its 60 MS/s build failed setup at -0.223 ns.
+Its final worst paths moved to AXI command/fault decoding, which is the next
+measured optimization target. No clock or timing constraint has been relaxed.
 
 The full 5/10 MS/s implementation audits were reviewed alongside the accepted
 2.5 MS/s canary. They contain one GLRT IP and DMA, no PSS and no native ADC DMA,
@@ -120,3 +121,30 @@ including absent `attr_name`/`attr_val`. The retained private receipt is
 `174d3f9eab559431b7ae81720216ddfafc71d1b54fff4eaf4a17766039ab0363`.
 This is a timestamped state observation; later operations require their own
 current identity and idle checks.
+
+Additional bounded 25 MS/s operation checked longer transport and recovery.
+The 30-second normal capture (`rate25000000-30sec-v1`, visit 909516) saved
+300 MB in 30.181149 seconds with all 10,381 score records, no positive
+decisions, FIFO high water one and clean transport/detector/closure counters.
+The blind host completed all 3,000 windows without a multi-frame positive;
+the comparison retains 4,602 unmatched overlapping individual-frame supports.
+
+Three separate intentional controls requested three seconds each with unchanged
+normal gates and 250,000-sample chunks. Each started its local process signal
+only after at least 2 MB of actual IQ had been saved, with exact PID identity
+and separate control receipts. They are operational tests, not detector trials.
+
+| Control / visit | Observed result | Cleanup |
+|---|---|---|
+| Operator interruption / 909517 | Failed as intended; 1,000,000 samples saved of 7,500,000 requested, while fabric/AXIS delivered 1,286,752; all 171 events drained and finite accounting settled | Graceful collector SIGINT, no kill escalation; exact identity and both idle buffers verified |
+| Collector pause, measured 150.130 ms / 909518 | Complete 30 MB and all 1,002 events, no faults, FIFO high water one | Both buffers idle and TX mute verified |
+| Collector pause, measured 700.113 ms / 909519 | Failed explicitly with output FIFO overflow and broken pipe; 1,500,256 samples reached AXIS and 1,500,000 were saved, high water 256; all 197 events and finite accounting still drained | Both buffers idle and TX mute verified; no escalation |
+
+These controls measure those individual pauses at their recorded points; they
+do not establish a universal stall tolerance or sustained spare capacity.
+Their original failed capture/operator receipts remain failed. A fresh normal
+one-second capture after the induced overflow (`rate25000000-restart-1sec-v1`,
+visit 909520) then saved all 10 MB and 335 score records in 1.042284 seconds,
+with clean counters, settled closure and verified idle state. Its blind host
+analysis completed all 100 windows without multi-frame positives, and its
+capture comparison completed without unmatched or unobservable FPGA positives.
