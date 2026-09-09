@@ -73,7 +73,7 @@ def extension_snapshot():
 
 
 @pytest.mark.parametrize("count", [350, 1100, 1500, 2300])
-@pytest.mark.parametrize("rate", [2500000, 60000000])
+@pytest.mark.parametrize("rate", RATES)
 def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(count, rate, captures, tmp_path):
     # The cutoffs span acquisition, partial native collection, staged/scoring
     # work and a completed result. No candidate epoch is fed into the fabric.
@@ -171,6 +171,27 @@ def test_true_source_rate_continuous_iq_and_snapshot(rate, captures, tmp_path):
     decoded = decode_snapshot(regs, rate)
     decoded.require_iq_prefix(expected_visit=17, expected_rate=rate, received_bytes=4*len(output))
     assert decoded.source_center(0) == int(oracle.indexes[oracle.supported][0])-regs[0x17c]
+
+
+def test_full_width_write_decode_boundaries_and_partial_strobes(captures,tmp_path):
+    rows=[]
+    expected=[]
+    for address,maximum in [(0x34,65536),(0x38,65536),(0x3c,65536),(0x40,1),(0x44,7)]:
+        values=sorted({0,1,maximum,maximum+1,65535,65536,65537,*[1<<bit for bit in range(32)]})
+        for value in values:
+            rows += [write(8,4),write(address,0),write(address,value,skew=value%4),read(address),read(0x10)]
+            expected += [(address,value if value<=maximum else 0),(0x10,0 if value<=maximum else 16)]
+    for command_value in (1,2,4,8,16):
+        for bit in range(8,32):
+            rows += [write(8,4),write(8,command_value|(1<<bit),skew=bit%4),read(0x10)]
+            expected.append((0x10,16))
+    for strobe in range(15):
+        rows += [write(8,4),write(0x34,0),write(0x34,65536,strobe=strobe),read(0x34),read(0x10)]
+        expected += [(0x34,0),(0x10,16)]
+    rows += [write(8,4),read(0x10)]
+    expected.append((0x10,0))
+    output,reads,final=run(captures(2500000),rows,tmp_path)
+    assert not len(output) and reads==expected and final==(0,0)
 
 
 @pytest.mark.parametrize("rate", [2500000, 60000000])
