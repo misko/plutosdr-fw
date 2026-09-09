@@ -4,14 +4,22 @@ Experimental branch `codex/starlink-glrt-only-do-not-merge`. Persistent task
 `01a0821a-7b4c-73f0-8b2c-47b4e95207f9`, gpt-6-astra / xhigh; unbudgeted objective
 unfinished. See [the completion gate](GLRT_ONLY_GOAL.md).
 
-Current checkpoint: all five full-board builds at HDL ff42d5ab pass internal
-setup/hold and Gray-bus skew; five RAM packages have independently verified
-embedded contents. No hardware has been accessed. The numerical report retains
-one synthetic strong-signal busy miss and the saved-RF sensitivity limits.
-The independent CDC prototype is being reviewed before promotion; actual radio
-calibration, transport headroom, owner allocation and live agreement remain.
-See [routing evidence](reports/starlink-glrt-five-rate-checkpoint-20260909.json)
-and [numerical evidence](reports/starlink-glrt-numerical-checkpoint-20260909.json).
+Current HDL a9a4ca9a includes the reviewed CDC changes and 352-sample candidate
+grouping. Its 2.5/5/10/25 MS/s full-board routes and independently extracted RAM
+packages pass their local checks. Its first 60 MS/s route fails setup by 0.056 ns;
+an isolated physical-optimization attempt is running with identical RTL and
+unchanged timing constraints. The earlier ff42d5ab five-rate route/package
+checkpoint remains preserved, but is not the current detector implementation.
+
+A new fixed-seed, randomized-timing synthetic trial passes every strong-case
+and control-case criterion. It recovers 32/45 complete strong frames; all 13
+missed frames had truth-near candidates selected but busy rejected. All 32 strong
+positives agree with independent host GLRT. Weak/short-signal and saved-RF
+sensitivity limits remain. No hardware has been accessed: radio calibration,
+real transport headroom, owner allocation and live agreement are outstanding.
+See [current numerical evidence](reports/starlink-glrt-selector352-numerical-20260909.json),
+[the retained routing checkpoint](reports/starlink-glrt-five-rate-checkpoint-20260909.json)
+and [the original numerical checkpoint](reports/starlink-glrt-numerical-checkpoint-20260909.json).
 
 ## Source isolation, 2026-09-08
 
@@ -31,7 +39,7 @@ No applicable AGENTS.md files were found in this firmware worktree or its
 initialized components. Scanner reference instructions were read; its sources
 are read-only and will not become runtime dependencies.
 
-## Architecture under implementation
+## Current architecture
 
 One pilot-centered RX1 source, with a free-running absolute source counter,
 feeds both native-rate FPGA GLRT and an independent continuous 2.5 MS/s IQ
@@ -44,25 +52,27 @@ the initial digital translation zero, explicitly recorded in the frequency plan.
 
 Pilot-only FPGA acquisition proposes timing using known-pilot correlations;
 a bounded native-rate sample ring supports 64-symbol exact/control GLRT.
-The frequency search and score decision must run in fabric. CPU control cannot
-provide acquired timing/CFO to the primary FPGA path. Numerical/resource work
-will establish admission capacity and expose missed work before this design
-is considered implemented. The proposed schedule is not yet a throughput proof.
+Frequency search and score decisions run in fabric. CPU control provides no
+acquired timing/CFO to the primary FPGA path. Proposal, grouping, admission,
+busy rejection and result counters expose missed work. Simulated pacing and
+positive internal slack still require actual DMA/transport qualification.
 
 ## Qualification ladder
 
-| Source MS/s | Numerical reference | RTL verified | Synthesized | Full route | Hardware | Live agreement |
-|---|---|---|---|---|---|---|
-| 2.5 | frozen arithmetic | blind core + ADC/AXI export | combined core +0.212 ns setup | v1 -0.873 ns; v2 running | pending | pending |
-| 5 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
-| 10 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
-| 25 | frozen arithmetic | blind core + export | common acquisition/scorer | pending | pending | pending |
-| 60 | frozen arithmetic | blind core + export | separate components | pending | pending | pending |
+| Source MS/s | Current numerical/RTL evidence | a9a4ca9a full route, setup/hold ns | RAM package | Hardware/live |
+|---|---|---|---|---|
+| 2.5 | exact IQ/statistics; strong 4/9 frames; controls quiet | +0.112 / +0.019 | ram-2500000-v3 verified | pending |
+| 5 | exact IQ/statistics; strong 4/9 frames; controls quiet | +0.200 / +0.021 | ram-5000000-v2 verified | pending |
+| 10 | exact IQ/statistics; strong 8/9 frames; controls quiet | +0.075 / +0.014 | ram-10000000-v2 verified | pending |
+| 25 | exact IQ/statistics; strong 8/9 frames; controls quiet | +0.041 / +0.024 | ram-25000000-v2 verified | pending |
+| 60 | exact IQ/statistics; strong 8/9 frames; controls quiet | -0.056 / +0.025; physical retry running | current image blocked by timing | pending |
 
 RTL entries now include blind fabric acquisition, native GLRT and continuous
-IQ export together, with no candidate timing input. Synthetic positives pass
-at all rates. The GLRT-only board profile is implemented; its timing, I/O boundary and real RF
-qualification remain pending. These are engineering tests, not held-out sensitivity claims.
+IQ export together, with no candidate timing input. The counts above describe
+the new synthetic trial, with three CFO cases and nine complete strong frames
+per rate. The GLRT-only board profile is implemented; 60 MS/s timing, the external
+I/O boundary and real RF qualification remain open. These bounded synthetic
+observations are not a measured RF sensitivity curve.
 
 ## Coordination
 
@@ -76,10 +86,11 @@ Scanner task asked for saved positive and independent control/holdout locations.
 
 Inherited pilot replay proves host GLRT after a 15-to-2.5 DDC. It contains no
 FPGA GLRT and does not qualify any requested rate in this new profile.
-No sensitivity, false-positive rate, full-receiver timing closure, transport
-headroom, or live agreement is claimed yet. Component resource measurements
-below do not establish whole-design fit. No production deployment or source
-promotion is authorized.
+No calibrated RF sensitivity, false-positive rate, transport headroom or live
+agreement is claimed. Positive internal setup/hold does not close the external
+receive interface. The sections below retain earlier implementation history;
+their component/OOC results do not replace the current full-board evidence.
+Production deployment is outside this task's experimental branch.
 
 ## First digital implementation checkpoint
 
@@ -501,3 +512,46 @@ original generated document: the copied generator initially inherited its
 first-run seed-description sentence. No case, gate, source hash or outcome
 was changed by that metadata correction. Future runs do not infer holdout status
 from fixed seeds. No hardware or fresh saved/live RF holdout is claimed.
+
+## Wider grouping and independent synthetic trial, 2026-09-09
+
+All 29 selector/receiver tests pass in 386.92 seconds, including lookahead 352
+and five-rate positive/noise/tone/scrambled/rolled cases. Main HDL is a9a4ca9a.
+The complete 50-case development regression passes its 15 strong and 15 control
+criteria, recovering 37/45 strong frames. Eight strong frames remain missed.
+
+The separately fixed trial uses seed offset 764930281 and randomized integer
+native epochs, including fractional positions on the output grid. All 50 cases
+complete with unchanged source hashes and no checker rechecks. Its 15 strong
+cases recover 32/45 complete frames; each of the 13 missed frames had a proposal
+within two output samples of truth, selected but rejected while busy. All 32
+strong detections agree with independently acquired, individually scored host
+frames. Noise/tone/scrambled cases produce zero positives in 60 ms nominal
+observation (59.4984 ms supported IQ); this is not a false-alarm-rate qualification.
+
+The new weak case detects one frame at 2.5 MS/s and none at the other rates.
+Repeated 32-symbol bursts yield 3/1/3/3/3 detections across the five rates; 8-symbol
+bursts yield none. The 5 MS/s short-burst detection and all three at 60 MS/s lack
+a matching host positive. The latter host run has an unrelated in-band engineering
+crossing instead, retained in its comparison evidence. Rolled-code shifted
+ambiguity remains at every rate. Across all cases, 495820 supported CI16 words
+match exactly and 177 completed native results match the fixed-point oracle.
+Three incomplete native/scorer tails and 14 pending selectors remain explicit.
+See the [frozen numerical report](reports/starlink-glrt-selector352-numerical-20260909.json).
+
+Current 2.5/5/10/25 MS/s builds pass full setup/hold, Gray-bus skew and the active
+netlist gate. Their reports contain no CDC-10, LUTAR-1, REQP-1839 or REQP-1840.
+Their new RAM packages pass U-Boot extraction, exact embedded-byte comparisons,
+GNU cpio listing/VERSIONS extraction and DFU-suffix validation. The reusable
+local verifier is `scripts/verify_glrt_ram.py`; it never accesses a radio and
+does not grant deployment approval. All four archives contain 783 members with
+exact component identities and no PSS paths.
+
+The a9a4ca9a 60 MS/s attempt is retained in
+`artifacts/board-60000000-selector352-v1`, setup/hold -0.056/+0.025 ns. Its critical
+path is acquisition-history address through distributed RAM/bank selection to
+a DSP input. Isolated commit 25c9b1d1 changes only the 60 MS/s pre/post-route
+physical-optimization directives to AggressiveExplore; all RTL and XDC bounds
+are identical. Its full build is in progress. Hardware coordination messaging
+still fails at the local MCP transport endpoint, and no ownership window has
+been assumed.

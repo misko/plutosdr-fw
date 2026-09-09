@@ -31,8 +31,9 @@ python3 tools/starlink_glrt_capture.py \
 ```
 
 Use a nonzero visit ID different from the preceding observation. Finite sample
-limits must fill whole even-length CI16 buffers; one invocation is bounded to
-30 seconds. IQ uses four kernel buffers. Events use one-record client refills
+limits must fill whole even-length CI16 buffers; one invocation requests at most
+30 seconds of IQ. Setup, timeouts and final draining add wall-clock time.
+IQ uses four kernel buffers. Events use one-record client refills
 and a requested 1024-record kernel kfifo, preserving a short final event tail.
 This relies on the pinned target libiio software-buffer behavior and still
 requires real network/USB qualification.

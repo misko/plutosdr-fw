@@ -1,0 +1,106 @@
+#!/usr/bin/env python3
+"""Verify a local GLR1 RAM package with U-Boot and GNU cpio, without a radio.
+
+This deliberately does not import the packager's FIT/newc implementation.
+An independent extraction receipt is evidence of package contents only.
+"""
+from __future__ import annotations
+
+import argparse
+import gzip
+import hashlib
+import json
+from pathlib import Path
+import shutil
+import subprocess
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def digest(path):
+    with path.open("rb") as stream:
+        return hashlib.file_digest(stream, "sha256").hexdigest()
+
+
+def verify(package, output):
+    package, output = package.resolve(), output.resolve()
+    manifest_path = package / "manifest.json"
+    manifest_hash = digest(manifest_path)
+    manifest = json.loads(manifest_path.read_text())
+    if manifest["schema"] != "starlink-glrt-ram-package/v1":
+        raise ValueError("unsupported package schema")
+    fit, dfu = package / "pluto.itb", package / "pluto.dfu"
+    for path in (fit, dfu):
+        if digest(path) != manifest["outputs_sha256"][path.name]:
+            raise ValueError("package output changed: " + path.name)
+    dumpimage = ROOT / "buildroot/output/host/bin/dumpimage"
+    cpio = Path(shutil.which("cpio") or "/missing-cpio")
+    suffix = Path(shutil.which("dfu-suffix") or "/missing-dfu-suffix")
+    tools = {str(p): digest(p) for p in (dumpimage, cpio, suffix, Path(__file__))}
+    output.mkdir(parents=True, exist_ok=False)
+    payloads = ("zynq-pluto-sdr-glrt.dtb", "system_top.bit", "zImage", "rootfs.cpio.gz")
+    embedded = {}
+    with (output / "extraction.log").open("x") as log:
+        for index, name in enumerate(payloads):
+            extracted = output / name
+            subprocess.run([str(dumpimage), "-T", "flat_dt", "-p", str(index),
+                            "-o", str(extracted), str(fit)],
+                           check=True, stdout=log, stderr=subprocess.STDOUT)
+            if extracted.read_bytes() != (package / "build" / name).read_bytes():
+                raise ValueError("embedded payload differs from assembled input: " + name)
+            embedded[name] = digest(extracted)
+        subprocess.run([str(suffix), "-c", str(dfu)], check=True,
+                       stdout=log, stderr=subprocess.STDOUT)
+    fit_bytes, dfu_bytes = fit.read_bytes(), dfu.read_bytes()
+    if len(dfu_bytes) != len(fit_bytes) + 16 or dfu_bytes[:-16] != fit_bytes:
+        raise ValueError("DFU is not exactly FIT plus its 16-byte suffix")
+    archive = gzip.decompress((output / "rootfs.cpio.gz").read_bytes())
+    listing = subprocess.run([str(cpio), "-it", "--quiet"], input=archive,
+                             check=True, capture_output=True)
+    (output / "cpio-listing.txt").write_bytes(listing.stdout)
+    members = listing.stdout.decode().splitlines()
+    normalized = [name.removeprefix("./") for name in members]
+    if len(set(normalized)) != len(normalized):
+        raise ValueError("duplicate rootfs member")
+    if any("starlink_pss" in name or "starlink-pss" in name for name in normalized):
+        raise ValueError("rootfs retains a PSS path")
+    for required in ("opt/VERSIONS", "etc/init.d/S22starlink_glrt_iio", "usr/sbin/iiod"):
+        if required not in normalized:
+            raise ValueError("missing GLRT rootfs member: " + required)
+    versions_name = members[normalized.index("opt/VERSIONS")]
+    versions = subprocess.run([str(cpio), "-i", "--to-stdout", "--quiet", versions_name],
+                              input=archive, check=True, capture_output=True).stdout
+    expected_versions = "device-fw " + manifest["firmware_label"] + "\n" + "".join(
+        f"{name} {manifest['source_commits'][name]}\n"
+        for name in ("hdl", "linux", "buildroot", "u-boot-xlnx"))
+    if versions != expected_versions.encode() or versions != (package / "VERSIONS").read_bytes():
+        raise ValueError("embedded VERSIONS does not identify the assembled components")
+    (output / "VERSIONS").write_bytes(versions)
+    if digest(manifest_path) != manifest_hash or any(digest(Path(p)) != h for p, h in tools.items()):
+        raise ValueError("manifest or verification tool changed during extraction")
+    for path in (fit, dfu):
+        if digest(path) != manifest["outputs_sha256"][path.name]:
+            raise ValueError("package changed during verification")
+    receipt = {"schema": "starlink-glrt-independent-package-verification/v1", "status": "pass",
+               "method": "U-Boot payload extraction and byte comparison; GNU cpio listing and VERSIONS extraction; dfu-suffix validation",
+               "manifest_sha256": manifest_hash, "tools_sha256": tools,
+               "outputs_sha256": manifest["outputs_sha256"], "embedded_sha256": embedded,
+               "rootfs_members": len(members), "versions": versions.decode(),
+               "dfu_prefix_matches_fit": True, "hardware_accessed": False,
+               "deployment_approved": False}
+    (output / "receipt.json").write_text(json.dumps(receipt, indent=2, sort_keys=True) + "\n")
+    return receipt
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--package", type=Path, required=True)
+    parser.add_argument("--output", type=Path, required=True)
+    args = parser.parse_args()
+    receipt = verify(args.package, args.output)
+    print(json.dumps({"status": receipt["status"], "rootfs_members": receipt["rootfs_members"],
+                      "receipt": str(args.output / "receipt.json"), "hardware_accessed": False}))
+
+
+if __name__ == "__main__":
+    main()
