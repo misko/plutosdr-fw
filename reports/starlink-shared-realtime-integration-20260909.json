@@ -1,0 +1,172 @@
+{
+  "schema": "starlink-shared-realtime-integration-v1",
+  "date_utc": "2026-09-09",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "hdl_base_commit": "df2854d6",
+  "integration_was_uncommitted_when_replays_were_frozen": true,
+  "hardware_accessed": false,
+  "deployed": false,
+  "deployment_eligible": false,
+  "scope": "Default-off shared realtime FFT integration into the existing score/map and paired receiver shell; exact numerical and short capacity evidence. Full capacity and physical qualification remain separate gates.",
+  "selector": {
+    "name": "STARLINK_PSS_REALTIME_XFFT",
+    "default": 0,
+    "requires": {
+      "STARLINK_PSS_SHARED_XFFT": 1,
+      "STARLINK_PSS_PROFILE": "paired-pilot",
+      "STARLINK_PSS_RATE_MSPS": 15
+    },
+    "original_ip": "starlink_pss_fft512_bfp18",
+    "distinct_candidate_ip": "starlink_pss_fft512_bfp18_rt_candidate",
+    "library_packaging_environment_independent": true,
+    "original_ip_configuration_unchanged": true,
+    "arithmetic_coefficients_and_score_contracts_unchanged": true,
+    "psma_abi": "1.5",
+    "shared_service_health_bit": 14
+  },
+  "physical_contract": {
+    "slow_clock_mhz": 100,
+    "fft_clock_mhz": 200,
+    "original_constraints_retained": true,
+    "new_sticky_source_fault": {
+      "producer_clock_ns": 10,
+      "destination_clock_ns": 5,
+      "first_stage_max_delay_ns": 5,
+      "second_stage_normally_timed": true,
+      "strict_source_and_both_flops_inventory": true,
+      "async_reg_marking_required": true
+    },
+    "actual_synthesized_endpoints_verified": false,
+    "physical_timing_qualified": false
+  },
+  "score_replays": [
+    {
+      "directory": "hdl/library/starlink_pss_acquisition/build/realtime-integrated-numeric-v1",
+      "realtime": 1,
+      "result": "PASS",
+      "exact_scores": 1341,
+      "exact_words_each_forward_product_inverse": 1536,
+      "source_samples": 1406,
+      "blocks": 3,
+      "score_stalls": true,
+      "global_fault_recovery": true,
+      "independent_fft_reset_quarantine_recovery": true,
+      "terminal_machine_verified": true,
+      "log_sha256": "f4d112511357281528f69ba41ab9b235c50e7439e1478d6e5aa3a657a387234a"
+    },
+    {
+      "directory": "hdl/library/starlink_pss_acquisition/build/realtime-optin-nonrt-numeric-v1",
+      "realtime": 0,
+      "result": "PASS",
+      "exact_scores": 1341,
+      "exact_words_each_forward_product_inverse": 1536,
+      "source_samples": 1406,
+      "blocks": 3,
+      "score_stalls": true,
+      "global_fault_recovery": true,
+      "independent_fft_reset_quarantine_recovery": true,
+      "terminal_machine_verified": true,
+      "log_sha256": "271aa1e55a14c5f245626d61a29bcaf6664081afd78182860b64e437c4c11eb0"
+    }
+  ],
+  "bursty_capacity_64": {
+    "directory": "hdl/library/starlink_pss_acquisition/build/realtime-integrated-bursty64-v1",
+    "result": "PASS",
+    "source_samples": 28673,
+    "blocks": 64,
+    "words_counted_each_forward_product_inverse": 32768,
+    "ordered_scores_counted": 28608,
+    "score_fifo_max": 358,
+    "overlap_queue_max": 1,
+    "ring_retention_age_max": 589,
+    "transform_fifo_max": 2,
+    "energy_lookup_age_max": 884,
+    "score_age_max": 953,
+    "forward_stall_cycles_max": 0,
+    "source_burst_mode": 1,
+    "score_stall_mode": 1,
+    "all_score_values_compared_to_oracle": false,
+    "duration_is_not_120ms": true,
+    "terminal_machine_verified": true,
+    "log_sha256": "77ab1a39ddae865d0ff8f5c389564cbf7db64eb80a8279692c8bca8eb7f296f7"
+  },
+  "capacity_4096": {
+    "directory": "hdl/library/starlink_pss_acquisition/build/realtime-integrated-capacity4096-v1",
+    "state": "RUNNING_AT_CHECKPOINT",
+    "exec_session": 29730,
+    "requested_blocks": 4096,
+    "profile": "nominal",
+    "qualified": false,
+    "observed_progress_is_not_terminal_success": true,
+    "command": "LD_LIBRARY_PATH=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE /opt/Xilinx/Vivado/2022.2/bin/vivado -mode batch -source simulate_iq_to_score_shared.tcl -log build/realtime-integrated-capacity4096-v1-vivado.log -journal build/realtime-integrated-capacity4096-v1-vivado.jou -tclargs build/realtime-integrated-capacity4096-v1 capacity 4096 nominal 1"
+  },
+  "source_sha256": {
+    "starlink_pss_iq_to_score_shared.v": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26",
+    "simulate_iq_to_score_shared.tcl": "94486bf8c2653d5d800dc41aeb63ba60535764cece5dd2a94eca41b69dc1c53a",
+    "tests/test_starlink_shared_score_runner_policy.py": "4294cb883c164b093430922a8af01bfe1d23c4de262d4907f29dc7043ce4dbdb",
+    "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "starlink_pss_iq_to_phase_map.v": "344b184b81056762546bd9578dae80ba6f647cd5be2b43e2a68b19a0474564de",
+    "starlink_pss_shared_xfft_constr.xdc": "bb88a5d9c8439bc0a7e72737c284fd4f3d335e502901097dd950b8c76e4a3905",
+    "shared_xfft_impl_gate.tcl": "846fc0ce1fd0a052e5870a6253cc1d8e5e0df72848d747a7f7610760f9935233"
+  },
+  "remaining": [
+    "Current-source >=120ms sustained capacity, exact physical fit/setup/hold/CDC and board I/O qualification",
+    "Native fine control acceptance receipts and durable bounded paired recorder",
+    "Versioned map-boundary stop ticket and terminal published/enqueued/reassembled drain",
+    "Same-observation >=1s paired live pilot plus PSS timing proof on .18 before .17 network deployment",
+    "Independent blind host GLRT including negatives, complete 8-target 120ms/300s >=95% duty scanner and 15/30/60 MS/s gates"
+  ],
+  "hdl_commit": "ff4229bb230437fcd975413390a34c00ffcc226f",
+  "regression": {
+    "passed": 714,
+    "seconds": 68.19,
+    "log": "/tmp/starlink-realtime-integrated-regression-v3.log",
+    "log_sha256": "8b26d36bda446e447000eaa2477664c40d468c4f47422d511d6ba217bde6e72c",
+    "scope": "RTL, oracle, wrapper/build admission, recorder contracts and new executable constraint-gate model; not physical timing or hardware evidence"
+  },
+  "phase_replays": [
+    {
+      "directory": "hdl/library/starlink_pss_acquisition/build/realtime-integrated-phase-map-v2",
+      "realtime": 1,
+      "result": "PASS",
+      "exact_scores": 1341,
+      "exact_map_reads": 447,
+      "phase_bins": 447,
+      "tile_frames": 3,
+      "reduced_geometry_not_full_tile": true,
+      "map_peak_phase": 0,
+      "map_peak_value": 264,
+      "candidate_fifo_peak": 356,
+      "healthy_flags": 0,
+      "partial_tile_aborted_without_publication": true,
+      "service_fault_health_bit": 14,
+      "terminal_machine_verified": true,
+      "all_frozen_runtime_sources_match_current": true,
+      "log_sha256": "0eb530b54e635ffef09f0ce0d824532cc94cc87284b34bfaa66e51853c5e10cb"
+    },
+    {
+      "directory": "hdl/library/starlink_pss_acquisition/build/nonrealtime-integrated-phase-map-v2",
+      "realtime": 0,
+      "result": "PASS",
+      "exact_scores": 1341,
+      "exact_map_reads": 447,
+      "phase_bins": 447,
+      "tile_frames": 3,
+      "reduced_geometry_not_full_tile": true,
+      "map_peak_phase": 0,
+      "map_peak_value": 264,
+      "candidate_fifo_peak": 356,
+      "healthy_flags": 0,
+      "partial_tile_aborted_without_publication": true,
+      "service_fault_health_bit": 14,
+      "terminal_machine_verified": true,
+      "all_frozen_runtime_sources_match_current": true,
+      "log_sha256": "ed19bcdf5f06260319ed7eaaf7945172fa9fdb43f4403979bcb05969e4c50728"
+    }
+  ],
+  "retained_phase_v1": {
+    "both_passed": true,
+    "not_final_source_snapshot": true,
+    "reason": "Final guard rejects USE_SHARED_XFFT values other than exactly one for realtime mode; phase v2 replays the final source bytes."
+  }
+}

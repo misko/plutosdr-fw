@@ -22,7 +22,7 @@ def test_shared_clock_is_explicit_and_bounded(profile, rate, choice, allowed):
     policy = source[source.index("set starlink_pss_shared_xfft 0"):
                     source.index("set starlink_pss_rx_dma_enabled")]
     environment = {key: value for key, value in os.environ.items()
-                   if key != "STARLINK_PSS_SHARED_XFFT"}
+                   if key not in {"STARLINK_PSS_SHARED_XFFT", "STARLINK_PSS_REALTIME_XFFT"}}
     if choice is not None:
         environment["STARLINK_PSS_SHARED_XFFT"] = choice
     script = f"set starlink_pss_profile {profile}\nset starlink_pss_rate_msps {rate}\n"
@@ -90,3 +90,68 @@ def test_real_clock_connections_and_packaged_sources_are_present():
                  "starlink_pss_shared_xfft_service.v", "starlink_pss_shared_xfft_constr.xdc"):
         assert f'"$acq_dir/{name}"' in packager
     assert "PROCESSING_ORDER LATE" in packager
+
+
+@pytest.mark.parametrize("profile,rate,shared,realtime,allowed", [
+    ("paired-pilot", 15, "1", None, True),
+    ("paired-pilot", 15, "1", "0", True),
+    ("paired-pilot", 15, "1", "1", True),
+    ("paired-pilot", 15, "0", "1", False),
+    ("paired-pilot", 30, "1", "1", False),
+    ("paired-pilot", 60, "1", "1", False),
+    ("full", 15, "1", "1", False),
+    ("detector-only", 15, "1", "1", False),
+    ("acquisition-only", 15, "0", "1", False),
+    ("paired-pilot", 15, "1", "2", False),
+    ("paired-pilot", 15, "1", "1.0", False),
+    ("paired-pilot", 15, "1", "true", False),
+    ("full", 60, "0", "0", True),
+])
+def test_realtime_board_selector_is_additive_and_restricted(profile, rate, shared, realtime, allowed):
+    source = (HDL / "projects/pluto/system_bd.tcl").read_text()
+    policy = source[source.index("set starlink_pss_shared_xfft 0"):
+                    source.index("set starlink_pss_rx_dma_enabled")]
+    env = {key: value for key, value in os.environ.items()
+           if key not in {"STARLINK_PSS_SHARED_XFFT", "STARLINK_PSS_REALTIME_XFFT"}}
+    env["STARLINK_PSS_SHARED_XFFT"] = shared
+    if realtime is not None:
+        env["STARLINK_PSS_REALTIME_XFFT"] = realtime
+    script = f"set starlink_pss_profile {profile}\nset starlink_pss_rate_msps {rate}\n"
+    script += f"if {{[catch {{\n{policy}}} message]}} {{puts stderr $message; exit 2}}\n"
+    script += "puts $starlink_pss_realtime_xfft\n"
+    result = subprocess.run(["tclsh"], input=script, text=True, capture_output=True, env=env, timeout=10)
+    assert result.returncode == (0 if allowed else 2), result.stdout + result.stderr
+    if allowed:
+        assert result.stdout.strip() == (realtime or "0")
+
+
+@pytest.mark.parametrize("rate,shared,pilot,realtime,allowed", [
+    (15, 1, 1, 1, True), (15, 1, 1, 0, True), (15, 0, 0, 0, True),
+    (30, 0, 0, 0, True), (60, 0, 0, 0, True), (15, 0, 1, 1, False),
+    (15, 1, 0, 1, False), (30, 1, 1, 1, False), (60, 1, 1, 1, False),
+    (15, 1, 1, 2, False),
+    (15, 2, 1, 1, False), (15, 1, 2, 1, False),
+])
+def test_actual_receiver_rtl_realtime_admission(tmp_path, rate, shared, pilot, realtime, allowed):
+    acq = HDL / "library/axi_starlink_pss_acquisition"
+    signal = HDL / "library/starlink_pss_acquisition"
+    bench = tmp_path / "admission.sv"
+    bench.write_text(f"""module realtime_admission;
+      axi_starlink_pss_acquisition #(.INPUT_RATE_MSPS({rate}),
+        .USE_SHARED_XFFT({shared}), .ENABLE_PILOT_TAP({pilot}),
+        .USE_REALTIME_XFFT({realtime})) dut();
+      initial begin #1;
+        if (dut.acquisition.USE_REALTIME_XFFT != {realtime}) $fatal(1, "lost selector");
+        $display("REALTIME_WRAPPER_ADMISSION_PASS"); $finish;
+      end
+    endmodule
+    """)
+    result = _simulate(tmp_path, "realtime_admission", [
+        signal / "starlink_pss_sample_cdc.v", signal / "starlink_pss_x2_ddc.v",
+        HDL / "library/axi_starlink_pss_phase_map/starlink_pss_axi_lite.v",
+        acq / "axi_starlink_pss_phase_map_sync.v",
+        acq / "tb/starlink_pss_iq_to_phase_map_stub.v",
+        acq / "axi_starlink_pss_acquisition.v", bench,
+    ], {})
+    assert (result.returncode == 0) == allowed, result.stdout + result.stderr
+    assert ("REALTIME_WRAPPER_ADMISSION_PASS" in result.stdout) == allowed

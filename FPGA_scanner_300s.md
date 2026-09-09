@@ -292,6 +292,38 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
+### Default-off realtime integration — 2026-09-09
+
+HDL `ff4229bb230437fcd975413390a34c00ffcc226f` integrates the candidate behind
+`STARLINK_PSS_REALTIME_XFFT=1`, requiring the existing shared selection,
+paired-pilot profile and 15 MS/s. The new selector defaults to zero. Packaging
+contains separately named fixed realtime/nonrealtime IP definitions, avoiding
+environment-sensitive reuse of a cached library. The old IP definition,
+coefficients, scores, source coordinates and PSMA 1.5 contract are unchanged.
+
+Actual realtime and default-nonrealtime score replays each preserve 1341 exact
+scores and 1536 exact words in each forward/product/inverse stage. Both final
+source-matched phase replays preserve 447 exact map reads, zero healthy flags
+and the existing bit-14 partial-map fault/abort receipt. Their three-frame,
+447-bin map geometry is a reduced test, not a production-size tile proof.
+
+The realtime bursty/stalled 64-block replay passes 28608 ordered scores with
+bounded queues and zero forward stall cycles. It tests counts/order/backlog,
+not every numerical value and not 120 ms. The current frozen 4096-block nominal
+replay is running; progress alone is not a capacity pass. The expanded firmware
+regression passes 714 tests, including executable selector and physical-gate
+models. Those models do not establish actual synthesized endpoints or timing.
+
+All original clock/CDC constraints remain. The new sticky source-fault crossing
+has a narrow 5 ns first-stage bound, with both synchronizer flops, clocks,
+ASYNC_REG markings and normally timed second-stage path required by the actual
+implementation gate. A review caught and corrected a generate-hierarchy naming
+mismatch before synthesis. Full receiver synthesis/placement/routing and the
+longer capacity result remain unqualified; no radio has been accessed or flashed.
+See `reports/starlink-shared-realtime-integration-20260909.json`. After these
+gates, native paired capture/stop/drain and .18-before-.17 live qualification
+still precede the complete hopping/rate ladder.
+
 ### Latest explicit transport / registered CLEAR checkpoint — 2026-09-09
 
 Receiver RTL `d80fd15490ce82b7eda151be4594433ac9e738f5` is tested and pushed
