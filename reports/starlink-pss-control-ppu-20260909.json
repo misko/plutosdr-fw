@@ -1,0 +1,85 @@
+{
+  "schema": "starlink-pss-control-ppu-v1",
+  "date_utc": "2026-09-09",
+  "ppu_commit": "1245220f6078f9bcb3008aec9f6bacef83f5419e",
+  "ppu_branch": "main",
+  "remote_head_verified": true,
+  "hardware_accessed": false,
+  "scope": "Reusable bounded current-index/control reads and finite fine-start acceptance evidence; not a paired recorder or live radio qualification.",
+  "methods": [
+    "PssIioClient.read_current_index(observation)",
+    "PssIioClient.read_tracker_control(observation)",
+    "PssIioClient.open_fine_receipted(manifest)"
+  ],
+  "supported_profile": "PAIRED_15_SHARED_XFFT_512_447_V1",
+  "source_rate_sps": 15000000,
+  "contract": {
+    "exclusive_context_admission": true,
+    "finite_timeout_and_total_budget_ms": "each 1..60000; each operation timeout bounded by remaining budget",
+    "maximum_journal_operations": 128,
+    "maximum_retained_numeric_attribute_characters": 128,
+    "maximum_fine_scans_per_refill": 4096,
+    "finite_count_must_fill_whole_refills": true,
+    "current_index": "One coherent u64 LOW/HIGH hardware snapshot; zero valid; no freshness guarantee",
+    "multi_attribute_atomic": false,
+    "serial": "All available cached context serial aliases must match caller-owned observation",
+    "boot": "Present cached boot ID must match; absent remains unavailable, never inferred",
+    "enable_acceptance": [
+      "NOT_ATTEMPTED",
+      "ACKNOWLEDGED normal binding return",
+      "UNKNOWN attempted without recorded normal return"
+    ],
+    "enable_flag_not_acceptance": true,
+    "write_byte_count": "Unavailable in binding, not fabricated",
+    "minimum_lead_source_samples": 65536,
+    "lead_scope": "Host preflight at observed index; driver rechecks live lead at enable",
+    "negative_and_error_evidence_retained": true,
+    "legacy_open_and_batch_api_preserved": true
+  },
+  "review_fixes": [
+    "Cleanup attempted before rich receipt reconstruction; repeated constructor failure retains immutable journal/identity/manifest fallback",
+    "Uncertain allocation without exposed handle quarantines context",
+    "Definitely-unattempted destruction retains known owned handle for exactly one joined teardown; attempted/uncertain destruction is not retried"
+  ],
+  "verification": {
+    "new_tests": 91,
+    "focused_tests": 559,
+    "root_focused_seconds": 1.42,
+    "independent_review_passed": true,
+    "working_tree_offline": {
+      "passed": 2230,
+      "skipped": 1,
+      "deselected": 10,
+      "warnings": 1,
+      "seconds": 28.68,
+      "log": "/tmp/ppu-pss-control-checks.isegx5/pytest-offline.log",
+      "log_sha256": "60e1528dd3f6382cf63f30f895409f31b20bf625d99528795fb2121dc1ad3b0a",
+      "caveat": "Includes five tests from four unrelated dirty files, deliberately not committed or pushed"
+    },
+    "exact_committed_clean_export": {
+      "directory": "/tmp/ppu-main-control-test.SV6Xz2",
+      "passed": 2225,
+      "skipped": 1,
+      "deselected": 10,
+      "warnings": 1,
+      "seconds": 32.84,
+      "ruff": "PASS",
+      "mypy": "PASS",
+      "mypy_source_files": 78,
+      "log_sha256": "dd6de0337bc4a0ac2ddfd2bfe23994a6be674a3b93c905b41889b255b011555f"
+    }
+  },
+  "source_sha256": {
+    "src/pluto_plus/hardware/pss_iio.py": "8130e4d102c8c9e70d8d5f8f9a5ce636bcbb61d57c98f1e436b85af2ca8f1e57",
+    "src/pluto_plus/hardware/pss_control.py": "495267dc0ac332bdcb0c2858f2e6dbef0c45d0a2074f6cf49aa718da2db204ff",
+    "tests/test_pss_control.py": "8a1a8c43ced1a7c79a930042d1444b9c9badfa6663fe685af90273aea6c31cab",
+    "docs/pss-control.md": "8a498a527c7740f9e641404742bcdec434518ab766865133f9ec5b2c80f6b9a2"
+  },
+  "remaining": [
+    "Durable bounded concurrent paired pilot/maps/fine recorder and external exact-serial ownership",
+    "Versioned map-boundary stop ticket and terminal published/enqueued/reassembled drain",
+    "Coarse qualification and independently consumed GLRT support over >=1s common input",
+    "Full current receiver timing/CDC and sustained capacity, then .18 before .17 network deployment",
+    "Eight channels/edges, 120ms valid visits, 300s source timeline, >=95% duty and 15/30/60 MS/s qualification"
+  ]
+}

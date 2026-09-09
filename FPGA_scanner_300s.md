@@ -203,6 +203,10 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 - [x] Add the pure exact Q32.32 finite fine-schedule ledger, raw-packet validation
   and source-support joins. This does not submit a native schedule, establish
   continuous coverage, or prove paired capture/lock.
+- [x] Add bounded public current-index/control reads and receipted finite fine
+  startup. Retain individual write outcomes, driver acknowledgment separately
+  from later worker/result completion, and uncertain cleanup evidence. These
+  APIs remain offline-tested prerequisites, not paired live qualification.
 - [ ] Build the concurrent finite paired recorder using independent bounded
   pilot/map/fine contexts under one serial-attested owner. Open/flush maps
   before pilot ARM; keep maps running while fine requests are submitted/read.
@@ -292,6 +296,28 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
+### Bounded native fine-control evidence — 2026-09-09
+
+PPU main `1245220f6078f9bcb3008aec9f6bacef83f5419e` is pushed and remotely
+verified. Public current-index/control reads and finite fine-start receipts now
+share the existing exclusive context lifecycle. Each schedule write, buffer
+allocation and enable operation has retained attempted/returned/error evidence.
+A normal enable-write return is driver acknowledgment; the later worker enable
+flag and submission counts are not substitutes for that acknowledgment or proof
+of result completion. Multi-attribute reads remain explicitly non-atomic.
+
+The API preserves unknown writes and cleanup failures. Review fixed cleanup
+ordering around receipt-construction failure and retained a known live handle
+when destruction was never attempted; uncertain attempted destruction is not
+retried. There are 91 new tests and 559 passing focused tests. The exact committed
+clean export passes 2225 offline tests, Ruff and mypy. The 2230-test working-tree
+run contains five unrelated dirty tests that remain uncommitted. See
+`reports/starlink-pss-control-ppu-20260909.json`.
+
+The durable concurrent paired recorder, map-boundary stop/drain, coarse/GLRT
+support reconciliation and live .18/.17 qualification are still open. No radio
+was accessed, and the native API does not infer new 30/60 MS/s contracts.
+
 ### Default-off realtime integration — 2026-09-09
 
 HDL `ff4229bb230437fcd975413390a34c00ffcc226f` integrates the candidate behind
@@ -318,8 +344,15 @@ All original clock/CDC constraints remain. The new sticky source-fault crossing
 has a narrow 5 ns first-stage bound, with both synchronizer flops, clocks,
 ASYNC_REG markings and normally timed second-stage path required by the actual
 implementation gate. A review caught and corrected a generate-hierarchy naming
-mismatch before synthesis. Full receiver synthesis/placement/routing and the
-longer capacity result remain unqualified; no radio has been accessed or flashed.
+mismatch before synthesis. The fresh full receiver now completes synthesis and
+placement: 13284 LUTs / 18951 registers at synthesis (129 LUTs / 87 registers
+fewer than d80), and an actual fully placed checkpoint. All 4400 slices are
+occupied. The real implementation gate confirms one realtime core, both PSS
+stages, pilot DMA, actual clocks and both new fault-synchronizer timing paths.
+Routing/post-route timing and the longer capacity result remain unqualified;
+retained CDC warnings still require review. No radio has been accessed or flashed.
+See `reports/starlink-shared-realtime-physical-20260909.json` for the explicit
+completed-stage versus live-implementation checkpoint.
 See `reports/starlink-shared-realtime-integration-20260909.json`. After these
 gates, native paired capture/stop/drain and .18-before-.17 live qualification
 still precede the complete hopping/rate ladder.
@@ -432,8 +465,8 @@ See `reports/starlink-shared-realtime-service-20260909.json`.
 Next, qualify the explicit default-off integration with exact scores/maps,
 current-source 120 ms capacity,
 whole-chip resources, all timing constraints and CDC. None of the current guard
-passes authorize flashing. The separate paired recorder still needs
-native fine-schedule admission, durable bounded recording, map-boundary
+passes authorize flashing. The separate paired recorder still needs to compose
+the now-available native fine admission with durable bounded recording, map-boundary
 stop/drain and independent GLRT on proven common observation support.
 
 ### Exact finite fine-schedule ledger — 2026-09-09
@@ -453,9 +486,10 @@ export of the exact pushed commit passes 2134 offline tests, Ruff and mypy; the
 See `reports/starlink-fine-schedule-ppu-20260909.json`.
 
 This is explicitly the qualified 15 MS/s shared processing geometry, not inferred
-30/60 MS/s support. Native current-index reads, schedule acceptance, durable
-transition ownership, concurrent paired capture and graceful map stop/drain are
-still required. Separation between validated fine anchors is not continuous
+30/60 MS/s support. Native current-index and schedule-acceptance receipts are now
+implemented separately; durable transition ownership, concurrent paired capture
+and graceful map stop/drain are still required. Separation between validated fine
+anchors is not continuous
 sample coverage or measured timing lock. All live and full scanner gates remain.
 
 ### Latest counter/retirement checkpoint — 2026-09-09

@@ -1,0 +1,197 @@
+{
+  "schema": "starlink.paired_receiver.realtime_physical.v1",
+  "date_utc": "2026-09-09",
+  "checkpoint_utc": "2026-09-09T07:38:00Z",
+  "status": "SYNTHESIS_AND_PLACEMENT_PASS_IMPLEMENTATION_RUNNING",
+  "scope": "Fresh complete paired-pilot 15 MS/s receiver with explicitly selected shared realtime XFFT; completed synthesis/placement and INIT clock/CDC-constraint gate evidence only. Not routed timing or deployment qualification.",
+  "source": {
+    "hdl_commit": "ff4229bb230437fcd975413390a34c00ffcc226f",
+    "hdl_worktree_clean_at_launch": true,
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "previous_receiver_hdl_commit": "d80fd15490ce82b7eda151be4594433ac9e738f5",
+    "baseline_report": "reports/starlink-shared-transport-clear-20260909.json"
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "hardware_qualified": false,
+  "timing_closed": false,
+  "fpga_pss_lock": false,
+  "build": {
+    "base": "hdl/projects/pluto/shared-realtime-full-v1",
+    "part": "xc7z010clg400-1",
+    "vivado": "2022.2",
+    "source_msps": 15,
+    "processing_clock_mhz": 100,
+    "fft_clock_mhz": 200,
+    "shared_xfft": 1,
+    "realtime_xfft": 1,
+    "profile": "paired-pilot",
+    "ooc_synthesis": false,
+    "synthesis_strategy": "Flow_AreaOptimized_high",
+    "control_set_opt_threshold": 4,
+    "placement_directive": "AltSpreadLogic_high",
+    "implementation_strategy": "Congestion_SpreadLogic_high",
+    "post_route_phys_opt": "Explore",
+    "constraints_relaxed": false,
+    "reused_implementation_checkpoint": false,
+    "command": "LD_LIBRARY_PATH=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE STARLINK_PSS_RATE_MSPS=15 STARLINK_PSS_PROFILE=paired-pilot STARLINK_PSS_SHARED_XFFT=1 STARLINK_PSS_REALTIME_XFFT=1 ADI_USE_OOC_SYNTHESIS=n ADI_PROJECT_DIR=shared-realtime-full-v1/ /opt/Xilinx/Vivado/2022.2/bin/vivado -mode batch -source system_project.tcl -log shared-realtime-full-v1/vivado.log -journal shared-realtime-full-v1/vivado.jou > shared-realtime-full-v1/console.log 2>&1"
+  },
+  "synthesis": {
+    "terminal": true,
+    "result": "pass",
+    "lut": 13284,
+    "ff": 18951,
+    "bram_tiles": 49,
+    "dsp": 48,
+    "completion_evidence": [
+      "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/synth_1/.vivado.end.rst",
+      "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/synth_1/system_top.dcp"
+    ],
+    "baseline_same_stage": {
+      "lut": 13413,
+      "ff": 19038,
+      "bram_tiles": 49,
+      "dsp": 48
+    },
+    "delta_vs_baseline": {
+      "lut": -129,
+      "ff": -87,
+      "bram_tiles": 0,
+      "dsp": 0
+    }
+  },
+  "placement": {
+    "terminal": true,
+    "result": "pass",
+    "design_state": "Fully Placed",
+    "lut_adjusted_for_combining": 12782,
+    "ff": 18948,
+    "bram_tiles": 49,
+    "dsp": 44,
+    "slices_used": 4400,
+    "slices_available": 4400,
+    "unique_control_sets": 444,
+    "completion_evidence": [
+      "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/.place_design.end.rst",
+      "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_placed.dcp",
+      "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_utilization_placed.rpt"
+    ],
+    "note": "Implementation optimizes resource mapping; placement counts are not the synthesis counts. All slices are occupied. A Fully Placed checkpoint is not a routing or timing pass.",
+    "baseline_current_source_placement_results": [
+      {
+        "strategy": "high",
+        "result": "fail",
+        "slice_shortfall": 10
+      },
+      {
+        "strategy": "medium",
+        "result": "fail",
+        "slice_shortfall": 12
+      },
+      {
+        "strategy": "place-explore",
+        "result": "fail",
+        "slice_shortfall": 6
+      },
+      {
+        "strategy": "area-explore",
+        "result": "fail",
+        "slice_shortfall": 87
+      }
+    ]
+  },
+  "init_gate": {
+    "terminal": true,
+    "result": "pass",
+    "scope": "Structure and required timing paths only, before placement; no physical slack or complete CDC qualification.",
+    "generated_cores": 1,
+    "generated_core": "starlink_pss_fft512_bfp18_rt_candidate",
+    "coarse_fine_pilot_dma_present": true,
+    "pilot_pacer_ramb18": 1,
+    "common_reset_flops": 8,
+    "mailbox_local_reset_flops": 0,
+    "held_input_metadata_bits": 70,
+    "held_output_metadata_bits": 75,
+    "held_input_metadata_requirement_ns": 10,
+    "held_output_metadata_requirement_ns": 20,
+    "ownership_crossing_requirements_ns": {
+      "input_request": 5,
+      "input_ack": 10,
+      "output_request": 10,
+      "output_ack": 5
+    },
+    "fast_fault_to_slow_requirement_ns": 10,
+    "source_fault_to_fast_requirement_ns": 5,
+    "source_fault_second_stage_requirement_ns": 5
+  },
+  "init_cdc": {
+    "stage": "INIT_DESIGN",
+    "blanket_pass": false,
+    "review_required": true,
+    "summary": [
+      {
+        "id": "CDC-3",
+        "severity": "Info",
+        "count": 31
+      },
+      {
+        "id": "CDC-6",
+        "severity": "Warning",
+        "count": 9
+      },
+      {
+        "id": "CDC-9",
+        "severity": "Info",
+        "count": 7
+      },
+      {
+        "id": "CDC-15",
+        "severity": "Warning",
+        "count": 360
+      },
+      {
+        "id": "CDC-17",
+        "severity": "Warning",
+        "count": 7
+      }
+    ],
+    "note": "The held metadata buses are intentionally bundled with synchronized ownership. Retained warnings must be reviewed in context; first-stage bounds do not waive second-stage timing or prove routed CDC."
+  },
+  "implementation": {
+    "terminal": false,
+    "observed_stage": "post-placement physical optimization",
+    "root_exec_session": 11361,
+    "root_owns_authoritative_exit": true,
+    "checkpoint_os_processes": {
+      "shell": 3874716,
+      "main_vivado": 3874789,
+      "impl_runme": 3878296,
+      "impl_begin_pid": 3878300,
+      "impl_vivado_worker": 3878369
+    },
+    "worker_observation": {
+      "elapsed_seconds": 284,
+      "cpu_percent": 283,
+      "state": "Sl"
+    },
+    "liveness_evidence": "Matching live OS process tree plus current impl_1 runme.log progress; no inference from a stale log or xpr State=current. Child agent cannot consume root-owned exec handle.",
+    "final_routed_timing": null
+  },
+  "remaining": [
+    "Complete this same live implementation and consume its actual terminal result; do not restart because it is slow.",
+    "Inspect final routed setup/hold, board I/O, CDC and exception reports before declaring timing closure.",
+    "Preserve full receiver/source correspondence and matched software qualification before any .18 canary or .17 network deployment."
+  ],
+  "sha256": {
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/synth_1/system_top.dcp": "1e6fa6688601f0d7aa1885d3a502bd887a683ac0ad91be55cdc4c4f9ec771b8c",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/synth_1/system_top_utilization_synth.rpt": "17ca40aee87273122e64e3eba906f794ba226cdb89017b260e7c74a3e8567d73",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_opt.dcp": "436fd7c848f2328414fb8d86cfaee0aab5ef8a87e65d00a9c3a7c92a73e1a8f4",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_placed.dcp": "9bb19db8d4d592ba89d215017d30786ac5c1fbee5a711edf617637437e39953c",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_utilization_placed.rpt": "12776076a9bd61bf6c86da5b2752ab9e61186cac05f6d77bf9e366bb4c169073",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_gate.txt": "9ef553b17d9936e76ab9a9aa731e0ed5db6ea4fee1ee1f33e7ed81328e5d6f82",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_clocks.rpt": "a99a1bd8b359bc900bb1a2d2c3956e5f7d13b5402bfefdd302aec909687664be",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_cdc.rpt": "b4338ca72f835cf4b56d0dcfbac1d9f4cf70e192c9a9c10c3238bf923e0461de",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_exceptions.rpt": "4eae64fc975c113fe0b64c2b1ae9696c5f17c58afc2a772f41ddfbc2d32ffea0",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_ignored_exceptions.rpt": "d089c90c0e75bf61f05dac775bba800ba02126eeccf2b6138ba894029ee1683f"
+  }
+}
