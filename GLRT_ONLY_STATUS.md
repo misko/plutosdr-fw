@@ -593,3 +593,21 @@ All five new packages and candidate-plan hashes are in the
 Plans live in owned mode-0700 `contracts/` directories and name the intended
 ad9361-1r1t setup, not an observed current radio state. No USB inventory or live
 operation has run. Owner messaging continues to fail at the local MCP endpoint.
+
+## Captured-observation comparison, 2026-09-09
+
+The collector now binds its source files and all retained protocol/identity/
+snapshot/refill/raw evidence by hash. `tools/starlink_glrt_compare_capture.py`
+rechecks those bindings and the strict ABI before comparing with finalized,
+unseeded host GLRT output. It preserves counter/filter coordinates above 2^53
+and separates unobservable support/CFO from unmatched comparable positives.
+It retains busy, partial, clipping and other-visit counts; no vacuous agreement
+is claimed when there are no matches. Older captures without evidence hashes
+are conservatively rejected by this comparison entry point.
+
+All **20** comparator/collector tests pass in 3.51 seconds. The existing mock
+IIO fixture was also passed through the actual pinned blind analyzer and new
+comparison CLI in `artifacts/glrt-mock-capture-blind-comparison-v1`: its 20-sample
+IQ is insufficient for host acquisition, both synthetic events are outside the
+exported support, and the result correctly reports no agreement. This validates
+file/coordinate plumbing only; it is explicitly not a hardware observation.

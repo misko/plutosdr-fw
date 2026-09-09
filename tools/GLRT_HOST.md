@@ -52,6 +52,9 @@ clipping immunity, input-eye calibration, RF truth or complete detector coverage
 Busy rejections, pending work and DDC clipping remain explicit fields. Context
 firmware labels must be bound to the separately recorded deployment manifest;
 the collector cannot read back a bitstream hash from the current GLR1 registers.
+The protocol records the collector/binding/decoder source hashes; the summary
+binds the protocol, identities, snapshots, refill records and both raw streams.
+Changing collector sources during an observation makes the run fail.
 
 ## Independent offline GLRT
 
@@ -93,10 +96,28 @@ The frame entries preserve their own score, control, CFO and engineering gate
 crossing. Applying the same engineering gates to individual frames does not
 establish a calibrated per-frame false-alarm rate.
 
-Compare FPGA events only after the blind output is finalized and hashed. Use
-`Snapshot.source_center()` and `Event.observable_interval()` for counter/filter
-mapping, never as acquisition seeds. A complete comparison, agreed tolerances,
-fresh holdouts and live validation are still required by the firmware goal.
+Compare FPGA events only after the blind output is finalized and hashed:
+
+```sh
+.venv/bin/python tools/starlink_glrt_compare_capture.py \
+  --capture artifacts/capture-101 --host-blind artifacts/capture-101-blind \
+  --output artifacts/capture-101-comparison.json
+```
+
+The comparator rechecks all captured evidence hashes, identities, configuration,
+IQ endpoints and event/CPU counters. It requires an unseeded upper-edge host
+protocol with digital center zero and the same exact IQ. Native counters and
+filter delay are mapped after acquisition, preserving fractional coordinates
+even for counters above 2^53. It retains events whose complete time support is
+outside the export or whose CFO is outside the +/-100 kHz host search band.
+These are distinct from comparable positives without a host match. The matching
+tolerances remain five output samples and 2 kHz circular CFO.
+
+Older captures lacking the evidence-hash envelope are rejected by this strict
+workflow. Their raw files remain available for separately labeled analysis.
+An observed match does not itself qualify deployment, the physical receive
+interface, transport headroom or live sensitivity. Fresh saved/live holdouts
+and actual radio qualification remain required by the firmware goal.
 
 `starlink_glrt_saved_development.py` replays every record of a specified hashed
 LPP1 worker pack. It uses recorded CI16 and edge, preserving old labels solely

@@ -117,6 +117,9 @@ def collect(args, *, library=None, context_factory=Context):
                     edge="upper", event_buffer_records=1, event_kernel_buffer_count=1024,
                     iq_kernel_buffer_count=4, hardware_qualification="not inferred by this collector",
                     purpose="whole finite continuous IQ prefix, independent of FPGA decisions")
+    source_files = [Path(__file__).resolve(), Path(__file__).with_name("starlink_glrt_abi.py").resolve(),
+                    Path(__file__).with_name("starlink_glrt_iio.py").resolve()]
+    protocol["source_sha256"] = {str(path): sha256(path) for path in source_files}
     save(args.output / "protocol.json", protocol)
     api = library or Library(args.libiio)
     context = event_context = iq_buffer = event_buffer = reader = baseline = final = None
@@ -240,6 +243,13 @@ def collect(args, *, library=None, context_factory=Context):
     except (OSError, ValueError) as error:
         failures.append(f"event attestation: {error}")
     save(args.output / "blocks.json", blocks)
+    try:
+        if any(sha256(Path(path)) != value for path, value in protocol["source_sha256"].items()):
+            failures.append("collector source changed during observation")
+    except OSError as error:
+        failures.append(f"collector source verification: {error}")
+    evidence_names = ("protocol.json", "identity.json", "initial_snapshot.txt", "baseline_snapshot.txt",
+                      "final_snapshot.txt", "blocks.json", "iq.ci16", "events.raw")
     summary = {"schema": protocol["schema"], "status": "complete" if not failures else "failed",
                "failures": failures, "received_bytes": received,
                "iq_prefix_attested": iq_pass, "event_transport_attested": event_pass,
@@ -250,6 +260,8 @@ def collect(args, *, library=None, context_factory=Context):
                "radio_before": radio_before, "radio_after": radio_after,
                "iq_sha256": sha256(args.output / "iq.ci16"),
                "events_sha256": sha256(args.output / "events.raw"),
+               "evidence_sha256": {name: sha256(args.output/name) for name in evidence_names
+                                   if (args.output/name).is_file()},
                "independent_host_glrt_run": False, "live_detector_qualified": False,
                "detector_busy_rejections": final.u64(36) if final else None,
                "detector_pending_bits": final.words[61] if final else None,

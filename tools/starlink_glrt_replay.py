@@ -57,7 +57,7 @@ def terminal_state(status, trace, samples, ratio):
 
 
 def compare(host, iq_path, events, first_center, ratio):
-    # This function is called only after RTL and exact IQ verification finish.
+    # Call only after the exported bytes and their observation have been verified.
     summary = json.loads((host / "summary.json").read_text())
     if summary["status"] != "complete" or summary["iq_sha256"] != digest(iq_path):
         raise ValueError("blind host result did not analyze these exact exported bytes")
