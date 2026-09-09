@@ -1,71 +1,123 @@
-**GLRT implementation and Ethernet deployment — active, 9 September 2026**
+**GLRT implementation and Ethernet deployment — active, 9 September 2026, 05:55 UTC snapshot**
 
-User instruction: implement, test, deploy and verify. Use a locally USB-connected
-radio other than `1040007c4a94000211000b009186843ef2`, and operate it over Ethernet.
-This supersedes the review's proposed .18 target and historical target choices.
-Exact device identity, current ownership and recoverability remain prerequisites
-for hardware mutation. TX remains muted; RF collection windows are bounded to
-at most 30 minutes, with short captures and saved-data analysis between them.
+The 2.5 and 5 MS/s images have passed bounded Ethernet commissioning, including
+RX PN calibration, continuous IQ, scored-event transport and finite GLX1 closure.
+Exact original persistent v0.47 rollback also passed. The 10 MS/s deployment,
+PN and short capture passed; its ten-second capture is running at this snapshot.
+The 25 MS/s image is packaged with frozen transition policies.
+The 60 MS/s build still fails timing. Five-rate deployment and live-detector
+qualification are not complete.
 
-Persistent goal belongs to task `01a08439-8ad1-7b41-af10-f6329917f083`.
-Implementation branch: `codex/glrt-deployment-implementation`, workspace
-`/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review`.
-Firmware baseline: `6e49144af`; review: `7dc653acd`.
-HDL, Linux, Buildroot and U-Boot have independent working directories, each on
-the implementation branch. The original GLRT workspace is a read-only reference.
+Implementation branch `codex/glrt-deployment-implementation` is in
+`/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review`, based on firmware
+`6e49144af`; review checkpoint `7dc653acd`. The persistent goal belongs to task
+`01a08439-8ad1-7b41-af10-f6329917f083`. Original workspaces remain references.
 
-The review's documentation-only statement describes the completed review, not
-the current user-authorized implementation/deployment work. Hardware actions
-will use the newly selected eligible radio, not the excluded serial.
+The user authorized implementation, testing, deployment and verification using
+Ethernet on a locally USB-connected receiver except
+`1040007c4a94000211000b009186843ef2`. The selected receiver is
+`winbond-db620818a328172c`, Ethernet `192.168.1.14`, local USB `5-1`.
+All normal operations use Ethernet; exact serial, local USB recovery presence,
+source/target FIT identities, idle buffers, TX safety and a shared ownership lock
+guard transitions. The excluded receiver is not operated. Individual operator
+captures are bounded to 30 seconds of output; no multi-hour RF campaign is used.
 
-| Work package | State | Evidence / next action |
-|---|---|---|
-| Explicit numerical profile and enforceable detector gates | Implemented | Frozen `glrt-upper-candidate-v1`; all complete strong frames required; failure exits nonzero |
-| Bounded vector staging and finite-close accounting | Implemented and tested | Additive GLX1; HDL `ec87261d` paired-bin scorer halves service time; all five rates pass strict simulation |
-| Kernel and strict host closure | Implemented and tested | Linux `93a343f29717` build passed; dedicated DT explicitly selects AD9361; completed event support must fit the attested native endpoint |
-| Reproducible build/package and saved/synthetic verification | Numerical checks passed; physical closure partial | Fresh 50-case five-rate matrix: 45/45 strong frames; 15 quiet controls; 500,000 IQ words and 327 raw scores bit exact. HDL625a saved batch: 24 recordings, 1.2M IQ words, 116 vectors exact |
-| Routed implementation | 2.5, 5, 10 MS/s pass; 25 and 60 fail | Setup slacks +0.009, +0.013, +0.055, -0.341, -0.938 ns respectively. Failed high-rate images are not deployable; measured control-path fix in progress |
-| Ethernet deployment and recovery policy | Implemented and used | Exact source FIT, serial, USB recovery presence, idle buffers and ownership lock required; original persistent backup retained |
-| Hardware calibration, IQ/event transport and recovery | First candidate deployed; commissioning active | 2.5 MS/s RX PN eye passed at delay0x08, 140 passing points. First 300,000 samples received; final snapshot race caused explicit failed capture, fixed with bounded current-visit wait and 58 tests |
-| Independent same-IQ live GLRT comparison | Pending successful capture | Receiver feed/IF remains unknown; transport evidence cannot establish live pilot sensitivity |
-| Five-rate deployment/verification completion | Not achieved | Per-rate evidence required; no aggregate success inferred |
+| Image | Exact built HDL | Exact Linux | Internal setup / hold | Current evidence |
+| --- | --- | --- | --- | --- |
+| `glrt-eth-r2500000-v1` | `625a93e7376727f78286785ef27190eb2dd7a719` | `36c6561f152a1e0ae635a77da2d120c71478e925` | +0.009 / +0.020 ns | Historical canary; exact return reconciled, short/backlog passed; superseded by AD9361-corrected v2 |
+| `glrt-eth-r2500000-v2` | `625a93e7376727f78286785ef27190eb2dd7a719` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.009 / +0.020 ns | PN, short capture, two 100 MB ten-second runs, 320-event control and original rollback passed |
+| `glrt-eth-r5000000-v1` | `ec87261da8d0ec0dda58b0ce6a5e9adeb2097bb6` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.013 / +0.017 ns | Deployed from restored v0.47; PN/short and 100 MB ten-second capture passed |
+| `glrt-eth-r10000000-v1` | `ec87261da8d0ec0dda58b0ce6a5e9adeb2097bb6` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.055 / +0.035 ns | Deployment, PN and 120 ms/34-event capture passed; ten-second run in progress, not yet qualified |
+| `glrt-eth-r25000000-v1` | `4cd97a03315a518ff258c54381d4034391da668f` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.004 / +0.025 ns | Independent package/PPU validation passed; 10→25, reverse and 25→2.5 fallback policies frozen |
+| 60 MS/s, unqualified build | `4cd97a03315a518ff258c54381d4034391da668f` | Intended `93a343f2971762f7c8c3d0dba0d9a5934b9e3986`; no released package | −0.199 / +0.019 ns | Not eligible for deployment; isolated physical optimization in progress |
 
-Selected receiver: `192.168.1.14`, serial `winbond-db620818a328172c`, physically
-present at USB `5-1`. Read-only inspection found a 1000 Mb/s full-duplex Ethernet
-link, idle IIO buffers and no held shared radio lock. Recheck at each mutation.
-The excluded serial was not operated.
+All source rates export fixed 2.5 MS/s CI16 IQ through the dedicated GLRT DMA.
+GLR1 stays immutable; additive GLX1 attests native endpoints, staged complete
+vectors and finite closure. Public source geometry is checked before RF writes.
+The frozen normal detector profile remains `glrt-upper-candidate-v1` with FPGA
+gates 13107/19661/9831 and host gates 0.175/0.025.
 
-The pre-deployment active runtime was `v0.48-plutoplus-spf-iq-direct-async-v3`; the independently
-downloaded and extracted persistent QSPI FIT is v0.47 direct-async-v2. These are
-different baselines. Exact persistent FIT: 12,826,107 bytes, SHA256
+The [hardware evidence index](/srv/bulk/leo/glrt-deployment-20260909/hardware-evidence-index-20260909-v1/REPORT.md)
+links all eleven completed capture attempts through 5 MS/s, original deployment
+and rollback receipts, and 153 unchanged source hashes. It preserves eight
+complete captures and three failed ones. The two corrected 2.5 MS/s long runs
+saved 100 MB in 10.069882 and 10.068877 seconds. The 5 MS/s short run saved
+1.2 MB and nine normal-profile score records; its long run saved 100 MB in
+10.065150 seconds with all 1,560 score records and clean IQ/event/closure checks.
+These records are scores, not claims of pilot detections.
+
+After that index's cutoff, the [10 MS/s deployment receipt](/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review/artifacts/device-tool-glrt-ethernet/artifacts/ethernet-canary-14/rate10000000-forward-receipts/90bc2ad7-3b7d-4ae5-a422-ffad32f2bf58.json)
+returned success with exact AD9361 firmware identity. Its calibrated
+[short capture](/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review/artifacts/device-tool-glrt-ethernet/artifacts/ethernet-canary-14/captures/rate10000000-120ms-v1/summary.json)
+saved 1.2 MB and all 34 scored events without failures. Its long-run result is
+pending at this status snapshot and is not inferred from the short run.
+
+The separate 120 ms decisions-off control used acquisition zero and exact/margin
+65536, with an explicit transport-only purpose. All 320 hardware event records
+matched the frozen integer oracle's energies, peaks, bins, shift, flags and Q16
+scores exactly; none lacked saved native support. This is conditional arithmetic
+at recorded epochs, separate from blind acquisition. See the
+[arithmetic report](/srv/bulk/leo/glrt-deployment-20260909/hardware-2500000-event-control-v2-oracle-v1/REPORT.md).
+The [blind 2.5 MS/s host run](/srv/bulk/leo/glrt-deployment-20260909/host-live-v2-2500000-10sec-v1/summary.json)
+completed all 1,000 overlapping windows without pilot positives; the
+[5 MS/s short host run](/srv/bulk/leo/glrt-deployment-20260909/host-live-5000000-120ms-v1/summary.json)
+completed twelve windows without multi-frame positives. Live pilot agreement
+remains unproven.
+
+Failures remain part of the record. The initial v1 short capture saved its IQ
+but failed final evidence with ENODATA before asynchronous IIOD teardown ended.
+The initial v1 ten-second run saved 100 MB but failed when its quiet event socket
+expired; its historical event-attested flag predates the correction and does not
+override the failed status. The v2 ten-second attempt with 25,000-sample chunks
+overflowed the 256-word output FIFO: 550,256 words reached AXIS, but only 550,000
+were saved. Subsequent long runs use 250,000-sample chunks and four requested
+kernel buffers (4 MB), with output FIFO high water one. This identifies the
+observed FIFO failure, not a proven host/kernel/DMA root cause or throughput
+headroom. See the [buffering comparison](/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review/artifacts/device-tool-glrt-ethernet/docs/glrt-ethernet-commissioning-evidence.md).
+
+Collector checkpoint `cb7734c09` waits for the current visit's final evidence,
+sets the quiet-event timeout before OPEN, and preserves unexpected late event
+errors during cancellation. Only verified pending-refill cancellation errors
+are ignored; 94 collector/binding/ABI tests pass. Device-tool checkpoint
+`28b2eaa` includes exact 25 MS/s profiles and the `c539bd0` timeout cleanup:
+bounded SIGINT, kill only if needed, then read-only post-run idle/identity under
+the held lock, retaining both process and cleanup failures. Its 219 deployment/
+operator tests and static checks pass. The
+[operator runbook](/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review/artifacts/device-tool-glrt-ethernet/docs/glrt-ethernet-canary-runbook.md)
+contains executable transition and capture commands.
+
+The pre-deployment active RAM version was v0.48 direct-async-v3, while the
+independently extracted persistent QSPI FIT was v0.47 direct-async-v2:
+12,826,107 bytes, SHA-256
 `7a198f961cd6765ebd831c21314baac0f962650541af671911c23e76db33cbc2`.
-Rollback must expect that verified v0.47 image, not claim to restore the active
-v0.48 RAM bytes. A verified published v0.48 artifact is separately retained.
-Original U-Boot environment remains preserved; its mode handling does not add
-2R2T to the candidate's compiled 1R1T device tree.
+The successful rollback restored those exact persistent bytes and original
+2R2T topology; it does not claim the preceding RAM bytes were restored.
+Original U-Boot environment remains preserved. Its `/amba` PHY override does
+not reach the GLRT kernel's `/axi` PHY; Linux `93a343f2` explicitly compiles
+AD9361 in the dedicated DT. The original v1 unknown deployment receipt remains
+unchanged alongside its separate successful read-only reconciliation.
 
-Build and numerical evidence is retained under
-`/srv/bulk/leo/glrt-deployment-20260909`. Private recovery/enrollment material is
-under the owned device tool's ignored `artifacts/ethernet-canary-14` directory.
-The first persistent candidate `glrt-eth-r2500000-v1` was written and its exact
-QSPI FIT verified over Ethernet. It rebooted successfully. The initial deployment
-receipt remains `unknown` because its return validator looked for a device-level
-sampling attribute on a channel. A separate read-only reconciliation receipt
-verifies the running candidate, new boot identity, exact FIT, GLR1/GLX1, idle
-buffers, muted TX and gigabit link without rewriting the original receipt.
-The candidate FIT SHA256 is
-`e447ccc721927f69abe38f46bf6d9694f1d9a83b1f242a040b84500aa27e30b0`.
+The [25 MS/s package review](/srv/bulk/leo/glrt-deployment-20260909/package-25000000-4cd97a03-v1/result.json)
+binds the exact FIT/DFU/FRM and acknowledges the small setup margin. Internal
+timing does not qualify the external RX interface: existing reset/Gray/ADI CDC
+warnings, clock exceptions and unmeasured input/output-delay boundaries remain.
+Each new rate still requires its own measured RX PN eye and bounded transport
+checks. The [60 MS/s audit](/srv/bulk/leo/glrt-deployment-20260909/board-60000000-4cd97a03-v1/full-audit/audit.tsv)
+retains its failure; no timing constraint is relaxed to call it a pass.
 
-The old U-Boot AD9361 override uses `/amba`, but this kernel's PHY is under `/axi`.
-The deployed v1 therefore reports AD9363a. The dedicated DT fix is compiled and
-packaged as `glrt-eth-r2500000-v2`, FIT SHA256
-`df5eece95500896aebf7980a24af1ad129d46633690a8e75b9afb3fe19e69fab`.
-It preserves Rev.C identity, 1R1T topology and the existing U-Boot environment.
-The original persistent rollback and subsequent GLRT redeployment remain to be
-exercised. No image is declared production or live-detector qualified.
+The exact `4cd97a03` [five-rate synthetic matrix](/srv/bulk/leo/glrt-deployment-20260909/host-synthetic-five-rate-4cd97a03-seed29343-v1/summary.json)
+passes the strong-frame and quiet-control gates. Weak/short cases remain
+reported limits; diagnostic short-32 cases retain six unmatched host supports.
+Rolled pilots retain cyclic timing ambiguity and are not a certified negative
+control or spacecraft/frame identity. Those limits are not erased by passing
+transport or arithmetic. All captures use the observed post-boot 2.4 GHz LO,
+2 MHz bandwidth, A_BALANCED and manual 30 dB gain with TXLO down; actual
+antenna/LNB connection and IF remain unknown. Sensitivity, field false-alarm
+rate and live pilot agreement remain unqualified; hardware-qualified flags
+remain false.
 
-First RX-only transport collection used the observed post-boot 2.4 GHz LO,
-2 MHz bandwidth, RX A_BALANCED and manual 30 dB gain. These settings are for
-transport commissioning and do not identify the connected RF feed.
-Live pilot verification still depends on the selected receiver's actual RF feed;
-transport and closure tests do not establish Starlink sensitivity.
+Remaining work is ordered: finish 10 MS/s long-run validation, then
+25 MS/s with the same gates; close and independently audit 60 MS/s timing before
+packaging or deploying it; preserve each rate's failures and successful receipts;
+leave a verified GLRT image deployed. Live detector qualification additionally
+requires a known RF feed and bounded, explicitly interpreted pilot evidence.
