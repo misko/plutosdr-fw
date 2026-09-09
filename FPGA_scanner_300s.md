@@ -398,6 +398,13 @@ both detector stages, pilot DMA and the original timing-path obligations.
 Physical qualification remains open. No radio or PPU was changed. See
 `reports/starlink-track-dsp-selection-20260909.json`.
 
+At 19:35:38 UTC this receiver completed placement and saved its placed
+checkpoint. It uses 13132 Slice LUTs, 18501 fabric registers, all 4400 slices,
+53.5 BRAM tiles and 54 DSP48E1s, with 444 control sets. Placement has advanced
+beyond the previous three-slice failure, but post-placement estimated setup
+slack is still -2.763 ns. Implementation is continuing; this is not routed
+timing closure and no hardware promotion is allowed from this checkpoint.
+
 ### Snapshot data-enable remap: replay passes, placement still fails — 2026-09-09
 
 HDL `6ee01b7c399f06765ea387720a5c3ccfa6e62de1` retains local request
