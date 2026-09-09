@@ -103,10 +103,43 @@ def validate_request(args):
         raise ValueError("capture requires 1..250000 samples per buffer and at most 30 seconds")
     if args.samples % args.chunk_samples or args.chunk_samples % 2:
         raise ValueError("sample limit must fill whole DMA buffers, with even CI16 buffer length")
+    if getattr(args, "prefill", False) and args.samples > 4*args.chunk_samples:
+        raise ValueError("prefill requires the entire observation to fit in four requested IQ kernel buffers")
     if not all(0 <= v <= 65536 for v in (args.acquisition_q16, args.threshold_q16, args.margin_q16)):
         raise ValueError("Q16 gates must be 0..65536")
     if args.lo_hz <= 0 or args.bandwidth_hz <= 0:
         raise ValueError("expected RX LO and bandwidth must be positive")
+
+
+def wait_for_prefill(iq, args, *, clock=time.monotonic, sleep=time.sleep):
+    """Wait for all requested IQ to reach DMA, before the first host refill.
+
+    Keep the latest snapshot even on fault/timeout. A backend that cannot queue
+    enough DMA without host reads fails this mode instead of yielding a rate.
+    Per-read libiio timeouts also bound a stalled attribute request.
+    """
+    started = clock()
+    timeout = 2.0 + 4*args.samples/2_500_000
+    polls = 0
+    while True:
+        wire = iq.read("capture_snapshot")
+        (args.output / "prefill_snapshot.txt").write_text(wire + "\n")
+        snap = Snapshot.decode(wire)
+        polls += 1
+        snap.require_iq_health(expected_visit=args.visit, expected_rate=args.source_rate)
+        if not snap.words[19] & 1:
+            if snap.samples != args.samples:
+                raise ValueError("prefill producer stopped before the requested sample limit")
+            if not snap.words[19] & 2 and snap.words[22] == 0:
+                snap.require_stopped_iq(expected_visit=args.visit, expected_rate=args.source_rate,
+                                        expected_samples=args.samples)
+                return {"producer_stopped_and_dma_prefix_complete": True,
+                        "samples": snap.samples, "snapshot_generation": snap.generation,
+                        "wait_seconds": clock()-started, "poll_count": polls,
+                        "poll_timeout_seconds": timeout}
+        if clock()-started >= timeout:
+            raise TimeoutError("prefill did not reach a stopped, fully DMA-delivered prefix")
+        sleep(.01)
 
 
 def collect(args, *, library=None, context_factory=Context):
@@ -114,6 +147,7 @@ def collect(args, *, library=None, context_factory=Context):
     args.output.mkdir(parents=True, exist_ok=False)
     protocol = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     protocol.update(schema="starlink-glrt-iio-capture/v1", output_rate_hz=2_500_000,
+                    prefill=bool(getattr(args, "prefill", False)),
                     edge="upper", event_buffer_records=1, event_kernel_buffer_count=1024,
                     iq_kernel_buffer_count=4, hardware_qualification="not inferred by this collector",
                     purpose="whole finite continuous IQ prefix, independent of FPGA decisions")
@@ -124,6 +158,7 @@ def collect(args, *, library=None, context_factory=Context):
     api = library or Library(args.libiio)
     context = event_context = iq_buffer = event_buffer = reader = baseline = final = None
     failures, blocks = [], []
+    prefill = drain_seconds = None
     received, began = 0, time.monotonic()
     radio_before = radio_after = None
     with (args.output / "iq.ci16").open("xb") as iq_file, (args.output / "events.raw").open("xb") as event_file:
@@ -169,6 +204,9 @@ def collect(args, *, library=None, context_factory=Context):
             baseline = Snapshot.decode(baseline_text)
             if baseline.words[20] != args.visit or baseline.samples or baseline.words[19] & 0x1f:
                 raise ValueError("driver baseline is not the requested pre-ARM observation")
+            if protocol["prefill"]:
+                prefill = wait_for_prefill(iq, args)
+            drain_start = time.monotonic()
             while received < 4*args.samples:
                 start = time.monotonic()
                 raw = iq_buffer.refill()
@@ -177,6 +215,7 @@ def collect(args, *, library=None, context_factory=Context):
                 blocks.append({"bytes": len(raw), "refill_seconds": time.monotonic()-start})
                 if len(raw) != args.chunk_samples*4:
                     raise ValueError("finite IQ DMA returned a partial buffer")
+            drain_seconds = time.monotonic()-drain_start
         except BaseException as error:
             failures.append(f"{type(error).__name__}: {error}")
         finally:
@@ -232,6 +271,10 @@ def collect(args, *, library=None, context_factory=Context):
         final.require_iq_prefix(expected_visit=args.visit, expected_rate=args.source_rate,
                                 received_bytes=(args.output / "iq.ci16").stat().st_size,
                                 expected_samples=args.samples)
+        if prefill:
+            before_drain = Snapshot.decode((args.output / "prefill_snapshot.txt").read_text())
+            if before_drain.words[:8] != final.words[:8]:
+                raise ValueError("prefill and final IQ endpoints/counts differ")
         iq_pass = True
     except (OSError, ValueError) as error:
         failures.append(f"IQ attestation: {error}")
@@ -250,6 +293,8 @@ def collect(args, *, library=None, context_factory=Context):
         failures.append(f"collector source verification: {error}")
     evidence_names = ("protocol.json", "identity.json", "initial_snapshot.txt", "baseline_snapshot.txt",
                       "final_snapshot.txt", "blocks.json", "iq.ci16", "events.raw")
+    if protocol["prefill"]:
+        evidence_names += ("prefill_snapshot.txt",)
     summary = {"schema": protocol["schema"], "status": "complete" if not failures else "failed",
                "failures": failures, "received_bytes": received,
                "iq_prefix_attested": iq_pass, "event_transport_attested": event_pass,
@@ -266,6 +311,15 @@ def collect(args, *, library=None, context_factory=Context):
                "detector_busy_rejections": final.u64(36) if final else None,
                "detector_pending_bits": final.words[61] if final else None,
                "ddc_clipping_count": final.words[16] if final else None}
+    if protocol["prefill"]:
+        summary["prefill"] = prefill
+        valid_drain = bool(prefill and drain_seconds and not failures)
+        summary["drain_seconds_after_prefill"] = drain_seconds
+        summary["drain_bytes_per_second_after_prefill"] = received/drain_seconds if valid_drain else None
+        summary["prefill_drain_limitations"] = [
+            "Finite buffered service rate includes host refills and buffered file writes; excludes final flush/fsync/stop.",
+            "Backend prefetch, kernel buffering and transport scheduling require separate runtime characterization.",
+            "This is not a sustained streaming or physical link capacity qualification."]
     save(args.output / "summary.json", summary)
     return summary
 
@@ -281,6 +335,8 @@ def main():
     parser.add_argument("--visit", type=int, required=True)
     parser.add_argument("--samples", type=int, default=300_000)
     parser.add_argument("--chunk-samples", type=int, default=25_000)
+    parser.add_argument("--prefill", action="store_true",
+                        help="wait for complete DMA backlog before timing refills; requires <=4 IQ buffers")
     parser.add_argument("--acquisition-q16", type=int, default=15729)
     parser.add_argument("--threshold-q16", type=int, default=19661)
     parser.add_argument("--margin-q16", type=int, default=9831)

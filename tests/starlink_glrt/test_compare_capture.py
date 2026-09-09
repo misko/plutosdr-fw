@@ -18,7 +18,8 @@ def save(path, value):
 
 def refresh_capture(capture):
     summary = json.loads((capture/"summary.json").read_text())
-    summary["evidence_sha256"] = {name: digest(capture/name) for name in EVIDENCE}
+    names = EVIDENCE + (("prefill_snapshot.txt",) if (capture/"prefill_snapshot.txt").exists() else ())
+    summary["evidence_sha256"] = {name: digest(capture/name) for name in names}
     summary["iq_sha256"] = digest(capture/"iq.ci16")
     summary["events_sha256"] = digest(capture/"events.raw")
     save(capture/"summary.json", summary)
@@ -129,3 +130,32 @@ def test_capture_comparison_rejects_changed_or_incomplete_evidence(tmp_path, fau
               "event-loss": "event inventory differs", "legacy": "evidence missing or changed"}[fault]
     with pytest.raises(ValueError, match=reason):
         compare_capture(capture, host)
+
+
+@pytest.mark.parametrize("fault", [None, "changed", "active", "endpoints"])
+def test_prefill_snapshot_is_bound_stopped_and_matches_received_prefix(tmp_path, fault):
+    capture, host, ratio, _ = fixture(tmp_path)
+    protocol = json.loads((capture/"protocol.json").read_text())
+    protocol.update(prefill=True, chunk_samples=2500)
+    save(capture/"protocol.json", protocol)
+    save(capture/"blocks.json", [{"bytes": 10000, "refill_seconds": .001}]*4)
+    fields = (capture/"final_snapshot.txt").read_text().split()
+    if fault == "active":
+        fields[14+19] = "00000019"
+    elif fault == "endpoints":
+        for word in (0, 2):
+            value = int(fields[14+word], 16) + (int(fields[15+word], 16) << 32) + ratio
+            fields[14+word:16+word] = [f"{value & 0xffffffff:08x}", f"{value >> 32:08x}"]
+    (capture/"prefill_snapshot.txt").write_text(" ".join(fields))
+    refresh_capture(capture)
+    if fault == "changed":
+        with (capture/"prefill_snapshot.txt").open("a") as stream:
+            stream.write(" ")
+    if fault is None:
+        result = compare_capture(capture, host)
+        assert str(capture/"prefill_snapshot.txt") in result["input_sha256"]
+    else:
+        reason = {"changed": "evidence missing or changed", "active": "active, queued",
+                  "endpoints": "endpoints/counts differ"}[fault]
+        with pytest.raises(ValueError, match=reason):
+            compare_capture(capture, host)

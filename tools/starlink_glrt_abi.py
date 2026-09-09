@@ -82,20 +82,20 @@ class Snapshot:
         require(type(output_index) is int and 0 <= output_index < self.samples, "sample outside admitted prefix")
         return self.u64(0)+self.ratio*output_index-DELAYS[self.source_rate]
 
-    def require_iq_prefix(self, *, expected_visit: int, expected_rate: int,
-                          received_bytes: int, expected_samples: int | None = None) -> None:
-        """Require a stopped, drained, fault-free prefix plus exact received bytes.
-
-        Bytes must be measured by the caller from the actual payload. This
-        validates counter consistency; it cannot attest an invented byte count,
-        file provenance, ADC analog clipping, radio configuration, or live RF.
-        """
+    def require_iq_health(self, *, expected_visit: int, expected_rate: int) -> None:
+        """Check image, visit and recorded transport faults, including while active."""
         w = self.words
         require(self.source_rate == expected_rate == self.readback_rate, "source clock/image mismatch")
         require(w[20] == expected_visit and expected_visit != 0, "visit mismatch")
         require(not self.recovery_failed and self.dma_error == 0, "DMA/recovery failure")
         require(w[17] == w[18] == 0, "DDC/transport fault invalidates complete-prefix qualification")
         require(w[44] == w[45] and w[46] == w[47], "source FIFO dropped samples")
+
+    def require_stopped_iq(self, *, expected_visit: int, expected_rate: int,
+                           expected_samples: int | None = None) -> None:
+        """Require complete fabric-to-DMA counters; this says nothing about host bytes."""
+        self.require_iq_health(expected_visit=expected_visit, expected_rate=expected_rate)
+        w = self.words
         require(not w[19] & 3 and w[19] & 8 and w[19] & 16, "capture is active, queued, unused or empty")
         require(self.samples > 0 and self.u64(6) == self.samples and w[22] == 0, "IQ not fully drained")
         first, last = self.u64(0), self.u64(2)
@@ -103,9 +103,19 @@ class Snapshot:
         require(last == first+self.ratio*(self.samples-1) <= U64_MAX, "noncontiguous source endpoints")
         require(self.samples+self.u64(8) <= self.u64(14) <= self.u64(12), "DDC output accounting is inconsistent")
         require(0 < w[21] <= 256, "invalid IQ FIFO high water")
-        require(type(received_bytes) is int and received_bytes == 4*self.samples, "host bytes differ from AXIS prefix")
         if expected_samples is not None:
             require(type(expected_samples) is int and expected_samples == self.samples, "requested sample count differs")
+
+    def require_iq_prefix(self, *, expected_visit: int, expected_rate: int,
+                          received_bytes: int, expected_samples: int | None = None) -> None:
+        """Require stopped, drained counters plus the caller's actual saved byte count.
+
+        Counter consistency does not attest file provenance, ADC analog clipping,
+        radio configuration, or live RF.
+        """
+        self.require_stopped_iq(expected_visit=expected_visit, expected_rate=expected_rate,
+                                expected_samples=expected_samples)
+        require(type(received_bytes) is int and received_bytes == 4*self.samples, "host bytes differ from AXIS prefix")
 
     def require_events(self, events: list[Event], *, baseline: Snapshot) -> None:
         """Require all fabric results and all CPU transfers for one settled visit.

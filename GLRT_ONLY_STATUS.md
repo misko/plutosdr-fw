@@ -611,3 +611,25 @@ comparison CLI in `artifacts/glrt-mock-capture-blind-comparison-v1`: its 20-samp
 IQ is insufficient for host acquisition, both synthetic events are outside the
 exported support, and the result correctly reports no agreement. This validates
 file/coordinate plumbing only; it is explicitly not a hardware observation.
+
+## Finite transport benchmark preparation, 2026-09-09
+
+The collector's optional `--prefill` mode waits for a complete, stopped DMA
+backlog before its first IQ refill. The observation must fit within four
+requested kernel buffers (at most 4 MB). Its retained snapshot proves fabric
+endpoints and counters separately from the final actual-byte attestation;
+the comparator rechecks both and their hashes. Stalls, short stops, drops,
+changed endpoints or incomplete capture yield no drain-rate result. Normal
+capture behavior is unchanged. The measured interval covers refills and
+buffered file writes, excluding final flush/fsync/stop. This finite service
+measurement still requires real backend characterization and does not replace
+sustained 10 MB/s streaming qualification.
+
+All **88** ABI, binding, collector and comparison tests pass in 3.62 seconds
+(`artifacts/glrt-prefill-drain-tests-v2-20260909.xml`). Tests include cancellation
+and event draining after a prefill fault, proof before the first IQ refill,
+bounded stalled-producer cases and altered prefill evidence. The preceding
+87-test run also passed and is retained. No hardware throughput was measured.
+The latest owner-window message attempt at 02:43 UTC again failed at the local
+MCP transport endpoint; the existing request for an allocated .18 window is
+still pending. All five RAM candidates remain prepared, with no radio accessed.

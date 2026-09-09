@@ -26,12 +26,16 @@ def compare_capture(capture: Path, host: Path):
     before = {str(path): digest(path) for path in paths}
     summary = json.loads((capture/"summary.json").read_text())
     protocol = json.loads((capture/"protocol.json").read_text())
+    evidence = EVIDENCE
+    if protocol.get("prefill", False):
+        evidence += ("prefill_snapshot.txt",)
+        before[str(capture/"prefill_snapshot.txt")] = digest(capture/"prefill_snapshot.txt")
     require(summary["schema"] == protocol["schema"] == "starlink-glrt-iio-capture/v1",
             "unsupported capture schema")
     require(summary["status"] == "complete" and not summary["failures"] and
             summary["iq_prefix_attested"] and summary["event_transport_attested"],
             "capture is not completely attested")
-    for name in EVIDENCE:
+    for name in evidence:
         require(summary.get("evidence_sha256", {}).get(name) == before[str(capture/name)],
                 "capture evidence missing or changed: " + name)
     require(summary["iq_sha256"] == before[str(capture/"iq.ci16")] and
@@ -51,6 +55,12 @@ def compare_capture(capture: Path, host: Path):
     byte_count = (capture/"iq.ci16").stat().st_size
     final.require_iq_prefix(expected_visit=protocol["visit"], expected_rate=protocol["source_rate"],
                             received_bytes=byte_count, expected_samples=protocol["samples"])
+    if protocol.get("prefill", False):
+        prefill = Snapshot.decode((capture/"prefill_snapshot.txt").read_text())
+        prefill.require_stopped_iq(expected_visit=protocol["visit"], expected_rate=protocol["source_rate"],
+                                   expected_samples=protocol["samples"])
+        require(prefill.words[:8] == final.words[:8], "prefill and final IQ endpoints/counts differ")
+        require(protocol["samples"] <= 4*protocol["chunk_samples"], "prefill exceeds requested kernel buffers")
     require(summary["received_bytes"] == byte_count, "capture byte count differs from payload")
     require(list(final.words[57:61]) == [protocol["acquisition_q16"], protocol["threshold_q16"],
             protocol["margin_q16"], int(not protocol["decisions_off"])], "capture gates differ from request")

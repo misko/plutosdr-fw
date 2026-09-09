@@ -56,6 +56,28 @@ The protocol records the collector/binding/decoder source hashes; the summary
 binds the protocol, identities, snapshots, refill records and both raw streams.
 Changing collector sources during an observation makes the run fail.
 
+For a separate finite backlog-drain measurement, add `--prefill` and choose
+`--samples 1000000 --chunk-samples 250000` with a new visit/output directory.
+This fits the four requested IQ kernel buffers (4 MB total, 0.4 seconds of
+production). Before its first IQ refill, the collector polls the live snapshot
+until the producer has stopped at the requested limit, every admitted sample
+has reached DMA and the FPGA IQ FIFO is empty. The latest prefill snapshot is
+retained and hashed, including on timeout/fault. Its endpoints must agree with
+the final capture. Counter-only prefill proof is separate from the final check
+against actual saved IQ bytes.
+
+`drain_bytes_per_second_after_prefill` times the first through last IQ refill
+and buffered file writes, excluding final flush/fsync and stop/event draining.
+It is reported only for a completely attested run. The usual elapsed rate
+includes waiting for source production and cannot establish transport headroom.
+The prefill rate measures finite buffered service; backend prefetch and scheduling
+still require runtime characterization, and sustained 10 MB/s streaming remains
+a separate test. The pinned target libiio ordinary OPEN posts mmap DMA blocks
+before enabling the buffer; IIOD waits for READBUF before refilling/sending IQ.
+Actual block allocation can be smaller than requested. If the entire backlog
+cannot reach DMA without host reads, this mode fails within a bounded poll/read
+timeout and yields no drain rate. It never changes to a synthetic IQ source.
+
 ## Independent offline GLRT
 
 The numerical reference is the clean Leo commit

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools.starlink_glrt_capture import collect, validate_request
+from tools.starlink_glrt_capture import collect, sha256, validate_request, wait_for_prefill
 from .test_abi import record
 
 
@@ -52,6 +52,7 @@ class Scenario:
         self.cancelled = False
         self.iq_closed = False
         self.context_count = 0
+        self.live_snapshots = None
 
     def context(self, api, uri, serial, firmware):
         assert api is self and uri == "fake:fixture"
@@ -107,6 +108,9 @@ class FakeDevice:
         if attr == "capture_abi":
             return "GLR1-1.0-upper-only"
         if attr == "capture_snapshot":
+            if self.scenario.live_snapshots is not None and ("iq", "open") in self.scenario.log:
+                self.scenario.log.append(("iq", "live_snapshot"))
+                return self.scenario.live_snapshots.popleft()
             return snapshot(initial=True)
         if attr == "capture_baseline_snapshot":
             return snapshot(baseline=True)
@@ -137,6 +141,7 @@ class FakeBuffer:
 
     def refill(self):
         if self.role == "iq":
+            self.scenario.log.append(("iq", "refill"))
             self.calls += 1
             if self.calls == 1:
                 self.scenario.emit(b"\0"*64 if self.scenario.fault == "event_malformed" else event(0))
@@ -162,6 +167,8 @@ class FakeBuffer:
         self.context.buffers.remove(self)
         if self.role == "iq":
             self.scenario.iq_closed = True
+            if self.scenario.live_snapshots is not None and ("iq", "refill") not in self.scenario.log:
+                self.scenario.emit(event(0))
             if self.scenario.fault != "event_loss":
                 self.scenario.emit(event(1))  # Last event arrives only at IQ disable.
 
@@ -177,6 +184,7 @@ def test_continuous_iq_and_short_event_tail_are_drained_before_context_close(tmp
     assert scenario.log.index(("iq", "close")) < scenario.log.index(("iq", "final_snapshot"))
     assert scenario.log.index(("iq", "final_snapshot")) < scenario.log.index(("events", "close"))
     assert summary["independent_host_glrt_run"] is False
+    assert "drain_bytes_per_second_after_prefill" not in summary
 
 
 @pytest.mark.parametrize("fault,expected_bytes", [("refill", 40), ("partial", 60)])
@@ -209,9 +217,74 @@ def test_event_failure_does_not_shorten_or_invalidate_the_iq_prefix(fault, tmp_p
 
 
 @pytest.mark.parametrize("change", [dict(samples=21), dict(chunk_samples=9), dict(samples=0),
-                                  dict(samples=75_000_010), dict(visit=0), dict(threshold_q16=65537)])
+                                  dict(samples=75_000_010), dict(visit=0), dict(threshold_q16=65537),
+                                  dict(prefill=True, samples=50, chunk_samples=10)])
 def test_invalid_capture_geometry_rejected_without_library_or_radio(change, tmp_path):
     args = arguments(tmp_path)
     vars(args).update(change)
     with pytest.raises(ValueError):
         validate_request(args)
+
+
+def changed_snapshot(changes):
+    fields = snapshot().split()
+    for word, value in changes.items():
+        fields[14+word] = f"{value:08x}"
+    return " ".join(fields)
+
+
+@pytest.mark.parametrize("fault", [None, "partial"])
+def test_prefill_finishes_before_first_refill_and_only_complete_capture_gets_rate(tmp_path, fault):
+    scenario, args = Scenario(fault), arguments(tmp_path)
+    args.prefill = True
+    scenario.live_snapshots = deque([changed_snapshot({19: 27, 4: 10, 6: 8, 22: 2}),
+                                     changed_snapshot({19: 26, 6: 18, 22: 2}), snapshot()])
+    summary = collect(args, library=scenario, context_factory=scenario.context)
+    first_refill = scenario.log.index(("iq", "refill"))
+    assert scenario.log[:first_refill].count(("iq", "live_snapshot")) == 3
+    assert summary["prefill"]["samples"] == 20 and summary["prefill"]["poll_count"] == 3
+    assert summary["evidence_sha256"]["prefill_snapshot.txt"] == sha256(args.output/"prefill_snapshot.txt")
+    if fault is None:
+        assert summary["status"] == "complete", summary
+        assert summary["drain_bytes_per_second_after_prefill"] == 80/summary["drain_seconds_after_prefill"]
+    else:
+        assert summary["status"] == "failed"
+        assert summary["drain_bytes_per_second_after_prefill"] is None
+
+
+def test_prefill_failure_closes_iq_and_drains_events_without_fetching_unproven_backlog(tmp_path):
+    scenario, args = Scenario(), arguments(tmp_path)
+    args.prefill = True
+    scenario.live_snapshots = deque([changed_snapshot({18: 1})])
+    summary = collect(args, library=scenario, context_factory=scenario.context)
+    assert summary["status"] == "failed" and summary["received_bytes"] == 0
+    assert any("transport fault" in reason for reason in summary["failures"])
+    assert ("iq", "refill") not in scenario.log
+    assert ("iq", "close") in scenario.log and ("events", "context_close") in scenario.log
+    assert summary["event_transport_attested"]
+    assert summary["drain_bytes_per_second_after_prefill"] is None
+    assert summary["evidence_sha256"]["prefill_snapshot.txt"] == sha256(args.output/"prefill_snapshot.txt")
+
+
+@pytest.mark.parametrize("changes,exception,reason", [
+    ({18: 1}, ValueError, "transport fault"),
+    ({44: 1}, ValueError, "dropped samples"),
+    ({20: 98}, ValueError, "visit mismatch"),
+    ({4: 10}, ValueError, "stopped before"),
+    ({19: 27, 22: 2}, TimeoutError, "fully DMA-delivered"),
+    ({19: 26, 6: 18, 22: 2}, TimeoutError, "fully DMA-delivered"),
+    ({6: 18}, ValueError, "not fully drained"),
+])
+def test_prefill_rejects_faults_short_stop_and_bounded_stall(tmp_path, changes, exception, reason):
+    args = arguments(tmp_path)
+    args.output.mkdir()
+    wire = changed_snapshot(changes)
+    ticks = [0.0]
+    def sleep(seconds):
+        assert seconds == .01
+        ticks[0] += 1.0  # Virtual clock; no physical wait.
+    iq = SimpleNamespace(read=lambda attr: wire)
+    with pytest.raises(exception, match=reason):
+        wait_for_prefill(iq, args, clock=lambda: ticks[0], sleep=sleep)
+    assert (args.output/"prefill_snapshot.txt").read_text().strip() == wire
+    assert ticks[0] <= 3.0
