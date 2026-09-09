@@ -96,6 +96,7 @@ def compare_capture(capture: Path, host: Path):
         closure = Closure.decode((capture/"final_extension_snapshot.txt").read_text())
         closure.require_complete(final, baseline=Closure.decode((capture/"baseline_extension_snapshot.txt").read_text()),
                                  base_snapshot=baseline)
+        closure.require_event_support(events)
         require(summary["finite_detector_closure"] == closure.evidence(), "closure summary differs from counters")
     host_protocol = json.loads((host/"protocol.json").read_text())
     host_summary = json.loads((host/"summary.json").read_text())

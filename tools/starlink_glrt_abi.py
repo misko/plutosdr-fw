@@ -196,6 +196,13 @@ class Closure:
                 "completed_scorer_vectors": self.u64(10), "selected_close_rejections": self.u64(12),
                 "expired_candidates": self.u64(14)}
 
+    def require_event_support(self, events: list[Event]) -> None:
+        """Completed results need native samples even when IQ export cannot see them."""
+        ratio = self.source_rate//OUTPUT_RATE
+        for event in events:
+            require(event.visit == self.visit and event.epoch+726*ratio-1 <= self.u64(2),
+                    "completed event extends beyond the closed native observation")
+
 
 @dataclass(frozen=True)
 class Event:

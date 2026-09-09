@@ -115,9 +115,13 @@ class FakeDevice:
             words = [0]*16
             if attr == "capture_final_extension_snapshot":
                 assert self.scenario.iq_closed
-                words[0], words[2], words[8], words[10] = 7, 119, 2, 2
+                # Synthetic native support exceeds the tiny exported mock IQ;
+                # these records exercise transport, not physical pacing.
+                words[0], words[2], words[8], words[10] = 7, 1826, 2, 2
                 if self.scenario.fault == "closure_loss":
                     words[8] = 3
+                elif self.scenario.fault == "closure_event_support":
+                    words[2] = 119
                 elif self.scenario.fault == "closure_identity":
                     return "GLX1 00010000 2 99 2500000 " + " ".join(f"{word:08x}" for word in words)
             return "GLX1 00010000 1 99 2500000 " + " ".join(f"{word:08x}" for word in words)
@@ -201,7 +205,7 @@ def test_continuous_iq_and_short_event_tail_are_drained_before_context_close(tmp
     assert "drain_bytes_per_second_after_prefill" not in summary
 
 
-@pytest.mark.parametrize("fault", [None, "closure_loss", "closure_identity"])
+@pytest.mark.parametrize("fault", [None, "closure_loss", "closure_identity", "closure_event_support"])
 def test_candidate_capture_requires_atomic_accounted_finite_closure(tmp_path, fault):
     scenario, args = Scenario(fault, extension=True), arguments(tmp_path)
     args.acquisition_q16 = 13107

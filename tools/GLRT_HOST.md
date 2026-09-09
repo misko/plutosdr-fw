@@ -37,6 +37,8 @@ pending candidates remain explicit. Expiry is a subset of busy rejections.
 Incomplete support can retire at a finite boundary; completed vectors must
 produce results. The driver checks this within 20 ms and preserves a failure
 in final evidence instead of silently accepting a busy timeout.
+Every completed event must fit within the final native source endpoint, including
+events whose support is outside the exported IQ comparison window.
 
 ## Capture
 

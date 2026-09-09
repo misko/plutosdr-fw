@@ -316,6 +316,7 @@ def collect(args, *, library=None, context_factory=Context):
             if final_closure is None or baseline_closure is None:
                 raise ValueError("paired finite closure evidence is unavailable")
             final_closure.require_complete(final, baseline=baseline_closure, base_snapshot=baseline)
+            final_closure.require_event_support(reader.events)
         event_pass = True
     except (OSError, ValueError) as error:
         failures.append(f"event attestation: {error}")

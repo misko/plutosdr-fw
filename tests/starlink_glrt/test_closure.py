@@ -1,9 +1,10 @@
 """An incomplete native tail may retire; completed vectors and metadata cannot disappear."""
 from dataclasses import replace
+import struct
 
 import pytest
 
-from tools.starlink_glrt_abi import Closure, Snapshot
+from tools.starlink_glrt_abi import Closure, Event, Snapshot
 from .test_abi import wire
 
 
@@ -32,6 +33,10 @@ def attest_fabric_closure(evidence):
     (baseline, before), (final, closure) = decoded
     closure.require_complete(final, baseline=before, base_snapshot=baseline)
     final.require_stopped_iq(expected_visit=visit, expected_rate=rate, expected_samples=evidence["iq_samples"])
+    if "event_words" in evidence:
+        events = [Event.decode(struct.pack("<16I", *words)) for words in evidence["event_words"]]
+        assert len(events) == final.u64(38)
+        closure.require_event_support(events)
     return closure.evidence()
 
 

@@ -85,10 +85,12 @@ def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(co
     regs = dict(reads)
     baseline_regs = dict(reads[:84])
     assert all(baseline_regs[address] == 0 for address in range(0x300, 0x340, 4))
+    event_words = [value for address, value in reads if 0x200 <= address < 0x240]
+    assert len(event_words) % 16 == 0
     import json
     evidence = {"rate": 2500000, "visit": 490,
         "source_samples": count, "iq_samples": len(output), "baseline_registers": baseline_regs,
-        "final_registers": regs}
+        "final_registers": regs, "event_words": [event_words[index:index+16] for index in range(0, len(event_words), 16)]}
     (tmp_path / "closure-evidence.json").write_text(json.dumps(evidence, indent=2)+"\n")
     from .test_closure import attest_fabric_closure
     attest_fabric_closure(evidence)

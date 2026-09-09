@@ -164,7 +164,7 @@ def test_prefill_snapshot_is_bound_stopped_and_matches_received_prefix(tmp_path,
             compare_capture(capture, host)
 
 
-@pytest.mark.parametrize("fault", [None, "changed", "wrong-generation", "lost-vector", "unsettled"])
+@pytest.mark.parametrize("fault", [None, "changed", "wrong-generation", "lost-vector", "unsettled", "event-support"])
 def test_comparator_rechecks_finite_closure_evidence_and_preserves_large_endpoints(tmp_path, fault):
     capture, host, _, _ = fixture(tmp_path)
     protocol = json.loads((capture/"protocol.json").read_text())
@@ -176,7 +176,10 @@ def test_comparator_rechecks_finite_closure_evidence_and_preserves_large_endpoin
     final = Snapshot.decode(" ".join(fields))
     words = [0]*16
     words[0] = 7
-    words[2:4] = [final.u64(2) & 0xffffffff, final.u64(2) >> 32]
+    endpoint = final.u64(2)+1000*final.ratio
+    if fault == "event-support":
+        endpoint = final.u64(2)
+    words[2:4] = [endpoint & 0xffffffff, endpoint >> 32]
     words[8] = words[10] = 3
     if fault == "lost-vector":
         words[10] = 2
@@ -198,9 +201,10 @@ def test_comparator_rechecks_finite_closure_evidence_and_preserves_large_endpoin
     if fault is None:
         result = compare_capture(capture, host)
         assert result["finite_detector_closure_attested"]
-        assert result["finite_detector_closure"]["native_endpoint"] == final.u64(2) > 1 << 53
+        assert result["finite_detector_closure"]["native_endpoint"] == endpoint > 1 << 53
     else:
         reason = {"changed": "evidence missing or changed", "wrong-generation": "identity mismatch",
-                  "lost-vector": "vectors were lost", "unsettled": "closure is incomplete"}[fault]
+                  "lost-vector": "vectors were lost", "unsettled": "closure is incomplete",
+                  "event-support": "beyond the closed native"}[fault]
         with pytest.raises(ValueError, match=reason):
             compare_capture(capture, host)

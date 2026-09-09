@@ -57,6 +57,24 @@ def terminal_state(status, trace, samples, ratio):
             "scorer_state": score_state, "collected_symbols": expected_symbol if score_state == 1 else None}
 
 
+def closed_terminal_state(status, trace, tail_epochs, samples, ratio):
+    """Validate v3 finite-close evidence without excusing complete-vector loss."""
+    closed, settled, stage_fault, tails, groups, vectors, results, closed_rejections, expired, waiting = trace
+    if (closed, settled, stage_fault, waiting) != (1, 1, 0, 0) or any(status[j] for j in (11, 12, 13, 14, 17)):
+        raise ValueError("finite detector closure did not settle cleanly")
+    if (status[15] != status[8]+status[9]+closed_rejections or status[8] != vectors+tails
+            or vectors != results or results != status[10] or expired > status[9]):
+        raise ValueError("finite candidate/vector/result conservation failed")
+    if len(tail_epochs) != tails or any(epoch < 0 or epoch+726*ratio <= samples for epoch in tail_epochs):
+        raise ValueError("native tail classification discarded supported work")
+    return {"source_closed": True, "detector_settled": True, "native_waiting_for_future_input": False,
+            "native_incomplete_tails": tails, "aborted_native_epochs": tail_epochs,
+            "aborted_selector_groups": groups, "completed_native_vectors": vectors,
+            "completed_scorer_vectors": results, "selected_close_rejections": closed_rejections,
+            "expired_candidates": expired, "received_support_end_native": samples,
+            "hardware_abi_attestation": False}
+
+
 def compare(host, iq_path, events, first_center, ratio):
     # Call only after the exported bytes and their observation have been verified.
     summary = json.loads((host / "summary.json").read_text())
@@ -124,6 +142,10 @@ def main():
         detector_profile = profile(gates, requested=args.profile)
     except ValueError as error:
         parser.error(str(error))
+    if args.edge == "lower":
+        if args.profile:
+            parser.error("the named candidate profile is upper-edge only")
+        detector_profile["name"] = "custom-development"
     raw_bytes = args.iq.read_bytes()
     if not raw_bytes or len(raw_bytes) % 4 or len(raw_bytes)//4 > args.source_rate//50:
         parser.error("requires a nonempty complete CI16 observation of at most 20 ms")
@@ -134,18 +156,26 @@ def main():
     source_files = [p for p in source_files if p.is_file() and p.suffix in (".py", ".v", ".mem", ".json")]
     source_hashes = {str(path): digest(path) for path in source_files}
     args.output.mkdir(parents=True, exist_ok=False)
-    save(args.output / "protocol.json", {"schema": "starlink-glrt-saved-rtl/v2", "source_rate_hz": args.source_rate,
+    save(args.output / "protocol.json", {"schema": "starlink-glrt-saved-rtl/v3", "source_rate_hz": args.source_rate,
          "edge": args.edge, "samples": len(raw), "input_sha256": hashlib.sha256(raw_bytes).hexdigest(),
          "source_sha256": source_hashes, "replay_first_source_index": 0,
          "index_note": "replay ordinal, not the original radio counter",
          "fpga_gates_q16": gates, "detector_profile": detector_profile, "host_seed_inputs": [],
          "comparison_epoch_tolerance_output_samples": 5, "comparison_cfo_tolerance_hz": 2000,
          "tolerance_note": "engineering window of five 0.4 us cells and about 4.5 FPGA CFO bins; misses are retained",
+         "finite_close": {"acquisition_drain_cycles": 1000, "closed_drain_cycles": 100000,
+                           "extra_source_samples": 0, "tail_policy": "retire only provably incomplete native work"},
          "hardware_accessed": False})
     source = BENCH.replace("(RATE)", f"({args.source_rate})")
-    source = source.replace("$finish;", '$display("T %d %d %d %d %d %d %d", dut.native.reading, dut.native.next_index, '
-                            'dut.native.newest_index, dut.native.job_epoch, dut.scorer.state, '
-                            'dut.scorer.expected_symbol, dut.scorer.job_epoch);\n $finish;')
+    source = source.replace('if(dut.selected_valid) $display("C %h %d %d",dut.selected_epoch,dut.admit,dut.reject_busy);',
+                            'if(dut.selected_valid) $display("C %h %d %d %d",dut.selected_epoch,dut.admit,dut.reject_busy,source_closed ? 1 : 0);\n'
+                            '  if(source_closed && dut.waiting_valid && dut.converted_valid) '
+                            '$display("C %h 0 0 1",dut.converted_start-64\'d22*(RATE)/2500000);\n'
+                            '  if(dut.native.truncate_tail) $display("F %h",dut.native.job_epoch);')
+    source = source.replace("(RATE)", f"({args.source_rate})")
+    source = source.replace("$finish;", '$display("E %d %d %d %d %d %d %d %d %d %d", source_closed,detector_settled,stage_fault,'
+                            'incomplete_native_tails,aborted_selector_groups,completed_native_vectors,result_count,'
+                            'selected_close_rejections,expired_candidates,dut.waiting_valid);\n $finish;')
     source = source.replace("acquisition_threshold_q16=15729,glrt_threshold_q16=19661,glrt_margin_q16=9831",
                             f"acquisition_threshold_q16={gates[0]},glrt_threshold_q16={gates[1]},glrt_margin_q16={gates[2]}")
     for token, filename in {"NATIVE": f"pilot_{args.source_rate}_{args.edge}_q7.mem",
@@ -158,39 +188,46 @@ def main():
     subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable), str(bench),
                     *map(str, sorted(BANK_ROOT.glob("*.v")))], check=True)
     stimulus = args.output / "input.txt"
-    stimulus.write_text("\n".join(records(raw, args.source_rate) + ["0 0 0 0 0 0 0"]*75_000)+"\n")
+    stimulus.write_text("\n".join(records(raw, args.source_rate) + ["0 0 0 0 0 0 0"]*1000
+                                 + ["0 0 2 0 0 0 0"]*100000)+"\n")
     started = time.monotonic()
     print(f"RTL replay {args.source_rate} samples/s, {len(raw)} samples; no timing/CFO seed", flush=True)
     process = subprocess.run(["vvp", str(executable), f"+INPUT={stimulus}"], capture_output=True, text=True, timeout=900)
     (args.output / "rtl_trace.txt").write_text(process.stdout + process.stderr)
     if process.returncode:
         raise RuntimeError("RTL replay failed; inspect retained trace")
-    streams = {name: [] for name in ("O", "P", "C", "G", "S", "T")}
+    streams = {name: [] for name in ("O", "P", "C", "G", "S", "E", "F")}
     for line in process.stdout.splitlines():
         words = line.split()
         if words[0] in streams:
-            streams[words[0]].append(tuple(int(word, 16 if j == 0 and words[0] not in ("S", "T") else 10)
+            streams[words[0]].append(tuple(int(word, 16 if j == 0 and words[0] not in ("S", "E") else 10)
                                                 for j, word in enumerate(words[1:])))
         elif "$finish called at" not in line:
             raise ValueError("unexpected RTL output: " + line)
     reference = Ddc(args.source_rate).process(raw, 0)
     expected = [(int(index), int(i), int(q), int(support)) for index, (i, q), support in
                 zip(reference.indexes, reference.iq, reference.supported)]
-    if streams["O"] != expected or len(streams["S"]) != 1 or len(streams["T"]) != 1:
+    if streams["O"] != expected or len(streams["S"]) != 1 or len(streams["E"]) != 1:
         raise ValueError("RTL IQ differs from independent integer convolution")
     status = streams["S"][0]
     if status[:5] != (len(raw), len(expected), reference.clips, 0, 0) or any(status[j] for j in (11, 12)):
         raise ValueError("RTL export or detector fault/pending complete work")
-    terminal = terminal_state(status, streams["T"][0], len(raw), args.source_rate//2_500_000)
+    terminal = closed_terminal_state(status, streams["E"][0], [row[0] for row in streams["F"]],
+                                     len(raw), args.source_rate//2_500_000)
     if status[5:8] != (len(expected), max(0, int(reference.supported.sum())-175), len(streams["P"])):
         raise ValueError("acquisition window/proposal counts do not reconcile")
     if status[8:11] != (sum(row[1] for row in streams["C"]), sum(row[2] for row in streams["C"]), len(streams["G"])):
         raise ValueError("candidate admission/busy/result counts do not reconcile")
-    if (status[15] != len(streams["C"]) or status[7] != status[15]+status[16]+status[17]
-            or status[15] != status[8]+status[9] or status[8] != status[10]+status[13]):
+    if (status[15] != len(streams["C"]) or status[7] != status[15]+status[16]+terminal["aborted_selector_groups"]
+            or terminal["selected_close_rejections"] != sum(row[3] for row in streams["C"])):
         raise ValueError("proposal selection or incomplete native work is unaccounted")
     admitted = [row[0] for row in streams["C"] if row[1]]
-    if [row[0] for row in streams["G"]] != admitted[:len(streams["G"])]:
+    completed_admissions = list(admitted)
+    for epoch in terminal["aborted_native_epochs"]:
+        if epoch not in completed_admissions:
+            raise ValueError("aborted native tail has no admitted candidate")
+        completed_admissions.remove(epoch)
+    if [row[0] for row in streams["G"]] != completed_admissions:
         raise ValueError("result epochs do not match admitted candidate order")
     events = []
     for sequence, row in enumerate(streams["G"]):
@@ -214,9 +251,10 @@ def main():
               "first_center_native_index": first_center, "group_delay_native_samples": group_delay(args.source_rate),
               "exported_sha256": digest(iq_path), "status_counters": status, "events": events,
               "proposal_epochs": [row[0] for row in streams["P"]],
-              "selected_candidates": [{"epoch": row[0], "admitted": bool(row[1]), "busy_rejected": bool(row[2])}
+              "selected_candidates": [{"epoch": row[0], "admitted": bool(row[1]), "busy_rejected": bool(row[2]),
+                                       "close_rejected": bool(row[3])}
                                       for row in streams["C"]],
-              "incomplete_native_candidate": bool(status[13]), "selection_pending": bool(status[17]),
+              "incomplete_native_candidate": bool(terminal["native_incomplete_tails"]), "selection_pending": bool(status[17]),
               "terminal_state": terminal,
               "hardware_accessed": False, "transport_qualified": False, "live_detector_qualified": False}
     if args.host_blind is not None:
