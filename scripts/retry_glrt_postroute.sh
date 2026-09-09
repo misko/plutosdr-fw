@@ -77,8 +77,11 @@ assert all(int(row[n]) == 0 for n in (2, 6, 10)), row
 routes = (root/'full-audit/route_status.rpt').read_text()
 assert re.search(r'# of nets with routing errors\.+\s*:\s*0\s*:', routes), routes
 def clock_body(path):
+    # Vivado sizes the banner rules from the command's output pathname.
+    # Preserve every clock, waveform, uncertainty, jitter and device line.
     return '\n'.join(line for line in path.read_text().splitlines()
-                     if not line.startswith(('| Date', '| Command')))
+                     if not line.startswith(('| Date', '| Command'))
+                     and not re.fullmatch(r'-+', line))
 assert clock_body(root/'clocks_before.rpt') == clock_body(root/'clocks_after.rpt')
 bit = root/'hdl/projects/pluto/pluto.runs/impl_1/system_top.bit'
 xsa = root/'hdl/projects/pluto/pluto.sdk/system_top.xsa'
