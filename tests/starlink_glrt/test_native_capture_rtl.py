@@ -3,6 +3,7 @@ import hashlib
 import struct
 
 from tools.starlink_glrt_native_abi import NativeResult
+from tools.starlink_glrt_native_replay import verify as verify_original_iq
 
 from .ddc import BANK_ROOT
 from .test_capture_rtl import (
@@ -60,13 +61,16 @@ def test_full_native_dma_uses_original_60m_coordinates_and_returns_to_glr1(captu
     headers = [v for a, v in reads if 0x600 <= a < 0x680]
     assert len(headers) == 64
     bank = native_bank()
-    for header in (headers[:32], headers[32:]):
+    for job_index, header in enumerate((headers[:32], headers[32:])):
         job = (header[3] | header[4] << 32, 2**32-7, 91771)
         values = [(job[0]+n, 700, -200) for n in range(79200)]
         assert header == record(job, 79200, bank, iq_values=values)
         decoded = NativeResult.decode(struct.pack("<32I", *header))
         decoded.require_complete()
         decoded.require_native_evidence(received_bytes=316800, expected_tag=17, expected_start=job[0])
+        original = b"".join(struct.pack("<hh", *value) for value in output[job_index*79200:(job_index+1)*79200])
+        replay = verify_original_iq(decoded, original, (BANK_ROOT/"native_cubic_60000000_upper.mem").read_bytes())
+        assert replay["exact_integer_match"] is True and replay["precision_qualified"] is False
     assert output[:158400] == [(700, -200)]*158400
     assert len(output) == 158400+128
     assert [v for a, v in reads if a == 0x410] == [0, 0]

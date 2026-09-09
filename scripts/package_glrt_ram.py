@@ -94,6 +94,21 @@ def stamp_rootfs(compressed: bytes, versions: str) -> bytes:
     return gzip.compress(write_newc(entries), mtime=0)
 
 
+def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
+    selection = board / "native_refinement.txt"
+    enabled = selection.read_text().strip() if selection.exists() else "0"
+    if enabled not in ("0", "1"):
+        raise ValueError("invalid native refinement build selection")
+    # Old reference builds predate this field. An enabled image always needs
+    # explicit implemented-netlist evidence; its source setting alone is not
+    # proof that the native engine survived synthesis and routing.
+    if audit.get("native_refinement_engines", "0") != enabled:
+        raise ValueError("implemented native engine differs from build selection")
+    if enabled == "1" and rate != 60_000_000:
+        raise ValueError("native refinement requires a 60 MS/s board")
+    return [selection] if selection.exists() else []
+
+
 def package(args):
     board, kernel = args.board.resolve(), args.kernel.resolve()
     host_bin = (getattr(args, "host_bin", None) or ROOT / "buildroot/output/host/bin").resolve()
@@ -119,6 +134,7 @@ def package(args):
     rate = int((board / "source_rate_hz.txt").read_text())
     if rate not in (2_500_000, 5_000_000, 10_000_000, 25_000_000, 60_000_000):
         raise ValueError("unsupported board source rate")
+    native_inputs = verify_native_selection(board, audit, rate)
     bit = board / "hdl/projects/pluto/pluto.runs/impl_1/system_top.bit"
     xsa = board / "hdl/projects/pluto/pluto.sdk/system_top.xsa"
     frozen_outputs = dict(line.split(maxsplit=1)[::-1] for line in (board / "outputs.sha256").read_text().splitlines())
@@ -149,7 +165,7 @@ def package(args):
     rootfs = args.rootfs.resolve()
     inputs = [bit, xsa, rootfs, dtb, kernel / "arch/arm/boot/zImage", kernel / ".config",
               ROOT / "scripts/pluto-glrt.its", Path(__file__), mkimage, dtc,
-              audit_root / "audit.tsv", audit_root / "bus_skew.rpt"]
+              audit_root / "audit.tsv", audit_root / "bus_skew.rpt", *native_inputs]
     hashes = {str(path): digest(path) for path in inputs}
     stamped = stamp_rootfs(rootfs.read_bytes(), versions)
     args.output.mkdir(parents=True, exist_ok=False)

@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from scripts.package_glrt_ram import package, read_newc, stamp_rootfs
+from scripts.package_glrt_ram import package, read_newc, stamp_rootfs, verify_native_selection
 
 
 def rootfs(root, *, pss=False):
@@ -64,3 +64,22 @@ def test_failed_board_cannot_be_packaged(tmp_path):
     with pytest.raises(ValueError, match="board build did not pass"):
         package(args)
     assert not args.output.exists()
+
+
+@pytest.mark.parametrize("selection,engines,rate,accepted", [
+    (None, None, 60000000, True), ("0", "0", 2500000, True),
+    ("1", "1", 60000000, True), ("1", None, 60000000, False),
+    ("1", "0", 60000000, False), ("0", "1", 60000000, False),
+    (None, "1", 60000000, False), ("1", "2", 60000000, False),
+    ("1", "1", 25000000, False), ("2", "2", 60000000, False),
+])
+def test_native_package_requires_matching_implemented_engine(tmp_path, selection, engines, rate, accepted):
+    path = tmp_path/"native_refinement.txt"
+    if selection is not None:
+        path.write_text(selection+"\n")
+    audit = {} if engines is None else {"native_refinement_engines": engines}
+    if accepted:
+        assert verify_native_selection(tmp_path, audit, rate) == ([] if selection is None else [path])
+    else:
+        with pytest.raises(ValueError):
+            verify_native_selection(tmp_path, audit, rate)
