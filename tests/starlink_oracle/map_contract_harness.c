@@ -1,5 +1,5 @@
 /* Executed after the actual map_require_contract/map_snapshot_fault_free C.
- * Golden legacy register contracts and explicit experimental ABI 1.5.
+ * Golden legacy register contracts and explicit experimental ABI 1.5/1.6.
  */
 int main(void)
 {
@@ -9,6 +9,7 @@ int main(void)
         {0x10003, 60, 0x7f, 0x020f0403, 21, 1073765335, 0x37ff},
         {0x10004, 60, 0xff, 0x020f0403, 21, 1073765335, 0x37ff},
         {0x10005, 15, 0x13f, 0x000f0202, 0, 0, 0x57ff},
+        {0x10006, 15, 0x33f, 0x000f0202, 0, 0, 0x57ff},
     };
     static const u32 contract30[8] = {
         0x73142604, 0x7077b036, 0xf9213db3, 0x574e4a55,
@@ -18,11 +19,11 @@ int main(void)
         0x8e807d15, 0xd5372b0a, 0x9669d119, 0x0d899697,
         0xe7c2911a, 0x73ddfb23, 0x095806c2, 0xa31de5b2,
     };
-    static const u32 rejected[] = {0, 1, 0x10000, 0x10006, 0x20000};
+    static const u32 rejected[] = {0, 1, 0x10000, 0x10007, 0x20000};
     struct adi_starlink_pss_map st;
     struct map_snapshot snapshot;
     unsigned int row, bit, field, mutations = 0, health_cases = 0;
-    assert(MAP_MIN_VERSION == 0x10001 && MAP_MAX_VERSION == 0x10005);
+    assert(MAP_MIN_VERSION == 0x10001 && MAP_MAX_VERSION == 0x10006);
     for (row = 0; row < ARRAY_SIZE(expected); row++) {
         const u32 *gold = expected[row];
         memset(&st, 0, sizeof(st));
@@ -72,7 +73,7 @@ int main(void)
         st.version = rejected[row];
         assert(map_require_contract(&st) == -EINVAL);
     }
-    printf("MAP_DRIVER_CONTRACT_HEALTH_PASS versions=5 mutations=%u health_cases=%u\n",
+    printf("MAP_DRIVER_CONTRACT_HEALTH_PASS versions=6 mutations=%u health_cases=%u\n",
            mutations, health_cases);
     return 0;
 }

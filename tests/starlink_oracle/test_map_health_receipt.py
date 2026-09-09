@@ -51,7 +51,7 @@ def test_actual_map_health_receipt_and_late_fault(tmp_path):
     ], check=True, capture_output=True, text=True, timeout=30)
     result = subprocess.run([str(executable)], check=True,
                             capture_output=True, text=True, timeout=30)
-    assert "MAP_HEALTH_RECEIPT_PASS versions=5 fault_receipts=70 " in result.stdout
+    assert "MAP_HEALTH_RECEIPT_PASS versions=6 fault_receipts=84 " in result.stdout
     assert "mock_only=1 no_kernel_or_radio_claim=1" in result.stdout
     receipt = next(line for line in result.stdout.splitlines()
                    if line.startswith("PSMH "))

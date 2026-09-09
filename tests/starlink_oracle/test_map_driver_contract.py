@@ -3,9 +3,9 @@
 This tests extracted C logic, not kernel IRQ/IIO execution or radio hardware.
 The separately cross-compiled module establishes target compilation only.
 """
-from pathlib import Path
 import re
 import subprocess
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -51,4 +51,4 @@ static u32 map_read(struct adi_starlink_pss_map *st, unsigned int address)
                    capture_output=True, text=True, timeout=30)
     result = subprocess.run([str(executable)], check=True,
                             capture_output=True, text=True, timeout=30)
-    assert "MAP_DRIVER_CONTRACT_HEALTH_PASS versions=5 " in result.stdout
+    assert "MAP_DRIVER_CONTRACT_HEALTH_PASS versions=6 " in result.stdout

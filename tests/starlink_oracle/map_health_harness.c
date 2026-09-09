@@ -227,7 +227,7 @@ int main(void)
         OVERRUN_AFTER_PAYLOAD, PENDING_AFTER_PAYLOAD,
     };
 
-    for (version = 0x10001; version <= 0x10005; version++) {
+    for (version = 0x10001; version <= 0x10006; version++) {
         reset_mock(&st, version);
         st.streaming = st.acquisition_enabled = st.irq_live = true;
         st.maps_delivered = 13;
@@ -319,7 +319,7 @@ int main(void)
             snapshot.fault_signature[7] = words[24];
             assert(map_snapshot_fault_free(&st, &snapshot) ==
                 !(BIT(bit) & (version == 0x10001 ? 0x17ffU :
-                    version == 0x10005 ? 0x57ffU : 0x37ffU)));
+                    (version == 0x10005 || version == 0x10006) ? 0x57ffU : 0x37ffU)));
         }
     }
 
@@ -369,7 +369,7 @@ int main(void)
     reset_mock(&st, 0x10005);
     assert(receipt(&st, words, output) == 0 && lock_reads > 40);
     fputs(output, stdout);
-    printf("MAP_HEALTH_RECEIPT_PASS versions=5 fault_receipts=%u failures=%u "
+    printf("MAP_HEALTH_RECEIPT_PASS versions=6 fault_receipts=%u failures=%u "
         "rollovers=%u mock_only=1 no_kernel_or_radio_claim=1\n",
         fault_receipts, failures, rollovers);
     return 0;

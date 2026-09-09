@@ -2,8 +2,10 @@
 
 Status: slice A (default-disabled map-core fence) is implemented and tested in
 HDL `a29fb9f7`; the standalone PPU receipt decoder is on main `5c78c01a`.
-The native controller/driver/recorder protocol below is not yet integrated or
-hardware-qualified. This is a bounded
+Linux `4357f41a721d` adds the typed request and bracketed receipt attributes,
+with actual-C MMIO/IRQ-model tests and an ARM module build. The complete native
+controller/driver/recorder path below is not yet integrated or hardware-qualified.
+This is a bounded
 prerequisite for a fixed-frequency paired pilot-IQ/map/fine recorder, not a
 replacement for the 300 s scanner, independent GLRT, or subsequent 30/60 MS/s
 work. The first admitted implementation is the shared-XFFT 15 MS/s image.

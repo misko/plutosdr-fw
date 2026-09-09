@@ -221,7 +221,7 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   completion. Legacy immediate disable/flush semantics stay unchanged.
   The proposed two-register ticket/receipt ABI, exact boundary semantics and
   executable rollout gates are in `docs/starlink-map-stop-boundary-plan.md`;
-  native controller/driver/recorder stop support is not yet implemented.
+  the complete native controller/driver/recorder path is not yet qualified.
 - [x] Add the default-disabled map-core publication fence, with same-edge
   admission blocking, actual-publication acknowledgment, retained terminal
   metadata and real fault/abort accounting. This core-only slice is not wired
@@ -229,6 +229,10 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 - [x] Add the pure PSST 1/12 receipt decoder in PPU, with explicit structural
   qualification and diagnostic failure retention. It does not admit a new
   firmware ABI or perform native stop/drain operations.
+- [x] Add Linux's typed stop-request/receipt attributes with explicit ABI 1.6
+  admission, bounded acceptance/read phases and preserved healthy IRQ draining.
+  Actual-C register/IRQ models and ARM compilation pass; real kernel scheduling,
+  feature-enabled firmware and paired native PPU recording remain unqualified.
 - [ ] Keep map IRQ/readers alive until published, driver-enqueued and
   host-reassembled terminal generations agree. Use 200-chunk/one-map refills
   initially; a 400-chunk watermark can strand an odd final map after stop.
@@ -305,6 +309,23 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   to their do-not-merge remotes. Seal artifact hashes and independent replay.
 
 ## Current progress
+
+### Native map-boundary stop driver — 2026-09-09
+
+Linux `4357f41a721df9d89a66be7a2a3f921a71d46bad` is pushed to its
+do-not-merge branch. New `acquisition_stop_request` and `acquisition_stop`
+attributes require the exact shared-15 ABI 1.6 contract. Request success means
+engine acceptance only; status polling returns diagnostic PSST words and keeps
+the IRQ and IIO readers alive after a normal boundary stop.
+
+The focused actual-C tests pass: both retained banks drain as 400 exact chunks,
+six IRQ failure paths remain fail-closed, timeouts/vanished acceptance remain
+errors, and independently changing receipt fields are retried or rejected.
+All six admitted legacy/new image contracts and health receipts are exercised.
+The ARM module builds, and the actual-C receipt passes PPU main's pure decoder.
+This does not qualify real kernel timing, IIO transport, paired capture or RF
+lock. PPU's native clients still do not admit ABI 1.6. See
+`reports/starlink-map-stop-native-driver-20260909.json`.
 
 ### Private return/publication timing cut and production map fence — 2026-09-09
 

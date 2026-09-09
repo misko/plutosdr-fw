@@ -1,0 +1,155 @@
+{
+  "schema": "starlink.map_boundary_stop.native_driver.v1",
+  "date_utc": "2026-09-09",
+  "status": "NATIVE_DRIVER_OFFLINE_TESTS_AND_ARM_COMPILE_PASS_NO_DEPLOYMENT",
+  "source": {
+    "linux_commit": "4357f41a721df9d89a66be7a2a3f921a71d46bad",
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "runtime": "linux/drivers/iio/adc/adi_starlink_pss_map.c",
+    "ppu_decoder_commit": "5c78c01a3f6fa455c9ac86f43d77d0a1ecd171a2",
+    "firmware_feature_integration": "Controller/wrapper slice B in progress separately; no feature-enabled physical qualification."
+  },
+  "contract": {
+    "abi": "0x00010006",
+    "capabilities": "0x0000033f",
+    "source_msps": 15,
+    "stop_ticket": "0xf8",
+    "stop_window": "0xfc",
+    "wire": "PSST 1 12, twelve lowercase 8-digit hexadecimal u32 words",
+    "request_attribute": "acquisition_stop_request",
+    "receipt_attribute": "acquisition_stop",
+    "window_attempts": 3,
+    "bracket_words": [
+      2,
+      3,
+      4,
+      10,
+      11
+    ],
+    "extra_brackets": [
+      "Direct accepted-ticket register",
+      "Live epoch/enable status",
+      "Exact ID/version/capability/geometry/rate/DDC checks"
+    ],
+    "acceptance_poll_microseconds": 10000,
+    "tile_wait_under_mutex": false,
+    "changes_psmh_layout": false,
+    "shared_fatal_mask": "0x57ff",
+    "legacy_abi_contracts_preserved": true,
+    "legacy_control_semantics_unchanged": true
+  },
+  "behavior": {
+    "request_success": "Observed exact engine-accepted ticket, not structural stop, delivery or healthy data.",
+    "receipt_success": "Coherent-enough bracketed raw diagnostic receipt; failure/invalid history is retained without automatic qualification.",
+    "cache": "Refresh only acquisition_enabled from hardware; successful stop does not clear streaming, disable IRQ, abort acquisition, flush pilot, release banks or close buffers.",
+    "timeout": "Acceptance timeout retains staged/pending state; no fabricated cancellation and no automatic abort.",
+    "idempotence": "Same nonzero accepted ticket is replayed unchanged; no wrap and no inferred next operation. A vanished accepted ticket after poll returns an error.",
+    "known_rejections": "Malformed/sequence/busy/disabled/fatal health return typed errors; receipt remains separately readable."
+  },
+  "tests": {
+    "focused_passed": 9,
+    "focused_seconds": 0.69,
+    "actual_extracted_c": true,
+    "undefined_behavior_sanitizer": true,
+    "full_kernel_execution": false,
+    "exact_chunks": 400,
+    "complete_maps": 2,
+    "exact_bins": 40000,
+    "zero_padding_checked": true,
+    "metadata_checked": true,
+    "irq_error_cases": 6,
+    "irq_error_modes": [
+      "Copy data error",
+      "Partial IIO buffer push failure",
+      "Release failure after all chunks pushed",
+      "Known shared-service health bit14",
+      "Snapshot timeout",
+      "Health change during copy"
+    ],
+    "retained_partial_push_chunks": 122,
+    "retained_chunks_on_release_failure": 200,
+    "exact_contract_bit_mutations": 256,
+    "legacy_contract_versions": 6,
+    "health_receipt_versions": 6,
+    "late_health_receipts": 84,
+    "independent_window_changes": [
+      "State flags",
+      "Accepted/terminal ticket plus tuple",
+      "Terminal ticket alone",
+      "Failure reasons",
+      "Command status",
+      "Live enable inconsistency",
+      "Matched enable/status transition"
+    ],
+    "other_cases": [
+      "Pending source-quiet observations",
+      "Acceptance timeout then retry same staged ticket",
+      "Old accepted-ticket replay after modeled re-enable",
+      "Competing pending ticket rejection without overwrite",
+      "u32 exhaustion and idempotent max ticket",
+      "Malformed typed requests",
+      "Vanished acceptance after poll",
+      "Strict receipt reserved bits/magic/version",
+      "Unknown/legacy capability rejection before window writes"
+    ],
+    "limitations": [
+      "Mocks execute actual C but model hardware/MMIO/poll/locks/kfifo.",
+      "The mock poll performs eight steps; configured 10 ms does not establish measured wall-clock or native IIO/network latency.",
+      "Sequential interleaving proves mutex boundaries and continued IRQ logic, not real concurrent scheduling.",
+      "Hardware ticket/idempotence/fence correctness requires separate RTL and radio evidence."
+    ]
+  },
+  "independent_review": {
+    "finding": "No actionable runtime bug found",
+    "source_sha256": "0767ad83afa87d85f0dd1a0c67c5cbf98bcd9f975ea70980f27bf1c0311c1ead",
+    "passed": 9,
+    "followups": "Added independent receipt-field transitions and native replay/pending cases after review; controller joint tests remain separate."
+  },
+  "arm_compile": {
+    "exit_code": 0,
+    "architecture": "ARM EABI5 32-bit ELF relocatable",
+    "clean_linux_commit": true,
+    "module": "/tmp/starlink-map-stop-driver.fRcfKU/committed-adi_starlink_pss_map.ko",
+    "log": "/tmp/starlink-map-stop-driver.fRcfKU/committed-crosscompile.log",
+    "stop_request_and_receipt_symbols_verified": true,
+    "loaded": false,
+    "matched_full_firmware_built": false,
+    "checkpatch": "0 errors, 0 warnings"
+  },
+  "c_to_ppu": {
+    "passed": true,
+    "log": "/tmp/starlink-map-stop-driver.fRcfKU/c-to-ppu-v2.log",
+    "actual_c_receipt_qualified_by_committed_decoder": true,
+    "expected_ticket": 1,
+    "terminal_generation": 42,
+    "start": "0x00000001fff80000",
+    "end_exclusive": "0x00000002000b8800",
+    "scope": "Offline mock receipt only; does not admit ABI1.6 in native PPU IIO clients."
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "timing_closed": false,
+  "fpga_pss_lock": false,
+  "remaining": [
+    "Joint controller/wrapper + real FFT and pilot stop integration",
+    "Feature-enabled physical timing and recovery closure",
+    "Native PPU ABI1.6 admission and bounded stop/map drain orchestration on PPU main",
+    "Actual IIO/IRQ/Ethernet and retained IQ/map/fine paired observation on serial-locked .18 before .17",
+    "Independent blind GLRT on the same >=1 s fixed-frequency observation",
+    "Eight-target 120 ms / 300 s >=95% duty scanner and 30/60 MS/s qualification"
+  ],
+  "sha256": {
+    "linux/drivers/iio/adc/adi_starlink_pss_map.c": "0767ad83afa87d85f0dd1a0c67c5cbf98bcd9f975ea70980f27bf1c0311c1ead",
+    "tests/starlink_oracle/map_stop_harness.c": "cc086039b3b7451e208684c35f7ed26d5087aac531b37d6620e7205b7caff02d",
+    "tests/starlink_oracle/test_map_stop_driver.py": "6132eebf5eda5c025f1572b30dbc08581569f8e3f491b28c68a4ad662b2dfdbb",
+    "tests/starlink_oracle/map_contract_harness.c": "0d3bb1aea6fc4a1fa5a33fa3b12a805a55f1160743174dda9eacc2e83ae578b8",
+    "tests/starlink_oracle/test_map_driver_contract.py": "393f77fe84aedf142eb6aea8de30e1903944aef0e52714618103b3a34e22b0a3",
+    "tests/starlink_oracle/map_health_harness.c": "9a6995146c6dcc6cdfc767e7402402dd8ece8d2fb64f4efedbe4312b20795329",
+    "tests/starlink_oracle/test_map_health_receipt.py": "5b899aef59769430e754c588de6175a49b7e73b875546995507a48823f82b40f",
+    "/tmp/starlink-map-stop-driver.fRcfKU/committed-adi_starlink_pss_map.ko": "7b2c5905b2c396c242b3454d83c3eaa7a231da47782330c818783287d20c6e8d",
+    "/tmp/starlink-map-stop-driver.fRcfKU/committed-crosscompile.log": "2b377f779b53924536f2a8f8a962a1908c1afea8e98570cee551bf61f42fe073",
+    "/tmp/starlink-map-stop-driver.fRcfKU/focused-v2.log": "39afe83ab2490c3550749c662dc54bc67a2c4ef7a1b819abda039bd344f39849",
+    "/tmp/starlink-map-stop-driver.fRcfKU/c-to-ppu-v2.log": "1894819e1c1af7701917858d19cf1f84966f7dacefa0757d4fc971771b217e8b",
+    "/tmp/starlink-map-stop-driver.fRcfKU/pytest-v2/test_actual_stop_request_recei0/map-stop-driver.log": "77e9945ee092ef35bedad9d67bfc0abab107f38c262ba1da94d0e11f0b03b237"
+  }
+}
