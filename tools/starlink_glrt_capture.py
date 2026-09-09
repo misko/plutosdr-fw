@@ -113,8 +113,8 @@ def radio_state(context):
 def validate_request(args):
     if args.source_rate not in RATES or not 0 < args.visit < 1 << 32:
         raise ValueError("requires a supported source rate and nonzero u32 visit")
-    if not 1 <= args.chunk_samples <= 250_000 or not 0 < args.samples <= 75_000_000:
-        raise ValueError("capture requires 1..250000 samples per buffer and at most 30 seconds")
+    if not 1 <= args.chunk_samples <= 250_000 or not 0 < args.samples <= 750_000_000:
+        raise ValueError("capture requires 1..250000 samples per buffer and at most 300 seconds")
     if args.samples % args.chunk_samples or args.chunk_samples % 2:
         raise ValueError("sample limit must fill whole DMA buffers, with even CI16 buffer length")
     if getattr(args, "prefill", False) and args.samples > 4*args.chunk_samples:

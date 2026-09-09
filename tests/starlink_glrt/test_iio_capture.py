@@ -382,12 +382,25 @@ def test_event_failure_does_not_shorten_or_invalidate_the_iq_prefix(fault, tmp_p
 
 
 @pytest.mark.parametrize("change", [dict(samples=21), dict(chunk_samples=9), dict(samples=0),
-                                  dict(samples=75_000_010), dict(visit=0), dict(threshold_q16=65537),
+                                  dict(samples=750_000_010), dict(visit=0), dict(threshold_q16=65537),
                                   dict(prefill=True, samples=50, chunk_samples=10)])
 def test_invalid_capture_geometry_rejected_without_library_or_radio(change, tmp_path):
     args = arguments(tmp_path)
     vars(args).update(change)
     with pytest.raises(ValueError):
+        validate_request(args)
+
+
+def test_five_minute_geometry_fits_wire_limit_but_cannot_prefill_or_expand_dma(tmp_path):
+    args = arguments(tmp_path)
+    args.samples, args.chunk_samples = 750_000_000, 250_000
+    validate_request(args)
+    assert args.samples < 2**32
+    args.prefill = True
+    with pytest.raises(ValueError, match="four requested IQ kernel buffers"):
+        validate_request(args)
+    args.prefill, args.chunk_samples = False, 500_000
+    with pytest.raises(ValueError, match="per buffer"):
         validate_request(args)
 
 
