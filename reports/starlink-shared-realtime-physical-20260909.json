@@ -1,9 +1,9 @@
 {
   "schema": "starlink.paired_receiver.realtime_physical.v1",
   "date_utc": "2026-09-09",
-  "checkpoint_utc": "2026-09-09T07:38:00Z",
-  "status": "SYNTHESIS_AND_PLACEMENT_PASS_IMPLEMENTATION_RUNNING",
-  "scope": "Fresh complete paired-pilot 15 MS/s receiver with explicitly selected shared realtime XFFT; completed synthesis/placement and INIT clock/CDC-constraint gate evidence only. Not routed timing or deployment qualification.",
+  "checkpoint_utc": "2026-09-09T07:53:19Z",
+  "status": "COMPLETE_RECEIVER_ROUTED_TIMING_FAIL",
+  "scope": "Fresh complete paired-pilot 15 MS/s receiver with explicitly selected shared realtime XFFT. Synthesis, placement and routing completed; final post-route optimization meets 100 MHz setup but fails 200 MHz setup. Bitstream creation is not deployment qualification.",
   "source": {
     "hdl_commit": "ff4229bb230437fcd975413390a34c00ffcc226f",
     "hdl_worktree_clean_at_launch": true,
@@ -158,10 +158,14 @@
     "note": "The held metadata buses are intentionally bundled with synchronized ownership. Retained warnings must be reviewed in context; first-stage bounds do not waive second-stage timing or prove routed CDC."
   },
   "implementation": {
-    "terminal": false,
-    "observed_stage": "post-placement physical optimization",
+    "terminal": true,
+    "result": "timing_fail",
+    "observed_stage": "main Vivado exited after rejecting final routed timing",
+    "finished_utc": "2026-09-09T07:45:03Z",
     "root_exec_session": 11361,
     "root_owns_authoritative_exit": true,
+    "root_exec_exit_code": 1,
+    "root_exec_exit_pending_confirmation": false,
     "checkpoint_os_processes": {
       "shell": 3874716,
       "main_vivado": 3874789,
@@ -169,17 +173,104 @@
       "impl_begin_pid": 3878300,
       "impl_vivado_worker": 3878369
     },
-    "worker_observation": {
+    "earlier_worker_observation": {
       "elapsed_seconds": 284,
       "cpu_percent": 283,
       "state": "Sl"
     },
-    "liveness_evidence": "Matching live OS process tree plus current impl_1 runme.log progress; no inference from a stale log or xpr State=current. Child agent cannot consume root-owned exec handle.",
-    "final_routed_timing": null
+    "terminal_evidence": "All five scoped OS processes exited; route, post-route optimization, bitstream and impl .end.rst sentinels exist; main console terminates with ERROR: Timing Constraints NOT met! at adi_project_run pluto. Root retains authoritative exec exit consumption.",
+    "source_or_constraints_changed_during_run": false,
+    "route_design": {
+      "fully_routed_nets": 33339,
+      "routable_nets": 33339,
+      "routing_errors": 0,
+      "report_stage": "route_design before post-route physical optimization"
+    },
+    "final_routed_timing": {
+      "stage": "post_route_phys_opt_design",
+      "report": "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_timing_summary_postroute_physopted.rpt",
+      "overall": {
+        "wns_ns": -3.531,
+        "tns_ns": -1008.15,
+        "setup_failing_endpoints": 577,
+        "whs_ns": 0.049,
+        "ths_ns": 0,
+        "hold_failing_endpoints": 0,
+        "wpws_ns": 0.264,
+        "pulse_width_failing_endpoints": 0
+      },
+      "intra_clock": {
+        "clk_fpga_0": {
+          "mhz": 100,
+          "wns_ns": 0.002,
+          "tns_ns": 0,
+          "setup_failing_endpoints": 0,
+          "whs_ns": 0.049
+        },
+        "clk_fpga_1": {
+          "mhz": 200,
+          "wns_ns": -3.531,
+          "tns_ns": -1008.15,
+          "setup_failing_endpoints": 577,
+          "whs_ns": 0.056
+        },
+        "rx_clk": {
+          "mhz": 61.463,
+          "wns_ns": 2.314,
+          "tns_ns": 0,
+          "setup_failing_endpoints": 0,
+          "whs_ns": 0.061
+        }
+      },
+      "inter_clock": {
+        "clk_fpga_1_to_clk_fpga_0": {
+          "wns_ns": 8.034,
+          "setup_failing_endpoints": 0
+        },
+        "clk_fpga_0_to_clk_fpga_1": {
+          "wns_ns": 3.436,
+          "setup_failing_endpoints": 0
+        }
+      },
+      "worst_path": {
+        "source": "i_system_wrapper/system_i/starlink_pss_acquisition/inst/acquisition/shared_transform.iq_to_score/realtime_transform.transform_service/input_guard/expected_position_reg[0]/C",
+        "destination": "i_system_wrapper/system_i/starlink_pss_acquisition/inst/acquisition/shared_transform.iq_to_score/realtime_transform.transform_service/state_reg[1]/D",
+        "wns_ns": -3.531,
+        "data_delay_ns": 8.428,
+        "logic_delay_ns": 2.359,
+        "route_delay_ns": 6.069,
+        "logic_levels": 10,
+        "observed_cone": "input ordinal certificate through result guard fault/admission logic to service state"
+      },
+      "interpretation": "This exact complete route clears the prior 100 MHz setup failure, but its worst slow-domain margin is only 2 ps. All reported failing setup endpoints are in the 200 MHz domain. The endpoint audit additionally demonstrates independent vendor-internal and return/publication setup failures; the leading age/admission cone is not the only remaining timing problem. No current build is timing-qualified."
+    },
+    "final_bus_skew": {
+      "constraints": 4,
+      "failing_constraints": 0,
+      "worst_slack_ns": 8.241
+    },
+    "final_constraint_coverage": {
+      "unconstrained_internal_endpoints": 0,
+      "register_or_latch_pins_without_clock": 0,
+      "input_ports_without_input_delay": 13,
+      "output_ports_without_output_delay": 2,
+      "board_io_qualified": false,
+      "complete_cdc_qualified": false,
+      "note": "The completed read-only audit re-runs report_cdc on the final checkpoint without changing constraints. Its warning inventory matches INIT and still requires contextual review. The 15 missing I/O delays prevent a blanket board-interface timing claim."
+    },
+    "artifacts": {
+      "bitstream_created": true,
+      "bitstream": "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top.bit",
+      "xsa": "hdl/projects/pluto/shared-realtime-full-v1/pluto.sdk/system_top_bad_timing.xsa",
+      "xsa_explicitly_bad_timing": true,
+      "final_dcp": "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_postroute_physopt.dcp",
+      "deployable": false
+    }
   },
   "remaining": [
-    "Complete this same live implementation and consume its actual terminal result; do not restart because it is slow.",
-    "Inspect final routed setup/hold, board I/O, CDC and exception reports before declaring timing closure.",
+    "Review and refactor the 200 MHz certificate/fault/admission cone without delaying a required same-cycle veto or relaxing timing constraints.",
+    "Resolve the separately measured vendor-internal FFT and return/publication path failures; a private watchdog/admission cut alone is not proof of 200 MHz closure.",
+    "Obtain fresh complete-receiver setup/hold closure and review board I/O, CDC and exceptions before declaring timing qualification.",
     "Preserve full receiver/source correspondence and matched software qualification before any .18 canary or .17 network deployment."
   ],
   "sha256": {
@@ -192,6 +283,196 @@
     "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_clocks.rpt": "a99a1bd8b359bc900bb1a2d2c3956e5f7d13b5402bfefdd302aec909687664be",
     "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_cdc.rpt": "b4338ca72f835cf4b56d0dcfbac1d9f4cf70e192c9a9c10c3238bf923e0461de",
     "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_exceptions.rpt": "4eae64fc975c113fe0b64c2b1ae9696c5f17c58afc2a772f41ddfbc2d32ffea0",
-    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_ignored_exceptions.rpt": "d089c90c0e75bf61f05dac775bba800ba02126eeccf2b6138ba894029ee1683f"
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/shared_xfft_init_ignored_exceptions.rpt": "d089c90c0e75bf61f05dac775bba800ba02126eeccf2b6138ba894029ee1683f",
+    "hdl/projects/pluto/shared-realtime-full-v1/console.log": "57f5e7b0f1e0114137604be1e74678a85d5aaff98389ddf1ab12f166cfb59d0a",
+    "hdl/projects/pluto/shared-realtime-full-v1/vivado.log": "6d8e6ba1492af1b46718e35662be9f88bd34e46d24c3ac5a04c19898d03869d7",
+    "hdl/projects/pluto/shared-realtime-full-v1/timing_impl.log": "34ac313fb7f397abc6210a9216ce1d0f27e30d970a9da819feda8d35a4342eb8",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/runme.log": "196f05996404b13867c6b07968f45500e12bf57fd0e4ff242d283e5fe40f68ef",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_routed.dcp": "eaa11180217d92bcc0ef1816360d63fe70c44d93caa4855e88e107acca0a660a",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_postroute_physopt.dcp": "539732c6bcc201cf2a02d3d0cedf2d2d8881ff4e31e7c2def2ed99f02235b0e7",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_timing_summary_postroute_physopted.rpt": "a3b1d238840e155a163b94929b4d612a6888120f578c4c2777f568770e3e0e26",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_bus_skew_postroute_physopted.rpt": "de5eaafaaaef55d139b24561874135dbe3142b442a90b3f11bdb8f88afe1c0d4",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top_route_status.rpt": "bd604ef69ba3baf6fa4fca61066f8490c6c7ae189ab78d2371107770663894f0",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.runs/impl_1/system_top.bit": "17624fd3c3d9cb437e905e8870e2d32552e2822a7950e4e703c0dc944e160bbc",
+    "hdl/projects/pluto/shared-realtime-full-v1/pluto.sdk/system_top_bad_timing.xsa": "67560920c55c57faf148a2c4822a7d2fad5a1c656c1e1b9262d57348994d5a2d",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/audit_source.tcl": "887a33261f30a679232caa1e87a51b5dc334103bd5a295920581f5696647f3a4",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/summary.txt": "fcd37e8e7587920fa26995b16cbf0e7160a5aa61581a840f79d6c5ed7a6302be",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/vendor_internal.rpt": "98798de85f3a6f4922832c223791e58c1cd547fe740fc6f24065a7edab86014e",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/return_slot.rpt": "e5b58be814c19a8119b217d79501e9674df8973cd79bf0b5f410a265ae10b5f3",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/output_publication.rpt": "9c96f6cf5ac06b1f5b85314fc8e7681c2c8fc5990b91f15c7d50c69d10d25d64",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/output_mailbox_fault.rpt": "f3752e7b9e783e96ca74ce127b4768ef0aba64860878944a9dc1878905293e5d",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/output_mailbox_payload_control.rpt": "2351bdcb2bce5803607ea2835694ca35521b6dd0d5948c1c595812d074aaa7f9",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/sticky_fault_crossing.rpt": "1a28d8f0b576f115fd9fff536886d86f7f270ce58f1b1af5b74d5d47228b6712",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/sticky_fault_second_stage.rpt": "d076c1ffc9475e2cca4912402c9ba6dfac05739f4a530b853b271f30d335d95f",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/cdc.rpt": "be5685fb412b2cd84c1c6a340e345ad1519dd444834f2a8562ff8d5ebbefd132",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/utilization.rpt": "47ac2ccbc5b50ffdb3e22587af0d9ffa92c41b874549444d01a721bbf08b4512",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/clocks.rpt": "fb44d561c82cdb661f7010f47ae5fd1749267ac19c17cfe8a02fd47143547e0c",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/exceptions.rpt": "609d53bc1b2be940f2c90eb35b88d9f067f205658579c72b07ae3cf858539dfe",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/ignored_exceptions.rpt": "dec2d03f83b531a08a5afac1a10832037d07997619fcfa1f471a4d94c4e81f53",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/route_status.rpt": "d82cabd19eb64278ce861b47f521ccd632e27c15279c92f90e9d71dd86dd269c",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/check_timing.rpt": "a1c1af315b9f724e140ff1920578bf5fdae096dd640bdbdcdf47d98891198b60",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/starlink_pss_shared_realtime_xfft_service.v": "e07e601073edcb2bf92235883fc922091e73034769e270610333f7917923f3a3",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/starlink_pss_realtime_input_guard.v": "7f46eb92ae6fbe5142625216652b7c9f14b4d7f5e8eead6b244720842cf29d5c",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/starlink_pss_realtime_result_guard.v": "a3637871ad72551987006b5d5c1e0de716f28a07e706c0decf036e072cd7f35c",
+    "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1/starlink_pss_block_mailbox.v": "924eea7bfd66fd22ea37a6cb4babf14627aae8978efd09872fdda4b6cd119fe8",
+    "hdl/projects/pluto/audit_shared_realtime_routed.tcl": "887a33261f30a679232caa1e87a51b5dc334103bd5a295920581f5696647f3a4",
+    "tests/test_starlink_realtime_routed_audit_policy.py": "39a90b4d24674645be8efa290f3674e5ef8dfcd1baca7523f34bffdad417d437"
+  },
+  "routed_endpoint_audit": {
+    "terminal": true,
+    "result": "diagnostic_complete_receiver_still_timing_fail",
+    "exit_code": 0,
+    "agent_exec_session": 84871,
+    "completed_utc": "2026-09-09T07:53:19Z",
+    "base": "hdl/projects/pluto/shared-realtime-full-v1/routed-audit-v1",
+    "script": "hdl/projects/pluto/audit_shared_realtime_routed.tcl",
+    "checkpoint_sha256": "539732c6bcc201cf2a02d3d0cedf2d2d8881ff4e31e7c2def2ed99f02235b0e7",
+    "checkpoint_unchanged_after_audit": true,
+    "operations": "Open completed checkpoint; query named endpoint paths and report clocks, exceptions, CDC, utilization, routing and check_timing. No constraints are set or reloaded; no optimization, placement, routing or checkpoint writes.",
+    "source_association": "Caller-attested ff4229bb build provenance, not derived from the checkpoint; copies of service, input guard, result guard and mailbox extracted from that exact immutable commit.",
+    "artifact_source_current_worktree_required": false,
+    "timing_subgroups": [
+      {
+        "name": "vendor_internal",
+        "matched_source_cells": 3319,
+        "matched_destination_cells": 3319,
+        "reported_paths": 10,
+        "worst_slack_ns": -1.932,
+        "requirement_ns": 5,
+        "source": "shared_xfft/.../single_channel.datapath/i_fwd_inv_reg/C",
+        "destination": "shared_xfft/.../optionally_negate_inputs/apply_negation.registered_twos_comp_hblknm.gen_part_slices[0].ff_bi/D",
+        "data_delay_ns": 6.725,
+        "logic_delay_ns": 1.695,
+        "route_delay_ns": 5.03,
+        "logic_levels": 6
+      },
+      {
+        "name": "return_slot",
+        "source_scope": "all timed startpoints",
+        "matched_destination_cells": 52,
+        "reported_paths": 10,
+        "worst_slack_ns": -2.949,
+        "requirement_ns": 5,
+        "worst_endpoint": "result_guard/return_data_reg[12]/CE"
+      },
+      {
+        "name": "output_publication",
+        "source_scope": "all timed startpoints",
+        "matched_destination_cells": 1,
+        "reported_paths": 2,
+        "worst_slack_ns": -2.59,
+        "requirement_ns": 5,
+        "worst_endpoint": "output_mailbox/request_toggle_reg/D"
+      },
+      {
+        "name": "output_mailbox_fault",
+        "source_scope": "all timed startpoints",
+        "matched_destination_cells": 1,
+        "reported_paths": 2,
+        "worst_slack_ns": -2.596,
+        "requirement_ns": 5,
+        "worst_endpoint": "output_mailbox/input_fault_reg/D"
+      },
+      {
+        "name": "output_mailbox_payload_control",
+        "source_scope": "all timed startpoints",
+        "matched_destination_pins": 8,
+        "reported_paths": 6,
+        "worst_slack_ns": -3.255,
+        "requirement_ns": 5,
+        "worst_endpoint": "output_mailbox/payload_memory_reg/ENBWREN"
+      },
+      {
+        "name": "sticky_fault_crossing",
+        "matched_source_cells": 1,
+        "matched_destination_cells": 1,
+        "reported_paths": 1,
+        "worst_slack_ns": 3.436,
+        "requirement_ns": 5,
+        "timing_type": "max_delay_datapath_only",
+        "source_clock_ns": 10,
+        "destination_clock_ns": 5
+      },
+      {
+        "name": "sticky_fault_second_stage",
+        "matched_source_cells": 1,
+        "matched_destination_cells": 1,
+        "reported_paths": 1,
+        "worst_slack_ns": 3.771,
+        "requirement_ns": 5,
+        "timing_type": "ordinary_clocked_setup_no_max_delay_exception",
+        "source_clock_ns": 5,
+        "destination_clock_ns": 5
+      }
+    ],
+    "subgroup_limit": "Worst paths into/from nonempty named endpoint sets; not an exhaustive path distribution or proof that the remaining design is qualified.",
+    "final_resources": {
+      "stage": "Physopt postRoute",
+      "lut": 12824,
+      "ff": 18949,
+      "bram_tiles": 49,
+      "dsp": 44,
+      "slices_used": 4400,
+      "slices_available": 4400,
+      "unique_control_sets": 452
+    },
+    "final_route_status": {
+      "routable_nets": 33344,
+      "fully_routed_nets": 33344,
+      "routing_errors": 0
+    },
+    "final_cdc": {
+      "blanket_pass": false,
+      "review_required": true,
+      "summary": [
+        {
+          "id": "CDC-3",
+          "severity": "Info",
+          "count": 31
+        },
+        {
+          "id": "CDC-6",
+          "severity": "Warning",
+          "count": 9
+        },
+        {
+          "id": "CDC-9",
+          "severity": "Info",
+          "count": 7
+        },
+        {
+          "id": "CDC-15",
+          "severity": "Warning",
+          "count": 360
+        },
+        {
+          "id": "CDC-17",
+          "severity": "Warning",
+          "count": 7
+        }
+      ],
+      "note": "report_cdc omits ports without defined input delays; warnings are retained, not waived."
+    },
+    "admission_checks": {
+      "passed": 21,
+      "actual_tcl_cases": 20,
+      "static_read_only_policy_cases": 1,
+      "tests": "tests/test_starlink_realtime_routed_audit_policy.py",
+      "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/test_starlink_realtime_routed_audit_policy.py",
+      "execution": "Actual audit admission under tclsh with version/open_checkpoint stubs, using isolated temporary git repositories. Invalid cases never reach checkpoint opening or create/modify output. The valid case reaches opening only after freezing immutable source despite deliberately dirty worktree files. These tests are not physical timing or CDC evidence.",
+      "cases": [
+        "wrong argument count",
+        "unsupported tool version",
+        "malformed commit",
+        "malformed checkpoint hash",
+        "missing checkpoint",
+        "existing output directory",
+        "checkpoint hash mismatch",
+        "unresolvable source commit",
+        "valid admission freezes immutable source rather than dirty worktree",
+        "static prohibition on design or timing-constraint mutations"
+      ],
+      "real_checkpoint_audit_passed": true
+    }
   }
 }

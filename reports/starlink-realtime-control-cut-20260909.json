@@ -1,0 +1,207 @@
+{
+  "schema": "starlink.paired_receiver.realtime_control_cut.v1",
+  "date_utc": "2026-09-09",
+  "status": "BEHAVIORAL_REGRESSIONS_PASS_FRESH_IMPLEMENTATION_RUNNING",
+  "scope": "First function-preserving control-fanout trial in the explicitly selected shared realtime 15 MS/s receiver. Not timing closure, sustained >=120 ms qualification, paired IIO qualification, or RF lock.",
+  "source": {
+    "hdl_commit": "2e552234336a5426adcecb538f5da5ced844b7d1",
+    "hdl_remote_verified": true,
+    "baseline_hdl_commit": "ff4229bb230437fcd975413390a34c00ffcc226f",
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "changed_runtime_files": [
+      "hdl/library/starlink_pss_acquisition/starlink_pss_realtime_result_guard.v"
+    ],
+    "simulation_snapshot_note": "Simulations launched from ff4229 HEAD plus the uncommitted guard change; frozen runtime guard SHA exactly matches committed 2e552234. Existing service, guards, mailbox, vectors, score/map implementations and runners otherwise unchanged.",
+    "default_realtime_selector": 0,
+    "constraints_relaxed": false,
+    "numerical_configuration_changed": false
+  },
+  "changes": [
+    "Factor job_ready using faults_now restricted exactly to !active: all certificate/frame/status/output events reject idle admission; reservation/slot/watchdog terms are active-gated.",
+    "Update private age independently of the current-cycle fault aggregate, zero while inactive and increment while active. Healthy active age and direct deadline veto unchanged; only faulted/inactive private state may differ."
+  ],
+  "invariants": [
+    "Immediate public mailbox/final-commit fault veto unchanged",
+    "Sticky fault reasons and raw-output accounting unchanged",
+    "No added certificate latency",
+    "No extra payload RAM or clock reduction",
+    "Both PSS stages and anti-aliased pilot DMA retained"
+  ],
+  "baseline_physical_report": "reports/starlink-shared-realtime-physical-20260909.json",
+  "baseline_physical": {
+    "overall_wns_ns": -3.531,
+    "fast_failing_setup_endpoints": 577,
+    "slow_wns_ns": 0.002,
+    "hold_wns_ns": 0.049,
+    "vendor_internal_wns_ns": -1.932,
+    "return_slot_wns_ns": -2.949,
+    "publication_wns_ns": -2.59,
+    "output_ram_control_wns_ns": -3.255,
+    "deployable": false
+  },
+  "equivalence": {
+    "terminal": true,
+    "exit_code": 0,
+    "log": "hdl/library/starlink_pss_acquisition/build/realtime-result-guard-equivalence-v1-bw2iDQ/simulation.log",
+    "old_runtime_sha256": "a3637871ad72551987006b5d5c1e0de716f28a07e706c0decf036e072cd7f35c",
+    "healthy_jobs": 23,
+    "rejected_jobs": 37,
+    "independent_resets": 12,
+    "idle_combinations": 12288,
+    "watchdog_configurations": [
+      2,
+      3,
+      5,
+      17,
+      2048,
+      2049
+    ],
+    "watchdog_epochs_per_configuration": 2,
+    "compares": "Public control/fault reasons every half-cycle; payload/metadata while valid; private age only during healthy active job.",
+    "universal_formal_equivalence": false
+  },
+  "actual_core_service": {
+    "terminal": true,
+    "exit_code": 0,
+    "root_session": 68646,
+    "base": "hdl/library/starlink_pss_acquisition/build/shared-realtime-control-cut-service-v1",
+    "healthy_jobs": 26,
+    "exact_raw_and_published_words": 13312,
+    "starvation_cases": 6,
+    "final_edge_vendor_veto_cases": 3,
+    "malformed_metadata_cases": 2,
+    "independent_reset_cases": 6,
+    "late_ack_drain_fault_cases": 1,
+    "limits": "Cause-based input fence, not a universal vendor-event delay theorem; not capacity or physical qualification."
+  },
+  "actual_score": {
+    "terminal": true,
+    "exit_code": 0,
+    "root_session": 73906,
+    "base": "hdl/library/starlink_pss_acquisition/build/realtime-control-cut-numeric-v1",
+    "source_samples": 1406,
+    "blocks": 3,
+    "exact_forward_words": 1536,
+    "exact_product_words": 1536,
+    "exact_inverse_words": 1536,
+    "exact_scores": 1341,
+    "score_stalls": true,
+    "global_and_independent_fft_reset_recovery": true
+  },
+  "actual_map": {
+    "terminal": true,
+    "exit_code": 0,
+    "root_session": 19794,
+    "base": "hdl/library/starlink_pss_acquisition/build/realtime-control-cut-phase-map-v1",
+    "exact_scores": 1341,
+    "exact_map_reads": 447,
+    "healthy_flags": 0,
+    "partial_tile_fault_abort_preserved": true,
+    "service_health_bit": 14,
+    "limits": "Reduced 3-frame / 447-bin geometry, not a production 20000 x 64 tile."
+  },
+  "bursty64": {
+    "terminal": true,
+    "exit_code": 0,
+    "root_session": 92964,
+    "base": "hdl/library/starlink_pss_acquisition/build/realtime-control-cut-bursty64-v1",
+    "source_samples": 28673,
+    "blocks": 64,
+    "words_per_transform_stage": 32768,
+    "ordered_scores": 28608,
+    "candidate_fifo_max": 358,
+    "limits": "Counts/order/backlog, not every numeric score and not >=120 ms."
+  },
+  "regression": {
+    "prior_suite": {
+      "terminal": true,
+      "exit_code": 0,
+      "tests_passed": 714,
+      "seconds": 72.42,
+      "log": "/tmp/starlink-realtime-control-cut-regression-v1.log"
+    },
+    "focused_guard_and_service": {
+      "terminal": true,
+      "exit_code": 0,
+      "tests_passed": 24,
+      "seconds": 2.75
+    },
+    "focused_audit_and_equivalence": {
+      "terminal": true,
+      "exit_code": 0,
+      "tests_passed": 23,
+      "seconds": 1.29
+    },
+    "expanded_suite": {
+      "status": "PASS",
+      "terminal": true,
+      "exit_code": 0,
+      "tests_passed": 737,
+      "seconds": 75.25,
+      "root_session": 51747,
+      "log": "/tmp/starlink-realtime-control-cut-regression-v2.log"
+    }
+  },
+  "library_package": {
+    "terminal": true,
+    "exit_code": 0,
+    "root_session": 49146,
+    "log": "/tmp/starlink-realtime-control-cut-acquisition-package-v1.log"
+  },
+  "fresh_full_build": {
+    "status": "RUNNING",
+    "root_session": 25399,
+    "base": "hdl/projects/pluto/shared-realtime-control-cut-v1",
+    "hdl_worktree_clean_at_launch": true,
+    "source_msps": 15,
+    "processing_clock_mhz": 100,
+    "fft_clock_mhz": 200,
+    "profile": "paired-pilot",
+    "shared_xfft": 1,
+    "realtime_xfft": 1,
+    "ooc_synthesis": false,
+    "reused_implementation_checkpoint": false,
+    "command": "env LD_LIBRARY_PATH=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE STARLINK_PSS_RATE_MSPS=15 STARLINK_PSS_PROFILE=paired-pilot STARLINK_PSS_SHARED_XFFT=1 STARLINK_PSS_REALTIME_XFFT=1 ADI_USE_OOC_SYNTHESIS=n ADI_PROJECT_DIR=shared-realtime-control-cut-v1/ /opt/Xilinx/Vivado/2022.2/bin/vivado -mode batch -source system_project.tcl -log shared-realtime-control-cut-v1/vivado.log -journal shared-realtime-control-cut-v1/vivado.jou > shared-realtime-control-cut-v1/console.log 2>&1"
+  },
+  "baseline_capacity4096": {
+    "status": "RUNNING_NOT_RESTARTED",
+    "root_session": 29730,
+    "hdl_commit": "ff4229bb230437fcd975413390a34c00ffcc226f",
+    "base": "hdl/library/starlink_pss_acquisition/build/realtime-integrated-capacity4096-v1",
+    "note": "Frozen prior source, not the new guard-cut source. Retain and finish this run; no current-source capacity pass is inferred."
+  },
+  "next_gates": [
+    "Inspect actual synthesis/route fan-in, setup/hold, vendor and publication subgroups; preserve failed baseline.",
+    "Resolve remaining 200 MHz and board/CDC qualification without false paths or removed detector features.",
+    "Complete current-source >=120 ms sustained score qualification.",
+    "Implement planned map-boundary receipt/drain and concurrent paired recorder.",
+    "Exact-serial .18 canary before .17 network deployment, then live paired PSS/independent GLRT and full hopping 15/30/60 ladder."
+  ],
+  "hardware_accessed": false,
+  "radio_allocated_for_access": false,
+  "deployed": false,
+  "timing_closed": false,
+  "fpga_pss_lock": false,
+  "map_stop_plan": {
+    "path": "docs/starlink-map-stop-boundary-plan.md",
+    "status": "PROPOSED_NOT_IMPLEMENTED",
+    "note": "Two-word PSST ticket/receipt window, actual terminal generation and candidate bounds, retained faults/IRQ, staged A-F tests; no current ABI promotion."
+  },
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/starlink_pss_realtime_result_guard.v": "4d0eef58d7409a2ed0e3d942c28077e4cd068b90173468fd80595c5b71c4c164",
+    "hdl/library/starlink_pss_acquisition/tb/starlink_pss_realtime_result_guard_ff4229_golden.v": "32585046dc3ef0eae35e36acb902d4d512fae44d21d0cdf6784a365f40b049af",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_result_guard_equivalence.sv": "dd16b51d0f9f6cec02216ca01f63168f967cc8f1ba826b7b8659d9fa911d101b",
+    "hdl/library/starlink_pss_acquisition/build/realtime-result-guard-equivalence-v1-bw2iDQ/simulation.log": "da195e02b7fb9fcd444b4ba2d656837ab3c4ec1c0715e20ae569ee2953dac7c8",
+    "hdl/library/starlink_pss_acquisition/build/shared-realtime-control-cut-service-v1-console.log": "3d29ffaa067bfe9a528f4e8bffa53e7f6c3c9a684cd7ebae48e684cee0646445",
+    "hdl/library/starlink_pss_acquisition/build/realtime-control-cut-numeric-v1-console.log": "8e9cd260e8ac753997fc4796c45e75a9fdc0cfa8ea6ad8bacd330e21883d96a6",
+    "hdl/library/starlink_pss_acquisition/build/realtime-control-cut-phase-map-v1-console.log": "caced5a7e337186a6996cac77343fbf2b7d3308b4732b8eda4ec1d9c2b0a51c0",
+    "hdl/library/starlink_pss_acquisition/build/realtime-control-cut-bursty64-v1-console.log": "bdd6876777bdefcb0b2be307ff0a1c0808d26a3f3bd33b6f02fbca74b380e686",
+    "hdl/projects/pluto/audit_shared_realtime_routed.tcl": "887a33261f30a679232caa1e87a51b5dc334103bd5a295920581f5696647f3a4",
+    "/tmp/starlink-realtime-control-cut-regression-v1.log": "51182039db6ea7d7b39a86d692bb6a34b1b46b53ce883d0d23eaa237cd82ec18",
+    "/tmp/starlink-realtime-control-cut-acquisition-package-v1.log": "0f68681bbf4e37b1349d07d93366ea687265b4c20ad555275a46b1fc221f95ec",
+    "/tmp/starlink-realtime-control-cut-regression-v2.log": "b00331b59f1cb8cdb69568bbe8c932ad2897d79dce321d1ab164906f5a88ff0d",
+    "tests/starlink_oracle/test_realtime_result_guard_equivalence.py": "1b24668e6e377318b11146764b3d234619adfc7dbdc6c62f62657caf8ce06111",
+    "tests/test_starlink_realtime_routed_audit_policy.py": "39a90b4d24674645be8efa290f3674e5ef8dfcd1baca7523f34bffdad417d437",
+    "docs/starlink-map-stop-boundary-plan.md": "a115309f3263c4afda0c84faecd2f62405e40ca6d9f73d81f08fb497be9bc97c"
+  }
+}

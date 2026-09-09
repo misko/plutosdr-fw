@@ -219,6 +219,9 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   generation and exact source-coordinate bound before coarse disable. Preserve
   both ready banks and every real fault; absent scores must timeout, not imply
   completion. Legacy immediate disable/flush semantics stay unchanged.
+  The proposed two-register ticket/receipt ABI, exact boundary semantics and
+  executable rollout gates are in `docs/starlink-map-stop-boundary-plan.md`;
+  that document is a plan, not implemented stop support.
 - [ ] Keep map IRQ/readers alive until published, driver-enqueued and
   host-reassembled terminal generations agree. Use 200-chunk/one-map refills
   initially; a 400-chunk watermark can strand an odd final map after stop.
@@ -296,6 +299,25 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
+### First measured realtime control-cone cut — 2026-09-09
+
+HDL `2e552234336a5426adcecb538f5da5ced844b7d1` is pushed to the DNM remote.
+It factors the idle admission predicate and removes the complete same-cycle
+fault cone from the private watchdog's enable. Public fault/commit vetoes,
+healthy watchdog deadlines, coefficients, numeric IP configuration and clocks
+are unchanged. Differential RTL against immutable `ff4229bb` covers 23 healthy
+and 37 rejected jobs, 12 resets, 12288 idle combinations and six watchdog
+configurations. This is bounded executable comparison, not a formal theorem.
+
+The new source passes actual-core service (26 jobs / 13312 exact words), score
+(1341 exact values), reduced map (447 exact reads), and bursty 64-block capacity
+(28608 ordered scores) tests. The expanded regression passes 737 tests. A new
+clean full receiver build is running in `shared-realtime-control-cut-v1`.
+Independent vendor and publication failures in the baseline remain reasons
+not to assume this first cut closes timing. The older frozen 4096-block soak
+continues separately and cannot certify the changed source by itself. No radio
+was accessed or flashed. See `reports/starlink-realtime-control-cut-20260909.json`.
+
 ### Bounded native fine-control evidence — 2026-09-09
 
 PPU main `1245220f6078f9bcb3008aec9f6bacef83f5419e` is pushed and remotely
@@ -349,10 +371,16 @@ placement: 13284 LUTs / 18951 registers at synthesis (129 LUTs / 87 registers
 fewer than d80), and an actual fully placed checkpoint. All 4400 slices are
 occupied. The real implementation gate confirms one realtime core, both PSS
 stages, pilot DMA, actual clocks and both new fault-synchronizer timing paths.
-Routing/post-route timing and the longer capacity result remain unqualified;
-retained CDC warnings still require review. No radio has been accessed or flashed.
-See `reports/starlink-shared-realtime-physical-20260909.json` for the explicit
-completed-stage versus live-implementation checkpoint.
+Routing is complete, but final post-route timing FAILS: the 200 MHz domain has
+-3.531 ns WNS, -1008.150 ns TNS and 577 failing setup endpoints. The 100 MHz
+domain passes by only +0.002 ns; hold passes at +0.049 ns. The longest path is
+input-position certification through result-guard fault/admission logic to the
+service state; the private watchdog enable shares that deep validation cone.
+The generated XSA is explicitly `bad_timing` and is not deployable. The longer
+frozen capacity run remains pending, and retained CDC warnings require review.
+No radio has been accessed or flashed. See
+`reports/starlink-shared-realtime-physical-20260909.json` for the final routed
+evidence, separate from earlier synthesis and placement success.
 See `reports/starlink-shared-realtime-integration-20260909.json`. After these
 gates, native paired capture/stop/drain and .18-before-.17 live qualification
 still precede the complete hopping/rate ladder.
