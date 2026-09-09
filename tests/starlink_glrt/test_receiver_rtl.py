@@ -21,6 +21,7 @@ module tb;
 reg clk=0;
 always #5 clk=~clk;
 reg resetn=0,flush=0,input_valid=0,input_gap=0;
+reg source_closed=0;
 reg signed [15:0] input_i=0,input_q=0;
 reg [63:0] input_index=0;
 reg [4:0] input_phase=0;
@@ -37,6 +38,8 @@ wire [21:0] detector_fault;
 wire [63:0] selected_candidates,merged_proposals;
 wire selection_pending;
 wire [2:0] processing_pending;
+wire detector_settled,stage_fault;
+wire [63:0] incomplete_native_tails,aborted_selector_groups,completed_native_vectors,selected_close_rejections,expired_candidates;
 wire [16:0] exact_score_q16,control_score_q16;
 wire [54:0] exact_energy,control_energy;
 wire [50:0] exact_peak,control_peak;
@@ -58,12 +61,16 @@ initial begin
  while(!$feof(fd)) begin
   rc=$fscanf(fd,"%d %d %d %h %d %d %d\n",vi,ga,fl,ix,ph,si,sq);
   if(rc!=7) $fatal(1,"bad input");
-  input_valid=vi;input_gap=ga;flush=fl;input_index=ix;
+  input_valid=vi;input_gap=ga;flush=fl & 1;source_closed=(fl >> 1) & 1;input_index=ix;
   input_phase=ph;input_i=si;input_q=sq;
   @(posedge clk);
   // Admission is a handshake at this edge. Sampling ready after nonblocking
   // source-index updates can instead observe the next cycle's bounds check.
   if(dut.selected_valid) $display("C %h %d %d",dut.selected_epoch,dut.admit,dut.reject_busy);
+  if(dut.selected_valid && $test$plusargs("TRACE"))
+   $display("D %h %d %d %d %d %d %d %d %d",dut.selected_epoch,dut.native_ready,dut.stage_ready,
+    dut.score_ready,dut.vector_stage.state,dut.native.newest_index,dut.native.next_index,
+    dut.scorer.state,dut.scorer.frequency_bin);
   #1;
   if(iq_valid) $display("O %h %d %d %d",iq_index,iq_i,iq_q,iq_support);
   if(dut.proposal_valid) $display("P %h",dut.proposal_epoch);
@@ -87,10 +94,11 @@ endmodule
 def receivers(tmp_path_factory):
     root = tmp_path_factory.mktemp("receiver-compile")
     cache = {}
-    def get(rate, edge="upper"):
-        key = rate, edge
+    def get(rate, edge="upper", acquisition_q16=15729):
+        key = rate, edge, acquisition_q16
         if key not in cache:
             source = BENCH.replace("(RATE)", f"({rate})")
+            source = source.replace("acquisition_threshold_q16=15729", f"acquisition_threshold_q16={acquisition_q16}")
             for label, filename in {
                 "NATIVE": f"pilot_{rate}_{edge}_q7.mem",
                 "ACQUISITION": f"pilot_2500000_{edge}_q7.mem",
@@ -98,9 +106,9 @@ def receivers(tmp_path_factory):
                 "TWIDDLE": "glrt_dft512_q15.mem",
             }.items():
                 source = source.replace(f'"{label}"', f'"{BANK_ROOT / filename}"')
-            bench = root / f"tb_{rate}_{edge}.sv"
+            bench = root / f"tb_{rate}_{edge}_{acquisition_q16}.sv"
             bench.write_text(source)
-            executable = root / f"sim_{rate}_{edge}"
+            executable = root / f"sim_{rate}_{edge}_{acquisition_q16}"
             built = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable), str(bench),
                                     *map(str, sorted(BANK_ROOT.glob("*.v")))], capture_output=True, text=True)
             assert built.returncode == 0, built.stdout + built.stderr
@@ -109,13 +117,36 @@ def receivers(tmp_path_factory):
     return get
 
 
-def run(simulator, rows, tmp_path):
+@pytest.mark.parametrize("case_index", [0, 1, 2])
+def test_previously_busy_lost_strong_frames_at_2500000(case_index, receivers, tmp_path):
+    # Previously evaluated development regression; these exact seeds/epochs
+    # are not a new holdout. The detector still receives no timing/CFO seed.
+    from tools.starlink_glrt_synthetic_qualification import cases, stimulus
+    case = cases(seed_offset=764930281, vary_epochs=True)[case_index]
+    raw, epochs, clipped = stimulus(case)
+    assert case["rate"] == 2500000 and not clipped
+    rows = records(raw, 2500000)+["0 0 2 0 0 0 0"]*100000
+    streams = run(receivers(2500000, acquisition_q16=13107), rows, tmp_path, trace=True)
+    status = streams["S"][0]
+    assert status[11:15] == (0, 0, 0, 0), status
+    detections = [row for row in streams["G"] if row[1]]
+    complete_epochs = [epoch for epoch in epochs if epoch+726 <= len(raw)]
+    matched = [epoch for epoch in complete_epochs if any(abs(result[0]-epoch) <= 2 for result in detections)]
+    import json
+    (tmp_path / "admission-evidence.json").write_text(json.dumps({"case": case, "expected": complete_epochs,
+        "matched": matched, "selected": streams["C"], "trace": streams["D"], "detected": detections,
+        "status": status}, indent=2)+"\n")
+    assert matched == complete_epochs, {"expected": complete_epochs, "matched": matched,
+                                       "selected": streams["C"], "detected": detections, "status": status}
+
+
+def run(simulator, rows, tmp_path, *, trace=False):
     path = tmp_path / "input.txt"
     path.write_text("\n".join(rows)+"\n")
-    process = subprocess.run(["vvp", str(simulator), f"+INPUT={path}"],
+    process = subprocess.run(["vvp", str(simulator), f"+INPUT={path}", *( ["+TRACE"] if trace else [])],
                              capture_output=True, text=True, timeout=120)
     assert process.returncode == 0, process.stdout+process.stderr
-    streams = {"O": [], "P": [], "C": [], "G": [], "S": []}
+    streams = {"O": [], "P": [], "C": [], "G": [], "S": [], "D": []}
     for line in process.stdout.splitlines():
         words = line.split()
         if words[0] in streams:

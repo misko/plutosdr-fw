@@ -68,6 +68,43 @@ def snapshot():
     return [write(8, 8), *(read(address) for address in range(0x80, 0x180, 4)), read(0x48)]
 
 
+def extension_snapshot():
+    return [read(0x5c), read(0x60), read(0x64), *(read(address) for address in range(0x300, 0x340, 4))]
+
+
+@pytest.mark.parametrize("count", [350, 1100, 1500, 2300])
+def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(count, captures, tmp_path):
+    # The cutoffs span acquisition, partial native collection, staged/scoring
+    # work and a completed result. No candidate epoch is fed into the fabric.
+    raw, _, _ = observation(2500000, "positive")
+    preparing = arm(visit=490)
+    rows = [*preparing[:-1], *snapshot(), *extension_snapshot(), preparing[-1],
+            *samples(raw[:count]), write(8, 2), wait(100000),
+            (1, 10, 0, 0, 0), *snapshot(), *extension_snapshot()]
+    output, reads, final = run(captures(2500000), rows, tmp_path)
+    regs = dict(reads)
+    baseline_regs = dict(reads[:84])
+    assert all(baseline_regs[address] == 0 for address in range(0x300, 0x340, 4))
+    import json
+    evidence = {"rate": 2500000, "visit": 490,
+        "source_samples": count, "iq_samples": len(output), "baseline_registers": baseline_regs,
+        "final_registers": regs}
+    (tmp_path / "closure-evidence.json").write_text(json.dumps(evidence, indent=2)+"\n")
+    from .test_closure import attest_fabric_closure
+    attest_fabric_closure(evidence)
+    assert final == (0, 0)
+    assert (regs[0x5c], regs[0x60], regs[0x64]) == (0x474c5831, 0x10000, 16)
+    assert regs[0x300] == 7 and regs[0x304] == regs[0x338] == regs[0x33c] == 0
+    assert regs[0xc8] == regs[0x148] == 0  # base transport and detector faults
+    assert regs[0x174] == 0  # v1 pending bits have actually settled
+    assert u64(regs, 0x308) >= u64(regs, 0x88)
+    assert u64(regs, 0xf8) == u64(regs, 0x108) + u64(regs, 0x110) + u64(regs, 0x330)
+    assert u64(regs, 0x108) == u64(regs, 0x320) + u64(regs, 0x310)
+    assert u64(regs, 0x320) == u64(regs, 0x328) == u64(regs, 0x118)
+    assert u64(regs, 0x90) == u64(regs, 0x98) == len(output)
+    assert u64(regs, 0x15c) == u64(regs, 0x118)  # events buffered = results
+
+
 def run(simulator, rows, tmp_path):
     (tmp_path/"stimulus.txt").write_text("".join(f"{delay} {op} {idx:x} {value:x} {arg}\n"
                                                for delay, op, idx, value, arg in rows))

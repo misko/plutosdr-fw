@@ -14,6 +14,8 @@ module tb;
 reg clk=0;
 always #5 clk=~clk;
 reg resetn=0, flush=0, input_valid=0, input_gap=0, candidate_valid=0;
+reg source_closed=0;
+wire incomplete_tail;
 reg signed [15:0] input_i=0, input_q=0;
 reg [63:0] input_index=0, candidate_epoch=0;
 wire [63:0] candidate_start=candidate_epoch+64'd22*(RATE)/2500000;

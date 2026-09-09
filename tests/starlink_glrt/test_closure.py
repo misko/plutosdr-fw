@@ -11,6 +11,30 @@ def closure_wire(words, *, generation=1, visit=29, rate=10_000_000):
     return f"GLX1 00010000 {generation} {visit} {rate} " + " ".join(f"{word:08x}" for word in words)
 
 
+def attest_fabric_closure(evidence):
+    """Bridge real AXI reads to host checks with explicitly constructed CPU headers.
+
+    The caller's RTL test supplies the raw registers and IQ count. This does
+    not execute Linux or attest CPU/IIO transfers; all CPU counters are zero.
+    """
+    decoded = []
+    rate, visit = evidence["rate"], evidence["visit"]
+    for label in ("baseline_registers", "final_registers"):
+        registers = {int(key): value for key, value in evidence[label].items()}
+        assert (registers[0x5c], registers[0x60], registers[0x64]) == (0x474c5831, 0x10000, 16)
+        generation = registers[0x48]
+        words = [registers[0x80+4*index] for index in range(64)]
+        header = f"GLR1 00010000 {rate} 2500000 {generation} 0 {rate} 0 0 0 0 0 0 0 "
+        snapshot = Snapshot.decode(header+" ".join(f"{word:08x}" for word in words))
+        extension = [registers[0x300+4*index] for index in range(16)]
+        closure = Closure.decode(closure_wire(extension, generation=generation, visit=visit, rate=rate))
+        decoded.append((snapshot, closure))
+    (baseline, before), (final, closure) = decoded
+    closure.require_complete(final, baseline=before, base_snapshot=baseline)
+    final.require_stopped_iq(expected_visit=visit, expected_rate=rate, expected_samples=evidence["iq_samples"])
+    return closure.evidence()
+
+
 def evidence():
     final = Snapshot.decode(wire())
     words = list(final.words)
