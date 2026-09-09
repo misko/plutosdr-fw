@@ -1,8 +1,17 @@
 # Single-RX FPGA GLRT evidence
 
 Experimental branch `codex/starlink-glrt-only-do-not-merge`. Persistent task
-`01a0821a-7b4c-73f0-8b2c-47b4e95207f9`, gpt-6-astra / xhigh; goal active without
-a token budget. See [the completion gate](GLRT_ONLY_GOAL.md).
+`01a0821a-7b4c-73f0-8b2c-47b4e95207f9`, gpt-6-astra / xhigh; unbudgeted objective
+unfinished. See [the completion gate](GLRT_ONLY_GOAL.md).
+
+Current checkpoint: all five full-board builds at HDL ff42d5ab pass internal
+setup/hold and Gray-bus skew; five RAM packages have independently verified
+embedded contents. No hardware has been accessed. The numerical report retains
+one synthetic strong-signal busy miss and the saved-RF sensitivity limits.
+The independent CDC prototype is being reviewed before promotion; actual radio
+calibration, transport headroom, owner allocation and live agreement remain.
+See [routing evidence](reports/starlink-glrt-five-rate-checkpoint-20260909.json)
+and [numerical evidence](reports/starlink-glrt-numerical-checkpoint-20260909.json).
 
 ## Source isolation, 2026-09-08
 
