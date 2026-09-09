@@ -3,17 +3,18 @@
 These checks qualify provenance, fresh-output admission and read-only policy;
 they do not simulate Vivado timing, CDC or physical endpoint completeness.
 """
-from hashlib import sha256
-from pathlib import Path
+import os
 import re
 import shutil
 import subprocess
+from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
-
 ROOT = Path(__file__).resolve().parents[1]
-AUDIT = ROOT / "hdl/projects/pluto/audit_shared_realtime_routed.tcl"
+AUDIT_HDL = Path(os.environ.get("STARLINK_PSS_AUDIT_HDL", ROOT / "hdl"))
+AUDIT = AUDIT_HDL / "projects/pluto/audit_shared_realtime_routed.tcl"
 SOURCE_NAMES = (
     "starlink_pss_shared_realtime_xfft_service.v",
     "starlink_pss_realtime_input_guard.v",
@@ -83,7 +84,7 @@ def invoke(fixture, *, version="2022.2", args=None):
                 fixture["revision"], fixture["sha"]]
     return subprocess.run(
         ["tclsh", str(fixture["harness"]), str(fixture["script"]), version,
-         *map(str, args)], capture_output=True, text=True, timeout=10,
+          *map(str, args)], capture_output=True, text=True, timeout=10, check=False,
     )
 
 
@@ -161,7 +162,7 @@ def test_valid_admission_freezes_immutable_source_not_dirty_worktree(fixture_aud
         assert frozen == f"// immutable fixture: {name}\n".encode()
         dirty = fixture_audit["repo"] / "library/starlink_pss_acquisition" / name
         assert frozen != dirty.read_bytes()
-    assert set(p.name for p in output.iterdir()) == {*SOURCE_NAMES, "audit_source.tcl"}
+    assert {p.name for p in output.iterdir()} == {*SOURCE_NAMES, "audit_source.tcl"}
 
 
 def test_audit_never_mutates_saved_design_or_constraints():

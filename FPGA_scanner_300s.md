@@ -387,8 +387,13 @@ The finite burst/stall case delivers 28608 scores at FIFO high-water 358.
 Acquisition IP packaging passed. The fresh complete receiver launched at
 21:50 UTC in `hdl/projects/pluto/shared-realtime-input-cursor-v1`, retaining
 both PSS stages, pilot DMA, boundary stop and the original constraints, with
-global synthesis and no reference checkpoint. No timing result is available
-at this checkpoint; revalidate its recorded process before treating it as live.
+global synthesis and no reference checkpoint. It finished at 21:54:54 UTC with
+exit 1: **placement failed** (`Place 30-99`, could not commit all instances).
+The original structural/constraint INIT gate passed, but there is no new routed
+timing result. The failed candidate's pre-placement optimized checkpoint is
+being inspected; do not substitute its timing estimates for a routed result.
+The expanded read-only audit reproduces the older cursor's -0.956 ns path,
+inventorying nine registers and 18 D/CE pins. Its 21 admission/policy tests pass.
 No radio or PPU operation occurred. Evidence:
 `reports/starlink-input-cursor-20260909.json`.
 

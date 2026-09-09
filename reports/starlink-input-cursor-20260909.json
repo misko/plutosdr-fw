@@ -64,23 +64,46 @@
   },
   "acquisition_IP_package": {"exit_code": 0, "component_sha256": "954fd817c8eb7173e00017cac9b1ead9f9706359965efbf4978fe32511daec17", "console_sha256": "b183cecce708b5d14827d38e50349da6f46bb749279b98c71fffd02904f2c8d1"},
   "full_receiver": {
-    "status": "running",
+    "status": "terminal_placement_failed",
+    "exit_code": 1,
     "directory": "hdl/projects/pluto/shared-realtime-input-cursor-v1",
     "launch_utc_minute": "2026-09-09T21:50Z",
+    "finished_utc": "2026-09-09T21:54:54Z",
     "source_revision": "f96d0b0d89ee8a8d55a5107b464ebe1b957e789d",
     "configuration": "15MS/s paired-pilot, shared realtime XFFT, boundary stop, DSP fine tracker, pilot DMA, global synthesis, unchanged constraints, no reference DCP",
     "exec_session": 59255,
     "launch_process_pid": 1840623,
     "deployment_eligible": false,
-    "observation_rule": "Revalidate this exact process/session or terminal artifacts; a persisted running label is not proof of liveness."
+    "failure": "Place 30-99: failed to commit all instances; Common 17-69: Placer could not place all instances. No final placement/routed timing or bitstream result exists for this candidate.",
+    "INIT_structure_and_original_constraint_gate": "passed",
+    "console_sha256": "ae63bbe1b01703514d69e909fec9d48ca7f6d9ce19fe67cf5ff10b6c3211e6a4",
+    "implementation_log_sha256": "5300b51f0267a16725324aad2522df8d0e49648303c0f8cb9721439a4650524d",
+    "init_gate_sha256": "eb8d39270b020180b8763b30be4177c7cf7f3aed96a768a4f7da6b8642dca574",
+    "pre_placement_optimized_checkpoint_sha256": "d21fecfe96c9bf1ed2987894298556f18f4ff0ed9f3fc8319f987db1effd1457"
+  },
+  "baseline_cursor_audit": {
+    "audit_hdl_commit": "1082a1dd",
+    "directory": "hdl/projects/pluto/shared-realtime-phase-input-v1/cursor-audit-v1",
+    "exit_code": 0,
+    "checkpoint_source_revision": "ccdf64365e8145113115f2e933ee8b2901f6d3e0",
+    "checkpoint_sha256": "dea018c140f427d22f81ea36179e152114ef38ba6312aaa3da3702416d862e27",
+    "actual_cursor_registers": 9,
+    "actual_D_and_CE_pins": 18,
+    "reported_worst_paths": 10,
+    "WNS_ns": -0.956,
+    "requirement_ns": 5.0,
+    "summary_sha256": "2b98b75098c361ca57de9d05eef95eb98f0baa72dd3cb8cab0c9e4bbf9b32a0f",
+    "cursor_timing_sha256": "07c1f08c4d0019a7112a9ed4855dee852102d8cb5d93de07a95de32ef51c3da3",
+    "audit_admission_tests_passed": 21,
+    "limit": "Read-only unchanged older routed checkpoint. Reproduces the prior failure, not a timing measurement of the new cursor design."
   },
   "preceding_full_receiver": "ccdf6436 failed at WNS -0.956ns, 223 setup failures, all 4400 slices occupied. Worst path was input-checker position feedback; 100MHz and other 200MHz failures remain separate obligations. See starlink-phase-input-contract-20260909.json.",
   "radio_accessed": false,
   "ppu_changed": false,
   "deployed": false,
   "next": [
-    "Observe the launched complete 15MS/s paired receiver to terminal; do not restart on a polling timeout or infer timing from structural tests.",
-    "Inspect the exact final checkpoint and qualify all physical/board-I/O/CDC gates before accessing a radio.",
+    "Inspect the exact pre-placement optimized checkpoint to distinguish packing pressure from raw primitive capacity, and retain this terminal failed build without restarting it.",
+    "Qualify a measured resource/control-path improvement, then repeat a fresh full receiver build and all physical/board-I/O/CDC gates before accessing a radio.",
     "Then exact-serial .18 finite/persistent IIO and causal coarse/fine scheduling, PPU Ethernet .17 fixed-frequency independent live GLRT/PSS verification, eight-target 120ms/300s scanning and the 30/60MS/s rate ladder."
   ]
 }
