@@ -1,0 +1,90 @@
+{
+  "schema": "starlink-private-bridge-counter-summary-v1",
+  "scope": "Same-edge private PSMA error summary; all public counts, current-event fault vetoes, stop protocol, detector arithmetic, pilot data and receiver constraints retained.",
+  "hdl_base": "6090190c4442d2fd0e825136d87b692e2ad6deef",
+  "hdl_commit": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873",
+  "hdl_remote_branch": "codex/starlink-rx-only-do-not-merge",
+  "pushed": true,
+  "source": "hdl/library/axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v",
+  "source_sha256": "1a6efd511d7b8bcd7a023b4e55c5a61b4c3455ada764482e33f3a8ce8cbee1bb",
+  "reason": "The preceding final routed receiver fails at -0.716ns from bridge_read_error_count[28] through stop admission to map RAM control. The 96-bit historical bridge-counter OR is replaced by an exact same-edge one-bit summary, not a delayed observation or omitted fault cause.",
+  "invariants": [
+    "Both PSS stages, pilot DMA, arithmetic, coefficient and ABI contents are unchanged.",
+    "Every one of the five existing counter increment sites assigns the summary and unchanged saturating counter together.",
+    "Summary and all three counters clear only on their original common core reset; disabling/flushing acquisition does not clear bridge history.",
+    "All immediate fault-event veto terms remain byte-for-byte unchanged after comment/whitespace normalization; no added clock-cycle delay.",
+    "No clock, timing constraint, generated-core configuration, source rate or physical implementation policy change."
+  ],
+  "targeted_tests": {
+    "passed": 58,
+    "seconds": 3.34,
+    "files": ["tests/starlink_oracle/test_bridge_counter_summary.py", "tests/starlink_oracle/test_stop_health_integration.py", "tests/starlink_oracle/test_psma_boundary_stop.py"],
+    "new_directed_probe": {
+      "immutable_complete_controller_reference": "6090190c4442d2fd0e825136d87b692e2ad6deef",
+      "boundary_disabled_half_cycle_comparisons": 2269,
+      "boundary_enabled_half_cycle_comparisons": 2535,
+      "all_public_controller_outputs_compared": true,
+      "all_counter_increment_sites": 5,
+      "reset_sources": 2,
+      "seeded_near_saturation_counters": 3,
+      "deterministic_mixed_decoder_cycles": 1024,
+      "negative_mutations_rejected": 7,
+      "limit": "Decoded bus/controlled map handshake injection. Saturation counters are explicitly seeded in both models after a real event; no billions-of-events or native AXI claim."
+    },
+    "native_AXI_map_replay": "Frozen complete controller vs candidate public traces remain cycle-identical for all four health/map-summary combinations; actual AXI + real reduced map/core workload. Separate from decoder-injected supplemental cases.",
+    "ruff": "passed"
+  },
+  "integrated_regression": {
+    "passed": 887,
+    "skipped": 2,
+    "seconds": 181.17,
+    "exit_code": 0,
+    "log": "/tmp/starlink-stop-summary.n1AytQ/bridge-summary-oracle-v1.log",
+    "sha256": "9674847b25bda879f74b13ed4c34fdb355761ab4a70e83b75a9f8f2cdaea1e6d",
+    "scope": "tests/starlink_oracle plus realtime constraint, boundary build-option and routed-audit policy tests; explicit current guard and cursor actual-netlist fixtures supplied.",
+    "skip_reason": "Two older occupancy-netlist cases require an explicit different Vivado measurement. Current guard and cursor actual-netlist tests pass.",
+    "candidate_location": "/tmp/starlink-stop-summary.n1AytQ/hdl",
+    "association": "Controller bytes compared identical to pushed primary source. The isolated simulation-only lower-clock runner edit is not part of this firmware commit or full build."
+  },
+  "paired_actual_FFT": {
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T22:35:37Z",
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/bridge-summary-paired-v1",
+    "runner_log": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/bridge-summary-paired-v2.log",
+    "runner_log_sha256": "f7c3b8602e1d2c62034111776c6fd82c19af8cc234222c2eb20a281efcc54503",
+    "exact_scores": 894,
+    "exact_map_words": 447,
+    "exact_pilot_bytes": 2048,
+    "actual_invalid_release_fault_preserved": true,
+    "terminal_coordinates_and_pilot_bytes_retained": true,
+    "limit": "Actual digital shell/CDC/canonical/FFT/PSMA/PIL1 with reduced 447x2 map. Not ADC, DMA, IIO, fine timing, production geometry/duration, physical or RF evidence.",
+    "initial_attempt": "Rejected before output allocation because the isolated worktree lacked its test-oracle source link. Added a link to primary tests and reran with a new log; no detector/vector changes."
+  },
+  "packaging": {
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T22:37:07Z",
+    "log": "/tmp/starlink-stop-summary.n1AytQ/bridge-summary-package-v1.log",
+    "log_sha256": "fa0a755a816f40fac2ee3613793c31e3b47d507c3fcd6f731e80acc2fe88202e",
+    "component_sha256": "edb7738b79caa988f2d0100a6f1a4e6a6e11d0d57e58221eba623706cfb5e570"
+  },
+  "fresh_full_receiver": {
+    "status": "running",
+    "directory": "hdl/projects/pluto/shared-realtime-bridge-summary-v1",
+    "source_revision": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873",
+    "launch_utc_minute": "2026-09-09T22:37Z",
+    "exec_session": 12591,
+    "process_pid": 2127649,
+    "configuration": "15MS/s paired-pilot, shared realtime FFT, boundary stop, exact DSP fine tracker, pilot DMA, global synthesis, control threshold4, medium placement, unchanged original clocks/constraints, no checkpoint reuse",
+    "observation_rule": "Revalidate exact session/process or terminal artifacts; this running label alone is not proof of liveness.",
+    "deployment_eligible": false
+  },
+  "radios_accessed": false,
+  "ppu_changed_in_this_step": false,
+  "hardware_qualified": false,
+  "next": [
+    "Observe the exact full build to terminal completion and audit the final checkpoint, including remaining 100MHz scheduler and 200MHz service/vendor paths; no pass is inferred from functional tests.",
+    "Close static board-I/O/CDC/reset safety and actual native RX calibration gates before exact-serial .18 finite and persistent paired IIO qualification.",
+    "Complete causal coarse/CFO/fine scheduling, PPU Ethernet .17 deployment with rollback and independent live GLRT/PSS agreement.",
+    "Retain eight-target 120ms valid dwells over 300s and all 15/30/60MS/s hardware/scientific qualification requirements."
+  ]
+}

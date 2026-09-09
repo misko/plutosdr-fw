@@ -114,12 +114,29 @@ def test_map_fault_policy_rejects_missing_fault_checks(tmp_path, map_summary):
     assert "PSMA_STOP_PASS" not in result.stdout
 
 
-def test_runtime_change_is_only_the_explicit_summary_selection():
+def test_runtime_changes_are_only_the_explicit_and_atomic_summaries():
     def tokens(text):
         return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", text))
 
     baseline = tokens(frozen(CONTROL_PATH))
     candidate = tokens((HDL / CONTROL_PATH).read_text())
+    # The three private bridge counters share a reset and never wrap. The new
+    # summary is set atomically at each existing increment, not delayed from
+    # the counter value. All current-event veto terms must remain unchanged.
+    for fragment in ["regbridge_counter_fault;", "bridge_counter_fault<=1'b0;"]:
+        assert candidate.count(fragment) == 1
+        candidate = candidate.replace(fragment, "", 1)
+    for counter, count in [("bridge_read_error_count", 2),
+                           ("bridge_release_error_count", 2),
+                           ("snapshot_request_overrun_count", 1)]:
+        new = f"{{bridge_counter_fault,{counter}}}<={{1'b1,increment_saturating_32({counter})}};"
+        old = f"{counter}<=increment_saturating_32({counter});"
+        assert candidate.count(new) == count and baseline.count(old) == count
+        candidate = candidate.replace(new, old)
+    summary = "wirestop_bridge_fault_now=bridge_counter_fault||"
+    assert candidate.count(summary) == 1
+    candidate = candidate.replace(summary, "wirestop_bridge_fault_now=|bridge_read_error_count||"
+        "|bridge_release_error_count|||snapshot_request_overrun_count||", 1)
     parameter = "parameterintegerHEALTH_COUNTERS_FROM_FLAGS=0,"
     guard = (
         'if(HEALTH_COUNTERS_FROM_FLAGS!=0&&HEALTH_COUNTERS_FROM_FLAGS!=1)'

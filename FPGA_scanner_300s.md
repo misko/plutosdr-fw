@@ -363,6 +363,34 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Atomic private bridge-error summary — 2026-09-09
+
+HDL `18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873`, pushed only to the
+experimental do-not-merge branch, replaces the 96-bit historical bridge-error
+counter reduction with one exact sticky summary. Each of the five original
+error sites sets it on the same edge as its unchanged saturating counter.
+Current-event vetoes, public counts, reset semantics, both detectors, pilot
+output, coefficients, clocks and timing constraints remain unchanged.
+
+All **58 targeted tests** pass. The supplemental complete-controller shadow
+covers every increment site, idle/active/terminal observations, staged rejection,
+both resets and explicitly seeded saturation; all seven faulty variants are
+rejected. Its decoded-bus injection is not native AXI evidence. Separate real
+AXI/map traces remain cycle-identical to the frozen controller in all four
+health/map-summary configurations. The broader suite passes **887 tests** with
+two older-netlist cases explicitly skipped. Current guard/cursor netlists pass.
+The actual FFT + paired shell replay preserves 894 scores, 447 map words and
+2048 independent-oracle pilot bytes, including the real late invalid-release
+fault. That replay uses reduced map geometry and is not live IIO/RF proof.
+
+Acquisition IP packaging passed. A fresh complete receiver launched at
+**22:37 UTC** in `hdl/projects/pluto/shared-realtime-bridge-summary-v1`, with
+the original 100/200 MHz clocks and complete 15 MS/s paired profile. No prior
+checkpoint is reused. Revalidate session/process/terminal artifacts before
+treating this launch entry as current status. Full routed timing is still an
+open gate; no radio has been accessed. Detailed evidence and remaining scope:
+`reports/starlink-bridge-counter-summary-20260909.json`.
+
 ### PPU RX-interface matrix evidence — 2026-09-09
 
 PPU main `4bc2ca6a50dd8dd3c925522acfff5466385fbfd5` adds a hardware-free
@@ -418,8 +446,17 @@ fresh full build, keeping runtime RTL unchanged. All 291 policy/provenance/
 constraint/build-contract tests pass. The diagnostic checkpoint is not reused.
 The fresh complete receiver launched at 22:03 UTC in
 `hdl/projects/pluto/shared-realtime-input-cursor-medium-v1`; no final timing
-result is available at this checkpoint. Revalidate its recorded process before
-treating this historical launch entry as proof of liveness.
+result was available at launch. It finished at **22:22:29 UTC**, exit 1:
+all 34025 routable nets routed with no route errors, but final timing fails at
+**WNS -0.716 ns, TNS -167.843 ns, 724 setup endpoints**. Hold passes at
++0.011 ns. The saved final design uses 13103 LUT, 18548 FF, 4398/4400 slices,
+53.5 BRAM tiles and 54 DSP. The exact-checkpoint audit at 22:28:07 confirms
+the changed cursor now passes at +0.052 ns; the return slot passes at +0.214 ns.
+The worst path is now the private bridge error-counter reduction into map RAM
+control (100 MHz). The 200 MHz domain still fails at -0.494 ns; vendor internal,
+publication and mailbox fault paths also remain negative. Worst slack improved,
+but total slack and failing endpoint count worsened: this is not timing closure.
+The emitted bitstream and `bad_timing` XSA are not deployment candidates.
 The expanded read-only audit reproduces the older cursor's -0.956 ns path,
 inventorying nine registers and 18 D/CE pins. Its 21 admission/policy tests pass.
 No radio or PPU operation occurred. Evidence:
