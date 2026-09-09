@@ -197,6 +197,9 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 ### S2 — Paired fixed-frequency IIO capture on .18
 
 - [ ] Add the versioned single-RX IQ/metadata path and reusable PPU reader.
+- [x] Add explicitly selected, bounded raw PSS map/fine refill receipts with
+  error/negative retention and joined cleanup. This is a host API prerequisite,
+  not a paired recorder or live IIO qualification.
 - [ ] Build the concurrent finite paired recorder using independent bounded
   pilot/map/fine contexts under one serial-attested owner. Open/flush maps
   before pilot ARM; keep maps running while fine requests are submitted/read.
@@ -331,9 +334,49 @@ service contract is documented in
 `hdl/library/starlink_pss_acquisition/SHARED_REALTIME_CANDIDATE.md`; it proposes
 511 private mailbox writes plus a held final word with independent status/fault
 commit checks. Qualifying that candidate is the next architectural step, not
-another assumption that placement settings alone will fix the design. It is
-not implemented or qualified. All paired-live,
+another assumption that placement settings alone will fix the design. Its
+isolated input/private-result guards are now implemented and tested; the complete
+realtime service is not integrated or qualified. All paired-live,
 map-stop/drain, hopping, duty and 15/30/60 MS/s gates above remain open.
+
+### Bounded PSS readers and realtime dependencies — 2026-09-09
+
+PPU main `a0b4918a8e770d28ccf7eb4b289b836773f904aa` is pushed and verified.
+Explicit batch mode retains actual native map/fine refill bytes before decoding,
+including empty, short, malformed and negative observations. Admission caps
+4096 scans and one MiB, applies a finite timeout and excludes concurrent context
+operations. Completion requires exact decoded scan coverage. Interrupted final
+decisions/accounting retain evidence and poison the stream; uncertain failed-open
+cleanup quarantines the context and permits only joined teardown. Two independent
+reviews and 250 focused tests pass. A clean export of the exact pushed commit
+passes 1994 offline tests, Ruff and mypy; the 1999-pass working-tree run includes
+five unrelated dirty tests that were deliberately not committed. See
+`reports/starlink-pss-raw-batches-ppu-20260909.json`.
+
+HDL `239f096fec99b3173c362ecf58be1a1efdc6ef93` adds isolated guards only;
+the actual receiver remains the nonrealtime `d80fd154` runtime. The input guard
+checks each demanded delivery immediately. The result guard reuses the output
+mailbox for 511 private words and holds the last word until independent status
+and all explicitly certified premises pass. Synthetic real-mailbox tests cover
+late/missing status, malformed beats, exact commit-edge faults, reset and ACK
+ownership. External reservation and event-fence premises are not proven by
+supplying asserted flags in those tests. A registered admission token is required
+when composing the guards to avoid readiness/fault combinational feedback.
+
+The separate actual-XFFT delivery sweep passes 27 healthy jobs with 13824 exact
+complex words and observes all 10752 output words wrong across 21 deliberately
+starved jobs. Twelve vendor halt cycles arrive after the input phase, directly
+disproving an input-phase-only halt check. Twenty explicit reset recoveries pass.
+Observed two-clock event/status delays are not universal bounds. The combined
+firmware regression passes 538 tests. See
+`reports/starlink-realtime-guard-dependencies-20260909.json`.
+
+Next, test both guards with the actual core and both mailboxes, then integrate
+the real service and qualify exact scores/maps, current-source 120 ms capacity,
+whole-chip resources, all timing constraints and CDC. A standalone or synthetic
+guard pass does not authorize flashing. The separate paired recorder still needs
+the exact fine-schedule/source ledger, durable bounded recording, map-boundary
+stop/drain and independent GLRT on proven common observation support.
 
 ### Latest counter/retirement checkpoint — 2026-09-09
 

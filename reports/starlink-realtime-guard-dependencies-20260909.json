@@ -1,0 +1,458 @@
+{
+  "schema": "starlink-realtime-guard-dependencies-v1",
+  "date_utc": "2026-09-09",
+  "scope": "Isolated guard implementation and standalone generated-core delivery observer; no integrated realtime receiver qualification.",
+  "hdl_commit": "239f096fec99b3173c362ecf58be1a1efdc6ef93",
+  "production_receiver_runtime_commit": "d80fd15490ce82b7eda151be4594433ac9e738f5",
+  "receiver_runtime_changed": false,
+  "production_instantiation": false,
+  "hardware_accessed": false,
+  "deployment_eligible": false,
+  "standalone_actual_core": {
+    "directory": "hdl/library/starlink_pss_acquisition/build/realtime-delivery-sweep-v1",
+    "source_base_head_at_run": "31c450f2fa6fde7014430e204a59adcbda9926e4",
+    "diagnostic_bench_was_uncommitted_at_run": true,
+    "vivado": "2022.2",
+    "core": "xfft_v9_1_8",
+    "clock_period_ns": 5,
+    "generated_numeric_generics_checked": 32,
+    "healthy_jobs": 27,
+    "exact_complex_words": 13824,
+    "starved_jobs": 21,
+    "starved_output_words": 10752,
+    "starved_words_differing_from_frozen_fixture": 10752,
+    "explicit_reset_recoveries": 20,
+    "no_reset_direction_jobs": 3,
+    "gap_geometries": [
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        127,
+        1
+      ],
+      [
+        128,
+        2
+      ],
+      [
+        255,
+        1
+      ],
+      [
+        256,
+        8
+      ],
+      [
+        448,
+        64
+      ],
+      [
+        510,
+        1
+      ],
+      [
+        510,
+        2
+      ],
+      [
+        511,
+        1
+      ]
+    ],
+    "gap_geometry_columns": [
+      "first_omitted_demand_ordinal",
+      "omitted_demand_count"
+    ],
+    "directions": [
+      "forward",
+      "inverse"
+    ],
+    "healthy_halts": 0,
+    "starved_halts_by_phase": {
+      "input": 216,
+      "compute": 12
+    },
+    "observed_status_minus_first_output_clocks": [
+      2
+    ],
+    "observed_halt_minus_gap_clocks": [
+      2
+    ],
+    "universal_latency_bound_proven": false,
+    "numerical_scope": "All 18-bit I and Q components compared with frozen expected words; output index/TLAST/padding, status and exponent checked. Deliberately starved jobs are negative numerical observations, not passing transforms.",
+    "immediate_detector_scope": "Observer testbench flag only; this run does not instantiate either new guard.",
+    "hashes": {
+      "console": "264404d94d02db7d073303becf243660f1eb802cd8135e9139eba96a2aa8edd1",
+      "vivado_log": "581d0553f0d87fe8958f2b8d27b6b059e3aee3881ac5138dba3df3a16d7ef493",
+      "frozen_bench": "e2902b62138f24047e626eb1145d6a82da16d934f569e72549c7326519b907a9",
+      "frozen_runner": "d94ac68770f3316a0d0adc970fb941066d369c678259d414c469c9d43f3430ce",
+      "every_cycle_trace": "8cb9a50c691b7ea6c9fd4c34594e13b18288543d6d8bb72e43b352dba8ffedb5"
+    },
+    "starved_job_observations": [
+      {
+        "job": 6,
+        "fixture": 1,
+        "inverse": false,
+        "gap_start": 128,
+        "gap_length": 64,
+        "input_handshakes": 448,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 11668,
+        "first_vendor_halt_cycle": 11670
+      },
+      {
+        "job": 8,
+        "fixture": 0,
+        "inverse": false,
+        "gap_start": 1,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 15909,
+        "first_vendor_halt_cycle": 15911
+      },
+      {
+        "job": 10,
+        "fixture": 1,
+        "inverse": false,
+        "gap_start": 2,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 22334,
+        "first_vendor_halt_cycle": 22336
+      },
+      {
+        "job": 12,
+        "fixture": 2,
+        "inverse": false,
+        "gap_start": 127,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 28891,
+        "first_vendor_halt_cycle": 28893
+      },
+      {
+        "job": 14,
+        "fixture": 0,
+        "inverse": false,
+        "gap_start": 128,
+        "gap_length": 2,
+        "input_handshakes": 510,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 35332,
+        "first_vendor_halt_cycle": 35334
+      },
+      {
+        "job": 16,
+        "fixture": 1,
+        "inverse": false,
+        "gap_start": 255,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 41907,
+        "first_vendor_halt_cycle": 41909
+      },
+      {
+        "job": 18,
+        "fixture": 2,
+        "inverse": false,
+        "gap_start": 256,
+        "gap_length": 8,
+        "input_handshakes": 504,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 48364,
+        "first_vendor_halt_cycle": 48366
+      },
+      {
+        "job": 20,
+        "fixture": 0,
+        "inverse": false,
+        "gap_start": 448,
+        "gap_length": 64,
+        "input_handshakes": 448,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 55020,
+        "first_vendor_halt_cycle": 55022
+      },
+      {
+        "job": 22,
+        "fixture": 1,
+        "inverse": false,
+        "gap_start": 510,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 4,
+        "local_fault_cycle": 61554,
+        "first_vendor_halt_cycle": 61556
+      },
+      {
+        "job": 24,
+        "fixture": 2,
+        "inverse": false,
+        "gap_start": 510,
+        "gap_length": 2,
+        "input_handshakes": 510,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 4,
+        "local_fault_cycle": 68034,
+        "first_vendor_halt_cycle": 68036
+      },
+      {
+        "job": 26,
+        "fixture": 0,
+        "inverse": false,
+        "gap_start": 511,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 4,
+        "local_fault_cycle": 74523,
+        "first_vendor_halt_cycle": 74525
+      },
+      {
+        "job": 28,
+        "fixture": 0,
+        "inverse": true,
+        "gap_start": 1,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 80509,
+        "first_vendor_halt_cycle": 80511
+      },
+      {
+        "job": 30,
+        "fixture": 1,
+        "inverse": true,
+        "gap_start": 2,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 87014,
+        "first_vendor_halt_cycle": 87016
+      },
+      {
+        "job": 32,
+        "fixture": 2,
+        "inverse": true,
+        "gap_start": 127,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 93651,
+        "first_vendor_halt_cycle": 93653
+      },
+      {
+        "job": 34,
+        "fixture": 0,
+        "inverse": true,
+        "gap_start": 128,
+        "gap_length": 2,
+        "input_handshakes": 510,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 100172,
+        "first_vendor_halt_cycle": 100174
+      },
+      {
+        "job": 36,
+        "fixture": 1,
+        "inverse": true,
+        "gap_start": 255,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 106827,
+        "first_vendor_halt_cycle": 106829
+      },
+      {
+        "job": 38,
+        "fixture": 2,
+        "inverse": true,
+        "gap_start": 256,
+        "gap_length": 8,
+        "input_handshakes": 504,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 113364,
+        "first_vendor_halt_cycle": 113366
+      },
+      {
+        "job": 40,
+        "fixture": 0,
+        "inverse": true,
+        "gap_start": 448,
+        "gap_length": 64,
+        "input_handshakes": 448,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 3,
+        "local_fault_cycle": 120100,
+        "first_vendor_halt_cycle": 120102
+      },
+      {
+        "job": 42,
+        "fixture": 1,
+        "inverse": true,
+        "gap_start": 510,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 4,
+        "local_fault_cycle": 126714,
+        "first_vendor_halt_cycle": 126716
+      },
+      {
+        "job": 44,
+        "fixture": 2,
+        "inverse": true,
+        "gap_start": 510,
+        "gap_length": 2,
+        "input_handshakes": 510,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 4,
+        "local_fault_cycle": 133274,
+        "first_vendor_halt_cycle": 133276
+      },
+      {
+        "job": 46,
+        "fixture": 0,
+        "inverse": true,
+        "gap_start": 511,
+        "gap_length": 1,
+        "input_handshakes": 511,
+        "output_words": 512,
+        "value_mismatches": 512,
+        "metadata_mismatches": 0,
+        "first_halt_phase": 4,
+        "local_fault_cycle": 139843,
+        "first_vendor_halt_cycle": 139845
+      }
+    ]
+  },
+  "synthetic_input_guard": {
+    "test_cases": 2,
+    "identity_modes": [
+      0,
+      1
+    ],
+    "healthy_blocks": 9,
+    "rejected_jobs": 48,
+    "exact_certified_complex_words": 4608,
+    "rtl_sha256": "7f46eb92ae6fbe5142625216652b7c9f14b4d7f5e8eead6b244720842cf29d5c",
+    "bench_sha256": "321aad4e137224dc2d06332d8d48273a7600d7cdb494143fad5e607253d64826",
+    "test_sha256": "1e5e2a17a12d466ef0ee7dcc7af1b18eb0e005a8581a60d7abcfba6f62822228",
+    "scope": "Strict input ordinal/TLAST/optional latched descriptor, actual handshake certificates, immediate missing demand including withdrawn enable, legal first-word idle and source pauses while READY low, malformed stalled checker/transport split, sticky reset quarantine. No core or bank reservation proof.",
+    "required_composition": "Register admission token; do not connect result job_ready through input job_start/duplicate-start fault back to result readiness. Input guard admits one job per reset epoch."
+  },
+  "synthetic_result_guard": {
+    "test_cases": 3,
+    "slow_half_period_ns": [
+      5,
+      3.1,
+      6.7
+    ],
+    "slow_phase_ns": [
+      1.3,
+      0.7,
+      2.1
+    ],
+    "per_case": {
+      "healthy_blocks": 23,
+      "exact_transported_complex_words": 11776,
+      "rejected_jobs": 37,
+      "independent_reset_cases": 12,
+      "ack_only_job_reuses": 2
+    },
+    "private_mailbox_words": 511,
+    "held_return_slots": 1,
+    "additional_payload_ram_words": 0,
+    "maximum_tested_status_delay_after_final_word_clocks": 777,
+    "test_watchdog_clocks": 2048,
+    "default_watchdog_clocks": 8192,
+    "caller_event_fence_proven": false,
+    "caller_bank_reservations_proven": false,
+    "rtl_sha256": "a3637871ad72551987006b5d5c1e0de716f28a07e706c0decf036e072cd7f35c",
+    "bench_sha256": "32cbd2fe8767884b0c9f1979ed016cf3dafbafc3a39391e53ab15465c5f99f29",
+    "test_sha256": "ce84972d66ad8c8e1f96fcd861871c6deac48478e1cce40375a423ffe5092dda",
+    "standalone_log": "hdl/library/starlink_pss_acquisition/build/realtime-result-guard-v1-DNkIB0/simulation.log",
+    "standalone_log_sha256": "810272ae0360a56c411f740dfe670d91d843210ea688c424478d0f5baf6c0bef",
+    "scope": "Actual dual-clock mailbox with synthetic core outputs; exact payload/metadata transfer and same-cycle publication veto. No FFT arithmetic, source delivery, service capacity or physical CDC proof."
+  },
+  "regression": {
+    "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py tests/test_starlink_pss_multirate_build_contract.py tests/test_starlink_pilot_iio_contract.py tests/test_starlink_paired_packing_policy.py tests/test_starlink_physical_trial_policy.py tests/test_starlink_realtime_probe_policy.py tests/test_starlink_retirement_audit_policy.py tests/test_starlink_pilot_clear_audit_policy.py",
+    "passed": 538,
+    "elapsed_seconds": 65.35,
+    "log": "/tmp/starlink-realtime-guards-regression-v1.log",
+    "log_sha256": "d72d3c00b4aa23f4d7c9664cc11b047583ec150cea841010057a306e6dbde210"
+  },
+  "pending": [
+    "Joint actual-core guard/mailbox replay with aligned admission/certificates",
+    "Integrated realtime service and event policy",
+    "Exact scores/maps plus current-source >=120ms capacity",
+    "Whole-chip packing, 100/200MHz setup/hold, vendor internal timing and CDC",
+    "Serial-attested .18 canary before .17 network deployment",
+    "Fixed-frequency >=1s paired live proof, map-boundary stop/drain, eight-channel 120ms/300s and 15/30/60MS/s qualification"
+  ]
+}

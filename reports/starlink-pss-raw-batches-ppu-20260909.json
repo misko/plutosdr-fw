@@ -1,0 +1,88 @@
+{
+  "schema": "starlink-pss-raw-batches-ppu-v1",
+  "date_utc": "2026-09-09",
+  "repository": "git@github.com:misko/pluto-plus-utils.git",
+  "branch": "main",
+  "commit": "a0b4918a8e770d28ccf7eb4b289b836773f904aa",
+  "remote_verified": true,
+  "scope": "Additive bounded raw map/fine IIO batch API, not paired recorder or live capture.",
+  "files_sha256": {
+    "src/pluto_plus/hardware/pss_iio.py": "24deb45d94599361225036a96c3965c056e437481cf8c744adf8f80612c24f4a",
+    "tests/test_pss_iio_batches.py": "7dc1d507be24fd4717de8ff8af9f440c9fcdb21514d08a1bed1ed8ed1e1e21bd",
+    "docs/pss-iio-batches.md": "1468898655d79edfd4863a1c30eb8dedd522e4918981aae174531ebb85d20311"
+  },
+  "contract": {
+    "explicit_batch_mode": true,
+    "max_scans": 4096,
+    "max_bytes": 1048576,
+    "map_scan_bytes": 256,
+    "fine_scan_bytes": 128,
+    "initial_map_refill_chunks": 200,
+    "initial_map_refill_bytes": 51200,
+    "timeout_ms_range": [
+      1,
+      60000
+    ],
+    "raw_retained_before_decode": true,
+    "raw_none_distinct_from_empty": true,
+    "exact_scan_coverage_required": true,
+    "negative_observations_retained": true,
+    "incomplete_decode_never_complete": true,
+    "finite_fine_schedule_requires_whole_native_refills": true,
+    "pylibiio_missing_native_return_count_is_null": true
+  },
+  "fixes": [
+    "Resolve mutable buffer/stream only inside exclusive admission; recheck closed/open state",
+    "Prepare stream identity before allocation and protect registration/failed-open owned cleanup",
+    "Retain raw/decoded diagnostics through decode/finalization/completeness and half-ledger interrupts",
+    "Poison failed streams; no resumable partially advanced accounting",
+    "Quarantine context after uncertain failed-open disable/destruction; allow joined final teardown without retrying uncertain native pointer"
+  ],
+  "tests": {
+    "focused": {
+      "passed": 250,
+      "new_batch_tests": 119,
+      "independent_reviewers": 2,
+      "root_replay_seconds": 0.51
+    },
+    "working_tree": {
+      "passed": 1999,
+      "skipped": 1,
+      "deselected": 10,
+      "seconds": 23.56,
+      "source": "agent terminal output only; no file log",
+      "includes_five_unrelated_dirty_tests": true
+    },
+    "exact_pushed_commit_export": {
+      "directory": "/tmp/ppu-main-a0b4918-test.nmNWZh",
+      "method": "git archive a0b4918 with PYTHONPATH set to that export's src",
+      "passed": 1994,
+      "skipped": 1,
+      "deselected": 10,
+      "warnings": 1,
+      "pytest_seconds": 26.45,
+      "ruff": "pass src tests",
+      "mypy": "pass 76 source files",
+      "log": "/tmp/ppu-main-a0b4918-test.nmNWZh/verification.log",
+      "log_sha256": "96ca7e0470c997daa5aa80bed494a04973a3ed73b38c1e71f14447fef1f695b0",
+      "pytest_selection": "not hardware and not firmware and not browser"
+    }
+  },
+  "unrelated_changes_preserved": [
+    "README.md",
+    "src/pluto_plus/bootstrap_firmware.py",
+    "src/pluto_plus/doctor.py",
+    "tests/test_bootstrap_firmware.py"
+  ],
+  "hardware_accessed": false,
+  "live_transport_proven": false,
+  "paired_recorder_implemented": false,
+  "map_boundary_stop_implemented": false,
+  "limits": [
+    "Per-call raw memory bound is not a bound on caller queues/history or native third-party allocations",
+    "Before/after attributes are not atomic terminal health or source coverage",
+    "Reader does not own serial/boot/visit attestation, durable persistence or RF restoration",
+    "Fine batch ID checks do not yet verify exact Q32 schedule center ledger",
+    "No GLRT seeding, detection filtering, timing lock, or 300s/30/60MS/s qualification"
+  ]
+}
