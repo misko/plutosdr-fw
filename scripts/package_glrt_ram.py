@@ -12,6 +12,7 @@ from dataclasses import dataclass
 import gzip
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import shutil
@@ -95,6 +96,9 @@ def stamp_rootfs(compressed: bytes, versions: str) -> bytes:
 
 def package(args):
     board, kernel = args.board.resolve(), args.kernel.resolve()
+    host_bin = ROOT / "buildroot/output/host/bin"
+    dtc, mkimage = host_bin / "dtc", host_bin / "mkimage"
+    environment = dict(os.environ, PATH=str(host_bin) + os.pathsep + os.environ.get("PATH", ""))
     if not re.fullmatch(r"[a-zA-Z0-9_.-]+", args.label):
         raise ValueError("firmware label must be a plain filename-safe identifier")
     if (board / "build_exit_code.txt").read_text().strip() != "0":
@@ -136,7 +140,7 @@ def package(args):
             line.startswith("CONFIG_ADI_STARLINK_PSS") for line in config):
         raise ValueError("kernel configuration is not GLRT-only")
     dtb = kernel / "arch/arm/boot/dts/zynq-pluto-sdr-glrt.dtb"
-    dts = subprocess.check_output(["dtc", "-q", "-I", "dtb", "-O", "dts", str(dtb)], text=True)
+    dts = subprocess.check_output([str(dtc), "-q", "-I", "dtb", "-O", "dts", str(dtb)], text=True)
     if '"adi,starlink-glrt-1.00.a"' not in dts or "starlink-pss" in dts:
         raise ValueError("compiled device tree is not GLRT-only")
     source_commits.update(hdl=hdl, firmware=git(ROOT, "rev-parse", "HEAD"))
@@ -144,7 +148,8 @@ def package(args):
         f"{name} {source_commits[name]}\n" for name in ("hdl", "linux", "buildroot", "u-boot-xlnx"))
     rootfs = args.rootfs.resolve()
     inputs = [bit, xsa, rootfs, dtb, kernel / "arch/arm/boot/zImage", kernel / ".config",
-              ROOT / "scripts/pluto-glrt.its", Path(__file__), audit_root / "audit.tsv", audit_root / "bus_skew.rpt"]
+              ROOT / "scripts/pluto-glrt.its", Path(__file__), mkimage, dtc,
+              audit_root / "audit.tsv", audit_root / "bus_skew.rpt"]
     hashes = {str(path): digest(path) for path in inputs}
     stamped = stamp_rootfs(rootfs.read_bytes(), versions)
     args.output.mkdir(parents=True, exist_ok=False)
@@ -157,11 +162,10 @@ def package(args):
     shutil.copy2(ROOT / "scripts/pluto-glrt.its", scripts / "pluto-glrt.its")
     (build / "rootfs.cpio.gz").write_bytes(stamped)
     (args.output / "VERSIONS").write_text(versions)
-    mkimage = ROOT / "buildroot/output/host/bin/mkimage"
     fit = args.output / "pluto.itb"
     commands = [[str(mkimage), "-f", str(scripts / "pluto-glrt.its"), str(fit)]]
     with (args.output / "package.log").open("x") as log:
-        subprocess.run(commands[0], check=True, stdout=log, stderr=subprocess.STDOUT)
+        subprocess.run(commands[0], check=True, stdout=log, stderr=subprocess.STDOUT, env=environment)
         dfu = args.output / "pluto.dfu"
         shutil.copy2(fit, dfu)
         commands.append(["dfu-suffix", "-a", str(dfu), "-v", "0x0456", "-p", "0xb673"])
