@@ -84,6 +84,8 @@ def run(simulator, rows, tmp_path):
             reads.append(tuple(int(w, 16) for w in words[1:]))
         elif words[0] == "FINAL":
             final = tuple(map(int, words[1:]))
+        elif words[0] == "FAULT_EDGE":
+            continue  # Optional directed fault/ingress coincidence evidence.
         elif "$finish called at" not in line:
             pytest.fail(line)
     assert final is not None
@@ -239,6 +241,27 @@ def test_invalid_active_control_preserves_axis_promise(fault, captures, tmp_path
 def arm_continuous(limit=0):
     return [(1, 11, 0, 3, 0), wait(2000), write(8, 4), wait(2000),
             write(0x20, 87), write(0x30, limit), write(0x44, 2), write(8, 1)]
+
+
+@pytest.mark.parametrize('rate', [2_500_000, 60_000_000])
+def test_illegal_write_at_every_ingress_phase_preserves_exact_exported_prefix(rate, captures, tmp_path):
+    coincidences = 0
+    for phase in range(40):
+        directory = tmp_path / str(phase)
+        directory.mkdir()
+        output, reads, final = run(captures(rate, True),
+            [*arm_continuous(), wait(6000+phase), write(0x20, 23), wait(1000), *snapshot()], directory)
+        trace = (directory / 'rtl_trace.txt').read_text().splitlines()
+        fault_edges = [tuple(map(int, line.split()[1:])) for line in trace if line.startswith('FAULT_EDGE ')]
+        assert len(fault_edges) == 1 and fault_edges[0][2] == 0
+        ingress, accepted, _ = fault_edges[0]
+        assert accepted == ingress
+        coincidences += accepted
+        assert len(output) > 0 and all(word == (700, -200) for word in output)
+        regs = dict(reads)
+        assert u64(regs, 0x90) == u64(regs, 0x98) == len(output)
+        assert regs[0xc8] == 16 and final == (0, 1)
+    assert coincidences > 0, 'phase sweep never tested simultaneous ingress and invalid command'
 
 
 @pytest.mark.parametrize('rate', RATES)
