@@ -1,6 +1,6 @@
 {
   "schema": "starlink.paired_receiver.control_isolation_checkpoint.v1",
-  "date_utc": "2026-09-09T04:23:00Z",
+  "date_utc": "2026-09-09T04:29:00Z",
   "goal_status": "active",
   "scope": "Control timing isolation and finite paired IIO health prerequisites; full receiver and live paired gates remain required.",
   "hardware_accessed": false,
@@ -94,11 +94,28 @@
       "mypy": "pass",
       "actual_linux_c_golden_decode": "pass",
       "unrelated_dirty_files_preserved": 4
+    },
+    "pilot120ms": {
+      "report": "reports/starlink-pilot-control-isolation-dwell-rtl-20260909.json",
+      "supported_samples": 300000,
+      "ci16_bytes": 1200000,
+      "all_iq_exact": true,
+      "iq_sha256": "d653ccfb1f3fb48d10c5c859b316074dc2b7e3229681294b611301043dda97a1",
+      "first_newest_canonical": 540,
+      "last_newest_canonical": 1800534,
+      "delay_canonical": 269,
+      "capture_faults": 0,
+      "ddc_faults": 0,
+      "clips": 0,
+      "ddc_accepted": 1800544,
+      "ddc_emitted": 300090,
+      "unsupported": 90,
+      "scope": "Actual DDC/AXI/AXIS and offline PPU parser; synthetic kernel header, no DMA/IIO/RF."
     }
   },
   "full_receiver": {
     "build": "control-isolation-v1",
-    "state_at_checkpoint": "synthesis running",
+    "state_at_checkpoint": "terminal full-flow medium placement failure",
     "clock_mhz": {
       "slow": 100,
       "fft": 200
@@ -107,11 +124,33 @@
     "retained_coarse_fine_pilot_dma": true,
     "constraints_relaxed": false,
     "last_completed_route_report": "reports/starlink-paired-return-stage-medium-route-20260909.json",
-    "last_completed_route_qualified": false
+    "last_completed_route_qualified": false,
+    "synthesis": {
+      "lut": 13416,
+      "ff": 19037,
+      "bram_tiles": 49,
+      "dsp": 48
+    },
+    "placement": {
+      "finished_utc": "2026-09-09T04:25:43Z",
+      "result": "fail",
+      "remaining_slices_available": 2383,
+      "remaining_slices_required": 2387,
+      "shortfall": 4,
+      "control_sets": 449,
+      "combined_lut": 13660,
+      "total_lut": 16494,
+      "ff": 19074
+    },
+    "alternate_trial": {
+      "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1",
+      "state_at_checkpoint": "running",
+      "rtl_and_timing_constraints_changed": false,
+      "qualification": false
+    }
   },
   "pending_at_checkpoint": [
-    "Fresh full receiver synthesis/placement/route; separate internal FFT and board-I/O/CDC gates.",
-    "Current complete120ms pilot RTL replay report, source pinned.",
+    "Fresh-source bounded high-spread alternate placement/route; current medium full flow failed by4 slices. Separate internal FFT and board-I/O/CDC gates remain.",
     "Prior-source728d 4096block simulation, confirmed live; not new-source qualification.",
     "Common-source paired capture orchestration and persistent300second recording.",
     "Serial-attested .18 qualification before PPU Ethernet deployment to .17.",
@@ -137,6 +176,11 @@
     "tests/starlink_oracle/map_health_mapping_harness.sv": "cbef4c023f365a56d78669bf64d051abfe4ecee4c1f496087d43d3cfb7f9a7c8",
     "tests/starlink_oracle/test_map_health_receipt.py": "bfb7af184f1aa857459f198a21eac487dce64e5bc4e509439504b64cbbb5df79",
     "tests/starlink_oracle/test_pilot_output_stage.py": "789b422c7c7db36cf00dfed369e3e81a180934d6945e3fbe91958b730bc742da",
-    "tests/test_starlink_paired_packing_policy.py": "668b107765a4b176beef012e77f17df76bf99fae48f2ba85f4557f5b26ff301e"
+    "tests/test_starlink_paired_packing_policy.py": "668b107765a4b176beef012e77f17df76bf99fae48f2ba85f4557f5b26ff301e",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/pluto_vivado.log": "33b1933c556e3f30c421b46d71796d578b62c901b41544071647923c32fbd62c",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/pluto.runs/impl_1/runme.log": "bb07977f1cc18841f6f156cc399cb9a81db1b65272e67187a406a9a9178fc082",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/pluto.runs/impl_1/system_top_opt.dcp": "a92917daaaeb1f37bf1420bae45f23455e11f94f9c58c9704dd8b5d39fbc7c1a",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/pluto.runs/synth_1/system_top_utilization_synth.rpt": "bf8fb34a9aa27d6ff40f34d6c730dad0cefabef04678d261c3b440746fa13370",
+    "reports/starlink-pilot-control-isolation-dwell-rtl-20260909.json": "3d6fb91f7a35bfce5e5997379949e590593ae1613440c798a8ddf68d270a0364"
   }
 }

@@ -298,16 +298,30 @@ unchanged). Offline tests: 1745 passed, one skip and ten deselections; 284 focus
 tests, Ruff and mypy pass. Direct decoding of the actual Linux C-harness golden
 also passes. Four unrelated PPU edits remain untouched.
 
-The fresh full `control-isolation-v1` receiver build and 120 ms pilot replay are
-running at this checkpoint. Medium spread is explicitly selected only for the
-15 MS/s shared paired receiver, based on the completed fit experiment below;
-clocks, timing exceptions and detectors are unchanged. There is no current-source
-timing verdict or deployment qualification. A previous vendor-internal FFT
+The full `control-isolation-v1` receiver synthesizes to 13416 LUTs, 19037 FFs,
+49 BRAM tiles and 48 DSPs. Medium-spread placement fails by four slices (2383
+remaining available versus 2387 required), with 449 control sets. A bounded
+high-spread trial of the same saved opt DCP is running; clocks, timing exceptions
+and detectors are unchanged. The current 120 ms pilot replay passes all 300000
+supported outputs with exact IQ hash
+`d653ccfb1f3fb48d10c5c859b316074dc2b7e3229681294b611301043dda97a1`,
+zero capture/DDC faults and zero clips. This exercises RTL AXI/DDC/AXIS and the
+current offline PPU parser, not actual Linux DMA/IIO or RF. There is still no
+current-source routed timing verdict or deployment qualification. A previous vendor-internal FFT
 control path also failed timing, so wrapper changes alone cannot prove closure.
 No radio was accessed. Fixed-frequency paired orchestration, complete common
 source support, live lock/GLRT comparison, hops and the rate ladder remain open.
 Source pins and completed artifact hashes are recorded in
 `reports/starlink-paired-control-isolation-20260909.json`.
+
+A separate source-pinned FFT diagnostic applied the actual 5 ns clock during
+synthesis as well as implementation. It retains the frozen radix-4/BFP18
+architecture and produces exactly the same measured internal +0.168/+0.053 ns
+setup/hold slack, CE-cone delays and resource counts as the historical 10 ns
+synthesis / 5 ns implementation probe. This does not fix the integrated core
+path or justify changing production IP configuration. Its 50 unqualified OOC
+boundary hold warnings remain excluded from the explicitly internal-only gate;
+see `reports/starlink-shared-fft-actual-synthesis-clock-20260909.json`.
 
 ### Return-stage implementation checkpoint — 2026-09-09
 

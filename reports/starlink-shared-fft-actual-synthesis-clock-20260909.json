@@ -1,0 +1,66 @@
+{
+  "schema": "starlink.shared_fft.actual_synthesis_clock_probe.v1",
+  "date_utc": "2026-09-09",
+  "scope": "Standalone unchanged radix4 burst/BFP18 FFT only; not integrated receiver, boundary IO, CDC, scheduler, DMA/IIO or RF.",
+  "source": {
+    "hdl_commit": "a05f27ad",
+    "rtl_full_build_remains": "2e3280ce63a750b5843d1803e8679537a5bac80a",
+    "script": "hdl/library/starlink_pss_acquisition/measure_shared_xfft_clock.tcl",
+    "mode": "actual-synth",
+    "default_behavior_changed": false,
+    "production_xci_changed": false
+  },
+  "result": {
+    "terminal": "pass_internal_only",
+    "synthesis_clock_ns": 5,
+    "implementation_clock_ns": 5,
+    "setup_wns_ns": 0.168,
+    "hold_whs_ns": 0.053,
+    "synthesis_lut": 1367,
+    "synthesis_ff": 3121,
+    "routed_lut": 1283,
+    "routed_ff": 3119,
+    "routed_slices": 736,
+    "dsp": 17,
+    "ramb18": 11,
+    "ramb36": 0,
+    "ce_prediction_data_path_ns": 4.724,
+    "ce_prediction_logic_ns": 1.076,
+    "ce_prediction_route_ns": 3.648,
+    "ce_distribution_slack_ns": 0.493,
+    "ce_distribution_fanout": 3180,
+    "clock_override_warnings": 0,
+    "unqualified_boundary_hold_warnings": 50,
+    "hardware_qualified": false,
+    "hardware_accessed": false,
+    "numerical_post_synthesis_replay_performed": false
+  },
+  "comparison": {
+    "baseline": "hdl/library/starlink_pss_acquisition/build/shared-fft-200-clock-v3",
+    "baseline_synthesis_clock_ns": 10,
+    "baseline_implementation_clock_ns": 5,
+    "setup_hold_resources_and_measured_ce_delays": "unchanged",
+    "generated_wrapper_sha256": "77ee055d41d2cb535438d7308337aeb9acb492717970cd22cfebc4ccd734ccac",
+    "interpretation": "This probe provides no measured benefit from the tighter synthesis target and does not justify changing production XCI/OOC policy."
+  },
+  "evidence_preservation": {
+    "v1": "Retained first attempt; same timing but rejected for redundant clock override warnings. Clean v2 removes that diagnostic-mode-only duplicate clock command. No methodology waivers broadened.",
+    "v2": "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2"
+  },
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/summary.txt": "ed109372bf957aa7fc74f16663c28b0568ebcbc7e0333bd7f4b9a754f40bbeb3",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/synthesis_clocks.rpt": "13dfa0b8a28412324265e59856422cb1ff6f8a42cee57d5ca26655e0ecd2acb3",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/clocks.rpt": "f297a092082eae34f5e6bc20236a6c528a331105a477fa16d9b4bd8265b166fa",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/synthesis_utilization.rpt": "534d29e2baaa57979e8fb7e690a1e453e265bc0a538f51d8677c0f3d4efc60cc",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/utilization.rpt": "9bf17aee5904a2746a8a3d5ce9d44c227cab20a9db9315ec2ab1bcb1aba166a7",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/ce_prediction_fanin.rpt": "c55972f481727607106b7a94abf5a3338b47dd35090055ba4ea045c9e2e37d0e",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/ce_distribution_fanout.rpt": "0a0f08d4d7f43578e1a831219a0dbb35b9f6b136ea17c66db964007c3a5f7240",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/check_timing.rpt": "1ab9c858e039f9ab8053e50853844b9d62e98b298d9eb2b2370e95a2fb2d91cc",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/methodology.rpt": "35f88850146a0ffb7938c72a1a967875c3220def65167c59357bc4b5891ece3e",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/fft_synth.dcp": "e5bb4f688bbf2363983f0f55257f8ccf6e681095419350eae41664d6563c684c",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/fft_routed.dcp": "199096af1af6ce012d1e10a54d32674697b11ff8279352cd810408185930ab1b",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/generated_ooc_original.xdc": "6e9fc6f38fe2ce7ca388b12daa56a5af6a4871dd2b943f444e17f5822da2d916",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/actual_synthesis_ooc.xdc": "c36b15f80361743382cc2e128963a88decf0e68302293d8f8ba99d01e8b65bff",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2/probe_source.tcl": "97b72d298b30b4940e6faf4e57622b1f7aca988f106f22b8edb6d61a8dd3b64d"
+  }
+}
