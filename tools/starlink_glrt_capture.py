@@ -146,6 +146,27 @@ def wait_for_prefill(iq, args, *, clock=time.monotonic, sleep=time.sleep):
         sleep(.01)
 
 
+def wait_for_final(iq, visit, *, timeout=3.0, clock=time.monotonic, sleep=time.sleep):
+    """Await this visit's kernel teardown on the separate attribute socket.
+
+    IIOD can acknowledge a nonexclusive buffer CLOSE before its worker disables
+    the kernel buffer. Until then the final attribute is absent or still holds
+    the previous visit. Neither is evidence for the capture just closed.
+    """
+    deadline = clock() + timeout
+    while True:
+        try:
+            wire = iq.read("capture_final_snapshot")
+            if Snapshot.decode(wire).words[20] == visit:
+                return wire
+        except OSError as error:
+            if error.errno != errno.ENODATA:
+                raise
+        if clock() >= deadline:
+            raise TimeoutError("kernel final snapshot did not arrive for the closed visit")
+        sleep(0.005)
+
+
 def collect(args, *, library=None, context_factory=Context):
     validate_request(args)
     args.output.mkdir(parents=True, exist_ok=False)
@@ -254,7 +275,7 @@ def collect(args, *, library=None, context_factory=Context):
                     failures.append(f"IQ disable: {error}")
             if context is not None:
                 try:
-                    final_text = context.device("starlink-glrt-iq").read("capture_final_snapshot")
+                    final_text = wait_for_final(context.device("starlink-glrt-iq"), args.visit)
                     (args.output / "final_snapshot.txt").write_text(final_text + "\n")
                     final = Snapshot.decode(final_text)
                     if extension_abi == "GLX1-1.0":

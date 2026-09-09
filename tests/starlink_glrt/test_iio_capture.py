@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections import deque
+import errno
 import json
 import struct
 import threading
@@ -9,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools.starlink_glrt_capture import collect, sha256, validate_request, wait_for_prefill
+from tools.starlink_glrt_capture import collect, sha256, validate_request, wait_for_prefill, wait_for_final
 from .test_abi import record
 
 
@@ -40,6 +41,33 @@ def event(sequence, visit=99):
     words = record(sequence=sequence)
     words[0] = visit
     return struct.pack("<16I", *words)
+
+
+@pytest.mark.parametrize("pending", [OSError(errno.ENODATA, "no final yet"), snapshot(initial=True)])
+def test_final_wait_requires_current_visit_after_asynchronous_network_close(pending):
+    answers = deque([pending, snapshot()])
+    def read(name):
+        assert name == "capture_final_snapshot"
+        value = answers.popleft()
+        if isinstance(value, Exception):
+            raise value
+        return value
+    assert wait_for_final(SimpleNamespace(read=read), 99, sleep=lambda _: None) == snapshot()
+    assert not answers
+
+
+def test_final_wait_is_bounded_and_does_not_hide_io_or_decode_errors():
+    clock = iter([0.0, 0.0, 3.0])
+    old = SimpleNamespace(read=lambda _: snapshot(initial=True))
+    with pytest.raises(TimeoutError, match="closed visit"):
+        wait_for_final(old, 99, clock=lambda: next(clock), sleep=lambda _: None)
+    def broken(_):
+        raise OSError(errno.EIO, "driver failed")
+    with pytest.raises(OSError) as error:
+        wait_for_final(SimpleNamespace(read=broken), 99)
+    assert error.value.errno == errno.EIO
+    with pytest.raises(ValueError):
+        wait_for_final(SimpleNamespace(read=lambda _: "malformed"), 99)
 
 
 class Scenario:
