@@ -200,6 +200,9 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 - [x] Add explicitly selected, bounded raw PSS map/fine refill receipts with
   error/negative retention and joined cleanup. This is a host API prerequisite,
   not a paired recorder or live IIO qualification.
+- [x] Add the pure exact Q32.32 finite fine-schedule ledger, raw-packet validation
+  and source-support joins. This does not submit a native schedule, establish
+  continuous coverage, or prove paired capture/lock.
 - [ ] Build the concurrent finite paired recorder using independent bounded
   pilot/map/fine contexts under one serial-attested owner. Open/flush maps
   before pilot ARM; keep maps running while fine requests are submitted/read.
@@ -388,8 +391,30 @@ resets, synchronized fault handling and an internally established cause-based
 final fence. Then qualify exact scores/maps, current-source 120 ms capacity,
 whole-chip resources, all timing constraints and CDC. None of the current guard
 passes authorize flashing. The separate paired recorder still needs
-the exact fine-schedule/source ledger, durable bounded recording, map-boundary
+native fine-schedule admission, durable bounded recording, map-boundary
 stop/drain and independent GLRT on proven common observation support.
+
+### Exact finite fine-schedule ledger — 2026-09-09
+
+PPU main `90eaecd74719539495399b5de00d37d4edb2c68c` is pushed and remotely
+verified. Its pure immutable ledger checks each retained fine batch against the
+kernel's exact Q32.32 carry sequence, finite request IDs, coefficient generation,
+native batch accounting and external observation identity. It re-decodes raw
+scans, retains negatives and malformed evidence, and refuses to advance the
+accepted prefix on a failed batch. Full fine-search capture and actual winning
+support remain distinct. No FPGA result selects or seeds the GLRT comparison.
+
+The 140 new tests and 337 combined contract tests pass. Independent review also
+compared 97373 centers from 3000 manifests against the kernel recurrence. A clean
+export of the exact pushed commit passes 2134 offline tests, Ruff and mypy; the
+2139-test working-tree run includes five unrelated dirty tests not published.
+See `reports/starlink-fine-schedule-ppu-20260909.json`.
+
+This is explicitly the qualified 15 MS/s shared processing geometry, not inferred
+30/60 MS/s support. Native current-index reads, schedule acceptance, durable
+transition ownership, concurrent paired capture and graceful map stop/drain are
+still required. Separation between validated fine anchors is not continuous
+sample coverage or measured timing lock. All live and full scanner gates remain.
 
 ### Latest counter/retirement checkpoint — 2026-09-09
 

@@ -1,0 +1,67 @@
+{
+  "schema": "starlink-fine-schedule-ppu-v1",
+  "date_utc": "2026-09-09",
+  "ppu_commit": "90eaecd74719539495399b5de00d37d4edb2c68c",
+  "ppu_branch": "main",
+  "remote_head_verified": true,
+  "hardware_accessed": false,
+  "firmware_runtime_changed": false,
+  "scope": "Pure finite fine-request evidence ledger and source-support joins; no native control, paired recorder, durable writer, or RF claim.",
+  "supported_profile": "PAIRED_15_SHARED_XFFT_512_447_V1",
+  "source_rate_sps": 15000000,
+  "contract": {
+    "center_at_n": "first_center + ((n * period_q32_32) >> 32)",
+    "initial_fraction": 0,
+    "request_at_n": "request_base + n",
+    "capture_support": "[center - 32, center + 98)",
+    "winner_support": "[winner, winner + 66)",
+    "post_last_center_overflow_rejected": true,
+    "maximum_batch_slots_traversed": 4096,
+    "maximum_raw_bytes_traversed": 524288,
+    "manifest_and_ledger_state": "Constant-size; no allocation proportional to finite schedule count",
+    "batch_failure": "Accepted prefix does not advance; successor is FAILED; all derived records remain INCOMPLETE and original receipt is retained",
+    "identity": "External observation manifest, native stream/batch sequence, exact request IDs/centers and coefficient generation must agree",
+    "raw_evidence": "Re-decode each retained scan; verify bytes/padding, supplied decoded diagnostics and separate before/after attribute evidence",
+    "negative_retention": "NO_TRIGGER and NOT_EVALUATED are retained; they do not select comparison intervals or seed GLRT",
+    "state_owner_requirement": "Durable owner must journal each transition and adopt the immutable successor; historical states cannot be revoked by this pure module",
+    "anchor_separation": "Last accepted center minus first, not count times period and not continuous input coverage"
+  },
+  "verification": {
+    "new_tests": 140,
+    "combined_fine_source_support_batch_tests": 337,
+    "independent_kernel_carry_comparison": {
+      "manifests": 3000,
+      "centers": 97373,
+      "includes_post_last_advance": true,
+      "result": "PASS"
+    },
+    "exact_committed_clean_export": {
+      "directory": "/tmp/ppu-main-90eaecd-test.yUM0Jk",
+      "pytest_selection": "not hardware and not firmware and not browser",
+      "passed": 2134,
+      "skipped": 1,
+      "deselected": 10,
+      "warnings": 1,
+      "seconds": 30.92,
+      "ruff": "PASS",
+      "mypy_source_files": 77,
+      "mypy": "PASS",
+      "log_sha256": "c4148da9982a6768dd26e57a37ebcf60bec3a83b14e3c82c55101f80ac9786f1"
+    },
+    "working_tree_passed": 2139,
+    "working_tree_count_caveat": "Includes five tests from four unrelated dirty files; these changes were not committed or pushed. Exact-main evidence is the 2134-test clean export."
+  },
+  "source_sha256": {
+    "src/pluto_plus/hardware/fine_schedule.py": "133064347a4b15dea6f730d890c0b9554d764966515d55aadacbc006eb616b00",
+    "tests/test_fine_schedule.py": "fc12cdf0fc4261cff95cbb8af32db39b9523ff6019332f52380b27d3d5677e8d",
+    "docs/fine-schedule.md": "15aa30c00de12cae037a8e0d73ad16a6e91ce79ae55c5ae62933544d8adf3e2e"
+  },
+  "remaining": [
+    "Bounded native current-index/control API and schedule acceptance evidence",
+    "Durable bounded concurrent paired recorder under exact-serial ownership",
+    "Map-boundary stop ticket and published/enqueued/reassembled drain receipts",
+    "Coarse coverage and independent GLRT consumed-support joins on common input",
+    "Physical timing/CDC qualification and fixed-frequency >=1s paired live proof on .18 before .17",
+    "Eight targets, 120ms valid visits, 300s source timeline, >=95% duty and 15/30/60 MS/s qualification"
+  ]
+}
