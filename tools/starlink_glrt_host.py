@@ -73,6 +73,24 @@ def score_support(epoch: int, count: int, start: int) -> list[list[int]]:
     return result
 
 
+def frame_scores(methods, values, candidate, edge, start, minimum_exact, minimum_margin):
+    """Score each complete frame using only this host's acquired epoch/CFO.
+
+    A multi-frame crossing does not establish that every constituent frame
+    contains a pilot. Separate 704-sample scores make that distinction explicit.
+    """
+    result = []
+    for left, right in score_support(candidate.refined_epoch_sample, len(values), start):
+        frame_start = left-start-22
+        score = methods.conditioned_glrt64_score(
+            values[frame_start:right-start], OUTPUT_RATE, epoch_sample=0,
+            acquired_cfo_hz=candidate.absolute_cfo_hz, edge=edge, glrt_size=512)
+        result.append({"support_output_samples": [left, right], "glrt64": asdict(score),
+                       "engineering_positive": score.exact_score >= minimum_exact and score.margin >= minimum_margin,
+                       "within_cfo_comparison_band": abs(score.tracking_cfo_hz) <= 100_000})
+    return result
+
+
 def analyze(args) -> dict:
     root, iq_path = args.leo_source.resolve(), args.iq.resolve()
     identity = reference_identity(root)
@@ -114,9 +132,11 @@ def analyze(args) -> dict:
         "gate_status": "explicit engineering gates; not calibrated Starlink truth",
         "epoch_refinement": "integer only; 0.4 us sample grid",
         "fpga_seed_inputs": [], "score_normalization": "sum across frames of (sum of absolute symbol correlations)^2",
+        "per_frame_evidence": "each complete 704-sample support is also scored alone at independently host-acquired epoch/CFO",
         "limitations": ["at least two frames needed for blind acquisition",
                        "eight retained acquisition basins can miss other hypotheses",
                        "multi-frame host score differs from native single-frame FPGA score",
+                       "multi-frame crossings do not label each constituent frame positive; frame scores use the same uncalibrated engineering gates",
                        "acquisition CFO search limited to +/-100 kHz; subsequent periodic GLRT residual can place tracking CFO outside that band",
                        "overlapping windows are not independent trials",
                        "no analog clipping or transport integrity inferred from IQ alone"],
@@ -150,6 +170,8 @@ def analyze(args) -> dict:
                         values, OUTPUT_RATE, epoch_sample=candidate.refined_epoch_sample,
                         acquired_cfo_hz=candidate.absolute_cfo_hz, edge=args.edge, glrt_size=512)
                     scored.append({"acquisition": asdict(candidate), "glrt64": asdict(score),
+                                   "frame_glrt64": frame_scores(methods, values, candidate, args.edge, start,
+                                                                args.minimum_exact, args.minimum_margin),
                                    "score_support_output_samples": score_support(
                                        candidate.refined_epoch_sample, len(values), start),
                                    "within_cfo_comparison_band": -100_000 <= score.tracking_cfo_hz <= 100_000,

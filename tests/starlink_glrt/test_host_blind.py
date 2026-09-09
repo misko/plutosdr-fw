@@ -58,6 +58,31 @@ def test_blind_host_recovers_timing_and_cfo_without_fpga_inputs(edge, cfo, epoch
     assert abs(circular_error) <= 1
     assert abs(winner["glrt64"]["tracking_cfo_hz"] - cfo) <= 1000
     assert all(0 <= left < right <= count for left, right in winner["score_support_output_samples"])
+    assert [row["support_output_samples"] for row in winner["frame_glrt64"]] == winner["score_support_output_samples"]
+    assert all(row["engineering_positive"] for row in winner["frame_glrt64"])
+
+
+def test_multiframe_detection_does_not_label_intervening_noise_frames_positive(tmp_path):
+    rate, count, epoch = 2_500_000, 20_000, 391
+    rng = np.random.default_rng(390128)
+    values = 80 * (rng.normal(size=count) + 1j*rng.normal(size=count))
+    pilot = frame(rate, "upper")
+    for number in (0, 2, 4):
+        start = epoch+round(number*rate/750)
+        stop = min(count, start+len(pilot))
+        values[start:stop] += 4000*pilot[:stop-start]
+    values *= np.exp(2j*np.pi*42_000*np.arange(count)/rate)
+    iq, output = tmp_path/"iq.ci16", tmp_path/"analysis"
+    np.rint(np.column_stack((values.real, values.imag))).astype("<i2").tofile(iq)
+    result = invoke(iq, output)
+    assert result.returncode == 0, result.stdout+result.stderr
+    rows = json.loads((output/"blind-windows.jsonl").read_text().splitlines()[0])
+    candidate = min(rows["candidates"], key=lambda c: abs(c["acquisition"]["refined_epoch_sample"]-epoch))
+    assert candidate["engineering_positive"]
+    assert abs(candidate["acquisition"]["refined_epoch_sample"]-epoch) <= 1
+    frames = candidate["frame_glrt64"]
+    assert len(frames) == 6
+    assert [row["engineering_positive"] for row in frames] == [True, False, True, False, True, False]
 
 
 @pytest.mark.parametrize("kind", ["noise", "tone", "short"])

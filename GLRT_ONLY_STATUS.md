@@ -351,3 +351,72 @@ and counts in-band crossings separately. Eight host tests pass after adding the
 label. The original v1 saved analysis remains unchanged and records its source
 hashes. All holdout, same-observation FPGA comparison, transport headroom,
 physical interface and live RF qualification gates remain pending.
+
+## Five-rate board timing and saved RF, 2026-09-09
+
+Every requested rate now has a full-board placement/routing pass. These are
+internal timing results, with ADC input timing still dependent on measured
+radio/FPGA delay calibration. No radio has been opened or image deployed.
+
+| MS/s | HDL | Board artifact | Setup/hold ns | LUTs | Slices / 4400 | DSPs | BRAM tiles |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 2.5 | ff42d5ab | board-2500000-v4 | +0.065/+0.024 | 9706 | 3909 | 48 | 4.5 |
+| 5 | ff42d5ab | board-5000000-v3 | +0.091/+0.015 | 10589 | 4000 | 56 | 12 |
+| 10 | ff42d5ab | board-10000000-v2 | +0.184/+0.011 | 11387 | 4156 | 64 | 19.5 |
+| 25 | 72e94f19 | board-25000000-v1 | +0.005/+0.006 | 12933 | 4368 | 64 | 31 |
+| 60 | ff42d5ab | board-60000000-v5 | +0.067/+0.016 | 12960 | 4333 | 72 | 46.5 |
+
+All five implemented audits contain zero PSS cells, zero native-rate RX DMA
+cells, exactly one GLRT core and one GLRT IQ DMA, and no bus-skew violation.
+Margins are small, particularly at 25 MS/s. A fresh 25 MS/s build on ff42d5ab is
+running. Earlier failing routes remain retained and disqualified, including
+60 MS/s v4 at -0.286 ns and 5 MS/s v2 at -0.043 ns.
+
+The ff42d5ab command-path change prevents AXI illegal-command decoding from
+driving every internal FIR history write enable. A coincident input can enter
+the internal DDC on the fault edge; IQ admission is fenced on that edge and the
+core is flushed next cycle. **36** capture tests and **80** command/input phase
+cases across 2.5/60 MS/s pass. The compact-ROM receiver regression passes all
+**25** rate/control cases. XML evidence is under `artifacts/` with names
+`glrt-command-fence-capture-tests`, `glrt-illegal-command-phase-tests`, and
+`glrt-compact-rom-receiver-tests`, dated 20260909.
+
+Buildroot `35d87ae5b` builds the GLRT rootfs and FIT-capable host tools. Its
+inherited IIOD metadata/AIO dependencies are now explicitly selected in Kconfig;
+the earlier missing-dependency failure is preserved. Package
+`artifacts/ram-2500000-v2` contains a complete FIT and DFU with firmware label
+`glrt-ram-r2500000-v2`, HDL ff42d5ab, Linux f2a39d854e5e and Buildroot 35d87ae5b.
+Independent U-Boot extraction verifies all four embedded blobs byte-for-byte;
+GNU cpio verifies the 783-member rootfs, exact VERSIONS and absence of PSS paths.
+Device nodes were excluded from the second host extraction because the initial
+unprivileged extraction could not create them. Three packaging tests pass.
+The manifest remains `ready_for_deployment: false`: CDC/I/O review, calibrated
+receive interface, allocated owner window and real hardware qualification remain.
+
+Saved upper-edge record 31 is a previously examined development positive, not
+a holdout. Autonomous RTL replay at the default acquisition gate 15729/65536
+(.24) tests all 49825 windows but makes **zero proposals**. Its highest integer
+acquisition score is .22913945. All 50000 CI16 samples are exported exactly,
+SHA256 `3bf1603ceeba1b3a17888c4b9b87e215641879dc59ed71a81f15cd6650cbed25`.
+The unchanged default miss is preserved in `artifacts/saved-record031-rtl-v1`.
+
+Explicit experimental gate .20 yields seven completed GLRT scores, one positive
+at replay epoch 36593, exact/control .540207/.093262 and CFO -63032.67 Hz.
+It agrees with independent host acquisition within one 0.4 us sample and
+191 Hz. Gate .16 yields 350 proposals, 146 selections, 113 busy rejections,
+33 completed scores and zero positives; one selector remains pending at the
+finite tail. Both studies preserve all IQ and integer-exact native statistics.
+These are sensitivity/capacity observations, not calibrated detection rates.
+Artifacts `saved-record031-rtl-v2-gate20` and `saved-record031-rtl-v3-gate16`
+retain all proposals, selections, busy rejects, scores and source hashes.
+
+The host now also scores each complete 704-sample frame individually using
+only its own blind acquisition coordinates. A multi-frame crossing does not
+label every constituent frame positive. On record 31, only eight of the fourteen
+first-window frame supports cross the engineering gates; the other six remain
+negative. **Nine** host tests pass, including alternating pilot/noise frames.
+Original multi-frame analyses remain unchanged; new replay comparisons identify
+legacy aggregate support explicitly or use the separate frame scores when
+present. A broader all-upper-record development study is the next step; the
+default gates have not been changed. Hardware coordination MCP still fails at
+its local transport endpoint, so no bench ownership has been assumed.
