@@ -277,6 +277,52 @@ def test_transport_error_disqualifies_events_even_when_all_counters_match(tmp_pa
     assert result["event_records"] == 2 and not result["event_transport_attested"]
 
 
+@pytest.mark.parametrize("late_failure", ["malformed", "write", "refill"])
+def test_stop_preserves_unexpected_late_event_errors(tmp_path, monkeypatch, late_failure):
+    from tools.starlink_glrt_capture import EventReader
+
+    original_refill, original_stop = FakeBuffer.refill, EventReader.stop
+    original_init = EventReader.__init__
+    waiting = threading.Event()
+
+    def refill(buffer):
+        if buffer.role == "iq":
+            return original_refill(buffer)
+        with buffer.scenario.condition:
+            while not buffer.scenario.events and not buffer.scenario.cancelled:
+                if buffer.scenario.iq_closed:
+                    waiting.set()
+                buffer.scenario.condition.wait()
+            if buffer.scenario.cancelled:
+                if late_failure == "refill":
+                    raise OSError(errno.EIO, "late refill failure")
+                return b"bad" if late_failure == "malformed" else event(2)
+            return buffer.scenario.events.popleft()
+
+    def stop(reader):
+        assert waiting.wait(1), "reader must be in its pending final refill"
+        original_stop(reader)
+
+    def initialize(reader, buffer, stream, visit):
+        def write(raw):
+            if raw == event(2):
+                raise OSError(errno.ENOSPC, "late event file write failure")
+            return stream.write(raw)
+        original_init(reader, buffer, SimpleNamespace(write=write), visit)
+
+    monkeypatch.setattr(FakeBuffer, "refill", refill)
+    monkeypatch.setattr(EventReader, "stop", stop)
+    if late_failure == "write":
+        monkeypatch.setattr(EventReader, "__init__", initialize)
+    scenario, args = Scenario(), arguments(tmp_path)
+    summary = collect(args, library=scenario, context_factory=scenario.context)
+    assert summary["status"] == "failed" and summary["iq_prefix_attested"]
+    assert summary["event_records"] == 2 and not summary["event_transport_attested"]
+    assert any(reason.startswith("event attestation:") for reason in summary["failures"])
+    raw = (args.output/"events.raw").read_bytes()
+    assert raw == event(0, 98)+event(0)+event(1)+(b"bad" if late_failure == "malformed" else b"")
+
+
 @pytest.mark.parametrize("fault", [None, "closure_loss", "closure_identity", "closure_event_support"])
 def test_candidate_capture_requires_atomic_accounted_finite_closure(tmp_path, fault):
     scenario, args = Scenario(fault, extension=True), arguments(tmp_path)

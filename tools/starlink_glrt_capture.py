@@ -51,7 +51,15 @@ class EventReader:
     def run(self):
         try:
             while not self.stopping.is_set():
-                raw = self.buffer.refill()
+                try:
+                    raw = self.buffer.refill()
+                except OSError as error:
+                    # Only cancellation of the pending libiio read is expected.
+                    # A late malformed record, write failure, or unrelated I/O
+                    # error remains evidence even when stop raced its arrival.
+                    if self.stopping.is_set() and error.errno == errno.ECANCELED:
+                        break
+                    raise
                 self.stream.write(raw)  # Retain even malformed records as evidence.
                 event = Event.decode(raw)
                 with self.condition:
@@ -62,8 +70,7 @@ class EventReader:
                     self.condition.notify_all()
         except BaseException as error:
             with self.condition:
-                if not self.stopping.is_set():
-                    self.error = error
+                self.error = error
                 self.condition.notify_all()
 
     def start(self):
@@ -338,7 +345,7 @@ def collect(args, *, library=None, context_factory=Context):
         if final is None or baseline is None or reader is None:
             raise ValueError("complete baseline/final/event evidence is unavailable")
         if reader.error is not None:
-            raise reader.error
+            raise ValueError(f"event reader failed ({type(reader.error).__name__}): {reader.error}")
         final.require_events(reader.events, baseline=baseline)
         if extension_abi == "GLX1-1.0":
             if final_closure is None or baseline_closure is None:
