@@ -81,7 +81,7 @@ def main():
     save(args.output/"protocol.json", {"schema": "starlink-glrt-synthetic-trials/v1", "cases": specifications,
          "source_sha256": hashes, "fpga_gates_q16": [args.acquisition_q16, 19661, 9831],
          "host_gates": [.175, .025], "timing_tolerance_output_samples": 2, "cfo_tolerance_hz": 2000,
-         "randomness": "new fixed seeds; no outcomes examined when this protocol was written",
+         "randomness": "fixed reproducible seeds; whether these cases were previously examined must be established from study provenance",
          "noise_model": "white complex noise, variance proportional to native sample rate for constant spectral density",
          "weak_nominal_2p5m_sample_snr_db": -10.9691001301,
          "signal_model": "published upper-edge pilot; integer native epochs with deterministic output-grid fractional offsets",
@@ -135,9 +135,12 @@ def main():
     with ThreadPoolExecutor(max_workers=args.workers) as pool:
         results = list(pool.map(run, specifications))
     unchanged = all(digest(Path(p)) == h for p, h in hashes.items())
-    save(args.output/"summary.json", {"status": "complete" if unchanged and all(r["status"] == "complete" for r in results) else "disqualified",
+    summary = {"status": "complete" if unchanged and all(r["status"] == "complete" for r in results) else "disqualified",
          "source_unchanged": unchanged, "cases": results, "hardware_accessed": False,
-         "all_strong_and_control_criteria_pass": all(r.get("criterion") in ("pass", "reported_limit") for r in results)})
+         "all_strong_and_control_criteria_pass": all(r.get("criterion") in ("pass", "reported_limit") for r in results)}
+    save(args.output/"summary.json", summary)
+    if summary["status"] != "complete":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

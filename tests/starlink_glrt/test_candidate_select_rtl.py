@@ -42,7 +42,7 @@ endmodule
 '''
 
 
-@pytest.mark.parametrize("lookahead", [1, 5, 176])
+@pytest.mark.parametrize("lookahead", [1, 5, 176, 352])
 def test_bounded_selection_ties_deadline_and_flush(lookahead, tmp_path):
     rng = np.random.default_rng(617992)
     rows = []
