@@ -10,7 +10,7 @@ RUNNER = Path(__file__).resolve().parents[1] / "hdl/projects/pluto/explore_share
 FFT_RUNNER = RUNNER.parents[2] / "library/starlink_pss_acquisition/measure_shared_xfft_clock.tcl"
 
 
-@pytest.mark.parametrize("mode", ["spread-high", "spread-medium", "post-route"])
+@pytest.mark.parametrize("mode", ["spread-high", "spread-medium", "place-explore", "area-explore", "post-route"])
 def test_named_trial_requires_fresh_evidence_directory(tmp_path, mode):
     checkpoint = tmp_path / "saved.dcp"
     checkpoint.touch()
@@ -43,6 +43,45 @@ def test_missing_checkpoint_does_not_create_output(tmp_path):
     assert result.returncode != 0
     assert "missing input checkpoint" in result.stderr
     assert not output.exists()
+
+
+@pytest.mark.parametrize("mode,placement,optimization", [
+    ("spread-high", "AltSpreadLogic_high", ""),
+    ("spread-medium", "AltSpreadLogic_medium", ""),
+    ("place-explore", "Explore", ""),
+    ("area-explore", "AltSpreadLogic_high", "-directive ExploreArea"),
+])
+def test_bounded_alternatives_execute_only_the_named_mapping(tmp_path, mode, placement, optimization):
+    """Run real Tcl dispatch; mocked design commands are NOT physical evidence."""
+    checkpoint = tmp_path / "saved.dcp"
+    checkpoint.write_bytes(b"retained input")
+    output = tmp_path / "evidence"
+    script = "set argc 3\n"
+    script += f"set argv [list {{{checkpoint}}} {{{output}}} {{{mode}}}]\n"
+    script += r"""
+set optimizations {}
+set gates 0
+proc open_checkpoint {path} {}
+rename source real_source
+proc source {path} {
+    if {[file tail $path] eq "shared_xfft_impl_gate.tcl"} {incr ::gates; return}
+    uplevel 1 [list real_source $path]
+}
+proc opt_design {args} {lappend ::optimizations $args}
+proc write_checkpoint {path} {
+    if {$path ne "area_optimized.dcp"} {error "unexpected pre-placement checkpoint"}
+}
+proc place_design {args} {
+    error "BEFORE_PLACE placement=$args optimization=[join $::optimizations] gates=$::gates"
+}
+"""
+    script += f"if {{[catch {{source {{{RUNNER}}}}} message]}} {{puts stderr $message; exit 2}}\n"
+    result = subprocess.run(["tclsh"], input=script, capture_output=True, text=True, timeout=10)
+    assert result.returncode == 2
+    assert f"placement=-directive {placement} optimization={optimization} gates=" in result.stderr
+    assert f"gates={2 if optimization else 1}" in result.stderr
+    assert checkpoint.read_bytes() == b"retained input"
+    assert "timing_constraints_changed=false" in (output / "input.txt").read_text()
 
 
 @pytest.mark.parametrize("clock,mode,existing,error", [

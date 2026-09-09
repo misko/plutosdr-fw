@@ -21,3 +21,6 @@ def test_factored_output_gate_matches_original(tmp_path, identity):
                             capture_output=True, text=True, timeout=60)
     assert (f"XFFT_OUTPUT_GATE_EQUIVALENCE_PASS identity={identity} checked=524288 "
             in result.stdout)
+    assert (f"XFFT_INPUT_TRANSPORT_EQUIVALENCE_PASS identity={identity} checked=524288 "
+            in result.stdout)
+    assert "old_retirement_equal=1 validation_preserved=1" in result.stdout

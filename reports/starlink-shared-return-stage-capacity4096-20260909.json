@@ -1,0 +1,39 @@
+{
+  "schema": "starlink.shared_fft.prior_return_stage_capacity4096.v1",
+  "finished_utc": "2026-09-09T05:48:28Z",
+  "receiver_rtl": "728d2c873d882b148514c7a224c9193af289ab68",
+  "scope": "Terminal prior-source numerical-pipeline capacity simulation at canonical 15 MS/s; not current receiver, physical timing, DMA/IIO, or RF qualification.",
+  "terminal": true,
+  "hardware_accessed": false,
+  "deployed": false,
+  "hardware_qualified": false,
+  "command": "vivado -mode batch -source simulate_iq_to_score_shared.tcl -tclargs build/return-stage-capacity4096-v2 capacity 4096 nominal",
+  "output": "hdl/library/starlink_pss_acquisition/build/return-stage-capacity4096-v2",
+  "result": {
+    "passed": true,
+    "source_samples": 1830977,
+    "blocks": 4096,
+    "words_counted_per_transform_stage": 2097152,
+    "scores_counted_in_exact_source_index_order": 1830912,
+    "source_rate_hz": 15000000,
+    "source_duration_ms": 122.06513333333334,
+    "simulated_finish_ns": 122117195,
+    "score_fifo_max": 356,
+    "overlap_queue_max": 1,
+    "ring_retention_age_max": 589,
+    "transform_fifo_max": 2,
+    "energy_lookup_age_max": 885,
+    "score_age_max": 953,
+    "forward_stall_cycles_max": 0,
+    "source_burst_mode": 0,
+    "score_stall_mode": 0,
+    "explicit_backlog_bounds_pass": true,
+    "all_score_values_compared_to_oracle": false,
+    "limitation": "This long run verifies counts, source-index order, nonzero denominators, fault absence and backlog bounds. Independent shorter exact-vector replay supplies numerical-value evidence."
+  },
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/build/return-stage-capacity4096-v2-console.log": "79474018511372448a57bf17e2aee5a9d18c82f5e606bf52928a0c9a5880db76",
+    "hdl/library/starlink_pss_acquisition/build/return-stage-capacity4096-v2-vivado.log": "eb5d9d7bfcc38517ddcbf18cf389ea9365dc111d10269e194407725bbbac33a2",
+    "hdl/library/starlink_pss_acquisition/build/return-stage-capacity4096-v2/tb_starlink_pss_iq_to_score_xfft_longrun.sv": "230891eb89f6bbe337e0a1d0c8cb48bbcafea41a8c1cecc9e94f955fa173d29f"
+  }
+}

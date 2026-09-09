@@ -286,6 +286,55 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
+### Latest explicit transport / registered CLEAR checkpoint — 2026-09-09
+
+Receiver RTL `d80fd15490ce82b7eda151be4594433ac9e738f5` is tested and pushed
+only to the DNM branch. The adapter now exposes an explicit metadata-independent
+transport-ready output for mailbox retirement. The checker still accepts and
+faults malformed stalled input immediately; all output/completion fences remain.
+The actual synthesized netlist audit requires all nine position registers,
+18 address-control pins and the BRAM read enable: the old routed metadata
+dependency reached all 19 endpoints, whereas the new synthesis reaches none.
+This is a demonstrated structural cut, not proof of routed timing closure.
+
+Pilot CLEAR legality stays at its original inactive/empty check, but an accepted
+command executes from a registered token one clock later. Capture, DDC and
+snapshot state reset together before acknowledgment. Invalid CLEAR, STOP and
+active fault/admission timing are unchanged. Eleven new actual-AXI race tests
+and 74 prior pilot tests pass. The final combined firmware regression passes
+533 tests, including the new physical-diagnostic admission/inventory guards.
+The real checkpoint audit also confirms the pilot FIFO-count dependency changed
+from 64 of 128 FIR job-index CE/D pins to zero; the registered CLEAR source now
+reaches the 64 enable pins instead. All six FIFO registers and 128 destination
+pins are required by the audit, preventing missing endpoints from faking a pass.
+The fresh 120 ms pilot replay preserves all 300000 complex samples, exact source
+coordinates and the prior CI16 hash, with no capture/DDC/clipping faults. It
+executes AXI/DDC/AXIS RTL and the offline PPU parser, not Linux DMA/IIO or RF.
+
+Current real-XFFT service replay passes 82 jobs / 41984 exact words and unchanged
+29.74 us maximum pair latency. Exact numerical replay preserves 1341 scores and
+phase-map replay 447 reads, including partial-fault rejection. The bursty/stalled
+64-block capacity test passes ordered counts/backlog bounds; it does not compare
+every score value with an oracle. The older 728d 4096-block run is now terminal
+PASS (1830912 ordered scores / about 122 ms, bounded queues), but belongs to that
+older revision and also checks capacity/order rather than all numerical values.
+See `reports/starlink-shared-return-stage-capacity4096-20260909.json`.
+
+Fresh full synthesis uses 13413 LUTs, 19038 FFs, 49 BRAM tiles and 48 DSPs. High
+placement fails by 10 slices; the same opt checkpoint's medium trial fails by 12.
+Neither produces a current routed timing result. Two further bounded physical
+alternatives also fail: higher-effort placement is short by 6 slices, and area
+optimization plus high spread by 87. All four trials are terminal; no build is
+still running. RTL/clocks/constraints were retained. No hardware is qualified.
+See `reports/starlink-shared-transport-clear-20260909.json`. A future realtime
+service contract is documented in
+`hdl/library/starlink_pss_acquisition/SHARED_REALTIME_CANDIDATE.md`; it proposes
+511 private mailbox writes plus a held final word with independent status/fault
+commit checks. Qualifying that candidate is the next architectural step, not
+another assumption that placement settings alone will fix the design. It is
+not implemented or qualified. All paired-live,
+map-stop/drain, hopping, duty and 15/30/60 MS/s gates above remain open.
+
 ### Latest counter/retirement checkpoint — 2026-09-09
 
 PPU main `ffc41137f71c6156897148754c831c851b07bcf6` now exposes bounded

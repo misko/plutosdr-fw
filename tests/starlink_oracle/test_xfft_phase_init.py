@@ -25,3 +25,6 @@ def test_output_position_is_clear_before_next_input(tmp_path, identity, raw_posi
     assert (f"XFFT_PHASE_INIT_INVARIANT_PASS identity={identity} healthy_blocks=2 "
             "reset_between_blocks=0" in result.stdout)
     assert "XFFT_ADAPTER_PASS" in result.stdout
+    assert (f"XFFT_INPUT_TRANSPORT_STALLED_FAULT_PASS identity={identity} "
+            f"raw_position={raw_position} immediate_checker_fault=1 transport_held=1"
+            in result.stdout)

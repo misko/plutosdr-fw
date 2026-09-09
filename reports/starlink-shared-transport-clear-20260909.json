@@ -1,0 +1,254 @@
+{
+  "schema": "starlink.paired_receiver.transport_clear_checkpoint.v1",
+  "date_utc": "2026-09-09",
+  "scope": "Explicit FFT transport-ready and registered quiescent pilot CLEAR; functional and synthesized fan-in evidence, not paired hardware qualification.",
+  "source": {
+    "receiver_rtl": "d80fd15490ce82b7eda151be4594433ac9e738f5",
+    "transport_change": "6cb2f1f0",
+    "previous_receiver_rtl": "6b58ea9223402ef301be92c6c5930c9c0f0f8e4f",
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "xfft_throttle": "nonrealtime"
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "hardware_qualified": false,
+  "fpga_pss_lock": false,
+  "live_glrt_evidence": false,
+  "changes": [
+    "Explicit adapter input_transport_ready has no metadata comparator in its source expression. Only shared mailbox retirement uses it; existing checker, malformed-under-stall acceptance, fault quarantine and public completion gates are unchanged.",
+    "Accepted quiescent CLEAR has one registered execution token and acknowledges after the common capture/DDC/snapshot reset. Legality stays at the original edge; invalid CLEAR, STOP, active fault/admission semantics, IQ values and coordinates are unchanged.",
+    "Named high-spread placement selected from prior source measurements; this is not guaranteed to fit subsequent RTL. Full current high and medium placements both fail."
+  ],
+  "verification": {
+    "combined_regression": {
+      "passed": 512,
+      "seconds": 71.2,
+      "log": "/tmp/starlink-transport-clear-regression-v1.log",
+      "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py tests/test_starlink_pss_multirate_build_contract.py tests/test_starlink_pilot_iio_contract.py tests/test_starlink_paired_packing_policy.py tests/test_starlink_physical_trial_policy.py tests/test_starlink_realtime_probe_policy.py tests/test_starlink_retirement_audit_policy.py"
+    },
+    "transport_equivalence": {
+      "binary_vectors": 1048576,
+      "identity_modes": 2,
+      "healthy_retirement_equivalent": true,
+      "malformed_stalled_checker_acceptance_preserved": true
+    },
+    "actual_service": {
+      "jobs": 82,
+      "exact_complex_words": 41984,
+      "max_pair_slow_cycles": 2974,
+      "slow_clock_mhz": 100,
+      "fft_clock_mhz": 200,
+      "stalled_malformed_cases": 6,
+      "mailbox_ack_held": true,
+      "transport_ready_shadow_equivalent": true,
+      "final_drain_fault_cases": 6,
+      "drain_reset_cases": 2
+    },
+    "actual_numeric": {
+      "input_samples": 1406,
+      "blocks": 3,
+      "exact_words_per_transform_stage": 1536,
+      "exact_scores": 1341,
+      "reset_quarantine_and_recovery": true
+    },
+    "actual_phase_map": {
+      "exact_reads": 447,
+      "healthy_flags": 0,
+      "partial_fault_aborted_without_publication": true
+    },
+    "actual_bursty_capacity": {
+      "input_samples": 28673,
+      "blocks": 64,
+      "words_counted_per_transform_stage": 32768,
+      "ordered_scores_counted": 28608,
+      "score_fifo_max": 358,
+      "overlap_queue_max": 1,
+      "ring_retention_age_max": 589,
+      "transform_fifo_max": 2,
+      "energy_lookup_age_max": 887,
+      "score_age_max": 954,
+      "forward_stall_cycles_max": 0,
+      "explicit_bounds_pass": true,
+      "all_score_values_compared_to_oracle": false,
+      "duration_is_not_120ms": true
+    },
+    "pilot_clear": {
+      "new_actual_axi_scenarios": 11,
+      "combined_focused_passed": 85,
+      "combined_seconds": 23.95,
+      "reset_abort_and_no_ghost_ack": true,
+      "invalid_clear_original_edge": true,
+      "bvalid_stall_and_next_payload": true,
+      "independent_reads_before_and_after_ack": true
+    },
+    "pilot_120ms": {
+      "report": "reports/starlink-pilot-clear-commit-dwell-rtl-20260909.json",
+      "supported_samples": 300000,
+      "exact_ci16_bytes": 1200000,
+      "iq_sha256": "d653ccfb1f3fb48d10c5c859b316074dc2b7e3229681294b611301043dda97a1",
+      "first_newest_index": 540,
+      "last_newest_index": 1800534,
+      "ddc_accepted": 1800544,
+      "ddc_emitted": 300090,
+      "unsupported": 90,
+      "capture_faults": 0,
+      "ddc_faults": 0,
+      "clips": 0,
+      "kernel_dma_iio_executed": false
+    },
+    "prior_4096_capacity": {
+      "terminal": true,
+      "passed": true,
+      "source_is_not_current": true,
+      "report": "reports/starlink-shared-return-stage-capacity4096-20260909.json"
+    },
+    "diagnostic_policy_regression": {
+      "passed": 88,
+      "seconds": 0.34,
+      "scope": "Mocked runner admission/dispatch/inventory tests only, not physical evidence."
+    },
+    "latest_combined_regression": {
+      "passed": 533,
+      "seconds": 67.4,
+      "log": "/tmp/starlink-transport-clear-final-regression-v1.log",
+      "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py tests/test_starlink_pss_multirate_build_contract.py tests/test_starlink_pilot_iio_contract.py tests/test_starlink_paired_packing_policy.py tests/test_starlink_physical_trial_policy.py tests/test_starlink_realtime_probe_policy.py tests/test_starlink_retirement_audit_policy.py tests/test_starlink_pilot_clear_audit_policy.py",
+      "runtime_source": "d80fd15490ce82b7eda151be4594433ac9e738f5"
+    }
+  },
+  "synthesized_input_fanin": {
+    "baseline_stage": "old6b routed",
+    "new_stage": "currentd80 synthesis",
+    "required_source_registers": 9,
+    "required_address_pins": 18,
+    "memory_enable_pins": 1,
+    "baseline_dependent_endpoints": 19,
+    "new_dependent_endpoints": 0,
+    "missing_endpoints_rejected": true,
+    "check_does_not_prove_routed_timing": true,
+    "new_output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/input-retirement-synth-v1"
+  },
+  "physical": {
+    "base": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1",
+    "rtl_frozen": true,
+    "constraints_relaxed": false,
+    "coarse_fine_pilot_dma_retained": true,
+    "synthesis": {
+      "lut": 13413,
+      "ff": 19038,
+      "bram_tiles": 49,
+      "dsp": 48
+    },
+    "high_placement": {
+      "terminal": true,
+      "result": "fail",
+      "finished_utc": "2026-09-09T05:52:14Z",
+      "slices_available": 2382,
+      "slices_required": 2392,
+      "shortfall": 10,
+      "control_sets": 447,
+      "combined_lut": 13611,
+      "total_lut": 16492,
+      "ff": 19072
+    },
+    "medium_placement": {
+      "terminal": true,
+      "result": "fail",
+      "finished_utc": "2026-09-09T05:53:54Z",
+      "slices_available": 2382,
+      "slices_required": 2394,
+      "shortfall": 12,
+      "control_sets": 451,
+      "combined_lut": 13578,
+      "total_lut": 16492,
+      "ff": 19078
+    },
+    "current_routed_timing_available": false,
+    "additional_bounded_trials": [
+      {
+        "mode": "place-explore",
+        "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/place-explore-v1",
+        "state": "terminal_placement_fail",
+        "finished_utc": "2026-09-09T05:57:53Z",
+        "slices_available": 2385,
+        "slices_required": 2391,
+        "shortfall": 6,
+        "control_sets": 447,
+        "combined_lut": 13584,
+        "total_lut": 16492,
+        "ff": 19073
+      },
+      {
+        "mode": "area-explore",
+        "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/area-explore-v1",
+        "state": "terminal_placement_fail",
+        "finished_utc": "2026-09-09T05:58:12Z",
+        "netlist_area_optimization": true,
+        "slices_available": 2384,
+        "slices_required": 2471,
+        "shortfall": 87,
+        "control_sets": 437,
+        "combined_lut": 14035,
+        "total_lut": 16204,
+        "ff": 19063
+      }
+    ],
+    "no_trials_running": true
+  },
+  "remaining": [
+    "Complete current full receiver packing/setup/hold/CDC and board-I/O. Synthesized fan-in cuts alone are not closure; vendor BFP/CE paths remain unqualified.",
+    "Versioned map-boundary stop/drain receipts and bounded finite paired recorder/persistence, preserving all raw negatives/errors and >=1s common observation.",
+    "Exact-serial .18 paired DMA/IIO canary before .17 PPU Ethernet deployment; no TX on outdoor LNB.",
+    "Blind GLRT and qualified FPGA fine PSS same-observation live agreement, then eight120ms targets/300s/>=95% duty at15/30/60MS/s."
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/starlink_pss_xfft_block_adapter.v": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5",
+    "hdl/library/starlink_pss_acquisition/starlink_pss_shared_xfft_service.v": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8",
+    "hdl/library/axi_starlink_pilot_capture/axi_starlink_pilot_capture.v": "f6deba8c8ed7be63263711e8ca20949ee13b28c0d0912ce68bae78e7eb57adde",
+    "hdl/library/starlink_pss_acquisition/build/transport-ready-service-v1-console.log": "4ca0a91742896ff5022abaed7924f0fea26d16cd4101a17765c712a1e0430955",
+    "hdl/library/starlink_pss_acquisition/build/transport-ready-numeric-v1-console.log": "8794b7276c1a7be545c4dc63526c6b01231429e7cd5cb7bedcfc851eddf7e037",
+    "hdl/library/starlink_pss_acquisition/build/transport-ready-phase-map-v1-console.log": "6657c869a999cef44656467a5109bc1ff71e95ab6409c1f596b10ee50691b101",
+    "hdl/library/starlink_pss_acquisition/build/transport-ready-bursty64-v1-console.log": "2580f7af82f5f3c1eff17488356d2cb79247b3d6597656fe2fd203b15bc39a6e",
+    "reports/starlink-pilot-clear-commit-dwell-rtl-20260909.json": "f56d039cf54950b40e5e944dac9c4104857ba75391bbb35b3327a67cd7b02034",
+    "/tmp/starlink-transport-clear-regression-v1.log": "70d43d6c34bde76492b65275e6a4cdb66ba4f8d06a1380e37ba62313346e90c5",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/pluto.runs/synth_1/system_top.dcp": "8a965dfb9a72afff9b5014a5452497a8237800effe263688d3ebc4c9b0922985",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/pluto.runs/impl_1/system_top_opt.dcp": "0d6cc1ff9048d14b3dcd0ecd0b155aedfa3e7f0761c7d7bdf06b155a471123f6",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/pluto.runs/impl_1/runme.log": "53d1b2058f9aa7d55ee87b3c23b78db038a0ba0bbcdb82f4f4486ff64e1d787a",
+    "/tmp/starlink-transport-clear-spread-medium-v1.log": "ad033849e9f3ab66f1501f6fdce2e2d3c648732e7102c3278160de8884a46a1b",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/input-retirement-synth-v1/fanin.txt": "126b991cac6cda472a795da58f535ac0a07f89a2eb94ae5076d75a59170fbc0a",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/input-retirement-synth-v1/input_position_paths.rpt": "9e6b334f7096c44f63c6c94387c12ae076fe78ba504ab532ed867a927a1f7003",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/pluto.runs/synth_1/system_top_utilization_synth.rpt": "568311bf9cd7aec288c7736f08e4bd2de3e90f584ab4b9c4a780164f19d75fe0",
+    "/tmp/starlink-transport-clear-input-audit-v1.log": "6e7b53beffa3fd2309bd15776c5261c55a1ce5fbc9005b2731e1c77bfdb17334",
+    "/tmp/starlink-transport-clear-place-explore-v1.log": "9fd7b5cbbbf5c9623fc40ea0ec3d29699537c4b444bb7431f728bfae18961ec6",
+    "/tmp/starlink-transport-clear-area-explore-v1.log": "73992c9695f8ad4fa16c69a405ce08f5037d8a2f815be00badeed95038b0fd86",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/area-explore-v1/area_optimized.dcp": "4f2357c6750db9db2ca2456a840c7ff186afcfa3865cb7cc41d9f864e338eddf",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pilot-clear-fanin-audit-v2/fanin.txt": "412144abd6181a6f6dc084b9ca17b8398b14031a44e77190fc3f535c8ea9ba3b",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/pilot-clear-fanin-audit-v1/fanin.txt": "5e49fdd151f3fef50df4fc9ddf73c41ebb0579d7effb33979d20f3e00482677c",
+    "hdl/projects/pluto/audit_pilot_clear_fanin.tcl": "55386c5657479085815c5713087dbab12675ad40793c7ed0ab1eb7fbb764316d",
+    "tests/test_starlink_pilot_clear_audit_policy.py": "d717f7fbb32129d02db317e52fbd3315ae2dc91202e45b3ed2af99b2ad588782",
+    "/tmp/starlink-transport-clear-final-regression-v1.log": "a3981c97aa6f0916e3383a0e7e5aab8f044f166208d09eae5304bf2ec101d81d"
+  },
+  "next_architectural_step": {
+    "contract": "hdl/library/starlink_pss_acquisition/SHARED_REALTIME_CANDIDATE.md",
+    "implemented": false,
+    "reason": "Four bounded placement choices fail; the earlier nonrealtime routes also fail independent vendor-internal timing. Qualify the shared-realtime whole-bank/final-word commit architecture rather than claim these cuts solve the full design."
+  },
+  "synthesized_pilot_clear_fanin": {
+    "baseline_source": "6b58ea9223402ef301be92c6c5930c9c0f0f8e4f",
+    "baseline_stage": "routed",
+    "new_source": "d80fd15490ce82b7eda151be4594433ac9e738f5",
+    "new_stage": "synthesized",
+    "required_fifo_registers": 6,
+    "required_fir_job_index_ce_and_d_pins": 128,
+    "baseline_fifo_dependent": 64,
+    "baseline_registered_clear_dependent": 0,
+    "new_fifo_dependent": 0,
+    "new_registered_clear_dependent": 64,
+    "new_sequential_clear_registers": 1,
+    "baseline_output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcounter-retirement-v1/pilot-clear-fanin-audit-v2",
+    "new_output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELtransport-clear-v1/pilot-clear-fanin-audit-v1",
+    "source_and_checkpoint_sha_checked": true,
+    "source_association": "Caller-attested build provenance, not derived from DCP.",
+    "timing_closure_proven": false,
+    "superseded_old_v1": "Preserved unchanged; it named later diagnostic commit718c32e0 with equivalent runtime. v2 corrects association to the actual6b build."
+  }
+}
