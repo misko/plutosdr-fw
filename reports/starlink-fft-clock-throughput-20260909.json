@@ -1,0 +1,54 @@
+{
+  "schema": "starlink-simulation-only-fft-clock-feasibility-v1",
+  "decision": "Reject 150MHz and 175MHz for the unchanged shared realtime pipeline at canonical 15MS/s. Both pass short numerical replay but fail the 64-block burst/stall workload with energy-cache misses. Keep the deployed-candidate clock policy unchanged at 200MHz.",
+  "hardware_clock_changed": false,
+  "receiver_constraint_changed": false,
+  "generated_IP_configuration_changed": false,
+  "firmware_promoted": false,
+  "radio_accessed": false,
+  "receiver_build_in_parallel": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873, shared-realtime-bridge-summary-v1, original 100/200MHz clocks and full paired 15MS/s profile; completed22:49:41 UTC, 100MHz passes but200MHz fails. See starlink-bridge-counter-summary-20260909.json.",
+  "method": {
+    "base_runner_commit": "6090190c4442d2fd0e825136d87b692e2ad6deef",
+    "runtime_pipeline_commit": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873",
+    "runner": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_acquisition/simulate_iq_to_score_shared.tcl",
+    "runner_sha256": "dfe8d7f08e9cab30ed4686d37f3f301969bebc00c5c2d0a27023a6560f4b9380",
+    "archived_patch": "reports/experiments/20260909-fft-clock-throughput.patch",
+    "patch_sha256": "6979348498844a3009f1bf47e590813998f9339d8e5dca8374260a181c01392d",
+    "pipeline_clock_MHz": 100,
+    "canonical_source_MSps": 15,
+    "requested_FFT_clock_MHz": [150, 175],
+    "half_period_ps": [3334, 2858],
+    "rounding": "Round half-period upward to simulator1ps resolution, so actual stimulus is slightly slower than the requested frequency.",
+    "source_and_sink": "Original bursty 15MS/s source cadence and score stalls; numerical fixture and all RTL/coefficients remain unchanged. Only generated FFT stimulus clock changes.",
+    "generated_core": "Original 200MHz-targeted C_ARCH1 realtime XFFT9.1 configuration and exact generic checks; not regenerated for a lower-throughput architecture."
+  },
+  "policy_tests": {
+    "passed": 18,
+    "seconds": 0.18,
+    "archived_probe": "reports/experiments/20260909-fft-clock-policy-probe.py",
+    "probe_sha256": "2e5037b1851d48166f2af5dac23f0a4913f23635db14f5cb8d634ee07106ec80",
+    "log": "/tmp/starlink-stop-summary.n1AytQ/sim-clock-policy-v2.log",
+    "log_sha256": "729498e5bb74791c449bd81daae53960afaea75639e4957a5f7dd233cc52234e",
+    "scope": "Strict bounded clock choices before output allocation, explicit realtime selection, conservative period rounding, unchanged generated core settings, exact frozen RTL and clock-only generated bench delta. Not timing or throughput proof."
+  },
+  "FFT150": {
+    "numeric": {"exit_code": 0, "exact_scores": 1341, "explicit_reset_quarantine_and_recovery": true, "finished_utc": "2026-09-09T22:41:54Z", "console_sha256": "095c30c8f494ccf81cdf59c46ae030317c9607564f9a206a8266fe805a0febd2"},
+    "capacity64": {"exit_code": 1, "finished_utc": "2026-09-09T22:42:20Z", "fault": "energy_cache_miss", "completed_blocks": 16, "scores": 7152, "slow_cycle": 62259, "simulated_fault_time_ns": 622590, "driven_samples": 9337, "required_energy_index": 1007152, "oldest_available_energy_index": 1007224, "newest_available_energy_index": 1009271, "transform_FIFO_high_water": 358, "console_sha256": "5f95928b48d996f4a9636986351a767a0ad03117325a2c2b595a6e1b9ec1c623"},
+    "observed_block_interval": {"first_block": 1, "first_cycle": 9243, "last_block": 16, "last_cycle": 61091, "score_throughput_MSps": 12.932032093812683}
+  },
+  "FFT175": {
+    "numeric": {"exit_code": 0, "exact_scores": 1341, "explicit_reset_quarantine_and_recovery": true, "finished_utc": "2026-09-09T22:43:39Z", "console_sha256": "a7a198302d0dd0dbd059629de93d388ead2ca8dc98a49646b6c6ae78eeec1842"},
+    "capacity64": {"exit_code": 1, "finished_utc": "2026-09-09T22:45:26Z", "fault": "energy_cache_miss", "completed_blocks": 58, "scores": 25926, "slow_cycle": 187051, "simulated_fault_time_ns": 1870510, "driven_samples": 28054, "required_energy_index": 1025926, "oldest_available_energy_index": 1025941, "newest_available_energy_index": 1027988, "transform_FIFO_high_water": 358, "console_sha256": "e101e9f25f905498c2f6232de210a4630680fff4f27c9c615a2bb48d525e63be"},
+    "observed_block_interval": {"first_block": 1, "first_cycle": 8895, "last_block": 58, "last_cycle": 186227, "score_throughput_MSps": 14.367965172670472},
+    "capacity4096": {"status": "terminal_failed_before_completion", "exit_code": 1, "finished_utc": "2026-09-09T22:47:48Z", "exec_session": 8231, "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/sim-fft175-capacity4096-v1", "completed_blocks": 58, "scores": 25926, "slow_cycle": 187051, "fault": "energy_cache_miss", "console_sha256": "2cf6df4324edabac899aa37fc257a63de48a5e4c4b2cda8931d49d81343a8486", "limit": "Requested 4096 blocks, failed at the identical cycle and required/available cache indexes as the 64-block case. Not a completed 4096-block test."}
+  },
+  "evidence_root": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build",
+  "directory_pattern": "sim-fft{150|175}-{numeric|capacity}-v1; capacity means 64 blocks",
+  "interpretation": [
+    "The required energy index is older than the oldest retained cache entry at each failure. These are actual observable integrity failures, not a pass inferred from a process exit or small FIFO high-water.",
+    "Interval score rates are computed from completed-block counts and the unchanged 100MHz simulation clock, not a whole-run or hardware throughput certification.",
+    "Larger buffers alone do not resolve a sustained producer/consumer rate deficit; scheduling or arithmetic throughput would need improvement before using these lower clocks.",
+    "Do not extrapolate exact RF timing accuracy, native 60MS/s calibration, every-frame measurements, production-duration reliability or a physical timing pass from these tests.",
+    "Any future clock redesign must preserve the AD9361's actual 200MHz IDELAY reference, independently implement the new clock/reset domain, and pass original-scope throughput, CDC, board timing and full receiver hardware gates."
+  ]
+}

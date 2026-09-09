@@ -1,0 +1,37 @@
+diff --git a/library/starlink_pss_acquisition/simulate_iq_to_score_shared.tcl b/library/starlink_pss_acquisition/simulate_iq_to_score_shared.tcl
+index 721d50de..dac46989 100644
+--- a/library/starlink_pss_acquisition/simulate_iq_to_score_shared.tcl
++++ b/library/starlink_pss_acquisition/simulate_iq_to_score_shared.tcl
+@@ -4,0 +5,4 @@
++# Optional STARLINK_PSS_SIM_FFT_MHZ=150|175|200 changes only the behavioral
++# stimulus clock. Generated core configuration and receiver clocks/constraints
++# stay at their original values. This is throughput feasibility, not a new
++# hardware clock policy or permission to relax a receiver timing constraint.
+@@ -22,0 +27,11 @@ if {$use_realtime_xfft ni {0 1}} { error "USE_REALTIME_XFFT must be 0 or 1" }
++set sim_fft_mhz 200
++if {[info exists ::env(STARLINK_PSS_SIM_FFT_MHZ)]} {
++  set sim_fft_mhz $::env(STARLINK_PSS_SIM_FFT_MHZ)
++}
++if {$sim_fft_mhz ni {150 175 200}} { error "simulation FFT clock must be 150, 175, or 200 MHz" }
++if {$sim_fft_mhz != 200 && !$use_realtime_xfft} {
++  error "lower simulation FFT clock requires explicit realtime mode"
++}
++# Round upward at the bench's 1ps precision: the measured clock is slightly
++# SLOWER than the requested nonintegral rate, never an optimistic fast clock.
++set fft_half_period_ps [expr {int(ceil(500000.0 / $sim_fft_mhz))}]
+@@ -73,0 +89,9 @@ set bench [string map [list \
++if {$sim_fft_mhz != 200} {
++  set clock_anchor {forever #2.5 fft_clk = !fft_clk;}
++  if {[string first $clock_anchor $bench] < 0 ||
++      [string first $clock_anchor $bench] != [string last $clock_anchor $bench]} {
++    error "expected one simulation FFT clock driver"
++  }
++  set clock_driver "forever #[format %.3f [expr {$fft_half_period_ps / 1000.0}]] fft_clk = !fft_clk;"
++  set bench [string map [list $clock_anchor $clock_driver] $bench]
++}
+@@ -120 +144 @@ set channel [open $bench_path w]
+-puts $channel "// GENERATED: actual slow 100 / FFT 200 MHz composition; nominal ADC 15 MS/s."
++puts $channel "// GENERATED: slow 100MHz, simulation FFT requested ${sim_fft_mhz}MHz / half-period ${fft_half_period_ps}ps; ADC 15MS/s."
+@@ -191 +215 @@ close_project
+-puts "IQ_TO_SCORE_SHARED_SIMULATION_VERIFIED mode=$mode realtime=$use_realtime_xfft slow_mhz=100 fft_mhz=200 source_msps=15 RECEIVER_UNQUALIFIED"
++puts "IQ_TO_SCORE_SHARED_SIMULATION_VERIFIED mode=$mode realtime=$use_realtime_xfft slow_mhz=100 fft_mhz=$sim_fft_mhz fft_half_period_ps=$fft_half_period_ps source_msps=15 RECEIVER_UNQUALIFIED"

@@ -363,6 +363,20 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Lower FFT clocks rejected by throughput evidence — 2026-09-09
+
+Separate simulation-only trials at 150/175 MHz preserve the canonical 15 MS/s
+source and exact generated FFT/RTL configuration. Both pass 1341 exact numeric
+scores and reset recovery, but the 64-block burst/stall workload fails with an
+energy-cache miss after 16/58 completed blocks, respectively. Observed block
+interval rates are approximately 12.93/14.37 million scores/s. A required energy
+entry has already been overwritten. These lower clocks cannot sustain the
+unchanged pipeline; a short numeric pass or larger buffer is not a remedy.
+The complete receiver retains its original 100/200 MHz clocks. No clock
+or constraint change was promoted. The isolated experiment patch, 18 admission
+tests and reproduction notes are archived under `reports/experiments/`; exact
+receipts are in `reports/starlink-fft-clock-throughput-20260909.json`.
+
 ### Atomic private bridge-error summary — 2026-09-09
 
 HDL `18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873`, pushed only to the
@@ -386,9 +400,22 @@ fault. That replay uses reduced map geometry and is not live IIO/RF proof.
 Acquisition IP packaging passed. A fresh complete receiver launched at
 **22:37 UTC** in `hdl/projects/pluto/shared-realtime-bridge-summary-v1`, with
 the original 100/200 MHz clocks and complete 15 MS/s paired profile. No prior
-checkpoint is reused. Revalidate session/process/terminal artifacts before
-treating this launch entry as current status. Full routed timing is still an
-open gate; no radio has been accessed. Detailed evidence and remaining scope:
+checkpoint was reused. It completed at **22:49:41 UTC**, exit 1: all 33861 nets
+routed without errors, but the 200 MHz domain still fails. The **100 MHz domain
+now passes at +0.019 ns**, with zero setup failures. Overall failures fall from
+724 to **68**, all in the 200 MHz domain; WNS improves to **-0.421 ns** and TNS
+to **-7.772 ns**. Hold passes at +0.045 ns. Final resources are 13068 LUT,
+18505 FF, all 4400 slices, 53.5 BRAM tiles and 54 DSP.
+
+The exact final-checkpoint audit at 22:51:28 confirms input cursor +0.133 ns,
+return slot +0.194 ns and mailbox fault +0.287 ns. Vendor internal -0.206 ns
+and publication -0.118 ns still fail. The worst path is now the output mailbox's
+wide metadata check into the fast service's job-start control. Shortening that
+logic must retain every same-edge private-link fault check and the now-passing
+100 MHz paths. Lowering the FFT clock to 150/175 MHz is independently rejected
+by throughput evidence above. Static board-I/O/CDC/reset safety and native RX
+qualification are also still open. No radio has been accessed; the emitted
+bitstream and `bad_timing` XSA are not eligible for deployment. Detailed evidence:
 `reports/starlink-bridge-counter-summary-20260909.json`.
 
 ### PPU RX-interface matrix evidence — 2026-09-09
