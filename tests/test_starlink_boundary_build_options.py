@@ -9,7 +9,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-HELPER = ROOT / "hdl/projects/pluto/starlink_pss_build_options.tcl"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", str(ROOT / "hdl")))
+HELPER = HDL / "projects/pluto/starlink_pss_build_options.tcl"
 KEYS = {
     "rate_msps": "STARLINK_PSS_RATE_MSPS",
     "profile": "STARLINK_PSS_PROFILE",
@@ -226,7 +227,8 @@ def test_admission_regression_detects_policy_mutations(
     assert hashlib.sha256(HELPER.read_bytes()).hexdigest() == original_hash
 
 
-def entrypoint_probe(entrypoint, fields, *, readback="normal"):
+def entrypoint_probe(entrypoint, fields, *, readback="normal", through_tracker=False,
+                     tracker_readback="normal"):
     """Execute actual entrypoint Tcl with only its external Vivado APIs modeled.
 
     Project probes stop at project creation. BD probes stop AFTER parameter
@@ -238,6 +240,8 @@ def entrypoint_probe(entrypoint, fields, *, readback="normal"):
     path = HELPER.parent / entrypoint
     script = f"set helper {literal(HELPER)}\nset entrypoint {literal(path)}\n"
     script += f"set readback {literal(readback)}\n"
+    script += f"set through_tracker {int(through_tracker)}\n"
+    script += f"set tracker_readback {literal(tracker_readback)}\n"
     script += r'''
 set mutations 0
 set parameters [dict create]
@@ -258,6 +262,11 @@ proc ad_ip_parameter {cell property value} {
 }
 proc get_property {property object} {
   if {$property eq "IP_REPO_PATHS"} {return {}}
+  if {$property eq "CONFIG.USE_DSP_REDUCER"} {
+    puts "TRACKER_READBACK_REACHED [dict get $::parameters $object $property]"
+    if {$::tracker_readback eq "normal"} {return [dict get $::parameters $object $property]}
+    return $::tracker_readback
+  }
   if {$property eq "CONFIG.ENABLE_BOUNDARY_STOP"} {
     puts "READBACK_REACHED [dict get $::parameters $object $property]"
     if {$::readback eq "normal"} {return [dict get $::parameters $object $property]}
@@ -268,9 +277,13 @@ proc get_property {property object} {
 proc get_bd_cells {name} {return $name}
 proc ad_connect {args} {
   incr ::mutations
-  if {$args eq "sys_200m_clk starlink_pss_acquisition/fft_clk"} {
+  if {!$::through_tracker && $args eq "sys_200m_clk starlink_pss_acquisition/fft_clk"} {
     puts "FEATURES [dict get $::parameters starlink_pss_acquisition]"
     error BD_READBACK_VERIFIED
+  }
+  if {$::through_tracker && $args eq "rx_clk_in axi_ad9361/rx_clk_in"} {
+    puts "TRACKER_FEATURES [dict get $::parameters starlink_pss_tracker]"
+    error TRACKER_READBACK_VERIFIED
   }
 }
 proc unknown {command args} {
@@ -329,6 +342,29 @@ def test_bd_rejects_missing_or_ignored_stop_parameter(readback):
                               readback=readback)
     assert "boundary-stop IP readback mismatch" in result, result
     assert "BD_READBACK_VERIFIED" not in result
+
+
+@pytest.mark.parametrize("profile,rate", list(product(
+    ("full", "detector-only", "paired-pilot"), ("15", "30", "60"))))
+def test_unshared_tracker_keeps_existing_reducer_choice(profile, rate):
+    result = entrypoint_probe("system_bd.tcl", {"profile": profile, "rate_msps": rate},
+                              through_tracker=True)
+    assert "MESSAGE TRACKER_READBACK_VERIFIED" in result, result
+    assert f"CONFIG.USE_DSP_REDUCER {int(rate == '60')}" in result
+
+
+def test_shared_paired_tracker_explicitly_selects_dsp_and_reads_it_back():
+    result = entrypoint_probe("system_bd.tcl", SHARED, through_tracker=True)
+    assert "MESSAGE TRACKER_READBACK_VERIFIED" in result, result
+    assert "CONFIG.USE_DSP_REDUCER 1" in result
+
+
+@pytest.mark.parametrize("readback", ["0", "", "unknown"])
+def test_shared_tracker_rejects_ignored_or_missing_reducer_choice(readback):
+    result = entrypoint_probe("system_bd.tcl", SHARED, through_tracker=True,
+                              tracker_readback=readback)
+    assert "tracker reducer IP readback mismatch" in result, result
+    assert "TRACKER_READBACK_VERIFIED" not in result
 
 
 def test_make_exports_default_off_and_tracks_helper_dependency():

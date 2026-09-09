@@ -1,0 +1,102 @@
+{
+  "schema": "starlink-track-dsp-selection-progress-v1",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "550c21172c8641472aa25797e830e4eb9eeb45e5",
+  "baseline_hdl_commit": "6ee01b7c399f06765ea387720a5c3ccfa6e62de1",
+  "scope": "Explicitly reuse the existing exact DSP TRACK_ONE reducer in the 15 MS/s shared paired receiver. Functional and isolated resource evidence; complete physical and hardware qualification remain open.",
+  "implementation": {
+    "parameter": "USE_DSP_REDUCER",
+    "generic_defaults": "serial at 15/30 MS/s, DSP at 60 MS/s, unchanged",
+    "BD_policy": "shared-XFFT or 60 MS/s selects DSP; unshared 15/30 profiles retain serial",
+    "math_changed": false,
+    "coefficient_aperture_score_tie_rule_or_packet_ABI_changed": false,
+    "service_latency_changed": true,
+    "latency_limit": "Faster reducer service is not cycle-for-cycle public trace equivalence, guaranteed 120 ms acquisition, or sustained whole-receiver throughput proof.",
+    "selection_checks": "Actual BD readback and pre-placement inventory requiring ten DSP48E1s inside the exact reducer subtree and no serial reducer.",
+    "packaging": "Vivado initially inferred a derived boolean from the rate-dependent RTL default. The IP script now exports an explicit integer user/model parameter and generated XGUI forwarding; the BD explicitly selects every profile/rate.",
+    "clock_or_exception_changes": false,
+    "source_sha256": {
+      "hdl/library/starlink_pss_raw_correlator/starlink_pss_reduced_tracking_core.v": "4838876ecf0607ac9a7adba3f0b1d2f24383aba5ca98c27efc69629be77e3b92",
+      "hdl/library/axi_starlink_pss_tracker/axi_starlink_pss_tracker.v": "0f95565c6989e17915d0d9311958f8f0bfa720e58fe62f3d4aaa2252c6bcae46",
+      "hdl/library/axi_starlink_pss_tracker/axi_starlink_pss_tracker_ip.tcl": "3776dbb8fb97831ffb2dfd861e0bd6af22b8b8f7ed5dd2231cace2b9e99c436b",
+      "hdl/projects/pluto/system_bd.tcl": "15f2b9696b80165ea9652d292ee02dba3ff2eeb964c9408fe7cb3bd317a1cb44",
+      "hdl/projects/pluto/shared_xfft_impl_gate.tcl": "5aca8b0ec6e08236aacec5ff8cd9d94e92e23022e500159238e6711363adcba3"
+    }
+  },
+  "isolated_complete_tracking_core_measurement": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/track-reducer-choice-v1",
+    "scope_sha256": "4f03f1678a9790f004842a28d8fc4484a75026c5f896c729f63982d91f77373f",
+    "exit_code": 0,
+    "source_commit": "6ee01b7c399f06765ea387720a5c3ccfa6e62de1",
+    "derivative": "Only the frozen core generate condition is changed to select its existing DSP alternative; reversible source check, immutable input hashes. Runtime sources are not rewritten by the experiment.",
+    "configuration": "Vivado 2022.2 xc7z010clg400-1; actual complete TRACK_ONE core, rate multiplier 1; AreaOptimized_high, rebuilt hierarchy, control_set_opt_threshold 4, ExploreArea opt; unchanged existing OOC contract.",
+    "serial": {"LUT_primitives": 3744, "FF_primitives": 3124, "DSP48E1": 3, "RAMB36": 6, "RAMB18": 9, "control_sets": 81, "unplaced_setup_ns": 2.111},
+    "dsp": {"LUT_primitives": 2977, "FF_primitives": 2763, "DSP48E1": 13, "RAMB36": 6, "RAMB18": 9, "control_sets": 78, "unplaced_setup_ns": 2.111},
+    "serial_netlist_sha256": "a5accb284cc355c776ac807fb4143e2566f5b576aa2d671080bfeb9fefbcc52f",
+    "dsp_netlist_sha256": "a7f225a7a2b6500bea2d3f463182bd75e3c63612b018f85b0684697df33b33fa",
+    "methodology": "The DSP variant reports ten SYNTH-10 wide-multiplier warnings; reports retained. Neither methodology nor CDC nor placed timing is declared qualified by this measurement.",
+    "limit": "Savings of 767 LUT primitives and 361 fabric FFs are isolated measurements; no additive whole-chip fit or routed timing claim. These tracker netlists were not functionally simulated."
+  },
+  "functional_evidence": {
+    "source_contract": "Both reducer implementation files remain byte-identical to baseline. Whole core token comparison admits only the explicit selection parameter, parameter validity check and generate-condition substitution.",
+    "exact_winner_comparison": "Serial and DSP RTL return identical five TRACK_ONE packets under the original exact integer oracle, with first-wins ties, near-bound values, all-invalid input, backpressure and malformed-job draining; counters jobs=5 emitted=5 invalid=61 bound=3 protocol=1.",
+    "mutations_rejected": ["replace strict winner comparison with greater-or-equal", "increment retained winner denominator"],
+    "composed_core": "Known packet and accounting tests cover frozen serial/DSP alternatives and actual core defaults/explicit DSP selection at 15/30/60; explicit serial selection additionally tested at 15/30.",
+    "actual_AXI_wrapper": "Explicit DSP choice tested at 15/30/60, including atomic telemetry, deferred candidates, retained packets and coordinated reset.",
+    "fixture_correction": "The added 60 MS/s composed test initially rejected its fixed center=400 as late (late=1, rejected=1, admitted=0). Move stimulus and expected winner to center=1600 for rate multiplier4; retain real lead checks and publication timeout. Corrected frozen baseline and candidate both pass. The original low-rate fixture is not rewritten.",
+    "native_DMA_IIO_or_RF_qualified": false
+  },
+  "existing_regressions": {
+    "integrated": {"passed": 795, "seconds": 131.35, "exit_code": 0, "log": "hdl/library/starlink_pss_raw_correlator/build/track-dsp-oracle-v2.log", "log_sha256": "6965fe4d841e88cd0bb5f04e7fa9ab89b00c9e06a1d8fedcd3d1b4d11b9aa95b"},
+    "raw_core_suite": {"exit_code": 0, "log_sha256": "25dd10d1fb9d09273192b21ee82636753d6fd6b3c38ee232516b84fc995f50a5"},
+    "tracker_wrapper_suite": {"exit_code": 0, "log_sha256": "4f59e0b6cc3c619982a57c548bca2412017fe768a2ad5bda7c2dba50300da8e1"},
+    "ruff_changed_tests": "passed"
+  },
+  "recorded_replay_with_DSP_explicitly_enabled": {
+    "capture_id": "cap-20260831T071200-9184cf0ad6cc",
+    "scope": "Existing frozen 15 MS/s, previously selected/assisted fine-window fixture; not new blind acquisition, recent 25 MS/s capture qualification or live RF proof.",
+    "status": "passed",
+    "exit_code": 0,
+    "windows": 210,
+    "matching_packet_words": 5460,
+    "errors": 0,
+    "injected_first_window_samples": 130,
+    "direct_input_windows": 209,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/track-dsp-recorded-replay-v1.log",
+    "log_sha256": "1f4a4837cbc0078b51f9d0fe879c84949a7a803e42d9a56c4c66585ed601a9fe",
+    "simulation_log_sha256": "8c43ed14f711ed8782b657b5968f5e0692324302c30f666de187f860e128eea1"
+  },
+  "new_full_receiver": {
+    "directory": "hdl/projects/pluto/shared-realtime-track-dsp-v1",
+    "runtime_hdl_commit": "550c21172c8641472aa25797e830e4eb9eeb45e5",
+    "status": "running",
+    "tool_session": 44164,
+    "parent_vivado_pid_as_observed": 1117362,
+    "implementation_vivado_pid_as_observed": 1121791,
+    "process_confirmed_live_utc": "2026-09-09T19:34:23Z",
+    "configuration": "Fresh global synthesis, 15 MS/s shared realtime paired-pilot with boundary-stop; no reference DCP; unchanged physical implementation policy and receiver constraints.",
+    "tracker_package_exit_code": 0,
+    "tracker_component_sha256": "195c07aa5340fce8b642b115e0f10d437175cb806ae5dc9b3e13cddd3f35a988",
+    "tracker_package_console_sha256": "27d46e6b48362d7baeeb38f42f8f427f9686a7ce78e184e9f02934b3d337a53f",
+    "actual_BD_DSP_readback": 1,
+    "actual_init_design_structural_gate": "passed",
+    "init_design_gate_sha256": "eb8d39270b020180b8763b30be4177c7cf7f3aed96a768a4f7da6b8642dca574",
+    "actual_reducer_DSP48E1": 10,
+    "actual_serial_reducer_present": false,
+    "routed_timing_available": false,
+    "deployable": false
+  },
+  "radio_accessed": false,
+  "test_source_sha256": {
+    "tests/starlink_oracle/test_track_reducer_choice.py": "efe2e1497b7ac32f25b1e6dd9ec9e7ab02167e6c2ce810053688c450bac49426",
+    "tests/test_starlink_boundary_build_options.py": "a3914e81b9e250ec3cd50b640f329a387d61267f07591f65b5051a5bc330459b",
+    "tests/test_starlink_realtime_constraint_gate.py": "3f5b20b1ccbb8ff166477b666d4b9e491823e8af2bd4537e1cad4679a21405cb"
+  },
+  "ppu_changed": false,
+  "deployed": false,
+  "next": [
+    "Observe complete-receiver placement/routing, then exact checkpoint timing, CDC and board-I/O review. Do not deploy on isolated resource or functional evidence.",
+    "After physical gates pass, qualify matched finite and continuous paired IIO on .18, causal coarse/fine handoff, PPU network deployment and independent live GLRT/fine PSS on .17.",
+    "Complete eight-target 120 ms valid visits over 300 seconds and repeat full qualification at 30/60 MS/s."
+  ]
+}

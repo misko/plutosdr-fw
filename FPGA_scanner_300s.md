@@ -363,6 +363,61 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Existing DSP tracker selected for shared paired image — 2026-09-09
+
+HDL `550c21172c8641472aa25797e830e4eb9eeb45e5` adds an explicit
+`USE_DSP_REDUCER` choice. The shared paired receiver reuses the existing exact
+DSP TRACK_ONE reducer; other profiles keep serial at 15/30 and DSP at 60 MS/s.
+Both reducer implementations are unchanged. This preserves score, first-wins
+ties, aperture and packet ABI, but changes service latency; it is not a claim
+of cycle-for-cycle behavior or whole-receiver sustained throughput.
+
+An isolated complete 15 MS/s tracking-core comparison measures 3744 -> 2977
+LUT primitives, 3124 -> 2763 fabric FFs and 3 -> 13 DSP48E1s, with unchanged
+RAM use. The unchanged OOC timing contract measures +2.111 ns unplaced setup
+for both. These savings are not a whole-chip fit/timing result. Exact five-job
+RTL packet comparisons, deliberate tie/denominator mutations, composed core
+tests and explicit-DSP AXI wrapper tests pass. Existing integrated regression
+passes 795 tests, and both raw-core and wrapper suites pass. The explicit-DSP
+wrapper also matches every expected word across the existing 210-window
+recorded-data fixture (5460 words, zero errors); this is assisted fine-window
+replay, not blind or live acquisition.
+
+The expanded 60 MS/s composed fixture initially requested its window too early:
+the actual scheduler recorded one late rejection and zero admissions. Its
+stimulus and expected winner now move together from center 400 to 1600 only
+at that rate; real lead checks and publication timeout remain unchanged, and
+both frozen baseline and candidate pass. No runtime failure was suppressed.
+
+The tracker IP package now makes its selector an explicit integer rather than
+an inferred derived boolean. Fresh full receiver
+`hdl/projects/pluto/shared-realtime-track-dsp-v1` has actual BD readback=1 and
+is running from the clean pin above. Its actual pre-placement gate passes,
+including the ten-DSP reducer inventory, absence of the serial subtree,
+both detector stages, pilot DMA and the original timing-path obligations.
+Physical qualification remains open. No radio or PPU was changed. See
+`reports/starlink-track-dsp-selection-20260909.json`.
+
+### Snapshot data-enable remap: replay passes, placement still fails — 2026-09-09
+
+HDL `6ee01b7c399f06765ea387720a5c3ccfa6e62de1` retains local request
+replication and applies `extract_enable=no` only to the snapshot payload.
+The executable RTL, snapshot edge, reset/CLEAR and ABI remain unchanged.
+Actual isolated pilot synthesis removes variable CE pins from all 616 payload
+FFs, reducing control sets 76 -> 57 while adding 616 LUT primitives. Both
+actual synthesized cores compare successfully through 38726 cycles, 12
+snapshots, 396 AXI reads and 567 delivered pilot samples. Integrated regression
+passes 608 tests; the complete 120 ms replay again preserves all 300000 CI16
+samples exactly, with no capture/DDC faults or saturation.
+
+The complete receiver finished with placement failure at 19:18:17 UTC:
+2414 unplaced slices required versus 2411 available, a three-slice shortfall,
+439 control sets and 17307 total LUTs. This improves the preceding placement
+shortfall (nine) but does not establish fit or timing; it has no routed result
+and is not deployable. The next measured resource option is the existing DSP
+tracker above. See `reports/starlink-snapshot-data-enable-20260909.json` and
+`reports/starlink-snapshot-data-enable-dwell-rtl-20260909.json`.
+
 ### Local pilot snapshot replication and actual netlist comparison — 2026-09-09
 
 HDL `24bac44461c78868689ddb6b35e2f4edfd6d5d5d` adds only a local

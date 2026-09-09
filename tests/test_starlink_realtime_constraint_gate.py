@@ -3,14 +3,16 @@
 These tests qualify gate admission and failure behavior, not physical timing.
 Actual implementation still has to provide every checked endpoint/path.
 """
+import os
 import subprocess
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-GATE = ROOT / "hdl/projects/pluto/shared_xfft_impl_gate.tcl"
-XDC = ROOT / "hdl/library/starlink_pss_acquisition/starlink_pss_shared_xfft_constr.xdc"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", str(ROOT / "hdl")))
+GATE = HDL / "projects/pluto/shared_xfft_impl_gate.tcl"
+XDC = HDL / "library/starlink_pss_acquisition/starlink_pss_shared_xfft_constr.xdc"
 
 
 def gate_probe(tmp_path, *, mode=1, boundary=0, broken=""):
@@ -27,6 +29,9 @@ set broken {BROKEN}
 set endpoints [list ${prefix}shared_xfft receiver/starlink_pss_tracker/inst \
   receiver/starlink_pilot_capture/inst receiver/starlink_pilot_dma/inst]
 array set periods {}
+if {$broken eq "serial_reducer"} {
+  lappend endpoints receiver/starlink_pss_tracker/inst/i_core/g_slice_exact_reducer.i_exact_reducer
+}
 if {$::env(STARLINK_PSS_BOUNDARY_STOP) || $broken eq "unexpected_stop"} {
   foreach {role suffix} {
     stop_controller phase_map_control/stop_active_reg
@@ -62,6 +67,14 @@ if {$::env(STARLINK_PSS_REALTIME_XFFT)} {
 }
 proc get_cells {args} {
   if {[lsearch -exact $args -filter] >= 0} {
+    if {[string first g_dsp_exact_reducer [lindex $args end]] >= 0} {
+      set count 10
+      if {$::broken eq "missing_reducer_dsp"} {set count 9}
+      if {$::broken eq "extra_reducer_dsp"} {set count 11}
+      set result {}
+      for {set n 0} {$n < $count} {incr n} {lappend result reducer_dsp_$n}
+      return $result
+    }
     if {[string first pilot_pacer [lindex $args end]] >= 0 ||
         [string first pacer_memory [lindex $args end]] >= 0} {return pacer}
     return ${::prefix}shared_xfft
@@ -123,6 +136,7 @@ def test_real_gate_accepts_only_complete_matching_named_inventory(tmp_path, mode
     assert "SHARED_XFFT_INIT_GATE_PASS" in result.stdout
     report = (tmp_path / "shared_xfft_init_gate.txt").read_text()
     assert f"realtime_xfft={mode}" in report
+    assert "tracker_exact_reducer_dsp48e1=10 serial_reducer_present=0" in report
     assert f"stop_controller boundary_stop={boundary} surviving_registers={boundary}" in report
     assert f"stop_map_fence boundary_stop={boundary} surviving_registers={boundary}" in report
     assert ("input_fault_fast_sync/second_stage requirement_ns=5.0" in report) == bool(mode)
@@ -139,6 +153,13 @@ def test_enabled_stop_requires_both_synthesized_halves_at_actual_slow_clock(tmp_
 def test_disabled_stop_rejects_unexpected_synthesized_feature(tmp_path):
     result = gate_probe(tmp_path, boundary=0, broken="unexpected_stop")
     assert result.returncode == 2 and "boundary-stop disabled" in result.stderr
+
+
+@pytest.mark.parametrize("broken", ["missing_reducer_dsp", "extra_reducer_dsp", "serial_reducer"])
+def test_shared_image_requires_the_actual_exact_dsp_reducer(tmp_path, broken):
+    result = gate_probe(tmp_path, broken=broken)
+    assert result.returncode == 2 and "exact ten-DSP tracker reducer" in result.stderr
+    assert "SHARED_XFFT_INIT_GATE_PASS" not in result.stdout
 
 
 @pytest.mark.parametrize("broken", ["input_mailbox/input_fault_reg", "input_fault_fast_sync_reg[0]",

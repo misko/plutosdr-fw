@@ -45,13 +45,16 @@ def simulate(directory, candidate):
     return result
 
 
-def test_snapshot_replication_is_only_a_local_synthesis_attribute():
+def test_snapshot_changes_are_only_local_synthesis_attributes():
     def tokens(text):
         return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", text))
 
     old, new = tokens(baseline()), tokens((HDL / CONTROL).read_text())
     fragment = "regarm_request,stop_request,clear_request;(*max_fanout=32*)regsnapshot_request;"
     assert new.count(fragment) == 1
+    remap = '(*extract_enable="no"*)reg[31:0]snapshot[0:25];'
+    assert new.count(remap) == 1
+    new = new.replace(remap, "reg[31:0]snapshot[0:25];")
     assert new.replace(fragment, "regarm_request,stop_request,clear_request,snapshot_request;") == old
 
 
