@@ -338,8 +338,9 @@ service contract is documented in
 511 private mailbox writes plus a held final word with independent status/fault
 commit checks. Qualifying that candidate is the next architectural step, not
 another assumption that placement settings alone will fix the design. Its
-isolated input/private-result guards are now implemented and tested; the complete
-realtime service is not integrated or qualified. All paired-live,
+isolated input/private-result guards and synthesizable persistent service are
+now implemented and actual-core tested; complete receiver integration and
+physical timing are not qualified. All paired-live,
 map-stop/drain, hopping, duty and 15/30/60 MS/s gates above remain open.
 
 ### Bounded PSS readers and realtime dependencies — 2026-09-09
@@ -386,9 +387,18 @@ retained. The expanded firmware regression passes 573 tests. See
 `reports/starlink-realtime-guarded-mailbox-20260909.json`; these diagnostic changes
 are HDL `13df9535ef1acf22280135f30fd8347ae6fdabf4`, not a receiver promotion.
 
-Next, implement and test persistent-mailbox service ownership, per-job FFT/input
-resets, synchronized fault handling and an internally established cause-based
-final fence. Then qualify exact scores/maps, current-source 120 ms capacity,
+The subsequent synthesizable service now passes 26 actual-core jobs / 13312
+exact raw and published words. Persistent mailbox ownership, per-job FFT/input
+resets, synchronized sticky faults and a controller-owned cause-coverage fence
+are implemented. Tests reject six demanded-input gaps, three final-edge vendor
+faults, and malformed bank metadata at words 10/511; both raw reset inputs pass
+interruption/recovery during configuration, partial input and queued-bank/ACK
+ownership. A late ACK-drain fault remains quarantined. The six-job latency lane
+measures 28.46 us per pair, including ACK/reset/config; it is not a capacity soak.
+See `reports/starlink-shared-realtime-service-20260909.json`.
+
+Next, qualify the explicit default-off integration with exact scores/maps,
+current-source 120 ms capacity,
 whole-chip resources, all timing constraints and CDC. None of the current guard
 passes authorize flashing. The separate paired recorder still needs
 native fine-schedule admission, durable bounded recording, map-boundary

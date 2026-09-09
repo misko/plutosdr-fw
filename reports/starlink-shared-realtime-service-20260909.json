@@ -1,0 +1,192 @@
+{
+  "schema_version": 1,
+  "report_date_utc": "2026-09-09",
+  "scope": "Isolated synthesizable shared realtime 512-point complex BFP18 FFT service; actual generated-core simulation with two real CDC block mailboxes. Not receiver integration or deployment qualification.",
+  "result": "PASS_BOUNDED_ACTUAL_CORE_SERVICE",
+  "source": {
+    "hdl_base_commit": "13df9535ef1acf22280135f30fd8347ae6fdabf4",
+    "firmware_parent_at_report": "6508e60c3de2de611ca84a81f989391a527ba891",
+    "hdl_branch": "codex/starlink-rx-only-do-not-merge",
+    "new_candidate_was_uncommitted_when_snapshotted": true,
+    "source_directory": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v3/frozen_sources",
+    "service_rtl_unchanged_from_v2": true,
+    "production_files_changed_by_this_subtask": false,
+    "sha256": {
+      "starlink_pss_shared_realtime_xfft_service.v": "e07e601073edcb2bf92235883fc922091e73034769e270610333f7917923f3a3",
+      "starlink_pss_realtime_input_guard.v": "7f46eb92ae6fbe5142625216652b7c9f14b4d7f5e8eead6b244720842cf29d5c",
+      "starlink_pss_realtime_result_guard.v": "a3637871ad72551987006b5d5c1e0de716f28a07e706c0decf036e072cd7f35c",
+      "starlink_pss_block_mailbox.v": "924eea7bfd66fd22ea37a6cb4babf14627aae8978efd09872fdda4b6cd119fe8",
+      "tb_starlink_pss_shared_realtime_xfft_service.sv": "99ebf33265aabc328425afbe9c6f83e618e8ce6a02741f05e5b16a96a705b8fb",
+      "probe_runner.tcl": "51e028268cc9782e0f64eb9f649f68834c351b1a8f5ca0bde668862aa127628e",
+      "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+    },
+    "policy_test": {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/tests/test_starlink_shared_realtime_service_policy.py",
+      "sha256": "a9c09bbd3295bbfee6b177c3acd807ed4f1136827f81aadc200f4b6f8065ae84"
+    },
+    "vector_sha256": {
+      "samples_ci16.mem": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723",
+      "forward_q17.mem": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd",
+      "product_q17.mem": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7",
+      "inverse_q17.mem": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1",
+      "forward_exponents.mem": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f",
+      "inverse_exponents.mem": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    }
+  },
+  "execution": {
+    "working_directory": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl",
+    "command": "env LD_LIBRARY_PATH=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE /opt/Xilinx/Vivado/2022.2/bin/vivado -mode batch -nojournal -nolog -source library/starlink_pss_acquisition/simulate_shared_realtime_xfft_service.tcl -tclargs /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v3 /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/score-singlejob-numeric-vectors",
+    "tool": "Vivado 2022.2 / XSim, generated XFFT v9.1 revision8",
+    "terminal_utc": "2026-09-09 07:15:42",
+    "exec_session": 46774,
+    "exec_exit_code": 0,
+    "process_terminal": true,
+    "simulation_finish_ps": 686762600,
+    "actual_fft_clock_period_ns": 5,
+    "actual_slow_clock_period_ns": 10,
+    "full_synthesis_or_implementation_run": false,
+    "radio_or_network_access": false
+  },
+  "machine_verification": {
+    "terminal_marker": "REALTIME_SERVICE_CANDIDATE_PASS healthy_jobs=26 exact_words=13312 starvation_cases=6 final_veto_cases=3 malformed_bank_cases=2 independent_reset_cases=6 configure_reset_cases=2 partial_input_reset_cases=2 postcommit_ACK_fault_cases=1 CAUSE_FENCE_REVIEW_REQUIRED CAPACITY_AND_PHYSICAL_UNQUALIFIED",
+    "terminal_marker_occurrences": 1,
+    "exact_result_rows": 26,
+    "fatal_or_error_diagnostics": 0,
+    "runner_terminal_verifier_passed": true,
+    "all_generated_generic_pairs_compared": 34,
+    "all_generated_generic_pairs_equal_original_realtime_probe": true,
+    "original_wrapper": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/realtime-xfft-protocol-numeric-v1/project/realtime_xfft_protocol_probe.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_probe/synth/starlink_pss_fft512_bfp18_rt_probe.vhd",
+    "generic_comparison_method": "Nonempty anchored C_* => lines: exactly34 in each wrapper, diff -u exit0. Includes32 pinned numeric/protocol generics plus C_XDEVICEFAMILY and C_PART."
+  },
+  "inventory": {
+    "healthy_published_jobs": 26,
+    "healthy_exact_full_36_bit_words": 13312,
+    "starvation_cases": 6,
+    "starvation_after_certified_deliveries": [
+      1,
+      255,
+      511
+    ],
+    "starvation_directions": [
+      "forward",
+      "inverse"
+    ],
+    "exact_final_commit_vendor_fault_veto_cases": 3,
+    "injected_final_fault_classes": [
+      "TLAST_missing",
+      "TLAST_unexpected",
+      "input_halt"
+    ],
+    "malformed_input_bank_cases": 2,
+    "malformed_metadata_positions": [
+      10,
+      511
+    ],
+    "malformed_final_word_had_correct_position_and_TLAST": true,
+    "malformed_input_banks_admitted": 0,
+    "independent_raw_reset_cases": 6,
+    "independent_raw_reset_sides": [
+      "slow resetn only",
+      "fast fft_resetn only"
+    ],
+    "reset_cases_by_phase": {
+      "committed_output_ACK_held_with_next_bank_prefetched": 2,
+      "CONFIGURE_before_actual_config_handshake": 2,
+      "RUN_JOB_after128_certified_inputs": 2
+    },
+    "postcommit_ACK_drain_vendor_fault_cases": 1,
+    "every_fault_or_reset_case_followed_by_exact_numerical_recovery": true,
+    "trace_accounting": {
+      "fast_cycles": 137353,
+      "result_admissions": 42,
+      "registered_input_admissions": 42,
+      "actual_configuration_handshakes": 40,
+      "certified_input_beats": 18174,
+      "completed_input_blocks": 32,
+      "committed_output_blocks": 29,
+      "published_and_consumed_healthy_blocks": 26,
+      "committed_but_unread_blocks_discarded_by_reset": 3,
+      "discarded_block_explanation": "Two interrupted ACK-held epochs plus one postcommit ACK-drain fault epoch. Their slow reader is held; no retroactive commit-revocation claim."
+    }
+  },
+  "verified_contract": [
+    "Every healthy raw FFT word and every published output compare both complete18-bit components, order/index/TLAST, padding, block-floating exponent, independent status, and full descriptor against frozen fixtures.",
+    "Result admission precedes registered input-checker admission by one fast edge; configuration handshake precedes input enable; every per-job FFT reset spans at least two full fast clocks.",
+    "Per-job reset affects only the core/input checker. Common reset owns persistent input/output mailbox epochs and the result guard.",
+    "A complete next input bank remains prefetched while prior output/ACK is held; immutable fast-captured descriptor and held output survive stalls.",
+    "Input identity validation remains in the actual input mailbox; malformed word10 or511 never publishes the ownership toggle or admits a job.",
+    "Local missing-demand checks fault before vendor input-halt observation in all six injected starvation cases; no final output publication occurs.",
+    "All three direct delayed vendor error classes veto the exact final-write edge and remain sticky through ACK drain.",
+    "Either independent raw reset during CONFIGURE or partial input purges the old epoch, prevents stale publication, and supports exact healthy recovery."
+  ],
+  "bounded_latency": {
+    "measured_continuously_queued_jobs": 6,
+    "max_admission_to_final_commit_fast_cycles": 1809,
+    "max_admission_to_final_commit_us": 9.045,
+    "max_consecutive_job_admission_interval_fast_cycles": 2846,
+    "max_consecutive_job_admission_interval_us": 14.23,
+    "max_two_job_admission_interval_fast_cycles": 5692,
+    "max_two_job_admission_interval_us": 28.46,
+    "includes_actual_slow_ACK_per_job_reset_and_configuration": true,
+    "sustained_447_stride_capacity_qualified": false
+  },
+  "artifacts": {
+    "scope": {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v3/scope.txt",
+      "sha256": "0537fa1fb7743881fe793b5d249a8b303c866031ee5a50385acffa1b35c39917"
+    },
+    "simulation_log": {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v3/project/shared_realtime_xfft_service.sim/sim_1/behav/xsim/simulate.log",
+      "sha256": "512f25493293145d86a87f8bdfc2a1637d1a5f3150ba55f084eb9539f6b3a466"
+    },
+    "trace_csv": {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v3/project/shared_realtime_xfft_service.sim/sim_1/behav/xsim/realtime_service_trace.csv",
+      "sha256": "184df692634a5b8e1cde38c1857c6a49627880a56aae917a92dcad290665f3f3"
+    },
+    "generated_wrapper": {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v3/project/shared_realtime_xfft_service.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd",
+      "sha256": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+    }
+  },
+  "focused_checks": {
+    "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/test_starlink_shared_realtime_service_policy.py tests/starlink_oracle/test_realtime_result_guard.py tests/starlink_oracle/test_realtime_input_guard.py",
+    "working_directory": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only",
+    "passed": 22,
+    "failed": 0,
+    "duration_seconds": 1.65,
+    "syntax_check": "iverilog -g2012 -Wall -i -tnull -s tb_starlink_pss_shared_realtime_xfft_service with candidate service, input guard, result guard, and actual mailbox: exit0; no generated-core behavioral simulation claimed from this syntax check"
+  },
+  "retained_history": {
+    "v1": {
+      "result": "FAILED_TESTBENCH_CDC_WAIT",
+      "directory": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v1",
+      "healthy_exact_jobs_before_failure": 17,
+      "log_sha256": "06ae7d83370f77d870b44d0a34b9b4a28ac248fda444891f7b534e6a9b86e473",
+      "reason": "TB waited only for immediate slow-domain fault and prematurely demanded synchronized fast fault/result quarantine. Bounded wait corrected to require all three observations.",
+      "candidate_rtl_bug_found": false,
+      "runner_correctly_rejected_fatal_with_nonzero_exit": true,
+      "evidence_retained": true
+    },
+    "v2": {
+      "result": "PASS_BASELINE",
+      "directory": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/shared-realtime-service-v2",
+      "healthy_jobs": 21,
+      "exact_words": 10752,
+      "log_sha256": "98e6b125c0be01cbec3aabd54b7a7221714b740899380b4aceb9550bed6a0ea7",
+      "trace_sha256": "95f26e174c6e284eaa488f7a1017dfa2b05d2292591ff76477351790ed4fe3c5",
+      "bench_sha256": "6a1cf0b7c38f64d709266ee826aec345007213664300bef2ab9a85976da7b411",
+      "runner_sha256": "9d91f9d6005334dd65ee516a3d4d46a97cb5db64254cd1850456aa2207d54f2b",
+      "service_byte_identical_to_v3": true,
+      "log_and_trace_hashes_reverified_unchanged": true,
+      "evidence_retained": true
+    }
+  },
+  "limits": [
+    "This report qualifies only the bounded isolated service replay, not the score/map pipeline, receiver integration, sustained120ms service, or447-stride acquisition throughput.",
+    "Cause coverage uses fully checked local input deliveries, committed-bank identity, result framing/status, and direct/sticky vendor faults. It is not a universal delayed-event latency bound, SEU proof, or permission to ignore late vendor faults.",
+    "Synthetic forced starvation and vendor events supplement actual-core numeric replay; no hardware fault-injection or radio test occurred.",
+    "No full-chip resource fit, routed timing, implementation clock verification, or CDC physical qualification is claimed.",
+    "A fault after an internal block commit cannot retroactively revoke that commit. ACK-drain tests hold the slow reader and verify persistent quarantine/reset, not recovery of already-consumed output.",
+    "All production defaults remain outside this candidate-only subtask; root-owned opt-in integration is separately reviewed and requires its own evidence."
+  ]
+}
