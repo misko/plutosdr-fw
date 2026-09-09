@@ -323,6 +323,32 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
+### Targeted recorded 25 MS/s replay — 2026-09-09
+
+Capture `cap-20260909T121248-414fb81f488c` has now been replayed offline on
+two continuous, evidence-selected 320 ms windows. A documented +5 MHz
+translation and 3/5 filtered conversion feed the frozen 15 MS/s PSS model;
+this is not a new native 25 MS/s hardware profile. No radio was accessed.
+
+The positive interval passes all three PSS maps and the combined gate with
+the independently saved GLRT-derived +285.799 kHz correction (combined robust
+z=9.96). Its uncorrected baseline fails (z=4.89). Both corrected and uncorrected
+negative runs fail, as do all four combined frame-scrambled controls. The
+independent 2.5 MS/s pilot model and blind GLRT distinguish the same intervals
+without PSS seeds. No numerical clipping or FFT overflow was reported.
+
+Coarse PSS and pilot phases are near 400 microseconds modulo the nominal frame,
+but individual PSS lobes move and the combined drift optimum reaches the bank
+boundary. This does not establish fine timing, a stable clock estimate or lock.
+The tested windows are targeted, not held-out discovery or a false-alarm survey.
+Full input/derivative/backend identities, limitations and next tests are in
+`reports/starlink-capture25-replay-20260909.md` and its companion JSON receipts.
+Actual recorded-data RTL numerical replay also passes for two three-block
+snippets: all 1341 scores per snippet match their full-window C-model slices,
+with all transform values and metadata checked. Support-matched PSS/GLRT phase
+differences remain about 1–2 microseconds, not a fine timing bound. Physical
+timing closure, paired hardware IIO and live lock remain unfinished gates.
+
 ### Private FFT observation enables — 2026-09-09
 
 HDL `90c539cd4ea51bd0dbe3e8154177f62c388d394c` is pushed and remotely
@@ -397,10 +423,9 @@ the map; the extra score did not leak into another map. The unchanged default
 recording or deployment evidence. See
 `reports/starlink-private-descriptor-and-stop-residue-20260909.json`.
 
-The current user-requested next diagnostic is an offline replay of25MS/s
-recording `cap-20260909T121248-414fb81f488c`. That does not add a25MS/s hardware
-profile or waive timing closure. Read only real continuity islands; retain the
-explicit translation/resampling, frequency-assistance and source-support limits.
+The subsequent user-requested 25 MS/s recording diagnostic is reported above.
+It does not add a 25 MS/s hardware profile or waive timing closure. Its explicit
+translation/resampling, frequency-assistance and source-support limits remain.
 
 ### Paired digital stop and native PPU support — 2026-09-09
 

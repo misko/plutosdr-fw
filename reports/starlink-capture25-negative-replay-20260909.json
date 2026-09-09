@@ -1,0 +1,1188 @@
+{
+  "assisted_cfo_hz_requested": 285798.94603620283,
+  "capture": {
+    "applied_settings": {
+      "bandwidth_hz": 25000000,
+      "center_frequency_hz": 1932500000,
+      "gain_mode": "manual",
+      "gains": [
+        {
+          "gain_db": 30.0,
+          "receiver_id": 0,
+          "schema_version": 1
+        }
+      ],
+      "receiver_ids": [
+        0
+      ],
+      "sample_rate_hz": 25000000,
+      "schema_version": 1
+    },
+    "capture_path": "/srv/bulk/leo/recordings/2026/09/09/cap-20260909T121248-414fb81f488c",
+    "continuity_segment_index": 0,
+    "evidence_selected_not_blind": true,
+    "first_device_sample_counter": 3391190207311,
+    "halo_ci16_sha256": "ece60c1cc643567ef6bb44b9c0c9d724001986525d540b00487008761f3572bd",
+    "historical_radio_metadata_only_no_radio_access": true,
+    "manifest_sha256": "aaadf18494225b2ce55b9e1247d45a09e31e4a13ea1b88896ccadabff6ebe20a",
+    "manifest_state": "degraded",
+    "metadata_artifacts": [
+      {
+        "bytes": 60666,
+        "relative_path": "manifest.json",
+        "sha256": "aaadf18494225b2ce55b9e1247d45a09e31e4a13ea1b88896ccadabff6ebe20a"
+      },
+      {
+        "bytes": 14572,
+        "relative_path": "radio-10400056f695001322002d0010ad1719f2/validity-inventory.json",
+        "sha256": "4e1df74427a5d1fccc5827b9992a0fae888a2c5ed45000d58d51a50043960caf"
+      },
+      {
+        "bytes": 8170,
+        "relative_path": "radio-10400056f695001322002d0010ad1719f2/gap-map.json",
+        "sha256": "ef5d4cf43c8063d50f967a314051806ee4b41b4664a91d2a3f4b3c56a57b4c3d"
+      }
+    ],
+    "observed_island": {
+      "content_kind": "observed",
+      "continuity_segment_index": 0,
+      "device_sample_start": 0,
+      "run_index": 0,
+      "sample_count": 82000000,
+      "schema_version": 1,
+      "stored_sample_start": 0
+    },
+    "profile_label_is_not_resolved_tuning": true,
+    "radio_id": "radio_pluto_19f2",
+    "receiver_id": 0,
+    "resolved_plan": {
+      "captured_if_start_hz": 1920000000,
+      "captured_if_stop_hz": 1945000000,
+      "channel_if_start_hz": 1705000000,
+      "channel_if_stop_hz": 1945000000,
+      "gain_controller": {
+        "controller_receiver_ids": [
+          0,
+          1
+        ],
+        "cooldown_periods": 30,
+        "detector_blanking_cycles": 8,
+        "event_capacity": 64,
+        "initial_gain_db": 30,
+        "large_adc_overload_threshold": 49,
+        "large_lmt_overload_threshold": 58,
+        "low_power_dwell_periods": 3,
+        "low_power_threshold": 20,
+        "maximum_gain_db": 62,
+        "minimum_gain_db": 0,
+        "mode": "tandem_hold",
+        "observation_capacity": 64,
+        "power_measurement_samples": 1024,
+        "pulse_high_cycles": 4,
+        "pulse_low_cycles": 4,
+        "request_digest": "sha256:3f20b0cf4cf4f52927275d82db7da2e3294114de22268adac10744ea9a73ec7a",
+        "schema_version": 1,
+        "small_adc_overload_threshold": 48
+      },
+      "pilot_if_center_frequency_hz": 1940312500,
+      "profile_revision": {
+        "profile": {
+          "bandwidth_hz": 25000000,
+          "campaign": "production-native-rates-direct-async-exact-dma-v5",
+          "center_frequency_hz": 1717500000,
+          "continuity_policy": "allow_segments",
+          "description": "60-second 25 MS/s single-RX0 direct-async capture with exact 200 MB DMA and stale-backlog dropping",
+          "duration_seconds": "60",
+          "gain_mode": "manual",
+          "gains": [
+            {
+              "gain_db": 30.0,
+              "receiver_id": 0,
+              "schema_version": 1
+            }
+          ],
+          "kernel_buffers": 50,
+          "lnb_lo_hz": 9750000000,
+          "name": "starlink-ch4-lower-25m-60s-rx0-direct-async-exact-dma-drop-v12",
+          "peer_failure_policy": "fail_session",
+          "prime_refills": 0,
+          "receivers": [
+            0
+          ],
+          "refill_queue_capacity": 64,
+          "refill_samples": 1000000,
+          "require_device_metadata": true,
+          "rf_center_frequency_hz": 11467500000,
+          "sample_count": null,
+          "sample_rate_hz": 25000000,
+          "schema_version": 2,
+          "settle_seconds": "0.5",
+          "starlink_channel": "ch4",
+          "starlink_edge": "lower",
+          "storage_policy": "zstd-128m-device-axis-zero-v1",
+          "synchronization_mode": "best_effort",
+          "tags": [
+            "CAPTURE_ONLY",
+            "DEVICE_AXIS_ZERO_FILL",
+            "DEVICE_BUFFER:DIRECT_ASYNC_EXACT_DMA_DROP_V5",
+            "DMA_QUEUE_200M",
+            "FRESH_DATA_PRIORITY",
+            "LIVE",
+            "MIXED_RATE",
+            "NATIVE_BANDWIDTH",
+            "RANDOM_TUNING",
+            "RINGLESS",
+            "SINGLE_RX",
+            "STANDARD_NATIVE",
+            "TANDEM_CONTROLLER"
+          ]
+        },
+        "revision_digest": "sha256:d833e8c4ba727db490eb1a33cb8290508ff705dd921bf96c816048ae77d91927",
+        "schema_version": 2
+      },
+      "radio_id": "radio_pluto_19f2",
+      "requested_settings": {
+        "bandwidth_hz": 25000000,
+        "center_frequency_hz": 1932500000,
+        "gain_mode": "manual",
+        "gains": [
+          {
+            "gain_db": 30.0,
+            "receiver_id": 0,
+            "schema_version": 1
+          }
+        ],
+        "receiver_ids": [
+          0
+        ],
+        "sample_rate_hz": 25000000,
+        "schema_version": 1
+      },
+      "resolved_sample_count": 1500000000,
+      "schema_version": 2,
+      "starlink_channel": 4,
+      "starlink_edge": "upper"
+    },
+    "serial": "10400056f695001322002d0010ad1719f2",
+    "source_counter_start": 3391202707311,
+    "source_counter_stop": 3391210707311,
+    "source_halo_start_index": 12495000,
+    "source_halo_stop_index": 20505000,
+    "source_sample_axis": "stream-relative device-counter axis, NOT compact observed axis",
+    "source_start_index": 12500000,
+    "source_stop_index": 20500000,
+    "stream_id": "stream-1",
+    "stream_state": "partial",
+    "timeline_digest_crossbound_but_timeline_payload_not_reread": "sha256:feb38bc08cd7a3441b77dd9ad1676df64c31034758921eff11dbee9b1e0e7f6c",
+    "validated_stream_generation": "226718674914901",
+    "verified_chunks": [
+      {
+        "chunk_index": 0,
+        "compressed_bytes": 94447106,
+        "compressed_sha256": "sha256:1b52df0e945a9433b3b8842b595b915f814704d52ac03fb0784bf5242372adb5",
+        "content_kind": "observed",
+        "continuity_segment_index": 0,
+        "device_sample_start": 0,
+        "relative_path": "radio-10400056f695001322002d0010ad1719f2/iq-000000.ci16.zst",
+        "sample_count": 33554432,
+        "sample_format": "ci16_le",
+        "sample_layout": "sample_receiver_iq",
+        "schema_version": 1,
+        "selected_ci16_sha256": "ece60c1cc643567ef6bb44b9c0c9d724001986525d540b00487008761f3572bd",
+        "selected_start_index": 12495000,
+        "selected_stop_index": 20505000,
+        "uncompressed_bytes": 134217728,
+        "uncompressed_sha256": "sha256:1f05c8f54f420e65271f19aced451cbcc2f489aaba8e5f21a4e3ae476ba030f6"
+      }
+    ],
+    "whole_stream_error": "capture integrity degraded: gaps=19, missing_samples=587000000, overflows=19, enqueue_failures=0, device_span=1500000000/1500000000",
+    "whole_stream_logical_iq_digest_not_recomputed": "sha256:f02d3311a2712f7e279845922d0e388e7dee88275c7f473fd13bd4be35643310",
+    "window": "negative"
+  },
+  "cmodel": {
+    "archive": "/opt/Xilinx/Vivado/2022.2/data/ip/xilinx/xfft_v9_1/cmodel/xfft_v9_1_bitacc_cmodel_lin64.zip",
+    "archive_sha256": "0f264e0e15f93fcf5df9c60e715fe51c9bcd9639b578a5ae67be4df5cf2d5f87",
+    "arithmetic_only_not_realtime_core_protocol": true,
+    "data_bits": 18,
+    "fft_samples": 512,
+    "fraction_bits": 17,
+    "twiddle_bits": 16
+  },
+  "completed_utc": "2026-09-09T15:09:10.404966+00:00",
+  "conditioned_ci16": {
+    "bytes": 19223616,
+    "cfo_assistance_applied": false,
+    "first_canonical_index": 7497048,
+    "format": "ci16_le",
+    "includes_supported_halo": true,
+    "layout": "sample_receiver_iq, RX0 only",
+    "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/conditioned-15msps.ci16",
+    "sample_count": 4805904,
+    "sample_rate_hz": 15000000,
+    "sha256": "aba90780b1e18615f1744ce0cf12ae383a643a3952cc8152f256012167a58453",
+    "source_center_denominator": 3,
+    "source_center_numerator_per_index": 5
+  },
+  "conditioning": {
+    "adc_rf_continuity_clock_or_fpga_timing_qualified": false,
+    "canonical_stop_index": 12302952,
+    "clipped_components": 0,
+    "downmix_cycles_per_source_sample": [
+      1,
+      5
+    ],
+    "downmix_hz": 5000000.0,
+    "downmix_sign": "positive multiplies exp(-j*2*pi*f*absolute_source_index/25e6)",
+    "downsample": 5,
+    "filter": {
+      "beta": 8.6,
+      "boundary_policy": "discard every output lacking full original-input FIR support",
+      "causal_group_delay_high_rate_samples": 240,
+      "causal_group_delay_source_samples": 80,
+      "centered_offline": true,
+      "coefficient_dc_sum": 3.000000000000001,
+      "coefficient_encoding": "little-endian float64, ascending causal FIR tap index",
+      "coefficient_sha256": "154dc39c50b14427bf25d85c82511cf3fda48c8c56ef315f86257717801eb86b",
+      "cutoff_hz": 7000000,
+      "full_15mhz_bandwidth_preserved": false,
+      "measured_passband_max_absolute_db": 0.00039890716278640306,
+      "measured_passband_stop_hz": 6500000,
+      "measured_stopband_max_db": -87.56294208763661,
+      "measured_stopband_start_hz": 7500000,
+      "polyphase_dc_sums": [
+        1.0000006376187138,
+        0.9999996811906435,
+        0.9999996811906435
+      ],
+      "response_extrema_are_sampled_not_continuous_bounds": true,
+      "response_fft_length": 262144,
+      "response_grid_spacing_hz": 286.102294921875,
+      "response_normalization": "magnitude / 3 (zero-insertion gain)",
+      "returned_center_delay_source_samples": 0,
+      "taps": 481,
+      "upsampled_rate_hz": 75000000,
+      "window": "kaiser"
+    },
+    "first_canonical_index": 7497048,
+    "first_source_center_numerator": 37485240,
+    "implicit_amplitude_normalization": false,
+    "input_rate_hz": 25000000,
+    "last_source_center_numerator": 61514755,
+    "output_rate_hz": 15000000,
+    "output_sample_count": 4805904,
+    "quantization": "componentwise ties-to-even, then saturate to signed CI16",
+    "schema": "starlink-capture25-condition-v1",
+    "source_center_denominator": 3,
+    "source_dependency_start_index": 12495000,
+    "source_dependency_stop_index": 20504999,
+    "source_input_start_index": 12495000,
+    "source_input_stop_index": 20505000,
+    "upsample": 3
+  },
+  "geometry": {
+    "blocks": 10739,
+    "canonical_start_index": 7500000,
+    "model_input_samples": 4800398,
+    "requested_candidate_scores": 4800000,
+    "required_complete_maps": 3,
+    "source_halo_samples_each_side": 5000,
+    "source_start_index": 12500000,
+    "zero_padding_allowed": false
+  },
+  "hardware_qualified": false,
+  "kernel": {
+    "data_bits": 18,
+    "exact_existing_kernel_match": true,
+    "fraction_bits": 17,
+    "golden_regenerated": false,
+    "int32le_sha256": "0fb4bcf5ce7e2dc7c9354cf3770a9630687b8abeccfbb913465bc19022b26ed7",
+    "memory_sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+    "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/tb/upper_edge_pss_kernel_q17.mem",
+    "word_count": 512
+  },
+  "limitations": [
+    "Evidence-selected windows, not a blind survey",
+    "Host spectral conditioner and vendor C model, not executed RTL",
+    "No native 25 MS/s FPGA, radio, timing, lock, or RF identity qualification",
+    "Frame scrambling is not an independent RF negative control",
+    "Same-window saved PSS result is not asserted"
+  ],
+  "lock_proven": false,
+  "numerical_qualification_pass": true,
+  "schema": "starlink-capture25-pss-replay-v1",
+  "source_artifacts": [
+    {
+      "bytes": 32993,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tools__starlink_capture25_pss_replay.py",
+      "sha256": "ec9832d003e1f5c437df39cd1a6ef213984b15f2379cb605881a84b8463c3299"
+    },
+    {
+      "bytes": 10192,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tools__starlink_capture25_condition.py",
+      "sha256": "916b370d585b5b6b539c87f8cdce36304c982289120b6ed1bf2b7d1612c34016"
+    },
+    {
+      "bytes": 12201,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tools__starlink_pss_acquisition_study.py",
+      "sha256": "d013828361cae43f9c3300f756ce8079ddd3594a5875c944b7c72acb90129da4"
+    },
+    {
+      "bytes": 5120,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/hdl__library__starlink_pss_acquisition__tb__upper_edge_pss_kernel_q17.mem",
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    {
+      "bytes": 4493,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle____init__.py",
+      "sha256": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa"
+    },
+    {
+      "bytes": 19370,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__acquisition.py",
+      "sha256": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b"
+    },
+    {
+      "bytes": 14195,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__ddc.py",
+      "sha256": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05"
+    },
+    {
+      "bytes": 6667,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__fixed.py",
+      "sha256": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9"
+    },
+    {
+      "bytes": 2159,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__numerology.py",
+      "sha256": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015"
+    },
+    {
+      "bytes": 7965,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__pilot_ddc.py",
+      "sha256": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf"
+    },
+    {
+      "bytes": 5374,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__search.py",
+      "sha256": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086"
+    },
+    {
+      "bytes": 7338,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_acquisition.py",
+      "sha256": "1caef056a00d1cd1d72ef6bbad3e8272dd8c1635f16f462f6fe0c38db5db1f47"
+    },
+    {
+      "bytes": 2197,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_block_mailbox_rtl.py",
+      "sha256": "bb91b95afcc617e9e9faab8da47a76c6dfb0ed93eaf1548e1d766b05eb238d9d"
+    },
+    {
+      "bytes": 5828,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_ddc.py",
+      "sha256": "a7b5553d680ec5867cee885d485d98ac5a28855da022117a2aa9a164ac2f6361"
+    },
+    {
+      "bytes": 3233,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_fixed.py",
+      "sha256": "161bf4faec6d9be364de8fd25635c761b5c48c00a8c6a3efc38df9df26ba5733"
+    },
+    {
+      "bytes": 3057,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_map_boundary_stop.py",
+      "sha256": "2311013de3da5c3bf519306b5629832bbf0e002a3c41d8d094abd7be1a5719ad"
+    },
+    {
+      "bytes": 2280,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_map_driver_contract.py",
+      "sha256": "393f77fe84aedf142eb6aea8de30e1903944aef0e52714618103b3a34e22b0a3"
+    },
+    {
+      "bytes": 4107,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_map_health_receipt.py",
+      "sha256": "5b899aef59769430e754c588de6175a49b7e73b875546995507a48823f82b40f"
+    },
+    {
+      "bytes": 3235,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_map_stop_driver.py",
+      "sha256": "6132eebf5eda5c025f1572b30dbc08581569f8e3f491b28c68a4ad662b2dfdbb"
+    },
+    {
+      "bytes": 1303,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_admission_gate.py",
+      "sha256": "1085f58482743ec045a0b5d28e0bd8d2611829beb534a61d14103e34340727de"
+    },
+    {
+      "bytes": 13200,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_capture_rtl.py",
+      "sha256": "920c02a52a1da38f3f25e84b484ed40b0b578b2c51a449bb1891181914688d2f"
+    },
+    {
+      "bytes": 1803,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_clear_commit.py",
+      "sha256": "6fe4d31b831f2ecfe13cabd569d6663ca2a6356d39763e6e9fa4003973d1c67d"
+    },
+    {
+      "bytes": 1580,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_counter_width.py",
+      "sha256": "0e039c8374ed76ea6987f378f5cc2bcd7dff0a0e2623d315e1da5ab926db25b1"
+    },
+    {
+      "bytes": 6013,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_ddc.py",
+      "sha256": "fff8f61598771e345161cb2f1159a5159cb1fd8e944535df2fffcdecb3e5d68f"
+    },
+    {
+      "bytes": 11172,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_ddc_rtl.py",
+      "sha256": "482593eccd08a148a4282d6aa960b972f487a401e323220bf9d31c2a53e97dc8"
+    },
+    {
+      "bytes": 3590,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_driver_lifecycle.py",
+      "sha256": "4f5cb4008e5f8bafdc47617ccda7a4845f537b000d7a209a55184f97080cbc9b"
+    },
+    {
+      "bytes": 6802,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_fir3_rtl.py",
+      "sha256": "fb8865b567c661d9c109c285f44a7861be07995b9e6548b6c2b30f460626c65d"
+    },
+    {
+      "bytes": 1349,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_output_stage.py",
+      "sha256": "789b422c7c7db36cf00dfed369e3e81a180934d6945e3fbe91958b730bc742da"
+    },
+    {
+      "bytes": 1068,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_pacer_memory.py",
+      "sha256": "ebe2992b66cd69fd8704a3c1a803daf7d5328137aa9b5bb30025771a5d1a0cdb"
+    },
+    {
+      "bytes": 2842,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_pilot_rounding_rtl.py",
+      "sha256": "095215e923e3b608e9980a5ea30caa85c5190445bae62cd96086348071319d4b"
+    },
+    {
+      "bytes": 3408,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_psma_boundary_stop.py",
+      "sha256": "254055523b0028488aba4695e732a949c41bb7d2ae7d57b56ddbb8454c74d615"
+    },
+    {
+      "bytes": 1890,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_final_veto_equivalence.py",
+      "sha256": "7e30a45eb64dbe9e25ba8fbeeb43dc2aa034d8682f59aad2e196db7ba0f036ad"
+    },
+    {
+      "bytes": 1123,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_input_guard.py",
+      "sha256": "1e5e2a17a12d466ef0ee7dcc7af1b18eb0e005a8581a60d7abcfba6f62822228"
+    },
+    {
+      "bytes": 5459,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_private_bank.py",
+      "sha256": "89b8bc249610d8f94b45faad2cc50b88f97e617e41f42c0a39b9bb02c64e441f"
+    },
+    {
+      "bytes": 3262,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_private_descriptor.py",
+      "sha256": "bbf9de713a856a0d89116577e248609dd745cde7c959b2c7d23937663fe13817"
+    },
+    {
+      "bytes": 2781,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_private_observations.py",
+      "sha256": "1b5963ec5100b83c837868d4d309565ff730c4279771dc95176497e1864d85a6"
+    },
+    {
+      "bytes": 3529,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_private_return_payload.py",
+      "sha256": "0a3ed0cf96d67cc99ac89c04f1e425971263ce836631db91edfe817d6550345b"
+    },
+    {
+      "bytes": 1245,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_result_guard.py",
+      "sha256": "ce84972d66ad8c8e1f96fcd861871c6deac48478e1cce40375a423ffe5092dda"
+    },
+    {
+      "bytes": 2421,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_realtime_result_guard_equivalence.py",
+      "sha256": "1b24668e6e377318b11146764b3d234619adfc7dbdc6c62f62657caf8ce06111"
+    },
+    {
+      "bytes": 1414,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_sample_cdc_health_rtl.py",
+      "sha256": "d1fbe15579d452807a110c1a392521284ada55c4f167834011ada62ad9d0d18c"
+    },
+    {
+      "bytes": 3072,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_search.py",
+      "sha256": "dd8196477cf41704ef2a38ea1eca63bb9a7ed02a8a03d2235af973f20a03357f"
+    },
+    {
+      "bytes": 7997,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_shared_xfft_integration.py",
+      "sha256": "593d2f42cf5bc805e93851b6173706f8477a6e7a0f52aedad08f555d2fce4b77"
+    },
+    {
+      "bytes": 3697,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_waveforms.py",
+      "sha256": "90104215a2710375b9323a0563e58ee4bca3f383cbb86d3150859744efba63b0"
+    },
+    {
+      "bytes": 4781,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_xfft_bitacc.py",
+      "sha256": "e2aa774a6c919c0354f03aa658bb4179d079e564a4f86b8607825623fcad9f28"
+    },
+    {
+      "bytes": 1096,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_xfft_counter_cut.py",
+      "sha256": "b047341240d3f9b9082968037eefb73be83e687760249044ca7eefce4104116c"
+    },
+    {
+      "bytes": 1166,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_xfft_output_gate.py",
+      "sha256": "a85c9c8024700ac2a0b32d9234f88f0370f085e66281f94173b36494f9706137"
+    },
+    {
+      "bytes": 1425,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__test_xfft_phase_init.py",
+      "sha256": "4fd0ce3db2b74f41151be7d659aff692f09c73dec57eeed1f51032b4b04fe192"
+    },
+    {
+      "bytes": 8470,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__waveforms.py",
+      "sha256": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984"
+    },
+    {
+      "bytes": 20325,
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/frozen_sources/tests__starlink_oracle__xfft_bitacc.py",
+      "sha256": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e"
+    }
+  ],
+  "stage": "complete",
+  "started_utc": "2026-09-09T15:08:40.036233+00:00",
+  "status": "REPLAY_COMPLETE",
+  "variants": [
+    {
+      "assisted_cfo_hz": 0.0,
+      "block_count": 10739,
+      "computed_score_count": 4800333,
+      "conditioning_clipped_components": 0,
+      "derotation": "exp(-j*2*pi*cfo*stream_relative_canonical_index/15e6)",
+      "derotation_clipped_components": 0,
+      "discarded_extra_scores": 333,
+      "externally_assisted_not_blind": false,
+      "forward_block_exponent_histogram": {
+        "0": 6790,
+        "1": 3949
+      },
+      "forward_overflow_blocks": 0,
+      "inverse_block_exponent_histogram": {
+        "1": 3945,
+        "2": 6793,
+        "3": 1
+      },
+      "inverse_overflow_blocks": 0,
+      "maps": {
+        "artifact": {
+          "bytes": 120000,
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/baseline.maps.u16le",
+          "sha256": "838955007b3be184bc7459e85d1066bf2a65b622069596513725c4ede8f3a8cd"
+        },
+        "bounded_search_maximum_ppm": 10.0,
+        "combined_candidate": {
+          "combined_median": 774.0,
+          "combined_score": 1053,
+          "drift_bins_per_tile": 0.0,
+          "estimated_frame_period_samples": 20000.0,
+          "estimated_period_error_ppm": 0.0,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.3604651162790697,
+          "peak_to_median_unbounded": false,
+          "phase_bin": 18357,
+          "phase_bin_center_sample": 18357.0,
+          "phase_bin_start_sample": 18357,
+          "robust_z": 5.086024916053245,
+          "robust_z_unbounded": false,
+          "tile_count": 3
+        },
+        "discarded_leading_scores": 0,
+        "discarded_trailing_scores": 960000,
+        "drift_bank_bins_per_tile": [
+          -12.0,
+          -8.0,
+          -4.0,
+          0.0,
+          4.0,
+          8.0,
+          12.0
+        ],
+        "drift_bank_ppm": [
+          -9.375,
+          -6.25,
+          -3.125,
+          0.0,
+          3.125,
+          6.25,
+          9.375
+        ],
+        "encoding": "row-major unsigned16 little-endian; one row per complete map",
+        "hardware_qualified": false,
+        "lock_proven": false,
+        "maps": [
+          {
+            "candidate_zero_drift": {
+              "combined_median": 256.0,
+              "combined_score": 413,
+              "drift_bins_per_tile": 0.0,
+              "estimated_frame_period_samples": 20000.0,
+              "estimated_period_error_ppm": 0.0,
+              "passes_existing_epoch_gates": false,
+              "peak_to_median": 1.61328125,
+              "peak_to_median_unbounded": false,
+              "phase_bin": 7689,
+              "phase_bin_center_sample": 7689.0,
+              "phase_bin_start_sample": 7689,
+              "robust_z": 5.042621392277402,
+              "robust_z_unbounded": false,
+              "tile_count": 1
+            },
+            "canonical_full_fft_dependency_start_index": 7500000,
+            "canonical_full_fft_dependency_stop_index": 8780273,
+            "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+            "map_index": 0,
+            "source_full_fft_and_fir_dependency_start_index": 12499920,
+            "source_full_fft_and_fir_dependency_stop_index": 14633867,
+            "start_sample_index": 7500000,
+            "stop_sample_index": 8780000
+          },
+          {
+            "candidate_zero_drift": {
+              "combined_median": 258.0,
+              "combined_score": 424,
+              "drift_bins_per_tile": 0.0,
+              "estimated_frame_period_samples": 20000.0,
+              "estimated_period_error_ppm": 0.0,
+              "passes_existing_epoch_gates": false,
+              "peak_to_median": 1.6434108527131783,
+              "peak_to_median_unbounded": false,
+              "phase_bin": 5062,
+              "phase_bin_center_sample": 5062.0,
+              "phase_bin_start_sample": 5062,
+              "robust_z": 5.089339366959764,
+              "robust_z_unbounded": false,
+              "tile_count": 1
+            },
+            "canonical_full_fft_dependency_start_index": 8779761,
+            "canonical_full_fft_dependency_stop_index": 10060481,
+            "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+            "map_index": 1,
+            "source_full_fft_and_fir_dependency_start_index": 14632855,
+            "source_full_fft_and_fir_dependency_stop_index": 16767547,
+            "start_sample_index": 8780000,
+            "stop_sample_index": 10060000
+          },
+          {
+            "candidate_zero_drift": {
+              "combined_median": 258.0,
+              "combined_score": 404,
+              "drift_bins_per_tile": 0.0,
+              "estimated_frame_period_samples": 20000.0,
+              "estimated_period_error_ppm": 0.0,
+              "passes_existing_epoch_gates": false,
+              "peak_to_median": 1.565891472868217,
+              "peak_to_median_unbounded": false,
+              "phase_bin": 2931,
+              "phase_bin_center_sample": 2931.0,
+              "phase_bin_start_sample": 2931,
+              "robust_z": 4.689316708742043,
+              "robust_z_unbounded": false,
+              "tile_count": 1
+            },
+            "canonical_full_fft_dependency_start_index": 10059969,
+            "canonical_full_fft_dependency_stop_index": 11340242,
+            "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+            "map_index": 2,
+            "source_full_fft_and_fir_dependency_start_index": 16766535,
+            "source_full_fft_and_fir_dependency_stop_index": 18900482,
+            "start_sample_index": 10060000,
+            "stop_sample_index": 11340000
+          }
+        ],
+        "period_step_ppm": 3.125,
+        "phase_bin_samples": 1,
+        "shape": [
+          3,
+          20000
+        ],
+        "three_map_existing_epoch_gates_pass": false,
+        "tile_frames": 64
+      },
+      "model_first_canonical_index": 7500000,
+      "model_input_ci16_sha256": "b91a232cda146ca7c823fdf6e8d40bdd29ab7c3cb6894cd276311e86c57db569",
+      "model_input_samples": 4800398,
+      "name": "baseline",
+      "negative_control": {
+        "independent_rf_capture": false,
+        "kind": "independent random circular shifts of complete score frames",
+        "maps": {
+          "artifact": {
+            "bytes": 120000,
+            "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/baseline.frame-scrambled.maps.u16le",
+            "sha256": "c0abb3632ed82622cc4de1d34910bd28e31bce6ce2f34867fd9eb0e76db1fcea"
+          },
+          "bounded_search_maximum_ppm": 10.0,
+          "combined_candidate": {
+            "combined_median": 774.0,
+            "combined_score": 1036,
+            "drift_bins_per_tile": 4.0,
+            "estimated_frame_period_samples": 20000.0625,
+            "estimated_period_error_ppm": 3.1250000001037392,
+            "passes_existing_epoch_gates": false,
+            "peak_to_median": 1.3385012919896642,
+            "peak_to_median_unbounded": false,
+            "phase_bin": 17092,
+            "phase_bin_center_sample": 17092.0,
+            "phase_bin_start_sample": 17092,
+            "robust_z": 4.776123756293728,
+            "robust_z_unbounded": false,
+            "tile_count": 3
+          },
+          "discarded_leading_scores": 0,
+          "discarded_trailing_scores": 960000,
+          "drift_bank_bins_per_tile": [
+            -12.0,
+            -8.0,
+            -4.0,
+            0.0,
+            4.0,
+            8.0,
+            12.0
+          ],
+          "drift_bank_ppm": [
+            -9.375,
+            -6.25,
+            -3.125,
+            0.0,
+            3.125,
+            6.25,
+            9.375
+          ],
+          "encoding": "row-major unsigned16 little-endian; one row per complete map",
+          "hardware_qualified": false,
+          "lock_proven": false,
+          "maps": [
+            {
+              "candidate_zero_drift": {
+                "combined_median": 256.0,
+                "combined_score": 397,
+                "drift_bins_per_tile": 0.0,
+                "estimated_frame_period_samples": 20000.0,
+                "estimated_period_error_ppm": 0.0,
+                "passes_existing_epoch_gates": false,
+                "peak_to_median": 1.55078125,
+                "peak_to_median_unbounded": false,
+                "phase_bin": 16694,
+                "phase_bin_center_sample": 16694.0,
+                "phase_bin_start_sample": 16694,
+                "robust_z": 4.3228725948272695,
+                "robust_z_unbounded": false,
+                "tile_count": 1
+              },
+              "canonical_full_fft_dependency_start_index": 7500000,
+              "canonical_full_fft_dependency_stop_index": 8780273,
+              "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+              "map_index": 0,
+              "source_full_fft_and_fir_dependency_start_index": 12499920,
+              "source_full_fft_and_fir_dependency_stop_index": 14633867,
+              "start_sample_index": 7500000,
+              "stop_sample_index": 8780000
+            },
+            {
+              "candidate_zero_drift": {
+                "combined_median": 258.0,
+                "combined_score": 405,
+                "drift_bins_per_tile": 0.0,
+                "estimated_frame_period_samples": 20000.0,
+                "estimated_period_error_ppm": 0.0,
+                "passes_existing_epoch_gates": false,
+                "peak_to_median": 1.569767441860465,
+                "peak_to_median_unbounded": false,
+                "phase_bin": 9668,
+                "phase_bin_center_sample": 9668.0,
+                "phase_bin_start_sample": 9668,
+                "robust_z": 4.721435316336167,
+                "robust_z_unbounded": false,
+                "tile_count": 1
+              },
+              "canonical_full_fft_dependency_start_index": 8779761,
+              "canonical_full_fft_dependency_stop_index": 10060481,
+              "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+              "map_index": 1,
+              "source_full_fft_and_fir_dependency_start_index": 14632855,
+              "source_full_fft_and_fir_dependency_stop_index": 16767547,
+              "start_sample_index": 8780000,
+              "stop_sample_index": 10060000
+            },
+            {
+              "candidate_zero_drift": {
+                "combined_median": 257.0,
+                "combined_score": 410,
+                "drift_bins_per_tile": 0.0,
+                "estimated_frame_period_samples": 20000.0,
+                "estimated_period_error_ppm": 0.0,
+                "passes_existing_epoch_gates": false,
+                "peak_to_median": 1.595330739299611,
+                "peak_to_median_unbounded": false,
+                "phase_bin": 18040,
+                "phase_bin_center_sample": 18040.0,
+                "phase_bin_start_sample": 18040,
+                "robust_z": 4.690776645450867,
+                "robust_z_unbounded": false,
+                "tile_count": 1
+              },
+              "canonical_full_fft_dependency_start_index": 10059969,
+              "canonical_full_fft_dependency_stop_index": 11340242,
+              "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+              "map_index": 2,
+              "source_full_fft_and_fir_dependency_start_index": 16766535,
+              "source_full_fft_and_fir_dependency_stop_index": 18900482,
+              "start_sample_index": 10060000,
+              "stop_sample_index": 11340000
+            }
+          ],
+          "period_step_ppm": 3.125,
+          "phase_bin_samples": 1,
+          "shape": [
+            3,
+            20000
+          ],
+          "three_map_existing_epoch_gates_pass": false,
+          "tile_frames": 64
+        },
+        "seed": 3391422487
+      },
+      "numerical_qualification_pass": true,
+      "product_overflow_blocks": 0,
+      "qualification_errors": [],
+      "retained_score_count": 4800000,
+      "scores": {
+        "bytes": 4800000,
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/baseline.scores.u8",
+        "sha256": "6e3259dc813a65ec681b6c1a2b73da198f58adac2f36d51349250ce288b51396"
+      },
+      "three_map_candidate_qualified": false,
+      "zero_padded_input_blocks": 0
+    },
+    {
+      "assisted_cfo_hz": 285798.94603620283,
+      "block_count": 10739,
+      "computed_score_count": 4800333,
+      "conditioning_clipped_components": 0,
+      "derotation": "exp(-j*2*pi*cfo*stream_relative_canonical_index/15e6)",
+      "derotation_clipped_components": 0,
+      "discarded_extra_scores": 333,
+      "externally_assisted_not_blind": true,
+      "forward_block_exponent_histogram": {
+        "0": 6820,
+        "1": 3919
+      },
+      "forward_overflow_blocks": 0,
+      "inverse_block_exponent_histogram": {
+        "1": 3915,
+        "2": 6820,
+        "3": 4
+      },
+      "inverse_overflow_blocks": 0,
+      "maps": {
+        "artifact": {
+          "bytes": 120000,
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/assisted.maps.u16le",
+          "sha256": "d337086071fd4d7628517269bdca05e522f9dc64a84ccc1cce073bc967e8da57"
+        },
+        "bounded_search_maximum_ppm": 10.0,
+        "combined_candidate": {
+          "combined_median": 768.0,
+          "combined_score": 1033,
+          "drift_bins_per_tile": 12.0,
+          "estimated_frame_period_samples": 20000.1875,
+          "estimated_period_error_ppm": 9.375000000089173,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.3450520833333333,
+          "peak_to_median_unbounded": false,
+          "phase_bin": 13319,
+          "phase_bin_center_sample": 13319.0,
+          "phase_bin_start_sample": 13319,
+          "robust_z": 4.830812196251291,
+          "robust_z_unbounded": false,
+          "tile_count": 3
+        },
+        "discarded_leading_scores": 0,
+        "discarded_trailing_scores": 960000,
+        "drift_bank_bins_per_tile": [
+          -12.0,
+          -8.0,
+          -4.0,
+          0.0,
+          4.0,
+          8.0,
+          12.0
+        ],
+        "drift_bank_ppm": [
+          -9.375,
+          -6.25,
+          -3.125,
+          0.0,
+          3.125,
+          6.25,
+          9.375
+        ],
+        "encoding": "row-major unsigned16 little-endian; one row per complete map",
+        "hardware_qualified": false,
+        "lock_proven": false,
+        "maps": [
+          {
+            "candidate_zero_drift": {
+              "combined_median": 255.0,
+              "combined_score": 439,
+              "drift_bins_per_tile": 0.0,
+              "estimated_frame_period_samples": 20000.0,
+              "estimated_period_error_ppm": 0.0,
+              "passes_existing_epoch_gates": false,
+              "peak_to_median": 1.7215686274509805,
+              "peak_to_median_unbounded": false,
+              "phase_bin": 7500,
+              "phase_bin_center_sample": 7500.0,
+              "phase_bin_start_sample": 7500,
+              "robust_z": 5.909823797318738,
+              "robust_z_unbounded": false,
+              "tile_count": 1
+            },
+            "canonical_full_fft_dependency_start_index": 7500000,
+            "canonical_full_fft_dependency_stop_index": 8780273,
+            "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+            "map_index": 0,
+            "source_full_fft_and_fir_dependency_start_index": 12499920,
+            "source_full_fft_and_fir_dependency_stop_index": 14633867,
+            "start_sample_index": 7500000,
+            "stop_sample_index": 8780000
+          },
+          {
+            "candidate_zero_drift": {
+              "combined_median": 255.0,
+              "combined_score": 415,
+              "drift_bins_per_tile": 0.0,
+              "estimated_frame_period_samples": 20000.0,
+              "estimated_period_error_ppm": 0.0,
+              "passes_existing_epoch_gates": false,
+              "peak_to_median": 1.6274509803921569,
+              "peak_to_median_unbounded": false,
+              "phase_bin": 19704,
+              "phase_bin_center_sample": 19704.0,
+              "phase_bin_start_sample": 19704,
+              "robust_z": 5.138977215059773,
+              "robust_z_unbounded": false,
+              "tile_count": 1
+            },
+            "canonical_full_fft_dependency_start_index": 8779761,
+            "canonical_full_fft_dependency_stop_index": 10060481,
+            "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+            "map_index": 1,
+            "source_full_fft_and_fir_dependency_start_index": 14632855,
+            "source_full_fft_and_fir_dependency_stop_index": 16767547,
+            "start_sample_index": 8780000,
+            "stop_sample_index": 10060000
+          },
+          {
+            "candidate_zero_drift": {
+              "combined_median": 256.0,
+              "combined_score": 414,
+              "drift_bins_per_tile": 0.0,
+              "estimated_frame_period_samples": 20000.0,
+              "estimated_period_error_ppm": 0.0,
+              "passes_existing_epoch_gates": false,
+              "peak_to_median": 1.6171875,
+              "peak_to_median_unbounded": false,
+              "phase_bin": 10661,
+              "phase_bin_center_sample": 10661.0,
+              "phase_bin_start_sample": 10661,
+              "robust_z": 5.074739999871526,
+              "robust_z_unbounded": false,
+              "tile_count": 1
+            },
+            "canonical_full_fft_dependency_start_index": 10059969,
+            "canonical_full_fft_dependency_stop_index": 11340242,
+            "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+            "map_index": 2,
+            "source_full_fft_and_fir_dependency_start_index": 16766535,
+            "source_full_fft_and_fir_dependency_stop_index": 18900482,
+            "start_sample_index": 10060000,
+            "stop_sample_index": 11340000
+          }
+        ],
+        "period_step_ppm": 3.125,
+        "phase_bin_samples": 1,
+        "shape": [
+          3,
+          20000
+        ],
+        "three_map_existing_epoch_gates_pass": false,
+        "tile_frames": 64
+      },
+      "model_first_canonical_index": 7500000,
+      "model_input_ci16_sha256": "74a96aaf08050cf47b9af9e5bc89c8a9185c57404cdf1c6f74ae6545af6e3f9c",
+      "model_input_samples": 4800398,
+      "name": "assisted",
+      "negative_control": {
+        "independent_rf_capture": false,
+        "kind": "independent random circular shifts of complete score frames",
+        "maps": {
+          "artifact": {
+            "bytes": 120000,
+            "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/assisted.frame-scrambled.maps.u16le",
+            "sha256": "a497bb7554299c9a8920b28492aa895a1f8636863f84024bcb0b181c14f68885"
+          },
+          "bounded_search_maximum_ppm": 10.0,
+          "combined_candidate": {
+            "combined_median": 768.0,
+            "combined_score": 1044,
+            "drift_bins_per_tile": -4.0,
+            "estimated_frame_period_samples": 19999.9375,
+            "estimated_period_error_ppm": -3.124999999992717,
+            "passes_existing_epoch_gates": false,
+            "peak_to_median": 1.359375,
+            "peak_to_median_unbounded": false,
+            "phase_bin": 1334,
+            "phase_bin_center_sample": 1334.0,
+            "phase_bin_start_sample": 1334,
+            "robust_z": 5.031336476095683,
+            "robust_z_unbounded": false,
+            "tile_count": 3
+          },
+          "discarded_leading_scores": 0,
+          "discarded_trailing_scores": 960000,
+          "drift_bank_bins_per_tile": [
+            -12.0,
+            -8.0,
+            -4.0,
+            0.0,
+            4.0,
+            8.0,
+            12.0
+          ],
+          "drift_bank_ppm": [
+            -9.375,
+            -6.25,
+            -3.125,
+            0.0,
+            3.125,
+            6.25,
+            9.375
+          ],
+          "encoding": "row-major unsigned16 little-endian; one row per complete map",
+          "hardware_qualified": false,
+          "lock_proven": false,
+          "maps": [
+            {
+              "candidate_zero_drift": {
+                "combined_median": 255.0,
+                "combined_score": 397,
+                "drift_bins_per_tile": 0.0,
+                "estimated_frame_period_samples": 20000.0,
+                "estimated_period_error_ppm": 0.0,
+                "passes_existing_epoch_gates": false,
+                "peak_to_median": 1.5568627450980392,
+                "peak_to_median_unbounded": false,
+                "phase_bin": 16586,
+                "phase_bin_center_sample": 16586.0,
+                "phase_bin_start_sample": 16586,
+                "robust_z": 4.5608422783655485,
+                "robust_z_unbounded": false,
+                "tile_count": 1
+              },
+              "canonical_full_fft_dependency_start_index": 7500000,
+              "canonical_full_fft_dependency_stop_index": 8780273,
+              "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+              "map_index": 0,
+              "source_full_fft_and_fir_dependency_start_index": 12499920,
+              "source_full_fft_and_fir_dependency_stop_index": 14633867,
+              "start_sample_index": 7500000,
+              "stop_sample_index": 8780000
+            },
+            {
+              "candidate_zero_drift": {
+                "combined_median": 255.0,
+                "combined_score": 399,
+                "drift_bins_per_tile": 0.0,
+                "estimated_frame_period_samples": 20000.0,
+                "estimated_period_error_ppm": 0.0,
+                "passes_existing_epoch_gates": false,
+                "peak_to_median": 1.5647058823529412,
+                "peak_to_median_unbounded": false,
+                "phase_bin": 1330,
+                "phase_bin_center_sample": 1330.0,
+                "phase_bin_start_sample": 1330,
+                "robust_z": 4.6250794935537956,
+                "robust_z_unbounded": false,
+                "tile_count": 1
+              },
+              "canonical_full_fft_dependency_start_index": 8779761,
+              "canonical_full_fft_dependency_stop_index": 10060481,
+              "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+              "map_index": 1,
+              "source_full_fft_and_fir_dependency_start_index": 14632855,
+              "source_full_fft_and_fir_dependency_stop_index": 16767547,
+              "start_sample_index": 8780000,
+              "stop_sample_index": 10060000
+            },
+            {
+              "candidate_zero_drift": {
+                "combined_median": 255.0,
+                "combined_score": 387,
+                "drift_bins_per_tile": 0.0,
+                "estimated_frame_period_samples": 20000.0,
+                "estimated_period_error_ppm": 0.0,
+                "passes_existing_epoch_gates": false,
+                "peak_to_median": 1.5176470588235293,
+                "peak_to_median_unbounded": false,
+                "phase_bin": 9910,
+                "phase_bin_center_sample": 9910.0,
+                "phase_bin_start_sample": 9910,
+                "robust_z": 4.239656202424313,
+                "robust_z_unbounded": false,
+                "tile_count": 1
+              },
+              "canonical_full_fft_dependency_start_index": 10059969,
+              "canonical_full_fft_dependency_stop_index": 11340242,
+              "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+              "map_index": 2,
+              "source_full_fft_and_fir_dependency_start_index": 16766535,
+              "source_full_fft_and_fir_dependency_stop_index": 18900482,
+              "start_sample_index": 10060000,
+              "stop_sample_index": 11340000
+            }
+          ],
+          "period_step_ppm": 3.125,
+          "phase_bin_samples": 1,
+          "shape": [
+            3,
+            20000
+          ],
+          "three_map_existing_epoch_gates_pass": false,
+          "tile_frames": 64
+        },
+        "seed": 3391422487
+      },
+      "numerical_qualification_pass": true,
+      "product_overflow_blocks": 0,
+      "qualification_errors": [],
+      "retained_score_count": 4800000,
+      "scores": {
+        "bytes": 4800000,
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/assisted.scores.u8",
+        "sha256": "f8e5c5ac5b71729fb24c3530215de383bd242fbcab7ec3bb1c597d797b933a20"
+      },
+      "three_map_candidate_qualified": false,
+      "zero_padded_input_blocks": 0
+    }
+  ],
+  "window": "negative"
+}

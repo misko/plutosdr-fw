@@ -1,0 +1,331 @@
+{
+  "schema": "starlink-capture25-recorded-rtl-evidence-v1",
+  "status": "COMPLETE",
+  "hardware_access": false,
+  "native_25msps_fpga_qualified": false,
+  "timing_lock_proven": false,
+  "physical_timing_qualified": false,
+  "runtime_hdl_base": "deb9badcc9a521d4694ceebe0223c97344cb7566",
+  "runtime_changed_for_capture_test": false,
+  "scope": "Two real conditioned recording snippets through actual realtime 512-point 18-bit FFT and score RTL at simulated 15 MS/s; exact subset of full-window C-model scores. No phase-map or fine-stage RTL in this short fixture.",
+  "clock_domains_ns": {
+    "sample_logic": 10,
+    "fft": 5,
+    "fft_phase": 1.3
+  },
+  "first_canonical_index": 540005364,
+  "canonical_stop_index": 540006770,
+  "samples_each": 1406,
+  "scores_each": 1341,
+  "transform_words_each_stage": 1536,
+  "attempts": [
+    {
+      "variant": "baseline",
+      "version": 1,
+      "fixture": {
+        "provenance": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-baseline-fixture-v1/fixture_provenance.json",
+          "sha256": "238a3aa6ed730af60a0d9196fcdb925677adc29fafd533405b1d0d51bcb7b16d"
+        },
+        "manifest": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-baseline-fixture-v1/recorded_fixture.json",
+          "sha256": "f378cb3733777f4ce86d95a0419879e98b2b4c66239385d29ac2edf0a9ed6a0c"
+        },
+        "corrected_slice_ci16_sha256": "712abb7f9e7279ae7c484a33545e2d906d0604d770fd92d404077936e0dd7c03",
+        "exact_score_slice_sha256": "a5c0d07c249afdf9bbbf086e6aa84d277316ed0564876800525f8606af79ffbd",
+        "observed_score_summary": {
+          "maximum": 29,
+          "minimum": 0,
+          "nonzero_count": 1166,
+          "peak_relative_index": 1189
+        },
+        "full_replay_input_hash_bound": true,
+        "all_1406_samples_match_full_replay": true,
+        "all_1341_scores_match_full_replay": true,
+        "source_support": [
+          900008860,
+          900011362
+        ]
+      },
+      "console": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v1.log",
+        "sha256": "e387914f7e43bfe472cb151cd05de5fe0f6b3b042d531dc556071be08f780d31"
+      },
+      "scope": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v1/scope.txt",
+        "sha256": "cc00a86001b9526f80f46ff2ace454c281411eb8b7ff2d145f6fe4f50a476565"
+      },
+      "exit_code": 1,
+      "final_qualified_snapshot": false,
+      "status": "FAILED_BEFORE_ELABORATION",
+      "reason": "Vivado 2022.2 generated broken nested shell quoting for a 64'h sample-index generic; no numerical simulation executed."
+    },
+    {
+      "variant": "baseline",
+      "version": 2,
+      "fixture": {
+        "provenance": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-baseline-fixture-v1/fixture_provenance.json",
+          "sha256": "238a3aa6ed730af60a0d9196fcdb925677adc29fafd533405b1d0d51bcb7b16d"
+        },
+        "manifest": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-baseline-fixture-v1/recorded_fixture.json",
+          "sha256": "f378cb3733777f4ce86d95a0419879e98b2b4c66239385d29ac2edf0a9ed6a0c"
+        },
+        "corrected_slice_ci16_sha256": "712abb7f9e7279ae7c484a33545e2d906d0604d770fd92d404077936e0dd7c03",
+        "exact_score_slice_sha256": "a5c0d07c249afdf9bbbf086e6aa84d277316ed0564876800525f8606af79ffbd",
+        "observed_score_summary": {
+          "maximum": 29,
+          "minimum": 0,
+          "nonzero_count": 1166,
+          "peak_relative_index": 1189
+        },
+        "full_replay_input_hash_bound": true,
+        "all_1406_samples_match_full_replay": true,
+        "all_1341_scores_match_full_replay": true,
+        "source_support": [
+          900008860,
+          900011362
+        ]
+      },
+      "console": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v2.log",
+        "sha256": "e236f9ea0a0b6b2f222f2c5a4ce71fa3a5755cdf4f2a19ca58eb6b559909ef4e"
+      },
+      "scope": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v2/scope.txt",
+        "sha256": "6cb520b2b6c7ce7a428cadec1240949889833eaa42880de8af65283986aad963"
+      },
+      "exit_code": 0,
+      "final_qualified_snapshot": false,
+      "status": "NUMERICAL_REPLAY_PASS",
+      "simulation_log": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v2/project/recorded_iq_to_score_shared.sim/sim_1/behav/xsim/simulate.log",
+        "sha256": "31a97990417611df5eae3ae10a927a53057230a3a410c23499d7ecda9ba64d60"
+      },
+      "simulation_log_text": "Time resolution is 1 ps\nRECORDED_SCORE_ORIGIN first_canonical_index=00000000202fd3f4 sample_count=1406\nRECORDED_SCORE_FAULT_RECOVERY_PASS injected_checker_fault=1 explicit_recovery=1\nRECORDED_SCORE_FFT_RESET_PASS sticky_quarantine=1 explicit_recovery=1\nRECORDED_SCORE_REPLAY_PASS samples=1406 blocks=3 forward=1536 product=1536 inverse=1536 scores=1341 exact_metadata=1 score_stalls=1 NO_PSS_DETECTION_OR_CAPACITY_CLAIM\nRECORDED_SCORE_COUNTS first_canonical_index=00000000202fd3f4 stalled_cycles=154 max_fifo=358\n$finish called at time : 146940 ns : File \"/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v2/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv\" Line 327\n",
+      "generated_ip": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v2/generated_ip.txt",
+        "sha256": "36871add78b8836190ed132eddfe2b89e6c0c19eccf923e0e38bca3b39b78198"
+      },
+      "policy_note": "Numerical replay passed, but frozen policy file retained one stale old-literal text assertion; v3 repeats with corrected passing policy."
+    },
+    {
+      "variant": "baseline",
+      "version": 3,
+      "fixture": {
+        "provenance": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-baseline-fixture-v1/fixture_provenance.json",
+          "sha256": "238a3aa6ed730af60a0d9196fcdb925677adc29fafd533405b1d0d51bcb7b16d"
+        },
+        "manifest": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-baseline-fixture-v1/recorded_fixture.json",
+          "sha256": "f378cb3733777f4ce86d95a0419879e98b2b4c66239385d29ac2edf0a9ed6a0c"
+        },
+        "corrected_slice_ci16_sha256": "712abb7f9e7279ae7c484a33545e2d906d0604d770fd92d404077936e0dd7c03",
+        "exact_score_slice_sha256": "a5c0d07c249afdf9bbbf086e6aa84d277316ed0564876800525f8606af79ffbd",
+        "observed_score_summary": {
+          "maximum": 29,
+          "minimum": 0,
+          "nonzero_count": 1166,
+          "peak_relative_index": 1189
+        },
+        "full_replay_input_hash_bound": true,
+        "all_1406_samples_match_full_replay": true,
+        "all_1341_scores_match_full_replay": true,
+        "source_support": [
+          900008860,
+          900011362
+        ]
+      },
+      "console": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3.log",
+        "sha256": "e4633314847133f9cbb7f3a0e035ba01e5dc7d10942cbcd5ba37123696c7649a"
+      },
+      "scope": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/scope.txt",
+        "sha256": "ddba19a59ca4f7163963be3666f85a715b54c2ccab44f746b7a0fb4609926842"
+      },
+      "exit_code": 0,
+      "final_qualified_snapshot": true,
+      "status": "NUMERICAL_REPLAY_PASS",
+      "simulation_log": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/project/recorded_iq_to_score_shared.sim/sim_1/behav/xsim/simulate.log",
+        "sha256": "c8ad1e75935a396633ce8a031fc1ddd0023cf7a1daae641ee93e07bb90748d27"
+      },
+      "simulation_log_text": "Time resolution is 1 ps\nRECORDED_SCORE_ORIGIN first_canonical_index=00000000202fd3f4 sample_count=1406\nRECORDED_SCORE_FAULT_RECOVERY_PASS injected_checker_fault=1 explicit_recovery=1\nRECORDED_SCORE_FFT_RESET_PASS sticky_quarantine=1 explicit_recovery=1\nRECORDED_SCORE_REPLAY_PASS samples=1406 blocks=3 forward=1536 product=1536 inverse=1536 scores=1341 exact_metadata=1 score_stalls=1 NO_PSS_DETECTION_OR_CAPACITY_CLAIM\nRECORDED_SCORE_COUNTS first_canonical_index=00000000202fd3f4 stalled_cycles=154 max_fifo=358\n$finish called at time : 146940 ns : File \"/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv\" Line 327\n",
+      "generated_ip": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/generated_ip.txt",
+        "sha256": "e52108937dd68f569e565d6f68fe924a1957649a8a08638df08f7e8939db6be4"
+      },
+      "policy_note": "Frozen 70-test runner policy passes, including decimal origin handling; full-width runtime origin checked.",
+      "frozen_scope_text": "scope=recorded_conditioned_ci16_actual_realtime_xfft_and_score_numeric_replay\nfirst_canonical_index=540005364 first_canonical_index_hex=00000000202fd3f4\nsamples=1406 blocks=3 forward=1536 product=1536 inverse=1536 scores=1341\nslow_clock_ns=10 fft_clock_ns=5 fft_phase_ns=1.3 source_msps=15\nscore_stalls=true checker_fault_injected_after_numeric_replay=true independent_fft_reset_after_numeric_replay=true\nsource_kind_is_manifest_provenance_not_independently_authenticated_capture=true\npss_detection_capacity_receiver_physical_or_rf_qualified=false\nhdl_commit=deb9badcc9a521d4694ceebe0223c97344cb7566\nworking_tree_status=?? simulate_recorded_iq_to_score_shared.tcl\n?? tb/tb_starlink_pss_recorded_iq_to_score_shared.sv\nfrozen_source_hashes=0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/create_shared_realtime_xfft_ip.tcl\ne8c1a660c8f0e7f6a797bd92d16ec204c2548d17bb0f0c49d78f8e39d1bfe960  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/forward_exponents.mem\n2cf5f39254443acfc978c140d08a311916d98980701d41ff818b7d3c37fa11ba  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/forward_q17.mem\ne8c1a660c8f0e7f6a797bd92d16ec204c2548d17bb0f0c49d78f8e39d1bfe960  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/inverse_exponents.mem\n546145889979e2e9a0ecf0be7d30d4cffda3fabdab25df0e5e4d13011639251f  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/inverse_q17.mem\ne33df5c93afda30e040814456aa2c2da16b17b9432525a6c8084741884734230  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/product_q17.mem\nf378cb3733777f4ce86d95a0419879e98b2b4c66239385d29ac2edf0a9ed6a0c  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/recorded_fixture.json\n53023ba2aa84192197ffb8fde22ac361d9e7d593c40d81f6064189a4b094bc4c  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/samples_ci16.mem\n3fd004be5a28256ea21d62c17fa466a5ee493e1742c9cd165eda4e74027689e7  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/scores_u8.mem\nae64de63087c86c3c2b48d566b05f1f7675a8fb71d7ac7e3e120c1c949f77ee4  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/simulate_recorded_iq_to_score_shared.tcl\nf6ccb01e9eb7bd6198c9fb7ffd8af1b19d560f4a4ec2f41cb00a49127c0b0a9f  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_block_mailbox.v\nce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_candidate_score_path.v\n6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_energy_cache.v\n6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_energy_join.v\n61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_forward_kernel_join.v\n2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_ifft_qualifier.v\n5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_iq_to_score_shared.v\n47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_kernel_rom.v\nf88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_overlap_scheduler.v\n05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_raw_result_fifo.v\n7f46eb92ae6fbe5142625216652b7c9f14b4d7f5e8eead6b244720842cf29d5c  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_realtime_input_guard.v\n3b9d55d9252d6cab7cec904667db292a5b8e0beee582c1994f08faea9ec22041  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_realtime_result_guard.v\n54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_score_divider.v\n15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_score_divider_radix4.v\nf287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_score_lanes.v\n10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_score_prepare.v\nffc41a65bae297ad370833d65963bd2350fb8a6df03640317bdb69064b898daf  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_shared_realtime_xfft_service.v\n5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_shared_xfft_service.v\n147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_spectrum_product.v\n21740ca5d282ee1aea6b302692ffe3d4d96df1bfacd805d570fec4cea65f6db5  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_transform_fifo.v\n58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/starlink_pss_xfft_block_adapter.v\n9a3a449a086bc05b6b00c616af3274238276a713d198b92440e5589d6d4ddd38  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv\na7b09073a7ff05061801498631248d237337e7fad1238bd235adc953ff89dd31  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/test_starlink_recorded_score_runner_policy.py\n694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/upper_edge_pss_kernel_q17.mem\n84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/verify_realtime_probe_result.tcl\n",
+      "runner": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/simulate_recorded_iq_to_score_shared.tcl",
+        "sha256": "ae64de63087c86c3c2b48d566b05f1f7675a8fb71d7ac7e3e120c1c949f77ee4"
+      },
+      "bench": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv",
+        "sha256": "9a3a449a086bc05b6b00c616af3274238276a713d198b92440e5589d6d4ddd38"
+      },
+      "policy": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-baseline-rtl-v3/frozen_sources/test_starlink_recorded_score_runner_policy.py",
+        "sha256": "a7b09073a7ff05061801498631248d237337e7fad1238bd235adc953ff89dd31"
+      }
+    },
+    {
+      "variant": "assisted",
+      "version": 1,
+      "fixture": {
+        "provenance": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-assisted-fixture-v1/fixture_provenance.json",
+          "sha256": "675e84e86226265617fff58de49a2ede3884dca290e2314dda88e62e6e74f6b1"
+        },
+        "manifest": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-assisted-fixture-v1/recorded_fixture.json",
+          "sha256": "58a6175b18a91cf2d5a32df50d871b64d8321e70587f919582b64bc448702838"
+        },
+        "corrected_slice_ci16_sha256": "b1505e9e47fb301288465cf3115c99c71768c7d637887f665f6288da4e837b35",
+        "exact_score_slice_sha256": "cea392e26a66d92c4596551c9953cf1d4a4d5669c1288a59792a4e23d502d448",
+        "observed_score_summary": {
+          "maximum": 32,
+          "minimum": 0,
+          "nonzero_count": 1164,
+          "peak_relative_index": 616
+        },
+        "full_replay_input_hash_bound": true,
+        "all_1406_samples_match_full_replay": true,
+        "all_1341_scores_match_full_replay": true,
+        "source_support": [
+          900008860,
+          900011362
+        ]
+      },
+      "console": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v1.log",
+        "sha256": "7623751b2475c4a1296e3cd3237438b7ebd919a121de137ec34830e32b5daba2"
+      },
+      "scope": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v1/scope.txt",
+        "sha256": "387d0c587712aee039b333fdc00b2288d8f2409577ea77320e3ef6dd9b0685f4"
+      },
+      "exit_code": 1,
+      "final_qualified_snapshot": false,
+      "status": "FAILED_BEFORE_ELABORATION",
+      "reason": "Vivado 2022.2 generated broken nested shell quoting for a 64'h sample-index generic; no numerical simulation executed."
+    },
+    {
+      "variant": "assisted",
+      "version": 2,
+      "fixture": {
+        "provenance": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-assisted-fixture-v1/fixture_provenance.json",
+          "sha256": "675e84e86226265617fff58de49a2ede3884dca290e2314dda88e62e6e74f6b1"
+        },
+        "manifest": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-assisted-fixture-v1/recorded_fixture.json",
+          "sha256": "58a6175b18a91cf2d5a32df50d871b64d8321e70587f919582b64bc448702838"
+        },
+        "corrected_slice_ci16_sha256": "b1505e9e47fb301288465cf3115c99c71768c7d637887f665f6288da4e837b35",
+        "exact_score_slice_sha256": "cea392e26a66d92c4596551c9953cf1d4a4d5669c1288a59792a4e23d502d448",
+        "observed_score_summary": {
+          "maximum": 32,
+          "minimum": 0,
+          "nonzero_count": 1164,
+          "peak_relative_index": 616
+        },
+        "full_replay_input_hash_bound": true,
+        "all_1406_samples_match_full_replay": true,
+        "all_1341_scores_match_full_replay": true,
+        "source_support": [
+          900008860,
+          900011362
+        ]
+      },
+      "console": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v2.log",
+        "sha256": "8d0b1856a3fa75e47eeb754ffecddedb20e804cf0ca0b8b0b4463ca36e5ef722"
+      },
+      "scope": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v2/scope.txt",
+        "sha256": "c700967c820e99eb4d085ef2367faf3cf3046ec96c5962c356118e9772bc414a"
+      },
+      "exit_code": 0,
+      "final_qualified_snapshot": false,
+      "status": "NUMERICAL_REPLAY_PASS",
+      "simulation_log": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v2/project/recorded_iq_to_score_shared.sim/sim_1/behav/xsim/simulate.log",
+        "sha256": "a1f64d6ac61f34054594f25635fe62b92ea47856284866166214558f28e06fd4"
+      },
+      "simulation_log_text": "Time resolution is 1 ps\nRECORDED_SCORE_ORIGIN first_canonical_index=00000000202fd3f4 sample_count=1406\nRECORDED_SCORE_FAULT_RECOVERY_PASS injected_checker_fault=1 explicit_recovery=1\nRECORDED_SCORE_FFT_RESET_PASS sticky_quarantine=1 explicit_recovery=1\nRECORDED_SCORE_REPLAY_PASS samples=1406 blocks=3 forward=1536 product=1536 inverse=1536 scores=1341 exact_metadata=1 score_stalls=1 NO_PSS_DETECTION_OR_CAPACITY_CLAIM\nRECORDED_SCORE_COUNTS first_canonical_index=00000000202fd3f4 stalled_cycles=154 max_fifo=358\n$finish called at time : 146940 ns : File \"/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v2/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv\" Line 327\n",
+      "generated_ip": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v2/generated_ip.txt",
+        "sha256": "48c9f8037b8fb1a9aebcbc998ca70a2ad7ba8ca0bfff6191b162ac217768aa4f"
+      },
+      "policy_note": "Numerical replay passed, but frozen policy file retained one stale old-literal text assertion; v3 repeats with corrected passing policy."
+    },
+    {
+      "variant": "assisted",
+      "version": 3,
+      "fixture": {
+        "provenance": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-assisted-fixture-v1/fixture_provenance.json",
+          "sha256": "675e84e86226265617fff58de49a2ede3884dca290e2314dda88e62e6e74f6b1"
+        },
+        "manifest": {
+          "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-assisted-fixture-v1/recorded_fixture.json",
+          "sha256": "58a6175b18a91cf2d5a32df50d871b64d8321e70587f919582b64bc448702838"
+        },
+        "corrected_slice_ci16_sha256": "b1505e9e47fb301288465cf3115c99c71768c7d637887f665f6288da4e837b35",
+        "exact_score_slice_sha256": "cea392e26a66d92c4596551c9953cf1d4a4d5669c1288a59792a4e23d502d448",
+        "observed_score_summary": {
+          "maximum": 32,
+          "minimum": 0,
+          "nonzero_count": 1164,
+          "peak_relative_index": 616
+        },
+        "full_replay_input_hash_bound": true,
+        "all_1406_samples_match_full_replay": true,
+        "all_1341_scores_match_full_replay": true,
+        "source_support": [
+          900008860,
+          900011362
+        ]
+      },
+      "console": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3.log",
+        "sha256": "fc3870882da4eda8e10512f3e65042d847892441bcef9ea48cdd55c5af8e9bb8"
+      },
+      "scope": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/scope.txt",
+        "sha256": "f1d41a6f9f5dd75e684436249836d0c62a21ea6e5838d0445fe7578665305281"
+      },
+      "exit_code": 0,
+      "final_qualified_snapshot": true,
+      "status": "NUMERICAL_REPLAY_PASS",
+      "simulation_log": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/project/recorded_iq_to_score_shared.sim/sim_1/behav/xsim/simulate.log",
+        "sha256": "0db1099f6f10f23c2afd38307e98770bc1b43bcefa17572caa1c6e9a4b8f3934"
+      },
+      "simulation_log_text": "Time resolution is 1 ps\nRECORDED_SCORE_ORIGIN first_canonical_index=00000000202fd3f4 sample_count=1406\nRECORDED_SCORE_FAULT_RECOVERY_PASS injected_checker_fault=1 explicit_recovery=1\nRECORDED_SCORE_FFT_RESET_PASS sticky_quarantine=1 explicit_recovery=1\nRECORDED_SCORE_REPLAY_PASS samples=1406 blocks=3 forward=1536 product=1536 inverse=1536 scores=1341 exact_metadata=1 score_stalls=1 NO_PSS_DETECTION_OR_CAPACITY_CLAIM\nRECORDED_SCORE_COUNTS first_canonical_index=00000000202fd3f4 stalled_cycles=154 max_fifo=358\n$finish called at time : 146940 ns : File \"/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv\" Line 327\n",
+      "generated_ip": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/generated_ip.txt",
+        "sha256": "ea9c6ca42781efa3c1dfe93951f6d0a4912062adec829c4d43d4df40469f3d12"
+      },
+      "policy_note": "Frozen 70-test runner policy passes, including decimal origin handling; full-width runtime origin checked.",
+      "frozen_scope_text": "scope=recorded_conditioned_ci16_actual_realtime_xfft_and_score_numeric_replay\nfirst_canonical_index=540005364 first_canonical_index_hex=00000000202fd3f4\nsamples=1406 blocks=3 forward=1536 product=1536 inverse=1536 scores=1341\nslow_clock_ns=10 fft_clock_ns=5 fft_phase_ns=1.3 source_msps=15\nscore_stalls=true checker_fault_injected_after_numeric_replay=true independent_fft_reset_after_numeric_replay=true\nsource_kind_is_manifest_provenance_not_independently_authenticated_capture=true\npss_detection_capacity_receiver_physical_or_rf_qualified=false\nhdl_commit=deb9badcc9a521d4694ceebe0223c97344cb7566\nworking_tree_status=?? simulate_recorded_iq_to_score_shared.tcl\n?? tb/tb_starlink_pss_recorded_iq_to_score_shared.sv\nfrozen_source_hashes=0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/create_shared_realtime_xfft_ip.tcl\nb387e778ad0e166a90c2174189a6caf2d573750cea55c2c2e6f51a1c7fbdb6ca  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/forward_exponents.mem\n4b3410a2a927259f7df57e3b32b8c966dce07753b0de47d09d152bb6a0f605cf  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/forward_q17.mem\n661b76b69148f83bdbca8f88f0cb60f24a82b72728b31c2f854953b1c9511579  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/inverse_exponents.mem\naada59e872d47407b340216eaebea5fd896266dc0a1f49e623e054211ee461c9  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/inverse_q17.mem\n3c8706b6b9ea685755ad844362677aa68ff0f8e48152fc0776f48b37c0f16c61  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/product_q17.mem\n58a6175b18a91cf2d5a32df50d871b64d8321e70587f919582b64bc448702838  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/recorded_fixture.json\nd5e4a044eddb8e085d02765d0becf1ce0ac79c57a7a4df62375753a755f64419  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/samples_ci16.mem\n38932484006f646aa4ac31a39372842920f55b4e9c5b65455467c9eb26072e00  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/scores_u8.mem\nae64de63087c86c3c2b48d566b05f1f7675a8fb71d7ac7e3e120c1c949f77ee4  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/simulate_recorded_iq_to_score_shared.tcl\nf6ccb01e9eb7bd6198c9fb7ffd8af1b19d560f4a4ec2f41cb00a49127c0b0a9f  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_block_mailbox.v\nce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_candidate_score_path.v\n6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_energy_cache.v\n6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_energy_join.v\n61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_forward_kernel_join.v\n2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_ifft_qualifier.v\n5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_iq_to_score_shared.v\n47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_kernel_rom.v\nf88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_overlap_scheduler.v\n05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_raw_result_fifo.v\n7f46eb92ae6fbe5142625216652b7c9f14b4d7f5e8eead6b244720842cf29d5c  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_realtime_input_guard.v\n3b9d55d9252d6cab7cec904667db292a5b8e0beee582c1994f08faea9ec22041  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_realtime_result_guard.v\n54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_score_divider.v\n15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_score_divider_radix4.v\nf287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_score_lanes.v\n10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_score_prepare.v\nffc41a65bae297ad370833d65963bd2350fb8a6df03640317bdb69064b898daf  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_shared_realtime_xfft_service.v\n5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_shared_xfft_service.v\n147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_spectrum_product.v\n21740ca5d282ee1aea6b302692ffe3d4d96df1bfacd805d570fec4cea65f6db5  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_transform_fifo.v\n58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/starlink_pss_xfft_block_adapter.v\n9a3a449a086bc05b6b00c616af3274238276a713d198b92440e5589d6d4ddd38  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv\na7b09073a7ff05061801498631248d237337e7fad1238bd235adc953ff89dd31  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/test_starlink_recorded_score_runner_policy.py\n694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/upper_edge_pss_kernel_q17.mem\n84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452  /home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/verify_realtime_probe_result.tcl\n",
+      "runner": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/simulate_recorded_iq_to_score_shared.tcl",
+        "sha256": "ae64de63087c86c3c2b48d566b05f1f7675a8fb71d7ac7e3e120c1c949f77ee4"
+      },
+      "bench": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/tb_starlink_pss_recorded_iq_to_score_shared.sv",
+        "sha256": "9a3a449a086bc05b6b00c616af3274238276a713d198b92440e5589d6d4ddd38"
+      },
+      "policy": {
+        "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-assisted-rtl-v3/frozen_sources/test_starlink_recorded_score_runner_policy.py",
+        "sha256": "a7b09073a7ff05061801498631248d237337e7fad1238bd235adc953ff89dd31"
+      }
+    }
+  ]
+}

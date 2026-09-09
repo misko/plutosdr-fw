@@ -1,0 +1,1318 @@
+{
+  "schema": "starlink-capture25-map-audit-v1",
+  "date_utc": "2026-09-09",
+  "scope": "Read-only recomputation from immutable saved phase maps, saved GLRT epochs and frozen 66-sample template. No capture reread, C-model/RTL replay, threshold retuning, radio access, runtime edits or physical build.",
+  "qualification": {
+    "hardware_qualified": false,
+    "lock_proven": false,
+    "timing_accuracy_bound_proven": false,
+    "blind_detection_or_false_alarm_rate_proven": false,
+    "new_search_bank_applied": false
+  },
+  "environment": {
+    "python": "3.11.16",
+    "numpy": "2.4.6"
+  },
+  "summary": "Only externally CFO-assisted positive maps pass the existing combined detector gate; all three positive assisted individual maps also pass as observations. This supports a recorded-data candidate, not a unique frame origin or a locked timing bound. The winning drift is the bank edge and follows different ambiguity lobes across maps.",
+  "numerical_method": {
+    "saved_maps": "Exactly3x20000 uint16 little-endian values. Widen to signed64 before arithmetic. For each ORIGINAL drift d in[-12,-8,-4,0,4,8,12], combined[p]=sum(map[i,(p+i*d)%20000]); argmax uses first tie. Median/MAD from that combined map; z=(max-median)/(1.4826*MAD). No new hypotheses or altered gates.",
+    "rank": "One plus number of strictly larger values in a map; ties share rank.",
+    "glrt_fit": "Use every31 saved positive window integer epoch, phase_us=((3*epoch)%100000)/75; fit np.polyfit((window_start-first_window_start)/25e6,phase_us,1). Phase does not cross a modulo boundary here. Overlapping windows violate independence; this is descriptive, not a confidence interval or calibrated clock estimate.",
+    "same_tile_reference": "Only saved20ms windows whose complete support lies inside each64-frame map score interval; compare map maximum to median saved epoch phase. This is not a per-frame timing error distribution.",
+    "autocorrelation": "Frozen projected_pss(15000000,upper), complex128 direct full autocorrelation, squared magnitude divided by zero-lag squared magnitude. These deterministic sidelobes alone do not prove the cause of real-capture lobe selection."
+  },
+  "original_bank_results": [
+    {
+      "window": "positive",
+      "variant": "baseline",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          10848,
+          1028,
+          774.0,
+          4.28301632267638,
+          [
+            381,
+            290,
+            357
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          6802,
+          1027,
+          773.0,
+          4.392837254027056,
+          [
+            331,
+            367,
+            329
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          6578,
+          1024,
+          773.0,
+          4.340953349451933,
+          [
+            339,
+            356,
+            329
+          ]
+        ],
+        [
+          0,
+          0.0,
+          5956,
+          1035,
+          773.0,
+          4.417914474571699,
+          [
+            310,
+            417,
+            308
+          ]
+        ],
+        [
+          4,
+          3.125,
+          9648,
+          1064,
+          774.0,
+          4.890058006205315,
+          [
+            342,
+            313,
+            409
+          ]
+        ],
+        [
+          8,
+          6.25,
+          1732,
+          1042,
+          774.0,
+          4.634962142044295,
+          [
+            373,
+            369,
+            300
+          ]
+        ],
+        [
+          12,
+          9.375,
+          2570,
+          1013,
+          774.0,
+          4.133417731151442,
+          [
+            408,
+            301,
+            304
+          ]
+        ]
+      ]
+    },
+    {
+      "window": "positive",
+      "variant": "baseline.frame-scrambled",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          17022,
+          1061,
+          773.0,
+          5.2500902359259305,
+          [
+            388,
+            359,
+            314
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          1139,
+          1019,
+          773.0,
+          4.484452076520066,
+          [
+            336,
+            358,
+            325
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          18187,
+          995,
+          774.0,
+          4.028715076873717,
+          [
+            330,
+            389,
+            276
+          ]
+        ],
+        [
+          0,
+          0.0,
+          1685,
+          1048,
+          773.0,
+          5.01310699610983,
+          [
+            377,
+            317,
+            354
+          ]
+        ],
+        [
+          4,
+          3.125,
+          9672,
+          1088,
+          773.0,
+          5.591173400924408,
+          [
+            346,
+            415,
+            327
+          ]
+        ],
+        [
+          8,
+          6.25,
+          9947,
+          1010,
+          773.0,
+          4.32038675664738,
+          [
+            355,
+            325,
+            330
+          ]
+        ],
+        [
+          12,
+          9.375,
+          9939,
+          987,
+          774.0,
+          3.990736993569855,
+          [
+            363,
+            294,
+            330
+          ]
+        ]
+      ]
+    },
+    {
+      "window": "positive",
+      "variant": "assisted",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          5999,
+          1198,
+          769.0,
+          7.4193983542425475,
+          [
+            419,
+            492,
+            287
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          6007,
+          1052,
+          768.0,
+          5.040930939246133,
+          [
+            575,
+            185,
+            292
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          6007,
+          1231,
+          768.0,
+          8.007415939427272,
+          [
+            575,
+            399,
+            257
+          ]
+        ],
+        [
+          0,
+          0.0,
+          12029,
+          1054,
+          769.0,
+          4.9289709346366575,
+          [
+            371,
+            364,
+            319
+          ]
+        ],
+        [
+          4,
+          3.125,
+          6007,
+          1312,
+          768.0,
+          9.173074328881695,
+          [
+            575,
+            447,
+            290
+          ]
+        ],
+        [
+          8,
+          6.25,
+          6007,
+          1101,
+          768.0,
+          5.759113407838621,
+          [
+            575,
+            222,
+            304
+          ]
+        ],
+        [
+          12,
+          9.375,
+          6007,
+          1345,
+          769.0,
+          9.96170967842356,
+          [
+            575,
+            427,
+            343
+          ]
+        ]
+      ]
+    },
+    {
+      "window": "positive",
+      "variant": "assisted.frame-scrambled",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          4614,
+          1031,
+          769.0,
+          4.776123756293728,
+          [
+            399,
+            289,
+            343
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          11652,
+          996,
+          769.0,
+          4.138091956788841,
+          [
+            293,
+            372,
+            331
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          11496,
+          992,
+          769.0,
+          4.065174036845425,
+          [
+            332,
+            342,
+            318
+          ]
+        ],
+        [
+          0,
+          0.0,
+          19878,
+          1009,
+          769.0,
+          4.375075196604942,
+          [
+            364,
+            341,
+            304
+          ]
+        ],
+        [
+          4,
+          3.125,
+          11480,
+          1001,
+          769.0,
+          4.229239356718111,
+          [
+            358,
+            325,
+            318
+          ]
+        ],
+        [
+          8,
+          6.25,
+          339,
+          984,
+          769.0,
+          3.919338196958594,
+          [
+            306,
+            347,
+            331
+          ]
+        ],
+        [
+          12,
+          9.375,
+          14060,
+          1011,
+          769.0,
+          4.2954411524562115,
+          [
+            311,
+            338,
+            362
+          ]
+        ]
+      ]
+    },
+    {
+      "window": "negative",
+      "variant": "baseline",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          7843,
+          1007,
+          774.0,
+          4.135693341001228,
+          [
+            346,
+            371,
+            290
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          4263,
+          1031,
+          775.0,
+          4.666746876378605,
+          [
+            318,
+            366,
+            347
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          15238,
+          1004,
+          774.0,
+          4.192780396746403,
+          [
+            263,
+            420,
+            321
+          ]
+        ],
+        [
+          0,
+          0.0,
+          18357,
+          1053,
+          774.0,
+          5.086024916053245,
+          [
+            377,
+            313,
+            363
+          ]
+        ],
+        [
+          4,
+          3.125,
+          4971,
+          1004,
+          774.0,
+          4.082444070516234,
+          [
+            311,
+            318,
+            375
+          ]
+        ],
+        [
+          8,
+          6.25,
+          16525,
+          1016,
+          774.0,
+          4.41153415657665,
+          [
+            324,
+            326,
+            366
+          ]
+        ],
+        [
+          12,
+          9.375,
+          4918,
+          1022,
+          775.0,
+          4.5026815565059195,
+          [
+            336,
+            329,
+            357
+          ]
+        ]
+      ]
+    },
+    {
+      "window": "negative",
+      "variant": "baseline.frame-scrambled",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          17439,
+          1007,
+          774.0,
+          4.247468836703964,
+          [
+            364,
+            321,
+            322
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          4963,
+          1023,
+          774.0,
+          4.419689450254531,
+          [
+            354,
+            338,
+            331
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          19009,
+          997,
+          774.0,
+          3.958195772717914,
+          [
+            325,
+            339,
+            333
+          ]
+        ],
+        [
+          0,
+          0.0,
+          7984,
+          1029,
+          774.0,
+          4.52618799122452,
+          [
+            327,
+            358,
+            344
+          ]
+        ],
+        [
+          4,
+          3.125,
+          17092,
+          1036,
+          774.0,
+          4.776123756293728,
+          [
+            325,
+            329,
+            382
+          ]
+        ],
+        [
+          8,
+          6.25,
+          9815,
+          1022,
+          774.0,
+          4.520911036491774,
+          [
+            346,
+            352,
+            324
+          ]
+        ],
+        [
+          12,
+          9.375,
+          4769,
+          993,
+          775.0,
+          3.9740266369161557,
+          [
+            338,
+            315,
+            340
+          ]
+        ]
+      ]
+    },
+    {
+      "window": "negative",
+      "variant": "assisted",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          6291,
+          1017,
+          768.0,
+          4.5391405164776275,
+          [
+            403,
+            293,
+            321
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          16182,
+          1000,
+          768.0,
+          4.229239356718111,
+          [
+            355,
+            346,
+            299
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          13343,
+          1020,
+          767.0,
+          4.6120584364210435,
+          [
+            324,
+            327,
+            369
+          ]
+        ],
+        [
+          0,
+          0.0,
+          5360,
+          1002,
+          768.0,
+          4.15344309782956,
+          [
+            383,
+            335,
+            284
+          ]
+        ],
+        [
+          4,
+          3.125,
+          16353,
+          1016,
+          768.0,
+          4.520911036491774,
+          [
+            335,
+            306,
+            375
+          ]
+        ],
+        [
+          8,
+          6.25,
+          13319,
+          1021,
+          768.0,
+          4.6120584364210435,
+          [
+            358,
+            294,
+            369
+          ]
+        ],
+        [
+          12,
+          9.375,
+          13319,
+          1033,
+          768.0,
+          4.830812196251291,
+          [
+            358,
+            329,
+            346
+          ]
+        ]
+      ]
+    },
+    {
+      "window": "negative",
+      "variant": "assisted.frame-scrambled",
+      "columns": [
+        "drift_bins_per_tile",
+        "drift_ppm",
+        "phase_bin",
+        "combined_score",
+        "median",
+        "robust_z",
+        "per_map_contributions_at_selected_phase"
+      ],
+      "rows": [
+        [
+          -12,
+          -9.375,
+          3399,
+          1005,
+          768.0,
+          4.32038675664738,
+          [
+            341,
+            333,
+            331
+          ]
+        ],
+        [
+          -8,
+          -6.25,
+          15644,
+          992,
+          768.0,
+          4.08340351683128,
+          [
+            300,
+            332,
+            360
+          ]
+        ],
+        [
+          -4,
+          -3.125,
+          1334,
+          1044,
+          768.0,
+          5.031336476095683,
+          [
+            326,
+            399,
+            319
+          ]
+        ],
+        [
+          0,
+          0.0,
+          12953,
+          1019,
+          768.0,
+          4.5755994764493355,
+          [
+            323,
+            355,
+            341
+          ]
+        ],
+        [
+          4,
+          3.125,
+          17313,
+          999,
+          768.0,
+          4.211009876732256,
+          [
+            331,
+            336,
+            332
+          ]
+        ],
+        [
+          8,
+          6.25,
+          1447,
+          1003,
+          768.0,
+          4.283927796675672,
+          [
+            342,
+            364,
+            297
+          ]
+        ],
+        [
+          12,
+          9.375,
+          10767,
+          984,
+          768.0,
+          3.937567676944448,
+          [
+            315,
+            304,
+            365
+          ]
+        ]
+      ]
+    }
+  ],
+  "positive_assisted": {
+    "single_map_details": [
+      {
+        "map": 0,
+        "score_interval_seconds": [
+          0.0,
+          0.08533333333333333
+        ],
+        "maximum_phase_bin": 6007,
+        "maximum_phase_us": 400.46666666666664,
+        "maximum_score": 575,
+        "top_ten_phase_score_pairs": [
+          [
+            6007,
+            575
+          ],
+          [
+            5968,
+            504
+          ],
+          [
+            5984,
+            502
+          ],
+          [
+            6008,
+            488
+          ],
+          [
+            5976,
+            487
+          ],
+          [
+            6000,
+            480
+          ],
+          [
+            5985,
+            478
+          ],
+          [
+            6016,
+            441
+          ],
+          [
+            6015,
+            428
+          ],
+          [
+            5977,
+            419
+          ]
+        ],
+        "wholly_contained_saved_glrt_window_count": 7,
+        "saved_glrt_phase_us_min_median_max": [
+          399.4,
+          399.4533333333333,
+          399.49333333333334
+        ],
+        "map_maximum_minus_same_tile_glrt_median_us": 1.0133333333333212
+      },
+      {
+        "map": 1,
+        "score_interval_seconds": [
+          0.08533333333333333,
+          0.17066666666666666
+        ],
+        "maximum_phase_bin": 5971,
+        "maximum_phase_us": 398.06666666666666,
+        "maximum_score": 515,
+        "top_ten_phase_score_pairs": [
+          [
+            5971,
+            515
+          ],
+          [
+            5979,
+            506
+          ],
+          [
+            5978,
+            502
+          ],
+          [
+            5987,
+            492
+          ],
+          [
+            6011,
+            447
+          ],
+          [
+            17365,
+            444
+          ],
+          [
+            6010,
+            432
+          ],
+          [
+            6019,
+            427
+          ],
+          [
+            19756,
+            412
+          ],
+          [
+            5986,
+            411
+          ]
+        ],
+        "wholly_contained_saved_glrt_window_count": 7,
+        "saved_glrt_phase_us_min_median_max": [
+          399.53333333333336,
+          399.64,
+          399.7733333333333
+        ],
+        "map_maximum_minus_same_tile_glrt_median_us": -1.5733333333333235
+      },
+      {
+        "map": 2,
+        "score_interval_seconds": [
+          0.17066666666666666,
+          0.256
+        ],
+        "maximum_phase_bin": 5974,
+        "maximum_phase_us": 398.26666666666665,
+        "maximum_score": 456,
+        "top_ten_phase_score_pairs": [
+          [
+            5974,
+            456
+          ],
+          [
+            6013,
+            446
+          ],
+          [
+            6014,
+            442
+          ],
+          [
+            5981,
+            437
+          ],
+          [
+            12674,
+            434
+          ],
+          [
+            6006,
+            426
+          ],
+          [
+            6005,
+            423
+          ],
+          [
+            5426,
+            413
+          ],
+          [
+            5989,
+            410
+          ],
+          [
+            6012,
+            402
+          ]
+        ],
+        "wholly_contained_saved_glrt_window_count": 6,
+        "saved_glrt_phase_us_min_median_max": [
+          399.72,
+          399.82666666666665,
+          399.85333333333335
+        ],
+        "map_maximum_minus_same_tile_glrt_median_us": -1.5600000000000023
+      }
+    ],
+    "winning_drift_bins_per_tile": 12,
+    "winning_drift_ppm": 9.375,
+    "at_search_boundary": true,
+    "winning_phase_bin": 6007,
+    "winning_phase_us": 400.46666666666664,
+    "winning_sampled_map_phases": [
+      6007,
+      6019,
+      6031
+    ],
+    "winning_map_contributions": [
+      575,
+      427,
+      343
+    ],
+    "winning_map_contribution_ranks": [
+      1,
+      8,
+      163
+    ],
+    "next_largest_original_bank_maximum": {
+      "drift_bins_per_tile": 4,
+      "combined_score": 1312,
+      "winning_score_advantage_fraction": 0.025152439024390245
+    },
+    "illustrative_lobe_tracks_not_new_drift_search": {
+      "phase_bins": [
+        [
+          5968,
+          5971,
+          5974
+        ],
+        [
+          6007,
+          6010,
+          6013
+        ]
+      ],
+      "note": "These selected entries from the top-ten lists illustrate approximately3-bin/map lobe movement. They are post-hoc descriptive tracks, not newly accepted detector results."
+    },
+    "individual_maximum_spread_samples": 36,
+    "individual_maximum_spread_us": 2.4,
+    "one_bin_resolution_ns": 66.66666666666667,
+    "resolution_is_not_accuracy": true,
+    "drift_grid_spacing_bins_per_tile": 4,
+    "drift_grid_spacing_ppm": 3.125,
+    "drift_grid_half_step_phase_mismatch_at_third_map_samples": 4,
+    "intra_tile_drift_not_corrected": true,
+    "score_map_duration_seconds": 0.256,
+    "retained_model_score_duration_seconds": 0.32,
+    "trailing_scores_excluded_from_map_detector": 960000,
+    "trailing_duration_seconds": 0.064
+  },
+  "saved_glrt_descriptive_fit": {
+    "window_count": 31,
+    "window_duration_seconds": 0.02,
+    "stride_seconds": 0.01,
+    "slope_us_per_second_numerically_ppm": 1.9774193548375314,
+    "intercept_phase_us": 399.3962903225808,
+    "fitted_drift_samples_per_64frame_map": 2.53109677419204,
+    "residual_us_min_max": [
+      -0.04092473118282669,
+      0.0868709677419588
+    ],
+    "no_statistical_or_physical_accuracy_claim": true
+  },
+  "same_conditioned_data_pilot_checks": {
+    "independent_algorithm_not_independent_data_or_filter": true,
+    "probe_start_seconds": [
+      0,
+      0.1,
+      0.2
+    ],
+    "probe_duration_seconds": 0.02,
+    "phase_us": [
+      399.26666666666665,
+      399.6666666666667,
+      400.06666666666666
+    ],
+    "tracking_cfo_hz": [
+      286139.20454545174,
+      285744.384304375,
+      512585.3848550797
+    ],
+    "margin": [
+      0.4485741650808185,
+      0.463637828642399,
+      0.3801338035393661
+    ],
+    "pilot_lattice_resolution_us": 0.4,
+    "third_cfo_branch_warning": "Third winner512585Hz differs from first two~286kHz by approximately one1/4.4us pilot alias. Do not claim all three independently establish a stable CFO; saved reference also reports alias branches."
+  },
+  "frozen_template_autocorrelation": {
+    "samples": 66,
+    "lags_samples_and_relative_power": [
+      [
+        0,
+        1.0
+      ],
+      [
+        7,
+        0.0007988318282429688
+      ],
+      [
+        8,
+        0.39664753986585655
+      ],
+      [
+        9,
+        0.0002884048202695237
+      ],
+      [
+        15,
+        0.001285464144899048
+      ],
+      [
+        16,
+        0.22771314302948586
+      ],
+      [
+        17,
+        0.0006200987053995002
+      ],
+      [
+        24,
+        0.12410006164982836
+      ],
+      [
+        32,
+        0.05167183510094537
+      ]
+    ],
+    "interpretation": "Strong deterministic8-sample-spaced sidelobes are consistent with an ambiguity-comb explanation of the saved map neighborhoods, but do not establish which RF effect selected each lobe."
+  },
+  "conditioning_interpretation": {
+    "frequency_translation_hz": 5000000,
+    "half_subcarrier_shift_to_apply": 0,
+    "reference": "Existing deployed Leo and live FW both use upper channel reference midpoint+117187.5Hz; positive5MHz downmix is consistent with those conventions. Do not silently substitute the midpoint-only new scanner-plan convention.",
+    "filter": "481 taps at75MHz, Kaiser beta8.6, normalized DC3, centered offline finite-support3/5 FIR; measured sampled passband<=6.5MHz, stopband>=7.5MHz. It is not a complete unmodified15MHz-band signal.",
+    "group_delay": "Complete-support sample centers are returned with zero applied delay; the equivalent causal80-source-sample delay must not be subtracted again.",
+    "possible_mismatch": "The unchanged native15MS projected kernel and the additionally filtered25->15 waveform do not have identical spectral shaping. CFO correction is applied AFTER the low-pass: for assistedCFO+285798.946Hz, a template-frame frequency f was filtered at f+CFO, giving asymmetric effective support. This can alter correlation lobes; the current evidence does not quantify its timing bias or prove it is the dominant cause.",
+    "no_physical_calibration": true
+  },
+  "negative_control_limits": {
+    "positive_assistance_hz": 285798.94603620283,
+    "negative_assistance_hz": 285798.94603620283,
+    "matched_cfo_negative_test_done": true,
+    "matched_cfo_negative_result": "The predeclared negative320ms window used the SAME+285798.94603620283Hz assistance as the positive. Its combined robust_z4.830812196251291 and all three individual map candidates failed the frozen detector gates. This is a completed matched control, not a missing test.",
+    "frame_scramble": "One fixed seed independently circularly shifts each complete score frame, not IQ. It destroys inter-frame phase consistency but is neither independent RF data nor a false-alarm probability estimate.",
+    "gate": "Existing peak/median>=1.15 and robust_z>=6 are frozen heuristics; maxima over20000phases x7drifts are not converted to calibrated significance.",
+    "report_flag_note": "three_map_existing_epoch_gates_pass checks the combined candidate, not an explicit conjunction of the three individual gates. All three assisted positive individual gates happen to pass this run; no runtime change made."
+  },
+  "recommended_next_bounded_tests": [
+    "Finish the separately planned recorded3-block actual-XFFT replay against immutable C-model stage words/scores; numerical agreement proves implementation parity for that1406-input fixture, not detection accuracy or full-window hardware service.",
+    "Predeclare a subsequent diagnostic with a finer drift grid sufficient for one-sample phase maps, retain the original result, report the full score-vs-drift curve and edge flag, and evaluate on held-out windows. Include intra-tile drift or shorter tiles as a separate design comparison; do not describe the current+9.375ppm edge as a measured period.",
+    "Run known-origin synthetic native240->25->same481-tapconditioner->15 with fixed fractional epochs and CFO offsets, alongside direct15 projection. Measure lobe choice/timing bias before proposing any filter-matched kernel. Preserve the current kernel/gates as baseline.",
+    "Retain the completed predeclared matched-CFO negative control, and predeclare additional independent negative windows/CFO controls rather than tuning thresholds on the current positive. One negative interval does not establish a false-alarm probability.",
+    "Use the pilot/GLRT as a coarse candidate and inspect bounded full-rate PSS/SSS timing around prespecified epochs, with ambiguity-lobe reporting and same-support reference comparison. Require calibrated or known-origin tests before assigning66.7ns precision."
+  ],
+  "artifacts": [
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/report.json",
+      "sha256": "58dc4ce36a608fdea6ecfe1b0163a33b84224dca3fbe117580948535583d615b",
+      "bytes": 52608
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/pilot-check.json",
+      "sha256": "09f2063a69bbd7c953650d18c7849c3ecc424bd39e40ca5efd33fa4155ea9c1e",
+      "bytes": 22093
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/baseline.maps.u16le",
+      "sha256": "925106932ba791c87efd03edd6e7b2d9ca97c4c7eba26a582cf7961575e39f6b",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/baseline.frame-scrambled.maps.u16le",
+      "sha256": "c0f2b97ebcdaed25bc795b61537c12b0864d36cf3a1da1bab461a4c803602d87",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/assisted.maps.u16le",
+      "sha256": "ba1ca2b1993fffb4803bc8f02c2e993b2427cb97e363159cf7a430b3bac3471c",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/assisted.frame-scrambled.maps.u16le",
+      "sha256": "184b35761fabed16334ab31ac6d3efb184cb4f57da99b48e032bb8e28444e152",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/report.json",
+      "sha256": "c9ac733870a5886d33cb7bc2d0774252081c374252db1acc6c988a3ea844f52c",
+      "bytes": 52457
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/pilot-check.json",
+      "sha256": "4ed264271cf5b6a81a16b45f165c03d5656f9582f85affefc17e907ac0effca9",
+      "bytes": 22022
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/baseline.maps.u16le",
+      "sha256": "838955007b3be184bc7459e85d1066bf2a65b622069596513725c4ede8f3a8cd",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/baseline.frame-scrambled.maps.u16le",
+      "sha256": "c0abb3632ed82622cc4de1d34910bd28e31bce6ce2f34867fd9eb0e76db1fcea",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/assisted.maps.u16le",
+      "sha256": "d337086071fd4d7628517269bdca05e522f9dc64a84ccc1cce073bc967e8da57",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-negative-v1/assisted.frame-scrambled.maps.u16le",
+      "sha256": "a497bb7554299c9a8920b28492aa895a1f8636863f84024bcb0b181c14f68885",
+      "bytes": 120000
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/reports/cap25-reference-20260909.json",
+      "sha256": "6ffaf5fd7940832c1048d2af2898e99af81ca07d8265616d7c4d36616770044b",
+      "bytes": 38549
+    }
+  ],
+  "inspected_source_hashes_match_positive_frozen_copies": [
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/tools/starlink_capture25_pss_replay.py",
+      "sha256": "ec9832d003e1f5c437df39cd1a6ef213984b15f2379cb605881a84b8463c3299",
+      "frozen_path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/frozen_sources/tools__starlink_capture25_pss_replay.py",
+      "frozen_sha256": "ec9832d003e1f5c437df39cd1a6ef213984b15f2379cb605881a84b8463c3299"
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/tools/starlink_capture25_condition.py",
+      "sha256": "916b370d585b5b6b539c87f8cdce36304c982289120b6ed1bf2b7d1612c34016",
+      "frozen_path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/frozen_sources/tools__starlink_capture25_condition.py",
+      "frozen_sha256": "916b370d585b5b6b539c87f8cdce36304c982289120b6ed1bf2b7d1612c34016"
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/tools/starlink_pss_acquisition_study.py",
+      "sha256": "d013828361cae43f9c3300f756ce8079ddd3594a5875c944b7c72acb90129da4",
+      "frozen_path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/frozen_sources/tools__starlink_pss_acquisition_study.py",
+      "frozen_sha256": "d013828361cae43f9c3300f756ce8079ddd3594a5875c944b7c72acb90129da4"
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/tests/starlink_oracle/acquisition.py",
+      "sha256": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b",
+      "frozen_path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/frozen_sources/tests__starlink_oracle__acquisition.py",
+      "frozen_sha256": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b"
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/tests/starlink_oracle/waveforms.py",
+      "sha256": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+      "frozen_path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/frozen_sources/tests__starlink_oracle__waveforms.py",
+      "frozen_sha256": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984"
+    },
+    {
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/tests/starlink_oracle/xfft_bitacc.py",
+      "sha256": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e",
+      "frozen_path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-positive-v1/frozen_sources/tests__starlink_oracle__xfft_bitacc.py",
+      "frozen_sha256": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e"
+    }
+  ]
+}
