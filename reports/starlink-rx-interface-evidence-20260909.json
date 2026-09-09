@@ -1,0 +1,68 @@
+{
+  "schema": "starlink-rx-interface-evidence-progress-v1",
+  "scope": "Reusable hardware-free PPU RX digital-interface matrix validation. Native collection, hardware calibration, static board timing, RX throughput and RF qualification remain separate.",
+  "ppu_base_commit": "04b93d29753c7cdc3762e5f7a81e11d890bc331f",
+  "ppu_commit": "4bc2ca6a50dd8dd3c925522acfff5466385fbfd5",
+  "ppu_remote_branch": "main",
+  "pushed": true,
+  "primary_ppu_main_fast_forwarded": true,
+  "source": "src/pluto_plus/hardware/rx_interface_evidence.py",
+  "source_sha256": "ddfd052ece7ec6c0e3703ff67b7186cbaaa0ee1af58b67de6d57dcf90ba7fc07",
+  "documentation": "docs/rx-interface-evidence.md",
+  "implementation": [
+    "Strict bounded ASCII parser for exactly one complete 16x16 Linux AD9361 bist_timing_analysis report. Data-delay rows and clock-delay columns must be present in exact order with only o/. cells.",
+    "Assess an explicitly supplied selected setting and expected physical sample clock; do not choose a favorable unrelated cell or accept a different rate.",
+    "Caller explicitly chooses data-line, clock-line or complete-square margin and minimum radius. No clipping or wrapping of unmeasured boundary cells, and no implied nanosecond/PVT/bit-error margin.",
+    "Retain well-formed negative observations, all rejection reasons, original report, SHA256 and parsed matrix. Malformed data is rejected rather than repaired or silently truncated.",
+    "No discovery, IIO, setting writes, calibration, firmware promotion, changed PPU defaults or native collection implementation. Serial/boot/firmware/freshness/readback/restoration attestation remains external."
+  ],
+  "source_review": {
+    "kernel_commit": "4357f41a721df9d89a66be7a2a3f921a71d46bad",
+    "files": ["drivers/iio/adc/ad9361_conv.c", "drivers/iio/adc/ad9361.c"],
+    "findings": [
+      "The timing-report generator changes delays, RX PRBS, ENSM/pin-control and TX attenuation before attempting restoration. It is not an ordinary read-only health query.",
+      "ad9361_dig_tune can clear a tuning failure return when max_freq is zero. Successful command return alone must not satisfy the matrix gate.",
+      "The normal tuner can select zero on one delay axis. A measured margin along the other axis is a distinct claim from a complete square margin."
+    ],
+    "limit": "Local pinned source review, not observation of an installed radio/kernel."
+  },
+  "targeted_tests": {
+    "passed": 72,
+    "seconds": 0.21,
+    "coverage": "Rate ladder including 15/25/30/60MS/s, asymmetric axis orientation, all-fail and wrong-rate controls, exact radii 0..7, every square neighbor, both one-dimensional axes, grid edges, malformed/duplicate/reordered/truncated reports, original hash preservation, immutable receipt and strict configuration.",
+    "fixture_limit": "Synthetic text only; no calibration or RF evidence."
+  },
+  "software_regression": {
+    "exit_code": 0,
+    "passed": 2836,
+    "skipped": 1,
+    "deselected": 10,
+    "seconds": 42.41,
+    "command": "env -u PLUTO_HARDWARE_SERIALS PYTHONPATH=src /home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q -m 'not hardware and not firmware and not browser'",
+    "log": "/tmp/ppu-rx-interface.HtDC0r/full-tests-v1.log",
+    "sha256": "a2b42c364bd1ca4f47a144167b492692f0fa1c321104240ddaa6f621572bf8d1",
+    "skip_reason": "Seeded-hop transmitter-of-record fixture is not installed here.",
+    "warning": "Existing Starlette/httpx test-client deprecation.",
+    "limit": "Hardware, firmware-changing and browser test lanes explicitly excluded."
+  },
+  "static_checks": {
+    "changed_source_and_tests_ruff_passed": true,
+    "package_mypy_exit_code": 0,
+    "package_mypy_source_files": 82,
+    "mypy_log": "/tmp/ppu-rx-interface.HtDC0r/mypy-v1.log",
+    "mypy_sha256": "ceb03ca8a771fe10fa91dfe4fbf19651b6414279728f06b02590702db4fb5286"
+  },
+  "unrelated_ppu_changes": {
+    "preserved_files": ["README.md", "src/pluto_plus/bootstrap_firmware.py", "src/pluto_plus/doctor.py", "tests/test_bootstrap_firmware.py"],
+    "before_and_after_diff_sha256": "eb87e8049367ba2a2f8fccf89123b6c2bb58518175e79dba3f41cddabd07848d",
+    "published": false
+  },
+  "radio_accessed": false,
+  "firmware_flashing_performed": false,
+  "hardware_qualified": false,
+  "next": [
+    "Complete the running fresh FPGA receiver's physical qualification before radio access.",
+    "Implement and test bounded native RX-only timing-evidence collection with exact ownership, affected-setting snapshots, readback and interruption-safe restoration; then qualify it on exact-serial .18.",
+    "Keep native paired IIO, causal PSS refinement, PPU Ethernet .17 live GLRT/PSS verification, 120ms/300s hopping and 30/60MS/s qualification as required separate gates."
+  ]
+}

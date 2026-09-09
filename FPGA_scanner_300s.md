@@ -363,6 +363,24 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### PPU RX-interface matrix evidence — 2026-09-09
+
+PPU main `4bc2ca6a50dd8dd3c925522acfff5466385fbfd5` adds a hardware-free
+validator for complete AD9361 RX timing matrices. It checks the exact rate,
+selected clock/data-delay readback and an explicit one-dimensional or square
+margin policy, retaining negative/raw/hash evidence and rejecting malformed
+reports. It does not collect a matrix, attest a radio, change settings or
+qualify board timing. The pinned driver's test routine changes hardware state;
+a successful command return alone is not proof that tuning succeeded.
+
+All 72 focused tests pass; the hardware/firmware/browser-excluded regression
+passes 2836 tests, with one unavailable seeded fixture skipped and ten cases
+deselected. Changed-file Ruff and package mypy pass. The change is pushed to
+PPU remote main and the primary checkout is fast-forwarded; its four unrelated
+dirty files are byte-for-byte preserved and not published. No radio was accessed.
+Native collection/restoration and the full hardware gates remain open. Evidence:
+`reports/starlink-rx-interface-evidence-20260909.json`.
+
 ### Private input-cursor retirement — 2026-09-09
 
 HDL `f96d0b0d89ee8a8d55a5107b464ebe1b957e789d` removes the metadata and
