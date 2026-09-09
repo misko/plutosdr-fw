@@ -75,6 +75,35 @@ def extension_snapshot():
     return [read(0x5c), read(0x60), read(0x64), *(read(address) for address in range(0x300, 0x340, 4))]
 
 
+@pytest.mark.parametrize("native", [False, True])
+def test_entire_axi_aperture_preserves_registers_and_zero_reserved_pages(native, captures, tmp_path):
+    # Exercise all 1024 word addresses, including every unmapped page and both
+    # snapshot boundaries. No source/job is running and snapshots are reset.
+    rows = [write(0x20, 0x23456789), write(0x30, 12345)]
+    expected = {
+        0x000: 0x474c5231, 0x004: 0x10000, 0x014: 60000000,
+        0x018: 2500000, 0x01c: 24, 0x020: 0x23456789, 0x024: 1,
+        0x028: 1272, 0x02c: 2544, 0x030: 12345, 0x034: 15729,
+        0x038: 19661, 0x03c: 9831, 0x040: 1,
+        0x05c: 0x474c5831, 0x060: 0x10000, 0x064: 16,
+    }
+    if native:
+        config = {0x414: 0x76543210, 0x418: 0xfedcba98, 0x41c: 0x12345678,
+                  0x420: 0x87654321, 0x424: 0xff123456}
+        rows.extend(write(address, value) for address, value in config.items())
+        expected.update(config)
+        expected.update({0x400: 0x474c4e31, 0x404: 0x10000, 0x42c: 79200,
+                         0x454: 0xb04a2fab, 0x458: 1, 0x45c: 60000000, 0x460: 3})
+    rows.extend(read(address) for address in range(0, 4096, 4))
+    output, reads, _ = run(captures(60000000, native=native), rows, tmp_path)
+    assert not output and len(reads) == 1024
+    for address, value in reads:
+        # Source readiness is dynamic telemetry, checked by the capture tests.
+        if address == 0x00c or (native and address == 0x40c):
+            continue
+        assert value == expected.get(address, 0), f"readback at {address:03x}"
+
+
 @pytest.mark.parametrize("count", [350, 1100, 1500, 2300])
 @pytest.mark.parametrize("rate", RATES)
 def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(count, rate, captures, tmp_path):

@@ -89,6 +89,17 @@ def products(sample):
     return [index, a*ri+b*rq, b*ri-a*rq, -a*di-b*dq, a*dq-b*di, a*a+b*b, clipped]
 
 
+def test_every_folded_phase_fits_the_exact_narrow_stage_registers():
+    # Exhaust every possible folded Q18 phase, not a sampled approximation.
+    # The numerical oracle above retains unbounded original phase arithmetic.
+    phase = np.arange(-65536, 65536, dtype=np.int64)
+    for stage, step in enumerate(ANGLE_STEPS):
+        phase -= np.where(phase >= 0, step, -step)
+        bits = 16 if stage < 2 else 17-stage
+        assert np.all(phase >= -(1 << (bits-1)))
+        assert np.all(phase < (1 << (bits-1)))
+
+
 def surviving_samples(cycles, latency):
     pending = {}
     output = []
