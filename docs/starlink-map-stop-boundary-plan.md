@@ -1,6 +1,9 @@
 # Map-publication stop fence: implementation plan
 
-Status: proposed, not implemented or hardware-qualified. This is a bounded
+Status: slice A (default-disabled map-core fence) is implemented and tested in
+HDL `a29fb9f7`; the standalone PPU receipt decoder is on main `5c78c01a`.
+The native controller/driver/recorder protocol below is not yet integrated or
+hardware-qualified. This is a bounded
 prerequisite for a fixed-frequency paired pilot-IQ/map/fine recorder, not a
 replacement for the 300 s scanner, independent GLRT, or subsequent 30/60 MS/s
 work. The first admitted implementation is the shared-XFFT 15 MS/s image.

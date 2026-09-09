@@ -1,0 +1,268 @@
+{
+  "schema": "starlink.paired_receiver.publication_cut_and_map_stop_core.v1",
+  "date_utc": "2026-09-09",
+  "status": "BEHAVIORAL_AND_CORE_STOP_TESTS_PASS_FRESH_RECEIVER_IMPLEMENTATION_RUNNING",
+  "source": {
+    "hdl_commit": "0463f887d592452c940d3c70589becc330d70a0c",
+    "hdl_remote_verified": true,
+    "map_core_commit": "a29fb9f734f80ae9ff23deebeb30c2afee82e343",
+    "baseline_hdl_commit": "2e552234336a5426adcecb538f5da5ced844b7d1",
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "snapshot_note": "Vivado simulations launched from 2e552 plus uncommitted runtime changes; frozen guard88f1de and mapcore dc104b exactly match committed source. Core stop tests enable the feature; receiver simulations/build retain ENABLE_BOUNDARY_STOP=0."
+  },
+  "prior_physical_result": {
+    "report": "reports/starlink-realtime-control-cut-20260909.json",
+    "status": "TIMING_FAIL",
+    "fast_wns_ns": -2.538,
+    "fast_failing_setup_endpoints": 530,
+    "slow_wns_ns": 0.007,
+    "hold_wns_ns": 0.021,
+    "vendor_internal_wns_ns": -1.144,
+    "return_slot_wns_ns": -2.393,
+    "publication_wns_ns": -1.923,
+    "ram_control_wns_ns": -2.535,
+    "deployed": false
+  },
+  "guard_changes": [
+    "Exact effective-count == 512 predicate from 511/512 comparisons, no new latency.",
+    "Capture only 51 private payload bits outside current-cycle fault aggregation; validity, immediate mailbox veto, reason accumulation and sticky quarantine remain.",
+    "Use conditionally equivalent final-only fault predicate ONLY under held-final and registered final qualification; nonfinal words retain full validation."
+  ],
+  "preserved": [
+    "Clock constraints: 100/200 MHz",
+    "512-point BFP18 arithmetic/configuration/coefficients",
+    "Both PSS stages, pilot DMA and shared source counter",
+    "Same-edge final commit veto and fault reason bits",
+    "Default non-realtime selection and explicit shared-realtime opt-in",
+    "PSMA 1.5; no new native stop ABI"
+  ],
+  "behavioral": {
+    "final_veto": {
+      "tests": 12,
+      "watchdogs": [
+        2,
+        5,
+        17
+      ],
+      "conditioned_rows_per_watchdog": 262144,
+      "sequential_edges_per_watchdog": 512,
+      "missing_premise_tests_per_watchdog": 10,
+      "omitted_veto_mutants_rejected": 9,
+      "scope": "Conditional two-state algebra/edge checks; not qualification reachability or vendor latency."
+    },
+    "private_payload": {
+      "tests": 7,
+      "clock_relationships": 3,
+      "exact_private_captures_each": 25882,
+      "fault_edge_captures_each": 21,
+      "fault_epoch_resets_each": 21,
+      "quarantine_checks_each": 504,
+      "count_predicate_combinations": 2048,
+      "negative_mutants_rejected": 4,
+      "legacy_healthy_each": 23,
+      "legacy_rejected_each": 37,
+      "legacy_independent_resets_each": 12
+    },
+    "current_vs_ff4229": {
+      "public_behavior_preserved_in_existing_differential_regression": true,
+      "formal_universal_equivalence": false
+    },
+    "actual_service": {
+      "terminal": true,
+      "exit_code": 0,
+      "root_session": 20342,
+      "base": "hdl/library/starlink_pss_acquisition/build/shared-realtime-publication-cut-service-v1",
+      "healthy_jobs": 26,
+      "exact_raw_and_published_words": 13312,
+      "starvation_cases": 6,
+      "final_veto_cases": 3,
+      "malformed_metadata_cases": 2,
+      "independent_reset_cases": 6,
+      "late_ack_fault_cases": 1
+    },
+    "actual_score": {
+      "terminal": true,
+      "exit_code": 0,
+      "root_session": 26549,
+      "base": "hdl/library/starlink_pss_acquisition/build/realtime-publication-cut-numeric-v1",
+      "source_samples": 1406,
+      "exact_scores": 1341,
+      "exact_words_per_forward_product_inverse_stage": 1536,
+      "global_and_independent_fft_reset_recovery": true
+    },
+    "actual_map": {
+      "terminal": true,
+      "exit_code": 0,
+      "root_session": 82385,
+      "base": "hdl/library/starlink_pss_acquisition/build/realtime-publication-cut-phase-map-v1",
+      "exact_scores": 1341,
+      "exact_map_reads": 447,
+      "healthy_flags": 0,
+      "partial_tile_fault_abort_preserved": true,
+      "limits": "Reduced 3-frame, 447-bin map; stop disabled. Not production shared FFT/map stop proof."
+    },
+    "bursty64": {
+      "terminal": true,
+      "exit_code": 0,
+      "root_session": 3940,
+      "base": "hdl/library/starlink_pss_acquisition/build/realtime-publication-cut-bursty64-v1",
+      "source_samples": 28673,
+      "blocks": 64,
+      "ordered_scores": 28608,
+      "words_per_transform_stage": 32768,
+      "limits": "Counts/order/backlog, not every numerical score and not >=120 ms."
+    }
+  },
+  "map_stop_core": {
+    "implemented": true,
+    "parameter": "ENABLE_BOUNDARY_STOP",
+    "default": 0,
+    "enabled_in_receiver": false,
+    "behavior": "Same-edge new-tile admission fence including DRAIN speculative read; finish current tile and registered publication; acknowledge after empty pipeline; park without overwriting ready banks or inventing discarded/overrun counts.",
+    "metadata": "One actual-publication bank pointer/valid reuses retained bank generation/start; constant 65-bit checked end. Tuple valid only while stop_done; bank release retains it. Enable 0→1 invalidates/rearms.",
+    "health": "Real abort/error counters retained; local same-edge and late faults invalidate success; partial aborts never claim complete. Full-path/bridge health belongs to future PSMA.",
+    "small_geometry_tests": [
+      [
+        4,
+        2
+      ],
+      [
+        8,
+        4
+      ],
+      [
+        16,
+        4
+      ]
+    ],
+    "exercised": [
+      "Every score-request position in small geometries",
+      "WAIT_BANK, WAIT_FRAME, FILL, DRAIN and pending write/publication",
+      "Both ready banks, concurrent read/release, release on ack",
+      "No-input pending; no fabricated timeout success",
+      "Default-disabled omitted Z/forced X/forced 1 inert",
+      "Same-edge and late continuity/read/release faults",
+      "Legacy disable during FILL abort and DRAIN publication",
+      "Released metadata, rearm, idempotent core pulses",
+      "u64 end overflow and saturated generation rejection"
+    ],
+    "production_enabled": {
+      "terminal": true,
+      "exit_code": 0,
+      "phase_bins": 20000,
+      "tile_frames": 64,
+      "segments_per_bank": 10,
+      "request_position": 640013,
+      "accepted_scores": 1280000,
+      "generated_scores": 1360015,
+      "exact_map_words": 20000,
+      "generation": 1,
+      "start_hex": "00000001fff80000",
+      "end_hex": "00000002000b8800",
+      "peak_phase": 7311,
+      "continued_source_during_read_release_clear": true,
+      "log": "/tmp/map-stop-production.rlNWbQ/pytest/test_enabled_stop_with_product0/production-stop.log"
+    },
+    "production_legacy": {
+      "terminal": true,
+      "exit_code": 0,
+      "maps": 3,
+      "accepted_scores": 3840000,
+      "exact_map_words": 60000,
+      "peak_phases": [
+        0,
+        19999,
+        7311
+      ],
+      "log": "/tmp/map-stop-core.Vx1Pk5/legacy-matrix.log"
+    },
+    "focused_adjacent_tests": 59,
+    "independent_review": "No actionable findings; core-only contract.",
+    "root_final_source_tests": {
+      "passed": 5,
+      "seconds": 9.85
+    },
+    "remaining": "PSMA ticket/window/control wiring, coarse-disable coordination, Linux typed request/receipt and IRQ drain, PPU native integration, actual shared FFT + pilot stop proof and feature-enabled physical qualification."
+  },
+  "regression": {
+    "terminal": true,
+    "exit_code": 0,
+    "root_session": 27288,
+    "passed": 761,
+    "seconds": 87.3,
+    "log": "/tmp/starlink-realtime-publication-cut-regression-v1.log",
+    "note": "Final enabled production stop test rerun from frozen final test file: 5 pass in 9.85 s; no runtime source change."
+  },
+  "package": {
+    "terminal": true,
+    "exit_code": 0,
+    "root_session": 61462,
+    "log": "/tmp/starlink-realtime-publication-cut-acquisition-package-v1.log"
+  },
+  "fresh_build": {
+    "status": "RUNNING",
+    "root_session": 99492,
+    "base": "hdl/projects/pluto/shared-realtime-publication-cut-v1",
+    "clean_hdl_at_launch": true,
+    "source_msps": 15,
+    "profile": "paired-pilot",
+    "shared_xfft": 1,
+    "realtime_xfft": 1,
+    "map_boundary_stop": 0,
+    "processing_clock_mhz": 100,
+    "fft_clock_mhz": 200,
+    "ooc_synthesis": false,
+    "reused_checkpoint": false,
+    "constraints_relaxed": false
+  },
+  "structural_audit": {
+    "scope": "Read-only combinational fan-in, not path sensitization or timing closure. Source/checkpoint association is caller-attested build provenance.",
+    "exit_code": 0,
+    "old_stage": "2e552 final post-route",
+    "new_stage": "0463 synthesis checkpoint",
+    "expected_position_source_registers": 9,
+    "private_payload_registers": 51,
+    "position_dependent_private_ce_old": 51,
+    "position_dependent_private_ce_new": 0,
+    "position_dependent_private_d_and_reset_old_and_new": 0,
+    "position_dependent_mailbox_write_ce_old_and_new": 9,
+    "position_dependent_publication_control_old_and_new": "1 of 3",
+    "position_dependent_valid_control_old_and_new": "1 of 3",
+    "final_qualified_hierarchical_net": "Optimized away in both checkpoints; unavailable, not proof of absent dependency.",
+    "log": "/tmp/starlink-publication-fanin.4JTE6a/audit.log",
+    "original_checkpoints_unchanged": true
+  },
+  "baseline_capacity4096": {
+    "status": "RUNNING_NOT_RESTARTED",
+    "root_session": 29730,
+    "hdl_commit": "ff4229bb230437fcd975413390a34c00ffcc226f",
+    "note": "Prior source only. Current publication cut >=120 ms capacity remains unqualified."
+  },
+  "ppu_stop_decoder_report": "reports/starlink-pss-stop-receipt-ppu-20260909.json",
+  "hardware_accessed": false,
+  "deployed": false,
+  "timing_closed": false,
+  "fpga_pss_lock": false,
+  "sha256": {
+    "/tmp/starlink-publication-fanin.4JTE6a/audit.log": "56ca0d1bbeda449abb4e8d75b639e1dcfaf28e008f7475f2f31f9f84b47f0322",
+    "/tmp/starlink-publication-fanin.4JTE6a/audit.jou": "1d19bb7d4a89b593cbb04f95a88cec9fd3844534fac94beb98ca0d41606b1f02",
+    "hdl/projects/pluto/shared-realtime-publication-cut-v1/pluto.runs/synth_1/system_top.dcp": "a46c0db9ed0264fffa563eb382b24404a1f7309cb02edca29aea66f890070af0",
+    "hdl/library/starlink_pss_acquisition/build/shared-realtime-publication-cut-service-v1/frozen_sources/starlink_pss_realtime_result_guard.v": "88f1de9946a8291701f2c6e0ad331dfa0b4063367ef78a20720230d51e3e780b",
+    "hdl/library/starlink_pss_acquisition/build/realtime-publication-cut-phase-map-v1/frozen_sources/starlink_pss_phase_map.v": "dc104b18d4ddc7df3726f884820123a6d382a0c618920477b53a4a0a54e00950",
+    "/tmp/starlink-realtime-publication-cut-regression-v1.log": "b462b17b1f42862d2efa0ee0467f409b3de8f3438350b373d023ab6c5db1e49c",
+    "/tmp/starlink-realtime-publication-cut-acquisition-package-v1.log": "0f68681bbf4e37b1349d07d93366ea687265b4c20ad555275a46b1fc221f95ec",
+    "hdl/library/starlink_pss_acquisition/build/shared-realtime-publication-cut-service-v1-console.log": "9cd951d793eea758e6b1d078c3cda452247abde3d2bbbc209b37aed57070d73e",
+    "hdl/library/starlink_pss_acquisition/build/realtime-publication-cut-numeric-v1-console.log": "acd278138cad70d373613b52e4c25fb461f1d6e5b63d51663eb86393dadac143",
+    "hdl/library/starlink_pss_acquisition/build/realtime-publication-cut-phase-map-v1-console.log": "c20f08ff24c5146abb25f646b03f010da43309f7c1419a4c12176736ba641ea3",
+    "hdl/library/starlink_pss_acquisition/build/realtime-publication-cut-bursty64-v1-console.log": "55cdadc24623288746df7107df2f450388d68c7513624827a288c3fea86c4a29",
+    "/tmp/map-stop-production.rlNWbQ/pytest/test_enabled_stop_with_product0/production-stop.log": "4aba5c36ebe6a1e3b583509ae7df77be89ec52d69fd3254854c7ceb7adc16887",
+    "/tmp/map-stop-core.Vx1Pk5/legacy-matrix.log": "251569c154d280520272dd9432e2d50a74591c05812e1ae4768cb6342685542f",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_phase_map_stop.sv": "ab52d24a9b35c3c76600e37571282353867a26e5f09598add8ae7f18362c8530",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_phase_map_stop_production.sv": "966f8520ffd45d2042dfa4f9496d7ea960cb8d2e9f7ac558e03710667bcdb04e",
+    "tests/starlink_oracle/test_map_boundary_stop.py": "2311013de3da5c3bf519306b5629832bbf0e002a3c41d8d094abd7be1a5719ad",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_final_veto_equivalence.sv": "e32da77a32f8b08825c1340d17ddb5ae3127026b42e71b36b94ef38121a1d1bf",
+    "tests/starlink_oracle/test_realtime_final_veto_equivalence.py": "7e30a45eb64dbe9e25ba8fbeeb43dc2aa034d8682f59aad2e196db7ba0f036ad",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_private_return_payload.sv": "7d4571da352cb43046e4f8678691316caa6c2338b51440974941a5345bb4ec64",
+    "tests/starlink_oracle/test_realtime_private_return_payload.py": "0a3ed0cf96d67cc99ac89c04f1e425971263ce836631db91edfe817d6550345b"
+  }
+}

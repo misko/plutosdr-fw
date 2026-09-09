@@ -1,0 +1,94 @@
+{
+  "schema": "starlink.pss_stop_receipt.ppu.v1",
+  "date_utc": "2026-09-09",
+  "status": "OFFLINE_DECODER_TESTED_PUSHED_NO_ABI_PROMOTION",
+  "ppu_commit": "5c78c01a3f6fa455c9ac86f43d77d0a1ecd171a2",
+  "branch": "main",
+  "source_root": "/home/mouse9911/gits/pluto-plus-utils",
+  "remote_verified": true,
+  "scope": "Pure bounded PSST 1/12 receipt decoding and explicit structural-boundary qualification. Proposed protocol; no new image admitted by PPU IIO clients, no native calls, tickets submitted, hardware access or deployment.",
+  "files": [
+    "src/pluto_plus/hardware/pss_stop.py",
+    "tests/test_pss_stop.py",
+    "docs/pss-stop-receipt.md"
+  ],
+  "contract": {
+    "maximum_text_characters": 512,
+    "ascii_only": true,
+    "word_count": 12,
+    "word_grammar": "exactly eight lowercase hexadecimal digits",
+    "magic": "0x50535354",
+    "version_count": "0x0001000c",
+    "preserve_raw": true,
+    "direct_construction_matches_raw": true,
+    "known_state_bits": 6,
+    "known_failure_bits": 6,
+    "command_codes": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "semantic_checks": "Explicit nonzero u32 expected ticket; matching accepted/terminal tickets; terminal, nonpending, boundary complete, coarse disabled; no retained failure/rejected command. HAS_MAP requires generation1..0xfffffffe and exact representable [S,S+1280000). Empty history requires zero map generation and bounds."
+  },
+  "tests": {
+    "new_focused": {
+      "passed": 84,
+      "seconds": 0.54
+    },
+    "state_failure_command_combinations": 24576,
+    "independent_review": {
+      "finding": "No actionable issue",
+      "focused_passed": 423,
+      "note": "Reviewed original82 tests plus IIO/batches/control; exhaustive combination and cap cases then added as2 tracked tests."
+    },
+    "working_tree_before_last_two_tests": {
+      "passed": 2312,
+      "skipped": 1,
+      "deselected": 10,
+      "warnings": 1,
+      "seconds": 26.59,
+      "log": "/tmp/ppu-stop-receipt-offline-v1.log",
+      "note": "Contains five unrelated dirty tests, excluded from commit."
+    },
+    "clean_committed_archive": {
+      "path": "/tmp/ppu-main-stop-test.HFTwgE",
+      "passed": 2309,
+      "skipped": 1,
+      "deselected": 10,
+      "warnings": 1,
+      "seconds": 32.11,
+      "root_session": 78050,
+      "exit_code": 0,
+      "log": "/tmp/ppu-stop-receipt-clean-v1.log",
+      "import_path_verified": true,
+      "ruff": "pass",
+      "mypy": "pass79sourcefiles"
+    }
+  },
+  "unrelated_dirty_files_preserved": [
+    "README.md",
+    "src/pluto_plus/bootstrap_firmware.py",
+    "src/pluto_plus/doctor.py",
+    "tests/test_bootstrap_firmware.py"
+  ],
+  "limits": [
+    "Decoder success is not firmware capability/geometry admission.",
+    "Structural completion is not fresh health, radio/boot/observation identity, kernel drain, host retention, PSS lock or GLRT agreement.",
+    "An old immutable success cannot substitute for a fresh receipt after a late fault or restart.",
+    "Returned bounds are nominal candidate coordinates, not full FFT input or live ADC/pilot coordinates.",
+    "No controller/kernel/IIO stop operation or paired recorder is implemented by this increment."
+  ],
+  "sha256": {
+    "src/pluto_plus/hardware/pss_stop.py": "132ebe5b8548e321f3186151a9ad7723025bd7639fc0a75c2f5a930efa391ed9",
+    "tests/test_pss_stop.py": "3f4292bb17da41a16c902f843fed6c2d9b0b50dd4f417f48e18321bde4bf050d",
+    "docs/pss-stop-receipt.md": "9c77a634252b56c1e2b4d09e6582674308a3d5474ad8cb5e06205cd89287b4ef",
+    "/tmp/ppu-stop-receipt-clean-v1.log": "3b7fc7103575fa88473a133cca4c02b2e6025d8fca717fbae04c2ee75ebd69db",
+    "/tmp/ppu-stop-receipt-offline-v1.log": "216f52951bae40d3fea7f84fdfe6736a547c26c27c141dd2f467624efdaa991f"
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "firmware_abi_admission_changed": false
+}

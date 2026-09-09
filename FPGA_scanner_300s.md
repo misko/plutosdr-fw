@@ -221,7 +221,14 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   completion. Legacy immediate disable/flush semantics stay unchanged.
   The proposed two-register ticket/receipt ABI, exact boundary semantics and
   executable rollout gates are in `docs/starlink-map-stop-boundary-plan.md`;
-  that document is a plan, not implemented stop support.
+  native controller/driver/recorder stop support is not yet implemented.
+- [x] Add the default-disabled map-core publication fence, with same-edge
+  admission blocking, actual-publication acknowledgment, retained terminal
+  metadata and real fault/abort accounting. This core-only slice is not wired
+  to PSMA/Linux and does not implement tickets or full-path health receipts.
+- [x] Add the pure PSST 1/12 receipt decoder in PPU, with explicit structural
+  qualification and diagnostic failure retention. It does not admit a new
+  firmware ABI or perform native stop/drain operations.
 - [ ] Keep map IRQ/readers alive until published, driver-enqueued and
   host-reassembled terminal generations agree. Use 200-chunk/one-map refills
   initially; a 400-chunk watermark can strand an odd final map after stop.
@@ -299,6 +306,40 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
+### Private return/publication timing cut and production map fence — 2026-09-09
+
+HDL `0463f887d592452c940d3c70589becc330d70a0c` is pushed and remotely
+verified on the do-not-merge branch. It preserves public validity and immediate
+fault veto while removing the expected-position dependency from all 51 private
+payload register enables. A read-only old/new checkpoint audit confirms that
+specific structural change; the nine mailbox write-position enables still
+depend on expected position, so it is not a claim that timing is closed.
+
+Conditional final-veto and private-payload mutation tests pass, alongside the
+actual FFT service, exact score/map replays and a 64-block bursty run. The
+combined regression passes 761 tests. The enabled map-core fence separately
+passes the production 20000-bin by 64-frame geometry: 1280000 accepted scores,
+20000 exact map words, correct 64-bit boundary and retained bank contents while
+the input continues through host-like reads/releases. It remains default-off
+and is not yet connected to native stop controls.
+
+The fresh full receiver build in `shared-realtime-publication-cut-v1` has passed
+synthesis and placement and is routing at the unchanged 100/200 MHz clocks.
+It does not enable the new map fence. Later controller work is not part of this
+frozen netlist. No radio has been accessed or flashed. See
+`reports/starlink-realtime-publication-cut-20260909.json`.
+
+### Pure stop-receipt support in PPU — 2026-09-09
+
+PPU main `5c78c01a3f6fa455c9ac86f43d77d0a1ecd171a2` is tested, pushed and
+remotely verified. The pure proposed PSST v1 decoder preserves raw pending,
+failed, empty and invalidated tuples; explicit qualification checks the exact
+ticket and representable terminal map coordinates. Its 84 tests include all
+24576 state/failure/command combinations. The exact clean committed archive
+passes 2309 offline tests, Ruff and mypy (79 source files). No IIO client ABI
+admission, native calls, radio access or deployment changed. See
+`reports/starlink-pss-stop-receipt-ppu-20260909.json`.
+
 ### First measured realtime control-cone cut — 2026-09-09
 
 HDL `2e552234336a5426adcecb538f5da5ced844b7d1` is pushed to the DNM remote.
@@ -311,10 +352,12 @@ configurations. This is bounded executable comparison, not a formal theorem.
 
 The new source passes actual-core service (26 jobs / 13312 exact words), score
 (1341 exact values), reduced map (447 exact reads), and bursty 64-block capacity
-(28608 ordered scores) tests. The expanded regression passes 737 tests. A new
-clean full receiver build is running in `shared-realtime-control-cut-v1`.
-Independent vendor and publication failures in the baseline remain reasons
-not to assume this first cut closes timing. The older frozen 4096-block soak
+(28608 ordered scores) tests. The expanded regression passes 737 tests. The
+clean full receiver route in `shared-realtime-control-cut-v1` completes but
+fails at -2.538 ns fast WNS, with 530 failing endpoints; slow WNS is +0.007 ns
+and hold +0.021 ns. The watchdog dependency is structurally gone, while the
+worst path now ends at mailbox write-position CE. Independent vendor and
+publication paths still fail. The older frozen 4096-block soak
 continues separately and cannot certify the changed source by itself. No radio
 was accessed or flashed. See `reports/starlink-realtime-control-cut-20260909.json`.
 
