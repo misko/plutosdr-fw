@@ -262,10 +262,38 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
-### Latest control-isolation checkpoint — 2026-09-09
+### Latest counter/retirement checkpoint — 2026-09-09
 
-Current RTL is `2e3280ce63a750b5843d1803e8679537a5bac80a`; HDL head
-`011dca5691352e4de46fd51687f9a02446ff8746` adds only fault-semantics wording.
+HDL `6b58ea9223402ef301be92c6c5930c9c0f0f8e4f` is committed and pushed
+only to the experimental DNM branch. The shared service advances its private
+output-position counter from the raw healthy-phase handshake; dedicated users
+retain the validated default. Publication, exponent/status validation, sticky
+faults and final completion still use their original checked gates. Mailbox
+retirement additionally requires core readiness, removing malformed-input
+readiness from the retirement feedback path without delaying its adapter fault.
+
+The full firmware/oracle/contract regression passes 479 tests. Differential
+adapter tests cover 30 first/middle/final faults in each identity-check mode.
+Real two-clock XFFT replay passes 82 jobs / 41984 exact words, including six
+malformed-input-under-stall cases: the adapter faults immediately while mailbox
+storage/ACK stay held. The maximum saturated pair remains 2974 clocks at
+100 MHz (29.74 us). Numerical replay preserves 1341 scores and all transform
+words; phase-map replay preserves 447 reads and rejects partial faulted maps.
+Bursty/stalled 64-block replay preserves 28608 scores with explicit backlog
+bounds; this does not replace longer-duration qualification.
+
+Fresh full receiver build `counter-retirement-v1` is running, with the same
+100/200 MHz clocks, constraints, coarse/fine detectors and pilot DMA. No new
+physical verdict or deployment qualification exists yet. The completed route
+below belongs to the prior source; its independent vendor-internal failure
+means these wrapper changes alone do not establish closure. No radios accessed.
+See `reports/starlink-shared-fft-counter-retirement-20260909.json`.
+
+### Completed control-isolation checkpoint — 2026-09-09
+
+The completed physical checkpoint uses RTL
+`2e3280ce63a750b5843d1803e8679537a5bac80a`; subsequent HDL diagnostics and
+fault-semantics documentation do not change that frozen receiver RTL.
 Both are pushed exclusively to the DNM branch. The pilot now registers the
 whole IQ/index/visit/support observation before output FIFO admission. Its
 one-clock transport latency does not change signal coordinates or filter delay.
@@ -301,18 +329,29 @@ also passes. Four unrelated PPU edits remain untouched.
 The full `control-isolation-v1` receiver synthesizes to 13416 LUTs, 19037 FFs,
 49 BRAM tiles and 48 DSPs. Medium-spread placement fails by four slices (2383
 remaining available versus 2387 required), with 449 control sets. A bounded
-high-spread trial of the same saved opt DCP is running; clocks, timing exceptions
-and detectors are unchanged. The current 120 ms pilot replay passes all 300000
+high-spread trial of the same saved opt DCP now places and fully routes all
+33446 nets, with zero route errors. Clocks, timing exceptions and detectors
+are unchanged. Setup still fails: 100 MHz WNS -0.289 ns / 28 endpoints;
+200 MHz WNS -1.035 ns / 287 endpoints. Global hold +0.019 ns and all four
+bus-skew checks pass. Final utilization is 13011 LUTs, 19071 FFs, 49 BRAM
+tiles and 44 DSPs. The reduction from 1755 to 315 setup-failing endpoints
+compares both changed RTL and placement, not an isolated causal experiment.
+The current 120 ms pilot replay passes all 300000
 supported outputs with exact IQ hash
 `d653ccfb1f3fb48d10c5c859b316074dc2b7e3229681294b611301043dda97a1`,
 zero capture/DDC faults and zero clips. This exercises RTL AXI/DDC/AXIS and the
 current offline PPU parser, not actual Linux DMA/IIO or RF. There is still no
-current-source routed timing verdict or deployment qualification. A previous vendor-internal FFT
-control path also failed timing, so wrapper changes alone cannot prove closure.
+deployment qualification. The worst 200 MHz path is the expected-output
+counter's validated enable feedback (-1.035 ns); input-mailbox retirement is
+next (-1.006 ns). An independent vendor-internal index-to-CE-prediction path
+also fails (-0.756 ns), so wrapper changes alone cannot prove closure.
+Thirteen missing RX input delays and two control-output delays remain separate
+board-interface qualification work; they are not waived by internal timing.
 No radio was accessed. Fixed-frequency paired orchestration, complete common
 source support, live lock/GLRT comparison, hops and the rate ladder remain open.
 Source pins and completed artifact hashes are recorded in
-`reports/starlink-paired-control-isolation-20260909.json`.
+`reports/starlink-paired-control-isolation-20260909.json` and the terminal
+`reports/starlink-paired-control-isolation-high-route-20260909.json`.
 
 A separate source-pinned FFT diagnostic applied the actual 5 ns clock during
 synthesis as well as implementation. It retains the frozen radix-4/BFP18
@@ -322,6 +361,37 @@ synthesis / 5 ns implementation probe. This does not fix the integrated core
 path or justify changing production IP configuration. Its 50 unqualified OOC
 boundary hold warnings remain excluded from the explicitly internal-only gate;
 see `reports/starlink-shared-fft-actual-synthesis-clock-20260909.json`.
+
+An explicit, diagnostic-only realtime-throttle probe removes the standalone
+CE predictor and measures 1172 LUTs / 2988 FFs / 658 slices: 111 LUTs, 131 FFs
+and 78 slices below the nonrealtime baseline. Internal setup/hold are
++0.192/+0.052 ns, only 24 ps better setup. This changes the vendor handshake
+interface and is NOT a drop-in qualified service. No production XCI changed.
+Including the unqualified OOC boundaries, hold still fails at -1.195 ns across
+38 endpoints; the positive register-to-register result is not overall closure.
+Before considering it, prove input starvation handling, status/data ordering,
+unbackpressured output capture, exact numeric replay and full-service fences;
+then remeasure the full receiver. See
+`reports/starlink-shared-fft-realtime-feasibility-20260909.json`.
+
+PPU main `18608952f76515c1e047dad0cf1d1690f24434a2` adds a pure, explicit
+paired15/shared-ABI1.5 source-support profile with 78 focused tests. It binds
+observation identities, pilot filter histories, actual FFT-block processing
+envelopes and fine capture windows; joins retain negatives and incomplete or
+unobservable records. Geometric inclusion does not prove complete coverage,
+health, continuity, fine-request completion or lock. Initial boundary maps
+may be unobservable, and nominal dwell duration is not the first-to-last-center
+span. Separate 30/60 profiles and the actual paired recorder remain required.
+The repeated PPU offline suite passes 1823 tests (one skip, ten deselections);
+the source-support Ruff/mypy checks pass. Evidence and source hashes are in
+`reports/starlink-paired-source-support-ppu-20260909.json`.
+
+The concurrent-recorder audit also found a terminal-policy dependency:
+disabling the current map engine during FILL increments its aggregate
+`discontinuity_abort_count`. The new graceful-close health receipt correctly
+rejects that condition. Do not forgive it just because software intended to
+stop. Implement and test an explicit bounded terminal-discard receipt or
+stop-at-map-boundary protocol before claiming a fully healthy paired session.
 
 ### Return-stage implementation checkpoint — 2026-09-09
 

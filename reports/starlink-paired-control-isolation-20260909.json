@@ -1,6 +1,6 @@
 {
   "schema": "starlink.paired_receiver.control_isolation_checkpoint.v1",
-  "date_utc": "2026-09-09T04:29:00Z",
+  "date_utc": "2026-09-09T04:47:03Z",
   "goal_status": "active",
   "scope": "Control timing isolation and finite paired IIO health prerequisites; full receiver and live paired gates remain required.",
   "hardware_accessed": false,
@@ -123,7 +123,7 @@
     "source_msps": 15,
     "retained_coarse_fine_pilot_dma": true,
     "constraints_relaxed": false,
-    "last_completed_route_report": "reports/starlink-paired-return-stage-medium-route-20260909.json",
+    "last_completed_route_report": "reports/starlink-paired-control-isolation-high-route-20260909.json",
     "last_completed_route_qualified": false,
     "synthesis": {
       "lut": 13416,
@@ -144,13 +144,16 @@
     },
     "alternate_trial": {
       "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1",
-      "state_at_checkpoint": "running",
+      "state_at_checkpoint": "terminal place/route pass, setup fail",
       "rtl_and_timing_constraints_changed": false,
-      "qualification": false
+      "qualification": false,
+      "result_report": "reports/starlink-paired-control-isolation-high-route-20260909.json",
+      "setup_wns_ns": -1.035,
+      "setup_failing_endpoints": 315
     }
   },
   "pending_at_checkpoint": [
-    "Fresh-source bounded high-spread alternate placement/route; current medium full flow failed by4 slices. Separate internal FFT and board-I/O/CDC gates remain.",
+    "Close remaining100/200MHz setup failures after same-source high-spread place/route success; board-I/O and CDC qualification remain separate.",
     "Prior-source728d 4096block simulation, confirmed live; not new-source qualification.",
     "Common-source paired capture orchestration and persistent300second recording.",
     "Serial-attested .18 qualification before PPU Ethernet deployment to .17.",

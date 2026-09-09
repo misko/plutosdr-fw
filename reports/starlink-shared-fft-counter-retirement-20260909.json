@@ -1,0 +1,116 @@
+{
+  "schema": "starlink.shared_fft.counter_retirement_checkpoint.v1",
+  "date_utc": "2026-09-09",
+  "scope": "Shared-service timing-feedback cuts; frozen arithmetic and publication/fault fences. Physical closure and paired hardware proof pending.",
+  "source": {
+    "hdl_commit": "6b58ea9223402ef301be92c6c5930c9c0f0f8e4f",
+    "prior_receiver_rtl": "2e3280ce63a750b5843d1803e8679537a5bac80a",
+    "diagnostic_only_commit": "32d9788e1b144f8ab068952f6ce679e3e05e6bfb",
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "production_xfft_throttle": "nonrealtime",
+    "generated_xfft_wrapper_sha256": "77ee055d41d2cb535438d7308337aeb9acb492717970cd22cfebc4ccd734ccac"
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "hardware_qualified": false,
+  "fpga_pss_lock": false,
+  "live_glrt_evidence": false,
+  "changes": [
+    "Shared-only raw healthy-phase private output-position advancement; dedicated default, output/status/exponent/completion and sticky-fault gates remain validation-qualified.",
+    "Mailbox retirement additionally requires core_input_ready. Malformed stalled metadata still faults immediately; unpublished mailbox storage and ACK remain held until reset."
+  ],
+  "verification": {
+    "firmware_regression": {
+      "passed": 479,
+      "seconds": 72.54,
+      "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py tests/test_starlink_pss_multirate_build_contract.py tests/test_starlink_pilot_iio_contract.py tests/test_starlink_paired_packing_policy.py tests/test_starlink_physical_trial_policy.py"
+    },
+    "counter_differential": {
+      "identity_modes": 2,
+      "adversarial_cases_per_mode": 30,
+      "positions": [
+        "first",
+        "middle",
+        "final"
+      ],
+      "public_interface_equivalent": true,
+      "healthy_shadow_counter": true,
+      "reset_and_flush_recovery": true
+    },
+    "service": {
+      "jobs": 82,
+      "exact_words": 41984,
+      "max_saturated_pair_slow_cycles": 2974,
+      "slow_clock_mhz": 100,
+      "fft_clock_mhz": 200,
+      "stalled_malformed_input_cases": 6,
+      "unmatched_adapter_accepts": 6,
+      "unmatched_requires_same_cycle_framing_fault_and_core_stall": true,
+      "mailbox_storage_and_ack_held": true,
+      "speculative_counter_fault_advances": 6,
+      "final_drain_fault_cases": 6,
+      "drain_reset_cases": 2,
+      "blocked_return_cases": 2,
+      "raw_only_overruns": 1,
+      "validated_publication_and_completion_preserved": true
+    },
+    "numeric": {
+      "samples": 1406,
+      "blocks": 3,
+      "exact_forward_words": 1536,
+      "exact_product_words": 1536,
+      "exact_inverse_words": 1536,
+      "exact_scores": 1341,
+      "fft_reset_quarantine_and_recovery": true
+    },
+    "phase_map": {
+      "exact_reads": 447,
+      "healthy_flags": 0,
+      "partial_fault_publication": false
+    },
+    "bursty64": {
+      "samples": 28673,
+      "blocks": 64,
+      "exact_scores": 28608,
+      "exact_words_per_transform_stage": 32768,
+      "score_fifo_max": 358,
+      "overlap_queue_max": 1,
+      "ring_retention_age_max": 589,
+      "transform_fifo_max": 2,
+      "energy_lookup_age_max": 887,
+      "score_age_max": 954,
+      "forward_stall_cycles_max": 0,
+      "explicit_bounds_pass": true
+    }
+  },
+  "physical": {
+    "build_label": "counter-retirement-v1",
+    "state_at_checkpoint": "fresh full receiver synthesis running; no timing verdict",
+    "clock_mhz": 100,
+    "fft_clock_mhz": 200,
+    "source_rate_msps": 15,
+    "constraints_relaxed": false,
+    "coarse_fine_pilot_dma_retained": true,
+    "last_completed_route": "reports/starlink-paired-control-isolation-high-route-20260909.json",
+    "last_completed_route_source_is_prior_revision": true
+  },
+  "remaining": [
+    "Fresh full-receiver setup/hold/CDC and board-I/O; independent vendor-internal and100MHz paths may remain.",
+    "Original prior728d4096-block run remains pending, not current-source qualification.",
+    "Finite paired orchestration/persistence/progress and explicit terminal map-discard/stop contract without clearing fault evidence.",
+    "Serial-attested .18 paired DMA/IIO before .17 PPU Ethernet deployment.",
+    "Independent FPGA PSS and blind GLRT same-observation live agreement; eight120ms targets/300s/>=95% duty at15/30/60MS/s."
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/starlink_pss_xfft_block_adapter.v": "e1f740bcaa6fd3e11a7030b303c2df4cf9c9bcfe8eec44cd68bc952ce1a411ac",
+    "hdl/library/starlink_pss_acquisition/starlink_pss_shared_xfft_service.v": "2bfef60c4ce33f576faff735c41869cd4b510a0c3bec180367d23a2c23b902fd",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_xfft_counter_cut.sv": "6561c33f641769eb0a48dd6508a835b0a0d75c375b3f9a88e867a48e42a8f14d",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_shared_xfft_service.sv": "d5f59b7dfd0b83574f1b2fef19fcdf5ad935295a43626a2fab80d6dc8baf9847",
+    "tests/starlink_oracle/test_xfft_phase_init.py": "3cb2c65af5c17a34ef3ebedc85c90506bd15777b3ca7984ec0ad1ee6d4b67f89",
+    "tests/starlink_oracle/test_xfft_counter_cut.py": "b047341240d3f9b9082968037eefb73be83e687760249044ca7eefce4104116c",
+    "hdl/library/starlink_pss_acquisition/build/counter-retirement-service-v1-console.log": "9a2e5288dc582b2f1b10fb0632a132e7f4be492f0372ff07b6fca369e91b570b",
+    "hdl/library/starlink_pss_acquisition/build/counter-retirement-numeric-v1-console.log": "a83882ab13721279d4198d3847c9b3976743093cc29f229a954d4057b1e35faf",
+    "hdl/library/starlink_pss_acquisition/build/counter-retirement-phase-map-v1-console.log": "a7570ebba40884bbf0abe8fef5c4363b24df4b5f7c81796567ec6edf0f25cac9",
+    "hdl/library/starlink_pss_acquisition/build/counter-retirement-bursty64-v1-console.log": "8789fc75dc424896ffe67461712927edd68fbce787617f4c0a8d23884f494738"
+  }
+}

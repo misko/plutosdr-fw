@@ -1,0 +1,96 @@
+{
+  "schema": "starlink.shared_fft.realtime_feasibility.v1",
+  "date_utc": "2026-09-09",
+  "scope": "Standalone actual-5ns-synthesis XFFT only; not production service, numerical equivalence, integrated receiver, boundary timing, DMA/IIO or RF.",
+  "source": {
+    "script": "hdl/library/starlink_pss_acquisition/measure_shared_xfft_clock.tcl",
+    "script_sha256": "abdf42aa4e28a8fa6b8936118bb47525a185fadc5cc8114652507feb049958fa",
+    "arguments": [
+      "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1",
+      200,
+      "actual-synth",
+      "shared-realtime"
+    ],
+    "output": "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1",
+    "production_xci_changed": false,
+    "default_behavior_changed": false,
+    "baseline": "hdl/library/starlink_pss_acquisition/build/shared-fft-200-actual-synth-v2",
+    "arithmetic": "512 radix4 burst BFP18, input18/twiddle16, natural order, convergent rounding",
+    "only_generated_generic_difference": "C_THROTTLE_SCHEME 1 -> 0",
+    "hdl_commit": "32d9788e1b144f8ab068952f6ce679e3e05e6bfb"
+  },
+  "result": {
+    "terminal": "pass_internal_only",
+    "setup_wns_ns": 0.192,
+    "hold_whs_ns": 0.052,
+    "synthesis_clock_ns": 5,
+    "implementation_clock_ns": 5,
+    "lut": 1172,
+    "ff": 2988,
+    "slices": 658,
+    "dsp": 17,
+    "ramb18": 11,
+    "ce_prediction_register_count": 0,
+    "largest_reported_remaining_data_control_fanout": 172,
+    "unqualified_boundary_hold_warnings": 33,
+    "hardware_accessed": false,
+    "hardware_qualified": false,
+    "numerical_equivalence_qualified": false,
+    "service_protocol_qualified": false,
+    "generated_wrapper_sha256": "13a6a1088f47a73fb34f81c2c69c8e331e818631e546c3a5763bf55255e6e81c",
+    "worst_internal_path": {
+      "start": "BFP scaling RAM",
+      "end": "o_range_reg[0]",
+      "data_ns": 4.728,
+      "logic_ns": 2.702,
+      "route_ns": 2.026
+    },
+    "overall_including_unqualified_boundary": {
+      "setup_wns_ns": 0.081,
+      "hold_whs_ns": -1.195,
+      "hold_ths_ns": -40.082,
+      "hold_failing_endpoints": 38,
+      "qualified": false
+    }
+  },
+  "comparison": {
+    "lut_delta": -111,
+    "ff_delta": -131,
+    "slices_delta": -78,
+    "wns_gain_ns": 0.024,
+    "interpretation": "Promising packing/control alternative; small standalone slack gain is not evidence the full receiver closes timing."
+  },
+  "observed_interface_changes": [
+    "No output TREADY or status TREADY.",
+    "No output-halt or status-halt event ports.",
+    "Input TREADY/input-halt event, TLAST, frame-start, output indexes and exponents remain."
+  ],
+  "required_before_production": [
+    "Reserve complete512-word input and output storage and prove starvation-free servicing at every vendor demand, including consecutive jobs and final boundaries.",
+    "Observe healthy input-halt event timing in reset/config/idle/load/compute/output/drain. Define active-frame starvation with event latency and prove quarantine; blanket idle-event faulting is not justified.",
+    "Measure status versus first-data ordering; realtime output cannot wait behind the existing status-validation backpressure. Preserve all words while capturing/checking independent status.",
+    "Count every emitted raw beat; preserve validation, sticky fault quarantine, final completion fence, blocked-return, extra/final beat and reset tests.",
+    "Run exact frozen forward/inverse/exponent/product/score/map and service/backlog replay, then full-receiver place/route and unchanged qualification gates."
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/summary.txt": "5ff4f077e88be078aabeea5e63fc6ebbef4a6aeece8f206f1a1a0a4667350bb4",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/synthesis_clocks.rpt": "1b2c417020eaf311fd7d4f65d54b5b2652dcc6a8a8ea67f812cf857fb0401e02",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/clocks.rpt": "e1c5d5b44b0f00f236450e4d075754b3f65e1ecb442b32adca21701b80c875db",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/synthesis_utilization.rpt": "aebc08d122f11fa6c05f71b6a45b0e8cfcc2143258a8a8a6aaf58b2c5f3332ba",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/utilization.rpt": "ffee3d6d261cdc9d71a47a6901e6c7b5001d9c79c8f0d19a731d215ea4fdd870",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/internal_paths.rpt": "4290d37c43939668ece54299f4805d92c791a7bea32d31e307b145b639b42798",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/high_fanout.rpt": "a9521d30e12361d5d6134ad33168843bb6e6c306a77eb1ed524ead6c0ae26d76",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/check_timing.rpt": "6151a4f0d950cf2945925b05a0cd294b93a9d6334698b0106ddb85ee859fd1a7",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/methodology.rpt": "6b976ad794f173b755c78373cc3dee2486d28b23302d4814f5a6d7c71a38878d",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/fft_synth.dcp": "31219ec3442096e06a9e76f0d17284c7dc72d2afe768dba4d180a48caaa9b569",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/fft_routed.dcp": "7aded5260985f39be1fd53cd1e978d5781759cd0b6cafbf4688b87f86e03ce88",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/probe_source.tcl": "abdf42aa4e28a8fa6b8936118bb47525a185fadc5cc8114652507feb049958fa",
+    "hdl/library/starlink_pss_acquisition/build/shared-fft-200-realtime-feasibility-v1/timing.rpt": "20eeea86d9464954a77fc39da345f33a3e1a1da23f71fb814733d504fd04a8eb",
+    "tests/test_starlink_physical_trial_policy.py": "cf6f5bdffaea3825ae733b8c6005fe970a08ea9ec3b4328ae2d2bf62ad55278b"
+  },
+  "admission_tests": {
+    "passed": 39,
+    "new_cases": 27,
+    "scope": "Actual Tcl admission and generated-text guards with mocked project/IP generation boundaries; stops before synthesis."
+  }
+}

@@ -1,0 +1,127 @@
+{
+  "schema": "starlink.paired_receiver.control_isolation_high_route.v1",
+  "date_utc": "2026-09-09T04:47:03Z",
+  "scope": "Full paired15/shared receiver physical experiment, not deployment or RF qualification.",
+  "source": {
+    "hdl_rtl": "2e3280ce63a750b5843d1803e8679537a5bac80a",
+    "input_opt_dcp_sha256": "a92917daaaeb1f37bf1420bae45f23455e11f94f9c58c9704dd8b5d39fbc7c1a",
+    "runner": "hdl/projects/pluto/explore_shared_receiver_checkpoint.tcl",
+    "mode": "spread-high",
+    "output": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1"
+  },
+  "hardware_accessed": false,
+  "deployed": false,
+  "hardware_qualified": false,
+  "constraints_relaxed": false,
+  "result": {
+    "terminal": true,
+    "place": "pass",
+    "route": "pass",
+    "setup": "fail",
+    "hold": "pass",
+    "routable_nets": 33446,
+    "fully_routed_nets": 33446,
+    "routing_errors": 0,
+    "setup_wns_ns": -1.035,
+    "setup_tns_ns": -92.793,
+    "setup_failing_endpoints": 315,
+    "hold_whs_ns": 0.019,
+    "hold_failing_endpoints": 0,
+    "clock_100_mhz": {
+      "wns_ns": -0.289,
+      "tns_ns": -2.288,
+      "failing_endpoints": 28,
+      "whs_ns": 0.019
+    },
+    "clock_200_mhz": {
+      "wns_ns": -1.035,
+      "tns_ns": -90.505,
+      "failing_endpoints": 287,
+      "whs_ns": 0.049
+    },
+    "rx_clock": {
+      "constraint_mhz": 61.463,
+      "wns_ns": 1.566,
+      "whs_ns": 0.07
+    },
+    "bus_skew_slacks_ns": [
+      7.944,
+      8.476,
+      7.896,
+      7.964
+    ],
+    "lut": 13011,
+    "ff": 19071,
+    "ramb36": 32,
+    "ramb18": 34,
+    "bram_tiles": 49,
+    "dsp": 44,
+    "no_clock": 0,
+    "unconstrained_internal_endpoints": 0,
+    "missing_input_delays": 13,
+    "missing_output_delays": 2
+  },
+  "critical_paths": [
+    {
+      "clock_mhz": 100,
+      "wns_ns": -0.289,
+      "start": "transform_fifo/protocol_fault_reg",
+      "end": "transform_service/input_mailbox/input_fault_reg/D",
+      "report_line": 240,
+      "data_ns": 10.137,
+      "logic_ns": 2.557,
+      "route_ns": 7.58
+    },
+    {
+      "clock_mhz": 200,
+      "wns_ns": -1.035,
+      "start": "adapter/expected_output_position[5]",
+      "end": "adapter/expected_output_position[0]/CE",
+      "via": "output_metadata_valid -> output_state_advance",
+      "report_line": 3443
+    },
+    {
+      "clock_mhz": 200,
+      "wns_ns": -1.006,
+      "start": "input_mailbox/read_output_position",
+      "end": "input_mailbox/reading_reg/D",
+      "via": "adapter validated input / core-ready",
+      "report_line": 4001
+    },
+    {
+      "clock_mhz": 200,
+      "wns_ns": -0.756,
+      "start": "XFFT/xn_index_counter/cnt_reg[6].addsub_reg",
+      "end": "XFFT/gen_ce_non_real_time.ce_predicted_reg/D",
+      "report_line": 4455,
+      "data_ns": 5.475,
+      "logic_ns": 1.076,
+      "route_ns": 4.399,
+      "independent_vendor_internal_gate": true
+    }
+  ],
+  "comparison": {
+    "prior_report": "reports/starlink-paired-return-stage-medium-route-20260909.json",
+    "prior_failing_endpoints": 1755,
+    "current_failing_endpoints": 315,
+    "causal_limit": "RTL and placement directive both changed; do not attribute the total improvement to one cut."
+  },
+  "remaining": [
+    "Target wrapper output-counter and input-retirement feedback without changing validated publication/fault fences.",
+    "Close independent vendor-internal FFT timing and remaining 100 MHz control paths.",
+    "Qualify board IO and CDC, then actual .18 paired DMA/IIO before .17 network deployment.",
+    "Blind negative-retaining GLRT/FPGA same-source timing evidence, eight120ms visits over300s and15/30/60MS/s remain required."
+  ],
+  "sha256": {
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/summary.txt": "ee14352ed4bd04720e8c170c8f7c29f1ead42a76db34b8fa6a2d234ddd371a8e",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/timing.rpt": "891ce63ed96c8af1e4d9e1315f7d3bdf78d72395154a84f6567a6913def49700",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/utilization.rpt": "53b26cbf24208c72396e8d198be9a6071ac47be2b422b16d878a8bf476b43cf6",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/route_status.rpt": "dfc91f361878765f8469562a09bb11e262881eefd79e29d41db46deb8589f8ae",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/bus_skew.rpt": "03db6c6c289b3859acb4e787c2e588391292361ba99b3f921b7b3796c65f3d32",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/check_timing.rpt": "afd1cd438fc5ff7a4167627ffc56c610f9c7d540a16c5b8c2ef1e75f31804b45",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/methodology.rpt": "08907d7a9444709589e8dac313dba74aa468a7b1f527b840b87a838577462fa1",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/result_routed.dcp": "36fd309d35b7c6e247b182548312d2dd70795e4eaa99624455ab2374a371b1ee",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/spread_placed.dcp": "1057c3f7e39b46f5e5bb542bdf6990b8d971770431da80c07c5d30a9d2e82b5a",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELcontrol-isolation-v1/spread-high-v1/input.txt": "2fdd85ecaf411e8b91ace5455b81197ee2c42f94c57abf796908f6642809e75b"
+  }
+}

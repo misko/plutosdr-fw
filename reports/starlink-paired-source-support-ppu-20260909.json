@@ -1,0 +1,65 @@
+{
+  "schema": "starlink.paired_source_support.ppu_checkpoint.v1",
+  "date_utc": "2026-09-09",
+  "scope": "Reusable offline source-coordinate support and record joins; not the paired recorder or live qualification.",
+  "source": {
+    "ppu_main": "18608952f76515c1e047dad0cf1d1690f24434a2",
+    "previous_health_main": "1828eba15ad7c150909c79d291ec1b310a7f3de6",
+    "module": "src/pluto_plus/hardware/source_support.py",
+    "documentation": "docs/source-support.md",
+    "test": "tests/test_source_support.py"
+  },
+  "hardware_accessed": false,
+  "geometry_only": true,
+  "hardware_qualified": false,
+  "live_glrt_evidence": false,
+  "fpga_pss_lock": false,
+  "verification": {
+    "focused_passed": 78,
+    "focused_seconds": 0.81,
+    "offline_command": ".venv/bin/python -m pytest -q -m 'not hardware and not firmware and not browser'",
+    "offline_passed": 1823,
+    "skipped": 1,
+    "deselected": 10,
+    "seconds": 25.65,
+    "warning": "Starlette/httpx deprecation",
+    "ruff": "pass",
+    "mypy_source_support": "pass",
+    "unrelated_dirty_files_preserved": [
+      "README.md",
+      "src/pluto_plus/bootstrap_firmware.py",
+      "src/pluto_plus/doctor.py",
+      "tests/test_bootstrap_firmware.py"
+    ]
+  },
+  "contract": {
+    "profile": "paired-15-shared-xfft-512-447-v1",
+    "rate_hz": 15000000,
+    "abi": "PSMA1.5",
+    "fft_length": 512,
+    "fft_stride": 447,
+    "pilot_step": 6,
+    "pilot_delay_canonical": 269,
+    "pilot_input_span": 539,
+    "map_candidate_count": 1280000,
+    "map_unknown_origin_margin_before": 446,
+    "map_unknown_origin_margin_after": 511,
+    "fine_template_count": 66,
+    "fine_capture_count": 130,
+    "fine_winner": "first template tap, not midpoint",
+    "joining": "One decision per input record; complete/incomplete/unobservable and trigger/no-trigger remain distinct. Trigger choice does not change selected pilot IQ."
+  },
+  "limitations": [
+    "Identity equality is not serial/boot/RF/manifest attestation.",
+    "INCLUDED establishes per-record geometry, not continuous1s coverage, map/request ledger continuity, health or lock.",
+    "Initial maps may be unobservable because of filter history or conservativeFFT-envelope underflow; retain rather than clamp/drop.",
+    "Actual first-to-last-center span differs from nominal sample-count/rate exposure.",
+    "30/60profiles, concurrent paired recorder, persistence and blind actual-consumed-GLRT support remain required.",
+    "Graceful map disable during FILL increments discontinuity_abort_count in present RTL; keep failing terminal health receipt until explicit tested terminal-discard or stop-at-boundary contract exists."
+  ],
+  "sha256": {
+    "src/pluto_plus/hardware/source_support.py": "9a7d7006b16e6e0e50922637ed5adf27396a8a7961f7abd890bc6957ab26a30f",
+    "tests/test_source_support.py": "16664da854615b03a8ad0a8a695c8fde8be92e8ea630eb08807d4fb9991c6358",
+    "docs/source-support.md": "63c86fe30edf3647f7748b14f8e5dbada47ee2f7acc8a8c6a873ac2ad8d4f2a3"
+  }
+}
