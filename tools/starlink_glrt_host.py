@@ -109,13 +109,15 @@ def analyze(args) -> dict:
         "acquisition": asdict(config), "calibration": calibration_record,
         "calibration_sha256": calibration_sha, "glrt_size": 512,
         "minimum_exact": args.minimum_exact, "minimum_margin": args.minimum_margin,
+        "cfo_comparison_band_hz": [-100_000, 100_000],
+        "glrt_residual_alias_period_hz": float(Fraction(5_000_000, 22)),
         "gate_status": "explicit engineering gates; not calibrated Starlink truth",
         "epoch_refinement": "integer only; 0.4 us sample grid",
         "fpga_seed_inputs": [], "score_normalization": "sum across frames of (sum of absolute symbol correlations)^2",
         "limitations": ["at least two frames needed for blind acquisition",
                        "eight retained acquisition basins can miss other hypotheses",
                        "multi-frame host score differs from native single-frame FPGA score",
-                       "receiver-relative CFO search limited to +/-100 kHz",
+                       "acquisition CFO search limited to +/-100 kHz; subsequent periodic GLRT residual can place tracking CFO outside that band",
                        "overlapping windows are not independent trials",
                        "no analog clipping or transport integrity inferred from IQ alone"],
     }
@@ -129,7 +131,8 @@ def analyze(args) -> dict:
     })
     started = time.monotonic()
     counters = {"windows": 0, "complete": 0, "insufficient": 0, "no_result": 0,
-                "windows_with_engineering_positive": 0}
+                "windows_with_engineering_positive": 0,
+                "windows_with_in_band_engineering_positive": 0}
     samples = np.memmap(iq_path, mode="r", dtype="<i2", shape=(count, 2))
     try:
         with (args.output / "blind-windows.jsonl").open("x") as stream:
@@ -149,6 +152,7 @@ def analyze(args) -> dict:
                     scored.append({"acquisition": asdict(candidate), "glrt64": asdict(score),
                                    "score_support_output_samples": score_support(
                                        candidate.refined_epoch_sample, len(values), start),
+                                   "within_cfo_comparison_band": -100_000 <= score.tracking_cfo_hz <= 100_000,
                                    "engineering_positive": score.exact_score >= args.minimum_exact
                                        and score.margin >= args.minimum_margin})
                 winner = max(scored, key=lambda row: (row["glrt64"]["margin"],
@@ -163,6 +167,8 @@ def analyze(args) -> dict:
                 counters[result.status.value] += 1
                 counters["windows_with_engineering_positive"] += int(any(
                     item["engineering_positive"] for item in scored))
+                counters["windows_with_in_band_engineering_positive"] += int(any(
+                    item["engineering_positive"] and item["within_cfo_comparison_band"] for item in scored))
                 print(f"window {counters['windows']}: [{start},{stop}) {result.status.value}", flush=True)
         if iq_path.stat().st_size != size or digest(iq_path) != iq_sha:
             raise ValueError("IQ changed during blind analysis; output is disqualified")

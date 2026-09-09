@@ -72,7 +72,7 @@ def pacers(tmp_path_factory):
             bench, executable = root/f"tb_{rate}.sv", root/f"sim_{rate}"
             bench.write_text(source)
             built = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable), str(bench),
-                *[str(BANK_ROOT/name) for name in ("starlink_glrt_pacer.v", "starlink_glrt_fir.v", "starlink_glrt_ddc.v")]],
+                *[str(BANK_ROOT/name) for name in ("starlink_glrt_pacer.v", "starlink_glrt_fir.v", "starlink_glrt_sample_ring.v", "starlink_glrt_ddc.v")]],
                 capture_output=True, text=True)
             assert built.returncode == 0, built.stdout+built.stderr
             cache[rate] = executable

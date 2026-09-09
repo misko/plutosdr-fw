@@ -66,7 +66,8 @@ def test_bursts_preserve_history_during_mac_and_repeated_wraps(rate, lanes, offs
     bench, executable = tmp_path / "tb.sv", tmp_path / "sim"
     bench.write_text(source)
     built = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable),
-                            str(bench), str(BANK_ROOT / "starlink_glrt_fir.v")],
+                            str(bench), str(BANK_ROOT / "starlink_glrt_fir.v"),
+                            str(BANK_ROOT / "starlink_glrt_sample_ring.v")],
                            capture_output=True, text=True)
     assert built.returncode == 0, built.stdout + built.stderr
 

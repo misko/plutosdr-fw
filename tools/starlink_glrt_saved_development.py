@@ -66,6 +66,7 @@ def main():
                         "iq_sha256": summary["iq_sha256"],
                         "windows": summary["windows"],
                         "windows_with_engineering_positive": summary["windows_with_engineering_positive"],
+                        "windows_with_in_band_engineering_positive": summary["windows_with_in_band_engineering_positive"],
                         "summary_sha256": digest(directory / "blind/summary.json")})
         document(directory / "result.json", results[-1])
     if digest(args.pack) != manifest["pack_sha256"]:

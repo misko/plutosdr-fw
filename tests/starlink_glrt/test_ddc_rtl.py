@@ -63,6 +63,7 @@ def simulators(tmp_path_factory):
             executable = root / f"sim_{rate}"
             built = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable),
                 str(bench), str(BANK_ROOT / "starlink_glrt_fir.v"),
+                str(BANK_ROOT / "starlink_glrt_sample_ring.v"),
                 str(BANK_ROOT / "starlink_glrt_ddc.v")], capture_output=True, text=True)
             assert built.returncode == 0, built.stdout + built.stderr
             cache[rate] = executable

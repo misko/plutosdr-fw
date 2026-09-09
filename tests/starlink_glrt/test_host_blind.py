@@ -52,6 +52,7 @@ def test_blind_host_recovers_timing_and_cfo_without_fpga_inputs(edge, cfo, epoch
     rows = [json.loads(line) for line in (output / "blind-windows.jsonl").read_text().splitlines()]
     winner = next(c for c in rows[0]["candidates"] if c["acquisition"]["rank"] == rows[0]["winner_rank"])
     assert winner["engineering_positive"]
+    assert winner["within_cfo_comparison_band"]
     difference = winner["acquisition"]["refined_epoch_sample"] - epoch
     circular_error = (difference + rate/1500) % (rate/750) - rate/1500
     assert abs(circular_error) <= 1

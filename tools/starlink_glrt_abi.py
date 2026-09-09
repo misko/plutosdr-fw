@@ -116,8 +116,14 @@ class Snapshot:
         """
         w = self.words
         require(self.source_rate == baseline.source_rate, "event baseline image mismatch")
+        require(baseline.words[20] == w[20] and baseline.words[57:61] == w[57:61],
+                "event baseline visit/configuration mismatch")
+        require(not baseline.words[19] & 0x1f and baseline.samples == 0 and
+                baseline.u64(38) == baseline.u64(53) == baseline.u64(55) == 0,
+                "event baseline was not captured before ARM")
         require(not w[19] & 1 and w[50] == w[51] == 0 and not w[52] & 0x41f,
                 "active capture, detector fault, event overflow or undrained queue")
+        require(not w[61] & 6, "scorer or registered candidate is still pending")
         require(not self.cpu_fault and not baseline.cpu_fault, "CPU event fault")
         for attr in ("cpu_disabled", "cpu_full", "cpu_malformed"):
             require(getattr(self, attr) == getattr(baseline, attr), "CPU event loss during observation")

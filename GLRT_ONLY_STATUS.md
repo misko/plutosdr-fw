@@ -307,3 +307,47 @@ full-rate ladder routing, numerical limitations/holdouts, actual transport
 headroom and coordinated .18/.17 hardware/live qualification remain required.
 Coordinator messaging currently fails because its local MCP transport is down;
 independent work continues and no bench window has been assumed.
+
+## Routing pressure and host lifecycle, 2026-09-09 00:07 UTC
+
+The full 10 MS/s board at HDL `4e428a90` routes at **+0.004/+0.019 ns** setup/hold,
+using 13277 LUTs, 64 DSPs and 9 BRAM tiles. The 5 MS/s board misses setup by
+0.086 ns (hold +0.014). The 60 MS/s reduced-depth board v2 misses setup by
+0.440 ns (hold +0.008) and violates a Gray-bus skew constraint by 0.750 ns.
+All three implemented-netlist audits are saved; no failure is hardware eligible.
+Ten MS/s has very small internal margin and still needs CDC/I/O qualification.
+
+HDL `72e94f19` pipelines FIR history reads through synchronous BRAM. **96**
+FIR/DDC/pacing tests and **10** integrated positive/rolled-pilot cases pass.
+The standalone 60 MS/s DDC uses 2586 LUTs, 1120 FFs, 24 DSPs and 18 BRAM,
+with setup/hold +0.445/+0.111 ns and unchanged before/after source hashes.
+Full-board v3 still packs tightly and is completing routing; a 25 MS/s build
+from this source is also running. The first BRAM OOC attempt lacked the RAM
+wrapper in its source list and failed synthesis; v6 includes it and is the pass.
+
+HDL `1d78e87e` additionally expresses each acquisition lane's 33 reachable
+coefficients directly, eliminating general 891-word per-lane ROMs. **43**
+bank/acquisition arithmetic tests pass. The standalone bank drops from about
+3000 to 1612 LUTs (1228 FFs, 18 DSPs) and routes internally at +0.492/+0.102 ns.
+Fresh full 5/60 MS/s builds and the full 25-case receiver regression are running.
+
+Linux `f2a39d854e5e` builds the cached pre-ARM snapshot needed for exact event
+counter baselines. Kernel v2, modules and GLRT DTB build with the task's own
+toolchain. **44** strict metadata tests and **7** real RTL-to-host decoder cases
+pass with explicit constructed kernel baselines; Linux execution is not claimed.
+The new libiio collector preserves whole finite continuous IQ independently of
+event failures, checks identity/rate/RF/TX mute, retains partial data and final
+snapshots on error, and drains short event tails before closing contexts.
+**65** host binding/lifecycle/ABI tests pass with fake IIO in 3.06 seconds.
+The actual host libiio 0.26 loads; no IIO context or radio has been opened.
+Usage and limits are in `tools/GLRT_HOST.md`.
+
+All **48** saved development records completed independent host acquisition in
+96 overlapping windows. Twelve records crossed the .175 exact/.025 margin gates
+in at least one window (20 windows total). This is a count of engineering score
+crossings, not a true-positive rate. Some final GLRT tracking CFOs lie outside
+the +/-100 kHz acquisition/comparison range; the host now labels that explicitly
+and counts in-band crossings separately. Eight host tests pass after adding the
+label. The original v1 saved analysis remains unchanged and records its source
+hashes. All holdout, same-observation FPGA comparison, transport headroom,
+physical interface and live RF qualification gates remain pending.

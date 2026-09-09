@@ -158,7 +158,15 @@ def test_autonomous_glrt_event_words_and_irq_drain(rate, captures, tmp_path):
     decoded = decode_snapshot(regs, rate, len(events))
     decoded.require_iq_prefix(expected_visit=301, expected_rate=rate, received_bytes=4*len(output))
     event_records = [Event.decode(struct.pack("<16I", *words)) for words in events]
-    decoded.require_events(event_records, baseline=replace(decoded, cpu_read=0, cpu_pushed=0))
+    # Linux is not executed by this bench. Construct its new cached pre-ARM
+    # baseline explicitly, with zero fabric session/result counters.
+    baseline_words = list(decoded.words)
+    baseline_words[4:8] = [0]*4
+    baseline_words[19] &= ~0x1f
+    for word in (38, 39, 53, 54, 55, 56):
+        baseline_words[word] = 0
+    decoded.require_events(event_records, baseline=replace(decoded, cpu_read=0, cpu_pushed=0,
+                                                            words=tuple(baseline_words)))
 
 
 def test_backpressure_fault_preserves_and_drains_promised_prefix(captures, tmp_path):

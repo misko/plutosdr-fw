@@ -88,8 +88,12 @@ def test_reject_corrupt_event(index, value):
 
 
 def test_event_sequence_accounting_and_explicit_loss():
-    baseline = Snapshot.decode(wire())
-    words = list(baseline.words)
+    captured = Snapshot.decode(wire())
+    baseline_words = list(captured.words)
+    baseline_words[4:8] = [0]*4
+    baseline_words[19] &= ~0x1f
+    baseline = replace(captured, words=tuple(baseline_words))
+    words = list(captured.words)
     words[38] = words[53] = words[55] = 2
     final = replace(baseline, words=tuple(words), cpu_read=2, cpu_pushed=2)
     events = [Event.decode(struct.pack('<16I', *record(sequence=k))) for k in range(2)]
@@ -100,3 +104,14 @@ def test_event_sequence_accounting_and_explicit_loss():
     for attr in ('cpu_disabled', 'cpu_full', 'cpu_malformed', 'cpu_fault'):
         with pytest.raises(ValueError):
             replace(final, **{attr: 1}).require_events(events, baseline=baseline)
+    for pending in (2, 4):
+        changed = list(final.words)
+        changed[61] = pending
+        with pytest.raises(ValueError, match='pending'):
+            replace(final, words=tuple(changed)).require_events(events, baseline=baseline)
+    with pytest.raises(ValueError, match='before ARM'):
+        final.require_events(events, baseline=captured)
+    wrong_visit = list(baseline.words)
+    wrong_visit[20] += 1
+    with pytest.raises(ValueError, match='visit/configuration'):
+        final.require_events(events, baseline=replace(baseline, words=tuple(wrong_visit)))
