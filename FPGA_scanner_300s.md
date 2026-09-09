@@ -224,8 +224,13 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   the complete native controller/driver/recorder path is not yet qualified.
 - [x] Add the default-disabled map-core publication fence, with same-edge
   admission blocking, actual-publication acknowledgment, retained terminal
-  metadata and real fault/abort accounting. This core-only slice is not wired
-  to PSMA/Linux and does not implement tickets or full-path health receipts.
+  metadata and real fault/abort accounting. Tests include the production
+  20000-bin by 64-frame geometry; native control is a separate increment below.
+- [x] Add the default-disabled synchronous PSMA ticket/window/controller and
+  wrapper wiring. Enabled shared-15 ABI 1.6 supports actual fence-edge ticket
+  acceptance, frozen terminal bounds and retained IRQ/pilot wiring; dedicated
+  RTL tests pass. Reduced real-FFT shutdown-tail testing is recorded below;
+  full pilot-path integration and enabled-image timing remain open.
 - [x] Add the pure PSST 1/12 receipt decoder in PPU, with explicit structural
   qualification and diagnostic failure retention. It does not admit a new
   firmware ABI or perform native stop/drain operations.
@@ -309,6 +314,37 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   to their do-not-merge remotes. Seal artifact hashes and independent replay.
 
 ## Current progress
+
+### Checked publication with independent private RAM writes — 2026-09-09
+
+HDL `9f7699cc91249d8386bdcd761011832ca6d69b07` is pushed and remotely
+verified. The realtime result bank now separates private RAM/cursor updates
+from final publication authorization. A held final word may be rewritten but
+cannot publish until the original certificates and immediate vetoes pass.
+Current private-link framing faults also veto the guard's commit receipt on
+that same edge. No RAM, clock or healthy-path latency was added; the legacy
+mailbox mode remains the default.
+
+The combined regression passes 815 tests. Actual Vivado service, exact-score,
+reduced-map and bursty-64-block replays all pass on the frozen new runtime;
+the bursty run checks 28608 ordered scores, not every numerical value or a
+120 ms horizon. The fresh full receiver build in
+`shared-realtime-private-bank-v1` completed with 200 MHz setup failure:
+worst slack -1.999 ns, 444 failing endpoints. The 100 MHz domain (+0.007 ns),
+reset recovery (+0.184 ns) and hold (+0.050 ns) pass in this final report.
+Boundary-stop integration is disabled, so its timing effect remains separate.
+This is not a deployable image. See
+`reports/starlink-private-bank-and-stop-integration-20260909.json`.
+
+The preceding HDL `8129e8a0` implements the native stop controller. Its 10
+dedicated cases and 76 adjacent cases pass, with independent review. The shell
+test uses a declared toy scorer and proves continuing canonical-tap wiring,
+not actual FFT/PIL1 shutdown behavior. A separate reduced real-FFT test now
+passes: 894 exact scores, 447 exact map words and an actual unfinished third
+FFT block at the boundary acknowledgment. Native map read/release and both
+live-pending vendor-fault and post-terminal bridge-fault negatives pass.
+The continued source is test stimulus, not canonical-tap/PIL1 DMA evidence;
+the full pilot/fine/source-support join and production-duration tests remain.
 
 ### Native map-boundary stop driver — 2026-09-09
 

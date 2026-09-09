@@ -1,0 +1,65 @@
+{
+  "status": "REDUCED_REAL_FFT_NATIVE_PSMA_STOP_PASS_NOT_FULL_DATAPATH_QUALIFIED",
+  "date_utc": "2026-09-09",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "9f7699cc91249d8386bdcd761011832ca6d69b07",
+  "test_hdl_commit": "4d383dbc",
+  "runtime_changes": false,
+  "hardware_access": false,
+  "simulation": {
+    "tool": "Vivado 2022.2 actual generated shared realtime XFFT simulation",
+    "agent_session": 40879,
+    "terminal_exit_code": 0,
+    "terminal_time_ns": 320670,
+    "source_msps": 15,
+    "slow_clock_mhz": 100,
+    "fft_clock_mhz": 200,
+    "map_bins": 447,
+    "map_frames": 2,
+    "fixture_samples": 1406,
+    "fixture_scores": 1341,
+    "compared_score_prefix": 894,
+    "exact_native_map_words": 447,
+    "healthy_ack": {
+      "source_samples": 1734,
+      "accepted_scores": 894,
+      "third_forward_block_started": true,
+      "third_inverse_block_returned": false,
+      "actual_service_state": 6,
+      "actual_inverse_busy": true,
+      "coarse_disabled_only_after_terminal": true,
+      "acquisition_flush": false,
+      "retained_irq_native_read_release": true,
+      "continued_source_stimulus_and_clean_shutdown_tail": true
+    },
+    "negatives": [
+      "Force-injected event_last_missing while actual core reset is released, input enabled and stop pending: shared health bit14, one partial abort, no partial map publication.",
+      "Actual invalid native bridge release after healthy terminal: retained coordinate tuple, failed receipt and bridge failure."
+    ],
+    "launch_note": "An initial invocation failed before Tcl startup because libtinfo was unavailable. The first invocation that started this simulation passed using the bundled library path; no failed simulation was overwritten."
+  },
+  "offline_tests": {
+    "focused_and_adjacent": 142,
+    "seconds": 1.61,
+    "ruff": "PASS",
+    "independent_policy_tests": 51,
+    "independent_seconds": 0.33,
+    "independent_review": "No actionable gap in declared reduced scope; all41 frozen hashes, copied simulation vectors, frozen compile inputs and all34 vendor generics checked."
+  },
+  "limitations": [
+    "Reduced447x2 geometry; not production20000x64 or sustained120ms/300s evidence.",
+    "Continuing source is test stimulus, not canonical ADC tap or PIL1 DMA capture.",
+    "No pilot/fine/common-source-support join, native Linux/IIO host lifecycle or durable host recording is exercised.",
+    "Injected vendor event proves fault propagation, not vendor event-generation latency.",
+    "No physical timing, CDC, RF detection, GLRT comparison, timing lock or deployment claim."
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/simulate_realtime_psma_stop.tcl": "71c13ae15ef1ccd9ce2ea5f2c756a41f35e8cffbe64766ec65fff26f86ccad39",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_psma_stop.sv": "49310818c0a5a1c94fb37589bb4f4c1268483a2507a6e5eb1b8cc8cfc883ecab",
+    "tests/test_starlink_realtime_psma_stop_policy.py": "b832cccff29e3203a6627e1f846d928b0a4d75c946f29d411529f7797e341347",
+    "hdl/library/starlink_pss_acquisition/build/realtime-psma-stop-v1/scope.txt": "ba0b4958b5d862c7a53d47443181bb81daf4e534e85e9cef562e80208fb745e5",
+    "hdl/library/starlink_pss_acquisition/build/realtime-psma-stop-v1/offline-pytest.log": "fd2d2fcc0e551eb369d3aafbd8ced103ee413aee9b11e03ec9ad0f338321d464",
+    "hdl/library/starlink_pss_acquisition/build/realtime-psma-stop-v1/offline-ruff.log": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "hdl/library/starlink_pss_acquisition/build/realtime-psma-stop-v1/project/realtime_psma_stop.sim/sim_1/behav/xsim/simulate.log": "bd464fe08e5169e4a163055a24ddc02b807ae4af27c1a88586b704f805e9cf03"
+  }
+}

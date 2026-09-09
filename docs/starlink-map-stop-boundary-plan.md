@@ -2,9 +2,14 @@
 
 Status: slice A (default-disabled map-core fence) is implemented and tested in
 HDL `a29fb9f7`; the standalone PPU receipt decoder is on main `5c78c01a`.
+Slice B's synchronous PSMA controller and wrapper wiring are implemented in
+HDL `8129e8a0`, with 10 dedicated RTL cases and independent review.
 Linux `4357f41a721d` adds the typed request and bracketed receipt attributes,
 with actual-C MMIO/IRQ-model tests and an ARM module build. The complete native
 controller/driver/recorder path below is not yet integrated or hardware-qualified.
+Slice D has a passing reduced real-FFT/native-PSMA test with an unfinished
+third FFT block at acknowledgment, exact map values and fault negatives.
+This does not yet include canonical-tap/PIL1 DMA or full source-support joins.
 This is a bounded
 prerequisite for a fixed-frequency paired pilot-IQ/map/fine recorder, not a
 replacement for the 300 s scanner, independent GLRT, or subsequent 30/60 MS/s
@@ -96,11 +101,12 @@ another tile may already be active. Retain and validate through actual M.
 Exact stop-after-N would require a target-generation command armed before N
 finishes; it is explicitly outside this first increment.
 
-## 3. Proposed two-word PSMA ABI
+## 3. Opt-in two-word PSMA ABI
 
-Reserve a new explicitly admitted shared-15 ABI: proposed version `0x00010006`
-and capability bit 9 (`capabilities=0x0000033f`). These values are a proposal
-to freeze with the implementation, not an existing supported image. Keep all
+The default-disabled shared-15 implementation uses version `0x00010006`
+and capability bit 9 (`capabilities=0x0000033f`). Linux admits this exact
+contract; PPU native image admission and physical qualification remain open.
+These values do not describe a deployed, qualified image. Keep all
 existing register offsets and STATUS bits unchanged. The aperture remains
 256 bytes; `0xf8` and `0xfc` are its only presently unused words.
 
