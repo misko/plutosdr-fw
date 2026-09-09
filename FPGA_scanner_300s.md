@@ -371,10 +371,23 @@ Observed two-clock event/status delays are not universal bounds. The combined
 firmware regression passes 538 tests. See
 `reports/starlink-realtime-guard-dependencies-20260909.json`.
 
-Next, test both guards with the actual core and both mailboxes, then integrate
-the real service and qualify exact scores/maps, current-source 120 ms capacity,
-whole-chip resources, all timing constraints and CDC. A standalone or synthetic
-guard pass does not authorize flashing. The separate paired recorder still needs
+The subsequent actual-core/both-mailbox joint replay now passes 12 healthy jobs
+with 6144 exact published complex words and six missing-demand jobs quarantined
+before any private write or publication, followed by six reset recoveries.
+The coordinator and final-fence premise are still testbench-owned, and both
+mailboxes reset between jobs. This does not prove prefetched-bank preservation
+across local FFT resets or a synthesizable controller-owned final fence. Both
+diagnostic runners now reject assertion-stopped/incomplete logs even when Vivado
+would return zero. Corrected real replays pass; prior failed attempts remain
+retained. The expanded firmware regression passes 573 tests. See
+`reports/starlink-realtime-guarded-mailbox-20260909.json`; these diagnostic changes
+are HDL `13df9535ef1acf22280135f30fd8347ae6fdabf4`, not a receiver promotion.
+
+Next, implement and test persistent-mailbox service ownership, per-job FFT/input
+resets, synchronized fault handling and an internally established cause-based
+final fence. Then qualify exact scores/maps, current-source 120 ms capacity,
+whole-chip resources, all timing constraints and CDC. None of the current guard
+passes authorize flashing. The separate paired recorder still needs
 the exact fine-schedule/source ledger, durable bounded recording, map-boundary
 stop/drain and independent GLRT on proven common observation support.
 
