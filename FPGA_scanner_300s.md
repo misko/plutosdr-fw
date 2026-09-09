@@ -393,7 +393,8 @@ stages, pilot DMA and boundary stop enabled, unchanged constraints, and no
 reference checkpoint. It finished at 20:51:17 UTC with exit 1: **timing failed**.
 Final WNS is -2.183 ns, TNS -189.135 ns, 335 setup failures and zero hold
 failures (WHS +0.014 ns). The 100 MHz domain passes at +0.029 ns and RX passes
-at +2.200 ns; 332 failures remain within 200 MHz plus three inter-clock failures.
+at +2.200 ns; 332 failures remain within 200 MHz plus three 200 MHz reset-recovery
+failures (-0.355 ns). Reported inter-clock paths pass.
 Resources are 13092 LUT, 18502 FF, 4397/4400 slices, 53.5 BRAM tiles and 54 DSP.
 All 33946 routable nets routed, but an emitted bitstream is not deployable.
 

@@ -90,7 +90,9 @@
       "200MHz": {"WNS_ns": -2.183, "TNS_ns": -188.069, "setup_failing_endpoints": 332},
       "RX": {"WNS_ns": 2.200, "setup_failing_endpoints": 0}
     },
-    "additional_inter_clock_setup_failures": 3,
+    "inter_clock_setup_failures": 0,
+    "additional_async_reset_recovery_failures": 3,
+    "async_reset_recovery_WNS_ns": -0.355,
     "resources": {"LUT": 13092, "FF": 18502, "slices": 4397, "available_slices": 4400, "BRAM_tiles": 53.5, "DSP": 54},
     "routable_nets": 33946,
     "routing_errors": 0,
