@@ -1,4 +1,5 @@
 import hashlib
+import re
 import subprocess
 from pathlib import Path
 
@@ -85,8 +86,15 @@ def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:
     assert "CONFIG.TDD_DISABLE 1" in design
     assert "CONFIG.DAC_DATAPATH_DISABLE 1" in design
     assert "CONFIG.PCW_USE_S_AXI_HP2 0" in design
-    assert design.count("CONFIG.SYNC_TRANSFER_START") == 1
-    assert "CONFIG.SYNC_TRANSFER_START {true}" in design
+    # Raw RX uses timestamp-synchronized FIFO DMA; paired-pilot has a separate
+    # AXIS DMA that must not wait for that raw-RX transfer-start signal.
+    sync_starts = re.findall(
+        r"(?m)^\s*ad_ip_parameter (\S+) CONFIG\.SYNC_TRANSFER_START (\S+)\s*$",
+        design,
+    )
+    assert sorted((instance, value.strip("{}")) for instance, value in sync_starts) == [
+        ("axi_ad9361_adc_dma", "true"), ("starlink_pilot_dma", "false"),
+    ]
 
     forbidden = (
         "axi_ad9361_dac_dma",
@@ -104,6 +112,60 @@ def test_block_design_is_compile_time_single_rx_without_tx_engines() -> None:
     assert "up_raddr[13:7] == {6'h10, 1'b0}" in tx_null
     assert "up_raddr[13:8] == 6'h11" in tx_null
     assert "up_raddr[13:8] == 6'h00" not in tx_null
+
+
+def test_dma_instances_are_selected_by_the_actual_profile_gates() -> None:
+    """Execute only the real profile/DMA configuration snippets with Tcl mocks."""
+    design = _read("hdl/projects/pluto/system_bd.tcl")
+    snippets = []
+    for variable in ("starlink_pilot_enabled", "starlink_pss_rx_dma_enabled"):
+        expression = re.search(
+            rf"(?ms)^set {variable} \[expr \{{\n.*?^\}}\]", design,
+        )
+        assert expression, variable
+        snippets.append(expression.group(0))
+    for condition, instance in (
+        ("starlink_pss_rx_dma_enabled", "axi_ad9361_adc_dma"),
+        ("starlink_pilot_enabled", "starlink_pilot_dma"),
+    ):
+        blocks = re.findall(rf"(?ms)^if \{{\${condition}\}} \{{\n.*?^\}}", design)
+        selected = [block for block in blocks if f"ad_ip_instance axi_dmac {instance}" in block]
+        assert len(selected) == 1, instance
+        snippets.append(selected[0])
+    script = r"""
+proc ad_ip_instance {kind instance args} {
+  if {$kind eq "axi_dmac"} { lappend ::dma_instances $instance }
+}
+proc ad_ip_parameter {instance key value} {
+  if {$key eq "CONFIG.SYNC_TRANSFER_START"} {
+    lappend ::dma_sync "$instance:$value"
+  }
+}
+foreach profile {default full detector-only paired-pilot acquisition-only acquisition-injection} {
+  unset -nocomplain ::env(STARLINK_PSS_PROFILE)
+  set starlink_pss_profile full
+  if {$profile ne "default"} {
+    set ::env(STARLINK_PSS_PROFILE) $profile
+    set starlink_pss_profile $profile
+  }
+  set starlink_pss_rate_msps 15
+  set dma_instances {}
+  set dma_sync {}
+""" + "\n".join(snippets) + r"""
+  puts [list PROFILE $profile $dma_instances $dma_sync]
+}
+"""
+    result = subprocess.run(["tclsh"], input=script, text=True, capture_output=True,
+                            check=True, timeout=10)
+    assert not result.stderr, result.stderr
+    assert result.stdout.splitlines() == [
+        "PROFILE default axi_ad9361_adc_dma axi_ad9361_adc_dma:true",
+        "PROFILE full axi_ad9361_adc_dma axi_ad9361_adc_dma:true",
+        "PROFILE detector-only {} {}",
+        "PROFILE paired-pilot starlink_pilot_dma starlink_pilot_dma:false",
+        "PROFILE acquisition-only axi_ad9361_adc_dma axi_ad9361_adc_dma:true",
+        "PROFILE acquisition-injection axi_ad9361_adc_dma axi_ad9361_adc_dma:true",
+    ]
 
 
 def test_abi12_injection_is_the_shared_tracker_and_dma_boundary() -> None:
@@ -196,7 +258,14 @@ def test_abi12_batch_and_clock_contract_is_frozen_without_rtl_changes() -> None:
     assert "live_multiframe_pss_qualified: false" in manifest
 
     assert "PSS_COMMAND_FIFO_USABLE 7U" in header
-    assert "PSS_MINIMUM_HOST_LEAD UINT64_C(65536)" in header
+    # This manifest records the original Stage-15 source, not the subsequently
+    # generalized compile-time header. Keep that historical byte binding and
+    # lead claim; current evaluated 15/30/60 contracts are tested separately.
+    assert "batch_minimum_post_submit_lead_samples: 65536" in manifest
+    assert "host_header_sha256: " + _git_sha256(
+        ".", "d83f898bb3f18fce73db75545598df03243c9629",
+        "tools/starlink_pssctl/starlink_pss_hw.h",
+    ) in manifest
     assert "pss_track_batch" in header
     assert "pss_calculate_clock_slope" in header
     assert "validate_batch_counter_capacity" in library
@@ -205,6 +274,46 @@ def test_abi12_batch_and_clock_contract_is_frozen_without_rtl_changes() -> None:
     assert '"clock-slope"' in controller
     assert "batch_fifo=7 batch_refill=1" in selftest
     assert "clock_slope=1" in selftest
+
+
+def test_current_host_header_has_explicit_compile_time_rate_contracts() -> None:
+    header = ROOT / "tools/starlink_pssctl/starlink_pss_hw.h"
+    # Default retains the historical 15 MS/s values checked below. These
+    # compile checks are not qualification of hardware or host scheduling.
+    for selected, rate, version, geometry, capabilities, multiplier, lead in (
+        (None, 15, 0x10002, 0x003D8242, 0x3D, 1, 65536),
+        (15, 15, 0x10002, 0x003D8242, 0x3D, 1, 65536),
+        (30, 30, 0x10003, 0x0BCA0884, 0x1D, 2, 131072),
+        (60, 60, 0x10003, 0x0F8C1108, 0x1D, 4, 262144),
+    ):
+        expected = {
+            "PSS_RATE_MSPS": rate, "PSS_VERSION": version, "PSS_GEOMETRY": geometry,
+            "PSS_CAPABILITIES": capabilities, "PSS_RATE_MULTIPLIER": multiplier,
+            "PSS_MINIMUM_HOST_LEAD": lead, "PSS_DEFAULT_LEAD_SAMPLES": 1000000 * multiplier,
+            "PSS_COMMAND_FIFO_USABLE": 7, "PSS_DEFAULT_QUEUE_TARGET": 7,
+            "PSS_FRAME_PERIOD_SAMPLES": 20000 * multiplier,
+            "PSS_COEFFICIENT_COUNT": 66 * multiplier,
+            "PSS_CAPTURE_SAMPLES": 130 * multiplier,
+            "PSS_QUALIFIED_LAG_COUNT": 60 * multiplier + 1,
+            "PSS_RESULT_WORDS": 26, "PSS_HAS_INJECTION": int(rate == 15),
+        }
+        source = f'#include "{header}"\n' + "\n".join(
+            f'_Static_assert({name} == UINT64_C({value}), "{name}");'
+            for name, value in expected.items()
+        )
+        flags = [] if selected is None else [f"-DPSS_BUILD_RATE_MSPS={selected}"]
+        result = subprocess.run(
+            ["gcc", "-std=c11", "-Wall", "-Wextra", "-Werror", *flags, "-x", "c", "-fsyntax-only", "-"],
+            input=source, text=True, capture_output=True, check=False, timeout=10,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+    for rate in (0, 25, 120):
+        result = subprocess.run(
+            ["gcc", "-std=c11", f"-DPSS_BUILD_RATE_MSPS={rate}", "-x", "c", "-fsyntax-only", "-"],
+            input=f'#include "{header}"\n', text=True, capture_output=True, check=False, timeout=10,
+        )
+        assert result.returncode != 0
+        assert "PSS_BUILD_RATE_MSPS must be exactly 15, 30, or 60" in result.stderr
 
 
 def test_abi12_batch_hardware_evidence_keeps_rt_and_live_signal_boundaries() -> None:

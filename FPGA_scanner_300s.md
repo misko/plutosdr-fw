@@ -315,6 +315,30 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
+### Private FFT observation enables — 2026-09-09
+
+HDL `90c539cd4ea51bd0dbe3e8154177f62c388d394c` is pushed and remotely
+verified. The remaining worst path in `9f7699cc` reached the result guard's
+status-exponent enable through the full current fault cone. Private job
+observations now update independently of that cone; immediate quarantine,
+fault reasons, return validity and final publication gates are unchanged.
+Ten directed fault edges witness all seven moved fields, 1408 quarantine
+event combinations preserve exact public behavior/reasons against the frozen
+golden, and 11 complete jobs verify reset recovery. Three mutants are rejected.
+
+Actual service, exact-score and reduced native-stop XFFT replays pass on this
+new runtime. A fresh same-clock/same-constraint full receiver build completed
+in `shared-realtime-private-observations-v1`: 200 MHz setup still fails at
+-1.722 ns with 361 failing endpoints, improved from -1.999 ns/444. The 100 MHz
+domain (+0.237 ns), reset recovery (+0.318 ns) and hold (+0.021 ns) pass.
+Boundary-stop remains disabled for this separate timing measurement. This
+image is not deployable; no failing constraint has been waived.
+The wider regression now passes 886 tests. Two preexisting legacy text-contract
+failures are retained in the report; their replacements execute the actual
+profile-specific DMA gates and compile exact multirate header contracts while
+preserving historical manifest evidence. No runtime was changed for those tests. See
+`reports/starlink-realtime-private-observations-20260909.json`.
+
 ### Checked publication with independent private RAM writes — 2026-09-09
 
 HDL `9f7699cc91249d8386bdcd761011832ca6d69b07` is pushed and remotely
@@ -466,8 +490,11 @@ and the existing bit-14 partial-map fault/abort receipt. Their three-frame,
 
 The realtime bursty/stalled 64-block replay passes 28608 ordered scores with
 bounded queues and zero forward stall cycles. It tests counts/order/backlog,
-not every numerical value and not 120 ms. The current frozen 4096-block nominal
-replay is running; progress alone is not a capacity pass. The expanded firmware
+not every numerical value and not 120 ms. The frozen `ff4229bb` 4096-block
+nominal replay has now passed: 1830977 source samples (122.065 ms nominal),
+1830912 ordered scores, FIFO peak356 and bounded backlog. This is prior-source
+counts/order/capacity evidence, not a current-source or numerical qualification;
+see `reports/starlink-realtime-private-observations-20260909.json`. The expanded firmware
 regression passes 714 tests, including executable selector and physical-gate
 models. Those models do not establish actual synthesized endpoints or timing.
 
