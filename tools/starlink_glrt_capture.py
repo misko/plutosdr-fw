@@ -229,8 +229,11 @@ def collect(args, *, library=None, context_factory=Context):
             events.scan(count=16, bits=32, signed=False)
             # libiio's software-buffer path uses samples * kernel_buffers for
             # the kernel kfifo length. One-record refills retain a short tail.
-            event_buffer = events.buffer(1, 1024)
+            # The network backend copies the context timeout into each new
+            # buffer socket; changing it after OPEN does not update that socket.
+            # A quiet detector is valid for the entire bounded IQ observation.
             event_context.timeout(0)
+            event_buffer = events.buffer(1, 1024)
             reader = EventReader(event_buffer, event_file, args.visit)
             reader.start()
             for name, value in {
@@ -332,6 +335,8 @@ def collect(args, *, library=None, context_factory=Context):
     try:
         if final is None or baseline is None or reader is None:
             raise ValueError("complete baseline/final/event evidence is unavailable")
+        if reader.error is not None:
+            raise reader.error
         final.require_events(reader.events, baseline=baseline)
         if extension_abi == "GLX1-1.0":
             if final_closure is None or baseline_closure is None:

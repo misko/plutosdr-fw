@@ -172,6 +172,8 @@ class FakeDevice:
     def buffer(self, samples, kernel_buffers):
         role = "iq" if self.name.endswith("-iq") else "events"
         assert (samples, kernel_buffers) == ((10, 4) if role == "iq" else (1, 1024))
+        if role == "events":
+            assert ("events", "timeout", 0) in self.scenario.log, "buffer inherits timeout at OPEN"
         self.scenario.log.append((role, "open"))
         if role == "iq":
             assert ("events", "open") in self.scenario.log
@@ -231,6 +233,20 @@ def test_continuous_iq_and_short_event_tail_are_drained_before_context_close(tmp
     assert scenario.log.index(("iq", "final_snapshot")) < scenario.log.index(("events", "close"))
     assert summary["independent_host_glrt_run"] is False
     assert "drain_bytes_per_second_after_prefill" not in summary
+
+
+def test_transport_error_disqualifies_events_even_when_all_counters_match(tmp_path, monkeypatch):
+    from tools.starlink_glrt_capture import EventReader
+    original_wait = EventReader.wait
+    def failed_after_drain(reader, target):
+        original_wait(reader, target)
+        reader.error = OSError(errno.EPIPE, "quiet event socket expired")
+        raise reader.error
+    monkeypatch.setattr(EventReader, "wait", failed_after_drain)
+    scenario, args = Scenario(), arguments(tmp_path)
+    result = collect(args, library=scenario, context_factory=scenario.context)
+    assert result["status"] == "failed" and result["iq_prefix_attested"]
+    assert result["event_records"] == 2 and not result["event_transport_attested"]
 
 
 @pytest.mark.parametrize("fault", [None, "closure_loss", "closure_identity", "closure_event_support"])
