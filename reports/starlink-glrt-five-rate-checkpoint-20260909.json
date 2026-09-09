@@ -1,0 +1,296 @@
+{
+  "schema": "starlink-glrt-five-rate-checkpoint/v1",
+  "created_utc": "2026-09-09T00:54:33.965476+00:00",
+  "firmware_commit": "88fb47c8f2551196afacc5f1ba90726c78252fc1",
+  "full_board_rates": [
+    {
+      "source_rate_hz": 2500000,
+      "hdl_commit": "ff42d5ab0783502cff38ad96e0400d3579384825",
+      "artifact": "artifacts/board-2500000-v4",
+      "audit": {
+        "project": "/home/mouse9911/gits/plutosdr-fw-starlink-glrt-only/artifacts/board-2500000-v4/hdl/projects/pluto/pluto.xpr",
+        "part": "xc7z010clg400-1",
+        "setup_slack_ns": "0.065",
+        "hold_slack_ns": "0.024",
+        "pss_cells": "0",
+        "native_dma_cells": "0",
+        "glrt_ip_cells": "1",
+        "glrt_dma_cells": "1",
+        "hardware_eligible": "0",
+        "qualification": "Timing, CDC, I/O and exception reports require review; audit alone grants no deployment."
+      },
+      "resources": {
+        "luts": 9706.0,
+        "registers": 11987.0,
+        "slices": 3909.0,
+        "dsps": 48.0,
+        "bram_tiles": 4.5
+      },
+      "gray_bus_skew_slack_ns": [
+        1.192,
+        0.842,
+        1.078
+      ],
+      "report_sha256": {
+        "artifacts/board-2500000-v4/full-audit/audit.tsv": "43964c9e596336f1a99805e09ce5e4082aa067624f14b5c52ed887f690ad2300",
+        "artifacts/board-2500000-v4/full-audit/timing_summary.rpt": "d9254812c54e1946187cf8d17bd1631fdb287b1ecb55d3b4d7b202bc01cceac8",
+        "artifacts/board-2500000-v4/full-audit/cdc.rpt": "f47813d2b5cbc89eb20b8b6c6b529a8de98cb574ef9316457172cf2a67810615",
+        "artifacts/board-2500000-v4/full-audit/bus_skew.rpt": "d60a73412e04ec9b80a7ce5db4ca7a4ecbad9afc3eb1257a14234f247ff05f90",
+        "artifacts/board-2500000-v4/full-audit/drc.rpt": "588203f1a3413f289011e6f1cedf225f2ee76ec05c91b525c995270b7e0e6bfd",
+        "artifacts/board-2500000-v4/full-audit/methodology.rpt": "242c3164a7e5dbf4292ed40baa1d2271a64094dc92cc81fb0f5a4b7828d6d497",
+        "artifacts/board-2500000-v4/outputs.sha256": "a21401965be77c81c9f891e83955dc69c756e01ba8d046cffcff7204877be176"
+      }
+    },
+    {
+      "source_rate_hz": 5000000,
+      "hdl_commit": "ff42d5ab0783502cff38ad96e0400d3579384825",
+      "artifact": "artifacts/board-5000000-v3",
+      "audit": {
+        "project": "/home/mouse9911/gits/plutosdr-fw-starlink-glrt-only/artifacts/board-5000000-v3/hdl/projects/pluto/pluto.xpr",
+        "part": "xc7z010clg400-1",
+        "setup_slack_ns": "0.091",
+        "hold_slack_ns": "0.015",
+        "pss_cells": "0",
+        "native_dma_cells": "0",
+        "glrt_ip_cells": "1",
+        "glrt_dma_cells": "1",
+        "hardware_eligible": "0",
+        "qualification": "Timing, CDC, I/O and exception reports require review; audit alone grants no deployment."
+      },
+      "resources": {
+        "luts": 10589.0,
+        "registers": 12493.0,
+        "slices": 4000.0,
+        "dsps": 56.0,
+        "bram_tiles": 12.0
+      },
+      "gray_bus_skew_slack_ns": [
+        1.231,
+        0.719,
+        0.988
+      ],
+      "report_sha256": {
+        "artifacts/board-5000000-v3/full-audit/audit.tsv": "670bf79673a594e0213607b63e634ebd97c011e6244e5d5c7ee07352b236b9d0",
+        "artifacts/board-5000000-v3/full-audit/timing_summary.rpt": "1a148f250ae619a6db880ee21123a3f9f473790dc48ba023aeb05e7bf2d5f98d",
+        "artifacts/board-5000000-v3/full-audit/cdc.rpt": "cf778c46772feb0705b0069727317967f63450257736386a3e0c74c60e1f4715",
+        "artifacts/board-5000000-v3/full-audit/bus_skew.rpt": "d40b499f9598baa3385ade52e221b39d976f71a4134200482954deaab4cd788b",
+        "artifacts/board-5000000-v3/full-audit/drc.rpt": "19bc46d89c99fad55938d6a1b3df0fc06e83d17ba9d987c18ddd6d6e5ae1b3a1",
+        "artifacts/board-5000000-v3/full-audit/methodology.rpt": "b2a71cdd355477b39424ea14d21d2bcf259376165796ae4b97d788660654aea6",
+        "artifacts/board-5000000-v3/outputs.sha256": "4aeee64e333bf525b22ca00d61138315838a1d19f703793471e700a6ec0b3f61"
+      }
+    },
+    {
+      "source_rate_hz": 10000000,
+      "hdl_commit": "ff42d5ab0783502cff38ad96e0400d3579384825",
+      "artifact": "artifacts/board-10000000-v2",
+      "audit": {
+        "project": "/home/mouse9911/gits/plutosdr-fw-starlink-glrt-only/artifacts/board-10000000-v2/hdl/projects/pluto/pluto.xpr",
+        "part": "xc7z010clg400-1",
+        "setup_slack_ns": "0.184",
+        "hold_slack_ns": "0.011",
+        "pss_cells": "0",
+        "native_dma_cells": "0",
+        "glrt_ip_cells": "1",
+        "glrt_dma_cells": "1",
+        "hardware_eligible": "0",
+        "qualification": "Timing, CDC, I/O and exception reports require review; audit alone grants no deployment."
+      },
+      "resources": {
+        "luts": 11387.0,
+        "registers": 12976.0,
+        "slices": 4156.0,
+        "dsps": 64.0,
+        "bram_tiles": 19.5
+      },
+      "gray_bus_skew_slack_ns": [
+        1.199,
+        1.036,
+        0.962
+      ],
+      "report_sha256": {
+        "artifacts/board-10000000-v2/full-audit/audit.tsv": "0f94e09f9a41445c03f70100ee054d21161d191a7733badb5ca2dfd92f42591a",
+        "artifacts/board-10000000-v2/full-audit/timing_summary.rpt": "be1f912821c475b3b72028beead8024811f0c15f528a116b0bd6ae60c4a7ca48",
+        "artifacts/board-10000000-v2/full-audit/cdc.rpt": "fd9bebedebcdf33fce1b25e21f224f6482cda025de433f6b90c307962f9c8984",
+        "artifacts/board-10000000-v2/full-audit/bus_skew.rpt": "5526946e0bb73a6dccacb38872a0bc82ae2cf2a0fa643a3c28b9bc8420d892e2",
+        "artifacts/board-10000000-v2/full-audit/drc.rpt": "ca2854d3f499fd7fc1610f2e391e9092119af338f90cadb325d812da7014aed2",
+        "artifacts/board-10000000-v2/full-audit/methodology.rpt": "d1f58fd027e073148db8b25ef465beed4466b3c09005cf62a4217899e2d910fe",
+        "artifacts/board-10000000-v2/outputs.sha256": "92ef242338479a1b6bc56677c9ebcfe384c22698ecbda683d185841ce400e4aa"
+      }
+    },
+    {
+      "source_rate_hz": 25000000,
+      "hdl_commit": "ff42d5ab0783502cff38ad96e0400d3579384825",
+      "artifact": "artifacts/board-25000000-v2",
+      "audit": {
+        "project": "/home/mouse9911/gits/plutosdr-fw-starlink-glrt-only/artifacts/board-25000000-v2/hdl/projects/pluto/pluto.xpr",
+        "part": "xc7z010clg400-1",
+        "setup_slack_ns": "0.043",
+        "hold_slack_ns": "0.026",
+        "pss_cells": "0",
+        "native_dma_cells": "0",
+        "glrt_ip_cells": "1",
+        "glrt_dma_cells": "1",
+        "hardware_eligible": "0",
+        "qualification": "Timing, CDC, I/O and exception reports require review; audit alone grants no deployment."
+      },
+      "resources": {
+        "luts": 11416.0,
+        "registers": 12974.0,
+        "slices": 4171.0,
+        "dsps": 64.0,
+        "bram_tiles": 31.0
+      },
+      "gray_bus_skew_slack_ns": [
+        1.123,
+        0.881,
+        0.853
+      ],
+      "report_sha256": {
+        "artifacts/board-25000000-v2/full-audit/audit.tsv": "688a0b9d8ebf8e67720a0c88a7ab2dd902d432e3b091cd50c4066f8a63fd55df",
+        "artifacts/board-25000000-v2/full-audit/timing_summary.rpt": "6368f2a5436a19b8ac4d7cf367b2f9c9f3b15304b7cd6b1ae28b4f007d04025b",
+        "artifacts/board-25000000-v2/full-audit/cdc.rpt": "fc9f248605ea6243eddf5d8580cb1447880b6d4eff9ce0f9cf71afdc829c8b39",
+        "artifacts/board-25000000-v2/full-audit/bus_skew.rpt": "0d9cafc76ea69df68bf3bca4082c99fad79f44bf7ed287b125066d02262845ac",
+        "artifacts/board-25000000-v2/full-audit/drc.rpt": "d375838e27b2124b47b027218bbc5e2bdb26a96c6bc6b27e2b5d2e9a5fd508a5",
+        "artifacts/board-25000000-v2/full-audit/methodology.rpt": "6373bdaa71c69f832618cc7a28c6fe5b08ac8c702601fce3715b71a9133cbd9d",
+        "artifacts/board-25000000-v2/outputs.sha256": "00e11560c6d236695586b11f817d5e24c5dbff61a1b1a4850418b9d158ad4265"
+      }
+    },
+    {
+      "source_rate_hz": 60000000,
+      "hdl_commit": "ff42d5ab0783502cff38ad96e0400d3579384825",
+      "artifact": "artifacts/board-60000000-v5",
+      "audit": {
+        "project": "/home/mouse9911/gits/plutosdr-fw-starlink-glrt-only/artifacts/board-60000000-v5/hdl/projects/pluto/pluto.xpr",
+        "part": "xc7z010clg400-1",
+        "setup_slack_ns": "0.067",
+        "hold_slack_ns": "0.016",
+        "pss_cells": "0",
+        "native_dma_cells": "0",
+        "glrt_ip_cells": "1",
+        "glrt_dma_cells": "1",
+        "hardware_eligible": "0",
+        "qualification": "Timing, CDC, I/O and exception reports require review; audit alone grants no deployment."
+      },
+      "resources": {
+        "luts": 12960.0,
+        "registers": 13210.0,
+        "slices": 4333.0,
+        "dsps": 72.0,
+        "bram_tiles": 46.5
+      },
+      "gray_bus_skew_slack_ns": [
+        1.304,
+        1.244,
+        0.993
+      ],
+      "report_sha256": {
+        "artifacts/board-60000000-v5/full-audit/audit.tsv": "554e21922ead6fea6d5ea4b6c8225363d6ec078f884c8716cdeb93c85cdeeaed",
+        "artifacts/board-60000000-v5/full-audit/timing_summary.rpt": "b9e6c8ea1e7716cf4319061bec3be989cfc54fe9477276ccbce3ed72ddf5f268",
+        "artifacts/board-60000000-v5/full-audit/cdc.rpt": "23eb4cabfc57b0700633873dca4d28509986df65e1668575ca52350ed1eedceb",
+        "artifacts/board-60000000-v5/full-audit/bus_skew.rpt": "f323335d32e9a1ae0115cbe6b58845ca440c8b5087ff1db7034ca2f2e7b61115",
+        "artifacts/board-60000000-v5/full-audit/drc.rpt": "0e4d5578ed15d32388258eddce94528e7e7468fed199b8ecd80b0e4aadae0d2c",
+        "artifacts/board-60000000-v5/full-audit/methodology.rpt": "579eb6055f3279e118089b930fd25f6e3b782009a437aea2b3c470415e3568af",
+        "artifacts/board-60000000-v5/outputs.sha256": "afe16c1c1f6d1d9aeda1d55ff1d24101cfb9e0ba0a6b5fa15ab9dda2954db817"
+      }
+    }
+  ],
+  "saved_development_studies": [
+    {
+      "artifact": "artifacts/saved-record031-rtl-v1",
+      "summary_sha256": "0eeb92012804d5bd9f7c9f1742b63ba370b19bbe90d5d4158e64c039ecf7baee",
+      "protocol_sha256": "3e70b9283f50367db7aaa8e4d5b47fc59e8ea0fa36fd5e843c3b9bdda93b9b97",
+      "status_counters": [
+        50000,
+        50000,
+        0,
+        0,
+        0,
+        50000,
+        49825,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "detections": 0,
+      "exported_sha256": "3bf1603ceeba1b3a17888c4b9b87e215641879dc59ed71a81f15cd6650cbed25",
+      "fresh_holdout": false
+    },
+    {
+      "artifact": "artifacts/saved-record031-rtl-v2-gate20",
+      "summary_sha256": "87036ee24d9905c7dee83671fe6029ba917dcf138acfc8bc72ba093b684027c9",
+      "protocol_sha256": "3e089b514300e52a246e7f5662357833a9521baabaea34ed366a9f6bf00298ec",
+      "status_counters": [
+        50000,
+        50000,
+        0,
+        0,
+        0,
+        50000,
+        49825,
+        7,
+        7,
+        0,
+        7,
+        0,
+        0,
+        0,
+        0,
+        7,
+        0,
+        0
+      ],
+      "detections": 1,
+      "exported_sha256": "3bf1603ceeba1b3a17888c4b9b87e215641879dc59ed71a81f15cd6650cbed25",
+      "fresh_holdout": false
+    },
+    {
+      "artifact": "artifacts/saved-record031-rtl-v3-gate16",
+      "summary_sha256": "813d954b3f39ffbd987fdcaa6e714693d67d934a7be5a556ee1cfbc9b75a239c",
+      "protocol_sha256": "db28426ebe6ca04befa8a88a87b4c3cba81e243796cbefda9cd1dbfc93062bda",
+      "status_counters": [
+        50000,
+        50000,
+        0,
+        0,
+        0,
+        50000,
+        49825,
+        350,
+        33,
+        113,
+        33,
+        0,
+        0,
+        0,
+        0,
+        146,
+        203,
+        1
+      ],
+      "detections": 0,
+      "exported_sha256": "3bf1603ceeba1b3a17888c4b9b87e215641879dc59ed71a81f15cd6650cbed25",
+      "fresh_holdout": false
+    }
+  ],
+  "ram_canary_manifest": "artifacts/ram-2500000-v2/manifest.json",
+  "ram_canary_manifest_sha256": "46169847b1da40a3c9f2f308e1b99f326970754902b5735343da1a78a32f5363",
+  "hardware_accessed": false,
+  "hardware_qualified": false,
+  "live_qualified": false,
+  "remaining": [
+    "manual CDC/reset/BRAM and runtime-calibrated ADC I/O review",
+    "frozen synthetic CFO/weak/short/control matrix running",
+    "24 saved upper development records at .20 running",
+    "fresh saved/live holdouts after gates freeze",
+    "owner allocated .18 then .17 windows; messaging transport currently down",
+    "real IIO DMA lifecycle, headroom and live FPGA/host agreement"
+  ]
+}

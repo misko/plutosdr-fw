@@ -36,6 +36,26 @@ def save(path, data):
         stream.write("\n")
 
 
+def terminal_state(status, trace, samples, ratio):
+    reading, next_index, newest_index, native_epoch, score_state, expected_symbol, score_epoch = trace
+    partial = bool(status[13])
+    if partial:
+        if not (reading and next_index == samples and newest_index == samples-1
+                and native_epoch+726*ratio > samples and score_state in (0, 1)):
+            raise ValueError("pending native work is not solely waiting for samples beyond the observation")
+        if score_state == 1 and (not 1 <= expected_symbol <= 63 or score_epoch != native_epoch):
+            raise ValueError("partial scorer does not belong to the incomplete native frame")
+    elif score_state != 0 or status[14]:
+        raise ValueError("complete scorer work is still pending after drain")
+    if bool(status[14]) != bool(score_state):
+        raise ValueError("scorer state and busy flag disagree")
+    return {"native_waiting_for_future_input": partial,
+            "native_epoch": native_epoch if partial else None,
+            "required_support_end_native": native_epoch+726*ratio if partial else None,
+            "received_support_end_native": samples,
+            "scorer_state": score_state, "collected_symbols": expected_symbol if score_state == 1 else None}
+
+
 def compare(host, iq_path, events, first_center, ratio):
     # This function is called only after RTL and exact IQ verification finish.
     summary = json.loads((host / "summary.json").read_text())
@@ -113,7 +133,7 @@ def main():
     source_files = [p for p in source_files if p.is_file() and p.suffix in (".py", ".v", ".mem", ".json")]
     source_hashes = {str(path): digest(path) for path in source_files}
     args.output.mkdir(parents=True, exist_ok=False)
-    save(args.output / "protocol.json", {"schema": "starlink-glrt-saved-rtl/v1", "source_rate_hz": args.source_rate,
+    save(args.output / "protocol.json", {"schema": "starlink-glrt-saved-rtl/v2", "source_rate_hz": args.source_rate,
          "edge": args.edge, "samples": len(raw), "input_sha256": hashlib.sha256(raw_bytes).hexdigest(),
          "source_sha256": source_hashes, "replay_first_source_index": 0,
          "index_note": "replay ordinal, not the original radio counter",
@@ -122,6 +142,9 @@ def main():
          "tolerance_note": "engineering window of five 0.4 us cells and about 4.5 FPGA CFO bins; misses are retained",
          "hardware_accessed": False})
     source = BENCH.replace("(RATE)", f"({args.source_rate})")
+    source = source.replace("$finish;", '$display("T %d %d %d %d %d %d %d", dut.native.reading, dut.native.next_index, '
+                            'dut.native.newest_index, dut.native.job_epoch, dut.scorer.state, '
+                            'dut.scorer.expected_symbol, dut.scorer.job_epoch);\n $finish;')
     source = source.replace("acquisition_threshold_q16=15729,glrt_threshold_q16=19661,glrt_margin_q16=9831",
                             f"acquisition_threshold_q16={gates[0]},glrt_threshold_q16={gates[1]},glrt_margin_q16={gates[2]}")
     for token, filename in {"NATIVE": f"pilot_{args.source_rate}_{args.edge}_q7.mem",
@@ -141,22 +164,23 @@ def main():
     (args.output / "rtl_trace.txt").write_text(process.stdout + process.stderr)
     if process.returncode:
         raise RuntimeError("RTL replay failed; inspect retained trace")
-    streams = {name: [] for name in ("O", "P", "C", "G", "S")}
+    streams = {name: [] for name in ("O", "P", "C", "G", "S", "T")}
     for line in process.stdout.splitlines():
         words = line.split()
         if words[0] in streams:
-            streams[words[0]].append(tuple(int(word, 16 if j == 0 and words[0] != "S" else 10)
+            streams[words[0]].append(tuple(int(word, 16 if j == 0 and words[0] not in ("S", "T") else 10)
                                                 for j, word in enumerate(words[1:])))
         elif "$finish called at" not in line:
             raise ValueError("unexpected RTL output: " + line)
     reference = Ddc(args.source_rate).process(raw, 0)
     expected = [(int(index), int(i), int(q), int(support)) for index, (i, q), support in
                 zip(reference.indexes, reference.iq, reference.supported)]
-    if streams["O"] != expected or len(streams["S"]) != 1:
+    if streams["O"] != expected or len(streams["S"]) != 1 or len(streams["T"]) != 1:
         raise ValueError("RTL IQ differs from independent integer convolution")
     status = streams["S"][0]
-    if status[:5] != (len(raw), len(expected), reference.clips, 0, 0) or any(status[j] for j in (11, 12, 14)):
+    if status[:5] != (len(raw), len(expected), reference.clips, 0, 0) or any(status[j] for j in (11, 12)):
         raise ValueError("RTL export or detector fault/pending complete work")
+    terminal = terminal_state(status, streams["T"][0], len(raw), args.source_rate//2_500_000)
     if status[5:8] != (len(expected), max(0, int(reference.supported.sum())-175), len(streams["P"])):
         raise ValueError("acquisition window/proposal counts do not reconcile")
     if status[8:11] != (sum(row[1] for row in streams["C"]), sum(row[2] for row in streams["C"]), len(streams["G"])):
@@ -192,6 +216,7 @@ def main():
               "selected_candidates": [{"epoch": row[0], "admitted": bool(row[1]), "busy_rejected": bool(row[2])}
                                       for row in streams["C"]],
               "incomplete_native_candidate": bool(status[13]), "selection_pending": bool(status[17]),
+              "terminal_state": terminal,
               "hardware_accessed": False, "transport_qualified": False, "live_detector_qualified": False}
     if args.host_blind is not None:
         result["comparison"] = compare(args.host_blind, iq_path, events, first_center, args.source_rate//2_500_000)

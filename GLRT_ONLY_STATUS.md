@@ -363,13 +363,13 @@ radio/FPGA delay calibration. No radio has been opened or image deployed.
 | 2.5 | ff42d5ab | board-2500000-v4 | +0.065/+0.024 | 9706 | 3909 | 48 | 4.5 |
 | 5 | ff42d5ab | board-5000000-v3 | +0.091/+0.015 | 10589 | 4000 | 56 | 12 |
 | 10 | ff42d5ab | board-10000000-v2 | +0.184/+0.011 | 11387 | 4156 | 64 | 19.5 |
-| 25 | 72e94f19 | board-25000000-v1 | +0.005/+0.006 | 12933 | 4368 | 64 | 31 |
+| 25 | ff42d5ab | board-25000000-v2 | +0.043/+0.026 | 11416 | 4171 | 64 | 31 |
 | 60 | ff42d5ab | board-60000000-v5 | +0.067/+0.016 | 12960 | 4333 | 72 | 46.5 |
 
 All five implemented audits contain zero PSS cells, zero native-rate RX DMA
 cells, exactly one GLRT core and one GLRT IQ DMA, and no bus-skew violation.
-Margins are small, particularly at 25 MS/s. A fresh 25 MS/s build on ff42d5ab is
-running. Earlier failing routes remain retained and disqualified, including
+Margins are small. All five rows now use the same ff42d5ab source. Earlier
+failing routes remain retained and disqualified, including
 60 MS/s v4 at -0.286 ns and 5 MS/s v2 at -0.043 ns.
 
 The ff42d5ab command-path change prevents AXI illegal-command decoding from
@@ -420,3 +420,52 @@ legacy aggregate support explicitly or use the separate frame scores when
 present. A broader all-upper-record development study is the next step; the
 default gates have not been changed. Hardware coordination MCP still fails at
 its local transport endpoint, so no bench ownership has been assumed.
+
+## Bounded numerical trials and reset review, 2026-09-09
+
+The all-upper saved-development study finished all 24 records at gate .20:
+1.2 million exported CI16 words match exactly, with 122 proposals, eight busy
+rejections and one positive (record 31). Record 29 ended with an incomplete
+native frame and partially filled scorer. The original checker rejected that
+combination; its failed artifact remains intact. Recheck
+`artifacts/saved-record029-terminal-v2` records the native next/newest indexes,
+required support end, scorer COLLECT state and collected-symbol count, proving
+the pending work requires future input. It passes IQ and completed-score checks.
+This is a finite-tail classification correction, not a repaired detector fault.
+
+The frozen synthetic matrix contains 50 new seeded 4 ms cases across all five
+rates at gate .20. All cases underwent autonomous RTL replay and independent
+blind host analysis of the exact exported bytes. Four original runs encountered
+the same checker limitation; only those were rerun, in
+`artifacts/synthetic-glrt-terminal-rechecks-v2`. The 46 original completed cases
+and four corrected rechecks retain their source/input hashes. Original aggregate
+summaries stay disqualified and are not rewritten into passes.
+
+Fourteen of fifteen strong cases at CFO -100/0/+100 kHz recover a truth-aligned
+event. The 60 MS/s, zero-CFO case is an actual miss: all three true proposals
+were selected but rejected while the scorer was busy. Six unrelated candidates
+were scored, with no positive result, while independent host GLRT scored .989.
+No positives occur in the 15 noise/tone/scrambled-control cases (only 60 ms total
+control observation; not a qualified false-alarm rate). The nominal -10.97 dB
+weak cases produce no detections at 2.5/5/10/25 and one at 60 MS/s. Repeated
+32-symbol bursts produce detections at every rate; 8-symbol bursts do not.
+Rolled-code ambiguity is rediscovered at 2.5/10, with busy/acquisition misses at
+the other rates. These generated cases are not fresh saved/live RF holdouts.
+
+All five rates have assembled RAM FIT/DFU packages under `artifacts/ram-*`.
+Their manifests remain ineligible for deployment. The routed reset topology
+still produces CDC-10/11 and RAM asynchronous-control warnings. Sixteen new
+occupied-FIFO/stopped-ADC tests pass on ff42d5ab, preserving source-index reset
+versus radio-reset behavior and requiring source-clock acknowledgement.
+
+An independent owned HDL clone, `artifacts/cdc-development-v1/hdl`, contains
+prototype commit `1a0bafdc`: each raw reset's source-clock release is separately
+acknowledged in the CPU domain; no AND of readiness levels drives a FIFO async
+clear. RAM write enable/address/payload are registered without async resets,
+and the Gray write pointer is published at the actual delayed write edge.
+Twenty-three FIFO/ingress/reset tests pass in 4.05 s. An intermediate cleanup
+mistakenly removed a wire still used for the full comparison and failed compile;
+the passing v3 restores it. A full 60 MS/s board build is running in
+`artifacts/board-60000000-cdc-v1`. This prototype has not replaced the main HDL
+or been declared physically qualified. Real hardware transport, calibration,
+bench ownership and live RF agreement remain outstanding.
