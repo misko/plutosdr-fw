@@ -63,13 +63,23 @@
     "command": "STARLINK_PSS_PHASE_INPUT_NETLIST_DIR=/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/final-auth-guard-synth-v1 STARLINK_PSS_INPUT_CURSOR_NETLIST_DIR=/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/input-cursor-synth-v1 /home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_realtime_constraint_gate.py tests/test_starlink_boundary_build_options.py tests/test_starlink_realtime_routed_audit_policy.py"
   },
   "acquisition_IP_package": {"exit_code": 0, "component_sha256": "954fd817c8eb7173e00017cac9b1ead9f9706359965efbf4978fe32511daec17", "console_sha256": "b183cecce708b5d14827d38e50349da6f46bb749279b98c71fffd02904f2c8d1"},
-  "full_receiver": {"status": "not_started", "deployment_eligible": false},
+  "full_receiver": {
+    "status": "running",
+    "directory": "hdl/projects/pluto/shared-realtime-input-cursor-v1",
+    "launch_utc_minute": "2026-09-09T21:50Z",
+    "source_revision": "f96d0b0d89ee8a8d55a5107b464ebe1b957e789d",
+    "configuration": "15MS/s paired-pilot, shared realtime XFFT, boundary stop, DSP fine tracker, pilot DMA, global synthesis, unchanged constraints, no reference DCP",
+    "exec_session": 59255,
+    "launch_process_pid": 1840623,
+    "deployment_eligible": false,
+    "observation_rule": "Revalidate this exact process/session or terminal artifacts; a persisted running label is not proof of liveness."
+  },
   "preceding_full_receiver": "ccdf6436 failed at WNS -0.956ns, 223 setup failures, all 4400 slices occupied. Worst path was input-checker position feedback; 100MHz and other 200MHz failures remain separate obligations. See starlink-phase-input-contract-20260909.json.",
   "radio_accessed": false,
   "ppu_changed": false,
   "deployed": false,
   "next": [
-    "Fresh complete 15MS/s paired receiver implementation with both PSS stages, pilot DMA and boundary stop retained; original clocks/constraints and no reference checkpoint.",
+    "Observe the launched complete 15MS/s paired receiver to terminal; do not restart on a polling timeout or infer timing from structural tests.",
     "Inspect the exact final checkpoint and qualify all physical/board-I/O/CDC gates before accessing a radio.",
     "Then exact-serial .18 finite/persistent IIO and causal coarse/fine scheduling, PPU Ethernet .17 fixed-frequency independent live GLRT/PSS verification, eight-target 120ms/300s scanning and the 30/60MS/s rate ladder."
   ]

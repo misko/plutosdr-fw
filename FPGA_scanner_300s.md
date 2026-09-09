@@ -384,8 +384,12 @@ cases intentionally skipped. Current guard and all four cursor netlists pass.
 Numeric replay preserves 1341 scores and reset recovery; paired replay preserves
 894 scores, 447 map words and 2048 pilot bytes including a retained late fault.
 The finite burst/stall case delivers 28608 scores at FIFO high-water 358.
-Acquisition IP packaging passed. A fresh full-receiver route is the next gate;
-no radio or PPU operation occurred. Evidence:
+Acquisition IP packaging passed. The fresh complete receiver launched at
+21:50 UTC in `hdl/projects/pluto/shared-realtime-input-cursor-v1`, retaining
+both PSS stages, pilot DMA, boundary stop and the original constraints, with
+global synthesis and no reference checkpoint. No timing result is available
+at this checkpoint; revalidate its recorded process before treating it as live.
+No radio or PPU operation occurred. Evidence:
 `reports/starlink-input-cursor-20260909.json`.
 
 ### Explicit final-only result authorization — 2026-09-09
