@@ -1,0 +1,133 @@
+{
+  "schema": "starlink-descriptor-bram-progress-v1",
+  "observed_utc": "2026-09-09T17:50:53Z",
+  "scope": "Verified descriptor BRAM integration, actual optimized tracker functional tests and complete receiver placement; original route still running, no hardware qualification.",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "baseline_hdl_commit": "c66bb2197dd55b63d23797463570d7c2696c9fa6",
+  "runtime_hdl_commit": "653a3205bc7bd158a7267a9288beba63aebe12cf",
+  "audit_and_test_hdl_commit": "406c5a55db16157fd351069842344501ad71a549",
+  "source_sha256": {
+    "hdl/library/starlink_pss_raw_correlator/starlink_pss_async_fifo.v": "a07f1bf38da80b3a0f125351af439af5b58aae1ab783597ba15086d40f3cbc0d",
+    "hdl/library/starlink_pss_raw_correlator/starlink_pss_capture_bridge.v": "950d9a5b1cafd4fc685039af49df5782b254bff908d46459e7c5f25eb3447a2f",
+    "hdl/library/axi_starlink_pss_tracker/axi_starlink_pss_tracker_constr.xdc": "e734677e579f31ddebb2998090045a09040fc2e0b636d916bc674bf9b15f549d",
+    "hdl/library/axi_starlink_pss_tracker/component.xml": "18bd78b9e4242773e7e6d49872f370c046f4c59c607f137132e3c98161af5cc1"
+  },
+  "implementation": {
+    "descriptor_bits": 161,
+    "physical_entries": 4,
+    "usable_queued_entries": 3,
+    "runtime_change": "Select the existing RAM_STYLE=block parameter only; FIFO algorithm unchanged.",
+    "constraint_change": "Do not issue the legacy distributed-payload-to-read_data-D exception when BRAM absorbs its destination. Retain ordinary address, enable, output and second-stage synchronization timing.",
+    "global_synthesis": "Two 72-bit RAMB36 output stages absorb 144 downstream winner-metadata FFs; one 36-bit RAMB18 remains unregistered. This differs from standalone FIFO synthesis.",
+    "global_optimized_descriptor_luts": 60,
+    "global_optimized_descriptor_ffs": 23,
+    "global_optimized_descriptor_bram_tiles": 2.5,
+    "global_optimized_exact_reducer_luts": 1086,
+    "global_optimized_exact_reducer_ffs": 1286
+  },
+  "standalone_bram_equivalence": {
+    "directory": "hdl/library/starlink_pss_raw_correlator/build/descriptor-storage-netlist-v2",
+    "scope_sha256": "e550e00fe54f409c56348c0c5e46990da0929d320ee86393e2465c0c0cbaf21d",
+    "actual_netlist_sha256": "54e910f589a6477a08b1b22099ed20891db0d11b92f8039be78e19a6d04ea1a4",
+    "exit_code": 0,
+    "passed_cases": 6,
+    "write_read_half_period_ns": [[7, 5], [5, 7], [3, 5]],
+    "coordinated_reset_release_orders": 2,
+    "accepted_per_case": 195,
+    "consumed_per_case": 192,
+    "reset_discarded_per_case": 3,
+    "held_after_consumption_cycles": 12,
+    "scope_limit": "Public cycle-by-cycle comparison with frozen old RTL plus queue oracle, not metastability or physical CDC proof. Only coordinated reset assertion is supported."
+  },
+  "actual_optimized_tracker": {
+    "directory": "hdl/library/axi_starlink_pss_tracker/build/global-descriptor-tracker-v3",
+    "scope_sha256": "cfdaf2035da5d067eddf3ac7b29a7abe05be3501e6fa1d511a089902b86c28b2",
+    "result_log_sha256": "2f68ca873bbf56060640746419ddad39049a9685eb0d5f36afce2ddd59eca2ad",
+    "exported_netlist_sha256": "0ffe57f1ab24bfdba135edc6f377302935554e1ab06450ea460fcc572d8fa00a",
+    "export_context_sha256": "0449dc4ec231c8c06d45703fa43a84c41c0f8b1c582cb956da22682f1ffbb947",
+    "exit_code": 0,
+    "first_packet_words_checked": 26,
+    "descriptor_metadata_packets_checked": 3,
+    "later_packet_fields": "Request ID, center index and center timestamp; later correlation payloads are not fully compared.",
+    "public_behavior_checked": "Coefficient commit, known first winner, result IRQ/release, concurrent telemetry, deferred requests, successive metadata and coordinated sample-reset epoch with a result pending.",
+    "board_adapter": "15 MS/s paired profile with injection disabled; timestamp equals source index; global lopt derives from AD9361 adc_rst_n and is driven as not sample_reset.",
+    "full_receiver_simulation": false,
+    "ADC_DMA_IIO_RF_physical_CDC_timing_qualified": false
+  },
+  "descriptor_structure_audit": {
+    "directory": "hdl/projects/pluto/shared-realtime-descriptor-bram-stop-v1/resource-audit-descriptor-v4",
+    "scope_sha256": "eccf8529546f8c82322b64cc1cb6bd45897b8a47d976a6d103b6a00b3c69fad8",
+    "exit_code": 0,
+    "checks": "Exact global BRAM/register-fusion profile; no LUTRAM payload; twelve marked pointer-sync FFs; both second stages fully timed; independent read/write clocks; read and fused-register-enable paths retain 10 ns requirements; reducer-derived register enables.",
+    "changes_checkpoint_or_constraints": false,
+    "physical_CDC_or_timing_clearance": false
+  },
+  "completed_regressions": {
+    "oracle_and_constraint_gate": {
+      "log": "hdl/library/starlink_pss_raw_correlator/build/descriptor-bram-oracle-v3.log",
+      "sha256": "086b9abf11746d32df166f3082fa9f845f7f8d369cefd474753fae58927d980a",
+      "exit_code": 0,
+      "passed": 572,
+      "seconds": 93.20
+    },
+    "raw_fine": {
+      "log": "hdl/library/starlink_pss_raw_correlator/build/descriptor-bram-raw-regression-v1.log",
+      "sha256": "25dd10d1fb9d09273192b21ee82636753d6fd6b3c38ee232516b84fc995f50a5",
+      "exit_code": 0
+    },
+    "axi_wrapper": {
+      "log": "hdl/library/axi_starlink_pss_tracker/build/descriptor-bram-axi-regression-v2.log",
+      "sha256": "4f59e0b6cc3c619982a57c548bca2412017fe768a2ad5bda7c2dba50300da8e1",
+      "exit_code": 0,
+      "rtl_rates_msps": [15, 30, 60],
+      "recorded_data_windows": 210,
+      "recorded_data_fixed_float_lag_matches": 210,
+      "scope_limit": "RTL, not live ADC/IIO or native higher-rate physical qualification."
+    },
+    "focused_new_tests": 44,
+    "ruff_new_tests": "PASS"
+  },
+  "retained_failed_experiments": [
+    "Standalone netlist v1 failed because bench sampled at the vendor FF's 100 ps output-update instant. Compare at 1 ns within the same cycle; unchanged RTL then passes v2.",
+    "Old distributed receiver is rejected by the new BRAM audit.",
+    "New-image audit v1/v2 rejected the original DOA_REG=0 assumption. Actual global register fusion was inspected and functionally tested before accepting the explicit fused profile.",
+    "Audit launch v3 rejected extra Tcl arguments before opening a checkpoint; corrected command places -tclargs last and passes in v4."
+  ],
+  "physical_build": {
+    "directory": "hdl/projects/pluto/shared-realtime-descriptor-bram-stop-v1",
+    "source_commit_at_launch": "653a3205bc7bd158a7267a9288beba63aebe12cf",
+    "launch_conditions": "Clean runtime tree, fresh project, no reference.dcp, ADI_USE_OOC_SYNTHESIS=n.",
+    "profile": "15 MS/s paired-pilot, shared realtime XFFT, boundary stop enabled",
+    "tool": "Vivado 2022.2",
+    "part": "xc7z010clg400-1",
+    "optimized_checkpoint_sha256": "a952fc4edb35c7dbe4cd8342c272c8dcd76da300c8d95eaf3697edbfb5a89b2f",
+    "placement": "PASS",
+    "placed_utilization_report_sha256": "e179edf8febdb37f886d9a2926e576f3ed954dae504ca0f5b1cac5882d59612c",
+    "placed_luts": 13276,
+    "placed_ffs": 18841,
+    "placed_slices": 4400,
+    "available_slices": 4400,
+    "placed_control_sets": 446,
+    "bram_tiles": 53.5,
+    "available_bram_tiles": 60,
+    "route_state_as_observed": "RUNNING: Phase 4.4 Global Iteration 3; original Vivado process PID 644029 confirmed live and using CPU.",
+    "last_intermediate_wns_ns": -3.221,
+    "last_intermediate_tns_ns": -5574.278,
+    "intermediate_is_final_timing": false,
+    "final_route_result": null,
+    "physical_timing_qualified": false,
+    "deployable": false
+  },
+  "ppu_changed": false,
+  "radio_accessed": false,
+  "hardware_deployed": false,
+  "native_paired_IIO_qualified": false,
+  "live_fine_PSS_lock_qualified": false,
+  "remaining": [
+    "Consume the original full route's terminal result and audit actual critical paths, CDC and board I/O obligations; do not replace a live job on observation timeout.",
+    "Finish complete-receiver timing without removing either PSS stage or the pilot product.",
+    "Only then qualify the matched image on serial-attested .18 before Ethernet-only PPU deployment to outdoor .17.",
+    "Qualify native paired delivery, automatic coarse-to-fine and causal CFO assistance, genuine continuous capture and independent live GLRT/PSS agreement.",
+    "Implement and qualify eight-target 120 ms hopping over 300 seconds and repeat the full ladder at 30 and 60 MS/s."
+  ]
+}

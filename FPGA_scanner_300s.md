@@ -363,6 +363,47 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Descriptor BRAM: complete receiver placed, routing still active — 2026-09-09
+
+Runtime HDL `653a3205bc7bd158a7267a9288beba63aebe12cf` selects block RAM
+for the 161-bit, three-usable-entry fine capture descriptor FIFO. The FIFO
+algorithm, public latency, retained payload, capacity and coordinated-reset
+contract are unchanged. Six asynchronous-clock/reset-release combinations
+pass against frozen old RTL and an independent queue oracle, including the
+actual synthesized standalone BRAM netlist. Wrong-address, stale/cleared-data
+and premature-synchronizer mutants are rejected.
+
+The complete optimized receiver uses two RAMB36s and one RAMB18 for this FIFO.
+Global synthesis also absorbs 144 bits of downstream winner metadata into the
+RAMB36 output registers. An initial standalone-latency structural assumption
+correctly rejected this different shape; inspection and public AXI/RX tests of
+the **actual globally optimized tracker subtree** now verify the relevant
+behavior. The first packet is checked in all 26 words, later packets' descriptor
+metadata are checked independently, and a pending packet is retained for the
+epoch-reset test. This is not a full-receiver ADC/DMA/IIO simulation. The new
+read-only audit explicitly checks the fused shape, both pointer synchronizers,
+clock ownership and normally timed read/registered-enable controls; it neither
+changes constraints nor declares physical timing/CDC clearance.
+
+The complete stop-enabled paired receiver has now **passed placement**. Its
+placed inventory is 13276 LUTs, 18841 FFs, 53.5/60 BRAM tiles and **4400/4400
+slices**, with 446 control sets. This advances beyond the older 65-slice
+placement failure below, but leaves no spare slices. The original full build
+`shared-realtime-descriptor-bram-stop-v1` is still routing, with congestion and
+negative intermediate slack; no final route/timing qualification exists.
+Do not restart it just because observation takes time, and do not deploy it.
+
+The raw/fine regression and 15/30/60 MS/s AXI wrapper regression pass, including
+210 recorded-data windows and the stronger successive-descriptor checks.
+The full oracle/constraint regression passes 572 tests. Audit and
+simulation-admission tests reject weakened paths, stale/unbound
+inputs, missing pass markers and simulated fatal/error completion. Exact
+source pins, completed evidence and the explicitly provisional physical
+status are recorded in `reports/starlink-descriptor-bram-20260909.json`.
+No radio or PPU worktree was changed. Next: consume the original route's
+terminal result, inspect its real critical paths and complete physical gates
+before the first paired native IIO canary on .18.
+
 ### Measured transform-FIFO BRAM storage — 2026-09-09
 
 HDL `4c9a3b7358fa0e9122c80293e6e5021285582ac0` changes only the
