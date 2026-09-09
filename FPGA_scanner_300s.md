@@ -363,6 +363,35 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Balanced private output-metadata check — 2026-09-09
+
+HDL `65adf692da07422f10fea6c342b2711807ff7a89` is pushed only to the
+do-not-merge branch. A stateless three-bit equality/six-way reduction tree
+shortens the output mailbox's mapped metadata-check logic without dropping any
+bit, delaying any veto, adding state, or changing legacy mailbox behavior.
+The isolated framing cone has one CARRY4 instead of eight, at a cost of eight
+LUTs and no extra FF/BRAM/DSP. Its *unrouted* delay estimate is worse; this is
+not yet evidence of a receiver timing improvement.
+
+The expanded regression passes **940 tests**, with two older-netlist cases
+explicitly skipped. Both actual synthesized mailbox variants match frozen RTL
+through 225 malformed metadata cases and 1536 healthy words each. A portable
+retained-netlist archive also passes 45 follow-up replay/admission tests after
+extraction into a different directory. Actual FFT replay preserves all 1341
+numeric scores and reset recovery; the 64-block burst/stall workload passes
+with 28608 scores. The paired digital shell preserves 894 scores, 447 map words
+and 2048 pilot bytes, including the late invalid-release rejection.
+
+Packaging passed. A fresh complete receiver launched at **23:14 UTC** in
+`hdl/projects/pluto/shared-realtime-metadata-tree-v1`, at the original clocks
+and constraints with both detectors, pilot DMA and boundary stop retained.
+Its physical result is pending; revalidate the live process or terminal logs.
+No radio has been accessed. Board-I/O/CDC/reset, native RX and paired IIO,
+causal refinement, .17 live GLRT/PSS agreement, 120ms/300s hopping and the
+15/30/60MS/s ladder remain required. Detailed evidence and replay instructions:
+`reports/starlink-mailbox-metadata-tree-20260909.json` and
+`reports/experiments/20260909-mailbox-metadata-synthesis.md`.
+
 ### Lower FFT clocks rejected by throughput evidence — 2026-09-09
 
 Separate simulation-only trials at 150/175 MHz preserve the canonical 15 MS/s

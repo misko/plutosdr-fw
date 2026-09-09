@@ -1,0 +1,164 @@
+{
+  "schema": "starlink-private-mailbox-metadata-tree-v1",
+  "scope": "Balanced combinational equality only in the explicit-commit output mailbox. All metadata bits, same-edge rejection, ownership, public outputs, default mailbox mode, clocks and receiver constraints retained.",
+  "hdl_base": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873",
+  "hdl_commit": "65adf692da07422f10fea6c342b2711807ff7a89",
+  "hdl_remote_branch": "codex/starlink-rx-only-do-not-merge",
+  "pushed": true,
+  "source": "hdl/library/starlink_pss_acquisition/starlink_pss_block_mailbox.v",
+  "source_sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+  "runtime_delta": "Three-bit equality leaves and six-way reduction groups, with preserved combinational boundaries. No new state or pipeline cycle. Legacy EXPLICIT_COMMIT=0 retains its original comparison.",
+  "isolated_synthesis": {
+    "directory": "/tmp/starlink-metadata-equality.cihpiD/synthesis-v1",
+    "finished_utc": "2026-09-09T22:58:43Z",
+    "exit_code": 0,
+    "runner": "hdl/library/starlink_pss_acquisition/measure_mailbox_metadata_tree.tcl",
+    "runner_sha256": "9474b88a4f32643695a1228cd0290f2332fd02506fbfc4587ce6d664dc9955e2",
+    "console_sha256": "21d0cb425040571512e72bdc45e2abde947c57e0bee3431c8b3957434bbd994d",
+    "geometry": "ADDRESS_WIDTH=9 DATA_WIDTH=36 METADATA_WIDTH=75 RESET_RELEASE_EXTERNAL=1 EXPLICIT_COMMIT=1",
+    "baseline": {
+      "LUT": 76,
+      "FF": 187,
+      "DSP": 0,
+      "RAMB18": 1,
+      "framing_fanin_CARRY4": 8,
+      "held_metadata_data_delay_ns": 5.202,
+      "logic_delay_ns": 2.695,
+      "estimated_route_delay_ns": 2.507,
+      "synthetic_slack_ns": -1.21,
+      "netlist_sha256": "f2fe3a9f49e6079b48e4300e1bcdba12673e06a95ddc2c251af6177c608dede2"
+    },
+    "candidate": {
+      "LUT": 84,
+      "FF": 187,
+      "DSP": 0,
+      "RAMB18": 1,
+      "framing_fanin_CARRY4": 1,
+      "held_metadata_data_delay_ns": 5.426,
+      "logic_delay_ns": 1.163,
+      "estimated_route_delay_ns": 4.263,
+      "synthetic_slack_ns": -1.434,
+      "netlist_sha256": "689ee663fa1db067b4cff3bd27cec8993fe6484a870a985e4eba5c145a69ae73"
+    },
+    "interpretation": "The mapped logic is shallower, but the isolated unrouted delay estimate is WORSE. This is structural evidence, not a timing improvement. Fresh complete receiver placement/routing is authoritative."
+  },
+  "targeted_verification": {
+    "tests": 33,
+    "passed": 33,
+    "seconds": 18.5,
+    "log": "/tmp/starlink-metadata-equality.cihpiD/metadata-tests-v2.log",
+    "sha256": "8f04ea9890fba59c26d73f2d41053e31b99300818fcc49b2be04456be17172a4",
+    "scope": [
+      "Whole mailbox source equals immutable18c after removing only the SHA-pinned comparator delta.",
+      "All bits and partial groups at widths1,2,3,4,6,7,17,18,19,70,75,76,109; width3 exhausts4096 four-state operand pairs. This combinational test explicitly forces only the held operand.",
+      "Real dual-clock RTL mailboxes against frozen18c: every metadata bit corrupted at each of3 noninitial slots, same-edge veto and quarantine, healthy blocks, stalls and ACK reuse; both legacy and explicit modes at widths70/75/76.",
+      "Actual baseline and candidate synthesized512-word mailboxes each match frozen18c public behavior:225 rejected metadata faults and1536 healthy words, all75 bits including final publication edge. No netlist state forcing.",
+      "Always-true and always-false comparator mutations rejected. Existing final-authorization behavioral/mutation tests retained."
+    ],
+    "initial_netlist_attempt": "Elaboration rejected a testbench reference to an FDRE instance as an expression. Corrected the observer to the actual Q net, checked its declaration, and reran both netlists successfully. No netlist/RTL behavior was changed for this correction."
+  },
+  "integrated_regression": {
+    "status": "terminal_passed",
+    "log": "/tmp/starlink-metadata-equality.cihpiD/oracle-v2.log",
+    "exec_session": 13731,
+    "previous": {
+      "log": "/tmp/starlink-metadata-equality.cihpiD/oracle-v1.log",
+      "passed": 904,
+      "failed": 1,
+      "skipped": 2,
+      "seconds": 204.01,
+      "reason": "Older service-policy source assertion expected the pre-phase-contract fence. The exact same existing18c service already violates that stale text assertion. Updated it to check current duplicate-start and full sticky/current veto predicates; executed phase-contract shadow tests remain required."
+    },
+    "skip_scope": "Two older occupancy-netlist cases need a distinct explicit measurement; current phase-guard, cursor and metadata-tree netlists are supplied.",
+    "new_measurement_admission_tests": 12,
+    "static_checks": "Changed-file Ruff passed.",
+    "exit_code": 0,
+    "passed": 940,
+    "skipped": 2,
+    "seconds": 202.54,
+    "sha256": "7b72bc26b28bc0f2766c132e570833958623533eb2871986151af4efdb2c3aaa"
+  },
+  "actual_FFT_numeric": {
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T23:11:46Z",
+    "directory": "/tmp/starlink-metadata-equality.cihpiD/numeric-v1",
+    "scores": 1341,
+    "explicit_FFT_reset_quarantine_and_recovery": true,
+    "console_sha256": "148a570481f1f6776eefd7399cd72f87bd19d5512da166467093ab2b8917101f"
+  },
+  "actual_FFT_capacity": {
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T23:10:47Z",
+    "directory": "/tmp/starlink-metadata-equality.cihpiD/capacity64-v1",
+    "profile": "bursty-stalled",
+    "blocks": 64,
+    "samples": 28673,
+    "scores": 28608,
+    "fifo_high_water": 358,
+    "console_sha256": "c0dce2b5d17c2af26698f18af9850aac5e6a82745d61668830f981cfc821bc53",
+    "limit": "Counts/order/backlog simulation at canonical15MS/s and original100/200MHz; not production-duration, physical, IIO or RF qualification."
+  },
+  "actual_paired_replay": {
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T23:08:49Z",
+    "directory": "/tmp/starlink-metadata-equality.cihpiD/paired-v1",
+    "exact_scores": 894,
+    "exact_map_words": 447,
+    "exact_pilot_bytes": 2048,
+    "actual_late_invalid_release_veto": true,
+    "console_sha256": "bdda344da8bb5b9c1c057221070b328d14008988a1d36d2818ca3f614f306a3c",
+    "limit": "Actual digital shell/CDC/canonical FFT/PSMA/PIL1 at447x2 map geometry. Not ADC/DMA/IIO/fine timing/production geometry or duration/physical/RF."
+  },
+  "packaging": {
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T23:11:36Z",
+    "console_sha256": "d94b37c716fa809b19fb144d6f7db52b545e8837fbe147c84bf5c8a11f7217d9",
+    "component_sha256": "8c275fa0a625ee4dbab2bd9185dd4d3f2776cb3363687ed39d1b4d41de54abfb"
+  },
+  "fresh_full_receiver": {
+    "status": "running",
+    "directory": "hdl/projects/pluto/shared-realtime-metadata-tree-v1",
+    "hdl_revision": "65adf692da07422f10fea6c342b2711807ff7a89",
+    "launch_utc_minute": "2026-09-09T23:14Z",
+    "exec_session": 85470,
+    "process_pid": 2243355,
+    "configuration": "15MS/s paired-pilot, both detectors, exact DSP fine tracker, pilot DMA, boundary stop, shared realtime FFT, original100/200MHz clocks/constraints, global synthesis, control threshold4, medium placement, no checkpoint reuse.",
+    "observation_rule": "Revalidate session/process and terminal artifacts; this stored running label is not proof of liveness.",
+    "deployment_eligible": false
+  },
+  "radios_accessed": false,
+  "ppu_changed": false,
+  "hardware_qualified": false,
+  "remaining": [
+    "Complete receiver timing including now-passing100MHz domain and remaining200MHz control/vendor paths.",
+    "Board-I/O/CDC/reset gates and native RX calibration; exact-serial .18 finite and persistent paired IIO.",
+    "Causal coarse/CFO/fine scheduling, PPU Ethernet .17 deployment/rollback and independent live GLRT/PSS agreement.",
+    "Eight targets,120ms valid dwells over300s; separately qualify15/30/60MS/s."
+  ],
+  "retained_synthesis_archive": {
+    "path": "reports/experiments/20260909-mailbox-metadata-synthesis.tgz",
+    "sha256": "c851aaed164907e1364271ecc9b3ee5f28677550424505b8514024ccb464f25e",
+    "scope": "Both actual functional netlists, frozen sources, measurement runner, hashes and isolated reports; no receiver firmware/DCP.",
+    "relocated_replay": {
+      "passed": 45,
+      "seconds": 18.67,
+      "exit_code": 0,
+      "log": "/tmp/starlink-metadata-equality.cihpiD/relocated-replay-v1.log",
+      "directory": "/tmp/starlink-metadata-replay.4TbPrr",
+      "limit": "Follow-up tests rerun after making frozen-hash verification independent of the original temporary path. No RTL changes after the940-test regression."
+    }
+  },
+  "baseline_targeted_audit": {
+    "status": "terminal_passed_read_only_audit_not_timing",
+    "exit_code": 0,
+    "finished_utc": "2026-09-09T23:15:49Z",
+    "directory": "/tmp/starlink-metadata-equality.cihpiD/baseline-path-audit-v1",
+    "runner": "/tmp/starlink-metadata-equality.cihpiD/hdl/projects/pluto/audit_shared_realtime_routed.tcl",
+    "runner_sha256": "03c7ceb282bf744864bb94d6b05460d72a0f00545d5373d5a54836ea7dfc7a84",
+    "summary_sha256": "b038546ca1f40d60dbb2bacfeb4e190beb655df1a5e929feeb0bd835b45a6cd9",
+    "scope": "Added observation of all75 held output-metadata registers to job-start, and all9 input cursor registers to result fault reason5. No design/constraint mutation.",
+    "output_metadata_job_start_WNS_ns": -0.421,
+    "input_cursor_result_fault_WNS_ns": -0.396,
+    "admission_policy_tests": 21
+  }
+}

@@ -1,12 +1,14 @@
 """Isolated service admission/source checks; actual Vivado log owns numerics."""
 import hashlib
-from pathlib import Path
+import os
 import re
 import subprocess
+from pathlib import Path
 
 import pytest
 
-ACQ = Path(__file__).resolve().parents[1] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[1] / "hdl"))
+ACQ = HDL / "library/starlink_pss_acquisition"
 RUNNER = ACQ / "simulate_shared_realtime_xfft_service.tcl"
 BENCH = ACQ / "tb/tb_starlink_pss_shared_realtime_xfft_service.sv"
 SERVICE = ACQ / "starlink_pss_shared_realtime_xfft_service.v"
@@ -23,7 +25,8 @@ def probe(arguments, version="2022.2"):
     script += "set argv [list " + " ".join(f"{{{arg}}}" for arg in arguments) + "]\n"
     script += "set argc [llength $argv]\n"
     script += f"if {{[catch {{source {{{RUNNER}}}}} message]}} {{puts stderr $message; exit 2}}\n"
-    return subprocess.run(["tclsh"], input=script, capture_output=True, text=True, timeout=10)
+    return subprocess.run(["tclsh"], input=script, capture_output=True, text=True,
+                          timeout=10, check=False)
 
 
 @pytest.mark.parametrize("count", [0, 1, 3])
@@ -96,8 +99,8 @@ def test_pinned_arithmetic_and_machine_checked_terminal_evidence():
     source, bench = RUNNER.read_text(), BENCH.read_text()
     old = (ACQ / "simulate_realtime_xfft_protocol_probe.tcl").read_text()
     pattern = r"set required_generics \{(.*?)\}"
-    values = re.search(pattern, source, re.S).group(1).split()
-    assert len(values) == 64 and values == re.search(pattern, old, re.S).group(1).split()
+    values = re.search(pattern, source, re.DOTALL).group(1).split()
+    assert len(values) == 64 and values == re.search(pattern, old, re.DOTALL).group(1).split()
     assert "set module_name starlink_pss_fft512_bfp18_rt_candidate" in source
     assert "starlink_pss_fft512_bfp18_rt_candidate shared_xfft (" in SERVICE.read_text()
     assert "source [file join $source_dir verify_realtime_probe_result.tcl]" in source
@@ -123,7 +126,17 @@ def test_persistent_mailbox_epochs_registered_admission_and_sticky_fault_crossin
     assert "input_job_start <= 1;" in service and "assign input_job_start" not in service
     assert "CHECK_INPUT_BLOCK_IDENTITY(0)" in service
     assert "input_metadata = i == bad_position ? 70'h124 : 70'h123" in bench
-    assert "checked_input_complete && !input_guard_fault && !input_fault_now" in service
+    # The pinned phase-input contract already replaced the redundant full
+    # framing predicate after input completion. Keep its duplicate-start and
+    # sticky/current external vetoes explicit. Executed shadow/mutation tests
+    # in test_phase_input_contract.py independently check that equivalence.
+    normalized = re.sub(r"\s+", "", service)
+    assert ("wirefinal_fence=checked_input_complete&&!input_guard_fault&&"
+            "!(core_aresetn&&input_job_start);") in normalized
+    assert ("wireexternal_fault_now=input_fault_now||input_guard_fault||"
+            "input_fault_fast_sync[1]||vendor_fault_now||fast_fault;") in normalized
+    assert ("wirephase_input_fault_now=(core_aresetn&&input_job_start)||input_guard_fault||"
+            "input_fault_fast_sync[1]||vendor_fault_now||fast_fault;") in normalized
     assert "ACK_DRAIN: if (!result_busy && output_mailbox_ready)" in service
     assert "fast_input_ready = input_transport_ready && engine_input_enable;" in service
     assert "dut.fast_input_metadata !== descriptors[1]" in bench

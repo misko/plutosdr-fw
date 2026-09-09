@@ -2,13 +2,15 @@
 
 This simulation does not qualify physical CDC constraints or a shared FFT.
 """
-from pathlib import Path
+import os
 import shutil
 import subprocess
+from pathlib import Path
 
 import pytest
 
-RTL = Path(__file__).resolve().parents[2] / "hdl/library/starlink_pss_acquisition"
+HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
+RTL = HDL / "library/starlink_pss_acquisition"
 TOP = "tb_starlink_pss_block_mailbox"
 
 

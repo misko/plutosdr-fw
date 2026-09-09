@@ -11,6 +11,9 @@ from pathlib import Path
 import pytest
 
 from tests.starlink_oracle import test_realtime_private_bank as private_bank
+from tests.starlink_oracle.mailbox_metadata_contract import (
+    restore_legacy_metadata_comparison,
+)
 
 HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
 ACQ = HDL / "library/starlink_pss_acquisition"
@@ -46,7 +49,7 @@ def test_guard_delta_is_only_final_qualification_export_and_exact_handshake():
     assert source == baseline(name)
 
 
-def test_service_delta_is_only_final_authorization_connection_and_mailbox_is_unchanged():
+def test_service_delta_is_only_final_authorization_and_mailbox_retains_its_contract():
     name = "starlink_pss_shared_realtime_xfft_service"
     source = tokens((ACQ / f"{name}.v").read_text())
     source = replace_once(source,
@@ -57,7 +60,7 @@ def test_service_delta_is_only_final_authorization_connection_and_mailbox_is_unc
         ".input_commit_authorized(return_valid),")
     assert source == baseline(name)
     name = "starlink_pss_block_mailbox"
-    assert tokens((ACQ / f"{name}.v").read_text()) == baseline(name)
+    assert tokens(restore_legacy_metadata_comparison((ACQ / f"{name}.v").read_text())) == baseline(name)
 
 
 @pytest.mark.parametrize("mutation", [False, True])
