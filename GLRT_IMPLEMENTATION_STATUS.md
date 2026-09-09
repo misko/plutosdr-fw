@@ -1,12 +1,13 @@
-**GLRT implementation and Ethernet deployment — active, 9 September 2026, through the 25 MS/s commissioning snapshot**
+**GLRT implementation and Ethernet deployment — active, 9 September 2026, through the 25 MS/s stall controls and recovery**
 
 The 2.5, 5, 10 and 25 MS/s images have passed bounded Ethernet commissioning, including
 RX PN calibration, continuous IQ, scored-event transport and finite GLX1 closure.
 Exact original persistent v0.47 rollback also passed. The 25 MS/s image is
-currently deployed and independently attested idle with its U-Boot baseline
-unchanged. A new 60 MS/s implementation on HDL `6099b304` is building after
-the preceding image failed timing. Five-rate deployment and live-detector
-qualification are not complete.
+currently deployed and idle after a clean 30-second run, deliberate interruption
+and stall controls, and a successful normal restart without reboot. Its retained
+full U-Boot comparison matches the original baseline. The 60 MS/s implementation
+on HDL `6099b304` passed numerical checks but failed routed setup at −0.223 ns.
+Five-rate deployment and live-detector qualification are not complete.
 
 Implementation branch `codex/glrt-deployment-implementation` is in
 `/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review`, based on firmware
@@ -28,8 +29,8 @@ captures are bounded to 30 seconds of output; no multi-hour RF campaign is used.
 | `glrt-eth-r2500000-v2` | `625a93e7376727f78286785ef27190eb2dd7a719` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.009 / +0.020 ns | PN, short capture, two 100 MB ten-second runs, 320-event control and original rollback passed |
 | `glrt-eth-r5000000-v1` | `ec87261da8d0ec0dda58b0ce6a5e9adeb2097bb6` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.013 / +0.017 ns | Deployed from restored v0.47; PN/short and 100 MB ten-second capture passed |
 | `glrt-eth-r10000000-v1` | `ec87261da8d0ec0dda58b0ce6a5e9adeb2097bb6` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.055 / +0.035 ns | Deployment/PN passed; short 34-event and ten-second 100 MB/2,549-event captures passed |
-| `glrt-eth-r25000000-v1` | `4cd97a03315a518ff258c54381d4034391da668f` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.004 / +0.025 ns | Deployment/PN passed; short 50-event and ten-second 100 MB/3,497-event captures passed; current idle state verified |
-| 60 MS/s, new build pending | `6099b30466a50bd75068e5de1fc6def631ea60e3` | Intended `93a343f2971762f7c8c3d0dba0d9a5934b9e3986`; no released package | Pending | Previous `4cd97a03` build failed at −0.199 / +0.019 ns; new build and independent validation remain in progress |
+| `glrt-eth-r25000000-v1` | `4cd97a03315a518ff258c54381d4034391da668f` | `93a343f2971762f7c8c3d0dba0d9a5934b9e3986` | +0.004 / +0.025 ns | PN/short, 100 MB ten-second and 300 MB thirty-second captures passed; intentional errors retained, normal restart and idle checks passed |
+| 60 MS/s, timing failed | `6099b30466a50bd75068e5de1fc6def631ea60e3` | Intended `93a343f2971762f7c8c3d0dba0d9a5934b9e3986`; no released package | Setup −0.223 ns | Full fresh five-rate numerical and finite-close checks pass; routed setup fails. Previous `4cd97a03` also failed at −0.199 / +0.019 ns |
 
 All source rates export fixed 2.5 MS/s CI16 IQ through the dedicated GLRT DMA.
 GLR1 stays immutable; additive GLX1 attests native endpoints, staged complete
@@ -37,11 +38,11 @@ vectors and finite closure. Public source geometry is checked before RF writes.
 The frozen normal detector profile remains `glrt-upper-candidate-v1` with FPGA
 gates 13107/19661/9831 and host gates 0.175/0.025.
 
-The new [hardware evidence index v2](/srv/bulk/leo/glrt-deployment-20260909/hardware-evidence-index-20260909-v2/REPORT.md)
-links all fifteen completed capture attempts through 25 MS/s, eight independent
-host comparisons, deployment/rollback/current-state receipts, and 242 verified
-source hashes. It preserves twelve complete captures, three failed ones and the
-unchanged earlier v1 index. The two corrected 2.5 MS/s long runs
+The new [hardware evidence index v3](/srv/bulk/leo/glrt-deployment-20260909/hardware-evidence-index-20260909-v3/REPORT.md)
+links all twenty completed capture attempts through 25 MS/s, ten independent
+host comparisons, deployment/rollback/current-state receipts, and 321 verified
+source hashes. It preserves fifteen complete captures, three ordinary failures,
+two intentional failures and the unchanged earlier v1/v2 indexes. The two corrected 2.5 MS/s long runs
 saved 100 MB in 10.069882 and 10.068877 seconds. The 5 MS/s short run saved
 1.2 MB and nine normal-profile score records; its long run saved 100 MB in
 10.065150 seconds with all 1,560 score records and clean IQ/event/closure checks.
@@ -52,6 +53,20 @@ The 10 and 25 MS/s ten-second captures each saved 100 MB in 10.061013 and
 IQ/event/closure accounting, and zero recorded faults, DDC clipping, busy
 rejections or pending work. Their short captures each saved 1.2 MB with 34 and
 50 scored events after a passing rate-specific RX PN eye.
+
+The 25 MS/s thirty-second capture saved all 300 MB and 10,381 events in
+30.181149 seconds, with clean IQ/event/closure accounting and output FIFO high
+water one. Intentional controls then exercised the frozen normal gates with a
+three-second request. Operator interruption after 2 MB caused a graceful child
+SIGINT exit without kill escalation; its incomplete 4 MB capture remains failed.
+A measured 150.129545 ms consumer pause preserved all 30 MB and 1,002 events.
+A measured 700.112501 ms pause overflowed the output FIFO: 1,500,256 words
+reached AXIS but 1,500,000 were saved. Its 6 MB capture correctly failed IQ
+attestation while all 197 events and detector closure drained. Each operator
+retained its outcome and verified idle buffers, exact FIT and TX safety afterward.
+The following normal one-second restart saved all 10 MB and 335 events in
+1.042284 seconds with clean accounting, without a reboot. These specific pause
+outcomes do not establish a general latency tolerance or throughput headroom.
 
 The separate 120 ms decisions-off control used acquisition zero and exact/margin
 65536, with an explicit transport-only purpose. All 320 hardware event records
@@ -71,6 +86,9 @@ runs have 1,392 / 1,493 / 1,478 / 1,512 at 2.5 / 5 / 10 / 25 MS/s respectively.
 Those overlapping hypotheses are not independent trials or calibrated RF truth.
 The [25 MS/s long comparison](/srv/bulk/leo/glrt-deployment-20260909/compare-live-25000000-10sec-v1.json)
 preserves that distinction; live pilot agreement remains unproven.
+The new thirty-second and restart replays add 3,000 and 100 windows, still with
+zero multi-frame host or comparable FPGA positives and `agreement_observed=false`.
+They retain all 4,602 and 147 unmatched individual-frame supports respectively.
 
 Failures remain part of the record. The initial v1 short capture saved its IQ
 but failed final evidence with ENODATA before asynchronous IIOD teardown ended.
@@ -105,13 +123,17 @@ not reach the GLRT kernel's `/axi` PHY; Linux `93a343f2` explicitly compiles
 AD9361 in the dedicated DT. The original v1 unknown deployment receipt remains
 unchanged alongside its separate successful read-only reconciliation.
 
-The [current read-only idle attestation](/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review/artifacts/device-tool-glrt-ethernet/artifacts/ethernet-canary-14/current-25000000-idle-state-v1.json)
+The [full read-only idle attestation](/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review/artifacts/device-tool-glrt-ethernet/artifacts/ethernet-canary-14/current-25000000-idle-state-v1.json)
 completed at 06:07:20 UTC under the shared lock. It verifies exact 25 MS/s
 firmware/FIT, serial and local USB5-1, GLR1+GLX1, both buffers disabled, gigabit
 full-duplex Ethernet, 25 MS/s / 2.4 GHz / 2 MHz / manual30 / A_BALANCED / ENSMrx,
 TXLO down and TX gain−80. All eight requested U-Boot fields match the original
 hash-verified baseline, with attr_name/attr_val absent. Pinned SSH trust remained
 unchanged; the check performed no hardware writes.
+The latest [restart operator receipt](/home/mouse9911/gits/plutosdr-fw-glrt-deployment-review/artifacts/device-tool-glrt-ethernet/artifacts/ethernet-canary-14/captures/rate25000000-restart-1sec-v1.operator.json)
+again verifies idle buffers, exact serial/firmware/FIT, TX safety and gigabit
+Ethernet after the controls, on the same boot. It does not re-read U-Boot;
+the unchanged environment claim refers to the retained full 06:07 attestation.
 
 The [25 MS/s package review](/srv/bulk/leo/glrt-deployment-20260909/package-25000000-4cd97a03-v1/result.json)
 binds the exact FIT/DFU/FRM and acknowledges the small setup margin. Internal
