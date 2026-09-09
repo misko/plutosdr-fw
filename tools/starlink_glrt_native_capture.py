@@ -10,9 +10,14 @@ import struct
 import time
 from pathlib import Path
 
-from tools.starlink_glrt_capture import radio_state
-from tools.starlink_glrt_iio import Context, Library
-from tools.starlink_glrt_native_abi import RATE, SAMPLES, NativeResult
+if __package__:
+    from .starlink_glrt_capture import radio_state
+    from .starlink_glrt_iio import Context, Library
+    from .starlink_glrt_native_abi import RATE, SAMPLES, NativeResult
+else:
+    from starlink_glrt_capture import radio_state
+    from starlink_glrt_iio import Context, Library
+    from starlink_glrt_native_abi import RATE, SAMPLES, NativeResult
 
 EXCLUDED_SERIAL = "1040007c4a94000211000b009186843ef2"
 

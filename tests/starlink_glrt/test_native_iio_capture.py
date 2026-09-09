@@ -1,7 +1,10 @@
 """Native collector sequencing with explicit fake IIO, never a physical radio."""
 import errno
 import json
+import subprocess
+import sys
 from collections import deque
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -17,6 +20,14 @@ from tools.starlink_glrt_native_capture import (
 )
 
 from .test_native_abi import words
+
+
+def test_native_collector_script_entrypoint_from_unrelated_directory(tmp_path):
+    script = Path(__file__).resolve().parents[2]/"tools/starlink_glrt_native_capture.py"
+    result = subprocess.run([sys.executable, str(script), "--help"], cwd=tmp_path,
+        capture_output=True, text=True, timeout=10, check=False)
+    assert result.returncode == 0, result.stderr
+    assert "--jobs" in result.stdout and "--phase-step" in result.stdout
 
 
 def arguments(tmp_path):
