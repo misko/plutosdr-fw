@@ -1,0 +1,111 @@
+{
+  "schema": "starlink.paired_receiver.physical_checkpoint.v1",
+  "date_utc": "2026-09-09T04:02:15Z",
+  "scope": "Completed medium-spread physical experiment on the return-stage-v1 full receiver; not the subsequent control-isolation RTL.",
+  "source": {
+    "rtl_hdl_commit": "728d2c873d882b148514c7a224c9193af289ab68",
+    "runner_hdl_commit": "c0d281ec",
+    "input_checkpoint": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/pluto.runs/impl_1/system_top_opt.dcp",
+    "output_directory": "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1"
+  },
+  "result": {
+    "placement": "pass",
+    "routing": "complete",
+    "routable_nets": 33356,
+    "routing_errors": 0,
+    "setup": "fail",
+    "hold": "pass",
+    "timing_constraints_changed": false,
+    "bitstream_generated": false,
+    "hardware_accessed": false,
+    "hardware_qualified": false
+  },
+  "utilization": {
+    "lut": 13000,
+    "flip_flop": 18961,
+    "ramb36": 32,
+    "ramb18": 34,
+    "bram_tiles": 49,
+    "dsp": 44
+  },
+  "timing": {
+    "clk_fpga_0": {
+      "frequency_mhz": 100,
+      "wns_ns": -0.968,
+      "tns_ns": -289.047,
+      "failing_setup_endpoints": 957,
+      "hold_slack_ns": 0.027
+    },
+    "clk_fpga_1": {
+      "frequency_mhz": 200,
+      "wns_ns": -1.632,
+      "tns_ns": -457.613,
+      "failing_setup_endpoints": 798,
+      "hold_slack_ns": 0.059
+    },
+    "rx_clk": {
+      "wns_ns": 2.11,
+      "hold_slack_ns": 0.061
+    },
+    "bus_skew_slacks_ns": [
+      6.9,
+      7.996,
+      7.52,
+      7.387
+    ]
+  },
+  "checks": {
+    "no_clock": 0,
+    "unconstrained_internal_endpoints": 0,
+    "combinational_loops": 0,
+    "missing_input_delays": 13,
+    "missing_output_delays": 2,
+    "methodology_warnings": {
+      "large_setup": 127,
+      "missing_io_delay": 15,
+      "control_set_limit": 1,
+      "inefficient_pin_lookup": 2
+    }
+  },
+  "critical_paths": [
+    {
+      "clock_mhz": 100,
+      "slack_ns": -0.968,
+      "source": "pilot_capture active register",
+      "destination": "pilot_capture FIFO count CE",
+      "logic_levels": 10,
+      "data_path_ns": 10.688,
+      "route_ns": 8.556,
+      "action": "Register complete DDC IQ/index/visit/support observation before capture admission; preserve same-edge termination and AXIS promises."
+    },
+    {
+      "clock_mhz": 200,
+      "slack_ns": -1.632,
+      "source": "FFT core output index/tuser",
+      "destination": "service engine_output_closed D",
+      "logic_levels": 9,
+      "data_path_ns": 6.511,
+      "action": "Separate descriptor capture and local output-stage state from global transport-fault priority; preserve checked final completion fence."
+    },
+    {
+      "clock_mhz": 200,
+      "slack_ns": -1.44,
+      "source": "vendor FFT xn_index_counter",
+      "destination": "vendor FFT gen_ce_non_real_time.ce_predicted_replica",
+      "routing_fraction": 0.82,
+      "action": "Separate internal physical-timing gate; wrapper changes alone do not prove closure."
+    }
+  ],
+  "interpretation": "This experiment fits where high-spread failed by 12 slices, but is worse in setup slack than the earlier routed source (-0.304/-1.364 ns). No rate, hardware, board-I/O, IIO, GLRT or PSS-lock qualification follows.",
+  "sha256": {
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/summary.txt": "740688ba84cc65e14d5866d90269f8c8d9f31c8a84e8ec13d027eb317a7984cc",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/input.txt": "1995fa5a9ea3d3059e6b8b9d6e3f42f17ae3301d32faae3dd477f47ebd3d8db8",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/timing.rpt": "c2b2eb5069ccac7075964f262ae846e9778a3b5f100291225c003cb8e1e48fbe",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/utilization.rpt": "8eae0d897ef5e60ac3b36e36d3f4bc1f7e5a561dd831e60d329f45b9d09726d4",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/route_status.rpt": "a72e67d58c2881971dec14506e253a40f406e84962d21da03f401804d76f9db1",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/bus_skew.rpt": "69d2a3e5e2f1d03938048b84b29c13b4c7bf662c5d551c669f4303acade0ffaf",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/check_timing.rpt": "eb9a274545a6ffb2b87bbf50fcca0da5096b36248a56d7914b1880688208e9ed",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/methodology.rpt": "60bd24bae5801789f25a784638123e90969cf91c272b5516c16bc02123c541af",
+    "hdl/projects/pluto/STARLINKPSSRATEMSPS15_STARLINKPSSPROFILEpaired-pilot_STARLINKPSSSHAREDXFFT1_ADIUSEOOCSYNTHESISn_PILOTBUILDLABELreturn-stage-v1/spread-medium-v1/result_routed.dcp": "9965bc118d7fc06d9b273d17215699bb20dfa48e48e70c1aab8793d1aaaf3e02"
+  }
+}

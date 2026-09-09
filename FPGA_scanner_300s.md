@@ -262,7 +262,54 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ## Current progress
 
-### Latest implementation checkpoint — 2026-09-09
+### Latest control-isolation checkpoint — 2026-09-09
+
+Current RTL is `2e3280ce63a750b5843d1803e8679537a5bac80a`; HDL head
+`011dca5691352e4de46fd51687f9a02446ff8746` adds only fault-semantics wording.
+Both are pushed exclusively to the DNM branch. The pilot now registers the
+whole IQ/index/visit/support observation before output FIFO admission. Its
+one-clock transport latency does not change signal coordinates or filter delay.
+Twenty adversarial boundary cases cover termination, combined STOP/full/index
+conditions, counter exhaustion and the final-admission/internal-DDC-fault edge.
+The latter retains sticky DDC fault evidence even if capture auto-stop precedes
+its observation of registered DDC halt; both fault domains remain mandatory.
+
+The shared FFT separates descriptor capture, local return state and transport
+fault detection while preserving checked words and the final completion fence.
+Current real-XFFT tests pass 76 jobs / 38912 exact words, six final/drain faults,
+two drain resets, and two blocked-return cases. Numerical replay preserves all
+1341 scores; phase-map replay preserves 447 exact reads and aborts a faulted
+partial map. A current-source bursty/stalled 64-block replay preserves all
+28608 scores and passes explicit backlog/retention bounds. The older-source
+4096-block run remains live and pending; it does not qualify this newer source.
+The current firmware/oracle/contract regression command passes 444 tests.
+
+Linux `ab93ab53638a8837990053250a9971c59f30c310` adds read-only, serialized
+`PSMH 1 46` health receipts and is pushed only to DNM. Fresh coherent fault
+snapshots catch faults after the last map. Live DDC telemetry is explicitly
+separate (including the paired-30 low-word-only ABI limitation). Actual C and
+real RTL register-mapping tests cover late faults, all admitted ABIs, busy/timeouts,
+generation races and bounded counter reads; ARM compilation/checkpatch pass.
+
+PPU `1828eba15ad7c150909c79d291ec1b310a7f3de6` is pushed to main: strict
+fresh health decoding, explicit joined-reader cleanup without native cancel,
+retained failed receipts, and a two-second finite pilot envelope (120 ms default
+unchanged). Offline tests: 1745 passed, one skip and ten deselections; 284 focused
+tests, Ruff and mypy pass. Direct decoding of the actual Linux C-harness golden
+also passes. Four unrelated PPU edits remain untouched.
+
+The fresh full `control-isolation-v1` receiver build and 120 ms pilot replay are
+running at this checkpoint. Medium spread is explicitly selected only for the
+15 MS/s shared paired receiver, based on the completed fit experiment below;
+clocks, timing exceptions and detectors are unchanged. There is no current-source
+timing verdict or deployment qualification. A previous vendor-internal FFT
+control path also failed timing, so wrapper changes alone cannot prove closure.
+No radio was accessed. Fixed-frequency paired orchestration, complete common
+source support, live lock/GLRT comparison, hops and the rate ladder remain open.
+Source pins and completed artifact hashes are recorded in
+`reports/starlink-paired-control-isolation-20260909.json`.
+
+### Return-stage implementation checkpoint — 2026-09-09
 
 The following supersedes the status of older, dated experiments below; it does
 not turn their source-specific results into evidence for a newer build.
@@ -306,10 +353,17 @@ not turn their source-specific results into evidence for a newer build.
 - The completed `return-stage-v1` full build synthesizes to 13407 LUTs,
   18908 FFs, 49 BRAM tiles and 48 DSPs. Its high-spread placement fails by
   12 slices (2376 available versus 2388 required for remaining instances);
-  there is no new routed timing verdict. A bounded medium-spread trial on its
-  saved opt DCP is running with unchanged clocks/constraints. The last fully
-  routed earlier source remains failing at -0.304 ns (100 MHz) / -1.364 ns
-  (200 MHz); do not attribute those values to the new pipeline.
+  the bounded medium-spread trial on its saved opt DCP completed at 04:02 UTC
+  with unchanged clocks/constraints. All 33356 routable nets complete with zero
+  route errors, but setup fails at -0.968 ns (100 MHz) / -1.632 ns (200 MHz).
+  Hold and all four declared bus-skew checks pass. The final utilization is
+  13000 LUTs, 18961 FFs, 49 BRAM tiles and 44 DSPs. This is worse setup slack
+  than the earlier routed source (-0.304/-1.364 ns), not a timing improvement.
+  There are no unconstrained internal endpoints or combinational loops, but
+  13 RX input and two control output delay warnings remain separate board-I/O
+  qualification gates. See
+  `reports/starlink-paired-return-stage-medium-route-20260909.json` for completed
+  artifact hashes, exact path evidence and the independent vendor-core failure.
 
 No radio was held, accessed, or flashed in this checkpoint. Next remains
 complete-receiver placement/timing and board-I/O/CDC qualification, then matched

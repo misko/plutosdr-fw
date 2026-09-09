@@ -73,9 +73,10 @@ def test_spread_implementation_is_only_for_explicit_shared_receiver(shared, prof
             assert not result.stdout
         else:
             lines = result.stdout.splitlines()
-            assert lines[:3] == [
+            assert lines[:4] == [
                 "strategy Congestion_SpreadLogic_high impl_1",
+                "STEPS.PLACE_DESIGN.ARGS.DIRECTIVE AltSpreadLogic_medium impl_1",
                 "STEPS.POST_ROUTE_PHYS_OPT_DESIGN.IS_ENABLED true impl_1",
                 "STEPS.POST_ROUTE_PHYS_OPT_DESIGN.ARGS.DIRECTIVE Explore impl_1",
             ]
-            assert len(lines) == 4 and "shared_xfft_impl_gate.tcl" in lines[3]
+            assert len(lines) == 5 and "shared_xfft_impl_gate.tcl" in lines[4]

@@ -1,0 +1,142 @@
+{
+  "schema": "starlink.paired_receiver.control_isolation_checkpoint.v1",
+  "date_utc": "2026-09-09T04:23:00Z",
+  "goal_status": "active",
+  "scope": "Control timing isolation and finite paired IIO health prerequisites; full receiver and live paired gates remain required.",
+  "hardware_accessed": false,
+  "deployed": false,
+  "hardware_qualified": false,
+  "iio_capture_qualified": false,
+  "live_glrt_evidence": false,
+  "fpga_pss_lock": false,
+  "source": {
+    "hdl_rtl": "2e3280ce63a750b5843d1803e8679537a5bac80a",
+    "hdl_head_documentation_only": "011dca5691352e4de46fd51687f9a02446ff8746",
+    "linux": "ab93ab53638a8837990053250a9971c59f30c310",
+    "ppu_main": "1828eba15ad7c150909c79d291ec1b310a7f3de6",
+    "firmware_parent": "21f616ad5",
+    "firmware_and_submodules_branch": "codex/starlink-rx-only-do-not-merge"
+  },
+  "changes": [
+    "Register full pilot output IQ/index/visit/support bundle; one fabric clock, no signal-coordinate or arithmetic change.",
+    "Preserve STOP/source cancellation priority over staged output-derived faults; final finite admission cannot erase sticky DDC fault evidence.",
+    "Split shared FFT descriptor capture, local return token and transport quarantine while keeping validated final completion fence.",
+    "Select measured AltSpreadLogic_medium only for shared paired15; retain constraints and detector functions.",
+    "Add serialized read-only PSMH1/46 hardware health receipt; distinguish coherent snapshot from live/low-word-only DDC observations.",
+    "PPU strict health decoder, bounded joined-reader graceful close without native cancel, two-second finite pilot envelope; default120ms unchanged."
+  ],
+  "verification": {
+    "firmware_regression": {
+      "passed": 444,
+      "seconds": 66.38,
+      "command": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_pss_scanner_plan.py tests/test_starlink_pss_multirate_build_contract.py tests/test_starlink_pilot_iio_contract.py tests/test_starlink_paired_packing_policy.py tests/test_starlink_physical_trial_policy.py",
+      "includes_final_20_case_stage_test": true
+    },
+    "pilot_boundary": {
+      "cases": 20,
+      "latency_fabric_clocks": 1,
+      "complete_payload_coherence": true,
+      "stop_plus_full_false_overflow_fixed": true,
+      "final_prefix_internal_ddc_fault_retained": true
+    },
+    "fft_service": {
+      "jobs": 76,
+      "exact_words": 38912,
+      "final_drain_fault_cases": 6,
+      "drain_resets": 2,
+      "blocked_return_cases": 2,
+      "raw_only_overruns": 1,
+      "validated_overruns_preserved": true,
+      "active_descriptor_stable": true
+    },
+    "fft_numeric": {
+      "scores": 1341,
+      "exact_forward_words": 1536,
+      "exact_product_words": 1536,
+      "exact_inverse_words": 1536
+    },
+    "phase_map": {
+      "exact_reads": 447,
+      "partial_fault_publication": false
+    },
+    "capacity64": {
+      "mode": "bursty source and injected score stalls",
+      "blocks": 64,
+      "exact_scores": 28608,
+      "candidate_fifo_max": 358,
+      "overlap_queue_max": 1,
+      "ring_retention_age_max": 589,
+      "transform_fifo_max": 2,
+      "energy_lookup_age_max": 887,
+      "score_age_max": 954,
+      "forward_stall_cycles_max": 0,
+      "explicit_bounds_pass": true
+    },
+    "linux_health": {
+      "actual_c_test": true,
+      "abi_profiles": 5,
+      "late_fault_receipts": 70,
+      "raw_health_receipts": 160,
+      "failure_modes": 13,
+      "bounded_ddc_rollover_cases": 4,
+      "real_rtl_mapping_profiles": 4,
+      "arm_module_compiled": true,
+      "checkpatch_errors": 0,
+      "checkpatch_warnings": 0,
+      "kernel_runtime_executed": false
+    },
+    "ppu": {
+      "offline_passed": 1745,
+      "skipped": 1,
+      "deselected": 10,
+      "focused_passed": 284,
+      "ruff": "pass",
+      "mypy": "pass",
+      "actual_linux_c_golden_decode": "pass",
+      "unrelated_dirty_files_preserved": 4
+    }
+  },
+  "full_receiver": {
+    "build": "control-isolation-v1",
+    "state_at_checkpoint": "synthesis running",
+    "clock_mhz": {
+      "slow": 100,
+      "fft": 200
+    },
+    "source_msps": 15,
+    "retained_coarse_fine_pilot_dma": true,
+    "constraints_relaxed": false,
+    "last_completed_route_report": "reports/starlink-paired-return-stage-medium-route-20260909.json",
+    "last_completed_route_qualified": false
+  },
+  "pending_at_checkpoint": [
+    "Fresh full receiver synthesis/placement/route; separate internal FFT and board-I/O/CDC gates.",
+    "Current complete120ms pilot RTL replay report, source pinned.",
+    "Prior-source728d 4096block simulation, confirmed live; not new-source qualification.",
+    "Common-source paired capture orchestration and persistent300second recording.",
+    "Serial-attested .18 qualification before PPU Ethernet deployment to .17.",
+    "Independent live FPGA PSS lock and blind GLRT agreement, preserving negatives.",
+    "Eight120ms L/U targets over300s at15/30/60MS/s with>=95% measured duty."
+  ],
+  "sha256": {
+    "hdl/library/starlink_pss_acquisition/build/local-control-service-v1-console.log": "34db2f13acd920dc657d6d51c095fe5d6a9bfac7b8f6295faf35ca0d1a2c9f01",
+    "hdl/library/starlink_pss_acquisition/build/local-control-service-v1-vivado.log": "726ef257384e3230d908cd8689eec5617298bceabf4cdeec68029a4987710621",
+    "hdl/library/starlink_pss_acquisition/build/local-control-numeric-v1-console.log": "6ce7c5c3aee1de913715a4b9d289d07f745460e66f0b7b198761c987fc64063c",
+    "hdl/library/starlink_pss_acquisition/build/local-control-numeric-v1-vivado.log": "b5cd05352d71e7161f3d8f307022428dade7d7f4f3131732c3d7f7fa2a3cbdba",
+    "hdl/library/starlink_pss_acquisition/build/local-control-phase-map-v1-console.log": "46986b6d3df79d61f2e290e9303be2475d19892f98252afd7f9f8e2a8e3d4761",
+    "hdl/library/starlink_pss_acquisition/build/local-control-phase-map-v1-vivado.log": "4175d132d49f74819ca399cd64c514365a03ca033598f4e8bb68a6daff65cae8",
+    "hdl/library/starlink_pss_acquisition/build/local-control-bursty64-v1-console.log": "1b3977de6a58d05d0c54ea0ce76998558fd6da9ae19390017a0839518831dcde",
+    "hdl/library/starlink_pss_acquisition/build/local-control-bursty64-v1-vivado.log": "51ccf1f851d9bf649f46de8236363716b805984b925f837628f8b866d33f9338",
+    "hdl/library/axi_starlink_pilot_capture/axi_starlink_pilot_capture.v": "7ba007e22418603c0fa356b639d78bf60c73b04e54f1bdb1a56f1877930425fc",
+    "hdl/library/axi_starlink_pilot_capture/tb/tb_starlink_pilot_output_stage.sv": "cbc1be86204a1adb35f2fd93b750721fc85de11f73bd634a66b6dbda714ac530",
+    "hdl/library/starlink_pss_acquisition/starlink_pss_shared_xfft_service.v": "12722375f19926d17f0b9c5187c19a79e52ef47ddc7ac737b65d731c01a2d390",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_shared_xfft_service.sv": "3aa2168f0e173f749284f35e4f3a47481313ba0c35f39671ce71430939229614",
+    "linux/drivers/iio/adc/adi_starlink_pss_map.c": "e7a5c5ce27d66556369768906b0cb689d6aa0f0e9dc3e77bbf4a51a5f210cfaf",
+    "linux/drivers/iio/adc/adi_starlink_pss_map.ko": "67287099fc7cd567bcf93ec479f95d436ed2ef0acdd1fa37dfc5f9a9b6274950",
+    "tests/starlink_oracle/map_health_harness.c": "cd59e00043486f2f6eabd5c0083828655274b521202087409d15b2013ce1be5e",
+    "tests/starlink_oracle/map_health_mapping_harness.sv": "cbef4c023f365a56d78669bf64d051abfe4ecee4c1f496087d43d3cfb7f9a7c8",
+    "tests/starlink_oracle/test_map_health_receipt.py": "bfb7af184f1aa857459f198a21eac487dce64e5bc4e509439504b64cbbb5df79",
+    "tests/starlink_oracle/test_pilot_output_stage.py": "789b422c7c7db36cf00dfed369e3e81a180934d6945e3fbe91958b730bc742da",
+    "tests/test_starlink_paired_packing_policy.py": "668b107765a4b176beef012e77f17df76bf99fae48f2ba85f4557f5b26ff301e"
+  }
+}
