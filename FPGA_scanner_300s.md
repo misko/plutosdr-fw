@@ -363,6 +363,33 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Private idle observation clear — 2026-09-09
+
+HDL `ced8a17d21e5ea00a134eb075a095d5ecf435955` moves six private
+per-job observation clears out of the full fault-qualified admission mux and
+into healthy idle/ACK wait. Active validation, immediate public fault veto,
+descriptor holding, exact sticky reasons and faulted private-state freeze are
+unchanged. This targets the measured output-mailbox metadata-to-input-counter
+path; no clock or timing constraint was relaxed.
+
+The 51 focused actual-RTL guard tests pass, including a nonvacuous 11-job ACK
+clear witness and a rejected admission-only-clear mutation. The actual generated
+FFT service passes 26 jobs / 13312 exact words with the existing fault/reset/ACK
+cases. The actual reduced digital shell/CDC/FFT/PSMA/PIL1 pairing also passes
+894 scores, 447 map words and 2048 exact pilot bytes, including pilot continuation
+after stop and retained late invalid-release failure. These are not ADC/DMA/IIO,
+fine detector, production-duration or physical qualification.
+
+The fresh full stop-enabled receiver completed with placement failure in
+`hdl/projects/pluto/shared-realtime-idle-clear-stop-v1`: 65 slices short
+(2432 required versus 2367 remaining), 438 control sets, 17074 total LUTs and
+19259 flip-flops. Compared with the preceding 63-slice shortfall, this is not a
+packing improvement; no routed timing result exists. Its authoritative build
+and test evidence is `reports/starlink-private-idle-clear-20260909.json`.
+The full oracle regression passes 482 tests after updating the 25 existing BD
+admission cases to execute the new shared validator. Physical fit/timing and
+all native/live promotion gates remain open; neither radio was touched.
+
 ### Deployment work resumed — 2026-09-09
 
 A fresh full-receiver diagnostic completed with timing failure from clean HDL

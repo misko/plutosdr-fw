@@ -1,12 +1,28 @@
 """Executable opt-in policy and PSMA health/ABI checks, not full fit evidence."""
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 HDL = ROOT / "hdl"
+
+
+def _board_admission(fields):
+    # Execute the actual independent pre-mutation BD admission. The former
+    # mid-file inline validator moved into the shared pure policy helper.
+    # Full BD parameter/readback execution is covered separately by the
+    # boundary build-option tests; this retains every original case below.
+    source = (HDL / "projects/pluto/system_bd.tcl").read_text()
+    policy = source[:source.index("# Add custom repo")]
+    environment = {key: value for key, value in os.environ.items()
+                   if not key.startswith("STARLINK_PSS_")}
+    environment.update({key: str(value) for key, value in fields.items() if value is not None})
+    script = f"if {{[catch {{\n{policy}}} message]}} {{puts stderr $message; exit 2}}\n"
+    script += 'puts "$starlink_pss_shared_xfft $starlink_pss_realtime_xfft"\n'
+    return subprocess.run(["tclsh"], input=script, text=True, capture_output=True,
+                          env=environment, cwd=HDL / "projects/pluto", timeout=10, check=False)
 
 
 @pytest.mark.parametrize("profile,rate,choice,allowed", [
@@ -18,21 +34,11 @@ HDL = ROOT / "hdl"
     ("paired-pilot", 15, "true", False), ("full", 60, "0", True),
 ])
 def test_shared_clock_is_explicit_and_bounded(profile, rate, choice, allowed):
-    source = (HDL / "projects/pluto/system_bd.tcl").read_text()
-    policy = source[source.index("set starlink_pss_shared_xfft 0"):
-                    source.index("set starlink_pss_rx_dma_enabled")]
-    environment = {key: value for key, value in os.environ.items()
-                   if key not in {"STARLINK_PSS_SHARED_XFFT", "STARLINK_PSS_REALTIME_XFFT"}}
-    if choice is not None:
-        environment["STARLINK_PSS_SHARED_XFFT"] = choice
-    script = f"set starlink_pss_profile {profile}\nset starlink_pss_rate_msps {rate}\n"
-    script += f"if {{[catch {{\n{policy}}} message]}} {{puts stderr $message; exit 2}}\n"
-    script += "puts $starlink_pss_shared_xfft\n"
-    result = subprocess.run(["tclsh"], input=script, text=True, capture_output=True,
-                            env=environment, timeout=10)
+    result = _board_admission({"STARLINK_PSS_PROFILE": profile, "STARLINK_PSS_RATE_MSPS": rate,
+                               "STARLINK_PSS_SHARED_XFFT": choice})
     if allowed:
         assert result.returncode == 0, result.stderr
-        assert result.stdout.strip() == (choice or "0")
+        assert result.stdout.strip() == f'{choice or "0"} 0'
     else:
         assert result.returncode == 2 and ("shared-XFFT" in result.stderr or
                                           "STARLINK_PSS_SHARED_XFFT" in result.stderr)
@@ -46,7 +52,7 @@ def _simulate(tmp_path, top, sources, parameters):
                    text=True, capture_output=True, check=True, timeout=30)
     (tmp_path / "build").mkdir(exist_ok=True)
     return subprocess.run(["vvp", str(executable)], cwd=tmp_path, text=True,
-                          capture_output=True, timeout=30)
+                          capture_output=True, timeout=30, check=False)
 
 
 @pytest.mark.parametrize("shared", [0, 1])
@@ -108,21 +114,12 @@ def test_real_clock_connections_and_packaged_sources_are_present():
     ("full", 60, "0", "0", True),
 ])
 def test_realtime_board_selector_is_additive_and_restricted(profile, rate, shared, realtime, allowed):
-    source = (HDL / "projects/pluto/system_bd.tcl").read_text()
-    policy = source[source.index("set starlink_pss_shared_xfft 0"):
-                    source.index("set starlink_pss_rx_dma_enabled")]
-    env = {key: value for key, value in os.environ.items()
-           if key not in {"STARLINK_PSS_SHARED_XFFT", "STARLINK_PSS_REALTIME_XFFT"}}
-    env["STARLINK_PSS_SHARED_XFFT"] = shared
-    if realtime is not None:
-        env["STARLINK_PSS_REALTIME_XFFT"] = realtime
-    script = f"set starlink_pss_profile {profile}\nset starlink_pss_rate_msps {rate}\n"
-    script += f"if {{[catch {{\n{policy}}} message]}} {{puts stderr $message; exit 2}}\n"
-    script += "puts $starlink_pss_realtime_xfft\n"
-    result = subprocess.run(["tclsh"], input=script, text=True, capture_output=True, env=env, timeout=10)
+    result = _board_admission({"STARLINK_PSS_PROFILE": profile, "STARLINK_PSS_RATE_MSPS": rate,
+                               "STARLINK_PSS_SHARED_XFFT": shared,
+                               "STARLINK_PSS_REALTIME_XFFT": realtime})
     assert result.returncode == (0 if allowed else 2), result.stdout + result.stderr
     if allowed:
-        assert result.stdout.strip() == (realtime or "0")
+        assert result.stdout.strip() == f'{shared} {realtime or "0"}'
 
 
 @pytest.mark.parametrize("rate,shared,pilot,realtime,allowed", [
