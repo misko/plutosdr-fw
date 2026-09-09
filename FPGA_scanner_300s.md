@@ -363,6 +363,38 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Local pilot snapshot replication and actual netlist comparison — 2026-09-09
+
+HDL `24bac44461c78868689ddb6b35e2f4edfd6d5d5d` adds only a local
+`max_fanout=32` attribute to the registered pilot snapshot request. Snapshot
+capture timing, reset/CLEAR behavior, data and ABI are unchanged. Actual pilot
+core synthesis reduces the single 649-load driver to 22 drivers with at most
+31 loads each, preserving all 649 loads. The cost is 21 additional LUT
+primitives, 21 FFs and 20 control sets in the isolated core; this is a fanout
+measurement, not a receiver fit/timing improvement claim.
+
+Two actual synthesized pilot cores pass a public-interface comparison with
+vendor primitive models: 38726 cycles, 12 snapshots, 396 AXI reads and 567 pilot
+samples. The test covers live snapshots, held snapshots, output stalls,
+overflow/drain, active-CLEAR rejection and reset, with unknown valid data/control
+rejected. The RTL comparison and two deliberate snapshot-semantic mutations
+also pass their expected gates. Integrated oracle/constraint regression passes
+608 tests. The complete 120 ms PIL1 replay preserves all 300000 CI16 samples,
+matching the integer oracle exactly, with zero capture/DDC faults or saturation
+and a passing offline PPU parser. None of these tests accesses native DMA/IIO
+or proves live RF detection.
+
+The preceding health-summary receiver (`84a1a358`) finished with placement
+failure: 2413 unplaced slices required versus 2408 available, a five-slice
+shortfall and 441 control sets. It has no routed timing result. The new
+snapshot-replication receiver is running in
+`hdl/projects/pluto/shared-realtime-snapshot-fanout-v1`, after refreshing the
+pilot IP package, with unchanged clocks, exceptions and paired/shared-realtime/
+boundary-stop profile. Physical promotion remains closed; neither .18 nor .17
+was accessed and PPU is unchanged. See
+`reports/starlink-pilot-snapshot-fanout-20260909.json` and
+`reports/starlink-snapshot-fanout-dwell-rtl-20260909.json`.
+
 ### Integrated stop-health simplification and final baseline timing — 2026-09-09
 
 HDL `84a1a3589a08f5af72323755d38b9d7ef9153846` implements the explicit

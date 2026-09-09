@@ -1,0 +1,133 @@
+{
+  "schema": "starlink-pilot-snapshot-fanout-progress-v1",
+  "observed_utc": "2026-09-09T18:56:22Z",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "24bac44461c78868689ddb6b35e2f4edfd6d5d5d",
+  "baseline_hdl_commit": "84a1a3589a08f5af72323755d38b9d7ef9153846",
+  "scope": "Local snapshot-enable replication, actual pilot-core synthesis and public functional comparison. Full receiver physical qualification and deployment remain incomplete.",
+  "source_sha256": {
+    "hdl/library/axi_starlink_pilot_capture/axi_starlink_pilot_capture.v": "f18192ea5d4c572cd1f6eb6e92aa4c3e704752a11e0194bfee8b846520a8cdcf",
+    "hdl/library/axi_starlink_pilot_capture/measure_snapshot_fanout.tcl": "7500dedb740aa8822889f721224cbc2d99a7fa5d08737412acdf3f0e21f6976f",
+    "hdl/library/axi_starlink_pilot_capture/simulate_snapshot_fanout.tcl": "0d4f4775a8606687f3732215e33a441e804d33f0d2c00640380ae0eeaf4b370f",
+    "hdl/library/axi_starlink_pilot_capture/tb/tb_pilot_snapshot_replication.sv": "5baf1fba837ca4c373adca4e93dee33c36cc32337748b92f7e1dcf4c7fba0311",
+    "tests/starlink_oracle/test_pilot_snapshot_replication.py": "df0c37ecb4a39801f68d7ec64f4e863b021f5c22db04b2af49979e5395cfcd4f"
+  },
+  "implementation": {
+    "target": "axi_starlink_pilot_capture.snapshot_request",
+    "attribute": "max_fanout=32",
+    "behavioral_change": false,
+    "source_token_check": "Only split the existing declaration and add the local synthesis attribute/comments; all executable RTL tokens otherwise match baseline 84a1a358.",
+    "added_pipeline_cycles": 0,
+    "snapshot_capture_epoch_or_ABI_changed": false,
+    "clock_or_timing_exception_changed": false,
+    "motivation": "The preceding final routed receiver measured fanout 649, wire delay 12.649 ns and slack -3.384 ns on this same-clock pilot snapshot-enable net.",
+    "vendor_references": [
+      "https://docs.amd.com/r/2022.2-English/ug912-vivado-properties/MAX_FANOUT",
+      "https://docs.amd.com/r/2022.2-English/ug949-vivado-design-methodology/Replicate-High-Fanout-Net-Drivers"
+    ],
+    "tradeoff": "Replication reduces local fanout but increases registers, LUT primitives and control sets. Full placement and timing must decide whether it helps this nearly full receiver."
+  },
+  "isolated_synthesis": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/axi_starlink_pilot_capture/build/snapshot-fanout-v1",
+    "scope_sha256": "800cb92d4bf4c5a4762b7b56a642cda04717886cd4a7c7a4d12876e63e0de5db",
+    "exit_code": 0,
+    "part": "xc7z010clg400-1",
+    "tool": "Vivado 2022.2",
+    "configuration": "Actual complete pilot capture/DDC, fixed 15 MS/s profile, full flattening, AreaOptimized_high, control_set_opt_threshold=4. Synthetic 10 ns clock and 0 ns I/O only in this isolated probe.",
+    "baseline": {"drivers": 1, "maximum_loads": 649, "total_loads": 649, "LUT_primitives": 2647, "FF_primitives": 2690, "control_sets": 56},
+    "replicated": {"drivers": 22, "maximum_loads": 31, "total_loads": 649, "LUT_primitives": 2668, "FF_primitives": 2711, "control_sets": 76},
+    "baseline_netlist_sha256": "e692825d6f6ba42d7d435ae6f2c46d174eff9ca319979d81c436894f89fa8b1b",
+    "replicated_netlist_sha256": "3754b15a95c811176a302587ea8af9fec0aca487c600b38f9cc308f2d6befb5f",
+    "routed_timing_improvement_measured": false
+  },
+  "functional_evidence": {
+    "rtl_tests": {"passed": 4, "log": "hdl/library/starlink_pss_raw_correlator/build/snapshot-replication-rtl-v2.log", "log_sha256": "02e1ee95044da002c5174d3355eb1fb316130ac3ec98d6eccb2023b44ab979e7"},
+    "actual_netlist_comparison": {
+      "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/axi_starlink_pilot_capture/build/snapshot-netlist-v2",
+      "scope_sha256": "2ace867a8a8f1a4b81145b4dc69196526b4fc2b02a86a82b1946d0dd8d31536a",
+      "log_sha256": "3b0e8739ebda5e128fe417c53c6d56632593f6c5ef01c51b2506a2f0214159f0",
+      "exit_code": 0,
+      "cycles": 38726,
+      "snapshots": 12,
+      "AXI_reads": 396,
+      "delivered_pilot_samples": 567,
+      "unknown_public_control_or_valid_data_rejected": true,
+      "comparison": "Two actual synthesized full pilot cores with vendor primitive models; cycle-by-cycle public control, valid AXI data and promised AXIS data equality. No internal signal forcing.",
+      "adapters": "Unique names for the retained pacer submodules; one byte-identical global-startup definition. Reversing the name-only adapters reconstructs each original netlist exactly."
+    },
+    "workloads": ["snapshots while real DDC data continues", "snapshot hold and generation", "periodic AXIS stalls", "overflow then exact 32-word drain", "CLEAR and snapshot invalidation", "invalid active CLEAR retains a fault", "high source-counter bits and reset epoch"],
+    "mutations_rejected": ["ARM also captures a snapshot", "snapshot generation advances by two"],
+    "bench_development": "The initial stall assertion wrongly checked the FIFO output after a newly-ready consumer could advance it. It now checks the promised beat before the consuming edge. Explicit reduction-X checks reject unknown public controls and valid data; the final v2 netlist run includes them. Earlier evidence is retained.",
+    "limits": "Finite tested workloads, not formal equivalence or full-receiver timing, ADC, DMA, native IIO or RF proof. RTL and netlist simulations are separate comparisons, not a cross-simulator trace-equality claim."
+  },
+  "integrated_regression": {
+    "command": "python -m pytest -q tests/starlink_oracle tests/test_starlink_realtime_constraint_gate.py",
+    "passed": 608,
+    "seconds": 98.38,
+    "exit_code": 0,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/snapshot-fanout-oracle-v1.log",
+    "log_sha256": "e192fdbd8a12858a265391cefd9dbf17844a743d3b3ba77d02af8cd9ff5e7f32",
+    "candidate_path_override_used": false,
+    "ruff_new_test": "PASS"
+  },
+  "full_120ms_rtl_dwell": {
+    "status": "passed",
+    "exit_code": 0,
+    "report": "reports/starlink-snapshot-fanout-dwell-rtl-20260909.json",
+    "report_sha256": "ad6afe0743da26d0cb76b853fcdaf8b46bf8a8a0379ca153e4d6b8c562816d11",
+    "log_sha256": "92f61af76576bc976f26f16eceae0f990083a21602eafa1f9b8fce166a5d6e76",
+    "supported_complex_samples": 300000,
+    "output_bytes": 1200000,
+    "iq_ci16_sha256": "d653ccfb1f3fb48d10c5c859b316074dc2b7e3229681294b611301043dda97a1",
+    "all_samples_match_integer_oracle": true,
+    "first_source_center": 271,
+    "last_source_center": 1800265,
+    "capture_and_DDC_faults": 0,
+    "saturation_events": 0,
+    "ppu_offline_parser_verified": true,
+    "radio_accessed": false,
+    "native_DMA_IIO_or_RF_qualified": false
+  },
+  "preceding_health_summary_receiver": {
+    "directory": "hdl/projects/pluto/shared-realtime-stop-health-v1",
+    "runtime_hdl_commit": "84a1a3589a08f5af72323755d38b9d7ef9153846",
+    "finished_utc": "2026-09-09T18:40:10Z",
+    "exit_code": 1,
+    "result": "placement_failed",
+    "unplaced_required_slices": 2413,
+    "remaining_available_slices": 2408,
+    "slice_shortfall": 5,
+    "placer_control_sets": 441,
+    "placer_combined_luts": 13772,
+    "placer_total_luts": 16671,
+    "placer_ffs": 18925,
+    "console_sha256": "9cf5df98c705f44d0c2633168aee19de4ff4a167f2d580411f474d4afd4c7525",
+    "implementation_log_sha256": "a6a1b3efa4c05de8fa012d590b49f81d89864cba250d1022374455a8a28482db",
+    "routed_timing_available": false,
+    "deployable": false
+  },
+  "new_full_receiver": {
+    "directory": "hdl/projects/pluto/shared-realtime-snapshot-fanout-v1",
+    "runtime_hdl_commit": "24bac44461c78868689ddb6b35e2f4edfd6d5d5d",
+    "tool_session": 21783,
+    "status": "running",
+    "parent_vivado_pid_as_observed": 865138,
+    "synthesis_vivado_pid_as_observed": 865478,
+    "process_confirmed_live": true,
+    "launch_conditions": "Clean pinned HDL, fresh project, no reference.dcp, global synthesis, identical 15 MS/s paired/shared-realtime/boundary-stop profile and constraints.",
+    "pilot_package_refresh_exit_code": 0,
+    "pilot_component_sha256": "5ba346dc397b8ec9a24af84d8348b2ddbfb998a0f0f6b520f0af662dd50287a6",
+    "package_console_sha256": "cde3fb364a0f17f2753710b8fd1421829000a9c1e808ce166843389307e43a59",
+    "terminal_result": null,
+    "deployable": false
+  },
+  "ppu_changed": false,
+  "radio_accessed": false,
+  "deployed": false,
+  "next": [
+    "Consume the fresh full receiver's physical result and inspect actual integrated snapshot replication; standalone fanout reduction is not sufficient.",
+    "Continue fit/timing/CDC/board-I/O closure, including separate FFT input/return guards and vendor-internal paths.",
+    "Qualify native paired .18 IIO, automatic causal coarse/fine handoff, real continuous 30/300-second capture, then PPU network deployment and independent live .17 GLRT/PSS verification.",
+    "Complete eight-target 120 ms valid-dwell scans over 300 seconds and the 30/60 MS/s rate ladder."
+  ]
+}
