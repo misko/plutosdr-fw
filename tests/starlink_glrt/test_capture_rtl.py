@@ -82,16 +82,22 @@ def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(co
     preparing = arm(visit=490)
     rows = [*preparing[:-1], *snapshot(), *extension_snapshot(), preparing[-1],
             *samples(raw[:count]), write(8, 2), wait(100000),
-            (1, 10, 0, 0, 0), *snapshot(), *extension_snapshot()]
+            (1, 10, 0, 0, 0), *snapshot(), *extension_snapshot(),
+            write(8, 4), wait(), *snapshot(), *extension_snapshot()]
     output, reads, final = run(captures(rate), rows, tmp_path)
+    post_clear_regs = dict(reads[-84:])
+    reads = reads[:-84]
     regs = dict(reads)
     baseline_regs = dict(reads[:84])
     assert all(baseline_regs[address] == 0 for address in range(0x300, 0x340, 4))
+    assert all(post_clear_regs[address] == 0 for address in range(0x300, 0x340, 4))
+    assert post_clear_regs[0xc8] == post_clear_regs[0x148] == post_clear_regs[0x174] == 0
     event_words = [value for address, value in reads if 0x200 <= address < 0x240]
     assert len(event_words) % 16 == 0
     import json
     evidence = {"rate": rate, "visit": 490,
         "source_samples": count, "iq_samples": len(output), "baseline_registers": baseline_regs,
+        "post_clear_registers": post_clear_regs,
         "final_registers": regs, "event_words": [event_words[index:index+16] for index in range(0, len(event_words), 16)]}
     (tmp_path / "closure-evidence.json").write_text(json.dumps(evidence, indent=2)+"\n")
     from .test_closure import attest_fabric_closure

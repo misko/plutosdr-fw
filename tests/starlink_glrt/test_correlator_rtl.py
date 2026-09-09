@@ -41,6 +41,7 @@ initial begin
   input_valid=vi; input_gap=ga; flush=fl; input_index=ix;
   input_i=si; input_q=sq; candidate_valid=cv; candidate_epoch=ep;
   @(posedge clk); #1;
+  if (!busy && dut.reading) $fatal(1,"idle reader still issues memory operations");
   if (correlation_valid) $display("C %h %d %d %d %d %d",correlation_epoch,correlation_symbol,exact_i,exact_q,control_i,control_q);
   if (candidate_rejected) $display("R");
   @(negedge clk);
@@ -115,6 +116,12 @@ def test_native_exact_control_bit_exact(rate, edge, correlators, tmp_path):
     values = rng.integers(-32768, 32768, (epoch + 70*n, 2), dtype=np.int16)
     command_cycle = (epoch + 18*n)*100_000_000//rate
     rows = records(values, rate, first, [(command_cycle, first+epoch)])
+    # Candidate payload is unconstrained without candidate_valid. Change it
+    # every clock, including the last valid correlation and return to idle.
+    # The complete vector must retain its admitted epoch and integer samples.
+    for cycle, row in enumerate(rows):
+        if not row[6]:
+            row[7] = ((1 << 64)-1-cycle*317) & ((1 << 64)-1)
     result, status, rejected = run(correlators(rate, edge), rows, tmp_path)
     exact = symbol_correlations(values, rate, edge, epoch)
     control = symbol_correlations(values, rate, edge, epoch, 17)
@@ -160,7 +167,7 @@ def test_missing_history_candidate_fails_closed(rate, correlators, tmp_path):
     rows = records(values, rate, first=1000, candidates=[(cycle, 0)])
     result, status, rejected = run(correlators(rate, "upper"), rows, tmp_path)
     assert not result and rejected == 1
-    assert status[:3] == (1, 1, 1)
+    assert status == (1, 1, 1, 0)
 
 
 @pytest.mark.parametrize("rate", RATES)
@@ -174,4 +181,4 @@ def test_admission_accounts_for_same_cycle_ring_overwrite(rate, correlators, tmp
     rows = records(values, rate, candidates=[(cycle, 0)])
     result, status, rejected = run(correlators(rate, "upper"), rows, tmp_path)
     assert not result and rejected == 1
-    assert status[:3] == (1, 1, 1)
+    assert status == (1, 1, 1, 0)
