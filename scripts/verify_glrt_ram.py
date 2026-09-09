@@ -22,7 +22,7 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def verify(package, output):
+def verify(package, output, *, dumpimage=None):
     package, output = package.resolve(), output.resolve()
     manifest_path = package / "manifest.json"
     manifest_hash = digest(manifest_path)
@@ -33,7 +33,7 @@ def verify(package, output):
     for path in (fit, dfu):
         if digest(path) != manifest["outputs_sha256"][path.name]:
             raise ValueError("package output changed: " + path.name)
-    dumpimage = ROOT / "buildroot/output/host/bin/dumpimage"
+    dumpimage = (dumpimage or ROOT / "buildroot/output/host/bin/dumpimage").resolve()
     cpio = Path(shutil.which("cpio") or "/missing-cpio")
     suffix = Path(shutil.which("dfu-suffix") or "/missing-dfu-suffix")
     tools = {str(p): digest(p) for p in (dumpimage, cpio, suffix, Path(__file__))}
@@ -96,8 +96,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--package", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--dumpimage", type=Path,
+                        help="explicit existing U-Boot extractor; recorded by hash")
     args = parser.parse_args()
-    receipt = verify(args.package, args.output)
+    receipt = verify(args.package, args.output, dumpimage=args.dumpimage)
     print(json.dumps({"status": receipt["status"], "rootfs_members": receipt["rootfs_members"],
                       "receipt": str(args.output / "receipt.json"), "hardware_accessed": False}))
 

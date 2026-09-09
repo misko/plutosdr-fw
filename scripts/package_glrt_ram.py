@@ -96,7 +96,7 @@ def stamp_rootfs(compressed: bytes, versions: str) -> bytes:
 
 def package(args):
     board, kernel = args.board.resolve(), args.kernel.resolve()
-    host_bin = ROOT / "buildroot/output/host/bin"
+    host_bin = (getattr(args, "host_bin", None) or ROOT / "buildroot/output/host/bin").resolve()
     dtc, mkimage = host_bin / "dtc", host_bin / "mkimage"
     environment = dict(os.environ, PATH=str(host_bin) + os.pathsep + os.environ.get("PATH", ""))
     if not re.fullmatch(r"[a-zA-Z0-9_.-]+", args.label):
@@ -192,6 +192,8 @@ def main():
     parser.add_argument("--board", type=Path, required=True)
     parser.add_argument("--kernel", type=Path, required=True)
     parser.add_argument("--rootfs", type=Path, required=True)
+    parser.add_argument("--host-bin", type=Path,
+                        help="explicit existing read-only Buildroot host tools; recorded by hash")
     parser.add_argument("--label", required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
