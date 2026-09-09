@@ -57,7 +57,9 @@ class EventReader:
                     # Only cancellation of the pending libiio read is expected.
                     # A late malformed record, write failure, or unrelated I/O
                     # error remains evidence even when stop raced its arrival.
-                    if self.stopping.is_set() and error.errno == errno.ECANCELED:
+                    # libiio 0.26 network-unix.c wait_cancellable returns EBADF
+                    # when its cancellation eventfd/pipe becomes readable.
+                    if self.stopping.is_set() and error.errno in (errno.ECANCELED, errno.EBADF):
                         break
                     raise
                 self.stream.write(raw)  # Retain even malformed records as evidence.

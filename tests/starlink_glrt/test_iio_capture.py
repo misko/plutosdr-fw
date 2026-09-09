@@ -202,7 +202,7 @@ class FakeBuffer:
             while not self.scenario.events and not self.scenario.cancelled:
                 self.scenario.condition.wait()
             if self.scenario.cancelled:
-                raise OSError(125, "cancelled")
+                raise OSError(getattr(self.scenario, "cancel_errno", errno.ECANCELED), "cancelled")
             return self.scenario.events.popleft()
 
     def cancel(self):
@@ -277,7 +277,7 @@ def test_transport_error_disqualifies_events_even_when_all_counters_match(tmp_pa
     assert result["event_records"] == 2 and not result["event_transport_attested"]
 
 
-@pytest.mark.parametrize("late_failure", ["malformed", "write", "refill"])
+@pytest.mark.parametrize("late_failure", ["malformed", "write", "write_bad_descriptor", "refill"])
 def test_stop_preserves_unexpected_late_event_errors(tmp_path, monkeypatch, late_failure):
     from tools.starlink_glrt_capture import EventReader
 
@@ -306,13 +306,14 @@ def test_stop_preserves_unexpected_late_event_errors(tmp_path, monkeypatch, late
     def initialize(reader, buffer, stream, visit):
         def write(raw):
             if raw == event(2):
-                raise OSError(errno.ENOSPC, "late event file write failure")
+                raise OSError(errno.EBADF if late_failure == "write_bad_descriptor" else errno.ENOSPC,
+                              "late event file write failure")
             return stream.write(raw)
         original_init(reader, buffer, SimpleNamespace(write=write), visit)
 
     monkeypatch.setattr(FakeBuffer, "refill", refill)
     monkeypatch.setattr(EventReader, "stop", stop)
-    if late_failure == "write":
+    if late_failure.startswith("write"):
         monkeypatch.setattr(EventReader, "__init__", initialize)
     scenario, args = Scenario(), arguments(tmp_path)
     summary = collect(args, library=scenario, context_factory=scenario.context)
@@ -321,6 +322,14 @@ def test_stop_preserves_unexpected_late_event_errors(tmp_path, monkeypatch, late
     assert any(reason.startswith("event attestation:") for reason in summary["failures"])
     raw = (args.output/"events.raw").read_bytes()
     assert raw == event(0, 98)+event(0)+event(1)+(b"bad" if late_failure == "malformed" else b"")
+
+
+@pytest.mark.parametrize("cancel_errno", [errno.ECANCELED, errno.EBADF])
+def test_expected_pending_refill_cancellation_preserves_success(tmp_path, cancel_errno):
+    scenario, args = Scenario(), arguments(tmp_path)
+    scenario.cancel_errno = cancel_errno
+    summary = collect(args, library=scenario, context_factory=scenario.context)
+    assert summary["status"] == "complete" and summary["event_transport_attested"]
 
 
 @pytest.mark.parametrize("fault", [None, "closure_loss", "closure_identity", "closure_event_support"])
