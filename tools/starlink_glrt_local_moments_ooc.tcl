@@ -1,6 +1,13 @@
 # Bounded full-pilot reduction alone; this is not complete-receiver timing proof.
-# Usage: vivado -mode batch -source THIS -tclargs FRESH_OUTPUT_DIRECTORY
-if {$argc != 1} { error "expected one absolute output directory" }
+# Usage: vivado -mode batch -source THIS -tclargs FRESH_OUTPUT_DIRECTORY ?wide?
+if {$argc < 1 || $argc > 2} { error "expected output directory and optional wide mode" }
+set product_width 33
+set power_width 33
+if {$argc == 2} {
+  if {[lindex $argv 1] ne "wide"} { error "unknown local moment geometry" }
+  set product_width 35
+  set power_width 36
+}
 if {[version -short] ne "2022.2"} { error "requires Vivado 2022.2" }
 set output_dir [file normalize [lindex $argv 0]]
 set repo [file dirname [file dirname [file normalize [info script]]]]
@@ -13,7 +20,8 @@ set wrapper_digest [lindex [exec sha256sum $wrapper_file] 0]
 create_project -in_memory -part xc7z010clg400-1
 read_verilog $source_file
 read_verilog $wrapper_file
-synth_design -top starlink_glrt_local_moments_ooc_wrapper -mode out_of_context -flatten_hierarchy none
+synth_design -top starlink_glrt_local_moments_ooc_wrapper -mode out_of_context -flatten_hierarchy none \
+  -generic [list PRODUCT_WIDTH=$product_width POWER_WIDTH=$power_width]
 create_clock -name moment_clk -period 10.0 [get_ports clk]
 # Match the FCLK0 buffer site in the retained full-receiver routed checkpoint.
 # OOC clock delay/skew is otherwise explicitly unqualified by Vivado 38-242.
@@ -70,6 +78,8 @@ puts $report "vivado=2022.2"
 puts $report "source_sha256=$source_digest"
 puts $report "wrapper_sha256=$wrapper_digest"
 puts $report "sample_count=79200"
+puts $report "product_width=$product_width"
+puts $report "power_width=$power_width"
 puts $report "clock_mhz=100"
 puts $report "clock_source_site=BUFGCTRL_X0Y0"
 puts $report "external_fixture_io_timing=excluded"

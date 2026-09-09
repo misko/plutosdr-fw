@@ -12,12 +12,13 @@ BENCH = r'''
 `timescale 1ns/1ps
 module tb;
 localparam N = COUNT;
-localparam C = $clog2(N+1), S = 33+$clog2(N), T = S+$clog2(N), E = 33+$clog2(N);
+localparam PW=PRODUCT_VALUE, EW=POWER_VALUE;
+localparam C = $clog2(N+1), S = PW+$clog2(N), T = S+$clog2(N), E = EW+$clog2(N);
 reg clk=0; always #5 clk=~clk;
 reg resetn=0, flush=0, job_valid=0, input_valid=0, input_gap=0, products_closed=0, result_ready=1;
 reg [63:0] job_start=0, input_index=0;
-reg signed [32:0] pri=0, prq=0, pdi=0, pdq=0;
-reg [32:0] power=0;
+reg signed [PW-1:0] pri=0, prq=0, pdi=0, pdq=0;
+reg [EW-1:0] power=0;
 wire job_ready, active, result_valid;
 wire [63:0] result_start;
 wire [C-1:0] result_count;
@@ -25,7 +26,7 @@ wire [3:0] result_fault;
 wire signed [S-1:0] ri,rq,di,dq;
 wire signed [T-1:0] ti,tq;
 wire [E-1:0] energy;
-starlink_glrt_local_moments #(.SAMPLE_COUNT(N)) dut (
+starlink_glrt_local_moments #(.SAMPLE_COUNT(N),.PRODUCT_WIDTH(PW),.POWER_WIDTH(EW)) dut (
  .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),.job_start(job_start),
  .input_valid(input_valid),.input_gap(input_gap),.products_closed(products_closed),.input_index(input_index),
  .reference_product_i(pri),.reference_product_q(prq),.delay_product_i(pdi),.delay_product_q(pdq),.sample_power(power),
@@ -69,9 +70,9 @@ def row(*, reset=1, flush=0, job=None, sample=None, gap=0, closed=0, ready=1):
     return f"{reset} {flush} {int(job is not None)} {job or 0:x} {int(sample is not None)} {gap} {closed} {ready} {index:x} {ri} {rq} {di} {dq} {power:x}\n"
 
 
-def simulate(tmp_path, count, rows):
+def simulate(tmp_path, count, rows, product_width=33, power_width=33):
     bench, input_path, executable = tmp_path / "tb.sv", tmp_path / "input.txt", tmp_path / "sim"
-    bench.write_text(BENCH.replace("= COUNT;", f"= {count};"))
+    bench.write_text(BENCH.replace("= COUNT;", f"= {count};").replace("PRODUCT_VALUE", str(product_width)).replace("POWER_VALUE", str(power_width)))
     with input_path.open("w") as file:
         file.writelines(rows)
     build = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable), str(bench), str(BANK_ROOT / "starlink_glrt_local_moments.v")], capture_output=True, text=True)
@@ -89,9 +90,11 @@ def expected(start, samples, fault=0):
     return [start, n, fault, *sums, *prefix, sum(s[5] for s in samples)]
 
 
-def test_full_native_moments_run_on_every_750_hz_repeat_with_integer_corner_values(tmp_path):
+@pytest.mark.parametrize("product_width,power_width", [(33, 33), (35, 36)])
+def test_full_native_moments_run_on_every_750_hz_repeat_with_integer_corner_values(tmp_path, product_width, power_width):
     count, base = 79_200, 2**55+71
-    corner = [(2**32-1, -2**32, -2**32, 2**32-1, 2**33-1), (-2**32, 2**32-1, 17, -31, 2**32)]
+    limit = 2**(product_width-1)
+    corner = [(limit-1, -limit, -limit, limit-1, 2**power_width-1), (-limit, limit-1, 17, -31, limit)]
     wanted = []
     for frame in range(3):
         start = base+frame*80_000
@@ -111,7 +114,7 @@ def test_full_native_moments_run_on_every_750_hz_repeat_with_integer_corner_valu
             yield row(sample=sample, job=job)
             native_index += 1
 
-    assert simulate(tmp_path, count, inputs()) == wanted
+    assert simulate(tmp_path, count, inputs(), product_width, power_width) == wanted
 
 
 @pytest.mark.parametrize("failure,fault", [("index", 1), ("gap", 1), ("close", 2), ("flush", 8)])
