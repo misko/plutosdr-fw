@@ -19,22 +19,25 @@ IP_ROOT = BANK_ROOT.parent/"axi_starlink_glrt"
 def captures(tmp_path_factory):
     root = tmp_path_factory.mktemp("capture-compile")
     cache = {}
-    def get(rate, continuous=False):
-        key = rate, continuous
+    def get(rate, continuous=False, native=False):
+        key = rate, continuous, native
         if key not in cache:
             source = (IP_ROOT/"tb/tb_starlink_glrt_capture.sv").read_text()
             for token, filename in {
                 "NATIVE_FILE": f"pilot_{rate}_upper_q7.mem", "ACQUISITION_FILE": "pilot_2500000_upper_q7.mem",
                 "FIRST_FILE": f"ddc_{rate}_q17.mem", "FINAL_FILE": "ddc_5000000_q17.mem", "TWIDDLE_FILE": "glrt_dft512_q15.mem",
+                "REFINEMENT_FILE": "native_cubic_60000000_upper.mem",
             }.items():
                 source = source.replace(f'"{token}"', f'"{BANK_ROOT/filename}"')
-            bench, executable = root/f"tb_{rate}_{int(continuous)}.sv", root/f"sim_{rate}_{int(continuous)}"
+            bench, executable = root/f"tb_{rate}_{int(continuous)}_{int(native)}.sv", root/f"sim_{rate}_{int(continuous)}_{int(native)}"
             bench.write_text(source)
             top = "tb_starlink_glrt_capture"
             process = subprocess.run(["iverilog", "-g2012", "-s", top, f"-P{top}.SOURCE_RATE_HZ={rate}",
                                       f"-P{top}.SOURCE_CONTINUOUS={int(continuous)}",
+                                      f"-P{top}.ENABLE_NATIVE_REFINEMENT={int(native)}",
                                       "-o", str(executable), str(bench),
                                       *map(str, sorted(BANK_ROOT.glob("*.v"))),
+                                      str(BANK_ROOT.parent/"common/ad_dds_cordic_pipe.v"),
                                       str(IP_ROOT/"axi_starlink_glrt.v"), str(IP_ROOT/"starlink_glrt_axi_lite.v")],
                                      capture_output=True, text=True)
             assert process.returncode == 0, process.stdout+process.stderr

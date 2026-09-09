@@ -32,6 +32,7 @@ set forbidden {}
 set native_dma {}
 set glrt {}
 set glrt_dma {}
+set native_engines {}
 foreach cell [get_cells -hierarchical] {
   set name [get_property NAME $cell]
   set ref [get_property REF_NAME $cell]
@@ -41,6 +42,9 @@ foreach cell [get_cells -hierarchical] {
   if {[string match *axi_ad9361_adc_dma* $name]} { lappend native_dma $name }
   if {[string match *axi_starlink_glrt* $ref] || [string match *axi_starlink_glrt* $orig]} { lappend glrt $name }
   if {[string match */starlink_glrt_dma $name]} { lappend glrt_dma $name }
+  if {[string match starlink_glrt_native_engine* $ref] || [string match starlink_glrt_native_engine* $orig]} {
+    lappend native_engines $name
+  }
 }
 close $f
 set maxpath [get_timing_paths -delay_type max -max_paths 1]
@@ -55,6 +59,7 @@ puts $f "pss_cells\t[llength $forbidden]"
 puts $f "native_dma_cells\t[llength $native_dma]"
 puts $f "glrt_ip_cells\t[llength $glrt]"
 puts $f "glrt_dma_cells\t[llength $glrt_dma]"
+puts $f "native_refinement_engines\t[llength $native_engines]"
 puts $f "hardware_eligible\t0"
 puts $f "qualification\tTiming, CDC, I/O and exception reports require review; audit alone grants no deployment."
 close $f

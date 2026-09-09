@@ -2,11 +2,19 @@
 # Build one committed GLRT-only board image in a new independent HDL checkout.
 # This script never opens, configures or deploys to a radio.
 set -euo pipefail
-if [[ $# -ne 2 ]]; then
-  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY' >&2
+if [[ $# -lt 2 || $# -gt 3 ]]; then
+  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY [--native-refinement]' >&2
   exit 2
 fi
 case "$1" in 2500000|5000000|10000000|25000000|60000000) ;; *) exit 2 ;; esac
+native_refinement=0
+if [[ $# -eq 3 ]]; then
+  if [[ "$3" != --native-refinement || "$1" != 60000000 ]]; then
+    echo 'native refinement requires --native-refinement and 60000000 Hz' >&2
+    exit 2
+  fi
+  native_refinement=1
+fi
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 output=$(realpath -m "$2")
 if [[ -e "$output" ]]; then
@@ -21,9 +29,11 @@ git clone --shared --no-checkout "$repository/hdl" "$output/hdl" >"$output/check
 git -C "$output/hdl" checkout --detach "$hdl_commit" >>"$output/checkout.log" 2>&1
 printf '%s\n' "$hdl_commit" >"$output/hdl_commit.txt"
 printf '%s\n' "$1" >"$output/source_rate_hz.txt"
+printf '%s\n' "$native_refinement" >"$output/native_refinement.txt"
 git -C "$repository" rev-parse HEAD >"$output/firmware_parent_commit.txt"
 sha256sum "$repository/scripts/build_glrt_board.sh" >"$output/build_script.sha256"
 export STARLINK_GLRT_RATE_HZ="$1"
+export STARLINK_GLRT_NATIVE_REFINEMENT="$native_refinement"
 export ADI_HDL_DIR="$output/hdl"
 export ADI_USE_OOC_SYNTHESIS=n
 export ADI_MAX_OOC_JOBS=4
