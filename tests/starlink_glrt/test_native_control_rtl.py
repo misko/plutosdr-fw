@@ -189,6 +189,27 @@ def test_pending_dma_hides_result_and_prohibits_pop_clear_until_drained(tmp_path
     assert len(result["OUT"]) == count
 
 
+def test_descriptor_and_sequence_survive_pop_without_clear_and_forbidden_reconfiguration(tmp_path):
+    count = 96
+    jobs = [(2**55+1000+n*80000, (2**32-31+n*97) % 2**32, 97137+n*11) for n in range(3)]
+    rows, expected_headers = [], []
+    for sequence, job in enumerate(jobs):
+        rows += [*configure(job, capture=0, tag=17+sequence), *body(job, count), *head()]
+        expected_headers += record(job, count, bank_for(count), capture=0, sequence=sequence, tag=17+sequence)
+        if sequence == 2:
+            # Every descriptor register, including capture mode, is immutable
+            # while the head is pending; none may alter its reported provenance.
+            rows += [*configure((4567, 891, 123), capture=1, tag=99), *head()]
+            expected_headers += record(job, count, bank_for(count), capture=0, sequence=sequence, tag=17+sequence)
+        rows += [write(2, 8), wait(), read(0x0d), read(0x0e), read(0x0f)]
+    rows += [write(2, 4), *configure(jobs[0]), *body(jobs[0], count), *head(), *finish()]
+    expected_headers += record(jobs[0], count, bank_for(count))
+    result = simulate(tmp_path, count, rows)
+    assert [value for address, value in result["READ"] if address >= 0x80] == expected_headers
+    assert [value for address, value in result["READ"] if address in (0x0d, 0x0e, 0x0f)] == [1]*3+[2]*3+[3]*3
+    assert len(result["CAP"]) == len(result["OUT"]) == count
+
+
 @pytest.mark.parametrize("failure", ["overflow", "abort", "source", "cdc", "pacer", "gap", "clip", "index"])
 def test_fault_retains_dma_prefix_and_recovers_after_pop_and_clear(tmp_path, failure):
     count, job = 96, (1000, 7, 19)
