@@ -363,6 +363,37 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Certified phase-specific input veto — 2026-09-09
+
+HDL `ccdf64365e8145113115f2e933ee8b2901f6d3e0` specializes input fault
+checks only in actual reset-idle/completed-input final/ACK phases. Generic
+callers retain the unrestricted checks by default. Same-edge duplicate-start,
+vendor/transport faults, full active-input checks, sticky reason accumulation
+and publication qualification remain. The final handshake is expanded explicitly
+to avoid reconverging its excluded nonfinal fault branch. No FFT arithmetic,
+coefficient, public packet ABI, clock or constraint changed.
+
+The whole regression passes **861 tests**, including both actual synthesized
+phase-mode netlists; two previous-source occupancy-netlist cases are intentionally
+skipped. The actual FFT service matches the frozen public guard across 284647
+comparisons, including duplicate starts at final/ACK. Numeric replay preserves
+1341 exact scores, paired replay preserves 894 scores/447 map words/2048 pilot
+bytes with late faults retained, and the finite 64-block burst/stall capacity
+case delivers 28608 scores with FIFO high-water 358. These are simulation gates,
+not radio qualification.
+
+Isolated synthesis removes all three raw-input fault ports from job-ready,
+active-state D, ACK-state D and commit-pulse D fan-in, replacing them with the
+explicit phase predicate. This is not a routed timing claim. Its first real
+dependency check failed at active state; the failed evidence is retained and
+the unchanged gate passes after the explicit final-handshake expansion.
+
+Fresh full receiver `hdl/projects/pluto/shared-realtime-phase-input-v1` launched
+at 21:15 UTC with both PSS stages, pilot DMA and boundary stop retained, global
+synthesis, unchanged constraints and no reference checkpoint. Physical result
+is pending. No radio or PPU operation occurred. Detailed evidence and hashes:
+`reports/starlink-phase-input-contract-20260909.json`.
+
 ### Atomic map-counter summary — 2026-09-09
 
 HDL runtime `f284b9f5a909c1c64f9040ac3dd7b90e42e6e659` sets an exact sticky

@@ -1,0 +1,102 @@
+{
+  "schema": "starlink-phase-input-contract-progress-v1",
+  "branch": "codex/starlink-rx-only-do-not-merge",
+  "runtime_hdl_commit": "ccdf64365e8145113115f2e933ee8b2901f6d3e0",
+  "baseline_hdl_commit": "af96c48ed34a58d54c548b4a2dc414aeff593c39",
+  "scope": "Phase-specific input fault contract and explicit final handshake. Functional and isolated synthesized evidence, not complete receiver timing or hardware qualification.",
+  "implementation": {
+    "premise": "Before admission the actual input checker is held in reset. Once all 512 input beats are checked, its slot is closed through final publication and ACK drain. No framing/delivery event or new certificate can then occur; duplicate job-start remains an immediate error.",
+    "guard": "USE_PHASE_INPUT_FAULT defaults to zero. Only the actual realtime service opts into a predicate containing duplicate start, sticky checker/source faults, vendor events and fast quarantine. Idle/final/ACK use it only under the documented phase premise. Full active-input fault checks and exact sticky reason accumulation remain unchanged.",
+    "final_commit": "Explicitly expands mailbox_accept AND return_last using the already-existing qualified-final branch. All same-edge final conditions remain; the nonfinal fault branch is not needlessly reconverged onto final occupancy and ACK controls.",
+    "service": "Final input fence retains checked completion, sticky checker fault and same-edge duplicate-start veto. Checker epoch remains alive throughout ACK drain and quarantine.",
+    "guard_sha256": "41b0c21b4c1e11b09029282c5998b9e24272c789d336f5433b8950552a916374",
+    "service_sha256": "0c30d6b2c77bd371c1a114305758f6b35e9430058b0de8d60a2affd17b604067",
+    "input_checker_changed": false,
+    "public_packet_ABI_changed": false,
+    "FFT_math_or_coefficients_changed": false,
+    "clocks_or_constraints_changed": false
+  },
+  "targeted_tests": {
+    "passed": 12,
+    "seconds": 17.91,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/phase-input-contract-v4.log",
+    "sha256": "8fb8dbf0025bde1fe46f7df4c23d1e3047536b58ce8e3fb942e83111a858159a",
+    "coverage": [
+      "Whole executable guard/service token whitelist against af96c48e, preserving all other logic.",
+      "Actual unchanged input checker, identity checking disabled/enabled, 512 real delivered beats, 32768 completed-phase pin rows including 16384 duplicate rows in each mode; four/five premature-fault witnesses and common-reset/new-job recovery. No private-state deposits.",
+      "Default and enabled guard RTL compared with immutable ff4229 public reference over 256 jobs, 131072 words and 254 faulted/two healthy ACK cases. Enabled unit adapter deliberately supplies the full unrestricted input tuple; the service's reduced predicate is checked separately.",
+      "Actual mode-zero and mode-one synthesized netlists replay the same public reference workload using vendor primitive models. Source and netlist hashes must match the measured artifact.",
+      "Missing duplicate-start and missing external-fault mutations rejected; invalid selector rejected."
+    ],
+    "limit": "Finite executable traces and structural invariants, not exhaustive formal verification or physical timing."
+  },
+  "generic_guard_regression": {
+    "passed": 27,
+    "skipped": 2,
+    "seconds": 9.90,
+    "log": "hdl/library/starlink_pss_raw_correlator/build/phase-input-generic-v2.log",
+    "sha256": "7409adc020cd1954f905cea7c9ec1c983278c9f558006d94e1df6f58b8507339",
+    "skip_reason": "Old occupancy-netlist artifacts belong to the previous guard source and are not reused. Current phase-mode netlists are independently checked in the targeted suite."
+  },
+  "isolated_synthesis": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/phase-input-synth-v3",
+    "tool": "Vivado 2022.2, xc7z010clg400-1, actual guard mode zero versus mode one; AreaOptimized_high synthesis and ExploreArea optimization",
+    "scope_sha256": "ce3a741ae251606ba90f8f90ef2e155b316ee3f09d59d01e9385e26ef8180e64",
+    "endpoints": ["job_ready", "active_private_reg/D", "awaiting_ack_reg/D", "commit_pulse_reg/D"],
+    "mode_zero": {"raw_input_fault_ports_per_endpoint": 3, "phase_ports_per_endpoint": 0, "LUT": 114, "FF": 180, "DSP": 0, "BRAM": 0, "netlist_sha256": "cbf7a765696824f0037c5a0d2bd55df299b95d0d857cffd204f746b127a97831"},
+    "mode_one": {"raw_input_fault_ports_per_endpoint": 0, "phase_ports_per_endpoint": 1, "LUT": 113, "FF": 180, "DSP": 0, "BRAM": 0, "netlist_sha256": "1f7a21f25172607ee4374ba97f40aa7a706742d2b813be45539e3c19099beb72"},
+    "limit": "Same candidate RTL with two parameter values, not a whole-receiver area comparison. Five-nanosecond standalone clock is not receiver timing qualification."
+  },
+  "actual_FFT_service": {
+    "directory": "/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/phase-input-service-v3",
+    "exit_code": 0,
+    "console_sha256": "1fd85a809742c4735cc4463468243ab42c2c466abab707df5c57c64ea065c696",
+    "public_shadow_comparisons": 284647,
+    "qualified_final_rows": 67,
+    "ACK_rows": 75344,
+    "healthy_idle_rows": 156753,
+    "healthy_jobs": 26,
+    "exact_words": 13312,
+    "fault_cases": {"starvation": 6, "final_vendor_veto": 3, "malformed_bank": 2, "independent_reset": 6, "configuration_reset": 2, "partial_input_reset": 2, "postcommit_ACK": 1, "duplicate_start_final": 1, "duplicate_start_ACK": 1},
+    "reference": "Immutable ff4229 guard shadow consumes actual checker/core pins and the original service fence. Public validity/ready/busy/commit/fault/reasons and valid payload are compared at both clock edges. Reduced predicate equality and reset/completion premises are checked in actual idle/final/ACK phases.",
+    "limit": "Actual generated FFT behavioral simulation, not whole-receiver physical, ADC, DMA, IIO or RF qualification."
+  },
+  "numeric_pipeline": {
+    "directory": "hdl/library/starlink_pss_raw_correlator/build/phase-input-numeric-v1",
+    "exit_code": 0,
+    "exact_scores": 1341,
+    "independent_FFT_reset_quarantine_and_recovery": true,
+    "console_sha256": "14f829cbbb1f3974828bf14990b376208efb1a1de879294dbb17f6a6c5022f5b"
+  },
+  "paired_actual_FFT": {
+    "directory": "hdl/library/starlink_pss_raw_correlator/build/phase-input-paired-v1",
+    "exit_code": 0,
+    "exact_scores": 894,
+    "exact_map_words": 447,
+    "exact_pilot_bytes": 2048,
+    "late_fault_retained": true,
+    "console_sha256": "95b8fe05f0291fbf3f9634b261e6d1fa9f7796b2dda92e886e6314dd252c582e",
+    "limit": "Reduced 447x2 map and 512 pilot words; actual digital shell/CDC/canonical/FFT/PSMA/PIL1, not ADC formatting, DMA, IIO, fine engine, production duration or RF."
+  },
+  "capacity": {"status": "passed", "exit_code": 0, "directory": "hdl/library/starlink_pss_raw_correlator/build/phase-input-capacity-v1", "blocks": 64, "profile": "bursty-stalled", "samples": 28673, "scores": 28608, "fifo_high_water": 358, "console_sha256": "83067d5833b585e6f539f4a2eeb3806f271f9960fc22149a32b020bfb5f4645f", "limit": "Counts, order and bounded backlog in a finite nominal-15MS/s simulation; not numeric or live sustained-throughput qualification."},
+  "integrated": {"status": "passed", "exit_code": 0, "passed": 861, "skipped": 2, "seconds": 164.79, "log": "hdl/library/starlink_pss_raw_correlator/build/phase-input-oracle-v1.log", "sha256": "a5b84ac16ab212ac57b57ffcef19f4223060af6c0e053c1d08f0f66c282d16b1", "skip_reason": "Two previous-source occupancy-netlist tests deliberately not reused. Both actual current-source phase-mode netlists pass in the same run.", "command": "STARLINK_PSS_PHASE_INPUT_NETLIST_DIR=/tmp/starlink-stop-summary.n1AytQ/hdl/library/starlink_pss_raw_correlator/build/phase-input-synth-v3 /home/mouse9911/gits/pluto-plus-utils/.venv/bin/python -m pytest -q tests/starlink_oracle tests/test_starlink_realtime_constraint_gate.py tests/test_starlink_boundary_build_options.py tests/test_starlink_realtime_routed_audit_policy.py"},
+  "acquisition_IP_package": {
+    "exit_code": 0,
+    "component_sha256": "781e09e7576cd66baf7f885fb92765a6b4cb92e0e12454646861b1389cedc9ed",
+    "console_sha256": "6e0803820c067a902fc440c324c6359d88b35300e39ecc803c7de1141f56f77b"
+  },
+  "retained_failed_diagnostics": [
+    "phase-input-synth-v1 stopped on a Tcl filter quoting error; script corrected without changing RTL.",
+    "phase-input-synth-v2 actually failed the structural acceptance gate: job_ready was cut but active_private still depended on all three raw inputs. The nonfinal/final reconvergence was then removed by explicitly expanding the same final handshake. The original gate was retained and all four endpoints passed v3."
+  ],
+  "full_receiver": {"status": "launched", "directory": "hdl/projects/pluto/shared-realtime-phase-input-v1", "launch_utc_minute": "2026-09-09T21:15Z", "source_revision": "ccdf64365e8145113115f2e933ee8b2901f6d3e0", "configuration": "15MS/s paired-pilot, shared realtime XFFT, boundary stop, DSP fine tracker, pilot DMA, global synthesis, unchanged constraints, no reference DCP", "deployment_eligible": false},
+  "preceding_receiver": "af96c48e failed full timing: WNS -2.183 ns, 335 failing endpoints, zero hold failures. Vendor-internal FFT, publication/fault paths, reset recovery and board-I/O/CDC obligations remain; see starlink-map-counter-summary-20260909.json.",
+  "radio_accessed": false,
+  "ppu_changed": false,
+  "deployed": false,
+  "next": [
+    "Observe the specific fresh complete receiver build to its terminal result. Do not restart because observation is slow.",
+    "Audit the exact final checkpoint; structural fan-in improvement alone cannot authorize deployment.",
+    "After physical qualification: exact-serial .18 finite/persistent IIO and causal coarse/fine integration, then PPU Ethernet .17 fixed-frequency paired live verification; eight-target 120ms/300s scanning and 30/60MS/s remain later gates."
+  ]
+}
