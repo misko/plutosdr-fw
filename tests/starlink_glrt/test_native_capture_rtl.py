@@ -2,6 +2,8 @@
 import hashlib
 import struct
 
+import pytest
+
 from tools.starlink_glrt_native_abi import NativeResult
 from tools.starlink_glrt_native_replay import verify as verify_original_iq
 
@@ -82,6 +84,34 @@ def test_full_native_dma_uses_original_60m_coordinates_and_returns_to_glr1(captu
     regs = dict(reads)
     assert [regs[a] for a in (0x400, 0x404, 0x458, 0x45c, 0x460)] == [0x474c4e31, 0x10000, 1, 60000000, 3]
     assert final == (0, 0)
+
+
+@pytest.mark.parametrize("fifo_bits", [5, 8])
+@pytest.mark.parametrize("backpressure", ["periodic", "full"])
+def test_varying_native_iq_preserves_order_across_stalls_and_fifo_wrap(captures, tmp_path, fifo_bits, backpressure):
+    # The source emits a distinct deterministic CI16 word at each ADC index.
+    # Periodic 20-cycle stalls build and drain the queue repeatedly, including
+    # single-word replacements and many wraps at the actual board FIFO depth.
+    pressure = (0, 4, 0, 3, 0) if backpressure == "periodic" else (0, 15, 0, 0, 0)
+    required_coverage = 0b11011 if backpressure == "periodic" else 0b11101
+    rows = [(0, 11, 0, 3, 1), wait(2000), *native_config(),
+            (0, 14, 0, 6000, 0), pressure, wait(150000), (0, 4, 0, 1, 0), wait(500),
+            (0, 16, 0, required_coverage, 0), *native_head(), *native_finish()]
+    output, reads, final = run(captures(60000000, continuous=True, native=True, fifo_bits=fifo_bits), rows, tmp_path)
+    header = [value for address, value in reads if 0x600 <= address < 0x680]
+    decoded = NativeResult.decode(struct.pack("<32I", *header))
+    decoded.require_complete()
+    start = header[3] | header[4] << 32
+    expected = []
+    for index in range(start, start+79200):
+        unsigned = ((index*73+19) & 65535, (index & 65535) ^ 0xa5a5)
+        expected.append(tuple(value if value < 32768 else value-65536 for value in unsigned))
+    assert output == expected
+    original = b"".join(struct.pack("<hh", *value) for value in output)
+    decoded.require_native_evidence(received_bytes=len(original), expected_tag=17, expected_start=start)
+    replay = verify_original_iq(decoded, original, (BANK_ROOT/"native_cubic_60000000_upper.mem").read_bytes())
+    assert replay["exact_integer_match"] is True
+    assert dict(reads)[0x410] == 0 and final == (0, 0)
 
 
 def test_native_dma_overflow_preserves_offered_words_across_invalid_clear(captures, tmp_path):

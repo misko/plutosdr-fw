@@ -1,16 +1,16 @@
 """Real ADC-clock ingress, blind FPGA GLRT, AXI control and continuous IQ FIFO."""
-from pathlib import Path
-from dataclasses import replace
 import struct
 import subprocess
+from dataclasses import replace
 
 import numpy as np
 import pytest
 
-from .ddc import BANK_ROOT, Ddc, RATES
+from tools.starlink_glrt_abi import Event, Snapshot
+
+from .ddc import BANK_ROOT, RATES, Ddc
 from .pilot import fixed_score, symbol_correlations
 from .test_receiver_rtl import observation
-from tools.starlink_glrt_abi import Snapshot, Event
 
 IP_ROOT = BANK_ROOT.parent/"axi_starlink_glrt"
 
@@ -19,8 +19,8 @@ IP_ROOT = BANK_ROOT.parent/"axi_starlink_glrt"
 def captures(tmp_path_factory):
     root = tmp_path_factory.mktemp("capture-compile")
     cache = {}
-    def get(rate, continuous=False, native=False):
-        key = rate, continuous, native
+    def get(rate, continuous=False, native=False, fifo_bits=5):
+        key = rate, continuous, native, fifo_bits
         if key not in cache:
             source = (IP_ROOT/"tb/tb_starlink_glrt_capture.sv").read_text()
             for token, filename in {
@@ -29,17 +29,19 @@ def captures(tmp_path_factory):
                 "REFINEMENT_FILE": "native_cubic_60000000_upper.mem",
             }.items():
                 source = source.replace(f'"{token}"', f'"{BANK_ROOT/filename}"')
-            bench, executable = root/f"tb_{rate}_{int(continuous)}_{int(native)}.sv", root/f"sim_{rate}_{int(continuous)}_{int(native)}"
+            suffix = f"{rate}_{int(continuous)}_{int(native)}_{fifo_bits}"
+            bench, executable = root/f"tb_{suffix}.sv", root/f"sim_{suffix}"
             bench.write_text(source)
             top = "tb_starlink_glrt_capture"
             process = subprocess.run(["iverilog", "-g2012", "-s", top, f"-P{top}.SOURCE_RATE_HZ={rate}",
                                       f"-P{top}.SOURCE_CONTINUOUS={int(continuous)}",
                                       f"-P{top}.ENABLE_NATIVE_REFINEMENT={int(native)}",
+                                      f"-P{top}.OUTPUT_FIFO_BITS={fifo_bits}",
                                       "-o", str(executable), str(bench),
                                       *map(str, sorted(BANK_ROOT.glob("*.v"))),
                                       str(BANK_ROOT.parent/"common/ad_dds_cordic_pipe.v"),
                                       str(IP_ROOT/"axi_starlink_glrt.v"), str(IP_ROOT/"starlink_glrt_axi_lite.v")],
-                                     capture_output=True, text=True)
+                                     capture_output=True, text=True, check=False)
             assert process.returncode == 0, process.stdout+process.stderr
             cache[key] = executable
         return cache[key]
@@ -150,7 +152,7 @@ def test_finite_glx1_close_retires_partial_work_and_conserves_complete_events(co
 def run(simulator, rows, tmp_path):
     (tmp_path/"stimulus.txt").write_text("".join(f"{delay} {op} {idx:x} {value:x} {arg}\n"
                                                for delay, op, idx, value, arg in rows))
-    process = subprocess.run(["vvp", str(simulator)], cwd=tmp_path, capture_output=True, text=True, timeout=120)
+    process = subprocess.run(["vvp", str(simulator)], cwd=tmp_path, capture_output=True, text=True, timeout=120, check=False)
     (tmp_path/"rtl_trace.txt").write_text(process.stdout+process.stderr)
     assert process.returncode == 0, process.stdout+process.stderr
     output, reads, final = [], [], None
