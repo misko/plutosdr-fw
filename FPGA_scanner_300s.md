@@ -158,13 +158,45 @@ snippets for that gate. Debug sampling must include negatives as well as trigger
 
 ## Stage gates
 
-Execution order: S3/S4 are coupled workstreams, not permission to deploy hops
-before the short-dwell policy is qualified. Start S4's offline policy comparisons
-in parallel with timing work. First fixed-frequency paired hardware capture
-should span at least one second, enough to exercise the existing three-map
-qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
-256 ms qualification. Complete the versioned short-dwell policy before the first
-120 ms hopping qualification; retain the full eight-target/rate-ladder scope.
+### Release ordering and promotion gates
+
+Release A is fixed-frequency, upper-edge, single-RX 15 MS/s paired recording
+and outdoor verification. Release B adds the eight-target 120 ms scanner and
+the 30/60 MS/s rate ladder. Release A does not require every Release B feature,
+but is not completion of the full objective.
+
+1. In parallel: close complete-receiver physical timing; qualify prior-only
+   frequency assistance and fine timing on held-out/known-origin data; finish
+   the native paired recorder. The existing 25 MS/s replay remains a frozen
+   externally assisted baseline, not online acquisition proof.
+2. Qualify the matched stop-enabled image and paired recorder on .18. Start
+   with a 120 ms transport check, then a two-second finite envelope providing
+   at least one second of actual common pilot/map/fine support. The current
+   PPU finite reader allows this envelope; it does not implement continuous
+   30/300-second recording. Extend and test bounded continuous delivery before
+   making those duration claims; do not concatenate finite sessions silently.
+3. After .18 passes the relevant gates, use PPU network deployment and tested
+   rollback on .17. Start fixed-frequency with a short integrity check, then
+   120/300-second observations. Distinguish transport, coarse detection, fine
+   lock and calibrated timing accuracy. No RF detection is a valid observation,
+   not proof of receiver success or a reason to invent a lock.
+4. Only after the separate short-dwell policy is qualified, add lower/upper
+   switching and 120 ms visits over 300 seconds. S3/S4 remain coupled: the old
+   three-map rule needs 256 ms and cannot qualify a 120 ms dwell. Boundary-stop
+   at the next complete tile is not itself an exact 120 ms hop fence.
+5. Repeat the same offline, full-image, .18 and .17 gates at 30 and 60 MS/s;
+   pilot output remains 2.5 MS/s. All original rate/scanner requirements remain.
+
+Every promoted image must include the exact tested FPGA, kernel, device tree
+and host contracts, a fresh timing/CDC/board-I/O audit, and serial/boot identity
+checks. The latest measured route is still a failure; test-vector success and
+an available package or bitstream are not deployment authorization.
+
+Frequency assistance must use evidence available before the PSS observation.
+Test its source-time order, alias-selection policy, correction age and actual
+processing/command latency separately. Earlier sample timestamps alone do not
+prove an implementation can meet an online deadline. Keep independent GLRT on
+the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ### S0 — Offline contracts and source audit
 
@@ -182,10 +214,11 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 - [ ] Tests: impulses and exact group delay; both edges; tones and pilots over
   the declared CFO domain; alias rejection; clipping; decimation phase; reset
   transients; PSS/pilot frequency-reference agreement at 15/30/60 MS/s.
-- [ ] Build a bit-accurate RTL DDC and matched replay vectors. Out-of-context
-  and full-shell synthesis/route must demonstrate fit and timing margin with
-  PSS plus the single-RX IQ DMA. Do not assume the current nearly full design
-  has space, and do not count already-removed TX resources a second time.
+- [ ] Finish complete-receiver physical qualification of the implemented,
+  bit-tested RTL DDC. Out-of-context and full-shell synthesis/route must
+  demonstrate fit and timing margin with PSS plus the single-RX IQ DMA. Do not
+  assume the current nearly full design has space, and do not count
+  already-removed TX resources a second time.
 - [x] Implement and bit-test the largest new stage: time-shared 255-tap /3 FIR,
   including rate/phase/fault fences. This is not the complete pilot DDC.
 - [x] Assemble the canonical FIFO/pacer, mixer and halfband with the /3 FIR;
@@ -196,7 +229,9 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 ### S2 — Paired fixed-frequency IIO capture on .18
 
-- [ ] Add the versioned single-RX IQ/metadata path and reusable PPU reader.
+- [ ] Qualify the implemented single-RX IQ/metadata path and finite PPU reader
+  through real DMA/IIO/Ethernet. The individual RTL/driver/API components are
+  present; native paired operation and durable delivery remain unqualified.
 - [x] Add explicitly selected, bounded raw PSS map/fine refill receipts with
   error/negative retention and joined cleanup. This is a host API prerequisite,
   not a paired recorder or live IIO qualification.
@@ -207,12 +242,13 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   startup. Retain individual write outcomes, driver acknowledgment separately
   from later worker/result completion, and uncertain cleanup evidence. These
   APIs remain offline-tested prerequisites, not paired live qualification.
-- [ ] Build the concurrent finite paired recorder using independent bounded
-  pilot/map/fine contexts under one serial-attested owner. Open/flush maps
+- [x] Implement and offline-test the concurrent finite paired recorder using
+  independent bounded pilot/map/fine contexts under one serial-attested owner. Open/flush maps
   before pilot ARM; keep maps running while fine requests are submitted/read.
   Preserve raw chunks before decoding/reassembly, negative observations,
   partial/error payloads and durable manifests. Progress/origin events are
-  provisional until terminal identity, counts and health checks pass.
+  provisional until terminal identity, counts and health checks pass. Native
+  `.18` DMA/Ethernet and live detector qualification remain unchecked above.
 - [ ] Add an explicit map stop receipt and drain protocol. For fixed frequency,
   a stop-at-map-boundary request must finish the current tile and pending
   publication, forbid the next tile, and acknowledge a stop ticket, terminal
@@ -303,8 +339,12 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
 
 - [ ] Only after .18 passes: exact-serial PPU network deployment, attested boot,
   firmware/HDL/kernel/host identities, and a tested rollback path. No USB on .17.
-- [ ] First short capture, then one 300-second eight-target run at the qualified
-  source rate, with 2.5 MS/s IQ and FPGA evidence from the same RX1 stream.
+- [ ] S5a / Release A: short fixed-frequency integrity capture followed by
+  qualified longer single-channel recording and independent live GLRT/PSS
+  comparison. This may follow S2 without waiting for all S3/S4 hopping work.
+- [ ] S5b / Release B: after S3/S4, one 300-second eight-target run at the
+  qualified source rate, with 2.5 MS/s IQ and FPGA evidence from the same RX1
+  stream. Fixed-frequency success does not complete this requirement.
 - [ ] Require at least 95% measured valid duty, exact valid visit lengths,
   balanced target coverage, no unexplained drops/overflow/event gaps, and exact
   restoration. Repeat runs must not require unexplained radio resets.
@@ -322,6 +362,54 @@ qualification on matching IQ. A 120 ms finite IQ replay alone cannot cover that
   to their do-not-merge remotes. Seal artifact hashes and independent replay.
 
 ## Current progress
+
+### Deployment work resumed — 2026-09-09
+
+A fresh full-receiver diagnostic completed with timing failure from clean HDL
+`1003cf0f84ef9c6661ff05483c992133ba6bc059` in
+`hdl/projects/pluto/shared-realtime-private-descriptor-v1`. It measures the
+private-descriptor change with the same explicit shared realtime 15 MS/s
+paired-pilot configuration as the previous route. Packages were refreshed;
+global synthesis was used and no incremental reference DCP was present. Final
+WNS is -2.047 ns, global TNS -236.046 ns with 361 failing endpoints, including
+18 reset-recovery failures. The saved-checkpoint read-only audit also measured
+vendor-internal WNS -1.064 ns and publication WNS -1.819 ns. All 4400 slices are
+occupied; 13 input and two output delay obligations remain unresolved. This is
+not a deployable image. Launch pins and terminal evidence are recorded in
+`reports/starlink-private-descriptor-build-launch-20260909.json`.
+
+Boundary stop remained disabled in that diagnostic. The normal project entry
+point now has explicit default-off `STARLINK_PSS_BOUNDARY_STOP` admission,
+BD parameter/readback, and a synthesized stop-controller/map-fence state check.
+The pure helper and actual Tcl entrypoint/constraint gate regressions pass;
+they do not substitute for a separately measured stop-enabled receiver image.
+
+The first stop-enabled full receiver (`b73758989a0a236fa429f23ee999628c42ed7e94`)
+passed actual BD readback and the synthesized structure/clock gate (67 surviving
+controller and four map-fence registers at 100 MHz), then failed placement by
+63 slices: 2428 required versus 2365 available for the remaining instances,
+441 control sets. No route or deployable image exists for it. See
+`reports/starlink-boundary-stop-build-20260909.json`.
+
+PPU `04b93d29753c7cdc3762e5f7a81e11d890bc331f` implements the actual finite
+three-context paired recorder, explicit diagnostic fine schedule, raw durable
+records and terminal delivery accounting. Sticky cleanup failure, late external
+cancellation, stale epoch, producer/storage errors and process-control exception
+retention have targeted tests. Its clean intended tree passes 2764 offline tests
+(one skip, ten hardware/firmware/browser deselections), full Ruff and strict
+mypy over 81 source files. This is not native `.18` DMA/Ethernet qualification,
+an automatic candidate handoff, persistent 300-second recording, or live lock.
+See `reports/starlink-finite-paired-ppu-20260909.json`.
+
+The predeclared earlier-pilot held-out study is complete: later positive
+baseline combined z 4.981/4.721 fails, fixed-prior assisted z 8.474/8.077 passes;
+the negative prior abstains, both negative baselines fail, and all six combined
+scrambled controls fail. One positive baseline individual map passes. Exact
+limits and pinned evidence are in
+`reports/starlink-capture25-causal-heldout-20260909.md`. Source order is not an
+online latency or fine timing proof. No radio was opened and no frozen earlier
+recording result was edited. `.18` remains the only local canary; `.17` is
+reserved for subsequent network deployment after promotion gates pass.
 
 ### Targeted recorded 25 MS/s replay — 2026-09-09
 

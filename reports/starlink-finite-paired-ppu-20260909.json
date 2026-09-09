@@ -1,0 +1,37 @@
+{
+  "schema": "starlink-finite-paired-ppu-qualification-v1",
+  "ppu_commit": "04b93d29753c7cdc3762e5f7a81e11d890bc331f",
+  "ppu_branch": "main",
+  "base_commit": "dfd5e46a10f8edd7daf19b7172b28fbf8fb65579",
+  "scope": "Real concurrent public IIO clients over deterministic native doubles. One-shot 2s pilot plus >=1s common coarse/pilot/fine anchor envelope. No hardware/online detection qualification.",
+  "source_sha256": {
+    "src/pluto_plus/hardware/paired_capture.py": "00f084bdc288bb78868a0a626d02a5aad959233088d85fc9363f9152c0c1b2da",
+    "tests/test_paired_capture.py": "daef578e6932887599c227efdae421b06b29b346732d2006c230bc37b0c645af",
+    "docs/paired-capture.md": "e7bf56c62048e62f07144dd202ffe01f5a0fb3d593617a14922e6fd2b261274c"
+  },
+  "tests": {
+    "paired_targeted": 57,
+    "paired_and_dependencies": 890,
+    "clean_candidate_offline_passed": 2764,
+    "clean_candidate_offline_skipped": 1,
+    "clean_candidate_offline_deselected": 10,
+    "clean_candidate_offline_seconds": 37.24,
+    "clean_candidate": "/tmp/ppu-paired-verify.nP1mZJ",
+    "clean_candidate_recipe": "git archive base commit plus only the three new files; PYTHONPATH selects exported src",
+    "offline_command": "pytest -q -m 'not hardware and not firmware and not browser'",
+    "ruff_full_src_tests": "PASS",
+    "mypy_strict_source_files": 81,
+    "mypy_strict_result": "PASS"
+  },
+  "unrelated_dirty_files_excluded": [
+    "README.md",
+    "src/pluto_plus/bootstrap_firmware.py",
+    "src/pluto_plus/doctor.py",
+    "tests/test_bootstrap_firmware.py"
+  ],
+  "native_radio_access": false,
+  "live_dma_ethernet_qualified": false,
+  "automatic_candidate_to_fine_qualified": false,
+  "persistent_30_300_second_qualified": false,
+  "live_pss_lock_qualified": false
+}

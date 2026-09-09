@@ -3,8 +3,8 @@
 These tests qualify gate admission and failure behavior, not physical timing.
 Actual implementation still has to provide every checked endpoint/path.
 """
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -13,17 +13,30 @@ GATE = ROOT / "hdl/projects/pluto/shared_xfft_impl_gate.tcl"
 XDC = ROOT / "hdl/library/starlink_pss_acquisition/starlink_pss_shared_xfft_constr.xdc"
 
 
-def gate_probe(tmp_path, *, mode=1, broken=""):
+def gate_probe(tmp_path, *, mode=1, boundary=0, broken=""):
     # Use Vivado's dot-joined generate hierarchy, not a fabricated slash-join.
     prefix = "receiver/acquisition/shared_transform.iq_to_score.realtime_transform.transform_service/"
     script = r'''
 set ::env(STARLINK_PSS_SHARED_XFFT) 1
 set ::env(STARLINK_PSS_REALTIME_XFFT) MODE
+set ::env(STARLINK_PSS_RATE_MSPS) 15
+set ::env(STARLINK_PSS_PROFILE) paired-pilot
+set ::env(STARLINK_PSS_BOUNDARY_STOP) @BOUNDARY@
 set prefix {PREFIX}
 set broken {BROKEN}
 set endpoints [list ${prefix}shared_xfft receiver/starlink_pss_tracker/inst \
   receiver/starlink_pilot_capture/inst receiver/starlink_pilot_dma/inst]
 array set periods {}
+if {$::env(STARLINK_PSS_BOUNDARY_STOP) || $broken eq "unexpected_stop"} {
+  foreach {role suffix} {
+    stop_controller phase_map_control/stop_active_reg
+    stop_map_fence acquisition/phase_map/stop_pending_reg
+  } {
+    set name receiver/starlink_pss_acquisition/inst/$suffix
+    if {$broken ne $role} {lappend endpoints $name}
+    set periods($name) [expr {$broken eq "stop_clock" ? 5.0 : 10.0}]
+  }
+}
 foreach box {input_mailbox output_mailbox} {
   foreach suffix {request_toggle_reg acknowledge_toggle_reg request_sync_reg[0] acknowledge_sync_reg[0] metadata_in_hold_reg[0] metadata_out_hold_reg[0]} {
     set name ${prefix}${box}/${suffix}
@@ -95,20 +108,37 @@ proc report_cdc {args} {}
 proc report_exceptions {args} {}
 if {[catch {source {GATE}} message]} {puts stderr $message; exit 2}
 '''
-    for key, value in {"PREFIX": prefix, "MODE": str(mode), "BROKEN": broken, "GATE": str(GATE)}.items():
+    for key, value in {"PREFIX": prefix, "MODE": str(mode), "@BOUNDARY@": str(boundary),
+                       "BROKEN": broken, "GATE": str(GATE)}.items():
         script = script.replace(key, value)
     return subprocess.run(["tclsh"], input=script, text=True, capture_output=True,
-                          cwd=tmp_path, timeout=10)
+                          cwd=tmp_path, timeout=10, check=False)
 
 
 @pytest.mark.parametrize("mode", [0, 1])
-def test_real_gate_accepts_only_complete_matching_named_inventory(tmp_path, mode):
-    result = gate_probe(tmp_path, mode=mode)
+@pytest.mark.parametrize("boundary", [0, 1])
+def test_real_gate_accepts_only_complete_matching_named_inventory(tmp_path, mode, boundary):
+    result = gate_probe(tmp_path, mode=mode, boundary=boundary)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "SHARED_XFFT_INIT_GATE_PASS" in result.stdout
     report = (tmp_path / "shared_xfft_init_gate.txt").read_text()
     assert f"realtime_xfft={mode}" in report
+    assert f"stop_controller boundary_stop={boundary} surviving_registers={boundary}" in report
+    assert f"stop_map_fence boundary_stop={boundary} surviving_registers={boundary}" in report
     assert ("input_fault_fast_sync/second_stage requirement_ns=5.0" in report) == bool(mode)
+
+
+@pytest.mark.parametrize("mode", [0, 1])
+@pytest.mark.parametrize("broken", ["stop_controller", "stop_map_fence", "stop_clock"])
+def test_enabled_stop_requires_both_synthesized_halves_at_actual_slow_clock(tmp_path, mode, broken):
+    result = gate_probe(tmp_path, mode=mode, boundary=1, broken=broken)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert "SHARED_XFFT_INIT_GATE_PASS" not in result.stdout
+
+
+def test_disabled_stop_rejects_unexpected_synthesized_feature(tmp_path):
+    result = gate_probe(tmp_path, boundary=0, broken="unexpected_stop")
+    assert result.returncode == 2 and "boundary-stop disabled" in result.stderr
 
 
 @pytest.mark.parametrize("broken", ["input_mailbox/input_fault_reg", "input_fault_fast_sync_reg[0]",
@@ -149,5 +179,5 @@ if {[catch {
 puts REALTIME_FAULT_XDC_MATCH_PASS
 '''.replace("{XDC}", "{" + str(XDC) + "}")
     result = subprocess.run(["tclsh"], input=script, text=True, capture_output=True,
-                            cwd=tmp_path, timeout=10)
+                            cwd=tmp_path, timeout=10, check=False)
     assert result.returncode == 0 and "REALTIME_FAULT_XDC_MATCH_PASS" in result.stdout, result.stderr
