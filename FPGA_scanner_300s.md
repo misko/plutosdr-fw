@@ -363,6 +363,42 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Measured transform-FIFO BRAM storage — 2026-09-09
+
+HDL `4c9a3b7358fa0e9122c80293e6e5021285582ac0` changes only the
+transform FIFO's runtime memory attribute from distributed to block. Its
+behavioral tokens, registered output latency, capacity, metadata checks and
+fault handling are unchanged. Pinned cycle-by-cycle equivalence passes at
+depths 2/4/8/16, with wrong-address and wrong-reset-payload mutants rejected.
+The actual synthesized default-depth BRAM netlist passes against the frozen
+old RTL, including 512 ordered words, stalls, full/drain, malformed metadata,
+flush and reset. The first netlist run was correctly rejected for a missing
+VCD output directory; the corrected run has no such diagnostic.
+
+Isolated synthesis measures 132 -> 60 slice LUTs and 201 -> 86 FFs for two
+BRAM tiles. The complete optimized receiver confirms its FIFO changes from
+188 -> 122 LUTs and 198 -> 83 FFs. Nevertheless the full stop-enabled image
+**still fails placement by 65 slices** (2449 required versus 2384 remaining),
+with 438 placement control sets, 16920 total LUTs and 19147 FFs. Synthesis
+uses 51 of 60 BRAM tiles. This is a measured resource reduction, **not** a
+packing or timing improvement; no routed checkpoint or deployable image exists.
+
+The actual reduced paired digital simulation preserves all 894 scores and
+2048 pilot bytes, pilot continuation after stop, and a real late fault. The
+full oracle regression passes 508 tests; focused tooling tests reject changed
+checkpoints and unbound netlists. ADC/DMA/IIO/fine/production-duration and live
+qualification are not inferred from these checks. Authoritative pins, exact
+scope and terminal build failure are in
+`reports/starlink-transform-fifo-bram-20260909.json`.
+
+The next isolated storage experiment uses the already parameterized 161-bit,
+three-usable-entry fine capture descriptor FIFO. It measures 125 -> 16 LUTs
+and 184 -> 23 FFs for 2.5 BRAM tiles, without changing the receiver's current
+distributed-memory selection. Before integration, test its synthesized BRAM
+behavior with asynchronous clocks, retained metadata, wrap, backpressure and
+coordinated reset, then the capture bridge and full receiver. This measurement
+does not establish CDC safety, fit or timing. Neither radio was touched.
+
 ### Private idle observation clear — 2026-09-09
 
 HDL `ced8a17d21e5ea00a134eb075a095d5ecf435955` moves six private
