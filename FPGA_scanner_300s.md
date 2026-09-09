@@ -390,7 +390,11 @@ The acquisition IP package was refreshed successfully. Fresh full receiver
 `hdl/projects/pluto/shared-realtime-guard-occupancy-v1` started at 20:07:51 UTC
 from the clean tracked HDL pin above, with boundary stop enabled, the DSP
 tracker retained, global synthesis and no reference checkpoint. It is running;
-no physical gate or radio promotion is claimed. See
+no physical gate or radio promotion is claimed. By 20:12:27 UTC, synthesis and
+the actual INIT_DESIGN structure/clock checks passed, with both PSS stages,
+pilot DMA, ten reducer DSPs, 67 stop-controller and four map-fence registers.
+The generated guard source hash matches the tested runtime. Placement is active.
+See
 `reports/starlink-guard-occupancy-20260909.json`.
 
 ### Existing DSP tracker selected for shared paired image — 2026-09-09
