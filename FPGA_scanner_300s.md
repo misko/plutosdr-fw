@@ -363,6 +363,40 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Read-only timing-pressure inventory and stop-summary premise — 2026-09-09
+
+The original descriptor-BRAM build is still live. It reached zero failed nets
+and successful net verification in one routing phase, then performed an
+incremental placement change and re-entered routing. That intermediate result
+is **not** a completed route or timing pass. Runtime sources remain unchanged
+from its launch pin while it runs; no radio has been accessed.
+
+A hash-bound inspection of its saved **pre-route** physical checkpoint finds
+two substantial paths: input-guard position through result-guard return-valid
+at 200 MHz (9 logic levels, estimated slack -2.517 ns), and acquisition health
+counters through stop admission into map control at 100 MHz (13 levels,
+estimated slack -1.758 ns). Estimated routing accounts for 70.251% and 80.393%
+of those path delays. Pilot delivered-count to first-index enables is another
+100 MHz candidate. These are pre-route diagnoses, not final critical-path
+rankings or measured improvements. Board input/output-delay obligations remain.
+
+The first bounded experiment tests a premise for shortening the stop-control
+path: the real health producer sets five sticky bits on exactly the same edges
+as their corresponding saturating counters become nonzero. Six RTL runs cover
+all 8192 simultaneous producer-input combinations, both FFT health-bit
+conventions, and counter widths 1/3/32; four bad-premise/policy mutations are
+rejected. The unchanged fatal mask, independent ingress-loss count and
+diagnostic-only denominator-zero policy are preserved. The complete
+oracle/constraint regression now passes 589 tests.
+
+This is a **test-only proposal**, not a receiver change or formal equivalence
+proof. A future implementation must retain conservative checking for arbitrary
+independent controller inputs, explicitly select the stronger integrated
+producer contract, compare actual stop/receipt behavior and measure the full
+image. It does not solve the separate 200 MHz guard path or routing congestion.
+Evidence, the optional QoR-report tool crash and the original live build state
+are recorded in `reports/starlink-physical-pressure-20260909.json`.
+
 ### Descriptor BRAM: complete receiver placed, routing still active — 2026-09-09
 
 Runtime HDL `653a3205bc7bd158a7267a9288beba63aebe12cf` selects block RAM
