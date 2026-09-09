@@ -23,17 +23,23 @@ from tests.starlink_glrt.pilot import frame, waveforms
 from tools.starlink_glrt_replay import compare, digest, save
 
 
-def cases():
+def cases(seed_offset=0, vary_epochs=False):
     result = []
     for rate in RATES:
         specifications = [("strong", cfo) for cfo in (-100_000, 0, 100_000)]
         specifications += [(kind, 42_000) for kind in ("weak", "short32", "short8", "noise", "tone", "scrambled", "rolled")]
         for kind, cfo in specifications:
+            seed = 207892153+seed_offset+len(result)
+            ratio = rate//2_500_000
+            epoch = 513*ratio+ratio//3
+            if vary_epochs:
+                geometry = np.random.default_rng(seed ^ 0x74ca208d)
+                epoch = int(geometry.integers(350, 901))*ratio+int(geometry.integers(ratio))
             result.append({"case": len(result), "rate": rate, "kind": kind, "cfo_hz": cfo,
-                           "seed": 207892153+len(result), "count": rate//250,
+                           "seed": seed, "count": rate//250,
                            "noise_sigma_per_component": 500*(rate/2_500_000)**.5,
                            "pilot_scale": 200 if kind == "weak" else 2000,
-                           "epoch": 513*(rate//2_500_000)+(rate//2_500_000)//3})
+                           "epoch": epoch})
     return result
 
 
@@ -69,11 +75,15 @@ def main():
     parser.add_argument("--leo-source", type=Path, required=True)
     parser.add_argument("--acquisition-q16", type=int, required=True)
     parser.add_argument("--workers", type=int, choices=(1, 2, 3), default=3)
+    parser.add_argument("--seed-offset", type=int, default=0)
+    parser.add_argument("--vary-epochs", action="store_true")
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if not 0 <= args.acquisition_q16 <= 65536:
         parser.error("acquisition gate must lie in [0, 65536]")
-    specifications = cases()
+    if not 0 <= args.seed_offset < 1 << 32:
+        parser.error("seed offset must be an unsigned 32-bit integer")
+    specifications = cases(args.seed_offset, args.vary_epochs)
     sources = [Path(__file__), ROOT/"tools/starlink_glrt_replay.py", ROOT/"tools/starlink_glrt_host.py",
                ROOT/"tests/starlink_glrt/pilot.py", ROOT/"tests/starlink_glrt/ddc.py"]
     hashes = {str(p): digest(p) for p in sources}
@@ -85,6 +95,7 @@ def main():
          "noise_model": "white complex noise, variance proportional to native sample rate for constant spectral density",
          "weak_nominal_2p5m_sample_snr_db": -10.9691001301,
          "signal_model": "published upper-edge pilot; integer native epochs with deterministic output-grid fractional offsets",
+         "seed_offset": args.seed_offset, "vary_epochs": args.vary_epochs,
          "expected": "strong must recover at least one complete frame; noise/tone/scrambled must have no positives; weak/short/rolled are reported without a forced pass",
          "hardware_accessed": False, "fresh_saved_or_live_holdout": False})
 
