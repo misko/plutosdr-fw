@@ -21,18 +21,18 @@ def arguments(tmp_path):
                            libiio=None, output=tmp_path / "capture")
 
 
-def snapshot(*, baseline=False, initial=False):
+def snapshot(*, baseline=False, initial=False, acquisition=15729):
     words = [0]*64
     if not baseline:
         words[0], words[2], words[4], words[6] = 100, 119, 20, 20
         words[12] = words[14] = 20
         words[19], words[21] = 24, 1
     words[20], words[23] = 98 if initial else 99, 1
-    words[57:61] = [15729, 19661, 9831, 1]
+    words[57:61] = [acquisition, 19661, 9831, 1]
     words[62] = 2_500_000
     cpu = 5 if initial or baseline else 7
     if not initial and not baseline:
-        words[38] = words[53] = words[55] = 2
+        words[30] = words[34] = words[38] = words[53] = words[55] = 2
     return f"GLR1 00010000 2500000 2500000 1 0 2500000 0 {cpu} {cpu} 0 0 0 0 " + " ".join(f"{w:08x}" for w in words)
 
 
@@ -45,8 +45,9 @@ def event(sequence, visit=99):
 class Scenario:
     version = "fake-libiio"
 
-    def __init__(self, fault=None):
+    def __init__(self, fault=None, *, extension=False):
         self.fault, self.log, self.settings = fault, [], {}
+        self.extension = extension
         self.condition = threading.Condition()
         self.events = deque([event(0, 98)])
         self.cancelled = False
@@ -107,17 +108,30 @@ class FakeDevice:
     def read(self, attr):
         if attr == "capture_abi":
             return "GLR1-1.0-upper-only"
+        if attr == "capture_extension_abi":
+            return "GLX1-1.0" if self.scenario.extension else "none"
+        if attr in ("capture_baseline_extension_snapshot", "capture_final_extension_snapshot"):
+            assert self.scenario.extension
+            words = [0]*16
+            if attr == "capture_final_extension_snapshot":
+                assert self.scenario.iq_closed
+                words[0], words[2], words[8], words[10] = 7, 119, 2, 2
+                if self.scenario.fault == "closure_loss":
+                    words[8] = 3
+                elif self.scenario.fault == "closure_identity":
+                    return "GLX1 00010000 2 99 2500000 " + " ".join(f"{word:08x}" for word in words)
+            return "GLX1 00010000 1 99 2500000 " + " ".join(f"{word:08x}" for word in words)
         if attr == "capture_snapshot":
             if self.scenario.live_snapshots is not None and ("iq", "open") in self.scenario.log:
                 self.scenario.log.append(("iq", "live_snapshot"))
                 return self.scenario.live_snapshots.popleft()
             return snapshot(initial=True)
         if attr == "capture_baseline_snapshot":
-            return snapshot(baseline=True)
+            return snapshot(baseline=True, acquisition=self.scenario.settings.get("acquisition_threshold_q16", 15729))
         if attr == "capture_final_snapshot":
             assert self.scenario.iq_closed, "final metadata must follow IQ disable"
             self.scenario.log.append(("iq", "final_snapshot"))
-            return snapshot()
+            return snapshot(acquisition=self.scenario.settings.get("acquisition_threshold_q16", 15729))
         raise AssertionError(attr)
 
     def write(self, name, value):
@@ -185,6 +199,26 @@ def test_continuous_iq_and_short_event_tail_are_drained_before_context_close(tmp
     assert scenario.log.index(("iq", "final_snapshot")) < scenario.log.index(("events", "close"))
     assert summary["independent_host_glrt_run"] is False
     assert "drain_bytes_per_second_after_prefill" not in summary
+
+
+@pytest.mark.parametrize("fault", [None, "closure_loss", "closure_identity"])
+def test_candidate_capture_requires_atomic_accounted_finite_closure(tmp_path, fault):
+    scenario, args = Scenario(fault, extension=True), arguments(tmp_path)
+    args.acquisition_q16 = 13107
+    summary = collect(args, library=scenario, context_factory=scenario.context)
+    assert summary["iq_prefix_attested"]
+    assert summary["status"] == ("complete" if fault is None else "failed")
+    assert summary["finite_detector_closure_attested"] == (fault is None)
+    assert summary["evidence_sha256"]["final_extension_snapshot.txt"] == sha256(args.output/"final_extension_snapshot.txt")
+
+
+def test_candidate_refuses_legacy_image_before_any_iq_or_event_buffer_is_armed(tmp_path):
+    scenario, args = Scenario(), arguments(tmp_path)
+    args.acquisition_q16 = 13107
+    summary = collect(args, library=scenario, context_factory=scenario.context)
+    assert summary["status"] == "failed"
+    assert any("requires the GLX1" in reason for reason in summary["failures"])
+    assert not any("open" in item for item in scenario.log)
 
 
 @pytest.mark.parametrize("fault,expected_bytes", [("refill", 40), ("partial", 60)])

@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tests.starlink_glrt.ddc import BANK_ROOT, Ddc, RATES, group_delay
 from tests.starlink_glrt.pilot import fixed_score, symbol_correlations
+from tools.starlink_glrt_profile import add_arguments, profile
 from tests.starlink_glrt.test_ddc_rtl import records
 from tests.starlink_glrt.test_receiver_rtl import BENCH
 
@@ -115,19 +116,19 @@ def main():
     parser.add_argument("--source-rate", type=int, choices=RATES, required=True)
     parser.add_argument("--edge", choices=("upper", "lower"), required=True)
     parser.add_argument("--host-blind", type=Path)
-    parser.add_argument("--acquisition-q16", type=int, default=15729)
-    parser.add_argument("--exact-q16", type=int, default=19661)
-    parser.add_argument("--margin-q16", type=int, default=9831)
+    add_arguments(parser)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     gates = (args.acquisition_q16, args.exact_q16, args.margin_q16)
-    if any(not 0 <= value <= 65536 for value in gates):
-        parser.error("each Q16 gate must lie in [0, 65536]")
+    try:
+        detector_profile = profile(gates, requested=args.profile)
+    except ValueError as error:
+        parser.error(str(error))
     raw_bytes = args.iq.read_bytes()
     if not raw_bytes or len(raw_bytes) % 4 or len(raw_bytes)//4 > args.source_rate//50:
         parser.error("requires a nonempty complete CI16 observation of at most 20 ms")
     raw = np.frombuffer(raw_bytes, dtype="<i2").reshape(-1, 2)
-    source_files = [Path(__file__), ROOT / "tests/starlink_glrt/test_receiver_rtl.py",
+    source_files = [Path(__file__), ROOT / "tools/starlink_glrt_profile.py", ROOT / "tests/starlink_glrt/test_receiver_rtl.py",
                     ROOT / "tests/starlink_glrt/test_ddc_rtl.py", ROOT / "tests/starlink_glrt/pilot.py",
                     ROOT / "tests/starlink_glrt/ddc.py", *sorted(BANK_ROOT.glob("*.*"))]
     source_files = [p for p in source_files if p.is_file() and p.suffix in (".py", ".v", ".mem", ".json")]
@@ -137,7 +138,7 @@ def main():
          "edge": args.edge, "samples": len(raw), "input_sha256": hashlib.sha256(raw_bytes).hexdigest(),
          "source_sha256": source_hashes, "replay_first_source_index": 0,
          "index_note": "replay ordinal, not the original radio counter",
-         "fpga_gates_q16": gates, "host_seed_inputs": [],
+         "fpga_gates_q16": gates, "detector_profile": detector_profile, "host_seed_inputs": [],
          "comparison_epoch_tolerance_output_samples": 5, "comparison_cfo_tolerance_hz": 2000,
          "tolerance_note": "engineering window of five 0.4 us cells and about 4.5 FPGA CFO bins; misses are retained",
          "hardware_accessed": False})

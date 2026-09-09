@@ -147,6 +147,57 @@ class Snapshot:
 
 
 @dataclass(frozen=True)
+class Closure:
+    """Additive GLX1 evidence; GLR1 wire data and conservative checks stay intact."""
+    generation: int
+    visit: int
+    source_rate: int
+    words: tuple[int, ...]
+
+    @classmethod
+    def decode(cls, text: str) -> Closure:
+        fields = text.split()
+        require(len(fields) == 21 and fields[:2] == ["GLX1", "00010000"], "unsupported GLX1 closure snapshot")
+        generation, visit, rate = (integer(value, 32) for value in fields[2:5])
+        require(generation != 0 and rate in RATES, "invalid closure generation/rate")
+        require(all(re.fullmatch(r"[0-9a-fA-F]{8}", word) for word in fields[5:]), "invalid closure fabric word")
+        words = tuple(int(word, 16) for word in fields[5:])
+        require(words[0] >> 3 == 0 and words[1] >> 1 == 0,
+                "reserved closure bits")
+        return cls(generation, visit, rate, words)
+
+    def u64(self, offset: int) -> int:
+        return self.words[offset] | self.words[offset+1] << 32
+
+    def require_pair(self, snapshot: Snapshot) -> None:
+        require((self.generation, self.visit, self.source_rate) ==
+                (snapshot.generation, snapshot.words[20], snapshot.source_rate), "closure/base snapshot identity mismatch")
+
+    def require_complete(self, final: Snapshot, *, baseline: Closure, base_snapshot: Snapshot) -> None:
+        self.require_pair(final)
+        baseline.require_pair(base_snapshot)
+        require(self.visit == baseline.visit and self.source_rate == baseline.source_rate,
+                "closure baseline visit/image mismatch")
+        require(not any(baseline.words), "closure baseline is not pre-ARM")
+        require(self.words[0] == 7 and self.words[1] == 0, "source/detector closure is incomplete or faulted")
+        require(not final.recovery_failed and final.dma_error == 0 and not final.words[19] & 3 and
+                final.words[50] == final.words[51] == final.words[61] == 0,
+                "closure has failed recovery, detector fault or pending work")
+        require(self.u64(2) >= final.u64(2), "native closure endpoint precedes exported IQ")
+        require(final.u64(30) == final.u64(34)+final.u64(36)+self.u64(12),
+                "selected candidates are unaccounted at closure")
+        require(self.u64(14) <= final.u64(36), "expired candidates exceed busy rejections")
+        require(final.u64(34) == self.u64(8)+self.u64(4), "admitted native candidates are unaccounted at closure")
+        require(self.u64(8) == self.u64(10) == final.u64(38), "complete native/scorer vectors were lost at closure")
+
+    def evidence(self) -> dict:
+        return {"native_endpoint": self.u64(2), "incomplete_native_tails": self.u64(4),
+                "discarded_selector_groups": self.u64(6), "completed_native_vectors": self.u64(8),
+                "completed_scorer_vectors": self.u64(10), "selected_close_rejections": self.u64(12),
+                "expired_candidates": self.u64(14)}
+
+
+@dataclass(frozen=True)
 class Event:
     words: tuple[int, ...]
 

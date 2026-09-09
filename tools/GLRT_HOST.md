@@ -10,6 +10,34 @@ window before opening a context; this task's user authorization does not imply
 that a shared radio is currently available. All capture commands below arm IQ.
 No hardware has yet been qualified by this workflow.
 
+## Frozen candidate profile and finite closure
+
+The current engineering candidate is `glrt-upper-candidate-v1`: acquisition,
+exact and margin gates are **13107/19661/9831 Q16** (approximately .20/.30/.15).
+The collector, replay and synthetic runner share these defaults from
+`starlink_glrt_profile.py`. Supply `--profile glrt-upper-candidate-v1` to reject
+conflicting gate overrides. Explicit different gates without a named profile
+remain available and are recorded as `custom-development`. The host's separate
+.175/.025 gates belong to its different estimator; they are not equal-score
+equivalents. Neither set is a calibrated sensitivity or false-alarm guarantee.
+
+Candidate captures require the additive **GLX1-1.0** closure extension before
+arming. GLR1 headers, 64-word snapshots and events retain their original wire
+formats. Each GLX1 snapshot has `GLX1 00010000 GENERATION VISIT SOURCE_HZ` and
+16 hexadecimal words, paired atomically with the corresponding GLR1 snapshot.
+The collector retains and hashes baseline/final closure files. The comparator
+rechecks them independently. Legacy captures remain readable through the original
+conservative checks and do not acquire a claim of finite detector closure.
+
+Closure requires source admission closed, a valid final native endpoint, all
+detector work settled, zero stage faults, and exact accounting of selections,
+admissions, completed native/scorer vectors and incomplete native tails.
+Selected candidates rejected at close, discarded selector groups and expired
+pending candidates remain explicit. Expiry is a subset of busy rejections.
+Incomplete support can retire at a finite boundary; completed vectors must
+produce results. The driver checks this within 20 ms and preserves a failure
+in final evidence instead of silently accepting a busy timeout.
+
 ## Capture
 
 `starlink_glrt_capture.py` uses libiio 0.21..0.x through a small ctypes binding;
@@ -22,6 +50,7 @@ For a 120 ms observation with an already loaded and configured 2.5 MS/s image:
 
 ```sh
 python3 tools/starlink_glrt_capture.py \
+  --profile glrt-upper-candidate-v1 \
   --uri '<allocated exact IIO URI>' \
   --serial '1040007c4a94000211000b009186843ef2' \
   --firmware-version '<exact /opt/VERSIONS device-fw label>' \
@@ -163,7 +192,7 @@ must identify the exact exported bytes. For an already analyzed 2.5 MS/s record:
 ```
 
 The acquisition gate in this example is the experimental .20 setting; the CLI
-default remains .24. Exact and margin defaults remain .30/.15. The protocol
+default is the same .20 candidate setting. Exact and margin defaults remain .30/.15. The protocol
 records all three Q16 gates and source/input hashes before execution. Never
 pass exported 2.5 MS/s IQ as if it were a higher native-rate observation.
 
@@ -182,7 +211,22 @@ to hardware without equivalent evidence. IQ attestation remains independent.
 
 `starlink_glrt_saved_rtl_development.py` covers every saved record of one edge
 in original order. `starlink_glrt_synthetic_qualification.py` runs a reproducible
-50-case, five-rate matrix through RTL and blind host analysis. Reusing its fixed
-seeds is a regression, not a new holdout. Both tools retain numerical misses,
-structured-control crossings and incomplete/failing runs instead of filtering
-them from the evidence.
+50-case, five-rate matrix through RTL and blind host analysis. Start with bounded
+subsets using repeatable `--source-rate` or `--case` flags; for example:
+
+```sh
+.venv/bin/python tools/starlink_glrt_synthetic_qualification.py \
+  --leo-source artifacts/host-reference-5f25fc57 \
+  --profile glrt-upper-candidate-v1 --source-rate 2500000 --case 0 \
+  --workers 1 --output artifacts/candidate-case-000
+```
+
+Version 2 qualification requires a distinct truth-matched detection for every
+complete strong frame, no unmatched strong-case positives, and independent host
+agreement for those detections. Noise, tone and scrambled controls must remain
+quiet. A completed run with failed criteria exits nonzero. Weak/short/rolled
+experiments retain their observed limits and cannot by themselves claim strong
+or control qualification. Subset protocols declare their case IDs and explicitly
+set `full_five_rate_matrix` false. Reusing fixed seeds is regression, not a new
+holdout. Both tools retain numerical misses, structured-control crossings and
+incomplete/failing runs instead of filtering them from the evidence.

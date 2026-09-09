@@ -6,7 +6,8 @@ import struct
 
 import pytest
 
-from tools.starlink_glrt_abi import DELAYS
+from tools.starlink_glrt_abi import Closure, DELAYS, Snapshot
+from tools.starlink_glrt_profile import FPGA_GATES, profile
 from tools.starlink_glrt_compare_capture import EVIDENCE, compare_capture
 from tools.starlink_glrt_replay import digest
 from .test_abi import record
@@ -19,6 +20,8 @@ def save(path, value):
 def refresh_capture(capture):
     summary = json.loads((capture/"summary.json").read_text())
     names = EVIDENCE + (("prefill_snapshot.txt",) if (capture/"prefill_snapshot.txt").exists() else ())
+    names += tuple(name for name in ("extension_abi.txt", "baseline_extension_snapshot.txt", "final_extension_snapshot.txt")
+                   if (capture/name).is_file())
     summary["evidence_sha256"] = {name: digest(capture/name) for name in names}
     summary["iq_sha256"] = digest(capture/"iq.ci16")
     summary["events_sha256"] = digest(capture/"events.raw")
@@ -157,5 +160,47 @@ def test_prefill_snapshot_is_bound_stopped_and_matches_received_prefix(tmp_path,
     else:
         reason = {"changed": "evidence missing or changed", "active": "active, queued",
                   "endpoints": "endpoints/counts differ"}[fault]
+        with pytest.raises(ValueError, match=reason):
+            compare_capture(capture, host)
+
+
+@pytest.mark.parametrize("fault", [None, "changed", "wrong-generation", "lost-vector", "unsettled"])
+def test_comparator_rechecks_finite_closure_evidence_and_preserves_large_endpoints(tmp_path, fault):
+    capture, host, _, _ = fixture(tmp_path)
+    protocol = json.loads((capture/"protocol.json").read_text())
+    protocol.update(closure_extension_required=True, detector_profile=profile(FPGA_GATES))
+    save(capture/"protocol.json", protocol)
+    fields = (capture/"final_snapshot.txt").read_text().split()
+    fields[14+30] = fields[14+34] = "00000003"
+    (capture/"final_snapshot.txt").write_text(" ".join(fields))
+    final = Snapshot.decode(" ".join(fields))
+    words = [0]*16
+    words[0] = 7
+    words[2:4] = [final.u64(2) & 0xffffffff, final.u64(2) >> 32]
+    words[8] = words[10] = 3
+    if fault == "lost-vector":
+        words[10] = 2
+    if fault == "unsettled":
+        words[0] = 3
+    def extension(values, generation=1):
+        return f"GLX1 00010000 {generation} 29 60000000 " + " ".join(f"{w:08x}" for w in values)
+    (capture/"extension_abi.txt").write_text("GLX1-1.0\n")
+    (capture/"baseline_extension_snapshot.txt").write_text(extension([0]*16))
+    wire = extension(words, generation=2 if fault == "wrong-generation" else 1)
+    (capture/"final_extension_snapshot.txt").write_text(wire)
+    summary = json.loads((capture/"summary.json").read_text())
+    summary.update(extension_abi="GLX1-1.0", finite_detector_closure_attested=True,
+                   finite_detector_closure=Closure.decode(wire).evidence())
+    save(capture/"summary.json", summary)
+    refresh_capture(capture)
+    if fault == "changed":
+        (capture/"final_extension_snapshot.txt").write_text(wire+" ")
+    if fault is None:
+        result = compare_capture(capture, host)
+        assert result["finite_detector_closure_attested"]
+        assert result["finite_detector_closure"]["native_endpoint"] == final.u64(2) > 1 << 53
+    else:
+        reason = {"changed": "evidence missing or changed", "wrong-generation": "identity mismatch",
+                  "lost-vector": "vectors were lost", "unsettled": "closure is incomplete"}[fault]
         with pytest.raises(ValueError, match=reason):
             compare_capture(capture, host)

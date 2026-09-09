@@ -8,6 +8,7 @@ Finite means a whole-buffer sample limit, with no detection-conditioned gaps.
 from __future__ import annotations
 
 import argparse
+import errno
 import hashlib
 import json
 import os
@@ -16,11 +17,13 @@ import threading
 import time
 
 if __package__:
-    from .starlink_glrt_abi import Event, Snapshot, RATES
+    from .starlink_glrt_abi import Closure, Event, Snapshot, RATES
     from .starlink_glrt_iio import Context, Library
+    from .starlink_glrt_profile import CANDIDATE, add_arguments, profile
 else:
-    from starlink_glrt_abi import Event, Snapshot, RATES
+    from starlink_glrt_abi import Closure, Event, Snapshot, RATES
     from starlink_glrt_iio import Context, Library
+    from starlink_glrt_profile import CANDIDATE, add_arguments, profile
 
 
 def save(path, value):
@@ -107,6 +110,7 @@ def validate_request(args):
         raise ValueError("prefill requires the entire observation to fit in four requested IQ kernel buffers")
     if not all(0 <= v <= 65536 for v in (args.acquisition_q16, args.threshold_q16, args.margin_q16)):
         raise ValueError("Q16 gates must be 0..65536")
+    profile((args.acquisition_q16, args.threshold_q16, args.margin_q16), requested=getattr(args, "profile", None))
     if args.lo_hz <= 0 or args.bandwidth_hz <= 0:
         raise ValueError("expected RX LO and bandwidth must be positive")
 
@@ -147,16 +151,22 @@ def collect(args, *, library=None, context_factory=Context):
     args.output.mkdir(parents=True, exist_ok=False)
     protocol = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     protocol.update(schema="starlink-glrt-iio-capture/v1", output_rate_hz=2_500_000,
+                    detector_profile=profile((args.acquisition_q16, args.threshold_q16, args.margin_q16),
+                                             requested=getattr(args, "profile", None)),
                     prefill=bool(getattr(args, "prefill", False)),
                     edge="upper", event_buffer_records=1, event_kernel_buffer_count=1024,
                     iq_kernel_buffer_count=4, hardware_qualification="not inferred by this collector",
                     purpose="whole finite continuous IQ prefix, independent of FPGA decisions")
+    protocol["closure_extension_required"] = (protocol["detector_profile"]["name"] == CANDIDATE or
+                                               bool(getattr(args, "require_closure", False)))
     source_files = [Path(__file__).resolve(), Path(__file__).with_name("starlink_glrt_abi.py").resolve(),
-                    Path(__file__).with_name("starlink_glrt_iio.py").resolve()]
+                    Path(__file__).with_name("starlink_glrt_iio.py").resolve(),
+                    Path(__file__).with_name("starlink_glrt_profile.py").resolve()]
     protocol["source_sha256"] = {str(path): sha256(path) for path in source_files}
     save(args.output / "protocol.json", protocol)
     api = library or Library(args.libiio)
     context = event_context = iq_buffer = event_buffer = reader = baseline = final = None
+    extension_abi = baseline_closure = final_closure = None
     failures, blocks = [], []
     prefill = drain_seconds = None
     received, began = 0, time.monotonic()
@@ -175,6 +185,17 @@ def collect(args, *, library=None, context_factory=Context):
             iq = context.device("starlink-glrt-iq")
             if iq.read("capture_abi") != "GLR1-1.0-upper-only":
                 raise ValueError("unsupported GLR1 kernel ABI")
+            try:
+                extension_abi = iq.read("capture_extension_abi")
+            except OSError as error:
+                if error.errno not in (errno.ENOENT, errno.EOPNOTSUPP):
+                    raise
+                extension_abi = "none"
+            (args.output/"extension_abi.txt").write_text(extension_abi+"\n")
+            if extension_abi not in ("none", "GLX1-1.0"):
+                raise ValueError("unsupported finite closure extension")
+            if protocol["closure_extension_required"] and extension_abi != "GLX1-1.0":
+                raise ValueError("candidate capture requires the GLX1 finite closure extension")
             initial_text = iq.read("capture_snapshot")
             (args.output / "initial_snapshot.txt").write_text(initial_text + "\n")
             initial = Snapshot.decode(initial_text)
@@ -202,6 +223,11 @@ def collect(args, *, library=None, context_factory=Context):
             baseline_text = iq.read("capture_baseline_snapshot")
             (args.output / "baseline_snapshot.txt").write_text(baseline_text + "\n")
             baseline = Snapshot.decode(baseline_text)
+            if extension_abi == "GLX1-1.0":
+                wire = iq.read("capture_baseline_extension_snapshot")
+                (args.output/"baseline_extension_snapshot.txt").write_text(wire+"\n")
+                baseline_closure = Closure.decode(wire)
+                baseline_closure.require_pair(baseline)
             if baseline.words[20] != args.visit or baseline.samples or baseline.words[19] & 0x1f:
                 raise ValueError("driver baseline is not the requested pre-ARM observation")
             if protocol["prefill"]:
@@ -231,6 +257,10 @@ def collect(args, *, library=None, context_factory=Context):
                     final_text = context.device("starlink-glrt-iq").read("capture_final_snapshot")
                     (args.output / "final_snapshot.txt").write_text(final_text + "\n")
                     final = Snapshot.decode(final_text)
+                    if extension_abi == "GLX1-1.0":
+                        wire = context.device("starlink-glrt-iq").read("capture_final_extension_snapshot")
+                        (args.output/"final_extension_snapshot.txt").write_text(wire+"\n")
+                        final_closure = Closure.decode(wire)
                 except BaseException as error:
                     failures.append(f"final evidence: {error}")
                 try:
@@ -282,6 +312,10 @@ def collect(args, *, library=None, context_factory=Context):
         if final is None or baseline is None or reader is None:
             raise ValueError("complete baseline/final/event evidence is unavailable")
         final.require_events(reader.events, baseline=baseline)
+        if extension_abi == "GLX1-1.0":
+            if final_closure is None or baseline_closure is None:
+                raise ValueError("paired finite closure evidence is unavailable")
+            final_closure.require_complete(final, baseline=baseline_closure, base_snapshot=baseline)
         event_pass = True
     except (OSError, ValueError) as error:
         failures.append(f"event attestation: {error}")
@@ -295,6 +329,9 @@ def collect(args, *, library=None, context_factory=Context):
                       "final_snapshot.txt", "blocks.json", "iq.ci16", "events.raw")
     if protocol["prefill"]:
         evidence_names += ("prefill_snapshot.txt",)
+    evidence_names += ("extension_abi.txt",)
+    if extension_abi == "GLX1-1.0":
+        evidence_names += ("baseline_extension_snapshot.txt", "final_extension_snapshot.txt")
     summary = {"schema": protocol["schema"], "status": "complete" if not failures else "failed",
                "failures": failures, "received_bytes": received,
                "iq_prefix_attested": iq_pass, "event_transport_attested": event_pass,
@@ -311,6 +348,9 @@ def collect(args, *, library=None, context_factory=Context):
                "detector_busy_rejections": final.u64(36) if final else None,
                "detector_pending_bits": final.words[61] if final else None,
                "ddc_clipping_count": final.words[16] if final else None}
+    summary["extension_abi"] = extension_abi
+    summary["finite_detector_closure_attested"] = event_pass and extension_abi == "GLX1-1.0"
+    summary["finite_detector_closure"] = final_closure.evidence() if final_closure is not None else None
     if protocol["prefill"]:
         summary["prefill"] = prefill
         valid_drain = bool(prefill and drain_seconds and not failures)
@@ -337,9 +377,8 @@ def main():
     parser.add_argument("--chunk-samples", type=int, default=25_000)
     parser.add_argument("--prefill", action="store_true",
                         help="wait for complete DMA backlog before timing refills; requires <=4 IQ buffers")
-    parser.add_argument("--acquisition-q16", type=int, default=15729)
-    parser.add_argument("--threshold-q16", type=int, default=19661)
-    parser.add_argument("--margin-q16", type=int, default=9831)
+    add_arguments(parser, exact_option="--threshold-q16")
+    parser.add_argument("--require-closure", action="store_true", help="require GLX1 also for custom development gates")
     parser.add_argument("--decisions-off", action="store_true")
     parser.add_argument("--libiio")
     parser.add_argument("--output", type=Path, required=True)

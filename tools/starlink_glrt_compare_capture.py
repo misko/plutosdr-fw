@@ -13,7 +13,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools.starlink_glrt_abi import Event, Snapshot, require
+from tools.starlink_glrt_abi import Closure, Event, Snapshot, require
+from tools.starlink_glrt_profile import CANDIDATE, profile
 from tools.starlink_glrt_replay import compare, digest, save
 
 EVIDENCE = ("protocol.json", "identity.json", "initial_snapshot.txt", "baseline_snapshot.txt",
@@ -27,6 +28,21 @@ def compare_capture(capture: Path, host: Path):
     summary = json.loads((capture/"summary.json").read_text())
     protocol = json.loads((capture/"protocol.json").read_text())
     evidence = EVIDENCE
+    extension_abi = "none"
+    if "closure_extension_required" in protocol:
+        evidence += ("extension_abi.txt",)
+        extension_abi = (capture/"extension_abi.txt").read_text().strip()
+        require(extension_abi in ("none", "GLX1-1.0") and summary["extension_abi"] == extension_abi,
+                "closure extension identity differs")
+        gates = (protocol["acquisition_q16"], protocol["threshold_q16"], protocol["margin_q16"])
+        require(protocol["detector_profile"] == profile(gates), "detector profile differs from its gates")
+        if protocol["closure_extension_required"] or protocol["detector_profile"]["name"] == CANDIDATE:
+            require(extension_abi == "GLX1-1.0", "candidate requires finite closure evidence")
+        if extension_abi == "GLX1-1.0":
+            evidence += ("baseline_extension_snapshot.txt", "final_extension_snapshot.txt")
+            require(summary["finite_detector_closure_attested"], "finite closure was not attested")
+        for name in evidence[len(EVIDENCE):]:
+            before[str(capture/name)] = digest(capture/name)
     if protocol.get("prefill", False):
         evidence += ("prefill_snapshot.txt",)
         before[str(capture/"prefill_snapshot.txt")] = digest(capture/"prefill_snapshot.txt")
@@ -75,6 +91,12 @@ def compare_capture(capture: Path, host: Path):
     require(len(events) == summary["event_records"] and
             len(decoded)-len(events) == summary["other_visit_event_records"], "event inventory differs")
     final.require_events(events, baseline=baseline)
+    closure = None
+    if extension_abi == "GLX1-1.0":
+        closure = Closure.decode((capture/"final_extension_snapshot.txt").read_text())
+        closure.require_complete(final, baseline=Closure.decode((capture/"baseline_extension_snapshot.txt").read_text()),
+                                 base_snapshot=baseline)
+        require(summary["finite_detector_closure"] == closure.evidence(), "closure summary differs from counters")
     host_protocol = json.loads((host/"protocol.json").read_text())
     host_summary = json.loads((host/"summary.json").read_text())
     require(host_protocol["schema"] == "starlink-glrt-blind-host/v1" and
@@ -114,6 +136,8 @@ def compare_capture(capture: Path, host: Path):
             "comparison": comparison,
             "agreement_observed": any(row["matches"] for row in comparison["fpga_positive_comparisons"]),
             "busy_rejections": final.u64(36), "pending_bits": final.words[61],
+            "finite_detector_closure_attested": closure is not None,
+            "finite_detector_closure": closure.evidence() if closure is not None else None,
             "ddc_clipping_count": final.words[16], "hardware_accessed_by_comparator": False,
             "live_detector_qualified": False,
             "limitations": ["Engineering comparison tolerances: five 0.4 us output samples and 2 kHz circular CFO.",
