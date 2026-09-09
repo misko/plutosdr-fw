@@ -17,14 +17,18 @@ verified; it differs from the original active v0.48 RAM image.
 |---|---|---|---|---|
 | `glrt-eth-r2500000-v1` | `625a93e7` | `36c6561f` | +0.009 / +0.020 ns | Reconciled exact running FIT; PN and short/backlog captures passed |
 | `glrt-eth-r2500000-v2` | `625a93e7` | `93a343f2` | +0.009 / +0.020 ns | PN, short capture, two complete ten-second captures and 320-event control passed; exact original rollback passed |
-| `glrt-eth-r5000000-v1` | `ec87261d` | `93a343f2` | +0.013 / +0.017 ns | Deployed successfully from restored original v0.47; receive checks pending |
-| `glrt-eth-r10000000-v1` | `ec87261d` | `93a343f2` | +0.055 / +0.035 ns | Package verified; hardware checks pending |
-| `glrt-eth-r25000000-v1` | `4cd97a03` | `93a343f2` | +0.004 / +0.025 ns | Full build audit passed; package preparation underway |
+| `glrt-eth-r5000000-v1` | `ec87261d` | `93a343f2` | +0.013 / +0.017 ns | Deployment, PN, short and ten-second IQ/event capture, and blind host comparison passed |
+| `glrt-eth-r10000000-v1` | `ec87261d` | `93a343f2` | +0.055 / +0.035 ns | Deployment, PN, short and ten-second IQ/event capture, and blind host comparison passed |
+| `glrt-eth-r25000000-v1` | `4cd97a03` | `93a343f2` | +0.004 / +0.025 ns | Currently deployed; PN, short and ten-second IQ/event capture, blind host comparison and idle attestation passed |
 
 Each image exports continuous 2.5 MS/s CI16 IQ. Its source rate is attested from
 the public FPGA snapshot before any PHY rate change. The 25 and 60 MS/s ec872
 builds failed timing and are excluded from deployment. The reviewed idle-payload
-change now closes timing at 25 MS/s; the fresh 60 MS/s build remains in progress.
+change closes timing at 25 MS/s. Its 60 MS/s build and one fixed physical retry
+both failed setup at -0.199 ns and were not deployed. A subsequent exact pilot
+bank row precomputation (`6099b304`) passed focused numerical, cycle-timing and
+finite-close checks; its fresh full 60 MS/s build and independent five-rate
+matrix are in progress. No clock or timing constraint has been relaxed.
 
 The full 5/10 MS/s implementation audits were reviewed alongside the accepted
 2.5 MS/s canary. They contain one GLRT IP and DMA, no PSS and no native ADC DMA,
@@ -51,7 +55,7 @@ bandwidth, A_BALANCED RX and manual 30 dB gain, with TXLO powered down and
 TX gain at -80 dB. Neither that LO nor historical bench notes identifies the
 current RX1 feed. Current antenna/LNB connection and IF remain unknown.
 
-Two real collector failures are preserved. The first short capture read final
+Three real collector failures are preserved. The first short capture read final
 counters before IIOD finished asynchronous kernel buffer teardown; the fix
 waits for the matching visit's final snapshot. The first ten-second capture
 received its full 100 MB, but its quiet event socket retained a ten-second
@@ -76,9 +80,43 @@ This is arithmetic verification using the recorded epochs, separate from the
 unseeded host detector. Busy/expiry counts induced by the artificial zero
 acquisition gate are explicitly retained.
 
-Independent blind host analysis of the normal ten-second capture completed all
-1,000 overlapping windows and found no pilot positives, matching the FPGA's
-quiet observation. The separate decisions-off control also had no multi-frame
-host positives, while 15 individual-frame engineering supports are retained in
-its comparison. These uncalibrated metrics do not establish live sensitivity.
-Live pilot agreement remains unproven; hardware-qualified flags remain false.
+Normal ten-second captures at each commissioned source rate saved all
+25 million output samples, with exact IQ/event and finite-close accounting.
+There were no busy rejections, expiry, incomplete tails, clipping, transport
+faults or pending work. Every output FIFO high water was one.
+
+| Source MS/s | Capture / visit | Elapsed including stop, s | Scored events | RX PN passing eye points |
+|---|---|---|---|---|
+| 2.5 | `v2-2500000-10sec-large-buffers-v1` / 909507 | 10.069882 | 0 | 141 |
+| 2.5 repeat | `v2-2500000-10sec-large-buffers-v2` / 909509 | 10.068877 | 0 | Same unchanged calibration |
+| 5 | `rate5000000-10sec-v1` / 909511 | 10.065150 | 1,560 | 150 |
+| 10 | `rate10000000-10sec-v1` / 909513 | 10.061013 | 2,549 | 159 |
+| 25 | `rate25000000-10sec-v1` / 909515 | 10.068624 | 3,497 | 161 |
+
+PN eyes were measured in each rate's preceding 120 ms commissioning operation;
+each selected RX delay was 0x08, independently checked within its passing eye.
+These score records contain no positive detector decisions.
+
+Independent blind host analysis of one normal ten-second capture at each of
+2.5, 5, 10 and 25 MS/s completed all 1,000 overlapping windows per recording
+and found no multi-frame pilot positives. Every comparison completed with no
+unmatched or unobservable FPGA positive. The 5/10/25 MS/s comparisons still
+retain 1,493/1,478/1,512 unmatched individual-frame host engineering supports;
+those overlapping, uncalibrated supports are not known misses or independent
+false-alarm trials. The separate decisions-off control also had no multi-frame
+host positives, with 15 individual-frame engineering supports retained.
+Reports are `host-live-<rate>-10sec-v1` and
+`compare-live-<rate>-10sec-v1.json` under the evidence root (the 2.5 MS/s names
+use `v2-2500000`). This quiet observation does not establish live sensitivity
+or nonvacuous detector agreement. Hardware-qualified flags remain false.
+
+At 06:07 UTC, an independent read-only check verified the currently deployed
+25 MS/s label, serial, FIT SHA-256
+`61c05dfea20f8758e1ec250843bb9358dbbf27db4b9c0fe616df1c7399c42cb0`,
+GLR1/GLX1, AD9361, gigabit/full-duplex Ethernet, both disabled buffers and TX mute.
+All eight recorded U-Boot fields matched the original verified baseline,
+including absent `attr_name`/`attr_val`. The retained private receipt is
+`current-25000000-idle-state-v1.json`, SHA-256
+`174d3f9eab559431b7ae81720216ddfafc71d1b54fff4eaf4a17766039ab0363`.
+This is a timestamped state observation; later operations require their own
+current identity and idle checks.
