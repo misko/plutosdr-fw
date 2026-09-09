@@ -48,7 +48,10 @@ initial begin
   if(dut.waiting_valid || dut.expired_candidates!=1 || dut.busy_rejections!=1 || dut.admitted_candidates!=0 || dut.detector_halted)
    $fatal(1,"expired history reached reader or disappeared");
  end else begin
-  propose=1;start=1200;tick();propose=0;
+  propose=1;start=1200;#1;
+  if(dut.selected_start!=1200 || dut.native.candidate_start!=1000 || dut.admit)
+   $fatal(1,"rejected overflow changed the native admission head");
+  tick();propose=0;
   if(!dut.waiting_valid || dut.waiting_start!=1000 || dut.busy_rejections!=1) $fatal(1,"full queue replaced waiting work");
   resources=1;tick();
   if(dut.waiting_valid || dut.admitted_candidates!=1 || dut.detector_halted) $fatal(1,"waiting work did not recover");
