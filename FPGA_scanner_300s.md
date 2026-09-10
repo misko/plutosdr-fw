@@ -98,6 +98,11 @@ negative cases and runtime promotion remain open. Actual60 bank/native/pilot
 integration remains open. Latest
 source-specific decisions and measurements:
 [`reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md`](reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md).
+The separate60 sample-support contract is now tested:16423 raw samples map to
+4096 canonical samples, with520-sample native capture and exact pilot support.
+Its39 new tests plus unchanged30/60 golden regressions pass132 tests. This is
+coordinate preparation only, not a60 common-source numerical or hardware pass:
+[`reports/experiments/20260910-high-rate60-support-contract.md`](reports/experiments/20260910-high-rate60-support-contract.md).
 No receiver profile or radio has been changed. Completed alternative studies are preserved
 on remote do-not-merge branches. See
 [`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)
