@@ -8,6 +8,61 @@ import json
 import re
 from pathlib import Path
 
+REQUIRED_COMMON_FILES = {
+    name + ".v"
+    for name in [
+        "starlink_pss_iq_to_score_bank_owned",
+        "starlink_pss_fft_bank_owned_slice",
+        "starlink_pss_realtime_input_guard",
+        "starlink_pss_realtime_result_guard",
+        "starlink_pss_block_mailbox",
+        "starlink_pss_forward_kernel_join",
+        "starlink_pss_kernel_rom",
+        "starlink_pss_spectrum_product",
+        "starlink_pss_overlap_scheduler",
+        "starlink_pss_energy_cache",
+        "starlink_pss_ifft_qualifier",
+        "starlink_pss_raw_result_fifo",
+        "starlink_pss_energy_join",
+        "starlink_pss_score_prepare",
+        "starlink_pss_score_divider",
+        "starlink_pss_score_divider_radix4",
+        "starlink_pss_score_lanes",
+        "starlink_pss_candidate_score_path",
+    ]
+} | {
+    "simulate_iq_to_score_bank_owned.tcl",
+    "prepare_iq_to_score_bank_owned.tcl",
+    "create_shared_realtime_xfft_ip.tcl",
+    "verify_realtime_probe_result.tcl",
+    "bank_owned_iq_fault_scenarios.svh",
+    "bank_owned_iq_capacity_checks.svh",
+    "upper_edge_pss_kernel_q17.mem",
+}
+
+
+def expected_sources(mode: str) -> set[str]:
+    if mode == "capacity":
+        return REQUIRED_COMMON_FILES | {"tb_starlink_pss_iq_to_score_xfft_longrun.sv"}
+    if mode != "numeric":
+        raise ValueError("unsupported evidence mode")
+    return (
+        REQUIRED_COMMON_FILES
+        | {"tb_starlink_pss_iq_to_score_xfft.sv"}
+        | {
+            name + ".mem"
+            for name in [
+                "samples_ci16",
+                "forward_q17",
+                "product_q17",
+                "inverse_q17",
+                "forward_exponents",
+                "inverse_exponents",
+                "scores_u8",
+            ]
+        }
+    )
+
 
 def digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -51,6 +106,20 @@ def parse_run(directory: Path, mode: str, mhz: int, profile: str) -> dict:
         path.name: digest(path)
         for path in sorted((directory / "frozen_sources").iterdir())
     }
+    inventory_records = [
+        (sha, Path(path))
+        for sha, path in re.findall(
+            r"(?:^|source_hashes=)([0-9a-f]{64})  (.+)$", scope, re.MULTILINE
+        )
+        if Path(path).parent == directory / "frozen_sources"
+    ]
+    inventory_names = [path.name for _, path in inventory_records]
+    if (
+        len(inventory_names) != len(set(inventory_names))
+        or set(inventory_names) != expected_sources(mode)
+        or set(source_hashes) != set(inventory_names)
+    ):
+        raise ValueError("frozen source inventory missing, extra, or duplicated")
     for name, sha in source_hashes.items():
         if f"{sha}  {directory / 'frozen_sources' / name}" not in scope:
             raise ValueError(f"pre-simulation hash missing or changed: {name}")
@@ -193,8 +262,7 @@ def collect(build: Path) -> dict:
                     profile,
                 )
             )
-    common = set.intersection(*(set(run["frozen_source_sha256"]) for run in runs))
-    for name in common:
+    for name in REQUIRED_COMMON_FILES:
         if len({run["frozen_source_sha256"][name] for run in runs}) != 1:
             raise ValueError(
                 f"different source across final clock/profile runs: {name}"

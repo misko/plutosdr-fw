@@ -129,9 +129,11 @@ adaptation supplies a fatal message and final postprocessing rejects explicit
 FAIL/FAULT lines even if followed by PASS. Every verifier call requires a
 nonempty, unique, exact terminal marker and complete row inventory.
 
-Root independently supplied 43 admission/adaptation/runner-policy tests; 14 new
-portable receipt tests and the preceding 19 slice/budget tests also pass: **76
-tests**, plus Ruff on the new Python files. These unit tests do not add arithmetic
+Root independently supplied 43 admission/adaptation/runner-policy tests; 16 new
+portable receipt tests and the preceding 19 slice/budget tests also pass: **78
+tests**, plus Ruff on the new Python files. The collector rejects missing/extra
+frozen files against both the pre-run hash inventory and explicit runtime source
+inventory, in addition to altered contents. These unit tests do not add arithmetic
 or physical evidence. Handwritten files are additive; the immutable kernel/vector
 files and all prior production/default modules are unchanged.
 
