@@ -11,8 +11,12 @@ this is not routed receiver area or timing qualification. Paired digital PSS/PIL
 replay now passes both reduced geometries at bank175/bank200/shared200 with exact
 independent pilot bytes. Eight separate bank-map fault/reset/re-enable cases pass.
 The latest isolated preflight-separated route still fails at -2.438 ns; it is
-not promoted. A held-phase active-input selection refinement is being tested, and
-the original 4,096-block soak is still running. No receiver profile or radio has
+not promoted. Held-phase input selection now passes both actual-core modes;
+a separately opt-in balanced full-identity comparator is next, before another
+physical measurement. Generated175 MMCM active-traffic reset/recovery also passes
+an independent primary replay with 7,853 exact accepted scores. The original
+4,096-block soak is still running; full production-map verification is being
+implemented in its own worktree. No receiver profile or radio has
 been changed. Completed alternative studies are preserved
 on remote do-not-merge branches. See
 [`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)

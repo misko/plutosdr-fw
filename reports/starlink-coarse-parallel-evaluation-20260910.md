@@ -41,21 +41,47 @@ one isolated outlier. Physical evidence is separately frozen at FW `091d0e663`
 / HDL `691966ae`, with no design-RTL change. Root verified its report and full
 checksums. The worst path moved to state-dependent input selection through the
 active input guard's full metadata equality into admission. An explicit held-
-phase delivery tuple is the next test-only/default-preserving experiment;
-per-beat identity/framing/delivery fault checks remain required on their edge.
+phase delivery tuple now passes both actual175 modes, frozen at FW `1530939f`
+/ HDL `3c5c3aba` (tested RTL `d99c251e`). Root reviewed the exact tuple-only
+delta, old-mux checker witness and full evidence checksums; its two strict
+source tests independently pass. Both modes cover12 actual-bank corruption
+cases, two open-slot QUARANTINE cases and two one-sided-reset recoveries.
+The registered84-row preflight suite remains intact. These pins are backed up
+on the completed-input-fence remote branch, not promoted to primary. The next
+separate default-off comparator experiment retains all70 identity bits and
+same-edge certification/reasons with balanced equality leaves. No held-phase
+or comparator physical result is claimed yet.
 
 A separate active-clock verification worktree now exists at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch
 `codex/starlink-rx-only-do-not-merge-clock-traffic` in FW/HDL, starting FW
-`135769292` / HDL `dbe744c0`. It will exercise the actual generated175 MMCM with
-complete coarse traffic and active reset/recovery, not change receiver clocks.
+`135769292` / HDL `dbe744c0`. It completed at FW `704f58b2` / HDL `7d4d6d8c`:
+five exact full replays and four active reset cases with actual generated175
+MMCM and complete coarse traffic. Root verified all124 hash receipts, merged
+only additive tests/evidence, and independently replayed the merged source at
+02:55:46 UTC: 7,853 accepted exact scores, 10,752 forward/product and9,985 inverse
+words. No receiver clock wiring changed. See
+`experiments/20260910-bank-clock-traffic-primary-replay.md`.
 The root independently completed a read-only exact-bank CDC inventory of the
 earlier complete-coarse DCP; see `experiments/20260910-bank-cdc-inventory.md`.
 No CDC exceptions were added and no physical pass is claimed.
 
 The original 4,096-block175 burst/stall soak remains active; its latest agent
-observation reached 1,554 blocks/694,638 ordered scores with FIFO maximum358 and
+observation at02:52:37 UTC reached2,417 blocks/1,080,399 ordered scores with FIFO maximum358 and
 no observed error. That partial count is not a terminal capacity PASS.
+
+A new independent FW/HDL worktree at
+`/tmp/starlink-coarse-alternatives.Y3JzOI/production-map`, branch
+`codex/starlink-rx-only-do-not-merge-production-map`, starts at FW `ad6dfbb79`
+/ HDL `6ae9c302`. Its bounded task is a compact independent18-bit C-model
+oracle and actual-bank production20000x64 map verification, with unchanged
+runtime/geometry and full numerical/tail/stop/retention checks. A447-sample
+periodic synthetic source makes the oracle compact; it is arithmetic and map
+geometry stress, not RF or750 Hz acquisition evidence. The full1,280,000 selected
+scores must be distinguished from the supporting2,864 FFT blocks and208 potential
+tail scores. Root must review frozen expectations and a reduced wiring smoke
+before the long production simulation is launched. No runtime/profile/radio or
+physical-build work is delegated to that task.
 
 An additional independent verification worktree was allocated after the
 read-only map integration review: `/tmp/starlink-coarse-alternatives.Y3JzOI/bank-map-lifecycle`,

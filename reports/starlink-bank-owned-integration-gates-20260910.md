@@ -93,10 +93,13 @@ The current FFT clock also supplies AD9361's200MHz delay reference. A175MHz
 experiment needs a separate source, not a changed FCLK1. An actual candidate
 MMCM configuration has been generated and simulated with the actual idle bank;
 see `experiments/20260910-bank-island-clock-generation.md` and
-`experiments/20260910-bank-clock-epoch.md`. Three reset epochs and the nominal
-175 MHz period pass, but no active-data or receiver physical qualification is
-claimed. Its active-traffic lock/reset and new exact bank-CDC endpoint contracts
-are additional full-integration gates.
+`experiments/20260910-bank-clock-epoch.md`. Active complete-coarse traffic now
+also passes five exact replays and four reset cases, independently repeated on
+primary: 7,853 accepted scores and all accepted transform words checked, including
+failed prefixes. See `experiments/20260910-bank-clock-traffic-primary-replay.md`.
+The testbench's LOCKED/reset wiring is not yet a receiver connection. Input-clock
+loss, arbitrary reset phases, physical recovery/removal and receiver integration
+remain open; these finite functional tests do not close those gates.
 
 The read-only complete-coarse checkpoint inventory now identifies all208
 surviving held-metadata destinations, six ownership chains, two fault chains
