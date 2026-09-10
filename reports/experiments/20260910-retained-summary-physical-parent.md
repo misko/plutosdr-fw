@@ -86,6 +86,17 @@ rejected. No next RTL candidate is accepted by this report.
 
 ## Evidence and publication
 
+Physical evidence is now published and remote-verified at FW
+`399b84b547d49020e479b60da85573f728a01235` on the existing bank-arithmetic DNM
+branch. Parent independently verified all7598 regular archive members from Git
+objects:30,913,549bytes, SHA256
+`559d2fe553db424fee5b8748008799479bab1d2855e57061734d2f63943f4303`.
+The77 symlink aliases are recorded separately, not followed. The first archive
+attempt hit a /tmp quota; its partial file and traceback are retained in recovery.
+Publication used a separate recovery-filesystem worktree. Original /tmp physical
+source HEAD remains`f372dfa856ff8a47416653a97563fff424a6e070`; its HDL pin is
+unchanged. No raw evidence was deleted. Root audit is`pcs0TXoZ/physical.json`.
+
 Under `/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz`:
 
 - `retained-summary-synth-parent.39BysdkS`: independent77, full source snapshots,

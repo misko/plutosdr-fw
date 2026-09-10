@@ -4,6 +4,14 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+The next default-off bank-local identity candidate passes independent comparison
+probes and the complete seven-context scripted replay in modes0/1: all77953 CSV
+rows and complete prior results match,122 pins unchanged. It moves source/product
+metadata comparisons before phase selection while retaining exact X/Z fallback.
+Clocked adversarial qualification and new actual/physical evaluation are pending;
+the last measured route remains-2.504ns below.
+See [bank-local candidate checks and remaining gates](reports/experiments/20260910-bank-local-identity-parent.md).
+
 The offered-summary candidate now completes source-matched synthesis and route,
 but timing still FAILS: **WNS-2.504ns**,TNS-829.822ns,679 failing setup endpoints.
 This improves from-2.697ns/848 endpoints, without closing timing. Hold+0.049ns
