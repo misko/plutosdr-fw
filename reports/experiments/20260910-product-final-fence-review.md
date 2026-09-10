@@ -311,3 +311,17 @@ Parent read-only synthesis audit script and result are archived as
 `6d41bf6f6cf70d3ff9bf1a2645a33a93fa826f18f7ff81b9f854284ea6881c6f`.
 The archive compares to its originals. This compact audit is separate from the
 owner's full source/DCP/report archive.
+
+### Published synthesis/preparation closure and routed outcome
+
+Parent independently verifies committed synthesis archive77 payloads/78 tracked
+files at HDL `57322987e9e188dcd20a6cc2cac0a3f6b6404a93`, manifest
+`274168fd85afb13f9ebf800daffb0e59652c40ee258411cf377d0e5ccdf2c010`.
+Preparation archive outer closure verifies4 payloads/5 tracked files at HDL
+`fc37b96b8bffba00104d2f24ff3cfb17acd96981`, manifest
+`2cac021ac69f2de5ec82d9ff659896d97787e8f355632d570f218309ef6fedf6`.
+The owner separately verified its504 inner payloads; parent does not relabel
+that as an independent inner audit.
+
+The approved route63593 subsequently completed but FAILS timing, -1.492ns.
+No promotion: see [complete failed-route record](20260910-product-final-route.md).

@@ -2,6 +2,16 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest physical result (2026-09-10, after15:29 UTC): the P1 product-publication
+trial's route completed but **TIMING FAILS**, WNS-1.492ns/TNS-441.681,
+591 failing endpoints, hold+0.058ns. This is0.132ns worse than the ROM route.
+All6916 nets routed with zero errors, but no promotion/deployment follows.
+Parent independently verified all15 products and the committed full archive.
+Next is a source-specific staged product-validation design, addressing both
+metadata-write and input-identity fault/control paths; the inverse-bank actual
+preparation continues separately. See
+[failed route and next boundary](reports/experiments/20260910-product-final-route.md).
+
 Synthesis checkpoint (2026-09-10, after15:24 UTC): original75133 PASSES the
 source-pinned product-final OOC synthesis,2064 LUTs/4607 FFs/21 DSPs/15 RAMB18s,
 zero black boxes. Parent independently verified complete actual-source binding,
