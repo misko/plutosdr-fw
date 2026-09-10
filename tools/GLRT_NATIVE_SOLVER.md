@@ -98,3 +98,48 @@ counter sums; envelope failures leave no partial output. The port also compiles
 with the target Cortex-A9 hard-float compiler and `-Wall -Wextra -Werror`.
 This is a tested port for the future radio-local runtime, not a deployed
 feedback loop or an end-to-end I/O benchmark.
+
+## Finite causal trend core
+
+`glrt_native_trend.c/.h` is the allocation-free development predictor around
+the associated solver. Its input frame ordinal must come from the retained
+descriptor history across batches; the GLS1 packet's repeat field resets at
+each batch and cannot serve as that ordinal. The runtime must retain that
+mapping with each submission. Source epoch, sequence and payload association
+are checked by the port before an observation enters this core.
+
+The core fits timing offsets and received CFO against frame ordinal using only
+supported observations in the preceding 96 frame positions (about 128 ms).
+Eight supported points are required. Integer source coordinates are subtracted
+before conversion to double, preserving fractional timing at large indexes.
+The two fitted slopes set the repeat period and carrier-step delta. CFO rate
+uses the fitted period before scheduling quantization. The output descriptor
+uses Q16 timing/period, modulo-48 carrier phase steps, exact full-pilot expiry,
+and at most 32 future frames beyond the last supported observation (about
+42.7 ms). The finite horizon includes the batch's last repeat. Predictions
+cannot start at or before the last observed frame, even if that observation
+was rejected. Producing a descriptor has no state or submission side effect.
+
+Rejected local fits do not enter the regression. Faulted/incomplete source
+support, epoch changes, malformed values and out-of-order frames fence the
+trend until explicit reset and fresh acquisition. Old observations age out
+after 96 frame positions, including through losses. A source epoch is bounded
+to 1,350,000 frame positions (30 minutes at the nominal cadence). These are
+development controller limits, not new scientific acceptance criteria.
+
+`native-radio-trend-v3.xml` passes **40 tests** against independent least squares
+and analytic timing/carrier ramps, including both rate signs, both timing-drift
+signs, positive/negative/zero-centered CFO, large indexes, rejected controls,
+warmup, horizon/expiry, loss ageing, immutable prior descriptors and source
+fences. An earlier test exposed that the reported CFO rate used the quantized
+period; the implementation now reports the unquantized fitted slope. The
+previous failed receipt is retained. The core compiles with the Cortex-A9
+hard-float compiler and all warnings treated as errors.
+
+This tests prediction from supplied estimates. It does **not** establish an
+acquired, closed-loop precision result. Integration still needs workstation
+bootstrap, a retained global-frame mapping, radio-local sysfs reads/writes,
+deadlines checked against the live native index, durable head retention before
+POP, finite active/pending schedule ownership, and measured I/O/jitter. The
+existing native-IQ and real 25 MS/s qualification gates remain required; these
+unit tests do not replace them.
