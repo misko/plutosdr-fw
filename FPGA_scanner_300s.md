@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest actual frame finding (2026-09-10): independent180 preparation tests PASS;
+the two-site logger fix preserves all77953 scripted CSV rows exactly. Actual
+vendor25461 passes the former logger crash, then stops on a testbench frame
+ordinal assumption at cycle942. Physical inputs arrive939/941/942; the event
+means internal frame processing, not first AXI acceptance. A documented causal
+per-job event ledger is next, retaining all numeric/service/ownership gates.
+See [logger verification and frame-contract finding](reports/experiments/20260910-retained-logger-parent.md).
+
 Latest logger isolation (2026-09-10): parent runs12 tiny actual XSim cases.
 All four conditional-string calls kernel-crash; all eight literal/explicit-if
 cases emit exact expected rows. No FFT/runtime is involved. Parent also proves
