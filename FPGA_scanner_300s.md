@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest sampled-READY boundary (2026-09-10): parent verifies corrected additive
+issuer rejects private writes when sampled READY is high but advertised capacity
+is low during a natural mixed-reason-Q interval. A one-line lost-capacity-check
+mutant fails the same independent probe. This is an invalid-caller primitive
+test, not demonstrated real-top reachability. Full new-seam regression and
+actual-FFT preparation remain in progress; no routing or radio promotion.
+See [sampled-READY parent review](reports/experiments/20260910-sampled-ready-parent-review.md).
+
 Latest retained-output gate (2026-09-10): parent independently repeats415
 offline tests with exact-original clock precision; all46 sources remain pinned.
 Separate403-simulation receipt audit and stricter typed5893-node/69LS graph
