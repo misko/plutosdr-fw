@@ -2,12 +2,17 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
-Latest measured increment: the standalone native60 public-wrapper simulation
-now passes all520 captured samples,257 raw hypotheses/241 qualified tuples and
-two26-word packet reads. Full drain takes74642 control cycles (746.42us at the
-simulated100MHz clock) after final capture, within the unchanged84000 limit.
-Parent independently verified575 preparation/numerical tests and all246 archived
-run files. This is one static-known-center job, not paired60 coarse/pilot or RF.
+Latest measured increment: the first combined60 common-source coarse/native/
+pilot vendor-FFT simulation now passes (original5432 terminal0). It checks894
+exact coarse scores/447 retained map words,520 native captured samples,257 raw
+hypotheses/241 qualified tuples, two26-word public packet reads and512 independent
+pilot CI16 words. Native full drain takes74641 control cycles (746.41us at the
+simulated100MHz clock), within the unchanged84000 limit. Parent independently
+ran the frozen result verifier, rehashed both250-file input bundles and checked
+generated-IP before/after identity. Actual own-clock FFT/capture overlap is245
+transfers. This is one static-known-center ideal-clock simulation with a declared
+startup pause and13312 continuous60 samples, not causal acquisition,750-frame/s,
+production-map, physical60, IIO-throughput or RF qualification.
 The exact111 control candidate synthesized with zero black boxes and completed
 its diagnostic route, but timing FAILS: island175 setup -1.761 ns, global setup
 -1.862 ns, hold +0.071 ns. Distributed-fault CDC-10, other crossings, reset
@@ -43,8 +48,10 @@ reviewed sources/evidence are pushed to their respective experimental DNM
 branches, not firmware main. The60 public bank/STOP/pilot interface independently
 passes660 tests; its combined common-source coarse/native/pilot harness passes311
 independent preparation/verifier tests under a frozen no-tail numerical/service
-contract. Full source review remains in progress; no combined60 vendor run or
-radio operation follows from the offline test counts.
+contract. Full source review and frozen108-source/250-file verification now
+pass; the first healthy common-source60 vendor-FFT simulation now PASSES
+(original5432 terminal0), independently verified above. This bounded447x2/static-known-center test is not a causal,
+750-frame/s, full-map, physical or radio qualification.
 An additional isolated ROM read-ahead/last-visible-retention prototype passes149
 offline tests, including continuous512-beat traffic; it adds37 logical bits at
 D18 and no nominal cycles. All old visible coefficient/control fields compare

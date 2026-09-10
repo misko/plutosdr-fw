@@ -1615,3 +1615,105 @@ parameter-fixture elaboration attempt and subsequent27PASS are preserved.
 This extends standalone coverage, not the earlier149 combined-test claim or
 actual FFT/physical qualification. Full details in the isolated ROM branch's
 `docs/starlink-rom-active-boundaries-20260910.md`.
+
+## First paired60 actual launch approved after complete source review
+
+Parent completed review of the final206-line result verifier,93-line vector
+preparer,222-line bundle helper,91-line Tcl runner, CLI, all579 lines of three
+new test files and final preparation report. The268-line top and178/134/65-line
+source/FFT/clock includes had already been read. The original native verifier's
+complete-function AST projection retains every inner numerical/service check;
+only eight enumerated outer-context changes admit paired receipts. Nine singleton
+paired markers plus512 pilot-word lines require exactly521, independently of
+the60 native-component markers. The full bench checks every emitted FFT/filter
+prefix, not just summarized counts. The311 independently repeated offline tests
+remain preparation, compile-only and verifier evidence, not actual simulation.
+
+Parent ran the frozen snapshot CLI from `/`: bundle
+b5f7d48a96217691d7a034634d3bdc7006e489066e571d93b00ce2ed5f741714 PASS,
+source signature26f33d8727828eabd56d24466984168be3bdc52fc5e0166ba8ffe94f0e89b8e8.
+All108 live source hashes match the frozen source. Committed archive at
+FWb47c355b08cf66af126f173093cf90b4928fca99 was independently verified:334 safe
+regular members,333 exact member hashes/lengths plus embedded receipt; archive
+60980bcc984b4c4b396de4429d95cb79d4b62d2a52b291552d402316af7f8f20.
+HDL88195cd9029a0c66f642fe21045ff70053fc46de and FWb47c355 are now root-pushed
+to the high-rate60-paired DNM remote branch.
+
+One exact healthy60upper/ideal100-175/native264/PIL1/447x2 actual run is authorized.
+Frozen runner c8233d7200a7dbbefe1ac5644350101ebc70784151095cfb3166e290cbaa471d
+uses reviewed2022.2/SuSE environment, two threads, explicit repository Python
+and log/journal arguments before Tclargs. Agent owns original5432; new run
+`/tmp/starlink-bank-route.I50MDJ/main-high-rate60-bank175-447-v1` and separate
+`main-high-rate60-bank175-447-v1-owner`. All output/owner/external log/journal
+paths were checked absent. Require original process terminal, immutable external
+bundle and copied inputs, generated-IP before/after hashes, full strict result
+verification even when compilation/simulation fails. No retries or source edits.
+
+Acceptance retains the original69 golden files,264 taps/520 native capture,
+257 raw/241 qualified tuples, full public52-word repeated readout and full drain,
+both exact decimator ledgers,512 pilot CI16 words and actual overlap. The original
+16423 samples include an explicitly declared startup pause; only the subsequent
+13312-sample segment is wall-clock continuous60. No added tail, causal acquisition,
+production20k maps,750 measurement/s, DMA/IIO throughput, physical60 or RF claim.
+
+## Local startup diagnosis: proposed scheduling proof, no waiver
+
+Read-only field decode narrows the14041 diagnostic difference to mixed-X nibbles
+103:100 and3:0. A sufficient source-based hypothesis is actual core_input_tready0
+while the observer's copied input remainsX during time-zero alias propagation.
+The hexadecimal log cannot identify each differing bit or exclude a real state
+difference. No proprietary WDB loader was invoked and no benignity claim follows.
+An offline bounded hierarchy/scheduling reproduction is authorized, including an
+original-RTL-as-DUT control and true pre-NBA/current-fault/reset corruption tests.
+Proposed #0 before PRE comparisons would settle Active-region combinational
+aliases without advancing time or intentionally skipping NBA state; it must be
+demonstrated before adopting any observer change. Every clock/reset event,155
+bits and existing1ps POST observation must remain. No new vendor run authorized.
+
+## Paired60 actual PASS, independently verified without rerunning simulation
+
+Original5432 terminal0. Genuine HIGH_RATE60_PASS and unchanged frozen result gate
+HIGH_RATE60_SIMULATION_VERIFIED; run_tcl_exit0/integrity_exit0 and terminal receipt
+present. Parent independently reran the frozen snapshot CLI's result mode from
+`/`, terminal0, and obtained the same complete result as the original receipt.
+Both original and copied250-file bundles match b5f7d48a... with no missing/extra
+files; generated vendor wrapper still matches its recorded pre-run SHA
+a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68.
+Standard Wavedata display warnings are retained in outer Vivado output, not the
+actual simulate.log; the existing strict warning/failure rejection passed
+unchanged. No parser correction, source change or retry was needed.
+
+Measured exact prefixes:894 visible/admitted scores and447 map words;
+1536 forward-input/forward/product/inverse-input words and1024 inverse outputs;
+894 numerator/ratio preparations. Both independent decimator ledgers agree:
+14518 enabled raw inputs→7251 first-stage outputs/7250 second-stage admissions
+→3618 canonical outputs. Pilot3617 admissions/mixed,1808 halfband outputs,
+602 full outputs,512 selected/exported CI16 words/2048 bytes with exact indexes.
+These are bounded prefix counts, not all seven frozen golden FFT blocks.
+
+Native admission at index34359738591, lead1664, controlcycle10678 versus
+trigger10625. Snapshot capture10627/return10639, captured34359738559,
+capturelag2/returnlag9. All520 capture coordinates and264 coefficients feed
+exact257 raw/241 qualified results;52 public packet-word reads match twice.
+Capture ends14318, publication86814, publicrelease87604, finalrawdrain88959:
+72496/73286/74641 cycles after capture respectively (724.96/732.86/746.41us
+at simulated100MHz). All257 results are required even though publication occurs
+after249; maximum tuple hold11, AXI8,105 readout transactions.
+
+Actual FFT-input handshakes during native capture245; native compute overlapping
+coarse/pilot5671 cycles and after STOP67405 cycles. Source off32415 after16423
+original plus2 prime samples, native still busy;56544 compute cycles follow
+source-off. Map retention survives native release, both public releases occur
+after source-off, and final256 quiet cycles end89576 with no stale result.
+STOP occurs after9908 total source samples, while independent pilot/native work
+continues. This establishes healthy digital composition, not deployment:
+known center, ideal clocks/direct AXI,447x2 reduced map and declared startup pause.
+Routing/CDC/I/O closure, causal scheduling, full production service, host IIO and
+actual60 RX calibration remain open. No radio was accessed or changed.
+
+Publication check also completed for local-admission history at FW
+a3c691ffc12a10c3742c40f118e9cf391c167c1f: root directly verified6662 preparation,
+179 original22656 failure,2574 diagnostic-correction and184 original14041 failure
+archive members from Git objects (first archive reconstructed from two exact
+parts). All lengths/hashes/exact safe member sets match; all failures retained.
+Reviewed FW/HDLe0e075d are pushed to the bank-arithmetic DNM remote.
