@@ -126,10 +126,13 @@ def test_all_750_hz_opportunities_two_prefilled_batches_and_exact_fractional_pre
 
 def test_busy_capacity_and_late_opportunities_are_counted_and_do_not_rebase_future_jobs(tmp_path):
     first = 1_000_000
-    rows = [config(9,first),WAIT,WAIT,
-        tick(first-512,ready=False),tick(first-63,ready=False),
-        tick(first+80000-512,space=False),tick(first+80000-63,space=False),
-        tick(first+160000),tick(first+240000-64)]
+    # Keep each opportunity's resource state through its preparation. These
+    # traces jump 80,000 sample indices between repeats; hardware has >130,000
+    # clocks there. Exact due/minimum boundaries remain unchanged.
+    rows = [config(9,first)] + [WAIT]*6 + [
+        tick(first-512,ready=False),tick(first-63,ready=False)] + [WAIT]*5 + [
+        tick(first+80000-512,space=False),tick(first+80000-63,space=False)] + [WAIT]*5 + [
+        tick(first+160000)] + [WAIT]*5 + [tick(first+240000-64)]
     result = simulate(tmp_path, rows)
     assert [row[-1] for row in result["D"]] == [3,2,1,0]
     assert result["J"] == [(9,3,first+240000,0xfffffff9,0)]
@@ -140,7 +143,7 @@ def test_busy_capacity_and_late_opportunities_are_counted_and_do_not_rebase_futu
 def test_all_remaining_predictions_are_fenced_with_complete_accounting(tmp_path, cause):
     first = 1_000_000 if cause!="overflow" else 2**64-100000
     end = first+79200 if cause=="expiry" else 2**64-1
-    rows = [config(1,first,expires=end),WAIT,WAIT]
+    rows = [config(1,first,expires=end)] + [WAIT]*6
     if cause in ("cancel","source"):
         rows += [config(2,first+320000),WAIT]
     rows += [tick(first-512),WAIT]
@@ -162,3 +165,46 @@ def test_invalid_descriptor_does_not_create_a_schedule(tmp_path, changes):
     assert result["R"] == [()]
     assert result["J"] == []
     assert result["S"] == [(0,0,0,0,0,0,0,0)]
+
+
+@pytest.mark.parametrize("lead,admitted", [(512,1),(64,1),(63,0)])
+def test_prepared_descriptor_uses_current_sample_at_exact_admission_boundary(tmp_path, lead, admitted):
+    first = 1_000_000
+    result = simulate(tmp_path, [config(1,first,count=1)] + [WAIT]*6 + [tick(first-lead)])
+    assert len(result["J"]) == admitted
+    assert result["S"] == [(1,admitted,1-admitted,0,0,0,0,0)]
+
+
+@pytest.mark.parametrize("clocks", [0,1,2,3,4])
+@pytest.mark.parametrize("cause", ["cancel","source"])
+def test_cancellation_during_preparation_never_leaks_a_later_job(tmp_path, clocks, cause):
+    rows = [config(1,1000,count=3)] + [WAIT]*clocks
+    rows += [CANCEL if cause=="cancel" else tick(600,good=False)] + [WAIT]*6
+    rows += [tick(80000)] + [WAIT]*6
+    result = simulate(tmp_path, rows)
+    assert result["J"] == []
+    assert result["S"] == [(3,0,0,0,3 if cause=="source" else 0,0,
+                           3 if cause=="cancel" else 0,0)]
+
+
+def test_time_can_cross_deadline_during_preparation_without_late_admission(tmp_path):
+    rows = [tick(1000-67),config(1,1000,count=1)]
+    rows += [tick(index) for index in range(1000-66,1000-58)]
+    result = simulate(tmp_path, rows)
+    assert result["J"] == []
+    assert result["S"] == [(1,0,1,0,0,0,0,0)]
+
+
+@pytest.mark.parametrize("start,fraction,expiry,admitted", [
+    (2**32-1,32768,2**32+79200-1,1),
+    (2**32-1,32768,2**32+79200-2,0),
+    (2**64-1,32768,2**64-1,0),
+    (2**64-79200,0,2**64-1,1),
+    (2**64-79200+1,0,2**64-1,0),
+])
+def test_prepared_rounding_and_pilot_end_preserve_carries_and_expiry(
+        tmp_path, start, fraction, expiry, admitted):
+    result = simulate(tmp_path, [config(1,start,fraction=fraction,count=1,expires=expiry)] +
+                      [WAIT]*6 + [tick(round(Fraction(start*65536+fraction,65536))-512)])
+    assert len(result["J"]) == admitted
+    assert result["S"] == [(1,admitted,0,0,0,1-admitted,0,0)]
