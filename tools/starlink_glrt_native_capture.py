@@ -104,7 +104,7 @@ def validate_request(args):
         raise ValueError("native scheduling lead is outside driver bounds")
 
 
-def collect(args, *, library=None, context_factory=Context):
+def collect(args, *, library=None, context_factory=Context, clock_ns=time.monotonic_ns):
     validate_request(args)
     base_abi = getattr(args, "base_abi", BASE_ABIS[0])
     args.output.mkdir(parents=True, exist_ok=False)
@@ -112,6 +112,13 @@ def collect(args, *, library=None, context_factory=Context):
     deadline = started+60
     protocol = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     exact_start = getattr(args, "start_sample", None)
+    milestones = []
+
+    def mark(stage):
+        if exact_start is not None:
+            milestones.append({"stage": stage, "monotonic_ns": str(clock_ns())})
+
+    mark("request_preparation")
     if exact_start is None:
         protocol.pop("start_sample", None)
     files = [Path(__file__), Path(__file__).with_name("starlink_glrt_native_abi.py"),
@@ -131,7 +138,9 @@ def collect(args, *, library=None, context_factory=Context):
     before = after = None
     try:
         api = library or Library(args.libiio)
+        mark("context_open_begin")
         context = context_factory(api, args.uri, args.serial, args.firmware_version, timeout_ms=2000)
+        mark("context_open_end")
         save(args.output/"identity.json", dict(context.attributes))
         before = radio_state(context)
         if (before["sample_rate_hz"] != RATE or before["tx_powerdown"] != 1 or
@@ -142,11 +151,13 @@ def collect(args, *, library=None, context_factory=Context):
             raise ValueError("native capture requires the default receiver and GLN1 driver")
         driver_validated = True
         device.scan(count=2, bits=16, signed=True)
+        mark("radio_and_driver_verified")
         for index in range(args.jobs):
             if time.monotonic()+5 >= deadline:
                 raise TimeoutError("bounded native campaign has insufficient time for another job")
             root = args.output/f"job-{index}"
             root.mkdir()
+            mark("configuration_begin")
             configuration = [("native_capture_tag", args.tag+index),
                     ("native_capture_phase_seed", args.phase_seed), ("native_capture_phase_step", args.phase_step),
                     ("native_capture_lead_samples", args.lead_samples)]
@@ -161,10 +172,14 @@ def collect(args, *, library=None, context_factory=Context):
                 raise ValueError("native buffer ABI did not switch")
             # One complete native observation per descriptor; the second
             # queued descriptor remains empty and is canceled at teardown.
+            mark("buffer_open_begin")
             buffer = device.buffer(SAMPLES, 2)
+            mark("buffer_open_end")
             raw = buffer.refill()
+            mark("iq_received")
             (root/"iq.ci16").write_bytes(raw)
             text, result, payload = wait_result(device, deadline=min(deadline, time.monotonic()+3))
+            mark("result_received")
             (root/"result.txt").write_text(text+"\n")
             (root/"result.raw").write_bytes(payload)
             # The kernel checks the result start against its locally scheduled
@@ -179,6 +194,7 @@ def collect(args, *, library=None, context_factory=Context):
                 raise ValueError("native result differs from the requested exact start")
             buffer.close()
             buffer = None
+            mark("buffer_closed")
             wait_default(device, deadline=min(deadline, time.monotonic()+3), base_abi=base_abi)
             status = device.read("native_capture_status")
             (root/"final-status.txt").write_text(status+"\n")
@@ -222,6 +238,13 @@ def collect(args, *, library=None, context_factory=Context):
                 context.close()
             except (OSError, ValueError, RuntimeError) as error:
                 failures.append(f"context cleanup: {type(error).__name__}: {error}")
+    if exact_start is not None:
+        mark("cleanup_finished")
+        save(args.output/"timing.json", dict(schema="starlink-gln1-native-host-timing/v1",
+            clock="host_monotonic_ns", milestones=milestones,
+            scope="host collector calls; buffer open includes local DMA setup and native admission",
+            hardware_admission_timestamp_measured=False, source_continuity_verified=False,
+            acquisition_verified=False))
     summary = {"status": "failed" if failures else "transport_pass", "jobs": jobs, "failures": failures,
         "radio_before": before, "radio_after": after, "elapsed_seconds": time.monotonic()-started,
         "precision_qualified": False, "arithmetic_replay_required": True}

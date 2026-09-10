@@ -205,6 +205,32 @@ def test_exact_start_is_preserved_and_never_replaced_by_relative_capture(tmp_pat
     assert fake.values["native_capture_enable"] == "0"
 
 
+@pytest.mark.parametrize("fault", [None, "open", "timeout", "start"])
+def test_exact_capture_retains_host_timing_on_success_and_failure(tmp_path, fault):
+    args = arguments(tmp_path)
+    args.jobs, args.start_sample = 1, 2**55+12345
+    fake = Fake(fault)
+    # Host clock values also stay lossless above JSON's exact number range.
+    ticks = iter(range(2**55, 2**55+10000, 100))
+    summary = collect(args, library=fake, context_factory=fake.context,
+                      clock_ns=lambda: next(ticks))
+    timing = json.loads((args.output/"timing.json").read_text())
+    assert timing["schema"] == "starlink-gln1-native-host-timing/v1"
+    assert timing["clock"] == "host_monotonic_ns"
+    marks = timing["milestones"]
+    assert all(type(row["monotonic_ns"]) is str for row in marks)
+    values = [int(row["monotonic_ns"]) for row in marks]
+    assert values == list(range(2**55, 2**55+100*len(marks), 100))
+    stages = [row["stage"] for row in marks]
+    assert stages[0] == "request_preparation" and stages[-1] == "cleanup_finished"
+    assert "buffer_open_begin" in stages
+    assert ("buffer_open_end" in stages) == (fault != "open")
+    assert ("iq_received" in stages) == (fault not in ("open", "timeout"))
+    assert summary["status"] == ("failed" if fault else "transport_pass")
+    assert timing["hardware_admission_timestamp_measured"] is False
+    assert timing["source_continuity_verified"] is False and timing["acquisition_verified"] is False
+
+
 @pytest.mark.parametrize("start,jobs", [(0, 1), (-1, 1), (2**64-SAMPLES+1, 1),
                                       (12345, 2), (True, 1)])
 def test_bad_exact_start_is_rejected_before_access(tmp_path, start, jobs):
@@ -223,6 +249,7 @@ def test_no_exact_start_preserves_published_bringup_protocol(tmp_path):
     protocol = json.loads((args.output/"protocol.json").read_text())
     assert protocol["schema"] == "starlink-gln1-native-bringup/v1"
     assert "start_sample" not in protocol
+    assert not (args.output/"timing.json").exists()
     assert not any(row[:2] == ("write", "native_capture_start_sample") for row in fake.events)
 
 

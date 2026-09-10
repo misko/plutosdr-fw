@@ -52,3 +52,25 @@ def test_three_scheduled_pilots_through_real_axi_head_reads(captures, tmp_path):
     regs = dict(reads)
     assert all(regs[a] == 0 for a in (0x410, 0x430, 0x438, 0xa00, 0x810, 0x10))
     assert regs[0] == 0x474c4631 and regs[0x68] == 7
+
+
+def test_coarse_clear_invalidates_idle_schedule_epoch_even_with_continuous_adc(captures, tmp_path):
+    # A rebased, empty scheduler cannot serve as a continuity witness across
+    # GLR CLEAR: CLEAR resets source_seen although the ADC counter continues.
+    # The native-IQ handoff must retain this distinction from a physical gap.
+    snap = [write(0x808, 8), *(read(a) for a in range(0x900, 0x950, 4))]
+    rows = [(0, 11, 0, 3, 0), write(8, 4), wait(2000),
+        write(0x20, 31), write(0x30, 128), write(8, 1), wait(12000),
+        write(8, 2), wait(500), write(0x808, 16), *snap,
+        write(8, 4), wait(500), *snap, write(0x808, 4), wait(100), read(0x810)]
+    output, reads, final = run(captures(60000000, continuous=True, native=True,
+        legacy=False, schedule=True), rows, tmp_path)
+    words = [value for address, value in reads if 0x900 <= address < 0x950]
+    before, after = words[:20], words[20:]
+    assert len(words) == 40 and len(output) == 128
+    assert before[2] == after[2] == 1
+    assert before[5] & 16 and before[6] == 0
+    assert not after[5] & 16 and after[6] == 8
+    assert before[18:] == after[18:] == [0, 0]
+    assert (after[3] | after[4] << 32) > (before[3] | before[4] << 32)
+    assert dict(reads)[0x810] == 0 and final == (0, 0)

@@ -123,6 +123,30 @@ def test_coarse_only_capture_retains_live_origin_and_final_iq_without_event_clai
     assert not (a.output/"events.raw").exists()
 
 
+@pytest.mark.parametrize("fault", [None, "open", "refill", "close", "closure"])
+def test_coarse_timing_preserves_completed_stages_without_claiming_hardware_edges(tmp_path, fault):
+    fake = Fake(fault)
+    a = args(tmp_path)
+    ticks = iter(range(2**55, 2**55+10000, 100))
+    result = collect(a, library=fake, context_factory=fake.context,
+                     clock_ns=lambda: next(ticks))
+    timing = json.loads((a.output/"timing.json").read_text())
+    assert timing["schema"] == "starlink-glrt-lean-host-timing/v1"
+    marks = timing["milestones"]
+    assert all(type(row["monotonic_ns"]) is str for row in marks)
+    assert [int(row["monotonic_ns"]) for row in marks] == list(
+        range(2**55, 2**55+100*len(marks), 100))
+    stages = [row["stage"] for row in marks]
+    assert stages[0] == "request_preparation" and stages[-1] == "attestation_finished"
+    assert ("buffer_open_end" in stages) == (fault != "open")
+    assert ("buffer_close_end" in stages) == (fault not in ("open", "close"))
+    assert ("all_requested_iq_received" in stages) == (fault not in ("open", "refill"))
+    assert result["status"] == ("failed" if fault else "complete")
+    assert "timing.json" in result["evidence_sha256"]
+    assert timing["hardware_stop_timestamp_measured"] is False
+    assert timing["source_continuity_after_stop_verified"] is False
+
+
 @pytest.mark.parametrize("fault", ["tx", "abi", "owned", "open", "refill", "short", "gap", "visit", "origin", "closure", "close"])
 def test_failed_capture_retains_evidence_and_closes_only_its_owned_buffer(tmp_path, fault):
     fake = Fake(fault)

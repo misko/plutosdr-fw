@@ -63,7 +63,8 @@ def final_snapshot(device, visit, *, deadline, clock=time.monotonic, sleep=time.
     raise TimeoutError("GLF1 final snapshot did not arrive for this visit")
 
 
-def collect(args, *, library=None, context_factory=Context, clock=time.monotonic):
+def collect(args, *, library=None, context_factory=Context, clock=time.monotonic,
+            clock_ns=time.monotonic_ns):
     validate(args)
     args.output.mkdir(parents=True, exist_ok=False)
     files = [Path(__file__), *(Path(__file__).with_name(name) for name in (
@@ -79,6 +80,12 @@ def collect(args, *, library=None, context_factory=Context, clock=time.monotonic
     failures = []; blocks = []
     received = 0
     hasher = hashlib.sha256()
+    milestones = []
+
+    def mark(stage):
+        milestones.append(dict(stage=stage, monotonic_ns=str(clock_ns())))
+
+    mark("request_preparation")
     began = clock(); deadline = began+args.samples/2500000+30
     with (args.output/"iq.ci16").open("xb") as stream:
         try:
@@ -109,7 +116,9 @@ def collect(args, *, library=None, context_factory=Context, clock=time.monotonic
             for name, value in (("capture_visit_id", args.visit), ("capture_sample_limit", args.samples),
                                 ("glrt_decision_enable", 0)):
                 device.write(name, value)
+            mark("buffer_open_begin")
             buffer = device.buffer(args.chunk_samples, 4)
+            mark("buffer_open_end")
             raw = device.read("capture_baseline_snapshot")
             retain(args.output/"baseline_snapshot.txt", (raw+"\n").encode())
             baseline = LeanSnapshot.decode(raw)
@@ -141,11 +150,15 @@ def collect(args, *, library=None, context_factory=Context, clock=time.monotonic
                         native_signal_center_at_output_zero=origin, native_samples_per_output_sample=24,
                         received_prefix_samples=received//4, received_prefix_sha256=hasher.hexdigest(),
                         snapshot_sha256=sha256(args.output/"live_snapshot.txt")))
+            mark("all_requested_iq_received")
         except BaseException as error:
             failures.append(f"{type(error).__name__}: {error}")
         finally:
             if buffer is not None:
-                try: buffer.close()
+                try:
+                    mark("buffer_close_begin")
+                    buffer.close()
+                    mark("buffer_close_end")
                 except BaseException as error: failures.append(f"coarse close: {error}")
                 try:
                     raw = final_snapshot(device, args.visit, deadline=clock()+3, clock=clock)
@@ -154,11 +167,14 @@ def collect(args, *, library=None, context_factory=Context, clock=time.monotonic
                     raw = device.read("capture_final_extension_snapshot")
                     retain(args.output/"final_extension_snapshot.txt", (raw+"\n").encode())
                     closure = LeanClosure.decode(raw)
+                    mark("final_snapshots_received")
                 except BaseException as error: failures.append(f"coarse final evidence: {error}")
             if context is not None:
                 try: after = radio_state(context)
                 except BaseException as error: failures.append(f"RF final readback: {error}")
-                try: context.close()
+                try:
+                    context.close()
+                    mark("context_closed")
                 except BaseException as error: failures.append(f"context close: {error}")
             stream.flush(); os.fsync(stream.fileno())
     try:
@@ -175,6 +191,11 @@ def collect(args, *, library=None, context_factory=Context, clock=time.monotonic
             raise ValueError("coarse collector source changed")
     except (OSError, ValueError) as error:
         failures.append(f"coarse attestation: {error}")
+    mark("attestation_finished")
+    retain(args.output/"timing.json", dict(schema="starlink-glrt-lean-host-timing/v1",
+        clock="host_monotonic_ns", milestones=milestones,
+        scope="host calls for a complete finite coarse segment, including stop/drain",
+        hardware_stop_timestamp_measured=False, source_continuity_after_stop_verified=False))
     retain(args.output/"blocks.json", blocks)
     summary = dict(schema=SCHEMA, status="complete" if not failures else "failed", failures=failures,
         received_bytes=received, iq_sha256=hasher.hexdigest(), iq_prefix_attested=not failures,

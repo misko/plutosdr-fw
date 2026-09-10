@@ -36,6 +36,29 @@ result and emits `starlink-gln1-native-exact-start-replay/v1`. Its
 acquisition, prediction-source and physical-precision flags remain false.
 Legacy relative captures keep their existing replay schema.
 
+Exact-start captures also retain `timing.json`, including failed attempts.
+Its `starlink-gln1-native-host-timing/v1` milestones use decimal-string host
+monotonic nanoseconds around context creation, verification, configuration,
+buffer open, IQ/result arrival and cleanup. The owner can compare these with
+coarse-stop milestones on the same host and boot. The buffer-open interval
+includes network calls and radio DMA/admission work; it is not a timestamp of
+the FPGA admission edge. The sidecar makes no source-continuity claim.
+
+The finite GLF1 collector likewise writes `timing.json` using
+`starlink-glrt-lean-host-timing/v1`. Its milestones distinguish receiving all
+requested coarse IQ, buffer close, final snapshots, context close and final
+attestation. The sidecar is included in the coarse summary's evidence hashes;
+the existing complete-prefix and closure checks still apply. A diagnostic
+owner should finish the finite segment before switching modes. Early close
+can leave queued DMA data outside the saved file and fails those checks.
+
+Do not use an idle GLS1 epoch as a continuity witness across GLR CLEAR.
+The complete AXI/CDC simulation confirms that CLEAR resets `source_seen`,
+invalidates a rebased idle scheduler epoch and sets its source fault even
+with a continuous ADC, zero CDC/pacer drops and an advancing source counter.
+Numeric coordinates remain useful, but an unchanged sample-index origin does
+not by itself attest uninterrupted physical sampling across this boundary.
+
 The kernel requires 6,000–6,000,000 samples of lead at its local post-DMA
 snapshot, and rejects u64 end-of-pilot overflow. A request can become late
 after that check; fault-free complete FPGA evidence remains required.
