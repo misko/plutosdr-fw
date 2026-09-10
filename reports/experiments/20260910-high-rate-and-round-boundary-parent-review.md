@@ -892,3 +892,46 @@ the total deadline alone cannot prove these per-step conditions. The clock origi
 is unambiguous: starts0,2.1ns offset then first half-period; first positive edge
 10433333fs, first negative edge18766666fs. Source/numerical/deadline contracts
 remain frozen, and the first native service measurement is still not launched.
+
+## Independent monitor gate and source-specific actual launches
+
+Parent read the complete final monitor helper,265-line policy, six-reference
+bench delta and40-line diagnostic Tcl. The runner's sole change selects that
+diagnostic Tcl; runtime arithmetic, full comparison predicates, original fault
+stimuli and numerical vectors remain unchanged. Parent repeated226 tests PASS
+in22.92s at `/tmp/starlink-arithmetic-monitor-parent.K4YnWa` (original77195,
+terminal0), with Ruff PASS. Parent independently verified all8295 archive
+members, all five live sources and both44-file prepared inventories (original
+45309,terminal0). Archive SHA256:
+`9b7ff3bf21f94aaaf59f31e21fc0b0f0ae326628e23049b51b874866cf202acc`.
+
+FW`deb023b36b2780bd25aa5257eee52d905a662174` and
+HDL`18aa1b6f58fe7abcf06672fccf6d93551174de54` are pushed to the existing
+bank-arithmetic DO NOT MERGE remotes (original35207/32134,terminal0).
+Root authorized exactly one actual vendor-FFT run per175MHz v3 preparation:
+
+- R1/B0/O0 baseline inventory
+  `440e349ac6c245cec032e18b717dc52037ed7e0b53f777d984aee9c0e2b43b2f`;
+- R1/B1/O1 candidate inventory
+  `6376f1fb2508f357933d4cb9cd9949d8da452d155a47084701aa29fb99df1954`.
+
+The agent rechecked both inventories and runner684f8e78 before starting the
+original handles65522/58122 at09:22:56–58UTC. It owns their polling; no restart
+on observation timeout is authorized. Results remain pending. Original failed
+actual runs are not relabeled. Full historical baseline CSV, event-indexed
+candidate/fault checks, source/IP post-integrity and recorded internal waveform
+histories are required. No synthesis, route or radio action follows implicitly.
+
+Parent also read the complete native60 bench/checks, helper and preparation
+tests. Review found Python numeric-type aliases in recipe equality and
+case-sensitive fatal parsing; the agent corrected both and added negative
+tests before freezing or measuring service. The actual native compile remains
+compile-only. Its517-test combined preparation/numerical result is agent-reported
+and awaits an independent parent repeat and final bundle review.
+
+The control physical adapter's complete initial source/tests were reviewed.
+Its fixed constraints/directives and explicit R/D/S binding are retained.
+Before physical execution, independent Python children must clear vendor and
+Python path overrides without changing Vivado's parent environment; offline
+poisoned-environment coverage and a post-failure integrity audit are being
+prepared. No control physical launch or full-receiver promotion is authorized.

@@ -84,8 +84,12 @@ delayed success-receipt publication. The175 baseline/candidate actual pair both
 terminate with PAYLOAD_PRODUCT_OUTPUT_MISMATCH during the deliberate epoch14
 product-overflow injection. Parent independently verifies their preceding
 19456 ordered words/stream and16986 output-derived oracle scores each, but both
-full runs remain FAIL. Wrapper force/monitor visibility is under diagnosis;
-no checker bypass, retry or new complete-bank routing is authorized.
+full runs remain FAIL. Standalone vendor simulation isolates a force/monitor
+register-versus-wrapper observation distinction. A narrow three-field rebind
+per observer preserves all comparisons and runtime arithmetic and now passes226
+independent parent tests. Both source-frozen175 actual retries are running with
+additional internal waveform diagnostics; no result or complete-bank routing
+pass is claimed. See the parent review for exact source/inventory pins.
 The control R1/D1/S1 settings-only freeze passes94 independent
 parent tests and its single175 actual run now PASSES, including the complete
 historical registered CSV and both extra fault/reset suites. Parent independently
