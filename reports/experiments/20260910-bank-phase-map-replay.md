@@ -39,6 +39,22 @@ native fine search, RF detection or physical timing. The long 4,096-block coarse
 soak is separate and remains running. Native source-rate and deployment gates
 are unchanged.
 
+Independent read-only review verified the three runs' frozen source/wrapper
+hashes and found no regression in selector/default wiring. It did not execute
+additional simulations. Important uncovered boundaries remain explicit: the
+injected fault is after 100 accepted scores in a fresh partial tile, after the
+old map has been released, and the bench waits 40 slow clocks before asserting
+quarantine. This does not prove a fault on the final-score/publication edge,
+retaining/reading/releasing a previously completed map during a later fault,
+or clean restart after that fault. The bench ties both reset inputs together
+and disables boundary stop. Those are next integration tests, not implied by
+the present PASS markers. Production 20,000-by-64 maps, independent resets,
+source gaps/hops, slow-reader bank turnover, lower/upper coefficient identity,
+and native-counter/visit support under concurrent pilot/fine traffic also remain.
+The existing stop/paired-stop policy and map/PSMA/health suites additionally
+pass 172 tests on the merged tree. These are regression checks of their existing
+scope, not actual-core bank-owned stop qualification.
+
 ## Reproduction and identities
 
 Run `simulate_iq_to_phase_map_xfft.tcl NEW_OUTPUT VECTOR_DIRECTORY 1 1 1 175`

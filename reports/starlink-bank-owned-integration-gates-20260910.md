@@ -13,6 +13,14 @@ alternative runs and two independent primary-branch 175 MHz reruns. The
 4,096-block soak and physical gates below remain open. No receiver profile
 selects this module yet.
 
+The default-off phase-map selector now passes reduced 447-bin/three-frame
+actual-core bank175/bank200 replay and existing shared200 regression, including
+partial-tile vendor-fault abort and exact map reads. See
+`experiments/20260910-bank-phase-map-replay.md`. This does not establish bank
+boundary-stop, publication-edge fault behavior, independent-domain restart,
+production map capacity or concurrent pilot/fine support; qualify these before
+exposing the selector through AXI/receiver packaging.
+
 Keep the existing overlap scheduler,2048-entry energy cache, inverse output
 register,447-candidate extraction,512-entry result FIFO and normalization.
 Replace only the forward/inverse dispatch and intervening cross-domain copies
