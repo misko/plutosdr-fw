@@ -2,6 +2,13 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest actual-FFT preparation review (2026-09-10): parent saved-data probes
+show the draft parser accepts a clock-grid-valid but wrong first-output time,
+and an impossible slow-edge counter. Per-sample numerical equality alone is
+not event-timing proof. Exact job/time joins and rejection regressions are
+required before the actual run; no vendor or radio action was taken.
+See [ledger timing counterexamples](reports/experiments/20260910-actual-ledger-time-parent-review.md).
+
 Latest sampled-READY boundary (2026-09-10): parent verifies corrected additive
 issuer rejects private writes when sampled READY is high but advertised capacity
 is low during a natural mixed-reason-Q interval. A one-line lost-capacity-check
