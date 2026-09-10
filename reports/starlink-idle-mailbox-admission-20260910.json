@@ -217,6 +217,20 @@
       "retained_first_attempt": "Audit-v1 command placed log/journal options after tclargs; argument-count rejection occurred before opening any checkpoint. Corrected invocation uses new v2 evidence paths.",
       "constraint_changes": false
     },
+    "completed_followup_endpoint_audit": {
+      "status": "completed_observation_not_qualification",
+      "audit_only_hdl_commit": "aa1b2d52db4a4fd376ce77786d2201431015a83b",
+      "directory": "/tmp/starlink-idle-mailbox.N0l1fN/dependency-idle-admission-audit-v1",
+      "exit_code": 0,
+      "metadata_job_start": "No combinational dependency in all-arc fanin; all75 source flops and both destination D/CE pins retained with5ns clocks.",
+      "job_start_all_sources_WNS_ns": -1.053,
+      "vendor_internal_WNS_ns": -0.717,
+      "final_saved_DCP_utilization": {"LUT": 13060, "FF": 18575, "slices": 4400, "BRAM_tiles": 53.5, "DSP": 54},
+      "report": "reports/experiments/20260910-routed-dependency-audit.md",
+      "archive_sha256": "a27941940bbcb6b3af29529847a8f49e388e37c94332f961a827779f728899ba",
+      "constraints_and_checkpoint_unchanged": true,
+      "hardware_qualified": false
+    },
     "disposition": "Reject for deployment; physical timing regressed. Generated bitstream and bad_timing XSA are not qualified firmware. Retain best18c and all failed evidence.",
     "best_previous_physical_baseline": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873;100MHz+.019ns,200MHz-.421ns. Preserve regardless of new result."
   },

@@ -365,6 +365,17 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ### Idle mailbox admission and parallel alternatives — 2026-09-10
 
+Follow-up audit-only HDL `aa1b2d52` completes read-only checks on both saved
+receivers, preserving all constraints and requiring destination timing even
+when a targeted dependency has disappeared.214 audit/constraint/build-policy
+tests pass. The metadata-to-job-start combinational path is absent in the
+candidate, but job-start from other sources still fails at-1.053ns and vendor
+FFT internal paths fail at-.717ns. Final saved-DCP resources are13060LUT/
+18575FF/4400slices/53.5BRAM/54DSP. No timing/CDC/hardware pass is inferred.
+See `reports/experiments/20260910-routed-dependency-audit.md` and its archive.
+The FFT-island agent is developing the next isolated bank-ownership slice;
+no replacement has been integrated into the full receiver.
+
 HDL `d1b3107b56c869d59724df2a8d695112a1f6ac3c` is pushed only to the
 experimental DNM branch. It opts the actual service into an idle-only mailbox
 fault predicate. Current output framing faults require a private write, which
