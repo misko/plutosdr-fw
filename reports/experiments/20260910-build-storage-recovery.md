@@ -178,3 +178,50 @@ Successful original pushes, all to experimental do-not-merge branches:
 
 No firmware-main update, primary runtime-gitlink promotion, PPU change or radio
 operation followed any of these publications.
+
+## ROM successor terminal: complete functional pass
+
+Original session **10102** terminated with exit 0. Vivado exited at
+13:06:14 UTC; the preserved `/usr/bin/time` wall receipt is 10:16.59, with
+exit status 0. The parent independently checked all four nonempty persisted
+exit files (process, source integrity, generated-IP audit, result receipts),
+stored before/after digest equality, external manifest identity, all 56
+source hashes, and all 19 generated-IP after-only hashes.
+
+The frozen preparation and result functions were independently invoked from
+`/`, with their source hashes checked before execution. Their result equals
+the stored independent receipt. The parent also independently checked all
+four complete CSVs, including exact bytes, newline counts and final newline:
+
+| Traces | Each file's lines / bytes | Exact historical SHA-256 |
+| --- | --- | --- |
+| Main candidate and reference | 589,950 / 35,655,334 | `25ab9d06ca0e03f280540cda625a7826b3c4cbaa6322ce3266c59e1fbad94122` |
+| Extra candidate and reference | 33,180 / 2,055,036 | `b965d12603a64111fa9c6ea36cb0f12189945ad4d9be7cf4fbd883980c4ec4a0` |
+
+Original terminal logs contain:
+
+- ROM shadow: 623,129 pre and post checks; 74,440 accepts, 148 first and
+  141 last accepts, 11 stalls, 4,011 reset observations, 7,882 current-fault
+  edges and 115 final-index fault edges. Old ROM state remains unconditionally
+  compared using only the actual ROM input ports.
+- Exact control: 1,246,258 checks, 780,367 active observations, 36 consumed
+  completions, 99,936 owned-stall observations and 143 owned-reset observations.
+- Both extra-epoch terminals: two final faults, three held-final stalls, two
+  one-sided resets and four healthy recoveries.
+- CDC: 712,146 checks with the existing current-fault/private-reset coverage.
+- Qualified status: 953,943 raw-equal plus 292,315 invalid-only observations,
+  totaling 1,246,258. The invalid-only count is 148 below the prior C1 run;
+  the frozen contract permits that count variation. This is **not** a raw
+  217-bit equality pass; every other unconditional comparison remains required.
+
+Original quota-failed run 23845 remains failed. The new run qualifies this exact
+ROM word/metadata read-ahead composition functionally, not physically. Its
+immutable terminal archive is being prepared. A source-specific synthesis
+preparation may proceed offline with unchanged C1 clocks, IP and constraints;
+no physical launch, canonical runtime promotion or radio action is yet approved.
+
+The corrected late60 result package was independently verified from Git at FW
+`db72419c3b10b8621b3fa6fcccbdba2d7aff8c94`: 406 safe members, 405 payload
+hash/length receipts, 2,291,252 bytes, SHA-256
+`0c0d31b9d5c907f3453597c751064a5c15df26f54fd0281683e947ce783e9af8`.
+Its original push to the high-rate60 do-not-merge branch succeeded.
