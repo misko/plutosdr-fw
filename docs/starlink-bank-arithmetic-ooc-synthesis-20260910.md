@@ -85,6 +85,15 @@ directories, with ordered path/hash inventory, checkpoint hashes and independent
 archive-member verification. Generated symbolic links, if any, are explicitly
 listed as references rather than fabricated regular-file copies.
 
-Routing remains separately unapproved. Full-receiver timing, CDC qualification,
+At the time of this synthesis receipt, routing was separately unapproved.
+Full-receiver timing, CDC qualification,
 continuous canonical coarse/native fine/pilot integration, .18-before-.17 RF work,
 and the eventual eight-target / 120 ms / 300 s objective remain separate gates.
+
+## Later route authorization
+
+After reviewing the synthesis result, the parent authorized exactly one diagnostic
+route from checkpoint `de5b7ca6…` with the unchanged frozen `0873675f…` script.
+That run started under original handle 42281 in
+`/tmp/starlink-arithmetic-route-v1.VNX5gK`. Its result is separate from this
+synthesis-only receipt; the original synthesis archive remains unchanged.
