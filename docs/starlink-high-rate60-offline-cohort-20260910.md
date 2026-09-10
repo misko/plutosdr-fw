@@ -46,7 +46,8 @@ the pre-evaluation recipe document and executable recipe source.
 | Native capture | 520 original raw, [34359740256,34359740776) |
 | Native coefficients | 264, original60 projected PSS; Eh1073758594 |
 | Native raw / qualified tuples | 257 lags[-128,128] /241 lags[-120,120] |
-| Native packet | all26 words, IDs60000520/60000001/60000052 |
+| Native packet | all26 words; request60000520, coefficient generation60000001 |
+| Fixture visit context (outside native packet) | 60000052 |
 | Coarse overlap jobs | seven512-word blocks, stride447;3584 words/stage |
 | Coarse scores | 3129, indexes[8589934576,8589937705) |
 | All coarse block raw support | [34359738283,34359751098) |
