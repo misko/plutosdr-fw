@@ -48,6 +48,32 @@ def test_actual_all_old_stimulus_shadow_assertions_and_csv_operations_literal():
     assert "FORWARD_CALLER_PHASE_INVARIANT_BROKEN" in source
 
 
+def test_legacy_bench_bindings_leave_all_stimulus_assertions_and_phase_mutant_literal():
+    binding = "    .inverse_phase(1'b0), .forward_mailbox_fault(1'b0), .forward_retirement_valid(),"
+    for kind in ("occupancy", "final_veto_equivalence"):
+        name = f"tb/tb_starlink_pss_realtime_{kind}.sv"
+        source = (ACQ / name).read_text()
+        assert source.count(binding) == 1 and "USE_FORWARD_RETIREMENT" not in source
+        if kind == "occupancy":
+            source = source.replace("dut (\n" + binding + " .*);", "dut (.*);", 1)
+        else:
+            source = source.replace(binding + "\n", "", 1)
+        assert source == frozen(name)
+    path = Path(__file__).with_name("test_phase_input_contract.py")
+    source = path.read_text()
+    new = '''    bench_source = replace_once(bench_source, "starlink_pss_realtime_result_guard dut (\\n"
+        "    .inverse_phase(1'b0), .forward_mailbox_fault(1'b0), .forward_retirement_valid(), .*);",
+        f"starlink_pss_realtime_result_guard #(.USE_PHASE_INPUT_FAULT({mode})) dut (\\n"
+        "    .inverse_phase(1'b0), .forward_mailbox_fault(1'b0), .forward_retirement_valid(), .*);")'''
+    old = '''    bench_source = replace_once(bench_source, "starlink_pss_realtime_result_guard dut (.*);",
+        f"starlink_pss_realtime_result_guard #(.USE_PHASE_INPUT_FAULT({mode})) dut (.*);")'''
+    assert source.count(new) == 1
+    baseline = subprocess.run(["git", "-C", str(HDL.parent), "show",
+        "ce987ffe5ef3b7a1e8780cd99e37b64bba90ea99:tests/starlink_oracle/test_phase_input_contract.py"],
+        capture_output=True, text=True, check=True, timeout=10).stdout
+    assert source.replace(new, old, 1) == baseline
+
+
 def run(tmp_path, parameters, mutation=None):
     source = (ACQ / "starlink_pss_realtime_result_guard.v").read_text()
     if mutation:

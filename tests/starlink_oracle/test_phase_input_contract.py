@@ -99,8 +99,10 @@ def test_public_guard_contract_with_explicit_full_tuple_adapter(tmp_path, mode, 
         "wire phase_input_fault_now = 1'bz;",
         "wire phase_input_fault_now = " + ("1'bz;" if mode == 0 else
         ("" if mutation else "external_fault_now || ") + "certified_input_beat || certified_input_complete;"))
-    bench_source = replace_once(bench_source, "starlink_pss_realtime_result_guard dut (.*);",
-        f"starlink_pss_realtime_result_guard #(.USE_PHASE_INPUT_FAULT({mode})) dut (.*);")
+    bench_source = replace_once(bench_source, "starlink_pss_realtime_result_guard dut (\n"
+        "    .inverse_phase(1'b0), .forward_mailbox_fault(1'b0), .forward_retirement_valid(), .*);",
+        f"starlink_pss_realtime_result_guard #(.USE_PHASE_INPUT_FAULT({mode})) dut (\n"
+        "    .inverse_phase(1'b0), .forward_mailbox_fault(1'b0), .forward_retirement_valid(), .*);")
     bench = tmp_path / f"{top}.sv"
     bench.write_text(bench_source)
     compile_result = subprocess.run([
