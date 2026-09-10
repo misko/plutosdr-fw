@@ -116,6 +116,19 @@ further comparator-only changes; healthy retirement, exact current/sticky fault
 reasons and final publication/ownership cannot be relaxed. No implementation or
 new physical trial is authorized for that proposal.
 
+The read-only review rejected a bare raw-private joiner-retirement swap: it can
+create additional checker reasons on a fault edge. Root instead authorized
+implementation/tests for default-off data-only bubble enables in joiner and
+spectrum product, and both exact64-bit kernel block-identity comparisons.
+Only invalid numerical payload may differ; occupied stalled stages, every
+logical handshake/state/fault reason and product output/overflow remain exact.
+The experiment targets both absorbed DSP input-enable and kernel comparison
+cones, but no timing improvement is assumed. Frozen old-module shadows, all
+option combinations, hostile bubbles/occupied stalls/resets, fixed-point
+boundaries and omitted-bit/overwritten-stage/invalid-token mutants are required
+before actual-core default/registered numerical/fault replay and source review.
+No new physical run or primary runtime promotion is authorized.
+
 A separate active-clock verification worktree now exists at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch
 `codex/starlink-rx-only-do-not-merge-clock-traffic` in FW/HDL, starting FW
@@ -162,6 +175,15 @@ is authorized on exact reviewed signature
 under the original agent-owned handle88186 in `bank-production-map-full-v1`.
 Its61 frozen files byte-match the approved smoke-v5; no full-map PASS is claimed.
 See that branch's `docs/starlink-bank-production-map-prelaunch-20260910.md`.
+
+The completed capacity agent now owns the separate `bank-native-paired`
+worktree, FW/HDL branch `codex/starlink-rx-only-do-not-merge-bank-native-paired`,
+starting FW `9c6bee20c` / HDL `9759cf12`. Root authorized only additive15MHz
+concurrent source/coarse/native/pilot oracle, bench, runner and policy work,
+then175/200 healthy actual-core simulations. Its source clock must reflect the
+native continuous-valid contract; it may not alter the scheduler to accept the
+old coarse bench's100MHz/15%-strobe pattern. High-rate interface guards stay
+unchanged. Negative combined epochs and causal scheduling remain later gates.
 
 An additional independent verification worktree was allocated after the
 read-only map integration review: `/tmp/starlink-coarse-alternatives.Y3JzOI/bank-map-lifecycle`,

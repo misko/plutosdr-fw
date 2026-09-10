@@ -135,10 +135,31 @@ Latest isolated registered/held-preflight physical trial remains failing at
 175MHz setup-1.614ns,hold+0.071ns,501 same-clock failing endpoints. This follows
 the prior-1.596ns result; fewer LUTs did not improve worst timing. Current faults
 feeding private product work and kernel metadata comparisons now dominate.
-Before another implementation, review whether a separately certified private
-forward path can remove that coupling without changing public retirement,
-same-edge fault reasons, final commit or bank ownership. No such change is
-implemented or authorized by this plan, and no further route is authorized.
+The next reviewed experiment is narrower than changing private retirement:
+default-off bubble updates for only joiner I/Q and the four multiplier payload
+registers, plus two exact balanced64-bit kernel identity comparisons. All
+logical accepts, valid/metadata/overflow behavior, current/sticky faults, final
+commit and bank ownership stay unchanged. The completed-input-fence worktree
+is implementing/testing this opt-in experiment; it is not promoted to primary
+and no further synthesis/route is authorized before source-specific review.
+
+An independent `-bank-native-paired` FW/HDL worktree is implementing the first
+additive15MHz concurrent test, starting FW `9c6bee20c` / HDL `9759cf12`.
+One true15MHz original CI16/index/timestamp source feeds native tracking and
+the actual bank coarse/pilot shell; a100MHz sample clock with15/100 strobes is
+not legal for the native scheduler's continuous-valid capture contract. Use
+public native AXI, injection disabled, DSP reduction, independently calculated
+26-word packets and positive observed compute/capture overlap. The static
+smoke anchor is not causal acquisition. Existing runtime and old benches stay
+unchanged;175/200 simulations follow new frozen expectations and policy tests.
+
+The30/60 extension cannot merely change a test parameter: current realtime and
+boundary-stop wrapper/profile guards explicitly require15MS/s. Rate-conditioned
+coarse kernels/energies and the original-rate/canonical/pilot source mappings
+also differ. New high-rate raw fixtures must cover full pilot filter history,
+not just the shorter existing three-FFT fixture. Keep those guards and expose
+the missing high-rate interface scope in its own reviewed implementation; do
+not claim high-rate paired support from this15MHz test.
 
 Require complete route, setup/hold/recovery, reviewed CDC/reset paths, and actual
 board-I/O constraints. A generated bitstream or isolated positive slack is not
