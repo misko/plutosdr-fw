@@ -1,0 +1,35 @@
+{
+  "format": "starlink-portable-archive-parts-v1",
+  "max_part_bytes": 41943040,
+  "archive": {
+    "name": "20260910-local-admission-actual175-pre-nba-v3.tgz",
+    "bytes": 144578850,
+    "sha256": "80b06a8826ebc180324c1f16ccb4f2552f6d028f14fc8086a3916422fb139857"
+  },
+  "parts": [
+    {
+      "index": 0,
+      "name": "20260910-local-admission-actual175-pre-nba-v3.tgz.part000",
+      "bytes": 41943040,
+      "sha256": "a65fe7db2ccce4c531d7ee7e03bf66bee0f0b780cc7217ce29446d3a0fc0b6e9"
+    },
+    {
+      "index": 1,
+      "name": "20260910-local-admission-actual175-pre-nba-v3.tgz.part001",
+      "bytes": 41943040,
+      "sha256": "f3361f3bf2023921276b3d51920cbe425891ce75f142ec6d4e4e8811492e8d6e"
+    },
+    {
+      "index": 2,
+      "name": "20260910-local-admission-actual175-pre-nba-v3.tgz.part002",
+      "bytes": 41943040,
+      "sha256": "3b3d8e8d05e67c3c58e9605823425c71052fd16461bfaa613249a51044d96423"
+    },
+    {
+      "index": 3,
+      "name": "20260910-local-admission-actual175-pre-nba-v3.tgz.part003",
+      "bytes": 18749730,
+      "sha256": "b135f300400984c914393fb78b52af346e5f8a8222c66ff8bcf7a62486fcc9d3"
+    }
+  ]
+}

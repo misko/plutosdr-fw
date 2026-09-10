@@ -45,3 +45,4 @@ build/
 # Original oversized evidence retained locally; tracked lossless ordered parts.
 /reports/experiments/20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz
 /reports/experiments/20260910-local-admission-actual-preparation-v2.tgz
+/reports/experiments/20260910-local-admission-actual175-pre-nba-v3.tgz
