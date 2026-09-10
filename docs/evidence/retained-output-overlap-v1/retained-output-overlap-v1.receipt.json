@@ -1,0 +1,140 @@
+{
+  "archive": "retained-output-overlap-v1.tar.gz",
+  "bytes": 196086,
+  "directories": 5,
+  "external_trace_not_copied": "e7127798f315772b95aff63b75fffcd9cf5d1af8ca3c96e878bae4b39e443d71",
+  "hdl_unchanged": "ecbb3712965ff39b144b5adf84a2a262c6c53dff",
+  "members": {
+    "attempt-v1-sources/output_overlap_ledger.py": {
+      "bytes": 16288,
+      "sha256": "2e497d9bc43148e776cd4a228902a80c10f5eb91c73bc2ff24b81b782584202a"
+    },
+    "attempt-v1-sources/output_overlap_recipe.json": {
+      "bytes": 3316,
+      "sha256": "1fb118404547d0a3eb13f72d969a5ee80687aec5a388c285839106d1e7fcc688"
+    },
+    "attempt-v1-sources/test_starlink_output_overlap_ledger.py": {
+      "bytes": 9853,
+      "sha256": "f37938c4ee89437e58e2e9f48758eae0e4d9be32ee7d749c73f895eaefc375e8"
+    },
+    "derive-v2.log": {
+      "bytes": 412,
+      "sha256": "bf5a24ec2c9ea54ffad4c907729fc4b9967d7cd88a8b5393328847ae0f38868c"
+    },
+    "derive-v3.log": {
+      "bytes": 412,
+      "sha256": "bf5a24ec2c9ea54ffad4c907729fc4b9967d7cd88a8b5393328847ae0f38868c"
+    },
+    "docs/starlink-retained-output-overlap-ledger-20260910.md": {
+      "bytes": 15575,
+      "sha256": "9b5e45d8e4d3d3338f38c60ee19e8e01d4499e15d0fc6fc51a6e9a7a846460f3"
+    },
+    "proof-v2/integrity.json": {
+      "bytes": 6459,
+      "sha256": "d6d26509996f076cb86ede70fbbbef11bb825d2e61b67bd78a5fe895efa0464d"
+    },
+    "proof-v2/ledger.json": {
+      "bytes": 450695,
+      "sha256": "9a6aff3dd81d3b14b52872bab143cddcd2fada75960bcd19b82171b621464d0b"
+    },
+    "proof-v2/source_snapshot/output_overlap_ledger.py": {
+      "bytes": 18823,
+      "sha256": "905325fa5dbec11d74e89e66062c8e46c7d8d4b69c02e7d480ea20c3b52bece7"
+    },
+    "proof-v2/source_snapshot/output_overlap_recipe.json": {
+      "bytes": 3316,
+      "sha256": "1fb118404547d0a3eb13f72d969a5ee80687aec5a388c285839106d1e7fcc688"
+    },
+    "proof-v2/source_snapshot/simulate.log": {
+      "bytes": 80885,
+      "sha256": "ead881d85bbcc6325e6300b8b26ef62ada0db4defce9ae91962db726c1f85e74"
+    },
+    "proof-v2/source_snapshot/starlink_pss_block_mailbox.v": {
+      "bytes": 10098,
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    "proof-v2/source_snapshot/starlink_pss_fft_bank_owned_local_admission_probe.v": {
+      "bytes": 27314,
+      "sha256": "0cb54617eb6757e1d6c719d97b0fd5002ec7f6105c8c4b50c41eba67d4306235"
+    },
+    "proof-v2/source_snapshot/starlink_pss_realtime_result_guard.v": {
+      "bytes": 21006,
+      "sha256": "09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2"
+    },
+    "proof-v2/source_snapshot/tb_starlink_pss_local_admission_actual.sv": {
+      "bytes": 64782,
+      "sha256": "a347cd6ec4bb3e888f0ce171aedb7c4a85cebea4932bc880f348a75ada5ae238"
+    },
+    "proof-v2/source_snapshot/test_starlink_output_overlap_ledger.py": {
+      "bytes": 11623,
+      "sha256": "d549ef357e273649b6e8ed6c67bb7dc56c84dad5c9a984118f829eb800f5e7d9"
+    },
+    "proof-v3/integrity.json": {
+      "bytes": 6459,
+      "sha256": "41b062db57c765e9efebe9470f3eccd528ec760e64d2dabd2a74c32e0f18839c"
+    },
+    "proof-v3/ledger.json": {
+      "bytes": 450695,
+      "sha256": "7d50829165b7ee6d5599646a44a719a45279d92cb1dd3cd0a37f40f660073594"
+    },
+    "proof-v3/source_snapshot/output_overlap_ledger.py": {
+      "bytes": 19261,
+      "sha256": "f01cac350351235895a6a667d4230c5703d2022dfdeeff9e27cdb970cee1ee4b"
+    },
+    "proof-v3/source_snapshot/output_overlap_recipe.json": {
+      "bytes": 3316,
+      "sha256": "1fb118404547d0a3eb13f72d969a5ee80687aec5a388c285839106d1e7fcc688"
+    },
+    "proof-v3/source_snapshot/simulate.log": {
+      "bytes": 80885,
+      "sha256": "ead881d85bbcc6325e6300b8b26ef62ada0db4defce9ae91962db726c1f85e74"
+    },
+    "proof-v3/source_snapshot/starlink_pss_block_mailbox.v": {
+      "bytes": 10098,
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    "proof-v3/source_snapshot/starlink_pss_fft_bank_owned_local_admission_probe.v": {
+      "bytes": 27314,
+      "sha256": "0cb54617eb6757e1d6c719d97b0fd5002ec7f6105c8c4b50c41eba67d4306235"
+    },
+    "proof-v3/source_snapshot/starlink_pss_realtime_result_guard.v": {
+      "bytes": 21006,
+      "sha256": "09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2"
+    },
+    "proof-v3/source_snapshot/tb_starlink_pss_local_admission_actual.sv": {
+      "bytes": 64782,
+      "sha256": "a347cd6ec4bb3e888f0ce171aedb7c4a85cebea4932bc880f348a75ada5ae238"
+    },
+    "proof-v3/source_snapshot/test_starlink_output_overlap_ledger.py": {
+      "bytes": 12224,
+      "sha256": "31ca2f8c1f163110789823761b52080cfd7b812b7f2e2395255af2b5e9acb879"
+    },
+    "pytest-v1.log": {
+      "bytes": 1711,
+      "sha256": "1133813959a6fa167b926af3e9db291a796e896f955aa02b1a6967688220ed27"
+    },
+    "pytest-v2.log": {
+      "bytes": 746,
+      "sha256": "98a902994dc7147674ae15c60ce617b41615e3d239464cad995886cd7427d577"
+    },
+    "pytest-v3.log": {
+      "bytes": 746,
+      "sha256": "753d6805caa915fe08dbef7d419927804fcadd1ca246b77f8be32f3c99f4035d"
+    },
+    "results-v1.xml": {
+      "bytes": 15320,
+      "sha256": "6224d16cd42bf772b945f39dce442fc65bdc7bfb65707850f35e33d0e9b759d9"
+    },
+    "results-v2.xml": {
+      "bytes": 14621,
+      "sha256": "87e330a245478c01dd651267c890b41e62ce136e2aaa0b69aaec536a7a62095c"
+    },
+    "results-v3.xml": {
+      "bytes": 14903,
+      "sha256": "1511fec94f48a5c70bf5e30ec04d8deb472fbc847f5769eece627c7c3723ba90"
+    }
+  },
+  "regular_files": 32,
+  "sha256": "a93bad7f2dde173284fa62299ee95979361cda93de5b1eccffc2aad5e0cadae3",
+  "tested_fw": "db4945dd4b13dfa9e40325b72620f3543bf5664b"
+}
