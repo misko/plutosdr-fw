@@ -156,3 +156,22 @@ inequality, which can miss X/Z values. The isolated agent is requested to
 harden only the new bank admission with case inequality and literal-instance
 unknown-parameter tests, retaining the initial310-pass receipt and every old
 numerical/legacy contract. Stage A is not yet promoted or actual-FFT-qualified.
+
+### First control pair: failed, not accepted
+
+Both original handles60442/8914 subsequently completed exit1, approximately
+4m10s wall each. Baseline and combined cases both stopped in epoch11 on
+`EXACT_ACTUAL_PUBLIC_REASON_OWNERSHIP_MISMATCH`, at1198594347644fs and
+1200640062032fs respectively. No original or extra terminal PASS receipt was
+reached; partial traces cannot satisfy the full original CSV hash gate. Parent
+read both raw failure sites and independently found the baseline candidate
+and reference partial CSVs byte-identical up to the stop. That narrower trace
+equality does not explain or waive the broader217-field mismatch.
+
+Epoch11 is the original missing-forward-status / held-final-readiness test,
+not an extra epoch. Because the unmodified-option baseline also fails, the
+new observation/reference composition must be investigated alongside the RTL;
+this alone does not prove that either the observer or candidate is at fault.
+Read-only waveform/source diagnosis is authorized. No rerun, changed compare
+scope, altered CSV hash, physical build or runtime promotion is authorized by
+this failure. Both original outputs and frozen sources remain preserved.
