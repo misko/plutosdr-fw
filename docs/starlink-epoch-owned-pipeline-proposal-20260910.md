@@ -1,8 +1,11 @@
 # Next bounded experiment: epoch-owned private transfer and sealed publication
 
-Read-only proposal, not implemented or qualified. Keep the current L1 actual and
-negative route evidence unchanged. Do not merge D/S/C/K/M or weaken an existing
-observer to make this proposal pass.
+Historical read-only proposal at FW265a309a1. Subsequently authorized **offline
+standalone implementation only** is described in
+[the sealed-bank contract](starlink-epoch-sealed-bank-offline-20260910.md).
+Its private checks intentionally use delayed tagged fault capture, not the
+immediate reason timing originally suggested below. Keep current L1 actual and
+negative route evidence unchanged; no D/S/C/K/M union or existing observer changes.
 
 ## What the L1 route actually says
 
@@ -88,11 +91,14 @@ Private speculation may continue on a fault edge; a public request toggle,
 certified completion, consumer admission or bank release may not. Keep per-cause
 sticky detection and event counts in the originating domain, including simultaneous
 causes, rather than deduplicating or resetting them at forward/inverse handoff.
-The first slice should retain the old immediate local full-check reason capture;
-its two-stage certificate is additional, not a delayed replacement for that
-reason. This deliberately leaves a bank-local comparator-to-reason path, but
-removes its cross-module consumers. Certificate transport latency is explicit and must drain
-before publication; global epoch quarantine survives private core reset and ACK.
+The original proposal suggested retaining old immediate local full-check reason
+capture. **Superseded after source review:** that would preserve a parallel wide
+cone. The implemented offline option captures private framing/metadata/lease
+causes after two edges and retains the offending token's offered lease/index.
+No publication or reuse may precede complete check drain. Raw current publication
+vetoes remain direct. This is not old counter/fault-timing compatibility; a later
+explicit integration/ABI adapter is required. Certificate latency is explicit and
+global epoch quarantine must survive private core reset and ACK.
 After a slow-domain prefix has been accepted, preserve it as provisional and
 honor the measured sticky-fault CDC window; no instantaneous cross-clock revocation
 or complete healthy block after quarantine may be claimed.
@@ -101,10 +107,14 @@ or complete healthy block after quarantine may be claimed.
 
 One proposed local controller needs no new BRAM/DSP: it reuses the512×36 bank,
 75-bit held descriptor and9-bit cursor. A two-stage descriptor-check implementation
-can use25 three-bit equality flags,4 group flags, two tag/valid/error bundles
+can use25 three-bit equality flags,5 group flags, two tag/valid/error bundles
 (at most16 bits each), and at most16 seal/lease/drain/ownership bits: **budget
-at most80 additional logical FF** before optimization. This is a design budget,
-not synthesis evidence. Local output current-veto fan-in and selector fanout must
+at most80 additional logical FF** before optimization. This was a target, not
+permission to omit state. The offline RTL actually declares317 register bits:
+222 reused bank/reader bits and95 control/check bits, plus the existing18432-bit
+RAM. The95 exceeds that target by15; external issuer/CDC state is additional,
+and this is not mapped utilization or the net delta against the old reset logic.
+Local output current-veto fan-in and selector fanout must
 be reported rather than assumed cheap. Preserve one private take per clock when
 capacity is owned; no one-sample-per-clock claim is made for the FFT itself.
 
@@ -152,9 +162,9 @@ only82 of4470 before other overhead: no robust150 MHz claim follows.
 | L: local first admission | Input descriptor CE only, no added logical state. | Current input faults and inverse-bank fault→admission; route -1.549. |
 
 D/S actual111 and C1 have completed qualified functional tests but failing routes.
-K/M first actual23845 failed quota mid-suite; it is incomplete, not a semantic
-counterexample or completed qualification. No waiting for its successor is needed
-to evaluate the proposed standalone protocol offline.
+K/M first actual23845 failed quota mid-suite and remains incomplete. The parent
+subsequently reported successor10102 complete functional qualification and a
+separate synthesis audit; those are not source-composed with this experiment.
 
 Use **one explicit source baseline**, the exact current R1/B1/O1/L1 runtime cohort
 62da6a39 and its unchanged arithmetic files, for the first additive controller and
@@ -166,7 +176,8 @@ standalone slice. S/K/M are orthogonal and can remain absent until their physica
 benefit and composition are demonstrated. Production promotion should eventually
 collapse reviewed changes into canonical modules, not accumulate probe variants.
 
-No implementation, test launch, synthesis/route or runtime modification is
-authorized by this note. Continuous canonical15 from source15/30/60, original-rate
+The original proposal itself authorized no execution. The later standalone
+offline approval still authorizes no vendor FFT, integration or synthesis/route.
+Continuous canonical15 from source15/30/60, original-rate
 native fine search, independent2.5 MS/s pilot and the full scanner/RF/receiver
 qualification remain separate requirements.
