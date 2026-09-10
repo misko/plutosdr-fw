@@ -184,3 +184,39 @@ def test_invalid_strobes_config_and_unbased_submit_are_explicit(tmp_path):
     assert [(a, v) for t, a, v in reads[:7]] == [(4, 1), (5, 0), (4, 1), (8, 0), (4, 1), (4, 2), (0x40, 0x474c5331)]
     snapshot = groups(reads, "S", 0x40, 20)[0]
     assert snapshot[7:18] == [0]*11
+
+
+@pytest.mark.parametrize("termination", ["complete", "source", "cancel"])
+def test_stale_manual_descriptor_cannot_affect_scheduled_admission_or_abort(tmp_path, termination):
+    action = {"complete":"", "source":"pacer=1;", "cancel":"write_reg(1,2,2);"}[termination]
+    reads = simulate(tmp_path, r'''
+ // Deliberately incompatible manual start/phase stays staged while the other
+ // owner prepares and admits (or cancels) its finite prediction.
+ write_reg(0,5,42);write_reg(0,6,32'hffffffff);write_reg(0,7,32'hffffffff);
+ write_reg(0,8,32'hdeadbeef);write_reg(0,9,32'hffffffff);write_reg(0,10,0);
+ write_reg(1,2,16);configure_schedule(23,1000,1000,1);write_reg(1,2,1);
+ while(index<488) @(negedge clk);
+ '''+action+r'''
+ while(index<1500) @(negedge clk);
+ head;snapshot;
+ if(dut.scheduled.control.head_valid) write_reg(1,2,32);
+ write_reg(1,2,4);repeat(4) @(negedge clk);
+ // The retained manual descriptor must still produce its own explicit range
+ // error when ownership returns, without any of the scheduled phase/start.
+ write_reg(0,2,1);repeat(100) @(negedge clk);
+ for(integer k=0;k<32;k=k+1) mr(8'h80+k);
+ write_reg(0,2,8);repeat(5) @(negedge clk);write_reg(0,2,4);
+ if(reserved) $fatal(1,"ownership leaked after range-error result");
+ ''')
+    head = groups(reads,"S",0x80,32)[0]
+    snapshot = groups(reads,"S",0x40,20)[0]
+    if termination == "complete":
+        check_moments(head,1000)
+        assert snapshot[7:17] == [1,1,0,0,0,0,0,1,0,1]
+    else:
+        assert head == [0]*32
+        assert snapshot[7:17] == [1,0,0,0,int(termination=="source"),0,
+                                  int(termination=="cancel"),0,0,0]
+    manual = groups(reads,"M",0x80,32)[0]
+    assert manual[:9] == [0x474c4e31,0,42,0xffffffff,0xffffffff,0xdeadbeef,0xffffffff,0,4]
+    assert manual[9:25] == [0]*16
