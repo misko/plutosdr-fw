@@ -24,8 +24,17 @@ handling. Raw preflight must still record its reason on the original edge and
 quarantine the epoch, but must not create a wide admission combinational path.
 An emitted start token must be suppressed even on the latest receipt-consume
 mismatch. All active fault/publication vetoes and bank retirement checks remain
-unchanged; exact status/orphan reason tests precede any new route. This is an
-implementation under test, not a timing fix claimed from the proposal.
+unchanged. The split is now frozen at FW `4eeda57e3f7f646ee14cdeab57b7074ca479d585`
+and HDL `fb820d3908ac75e29e604a9895d482c2edf4146a` (tested RTL `cee639e43`).
+Default and registered actual-core replay pass. All84 new preflight boundary
+rows, exact same/next-edge status reasons, six detailed causes, suppressed start/
+read/configuration/publication and two one-sided fault-reset recoveries pass.
+Registered service stays4,548 nominal/4,828 bounded-stall clocks. The full
+regression is247passed/eight explicit physical skips; root independently reran
+the reason-only, final-authorization and phase-input suites:20passed/two explicit
+physical skips. Root checked the source/log hashes and complete evidence
+checksums, then authorized one unchanged100/175 OOC synthesis/diagnostic route.
+That pending measurement is not a timing fix or deployment qualification.
 
 The original 4,096-block175 burst/stall soak remains active; its latest agent
 observation reached 1,554 blocks/694,638 ordered scores with FIFO maximum358 and
