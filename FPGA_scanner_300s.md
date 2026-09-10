@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest integration gate (2026-09-10): real P1 controller/design review authorizes
+additive primitive interfaces/tests only. Parent independently reproduces the
+missing actual-READY seam at word37 and511; both copied-fixture failures are
+preserved. The fix must align producer/bank acceptance without hiding raw
+closed/X/Z offers. Checked preflight head and persistent ACK receipt are also
+required before top integration. See
+[integration gate and exact counterexamples](reports/experiments/20260910-product-integration-gate.md).
+
 Latest staged-validation result (2026-09-10): parent independently repeats848
 offline product-reader/issuer tests, all PASS; eight healthy leases each deliver
 512 consecutive checked words without gaps. Four real-controller integration
