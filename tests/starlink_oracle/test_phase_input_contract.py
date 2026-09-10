@@ -11,6 +11,10 @@ from pathlib import Path
 
 import pytest
 
+from tests.starlink_oracle.completed_input_contract import (
+    restore_default_completed_input_guard,
+)
+
 HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
 ACQ = HDL / "library/starlink_pss_acquisition"
 BASE = "af96c48ed34a58d54c548b4a2dc414aeff593c39"
@@ -34,7 +38,7 @@ def replace_once(source, old, new):
 def test_entire_guard_delta_preserves_full_faults_and_publication_checks():
     name = "starlink_pss_realtime_result_guard"
     baseline = frozen(name)
-    candidate = tokens((ACQ / f"{name}.v").read_text())
+    candidate = restore_default_completed_input_guard((ACQ / f"{name}.v").read_text())
     if "outputwiremailbox_commit_valid," in candidate:
         # Later additive final-only export is checked independently against
         # ccdf6436. Normalize only its exact algebraic expansion here.

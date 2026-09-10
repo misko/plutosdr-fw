@@ -11,6 +11,9 @@ from pathlib import Path
 import pytest
 
 from tests.starlink_oracle import test_realtime_private_bank as private_bank
+from tests.starlink_oracle.completed_input_contract import (
+    restore_default_completed_input_guard,
+)
 from tests.starlink_oracle.mailbox_metadata_contract import (
     restore_legacy_metadata_comparison,
 )
@@ -38,7 +41,7 @@ def replace_once(source, old, new):
 
 def test_guard_delta_is_only_final_qualification_export_and_exact_handshake():
     name = "starlink_pss_realtime_result_guard"
-    source = tokens((ACQ / f"{name}.v").read_text())
+    source = restore_default_completed_input_guard((ACQ / f"{name}.v").read_text())
     source = replace_once(source, "outputwiremailbox_commit_valid,", "")
     source = replace_once(source,
         ("assignmailbox_commit_valid=resetn&&active&&!protocol_fault&&return_valid&&"
@@ -64,18 +67,35 @@ def test_service_delta_is_only_final_authorization_and_mailbox_retains_its_contr
 
 
 @pytest.mark.parametrize("mutation", [False, True])
-def test_new_output_is_subject_to_all_existing_final_veto_rows(tmp_path, mutation):
+@pytest.mark.parametrize("completed", [0, 1])
+def test_new_output_is_subject_to_all_existing_final_veto_rows(tmp_path, mutation, completed):
     top = "tb_starlink_pss_realtime_final_veto_equivalence"
     source = (ACQ / "starlink_pss_realtime_result_guard.v").read_text()
     if mutation:
         source = replace_once(source,
-            "return_last && final_qualified && !final_fault_now;",
-            "return_last && final_qualified;")
+            "return_phase_allowed && return_last && final_qualified && !final_public_fault;",
+            "return_phase_allowed && return_last && final_qualified;")
     runtime = tmp_path / "guard.v"
     runtime.write_text(source)
+    bench_source = (ACQ / "tb" / f"{top}.sv").read_text()
+    if completed:
+        # Full-tuple algebraic adapter, not a claim that injected input events
+        # satisfy the bank slice's closed-input producer premise. Both wrapper
+        # scheduling modes use this same enabled final-public veto; actual-core
+        # suites independently check that producer premise and scheduling.
+        bench_source = replace_once(bench_source,
+            "wire completed_input_certified = 1'bz, completed_input_fault_now = 1'bz;",
+            "wire completed_input_certified = 1'b1;\n"
+            "wire completed_input_fault_now = external_fault_now || "
+            "certified_input_beat || certified_input_complete;")
+        bench_source = replace_once(bench_source,
+            "#(.WATCHDOG_CYCLES(WATCHDOG_CYCLES)) dut",
+            "#(.WATCHDOG_CYCLES(WATCHDOG_CYCLES), .USE_COMPLETED_INPUT_FAULT(1)) dut")
+    bench = tmp_path / f"{top}.sv"
+    bench.write_text(bench_source)
     executable = tmp_path / "final_auth.vvp"
     compiled = subprocess.run(["iverilog", "-g2012", "-Wall", "-s", top,
-        "-o", str(executable), str(runtime), str(ACQ / "tb" / f"{top}.sv")],
+        "-o", str(executable), str(runtime), str(bench)],
         text=True, capture_output=True, timeout=30, check=False)
     assert compiled.returncode == 0, compiled.stdout + compiled.stderr
     result = subprocess.run(["vvp", str(executable)], text=True, capture_output=True,

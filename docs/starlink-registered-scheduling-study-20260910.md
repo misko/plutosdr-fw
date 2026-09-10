@@ -80,6 +80,22 @@ text rather than the completed-input `!final_public_fault` selection. The guard
 and those test files were byte-unchanged from the prior packaged study. Original
 test files and exact failure log are retained in `tests-before-adaptation/`.
 
+After the failed route was frozen at HDL `6a3574fa` / FW `e1b168389`, the three
+stale tests were repaired in a separate test-only change. The source adapter
+inverts only the explicitly enumerated completed-input additions and still
+requires equality of the entire remaining source against each old pin. It does
+not erase arbitrary fault expressions, sequential logic or reason accounting.
+The mutation still removes only the live final commit veto, now anchored at
+the actual `!final_public_fault` expression. Both default and completed-input
+full-tuple guard adapters reject it with `FINAL_AUTH_VETO_MISMATCH`; healthy
+versions retain262,656rows/512edges/nine mutation witnesses. The full-tuple
+adapter proves conditional algebra, not the producer's closed-input premise;
+actual-core tests of both scheduling modes supply that separate evidence.
+The expanded rerun is **244 passed, 8 explicit physical-test skips, 0 failed**.
+No RTL, golden, timing gate, required rejection or physical run changed.
+Before/after logs and the four executable mutation/healthy benches are retained
+under `tests-after-adaptation/`; the original239/8/3 result remains intact.
+
 ## Single measured implementation
 
 | Measurement | Synthesis | Route |
