@@ -264,3 +264,13 @@ fast-domain; inverse CSV cycles are slow-domain. The unchanged absolute
 drain25000, fault observation24, watchdog1500000 and provisional-prefix
 [128,132] gates remain unchanged. No actual FFT, synthesis or route was run
 for this follow-up; all runtime bytes remain unchanged.
+
+Parent independently repeated the exact source pins FW26688d6b6/HDLc121892c0:
+original89119 EXIT0,252PASS16.93s, all9 explicit hashes unchanged. Its retained
+path is recovery `inverse-early-parent.c6zzBY4f`. Both owned early-status attempts
+are archived separately (the original235 archive is untouched):
+`reports/experiments/20260910-inverse-early-status-offline-v1.tgz`,19239128 bytes,
+SHA256 `4a35442bd5f71c2a4f9aaae6fa7d70d79ac7fc317691050a9af83828afccc1ad`.
+The adjacent JSON records all3080 safe unique regular members and every hash;
+pre/post source identity and reconstructed member bytes were verified. Original
+archive/packaging source remains at recovery `inverse-early-archive-v1.kvsvy1Qa`.
