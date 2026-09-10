@@ -264,6 +264,14 @@ alone resolves that statistical/causal requirement. Preserve competing aliases
 until an independently evaluated rejection rule resolves them; no post-hoc GLRT
 winner may seed an allegedly blind comparison.
 
+The new conditional source-time budget model/test confirms the remaining
+window is limited: assuming the observed15MHz digital map post-ACK coordinate
+and zero extra host delay, only22–23 nominal full native captures fit after
+the existing65536R host lead.10ms extra delay reduces that to15–16;31ms leaves
+none. All182 new/existing scanner-budget tests pass. These are conditional
+geometry bounds, not measured availability, completed results or a new policy;
+see `experiments/20260910-short-visit-handoff-budget.md`.
+
 Record2.5MS/s CI16 pilot evidence at10MB/s plus metadata/results, reconcile source
 support with every valid visit, and compare FPGA outputs with independent replay
 GLRT/PSS. Retain negative controls, gaps, missed/expired candidates and clean
