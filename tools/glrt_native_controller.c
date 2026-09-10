@@ -277,6 +277,13 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
             uint32_t count = c->frames-c->next_frame;
             int predicted;
             if (count > 16) count = 16;
+            /* Use the remaining valid native horizon even when a full batch
+             * would exceed it. No job may extend past last_supported + 32. */
+            if (c->trend.initialized && c->next_frame >= c->trend.last_supported &&
+                c->next_frame-c->trend.last_supported <= 32) {
+                uint32_t remaining = 33-(c->next_frame-c->trend.last_supported);
+                if (count > remaining) count = remaining;
+            }
             if (c->next_tag == UINT32_MAX) return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
             predicted = !glrt_native_trend_batch(&c->trend,c->next_frame,count,c->next_tag,
                     c->slots[0].batch.seed,&b,&rate);

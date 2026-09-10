@@ -71,8 +71,8 @@ def test_native_loss_cannot_revive_old_coarse_horizon(controller,pilot_words):
     checked=review(journal(radio),epoch=3)
     sizes=[b.repeats for b in radio.descriptors]
     assert 16 in sizes
-    assert all(count==16 for count in sizes[sizes.index(16):])
-    assert len(checked['heads'])<64
+    assert all(count<=16 for count in sizes[sizes.index(16):])
+    assert len(checked['heads'])==52  # Last supported 19, then the existing 32-frame horizon.
 
 
 def test_uncertain_slice_submission_is_not_retried(controller,pilot_words):
