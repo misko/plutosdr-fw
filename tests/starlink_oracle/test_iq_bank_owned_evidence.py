@@ -46,7 +46,7 @@ def receipt(tmp_path: Path, transcript: str, mode: str = "numeric") -> Path:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("synthetic generated input for parser test only\n")
     (directory / "scope.txt").write_text(
-        "fast_mhz=175 slow_mhz=100 source_msps=15\n"
+        "fast_mhz=175 slow_mhz=100 source_msps=15\ncapacity_blocks=64 fixture=true\n"
         + "".join(f"{digest(source)}  {source}\n" for source in sources)
         + "".join(f"{digest(path)}  {path}\n" for path in generated)
     )

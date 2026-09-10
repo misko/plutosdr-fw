@@ -194,7 +194,7 @@ def test_exact_runner_postprocessor_rejects_failure_even_with_pass(tmp_path, mod
     log.write_text(bad_line + terminal_transcript(mode))
     result = tcl(
         f"source {{{ACQ / 'verify_realtime_probe_result.tcl'}}}\n"
-        f"set logfile {{{log}}}\nset mode {mode}\n"
+        f"set logfile {{{log}}}\nset mode {mode}\nset capacity_blocks 64\n"
         "if {[catch {\n" + contract + "\n} message]} {puts stderr $message; exit 2}\n"
     )
     assert result.returncode == (2 if bad_line else 0), result.stdout + result.stderr
