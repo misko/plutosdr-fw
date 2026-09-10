@@ -1,0 +1,9 @@
+{
+  "tool_chunk": "2f919d",
+  "exit_code": 1,
+  "failure": "ValueError: symlink in terminal evidence",
+  "phase": "initial inventory, before output directory creation",
+  "cause": "Parent pytest cases include current aliases and explicit symlink admission controls; initial inventory incorrectly treated the entire parent owner directory as vendor evidence.",
+  "correction": "Inventory full actual synthesis/route child plus regular parent-level receipts, not pytest directories. Preserve parent test log/XML; no vendor inputs or run products excluded.",
+  "vendor_run": false
+}

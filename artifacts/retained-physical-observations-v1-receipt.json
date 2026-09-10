@@ -1,0 +1,27 @@
+{
+  "archive": {
+    "bytes": 6448360,
+    "sha256": "39388ceeba0829e16b8a58fa83f7fc60f48b7baef9b6298115ee07a3a99cde83"
+  },
+  "file_receipts": 279,
+  "members": 280,
+  "raw_before_after_equal": true,
+  "raw_roots": {
+    "prepared_v1": {
+      "bytes": 796081,
+      "files": 94
+    },
+    "prepared_v2": {
+      "bytes": 796613,
+      "files": 94
+    },
+    "route": {
+      "bytes": 5979161,
+      "files": 39
+    },
+    "synthesis": {
+      "bytes": 33742341,
+      "files": 210
+    }
+  }
+}
