@@ -44,11 +44,19 @@ separate `-production-map` branch. Two343x2 maps match exactly:1,821 visible
 scores,1,819 admitted and two checked excluded tails across those maps and a
 fresh447-score partial abort. Root independently regenerated all14 oracle files,
 passed151 policy tests and verified336 artifact receipts. The single full
-20,000x64 actual-core simulation is running on reviewed source signature
+20,000x64 actual-core simulation passed on reviewed source signature
 `b10e4f2384084f7caff844d7508fff0a538e09caf8f3713d6fddcb7f2f39b75a`.
-It must check1,280,000 selected scores and every map word, plus a fresh447-score
-partial-abort recovery; it does not qualify a second full production map after
-recovery. The periodic synthetic source tests arithmetic/geometry, not RF
+It checked1,280,000 admitted scores, all20,000 map words and a fresh447-score
+classified partial abort. Original88186 exited0 at05:12:16UTC, with no restart.
+Root independently verified all103 artifact hashes, archive integrity and strict
+terminal replay;151 policy tests passed again. Additive harness/oracle/evidence
+are now on primary FW205b7eb0b/HDLc8ad25a7, with352 combined policy tests passing
+and no runtime RTL changes. Independent primary actual-core smoke also passes
+two reduced maps and a fresh447 partial abort; all61 frozen inputs byte-match
+the full-run freeze. See `experiments/20260910-bank-production-map-primary-review.md`
+and `../docs/starlink-bank-production-map-full-20260910.md`.
+This does not qualify a second full production map after recovery. The periodic
+synthetic source tests arithmetic/geometry, not RF
 acquisition or live120ms/750Hz performance. Native map fault is a separate output
 from detector health; the failed partial terminal must remain explicit.
 
@@ -153,8 +161,21 @@ expression, while sticky faults, original public return/commit/state and every
 global same-edge reason remain literal. Prove exact forward retirement against
 the frozen old guard under actual mailbox wiring, including raw corrupt tuples,
 all other current faults, transitions, final/status edges and broken-contract
-mutants. Implementation/tests are authorized; no new physical trial, exemption
-or primary runtime promotion is authorized. See
+mutants. That implementation passed both original actual-core runs with identical
+prior control CSVs; root reviewed all521 frozen artifact hashes and independently
+passed49 focused tests with four existing physical skips. The corrected broad
+sweep is769PASS/10 existing skips/7 known uninitialized-Linux source failures;
+those seven separately pass on primary's initialized pinned Linux tree.
+Its single approved unchanged100/175 physical trial is now terminal:175 setup
+-1.907ns,hold+0.071ns,TNS-663.483ns/664 endpoints;100 setup+2.400ns.
+The targeted output-bank current-framing/held-metadata fan-in is absent from
+all64 kernel expected-next enables in both checkpoints. Nevertheless the new
+worst path is held phase through input guard/current-fault aggregation into
+fast_fault, and the next is kernel BRAM output directly into multiplier BREG0.
+Kernel CE also remains failing through other fault/control dependencies.
+No timing exception, runtime promotion or retry is authorized. Review a genuine
+local-fault/quarantined-publication and multiplier-input pipeline before another
+implementation trial. See
 `experiments/20260910-payload-bubbles-parent-review.md` for scope and the separate
 missing-Linux-source regression evidence.
 
@@ -184,9 +205,16 @@ FW `aea211988` / HDL `8e2d11a8`, without changing runtime RTL. Independent
 primary175replay also passes and freezes all ten project-local Python runtime
 modules before simulation;201policy tests pass. See
 `experiments/20260910-bank-native-paired-primary-replay.md` for exact source/
-provenance distinctions. The next stage is offline implementation/testing of
-a new true-PSS520fixture with independently regenerated FFT/map/native/pilot
-goldens; no actual run is authorized until those inputs are reviewed.
+provenance distinctions. A new true-PSS520fixture now has independently
+regenerated nonperiodic FFT/map/native/pilot goldens. Root read its complete
+oracle/tests/runner delta, repeated244 tests, regenerated the complete cohort,
+and verified all24 cohort files plus12 runtime dependencies in the archive.
+The frozen source is FWc42ebde9/HDL5ad9ba4a on the separate native branch,
+fixtureSHA aa4330480879e5f44abdfeb34b5ddeca098f1b22352715743f0db32e6672de81.
+Both authorized actual175/200 runs report terminalPASS (original53217/88546),
+including exact zero-lag native packets, coarse/pilot bytes and positive
+concurrency. Final source/log/archive review is pending. This synthetic static
+anchor does not establish causal acquisition, RF accuracy or high-rate support.
 
 The30/60 extension cannot merely change a test parameter: current realtime and
 boundary-stop wrapper/profile guards explicitly require15MS/s. Rate-conditioned

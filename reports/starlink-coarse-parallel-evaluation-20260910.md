@@ -2,6 +2,25 @@
 
 ## Latest checkpoint: complete scorer and control-path counterevidence
 
+At05:13:14UTC the next forward-retirement trial completed with a worse175MHz
+setup miss:1.907ns (hold+0.071ns),664 same-clock failing endpoints. Its target
+output-bank current-framing dependency was genuinely removed from kernel CEs,
+but input-fault aggregation, BRAM-to-unregistered-multiplier inputs and other
+kernel control remain limiting. Do not promote this variant or rerun placement
+without a newly reviewed implementation. Stage-local fault isolation and a real
+multiplier input pipeline are being evaluated; no new runtime edit is approved.
+
+The original full production-map run88186 also completed:1,280,000 admitted
+scores/all20,000 map words exact, retained reads/release and fresh447 partial
+abort passed. Root verified103 receipts and the strict terminal postprocessor.
+Its additive harness/oracle/evidence are integrated on primary FW205b7eb0b /
+HDLc8ad25a7;352 combined policy tests pass, with no runtime RTL changes.
+The new independently reviewed true-PSS520 fixture passes244 offline tests;
+actual175/200 original53217/88546 reportPASS, pending final evidence review.
+These remain digital simulation results, not live60MS/s deployment qualification.
+
+Previous measured checkpoint:
+
 Newest data-only payload experiment: FW `c62118a9` / HDL `97adf891`, tested
 RTL `b7dac802`. Both actual-core modes pass with identical prior control traces;
 root independently verifies416 artifact hashes and19 focused tests. Its one

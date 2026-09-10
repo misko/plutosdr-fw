@@ -18,18 +18,28 @@ tests, but its single route still fails at-1.614ns. A subsequent data-only
 payload-enable/balanced-kernel-identity refactor also passes both actual-core
 modes and preserves prior control traces. Its single route is still failing:
 175MHz setup-1.559ns/hold+0.071ns,553 failing same-clock endpoints. The worst
-path now crosses output-bank current framing checks into forward kernel state
-enables. This is not timing closure; exact phase separation is now authorized
-for additive implementation/tests, with no further physical trial or runtime
-promotion authorized.
+path crosses output-bank current framing checks into forward kernel state
+enables. The subsequent forward-only phase-separation experiment passes exact
+functional equivalence, but its single unchanged route is worse:175MHz
+setup-1.907ns/hold+0.071ns,664 failing same-clock endpoints. Read-only netlist
+inspection confirms the intended output-bank current-metadata dependency is
+removed from kernel enables; input-fault aggregation, unregistered multiplier
+B inputs and remaining kernel control still fail. No timing closure, runtime
+promotion or additional physical retry is authorized. A stage-local fault and
+arithmetic-pipeline proposal is under review.
 Generated175 MMCM active-traffic reset/recovery also passes
 an independent primary replay with 7,853 exact accepted scores. The original
 4,096-block175 burst/stall soak completed:1,830,912 ordered scores, FIFO358/512
 and no ingress stalls. This is the frozen alternative source, not an exact
-primary-source4096 replay or physical qualification. Production-map smoke passes two exact maps
-and a fresh447-score classified partial abort; the separately reviewed full
-20,000-by-64 simulation is now running, not yet passed. No receiver profile or radio has
-been changed. Completed alternative studies are preserved
+primary-source4096 replay or physical qualification. The single full20,000-by-64
+simulation now passes:1,280,000 admitted scores, all20,000 map words, retained
+reads/release and a fresh447-score classified partial abort. Root verified all103
+artifact hashes and replayed its strict terminal verifier. Additive map tests,
+oracle and evidence are integrated on primary without runtime RTL changes;
+352 combined policy tests pass. This is not a second full recovered map or RF
+qualification. The new true-PSS520 concurrent fixture passes244 independently
+repeated offline tests; both actual175/200 runs now report PASS and await final
+artifact review. No receiver profile or radio has been changed. Completed alternative studies are preserved
 on remote do-not-merge branches. See
 [`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)
 and [`reports/starlink-bank-owned-integration-gates-20260910.md`](reports/starlink-bank-owned-integration-gates-20260910.md).
