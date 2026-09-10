@@ -402,3 +402,105 @@ def test_complete_postprocessor_keeps_original_numeric_fault_cycle_trace_and_new
         assert receipt["events"]["output_derived_exact_sample_scores"] == 16986
         assert receipt["trace_sha256"] == STUDY.HISTORICAL_CANDIDATE_CSV
     assert not (output / "results.json").exists()
+
+
+@pytest.mark.parametrize("kind", ["output", "dangling_output", "parent", "dangling_parent", "dotdot_parent"])
+def test_preparation_rejects_lexical_output_alias_before_normalization(tmp_path, kind):
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "sentinel").write_text("untouched")
+    alias = tmp_path / "alias"
+    alias.symlink_to(tmp_path / "missing" if "dangling" in kind else target, target_is_directory=True)
+    output = alias if "output" in kind else alias / "prepared"
+    if kind == "dotdot_parent":
+        output = alias / ".." / "prepared"
+    with pytest.raises(ValueError, match="symlink"):
+        STUDY.freeze(output, ACTUAL, 1)
+    assert sorted(p.name for p in target.iterdir()) == ["sentinel"]
+    assert (target / "sentinel").read_text() == "untouched"
+    assert not (tmp_path / "missing").exists()
+    assert not (tmp_path / "prepared").exists()
+
+
+@pytest.mark.parametrize("kind", ["root", "parent", "frozen_sources", "dangling_source", "manifest", "outcome"])
+def test_original_source_root_and_frozen_input_aliases_rejected(tmp_path, kind):
+    original = tmp_path / "original"
+    if kind == "root":
+        original.symlink_to(ACTUAL, target_is_directory=True)
+    elif kind == "parent":
+        original.symlink_to(ACTUAL.parent, target_is_directory=True)
+        original = original / ACTUAL.name
+    else:
+        original.mkdir()
+        for name in ("manifest.json", "run_outcome.txt"):
+            shutil.copy(ACTUAL / name, original / name)
+        if kind in ("frozen_sources", "dangling_source"):
+            (original / "frozen_sources").symlink_to(
+                ACTUAL / "frozen_sources" if kind == "frozen_sources" else tmp_path / "missing", target_is_directory=True)
+        else:
+            (original / "frozen_sources").mkdir()
+            name = "manifest.json" if kind == "manifest" else "run_outcome.txt"
+            (original / name).unlink()
+            (original / name).symlink_to(ACTUAL / name)
+    output = tmp_path / "never-created"
+    with pytest.raises(ValueError, match="symlink"):
+        STUDY.freeze(output, original, 1)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("kind", ["root", "parent", "dangling_root", "source", "dangling_source", "manifest"])
+def test_verifier_rejects_lexical_alias_even_when_target_matches_expected(prepared, tmp_path, kind):
+    expected = STUDY.digest((prepared / "manifest.json").read_bytes())
+    if kind in ("root", "parent", "dangling_root"):
+        alias = tmp_path / "alias"
+        alias.symlink_to(tmp_path / "missing" if kind == "dangling_root" else prepared.parent if kind == "parent" else prepared, target_is_directory=True)
+        output = alias / prepared.name if kind == "parent" else alias
+    else:
+        output = tmp_path / "copy"
+        output.mkdir()
+        if kind == "manifest":
+            (output / "manifest.json").symlink_to(prepared / "manifest.json")
+        else:
+            shutil.copy(prepared / "manifest.json", output / "manifest.json")
+            (output / "frozen_sources").symlink_to(
+                prepared / "frozen_sources" if kind == "source" else tmp_path / "missing", target_is_directory=True)
+    with pytest.raises(ValueError, match="symlink"):
+        STUDY.verify(output, expected)
+
+
+def test_missing_sources_and_existing_destination_fail_before_any_write(tmp_path):
+    output = tmp_path / "never-created"
+    with pytest.raises(FileNotFoundError):
+        STUDY.freeze(output, tmp_path / "missing", 1)
+    assert not output.exists()
+    output.mkdir()
+    (output / "sentinel").write_text("retained")
+    with pytest.raises(FileExistsError):
+        STUDY.freeze(output, ACTUAL, 1)
+    assert sorted(p.name for p in output.iterdir()) == ["sentinel"]
+
+
+@pytest.mark.parametrize("kind", ["output", "parent", "runner", "dotdot"])
+def test_frozen_tcl_rejects_alias_before_file_normalize(prepared, tmp_path, kind):
+    output = prepared
+    runner = prepared / "frozen_sources" / STUDY.RUNNER
+    alias = tmp_path / "alias"
+    if kind == "output":
+        alias.symlink_to(prepared, target_is_directory=True)
+        output = alias
+    elif kind == "parent":
+        alias.symlink_to(prepared.parent, target_is_directory=True)
+        output = alias / prepared.name
+    elif kind == "runner":
+        alias.symlink_to(runner)
+        runner = alias
+    else:
+        alias.symlink_to(prepared, target_is_directory=True)
+        output = alias / ".." / prepared.name
+    expected = STUDY.digest((prepared / "manifest.json").read_bytes())
+    mock = tmp_path / "mock-alias.tcl"
+    mock.write_text(f"set argc 3\nset argv [list {{{output}}} {{{sys.executable}}} {expected}]\nsource {{{runner}}}\n")
+    result = subprocess.run(["tclsh", str(mock)], env=env(), capture_output=True, text=True, timeout=10, check=False)
+    (tmp_path / "alias.log").write_text(result.stdout + result.stderr)
+    assert result.returncode != 0 and "symlink actual output/runner path forbidden" in result.stderr
+    assert not (prepared / "preflight.json").exists() and not (prepared / "launch_started.txt").exists()

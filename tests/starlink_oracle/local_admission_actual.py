@@ -40,6 +40,18 @@ def digest(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def safe_path(value):
+    """Reject aliases before normalization, including dangling lexical parents."""
+    lexical = Path(value)
+    if not lexical.is_absolute():
+        lexical = Path.cwd() / lexical
+    # Preserve '..' components until every traversed parent has been checked.
+    for entry in (lexical, *lexical.parents):
+        if entry.is_symlink():
+            raise ValueError("symlink path/ancestor forbidden: " + str(entry))
+    return lexical.resolve()
+
+
 def load(name):
     path = Path(__file__).with_name(name + ".py")
     if digest(path.read_bytes()) != FIXED[path.name]:
@@ -66,6 +78,7 @@ def edits_runner():
     return (
         ('if {$argc != 2} { error "expected PREPARED_OUTPUT ABSOLUTE_PYTHON" }',
          'if {$argc != 3} { error "expected PREPARED_OUTPUT ABSOLUTE_PYTHON EXPECTED_MANIFEST_SHA" }\nset expected_manifest [lindex $argv 2]'),
+        ("set output_dir [file normalize [lindex $argv 0]]", RUNNER_PATH_CHECK + "set output_dir [file normalize [lindex $argv 0]]"),
         ("bank_arithmetic_actual.py", "local_admission_actual.py"),
         ("verify $output_dir >", "verify $output_dir --expected $expected_manifest >"),
         ('if {$R != 1 || [list $B $O] ni {{0 0} {1 1}} || $fast_mhz ni {175 200}} { error "undeclared matrix" }',
@@ -78,6 +91,22 @@ def edits_runner():
         ("BANK_ARITHMETIC_ACTUAL_CORE_VERIFIED_NO_SCORER_RTL_PHYSICAL_OR_RF_CLAIM",
          "LOCAL_ADMISSION_ACTUAL_CORE_VERIFIED_NO_SCORER_RTL_PHYSICAL_OR_RF_CLAIM"),
     )
+
+
+RUNNER_PATH_CHECK = """# Reject lexical aliases BEFORE Tcl normalization can hide them from Python.
+foreach requested_path [list [lindex $argv 0] [info script]] {
+  set lexical_path $requested_path
+  if {[file pathtype $lexical_path] eq "relative"} { set lexical_path [file join [pwd] $lexical_path] }
+  while {1} {
+    if {![catch {file type $lexical_path} lexical_type] && $lexical_type eq "link"} {
+      error "symlink actual output/runner path forbidden: $lexical_path"
+    }
+    set parent_path [file dirname $lexical_path]
+    if {$parent_path eq $lexical_path} { break }
+    set lexical_path $parent_path
+  }
+}
+"""
 
 
 WAVE_ADD = """# Extra observer recording, independent of existing arithmetic diagnostics.
@@ -165,7 +194,10 @@ def verify_payloads(payloads, option):
 
 
 def freeze(output, old_actual, option):
-    output, old_actual = Path(output).resolve(), Path(old_actual).resolve()
+    output, old_actual = safe_path(output), safe_path(old_actual)
+    old_source = safe_path(old_actual / "frozen_sources")
+    for name in ("manifest.json", "run_outcome.txt"):
+        safe_path(old_actual / name)
     if type(option) is not int or option not in (0, 1):
         raise ValueError("only L0/L1 fixed R1/B1/O1 175 MHz preparations")
     if output.exists():
@@ -175,7 +207,6 @@ def freeze(output, old_actual, option):
     if digest((old_actual / "manifest.json").read_bytes()) != HISTORY:
         raise ValueError("not the fixed original v3 candidate source history")
     old_manifest = json.loads((old_actual / "manifest.json").read_text())
-    old_source = old_actual / "frozen_sources"
     found = {p.name: digest(p.read_bytes()) for p in old_source.iterdir() if p.is_file() and not p.is_symlink()}
     if found != old_manifest["source_sha256"] or len(found) != len(list(old_source.iterdir())):
         raise ValueError("original historical source inventory changed")
@@ -223,12 +254,13 @@ def freeze(output, old_actual, option):
 
 
 def verify(output, expected=None):
-    output = Path(output).resolve()
+    output = safe_path(output)
+    safe_path(output / "manifest.json")
     manifest_bytes = (output / "manifest.json").read_bytes()
     if expected is not None and digest(manifest_bytes) != expected:
         raise ValueError("unexpected authorized manifest identity")
     manifest = json.loads(manifest_bytes)
-    source = output / "frozen_sources"
+    source = safe_path(output / "frozen_sources")
     entries = list(source.iterdir())
     if any(not p.is_file() or p.is_symlink() for p in entries):
         raise ValueError("unsafe frozen source inventory")
@@ -273,7 +305,7 @@ def require_guard_wave(receipt, inventory):
 
 
 def results(output, expected):
-    output = Path(output).resolve()
+    output = safe_path(output)
     manifest = verify(output, expected)
     base = load("bank_arithmetic_actual")
     start = f"actual_fft=true R=1 B=1 O=1 frequency=175 L={manifest['L']} no_restart=true\n"
