@@ -1,0 +1,30 @@
+--- source.v
++++ source.v
+@@ -3,7 +3,7 @@
+ // Default is inert, not a substitute for any production caller. No RAM/FFT.
+ // The common epoch, NEVER a per-transform core reset, owns this state.
+ `timescale 1ns/1ps
+-module starlink_pss_checked_product_read_observe #(
++module starlink_pss_checked_product_read_interface #(
+   parameter integer CHECKED_PRODUCT_READ = 0
+ ) (
+   input wire clk, resetn,
+@@ -37,9 +37,6 @@
+   output wire validation_fault_now,
+   output wire token_fault_now, offer_fault_now,
+   output wire head_valid,
+-  // Observation only: no current live/offer/READY dependency. A caller must
+-  // still check the separately exported current token and raw fault fences.
+-  output wire head_owned_good,
+   output wire [1:0] head_lease,
+   output wire [15:0] fault_events_now,
+   output wire [15:0] fault_reasons,
+@@ -124,8 +121,6 @@
+   assign private_take = raw_valid === 1'b1 && raw_ready;
+   assign head_valid = enabled && owned && clean && live_clean && current_clean &&
+     count!=0 && occupied[head] && good[head];
+-  assign head_owned_good = enabled && owned && clean &&
+-    count!=0 && occupied[head] && good[head];
+   assign head_lease = lease_slot[head];
+   assign core_valid = head_valid && core_enable;
+   assign core_take = core_valid && core_ready === 1'b1;

@@ -1,0 +1,30 @@
+--- source.v
++++ source.v
+@@ -20,7 +20,7 @@
+ // transport stalls fault closed. A new job waits for the mailbox's actual ACK.
+ `timescale 1ns/1ps
+ 
+-module starlink_pss_realtime_result_guard_observe #(
++module starlink_pss_realtime_result_guard #(
+   parameter integer WATCHDOG_CYCLES = 8192,
+   // Opt in only when the caller proves idle input is reset/completed, and
+   // final qualification and the full ACK interval imply completed input.
+@@ -77,7 +77,6 @@
+   input wire inverse_phase,
+   input wire forward_mailbox_fault,
+   output wire forward_retirement_valid,
+-  output wire validated_ack,
+   output wire [35:0] mailbox_input_data,
+   output wire [8:0] mailbox_input_position,
+   output wire mailbox_input_last,
+@@ -167,10 +166,6 @@
+     (external_fault_now || certified_input_beat || certified_input_complete);
+   wire idle_fault_now = phase_input_fault || mailbox_input_fault ||
+     core_event_frame_started || core_status_tvalid || core_output_tvalid;
+-  // Observation of the exact old ACK-clear event; no internal state/control
+-  // expression changes. A bank transport ACK remains a separate transaction.
+-  assign validated_ack = resetn && awaiting_ack && mailbox_input_ready &&
+-    !protocol_fault && !idle_fault_now;
+   assign job_ready = resetn && !protocol_fault && !idle_fault_now &&
+     !active && !awaiting_ack && !return_valid &&
+     input_bank_reserved && output_bank_reserved && mailbox_input_ready;

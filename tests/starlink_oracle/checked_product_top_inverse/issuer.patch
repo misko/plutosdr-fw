@@ -1,0 +1,52 @@
+--- source.v
++++ source.v
+@@ -3,7 +3,7 @@
+ // Fixed product70 encoding is zero-extended to the opaque d9c75-bit checker.
+ // Common epoch reset/peer-purge attestation is external; never use core reset.
+ `timescale 1ns/1ps
+-module starlink_pss_product_sealed_observe #(
++module starlink_pss_product_sealed_publication_interface #(
+   parameter integer SEALED_PRODUCT_ADAPTER = 0,
+   parameter integer SEPARATE_PRODUCT_SEAMS = 0
+ ) (
+@@ -38,11 +38,9 @@
+   output wire fault,
+   output wire producer_owned,
+   output wire read_head_valid,
+-  output wire read_head_owned_good,
+   output wire [74:0] read_head_metadata,
+   output wire [1:0] read_head_lease,
+   output wire handoff_owned,
+-  output wire handoff_state_owned,
+   output wire handoff_capacity, handoff_fault_now,
+   output wire [74:0] admitted_metadata,
+   output wire [1:0] admitted_lease,
+@@ -142,9 +140,6 @@
+   assign reader_validation_fault_now = queue_validation_fault;
+   assign handoff_owned = epoch_resetn && handoff_seen && published_reference &&
+     reader_reference && direct_clean && !fault;
+-  // State-only receipt observation, NOT authorization or a new state machine.
+-  assign handoff_state_owned = epoch_resetn && handoff_seen && published_reference &&
+-    reader_reference && !fault;
+   // Capacity is NOT authorization. In ACK phase the real guard sees this
+   // state/GOOD-only capacity and independently checks handoff_fault_now plus
+   // its exact current idle faults before clearing ownership.
+@@ -203,7 +198,7 @@
+     .private_take(product_take), .checked_seal(checked_seal), .publish(publication),
+     .lease_release(lease_release), .sealed(), .published(bank_published)
+   );
+-  starlink_pss_checked_product_read_observe #(.CHECKED_PRODUCT_READ(1)) reader (
++  starlink_pss_checked_product_read_interface #(.CHECKED_PRODUCT_READ(1)) reader (
+     .clk(clk), .resetn(epoch_resetn), .admit_valid(queue_admit_valid), .admit_ready(queue_admit_ready),
+     .admit_lease(lease_reference), .admit_metadata(expected_metadata),
+     .raw_valid(bank_valid && reader_reference), .raw_ready(bank_ready), .raw_data(bank_data),
+@@ -215,8 +210,7 @@
+     .release_ready(queue_release_ready), .released(queue_released), .live_faults(reader_live),
+     .active(queue_active), .prefetched(queue_prefetched), .final_consumed(queue_final), .drained(queue_drained),
+     .private_take(), .core_take(core_take), .validation_fault_now(queue_validation_fault), .fault_reasons(reader_reasons),
+-    .head_valid(read_head_valid), .head_owned_good(read_head_owned_good),
+-    .head_lease(read_head_lease), .fault_events_now(reader_fault_events_now),
++    .head_valid(read_head_valid), .head_lease(read_head_lease), .fault_events_now(reader_fault_events_now),
+     .token_fault_now(reader_token_fault_now), .offer_fault_now(reader_offer_fault_now),
+     .fault_token_valid(), .fault_token_position(), .fault_token_lease()
+   );

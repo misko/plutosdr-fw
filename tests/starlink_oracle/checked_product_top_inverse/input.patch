@@ -1,0 +1,86 @@
+--- source.v
++++ source.v
+@@ -12,19 +12,14 @@
+ // waitstates are legal. Detect a violated demand immediately, even if the
+ // caller accidentally withdraws input_enable. Do not wait for vendor halt.
+ `timescale 1ns/1ps
+-module starlink_pss_realtime_checked_product_input_guard #(
++module starlink_pss_realtime_input_guard #(
+   parameter integer CHECK_INPUT_BLOCK_IDENTITY = 1,
+-  parameter integer BALANCED_IDENTITY_EQ = 0,
+-  parameter integer CHECKED_PRODUCT_BINDING = 0
++  parameter integer BALANCED_IDENTITY_EQ = 0
+ ) (
+   input wire clk,
+   input wire resetn,
+   input wire job_start,
+   input wire [69:0] job_descriptor,
+-  input wire checked_job_binding,
+-  input wire [1:0] checked_job_lease,
+-  input wire checked_token_good,
+-  input wire [1:0] checked_token_lease,
+   input wire input_enable,
+   input wire input_valid,
+   output wire input_ready,
+@@ -50,16 +45,12 @@
+   output reg [2:0] fault_reasons
+ );
+   initial begin
+-    if (CHECKED_PRODUCT_BINDING !== 0 && CHECKED_PRODUCT_BINDING !== 1)
+-      $fatal(1, "CHECKED_PRODUCT_BINDING must be zero or one");
+     if (CHECK_INPUT_BLOCK_IDENTITY != 0 && CHECK_INPUT_BLOCK_IDENTITY != 1)
+       $fatal(1, "CHECK_INPUT_BLOCK_IDENTITY must be zero or one");
+     if (BALANCED_IDENTITY_EQ != 0 && BALANCED_IDENTITY_EQ != 1)
+       $fatal(1, "BALANCED_IDENTITY_EQ must be zero or one");
+   end
+   reg job_started, input_started;
+-  reg checked_product_job;
+-  reg [1:0] checked_lease;
+   reg [69:0] descriptor;
+   reg [8:0] expected_position;
+   assign protocol_fault = |fault_reasons;
+@@ -84,9 +75,7 @@
+   end endgenerate
+   wire metadata_valid = input_position == expected_position &&
+     input_last == (expected_position == 511) &&
+-    (CHECKED_PRODUCT_BINDING && checked_product_job ?
+-      (checked_token_good === 1'b1 && checked_token_lease === checked_lease) :
+-      (!CHECK_INPUT_BLOCK_IDENTITY || identity_matches));
++    (!CHECK_INPUT_BLOCK_IDENTITY || identity_matches);
+   // Checker consumes malformed presented input even while the core stalls.
+   // Mailbox retirement uses the explicitly metadata-independent transport cone.
+   assign input_ready = eligible && (metadata_valid ? core_input_tready : 1'b1);
+@@ -94,14 +83,7 @@
+   assign core_input_tdata = {6'b0, input_data[35:18], 6'b0, input_data[17:0]};
+   assign core_input_tvalid = eligible && input_valid && metadata_valid;
+   assign core_input_tlast = input_last;
+-  // A mode bit is not authority. Top supplies independently ACK/origin-bound
+-  // descriptor/lease evidence; a missing/unknown inverse start binding fails
+-  // on this edge and is retained in the original framing category.
+-  wire invalid_checked_start = CHECKED_PRODUCT_BINDING && resetn && job_start &&
+-    job_descriptor[69] !== 1'b0 &&
+-    (job_descriptor[69] !== 1'b1 || checked_job_binding !== 1'b1 ||
+-     ^checked_job_lease === 1'bx);
+-  wire framing_error = (eligible && input_valid && !metadata_valid) || invalid_checked_start;
++  wire framing_error = eligible && input_valid && !metadata_valid;
+   wire delivery_error = slot_open && input_started && core_input_tready &&
+     !core_input_tvalid;
+   wire duplicate_start = resetn && job_start && job_started;
+@@ -117,8 +99,6 @@
+   always @(posedge clk or negedge resetn) begin
+     if (!resetn) begin
+       job_started <= 0;
+-      checked_product_job <= 0;
+-      checked_lease <= 0;
+       input_started <= 0;
+       input_complete <= 0;
+       descriptor <= 0;
+@@ -130,8 +110,6 @@
+         if (job_start) begin
+           job_started <= 1;
+           descriptor <= job_descriptor;
+-          checked_product_job <= CHECKED_PRODUCT_BINDING && job_descriptor[69];
+-          checked_lease <= checked_job_lease;
+         end
+         if (certified_input_beat) begin
+           input_started <= 1;
