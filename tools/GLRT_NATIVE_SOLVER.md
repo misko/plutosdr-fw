@@ -1,0 +1,72 @@
+# Native full-pilot radio solver
+
+`glrt_native_solver.c` consumes CPU-endian GLS1 result words and solves one
+bounded timing/CFO update without observed IQ, FFTs, allocation or I/O. It is
+portable C99 with double precision and libm. The caller must first associate
+epoch, batch, repeat, sequence, rounded start and carrier step using its retained
+finite descriptor. Packet shape alone is not acquisition or association.
+
+The three columns are the exact quantized B04 reference, negative derivative
+per microsecond and frequency derivative per kHz at centered native sample
+times. `generate_glrt_native_gram.py` pins the coefficient bank SHA-256 and
+generates the constant 3x3 Hermitian Gram matrix. The reference/derivative
+projections come directly from FPGA sums. The frequency projection is
+`-j*pi*1000/60000000 * ((N-1)*reference_sum - 2*prefix_integral)`.
+The centered integer quantity is calculated in signed 96-bit limbs before
+conversion to double, including near cancellation. No ARM `__int128` is needed.
+
+The solver profiles complex gain, projects it out of the two derivative
+columns and solves a real 2x2 system. This follows the qualified local streaming
+algorithm through a firmware-owned implementation; the tracker repositories
+are not runtime dependencies. The C implementation has no connection to a
+radio until a caller supplies already retained/associated moments.
+
+Corrections are relative to the **actual rounded engine start** and reported
+carrier step. Keep start as u64 plus a separate fractional correction; do not
+convert the whole source index to double. CFO is relative to the input pilot
+band and applies at pilot center under the local model. It does not isolate
+satellite Doppler from oscillator/LNB drift.
+
+Default local bounds remain 250 ns / 250 Hz, with minimum prediction coherence
+0.05. Faulted or incomplete observations are retained with rejection flags and
+never fitted using the full-pilot Gram matrix. Malformed integer encodings or
+source-index wrap return an error. A nonzero rejection forbids feeding the
+correction into tracking. A supported linearized fit still does not certify
+pilot acquisition, calibrated physical timing, uncertainty or RF truth.
+
+## Verification and radio benchmark
+
+`tests/starlink_glrt/test_native_solver.py` passes 43 tests: an independent tall
+real least-squares SVD matches the C corrections and both coherences; tests also
+cover noise/tone/zero controls, local bounds, malformed packets, partial faults,
+signed carrier steps, u64 coordinates and exact integer carry/cancellation.
+The generated Gram matrix must match regeneration from the pinned bank.
+
+Artifacts under `/srv/bulk/leo/glrt-deployment-20260909/native-solver-benchmark-v1`
+retain the host/ARM executables, exact five saved test packets, dense-fit
+expectations, source/binary hashes and PPU Ethernet operator receipts.
+`operator-v2.json` records **100,000 calls averaging 2.62945197 us** on radio
+`winbond-db620818a328172c` at `192.168.1.14`. All five ARM estimates match the host
+within 1e-18 s / 1e-8 Hz and 1e-12 coherence, including the rejected out-of-bound
+case. The first operator attempt failed because the minimal radio rootfs lacks
+`base64`; that receipt is retained. The successful attempt used PPU's binary-safe
+SSH stream and verified both input and executable hashes on the radio.
+
+This benchmark used no RF collection, changed no firmware, confirmed the pinned
+deployed manual profile and idle/TX-off state before and after, and removed its
+temporary radio files. It measures only the solver, **excluding sysfs access,
+record retention, scheduling, tracking and Linux scheduling jitter**. Those
+costs still require an end-to-end 750 Hz test. This is not a precision evaluation
+of newly received signals.
+
+Example host build:
+
+```
+cc -std=c99 -O2 -Wall -Wextra -Werror tools/glrt_native_solver.c \
+  tools/glrt_native_solver_bench.c -lm -o /tmp/glrt-native-solver-bench
+```
+
+The saved-packet benchmark accepts `PACKETS_TEXT ITERATIONS`, at most 64 packets
+and one million calls, with a ten-second computation ceiling checked every
+1,024 calls. It emits per-packet estimates and aggregate elapsed time. It never
+opens a device or changes any firmware/configuration.
