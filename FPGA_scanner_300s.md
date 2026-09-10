@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Synthesis checkpoint (2026-09-10, after15:24 UTC): original75133 PASSES the
+source-pinned product-final OOC synthesis,2064 LUTs/4607 FFs/21 DSPs/15 RAMB18s,
+zero black boxes. Parent independently verified complete actual-source binding,
+13 copied sources and all eight products. Accepted DCP `41c756bd...` is approved
+for ONE unchanged-constraint diagnostic route via the reviewed5938ff6c owner.
+There is no new routed timing result yet; neither synthesis success nor a future
+route-tool exit alone means deployment eligibility. See the product-final report.
+
 Next physical gate (2026-09-10, after 15:16 UTC): product-final physical
 preparation independently passes33 tests and closes19 frozen files, including
 eight actual-qualified runtime modules. Exact clocks/constraints/strategy and

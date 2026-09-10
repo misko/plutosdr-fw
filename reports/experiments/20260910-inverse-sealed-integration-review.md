@@ -207,3 +207,31 @@ Complete parent252 results/source copies are preserved as
 `a046ab797cd4d36131502fe36b1f897537dd801f372d77e6467d8e061598213c`.
 `tar --compare` matches retained originals; redundant pytest `*current` aliases
 are omitted. The earlier235 and first-word14-test results remain separate.
+
+Parent independently verified all3080 safe unique regular members from the
+committed early-status archive at FW
+`f9cde75ebbdf0d01e4b0053622b4de7b48230812` (including its independently pinned
+inventory). Archive19239128 bytes, SHA-256
+`4a35442bd5f71c2a4f9aaae6fa7d70d79ac7fc317691050a9af83828afccc1ad`.
+No extraction or source modification was needed.
+
+### Independent full baseline clock-model check
+
+Parent separately parsed the immutable76-job trace and arithmetic event CSV
+`bank_arithmetic_events.csv`, SHA-256
+`7bbe79fd2648984f0901296d69c1e168cac400426eb2642e91e24ff3815803f3`.
+Without importing the draft timing helper, it computed publication time as
+`2857143*(2*fast_cycle+1)` femtoseconds, enumerated the first later slow edge
+from origin6300000fs/period10000000fs, and applied the mailbox's four-edge
+acceptance pipeline plus the unchanged periodic READY schedule. Every one of
+19456 inverse acceptance timestamps matches. Forward19456 and product19456
+timestamps separately match admission+1299+position and+1304+position.
+All114 stream blocks contain512 ordered positions. Frozen1ns/1fs bench clock
+generation and falling-edge counters were independently read.
+
+This validates the baseline finite timing model in both nominal/stalled epochs,
+not the candidate's later-publication trajectory or full-pair service result.
+The draft parser initially rejected startup X values before epoch filtering;
+that read-only failure was caught and the owner repaired scoped parsing while
+retaining strict X rejection for healthy running rows. Future actual execution
+still needs a frozen timing/numerical/receipt contract and independent review.

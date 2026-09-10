@@ -270,3 +270,44 @@ Both parent smoke and full-test trees are preserved in
 `3db77b435be7294f60a2f0754826c9695b35d6b95a7a21d5a489fc9d5dc411d9`.
 Archive compares to retained originals; redundant pytest `*current` aliases
 are omitted, not followed or deleted.
+
+## Synthesis passed; exact diagnostic route approved
+
+Original75133 exited0 after127.892438 seconds, started15:22:18.723278 and
+ended15:24:26.615810 UTC. Before/tool/after/return statuses are all0, all eight
+products nonempty, zero black boxes. Mapped2064 LUTs,4607 FFs,21 DSPs and
+15 RAMB18s: +5 LUTs versus ROM synthesis, unchanged FF/DSP/RAM. This is not
+routed utilization or a timing improvement. CDC remains17 informational and
+139 warning paths;114 input/124 output delay omissions remain unqualified.
+
+Parent20406 independently exits0, recovery `product-synth-audit-parent.3ab5RYuC`.
+It rechecks the external19-file inventory/helper/owner pins, full copied
+13-file source closure, all eight product sizes/hashes, composed source
+admission, owner completion, all recorded source/IP hashes and seven exact
+enabled generics. The reports name `starlink_pss_fft_bank_owned_product_fence`
+and device `xc7z010clg400-1`. Clocks remain source100MHz/island175MHz
+(5.714ns constraint); the original generated-IP factory is unchanged.
+
+Accepted synthesis DCP2171713 bytes, SHA-256
+`41c756bdc45635b1107d73ad741826e5a8f8fa276dc159468ec2355c16203aa6`.
+Root and independent reviewer read the entire old route owner and unchanged Tcl.
+The new owner at recovery `product-final-route-v1/own_route.py`, SHA-256
+`5938ff6c7141676e3629547196e1d5aec57f5bd77c8df2fbe76edbc01e6873de`,
+strictly restores old owner `e9b7ca139...` with exactly three substitutions:
+new synthesized DCP path, new prepared Tcl path, new accepted DCP hash.
+No other owner/constraint/strategy change. Root checks all route/tmp/log/receipt
+targets absent and syntax valid before launch. Tcl remains
+`0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a`.
+
+ONE diagnostic route is approved for that exact owner/DCP/Tcl. The implementation
+agent owns its original process to terminal; no retries or radio operations.
+The route Tcl alone does not prove P1/top/device provenance: that binding comes
+from the accepted synthesis audit above. A successful owner exit only proves
+a complete diagnostic record; setup/hold, route completeness and crossings must
+still be examined. No full-receiver, I/O or deployment qualification is implied.
+
+Parent read-only synthesis audit script and result are archived as
+`20260910-product-synth-parent-audit.tgz`,2321 bytes, SHA-256
+`6d41bf6f6cf70d3ff9bf1a2645a33a93fa826f18f7ff81b9f854284ea6881c6f`.
+The archive compares to its originals. This compact audit is separate from the
+owner's full source/DCP/report archive.
