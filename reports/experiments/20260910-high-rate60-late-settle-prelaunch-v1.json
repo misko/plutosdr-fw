@@ -1,0 +1,11 @@
+{
+  "actual_executed": false,
+  "archive": "/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/late60-settle-agent.7cjlYh/20260910-high-rate60-late-settle-prelaunch-v1.tgz",
+  "archive_outside_worktree_to_avoid_tmp_quota": true,
+  "bundle_sha256": "79febd5abe231065f9fc77abd7c587104e4608ffd8eae40ebd5b4f20a6ac1043",
+  "bytes": 2121243,
+  "hash_length_receipts": 404,
+  "safe_regular_members": 405,
+  "sha256": "4ec1d4104633adadd3f10127c2a4743b6f1eadadafc21fa5eff171c6470ef90e",
+  "source_signature": "66eac04547dcef402651f4d2cd9a412d1c432b17045c223779076c6d8eaabfd3"
+}
