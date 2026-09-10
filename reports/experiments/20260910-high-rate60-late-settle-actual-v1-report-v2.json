@@ -1,0 +1,12 @@
+{
+  "archive": "/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/late60-settle-agent.7cjlYh/20260910-high-rate60-late-settle-actual-v1-report-v2.tgz",
+  "bundle_sha256": "79febd5abe231065f9fc77abd7c587104e4608ffd8eae40ebd5b4f20a6ac1043",
+  "bytes": 2291252,
+  "classification": "expected-late actual PASS, no causal/physical promotion",
+  "hash_length_receipts": 405,
+  "original_exit": 0,
+  "original_handle": 2011,
+  "safe_regular_members": 406,
+  "sha256": "0c0d31b9d5c907f3453597c751064a5c15df26f54fd0281683e947ce783e9af8",
+  "source_signature": "66eac04547dcef402651f4d2cd9a412d1c432b17045c223779076c6d8eaabfd3"
+}
