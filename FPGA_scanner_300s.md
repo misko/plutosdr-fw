@@ -2,6 +2,16 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest checkpoint (2026-09-10): the experimental three-bank FFT engine passes
+actual-core numerical/fault tests and has a tested175MHz slice service interval
+below the canonical block-arrival period. Its isolated route still fails an
+internal metadata/fault-to-kernel-enable path at-2.557ns. The additive complete
+scoring composition is being implemented separately; no receiver profile or
+radio has been changed. All three completed alternative studies are preserved
+on remote do-not-merge branches. See
+[`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)
+and [`reports/starlink-bank-owned-integration-gates-20260910.md`](reports/starlink-bank-owned-integration-gates-20260910.md).
+
 ## Objective and completion gate
 
 Capture one RX at 15, then 30, then 60 MS/s while hopping over CH1L, CH2L,

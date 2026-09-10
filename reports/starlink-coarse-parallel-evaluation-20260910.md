@@ -107,3 +107,47 @@ The measured reference-resource inventory and reproducible read-only reports are
 in `reports/experiments/20260910-coarse-reference-resources.md` and its archive.
 Normalization and20BRAM tiles of coarse maps remain material costs regardless
 of the FFT choice. No source-rate fine search or pilot output is removed.
+
+## Completed second studies and remote preservation
+
+The root reviewed all three second-study reports, reran the direct feeder RTL
+(72543 inputs/71047 exact results), reran the eleven prior-alias unit tests,
+and reran nineteen bank-evidence/island-budget tests. All passed. Root checked
+the six remote refs against the exact frozen hashes below after pushing.
+The FFT branch now proceeds to an additive unchanged-score composition; its
+frozen bank-slice revision remains separately identifiable below.
+
+| Alternative | Frozen firmware commit | Frozen HDL commit |
+| --- | --- | --- |
+| Three-bank FFT island | `1035b93d53b8519f18d280e50f7e3ab11e56edce` | `169f9fb659bd98b4cb1e76163f4fdb8b853a7d1b` |
+| Direct feeder/history | `73c98844d801aae3fdb510503d2f1d4e9c04615e` | `f36613fa13626a86db3b9f30ce557e41c61b1913` |
+| Prior-alias assistance | `d0acda14b7f44b054671df6098793c8c36db532f` | `eb96c64738697c10b9c0abb379ab64f6a4a5c59c` (unchanged) |
+
+The root pushed these exact six revisions to their corresponding do-not-merge
+branches in the firmware and HDL remotes. No main merge or PR was created.
+The agents themselves performed no remote writes. Further working-tree changes
+are not implied to be included in those frozen pushes.
+
+The FFT slice passes actual-core tests at150/175/200MHz with44 healthy complete
+blocks per run and a130-word exact provisional prefix before injected late-fault
+quarantine. The175MHz nominal/stalled maxima are25.943/27.543us, below29.8us
+arrival;150MHz's31us stalled interval exceeds it. These are independent-block
+slice results, not continuous-source score qualification. The complete slice
+synthesizes to1834LUT/4375FF/21DSP/7.5BRAM, with no black boxes.
+
+Root's subsequent isolated route finds a same-domain175MHz failure of-2.557ns
+from product-bank metadata through input/result validity to kernel-memory enable.
+The archive and exact diagnostic limitations are in
+`experiments/20260910-bank-owned-route-diagnostic.md`. A physical receiver clock
+is not established. The next control refactor must preserve identity checks,
+current-fault commit vetoes, private-bank ownership and terminal health.
+
+The complete direct feeder+MAC route fails setup(-3.161ns) and hold(-.742ns),
+with2354LUT/2814FF/18DSP/4BRAM; normalization remains omitted. It is not selected.
+The prior-alias study completes eleven exact PSS branches and25 blind GLRT
+probes, but both causal CFO aliases remain candidates. Two sequential maps
+need at least170.667ms at current throughput and the production three-map rule
+needs256ms for one branch. Short-dwell causal policy remains an explicit gate,
+not something timing closure alone resolves.
+
+Detailed next gates: `starlink-bank-owned-integration-gates-20260910.md`.
