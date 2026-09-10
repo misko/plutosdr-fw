@@ -1357,3 +1357,51 @@ receipts; all final traces, logs/XML and simulated sources are included. No
 numerical/runtime changes or extra actual FFT execution occurred. Combined60
 harness work proceeds separately; repeated unchanged suite runs solely to
 qualify packaging revisions are not required.
+
+## Next timing candidates: independent replays and C1 actual launch
+
+Parent fully read the final CDC actual-preparation helper, observation-only
+include, tests, report and frozen Tcl runner. Independent101 tests PASS16.65s,
+original76528 terminal0, `/tmp/starlink-cdc-prep-parent.Wyx7P7`. All48 prepared
+members still match inventory
+`9c81c43d9ed0bbc6cfba1d40074d11ec8cd94530fc9d7920de809bd6d68ce39c`;
+the project was absent before authorization. The seven direct runtime modules
+remain identical to reviewed CDC runtime02de07cc. Parent independently verified
+all1725 archive members directly from Git at HDL597a8ab65 (original23387 exit0),
+manifest `0e1d4b836d244a21790704ec0a88a55c690788eb2378cad487a7d00a11b588d2`.
+
+One R1D1S1C1/extras1/175/QUICK0 actual run is authorized at frozen
+`/tmp/starlink-completed-input.5EaJuD/fault-cdc-actual-prepared-v1`,
+FW4d59ce832f82fd06b8c95a1b2c2461a6162ecdb6 /
+HDL597a8ab65ce9d4ee68b4ca0fe4a98ab48604beb7. Owner launched original20091
+after all48 before-source checks. Use the original handle through terminal;
+retain process status and after-source verification even on failure. Dec20
+independent reference, all original numerical/CSV/stimulus and narrowly scoped
+qualified-status rules remain unchanged. No C0 rerun, physical run, or radio
+operation follows automatically. No C1 actual result is claimed at this checkpoint.
+
+The separate local first-admission candidate also passed independent349 tests
+in53.31s, original91543 terminal0,
+`/tmp/starlink-local-admission-parent.txG0Cf`. Parent read its final strict recipe,
+191-line bench and complete report; default-off additive guard/top and all old
+runtime remain unchanged. The local enable removes current metadata logic only
+from initial descriptor/job-started capture; it adds no logical state or latency
+and preserves current beat/fault/certificate logic. This is offline equivalence,
+not measured timing improvement. Its last actual route remains FAIL−1.341ns.
+
+At FW1086dbf361a51c48ab6f9b2e8724326d4d802beb /
+HDL461eda9fd2bf67a975f6016f06a8be789af9f077, parent read the tar and inventory
+from Git and independently verified all6578 safe regular members and exact
+archive SHA `203760ef6a3c7d781b001c54f4b67dbb8422177f0786e181e087e230277aef77`.
+Offline actual-equivalence preparation is authorized for R1/B1/O1 plus this local
+enable only, preserving old119-bit product/current fault/numerical checks and
+adding the independent old guard comparison. No D/S/CDC union or vendor/physical
+execution is included. Future canonical promotion remains separate.
+
+Parent also read the complete frozen combined60 machine recipe and75-line
+explanation at FWdd266118c2a524dec65c139076898098ea1563c6. It preserves the
+immutable69 numerical files and original native service limits, permits only
+the explicit startup pause outside the13312-sample continuous segment, and
+requires independent enable/STOP ledgers plus every visible FFT/pilot/native
+value. Additive combined harness/parser preparation continues; no combined60
+actual, capacity, physical or RF result is claimed. Radios and PPU are untouched.

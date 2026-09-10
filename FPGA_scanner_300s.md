@@ -20,6 +20,16 @@ This still FAILS, with379 internal and118 crossing setup failures. It is not the
 combined control/CDC candidate or a full receiver. Its worst internal path is
 input validation into descriptor capture; no physical release is authorized.
 
+Next timing cuts are independently checked offline: CDC actual preparation101
+PASS and local first-admission descriptor enable349 PASS. One frozen CDC
+R1D1S1C1/extras1/175 actual-core simulation is now launched (owner handle20091);
+no terminal result or new timing claim yet. The local-enable candidate is in
+offline actual-equivalence preparation, without a D/S/CDC combination. Their
+reviewed sources/evidence are pushed to their respective experimental DNM
+branches, not firmware main. The60 public bank/STOP/pilot interface independently
+passes660 tests; its combined common-source coarse/native/pilot harness is being
+prepared under a frozen no-tail numerical/service contract. No radios changed.
+
 Latest checkpoint (2026-09-10): the additive complete three-bank coarse scorer
 passes actual-core numerical/fault replay and 64-block continuous capacity tests
 at 175/200 MHz. Independent primary-branch 175 MHz replay also passes: 5,364
