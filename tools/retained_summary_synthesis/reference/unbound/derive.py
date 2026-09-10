@@ -6,7 +6,6 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 UNBOUND = 'UNBOUND_PENDING_ACCEPTED_SUMMARY_ACTUAL'
-ACTUAL_MANIFEST = 'b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368'
 GATE_IMPORT = '''import sys
 import importlib.util
 gate_path = Path(__file__).resolve().parent/'retained_summary_synthesis/admission.py'
@@ -49,7 +48,7 @@ TCL_EDITS = [
   '# Exact offered-summary runtime; unbound until reviewed original actual success.'),
  ('synthesize_retained_control.tcl', 'synthesize_retained_summary.tcl'),
  ('prepare_starlink_retained_control_actual.py', 'prepare_starlink_retained_summary_actual.py'),
- ('7a9b32f10241d22c3f5a6d3967ca9841e2646bb94d714f4935c05f5e8d03635e', ACTUAL_MANIFEST),
+ ('7a9b32f10241d22c3f5a6d3967ca9841e2646bb94d714f4935c05f5e8d03635e', UNBOUND),
  ('set py [list env',
   'if {![regexp {^[0-9a-f]{64}$} $qualified_sha]} { error "unbound reviewed actual source" }\nset py [list env'),
  ('*/retained_output_closed_candidate/*.v', '*/retained_output_summary_candidate/*.v'),

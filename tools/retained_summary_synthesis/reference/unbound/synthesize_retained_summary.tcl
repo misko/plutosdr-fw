@@ -25,7 +25,7 @@ set python /home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-g
 if {[lindex [exec sha256sum $python] 0] ne "2874a0b9344d06b7767aebb1e6e25a759ffcbdb544e99400ecc74dc6092d1174"} { error "tested Python identity" }
 set qualified [file join $prepared qualified]
 set cli [file join $qualified source_snapshot tools prepare_starlink_retained_summary_actual.py]
-set qualified_sha b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368
+set qualified_sha UNBOUND_PENDING_ACCEPTED_SUMMARY_ACTUAL
 if {![regexp {^[0-9a-f]{64}$} $qualified_sha]} { error "unbound reviewed actual source" }
 set py [list env -u PYTHONHOME -u PYTHONPATH -u PYTHONOPTIMIZE -u LD_LIBRARY_PATH $python -B $cli]
 puts [exec {*}$py verify $qualified --expected $qualified_sha --live]

@@ -1,7 +1,7 @@
-"""Read-only gate bound to the reviewed original offered-summary actual run.
+"""Source-specific read-only authority gate. Actual acceptance is NOT yet bound.
 
-No CLI can provide/override this binding. Original owner/result/source pins are
-fixed here; real physical preparation and vendor execution still need review.
+No CLI can provide/override this binding. Root must review and pin one original
+successful actual owner, result, manifest and command before enabling prepare.
 Tests may monkeypatch this module inside explicitly marked MOCK_ONLY fixtures;
 that is not a real accepted run or an executable physical preparation.
 """
@@ -11,23 +11,8 @@ from pathlib import Path
 import re
 
 HERE = Path(__file__).resolve().parent
-EXPECTED = 'b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368'
-ACCEPTED_ACTUAL = {
-    'manifest_sha256': 'b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368',
-    'qualified': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/retained-summary-actual-prelaunch-v1',
-    'actual': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/retained-summary-actual-parent.XYAbt6Np/run',
-    'owner': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/retained-summary-actual-parent.XYAbt6Np',
-    'owner_files': {
-        'owner.py': 'e60edf3106189468601f4d5def0e0aaefca6cd442ac42c4dc27ea50e3889717f',
-        'execution.json': '3e87e9cfcb1fc2bca476ae27a8f47552355e55d6e9ba518c470d2bb548ff6783',
-        'outcome.json': 'cdc5bdae42a199ad0d604ff9ee9b0e27b3c29207f942e6b3f8792605b7d451ac',
-        'command.json': 'a41db3307f827367d8761e73f9f366fb30586c7d62ab83f21774641e380c4351',
-        'stdout.log': 'a8e2dfb9f00edd946d4b851a109dc7df4cbc25f65315a7b827f4892df29b6cee',
-        'run/run_outcome.txt': '9c8daa782fbaed9a06a183e16209ce4389d3a27726c283bfb590a39c65716b88',
-    },
-    'results_sha256': '6605a2db8c69ffb94bea47e421f76fae5af9a473c5f05d81f5a344329eb2185e',
-    'cli_sha256': 'e0d91e6c5942e6a6d6d2a358e6e9f0c485c7e6d7ea3078eba2874f25f3107875',
-}
+EXPECTED = 'UNBOUND_PENDING_ACCEPTED_SUMMARY_ACTUAL'
+ACCEPTED_ACTUAL = None
 BASE = 'hdl/library/starlink_pss_acquisition/'
 WRAPPER = 'a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68'
 MARKER = 'RETAINED_SUMMARY_ACTUAL_VERIFIED_SEVEN_CONTEXTS_NO_CONTINUOUS_OR_PHYSICAL_CLAIM'

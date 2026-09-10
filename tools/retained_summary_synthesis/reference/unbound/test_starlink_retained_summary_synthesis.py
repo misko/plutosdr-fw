@@ -44,10 +44,8 @@ def clean_env():
             {'PYTHONHOME','PYTHONPATH','PYTHONOPTIMIZE','LD_LIBRARY_PATH'}}
 
 
-def test_explicit_unbound_source_still_rejects(tmp_path, monkeypatch):
-    monkeypatch.setattr(g,'ACCEPTED_ACTUAL',None)
-    monkeypatch.setattr(g,'EXPECTED',d.UNBOUND)
-    monkeypatch.setattr(p,'EXPECTED',d.UNBOUND)
+def test_current_source_is_deliberately_unbound(tmp_path, monkeypatch):
+    assert g.ACCEPTED_ACTUAL is None and p.EXPECTED == d.UNBOUND
     def forbidden(*args, **kwargs):
         pytest.fail('unbound recipe reached copier/subprocess')
     monkeypatch.setattr(p.subprocess, 'check_output', forbidden)
@@ -221,7 +219,7 @@ def mock_tcl_bundle(tmp_path):
     """Manually assembled MOCK_ONLY Tcl sandbox, not a real copier admission."""
     root=tmp_path/'MOCK_ONLY_TCL_BUNDLE';root.mkdir()
     text=(ASSETS/'synthesize_retained_summary.tcl').read_text()
-    text=text.replace(d.ACTUAL_MANIFEST,'a'*64)
+    text=text.replace(d.UNBOUND,'a'*64)
     put(root/'synthesize_retained_summary.tcl',text)
     for name in ('clocks.xdc','threads.tcl'):
         shutil.copyfile(ASSETS/name,root/name)
@@ -325,8 +323,7 @@ def test_mock_tcl_admission_never_crosses_vendor_boundary(mock_tcl_bundle,tmp_pa
     elif change=='overwrite':out.mkdir()
     elif change=='inside_prepared':out=bundle/'forbidden_child'
     elif change=='unbound':
-        put(bundle/'synthesize_retained_summary.tcl',
-            (ASSETS/'synthesize_retained_summary.tcl').read_text().replace(d.ACTUAL_MANIFEST,d.UNBOUND))
+        put(bundle/'synthesize_retained_summary.tcl',(ASSETS/'synthesize_retained_summary.tcl').read_text())
         rows=''.join(f'{digest(path)}  {path.relative_to(bundle)}\n' for path in sorted(bundle.rglob('*'))
                      if path.is_file() and path.name!='SHA256SUMS')
         put(bundle/'SHA256SUMS',rows);sha=digest(bundle/'SHA256SUMS')

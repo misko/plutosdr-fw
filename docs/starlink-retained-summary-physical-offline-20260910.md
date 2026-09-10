@@ -1,5 +1,10 @@
 # Offered-summary physical recipe: offline and unbound
 
+Historical scope: this report records the unbound source `0f2714d60`. The later
+accepted-actual binding is documented separately in
+`starlink-retained-summary-physical-binding-20260910.md`; the original observations
+and unbound-source references below are preserved.
+
 This is additive preparation code only. No offered-summary actual evaluation is
 accepted by this source, no real physical input bundle was copied, and no vendor
 tool was launched. `admission.py` deliberately has `ACCEPTED_ACTUAL = None` and
