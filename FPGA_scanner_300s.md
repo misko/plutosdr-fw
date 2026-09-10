@@ -22,13 +22,18 @@ input validation into descriptor capture; no physical release is authorized.
 
 Next timing cuts are independently checked offline: CDC actual preparation101
 PASS and local first-admission descriptor enable349 PASS. One frozen CDC
-R1D1S1C1/extras1/175 actual-core simulation is now launched (owner handle20091);
-no terminal result or new timing claim yet. The local-enable candidate is in
+R1D1S1C1/extras1/175 actual-core simulation now PASSES (original20091 terminal0,
+580.44s), with all four historical CSVs unchanged and independent CDC/status
+receipt verification. No new timing claim yet. The local-enable candidate is in
 offline actual-equivalence preparation, without a D/S/CDC combination. Their
 reviewed sources/evidence are pushed to their respective experimental DNM
 branches, not firmware main. The60 public bank/STOP/pilot interface independently
 passes660 tests; its combined common-source coarse/native/pilot harness is being
 prepared under a frozen no-tail numerical/service contract. No radios changed.
+An additional isolated ROM read-ahead/last-visible-retention prototype passes149
+offline tests, including continuous512-beat traffic; it adds37 logical bits at
+D18 and no nominal cycles. All old visible coefficient/control fields compare
+unconditionally. No actual FFT integration or physical benefit is claimed.
 
 Latest checkpoint (2026-09-10): the additive complete three-bank coarse scorer
 passes actual-core numerical/fault replay and 64-block continuous capacity tests

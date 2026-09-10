@@ -1405,3 +1405,82 @@ the explicit startup pause outside the13312-sample continuous segment, and
 requires independent enable/STOP ledgers plus every visible FFT/pilot/native
 value. Additive combined harness/parser preparation continues; no combined60
 actual, capacity, physical or RF result is claimed. Radios and PPU are untouched.
+
+## C1 actual PASS independently verified; physical preparation next
+
+Original20091 terminal0 with post-integrity0,10:47:42.315817530 through
+10:57:22.768161867 UTC,580.44s. Parent read the full terminal sequence and
+independently replayed frozen `verify_result` plus all four complete CSV hashes
+and line counts (root74812 terminal0). Both main589950-line CSVs remain25ab9d06;
+both extra33180-line CSVs remainb965d126. All48 sources and inventory9c81c43d
+remain unchanged. Original qualified accounting is still1246258=953795raw_equal
++292463invalid_only, explicitly NOT original raw217 equality.
+
+CDC observer reports712146 checks,8958/8686 destination-stage-high samples,
+4675 reset-low samples,7882 current-fault edges,115 aggregate-fault/index511
+samples and4265 private-core-reset-low/faulted samples. These are not distinct
+injection/reset counts. Original independent final-fault2 and both exact
+extra2fault/3stall/2reset/4recovery receipts remain unchanged. Nominal interval
+maximum4548 and44 healthy blocks are retained. This establishes digital
+actual-core equivalence, not analog CDC or timing closure.
+
+At FW56c3105ba6a32fe973d36b760082ec477efc0d20 /
+HDLc8321c4576d65c402d47bf8a3b6bdd66b90ce211, parent read the complete report
+and independently verified all91 committed archive members (exact92-file closure),
+manifest `e60f50a0c8e1f01f787f7ae67d7a2d83b4c1c5d04b3ad655c0eb011b021334cd`.
+Parent additionally decompressed all13 archived log/CSV gzip members directly
+from Git and checked every raw identity against live original files. The three
+Git WDB parts reconstruct112102920 gzip bytes and122136408 raw bytes, SHA
+`6814cf9dfab867e3715f1c55f74c3196f78711b64f6fabd7125e692763aaca3d`.
+The generated-cause forward-reference warning remains explicit; simulation
+does not establish synthesis support. Offline C1-specific physical preparation
+is authorized with exact passing sources and unchanged100/175 constraints,
+IP/directives/two threads. Synthesis and routing each require subsequent review.
+
+## Isolated ROM read-ahead prototype: exact visible retention
+
+Root created FW/HDL `codex/starlink-rx-only-do-not-merge-rom-prefetch` in
+`/tmp/starlink-rom-prefetch.j829ht/fw`, based on control FW4d59ce832/HDL597a8ab65.
+Only a new kernel variant and standalone bench are added; canonical modules and
+callers are untouched. A private synchronous ROM read uses original input_ready
+instead of the current metadata-qualified acceptance. A registered selector
+and retained last-visible word preserve every old raw coefficient bit on healthy,
+invalid, stalled, reset and fault cycles. All old acceptance/error/validity/history
+logic remains literal under a strict whole-source recipe. At D18 this adds37
+logical bits and a36-bit mux, zero nominal cycles. Mapped cost and timing are
+unmeasured; selector/mux paths may need further work.
+
+Initial52746:25PASS/1FAIL5.23s, `/tmp/starlink-rom-read-ahead-v1.jICW4m`.
+The failing test misclassified another valid speculation enable as a semantic
+mutant. Both input_valid and input_ready cover every acceptance; the first
+still carries the metadata path. Retain that observed equivalent variant as a
+positive control, use a genuinely missing-read mutant, and retain initial code
+at FWcaf9f92fc/HDL0fe2ca5f5. No runtime repair was required. Two explicit-check
+lint findings were fixed. Second9500:27PASS5.15s. Final15568:149PASS27.76s,
+`/tmp/starlink-rom-read-ahead-final.76jGL7`, with one continuous512-beat block,
+two stalled/bubble blocks, all64 identity-bit faults, accepted X/Z metadata,
+20,000 explicitly unconstrained inputs per configuration, nine semantic mutants
+and unchanged control/payload/retirement/CDC regressions. All12 width2/18/24,
+balanced and scratch combinations compare original/default/enabled fields
+unconditionally. This is standalone digital proof, not actual bank or formal
+exhaustive verification.
+
+Final FWd6ca47ef934a082b737191e3e41ca79e393d03cc /
+HDL1dd76119a681b5aa0b6d9f0d5f5d32f974e81342. Parent verified all2333 committed
+tar members including the embedded receipt, SHA
+`b0c2c425cecfe6fd26ea784a2096c4146198a43f638c3e3c0bba4595dc71b660`.
+All three attempts' logs/XML/generated source/executables are retained;
+only48 redundant pytest current symlinks are excluded explicitly. Collector
+integrity is not part of the149-test qualification. Separate report:
+`/tmp/starlink-rom-prefetch.j829ht/fw/docs/starlink-rom-read-ahead-offline-20260910.md`.
+Independent review and actual joiner/bank integration are still required; no
+arithmetic/CDC/local-enable union, timing benefit or release is claimed.
+
+During pre-evaluation combined60 review, parent caught a scalar receipt count
+of520 where nine one-off markers plus512 pilot rows require521. Agent is
+replacing it with an explicit marker inventory and negative tests, retaining
+all native numerical/service limits. Parent also identified lexical-symlink
+admission gaps in new local-enable preparation; corrected sources will be
+separately frozen/tested without overwriting the unlaunched original bundles.
+These are preparer/verifier corrections before vendor evaluation, not changes
+to radio code, signal goldens, or acceptance thresholds.
