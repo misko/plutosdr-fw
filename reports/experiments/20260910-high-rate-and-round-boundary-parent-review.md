@@ -1047,3 +1047,142 @@ ceil((2*10000000+8333333)/16666666)=2 samples. At completed readback, two
 ceil(480000000/16666666)=29 samples. These are separately derived readback bounds,
 not a relaxed command deadline. Missing/duplicate/future/stale/incoherent
 readback cases must fail. Corrected service execution is not yet authorized.
+
+## Exact111 synthesis and diagnostic route
+
+Parent fully reviewed final physical-preparation/owner code and independently
+repeated43 tests PASS81.93s, original29431 terminal0,
+`/tmp/starlink-control-physical-parent.6YHg0T`. Final preparation inventory
+`99862b8d88414de6b2b4171df2a1a61bf5849ef2effed3c875de9904c366f158`
+and all129 offline archive hashes verify (archive inventory
+`a980304b1489876bd98f93ecea30fd5aca0f16e382c8523e28f8b0412a9d092c`).
+Tested sources FWb0b43802603c18472c65c159a36424785441af1a /
+HDL26cc65a7f473ba3f528c90524df35ff0b25b7466 remain unchanged in the archive pins.
+
+One authorized synthesis original41784 terminated0 in108.90s,
+09:43:14–09:45:03UTC. Parent checked all8 product hashes, all13 scope-declared
+source/generated-IP hashes, the copied closure, explicitR/D/S111, actual100/175
+clocks, zero-black-box receipt and process/before/after-integrity0.
+Synthesis:1970LUT,4478FF,21DSP,15RAMB18(7.5tiles).
+DCP `exact-control-combined-synth-v1/synthesis/fft_bank_owned_synth.dcp` under
+`/tmp/starlink-completed-input.5EaJuD`, SHA256
+`00cd669cee367f2ff9b3852d7fd05827ba64027ccd526f1f269cde5ddff630d9`.
+All43 synthesis archive entries independently verify, inventory
+`d35dd92a792d5555aafb0274e3da8eb501c50be4294e676350471338180d0fb6`.
+FW55d7fbba5b8f32798f99ae568c51cb0be2c837c5 /
+HDLfbb6ba6de76e4750ea6f04e87cbf1edb4078c96a are pushed to the control DO NOT MERGE
+remotes; no runtime promotion occurred.
+
+New unqualified finding: CDC-10 critical1 from distributed cause sticky Qs
+through the combinational fast_fault OR to fast_fault_slow[0]. There are139CDC-15,
+5CDC-3 and114/124 missing input/output delays. These are not waived.
+Root authorized exactly one diagnostic route on that same DCP using unchanged
+route Tcl0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a,
+same100/175 constraints/directives, new
+`/tmp/starlink-completed-input.5EaJuD/exact-control-combined-route-v1`.
+Original98808 terminated0 at09:51:23UTC after46.956s, with all6630 routable nets
+routed and no routing errors. This is tool completion, not timing success:
+island175 setup -1.761ns/TNS -517.240/523 failing endpoints; global setup
+-1.862ns/TNS -615.411/668 failures; hold +0.071ns with zero failures.
+Source100 setup +2.217ns, crossings100-to175 -0.711ns and175-to100 -1.862ns,
+async recovery -0.038ns remain explicitly reported. Routed area1975LUT,
+4552FF,1077slices,58 control sets,21DSP,15RAMB18. Worst island path is full
+product metadata validation through result acceptance to kernel-ROM enable:
+6.948ns total,1.572ns logic plus5.376ns route,9 levels. The improvement from
+prior -1.907ns is0.146ns, not closure or the best historical result.
+Parent read the full route report, route-status and original exit/post-integrity
+receipts and independently verified all37 archived files. Archive inventory
+`a870afb08a029cc48b0f13828a7577d048de844bf6aeccab4a9624461a8c430b`;
+routed DCP `c45ac64b6731d8709cbab9fe57fdcd96c517e9d0f265017d958d2ca110537349`.
+Immutable archive pins FWbdd2fd5e3e6da0da1831dca8db5793cbf9a1ddba /
+HDL2ccfac2e70da2689d97eee75cbfc78e2589813a2. No exceptions or source edits
+were applied to this failed checkpoint. This is not a physical-release pass.
+
+Read-only CDC diagnosis favors two-stage per-cause synchronization with OR only
+in the destination domain: worst-case+22 sync FF, no nominal extra sampling
+stage, unchanged immediate fast-domain fences. A simple registered export of
+existing fast_fault would instead add one fast-clock cycle and is not exact
+retirement timing. Offline per-cause candidate/tests are authorized; no new
+actual FFT/synthesis/route is authorized by that preparation. Common epoch and
+private-core-reset separation must remain unchanged.
+
+## Native60 complete standalone service PASS
+
+Parent reviewed the exact readback-only correction and independently repeated
+575 tests PASS19.95s, original34984 terminal0, at
+`/tmp/starlink-native60-readback-parent.LuaPUs`. Its generated bundle is identical
+to final91-source/162-receipt bundle
+`bbcb423cf7d1f73bd6a6e7be3666aafe1eaa80414f7d99384ec5ad73c049ba83`;
+all live/snapshot identities, original69 numerical/76 source bytes and original
+service recipe verify. Corrected source pins FW0c49f441030c9507d1e1f7391a3b563cd13b5bb7 /
+HDL706ffb7b5b842409d8a8714c056203d8b5555034.
+
+The single authorized native-only run original75987 terminated0 in
+`/tmp/starlink-bank-route.I50MDJ/main-native60-service-readback-v1`.
+Parent independently reran the frozen result verifier, checked original
+compile/simulation0, no error/integrity error, identical before/after source and
+working fixtures, and all source/capture/raw/hold inventories. Measurements:
+
+- Actual command index34359738591, lead1664,52 control cycles after trigger;
+  original command window/lead/deadline all pass.
+- All16423 source samples,520 captured originals,257 raw/241 qualified tuples,
+  exact powers/saturations and two26-word public packet reads pass.
+- Capture-end11974; publication84472 (72498elapsed), release85261 (73287),
+  full257 drain/idle86616 (74642). At simulated100MHz these are724.98/732.87/
+  746.42us. Original84000/88000 limits unchanged.
+- Publication is at raw249; release at252; final5 raw tuples complete later.
+  No early packet/release is substituted for full completion.
+- Per-tuple hold max11, AXI max7,105 readout transactions; source-off30072,
+  56544 configured compute cycles afterward; final256 no-stale cycles and154
+  continuing source-clock edges. Health0, no IRQ/result/work left.
+- Public snapshot low capture8284/read return8295 equals34359738559, capture/return
+  lags1/8 within separately derived2/31 and read-return11 within48 cycles.
+
+Parent read the complete outcome report and verified all246 original archive
+files,1814229 bytes, SHA256
+`59a36a1b36bb05c9f0be992596080ecb998d12e391e2d03cdafa6d7944d7e3aa`.
+FW3c949b445b0208d6b1f5f72571fc5da1eeb0f2eb and HDL706ffb7b are pushed to60
+DO NOT MERGE remotes. Both earlier pre-command failures remain separate.
+This proves one healthy static-known-center native60 job, NOT native RF accuracy,
+queued capacity, paired60 PSMA/PIL1/FFT or deployment. The next paired60 step is
+read-only proposal preparation from the same raw cohort and existing30 harness;
+runtime admission changes and actual paired execution still need review.
+
+## Portable arithmetic assessment and future receipt fix
+
+Parent reviewed the full post-hoc script/report and future exclusive receipt-file
+fix, then independently repeated246 tests PASS24.60s, original91085 terminal0,
+`/tmp/starlink-arithmetic-receipt-parent.dr2uuN`. This includes full six-part
+archive reconstruction and all341 original member hashes. Parent also independently
+verified all9644 additive post-hoc/offline/future-source archive hashes, SHA256
+`bac2e967d91fa4e5a348084c049bbb6387e24bd3f40a55ebeaa48329f8683468`.
+Original241304017-byte archive470f5a8c remains intact locally, exactly ignored;
+only lossless<=40MiB parts are pushed. No new reachable blob exceeds100MiB.
+FW19dcc9c867c3cde285a2d9ca6c7d2a08c022f077 /
+HDL8bbfee6ebb1d77b58b33080e8a58bdcca978fd28 are reviewed and pushed to their
+DO NOT MERGE remotes (parent17915/74833 terminal0). Original actual automation
+failures remain failures, while the
+separate complete functional/source/WDB assessment passes. Offline source-specific
+OOC preparation for R1/B1/O1 is authorized, not physical execution or a new simulation.
+
+## Next isolated 60 paired admission gate
+
+Parent read the current public wrapper/controller admission, energy/identity and
+two-stage DDC counters against the agent's read-only integration proposal.
+Offline StageA60 implementation/tests are authorized in the isolated60 worktree:
+default-off ENABLE_BANK60_PAIRED, strict source60/bank/shared/realtime/pilot/STOP
+and conditioned Eh1073765335, distinct PSMA1.8 identity, unchanged legacy30/default
+profiles through a strict source inverse. In new mode only, a saturating sum of
+both DDC discontinuity counters exposes first-stage failures even if shutdown
+prevents downstream propagation; document stage events, not unique raw gaps.
+Test reset-only lifetime, flush/disable retention, retained-map terminal health,
+unknown/invalid options and exact public identities. This is not primary runtime
+promotion, host/kernel ABI admission, paired actual FFT authorization or hardware.
+
+The later common-source harness may account for two disabled-DDC CDC-prime beats
+separately from the immutable16423-sample cohort:16425 offered beats, no tail.
+It must retain native full257 drainage after source-off, independent pilot512,
+894 map admissions/447 words, actual coarse/native overlap and all visible
+numerical boundaries. Existing30 startup/release assumptions must not be copied
+blindly: source60 ends before native completion. Causal acquisition, shared-bus
+capacity, full receiver timing and 300s RF comparison remain separate gates.

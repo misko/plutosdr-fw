@@ -2,6 +2,19 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest measured increment: the standalone native60 public-wrapper simulation
+now passes all520 captured samples,257 raw hypotheses/241 qualified tuples and
+two26-word packet reads. Full drain takes74642 control cycles (746.42us at the
+simulated100MHz clock) after final capture, within the unchanged84000 limit.
+Parent independently verified575 preparation/numerical tests and all246 archived
+run files. This is one static-known-center job, not paired60 coarse/pilot or RF.
+The exact111 control candidate synthesized with zero black boxes and completed
+its diagnostic route, but timing FAILS: island175 setup -1.761 ns, global setup
+-1.862 ns, hold +0.071 ns. Distributed-fault CDC-10, other crossings, reset
+recovery and external I/O qualification remain open. The original failed route
+is archived before a separate default-off per-cause CDC candidate. No release,
+full-receiver timing or on-radio qualification follows.
+
 Latest checkpoint (2026-09-10): the additive complete three-bank coarse scorer
 passes actual-core numerical/fault replay and 64-block continuous capacity tests
 at 175/200 MHz. Independent primary-branch 175 MHz replay also passes: 5,364
@@ -133,10 +146,17 @@ The separate60 sample-support contract is now tested:16423 raw samples map to
 The new upper60 common-source numerical cohort also passes256 independently
 repeated tests and full frozen-helper rederivation of all69 numerical artifacts:
 seven coarse blocks,264-tap native257 raw/241 qualified tuples and512 pilot outputs.
-This remains offline arithmetic, not actual60 composition or a service bound.
-Its39 new tests plus unchanged30/60 golden regressions pass132 tests. This is
-coordinate preparation only, not a60 common-source numerical or hardware pass:
+The cohort itself remains offline arithmetic, not actual60 composition.
+The separate39 support tests plus unchanged30/60 golden regressions pass132 tests:
 [`reports/experiments/20260910-high-rate60-support-contract.md`](reports/experiments/20260910-high-rate60-support-contract.md).
+Native60 service preparation and a corrected public-index readback witness now
+pass575 independently repeated tests. One actual standalone native60 simulation
+passes with the same16423 original source samples/no added tail: publication
+72498 cycles, public release73287, full257 drain74642, then256 no-stale cycles.
+Computation continues after source-off; the final five raw tuples complete after
+packet release. Original public-readback failures remain preserved. Readback
+coherence/age is checked separately from unchanged actual command/lead/deadlines.
+This is not queued-load capacity, causal acquisition or actual paired60 PSMA/PIL1.
 No receiver profile or radio has been changed. Completed alternative studies are preserved
 on remote do-not-merge branches. See
 [`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)
