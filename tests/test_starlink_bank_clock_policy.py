@@ -33,7 +33,8 @@ def helper_probe(tmp_path, mutation=None, version="2022.2", existing=False):
     if mutation == "input":
         text = text.replace("= clk_in1", "= bad_clock")
     (tmp_path / "starlink_bank_clock175_candidate_clk_wiz.v").write_text(text)
-    script = f"source {{{HELPER}}}\nproc version {{args}} {{return {{{version}}}}\n"
+    script = f"source {{{HELPER}}}\n"
+    script += "proc version {args} {return {" + version + "}}\n"
     script += "set created 0\nproc create_ip {args} {incr ::created}\n"
     script += 'proc set_property {args} {set ::configuration [lindex $args 1]}\n'
     script += "proc generate_target {args} {}\n"
