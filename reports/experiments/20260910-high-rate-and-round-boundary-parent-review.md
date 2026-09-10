@@ -175,3 +175,54 @@ this alone does not prove that either the observer or candidate is at fault.
 Read-only waveform/source diagnosis is authorized. No rerun, changed compare
 scope, altered CSV hash, physical build or runtime promotion is authorized by
 this failure. Both original outputs and frozen sources remain preserved.
+
+## Stage A guard repair and operand wrapper accepted offline
+
+Parent read both complete Stage A benches (582 lines), the full wrapper and
+controller delta, all new tests, strict inverse and source collector. The
+new bank admission uses case inequality and rejects literal X/Z in every
+required field, while old guards/default behavior remain unchanged. Independent
+parent43177 completed340 tests in10.44s. Parent checked all1474 receipt hashes,
+1475 safe regular archive files and the96-file source signature, then reran
+the immutable snapshot producer: all51 original numeric artifacts matched.
+Isolated FW6d2252552 / HDLe2a8773b is preserved on the remote high-rate branch;
+primary runtime is not promoted. Archive SHA256:
+`63bd842f5531b137e14c0a78b3fd2ac8b57be2ceaed01b424e58e9152621a858`.
+
+The next approved implementation is an additive healthy30-upper actual-harness
+preparation only: real public PSMA1.7 bank175, native132/injection0/DSP1, PIL1,
+447x2 map and the same frozen raw samples. No old15 helper or golden changes.
+The15 bench's packet-before-coarse-STOP ordering cannot be assumed at30:
+capture/compute must survive coarse STOP, retaining the map until later native
+publication/read/release. The129 raw lags times132 taps give17028 correlation
+issue cycles, not a full service bound. Derive a conservative engine/reducer/
+public-read bound before fixing an independently generated continuation.
+
+The actual30 conditioner disables when both coarse and512-sample PIL1 stop.
+Consequently, a reduced STOP run must check every independently modeled active
+canonical/FFT prefix without claiming all4096 canonical outputs or seven full
+jobs. Keep exact894 admitted scores/447 map words,260 raw capture samples,
+129 raw/121 qualified tuples,26 packet words and512 pilot words. Two real
+disabled-DDC prime beats precede the untouched8205-word raw cohort; no pause
+may interrupt admitted native capture. Static known-center timing is not a
+causal candidate handoff or live accuracy claim. Actual FFT launch,343 profile,
+negative epochs, Linux/BD and physical/radio work still require later gates.
+
+Parent also read the complete standalone operand wrapper/bench/Python suite
+and independently reran29 new tests (68767 exit0,1.93s). The agent's52-test
+combined run includes23 retained rounding/product tests. All268 safe archive
+file hashes independently match, SHA256
+`10213e850e4958d2f7b5e041b62cd4461874eceeb84f150b1bf2ae4bda089176`.
+Offline pins FW375c5e6f / HDL0aeb4c09 preserve the arithmetic hash unchanged.
+The explicit one-cycle extra latency,152 logical added bits at D18 and
+insertion-time overflow contract are accepted only for this isolated slice.
+Preparation of an identical-budget A/B175MHz physical runner is authorized;
+no synthesis or route has launched. Real DSP input mapping, bank fault/ownership
+integration and receiver timing remain unproven.
+
+Both failed control runs are preserved at FW5fe9ac36 / HDL29fa754a. Parent read
+the report and checked all102 archive hashes. Read-only WDB inspection found
+zero recoverable candidate/reference field pairs among the217 compared fields;
+names exist but the original waveform did not log their values. A new baseline
+diagnostic preparation may print exact mismatching fields immediately before
+the same unchanged fatal/2ps observation. No diagnostic rerun is authorized yet.

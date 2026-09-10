@@ -59,8 +59,11 @@ the BRAM-to-DSP path with explicit added latency and offline qualification.
 
 The30MS/s common-source offline cohort is frozen and independently verified.
 A new explicit30-upper bank+STOP public interface remains isolated/offline;
-review identified fail-open unknown parameter checks, now being hardened before
-acceptance. Actual30/60 bank/native/pilot integration remains open. Latest
+its unknown-parameter guard repair and legacy regressions pass340 independent
+parent tests. The unchanged51-file numerical cohort independently rederives.
+Preparation of a real30 common-source bank/native132/PIL1 harness is authorized,
+but no actual FFT launch or runtime promotion yet. Actual30/60 bank/native/pilot
+integration remains open. Latest
 source-specific decisions and measurements:
 [`reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md`](reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md).
 No receiver profile or radio has been changed. Completed alternative studies are preserved
