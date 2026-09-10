@@ -70,3 +70,31 @@ The saved-packet benchmark accepts `PACKETS_TEXT ITERATIONS`, at most 64 packets
 and one million calls, with a ten-second computation ceiling checked every
 1,024 calls. It emits per-packet estimates and aggregate elapsed time. It never
 opens a device or changes any firmware/configuration.
+
+## Radio result association port
+
+`glrt_native_schedule.c/.h` provides the C controller's descriptor encoder,
+exact fractional/modulo prediction, length-bounded GLS1 text-envelope parsing,
+snapshot conservation and associated solve. It has no radio or storage access
+and adds no tracker-repository dependency. `glrt_native_associated_solve`
+requires the caller's retained descriptor and expected admitted sequence; it
+checks epoch, tag, repeat, rounded source start, phase seed/step and full-pilot
+expiry before entering the solver. A malformed or mismatched result returns
+an error with a rejection flag; an associated partial/faulted result remains
+drainable and cannot produce a supported correction.
+
+The raw envelope parser does not by itself validate the moment payload: retain
+the raw text, parse, associate/solve, then acknowledge. Never use an envelope
+parse as permission to POP. Both the solver return code and rejection bits
+must pass before feedback. An explicitly drained snapshot may have source
+faults: draining retained evidence is distinct from permitting new predictions.
+The controller must separately require a healthy current source epoch.
+
+`native-radio-association-v1.xml` records **102 passing tests**, comprising the
+59 association/transport tests and 43 solver tests. The prediction tests compare
+2,500 cases against Python's exact `Fraction` oracle, including u64 coordinates
+and signed modulo carrier ramps. Snapshot tests check conservation with wide
+counter sums; envelope failures leave no partial output. The port also compiles
+with the target Cortex-A9 hard-float compiler and `-Wall -Wextra -Werror`.
+This is a tested port for the future radio-local runtime, not a deployed
+feedback loop or an end-to-end I/O benchmark.
