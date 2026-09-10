@@ -94,6 +94,35 @@ Acceptance evidence:
 
 ## 2. Measure the complete coarse composition
 
+### Promotion boundary audit after the combined control actual PASS
+
+Read-only comparison of primary HDL0b4bf2f0 against the passed control source
+HDL5c186643 confirms these are different compositions, not interchangeable
+receiver snapshots. The control worktree predates primary's additive complete
+coarse wrapper/phase-map integration. A whole snapshot replacement would omit
+`starlink_pss_iq_to_score_bank_owned.v` and revert other primary integration;
+this is not permission to delete a detector or to assume a Git merge does so.
+Transfer only reviewed source changes onto the retained complete composition.
+
+Primary's coarse wrapper currently binds the island with only KERNEL_ROM_FILE;
+it has no REGISTERED_SCHEDULING/DISTRIBUTED_FAST_FAULT/PRIVATE_NEXT_START_SCRATCH
+selection. Therefore a passing standalone R1/D1/S1 result cannot establish that
+the complete scorer selects those options. Future integration must explicitly
+bind the qualified mode through the actual map→score→island hierarchy and test
+its elaborated parameters. An arithmetic wrapper/probe also needs explicit
+selection after qualification; neither inheritance nor filename is proof.
+
+The retained primary wrapper SHA256 is
+`3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e`.
+Independent energy-cache and score-path SHA256 values are respectively
+`6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009` and
+`ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1`.
+Preserve their arithmetic, source coordinates and fault/publication contract;
+any later change needs its own review. Re-run complete numerical/capacity,
+map/native/pilot and reset/expiry tests on the selected integrated source before
+using it for full receiver implementation. Standalone actual-core or diagnostic
+bank-route evidence is not a substitute for that composition gate.
+
 Checkpoint: passing alternative-source OOC synthesis has 3,868 LUTs, 6,499 FFs,
 27 DSPs, 14 BRAM tiles and no black boxes. Complete source-specific evidence is
 in `starlink-bank-owned-iq-to-score-resources-20260910.json`. This does not close

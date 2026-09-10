@@ -799,3 +799,54 @@ all three options and reject missing/wrong/failed evidence before launching.
 Keep unchanged100/175 diagnostic constraints and full pre/post source checks.
 No synthesis, placement, route, arithmetic graft, primary runtime promotion or
 radio action is yet authorized by this checkpoint.
+
+## Next-stage native60 contract and arithmetic force diagnosis
+
+Native60 service-probe recipe is committed before any measurement at
+FWd6408a2e59623c7ba9f0bd07e83bce23401e003f, HDL unchanged529dc8e8.
+Parent inspected the actual capture bridge, sliding correlator and DSP reducer
+state machines. The declared healthy single-job/free-store100MHz bound includes
+3*520+64 capture transfer,520+16 sample energy,257*(264+16+16) sweep/reducer and128
+publication cycles:78360 total, below84000. Readout uses at most140 dedicated
+AXI transactions of24 cycles each,32 retention and24 release-settle cycles;
+84000+3360+56=87416 is below88000. These are conditional bounds, not measured
+service or host/network timing. The source has exactly16423 samples/no added
+tail; the sample clock continues after valid stops. Completion must include
+all257 raw handshakes and engine/bridge idle, not just the result following
+qualified lag120. Observe256 further no-stale control cycles after source-off,
+public release and full drain. Implementation/compile-only policy tests are
+authorized; a native RTL service run still needs source-specific review.
+
+Parent independently verified the original72-file combined-control archive
+inventorye908dac935b0bebe362ff516bf7f4e04ce31b5cad4b321e5fabc0b2f83e75cb3.
+Its monolithic compressed waveform is105807603 bytes. Before remote publication,
+lossless<=40MiB parts with whole-compressed/original-WDB hashes and safe
+reconstruction tests are being prepared. Original local waveform/project and
+unpublished commits remain preserved; no oversized blob was pushed. Only the
+agent's two own unpublished archive/report tips may be amended after local
+backup refs; there is no remote history rewrite or source/measurement change.
+
+The first minimal Icarus force test contradicted the initial alias hypothesis:
+both direct and wrapped registers changed there. That failure remains retained.
+Read-only Xsim WDB queries preserved before/after hashes, but the original WDB
+only recorded top-level signals; listed internal paths have blank histories.
+It cannot establish the actual bank failure's exact119-bit compared vector.
+
+A separately authorized standalone Xsim diagnosis now completes in both modes,
+original4397/90953 exit0, without FFT/IP/bank execution. Parent read its full
+bench/runner, verified all five frozen source hashes, both phase/terminal
+receipts and all six force observations. Frozen bench655ab728..., runner3f0374e0...,
+directory `bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-force-xsim-v1.x51G4v`.
+For overflow/position/start, Xsim leaves original direct-core output registers
+and wrapped inner arithmetic registers unchanged while the wrapped output wire
+monitor sees the injected value; release restores it. Overflow changes only
+bit1 (XOR2); ordinal64→19 changes XOR0x53<<72; start changes
+(0x2000e0000 XOR0xdeadbeef)<<2. This reproduces a simulator-specific monitor
+boundary distinction, not an actual-bank internal waveform or arithmetic PASS.
+
+Only offline preparation of a three-field observation-binding adaptation is
+authorized: preserve the full119-bit predicate, all original force/veto/fault
+stimuli and runtime source bytes; observe the same register boundary for those
+three fields without masking fault epochs or dropping comparisons. Genuine
+arithmetic-corruption mutations and wrapper-transport consistency must remain
+detectable. No actual bank retry or arithmetic physical trial is authorized yet.
