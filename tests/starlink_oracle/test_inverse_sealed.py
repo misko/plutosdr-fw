@@ -189,6 +189,9 @@ def run_compiled(path, bench, parameters, sources, mutant=None):
             (path / "commands.json").write_text(json.dumps(receipts, indent=2))
             if index == 0:
                 assert result.returncode == 0, (result.stdout + result.stderr)[-3000:]
+                assert not re.search(
+                    r"\b(?:FATAL|ERROR)\b", result.stdout + result.stderr, re.IGNORECASE
+                ), result.stdout + result.stderr
     finally:
         assert hashes == {
             name: hashlib.sha256((path / name).read_bytes()).hexdigest()

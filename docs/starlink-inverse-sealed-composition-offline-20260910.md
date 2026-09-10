@@ -74,7 +74,10 @@ remain in each retained `cases/*/run`; no attempts are overwritten.
 - First/final slow stalls retain VALID and all output fields. Single metadata
   corruption at first/interior/final spans exponent, start, direction and all
   trailing25th-leaf bits72..74. Seven reset joins on both raw sides recover a
-  fresh exact512-word block. Old raw stimulus remains untouched.
+  fresh exact512-word block. Metadata corruption is10 directed bits per token
+  position, not75 separate individual-bit corruptions. Old raw stimulus remains
+  untouched. Separate first/final-stall fixture reuse+3 is outside the
+  immediate/delayed-status phase-sweep's4–6 range.
 - Full derived top: eight naturally reachable paused-source cases, both raw
   sides, old healthy full request1/fault0 versus separate malformed empty
   request0/fault1, fresh fill after rejoin versus full512 fill while fast paused.
@@ -89,8 +92,8 @@ remain in each retained `cases/*/run`; no attempts are overwritten.
 
 `tb_starlink_inverse_sealed_guard.sv` supplies independent nonzero raw results;
 `tb_starlink_inverse_source_purge.sv` uses the frozen explicitly synthetic ZERO
-FFT interface. Neither is an FFT golden. An independent event-receipt collector
-and source-closure/mutation gates remain before final composition qualification.
+FFT interface. Neither is an FFT golden. Final qualification below adds
+independent accepted-event/source/graph gates, without changing runtime RTL.
 
 ## Logical state and remaining scope
 
@@ -102,9 +105,77 @@ logical state bits. This is not mapped FF utilization. The original standalone
 317-bit count included a local two-bit reset release removed in this variant;
 three new remote-idle/CDC bits make the bank total318. No new payload RAM/DSP.
 
-Before vendor evaluation: finish independent event/source/graph checks and
-freeze exact runtime/test closure. Actual FFT numerical/current/late-fault
+Before vendor evaluation: source-specific actual preparation and reviewed
+runtime/test closure are required. Actual FFT numerical/current/late-fault
 qualification, measured complete pair throughput and physical CDC/timing remain
 separate approvals. Private pipelined cause timing is explicitly changed, not
 cycle-identical legacy reason-counter ABI. Full original-source coarse/native
 fine/pilot and source15/30/60 objectives remain unchanged.
+
+## Final bounded offline qualification
+
+Original99908 EXIT0, **234PASS16.11s**, RuffPASS:
+`/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/inverse-sealed-final-v1.DFztazfI`.
+Command is the same as above with both
+`tests/starlink_oracle/test_inverse_sealed.py` and
+`tests/starlink_oracle/test_inverse_sealed_receipts.py`.
+
+The only HDL change after136 is additive CASE12 in the new nonzero bench:
+after512 real slow reads and actual ACK, a current fault on the tagged-release
+opportunity must inhibit release/reuse. Its missing-current-veto mutant fails
+the explicit release-edge assertion. Runtime ea27c4e2/8ad9c2e7/2f988a16 remains
+unchanged. Eight literal invalid/X/Z parameter tests exercise actual guards;
+X/Z uses source literals, not unsupported Icarus command-line overrides.
+
+`inverse_sealed_events.py` independently checks each accepted36-bit value,
+all75 metadata bits, lease, epoch, ordinal, publication/ACK/release order,
+S1/S3 fault timing and profile-specific stimulus/fault/reset inventories.
+Terminal-only, truncated, missing cause/anchor, wrong identity/data, duplicate,
+out-of-order and late-error receipts are rejected. This model does not copy
+the RTL state machine or pretend slow provisional words can be revoked.
+The new receipt fixture freezes the actual imported repository Python closure
+before execution, including package/transitive imports, and checks exact names,
+bytes and live source hashes afterward. Earlier17-file smoke snapshots did not
+include that expanded Python package closure; their original inventories remain
+unchanged and are not retrospectively relabeled.
+
+The Icarus elaboration graph checker includes continuous `L` and intermediate
+`LS` nodes plus net aliases; procedural state is a cut. The real-guard pair has
+2690 continuous/net nodes, the complete synthetic top4412, both acyclic.
+Restoring direct `bad_admission` feedback instead of its register produces a
+detected actual graph cycle in both. This is not synthesis or physical timing;
+whole-vector dependencies are conservative, and unresolved continuous nodes
+are rejected. No combinational-loop waiver is used.
+
+## Retained attempts
+
+All paths are under the same recovery parent named above; no original is
+overwritten. Per-case command/source manifests and logs are retained.
+
+| Directory | Actual result / interpretation |
+| --- | --- |
+| `inverse-sealed-compile-v1.poLfTLr8` | Strict top inverse failed on extra final newline; subsequent shell reached missing-source compile. Not a compile pass. |
+| `inverse-sealed-compile-v2.dn0CnCwi` | Standalone issuer compilation EXIT0 only; no simulation. |
+| `inverse-sealed-tests-v1.OkYZuDcy` |16PASS4.97s, original49267. |
+| `inverse-guard-tests-v1.usVmseQd` |7PASS0.51s, nonzero actual guards. |
+| `inverse-guard-tests-v2.fp4ZxGdj` |50 phasePASS,8 compileFAIL: runner mistakenly treated kernel.mem as Verilog. |
+| `inverse-purge-tests-v1.2dLEdiPC` |8 watchdogFAIL; new bench released initial raw resets before any clock edge. Corrected bench holds initial reset across5 slow edges, matching old fixture. No runtime edit. |
+| `inverse-purge-tests-v2.L3YCM3uf` |8PASS1.33s, correct full-top reset stimulus. |
+| `inverse-guard-tests-v3.9zbQSZkd` |52PASS2 test failures: missing-ACK mutant exposed a missing early-ACK assertion; held-final mutant was killed by watchdog rather than expected earlier assertion. Added exact ACK and healthy-held-final checks; runtime unchanged. |
+| `inverse-sealed-tests-v2.oAiFdODy` |136PASS12.02s; Ruff identified two spelling-only aliases afterward. |
+| `inverse-sealed-tests-v3.VMsOb2jn` |136PASS12.99s, RuffPASS. Parent independently136PASS11.96s at frozen fbfcd628/0e1f103c. |
+| `inverse-receipts-tests-v1.mypGGP3C` |83PASS3 failures: model missed required S1 receipt, graph missed Icarus LS intermediate concat nodes. Both negative tests repaired the collector, not RTL. |
+| `inverse-receipts-tests-v2.zvsCumww` |86PASS2.62s, complete graph/event mutations. |
+| `inverse-receipts-tests-v3.MSPPC9Af` |93PASS4 failures: Icarus CLI X/Z defparam prints error but exits0 using the default. Test rejected the false premise; new runner rejects compile errors even at exit0 and guard tests use actual literal X/Z declarations. |
+| `inverse-sealed-final-v1.DFztazfI` |234PASS16.11s, RuffPASS; all original and new checks together. |
+
+The first compile failure's precheck/compile details include original tool output;
+no absent raw stderr file is fabricated. Minor Ruff/apply-patch preparation
+diagnostics remain tool-output observations, not invented archived logs.
+
+Next authorized work is offline-only vendor-FFT preparation. The old L1v4
+actual bench stays immutable. Its overloaded READY/bank hierarchy assertions
+and inverse reservation injection require explicit strict-derived bindings to
+transport/publication/ACK versus reusable/reserved signals. All old arithmetic,
+sample identities, fault intents and absolute service budget must remain
+independently checked; private latency changes are not whole-chain CSV identity.
