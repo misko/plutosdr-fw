@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest startup diagnosis (2026-09-10): a source-identical copied-snapshot replay
+reproduces cycle31 failure with66 explicitly logged controls. The completion
+control and cutover producer-closed port are Z at all95 sampled times. Cutover
+bit0 latches on the first enabled edge; other raw/known/admission controls are
+valid at that boundary. An explicit early declaration/continuous-assignment
+split is being prepared; its effect still requires actual re-compilation.
+See [targeted diagnostic evidence](reports/experiments/20260910-retained-startup-diagnosis-parent.md).
+
 Latest actual startup result (2026-09-10): the language-only launch correction
 passes31 independent preparation tests. Corrected vendor invocation74560 now
 compiles/elaborates, but fails at startup cycle31 before any FFT job admission.
