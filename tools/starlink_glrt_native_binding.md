@@ -18,6 +18,8 @@ exact source-file/IQ hashes and byte counts; healthy stopped GLF1 coordinates;
 the owner's exact bootstrap seed; runtime and native inventory agreement;
 and every retained native pilot inside the coarse source interval. The
 recording export is regenerated from the raw journal and compared in full.
+When the owner episode contains `journal_sha256`, that sealed digest must also
+match. Older receipts without this field remain explicitly retrospective.
 CLI hashing rejects an IQ file whose size or modification metadata changes
 while it is read. Existing output files are not overwritten.
 

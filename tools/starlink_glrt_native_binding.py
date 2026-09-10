@@ -88,6 +88,8 @@ def bind_source(*, journal, recording, owner, protocol, summary, final_snapshot,
     if episode_index >= len(episodes):
         raise ValueError('owner episode missing')
     episode = episodes[episode_index]
+    if 'journal_sha256' in episode and episode['journal_sha256'] != sha(journal):
+        raise ValueError('journal differs from owner sealed digest')
     checked = review(journal, epoch=epoch)
     entries, _ = records(journal)
     seeds = [batch(e.payload.decode('ascii')) for e in entries if e.kind == 'bootstrap_seed']

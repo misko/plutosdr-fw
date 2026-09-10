@@ -88,6 +88,18 @@ def test_failed_runtime_is_preserved_not_promoted(controller, pilot_words, resul
     assert output['runtime_result'] == result and output['owner_status'] == 'failed'
 
 
+def test_owner_sealed_journal_digest_is_enforced_when_available(controller, pilot_words):
+    inputs = evidence(controller, pilot_words)
+    owner = json.loads(inputs['owner'])
+    owner['episodes'][0]['journal_sha256'] = sha(inputs['journal'])
+    inputs['owner'] = encoded(owner)
+    assert bind_source(**inputs)['head_count'] == 16
+    owner['episodes'][0]['journal_sha256'] = '0'*64
+    inputs['owner'] = encoded(owner)
+    with pytest.raises(ValueError, match='sealed digest'):
+        bind_source(**inputs)
+
+
 @pytest.mark.parametrize('corruption', ['boot', 'serial', 'busy', 'tx', 'iq', 'bytes', 'protocol',
     'snapshot', 'owner_coarse', 'runtime', 'seed', 'epoch', 'export', 'writer', 'outside',
     'owner_inventory', 'missing_episode'])
