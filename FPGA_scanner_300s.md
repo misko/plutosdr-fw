@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest actual startup result (2026-09-10): the language-only launch correction
+passes31 independent preparation tests. Corrected vendor invocation74560 now
+compiles/elaborates, but fails at startup cycle31 before any FFT job admission.
+Both source copies remain unchanged. Saved-WDB inspection confirms the required
+controls exist but have no recorded history; a targeted diagnostic replay is
+needed before assigning a cause. No fault waiver, timing success or deployment.
+See [startup failure and read-only investigation](reports/experiments/20260910-retained-startup-parent.md).
+
 Latest vendor attempt (2026-09-10): parent138 offline preparation tests PASS
 with71 frozen sources, but first real vendor invocation49345 exits1 during
 compilation: SystemVerilog wildcard connections in a `.v` wrapper were compiled
