@@ -286,3 +286,22 @@ the whole-body inverse passes and that context is not stripped.
 
 No actual or physical launch is authorized by this report. Final source pins,
 all raw receipts and retained failures remain review gates before such a run.
+
+## Publication checkpoint and independent repeat
+
+The parent independently ran the final combined selection at exact FW
+`ed1d85745779e2ac9d324efdb6ed2618569edd76` / HDL
+`65cff8a983b2fd8489634939c363f2de230fc512`: original14525 exited0,
+**3306 PASS143.69s**, under persistent `checked-product-top-parent.tQnaKlfk`.
+All179 source pins were unchanged; the prior154 remained byte-identical.
+This is the parent's combined receipt, distinct from the owner's original3304
+and subsequent554 receipts recorded above. No vendor execution is implied.
+
+Portable owner evidence is committed in HDL
+`369e96adf802c1d8e837a27e9e855f4eea53e2c1`, directory
+`library/starlink_pss_acquisition/evidence/checked-product-p1-integration-offline-v1`.
+Manifest SHA256 is
+`21cab744ffb933c865735e47e1831169317419d165deed9d149ae455079edbe0`.
+The Git-object publication gate verifies all10 payloads and11 tracked files.
+It preserves all failed attempts and both final owner scopes; the archive's
+report is the unmodified tested-source report snapshot, before this checkpoint.
