@@ -1,0 +1,23 @@
+{
+  "archive": {
+    "bytes": 72134497,
+    "name": "20260910-inverse-sealed-offline-v1.tgz",
+    "sha256": "1701af578e98da39555a0aecfbe757c7fe4a8907f5aaa797d6fc02c7140d3c71"
+  },
+  "format": "starlink-portable-archive-parts-v1",
+  "max_part_bytes": 41943040,
+  "parts": [
+    {
+      "bytes": 41943040,
+      "index": 0,
+      "name": "20260910-inverse-sealed-offline-v1.tgz.part000",
+      "sha256": "0488f89e79f991307f8aac25c7bf44a13f70ef28322741efdeea5c4d4cf56681"
+    },
+    {
+      "bytes": 30191457,
+      "index": 1,
+      "name": "20260910-inverse-sealed-offline-v1.tgz.part001",
+      "sha256": "76bca99a1cad125c1e7d33814ac03643dc90296eb9c350ba6647264f01841472"
+    }
+  ]
+}

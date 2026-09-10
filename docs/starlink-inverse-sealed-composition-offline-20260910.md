@@ -188,3 +188,28 @@ and inverse reservation injection require explicit strict-derived bindings to
 transport/publication/ACK versus reusable/reserved signals. All old arithmetic,
 sample identities, fault intents and absolute service budget must remain
 independently checked; private latency changes are not whole-chain CSV identity.
+
+## Portable evidence
+
+All15 retained attempt directories, final source/reference files and packaging
+script are preserved as11891 safe unique regular tar members. Every member hash
+and pre/post source hash verified. Archive source pins are FW4ebd11f8a and
+HDL1df9b3162; this publication paragraph is a later report-only addition.
+
+Whole archive:72134497 bytes,
+SHA256 `1701af578e98da39555a0aecfbe757c7fe4a8907f5aaa797d6fc02c7140d3c71`.
+The original remains under recovery `inverse-sealed-archive-v1.uUEfIcM9`.
+Tracked artifacts use two lossless <=40MiB parts (41943040 and30191457 bytes),
+not the monolithic archive. Ordered receipt:
+`reports/experiments/20260910-inverse-sealed-offline-v1.parts.json`;
+complete member receipt: same prefix `.json`.
+
+The unchanged reviewed `tools/starlink_reconstruct_archive_parts.py` reconstructed
+the tracked parts into a new recovery directory and verified exact whole size/SHA.
+Example (OUTPUT must be absent, outside /tmp):
+
+```sh
+python -B tools/starlink_reconstruct_archive_parts.py \
+  --manifest reports/experiments/20260910-inverse-sealed-offline-v1.parts.json \
+  --output-dir /absolute/new/output
+```
