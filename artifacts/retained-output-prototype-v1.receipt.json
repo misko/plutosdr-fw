@@ -1,0 +1,12 @@
+{
+  "archive": "retained-output-prototype-v1.tar.gz",
+  "archive_verified": true,
+  "bytes": 5081084,
+  "raw_and_frozen_before_after_equal": true,
+  "raw_regular_bytes": 708949440,
+  "raw_regular_files": 11440,
+  "raw_symlinks_recorded_not_followed": 174,
+  "receipt_entries": 9322,
+  "safe_regular_members": 9323,
+  "sha256": "65c4a4abacf56be1778f840d5b1a8ede299cc64279aa4ab7a06d976d2c3929ca"
+}
