@@ -140,3 +140,33 @@ All11890 payload hashes plus the separately pinned inventory hash verify;
 corrected audit54371 explicitly checks its existing external hash and exits0.
 No archive/source was modified. The owner's FW32532 and HDL64538 pushes report
 terminal0 to the inverse DNM remote, not main.
+
+### Actual early-status and clock-domain baseline audit
+
+Parent independently parsed the entire accepted L1 trace at
+`/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-actual-R1B1O1-L1-175-prepared-v4/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/fft_bank_owned_trace.csv`,
+first checking SHA-256
+`e7127798f315772b95aff63b75fffcd9cf5d1af8ca3c96e878bae4b39e443d71`.
+All76 healthy jobs (38 forward/38 inverse) satisfy config+3,512 input samples
+from+5 through+517,512 raw outputs from+1298 through+1809, status+1300 and
+old commit+1810, relative to admission. Status is on the THIRD raw output
+(zero-based ordinal2), not the first. First inverse absolute fast cycles are
+admission2772/status4072/last raw4581/commit4582.
+
+Forward admission intervals in nominal epoch1 are24x4548 and7x4549 fast cycles;
+backpressure epoch2 has3x4821 and2x4822. Nominal maximum4549 at175MHz is
+25.994286us against447 canonical samples/15MS/s =29.8us =5215 fast clocks,
+leaving666 nominal cycles. These are original ideal-clock observations, not
+new sealed-bank full-pair throughput or arbitrary-stall guarantees.
+
+The independent review and parent source read also confirm the arithmetic
+event CSV's `cycle` column is stream-dependent: forward/product record
+`fast_cycle`; inverse records `slow_cycle`. Future event-indexed equivalence
+must retain sample/metadata identity AND use explicit domain mapping plus
+absolute fast-domain complete-pair measurements. Subtracting unlike counters
+or discarding all time columns would not prove the service requirement.
+
+The owner's directed first-word early-status test reports14PASS and publication
++3/reuse+6..7, separately from the old delayed-status+2/+4..6. Root requested
+an additional actual-third-word witness before the next source freeze; this
+owner result is not yet a parent repeated test or actual-core throughput pass.

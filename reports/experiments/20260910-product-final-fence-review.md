@@ -209,3 +209,27 @@ This qualifies source-specific OFFLINE physical preparation for the same
 product runtime8923b42b/e4f4c56d, preserving the ROM baseline and constraints.
 No synthesis/routing launch, receiver promotion, timing pass or radio operation
 follows automatically. Physical timing remains the deployment blocker.
+
+### Portable full actual evidence
+
+Parent independently verified the exact committed archive at HDL
+`734578cef0ce51ba5a280ceee91b72c6878e4dca`, FW report/gitlink
+`56e104530a9d08c1913ed055d9845e731f8535ad`:
+`library/starlink_pss_acquisition/evidence/producer-final-actual-v1`.
+Manifest `95e977b196d7c38bea2a68ceec12107e2212e5ae78e399ba8627804959c5f8d1`
+closes138 payloads/139 tracked files, all hashes checked directly from Git.
+The first packaging commit omitted nested `prepared/SHA256SUMS` due to a broad
+basename filter; the owner caught and added it before publication. No actual
+source or result changed. This archive integrity check is separate from the
+parent's earlier complete functional/source audit.
+
+The archive retains full CSVs, source closure, logs, generated IP and lossless
+WDB gzip parts (each at most40MiB). Original WDB128374373 bytes has SHA-256
+`00ef393f8a66be5777d9996e5171f5fcebe1804c49c8efe8abf3bdae26eb667f`.
+The owner executed exact reconstruction; parent checked committed part hashes,
+not an additional WDB reconstruction.
+
+Physical derivation must retain the canonical source/output mailbox AND add
+the product-fence mailbox: eight runtime Verilog files, not the old seven.
+Rename only the top, explicitly bind P1, and use the new `fence-preparation.json`
+settings; the inherited `preparation.json` intentionally describes the old base.
