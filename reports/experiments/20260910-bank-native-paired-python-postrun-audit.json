@@ -1,0 +1,119 @@
+{
+  "schema": "bank-native-paired-python-postrun-audit-v1",
+  "scope": "additive POST-RUN import/source audit; NOT retroactive original pre-run freeze",
+  "collected_utc": "2026-09-10T04:43:04.508663+00:00",
+  "fw_head": "9c6bee20cf9d970067bb5f8c8fc336ab85e3590d",
+  "hdl_head": "9759cf121e899975e841b17c593289cf646249fa",
+  "python": "3.11.16 (main, Aug 14 2026, 15:35:36) [Clang 22.1.3 ]",
+  "python_executable": "/home/mouse9911/gits/pluto-plus-utils/.venv/bin/python",
+  "numpy_version": "2.4.6",
+  "original_runs": [
+    "bank-native-paired-520-175-v1",
+    "bank-native-paired-520-200-v1"
+  ],
+  "original_explicit_math_module_count": 4,
+  "project_import_module_count": 10,
+  "omitted_package_or_transitive_module_count": 6,
+  "dependencies": [
+    {
+      "module": "tests",
+      "path": "tests/__init__.py",
+      "sha256": "1b6a77b6d966d9da304ea19eb14c75653f23291995976bab0940a96a504b372b",
+      "head_git_blob": "9e3362e06754c9388099b89d8b400deacb36905d",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": false,
+        "bank-native-paired-520-200-v1": false
+      }
+    },
+    {
+      "module": "tests.starlink_oracle",
+      "path": "tests/starlink_oracle/__init__.py",
+      "sha256": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa",
+      "head_git_blob": "7275d2191a300ba586149dd0642265d299805a8f",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": false,
+        "bank-native-paired-520-200-v1": false
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.acquisition",
+      "path": "tests/starlink_oracle/acquisition.py",
+      "sha256": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b",
+      "head_git_blob": "5f1f8d4751ff7bbcfeece8a59fb297fe4d3a66d4",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": false,
+        "bank-native-paired-520-200-v1": false
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.bank_native_paired",
+      "path": "tests/starlink_oracle/bank_native_paired.py",
+      "sha256": "de81facd4d9ea3e4bd319f2abfa759daad805adfd55c47d8a66be4491f187b1c",
+      "head_git_blob": null,
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": true,
+        "bank-native-paired-520-200-v1": true
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.ddc",
+      "path": "tests/starlink_oracle/ddc.py",
+      "sha256": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05",
+      "head_git_blob": "a594acb7580c75a13ffc034a65fb6facfc9b529b",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": false,
+        "bank-native-paired-520-200-v1": false
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.fixed",
+      "path": "tests/starlink_oracle/fixed.py",
+      "sha256": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9",
+      "head_git_blob": "19ab63fd1b9c9884b9bd7ec4055076f4eac05ac8",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": true,
+        "bank-native-paired-520-200-v1": true
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.numerology",
+      "path": "tests/starlink_oracle/numerology.py",
+      "sha256": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+      "head_git_blob": "708bebf94d8acc2425045886ac15c458406ee9bf",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": true,
+        "bank-native-paired-520-200-v1": true
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.search",
+      "path": "tests/starlink_oracle/search.py",
+      "sha256": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086",
+      "head_git_blob": "742f121a29b7932f01957ebbade784f005bdb09f",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": false,
+        "bank-native-paired-520-200-v1": false
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.waveforms",
+      "path": "tests/starlink_oracle/waveforms.py",
+      "sha256": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+      "head_git_blob": "495a43a77764b74216f0b2fdc21062d0396b1af8",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": true,
+        "bank-native-paired-520-200-v1": true
+      }
+    },
+    {
+      "module": "tests.starlink_oracle.xfft_bitacc",
+      "path": "tests/starlink_oracle/xfft_bitacc.py",
+      "sha256": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e",
+      "head_git_blob": "2b44490938dc0719c4967696e739c33c3ed5c180",
+      "byte_identical_to_original_frozen_file": {
+        "bank-native-paired-520-175-v1": false,
+        "bank-native-paired-520-200-v1": false
+      }
+    }
+  ]
+}
