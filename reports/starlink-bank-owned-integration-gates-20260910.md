@@ -140,8 +140,13 @@ default-off bubble updates for only joiner I/Q and the four multiplier payload
 registers, plus two exact balanced64-bit kernel identity comparisons. All
 logical accepts, valid/metadata/overflow behavior, current/sticky faults, final
 commit and bank ownership stay unchanged. The completed-input-fence worktree
-is implementing/testing this opt-in experiment; it is not promoted to primary
-and no further synthesis/route is authorized before source-specific review.
+has completed this opt-in experiment at FW `c62118a9` / HDL `97adf891`.
+Both actual-core modes pass with byte-identical prior control traces; root
+independently passed19 tests and verified416 artifact hashes. One unchanged
+100/175 synthesis/diagnostic route is now authorized and synthesis is running;
+no new timing result or primary runtime promotion is claimed. See
+`experiments/20260910-payload-bubbles-parent-review.md` for scope and the separate
+missing-Linux-source regression evidence.
 
 An independent `-bank-native-paired` FW/HDL worktree is implementing the first
 additive15MHz concurrent test, starting FW `9c6bee20c` / HDL `9759cf12`.
@@ -152,6 +157,11 @@ public native AXI, injection disabled, DSP reduction, independently calculated
 26-word packets and positive observed compute/capture overlap. The static
 smoke anchor is not causal acquisition. Existing runtime and old benches stay
 unchanged;175/200 simulations follow new frozen expectations and policy tests.
+The first175 actual run reaches exact native packet/coarse/map/pilot data but
+fails the required positive capture/FFT overlap gate. Anchor447 appears too
+early relative to real outer-bank fill. Preserve this failure and the strict
+gate; diagnostic timestamps and a separately reviewed later supported capture
+window must demonstrate concurrency, not merely correct sequential results.
 
 The30/60 extension cannot merely change a test parameter: current realtime and
 boundary-stop wrapper/profile guards explicitly require15MS/s. Rate-conditioned
