@@ -8,6 +8,11 @@ detector removal, timing waiver or replacement of fine evidence is authorized.
 
 ## 1. Integrate the local transform engine without changing score arithmetic
 
+Checkpoint: the additive complete scorer passes the six 64-block/numeric
+alternative runs and two independent primary-branch 175 MHz reruns. The
+4,096-block soak and physical gates below remain open. No receiver profile
+selects this module yet.
+
 Keep the existing overlap scheduler,2048-entry energy cache, inverse output
 register,447-candidate extraction,512-entry result FIFO and normalization.
 Replace only the forward/inverse dispatch and intervening cross-domain copies
@@ -41,6 +46,11 @@ Acceptance evidence:
   health; a valid prefix must not imply a complete healthy block/capture.
 
 ## 2. Measure the complete coarse composition
+
+Checkpoint: passing alternative-source OOC synthesis has 3,868 LUTs, 6,499 FFs,
+27 DSPs, 14 BRAM tiles and no black boxes. Complete source-specific evidence is
+in `starlink-bank-owned-iq-to-score-resources-20260910.json`. This does not close
+physical timing, external I/O or CDC gates.
 
 Use frozen passing inputs and the unchanged generated FFT arithmetic. Measure
 the complete scheduler, three banks, FFT/product, energy and score engine.

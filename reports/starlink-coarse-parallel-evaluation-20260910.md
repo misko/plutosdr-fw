@@ -1,5 +1,37 @@
 # Parallel coarse-engine evaluation — experimental only
 
+## Latest checkpoint: complete scorer and control-path counterevidence
+
+The complete bank-owned coarse composition is now additive code on the primary
+experimental branch, not selected by receiver defaults. Six alternative-branch
+actual-core runs cover numerical/fault replay and nominal/burst-stall 64-block
+capacity at 175/200 MHz. Independent primary-branch 175 MHz numeric and stalled
+capacity runs also pass; see `experiments/20260910-bank-composition-primary-replay.md`.
+Whole-coarse synthesis measures 3,868 LUTs, 6,499 FFs, 27 DSPs and 14 BRAM tiles,
+with no black boxes. These are not routed receiver resource savings or a timing
+pass. A separately frozen 4,096-block soak is being prepared.
+
+The completed-input refactor is intentionally NOT merged into the primary HDL.
+Its first isolated route regresses from the original bank's -2.557 ns to
+-3.855 ns. The subsequent raw-readiness/certified-ACK experiment passes the
+actual-core numerical/fault suite, including post-ACK orphan quarantine, but
+still fails setup at -3.144 ns (175 MHz hold +0.059 ns). Its worst path is
+`next_inverse_reg` through input metadata validation to controller state,
+8.806 ns data delay, including 6.060 ns routing. This is evidence for examining
+registered validation/admission boundaries, not permission to relax constraints.
+The second experiment remains in its independent worktree pending report review.
+
+Root pushed and verified these exact experimental remote pins after the
+independent replay, without touching main or radios:
+
+| Remote branch suffix after `codex/starlink-rx-only-do-not-merge` | Firmware | HDL |
+| --- | --- | --- |
+| primary (no suffix) | `1fc195de2b4a38fbe89efbb9f208b4508ab96404` | `39bbf8a131e1b83e70e3875c697c12f11f23b03c` |
+| `-fft-island` | `e880640b7763d2646fbba5f1aa118246ef6a9aa6` | `95cedf076a845d1c52ec3134fd55d4666d225bcd` |
+| `-completed-input-fence` (first failed physical study) | `ae0a51d92e92db039f24551e11befd8c5d53c669` | `b8c98c23d9cf7ee273aab83e94867b0efd9b85d2` |
+
+The history below retains earlier results and their original promotion limits.
+
 The user explicitly requested an independent subagent and worktree for every
 alternate approach. Three agents were launched on 2026-09-10 UTC. The primary
 agent continues the existing idle-admission timing experiment separately.
