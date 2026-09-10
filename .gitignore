@@ -41,3 +41,6 @@ __pycache__/
 
 build/
 .Xil
+
+# Original oversized evidence retained locally; tracked lossless ordered parts.
+/reports/experiments/20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz

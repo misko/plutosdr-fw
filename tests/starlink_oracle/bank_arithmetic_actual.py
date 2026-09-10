@@ -448,6 +448,12 @@ def require_wave_diagnostics(log, inventory):
     return {"objects": len(paths), "comparison_width": 119, "recorded_internal_signals": paths}
 
 
+def require_closed_wave_receipt(receipt, inventory):
+    if not re.fullmatch(r"ARITHMETIC_WAVE_DIAGNOSTICS_ENABLED objects=\d+ monitors=4 references=2 wrapper=1 inner=1 transport=1\n", receipt):
+        raise ValueError("malformed exclusive closed diagnostic receipt")
+    return require_wave_diagnostics(receipt, inventory)
+
+
 def verify_results(output):
     output = Path(output).resolve()
     manifest = verify_freeze(output)
@@ -467,7 +473,8 @@ def verify_results(output):
     log_path = simulation / "simulate.log"
     log = log_path.read_text()
     receipts = require_terminal(log, manifest)
-    require_wave_diagnostics(log, (simulation / "arithmetic_diagnostic_signals.txt").read_text())
+    require_closed_wave_receipt((simulation / "arithmetic_diagnostic_receipt.txt").read_text(),
+                               (simulation / "arithmetic_diagnostic_signals.txt").read_text())
     trace = simulation / "fft_bank_owned_trace.csv"
     if manifest["baseline_complete_csv_match_required"] and sha(trace) != HISTORICAL_R1_CSV:
         raise ValueError("R1/B0/O0 complete historical baseline CSV changed")

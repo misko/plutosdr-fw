@@ -194,11 +194,15 @@ def test_frozen_diagnostic_Tcl_inventory_runall_and_nonoverwrite(tmp_path, optio
     assert inventory.read_text().splitlines() == diagnostic_objects(option)
     assert "MOCK_RUN_ALL_ONLY" in result.stdout
     assert study.require_wave_diagnostics(result.stdout, inventory.read_text())["comparison_width"] == 119
+    receipt = tmp_path / "arithmetic_diagnostic_receipt.txt"
+    assert study.require_closed_wave_receipt(receipt.read_text(), inventory.read_text())["comparison_width"] == 119
+    receipt_before = receipt.read_bytes()
     before = inventory.read_bytes()
     again = subprocess.run(["tclsh", str(script)], cwd=tmp_path, capture_output=True, text=True, timeout=15, check=False)
     (tmp_path / "mock-diagnostics-repeat.log").write_text(again.stdout + again.stderr)
     assert again.returncode != 0 and "file already exists" in again.stderr
     assert "MOCK_RUN_ALL_ONLY" not in again.stdout and inventory.read_bytes() == before
+    assert receipt.read_bytes() == receipt_before
 
 
 @pytest.mark.parametrize("mutation", ("missing", "duplicate"))
@@ -207,6 +211,7 @@ def test_diagnostic_scope_missing_duplicate_rejected_before_runall(tmp_path, mut
     assert result.returncode != 0 and "ARITHMETIC_WAVE_DIAGNOSTIC_INVENTORY_MISMATCH" in result.stderr
     assert "MOCK_RUN_ALL_ONLY" not in result.stdout
     assert not (tmp_path / "arithmetic_diagnostic_signals.txt").exists()
+    assert not (tmp_path / "arithmetic_diagnostic_receipt.txt").exists()
 
 
 @pytest.mark.parametrize("mutation", ("missing_marker", "duplicate_marker", "too_many", "missing_path", "duplicate_path"))
@@ -263,3 +268,47 @@ def test_recorded_same_source_Xsim_force_vectors_prove_exact_rebound_fields(opti
     rebound = (wrapper & ~masks[kind]) | (before & masks[kind])
     assert rebound == int(xsim["old_monitor"], 16)
     assert all(int(icarus[name], 16) == expected for name in ("old_xor", "wrapper_xor", "inner_xor"))
+
+
+@pytest.mark.parametrize("mutation", ("missing", "duplicate", "lateFAIL", "lateFatal", "lateError", "prefix", "no_newline"))
+def test_exclusive_closed_diagnostic_receipt_rejects_extra_late_or_malformed_text(mutation):
+    objects = diagnostic_objects(1)
+    receipt = f"ARITHMETIC_WAVE_DIAGNOSTICS_ENABLED objects={len(objects)} monitors=4 references=2 wrapper=1 inner=1 transport=1\n"
+    if mutation == "missing":
+        receipt = ""
+    elif mutation == "duplicate":
+        receipt += receipt
+    elif mutation.startswith("late"):
+        receipt += mutation[4:] + ": after marker\n"
+    elif mutation == "prefix":
+        receipt = "untrusted prefix\n" + receipt
+    else:
+        receipt = receipt.rstrip("\n")
+    with pytest.raises(ValueError, match="closed diagnostic receipt"):
+        study.require_closed_wave_receipt(receipt, "\n".join(objects) + "\n")
+
+
+def test_existing_receipt_file_cannot_be_overwritten_or_advance_mock_time(tmp_path):
+    receipt = tmp_path / "arithmetic_diagnostic_receipt.txt"
+    receipt.write_text("existing evidence\n")
+    result, _ = mock_diagnostics(tmp_path, 0)
+    assert result.returncode != 0 and "file already exists" in result.stderr
+    assert "MOCK_RUN_ALL_ONLY" not in result.stdout
+    assert receipt.read_text() == "existing evidence\n"
+
+
+def test_future_receipt_writer_inverse_to_original_v3_Tcl_and_no_simulate_log_assumption():
+    name = "simulate_bank_arithmetic_diagnostics.tcl"
+    previous = subprocess.run(["git", "-C", str(study.ROOT / "hdl"), "show",
+        f"18aa1b6f58fe7abcf06672fccf6d93551174de54:library/starlink_pss_acquisition/{name}"],
+        capture_output=True, text=True, check=True, timeout=15).stdout
+    old = 'puts "ARITHMETIC_WAVE_DIAGNOSTICS_ENABLED objects=[llength $diagnostic_objects] monitors=4 references=2 wrapper=1 inner=1 transport=1"'
+    new = old.replace('puts "', 'set diagnostic_receipt "', 1) + (
+        '\nset diagnostic_channel [open arithmetic_diagnostic_receipt.txt {WRONLY CREAT EXCL}]'
+        '\nputs $diagnostic_channel $diagnostic_receipt\nclose $diagnostic_channel\nputs $diagnostic_receipt')
+    current = (study.ACQ / name).read_text()
+    assert study.once(current, new, old) == previous
+    assert current.index("close $diagnostic_channel\nputs $diagnostic_receipt") < current.index("run all")
+    helper = Path(study.__file__).read_text()
+    assert 'require_wave_diagnostics(log, (simulation / "arithmetic_diagnostic_signals.txt")' not in helper
+    assert 'require_closed_wave_receipt((simulation / "arithmetic_diagnostic_receipt.txt").read_text(),' in helper
