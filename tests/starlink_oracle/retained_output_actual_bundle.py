@@ -20,6 +20,9 @@ EXTRAS = (
     "tests/starlink_oracle/retained_completion_declaration.py",
     "tests/test_starlink_retained_completion_declaration.py",
     "tests/starlink_oracle/retained_logger_calls.py",
+    "tests/starlink_oracle/retained_frame_contract.py",
+    "tests/test_starlink_retained_frame_contract.py",
+    "docs/starlink-retained-causal-frame-contract-20260910.md",
     "tests/test_starlink_retained_logger_calls.py",
     "tests/test_starlink_retained_logger_repro.py",
     "hdl/library/starlink_pss_acquisition/retained_output_actual/logger_repro/tb_retained_logger_repro.sv",
@@ -32,6 +35,7 @@ EXTRAS = (
     "hdl/library/starlink_pss_acquisition/retained_output_actual/run_retained_output_actual.tcl",
 )
 RUNNER = EXTRAS[-2]
+KIND = "retained-output-actual-v2-causal-frame"
 
 
 def encoded(value) -> bytes:
@@ -99,7 +103,7 @@ def prepare(output: Path) -> dict:
     after = live_sources(a.ROOT)
     if before != after:
         raise ValueError("source changed during preparation")
-    manifest = {"kind": "retained-output-actual-v1", "source_root": str(a.ROOT),
+    manifest = {"kind": KIND, "source_root": str(a.ROOT),
                 "sources": before, "source_signature": hashlib.sha256(encoded(before)).hexdigest(),
                 "files": _files(output), "compiled": compiled, "vectors": vectors,
                 "source_before_after_equal": True, "actual_execution": False}
@@ -115,7 +119,7 @@ def verify(bundle: Path, expected: str, *, live=False) -> dict:
         raise ValueError("external manifest digest")
     raw = manifest_file.read_bytes()
     m = json.loads(raw)
-    if encoded(m) != raw or m.get("kind") != "retained-output-actual-v1" or m.get("actual_execution") is not False or m.get("source_before_after_equal") is not True:
+    if encoded(m) != raw or m.get("kind") != KIND or m.get("actual_execution") is not False or m.get("source_before_after_equal") is not True:
         raise ValueError("manifest canonical types/kind")
     if set(m) != {"kind", "source_root", "sources", "source_signature", "files", "compiled", "vectors", "source_before_after_equal", "actual_execution"}:
         raise ValueError("manifest fields")

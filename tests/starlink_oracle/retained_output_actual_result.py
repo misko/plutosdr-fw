@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 from .retained_output_actual import RECIPE, original, verify_originals
+from .retained_frame_contract import verify_frames
 
 
 def _require(ok: bool, message: str) -> None:
@@ -84,6 +85,7 @@ def verify_result(log: Path, numerical: Path, *, kind: str) -> dict:
             name = line.split()[0]
             records.setdefault(name, []).append(_fields(line))
     expected_counts = {"RACT_BEGIN": 7, "RACT_CONTEXT": 7, "RACT_ADMIT": 40,
+                       "RACT_FRAME": 40,
                        "RACT_RESET_RELEASE": 40, "RACT_STATUS": 38, "RACT_JOB": 38,
                        "RACT_SOURCE_ELIGIBILITY": 19, "RACT_ABORT": 2,
                        "RACT_SLOW_PAUSE": 2, "RACT_SLOW_RESUME": 2,
@@ -194,6 +196,8 @@ def verify_result(log: Path, numerical: Path, *, kind: str) -> dict:
                for name in ("samples_ci16", "forward_q17", "product_q17", "inverse_q17", "forward_exponents", "inverse_exponents")}
     seen = {}
     stream_times = {}
+    frame_input_cycles = {}
+    frame_raw_cycles = {}
     previous_stamp = -1
     columns = "context stream job position data start exponent fast slow time_fs".split()
     with numerical.open(newline="") as f:
@@ -236,9 +240,12 @@ def verify_result(log: Path, numerical: Path, *, kind: str) -> dict:
                 e = event_by_key.get((context, int(stream.endswith("I")), fixture))
                 _require(e is not None, "unadmitted numeric core owner")
                 if stream.startswith("input"):
+                    frame_input_cycles.setdefault((context, int(stream.endswith("I")), fixture), []).append(fast)
                     first = e.get("input_first", e.get("first"))
                     _require(fast == first+pos+(pos != 0), "input row/job ordinal time join")
                 else:
+                    if pos == 0:
+                        frame_raw_cycles[context, int(stream.endswith("I")), fixture] = fast
                     _require("raw_first" in e and fast == e["raw_first"]+pos, "raw row/job ordinal time join")
             if stream == "privateI":
                 _require(fast == event_by_key[context, 1, fixture]["raw_first"]+pos+1, "private row/job retirement time join")
@@ -269,6 +276,7 @@ def verify_result(log: Path, numerical: Path, *, kind: str) -> dict:
             admit = next(a for a in admits if a["context"] == context and a["inverse"] == 0 and a["start"] == 1000+447*fixture)
             _require(stream_times[context, "source", fixture] < (2*admit["cycle"]-1)*2857143, "complete source precedes forward admission")
     _require("OFFLINE_CLOCK fast_half_fs=2857143 slow_half_fs=5000000" in text, "actual clock witness missing")
+    verify_frames(records, frame_input_cycles, frame_raw_cycles)
     return {"kind": kind, "parser_only_not_execution_proof": True, "terminal": terminal,
             "contexts": records["RACT_CONTEXT"], "aborts": records["RACT_ABORT"],
             "numerical_words": sum(seen.values())}

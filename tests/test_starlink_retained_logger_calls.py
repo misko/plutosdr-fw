@@ -5,19 +5,28 @@ import pytest
 
 from tests.starlink_oracle import retained_logger_calls as calls
 from tests.starlink_oracle import retained_output_actual as a
-from tests.starlink_oracle.retained_output_actual_result import verify_result
+from tests.starlink_oracle import retained_frame_contract as frames
+
+
+def legacy_verifier():
+    """Test-only exact v4 parser; the live verifier has no legacy mode."""
+    source = frames.inverse_result((a.ROOT / 'tests/starlink_oracle/retained_output_actual_result.py').read_text())
+    namespace = {'__name__': 'tests.starlink_oracle._v4_logging_regression',
+                 '__package__': 'tests.starlink_oracle'}
+    exec(compile(source, '<strict-v4-logger-regression>', 'exec'), namespace)
+    return namespace['verify_result']
 
 
 def test_whole_witness_and_bench_inverse():
-    calls.inverse((a.RTL / 'witness.svh').read_text())
-    old_bench = calls.inverse(a.actual_bench(), bench=True)
+    calls.inverse(frames.inverse((a.RTL / 'witness.svh').read_text()))
+    old_bench = calls.inverse(frames.inverse(a.actual_bench(), bench=True), bench=True)
     assert hashlib.sha256(old_bench.encode()).hexdigest() == calls.ORIGINAL_BENCH_SHA
 
 
 @pytest.mark.parametrize('kind', ['old_site', 'missing_else', 'duplicate_site', 'swapped_phase',
                                   'changed_argument', 'changed_format', 'changed_task', 'changed_check'])
 def test_literal_calls_inverse_mutants(kind):
-    text = (a.RTL / 'witness.svh').read_text()
+    text = frames.inverse((a.RTL / 'witness.svh').read_text())
     old, new = calls.replacements()[0]
     if kind == 'old_site':
         text = text.replace(new, old)
@@ -40,8 +49,9 @@ def test_literal_calls_inverse_mutants(kind):
 
 
 def test_full_scripted_csv_is_byte_identical_to_v3(tmp_path):
-    new_bench = a.actual_bench()
+    new_bench = frames.inverse(a.actual_bench(), bench=True)
     old_bench = calls.inverse(new_bench, bench=True)
+    verify_result = legacy_verifier()
     for name, bench in (('original_v3', old_bench), ('literal_calls', new_bench)):
         run = tmp_path / name
         assert a.offline(run, execute=True, bench=bench) == {

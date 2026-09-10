@@ -9,6 +9,7 @@ import subprocess
 from . import retained_output_prototype as original
 from . import retained_completion_declaration as completion_declaration
 from . import retained_logger_calls as logger_calls
+from . import retained_frame_contract as frame_contract
 
 ROOT = Path(__file__).resolve().parents[2]
 RTL = ROOT / "hdl/library/starlink_pss_acquisition/retained_output_actual"
@@ -42,7 +43,7 @@ def sha(path: Path) -> str:
 
 def verify_originals() -> None:
     original.verify_baseline()
-    logger_calls.inverse((RTL / "witness.svh").read_text())
+    logger_calls.inverse(frame_contract.inverse((RTL / "witness.svh").read_text()))
     pins = {REF / n: v for n, v in REFERENCE_PINS.items()}
     pins[original.RTL / "tb/tb_retained_composition.sv"] = TEMPLATE_SHA
     pins[Path(original.__file__)] = HELPER_SHA

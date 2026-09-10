@@ -70,9 +70,10 @@ def prepared(tmp_path_factory):
 def test_exact_bundle_source_closure(prepared):
     path, expected = prepared
     result = b.verify(path, expected, live=True)
-    assert result["sources"] == 77
-    assert result["files"] == 80
+    assert result["sources"] == 80
+    assert result["files"] == 83
     manifest = json.loads((path / "manifest.json").read_text())
+    assert manifest['kind'] == 'retained-output-actual-v2-causal-frame'
     assert len(manifest["vectors"]) == 8
     assert not any("scripted_fft_ports" in p for p in manifest["compiled"])
     assert (path / "bench.sv").read_text() == a.actual_bench()
@@ -93,7 +94,7 @@ def test_no_overwrite_or_implicit_staging(prepared, tmp_path):
         b.after(path, out, expected)
 
 
-@pytest.mark.parametrize("kind", ["sha", "missing", "extra", "source", "recipe", "abi", "profile", "bench", "link", "float_length"])
+@pytest.mark.parametrize("kind", ["sha", "missing", "extra", "source", "recipe", "abi", "profile", "bench", "link", "float_length", "legacy_kind"])
 def test_bundle_mutants(prepared, tmp_path, kind):
     source, digest = prepared
     p = tmp_path / "bundle"
@@ -106,10 +107,13 @@ def test_bundle_mutants(prepared, tmp_path, kind):
         (p / "undeclared.txt").write_text("extra")
     elif kind == "link":
         (p / "alias").symlink_to(p / "bench.sv")
-    elif kind == "float_length":
+    elif kind in ("float_length", "legacy_kind"):
         m = json.loads((p / "manifest.json").read_text())
-        key = next(iter(m["files"]))
-        m["files"][key]["bytes"] = float(m["files"][key]["bytes"])
+        if kind == "float_length":
+            key = next(iter(m["files"]))
+            m["files"][key]["bytes"] = float(m["files"][key]["bytes"])
+        else:
+            m['kind'] = 'retained-output-actual-v1'
         (p / "manifest.json").write_bytes(b.encoded(m))
         digest = a.sha(p / "manifest.json")
     else:
