@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest actual-FFT harness gate (2026-09-10): parent independently repeats112
+offline tests; all66 source pins unchanged. Fresh77953-row scripted replay
+passes inventory and19456 exact raw-row/job-time joins. Both original malformed
+timestamp counterexamples and a consistent-clock/wrong-job-cycle mutation are
+now rejected. Bundle/standalone-launch tests and source-specific vendor review
+remain next; no actual FFT, routing or radio qualification is implied.
+See [actual harness parent review](reports/experiments/20260910-actual-harness-parent-review.md).
+
 Latest product integration gate (2026-09-10): independent parent2752 PASS
 (1308 additive plus unchanged1444), all154 source pins unchanged. Separate
 80-manifest/804-entry audit confirms96 exact reason/read rows and identical
