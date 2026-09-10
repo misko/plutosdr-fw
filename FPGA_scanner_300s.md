@@ -40,9 +40,30 @@ oracle and evidence are integrated on primary without runtime RTL changes;
 qualification. The new true-PSS520 concurrent fixture passes244 independently
 repeated offline tests; both actual175/200 runs pass and parent independently
 verified all238 archived artifacts plus ordered native/pilot observations.
-Additive tests/evidence are integrated;415 combined primary tests pass. A late
-native-command negative test is being implemented. No receiver profile or radio
-has been changed. Completed alternative studies are preserved
+Additive tests/evidence are integrated;415 combined primary tests pass. The late
+native-command negative now passes actual-generated-core simulations at175/200:
+late rejection with no capture/packet/IRQ, exact62 register reads and2048 pilot
+bytes each. Parent independently checked frozen sources and archived outputs;
+its additive integration passes303 primary regression tests. These are
+simulation results, not on-radio or physical qualification.
+
+The separate rounding candidate improves isolated setup from-1.577 to+0.207ns;
+its internal register-to-register setup/hold are+0.964/+0.103ns. All176 remaining
+isolated hold failures start at top-level ports; those are not waived, and
+neither this local result nor its74-fabric-FF reduction closes bank timing.
+The first active control-candidate comparison failed in both baseline and
+combined modes during the original missing-forward-status epoch. Both failures
+are retained and under read-only diagnosis; no comparison was relaxed and no
+candidate promoted. A separate one-stage operand-register prototype targets
+the BRAM-to-DSP path with explicit added latency and offline qualification.
+
+The30MS/s common-source offline cohort is frozen and independently verified.
+A new explicit30-upper bank+STOP public interface remains isolated/offline;
+review identified fail-open unknown parameter checks, now being hardened before
+acceptance. Actual30/60 bank/native/pilot integration remains open. Latest
+source-specific decisions and measurements:
+[`reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md`](reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md).
+No receiver profile or radio has been changed. Completed alternative studies are preserved
 on remote do-not-merge branches. See
 [`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)
 and [`reports/starlink-bank-owned-integration-gates-20260910.md`](reports/starlink-bank-owned-integration-gates-20260910.md).
