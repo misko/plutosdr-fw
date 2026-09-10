@@ -1,0 +1,806 @@
+{
+  "schema": "operand-boundary-offline-v1",
+  "actual_FFT_or_physical_run": false,
+  "base_fw": "90fc402229654bbba1de973eb03bf2a56c81e55c",
+  "base_hdl": "ce9c863ab00228378831dbdb395db1c49554e90b",
+  "sources": {
+    "hdl/library/starlink_pss_acquisition/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "hdl/library/starlink_pss_acquisition/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "hdl/library/starlink_pss_acquisition/tb/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "tests/starlink_oracle/test_spectrum_operand_register.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "tests/starlink_oracle/test_spectrum_round_boundary.py": "ae2b94f8578e0eeec7f1467f9a706363f0975759d9a8ca14abd6874628561cde",
+    "tests/test_starlink_spectrum_product_evidence.py": "f937255eae98e9a7b7ac3b5bbf1f5f6132bd90240ad9af578a6cf6780594457e"
+  },
+  "runs": [
+    {
+      "version": "v1",
+      "tests": 25,
+      "seconds": "1.852",
+      "cases": [
+        {
+          "name": "test_exact_math_metadata_laten0",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "7daad7d041908e4a548bf063363e01735bd591b74a77db655d283a921c2c723b"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=1 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=221 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=1 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=217 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten1",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=2 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=2 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten2",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=2 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=2 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten3",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=8 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=8 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten4",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=8 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=8 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten5",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=18 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=18 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten6",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=18 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=18 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten7",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=24 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=24 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten8",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=24 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=24 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut0",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "d5aa3533299f2e00d1dea9970c628ac2fdf859394d9c85bbd3482f29e867bcf2",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:87: OPERAND_READY_MISMATCH mode=1 cycle=1"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut1",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "5fecb30e6cffe602e03953aff7653a59f1b509f1de0a88492af4a66e3581d95c",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:121: OPERAND_VALID_PULSE_MISMATCH mode=1 cycle=2"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut2",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "25622b893ba99f97905c4d54b082d4ecf3d543b13d4424a7bdcecf0eb0bb8668",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:125: OPERAND_MATH_METADATA_MISMATCH mode=1 cycle=4 token=1"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut3",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "a834368b869535bb2a0d8641aa2369d74fc0a8fa347cfdc20255540298040095",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:125: OPERAND_MATH_METADATA_MISMATCH mode=1 cycle=3 token=0"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut4",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "59ecc8544e05351d4e6f13408f14f128fdef609e2fecfeb6b041b3089321ddb4",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:121: OPERAND_VALID_PULSE_MISMATCH mode=1 cycle=2"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut5",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "c1a2a5d029a1a83955292271b7f90f19cd524a777e34b856dfaefaa7a98e9adf",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:125: OPERAND_MATH_METADATA_MISMATCH mode=1 cycle=150 token=127"
+          ]
+        }
+      ]
+    },
+    {
+      "version": "v2",
+      "tests": 52,
+      "seconds": "13.156",
+      "cases": [
+        {
+          "name": "test_exact_math_metadata_laten0",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "7daad7d041908e4a548bf063363e01735bd591b74a77db655d283a921c2c723b"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=1 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=221 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=1 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=217 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten1",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=2 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=2 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten2",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=2 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=2 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=151 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten3",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=8 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=8 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten4",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=8 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=8 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten5",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=18 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=18 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten6",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=18 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=18 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten7",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=24 round=0 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=24 round=0 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_exact_math_metadata_laten8",
+          "expected_mutation_rejection": false,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682"
+          },
+          "terminal_rows": [
+            "OPERAND_MODE_PASS width=24 round=1 registered=0 no_stall_elapsed_clocks=2 accepted=1768 emitted=1682 discarded=86 simultaneous=1733 stalls=3131 pulses=104 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_MODE_PASS width=24 round=1 registered=1 no_stall_elapsed_clocks=3 accepted=1785 emitted=1671 discarded=114 simultaneous=1748 stalls=3112 pulses=102 last_saturation_reset=1 last_saturation_flush=1 outstanding=0",
+            "OPERAND_BOUNDARY_PASS cycles=5010 options=2 default_exact=1 registered_additional_latency=1 actual_FFT_physical=0"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut0",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "d5aa3533299f2e00d1dea9970c628ac2fdf859394d9c85bbd3482f29e867bcf2",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:87: OPERAND_READY_MISMATCH mode=1 cycle=1"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut1",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "5fecb30e6cffe602e03953aff7653a59f1b509f1de0a88492af4a66e3581d95c",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:121: OPERAND_VALID_PULSE_MISMATCH mode=1 cycle=2"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut2",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "25622b893ba99f97905c4d54b082d4ecf3d543b13d4424a7bdcecf0eb0bb8668",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:125: OPERAND_MATH_METADATA_MISMATCH mode=1 cycle=4 token=1"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut3",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "a834368b869535bb2a0d8641aa2369d74fc0a8fa347cfdc20255540298040095",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:125: OPERAND_MATH_METADATA_MISMATCH mode=1 cycle=3 token=0"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut4",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "59ecc8544e05351d4e6f13408f14f128fdef609e2fecfeb6b041b3089321ddb4",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:121: OPERAND_VALID_PULSE_MISMATCH mode=1 cycle=2"
+          ]
+        },
+        {
+          "name": "test_operand_and_ownership_mut5",
+          "expected_mutation_rejection": true,
+          "source_before_after_match": true,
+          "source_sha256": {
+            "frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+            "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+            "starlink_pss_spectrum_product_operand_register.v": "c1a2a5d029a1a83955292271b7f90f19cd524a777e34b856dfaefaa7a98e9adf",
+            "tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+            "vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+          },
+          "terminal_rows": [
+            "FATAL: tb_starlink_spectrum_operand_register.sv:125: OPERAND_MATH_METADATA_MISMATCH mode=1 cycle=150 token=127"
+          ]
+        }
+      ]
+    }
+  ],
+  "new_final_tests": 29,
+  "retained_round_and_product_tests": 23,
+  "logical_added_state": {
+    "formula": "4*DATA_WIDTH+80",
+    "width18": 152,
+    "width24": 176,
+    "default0": 0
+  },
+  "no_stall_latency_elapsed_clocks": {
+    "default0": 2,
+    "registered1": 3
+  },
+  "overflow_pulse_contract": "core-output insertion; NOT downstream acceptance",
+  "bank_raw_fault_timing_requires_new_qualification": true,
+  "archive": "20260910-operand-boundary-offline-evidence.tgz",
+  "archive_sha256": "10213e850e4958d2f7b5e041b62cd4461874eceeb84f150b1bf2ae4bda089176",
+  "archive_bytes": 916318,
+  "archive_safe_unique_files": 268,
+  "archive_file_sha256": {
+    "final-sources/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "final-sources/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "final-sources/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "final-sources/test_spectrum_operand_register.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "final-sources/test_spectrum_round_boundary.py": "ae2b94f8578e0eeec7f1467f9a706363f0975759d9a8ca14abd6874628561cde",
+    "final-sources/test_starlink_spectrum_product_evidence.py": "f937255eae98e9a7b7ac3b5bbf1f5f6132bd90240ad9af578a6cf6780594457e",
+    "policy/20260910-operand-boundary-policy-v1.xml": "b542acf72b5e31b60dbb1c6732e0205c48ede92e15b6a9817791d22dbeebc27c",
+    "policy/20260910-operand-boundary-policy-v2.xml": "ea5b1d0658c5c9ede80a1dd59c9115cba78ab3b4da861d079aaa84ad5461cf1d",
+    "v1/test_boundary_round_option_pre0/invalid.sv": "7b08ed8ace18239d52a16f944feebc934c1cc34688d03f88190829597960ec5c",
+    "v1/test_exact_math_metadata_laten0/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten0/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten0/simulate.log": "c5dceea9385eb884c8b444bddc97df332de7111d9eb30ad72340e057ab86ab6c",
+    "v1/test_exact_math_metadata_laten0/sources.sha256": "61a0c9fc9b8f4ab8e9032b24f81b122dc09b615a8a8423bceb6094476b2a04ee",
+    "v1/test_exact_math_metadata_laten0/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten0/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten0/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten0/vectors.mem": "7daad7d041908e4a548bf063363e01735bd591b74a77db655d283a921c2c723b",
+    "v1/test_exact_math_metadata_laten1/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten1/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten1/simulate.log": "3f5a8fab31e7dc24e75348be2bcd9ea754e117e2ecf710541216d4750430220e",
+    "v1/test_exact_math_metadata_laten1/sources.sha256": "ffa693900fe63702678630ef21cde30eca903a480d753e203086b5069f44b793",
+    "v1/test_exact_math_metadata_laten1/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten1/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten1/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten1/vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842",
+    "v1/test_exact_math_metadata_laten2/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten2/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten2/simulate.log": "8eba71281db8891b297818f9fecb0c45bb3900afe5a933dcf946381e9a1e1c0b",
+    "v1/test_exact_math_metadata_laten2/sources.sha256": "ffa693900fe63702678630ef21cde30eca903a480d753e203086b5069f44b793",
+    "v1/test_exact_math_metadata_laten2/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten2/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten2/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten2/vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842",
+    "v1/test_exact_math_metadata_laten3/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten3/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten3/simulate.log": "c7c64e1660295aedd8ed36d83b4d252a26bf7c8088ae24fb9d6345e29dd30d0c",
+    "v1/test_exact_math_metadata_laten3/sources.sha256": "63b584c8348d05b44f71190261f2b8c69ed6d4d3be5b8b86f0c9bab849a87b28",
+    "v1/test_exact_math_metadata_laten3/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten3/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten3/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten3/vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff",
+    "v1/test_exact_math_metadata_laten4/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten4/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten4/simulate.log": "697b0a418d524d0e3b3b143e5e9438fd61deb7c447c1e983c0be4cf0467dccd3",
+    "v1/test_exact_math_metadata_laten4/sources.sha256": "63b584c8348d05b44f71190261f2b8c69ed6d4d3be5b8b86f0c9bab849a87b28",
+    "v1/test_exact_math_metadata_laten4/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten4/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten4/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten4/vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff",
+    "v1/test_exact_math_metadata_laten5/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten5/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten5/simulate.log": "96b0294bb667c405bf99e336531056f22f9a18cb1822cdec44bcb870b870ec4c",
+    "v1/test_exact_math_metadata_laten5/sources.sha256": "65990d12183a7ed7da10b50586aad4c7de33f5bb77891a71d0a3fd8e5327436a",
+    "v1/test_exact_math_metadata_laten5/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten5/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten5/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten5/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v1/test_exact_math_metadata_laten6/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten6/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten6/simulate.log": "20b4bab3bae05a86a096c1b362dc23bac016ceb0b09f460350feddcea778316c",
+    "v1/test_exact_math_metadata_laten6/sources.sha256": "65990d12183a7ed7da10b50586aad4c7de33f5bb77891a71d0a3fd8e5327436a",
+    "v1/test_exact_math_metadata_laten6/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten6/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten6/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten6/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v1/test_exact_math_metadata_laten7/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten7/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten7/simulate.log": "ccc48d565cebd53bc173c1e253cb5d4eb91d1cc5120bc0ecd4ec63925db80cd4",
+    "v1/test_exact_math_metadata_laten7/sources.sha256": "56f0823a3a329e70b12135251c7718d792b001110f32d01297d764e5bb8e91a1",
+    "v1/test_exact_math_metadata_laten7/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten7/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten7/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten7/vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682",
+    "v1/test_exact_math_metadata_laten8/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_exact_math_metadata_laten8/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_exact_math_metadata_laten8/simulate.log": "65563a5745a6dcf8a36a1d06ec92ecbf8199f3d407f6014234f49e432f24d22d",
+    "v1/test_exact_math_metadata_laten8/sources.sha256": "56f0823a3a329e70b12135251c7718d792b001110f32d01297d764e5bb8e91a1",
+    "v1/test_exact_math_metadata_laten8/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_exact_math_metadata_laten8/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v1/test_exact_math_metadata_laten8/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_exact_math_metadata_laten8/vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682",
+    "v1/test_invalid_options_fail_clos0/invalid.sv": "a28c0eb55e3edb30d0e65413bebfffcd43b659951fdc6f1e8a4ea49da9637f2e",
+    "v1/test_invalid_options_fail_clos1/invalid.sv": "22d9abb0075f9b4b2b08a133ea1bfde896bc1391149ef6adfa1038f316d6cdee",
+    "v1/test_invalid_options_fail_clos2/invalid.sv": "55205c914df210b93436e1afc213fd8dfadb6a99c49081573a5bea268cbb327c",
+    "v1/test_invalid_options_fail_clos3/invalid.sv": "1ee4da5d83be73f7060ba5a81fbc55d62b0d22701020852cb481b4cbc32dffcc",
+    "v1/test_invalid_options_fail_clos4/invalid.sv": "766c1432eb2e93daef3d8c91eee8a034b909caf4109016b53d16ac41efee5dff",
+    "v1/test_invalid_options_fail_clos5/invalid.sv": "d2ee66267741c08d390cdd5bca0bb111bea840f03b4b729df8425f3c17f9c812",
+    "v1/test_invalid_options_fail_clos6/invalid.sv": "eda6556079704cd0eed93ea7f81a655f9c0aeed084ac592ad6744f4756450c1b",
+    "v1/test_invalid_options_fail_clos7/invalid.sv": "74997c94b502aabfe17cfa41fc4b40f4122c078eaa25811b385bb77901ef3673",
+    "v1/test_operand_and_ownership_mut0/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_operand_and_ownership_mut0/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_operand_and_ownership_mut0/simulate.log": "7e7b629200bdf47361bd809ac381d0605a8bc5fa54925039d1ab1f74e7bc0289",
+    "v1/test_operand_and_ownership_mut0/sources.sha256": "4458752417004018633b9c650b906143f108e2fb871eadae2ed9d08c91b29f7d",
+    "v1/test_operand_and_ownership_mut0/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_operand_and_ownership_mut0/starlink_pss_spectrum_product_operand_register.v": "d5aa3533299f2e00d1dea9970c628ac2fdf859394d9c85bbd3482f29e867bcf2",
+    "v1/test_operand_and_ownership_mut0/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_operand_and_ownership_mut0/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v1/test_operand_and_ownership_mut1/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_operand_and_ownership_mut1/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_operand_and_ownership_mut1/simulate.log": "1b6ef4a6d125dc0634c42b9d9772911d2d8d65bac576d27f1fd0111b04567b76",
+    "v1/test_operand_and_ownership_mut1/sources.sha256": "fb52ec821a63baada36af1d0120f6232b22fb5b19fe3fd18918a75dd88f438c8",
+    "v1/test_operand_and_ownership_mut1/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_operand_and_ownership_mut1/starlink_pss_spectrum_product_operand_register.v": "5fecb30e6cffe602e03953aff7653a59f1b509f1de0a88492af4a66e3581d95c",
+    "v1/test_operand_and_ownership_mut1/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_operand_and_ownership_mut1/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v1/test_operand_and_ownership_mut2/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_operand_and_ownership_mut2/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_operand_and_ownership_mut2/simulate.log": "d3a1729bb2cc1eb52f751e6b11f82a7a4306294850bf5d280e3b77ca76ae9b66",
+    "v1/test_operand_and_ownership_mut2/sources.sha256": "821f2b1c874d5ebb7d16521113536da1e8a1efd22e300e8be0fa8b6cb8d56c3f",
+    "v1/test_operand_and_ownership_mut2/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_operand_and_ownership_mut2/starlink_pss_spectrum_product_operand_register.v": "25622b893ba99f97905c4d54b082d4ecf3d543b13d4424a7bdcecf0eb0bb8668",
+    "v1/test_operand_and_ownership_mut2/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_operand_and_ownership_mut2/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v1/test_operand_and_ownership_mut3/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_operand_and_ownership_mut3/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_operand_and_ownership_mut3/simulate.log": "288e38383a1e669d4ae7ec237644eb6da0126154fbb091467b38d1e18e22b6c9",
+    "v1/test_operand_and_ownership_mut3/sources.sha256": "c986281e8e0f0378eb25cd9c1b15f7a4c7f58e877f7af14dfa95e4c220c2b688",
+    "v1/test_operand_and_ownership_mut3/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_operand_and_ownership_mut3/starlink_pss_spectrum_product_operand_register.v": "a834368b869535bb2a0d8641aa2369d74fc0a8fa347cfdc20255540298040095",
+    "v1/test_operand_and_ownership_mut3/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_operand_and_ownership_mut3/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v1/test_operand_and_ownership_mut4/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_operand_and_ownership_mut4/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_operand_and_ownership_mut4/simulate.log": "1b6ef4a6d125dc0634c42b9d9772911d2d8d65bac576d27f1fd0111b04567b76",
+    "v1/test_operand_and_ownership_mut4/sources.sha256": "196aca7570e1a8224a1aeb51c826d49de0685d78fb8ab883d94a2d731c28660f",
+    "v1/test_operand_and_ownership_mut4/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_operand_and_ownership_mut4/starlink_pss_spectrum_product_operand_register.v": "59ecc8544e05351d4e6f13408f14f128fdef609e2fecfeb6b041b3089321ddb4",
+    "v1/test_operand_and_ownership_mut4/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_operand_and_ownership_mut4/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v1/test_operand_and_ownership_mut5/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v1/test_operand_and_ownership_mut5/frozen_test.py": "47752e2105b3a1a757e97d6cec959db533fc2883766143276cebc49c2a42e99e",
+    "v1/test_operand_and_ownership_mut5/simulate.log": "a2a0aa3659a5bab747121cc6e4a2f50851c4580d01830599671073c2ebf2c7a5",
+    "v1/test_operand_and_ownership_mut5/sources.sha256": "804313b4e753e4c2c2842bce0707ca5248a7a2fdc41be48113e247e3b103318b",
+    "v1/test_operand_and_ownership_mut5/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v1/test_operand_and_ownership_mut5/starlink_pss_spectrum_product_operand_register.v": "c1a2a5d029a1a83955292271b7f90f19cd524a777e34b856dfaefaa7a98e9adf",
+    "v1/test_operand_and_ownership_mut5/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v1/test_operand_and_ownership_mut5/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_boundary_round_option_pre0/invalid.sv": "7b08ed8ace18239d52a16f944feebc934c1cc34688d03f88190829597960ec5c",
+    "v2/test_exact_math_metadata_laten0/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten0/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten0/simulate.log": "c5dceea9385eb884c8b444bddc97df332de7111d9eb30ad72340e057ab86ab6c",
+    "v2/test_exact_math_metadata_laten0/sources.sha256": "35ee6af8b85f64859aafd33a20d9d205d50dadcf2e3a1e27807da4945d23f689",
+    "v2/test_exact_math_metadata_laten0/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten0/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten0/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten0/vectors.mem": "7daad7d041908e4a548bf063363e01735bd591b74a77db655d283a921c2c723b",
+    "v2/test_exact_math_metadata_laten1/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten1/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten1/simulate.log": "3f5a8fab31e7dc24e75348be2bcd9ea754e117e2ecf710541216d4750430220e",
+    "v2/test_exact_math_metadata_laten1/sources.sha256": "27aa3737ce09307a14438aee62032e295d59ce8ce75dfaa1ec16a541a9cfd175",
+    "v2/test_exact_math_metadata_laten1/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten1/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten1/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten1/vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842",
+    "v2/test_exact_math_metadata_laten2/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten2/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten2/simulate.log": "8eba71281db8891b297818f9fecb0c45bb3900afe5a933dcf946381e9a1e1c0b",
+    "v2/test_exact_math_metadata_laten2/sources.sha256": "27aa3737ce09307a14438aee62032e295d59ce8ce75dfaa1ec16a541a9cfd175",
+    "v2/test_exact_math_metadata_laten2/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten2/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten2/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten2/vectors.mem": "767461da080f6f0a778807048df1cf9a1c0412a18082d674a936aeae5ecdd842",
+    "v2/test_exact_math_metadata_laten3/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten3/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten3/simulate.log": "c7c64e1660295aedd8ed36d83b4d252a26bf7c8088ae24fb9d6345e29dd30d0c",
+    "v2/test_exact_math_metadata_laten3/sources.sha256": "58ad7d5d8f1eedfb0fbd567ec6f7d084d8fb6b8af8bab1f30d6613e4c2b2644d",
+    "v2/test_exact_math_metadata_laten3/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten3/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten3/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten3/vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff",
+    "v2/test_exact_math_metadata_laten4/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten4/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten4/simulate.log": "697b0a418d524d0e3b3b143e5e9438fd61deb7c447c1e983c0be4cf0467dccd3",
+    "v2/test_exact_math_metadata_laten4/sources.sha256": "58ad7d5d8f1eedfb0fbd567ec6f7d084d8fb6b8af8bab1f30d6613e4c2b2644d",
+    "v2/test_exact_math_metadata_laten4/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten4/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten4/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten4/vectors.mem": "c5d5521071f412f5f1158339e98d4cf3ad6e2ab4881f01b667ff55f6dc863aff",
+    "v2/test_exact_math_metadata_laten5/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten5/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten5/simulate.log": "96b0294bb667c405bf99e336531056f22f9a18cb1822cdec44bcb870b870ec4c",
+    "v2/test_exact_math_metadata_laten5/sources.sha256": "e487e48f7f9233a19a5751560c21e361f2bc940abc72fdd490dc02148f9d773c",
+    "v2/test_exact_math_metadata_laten5/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten5/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten5/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten5/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_exact_math_metadata_laten6/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten6/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten6/simulate.log": "20b4bab3bae05a86a096c1b362dc23bac016ceb0b09f460350feddcea778316c",
+    "v2/test_exact_math_metadata_laten6/sources.sha256": "e487e48f7f9233a19a5751560c21e361f2bc940abc72fdd490dc02148f9d773c",
+    "v2/test_exact_math_metadata_laten6/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten6/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten6/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten6/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_exact_math_metadata_laten7/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten7/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten7/simulate.log": "ccc48d565cebd53bc173c1e253cb5d4eb91d1cc5120bc0ecd4ec63925db80cd4",
+    "v2/test_exact_math_metadata_laten7/sources.sha256": "0dd381fe6e285825463b9240c3b8661019c4576eb66c290d7af1b3258bd488d8",
+    "v2/test_exact_math_metadata_laten7/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten7/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten7/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten7/vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682",
+    "v2/test_exact_math_metadata_laten8/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_exact_math_metadata_laten8/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_exact_math_metadata_laten8/simulate.log": "65563a5745a6dcf8a36a1d06ec92ecbf8199f3d407f6014234f49e432f24d22d",
+    "v2/test_exact_math_metadata_laten8/sources.sha256": "0dd381fe6e285825463b9240c3b8661019c4576eb66c290d7af1b3258bd488d8",
+    "v2/test_exact_math_metadata_laten8/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_exact_math_metadata_laten8/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "v2/test_exact_math_metadata_laten8/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_exact_math_metadata_laten8/vectors.mem": "d3c963300e236252142ccab65426b9f0995a1cf121d4553f8aa9bb6724946682",
+    "v2/test_invalid_options_fail_clos0/invalid.sv": "a28c0eb55e3edb30d0e65413bebfffcd43b659951fdc6f1e8a4ea49da9637f2e",
+    "v2/test_invalid_options_fail_clos1/invalid.sv": "22d9abb0075f9b4b2b08a133ea1bfde896bc1391149ef6adfa1038f316d6cdee",
+    "v2/test_invalid_options_fail_clos2/invalid.sv": "55205c914df210b93436e1afc213fd8dfadb6a99c49081573a5bea268cbb327c",
+    "v2/test_invalid_options_fail_clos3/invalid.sv": "1ee4da5d83be73f7060ba5a81fbc55d62b0d22701020852cb481b4cbc32dffcc",
+    "v2/test_invalid_options_fail_clos4/invalid.sv": "766c1432eb2e93daef3d8c91eee8a034b909caf4109016b53d16ac41efee5dff",
+    "v2/test_invalid_options_fail_clos5/invalid.sv": "d2ee66267741c08d390cdd5bca0bb111bea840f03b4b729df8425f3c17f9c812",
+    "v2/test_invalid_options_fail_clos6/invalid.sv": "eda6556079704cd0eed93ea7f81a655f9c0aeed084ac592ad6744f4756450c1b",
+    "v2/test_invalid_options_fail_clos7/invalid.sv": "74997c94b502aabfe17cfa41fc4b40f4122c078eaa25811b385bb77901ef3673",
+    "v2/test_nonpositive_width_never_a0/invalid.sv": "8fa8e8fbd8d0d1afb4758efda50ab835cd4a20de8eca40a74555ca864b9317e1",
+    "v2/test_nonpositive_width_never_a1/invalid.sv": "d15cca01b16f7a42f6a5177370b31dc822f99e6d858a7f3160d12d898792abf0",
+    "v2/test_operand_and_ownership_mut0/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_operand_and_ownership_mut0/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_operand_and_ownership_mut0/simulate.log": "7e7b629200bdf47361bd809ac381d0605a8bc5fa54925039d1ab1f74e7bc0289",
+    "v2/test_operand_and_ownership_mut0/sources.sha256": "22547adc6c6c44ae7d5b6bebb9307751978584dd9cf74c52fc10664ecfaa5a3d",
+    "v2/test_operand_and_ownership_mut0/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_operand_and_ownership_mut0/starlink_pss_spectrum_product_operand_register.v": "d5aa3533299f2e00d1dea9970c628ac2fdf859394d9c85bbd3482f29e867bcf2",
+    "v2/test_operand_and_ownership_mut0/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_operand_and_ownership_mut0/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_operand_and_ownership_mut1/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_operand_and_ownership_mut1/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_operand_and_ownership_mut1/simulate.log": "1b6ef4a6d125dc0634c42b9d9772911d2d8d65bac576d27f1fd0111b04567b76",
+    "v2/test_operand_and_ownership_mut1/sources.sha256": "a8d06333e1f7d20993951bd67c08bce8ad57936ecfac92aca14b34fc149cfa78",
+    "v2/test_operand_and_ownership_mut1/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_operand_and_ownership_mut1/starlink_pss_spectrum_product_operand_register.v": "5fecb30e6cffe602e03953aff7653a59f1b509f1de0a88492af4a66e3581d95c",
+    "v2/test_operand_and_ownership_mut1/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_operand_and_ownership_mut1/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_operand_and_ownership_mut2/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_operand_and_ownership_mut2/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_operand_and_ownership_mut2/simulate.log": "d3a1729bb2cc1eb52f751e6b11f82a7a4306294850bf5d280e3b77ca76ae9b66",
+    "v2/test_operand_and_ownership_mut2/sources.sha256": "7e0342652e621baaa42f9be33fa11aba606f1314dd991bdd77da2e2790fd93f7",
+    "v2/test_operand_and_ownership_mut2/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_operand_and_ownership_mut2/starlink_pss_spectrum_product_operand_register.v": "25622b893ba99f97905c4d54b082d4ecf3d543b13d4424a7bdcecf0eb0bb8668",
+    "v2/test_operand_and_ownership_mut2/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_operand_and_ownership_mut2/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_operand_and_ownership_mut3/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_operand_and_ownership_mut3/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_operand_and_ownership_mut3/simulate.log": "288e38383a1e669d4ae7ec237644eb6da0126154fbb091467b38d1e18e22b6c9",
+    "v2/test_operand_and_ownership_mut3/sources.sha256": "c51837bf0a91ce508552765478a7ff23b5d628836a2e4507e64ecf5c186a2316",
+    "v2/test_operand_and_ownership_mut3/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_operand_and_ownership_mut3/starlink_pss_spectrum_product_operand_register.v": "a834368b869535bb2a0d8641aa2369d74fc0a8fa347cfdc20255540298040095",
+    "v2/test_operand_and_ownership_mut3/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_operand_and_ownership_mut3/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_operand_and_ownership_mut4/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_operand_and_ownership_mut4/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_operand_and_ownership_mut4/simulate.log": "1b6ef4a6d125dc0634c42b9d9772911d2d8d65bac576d27f1fd0111b04567b76",
+    "v2/test_operand_and_ownership_mut4/sources.sha256": "c212b0c77358e36085c098d47d38fc91cba2631594b810477d8f8d40d23f9eb3",
+    "v2/test_operand_and_ownership_mut4/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_operand_and_ownership_mut4/starlink_pss_spectrum_product_operand_register.v": "59ecc8544e05351d4e6f13408f14f128fdef609e2fecfeb6b041b3089321ddb4",
+    "v2/test_operand_and_ownership_mut4/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_operand_and_ownership_mut4/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9",
+    "v2/test_operand_and_ownership_mut5/compile.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "v2/test_operand_and_ownership_mut5/frozen_test.py": "8c13d13ebe497b5b8d8d4d6d109df5e776ce10205486771574c970eb59ff3321",
+    "v2/test_operand_and_ownership_mut5/simulate.log": "a2a0aa3659a5bab747121cc6e4a2f50851c4580d01830599671073c2ebf2c7a5",
+    "v2/test_operand_and_ownership_mut5/sources.sha256": "5cd6559264a02c781b206eb3de7605b9896c745e25b06c28c4e67f5de2e4fa57",
+    "v2/test_operand_and_ownership_mut5/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "v2/test_operand_and_ownership_mut5/starlink_pss_spectrum_product_operand_register.v": "c1a2a5d029a1a83955292271b7f90f19cd524a777e34b856dfaefaa7a98e9adf",
+    "v2/test_operand_and_ownership_mut5/tb_starlink_spectrum_operand_register.sv": "41871d9023789554da88b6aef04291d99d6cda239d40d84701ea6f43d5727ba9",
+    "v2/test_operand_and_ownership_mut5/vectors.mem": "94fd74fd8f6fa7c3a6b3484d374e1ce2a7295cf12c12582da48a6276091a46f9"
+  },
+  "legacy_round_vectors_not_duplicated_here": true,
+  "provenance_scope": "Five pre/post frozen inputs per new healthy/mutation simulation; final source copies and pinned commits bind remaining project context. No full Python-import or toolchain closure claim."
+}
