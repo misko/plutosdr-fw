@@ -358,3 +358,137 @@ FW/HDL operand preparation881a838570/f7345ab655 and diagnostic evidence
 f98abdb333/0c1a23a701 have been pushed to their respective experimental branches.
 Parent independently verified all57 diagnostic archive entries. No primary
 runtime, firmware main, PPU or radio change occurred.
+
+## Next actual checks admitted after independent review
+
+The operand v2 report/evidence is committed and pushed at FWbd668d21c /
+unchanged HDLf7345ab655. Parent independently verified all90 safe unique
+archive members, including the previously checked six checkpoints. Archive
+SHA256 is `573b139c5a1739e653edb90730b6f1333cc365ddb705f4d3222f8d77e015b50c`.
+The exact printed warning count is103 per arm:100 Route35-198, one35-426,
+one35-328 and one Synth8-7080. Those OOC limits and failed holds remain open.
+
+An isolated offline bank arithmetic port is now authorized in
+`/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic`, branch
+`codex/starlink-rx-only-do-not-merge-bank-arithmetic`, based on exact
+FWbda25bb5 / HDLdec20d637. Preserve original bank, core and legacy benches.
+The candidate is an additive core derived by strict inverse from dec20 plus
+the reviewed rounding option, compatible operand wrapper and a separately
+named bank test top. Parent reviewed the initial exact deltas and wrapper:
+registered private bubbles may update only unowned numeric payload; occupied
+stalled tokens and metadata remain protected. Original sequential core and
+all held-overflow current/sticky/publication connections remain literal.
+No actual FFT or physical build is authorized for that new integration yet.
+
+### Status-qualified control observer
+
+Parent read the complete new preparation, tests and expanded real-guard
+bench. Independent94648 completed29 tests in13.02s (23 new plus six retained
+diagnostic tests), with unique evidence at
+`/tmp/starlink-status-qualified-parent.Uzqln8`. Agent15112 completed73 tests
+in14.02s, including the unchanged50 preparation/diagnostic tests. The expanded
+guard suite proves reached phase states, matching/bad status coincident with
+an output, and ready-high awaited ACK fault attempts; all omitted-veto mutants
+fail. This is synthetic guard-interface testing, not vendor execution.
+
+Parent verified all248 offline archive hashes and the exact prepared manifest
+`36e44321ea694ee324f12613a54d0758219a62c7f9edd73b0106a45f6e70dd09`.
+The runner remains `496a3ed4a2b55d494a22fd78f64b4a68580d923b398f5282e31145dc6a7951b0`.
+Final offline evidence FW6395b6573 / HDLb4179711 is pushed. Exactly one baseline
+R0/D0/S0/extras1/175/QUICK0 actual run was authorized on the frozen preparation,
+original handle8757 owned by the control agent. No terminal outcome is recorded
+at this checkpoint. All old numerical/full-CSV/extra-epoch gates and the new
+independent qualified-observation receipt audit are required. The original
+raw217 failure is retained and can never be relabeled as this contract's pass.
+
+### First combined30-upper actual run
+
+Parent read the entire paired top, native/source/FFT ledgers, standalone module
+probe, helper, runner, parser/policy tests and final205-line report. Independent
+55422 completed91 new harness/budget tests in9.01s; retained unique directory
+`/tmp/starlink-highrate-harness-parent.jceqP8`. The real non-FFT module probe
+again produced7250 enabled raw /3618 canonical /512 selected pilot samples,
+19911 native publication cycles and20700 through public release. Agent's full
+490 tests pass and the original51 numerical artifacts rederive unchanged.
+
+Parent independently checked all358 prelaunch file hashes and95 live source
+hashes, plus1326 portable archive hashes /1327 safe unique regular members.
+The frozen source signature is
+`413f9cd065da934d258750b30075d5e9c75ff16efd9484a51222ca0b3043cb31`;
+bundle receipt SHA256
+`2d410bc8a7984425751a527725e8f43c8406596b23f610e904199d1524863da5`;
+portable archive SHA256
+`47e74d2ca0ab54337c178806bc0c8b1027ed1531becb6e5a0a91b9d2e76df39f`.
+FW6a99d1d538 / HDL446a8617 is committed and pushed. Its runtime is unchanged
+beyond the earlier reviewed StageA; all new harness files are additive.
+
+The first vendor launch failed before Tcl/project creation because the parent
+LD_LIBRARY_PATH was unset and libtinfo.so.5 could not load. The launcher returned
+0 despite that failure; this is not a simulation success. Exact stderr/command
+are preserved in `main-high-rate30-bank175-447-v1.initialization-failure.json`,
+SHA256 `223087f01f9fb9b68c75451fddeba62939c0b0adc44293e543baa119f26a59eb`.
+Parent checked the receipt and installed SuSE compatibility library, then
+authorized one new v2 launch using the established explicit environment:
+`env LD_LIBRARY_PATH=/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE /opt/Xilinx/Vivado/2022.2/bin/vivado`.
+The independent Python verifier still clears vendor overrides only in its own
+subprocess. No runner, RTL, fixture, profile or acceptance gate was changed.
+
+Original57213 owns the environment-corrected actual run at
+`/tmp/starlink-bank-route.I50MDJ/main-high-rate30-bank175-447-v2`.
+No terminal outcome is recorded here. The agent must consume that original
+handle to completion; no timeout-based restart, source edit or tail extension.
+This is healthy30-upper/175/447x2 only, not causal native scheduling,343/negative
+coverage, hardware timing,60MS/s, radio calibration, live lock or deployment.
+The complete original release objective remains unchanged and unfinished.
+
+## Combined30 actual PASS; control extra epoch still FAIL
+
+Original57213 subsequently completed exit0. Parent read the actual raw terminal,
+reran both frozen bundle and result verifiers successfully, and verified the
+full636-file generated-run inventory. The actual30 test checked894 exact
+visible/admitted scores,447 map words,260 original-raw capture samples,
+129 raw/121 qualified tuples,52 public native packet reads and512 pilot
+samples/2048 bytes. Forward input/output/product and inverse input each had
+1536 checked words;1024 inverse outputs were observed. This does not claim a
+third completed inverse output or all seven stored fixture blocks.
+
+Native publication took19910 engine cycles; reads/release completed in20700,
+maximum direct AXI transaction8 cycles. The predeclared24000/28000 limits and
+4096-sample tail were unchanged. Actual admission raw17179869201 had lead926.
+STOP occurred at source4946 with native busy; native release at8991 preserved
+the complete map, then map release at9000 preceded source exhaustion12303.
+Observed overlap:273 native-capture/FFT-consumption beats,6433 compute/coarse+
+pilot clocks,13219 compute-after-STOP clocks and43723 bank-quiescent fast clocks.
+The real enabled-prefix ledger matched7250 raw/3618 canonical outputs.
+
+Simulation endpoint453870ns and18.960s reported xsim CPU are host simulation
+measurements, not FPGA/RF timing accuracy. Raw result summary is
+`/tmp/starlink-bank-route.I50MDJ/main-high-rate30-bank175-447-v2/run_summary.md`.
+Simulation log SHA256:
+`3fcb4f1b86a102421b8fd0f42b1e0885023782b4325303d599091942f67b47db`;
+native raw tuple SHA256:
+`1d16a0259f13a5a4ee914896c20449c9028bb79edd6a55253ae273496f908f8c`;
+pilot bytes SHA256:
+`f461fa6399c6163d462835310bb18aeb431cec4153225c385cd4e7b79c5282ca`.
+The next authorized isolated work is result archival and offline preparation of
+the already-golden343x2 geometry and a late-native-command negative at30.
+No new actual run, runtime promotion or60 profile is authorized by this result.
+
+Original control8757 completed exit1 at1924511525797fs, epoch54, in the
+unchanged reference-bench `FORWARD_ACTUAL_JOIN_INPUT_MISMATCH` assertion.
+Both original main CSVs are complete and independently retain historical
+SHA256 `b0d60e80101b34ff163b85ef7547814e0403561b315f975eb38a98817b7eb84d`.
+The original terminal blocks printed before extra epochs; there is still no
+complete extra-epoch, qualified-observer or exact-control terminal PASS.
+The29 invalid-status-only observations directly log both valid bits0. In this
+run the candidate raw byte is11100101 versus00000101; the earlier strict
+diagnostic's xx100101 pattern remains separately retained, not rewritten.
+
+The failure occurs in newly added stimulus after the original suite. The
+kind1 sequence returns from three ticks at posedge+1ps, then drives a vendor
+fault/releases readiness at the same simulation instant as the old checker.
+This is a source-backed race hypothesis pending saved-waveform confirmation,
+not permission to disable or delay an assertion. Read-only diagnosis and a
+proposal to move only added stimulus away from that sample boundary are in
+scope; no source correction or actual retry is authorized yet. The complete
+bank setup result remains-1.907ns, and no radio or PPU operation occurred.

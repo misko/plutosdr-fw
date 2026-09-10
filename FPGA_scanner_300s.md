@@ -55,9 +55,13 @@ The first active control-candidate comparison failed in both baseline and
 combined modes during the original missing-forward-status epoch. Both failures
 are retained. A subsequent unchanged-comparison diagnostic isolates one raw
 FFT status-byte mismatch; status valid was inferred low from the saved guard
-output and literal veto logic. All216 other fields agree. A narrowly qualified
-payload-comparison proposal is under review, not accepted or rerun. No candidate
-is promoted. A separate one-stage operand-register prototype targets the
+output and literal veto logic. All216 other fields agree. The narrowly qualified
+payload observer now passes29 independent parent tests, including valid-status
+fault and same-edge publication checks. The baseline actual run reproduces
+both complete historical CSVs but fails later in an added fault epoch; a
+stimulus/checker same-time race is under read-only diagnosis. The original
+raw217 failure remains retained and no candidate is promoted.
+A separate one-stage operand-register prototype targets the
 BRAM-to-DSP path with explicit added latency and offline qualification. Its
 first two physical attempts failed before synthesis due to an inherited tool
 library conflict. A subprocess-only repair passes60 independent parent tests;
@@ -72,10 +76,17 @@ The30MS/s common-source offline cohort is frozen and independently verified.
 A new explicit30-upper bank+STOP public interface remains isolated/offline;
 its unknown-parameter guard repair and legacy regressions pass340 independent
 parent tests. The unchanged51-file numerical cohort independently rederives.
-Preparation of a real30 common-source bank/native132/PIL1 harness is authorized,
-but no actual FFT launch or runtime promotion yet. Its standalone native service
-budget passes3 independent parent tests, including continued computation after
-source disable; this does not prove the combined FFT composition. Actual30/60 bank/native/pilot
+The real30 common-source bank/native132/PIL1 harness is prepared:490 agent tests,
+91 new independent parent tests,95 frozen sources and unchanged51 goldens.
+Its standalone native service budget passes, including continued computation
+after source disable; this does not prove the combined FFT composition. The
+first actual launch failed before vendor initialization due to a missing loader
+path; the environment-corrected run now PASSES with unchanged inputs:894 exact
+scores/447 map words,260 native capture samples,129 raw tuples and512 pilot
+outputs. Parent independently reran the frozen verifiers and checked all636
+run-file hashes. Native capture overlaps actual FFT consumption and refinement
+survives coarse STOP. This is healthy30-upper447x2 simulation only;343 geometry,
+negative cases and runtime promotion remain open. Actual60 bank/native/pilot
 integration remains open. Latest
 source-specific decisions and measurements:
 [`reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md`](reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md).
