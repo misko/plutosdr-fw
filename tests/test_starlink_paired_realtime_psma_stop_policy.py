@@ -254,14 +254,27 @@ def test_runner_does_not_weaken_runtime_or_physical_gates():
     assert "parameter integer MAP_BINS = 447" in bench
     assert "defparam dut.acquisition.PHASE_BINS = MAP_BINS" in bench
     assert "defparam dut.phase_map_control.PHASE_BINS = MAP_BINS" in bench
-    assert "set_property generic MAP_BINS=$map_bins" in source
+    assert ('set_property generic "MAP_BINS=$map_bins '
+            'USE_BANK_OWNED_XFFT=$use_bank_owned_xfft FAST_MHZ=$fast_mhz"') in source
     assert "NO_ADC_DMA_IIO_FINE_PRODUCTION_OR_PHYSICAL_CLAIM" in bench
+    assert "defparam dut.acquisition.USE_BANK_OWNED_XFFT = USE_BANK_OWNED_XFFT" in bench
+    assert "parameter integer USE_BANK_OWNED_XFFT = 0" in bench
 
 
 @pytest.mark.parametrize("map_bins", [447, 343])
+@pytest.mark.parametrize("bank_owned,fast_mhz", [(0, 200), (1, 175), (1, 200)])
 @pytest.mark.parametrize("failure", [None, "PAIRED_REALTIME_PSMA_STOP_FAIL mismatch",
                                     "  paired_realtime_psma_stop_fail mismatch"])
-def test_verifier_accepts_negative_case_pass_marker_but_rejects_actual_failure(tmp_path, failure, map_bins):
+def test_verifier_accepts_negative_case_pass_marker_but_rejects_actual_failure(
+        tmp_path, failure, map_bins, bank_owned, fast_mhz):
+    result = _verify_receipt(tmp_path, map_bins, bank_owned, fast_mhz, failure=failure)
+    if failure:
+        assert result.returncode == 2 and "contains FAIL evidence" in result.stderr
+    else:
+        assert result.returncode == 0, result.stdout + result.stderr
+
+
+def _verify_receipt(tmp_path, map_bins, bank_owned, fast_mhz, *, failure=None, mutation=None):
     markers = [
         ("PAIRED_PREROLL_PASS real_shell=1 real_cdc=1 real_canonical=1 samples=768 "
          "empty_ticket=1 explicit_configuration_pause=1"),
@@ -277,23 +290,74 @@ def test_verifier_accepts_negative_case_pass_marker_but_rejects_actual_failure(t
         log += ["PAIRED_STOP_TAIL map_bins=343",
                 ("PAIRED_RESIDUE_PASS selected_scores=686 map_words=343 residue=239 "
                  "post_fence_tail_not_map_admission=1")]
+    if bank_owned and mutation != "missing_bank":
+        receipt_clock = 200 if mutation == "wrong_clock" and fast_mhz == 175 else fast_mhz
+        if mutation == "wrong_clock" and fast_mhz == 200:
+            receipt_clock = 175
+        bank_marker = (f"PAIRED_BANK_PASS map_bins={map_bins} selected_scores={map_bins * 2} "
+                       f"exact_pilot_bytes=2048 fast_mhz={receipt_clock} "
+                       "TEST_ONLY_SELECTOR_NOT_RECEIVER")
+        log += [bank_marker] * (2 if mutation == "duplicate_bank" else 1)
     if failure:
         log.insert(0, failure)
     (tmp_path / "simulate.log").write_text("\n".join(log) + "\n")
     binary = tmp_path / "paired_pilot_actual.ci16"
-    binary.write_bytes(bytes(2048))
+    binary.write_bytes(bytes(2047) + bytes([1 if mutation == "pilot_byte" else 0]))
+    expected = tmp_path / "independent_expected.ci16"
+    expected.write_bytes(bytes(2048))
     procedure = RUNNER.read_text().split("# Actual digital CI16 shell/CDC", 1)[0]
     script = f"source {{{ACQ / 'verify_realtime_probe_result.tcl'}}}\n" + procedure
-    script += f"pss_verify_paired_outputs {{{tmp_path}}} {{{binary}}} {map_bins}\n"
+    script += (f"pss_verify_paired_outputs {{{tmp_path}}} {{{expected}}} "
+               f"{map_bins} {bank_owned} {fast_mhz}\n")
     # Tcl stdin does not fail its process merely because a top-level command
     # errors; wrap the actual verifier to make the subprocess result meaningful.
     script = "if {[catch {\n" + script + "} reason]} {puts stderr $reason; exit 2}\n"
-    result = subprocess.run(["tclsh"], input=script, capture_output=True,
-                            check=False, text=True, timeout=10)
-    if failure:
-        assert result.returncode == 2 and "contains FAIL evidence" in result.stderr
-    else:
-        assert result.returncode == 0, result.stdout + result.stderr
+    return subprocess.run(["tclsh"], input=script, capture_output=True,
+                          check=False, text=True, timeout=10)
+
+
+@pytest.mark.parametrize("map_bins", [447, 343])
+@pytest.mark.parametrize("fast_mhz", [175, 200])
+@pytest.mark.parametrize("mutation", ["missing_bank", "wrong_clock", "duplicate_bank", "pilot_byte"])
+def test_bank_verifier_requires_exact_receipt_and_independent_bytes(tmp_path, map_bins, fast_mhz, mutation):
+    result = _verify_receipt(tmp_path, map_bins, 1, fast_mhz, mutation=mutation)
+    assert result.returncode == 2, result.stdout + result.stderr
+    if mutation == "pilot_byte":
+        assert "bytes differ from independent oracle" in result.stderr
+
+
+@pytest.mark.parametrize("bank_owned,fast_mhz", [(0, 175), (2, 200), (1, 180), ("auto", 175)])
+def test_verifier_rejects_unsupported_engine_clock(tmp_path, bank_owned, fast_mhz):
+    result = _verify_receipt(tmp_path, 447, bank_owned, fast_mhz)
+    assert result.returncode == 2 and "invalid paired verifier engine/clock" in result.stderr
+
+
+@pytest.mark.parametrize("selector,clock", [("0", "200"), ("01", "175"), ("auto", "175"),
+                                          ("1", "180"), ("1", "175.0"), ("1", "")])
+def test_invalid_bank_selector_fails_before_sources_or_output(tmp_path, selector, clock):
+    output = tmp_path / "out"
+    result = probe([output, "missing_scores", "missing_pilot", "447x2", selector, clock])
+    assert result.returncode == 2 and "paired bank probe requires" in result.stderr
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("geometry", ["447x2", "343x2"])
+@pytest.mark.parametrize("fast_mhz", [175, 200])
+def test_bank_probe_freezes_both_engines_and_explicit_scope(tmp_path, vectors, geometry, fast_mhz):
+    scores, pilot = vectors
+    if geometry == "343x2":
+        pilot = tmp_path / "residue"
+        generate_pilot_vectors(scores, pilot, geometry=geometry)
+    output = tmp_path / "out"
+    result = probe([output, scores, pilot, geometry, "1", fast_mhz])
+    assert result.returncode == 2 and "ADMITTED" in result.stderr
+    for name in ("starlink_pss_iq_to_score_bank_owned.v", "starlink_pss_fft_bank_owned_slice.v",
+                 "starlink_pss_iq_to_score_shared.v"):
+        assert (output / "frozen_sources" / name).read_bytes() == (ACQ / name).read_bytes()
+    scope = (output / "scope.txt").read_text()
+    assert f"fast_clock_MHz={fast_mhz}" in scope
+    assert "use_bank_owned_xfft=1" in scope
+    assert "bank_selector_is_test_only_child_defparam_not_AXI_receiver_profile=true" in scope
 
 
 @pytest.mark.parametrize("geometry", ["", "343", "343X2", "343x3", "447x64", "343x2 ", "auto"])
