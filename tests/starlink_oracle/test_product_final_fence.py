@@ -102,11 +102,11 @@ def test_real_checker_paired_mailbox_all_public_state_data_and_sampled_fence(tmp
     assert "input_bits=70 final_rows=71 current_rows=7 inverse_epochs=1" in log
     words = (1 << width) if width == 9 else (1 << width) - 1
     assert f"epoch_resets=2 words={words} short_inverse_poison={int(width != 9)}" in log
-    assert "unknown_final_rows=4" in log and "sampled=14 " in log
+    assert "unknown_final_rows=4 sticky_input_rows=1" in log and "sampled=15 " in log
     assert re.search(r"nonsampled_private=[1-9]\d*", log)
 
 
-@pytest.mark.parametrize("term", ["duplicate_start_fault_now", "source_fault_fast[1]",
+@pytest.mark.parametrize("term", ["duplicate_start_fault_now", "input_guard_fault", "source_fault_fast[1]",
     "vendor_fault_now", "kernel_fault", "product_overflow", "result_fault"])
 def test_current_missing_veto_mutants_rejected_on_real_final_edge(tmp_path, term):
     source = (ACQ / f"{TOP}.v").read_text()
