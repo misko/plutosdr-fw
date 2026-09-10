@@ -52,13 +52,13 @@ def run(tmp_path, width=18, balanced=1, scratch=1, mutated=None, bench=None):
          f"-Ptb_starlink_pss_rom_read_ahead.BALANCED={balanced}",
          f"-Ptb_starlink_pss_rom_read_ahead.SCRATCH={scratch}",
          "-o", "simulation", "original.v", "candidate.v", "bench.sv"],
-        cwd=tmp_path, capture_output=True, text=True, timeout=20,
+        cwd=tmp_path, capture_output=True, text=True, timeout=20, check=False,
     )
     (tmp_path / "compile.log").write_text(compile_result.stdout + compile_result.stderr)
     assert compile_result.returncode == 0, compile_result.stderr
     assert "error:" not in compile_result.stderr.lower()
     result = subprocess.run(["vvp", "simulation"], cwd=tmp_path,
-                            capture_output=True, text=True, timeout=30)
+                            capture_output=True, text=True, timeout=30, check=False)
     log = result.stdout + result.stderr
     (tmp_path / "simulation.log").write_text(log)
     return result.returncode, log
@@ -79,7 +79,7 @@ def test_full_unconditional_shadow_known_unknown_stall_fault_reset(
     ("if (use_speculative)\n          retained_word", "if (1'b0)\n          retained_word"),
     ("use_speculative ? speculative_word : retained_word", "speculative_word"),
     ("use_speculative ? speculative_word : retained_word", "retained_word"),
-    ("if (input_ready)\n        speculative_word", "if (input_valid)\n        speculative_word"),
+    ("if (input_ready)\n        speculative_word", "if (!input_ready)\n        speculative_word"),
     ("speculative_word <= kernel_memory[input_bin_index]", "speculative_word <= kernel_memory[input_bin_index ^ 9'd1]"),
     ("retained_word <= 0;", "retained_word <= 1;"),
     ("if (protocol_error_now)\n            use_speculative", "if (protocol_error_now !== 1'b0)\n            use_speculative"),
@@ -91,6 +91,17 @@ def test_semantic_mutants_reject(tmp_path, before, after):
     assert source.count(before) == 1
     code, log = run(tmp_path, mutated=source.replace(before, after, 1))
     assert code != 0 and ("MISMATCH" in log or "coefficient" in log), log
+
+
+def test_alternate_speculation_enable_is_not_a_semantic_mutant(tmp_path):
+    # Initial run incorrectly expected this to fail. Both enables include every
+    # actual acceptance; different unused speculative reads are not visible.
+    # Keep the observed equivalent variant as a positive control. It is NOT the
+    # selected timing candidate: input_valid carries the metadata dependency.
+    source = candidate().replace("if (input_ready)\n        speculative_word",
+                                 "if (input_valid)\n        speculative_word", 1)
+    code, log = run(tmp_path, mutated=source)
+    assert code == 0 and log.count("ROM_READ_AHEAD_OFFLINE_PASS") == 1, log
 
 
 @pytest.mark.parametrize("value", ["-1", "2", "32'bx", "32'bz"])
