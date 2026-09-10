@@ -2,6 +2,18 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest independent repaired-interface gate (2026-09-10): parent fresh1444 replay
+PASSES (596 new plus848 unchanged). All54 source manifests/498 file entries
+verify; independent full graph has3302nodes/36LS/no cycle and six restored
+backedges are rejected. No added primitive state/healthy cycles; qualified
+diagnostic summaries explicitly gain one edge. Real controller binding/reset
+integration design is next, not actual FFT or physical promotion. See
+[full parent review](reports/experiments/20260910-product-interface-full-parent-review.md).
+In the parallel retained-output owner, parent independently reproduces eight
+standalone coincident-control/ACK gaps, catches an overstrict first fence, then
+verifies10 final boundary cases including legitimate receipt/ACK coincidence.
+See [owner boundary review](reports/experiments/20260910-retained-owner-ack-parent-review.md).
+
 Latest overlap evidence (2026-09-10): parent independently compiles/replays the
 frozen retained-output prototype:17 PASS, all42 sources unchanged. Separate log
 audit confirms8-clock next-forward dispatch,3645-clock nominal publication
