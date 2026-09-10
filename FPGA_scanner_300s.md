@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest correction (2026-09-10): original848 run remains recorded PASS, but its
+product-fixture graph test omitted36LS concatenation nodes. Parent independently
+reproduces the false negative: corrected3159-node graph exposes guard-fault /
+handoff-readiness feedback. Earlier acyclicity/cone claims are withdrawn. The
+additive fixture fault split and complete graph regression are required before
+top integration. See
+[graph correction and repair gate](reports/experiments/20260910-product-graph-correction.md).
+
 Latest integration gate (2026-09-10): real P1 controller/design review authorizes
 additive primitive interfaces/tests only. Parent independently reproduces the
 missing actual-READY seam at word37 and511; both copied-fixture failures are

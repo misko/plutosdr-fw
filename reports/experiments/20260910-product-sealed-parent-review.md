@@ -1,6 +1,10 @@
 # Staged product validation: independent offline review
 
 **848 tests pass independently; top integration and physical timing remain unproven.**
+Correction: the graph test in that recorded run omitted36 intermediateLS
+connections and returned a false negative. Its acyclicity/cone claims are
+withdrawn; the corrected3159-node graph exposes a fixture feedback cycle. See
+[independent correction and repair gate](20260910-product-graph-correction.md).
 Parent original process87683 exited0, 848 passed in17.81s. Parent read both new
 RTL modules, both testbenches, both Python test files and the implementation
 report completely before execution. A separate read-only audit verifies all
@@ -41,10 +45,10 @@ handoff to first core transfer2; actual last core transfer to lease release1.
 The1555-clock admission-to-release interval excludes actual FFT execution.
 The earlier provisional+12 allocation is not a measured receiver overhead.
 
-The continuous-control graph has3123 nodes and no cycles; a deliberately added
-release feedback loop is rejected. Raw offered product metadata is absent
-from the publication/handoff/core-valid/release combinational cones. This is
-an Icarus connectivity audit with procedural state/input cut points, not
+The incomplete legacy graph reported3123 nodes and no cycles and rejected one
+deliberately added release feedback loop. That was insufficient: it missed36
+concatenation subnodes, so both acyclicity and cone-exclusion conclusions must
+be rechecked on the repaired fixture. These were connectivity claims, never
 mapped LUT depth or physical timing. Logical declared state is760 bits
 (bank317, reader350, issuer93), plus one512x36 RAM; external purge/CDC and
 existing guards/product are excluded. Mapped resource cost is still unknown.
