@@ -1,0 +1,25 @@
+{
+  "kind": "retained-offer-summary-actual-preparation-v1",
+  "qualified_control_manifest": "7a9b32f10241d22c3f5a6d3967ca9841e2646bb94d714f4935c05f5e8d03635e",
+  "qualified97_signature": "b52ba499ffbec7b4596afaba5b180d8145381ea56a4af60ab4cce30c79631908",
+  "summary_runtime_hdl": "48b82653d6fcc85ac0276ca1e7b159715cdfc59f",
+  "options": {"PRIVATE_DESCRIPTOR_OFFER": 1, "CLOSED_INPUT_CUTOVER": 1, "INPUT_OFFER_FAULT_SUMMARY": 1},
+  "contexts": ["H0", "H1", "H2", "H4", "H5", "R1", "R2"],
+  "unchanged": ["all original97 sources", "original control candidate actual bench and parser after strict additive inverse", "all numerical input/output lanes and padding, source and aborted prefixes", "all40 causal frame and configuration/reset/admission joins", "all original event-indexed service bounds and watchdog anchors", "175/100 ideal clocks and phases", "original full guard predicate references and unconditional shadows"],
+  "summary_witness": {
+    "flags_receipts": 1,
+    "proof_receipts": 1,
+    "total_new_markers": 2,
+    "flag_fields": ["wrapper", "top", "cutover", "owner0", "owner1"],
+    "scope": "Every enabled pre-edge and settled post-edge checks known input fault0/1 exact common equality, input faultX/Z known-one common tightening, and case-equal offered/certified strobes under known-zero input fault. Both actual routed owner masks are checked.",
+    "minimum_observations_each_region": 1000,
+    "healthy_campaign_known_one_input_faults": 0,
+    "healthy_campaign_unknown_input_faults": 0,
+    "accepted_input_counts": "Joined independently to complete original CSV inputF/inputI rows, including both aborted F prefixes; never fitted to observed result.",
+    "complete_input_ends": 38,
+    "marker_policy": "Exact fields/inventory, no synthetic or migrated missing proof; old complete verifier receives unchanged log/CSV first."
+  },
+  "offline_gate": "New script CSV must be byte-identical to original control candidate script and its entire parsed result equal after removing only the new summary field; only new markers may be added, no old result migration.",
+  "scope": "Healthy static available-source seven contexts plus original reset aborts, not all51 adversarial cases in vendor FFT; no continuous15/native60/lower-clock/causal/RF/physical qualification.",
+  "execution_authorized": false
+}
