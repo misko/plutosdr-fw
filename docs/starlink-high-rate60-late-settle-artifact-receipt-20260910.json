@@ -1,0 +1,21 @@
+{
+  "classification": "OFFLINE_PREPARATION_ONLY_NO_ACTUAL_SUCCESSOR_LAUNCHED",
+  "archive": "/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/late60-settle-agent.7cjlYh/20260910-high-rate60-late-settle-prelaunch-v1.tgz",
+  "archive_sha256": "4ec1d4104633adadd3f10127c2a4743b6f1eadadafc21fa5eff171c6470ef90e",
+  "archive_bytes": 2121243,
+  "safe_regular_members": 405,
+  "hash_length_receipts": 404,
+  "archive_kept_outside_tmp_worktree": true,
+  "tested_fw": "bca3b8e1478bef46dfc953758daded2ec49c7e4b",
+  "tested_hdl": "ecbb3712965ff39b144b5adf84a2a262c6c53dff",
+  "frozen_bundle": "/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/late60-settle-agent.7cjlYh/frozen-bundle",
+  "bundle_sha256": "79febd5abe231065f9fc77abd7c587104e4608ffd8eae40ebd5b4f20a6ac1043",
+  "source_signature": "66eac04547dcef402651f4d2cd9a412d1c432b17045c223779076c6d8eaabfd3",
+  "source_count": 119,
+  "bundle_payload_count": 376,
+  "local_tests": "original23132 terminal0:694 PASS19.08s",
+  "independent_parent_tests": "original64537 terminal0:694 PASS14.62s",
+  "prior_actual": "original88460 terminal1 overallFAIL, no reinterpretation",
+  "preserved_partial_report_sha256": "a2d4f183448d2e6137d43ff94e14fa05e12a60588071ef530fee5d0be0e0430c",
+  "successor_proposal": "/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/late60-settle-agent.7cjlYh/successor-proposal.json"
+}
