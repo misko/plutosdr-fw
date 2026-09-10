@@ -1,0 +1,35 @@
+{
+  "kind": "OFFLINE_UNBOUND_SUMMARY_PHYSICAL_RECIPE",
+  "reference_assets": {
+    "clocks.xdc": "bac30eff84cc71d1f273104b716b388b55e51d33be10f9beaf1901232193ba3f",
+    "reference/create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "reference/prepare_starlink_retained_control_synthesis.py": "81d418d1659a276a7a93609b44c611b669529f655d7e189b0c4856e742a28e4d",
+    "reference/route_owner.py": "0aa253a7a2d42c8f242fd483c6e2be7b008768824457cecadc671def59510a6c",
+    "reference/runtime/starlink_pss_core_job_cutover.v": "c67b62486356215a12cd8e9c2b220c5a877a661bd1b15a13b25f9904171ba330",
+    "reference/runtime/starlink_pss_fft_bank_owned_retained_output_probe.v": "7367d534792385eab3b4264f2e36849b18222e6fe848ef7dbc0887394de8bf94",
+    "reference/runtime/starlink_pss_fft_retained_output_impl.v": "3b98a25b8c5d50a18da1692511ae1647c2969fadf5c55d679278b2d5a7bbf0ff",
+    "reference/runtime/starlink_pss_result_guard_owner_view.v": "8b853ee26ab18b4639ab0faf156fd75661f86030773c14f5a9843140c52b5d02",
+    "reference/synthesis_owner.py": "3ef88c1bfe7e142372e64bf56f0d38939d1ccb96bc2b3cfb4856acb0c2be1d10",
+    "reference/synthesize_retained_control.tcl": "767ecdfb05f7fc967855196f92a08d8f1fafc6225ea6ef871d12ac8b1e8ed8fc",
+    "route_retained_output.tcl": "034d1eaa197757b762644acd0cad9dc267338ae23fd5d757290c8485d0f1ac9a",
+    "threads.tcl": "aec974f2800f01285e888d1b188cd089534941922531914926a8e1b568d4c227"
+  },
+  "runtime": {
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_fft_bank_owned_local_admission_probe.v": "0cb54617eb6757e1d6c719d97b0fd5002ec7f6105c8c4b50c41eba67d4306235",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_forward_kernel_join.v": "87e40b3cc9025502c05d2afbd6b0d9658618cd7204d4fd8ddc3f0ba74e68843a",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_kernel_rom.v": "0b4ee87d93d61c6fa12ee9992aa517a3a8be568835075531d9af4453f4ec80e5",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_realtime_input_guard.v": "eb1f968a30ae0371421cfb0766c7f8bf0c23411e730717cd0d4924be0604109e",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_realtime_input_guard_local_admission.v": "55438743eede0d346cec67351e079eb6ae21da437d4088a131a2a258b43ff233",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_realtime_result_guard.v": "09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_spectrum_product_bank_arithmetic.v": "515d29534dab921601c37564ad8a9957eed9befb9dff2e1c8c5f1f79fc6b5f70",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_spectrum_product_operand_register.v": "dead8e465b4bd982cebcab0c4a4e7eb4f3b20c038938f74c7663a79e0779893d",
+    "hdl/library/starlink_pss_acquisition/retained_output/starlink_pss_mailbox_owner_view.v": "de060a7930be1d65cc91903da447e51ead3efad4ebed4b61e4f257e45d76d2d6",
+    "hdl/library/starlink_pss_acquisition/retained_output/starlink_pss_retained_epoch_barrier.v": "954cff125145c81081678967f8afeecc6430dac07a4b7aff16c87b6174bf3afd",
+    "hdl/library/starlink_pss_acquisition/retained_output/starlink_pss_retained_output_owner.v": "b6280f6a894ec120f0e57415d5cc6da7b9e193a65f42b1d7f9789cbdbaa5d648",
+    "hdl/library/starlink_pss_acquisition/retained_output_summary_candidate/starlink_pss_core_job_cutover.v": "c67b62486356215a12cd8e9c2b220c5a877a661bd1b15a13b25f9904171ba330",
+    "hdl/library/starlink_pss_acquisition/retained_output_summary_candidate/starlink_pss_fft_bank_owned_retained_output_probe.v": "7367d534792385eab3b4264f2e36849b18222e6fe848ef7dbc0887394de8bf94",
+    "hdl/library/starlink_pss_acquisition/retained_output_summary_candidate/starlink_pss_fft_retained_output_impl.v": "3b98a25b8c5d50a18da1692511ae1647c2969fadf5c55d679278b2d5a7bbf0ff",
+    "hdl/library/starlink_pss_acquisition/retained_output_summary_candidate/starlink_pss_result_guard_owner_view.v": "8b853ee26ab18b4639ab0faf156fd75661f86030773c14f5a9843140c52b5d02"
+  }
+}
