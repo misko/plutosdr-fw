@@ -1,4 +1,5 @@
 """Exact inverse of the held preflight tuple/two-comparator experiment."""
+from tests.starlink_oracle.payload_bubble_contract import restore_payload_wrapper
 
 PREFLIGHT_ADDITION = '''  // VERIFY/ARM own the captured phase. Discovery remains state-selected, but
   // this current preflight tuple need not put scheduler state before equality.
@@ -33,6 +34,9 @@ PREFLIGHT_ADDITION = '''  // VERIFY/ARM own the captured phase. Discovery remain
 
 
 def restore_held_preflight_wrapper(source):
+    # Compose only the separately tested, exact later data-only opt-in delta.
+    if "PRIVATE_PAYLOAD_BUBBLES" in source:
+        source = restore_payload_wrapper(source)
     replacements = [
         (PREFLIGHT_ADDITION, ""),
         ("(held_phase ? preflight_identity_equal[1] : engine_metadata[4:0] == 0)",
