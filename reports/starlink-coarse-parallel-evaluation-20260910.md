@@ -151,3 +151,22 @@ needs256ms for one branch. Short-dwell causal policy remains an explicit gate,
 not something timing closure alone resolves.
 
 Detailed next gates: `starlink-bank-owned-integration-gates-20260910.md`.
+
+### Independent completed-input control experiment
+
+The direct-study agent's subsequent read-only review found that a visible held
+return implies registered complete input in the current result guard: any raw
+output without the required input evidence faults on capture, and the sticky
+fault masks the speculative return afterward. This is a candidate premise for
+shortening the control cone, not permission to remove active-input identity
+checks or current duplicate-start/final-publication vetoes.
+
+A separate FW/HDL worktree is allocated at
+`/tmp/starlink-coarse-alternatives.Y3JzOI/completed-input-fence`, branch
+`codex/starlink-rx-only-do-not-merge-completed-input-fence`, from the frozen
+bank-slice commits1035b93d5/169f9fb. The agent may implement an explicit opt-in
+phase predicate there, with unchanged default guards and complete fault reasons,
+then actual-core175MHz tests and an isolated diagnostic route. No full receiver
+build, radio, PPU edit or agent remote write is allowed. This branch is initially
+local and unqualified. It does not modify the FFT agent's concurrent scorer
+integration or the retained failed bank-slice route.
