@@ -2,6 +2,15 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest offline gate (2026-09-10, after 15:49 UTC): parent independently repeats
+65 inverse actual-preparation tests, all PASS with unchanged source pins. This
+qualifies the source/clock/protocol test harness, not a new FFT execution.
+Exclusive bundle/owner review is next. A separate staged product writer/reader
+prototype is authorized offline, and a trace-backed scheduling study is checking
+whether next-forward processing can overlap prior-inverse result draining.
+No timing constraint, production HDL gitlink, radio or PPU state changed. See
+[preparation evidence and parallel scope](reports/experiments/20260910-inverse-actual-preparation-review.md).
+
 Latest physical result (2026-09-10, after15:29 UTC): the P1 product-publication
 trial's route completed but **TIMING FAILS**, WNS-1.492ns/TNS-441.681,
 591 failing endpoints, hold+0.058ns. This is0.132ns worse than the ROM route.
