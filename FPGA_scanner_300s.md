@@ -19,8 +19,9 @@ payload-enable/balanced-kernel-identity refactor also passes both actual-core
 modes and preserves prior control traces. Its single route is still failing:
 175MHz setup-1.559ns/hold+0.071ns,553 failing same-clock endpoints. The worst
 path now crosses output-bank current framing checks into forward kernel state
-enables. This is not timing closure; exact phase separation is under read-only
-review, with no further physical trial or runtime promotion authorized.
+enables. This is not timing closure; exact phase separation is now authorized
+for additive implementation/tests, with no further physical trial or runtime
+promotion authorized.
 Generated175 MMCM active-traffic reset/recovery also passes
 an independent primary replay with 7,853 exact accepted scores. The original
 4,096-block175 burst/stall soak completed:1,830,912 ordered scores, FIFO358/512

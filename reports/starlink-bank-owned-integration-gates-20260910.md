@@ -147,7 +147,13 @@ independently passed19 tests and verified416 artifact hashes. Its one unchanged
 TNS-518.092ns/553 failing endpoints.100 setup+1.851ns,hold+0.100ns.
 All6668nets route, but the timing gate still fails. The worst path now runs
 through output-bank current framing checks into forward kernel state enables.
-Read-only phase-exclusivity analysis is next; no new physical trial, exemption
+The reviewed next step is an additive default-off forward-retirement output:
+an inverse-only current framing fault is excluded only from the forward-only
+expression, while sticky faults, original public return/commit/state and every
+global same-edge reason remain literal. Prove exact forward retirement against
+the frozen old guard under actual mailbox wiring, including raw corrupt tuples,
+all other current faults, transitions, final/status edges and broken-contract
+mutants. Implementation/tests are authorized; no new physical trial, exemption
 or primary runtime promotion is authorized. See
 `experiments/20260910-payload-bubbles-parent-review.md` for scope and the separate
 missing-Linux-source regression evidence.

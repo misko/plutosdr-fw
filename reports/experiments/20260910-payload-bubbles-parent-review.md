@@ -82,6 +82,27 @@ exception; any proposed refactor needs its own exact-source tests before a
 new physical trial. A successful tool exit alone cannot qualify CDC, external
 I/O, full receiver or deployment.
 
+That source-level review now authorizes implementation/tests only for the
+following additive experiment. Guard parameter USE_FORWARD_RETIREMENT defaults
+off. Add inverse_phase, forward_mailbox_fault and forward_retirement_valid;
+the wrapper supplies actual next_inverse and sticky output_bank_fault. The
+new forward-only nonfinal/final expression copies the old qualification and
+all other current fault terms, replacing only the mailbox fault term with
+the sticky fault, and gates with !inverse_phase. The registered-only wrapper
+selects this output for the same joiner handshake; default remains unchanged.
+All original guard expressions/state/return/commit/ACK/reasons remain literal.
+
+Required proof is new_forward_valid == old_return_valid && !next_inverse
+on every legal edge, not merely healthy numerical output. Establish the
+phase implication using real mailbox input wiring and corrupt raw tuples;
+do not assume framing is valid. A deliberately forced inverse-only fault in
+forward phase breaks the interface invariant and must be explicitly detected,
+not silently excluded as a passing test. Require strict source inverse, frozen
+old guard/joiner shadow, phase/stall/reset/status/final-edge/sticky-fault tests,
+wrong-phase/sticky-veto/private-retirement mutants, and unchanged actual-core
+default/registered numerical/fault/control traces. No new physical trial is
+authorized until this exact source-specific evidence is reviewed.
+
 ## Concurrent native/coarse/pilot counterevidence
 
 The separate additive15MHz paired test's original175-v2 fails its positive
