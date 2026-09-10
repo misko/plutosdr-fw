@@ -235,3 +235,36 @@ Git, against manifest
 The portable archive includes complete traces/logs and the full WDB in parts;
 its payload totals 142,282,627 bytes. Both original pushes to the ROM
 do-not-merge branches succeeded. Physical preparation remains offline-only.
+
+## ROM physical preparation admitted; one synthesis launched
+
+The final frozen preparation is firmware
+`cae523aa869b859f84b242d3b6dd03157fddc87d` / HDL
+`49a133554c8cb738d2a93136355571225df7076c`. The agent's original 42873
+passed 43 tests in 62.28 seconds. Parent repeat **87007 exited 0: 43 passed
+in 61.42 seconds**, retained at
+`/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/rom-physical-parent.iximS7oZ`.
+Its log SHA-256 is
+`0ef40e41c5908ad5e871098cc9d7b23ee8ff3dce6bd078aa006ba2d95e68ec1a`;
+JUnit XML is
+`fc2fa92d8a8e260ad380c8db2da70519c8c8aa071ac9eb189bb50812e39e14c2`.
+
+Parent read the full generated synthesis Tcl, unchanged external owner and
+100/175 MHz resource constraints, verified all 18 prepared files, and replayed
+actual admission (17899 exit 0). The reviewed preparation inventory is
+`d4d364427c31531358ce747b5931d4fa441e8e46002bf986626c69e923be2a39`.
+All six R/D/S/C/K/M options are explicitly 1; no timing exceptions were added.
+Parent also verified the committed portable archive's 699 payload hashes and
+matching embedded receipt: 700 safe members, 4,190,608 bytes, SHA-256
+`e67a4bcafdb717e4218d1100b040d905dbe4ab9c7b542d8ced7a51f02f1bd739`.
+The first parent archive check incorrectly counted the embedded receipt as a
+self-hashed payload and failed its membership assertion; inspecting the
+documented format resolved that check without changing the archive.
+
+Only after those checks, one synthesis was authorized with unchanged owner
+`d0f36ce2817ab20baaff8668b6743e367d296f7a60e714099fe69aa5b6912111`.
+The agent owns original handle **11476**, launched at
+2026-09-10T13:35:46.005660 UTC in recovery-parent `rom-k1m1-synth-v1`.
+Its output and TMPDIR are non-`/tmp`; the new run was absent and paths were
+checked for symlinks before launch. There is no retry, route, runtime promotion
+or radio authorization. A terminal synthesis result is not yet recorded here.
