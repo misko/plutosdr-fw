@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest actual correction (2026-09-10): the two-edit completion declaration fix
+passes independent155 preparation tests and actual compilation. Vendor43908
+passes startup, admits job1 at cycle934, then suffers an XSim kernel crash in
+the actual_word CSV formatter at cycle939. This is not numerical qualification.
+All73 source pins and both actual-run source copies remain unchanged. A minimal
+logging-only reproducer is next; no runtime/fault relaxation or radio operation.
+See [declaration correction and formatter crash](reports/experiments/20260910-retained-declaration-parent.md).
+
 Latest startup diagnosis (2026-09-10): a source-identical copied-snapshot replay
 reproduces cycle31 failure with66 explicitly logged controls. The completion
 control and cutover producer-closed port are Z at all95 sampled times. Cutover
