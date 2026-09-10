@@ -4,6 +4,16 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Latest checked-product candidate PASSES actual vendor FFT verification, but its
+completed diagnostic route FAILS at **-8.324 ns**,2309 failing setup endpoints.
+The unchanged runtime passes44 healthy numerical blocks,32 nominal and6 stalled
+service drains after a bounded bench-only correction; original failure retained.
+Independent76 preparation and43 physical-preparation tests pass. Synthesis and
+route sources are audited unchanged. See [actual result](reports/experiments/20260910-checked-drain-actual-pass.md)
+and [physical comparison](reports/experiments/20260910-checked-product-physical-parent.md).
+The checked lane is held; retained fault-summary separation is the next measured
+implementation target. Neither candidate is deployable.
+
 Latest combined-refactor route improves WNS to **-2.697 ns**, from -4.068 ns,
 but still FAILS: TNS -981.622 ns,848 failing setup endpoints. Hold +0.037 ns
 passes; all7233 nets route with0 errors. Same-domain metadata/fault propagation
@@ -19,11 +29,11 @@ are checked. Fresh synthesis/routing completed as recorded above; no RX or
 deployment qualification follows.
 See [combined refactor actual qualification](reports/experiments/20260910-retained-control-actual-parent.md).
 
-The parallel checked-product actual campaign completed but was rejected: its
+The earlier checked-product v1 actual campaign completed but was rejected: its
 final nominal job lacks a sampled live ready/drain row before the bench starts
 reset. The other31 nominal and all6 stalled services meet the unchanged5215
-limit; all624233 trace rows and ownership counts agree. A bounded bench-only
-drain witness is being developed, without accepting fewer completed jobs.
+limit; all624233 trace rows and ownership counts agree. The bounded bench-only
+drain witness now passes a fresh v2 run, without accepting fewer completed jobs.
 See [preserved actual failure and diagnosis](reports/experiments/20260910-checked-actual-drain-boundary.md).
 
 Retained-output actual vendor FFT now PASSES all seven contexts:19 complete
@@ -32,7 +42,8 @@ reset recoveries. Independent251 preparation tests pass; all77953 actual CSV
 rows match the frozen reference byte-for-byte. Runtime, clocks, numerical and
 service limits are unchanged. Parallel checked-product controller integration
 passes independent3306 tests, including distinct fresh payloads after reset;
-its FFT remains a control actor, not an actual numerical FFT qualification.
+that3306-test campaign uses a control actor. The separate actual numerical
+campaign now passes as recorded above.
 
 Retained-output synthesis and diagnostic routing have now completed, but
 physical timing FAILS: WNS -4.068 ns, TNS -1952.796 ns, 1266 failing setup
@@ -41,8 +52,7 @@ descriptor register enable; other reported paths reach kernel-ROM enables.
 This is worse than earlier P1 (-1.492 ns), not a release candidate. Five
 critical CDC findings and real 175 MHz board-clock integration remain open.
 
-Next: measured remaining fault-control-path refactor, parallel checked-product
-drain-witness actual replay (independent76 preparation tests now pass), then
+Next: measured retained fault-summary-path refactor, then new actual replay and
 physical closure and full receiver/continuous
 acquisition/IIO/board qualification before `.18`→`.17` deployment. No radio
 operation or production HDL gitlink promotion. See
