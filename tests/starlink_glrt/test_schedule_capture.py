@@ -78,7 +78,7 @@ class Radio:
 
 def run(radio,root,clock=lambda:0):
     return capture.run_batch(radio,root,tag=19,repeats=32,phase_seed=17,phase_step=7310173,
-        step_delta_q16=65536,lead_samples=1200000,deadline=60,clock=clock,sleep=lambda _:None)
+        step_delta_q16=65536,lead_samples=capture.COMMISSIONING_LEAD,deadline=60,clock=clock,sleep=lambda _:None)
 
 
 def test_finite_750_hz_batch_retains_all_heads_before_acknowledging(tmp_path):
@@ -121,7 +121,7 @@ def test_elapsed_deadline_prevents_any_radio_write(tmp_path):
 def args(root):
     return Namespace(uri=capture.URI,serial=capture.SERIAL,firmware_version="scheduled-test",
         output=root,tag=20,phase_seed=17,phase_step=7310173,step_delta_q16=65536,
-        lead_samples=1200000,lo_hz=1690312496,bandwidth_hz=2500000,libiio=None)
+        lead_samples=capture.COMMISSIONING_LEAD,lo_hz=1690312496,bandwidth_hz=2500000,libiio=None)
 
 
 def setup(monkeypatch,tmp_path,fault=None):
@@ -147,6 +147,16 @@ def test_wrong_profile_causes_no_mutation(monkeypatch,tmp_path):
     radio=setup(monkeypatch,tmp_path,"abi")
     result=capture.collect(args(tmp_path/"capture"),library=object(),context_factory=lambda *a,**kw:radio)
     assert result["status"]=="failed" and radio.closed and not radio.commands
+
+
+@pytest.mark.parametrize("lead", [5999,60_000_001])
+def test_invalid_commissioning_lead_cannot_open_a_radio_or_create_evidence(tmp_path,lead):
+    requested=args(tmp_path/"capture")
+    requested.lead_samples=lead
+    with pytest.raises(ValueError,match="lead"):
+        capture.collect(requested,library=object(),
+            context_factory=lambda *a,**kw:pytest.fail("invalid lead accessed radio"))
+    assert not requested.output.exists()
 
 
 def test_capture_failure_cancels_future_work_but_preserves_unacknowledged_head(monkeypatch,tmp_path):

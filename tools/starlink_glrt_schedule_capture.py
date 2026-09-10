@@ -25,6 +25,7 @@ else:
 SERIAL = "winbond-db620818a328172c"
 URI = "ip:192.168.1.14"
 BASE_ABI = "GLF1-1.0-upper-only"
+COMMISSIONING_LEAD = 30_000_000  # 500 ms; measured Ethernet command latency exceeds 20 ms.
 
 
 def save(path, value):
@@ -95,8 +96,11 @@ def run_batch(device, root, *, tag, repeats, phase_seed, phase_step, step_delta_
     save(root/"descriptor.json",asdict(batch))
     retain_text(root/"submit.txt",batch.encode().strip())
     device.command("native_schedule_submit",batch.encode().strip())
+    first_ack = None
     while True:
         state = snap()
+        if first_ack is None:
+            first_ack = state.latest_index
         if state.epoch != batch.epoch or state.configured != repeats:
             raise ValueError("scheduled submission acknowledgement differs from retained descriptor")
         terminal = sum((state.admitted,state.late,state.no_space,state.unavailable,state.expired,state.cancelled))
@@ -120,6 +124,8 @@ def run_batch(device, root, *, tag, repeats, phase_seed, phase_step, step_delta_
             raise ValueError("scheduled repeat inventory is not consecutive")
     receipt = dict(epoch=batch.epoch,tag=tag,repeats=repeats,first_start=start,
                    last_start=results[-1].start,high_water=final.high_water,
+                   lead_samples=lead_samples,
+                   first_ack_after_snapshot_samples=first_ack-based.latest_index,
                    terminal_snapshot=asdict(final),status="transport_pass",precision_qualified=False)
     save(root/"summary.json",receipt)
     return receipt
@@ -130,7 +136,7 @@ def collect(args, *, library=None, context_factory=Context):
         raise ValueError("requires the pinned Ethernet .14 receiver and scheduled firmware identity")
     if not 0 < args.tag < 2**32-1 or not 0 <= args.phase_seed < 2**32 or not 0 <= args.phase_step < 2**32:
         raise ValueError("invalid scheduled tag/carrier fields")
-    if not 0 <= args.step_delta_q16 < 2**48 or not 6000 <= args.lead_samples <= 6000000:
+    if not 0 <= args.step_delta_q16 < 2**48 or not 6000 <= args.lead_samples <= 60_000_000:
         raise ValueError("invalid scheduled step delta or source lead")
     args.output.mkdir(parents=True,exist_ok=False)
     started = time.monotonic(); deadline = started+60
@@ -140,7 +146,7 @@ def collect(args, *, library=None, context_factory=Context):
     save(args.output/"protocol.json",dict(schema="starlink-gls1-scheduled-bringup/v1",
         request={k:str(v) if isinstance(v,Path) else v for k,v in vars(args).items()},
         batches=[32,64],sample_rate_hz=RATE,samples_per_repeat=SAMPLES,
-        maximum_collection_seconds=60,precision_qualified=False,
+        maximum_collection_seconds=60,lead_samples=args.lead_samples,precision_qualified=False,
         source_sha256={str(f.resolve()):hashlib.sha256(f.read_bytes()).hexdigest() for f in files}))
     context = device = None
     owned = False
@@ -203,7 +209,7 @@ def main():
     parser.add_argument("--lo-hz",type=int,required=True); parser.add_argument("--bandwidth-hz",type=int,required=True)
     parser.add_argument("--tag",type=int,default=2000001); parser.add_argument("--phase-seed",type=int,default=17)
     parser.add_argument("--phase-step",type=int,default=7310173); parser.add_argument("--step-delta-q16",type=int,default=65536)
-    parser.add_argument("--lead-samples",type=int,default=1200000); parser.add_argument("--libiio")
+    parser.add_argument("--lead-samples",type=int,default=COMMISSIONING_LEAD); parser.add_argument("--libiio")
     result = collect(parser.parse_args())
     print(json.dumps(result,indent=2))
     return int(result["status"] != "transport_pass")

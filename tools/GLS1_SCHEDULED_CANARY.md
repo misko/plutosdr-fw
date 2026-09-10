@@ -17,9 +17,18 @@ collector returns. No scheduled image is registered by this collector change.
 The collector requires exact endpoint `ip:192.168.1.14` and serial
 `winbond-db620818a328172c`. No USB enumeration occurs. Firmware version, RX LO,
 bandwidth and TX-off state are checked before writes. Initial scheduling lead
-is 1,200,000 native samples (20 ms); future batches expire at the last sample
+is 30,000,000 native samples (500 ms); future batches expire at the last sample
 of their last permitted pilot. All work is finite even if Ethernet stalls.
 The operator imposes a 60-second process timeout followed by bounded cleanup.
+
+The first hardware attempt used 20 ms lead and counted all 32 repeats as late,
+with no source drops or queue faults. The retained source snapshots span
+83.502 ms between rebase observation and the first post-submit observation.
+The 500 ms lead addresses measured workstation/Ethernet commissioning overhead;
+it is not the tracking latency target or permission to extrapolate an acquired
+pilot for 500 ms. The final tracker must use radio-local finite feedback and
+its own short prediction horizon. Raw first-attempt snapshots and failure
+receipts remain under `scheduled-hardware-canary-v1`.
 
 Each batch retains its descriptor and submission text before SUBMIT. A failure
 after SUBMIT is uncertain and is never automatically retried. Every raw head is
