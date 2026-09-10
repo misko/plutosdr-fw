@@ -1,0 +1,2541 @@
+{
+  "study": "additive_bank_owned_iq_to_score_actual_core_v3",
+  "scope": "100 MHz overlap scheduler/energy/scorer; actual fixed XFFT at 175/200 MHz; direct canonical15 input",
+  "runs": [
+    {
+      "mode": "numeric",
+      "fast_mhz": 175,
+      "profile": "exact",
+      "artifact_directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/fft-island/hdl/library/starlink_pss_acquisition/build/bank-iq-numeric-175-v3",
+      "terminal_receipt": "BANK_IQ_TO_SCORE_ACTUAL_CORE_VERIFIED mode=numeric fast_mhz=175 NO_PHYSICAL_OR_RF_CLAIM",
+      "simulate_log_sha256": "c3ec54164dbf436de047a162907507b2fb1b1243cea5c5ac1e68761653754ac5",
+      "runner_log_sha256": "521d39f6b53788c98dd04e23044c96c773857a77996fe652730e3cc808773906",
+      "scope_sha256": "bf8fdcccc3dfaa093e33828c7e5b3757ff621303a26f1999b9946eb9fbb7fe06",
+      "frozen_source_sha256": {
+        "bank_owned_iq_capacity_checks.svh": "880f63b7be0f4823dc6c3cc6481abffbcef6766db327c77b0d113d785f213ace",
+        "bank_owned_iq_fault_scenarios.svh": "130e6677185e390c175f7f1f0d31c2c96127b5841e784091c573d69bc38c0cd2",
+        "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+        "forward_exponents.mem": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f",
+        "forward_q17.mem": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd",
+        "inverse_exponents.mem": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff",
+        "inverse_q17.mem": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1",
+        "prepare_iq_to_score_bank_owned.tcl": "6aacb8be2285e48b633608866e986f88ad76a7049f972c09de9e125c3df16fa6",
+        "product_q17.mem": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7",
+        "samples_ci16.mem": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723",
+        "scores_u8.mem": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d",
+        "simulate_iq_to_score_bank_owned.tcl": "625d26bb1963a4a721411d8327a40178d091ef8dcd8684bfcb3ad54c48093b94",
+        "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+        "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+        "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+        "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+        "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+        "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+        "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+        "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+        "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+        "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+        "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+        "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+        "starlink_pss_realtime_result_guard.v": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+        "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+        "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+        "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+        "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+        "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+        "tb_starlink_pss_iq_to_score_xfft.sv": "902743301305a6a63c65308056a2e1a4c063f73e2fc85b84e6b5d94debdce43a",
+        "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+        "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+      },
+      "generated_bench_core_sha256": {
+        "tb_starlink_pss_iq_to_score_xfft.sv": "7596b4200bbf4c49d7301c6018d2daa634f0715526321fc3bade881e6f7bcca3",
+        "starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+      },
+      "numeric": {
+        "samples": 1406,
+        "blocks": 3,
+        "forward": 1536,
+        "product": 1536,
+        "inverse": 1536,
+        "scores": 1341,
+        "pss255": 3,
+        "max_fifo": 357,
+        "score_stalls": 1,
+        "global_fault_recovery": 1
+      },
+      "boundary_receipt": {
+        "qualifier_mutations": 5,
+        "descriptor": 1,
+        "core_fault": 1,
+        "fft_reset": 1,
+        "slow_reset": 1,
+        "source_gap": 1,
+        "source_index": 1,
+        "exact_epochs": 4,
+        "exact_scores": 5364,
+        "autonomous_gap_index_recovery": 1
+      },
+      "exact_replays": [
+        {
+          "epoch": 2,
+          "scores": 1341
+        },
+        {
+          "epoch": 3,
+          "scores": 1341
+        },
+        {
+          "epoch": 4,
+          "scores": 1341
+        }
+      ]
+    },
+    {
+      "mode": "capacity",
+      "fast_mhz": 175,
+      "profile": "nominal",
+      "artifact_directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/fft-island/hdl/library/starlink_pss_acquisition/build/bank-iq-capacity-175-nominal-v3",
+      "terminal_receipt": "BANK_IQ_TO_SCORE_ACTUAL_CORE_VERIFIED mode=capacity fast_mhz=175 NO_PHYSICAL_OR_RF_CLAIM",
+      "simulate_log_sha256": "091a832583999d344e4bfaaa8add0a25488cc51659b0a584e25f8dba4c23f971",
+      "runner_log_sha256": "2cd46f18cd347bd78f91436aa8ca98c0e5c6ef888b1bd86e38ca05bba8e92e38",
+      "scope_sha256": "115cc53b5ee4a64abfc7bbeee807578e98720a3f83c9ee3b93c67c59bb43058e",
+      "frozen_source_sha256": {
+        "bank_owned_iq_capacity_checks.svh": "880f63b7be0f4823dc6c3cc6481abffbcef6766db327c77b0d113d785f213ace",
+        "bank_owned_iq_fault_scenarios.svh": "130e6677185e390c175f7f1f0d31c2c96127b5841e784091c573d69bc38c0cd2",
+        "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+        "prepare_iq_to_score_bank_owned.tcl": "6aacb8be2285e48b633608866e986f88ad76a7049f972c09de9e125c3df16fa6",
+        "simulate_iq_to_score_bank_owned.tcl": "625d26bb1963a4a721411d8327a40178d091ef8dcd8684bfcb3ad54c48093b94",
+        "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+        "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+        "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+        "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+        "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+        "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+        "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+        "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+        "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+        "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+        "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+        "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+        "starlink_pss_realtime_result_guard.v": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+        "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+        "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+        "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+        "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+        "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "e49157f99f0a12972d735f53d3218bb576e9b00d7c1b54d7332d7c8c0acc054e",
+        "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+        "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+      },
+      "generated_bench_core_sha256": {
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "ed329d33f14ee5645bc7747121b775be47c4533f1864812bd727559220745088",
+        "starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+      },
+      "counts": {
+        "samples": 28673,
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "scores": 28608,
+        "fifo_max": 356
+      },
+      "backlog": {
+        "blocks": 64,
+        "overlap_queue_max": 1,
+        "ring_retention_age_max": 589,
+        "removed_transform_fifo": 0,
+        "energy_lookup_age_max": 845,
+        "score_age_max": 913,
+        "forward_stall_cycles_max": 0,
+        "source_burst_mode": 0,
+        "score_stall_mode": 0
+      },
+      "independent_metadata": {
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "admission_interval_fast_min": 5215,
+        "admission_interval_fast_max": 5215,
+        "capture_next_epoch_words": 0,
+        "three_epoch_overlap_words": 0
+      },
+      "score_block_progress": [
+        {
+          "block": 1,
+          "scores": 447,
+          "cycle": 8333,
+          "fifo_max": 356,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001182
+        },
+        {
+          "block": 2,
+          "scores": 894,
+          "cycle": 11313,
+          "fifo_max": 356,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001629
+        },
+        {
+          "block": 3,
+          "scores": 1341,
+          "cycle": 14293,
+          "fifo_max": 356,
+          "cache_oldest": 1000029,
+          "cache_newest": 1002076
+        },
+        {
+          "block": 4,
+          "scores": 1788,
+          "cycle": 17273,
+          "fifo_max": 356,
+          "cache_oldest": 1000476,
+          "cache_newest": 1002523
+        },
+        {
+          "block": 5,
+          "scores": 2235,
+          "cycle": 20253,
+          "fifo_max": 356,
+          "cache_oldest": 1000923,
+          "cache_newest": 1002970
+        },
+        {
+          "block": 6,
+          "scores": 2682,
+          "cycle": 23233,
+          "fifo_max": 356,
+          "cache_oldest": 1001370,
+          "cache_newest": 1003417
+        },
+        {
+          "block": 7,
+          "scores": 3129,
+          "cycle": 26213,
+          "fifo_max": 356,
+          "cache_oldest": 1001817,
+          "cache_newest": 1003864
+        },
+        {
+          "block": 8,
+          "scores": 3576,
+          "cycle": 29193,
+          "fifo_max": 356,
+          "cache_oldest": 1002264,
+          "cache_newest": 1004311
+        },
+        {
+          "block": 9,
+          "scores": 4023,
+          "cycle": 32173,
+          "fifo_max": 356,
+          "cache_oldest": 1002711,
+          "cache_newest": 1004758
+        },
+        {
+          "block": 10,
+          "scores": 4470,
+          "cycle": 35153,
+          "fifo_max": 356,
+          "cache_oldest": 1003158,
+          "cache_newest": 1005205
+        },
+        {
+          "block": 11,
+          "scores": 4917,
+          "cycle": 38133,
+          "fifo_max": 356,
+          "cache_oldest": 1003605,
+          "cache_newest": 1005652
+        },
+        {
+          "block": 12,
+          "scores": 5364,
+          "cycle": 41113,
+          "fifo_max": 356,
+          "cache_oldest": 1004052,
+          "cache_newest": 1006099
+        },
+        {
+          "block": 13,
+          "scores": 5811,
+          "cycle": 44093,
+          "fifo_max": 356,
+          "cache_oldest": 1004499,
+          "cache_newest": 1006546
+        },
+        {
+          "block": 14,
+          "scores": 6258,
+          "cycle": 47073,
+          "fifo_max": 356,
+          "cache_oldest": 1004946,
+          "cache_newest": 1006993
+        },
+        {
+          "block": 15,
+          "scores": 6705,
+          "cycle": 50053,
+          "fifo_max": 356,
+          "cache_oldest": 1005393,
+          "cache_newest": 1007440
+        },
+        {
+          "block": 16,
+          "scores": 7152,
+          "cycle": 53033,
+          "fifo_max": 356,
+          "cache_oldest": 1005840,
+          "cache_newest": 1007887
+        },
+        {
+          "block": 17,
+          "scores": 7599,
+          "cycle": 56013,
+          "fifo_max": 356,
+          "cache_oldest": 1006287,
+          "cache_newest": 1008334
+        },
+        {
+          "block": 18,
+          "scores": 8046,
+          "cycle": 58993,
+          "fifo_max": 356,
+          "cache_oldest": 1006734,
+          "cache_newest": 1008781
+        },
+        {
+          "block": 19,
+          "scores": 8493,
+          "cycle": 61973,
+          "fifo_max": 356,
+          "cache_oldest": 1007181,
+          "cache_newest": 1009228
+        },
+        {
+          "block": 20,
+          "scores": 8940,
+          "cycle": 64953,
+          "fifo_max": 356,
+          "cache_oldest": 1007628,
+          "cache_newest": 1009675
+        },
+        {
+          "block": 21,
+          "scores": 9387,
+          "cycle": 67933,
+          "fifo_max": 356,
+          "cache_oldest": 1008075,
+          "cache_newest": 1010122
+        },
+        {
+          "block": 22,
+          "scores": 9834,
+          "cycle": 70913,
+          "fifo_max": 356,
+          "cache_oldest": 1008522,
+          "cache_newest": 1010569
+        },
+        {
+          "block": 23,
+          "scores": 10281,
+          "cycle": 73893,
+          "fifo_max": 356,
+          "cache_oldest": 1008969,
+          "cache_newest": 1011016
+        },
+        {
+          "block": 24,
+          "scores": 10728,
+          "cycle": 76873,
+          "fifo_max": 356,
+          "cache_oldest": 1009416,
+          "cache_newest": 1011463
+        },
+        {
+          "block": 25,
+          "scores": 11175,
+          "cycle": 79853,
+          "fifo_max": 356,
+          "cache_oldest": 1009863,
+          "cache_newest": 1011910
+        },
+        {
+          "block": 26,
+          "scores": 11622,
+          "cycle": 82833,
+          "fifo_max": 356,
+          "cache_oldest": 1010310,
+          "cache_newest": 1012357
+        },
+        {
+          "block": 27,
+          "scores": 12069,
+          "cycle": 85813,
+          "fifo_max": 356,
+          "cache_oldest": 1010757,
+          "cache_newest": 1012804
+        },
+        {
+          "block": 28,
+          "scores": 12516,
+          "cycle": 88793,
+          "fifo_max": 356,
+          "cache_oldest": 1011204,
+          "cache_newest": 1013251
+        },
+        {
+          "block": 29,
+          "scores": 12963,
+          "cycle": 91773,
+          "fifo_max": 356,
+          "cache_oldest": 1011651,
+          "cache_newest": 1013698
+        },
+        {
+          "block": 30,
+          "scores": 13410,
+          "cycle": 94753,
+          "fifo_max": 356,
+          "cache_oldest": 1012098,
+          "cache_newest": 1014145
+        },
+        {
+          "block": 31,
+          "scores": 13857,
+          "cycle": 97733,
+          "fifo_max": 356,
+          "cache_oldest": 1012545,
+          "cache_newest": 1014592
+        },
+        {
+          "block": 32,
+          "scores": 14304,
+          "cycle": 100713,
+          "fifo_max": 356,
+          "cache_oldest": 1012992,
+          "cache_newest": 1015039
+        },
+        {
+          "block": 33,
+          "scores": 14751,
+          "cycle": 103693,
+          "fifo_max": 356,
+          "cache_oldest": 1013439,
+          "cache_newest": 1015486
+        },
+        {
+          "block": 34,
+          "scores": 15198,
+          "cycle": 106673,
+          "fifo_max": 356,
+          "cache_oldest": 1013886,
+          "cache_newest": 1015933
+        },
+        {
+          "block": 35,
+          "scores": 15645,
+          "cycle": 109653,
+          "fifo_max": 356,
+          "cache_oldest": 1014333,
+          "cache_newest": 1016380
+        },
+        {
+          "block": 36,
+          "scores": 16092,
+          "cycle": 112633,
+          "fifo_max": 356,
+          "cache_oldest": 1014780,
+          "cache_newest": 1016827
+        },
+        {
+          "block": 37,
+          "scores": 16539,
+          "cycle": 115613,
+          "fifo_max": 356,
+          "cache_oldest": 1015227,
+          "cache_newest": 1017274
+        },
+        {
+          "block": 38,
+          "scores": 16986,
+          "cycle": 118593,
+          "fifo_max": 356,
+          "cache_oldest": 1015674,
+          "cache_newest": 1017721
+        },
+        {
+          "block": 39,
+          "scores": 17433,
+          "cycle": 121573,
+          "fifo_max": 356,
+          "cache_oldest": 1016121,
+          "cache_newest": 1018168
+        },
+        {
+          "block": 40,
+          "scores": 17880,
+          "cycle": 124553,
+          "fifo_max": 356,
+          "cache_oldest": 1016568,
+          "cache_newest": 1018615
+        },
+        {
+          "block": 41,
+          "scores": 18327,
+          "cycle": 127533,
+          "fifo_max": 356,
+          "cache_oldest": 1017015,
+          "cache_newest": 1019062
+        },
+        {
+          "block": 42,
+          "scores": 18774,
+          "cycle": 130513,
+          "fifo_max": 356,
+          "cache_oldest": 1017462,
+          "cache_newest": 1019509
+        },
+        {
+          "block": 43,
+          "scores": 19221,
+          "cycle": 133493,
+          "fifo_max": 356,
+          "cache_oldest": 1017909,
+          "cache_newest": 1019956
+        },
+        {
+          "block": 44,
+          "scores": 19668,
+          "cycle": 136473,
+          "fifo_max": 356,
+          "cache_oldest": 1018356,
+          "cache_newest": 1020403
+        },
+        {
+          "block": 45,
+          "scores": 20115,
+          "cycle": 139453,
+          "fifo_max": 356,
+          "cache_oldest": 1018803,
+          "cache_newest": 1020850
+        },
+        {
+          "block": 46,
+          "scores": 20562,
+          "cycle": 142433,
+          "fifo_max": 356,
+          "cache_oldest": 1019250,
+          "cache_newest": 1021297
+        },
+        {
+          "block": 47,
+          "scores": 21009,
+          "cycle": 145413,
+          "fifo_max": 356,
+          "cache_oldest": 1019697,
+          "cache_newest": 1021744
+        },
+        {
+          "block": 48,
+          "scores": 21456,
+          "cycle": 148393,
+          "fifo_max": 356,
+          "cache_oldest": 1020144,
+          "cache_newest": 1022191
+        },
+        {
+          "block": 49,
+          "scores": 21903,
+          "cycle": 151373,
+          "fifo_max": 356,
+          "cache_oldest": 1020591,
+          "cache_newest": 1022638
+        },
+        {
+          "block": 50,
+          "scores": 22350,
+          "cycle": 154353,
+          "fifo_max": 356,
+          "cache_oldest": 1021038,
+          "cache_newest": 1023085
+        },
+        {
+          "block": 51,
+          "scores": 22797,
+          "cycle": 157333,
+          "fifo_max": 356,
+          "cache_oldest": 1021485,
+          "cache_newest": 1023532
+        },
+        {
+          "block": 52,
+          "scores": 23244,
+          "cycle": 160313,
+          "fifo_max": 356,
+          "cache_oldest": 1021932,
+          "cache_newest": 1023979
+        },
+        {
+          "block": 53,
+          "scores": 23691,
+          "cycle": 163293,
+          "fifo_max": 356,
+          "cache_oldest": 1022379,
+          "cache_newest": 1024426
+        },
+        {
+          "block": 54,
+          "scores": 24138,
+          "cycle": 166273,
+          "fifo_max": 356,
+          "cache_oldest": 1022826,
+          "cache_newest": 1024873
+        },
+        {
+          "block": 55,
+          "scores": 24585,
+          "cycle": 169253,
+          "fifo_max": 356,
+          "cache_oldest": 1023273,
+          "cache_newest": 1025320
+        },
+        {
+          "block": 56,
+          "scores": 25032,
+          "cycle": 172233,
+          "fifo_max": 356,
+          "cache_oldest": 1023720,
+          "cache_newest": 1025767
+        },
+        {
+          "block": 57,
+          "scores": 25479,
+          "cycle": 175213,
+          "fifo_max": 356,
+          "cache_oldest": 1024167,
+          "cache_newest": 1026214
+        },
+        {
+          "block": 58,
+          "scores": 25926,
+          "cycle": 178193,
+          "fifo_max": 356,
+          "cache_oldest": 1024614,
+          "cache_newest": 1026661
+        },
+        {
+          "block": 59,
+          "scores": 26373,
+          "cycle": 181173,
+          "fifo_max": 356,
+          "cache_oldest": 1025061,
+          "cache_newest": 1027108
+        },
+        {
+          "block": 60,
+          "scores": 26820,
+          "cycle": 184153,
+          "fifo_max": 356,
+          "cache_oldest": 1025508,
+          "cache_newest": 1027555
+        },
+        {
+          "block": 61,
+          "scores": 27267,
+          "cycle": 187133,
+          "fifo_max": 356,
+          "cache_oldest": 1025955,
+          "cache_newest": 1028002
+        },
+        {
+          "block": 62,
+          "scores": 27714,
+          "cycle": 190113,
+          "fifo_max": 356,
+          "cache_oldest": 1026402,
+          "cache_newest": 1028449
+        },
+        {
+          "block": 63,
+          "scores": 28161,
+          "cycle": 193093,
+          "fifo_max": 356,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        },
+        {
+          "block": 64,
+          "scores": 28608,
+          "cycle": 196073,
+          "fifo_max": 356,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        }
+      ]
+    },
+    {
+      "mode": "capacity",
+      "fast_mhz": 175,
+      "profile": "bursty-stalled",
+      "artifact_directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/fft-island/hdl/library/starlink_pss_acquisition/build/bank-iq-capacity-175-bursty-stalled-v3",
+      "terminal_receipt": "BANK_IQ_TO_SCORE_ACTUAL_CORE_VERIFIED mode=capacity fast_mhz=175 NO_PHYSICAL_OR_RF_CLAIM",
+      "simulate_log_sha256": "6c5155a1c174b91d014f6d1f9b51b203fe1aeb5670fe9f902b35cd789171b76a",
+      "runner_log_sha256": "a310a76e23b96f38430ee3a4d942371413629f2f7f1903b2b29e184cbf0f1446",
+      "scope_sha256": "fd66cc1367616f104869d9eec1bded3dff33cd752c1a302cc548ec49a5f40913",
+      "frozen_source_sha256": {
+        "bank_owned_iq_capacity_checks.svh": "880f63b7be0f4823dc6c3cc6481abffbcef6766db327c77b0d113d785f213ace",
+        "bank_owned_iq_fault_scenarios.svh": "130e6677185e390c175f7f1f0d31c2c96127b5841e784091c573d69bc38c0cd2",
+        "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+        "prepare_iq_to_score_bank_owned.tcl": "6aacb8be2285e48b633608866e986f88ad76a7049f972c09de9e125c3df16fa6",
+        "simulate_iq_to_score_bank_owned.tcl": "625d26bb1963a4a721411d8327a40178d091ef8dcd8684bfcb3ad54c48093b94",
+        "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+        "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+        "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+        "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+        "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+        "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+        "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+        "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+        "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+        "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+        "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+        "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+        "starlink_pss_realtime_result_guard.v": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+        "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+        "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+        "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+        "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+        "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "e49157f99f0a12972d735f53d3218bb576e9b00d7c1b54d7332d7c8c0acc054e",
+        "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+        "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+      },
+      "generated_bench_core_sha256": {
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "ed329d33f14ee5645bc7747121b775be47c4533f1864812bd727559220745088",
+        "starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+      },
+      "counts": {
+        "samples": 28673,
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "scores": 28608,
+        "fifo_max": 358
+      },
+      "backlog": {
+        "blocks": 64,
+        "overlap_queue_max": 1,
+        "ring_retention_age_max": 589,
+        "removed_transform_fifo": 0,
+        "energy_lookup_age_max": 847,
+        "score_age_max": 914,
+        "forward_stall_cycles_max": 0,
+        "source_burst_mode": 1,
+        "score_stall_mode": 1
+      },
+      "independent_metadata": {
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "admission_interval_fast_min": 5198,
+        "admission_interval_fast_max": 5232,
+        "capture_next_epoch_words": 0,
+        "three_epoch_overlap_words": 0
+      },
+      "score_block_progress": [
+        {
+          "block": 1,
+          "scores": 447,
+          "cycle": 8380,
+          "fifo_max": 358,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001189
+        },
+        {
+          "block": 2,
+          "scores": 894,
+          "cycle": 11367,
+          "fifo_max": 358,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001636
+        },
+        {
+          "block": 3,
+          "scores": 1341,
+          "cycle": 14337,
+          "fifo_max": 358,
+          "cache_oldest": 1000035,
+          "cache_newest": 1002082
+        },
+        {
+          "block": 4,
+          "scores": 1788,
+          "cycle": 17330,
+          "fifo_max": 358,
+          "cache_oldest": 1000483,
+          "cache_newest": 1002530
+        },
+        {
+          "block": 5,
+          "scores": 2235,
+          "cycle": 20301,
+          "fifo_max": 358,
+          "cache_oldest": 1000930,
+          "cache_newest": 1002977
+        },
+        {
+          "block": 6,
+          "scores": 2682,
+          "cycle": 23287,
+          "fifo_max": 358,
+          "cache_oldest": 1001377,
+          "cache_newest": 1003424
+        },
+        {
+          "block": 7,
+          "scores": 3129,
+          "cycle": 26258,
+          "fifo_max": 358,
+          "cache_oldest": 1001824,
+          "cache_newest": 1003871
+        },
+        {
+          "block": 8,
+          "scores": 3576,
+          "cycle": 29245,
+          "fifo_max": 358,
+          "cache_oldest": 1002271,
+          "cache_newest": 1004318
+        },
+        {
+          "block": 9,
+          "scores": 4023,
+          "cycle": 32218,
+          "fifo_max": 358,
+          "cache_oldest": 1002718,
+          "cache_newest": 1004765
+        },
+        {
+          "block": 10,
+          "scores": 4470,
+          "cycle": 35208,
+          "fifo_max": 358,
+          "cache_oldest": 1003165,
+          "cache_newest": 1005212
+        },
+        {
+          "block": 11,
+          "scores": 4917,
+          "cycle": 38175,
+          "fifo_max": 358,
+          "cache_oldest": 1003610,
+          "cache_newest": 1005657
+        },
+        {
+          "block": 12,
+          "scores": 5364,
+          "cycle": 41166,
+          "fifo_max": 358,
+          "cache_oldest": 1004059,
+          "cache_newest": 1006106
+        },
+        {
+          "block": 13,
+          "scores": 5811,
+          "cycle": 44139,
+          "fifo_max": 358,
+          "cache_oldest": 1004506,
+          "cache_newest": 1006553
+        },
+        {
+          "block": 14,
+          "scores": 6258,
+          "cycle": 47129,
+          "fifo_max": 358,
+          "cache_oldest": 1004953,
+          "cache_newest": 1007000
+        },
+        {
+          "block": 15,
+          "scores": 6705,
+          "cycle": 50100,
+          "fifo_max": 358,
+          "cache_oldest": 1005400,
+          "cache_newest": 1007447
+        },
+        {
+          "block": 16,
+          "scores": 7152,
+          "cycle": 53087,
+          "fifo_max": 358,
+          "cache_oldest": 1005847,
+          "cache_newest": 1007894
+        },
+        {
+          "block": 17,
+          "scores": 7599,
+          "cycle": 56057,
+          "fifo_max": 358,
+          "cache_oldest": 1006293,
+          "cache_newest": 1008340
+        },
+        {
+          "block": 18,
+          "scores": 8046,
+          "cycle": 59050,
+          "fifo_max": 358,
+          "cache_oldest": 1006741,
+          "cache_newest": 1008788
+        },
+        {
+          "block": 19,
+          "scores": 8493,
+          "cycle": 62021,
+          "fifo_max": 358,
+          "cache_oldest": 1007188,
+          "cache_newest": 1009235
+        },
+        {
+          "block": 20,
+          "scores": 8940,
+          "cycle": 65008,
+          "fifo_max": 358,
+          "cache_oldest": 1007635,
+          "cache_newest": 1009682
+        },
+        {
+          "block": 21,
+          "scores": 9387,
+          "cycle": 67978,
+          "fifo_max": 358,
+          "cache_oldest": 1008082,
+          "cache_newest": 1010129
+        },
+        {
+          "block": 22,
+          "scores": 9834,
+          "cycle": 70965,
+          "fifo_max": 358,
+          "cache_oldest": 1008529,
+          "cache_newest": 1010576
+        },
+        {
+          "block": 23,
+          "scores": 10281,
+          "cycle": 73938,
+          "fifo_max": 358,
+          "cache_oldest": 1008976,
+          "cache_newest": 1011023
+        },
+        {
+          "block": 24,
+          "scores": 10728,
+          "cycle": 76928,
+          "fifo_max": 358,
+          "cache_oldest": 1009423,
+          "cache_newest": 1011470
+        },
+        {
+          "block": 25,
+          "scores": 11175,
+          "cycle": 79895,
+          "fifo_max": 358,
+          "cache_oldest": 1009868,
+          "cache_newest": 1011915
+        },
+        {
+          "block": 26,
+          "scores": 11622,
+          "cycle": 82886,
+          "fifo_max": 358,
+          "cache_oldest": 1010317,
+          "cache_newest": 1012364
+        },
+        {
+          "block": 27,
+          "scores": 12069,
+          "cycle": 85859,
+          "fifo_max": 358,
+          "cache_oldest": 1010764,
+          "cache_newest": 1012811
+        },
+        {
+          "block": 28,
+          "scores": 12516,
+          "cycle": 88849,
+          "fifo_max": 358,
+          "cache_oldest": 1011211,
+          "cache_newest": 1013258
+        },
+        {
+          "block": 29,
+          "scores": 12963,
+          "cycle": 91816,
+          "fifo_max": 358,
+          "cache_oldest": 1011657,
+          "cache_newest": 1013704
+        },
+        {
+          "block": 30,
+          "scores": 13410,
+          "cycle": 94807,
+          "fifo_max": 358,
+          "cache_oldest": 1012105,
+          "cache_newest": 1014152
+        },
+        {
+          "block": 31,
+          "scores": 13857,
+          "cycle": 97780,
+          "fifo_max": 358,
+          "cache_oldest": 1012552,
+          "cache_newest": 1014599
+        },
+        {
+          "block": 32,
+          "scores": 14304,
+          "cycle": 100770,
+          "fifo_max": 358,
+          "cache_oldest": 1012999,
+          "cache_newest": 1015046
+        },
+        {
+          "block": 33,
+          "scores": 14751,
+          "cycle": 103741,
+          "fifo_max": 358,
+          "cache_oldest": 1013446,
+          "cache_newest": 1015493
+        },
+        {
+          "block": 34,
+          "scores": 15198,
+          "cycle": 106728,
+          "fifo_max": 358,
+          "cache_oldest": 1013893,
+          "cache_newest": 1015940
+        },
+        {
+          "block": 35,
+          "scores": 15645,
+          "cycle": 109698,
+          "fifo_max": 358,
+          "cache_oldest": 1014340,
+          "cache_newest": 1016387
+        },
+        {
+          "block": 36,
+          "scores": 16092,
+          "cycle": 112685,
+          "fifo_max": 358,
+          "cache_oldest": 1014787,
+          "cache_newest": 1016834
+        },
+        {
+          "block": 37,
+          "scores": 16539,
+          "cycle": 115658,
+          "fifo_max": 358,
+          "cache_oldest": 1015234,
+          "cache_newest": 1017281
+        },
+        {
+          "block": 38,
+          "scores": 16986,
+          "cycle": 118649,
+          "fifo_max": 358,
+          "cache_oldest": 1015681,
+          "cache_newest": 1017728
+        },
+        {
+          "block": 39,
+          "scores": 17433,
+          "cycle": 121615,
+          "fifo_max": 358,
+          "cache_oldest": 1016126,
+          "cache_newest": 1018173
+        },
+        {
+          "block": 40,
+          "scores": 17880,
+          "cycle": 124606,
+          "fifo_max": 358,
+          "cache_oldest": 1016575,
+          "cache_newest": 1018622
+        },
+        {
+          "block": 41,
+          "scores": 18327,
+          "cycle": 127579,
+          "fifo_max": 358,
+          "cache_oldest": 1017022,
+          "cache_newest": 1019069
+        },
+        {
+          "block": 42,
+          "scores": 18774,
+          "cycle": 130569,
+          "fifo_max": 358,
+          "cache_oldest": 1017469,
+          "cache_newest": 1019516
+        },
+        {
+          "block": 43,
+          "scores": 19221,
+          "cycle": 133536,
+          "fifo_max": 358,
+          "cache_oldest": 1017915,
+          "cache_newest": 1019962
+        },
+        {
+          "block": 44,
+          "scores": 19668,
+          "cycle": 136527,
+          "fifo_max": 358,
+          "cache_oldest": 1018363,
+          "cache_newest": 1020410
+        },
+        {
+          "block": 45,
+          "scores": 20115,
+          "cycle": 139500,
+          "fifo_max": 358,
+          "cache_oldest": 1018810,
+          "cache_newest": 1020857
+        },
+        {
+          "block": 46,
+          "scores": 20562,
+          "cycle": 142490,
+          "fifo_max": 358,
+          "cache_oldest": 1019257,
+          "cache_newest": 1021304
+        },
+        {
+          "block": 47,
+          "scores": 21009,
+          "cycle": 145457,
+          "fifo_max": 358,
+          "cache_oldest": 1019703,
+          "cache_newest": 1021750
+        },
+        {
+          "block": 48,
+          "scores": 21456,
+          "cycle": 148448,
+          "fifo_max": 358,
+          "cache_oldest": 1020151,
+          "cache_newest": 1022198
+        },
+        {
+          "block": 49,
+          "scores": 21903,
+          "cycle": 151421,
+          "fifo_max": 358,
+          "cache_oldest": 1020598,
+          "cache_newest": 1022645
+        },
+        {
+          "block": 50,
+          "scores": 22350,
+          "cycle": 154405,
+          "fifo_max": 358,
+          "cache_oldest": 1021045,
+          "cache_newest": 1023092
+        },
+        {
+          "block": 51,
+          "scores": 22797,
+          "cycle": 157378,
+          "fifo_max": 358,
+          "cache_oldest": 1021492,
+          "cache_newest": 1023539
+        },
+        {
+          "block": 52,
+          "scores": 23244,
+          "cycle": 160369,
+          "fifo_max": 358,
+          "cache_oldest": 1021939,
+          "cache_newest": 1023986
+        },
+        {
+          "block": 53,
+          "scores": 23691,
+          "cycle": 163335,
+          "fifo_max": 358,
+          "cache_oldest": 1022384,
+          "cache_newest": 1024431
+        },
+        {
+          "block": 54,
+          "scores": 24138,
+          "cycle": 166326,
+          "fifo_max": 358,
+          "cache_oldest": 1022833,
+          "cache_newest": 1024880
+        },
+        {
+          "block": 55,
+          "scores": 24585,
+          "cycle": 169299,
+          "fifo_max": 358,
+          "cache_oldest": 1023280,
+          "cache_newest": 1025327
+        },
+        {
+          "block": 56,
+          "scores": 25032,
+          "cycle": 172290,
+          "fifo_max": 358,
+          "cache_oldest": 1023727,
+          "cache_newest": 1025774
+        },
+        {
+          "block": 57,
+          "scores": 25479,
+          "cycle": 175256,
+          "fifo_max": 358,
+          "cache_oldest": 1024173,
+          "cache_newest": 1026220
+        },
+        {
+          "block": 58,
+          "scores": 25926,
+          "cycle": 178247,
+          "fifo_max": 358,
+          "cache_oldest": 1024621,
+          "cache_newest": 1026668
+        },
+        {
+          "block": 59,
+          "scores": 26373,
+          "cycle": 181220,
+          "fifo_max": 358,
+          "cache_oldest": 1025068,
+          "cache_newest": 1027115
+        },
+        {
+          "block": 60,
+          "scores": 26820,
+          "cycle": 184210,
+          "fifo_max": 358,
+          "cache_oldest": 1025515,
+          "cache_newest": 1027562
+        },
+        {
+          "block": 61,
+          "scores": 27267,
+          "cycle": 187177,
+          "fifo_max": 358,
+          "cache_oldest": 1025961,
+          "cache_newest": 1028008
+        },
+        {
+          "block": 62,
+          "scores": 27714,
+          "cycle": 190168,
+          "fifo_max": 358,
+          "cache_oldest": 1026409,
+          "cache_newest": 1028456
+        },
+        {
+          "block": 63,
+          "scores": 28161,
+          "cycle": 193141,
+          "fifo_max": 358,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        },
+        {
+          "block": 64,
+          "scores": 28608,
+          "cycle": 196125,
+          "fifo_max": 358,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        }
+      ]
+    },
+    {
+      "mode": "numeric",
+      "fast_mhz": 200,
+      "profile": "exact",
+      "artifact_directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/fft-island/hdl/library/starlink_pss_acquisition/build/bank-iq-numeric-200-v3",
+      "terminal_receipt": "BANK_IQ_TO_SCORE_ACTUAL_CORE_VERIFIED mode=numeric fast_mhz=200 NO_PHYSICAL_OR_RF_CLAIM",
+      "simulate_log_sha256": "afcc09fd5d9da93a52d029622e3c656a3eeca731287141ab0758d824634bcd0e",
+      "runner_log_sha256": "5d147d8b27081d8a0d2489d8fd82673821ae367a2659b85b7a97281aa79c6991",
+      "scope_sha256": "a905824bf3f1ab8519549997c03169016a798d5407e4f935897e93f16d900cb5",
+      "frozen_source_sha256": {
+        "bank_owned_iq_capacity_checks.svh": "880f63b7be0f4823dc6c3cc6481abffbcef6766db327c77b0d113d785f213ace",
+        "bank_owned_iq_fault_scenarios.svh": "130e6677185e390c175f7f1f0d31c2c96127b5841e784091c573d69bc38c0cd2",
+        "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+        "forward_exponents.mem": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f",
+        "forward_q17.mem": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd",
+        "inverse_exponents.mem": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff",
+        "inverse_q17.mem": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1",
+        "prepare_iq_to_score_bank_owned.tcl": "6aacb8be2285e48b633608866e986f88ad76a7049f972c09de9e125c3df16fa6",
+        "product_q17.mem": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7",
+        "samples_ci16.mem": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723",
+        "scores_u8.mem": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d",
+        "simulate_iq_to_score_bank_owned.tcl": "625d26bb1963a4a721411d8327a40178d091ef8dcd8684bfcb3ad54c48093b94",
+        "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+        "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+        "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+        "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+        "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+        "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+        "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+        "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+        "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+        "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+        "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+        "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+        "starlink_pss_realtime_result_guard.v": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+        "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+        "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+        "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+        "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+        "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+        "tb_starlink_pss_iq_to_score_xfft.sv": "902743301305a6a63c65308056a2e1a4c063f73e2fc85b84e6b5d94debdce43a",
+        "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+        "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+      },
+      "generated_bench_core_sha256": {
+        "tb_starlink_pss_iq_to_score_xfft.sv": "7596b4200bbf4c49d7301c6018d2daa634f0715526321fc3bade881e6f7bcca3",
+        "starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+      },
+      "numeric": {
+        "samples": 1406,
+        "blocks": 3,
+        "forward": 1536,
+        "product": 1536,
+        "inverse": 1536,
+        "scores": 1341,
+        "pss255": 3,
+        "max_fifo": 358,
+        "score_stalls": 1,
+        "global_fault_recovery": 1
+      },
+      "boundary_receipt": {
+        "qualifier_mutations": 5,
+        "descriptor": 1,
+        "core_fault": 1,
+        "fft_reset": 1,
+        "slow_reset": 1,
+        "source_gap": 1,
+        "source_index": 1,
+        "exact_epochs": 4,
+        "exact_scores": 5364,
+        "autonomous_gap_index_recovery": 1
+      },
+      "exact_replays": [
+        {
+          "epoch": 2,
+          "scores": 1341
+        },
+        {
+          "epoch": 3,
+          "scores": 1341
+        },
+        {
+          "epoch": 4,
+          "scores": 1341
+        }
+      ]
+    },
+    {
+      "mode": "capacity",
+      "fast_mhz": 200,
+      "profile": "nominal",
+      "artifact_directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/fft-island/hdl/library/starlink_pss_acquisition/build/bank-iq-capacity-200-nominal-v3",
+      "terminal_receipt": "BANK_IQ_TO_SCORE_ACTUAL_CORE_VERIFIED mode=capacity fast_mhz=200 NO_PHYSICAL_OR_RF_CLAIM",
+      "simulate_log_sha256": "09584174c10758e62926597a31bf3923b994ff0a870ea9bdfe9213e2c4421ffe",
+      "runner_log_sha256": "ec06c1ef6efed9d1a1b3b4039ad41a3148da46f7d38a6cfdf21a5a51b7a268ef",
+      "scope_sha256": "eaf8d7c14ec089642a8a3fd4a2e1ed0f19aa7ae61603040aa7f399556c1def8f",
+      "frozen_source_sha256": {
+        "bank_owned_iq_capacity_checks.svh": "880f63b7be0f4823dc6c3cc6481abffbcef6766db327c77b0d113d785f213ace",
+        "bank_owned_iq_fault_scenarios.svh": "130e6677185e390c175f7f1f0d31c2c96127b5841e784091c573d69bc38c0cd2",
+        "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+        "prepare_iq_to_score_bank_owned.tcl": "6aacb8be2285e48b633608866e986f88ad76a7049f972c09de9e125c3df16fa6",
+        "simulate_iq_to_score_bank_owned.tcl": "625d26bb1963a4a721411d8327a40178d091ef8dcd8684bfcb3ad54c48093b94",
+        "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+        "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+        "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+        "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+        "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+        "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+        "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+        "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+        "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+        "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+        "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+        "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+        "starlink_pss_realtime_result_guard.v": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+        "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+        "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+        "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+        "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+        "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "e49157f99f0a12972d735f53d3218bb576e9b00d7c1b54d7332d7c8c0acc054e",
+        "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+        "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+      },
+      "generated_bench_core_sha256": {
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "ed329d33f14ee5645bc7747121b775be47c4533f1864812bd727559220745088",
+        "starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+      },
+      "counts": {
+        "samples": 28673,
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "scores": 28608,
+        "fifo_max": 356
+      },
+      "backlog": {
+        "blocks": 64,
+        "overlap_queue_max": 1,
+        "ring_retention_age_max": 589,
+        "removed_transform_fifo": 0,
+        "energy_lookup_age_max": 806,
+        "score_age_max": 874,
+        "forward_stall_cycles_max": 0,
+        "source_burst_mode": 0,
+        "score_stall_mode": 0
+      },
+      "independent_metadata": {
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "admission_interval_fast_min": 5960,
+        "admission_interval_fast_max": 5960,
+        "capture_next_epoch_words": 0,
+        "three_epoch_overlap_words": 0
+      },
+      "score_block_progress": [
+        {
+          "block": 1,
+          "scores": 447,
+          "cycle": 8073,
+          "fifo_max": 356,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001143
+        },
+        {
+          "block": 2,
+          "scores": 894,
+          "cycle": 11053,
+          "fifo_max": 356,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001590
+        },
+        {
+          "block": 3,
+          "scores": 1341,
+          "cycle": 14033,
+          "fifo_max": 356,
+          "cache_oldest": 1000000,
+          "cache_newest": 1002037
+        },
+        {
+          "block": 4,
+          "scores": 1788,
+          "cycle": 17013,
+          "fifo_max": 356,
+          "cache_oldest": 1000437,
+          "cache_newest": 1002484
+        },
+        {
+          "block": 5,
+          "scores": 2235,
+          "cycle": 19993,
+          "fifo_max": 356,
+          "cache_oldest": 1000884,
+          "cache_newest": 1002931
+        },
+        {
+          "block": 6,
+          "scores": 2682,
+          "cycle": 22973,
+          "fifo_max": 356,
+          "cache_oldest": 1001331,
+          "cache_newest": 1003378
+        },
+        {
+          "block": 7,
+          "scores": 3129,
+          "cycle": 25953,
+          "fifo_max": 356,
+          "cache_oldest": 1001778,
+          "cache_newest": 1003825
+        },
+        {
+          "block": 8,
+          "scores": 3576,
+          "cycle": 28933,
+          "fifo_max": 356,
+          "cache_oldest": 1002225,
+          "cache_newest": 1004272
+        },
+        {
+          "block": 9,
+          "scores": 4023,
+          "cycle": 31913,
+          "fifo_max": 356,
+          "cache_oldest": 1002672,
+          "cache_newest": 1004719
+        },
+        {
+          "block": 10,
+          "scores": 4470,
+          "cycle": 34893,
+          "fifo_max": 356,
+          "cache_oldest": 1003119,
+          "cache_newest": 1005166
+        },
+        {
+          "block": 11,
+          "scores": 4917,
+          "cycle": 37873,
+          "fifo_max": 356,
+          "cache_oldest": 1003566,
+          "cache_newest": 1005613
+        },
+        {
+          "block": 12,
+          "scores": 5364,
+          "cycle": 40853,
+          "fifo_max": 356,
+          "cache_oldest": 1004013,
+          "cache_newest": 1006060
+        },
+        {
+          "block": 13,
+          "scores": 5811,
+          "cycle": 43833,
+          "fifo_max": 356,
+          "cache_oldest": 1004460,
+          "cache_newest": 1006507
+        },
+        {
+          "block": 14,
+          "scores": 6258,
+          "cycle": 46813,
+          "fifo_max": 356,
+          "cache_oldest": 1004907,
+          "cache_newest": 1006954
+        },
+        {
+          "block": 15,
+          "scores": 6705,
+          "cycle": 49793,
+          "fifo_max": 356,
+          "cache_oldest": 1005354,
+          "cache_newest": 1007401
+        },
+        {
+          "block": 16,
+          "scores": 7152,
+          "cycle": 52773,
+          "fifo_max": 356,
+          "cache_oldest": 1005801,
+          "cache_newest": 1007848
+        },
+        {
+          "block": 17,
+          "scores": 7599,
+          "cycle": 55753,
+          "fifo_max": 356,
+          "cache_oldest": 1006248,
+          "cache_newest": 1008295
+        },
+        {
+          "block": 18,
+          "scores": 8046,
+          "cycle": 58733,
+          "fifo_max": 356,
+          "cache_oldest": 1006695,
+          "cache_newest": 1008742
+        },
+        {
+          "block": 19,
+          "scores": 8493,
+          "cycle": 61713,
+          "fifo_max": 356,
+          "cache_oldest": 1007142,
+          "cache_newest": 1009189
+        },
+        {
+          "block": 20,
+          "scores": 8940,
+          "cycle": 64693,
+          "fifo_max": 356,
+          "cache_oldest": 1007589,
+          "cache_newest": 1009636
+        },
+        {
+          "block": 21,
+          "scores": 9387,
+          "cycle": 67673,
+          "fifo_max": 356,
+          "cache_oldest": 1008036,
+          "cache_newest": 1010083
+        },
+        {
+          "block": 22,
+          "scores": 9834,
+          "cycle": 70653,
+          "fifo_max": 356,
+          "cache_oldest": 1008483,
+          "cache_newest": 1010530
+        },
+        {
+          "block": 23,
+          "scores": 10281,
+          "cycle": 73633,
+          "fifo_max": 356,
+          "cache_oldest": 1008930,
+          "cache_newest": 1010977
+        },
+        {
+          "block": 24,
+          "scores": 10728,
+          "cycle": 76613,
+          "fifo_max": 356,
+          "cache_oldest": 1009377,
+          "cache_newest": 1011424
+        },
+        {
+          "block": 25,
+          "scores": 11175,
+          "cycle": 79593,
+          "fifo_max": 356,
+          "cache_oldest": 1009824,
+          "cache_newest": 1011871
+        },
+        {
+          "block": 26,
+          "scores": 11622,
+          "cycle": 82573,
+          "fifo_max": 356,
+          "cache_oldest": 1010271,
+          "cache_newest": 1012318
+        },
+        {
+          "block": 27,
+          "scores": 12069,
+          "cycle": 85553,
+          "fifo_max": 356,
+          "cache_oldest": 1010718,
+          "cache_newest": 1012765
+        },
+        {
+          "block": 28,
+          "scores": 12516,
+          "cycle": 88533,
+          "fifo_max": 356,
+          "cache_oldest": 1011165,
+          "cache_newest": 1013212
+        },
+        {
+          "block": 29,
+          "scores": 12963,
+          "cycle": 91513,
+          "fifo_max": 356,
+          "cache_oldest": 1011612,
+          "cache_newest": 1013659
+        },
+        {
+          "block": 30,
+          "scores": 13410,
+          "cycle": 94493,
+          "fifo_max": 356,
+          "cache_oldest": 1012059,
+          "cache_newest": 1014106
+        },
+        {
+          "block": 31,
+          "scores": 13857,
+          "cycle": 97473,
+          "fifo_max": 356,
+          "cache_oldest": 1012506,
+          "cache_newest": 1014553
+        },
+        {
+          "block": 32,
+          "scores": 14304,
+          "cycle": 100453,
+          "fifo_max": 356,
+          "cache_oldest": 1012953,
+          "cache_newest": 1015000
+        },
+        {
+          "block": 33,
+          "scores": 14751,
+          "cycle": 103433,
+          "fifo_max": 356,
+          "cache_oldest": 1013400,
+          "cache_newest": 1015447
+        },
+        {
+          "block": 34,
+          "scores": 15198,
+          "cycle": 106413,
+          "fifo_max": 356,
+          "cache_oldest": 1013847,
+          "cache_newest": 1015894
+        },
+        {
+          "block": 35,
+          "scores": 15645,
+          "cycle": 109393,
+          "fifo_max": 356,
+          "cache_oldest": 1014294,
+          "cache_newest": 1016341
+        },
+        {
+          "block": 36,
+          "scores": 16092,
+          "cycle": 112373,
+          "fifo_max": 356,
+          "cache_oldest": 1014741,
+          "cache_newest": 1016788
+        },
+        {
+          "block": 37,
+          "scores": 16539,
+          "cycle": 115353,
+          "fifo_max": 356,
+          "cache_oldest": 1015188,
+          "cache_newest": 1017235
+        },
+        {
+          "block": 38,
+          "scores": 16986,
+          "cycle": 118333,
+          "fifo_max": 356,
+          "cache_oldest": 1015635,
+          "cache_newest": 1017682
+        },
+        {
+          "block": 39,
+          "scores": 17433,
+          "cycle": 121313,
+          "fifo_max": 356,
+          "cache_oldest": 1016082,
+          "cache_newest": 1018129
+        },
+        {
+          "block": 40,
+          "scores": 17880,
+          "cycle": 124293,
+          "fifo_max": 356,
+          "cache_oldest": 1016529,
+          "cache_newest": 1018576
+        },
+        {
+          "block": 41,
+          "scores": 18327,
+          "cycle": 127273,
+          "fifo_max": 356,
+          "cache_oldest": 1016976,
+          "cache_newest": 1019023
+        },
+        {
+          "block": 42,
+          "scores": 18774,
+          "cycle": 130253,
+          "fifo_max": 356,
+          "cache_oldest": 1017423,
+          "cache_newest": 1019470
+        },
+        {
+          "block": 43,
+          "scores": 19221,
+          "cycle": 133233,
+          "fifo_max": 356,
+          "cache_oldest": 1017870,
+          "cache_newest": 1019917
+        },
+        {
+          "block": 44,
+          "scores": 19668,
+          "cycle": 136213,
+          "fifo_max": 356,
+          "cache_oldest": 1018317,
+          "cache_newest": 1020364
+        },
+        {
+          "block": 45,
+          "scores": 20115,
+          "cycle": 139193,
+          "fifo_max": 356,
+          "cache_oldest": 1018764,
+          "cache_newest": 1020811
+        },
+        {
+          "block": 46,
+          "scores": 20562,
+          "cycle": 142173,
+          "fifo_max": 356,
+          "cache_oldest": 1019211,
+          "cache_newest": 1021258
+        },
+        {
+          "block": 47,
+          "scores": 21009,
+          "cycle": 145153,
+          "fifo_max": 356,
+          "cache_oldest": 1019658,
+          "cache_newest": 1021705
+        },
+        {
+          "block": 48,
+          "scores": 21456,
+          "cycle": 148133,
+          "fifo_max": 356,
+          "cache_oldest": 1020105,
+          "cache_newest": 1022152
+        },
+        {
+          "block": 49,
+          "scores": 21903,
+          "cycle": 151113,
+          "fifo_max": 356,
+          "cache_oldest": 1020552,
+          "cache_newest": 1022599
+        },
+        {
+          "block": 50,
+          "scores": 22350,
+          "cycle": 154093,
+          "fifo_max": 356,
+          "cache_oldest": 1020999,
+          "cache_newest": 1023046
+        },
+        {
+          "block": 51,
+          "scores": 22797,
+          "cycle": 157073,
+          "fifo_max": 356,
+          "cache_oldest": 1021446,
+          "cache_newest": 1023493
+        },
+        {
+          "block": 52,
+          "scores": 23244,
+          "cycle": 160053,
+          "fifo_max": 356,
+          "cache_oldest": 1021893,
+          "cache_newest": 1023940
+        },
+        {
+          "block": 53,
+          "scores": 23691,
+          "cycle": 163033,
+          "fifo_max": 356,
+          "cache_oldest": 1022340,
+          "cache_newest": 1024387
+        },
+        {
+          "block": 54,
+          "scores": 24138,
+          "cycle": 166013,
+          "fifo_max": 356,
+          "cache_oldest": 1022787,
+          "cache_newest": 1024834
+        },
+        {
+          "block": 55,
+          "scores": 24585,
+          "cycle": 168993,
+          "fifo_max": 356,
+          "cache_oldest": 1023234,
+          "cache_newest": 1025281
+        },
+        {
+          "block": 56,
+          "scores": 25032,
+          "cycle": 171973,
+          "fifo_max": 356,
+          "cache_oldest": 1023681,
+          "cache_newest": 1025728
+        },
+        {
+          "block": 57,
+          "scores": 25479,
+          "cycle": 174953,
+          "fifo_max": 356,
+          "cache_oldest": 1024128,
+          "cache_newest": 1026175
+        },
+        {
+          "block": 58,
+          "scores": 25926,
+          "cycle": 177933,
+          "fifo_max": 356,
+          "cache_oldest": 1024575,
+          "cache_newest": 1026622
+        },
+        {
+          "block": 59,
+          "scores": 26373,
+          "cycle": 180913,
+          "fifo_max": 356,
+          "cache_oldest": 1025022,
+          "cache_newest": 1027069
+        },
+        {
+          "block": 60,
+          "scores": 26820,
+          "cycle": 183893,
+          "fifo_max": 356,
+          "cache_oldest": 1025469,
+          "cache_newest": 1027516
+        },
+        {
+          "block": 61,
+          "scores": 27267,
+          "cycle": 186873,
+          "fifo_max": 356,
+          "cache_oldest": 1025916,
+          "cache_newest": 1027963
+        },
+        {
+          "block": 62,
+          "scores": 27714,
+          "cycle": 189853,
+          "fifo_max": 356,
+          "cache_oldest": 1026363,
+          "cache_newest": 1028410
+        },
+        {
+          "block": 63,
+          "scores": 28161,
+          "cycle": 192833,
+          "fifo_max": 356,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        },
+        {
+          "block": 64,
+          "scores": 28608,
+          "cycle": 195813,
+          "fifo_max": 356,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        }
+      ]
+    },
+    {
+      "mode": "capacity",
+      "fast_mhz": 200,
+      "profile": "bursty-stalled",
+      "artifact_directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/fft-island/hdl/library/starlink_pss_acquisition/build/bank-iq-capacity-200-bursty-stalled-v3",
+      "terminal_receipt": "BANK_IQ_TO_SCORE_ACTUAL_CORE_VERIFIED mode=capacity fast_mhz=200 NO_PHYSICAL_OR_RF_CLAIM",
+      "simulate_log_sha256": "d22090851f7c0802c0dd5b5bd5f32bdaf657e75763e6389304aea08a4c4dfdac",
+      "runner_log_sha256": "4c5a93fd8fe768779a21141c586908df27c871ffe7b9a36708451c75522efcd1",
+      "scope_sha256": "30d7577d25f31fdde65e884003022d696815339e8dc02893c7bd20f0002ea934",
+      "frozen_source_sha256": {
+        "bank_owned_iq_capacity_checks.svh": "880f63b7be0f4823dc6c3cc6481abffbcef6766db327c77b0d113d785f213ace",
+        "bank_owned_iq_fault_scenarios.svh": "130e6677185e390c175f7f1f0d31c2c96127b5841e784091c573d69bc38c0cd2",
+        "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+        "prepare_iq_to_score_bank_owned.tcl": "6aacb8be2285e48b633608866e986f88ad76a7049f972c09de9e125c3df16fa6",
+        "simulate_iq_to_score_bank_owned.tcl": "625d26bb1963a4a721411d8327a40178d091ef8dcd8684bfcb3ad54c48093b94",
+        "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+        "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+        "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+        "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+        "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+        "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+        "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+        "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+        "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+        "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+        "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+        "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+        "starlink_pss_realtime_result_guard.v": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+        "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+        "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+        "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+        "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+        "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "e49157f99f0a12972d735f53d3218bb576e9b00d7c1b54d7332d7c8c0acc054e",
+        "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+        "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+      },
+      "generated_bench_core_sha256": {
+        "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "ed329d33f14ee5645bc7747121b775be47c4533f1864812bd727559220745088",
+        "starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+      },
+      "counts": {
+        "samples": 28673,
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "scores": 28608,
+        "fifo_max": 358
+      },
+      "backlog": {
+        "blocks": 64,
+        "overlap_queue_max": 1,
+        "ring_retention_age_max": 589,
+        "removed_transform_fifo": 0,
+        "energy_lookup_age_max": 808,
+        "score_age_max": 875,
+        "forward_stall_cycles_max": 0,
+        "source_burst_mode": 1,
+        "score_stall_mode": 1
+      },
+      "independent_metadata": {
+        "blocks": 64,
+        "forward": 32768,
+        "product": 32768,
+        "inverse": 32768,
+        "admission_interval_fast_min": 5940,
+        "admission_interval_fast_max": 5980,
+        "capture_next_epoch_words": 0,
+        "three_epoch_overlap_words": 0
+      },
+      "score_block_progress": [
+        {
+          "block": 1,
+          "scores": 447,
+          "cycle": 8115,
+          "fifo_max": 357,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001149
+        },
+        {
+          "block": 2,
+          "scores": 894,
+          "cycle": 11106,
+          "fifo_max": 357,
+          "cache_oldest": 1000000,
+          "cache_newest": 1001598
+        },
+        {
+          "block": 3,
+          "scores": 1341,
+          "cycle": 14079,
+          "fifo_max": 357,
+          "cache_oldest": 1000000,
+          "cache_newest": 1002044
+        },
+        {
+          "block": 4,
+          "scores": 1788,
+          "cycle": 17069,
+          "fifo_max": 357,
+          "cache_oldest": 1000445,
+          "cache_newest": 1002492
+        },
+        {
+          "block": 5,
+          "scores": 2235,
+          "cycle": 20036,
+          "fifo_max": 357,
+          "cache_oldest": 1000890,
+          "cache_newest": 1002937
+        },
+        {
+          "block": 6,
+          "scores": 2682,
+          "cycle": 23027,
+          "fifo_max": 357,
+          "cache_oldest": 1001339,
+          "cache_newest": 1003386
+        },
+        {
+          "block": 7,
+          "scores": 3129,
+          "cycle": 26000,
+          "fifo_max": 357,
+          "cache_oldest": 1001785,
+          "cache_newest": 1003832
+        },
+        {
+          "block": 8,
+          "scores": 3576,
+          "cycle": 28990,
+          "fifo_max": 357,
+          "cache_oldest": 1002233,
+          "cache_newest": 1004280
+        },
+        {
+          "block": 9,
+          "scores": 4023,
+          "cycle": 31961,
+          "fifo_max": 358,
+          "cache_oldest": 1002679,
+          "cache_newest": 1004726
+        },
+        {
+          "block": 10,
+          "scores": 4470,
+          "cycle": 34948,
+          "fifo_max": 358,
+          "cache_oldest": 1003127,
+          "cache_newest": 1005174
+        },
+        {
+          "block": 11,
+          "scores": 4917,
+          "cycle": 37918,
+          "fifo_max": 358,
+          "cache_oldest": 1003573,
+          "cache_newest": 1005620
+        },
+        {
+          "block": 12,
+          "scores": 5364,
+          "cycle": 40905,
+          "fifo_max": 358,
+          "cache_oldest": 1004021,
+          "cache_newest": 1006068
+        },
+        {
+          "block": 13,
+          "scores": 5811,
+          "cycle": 43878,
+          "fifo_max": 358,
+          "cache_oldest": 1004467,
+          "cache_newest": 1006514
+        },
+        {
+          "block": 14,
+          "scores": 6258,
+          "cycle": 46869,
+          "fifo_max": 358,
+          "cache_oldest": 1004915,
+          "cache_newest": 1006962
+        },
+        {
+          "block": 15,
+          "scores": 6705,
+          "cycle": 49835,
+          "fifo_max": 358,
+          "cache_oldest": 1005360,
+          "cache_newest": 1007407
+        },
+        {
+          "block": 16,
+          "scores": 7152,
+          "cycle": 52826,
+          "fifo_max": 358,
+          "cache_oldest": 1005809,
+          "cache_newest": 1007856
+        },
+        {
+          "block": 17,
+          "scores": 7599,
+          "cycle": 55799,
+          "fifo_max": 358,
+          "cache_oldest": 1006255,
+          "cache_newest": 1008302
+        },
+        {
+          "block": 18,
+          "scores": 8046,
+          "cycle": 58789,
+          "fifo_max": 358,
+          "cache_oldest": 1006703,
+          "cache_newest": 1008750
+        },
+        {
+          "block": 19,
+          "scores": 8493,
+          "cycle": 61756,
+          "fifo_max": 358,
+          "cache_oldest": 1007148,
+          "cache_newest": 1009195
+        },
+        {
+          "block": 20,
+          "scores": 8940,
+          "cycle": 64747,
+          "fifo_max": 358,
+          "cache_oldest": 1007597,
+          "cache_newest": 1009644
+        },
+        {
+          "block": 21,
+          "scores": 9387,
+          "cycle": 67720,
+          "fifo_max": 358,
+          "cache_oldest": 1008043,
+          "cache_newest": 1010090
+        },
+        {
+          "block": 22,
+          "scores": 9834,
+          "cycle": 70710,
+          "fifo_max": 358,
+          "cache_oldest": 1008491,
+          "cache_newest": 1010538
+        },
+        {
+          "block": 23,
+          "scores": 10281,
+          "cycle": 73677,
+          "fifo_max": 358,
+          "cache_oldest": 1008936,
+          "cache_newest": 1010983
+        },
+        {
+          "block": 24,
+          "scores": 10728,
+          "cycle": 76668,
+          "fifo_max": 358,
+          "cache_oldest": 1009385,
+          "cache_newest": 1011432
+        },
+        {
+          "block": 25,
+          "scores": 11175,
+          "cycle": 79641,
+          "fifo_max": 358,
+          "cache_oldest": 1009831,
+          "cache_newest": 1011878
+        },
+        {
+          "block": 26,
+          "scores": 11622,
+          "cycle": 82625,
+          "fifo_max": 358,
+          "cache_oldest": 1010279,
+          "cache_newest": 1012326
+        },
+        {
+          "block": 27,
+          "scores": 12069,
+          "cycle": 85598,
+          "fifo_max": 358,
+          "cache_oldest": 1010725,
+          "cache_newest": 1012772
+        },
+        {
+          "block": 28,
+          "scores": 12516,
+          "cycle": 88589,
+          "fifo_max": 358,
+          "cache_oldest": 1011173,
+          "cache_newest": 1013220
+        },
+        {
+          "block": 29,
+          "scores": 12963,
+          "cycle": 91555,
+          "fifo_max": 358,
+          "cache_oldest": 1011618,
+          "cache_newest": 1013665
+        },
+        {
+          "block": 30,
+          "scores": 13410,
+          "cycle": 94546,
+          "fifo_max": 358,
+          "cache_oldest": 1012067,
+          "cache_newest": 1014114
+        },
+        {
+          "block": 31,
+          "scores": 13857,
+          "cycle": 97519,
+          "fifo_max": 358,
+          "cache_oldest": 1012513,
+          "cache_newest": 1014560
+        },
+        {
+          "block": 32,
+          "scores": 14304,
+          "cycle": 100510,
+          "fifo_max": 358,
+          "cache_oldest": 1012961,
+          "cache_newest": 1015008
+        },
+        {
+          "block": 33,
+          "scores": 14751,
+          "cycle": 103476,
+          "fifo_max": 358,
+          "cache_oldest": 1013406,
+          "cache_newest": 1015453
+        },
+        {
+          "block": 34,
+          "scores": 15198,
+          "cycle": 106467,
+          "fifo_max": 358,
+          "cache_oldest": 1013855,
+          "cache_newest": 1015902
+        },
+        {
+          "block": 35,
+          "scores": 15645,
+          "cycle": 109440,
+          "fifo_max": 358,
+          "cache_oldest": 1014301,
+          "cache_newest": 1016348
+        },
+        {
+          "block": 36,
+          "scores": 16092,
+          "cycle": 112430,
+          "fifo_max": 358,
+          "cache_oldest": 1014749,
+          "cache_newest": 1016796
+        },
+        {
+          "block": 37,
+          "scores": 16539,
+          "cycle": 115397,
+          "fifo_max": 358,
+          "cache_oldest": 1015194,
+          "cache_newest": 1017241
+        },
+        {
+          "block": 38,
+          "scores": 16986,
+          "cycle": 118388,
+          "fifo_max": 358,
+          "cache_oldest": 1015643,
+          "cache_newest": 1017690
+        },
+        {
+          "block": 39,
+          "scores": 17433,
+          "cycle": 121361,
+          "fifo_max": 358,
+          "cache_oldest": 1016089,
+          "cache_newest": 1018136
+        },
+        {
+          "block": 40,
+          "scores": 17880,
+          "cycle": 124345,
+          "fifo_max": 358,
+          "cache_oldest": 1016537,
+          "cache_newest": 1018584
+        },
+        {
+          "block": 41,
+          "scores": 18327,
+          "cycle": 127318,
+          "fifo_max": 358,
+          "cache_oldest": 1016983,
+          "cache_newest": 1019030
+        },
+        {
+          "block": 42,
+          "scores": 18774,
+          "cycle": 130309,
+          "fifo_max": 358,
+          "cache_oldest": 1017431,
+          "cache_newest": 1019478
+        },
+        {
+          "block": 43,
+          "scores": 19221,
+          "cycle": 133275,
+          "fifo_max": 358,
+          "cache_oldest": 1017876,
+          "cache_newest": 1019923
+        },
+        {
+          "block": 44,
+          "scores": 19668,
+          "cycle": 136266,
+          "fifo_max": 358,
+          "cache_oldest": 1018325,
+          "cache_newest": 1020372
+        },
+        {
+          "block": 45,
+          "scores": 20115,
+          "cycle": 139239,
+          "fifo_max": 358,
+          "cache_oldest": 1018771,
+          "cache_newest": 1020818
+        },
+        {
+          "block": 46,
+          "scores": 20562,
+          "cycle": 142230,
+          "fifo_max": 358,
+          "cache_oldest": 1019219,
+          "cache_newest": 1021266
+        },
+        {
+          "block": 47,
+          "scores": 21009,
+          "cycle": 145196,
+          "fifo_max": 358,
+          "cache_oldest": 1019664,
+          "cache_newest": 1021711
+        },
+        {
+          "block": 48,
+          "scores": 21456,
+          "cycle": 148187,
+          "fifo_max": 358,
+          "cache_oldest": 1020113,
+          "cache_newest": 1022160
+        },
+        {
+          "block": 49,
+          "scores": 21903,
+          "cycle": 151160,
+          "fifo_max": 358,
+          "cache_oldest": 1020559,
+          "cache_newest": 1022606
+        },
+        {
+          "block": 50,
+          "scores": 22350,
+          "cycle": 154151,
+          "fifo_max": 358,
+          "cache_oldest": 1021008,
+          "cache_newest": 1023055
+        },
+        {
+          "block": 51,
+          "scores": 22797,
+          "cycle": 157117,
+          "fifo_max": 358,
+          "cache_oldest": 1021452,
+          "cache_newest": 1023499
+        },
+        {
+          "block": 52,
+          "scores": 23244,
+          "cycle": 160108,
+          "fifo_max": 358,
+          "cache_oldest": 1021901,
+          "cache_newest": 1023948
+        },
+        {
+          "block": 53,
+          "scores": 23691,
+          "cycle": 163081,
+          "fifo_max": 358,
+          "cache_oldest": 1022347,
+          "cache_newest": 1024394
+        },
+        {
+          "block": 54,
+          "scores": 24138,
+          "cycle": 166068,
+          "fifo_max": 358,
+          "cache_oldest": 1022795,
+          "cache_newest": 1024842
+        },
+        {
+          "block": 55,
+          "scores": 24585,
+          "cycle": 169038,
+          "fifo_max": 358,
+          "cache_oldest": 1023241,
+          "cache_newest": 1025288
+        },
+        {
+          "block": 56,
+          "scores": 25032,
+          "cycle": 172029,
+          "fifo_max": 358,
+          "cache_oldest": 1023689,
+          "cache_newest": 1025736
+        },
+        {
+          "block": 57,
+          "scores": 25479,
+          "cycle": 174995,
+          "fifo_max": 358,
+          "cache_oldest": 1024134,
+          "cache_newest": 1026181
+        },
+        {
+          "block": 58,
+          "scores": 25926,
+          "cycle": 177986,
+          "fifo_max": 358,
+          "cache_oldest": 1024583,
+          "cache_newest": 1026630
+        },
+        {
+          "block": 59,
+          "scores": 26373,
+          "cycle": 180959,
+          "fifo_max": 358,
+          "cache_oldest": 1025029,
+          "cache_newest": 1027076
+        },
+        {
+          "block": 60,
+          "scores": 26820,
+          "cycle": 183950,
+          "fifo_max": 358,
+          "cache_oldest": 1025477,
+          "cache_newest": 1027524
+        },
+        {
+          "block": 61,
+          "scores": 27267,
+          "cycle": 186916,
+          "fifo_max": 358,
+          "cache_oldest": 1025922,
+          "cache_newest": 1027969
+        },
+        {
+          "block": 62,
+          "scores": 27714,
+          "cycle": 189907,
+          "fifo_max": 358,
+          "cache_oldest": 1026371,
+          "cache_newest": 1028418
+        },
+        {
+          "block": 63,
+          "scores": 28161,
+          "cycle": 192880,
+          "fifo_max": 358,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        },
+        {
+          "block": 64,
+          "scores": 28608,
+          "cycle": 195871,
+          "fifo_max": 358,
+          "cache_oldest": 1026560,
+          "cache_newest": 1028607
+        }
+      ]
+    }
+  ],
+  "not_qualified": [
+    "physical timing",
+    "CDC signoff",
+    "full receiver resources/route",
+    "source15/30/60 adapters",
+    "original-native fine search",
+    "2.5 MS/s pilot IIO",
+    "RF accuracy",
+    "eight-target 120ms dwells",
+    "300-second scan"
+  ],
+  "known_physical_counterevidence": "Parent's unchanged-constraint standalone route of frozen slice at175 reported WNS -2.557 ns; not this composition and not a timing pass.",
+  "discarded_runs": {
+    "numeric200v1": "bench passes but repeated malformed beat could mask specific predicate failures; obsolete coverage",
+    "capacity175nominalv1": "bench counts/backlog pass; automation rejects empty marker contract",
+    "numeric175and200v2": "early check observed extra registered diagnostic; FAIL lines plus invalid automation contract; not a pass"
+  }
+}
