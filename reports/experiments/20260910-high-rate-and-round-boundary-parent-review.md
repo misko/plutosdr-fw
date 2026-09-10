@@ -91,6 +91,14 @@ sample work, retain unconditional zero capture/result/fault checks, require
 idle after configuration, and move the negative bench's source declaration
 before first use. Offline review is required before fresh actual runs.
 
+That correction is now reviewed at FWb07e0419 / HDL1ece302e: parent read the
+complete source/test delta and report, independently replayed303 tests in9.91s
+and checked all120 archive hashes (SHA256
+`6ff880d76a446e7be15a8af94f40a8cc307fac7e76e28cfb58c9837468023615`).
+One fresh175 and one200 actual run are authorized with unchanged numerical
+and negative-event contracts, new output directories and retained original
+handles. No corrected actual result is claimed by this review.
+
 No radios were allocated or contacted. Full15/30/60 fine search, independent
 2.5MS/s IIO pilot, causal120ms visits/eight targets/300s scanner, blind host
 comparison, receiver timing/CDC/reset/IO/calibration and `.18` then Ethernet
