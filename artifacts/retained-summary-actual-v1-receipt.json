@@ -1,0 +1,12 @@
+{
+  "actual_raw_bytes": 38057000,
+  "actual_raw_files": 265,
+  "all_before_after_equal": true,
+  "all_raw_regular_files": 2558,
+  "archive": {
+    "bytes": 13516484,
+    "sha256": "9bc35a4ca8d2b2100e4c0aad4a29f302f892416926fae4df7fffc15408abfe0b"
+  },
+  "file_receipts": 493,
+  "members": 494
+}
