@@ -72,9 +72,22 @@ improvement, not timing closure or primary runtime promotion. Exact original
 reports are `/tmp/starlink-completed-input.5EaJuD/balanced-route-v1/`; input
 synthesis DCP SHA256
 `fbeb7245dec062e80ebf9c25cc10fdbf1c1a7fcd22b1fe3640168e552bff01c2`.
-Root read the actual route receipts and full worst path. Physical packaging is
-underway; a held preflight tuple/balanced preflight comparison is only proposed,
-not an authorized new physical run or a weakened current-edge fault check.
+Root read the actual route receipts and full worst path, then independently
+verified the complete physical archive checksums. The negative result is pinned
+and backed up on the completed-input-fence remote at FW `5e6424a4b` / HDL
+`6fb16e4b`, with design `447183b8` unchanged. See that branch's
+`docs/starlink-balanced-identity-physical-20260910.md`.
+
+The next bounded implementation/test step is approved, not another physical
+run: use a phase-direct held preflight tuple while VERIFY/ARM is active and
+balance both full70-bit preflight comparisons. Keep all header/phase/lease and
+current-edge fault/certificate vetoes. The independent witness must compute the
+old preflight predicates itself and feed the result shadow, not share the new
+predicate. All-bit fast predicate tests and existing actual-core boundary/fault/
+numeric tests have distinct scopes. Only unused idle preparation values may
+differ; forward-phase expected-product-cache mismatches remain ignored exactly
+as before. No further synthesis/route or primary runtime promotion is authorized
+until those source-specific tests are reviewed.
 
 A separate active-clock verification worktree now exists at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch
