@@ -199,9 +199,21 @@ static int consume(struct glrt_native_controller *c)
     if (c->ports.retain(c->ports.context,"estimate",fitted,(size_t)n)) return GLRT_NATIVE_RETENTION_ERROR;
     if (!c->stopping) bootstrap_observe(c,owner->first_frame+words[27],
         ((uint64_t)words[4]<<32)|words[3],&e);
-    if (!c->stopping && glrt_native_trend_observe(&c->trend,epoch,
-            owner->first_frame+words[27],((uint64_t)words[4]<<32)|words[3],&e) < 0)
-        stop(c,GLRT_NATIVE_SOURCE_LOST);
+    if (!c->stopping) {
+        uint32_t frame = owner->first_frame+words[27];
+        int exhausted = c->trend.initialized && frame > c->trend.last_supported &&
+            frame-c->trend.last_supported == 32 && c->next_frame == frame+1 &&
+            c->next_frame < c->frames &&
+            (!c->bootstrap_active || c->next_frame >= c->bootstrap.repeats);
+        int observed = glrt_native_trend_observe(&c->trend,epoch,frame,
+            ((uint64_t)words[4]<<32)|words[3],&e);
+        if (observed < 0) stop(c,GLRT_NATIVE_SOURCE_LOST);
+        /* At the last permitted repeat, its full-pilot result arrives too
+         * late to authorize the next consecutive job with 6000 samples lead.
+         * Retain this measurement, then require a fresh acquisition. Check
+         * wall/source faults and the drained inventory on the next tick first. */
+        if (observed > 0 && exhausted) c->acquisition_horizon_exhausted = 1;
+    }
     snprintf(ack,sizeof(ack),"%08" PRIx32 " %08" PRIx32 "\n",epoch,c->sequence);
     if (command(c,"native_schedule_pop",ack)) return GLRT_NATIVE_IO_ERROR;
     c->sequence++;
@@ -251,6 +263,8 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
     }
     if (!c->stopping && (w[7] != c->configured || w[15] != c->sequence))
         return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
+    if (!c->stopping && c->acquisition_horizon_exhausted && glrt_native_snapshot_drained(w))
+        stop(c,GLRT_NATIVE_ACQUISITION_LOST);
     if (c->stopping && !c->cancelled) {
         if (c->ports.retain(c->ports.context,"stopping",raw,(size_t)n))
             return finish_error(c,GLRT_NATIVE_RETENTION_ERROR);
