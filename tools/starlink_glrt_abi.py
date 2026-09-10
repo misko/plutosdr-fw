@@ -43,9 +43,13 @@ class Snapshot:
 
     @classmethod
     def decode(cls, text: str) -> Snapshot:
+        return cls._decode(text, magic="GLR1")
+
+    @classmethod
+    def _decode(cls, text: str, *, magic: str) -> Snapshot:
         fields = text.split()
         require(len(fields) == 78, "GLR1 snapshot requires 14 header fields and 64 words")
-        require(fields[:2] == ["GLR1", "00010000"], "unsupported GLR1 ABI")
+        require(fields[:2] == [magic, "00010000"], f"unsupported {magic} ABI")
         rate, output, generation, recovery, readback = (integer(v, 32) for v in fields[2:7])
         require(rate in RATES and output == OUTPUT_RATE, "unsupported source/output rate")
         require(generation != 0 and recovery in (0, 1), "invalid snapshot generation/recovery flag")
@@ -156,8 +160,12 @@ class Closure:
 
     @classmethod
     def decode(cls, text: str) -> Closure:
+        return cls._decode(text, magic="GLX1")
+
+    @classmethod
+    def _decode(cls, text: str, *, magic: str) -> Closure:
         fields = text.split()
-        require(len(fields) == 21 and fields[:2] == ["GLX1", "00010000"], "unsupported GLX1 closure snapshot")
+        require(len(fields) == 21 and fields[:2] == [magic, "00010000"], f"unsupported {magic} closure snapshot")
         generation, visit, rate = (integer(value, 32) for value in fields[2:5])
         require(generation != 0 and rate in RATES, "invalid closure generation/rate")
         require(all(re.fullmatch(r"[0-9a-fA-F]{8}", word) for word in fields[5:]), "invalid closure fabric word")
