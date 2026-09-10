@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Parent-reviewed increment (2026-09-10): the independent producer-local final
+publication alternative passes 26 repeated offline tests, including a newly
+required real-checker sticky-fault witness and its missing-veto mutation. It
+adds no state/cycles at source level and leaves original global checks intact,
+but has no actual-controller or physical timing result yet. Next is additive
+actual-core preparation and observer testing, not deployment. See
+[scope and exact evidence](reports/experiments/20260910-product-final-fence-review.md).
+
 Latest update (2026-09-10, after 13:47 UTC): build-output storage recovered
 without discarding evidence. The corrected late-request testbench independently
 passes694 offline tests and its fresh vendor run2011 now passes the unchanged
