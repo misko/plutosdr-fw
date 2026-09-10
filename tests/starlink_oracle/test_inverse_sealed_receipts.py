@@ -191,6 +191,30 @@ def test_negative_case_required_observation_not_just_zero_completed(logs, case, 
         MODEL.verify_guard_events(text, case)
 
 
+def test_post_s1_timestamp_regression_and_missing_update_mutant(logs, tmp_path):
+    lines = logs[4, 0, 0].splitlines()
+    anchor = next(i for i, line in enumerate(lines) if line.startswith("S1 "))
+    cycle = int(lines[anchor].split()[1])
+    after = next(i for i in range(anchor + 1, len(lines)) if lines[i].startswith("OUT "))
+    fields = lines[after].split()
+    fields[1] = str(cycle - 1)
+    lines[after] = " ".join(fields)
+    regressed = "\n".join(lines) + "\n"
+    (tmp_path / "timestamp_regression.log").write_text(regressed)
+    with pytest.raises(ValueError, match="slow event cycle order"):
+        MODEL.verify_guard_events(regressed, 4)
+    # Prove the original receipt gap, not merely rejection for another cause.
+    source = (HERE / "inverse_sealed_events.py").read_text()
+    assert source.count("                slow = cycle\n") == 1
+    source = source.replace("                slow = cycle\n", "", 1)
+    path = tmp_path / "missing_s1_monotonicity.py"
+    path.write_text(source)
+    spec = importlib.util.spec_from_file_location("s1_mutant", path)
+    mutant = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mutant)
+    assert mutant.verify_guard_events(regressed, 4)["candidate_outputs"] == 19
+
+
 def compile_graph(path, scope_name, mutant):
     path.mkdir()
     sources = (

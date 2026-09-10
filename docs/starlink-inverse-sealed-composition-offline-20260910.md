@@ -120,6 +120,14 @@ Command is the same as above with both
 `tests/starlink_oracle/test_inverse_sealed.py` and
 `tests/starlink_oracle/test_inverse_sealed_receipts.py`.
 
+Final model-only follow-up fixes a reviewed timestamp-order gap: S1 now advances
+the slow-clock ordering cursor. A post-S1 OUT moved to S1−1 is rejected; the
+missing-update mutant accepts that same log, proving the specific old gap.
+Original65839 EXIT0, **99 receipt testsPASS3.21s** at
+`/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/inverse-receipts-final-v1.VDAR2NuD`.
+Together with unchanged136 RTL tests this is235 tests, not a claim of one
+235-test execution. The234 original remains separately preserved. No HDL change.
+
 The only HDL change after136 is additive CASE12 in the new nonzero bench:
 after512 real slow reads and actual ACK, a current fault on the tagged-release
 opportunity must inhibit release/reuse. Its missing-current-veto mutant fails
@@ -168,6 +176,7 @@ overwritten. Per-case command/source manifests and logs are retained.
 | `inverse-receipts-tests-v2.zvsCumww` |86PASS2.62s, complete graph/event mutations. |
 | `inverse-receipts-tests-v3.MSPPC9Af` |93PASS4 failures: Icarus CLI X/Z defparam prints error but exits0 using the default. Test rejected the false premise; new runner rejects compile errors even at exit0 and guard tests use actual literal X/Z declarations. |
 | `inverse-sealed-final-v1.DFztazfI` |234PASS16.11s, RuffPASS; all original and new checks together. |
+| `inverse-receipts-final-v1.VDAR2NuD` |99PASS3.21s, S1 monotonic ordering fix plus explicit old-gap mutant; no runtime edit. |
 
 The first compile failure's precheck/compile details include original tool output;
 no absent raw stderr file is fabricated. Minor Ruff/apply-patch preparation

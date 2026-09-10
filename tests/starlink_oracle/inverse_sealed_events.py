@@ -266,6 +266,7 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
                     "slow fault sample anchor",
                 )
                 active["s1"] = cycle
+                slow = cycle
             elif kind == "ACK":
                 require(
                     len(active["pub"]) == 1
