@@ -42,6 +42,10 @@ def specimen(output, bundle):
             "request": 0x60000520, "generation": 0x60000001}, {"request", "generation"}),
         line("NATIVE60_SOURCE_OFF", {"cycle": 37372, "source": 16423, "first": 34359735211,
             "stop": 34359751634, "capture": 520, "busy": 1}),
+        line("NATIVE60_SNAPSHOT", {"count": 1, "capture_cycle": 15602, "return_cycle": 15613,
+            "captured_index": 34359738559, "live_at_capture": 34359738560, "public_index": 34359738559,
+            "retained_index": 34359738559, "live_at_return": 34359738567, "capture_lag": 1, "return_lag": 8,
+            "maximum_capture_lag": 2, "maximum_return_lag": 31, "maximum_return_cycles": 48}),
     ]
     packet = (bundle / "native_expected_packet.mem").read_text().splitlines()
     records += [f"NATIVE60_PACKET_WORD pass={p} word={n} data={v}" for p in range(2) for n, v in enumerate(packet)]
@@ -121,7 +125,7 @@ def test_recipe_rejects_numeric_type_aliases(key):
 
 def test_exact_old76_plus_new_source_closure_and_imports(bundle):
     r = nb.verify(bundle)
-    assert len(r["source_sha256"]) == 87
+    assert len(r["source_sha256"]) == 91
     assert len(nb.check_cohort(bundle)["files"]) == 69
     assert set(nb.NATIVE_SOURCES) <= r["source_sha256"].keys()
     assert {"tests/starlink_oracle/__init__.py", "tests/starlink_oracle/xfft_bitacc.py",
@@ -236,7 +240,7 @@ def test_bundle_budget_type_alias_rejected(bundle, tmp_path, key, value):
 
 
 RECEIPTS = ["NATIVE60_CONFIG", "NATIVE60_ADMISSION", "NATIVE60_SOURCE_OFF", "NATIVE60_RELEASE",
-            "NATIVE60_DRAIN", "NATIVE60_BUDGET", "NATIVE60_CLOCK", "NATIVE60_PASS"]
+            "NATIVE60_DRAIN", "NATIVE60_BUDGET", "NATIVE60_CLOCK", "NATIVE60_PASS", "NATIVE60_SNAPSHOT"]
 
 
 @pytest.mark.parametrize("marker", RECEIPTS)

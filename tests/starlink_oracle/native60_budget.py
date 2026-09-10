@@ -19,6 +19,8 @@ import sys
 from pathlib import Path
 
 from .native60_budget_recipe import recipe
+from .native60_readback_contract import contract as readback_contract
+from .native60_readback_contract import limits as readback_limits
 
 ROOT = Path(__file__).resolve().parents[2]
 COHORT = ROOT / "build/high-rate60-offline-v2/cohort"
@@ -30,6 +32,8 @@ ADDITIVE = [TOP, CHECKS, "tests/starlink_oracle/native60_budget_recipe.py",
             "tests/starlink_oracle/native60_budget.py", "tests/test_starlink_native60_budget.py",
             "tools/prepare_starlink_native60_budget.py",
             "docs/starlink-native60-service-recipe-before-evaluation-20260910.md"]
+ADDITIVE += [TB + "native60_readback_checks.svh", "tests/starlink_oracle/native60_readback_contract.py",
+             "tests/test_starlink_native60_readback.py", "docs/starlink-native60-readback-correction-20260910.md"]
 NATIVE_SOURCES = [
     *["hdl/library/starlink_pss_raw_correlator/" + name + ".v" for name in [
         "starlink_pss_async_fifo", "starlink_sat_add48", "starlink_pss_candidate_scheduler",
@@ -158,6 +162,8 @@ def check_bench(source_root):
     require(not re.search(r"\b(force|defparam)\b", code), "hierarchy forcing/override forbidden")
     require(not re.search(r"\bnative\.[\w.]+\s*(?:<=|=(?!=))", code), "hierarchy writes forbidden")
     require("#7" not in code and "EARLY_OFF" not in code and "$stop" not in code, "alternate clock/source/terminal")
+    require('`include "native60_readback_checks.svh"' in top and "check_native_snapshot(current_index);" in checks,
+            "independent low-read witness absent")
 
 
 def prepare(output, cohort=COHORT, source_root=ROOT):
@@ -180,6 +186,7 @@ def prepare(output, cohort=COHORT, source_root=ROOT):
     require(before == after, "source changed during preparation")
     check_cohort(cohort)
     result = {"schema": "native60-service-prelaunch-v1", "budget": budget(),
+              "readback_contract": readback_contract(),
               "source_sha256": before, "source_signature": sha(encoded(before)),
               "python_import_edges": python_dependencies(output / "source_snapshot"),
               "files": inventory(output), "service_measured": False}
@@ -198,6 +205,7 @@ def verify(directory, expected_sha=None):
             "unadmitted service bundle")
     require(encoded(r["budget"]) == encoded(budget()) and
             (directory / "recipe.json").read_bytes() == encoded(budget()), "budget changed")
+    require(encoded(r["readback_contract"]) == encoded(readback_contract()), "readback-only contract changed")
     original = check_cohort(directory)
     actual = inventory(directory)
     actual.pop("bundle.json")
@@ -249,6 +257,10 @@ def verify_result(directory, inputs):
             1535 <= adm["lead"] <= 1695 and adm["request"] == 0x60000520 and adm["generation"] == 0x60000001 and
             cfg["cycle"] < adm["trigger_cycle"] <= adm["handshake_cycle"] <= adm["trigger_cycle"]+256,
             "actual command coordinate/identity/control budget")
+    snapshot = _receipt(log, "NATIVE60_SNAPSHOT", ["count", "capture_cycle", "return_cycle", "captured_index",
+        "live_at_capture", "public_index", "retained_index", "live_at_return", "capture_lag", "return_lag",
+        "maximum_capture_lag", "maximum_return_lag", "maximum_return_cycles"])
+    verify_snapshot(snapshot, adm["trigger_cycle"], adm["handshake_cycle"])
     off = _receipt(log, "NATIVE60_SOURCE_OFF", ["cycle", "source", "first", "stop", "capture", "busy"])
     require({key: off[key] for key in off if key != "cycle"} ==
             {"source": 16423, "first": 34359735211, "stop": 34359751634, "capture": 520, "busy": 1}, "source-off inventory")
@@ -295,7 +307,7 @@ def verify_result(directory, inputs):
     expected_packet = (inputs / "native_expected_packet.mem").read_text().splitlines()
     packets = re.findall(r"^NATIVE60_PACKET_WORD pass=(\d+) word=(\d+) data=([0-9a-f]{8})$", log, re.MULTILINE)
     require(packets == [(str(p), str(n), expected_packet[n]) for p in range(2) for n in range(26)], "exact repeated public packet")
-    require(len(re.findall(r"^NATIVE60_", log, re.MULTILINE)) == 60, "unrecognized/duplicate evidence marker")
+    require(len(re.findall(r"^NATIVE60_", log, re.MULTILINE)) == 61, "unrecognized/duplicate evidence marker")
     rows = json.loads((inputs / "native_all_raw_tuples.json").read_bytes())
     expected_raw = []
     for row in rows:
@@ -317,7 +329,24 @@ def verify_result(directory, inputs):
     require(capture.splitlines() == [f"{n} {34359740256+n:016x} {34359740256+n:016x} {v}"
                                     for n, v in enumerate(capture_iq)], "all520 original capture coordinates/packing")
     return {"result": "NATIVE60_ONLY_VERIFIED", "budget": b, "clock": clock, "admission": adm,
+            "snapshot": snapshot,
             "scope": "actual native60 standalone simulation only; static known center; no PSMA/PIL1/FFT or RF claim"}
+
+
+def verify_snapshot(s, trigger_cycle, handshake_cycle):
+    """Public-pair coherence and separately derived CDC/return-age limits."""
+    bounds = readback_limits()
+    require(all(type(v) is int and v >= 0 for v in s.values()), "known unsigned snapshot fields")
+    require(s["count"] == 1 and
+            trigger_cycle <= s["capture_cycle"] <= s["return_cycle"] <= handshake_cycle and
+            s["return_cycle"]-s["capture_cycle"] <= bounds["return_cycles"], "low-register capture/read timing")
+    require(34359735211 <= s["captured_index"] <= s["live_at_capture"] <= s["live_at_return"] < 34359751634 and
+            s["public_index"] == s["retained_index"] == s["captured_index"], "known/nonfuture/coherent public64 snapshot")
+    require(s["live_at_capture"]-s["captured_index"] == s["capture_lag"] <= bounds["capture_lag"] and
+            s["live_at_return"]-s["public_index"] == s["return_lag"] <= bounds["return_lag"] and
+            s["maximum_capture_lag"] == bounds["capture_lag"] and
+            s["maximum_return_lag"] == bounds["return_lag"] and
+            s["maximum_return_cycles"] == bounds["return_cycles"], "separately bounded snapshot age")
 
 
 def run(bundle, output, expected_sha, *, authorize_native_service=False):
