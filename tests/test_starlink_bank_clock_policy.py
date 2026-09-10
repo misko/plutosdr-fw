@@ -96,3 +96,28 @@ def test_runner_never_overwrites_existing_evidence(tmp_path):
 def test_invalid_arity_is_rejected(arguments):
     result = runner_probe(arguments)
     assert result.returncode == 2 and "expected NEW_OUTPUT" in result.stderr
+
+
+@pytest.mark.parametrize("mutation", ["none", "missing_period", "missing_epoch", "fail", "fatal"])
+def test_exact_clock_postprocessor_rejects_incomplete_or_failed_epoch(tmp_path, mutation):
+    log = tmp_path / "test.sim/sim_1/behav/xsim/simulate.log"
+    log.parent.mkdir(parents=True)
+    lines = [f"BANK_CLOCK_EPOCH_READY epoch={n}" for n in range(1, 4)]
+    lines += [f"BANK_CLOCK_PERIOD_PASS epoch={n} edges=1024 mean_period_ns=5.714286133"
+              for n in range(1, 4)]
+    lines.append("BANK_CLOCK_EPOCH_PASS epochs=3 measured_edges=3072 mmcm_reset_lock_drop=1 manual_epoch_reset=1 actual_idle_bank=1 NO_PAYLOAD_PHYSICAL_OR_RADIO_CLAIM")
+    if mutation == "missing_period":
+        lines.pop(3)
+    if mutation == "missing_epoch":
+        lines.pop(0)
+    if mutation == "fail":
+        lines.append("BANK_CLOCK_EPOCH_FAIL late assertion")
+    if mutation == "fatal":
+        lines.append("Fatal: simulation failure")
+    log.write_text("\n".join(lines) + "\n")
+    contract = RUNNER.read_text().split("close_sim\n", 1)[1].split("close_project", 1)[0]
+    script = f"source {{{ACQ / 'verify_realtime_probe_result.tcl'}}}\n"
+    script += f"set project_dir {{{tmp_path}}}\nset project_name test\n"
+    script += f"if {{[catch {{{contract}}} message]}} {{puts stderr $message; exit 2}}\n"
+    result = tcl(script)
+    assert (result.returncode == 0) == (mutation == "none"), result.stderr

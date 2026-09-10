@@ -86,9 +86,12 @@ or loosen its physical interface constraints to fit the detector.
 
 The current FFT clock also supplies AD9361's200MHz delay reference. A175MHz
 experiment needs a separate source, not a changed FCLK1. An actual candidate
-MMCM configuration has been generated, but not integrated or physically tested;
-see `experiments/20260910-bank-island-clock-generation.md`. Its lock/reset and
-new exact bank-CDC endpoint contracts are additional full-integration gates.
+MMCM configuration has been generated and simulated with the actual idle bank;
+see `experiments/20260910-bank-island-clock-generation.md` and
+`experiments/20260910-bank-clock-epoch.md`. Three reset epochs and the nominal
+175 MHz period pass, but no active-data or receiver physical qualification is
+claimed. Its active-traffic lock/reset and new exact bank-CDC endpoint contracts
+are additional full-integration gates.
 
 Require complete route, setup/hold/recovery, reviewed CDC/reset paths, and actual
 board-I/O constraints. A generated bitstream or isolated positive slack is not
