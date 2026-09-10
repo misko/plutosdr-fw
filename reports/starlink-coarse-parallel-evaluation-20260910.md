@@ -59,9 +59,22 @@ with eight unchanged explicit physical skips. Root reviewed the exact all70-bit
 delta, immutable reference,420 corruption rows per mode, retained final-edge
 vetoes and all evidence checksums; its independent nine-test run passes including
 bit69 and duplicate-veto omission mutants. One fresh100/175 synthesis/diagnostic
-route is authorized with unchanged source/constraints/strategy. Synthesis is
-running at `/tmp/starlink-completed-input.5EaJuD/balanced-synth-v1`; no comparator
-physical result or primary runtime promotion is claimed yet.
+route was authorized with unchanged source/constraints/strategy. That single
+trial is complete: synthesis exited0 at03:08:07 UTC and route at03:09:57 UTC.
+The175MHz setup miss improves from−2.438ns to−1.596ns; hold+0.070ns. Source100MHz
+setup+2.426ns, hold+0.100ns. All6,664 routable nets complete with zero route
+errors, using2,023 LUTs,4,556 FFs,1,055 slices,21 DSPs and7.5 BRAM tiles. There
+are still497 same-clock175MHz failing endpoints, TNS−522.209ns. Worst path is
+now scheduling state through the preflight metadata carry chain into descriptor
+certification:7.255ns (2.443logic/4.812route),12levels including5CARRY4. The114/124
+OOC input/output delay gaps and139 metadata CDC warnings remain. This is
+improvement, not timing closure or primary runtime promotion. Exact original
+reports are `/tmp/starlink-completed-input.5EaJuD/balanced-route-v1/`; input
+synthesis DCP SHA256
+`fbeb7245dec062e80ebf9c25cc10fdbf1c1a7fcd22b1fe3640168e552bff01c2`.
+Root read the actual route receipts and full worst path. Physical packaging is
+underway; a held preflight tuple/balanced preflight comparison is only proposed,
+not an authorized new physical run or a weakened current-edge fault check.
 
 A separate active-clock verification worktree now exists at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch

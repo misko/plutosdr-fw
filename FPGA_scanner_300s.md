@@ -10,10 +10,11 @@ Whole-coarse synthesis measures 3,868 LUTs, 6,499 FFs, 27 DSPs and 14 BRAM tiles
 this is not routed receiver area or timing qualification. Paired digital PSS/PIL1
 replay now passes both reduced geometries at bank175/bank200/shared200 with exact
 independent pilot bytes. Eight separate bank-map fault/reset/re-enable cases pass.
-The latest isolated preflight-separated route still fails at -2.438 ns; it is
-not promoted. Held-phase input selection now passes both actual-core modes;
-a separately opt-in balanced full-identity comparator is next, before another
-physical measurement. Generated175 MMCM active-traffic reset/recovery also passes
+The latest isolated held-phase/balanced-identity route improves175MHz setup from
+-2.438ns to -1.596ns but still fails and is not promoted. Both actual-core modes
+pass with unchanged control traces. The worst path now goes through preflight
+metadata validation; its next refactor requires exact same-edge fault evidence
+before another physical run. Generated175 MMCM active-traffic reset/recovery also passes
 an independent primary replay with 7,853 exact accepted scores. The original
 4,096-block soak is still running; full production-map verification is being
 implemented in its own worktree. No receiver profile or radio has
