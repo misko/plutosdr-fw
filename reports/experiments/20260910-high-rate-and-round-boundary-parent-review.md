@@ -755,3 +755,47 @@ native60 service probe with a genuinely60MHz sample clock and declared admission
 capture, compute and release bounds BEFORE measuring service. The old generic
 native bench's #7 clock is not a60MHz source. No actual60 simulation, continuation
 tail, public profile admission or routing is authorized by the numerical result.
+
+Final60 FWf62b0716ccf660c7aac600be00d0f063b34a3a89 and unchanged
+HDL529dc8e8d33afc237c7b26f8969ec32fa97cdbdd are pushed to the new isolated
+`codex/starlink-rx-only-do-not-merge-high-rate60-paired` remotes. Parent verified
+all310 artifact hashes/311 safe unique archive members, SHA256
+`41cf3d35fb4f9b6a182490f3db71036594ddd021141466ece2e9b045c6f53f66`.
+The final report corrects one archived table row: the26-word native packet
+contains request and coefficient-generation IDs; visit60000052 is separate
+fixture context, not a packet field. No numerical source/recipe/archive changed.
+
+## Combined control actual175 PASS, physical preparation next
+
+Original79656 completed exit0; Vivado exit08:50:04UTC, wall593.59s. Both complete
+589950-line main CSVs equal the unchanged registered historical SHA25ab9d06...;
+both33180-line extra CSVs equal
+`b965d12603a64111fa9c6ea36cb0f12189945ad4d9be7cf4fbd883980c4ec4a0`.
+Parent verified both pairs and the complete input inventory, executed only the
+frozen Tcl receipt procedure offline, and independently ran the frozen observer
+audit:1246258 samples =953795 raw-equal +292463 invalid-only. Every invalid-only
+row requires both status-valid bits exactly0 and all other216 fields equal;
+all rows remain retained. This is qualified-protocol equality, not raw217 PASS
+or a determination of the invalid payload's driver origin. The earlier29-row
+baseline observation was not used as a combined expected count.
+
+Combined settings are exactly R1/D1/S1/extras1/175/QUICK0. Both independent extra
+suites prove2 final faults,3 held stalls,2 one-sided resets and4 recoveries.
+Original44 healthy blocks,84 registered preflight cases,12 active input-fault
+cases and literal current/sticky reason/retirement checks complete. Actual
+comparison has780367 active checks,36 identity consumptions,270 permitted private
+differences,2 final-fault edges,99936 owned stalls and143 reset-owned edges.
+Inverse-current/sticky-forward counters remain0; no coverage is invented there.
+Root's first supplemental audit command used a wrong extra-CSV basename and
+exited1 after successful status/main validation; the corrected read-only filename
+check passes. That was not an actual simulation failure or restart.
+
+Lossless archival is in progress. After archival, the next authorized work is
+OFFLINE physical preparation and tests only. The old synthesis script cannot
+be called directly: it reads old scope.txt and forwards only R, omitting D/S.
+A reviewed adapter must admit only this fully verified111 actual result, freeze
+the exact seven runtime bodies and IP/kernel/XDC/directives, explicitly bind
+all three options and reject missing/wrong/failed evidence before launching.
+Keep unchanged100/175 diagnostic constraints and full pre/post source checks.
+No synthesis, placement, route, arithmetic graft, primary runtime promotion or
+radio action is yet authorized by this checkpoint.

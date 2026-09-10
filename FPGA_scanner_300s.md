@@ -87,7 +87,11 @@ product-overflow injection. Parent independently verifies their preceding
 full runs remain FAIL. Wrapper force/monitor visibility is under diagnosis;
 no checker bypass, retry or new complete-bank routing is authorized.
 The control R1/D1/S1 settings-only freeze passes94 independent
-parent tests and its single175 actual run is also authorized. Neither branch
+parent tests and its single175 actual run now PASSES, including the complete
+historical registered CSV and both extra fault/reset suites. Parent independently
+verified all1246258 qualified observations, including292463 explicitly retained
+invalid-status-only differences. This is not original raw217 equality. Offline
+preparation for a source-specific physical measurement is next; neither branch
 is promoted. The control test-stimulus correction now handles the low-phase
 early-publication boundary found in its first attempt; old assertions remain.
 
