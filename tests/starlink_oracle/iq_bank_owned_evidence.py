@@ -83,7 +83,13 @@ def require_one(text: str, prefix: str) -> str:
     return found[0]
 
 
-def parse_run(directory: Path, mode: str, mhz: int, profile: str) -> dict:
+def parse_run(
+    directory: Path, mode: str, mhz: int, profile: str, *, capacity_blocks: int = 64
+) -> dict:
+    if capacity_blocks not in (64, 4096) or (
+        mode == "numeric" and capacity_blocks != 64
+    ):
+        raise ValueError("unsupported capacity inventory")
     log = directory / "project/iq_to_score_bank_owned.sim/sim_1/behav/xsim/simulate.log"
     top_log = directory / (directory.name + ".log")
     transcript = log.read_text()
@@ -186,8 +192,15 @@ def parse_run(directory: Path, mode: str, mhz: int, profile: str) -> dict:
             )
         result.update(numeric=numeric, boundary_receipt=fault, exact_replays=replays)
     else:
+        if f"capacity_blocks={capacity_blocks} " not in scope:
+            raise ValueError("requested block inventory differs from pre-run scope")
+        expected_scores = capacity_blocks * 447
+        expected_samples = expected_scores + 65
+        expected_fft_words = capacity_blocks * 512
         numeric = values(require_one(transcript, "IQ_TO_SCORE_XFFT_LONGRUN_PASS"))
         backlog = values(require_one(transcript, "IQ_TO_SCORE_XFFT_BACKLOG_PASS"))
+        if backlog.get("blocks") != capacity_blocks:
+            raise ValueError("backlog receipt has wrong block inventory")
         metadata = values(require_one(transcript, "BANK_IQ_CAPACITY_METADATA_PASS"))
         completion = require_one(transcript, "BANK_IQ_CAPACITY_COMPLETE")
         progress = [
@@ -196,32 +209,32 @@ def parse_run(directory: Path, mode: str, mhz: int, profile: str) -> dict:
         ]
         if (
             completion
-            != "BANK_IQ_CAPACITY_COMPLETE blocks=64 samples=28673 scores=28608"
+            != f"BANK_IQ_CAPACITY_COMPLETE blocks={capacity_blocks} samples={expected_samples} scores={expected_scores}"
         ):
             raise ValueError("incomplete continuous capacity receipt")
         if any(
             numeric.get(key) != val
             for key, val in {
-                "samples": 28673,
-                "blocks": 64,
-                "forward": 32768,
-                "product": 32768,
-                "inverse": 32768,
-                "scores": 28608,
+                "samples": expected_samples,
+                "blocks": capacity_blocks,
+                "forward": expected_fft_words,
+                "product": expected_fft_words,
+                "inverse": expected_fft_words,
+                "scores": expected_scores,
             }.items()
         ):
             raise ValueError("incomplete continuous counts")
-        if [row.get("block") for row in progress] != list(range(1, 65)) or any(
-            row.get("scores") != row["block"] * 447 for row in progress
-        ):
+        if [row.get("block") for row in progress] != list(
+            range(1, capacity_blocks + 1)
+        ) or any(row.get("scores") != row["block"] * 447 for row in progress):
             raise ValueError("unordered or missing score completion blocks")
         if any(
             metadata.get(key) != val
             for key, val in {
-                "blocks": 64,
-                "forward": 32768,
-                "product": 32768,
-                "inverse": 32768,
+                "blocks": capacity_blocks,
+                "forward": expected_fft_words,
+                "product": expected_fft_words,
+                "inverse": expected_fft_words,
             }.items()
         ):
             raise ValueError("missing independent metadata inventory")
@@ -295,8 +308,25 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("build", type=Path)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--single-capacity", action="store_true")
+    parser.add_argument("--blocks", type=int, choices=(64, 4096), default=64)
+    parser.add_argument("--fast-mhz", type=int, choices=(175, 200), default=175)
+    parser.add_argument(
+        "--profile", choices=("nominal", "bursty-stalled"), default="bursty-stalled"
+    )
     args = parser.parse_args()
-    args.output.write_text(json.dumps(collect(args.build.resolve()), indent=2) + "\n")
+    report = (
+        parse_run(
+            args.build.resolve(),
+            "capacity",
+            args.fast_mhz,
+            args.profile,
+            capacity_blocks=args.blocks,
+        )
+        if args.single_capacity
+        else collect(args.build.resolve())
+    )
+    args.output.write_text(json.dumps(report, indent=2) + "\n")
 
 
 if __name__ == "__main__":

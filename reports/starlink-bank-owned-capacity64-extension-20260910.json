@@ -1,0 +1,586 @@
+{
+  "mode": "capacity",
+  "fast_mhz": 175,
+  "profile": "bursty-stalled",
+  "artifact_directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/fft-island/hdl/library/starlink_pss_acquisition/build/bank-iq-capacity-175-bursty-stalled-v4",
+  "terminal_receipt": "BANK_IQ_TO_SCORE_ACTUAL_CORE_VERIFIED mode=capacity fast_mhz=175 NO_PHYSICAL_OR_RF_CLAIM",
+  "simulate_log_sha256": "9a6281ed500080d3fa31012ca5764dbd73c27b828bd7f3b47947ae0c0125ef85",
+  "runner_log_sha256": "e7a5a4378fc26ee9a7ceba0f4b7fb5a64376fa876f40a16d21f79ca4292ffacc",
+  "scope_sha256": "e4d69e2662d3a18cec9b2a56d1a8a3aec80c35d20a688dec62d4af8c4283364d",
+  "frozen_source_sha256": {
+    "bank_owned_iq_capacity_checks.svh": "880f63b7be0f4823dc6c3cc6481abffbcef6766db327c77b0d113d785f213ace",
+    "bank_owned_iq_fault_scenarios.svh": "130e6677185e390c175f7f1f0d31c2c96127b5841e784091c573d69bc38c0cd2",
+    "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "prepare_iq_to_score_bank_owned.tcl": "f1eb45a058f251f2418c62525b2b7a9865e11c74b72221cc88518ac2ad6c5bbc",
+    "simulate_iq_to_score_bank_owned.tcl": "3b3f78547080f8391f3549f5779613d7cdacc85776f8f9a8d0b9f944a6b83e6b",
+    "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+    "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+    "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+    "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+    "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+    "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+    "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+    "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+    "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+    "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+    "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+    "starlink_pss_realtime_result_guard.v": "67b77adbcb065bbd4ba0fa8798e728461af88e059b231c783c13fd95d9413d1d",
+    "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+    "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+    "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+    "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+    "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+    "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "e49157f99f0a12972d735f53d3218bb576e9b00d7c1b54d7332d7c8c0acc054e",
+    "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+    "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+  },
+  "generated_bench_core_sha256": {
+    "tb_starlink_pss_iq_to_score_xfft_longrun.sv": "aea11c143f333b9067b3f48cb6397e0afd4783a8ec345d7126c0b3888dc5a3e6",
+    "starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+  },
+  "counts": {
+    "samples": 28673,
+    "blocks": 64,
+    "forward": 32768,
+    "product": 32768,
+    "inverse": 32768,
+    "scores": 28608,
+    "fifo_max": 358
+  },
+  "backlog": {
+    "blocks": 64,
+    "overlap_queue_max": 1,
+    "ring_retention_age_max": 589,
+    "removed_transform_fifo": 0,
+    "energy_lookup_age_max": 847,
+    "score_age_max": 914,
+    "forward_stall_cycles_max": 0,
+    "source_burst_mode": 1,
+    "score_stall_mode": 1
+  },
+  "independent_metadata": {
+    "blocks": 64,
+    "forward": 32768,
+    "product": 32768,
+    "inverse": 32768,
+    "admission_interval_fast_min": 5198,
+    "admission_interval_fast_max": 5232,
+    "capture_next_epoch_words": 0,
+    "three_epoch_overlap_words": 0
+  },
+  "score_block_progress": [
+    {
+      "block": 1,
+      "scores": 447,
+      "cycle": 8380,
+      "fifo_max": 358,
+      "cache_oldest": 1000000,
+      "cache_newest": 1001189
+    },
+    {
+      "block": 2,
+      "scores": 894,
+      "cycle": 11367,
+      "fifo_max": 358,
+      "cache_oldest": 1000000,
+      "cache_newest": 1001636
+    },
+    {
+      "block": 3,
+      "scores": 1341,
+      "cycle": 14337,
+      "fifo_max": 358,
+      "cache_oldest": 1000035,
+      "cache_newest": 1002082
+    },
+    {
+      "block": 4,
+      "scores": 1788,
+      "cycle": 17330,
+      "fifo_max": 358,
+      "cache_oldest": 1000483,
+      "cache_newest": 1002530
+    },
+    {
+      "block": 5,
+      "scores": 2235,
+      "cycle": 20301,
+      "fifo_max": 358,
+      "cache_oldest": 1000930,
+      "cache_newest": 1002977
+    },
+    {
+      "block": 6,
+      "scores": 2682,
+      "cycle": 23287,
+      "fifo_max": 358,
+      "cache_oldest": 1001377,
+      "cache_newest": 1003424
+    },
+    {
+      "block": 7,
+      "scores": 3129,
+      "cycle": 26258,
+      "fifo_max": 358,
+      "cache_oldest": 1001824,
+      "cache_newest": 1003871
+    },
+    {
+      "block": 8,
+      "scores": 3576,
+      "cycle": 29245,
+      "fifo_max": 358,
+      "cache_oldest": 1002271,
+      "cache_newest": 1004318
+    },
+    {
+      "block": 9,
+      "scores": 4023,
+      "cycle": 32218,
+      "fifo_max": 358,
+      "cache_oldest": 1002718,
+      "cache_newest": 1004765
+    },
+    {
+      "block": 10,
+      "scores": 4470,
+      "cycle": 35208,
+      "fifo_max": 358,
+      "cache_oldest": 1003165,
+      "cache_newest": 1005212
+    },
+    {
+      "block": 11,
+      "scores": 4917,
+      "cycle": 38175,
+      "fifo_max": 358,
+      "cache_oldest": 1003610,
+      "cache_newest": 1005657
+    },
+    {
+      "block": 12,
+      "scores": 5364,
+      "cycle": 41166,
+      "fifo_max": 358,
+      "cache_oldest": 1004059,
+      "cache_newest": 1006106
+    },
+    {
+      "block": 13,
+      "scores": 5811,
+      "cycle": 44139,
+      "fifo_max": 358,
+      "cache_oldest": 1004506,
+      "cache_newest": 1006553
+    },
+    {
+      "block": 14,
+      "scores": 6258,
+      "cycle": 47129,
+      "fifo_max": 358,
+      "cache_oldest": 1004953,
+      "cache_newest": 1007000
+    },
+    {
+      "block": 15,
+      "scores": 6705,
+      "cycle": 50100,
+      "fifo_max": 358,
+      "cache_oldest": 1005400,
+      "cache_newest": 1007447
+    },
+    {
+      "block": 16,
+      "scores": 7152,
+      "cycle": 53087,
+      "fifo_max": 358,
+      "cache_oldest": 1005847,
+      "cache_newest": 1007894
+    },
+    {
+      "block": 17,
+      "scores": 7599,
+      "cycle": 56057,
+      "fifo_max": 358,
+      "cache_oldest": 1006293,
+      "cache_newest": 1008340
+    },
+    {
+      "block": 18,
+      "scores": 8046,
+      "cycle": 59050,
+      "fifo_max": 358,
+      "cache_oldest": 1006741,
+      "cache_newest": 1008788
+    },
+    {
+      "block": 19,
+      "scores": 8493,
+      "cycle": 62021,
+      "fifo_max": 358,
+      "cache_oldest": 1007188,
+      "cache_newest": 1009235
+    },
+    {
+      "block": 20,
+      "scores": 8940,
+      "cycle": 65008,
+      "fifo_max": 358,
+      "cache_oldest": 1007635,
+      "cache_newest": 1009682
+    },
+    {
+      "block": 21,
+      "scores": 9387,
+      "cycle": 67978,
+      "fifo_max": 358,
+      "cache_oldest": 1008082,
+      "cache_newest": 1010129
+    },
+    {
+      "block": 22,
+      "scores": 9834,
+      "cycle": 70965,
+      "fifo_max": 358,
+      "cache_oldest": 1008529,
+      "cache_newest": 1010576
+    },
+    {
+      "block": 23,
+      "scores": 10281,
+      "cycle": 73938,
+      "fifo_max": 358,
+      "cache_oldest": 1008976,
+      "cache_newest": 1011023
+    },
+    {
+      "block": 24,
+      "scores": 10728,
+      "cycle": 76928,
+      "fifo_max": 358,
+      "cache_oldest": 1009423,
+      "cache_newest": 1011470
+    },
+    {
+      "block": 25,
+      "scores": 11175,
+      "cycle": 79895,
+      "fifo_max": 358,
+      "cache_oldest": 1009868,
+      "cache_newest": 1011915
+    },
+    {
+      "block": 26,
+      "scores": 11622,
+      "cycle": 82886,
+      "fifo_max": 358,
+      "cache_oldest": 1010317,
+      "cache_newest": 1012364
+    },
+    {
+      "block": 27,
+      "scores": 12069,
+      "cycle": 85859,
+      "fifo_max": 358,
+      "cache_oldest": 1010764,
+      "cache_newest": 1012811
+    },
+    {
+      "block": 28,
+      "scores": 12516,
+      "cycle": 88849,
+      "fifo_max": 358,
+      "cache_oldest": 1011211,
+      "cache_newest": 1013258
+    },
+    {
+      "block": 29,
+      "scores": 12963,
+      "cycle": 91816,
+      "fifo_max": 358,
+      "cache_oldest": 1011657,
+      "cache_newest": 1013704
+    },
+    {
+      "block": 30,
+      "scores": 13410,
+      "cycle": 94807,
+      "fifo_max": 358,
+      "cache_oldest": 1012105,
+      "cache_newest": 1014152
+    },
+    {
+      "block": 31,
+      "scores": 13857,
+      "cycle": 97780,
+      "fifo_max": 358,
+      "cache_oldest": 1012552,
+      "cache_newest": 1014599
+    },
+    {
+      "block": 32,
+      "scores": 14304,
+      "cycle": 100770,
+      "fifo_max": 358,
+      "cache_oldest": 1012999,
+      "cache_newest": 1015046
+    },
+    {
+      "block": 33,
+      "scores": 14751,
+      "cycle": 103741,
+      "fifo_max": 358,
+      "cache_oldest": 1013446,
+      "cache_newest": 1015493
+    },
+    {
+      "block": 34,
+      "scores": 15198,
+      "cycle": 106728,
+      "fifo_max": 358,
+      "cache_oldest": 1013893,
+      "cache_newest": 1015940
+    },
+    {
+      "block": 35,
+      "scores": 15645,
+      "cycle": 109698,
+      "fifo_max": 358,
+      "cache_oldest": 1014340,
+      "cache_newest": 1016387
+    },
+    {
+      "block": 36,
+      "scores": 16092,
+      "cycle": 112685,
+      "fifo_max": 358,
+      "cache_oldest": 1014787,
+      "cache_newest": 1016834
+    },
+    {
+      "block": 37,
+      "scores": 16539,
+      "cycle": 115658,
+      "fifo_max": 358,
+      "cache_oldest": 1015234,
+      "cache_newest": 1017281
+    },
+    {
+      "block": 38,
+      "scores": 16986,
+      "cycle": 118649,
+      "fifo_max": 358,
+      "cache_oldest": 1015681,
+      "cache_newest": 1017728
+    },
+    {
+      "block": 39,
+      "scores": 17433,
+      "cycle": 121615,
+      "fifo_max": 358,
+      "cache_oldest": 1016126,
+      "cache_newest": 1018173
+    },
+    {
+      "block": 40,
+      "scores": 17880,
+      "cycle": 124606,
+      "fifo_max": 358,
+      "cache_oldest": 1016575,
+      "cache_newest": 1018622
+    },
+    {
+      "block": 41,
+      "scores": 18327,
+      "cycle": 127579,
+      "fifo_max": 358,
+      "cache_oldest": 1017022,
+      "cache_newest": 1019069
+    },
+    {
+      "block": 42,
+      "scores": 18774,
+      "cycle": 130569,
+      "fifo_max": 358,
+      "cache_oldest": 1017469,
+      "cache_newest": 1019516
+    },
+    {
+      "block": 43,
+      "scores": 19221,
+      "cycle": 133536,
+      "fifo_max": 358,
+      "cache_oldest": 1017915,
+      "cache_newest": 1019962
+    },
+    {
+      "block": 44,
+      "scores": 19668,
+      "cycle": 136527,
+      "fifo_max": 358,
+      "cache_oldest": 1018363,
+      "cache_newest": 1020410
+    },
+    {
+      "block": 45,
+      "scores": 20115,
+      "cycle": 139500,
+      "fifo_max": 358,
+      "cache_oldest": 1018810,
+      "cache_newest": 1020857
+    },
+    {
+      "block": 46,
+      "scores": 20562,
+      "cycle": 142490,
+      "fifo_max": 358,
+      "cache_oldest": 1019257,
+      "cache_newest": 1021304
+    },
+    {
+      "block": 47,
+      "scores": 21009,
+      "cycle": 145457,
+      "fifo_max": 358,
+      "cache_oldest": 1019703,
+      "cache_newest": 1021750
+    },
+    {
+      "block": 48,
+      "scores": 21456,
+      "cycle": 148448,
+      "fifo_max": 358,
+      "cache_oldest": 1020151,
+      "cache_newest": 1022198
+    },
+    {
+      "block": 49,
+      "scores": 21903,
+      "cycle": 151421,
+      "fifo_max": 358,
+      "cache_oldest": 1020598,
+      "cache_newest": 1022645
+    },
+    {
+      "block": 50,
+      "scores": 22350,
+      "cycle": 154405,
+      "fifo_max": 358,
+      "cache_oldest": 1021045,
+      "cache_newest": 1023092
+    },
+    {
+      "block": 51,
+      "scores": 22797,
+      "cycle": 157378,
+      "fifo_max": 358,
+      "cache_oldest": 1021492,
+      "cache_newest": 1023539
+    },
+    {
+      "block": 52,
+      "scores": 23244,
+      "cycle": 160369,
+      "fifo_max": 358,
+      "cache_oldest": 1021939,
+      "cache_newest": 1023986
+    },
+    {
+      "block": 53,
+      "scores": 23691,
+      "cycle": 163335,
+      "fifo_max": 358,
+      "cache_oldest": 1022384,
+      "cache_newest": 1024431
+    },
+    {
+      "block": 54,
+      "scores": 24138,
+      "cycle": 166326,
+      "fifo_max": 358,
+      "cache_oldest": 1022833,
+      "cache_newest": 1024880
+    },
+    {
+      "block": 55,
+      "scores": 24585,
+      "cycle": 169299,
+      "fifo_max": 358,
+      "cache_oldest": 1023280,
+      "cache_newest": 1025327
+    },
+    {
+      "block": 56,
+      "scores": 25032,
+      "cycle": 172290,
+      "fifo_max": 358,
+      "cache_oldest": 1023727,
+      "cache_newest": 1025774
+    },
+    {
+      "block": 57,
+      "scores": 25479,
+      "cycle": 175256,
+      "fifo_max": 358,
+      "cache_oldest": 1024173,
+      "cache_newest": 1026220
+    },
+    {
+      "block": 58,
+      "scores": 25926,
+      "cycle": 178247,
+      "fifo_max": 358,
+      "cache_oldest": 1024621,
+      "cache_newest": 1026668
+    },
+    {
+      "block": 59,
+      "scores": 26373,
+      "cycle": 181220,
+      "fifo_max": 358,
+      "cache_oldest": 1025068,
+      "cache_newest": 1027115
+    },
+    {
+      "block": 60,
+      "scores": 26820,
+      "cycle": 184210,
+      "fifo_max": 358,
+      "cache_oldest": 1025515,
+      "cache_newest": 1027562
+    },
+    {
+      "block": 61,
+      "scores": 27267,
+      "cycle": 187177,
+      "fifo_max": 358,
+      "cache_oldest": 1025961,
+      "cache_newest": 1028008
+    },
+    {
+      "block": 62,
+      "scores": 27714,
+      "cycle": 190168,
+      "fifo_max": 358,
+      "cache_oldest": 1026409,
+      "cache_newest": 1028456
+    },
+    {
+      "block": 63,
+      "scores": 28161,
+      "cycle": 193141,
+      "fifo_max": 358,
+      "cache_oldest": 1026560,
+      "cache_newest": 1028607
+    },
+    {
+      "block": 64,
+      "scores": 28608,
+      "cycle": 196125,
+      "fifo_max": 358,
+      "cache_oldest": 1026560,
+      "cache_newest": 1028607
+    }
+  ]
+}
