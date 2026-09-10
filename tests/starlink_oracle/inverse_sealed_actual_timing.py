@@ -54,9 +54,25 @@ def read_cycles(publication_fast_cycle, profile):
     return accepted
 
 
-def parse_trace(path):
+def _completed_epoch(jobs, epoch):
+    """Only the immutable full healthy inventory can precede profile reset."""
+    owned = [job for job in jobs if job["epoch"] == epoch]
+    require(len(owned) == (64 if epoch == 1 else 12), "profile transition before complete epoch")
+    for index, job in enumerate(owned):
+        require((job["inverse"], job["start"]) ==
+                (index % 2, 0x200000000 + epoch * 65536 + (index // 2) * 447),
+                "profile transition job identity")
+        require(job["config"] == [3] and job["input"] == [5, *range(7, 518)]
+                and job["raw"] == list(range(1298, 1810)) and job["status"] == [1300]
+                and job["commit"] in ([[1810], [1813]] if job["inverse"] else [[1810]]),
+                "profile transition before complete job phases")
+    return owned[-1]
+
+
+def parse_trace(path, transitions=None):
     """Retain all healthy job phases, exact per-beat cycles and source identity."""
     jobs, current, previous = [], None, -1
+    transition, transitioned = None, set()
     with Path(path).open() as stream:
         reader = csv.DictReader(stream)
         require(reader.fieldnames == TRACE_FIELDS, "trace schema")
@@ -67,6 +83,23 @@ def parse_trace(path):
                 raise ValueError("malformed trace row") from error
             require(cycle > previous, "trace cycle regression")
             previous = cycle
+            if transition is not None:
+                require(cycle == transition["last_cycle"] + 1 and epoch == transition["epoch"],
+                        "profile transition must reach adjacent common reset")
+                if raw["running"] == "0":
+                    try:
+                        reset_row = {key: int(value) for key, value in raw.items()}
+                    except (ValueError, TypeError) as error:
+                        raise ValueError("unknown profile transition reset row") from error
+                    require(reset_row["profile"] == transition["next_profile"]
+                            and not any(reset_row[name] for name in ("fault", "admit", "config", "core_resetn",
+                                "core_input", "core_output", "status", "guard_commit", "result_busy")),
+                            "profile transition reset contains active/fault event")
+                    transition["reset_cycle"] = cycle
+                    if transitions is not None:
+                        transitions.append(transition)
+                    transitioned.add(epoch)
+                    transition = None
             # The full original CSV retains startup unknowns and later deliberate
             # fault epochs. This parser qualifies only the two complete healthy
             # epochs, not arbitrary private fields while common reset is active.
@@ -77,9 +110,34 @@ def parse_trace(path):
                 row = {key: int(value) for key, value in raw.items()}
             except (ValueError, TypeError) as error:
                 raise ValueError("unknown/malformed healthy running trace row") from error
-            require(row["profile"] == row["epoch"] - 1 and not row["fault"],
-                    "healthy trace profile/fault")
+            require(row["running"] == 1 and row["fault"] == 0, "healthy trace running/fault")
+            if row["profile"] != epoch - 1:
+                last = _completed_epoch(jobs, epoch)
+                require(epoch not in transitioned and row["profile"] == 2 - epoch
+                        and row["state"] == 2 and row["inverse"] == 0
+                        and row["source_ready"] == row["output_bank_ready"] == 1
+                        and row["block_start"] == last["start"]
+                        and not any(row[name] for name in ("core_resetn", "admit", "config", "core_input",
+                            "core_output", "status", "guard_commit", "forward_committed", "product_commit",
+                            "handoff_ack", "result_busy", "source_valid", "product_read_valid", "product_read_ready")),
+                        "profile transition is not fully drained WAIT_BANK")
+                # The frozen bench sets profile only after await_results, then
+                # reset_epoch waits the next slow negedge: <=10 ns, at most two
+                # 175-MHz samples. No active job or source is allowed in this
+                # interval; its first reset row is checked, not silently skipped.
+                if transition is None:
+                    transition = {"epoch": epoch, "next_profile": row["profile"],
+                                  "first_cycle": cycle, "last_cycle": cycle,
+                                  "final_admit": last["admit"], "final_commit": last["admit"] + last["commit"][0]}
+                require(cycle - transition["first_cycle"] < 2,
+                        "profile transition exceeds frozen next-negedge bound")
+                transition["last_cycle"] = cycle
+                continue
+            require(transition is None and epoch not in transitioned,
+                    "profile transition resumed healthy traffic before new epoch")
             if row["admit"]:
+                require(current is None or len(current["commit"]) == 1,
+                        "repeated admission before prior job commit")
                 current = {"epoch": row["epoch"], "inverse": row["inverse"],
                            "start": row["block_start"], "admit": row["cycle"],
                            "config": [], "input": [], "raw": [], "status": [], "commit": []}
@@ -96,6 +154,7 @@ def parse_trace(path):
                     require(row[field] == 1 and row["inverse"] == current["inverse"],
                             "nonbinary event/wrong job phase")
                     current[key].append(row["cycle"] - current["admit"])
+    require(transition is None, "truncated profile transition before common reset")
     return jobs
 
 
