@@ -1,4 +1,4 @@
-# Offered-input fault summary: full51 parent checks PASS, physical gate open
+# Offered-input fault summary: actual FFT PASS, physical gate open
 
 The next retained candidate is additive and default-off. It separates the
 common fault summary from repeated certificate-derived fault expressions.
@@ -11,6 +11,47 @@ at -2.697ns worst setup slack. The checked-product alternative is held after
 its -8.324ns route; its complete route evidence has now been pushed on its own
 DNM branch (FW7cb773af85f2977cb96894a1b839d2de10f3e828,
 HDLbe867adb013e0ee89686075471a589f63a62d985).
+
+## Latest: independent preparation and actual vendor replay PASS
+
+Root32735 terminal0:67 tests PASS in19.79s, all116 live source pins and120
+prepared files unchanged. Frozen manifest is
+`b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368`.
+The complete old97-source authority remains unchanged. Before vendor execution,
+root48562 independently reproduced all77953 scripted numerical rows and the
+entire old parsed result, with106 source pins unchanged.
+
+Root84113 terminal0: actual vendor FFT PASS in59.0914s. Original/copied source
+checks and independent complete result CLI all exit0; generated FFT wrapper
+matches known `a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68`.
+Root independently compares the full actual CSV byte-for-byte with the preceding
+accepted control candidate: SHA256
+`07321b026a637e5922c56a84a955e58549056337198c952a9d73b1245cb4efaa`.
+The entire old result is identical after removing only the additive
+`offer_summary` field. No numerical, service, frame or reset gate was relaxed.
+
+Seven contexts retain19 complete forward/inverse pairs,40 admissions,38 completed
+jobs and two interrupted forward prefixes of64/65 words. Normal service remains
+3645 fast clocks, parked-reader service4912. New summary observations report
+89465 pre-edge and89474 settled post-edge checks, all known-zero input fault,
+9857 forward/9728 inverse physical input beats,38 complete ends and357878 routed
+owner checks. These healthy contexts do not replace the offline adversarial
+fault/XZ tests or establish continuous receive throughput.
+
+Root also independently passes60 offline physical-preparation policy tests
+(.66s),18 source pins unchanged. That initial recipe is deliberately unbound;
+the next step binds its exact original successful actual owner before preparing
+and running source-matched synthesis/routing. No new routed timing result yet.
+
+Evidence directories under the recovery root:
+
+- `retained-summary-script-parent.jVE5ixKt`: original scripted comparison.
+- `retained-summary-actual-prep-parent.ZLxFAi3v`: independent67, snapshots and inventory.
+- `retained-summary-actual-parent.XYAbt6Np`: original owner/process, full vendor
+  logs, actual traces, independent collector, and byte/result equality audit.
+- `retained-summary-physical-prep-parent.wBPF3WTp`: independent60 unbound policy gate.
+
+The earlier sections below retain development history and their original scope.
 
 ## Source review and independent abstract premise
 

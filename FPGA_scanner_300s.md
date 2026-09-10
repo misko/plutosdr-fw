@@ -9,9 +9,14 @@ The next retained offered-input fault-summary candidate passes parent **51 tests
 real-input/XZ premises, old guard shadows and bounded current-fault/ACK module
 tests. Independent graph replay now passes5347 nodes/69LS,19 retained roots,
 11 excluded echoes, nine source mutants and ten parser controls;27 inputs stay
-unchanged. Actual replay preparation is next. A separate proposed pulse-only
+unchanged. Actual vendor FFT replay now PASSES: root84113 exit0 in59.09s,
+all77953 CSV rows byte-identical to the preceding accepted actual run, and the
+complete old parsed result unchanged apart from the additive summary evidence.
+Independent67 preparation tests pass with116 source pins and120 prepared files
+unchanged. Independent60 physical-preparation tests pass, but the new candidate
+has not yet been synthesized or routed. A separate proposed pulse-only
 write-side change is rejected by a concrete premature-ACK counterexample.
-This is not actual FFT or timing qualification.
+This is seven-context actual FFT qualification, not continuous RX or timing closure.
 See [initial parent checks and explicit coverage limits](reports/experiments/20260910-retained-offer-summary-parent.md).
 
 Latest checked-product candidate PASSES actual vendor FFT verification, but its
@@ -62,8 +67,8 @@ descriptor register enable; other reported paths reach kernel-ROM enables.
 This is worse than earlier P1 (-1.492 ns), not a release candidate. Five
 critical CDC findings and real 175 MHz board-clock integration remain open.
 
-Next: measured retained fault-summary-path refactor, then new actual replay and
-physical closure and full receiver/continuous
+Next: source-matched synthesis/routing of the actual-qualified fault-summary
+refactor, then physical closure and full receiver/continuous
 acquisition/IIO/board qualification before `.18`→`.17` deployment. No radio
 operation or production HDL gitlink promotion. See
 [physical failure and targeted next changes](reports/experiments/20260910-retained-physical-parent-review.md)
