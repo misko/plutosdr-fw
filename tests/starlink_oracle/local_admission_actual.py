@@ -14,6 +14,9 @@ OLD_BENCH = "tb_starlink_pss_bank_arithmetic_actual"
 BENCH = "tb_starlink_pss_local_admission_actual"
 CHECKS = "starlink_pss_local_admission_actual_checks.svh"
 OBSERVER = "starlink_pss_local_admission_actual_observer.sv"
+OBSERVER_REFERENCE = OBSERVER + ".active.reference"
+SCHEDULE_BENCH = "tb_starlink_pss_local_admission_schedule.sv"
+SCHEDULE_POLICY = "test_starlink_local_admission_schedule.py"
 RUNNER = "simulate_local_admission_actual.tcl"
 DIAGNOSTICS = "simulate_local_admission_diagnostics.tcl"
 HISTORY = "6376f1fb2508f357933d4cb9cd9949d8da452d155a47084701aa29fb99df1954"
@@ -24,6 +27,7 @@ HISTORY_FILES = {
     "history_posthoc_assessment.json": "a1e7eebc49fba088327109643d9beb120276eb2f6f230a885d5a9438e048da0f",
 }
 FIXED = {
+    OBSERVER_REFERENCE: "ea16d902560799e4ddb694b8172fb689d6c2468378053ddad127655f9be7d368",
     "failed_actual_arithmetic_diagnostic_signals.txt": "f2cc4bee468b97cec08e8f71417150cf16e56841df43741f9266b6365132ace6",
     "bank_arithmetic_actual.py": "de13f13c54531a9e13fe872cc5b4be82ab917487c448f25ee744b0b555cca07d",
     "local_admission.py": "8b413b323dd55f347bbed4babef74a1faba7754672c01f9122231b82aa9a51ef",
@@ -35,6 +39,9 @@ FIXED = {
 WAVE_FIELDS = ("actual_view", "original_view", "default_view", "clk", "resetn", "job_start",
                "job_descriptor", "input_enable", "input_valid", "input_position", "input_metadata",
                "pre_checks", "post_checks", "reset_checks")
+COMPARISON_SCHEDULE = {"clock_edges": "posedge_and_negedge", "async_reset": "negedge",
+                      "pre_region": "inactive_before_NBA", "pre_delay_ns": 0,
+                      "post_delay_ns": 0.001, "width": 155, "masks": False}
 
 
 def digest(data):
@@ -73,6 +80,11 @@ def edits_bench():
          f'  `include "{CHECKS}"\n  `include "starlink_pss_bank_arithmetic_actual_checks.svh"'),
         ("    arithmetic_final_receipt();", "    local_guard_observer.final_receipt();\n    arithmetic_final_receipt();"),
     )
+
+
+def edits_observer():
+    return (("    compare(0);", "    #0; compare(0);"),
+            ("    compare(2);", "    #0; compare(2);"))
 
 
 def edits_runner():
@@ -193,6 +205,7 @@ def verify_payloads(payloads, option):
     required |= set(FIXED) | set(HISTORY_FILES) | {
         CHECKS, OBSERVER, RUNNER, DIAGNOSTICS, BENCH + ".sv", "local_admission_actual.py",
         "test_starlink_local_admission_actual_policy.py", "local_admission_original_guard.v",
+        SCHEDULE_BENCH, SCHEDULE_POLICY,
         "profile.tcl", "create_shared_realtime_xfft_ip.tcl", base.OLD_BENCH + ".sv.reference",
     }
     if set(payloads) != required:
@@ -219,6 +232,8 @@ def verify_payloads(payloads, option):
         b"module starlink_pss_realtime_input_guard #(", b"module local_admission_original_guard #(", 1)
     if payloads["local_admission_original_guard.v"] != renamed:
         raise ValueError("observer is not literal original guard")
+    if adapt(payloads[OBSERVER].decode(), edits_observer(), True) != payloads[OBSERVER_REFERENCE].decode():
+        raise ValueError("observer scheduling-only inverse changed")
     if adapt(payloads[RUNNER].decode(), edits_runner(), True) != payloads["simulate_bank_arithmetic_actual.tcl"].decode():
         raise ValueError("runner inverse changed")
     if adapt(payloads[DIAGNOSTICS].decode(), (("run all\n", wave_add(option) + "run all\n"),), True) != payloads["simulate_bank_arithmetic_diagnostics.tcl"].decode():
@@ -256,11 +271,13 @@ def freeze(output, old_actual, option):
     payloads["failed_actual_arithmetic_diagnostic_signals.txt"] = (ACQ / "build/local-admission-actual-R1B1O1-L1-175-prepared-v2/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/arithmetic_diagnostic_signals.txt").read_bytes()
     for name in (recipe.TOP + ".v", recipe.GUARD + ".v", "simulate_bank_arithmetic_actual.tcl", "simulate_bank_arithmetic_diagnostics.tcl"):
         payloads[name] = (ACQ / name).read_bytes()
-    for name in (CHECKS, OBSERVER):
+    for name in (CHECKS, OBSERVER, SCHEDULE_BENCH):
         payloads[name] = (ACQ / "tb" / name).read_bytes()
+    payloads[OBSERVER_REFERENCE] = (ACQ / "build/local-admission-actual-R1B1O1-L1-175-prepared-v3/frozen_sources" / OBSERVER).read_bytes()
     for name in ("bank_arithmetic_actual.py", "local_admission.py", "local_admission_actual.py"):
         payloads[name] = Path(__file__).with_name(name).read_bytes()
     payloads["test_starlink_local_admission_actual_policy.py"] = (ROOT / "tests/test_starlink_local_admission_actual_policy.py").read_bytes()
+    payloads[SCHEDULE_POLICY] = (ROOT / "tests" / SCHEDULE_POLICY).read_bytes()
     payloads[BENCH + ".sv"] = adapt(payloads[OLD_BENCH + ".sv"].decode(), edits_bench()).encode()
     payloads[RUNNER] = adapt(payloads["simulate_bank_arithmetic_actual.tcl"].decode(), edits_runner()).encode()
     payloads[DIAGNOSTICS] = adapt(payloads["simulate_bank_arithmetic_diagnostics.tcl"].decode(), (("run all\n", wave_add(option) + "run all\n"),)).encode()
@@ -279,6 +296,7 @@ def freeze(output, old_actual, option):
                 "historical_R1B1O1_complete_trace_sha256": HISTORICAL_CANDIDATE_CSV,
                 "original_history": "automation_FAIL_diagnostic_log_source_only_separate_posthoc_functional_qualification",
                 "guard_comparison_width": 155, "no_observer_masks": True,
+                "comparison_schedule": COMPARISON_SCHEDULE,
                 "actual_run": False, "no_vendor_execution_during_preparation": True}
     source = output / "frozen_sources"
     source.mkdir(parents=True, exist_ok=False)
@@ -313,6 +331,8 @@ def verify(output, expected=None):
         raise ValueError("immutable source/latency contract changed")
     if manifest.get("guard_comparison_width") != 155 or manifest.get("no_observer_masks") is not True or manifest.get("actual_run") is not False or manifest.get("no_vendor_execution_during_preparation") is not True or manifest.get("python_runtime_closure") != ["local_admission_actual.py", "local_admission.py", "bank_arithmetic_actual.py"] or manifest.get("original_history") != "automation_FAIL_diagnostic_log_source_only_separate_posthoc_functional_qualification":
         raise ValueError("preparation/observer/history scope changed")
+    if manifest.get("comparison_schedule") != COMPARISON_SCHEDULE:
+        raise ValueError("observer comparison scheduling contract changed")
     base.verify_vectors(source)
     return manifest
 

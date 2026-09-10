@@ -581,7 +581,11 @@ def test_tcl_and_parser_reject_root_leaf_profile_and_path_injection(prepared, tm
 
 
 def test_diagnostic_fix_changes_no_compiled_runtime_observer_bench_numeric_or_runner_bytes(prepared):
-    manifest = STUDY.verify(prepared)
+    # Preserve the original v2->v3 diagnostic-only claim against its immutable
+    # sources; the new scheduling revision is checked independently below.
+    option = STUDY.verify(prepared)["L"]
+    prepared = ACQ / f"build/local-admission-actual-R1B1O1-L{option}-175-prepared-v3"
+    manifest = json.loads((prepared / "manifest.json").read_text())
     old = ACQ / f"build/local-admission-actual-R1B1O1-L{manifest['L']}-175-prepared-v2"
     old_manifest = json.loads((old / "manifest.json").read_text())
     changed = {name for name, expected in old_manifest["source_sha256"].items()
@@ -592,3 +596,59 @@ def test_diagnostic_fix_changes_no_compiled_runtime_observer_bench_numeric_or_ru
         if key != "source_sha256": assert old_manifest[key] == manifest[key]
     for name in manifest["compiled"] + [STUDY.CHECKS, STUDY.RUNNER, "starlink_pss_bank_arithmetic_actual_checks.svh"]:
         assert (prepared / "frozen_sources" / name).read_bytes() == (old / "frozen_sources" / name).read_bytes()
+
+
+def test_scheduling_revision_exact_two_waits_and_complete_old_stimulus_runtime_closure(prepared):
+    manifest = STUDY.verify(prepared)
+    old = ACQ / f"build/local-admission-actual-R1B1O1-L{manifest['L']}-175-prepared-v3"
+    old_manifest = json.loads((old / "manifest.json").read_text())
+    changed = {name for name, expected in old_manifest["source_sha256"].items()
+               if manifest["source_sha256"].get(name) != expected}
+    assert changed == {"local_admission_actual.py", "test_starlink_local_admission_actual_policy.py", STUDY.OBSERVER}
+    assert set(manifest["source_sha256"]) - set(old_manifest["source_sha256"]) == {
+        STUDY.OBSERVER_REFERENCE, STUDY.SCHEDULE_BENCH, STUDY.SCHEDULE_POLICY}
+    assert len(manifest["source_sha256"]) == 49
+    assert manifest["comparison_schedule"] == STUDY.COMPARISON_SCHEDULE
+    assert set(manifest) - set(old_manifest) == {"comparison_schedule"}
+    for key in old_manifest:
+        if key != "source_sha256": assert old_manifest[key] == manifest[key]
+    source = prepared / "frozen_sources"
+    reference = (source / STUDY.OBSERVER_REFERENCE).read_text()
+    assert reference == (old / "frozen_sources" / STUDY.OBSERVER).read_text()
+    assert STUDY.adapt((source / STUDY.OBSERVER).read_text(), STUDY.edits_observer(), True) == reference
+    for name in manifest["compiled"] + [STUDY.CHECKS, STUDY.RUNNER, STUDY.DIAGNOSTICS,
+                                       "starlink_pss_bank_arithmetic_actual_checks.svh"]:
+        if name != STUDY.OBSERVER:
+            assert (source / name).read_bytes() == (old / "frozen_sources" / name).read_bytes()
+
+
+@pytest.mark.parametrize("mutation", ["immediate", "post_only", "after_nba", "post_delay", "width",
+                                    "predicate", "counter", "reset_event", "old_reference", "manifest"])
+def test_rehashed_observer_scheduling_predicate_state_or_reference_changes_fail_closed(prepared, tmp_path, mutation):
+    output = tmp_path / "changed"
+    shutil.copytree(prepared, output)
+    source = output / "frozen_sources"
+    manifest_path = output / "manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    if mutation == "manifest":
+        manifest["comparison_schedule"]["pre_region"] = "after_NBA"
+    else:
+        name = STUDY.OBSERVER_REFERENCE if mutation == "old_reference" else STUDY.OBSERVER
+        text = (source / name).read_text()
+        before, after = {
+            "immediate": ("#0; compare(0);", "compare(0);"),
+            "post_only": ("#0; compare(0);", "#0;"),
+            "after_nba": ("#0; compare(0);", "#0.001; compare(0);"),
+            "post_delay": ("#0.001; compare(1);", "#1; compare(1);"),
+            "width": ("[154:0] actual_view", "[153:0] actual_view"),
+            "predicate": ("actual_view !== original_view", "1'b0"),
+            "counter": ("pre_checks=pre_checks+1", "pre_checks=pre_checks+2"),
+            "reset_event": ("always @(negedge resetn)", "always @(posedge resetn)"),
+            "old_reference": ("compare(0);", "#0; compare(0);"),
+        }[mutation]
+        assert text.count(before) == 1
+        (source / name).write_text(text.replace(before, after))
+        manifest["source_sha256"][name] = STUDY.digest((source / name).read_bytes())
+    manifest_path.write_text(json.dumps(manifest))
+    with pytest.raises(ValueError):
+        STUDY.verify(output)
