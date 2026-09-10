@@ -81,13 +81,15 @@ int main(int argc, char **argv)
     uint64_t ticks = 0;
     double begin, previous, max_tick = 0, max_gap = 0, elapsed;
     int rc;
-    if (argc != 6 || integer(argv[4],10,&frames) || integer(argv[5],10,&seconds) ||
+    if ((argc != 6 && argc != 7) || (argc == 7 && strcmp(argv[6],"--bootstrap-slices")) ||
+        integer(argv[4],10,&frames) || integer(argv[5],10,&seconds) ||
         !frames || frames > 225000 || !seconds || seconds > 300 || bootstrap(argv[3],&b,raw,&size)) {
-        fprintf(stderr,"usage: %s ATTESTED_SYSFS_DIRECTORY NEW_JOURNAL BOOTSTRAP_FILE FRAMES SECONDS\n",argv[0]);
+        fprintf(stderr,"usage: %s ATTESTED_SYSFS_DIRECTORY NEW_JOURNAL BOOTSTRAP_FILE FRAMES SECONDS [--bootstrap-slices]\n",argv[0]);
         return 2;
     }
     if (glrt_native_posix_open(&io,&p,argv[1],argv[2],128U*1024U*1024U)) return 2;
-    if (glrt_native_controller_init(&controller,&p,&b,(uint32_t)frames,(double)seconds)) {
+    if ((argc == 7 ? glrt_native_controller_init_sliced : glrt_native_controller_init)(
+            &controller,&p,&b,(uint32_t)frames,(double)seconds)) {
         glrt_native_posix_close(&io); return 2;
     }
     memset(&action,0,sizeof(action));

@@ -3,6 +3,7 @@ import ctypes as c
 import json
 import os
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -91,3 +92,30 @@ def test_runner_requires_operator_rebase_and_never_starts_rx_or_submits_without_
     assert (tmp_path/"native_schedule_command").read_text() == "2\n"
     assert not (tmp_path/"native_schedule_submit").exists()
     assert (tmp_path/"native_schedule_snapshot").read_text() == raw
+
+
+@pytest.mark.parametrize('option,first_count',[(None,64),('--bootstrap-slices',12)])
+def test_sliced_startup_is_explicit_and_default_batch_semantics_are_preserved(runner,tmp_path,option,first_count):
+    _,binary=runner
+    initial=seed()
+    initial=replace(initial,repeats=64,expires=initial.start+64*80000)
+    seed_file=tmp_path/'seed';seed_file.write_text(initial.encode())
+    w=[0x474c5331,1,3,0,2**28,0x33,0]+[0]*13
+    (tmp_path/'native_schedule_snapshot').write_text('GLS1SNAP 00010000 '+' '.join(f'{v:08x}' for v in w)+'\n')
+    (tmp_path/'native_schedule_submit').touch();(tmp_path/'native_schedule_command').touch()
+    command=[str(binary),str(tmp_path),str(tmp_path/'journal'),str(seed_file),'128','1']
+    if option:command.append(option)
+    result=subprocess.run(command,capture_output=True,text=True,timeout=5)
+    # This static port never advances configured counters. The executable must
+    # stop after its first submit rather than claiming successful hardware work.
+    assert result.returncode==1 and json.loads(result.stdout)['result']==-2
+    fields=(tmp_path/'native_schedule_submit').read_text().split()
+    assert int(fields[8],16)==first_count
+    assert (tmp_path/'native_schedule_command').read_text()=='2\n'
+
+
+def test_unknown_startup_option_fails_before_io(runner,tmp_path):
+    _,binary=runner
+    result=subprocess.run([str(binary),str(tmp_path),str(tmp_path/'journal'),
+        str(tmp_path/'missing-seed'),'128','1','--unknown'],capture_output=True,timeout=5)
+    assert result.returncode==2 and not (tmp_path/'journal').exists()

@@ -41,6 +41,7 @@ def controller(tmp_path_factory):
     lib.controller_size.restype = c.c_size_t
     lib.glrt_native_controller_init.argtypes = [c.c_void_p, c.POINTER(Ports), c.POINTER(Batch),
                                               c.c_uint32, c.c_double]
+    lib.glrt_native_controller_init_sliced.argtypes = lib.glrt_native_controller_init.argtypes
     lib.glrt_native_controller_tick.argtypes = [c.c_void_p]
     lib.glrt_native_controller_request_stop.argtypes = [c.c_void_p]
     return lib

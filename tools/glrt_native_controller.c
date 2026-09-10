@@ -59,6 +59,84 @@ int glrt_native_controller_init(struct glrt_native_controller *c,
     return 0;
 }
 
+static int bootstrap_slice(const struct glrt_native_batch *original,
+    uint32_t first, uint32_t count, uint32_t tag, struct glrt_native_batch *out)
+{
+    uint64_t advance, last;
+    uint32_t step;
+    if (!count || first >= original->repeats || count > original->repeats-first) return -1;
+    /* The complete original horizon was checked before any I/O. Preserve its
+     * fractional sample cadence and modulo-48 carrier ramp without doubles. */
+    advance = original->fraction + first*original->period;
+    if (original->start > UINT64_MAX-(advance>>16)) return -1;
+    *out = *original;
+    out->start += advance>>16;
+    out->fraction = (uint32_t)(advance & 65535);
+    out->step = (original->step+first*original->delta) & UINT64_C(0xffffffffffff);
+    out->tag = tag;
+    out->repeats = count;
+    if (glrt_native_prediction(out,count-1,&last,&step)) return -1;
+    out->expires = last+79199;
+    return 0;
+}
+
+int glrt_native_controller_init_sliced(struct glrt_native_controller *c,
+    const struct glrt_native_ports *p, const struct glrt_native_batch *b,
+    uint32_t frames, double seconds)
+{
+    if (!b || b->repeats <= 16 || glrt_native_controller_init(c,p,b,frames,seconds)) return -1;
+    c->bootstrap = *b;
+    c->bootstrap_active = 1;
+    return bootstrap_slice(b,0,12,b->tag,&c->slots[0].batch);
+}
+
+static void bootstrap_observe(struct glrt_native_controller *c, uint32_t frame,
+    uint64_t start, const struct glrt_native_estimate *e)
+{
+    struct glrt_native_batch original;
+    uint64_t difference;
+    double samples, hz, predicted_hz;
+    int64_t carrier;
+    if (!c->bootstrap_active || e->rejection || frame >= c->bootstrap.repeats ||
+        bootstrap_slice(&c->bootstrap,frame,1,c->bootstrap.tag,&original)) return;
+    difference = start >= original.start ? start-original.start : original.start-start;
+    if (difference > 32) return;
+    samples = (start >= original.start ? (double)difference : -(double)difference)
+        + e->delay_correction_s*60000000 - original.fraction/65536.0;
+    carrier = (int64_t)original.step;
+    if (carrier & (INT64_C(1)<<47)) carrier -= INT64_C(1)<<48;
+    predicted_hz = carrier*(60000000.0/281474976710656.0);
+    hz = e->cfo_hz-predicted_hz;
+    /* Correct offsets only, never infer a rate from sparse startup results.
+     * Rejected fits cannot move the prediction. Corrections stay inside the
+     * original local basin and never move the external expiry boundary. */
+    if (!isfinite(samples) || !isfinite(hz) || fabs(samples) > 15 || fabs(hz) > 250) return;
+    c->bootstrap_delay_q16 = (int64_t)llround(samples*65536.0);
+    c->bootstrap_cfo_q48 = (int64_t)llround(hz*(281474976710656.0/60000000.0));
+}
+
+static void bootstrap_correct(struct glrt_native_controller *c, struct glrt_native_batch *b)
+{
+    struct glrt_native_batch corrected = *b;
+    int64_t position = (int64_t)b->fraction+c->bootstrap_delay_q16;
+    int64_t whole = position/65536, fraction = position%65536;
+    uint64_t last;
+    uint32_t step;
+    if (fraction < 0) { fraction += 65536; whole--; }
+    if ((whole < 0 && corrected.start < (uint64_t)-whole) ||
+        (whole > 0 && corrected.start > UINT64_MAX-(uint64_t)whole)) return;
+    if (whole < 0) corrected.start -= (uint64_t)-whole;
+    else corrected.start += (uint64_t)whole;
+    corrected.fraction = (uint32_t)fraction;
+    corrected.step = (uint64_t)((int64_t)corrected.step+c->bootstrap_cfo_q48) & UINT64_C(0xffffffffffff);
+    corrected.expires = c->bootstrap.expires;
+    /* A positive correction at the very end may exceed the original expiry.
+     * In that case retain the authorized uncorrected slice; never extend it. */
+    if (glrt_native_prediction(&corrected,corrected.repeats-1,&last,&step)) return;
+    corrected.expires = last+79199;
+    *b = corrected;
+}
+
 static int submit(struct glrt_native_controller *c, unsigned slot,
                   const struct glrt_native_batch *b, uint32_t first, uint64_t latest)
 {
@@ -118,6 +196,8 @@ static int consume(struct glrt_native_controller *c)
         e.coherence,e.linearized_coherence,e.rejection);
     if (n < 0 || (size_t)n >= sizeof(fitted)) return GLRT_NATIVE_PROTOCOL_ERROR;
     if (c->ports.retain(c->ports.context,"estimate",fitted,(size_t)n)) return GLRT_NATIVE_RETENTION_ERROR;
+    if (!c->stopping) bootstrap_observe(c,owner->first_frame+words[27],
+        ((uint64_t)words[4]<<32)|words[3],&e);
     if (!c->stopping && glrt_native_trend_observe(&c->trend,epoch,
             owner->first_frame+words[27],((uint64_t)words[4]<<32)|words[3],&e) < 0)
         stop(c,GLRT_NATIVE_SOURCE_LOST);
@@ -194,10 +274,21 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
             struct glrt_native_batch b;
             double rate;
             uint32_t count = c->frames-c->next_frame;
+            int predicted;
             if (count > 16) count = 16;
             if (c->next_tag == UINT32_MAX) return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
-            if (!glrt_native_trend_batch(&c->trend,c->next_frame,count,c->next_tag,
-                    c->slots[0].batch.seed,&b,&rate)) {
+            predicted = !glrt_native_trend_batch(&c->trend,c->next_frame,count,c->next_tag,
+                    c->slots[0].batch.seed,&b,&rate);
+            if (predicted) c->bootstrap_active = 0;
+            else if (c->bootstrap_active && c->next_frame < c->bootstrap.repeats) {
+                count = c->bootstrap.repeats-c->next_frame;
+                if (count > 4) count = 4;
+                if (bootstrap_slice(&c->bootstrap,c->next_frame,count,c->next_tag,&b))
+                    return finish_error(c,GLRT_NATIVE_PROTOCOL_ERROR);
+                bootstrap_correct(c,&b);
+                predicted = 1;
+            }
+            if (predicted) {
                 if (c->ports.retain(c->ports.context,"before_submit",raw,(size_t)n))
                     return finish_error(c,GLRT_NATIVE_RETENTION_ERROR);
                 rc = submit(c,i,&b,c->next_frame,latest);

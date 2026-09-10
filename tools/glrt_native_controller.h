@@ -33,9 +33,11 @@ struct glrt_native_controller {
     struct glrt_native_trend trend;
     struct glrt_native_owned_batch slots[2];
     struct glrt_native_ports ports;
+    struct glrt_native_batch bootstrap;
+    int64_t bootstrap_delay_q16, bootstrap_cfo_q48;
     uint32_t frames, next_frame, next_tag, sequence, configured;
     double deadline, cleanup_deadline;
-    int started, stopping, cancelled, clearing, done, failure;
+    int started, stopping, cancelled, clearing, done, failure, bootstrap_active;
 };
 /* Bootstrap is a retained acquisition prediction in a freshly rebased source
  * epoch, with zero scheduled counters. It begins at global frame zero. The
@@ -43,6 +45,15 @@ struct glrt_native_controller {
  * is invented here. Total work is bounded to frames <=225000 and <=300 s.
  * Returns zero after local validation; does not perform I/O. */
 int glrt_native_controller_init(struct glrt_native_controller *,
+    const struct glrt_native_ports *, const struct glrt_native_batch *bootstrap,
+    uint32_t frames, double seconds);
+/* Explicit startup mode: a 17..64-repeat externally validated prediction is
+ * an authorization horizon. Submit 12 first, then at most four at a time
+ * until native rate feedback is available. Supported native results may update
+ * bounded timing/CFO offsets while the coarse rates remain fixed. Never extend
+ * that horizon or return to
+ * it after native feedback takes over. The ordinary initializer is unchanged. */
+int glrt_native_controller_init_sliced(struct glrt_native_controller *,
     const struct glrt_native_ports *, const struct glrt_native_batch *bootstrap,
     uint32_t frames, double seconds);
 /* One bounded read/process/submit step. Caller polls or waits between ticks.
