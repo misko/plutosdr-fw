@@ -1,0 +1,1834 @@
+{
+  "schema": "operand-physical-v2",
+  "fw_pin": "881a8385703e15aebd6529be79207c7b8f24d862",
+  "hdl_pin": "f7345ab655a21374f46d2bda89854f40295fca24",
+  "runs": [
+    {
+      "option": 0,
+      "original_handle": 2548,
+      "exit_code": 0,
+      "terminal": "Thu Sep 10 07:23:10 2026...",
+      "source_pre_post_match": true,
+      "sources": {
+        "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+        "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+        "starlink_pss_spectrum_operand_register_ooc.xdc": "5ec96ae2f5a6e4b074a1c0ee2305f9fa7bb3d1a859e53f864789049d76a75ed9",
+        "tb_starlink_spectrum_operand_parameters.sv": "1bd5698740bb9c36df67260093cf20e67863d3416256ed3ea6ac67053efd4fc6",
+        "measure_spectrum_operand_boundary.tcl": "a3a733013e03e5bb60c8aeeb6ac029ef88136f2d407543c5a19368facc1d57d4",
+        "test_starlink_spectrum_operand_physical_policy.py": "20b609a5f61f0bcfe7ab59329e8aa2d51ad987c5cb40b4337da6189ad91c91b8"
+      },
+      "actual_parameters": [
+        [
+          "DATA_WIDTH",
+          "18"
+        ],
+        [
+          "REGISTER_OPERANDS",
+          "0"
+        ],
+        [
+          "BOUNDARY_ROUND_SAT",
+          "1"
+        ],
+        [
+          "DATA_WIDTH",
+          "18"
+        ],
+        [
+          "BOUNDARY_ROUND_SAT",
+          "1"
+        ]
+      ],
+      "resources": {
+        "synth": {
+          "total_LUT": 56,
+          "logic_LUT": 56,
+          "LUTRAM": 0,
+          "SRL": 0,
+          "FF": 278,
+          "RAMB36": 0,
+          "RAMB18": 0,
+          "DSP": 4
+        },
+        "opt": {
+          "total_LUT": 64,
+          "logic_LUT": 64,
+          "LUTRAM": 0,
+          "SRL": 0,
+          "FF": 278,
+          "RAMB36": 0,
+          "RAMB18": 0,
+          "DSP": 4
+        },
+        "route": {
+          "total_LUT": 62,
+          "logic_LUT": 62,
+          "LUTRAM": 0,
+          "SRL": 0,
+          "FF": 278,
+          "RAMB36": 0,
+          "RAMB18": 0,
+          "DSP": 4
+        }
+      },
+      "timing": {
+        "synth": {
+          "setup_slack_ns": "0.908",
+          "internal_setup_slack_ns": "1.168",
+          "failing_setup_endpoints": "0",
+          "hold_slack_ns": "0.276",
+          "internal_hold_slack_ns": "0.276",
+          "failing_hold_endpoints": "0",
+          "failing_setup_from_top_ports": 0,
+          "failing_setup_unique_start_ports": 0,
+          "failing_setup_all_start_ports": true,
+          "failing_hold_from_top_ports": 0,
+          "failing_hold_unique_start_ports": 0,
+          "failing_hold_all_start_ports": true,
+          "summary": {
+            "WNS": "0.908",
+            "TNS": "0.000",
+            "setup_failing": "0",
+            "setup_total": "1249",
+            "WHS": "0.276",
+            "THS": "0.000",
+            "hold_failing": "0",
+            "hold_total": "1249",
+            "WPWS": "2.357",
+            "TPWS": "0.000",
+            "pulse_failing": "0",
+            "pulse_total": "282"
+          }
+        },
+        "route": {
+          "setup_slack_ns": "0.207",
+          "internal_setup_slack_ns": "0.964",
+          "failing_setup_endpoints": "0",
+          "hold_slack_ns": "-0.685",
+          "internal_hold_slack_ns": "0.103",
+          "failing_hold_endpoints": "176",
+          "failing_setup_from_top_ports": 0,
+          "failing_setup_unique_start_ports": 0,
+          "failing_setup_all_start_ports": true,
+          "failing_hold_from_top_ports": 176,
+          "failing_hold_unique_start_ports": 134,
+          "failing_hold_all_start_ports": true,
+          "summary": {
+            "WNS": "0.207",
+            "TNS": "0.000",
+            "setup_failing": "0",
+            "setup_total": "1249",
+            "WHS": "-0.685",
+            "THS": "-49.536",
+            "hold_failing": "176",
+            "hold_total": "1249",
+            "WPWS": "2.357",
+            "TPWS": "0.000",
+            "pulse_failing": "0",
+            "pulse_total": "282"
+          }
+        }
+      },
+      "mapping": {
+        "synth": {
+          "DSP": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            }
+          ],
+          "CE": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/sum_real_reg_i_1/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/sum_real_reg_i_1/O"
+            }
+          ]
+        },
+        "route": {
+          "DSP": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "AREG": "0",
+              "BREG": "0",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "0",
+              "BCASCREG": "0"
+            }
+          ],
+          "CE": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/starlink_pss_sp1_LUT4_5/O"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/starlink_pss_sp1_LUT4_5/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/starlink_pss_sp1_LUT4_5/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/starlink_pss_sp1_LUT3_36/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/starlink_pss_sp1_LUT4_5/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/starlink_pss_sp1_LUT3_36/O"
+            }
+          ]
+        }
+      },
+      "route": {
+        "routable": 398,
+        "fully_routed": 398,
+        "errors": 0
+      },
+      "warnings": {
+        "Synth 8-7080": 1,
+        "Route 35-198": 100,
+        "Route 35-426": 1,
+        "Route 35-328": 1
+      },
+      "critical_warning_count": 0,
+      "tool_error_count": 0,
+      "all_path_timing_pass": false,
+      "bank_qualified": false,
+      "checkpoints": {
+        "operand0_synth.dcp": "53a844c63eaee71311116ebf91232ffb5b7a6a785348ff104ebb216be175603a",
+        "operand0_opt.dcp": "153e1e999ff127457c3ae91628b0e5f2df5b789e6125a975075db40ad2248db7",
+        "operand0_route.dcp": "f1288c1f9d439614840f94df9bd2d5306dee7fa7ea1b8e78d48538b51272c5b1"
+      }
+    },
+    {
+      "option": 1,
+      "original_handle": 30333,
+      "exit_code": 0,
+      "terminal": "Thu Sep 10 07:23:11 2026...",
+      "source_pre_post_match": true,
+      "sources": {
+        "starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+        "starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+        "starlink_pss_spectrum_operand_register_ooc.xdc": "5ec96ae2f5a6e4b074a1c0ee2305f9fa7bb3d1a859e53f864789049d76a75ed9",
+        "tb_starlink_spectrum_operand_parameters.sv": "1bd5698740bb9c36df67260093cf20e67863d3416256ed3ea6ac67053efd4fc6",
+        "measure_spectrum_operand_boundary.tcl": "a3a733013e03e5bb60c8aeeb6ac029ef88136f2d407543c5a19368facc1d57d4",
+        "test_starlink_spectrum_operand_physical_policy.py": "20b609a5f61f0bcfe7ab59329e8aa2d51ad987c5cb40b4337da6189ad91c91b8"
+      },
+      "actual_parameters": [
+        [
+          "DATA_WIDTH",
+          "18"
+        ],
+        [
+          "REGISTER_OPERANDS",
+          "1"
+        ],
+        [
+          "BOUNDARY_ROUND_SAT",
+          "1"
+        ],
+        [
+          "DATA_WIDTH",
+          "18"
+        ],
+        [
+          "BOUNDARY_ROUND_SAT",
+          "1"
+        ]
+      ],
+      "resources": {
+        "synth": {
+          "total_LUT": 58,
+          "logic_LUT": 58,
+          "LUTRAM": 0,
+          "SRL": 0,
+          "FF": 358,
+          "RAMB36": 0,
+          "RAMB18": 0,
+          "DSP": 4
+        },
+        "opt": {
+          "total_LUT": 58,
+          "logic_LUT": 58,
+          "LUTRAM": 0,
+          "SRL": 0,
+          "FF": 358,
+          "RAMB36": 0,
+          "RAMB18": 0,
+          "DSP": 4
+        },
+        "route": {
+          "total_LUT": 59,
+          "logic_LUT": 59,
+          "LUTRAM": 0,
+          "SRL": 0,
+          "FF": 358,
+          "RAMB36": 0,
+          "RAMB18": 0,
+          "DSP": 4
+        }
+      },
+      "timing": {
+        "synth": {
+          "setup_slack_ns": "0.811",
+          "internal_setup_slack_ns": "0.811",
+          "failing_setup_endpoints": "0",
+          "hold_slack_ns": "0.238",
+          "internal_hold_slack_ns": "0.284",
+          "failing_hold_endpoints": "0",
+          "failing_setup_from_top_ports": 0,
+          "failing_setup_unique_start_ports": 0,
+          "failing_setup_all_start_ports": true,
+          "failing_hold_from_top_ports": 0,
+          "failing_hold_unique_start_ports": 0,
+          "failing_hold_all_start_ports": true,
+          "summary": {
+            "WNS": "0.811",
+            "TNS": "0.000",
+            "setup_failing": "0",
+            "setup_total": "1504",
+            "WHS": "0.238",
+            "THS": "0.000",
+            "hold_failing": "0",
+            "hold_total": "1504",
+            "WPWS": "1.830",
+            "TPWS": "0.000",
+            "pulse_failing": "0",
+            "pulse_total": "362"
+          }
+        },
+        "route": {
+          "setup_slack_ns": "0.085",
+          "internal_setup_slack_ns": "0.441",
+          "failing_setup_endpoints": "0",
+          "hold_slack_ns": "-0.685",
+          "internal_hold_slack_ns": "0.152",
+          "failing_hold_endpoints": "272",
+          "failing_setup_from_top_ports": 0,
+          "failing_setup_unique_start_ports": 0,
+          "failing_setup_all_start_ports": true,
+          "failing_hold_from_top_ports": 272,
+          "failing_hold_unique_start_ports": 152,
+          "failing_hold_all_start_ports": true,
+          "summary": {
+            "WNS": "0.085",
+            "TNS": "0.000",
+            "setup_failing": "0",
+            "setup_total": "1504",
+            "WHS": "-0.685",
+            "THS": "-137.903",
+            "hold_failing": "272",
+            "hold_total": "1504",
+            "WPWS": "1.830",
+            "TPWS": "0.000",
+            "pulse_failing": "0",
+            "pulse_total": "362"
+          }
+        }
+      },
+      "mapping": {
+        "synth": {
+          "DSP": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            }
+          ],
+          "CE": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/sum_real_reg_i_1/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/sum_real_reg_i_1/O"
+            }
+          ]
+        },
+        "route": {
+          "DSP": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "0",
+              "PREG": "1",
+              "CREG": "0",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "AREG": "1",
+              "BREG": "1",
+              "MREG": "1",
+              "PREG": "1",
+              "CREG": "1",
+              "ACASCREG": "1",
+              "BCASCREG": "1"
+            }
+          ],
+          "CE": [
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_ii_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/product_iq_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/sum_imag_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/sum_real_reg_i_1/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEA2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEAD",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEALUMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB1",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEB2",
+              "nets": "arithmetic/registered_operands.payload",
+              "driver_pins": "arithmetic/product_ii_reg_i_1/O,arithmetic/registered_operands.payload"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEC",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECARRYIN",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CECTRL",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CED",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEINMODE",
+              "nets": "arithmetic/<const0>",
+              "driver_pins": "arithmetic/GND/G"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEM",
+              "nets": "arithmetic/product_bin_index_1",
+              "driver_pins": "arithmetic/product_ii_reg_i_2/O"
+            },
+            {
+              "cell": "arithmetic/sum_real_reg",
+              "pin": "CEP",
+              "nets": "arithmetic/sum_bin_index_0",
+              "driver_pins": "arithmetic/sum_real_reg_i_1/O"
+            }
+          ]
+        }
+      },
+      "route": {
+        "routable": 494,
+        "fully_routed": 494,
+        "errors": 0
+      },
+      "warnings": {
+        "Synth 8-7080": 1,
+        "Route 35-198": 100,
+        "Route 35-426": 1,
+        "Route 35-328": 1
+      },
+      "critical_warning_count": 0,
+      "tool_error_count": 0,
+      "all_path_timing_pass": false,
+      "bank_qualified": false,
+      "checkpoints": {
+        "operand1_synth.dcp": "c62a81571cd3022ca0eed9fcf45be7f12fdda3b1063e0d40bb5281cbfa156207",
+        "operand1_opt.dcp": "291039675b4c14f1c2b428db22f42ef8b477f428327d05120e3d8818dddb851b",
+        "operand1_route.dcp": "f5e6ecba7d57d5ea6963a90e8f1ec3fa353ccca924dc0086c854db5fffd893e2"
+      }
+    }
+  ],
+  "interpretation": "Isolated DSP input-register inference; all-hold timing fails; top-port routes inaccurate without HD.PARTPIN_LOCS; no bank qualification.",
+  "archive": "20260910-operand-physical-v2-evidence.tgz",
+  "archive_sha256": "573b139c5a1739e653edb90730b6f1333cc365ddb705f4d3222f8d77e015b50c",
+  "archive_bytes": 1395699,
+  "archive_safe_unique_files": 90,
+  "archive_file_sha256": {
+    "operand-physical-launch-0-v2/outer.stdout.log": "df5c71805e5c2907e05d879aa2fa2d3e891e35132d07b1c8f6da5d394b919a91",
+    "operand-physical-launch-0-v2/vivado.jou": "e76bfd172b33c581f562aaee69cbc09a8f05a569698c6cf675ae293a34386c00",
+    "operand-physical-launch-0-v2/vivado.log": "a6c69b448b20a69542e8920eb9f9d4f7c04f05935af45545321f39e28a53dfc2",
+    "operand-physical-launch-1-v2/outer.stdout.log": "8ccd643b39abed484a168c0e8d8ea61b17c6022211d70c87c0261f9335637ceb",
+    "operand-physical-launch-1-v2/vivado.jou": "af6f4fe52269c18ce23b819c69127d163d5e517d88db4e114965d22fe67572bd",
+    "operand-physical-launch-1-v2/vivado.log": "29ce4e241c246c81ee6cfd326f15d3f9aa3609f3010009d9feede203f8c2c0bf",
+    "operand-route-0-v2/check_timing_route.rpt": "e3a70debba26d683187fdd7a76e286069cdd5f163256cacd254328328d6260b4",
+    "operand-route-0-v2/check_timing_synth.rpt": "8830577c8e6f79d85864cc994d365dc0b381a064cdc2fd3418d9b45d636e24ab",
+    "operand-route-0-v2/checkpoints.sha256": "6950e12d0a6c2e08db1babd81f933635645c16220efdd46e3b97d2fa139df2a5",
+    "operand-route-0-v2/dsp_ce_route.tsv": "7fd06b5bb52691684bd33625aac326787133b0bd3a45200b1d563b0470b23199",
+    "operand-route-0-v2/dsp_ce_synth.tsv": "aa90f6a009b341cdd9485914d6b8e213ee14e5a6bf19637ca594735be9f4b434",
+    "operand-route-0-v2/dsp_route.tsv": "94a3f1fa01d15af8476b1f040823e40c13c78340fb4b9dbba932ab2badbf9c32",
+    "operand-route-0-v2/dsp_synth.tsv": "94a3f1fa01d15af8476b1f040823e40c13c78340fb4b9dbba932ab2badbf9c32",
+    "operand-route-0-v2/failing_hold_route.tsv": "7a3d079fac4dc3d92e3f061a0ba7b5ad389063a7e4de4a79d06478aa0b059ed8",
+    "operand-route-0-v2/failing_hold_synth.tsv": "cc99d5f415c81b81cde8fef81c2881d60aeef89878410e7a318c556c92d387a7",
+    "operand-route-0-v2/failing_setup_route.tsv": "cc99d5f415c81b81cde8fef81c2881d60aeef89878410e7a318c556c92d387a7",
+    "operand-route-0-v2/failing_setup_synth.tsv": "cc99d5f415c81b81cde8fef81c2881d60aeef89878410e7a318c556c92d387a7",
+    "operand-route-0-v2/frozen_sources/measure_spectrum_operand_boundary.tcl": "a3a733013e03e5bb60c8aeeb6ac029ef88136f2d407543c5a19368facc1d57d4",
+    "operand-route-0-v2/frozen_sources/starlink_pss_spectrum_operand_register_ooc.xdc": "5ec96ae2f5a6e4b074a1c0ee2305f9fa7bb3d1a859e53f864789049d76a75ed9",
+    "operand-route-0-v2/frozen_sources/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "operand-route-0-v2/frozen_sources/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "operand-route-0-v2/frozen_sources/tb_starlink_spectrum_operand_parameters.sv": "1bd5698740bb9c36df67260093cf20e67863d3416256ed3ea6ac67053efd4fc6",
+    "operand-route-0-v2/frozen_sources/test_starlink_spectrum_operand_physical_policy.py": "20b609a5f61f0bcfe7ab59329e8aa2d51ad987c5cb40b4337da6189ad91c91b8",
+    "operand-route-0-v2/hold_route.rpt": "3c4cedd5125a2523673d10dda222b1af31765fffeb0fcc622b9cd2a711181455",
+    "operand-route-0-v2/hold_synth.rpt": "fc0908b5908eccda6b572637f90ba8180fb02f038c8e0ed66a0c29017c349c23",
+    "operand-route-0-v2/input_sources.sha256": "2c432f4fa6afa794f1a4587eaace0cf5b8a6ccd79ef2f93ece2d7a77438f96bb",
+    "operand-route-0-v2/internal_hold_route.rpt": "ca668d9551c5778093c792e6e84801d15e24e2a616c6eb3e0a7c74a272d3a7c5",
+    "operand-route-0-v2/internal_hold_synth.rpt": "34ef24a333f4bf06ab1450639e4e4bf37658c75c0a4d017999d98737b047ad55",
+    "operand-route-0-v2/internal_setup_route.rpt": "f80cd6b47103b5ed5f967eb07a0ab567f38aa5d513a4484df380e15f518cea02",
+    "operand-route-0-v2/internal_setup_synth.rpt": "1d821cea7e03ea1f493700560abcb34d1c21334b6efe42e5b0227cd9ee1f3cf7",
+    "operand-route-0-v2/methodology.rpt": "b8c9c7357d1381b01564bda03672e3ffab828d85559ed0d1f76ad00b542dbf8b",
+    "operand-route-0-v2/operand0_opt.dcp": "153e1e999ff127457c3ae91628b0e5f2df5b789e6125a975075db40ad2248db7",
+    "operand-route-0-v2/operand0_route.dcp": "f1288c1f9d439614840f94df9bd2d5306dee7fa7ea1b8e78d48538b51272c5b1",
+    "operand-route-0-v2/operand0_synth.dcp": "53a844c63eaee71311116ebf91232ffb5b7a6a785348ff104ebb216be175603a",
+    "operand-route-0-v2/parameter_compile.log": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "operand-route-0-v2/parameter_probe.log": "5956631e4d7b6092cf4e6e0bdb781645ce80f139b7d3166be2ff1cd263dfae63",
+    "operand-route-0-v2/result.txt": "56d41b8008d0418d7a1f4f74965439fd9718ca8b90dff70f13ff767cf47f1e97",
+    "operand-route-0-v2/route_status.rpt": "eb6fe6b9fded5aa1c94c0df7a59e1c119f5a256b7b5c714bc9ef8b1fe813b14c",
+    "operand-route-0-v2/scope.txt": "09e77d0ea959f1e2fc1883a2d6a334e3106725c6c85a7661912f34b998b769dc",
+    "operand-route-0-v2/setup_route.rpt": "a11fa4744121b87e582225247d9071e6a06362591bf6a0f4ce9defc11c52104b",
+    "operand-route-0-v2/setup_synth.rpt": "d5722d321d88b916f52724c89a541bd13de63aae81b5d7e324c468d7aab6819c",
+    "operand-route-0-v2/timing_route.rpt": "15b887bd063cb2f4c3915067cadea08d4814ce49dc31b19456dfdf69adea41d0",
+    "operand-route-0-v2/timing_route.txt": "61fb21c3fe1bbaccbc2b38f9342c5308af72676441e49f122919fa0efdc3a949",
+    "operand-route-0-v2/timing_synth.rpt": "99b176a6c4f8868fcffd5c18ea008760a20a2c14bf609092df5c808c24e8e13b",
+    "operand-route-0-v2/timing_synth.txt": "3341473884376f955f17e86a1206f4e54bd35aaa6baa6ce97c03cf531e25e00c",
+    "operand-route-0-v2/utilization_opt.rpt": "24ba66d6832d00475f3adf200b47662415ddbbbb3e842b914da4d7ddb3951806",
+    "operand-route-0-v2/utilization_route.rpt": "2c2dd7c834f2b417e2493abfd522360cab197542a055adcf982c8a9a04469b31",
+    "operand-route-0-v2/utilization_synth.rpt": "e619be9dbb9cc7e5fe7c2605c222307e468ebba39f58707954dfac4ca67d0b88",
+    "operand-route-1-v2/check_timing_route.rpt": "8f66ee1c7b3cbffc5ddc9c8fe37504d6945dfadea85be008d6c47173c88feb47",
+    "operand-route-1-v2/check_timing_synth.rpt": "8830577c8e6f79d85864cc994d365dc0b381a064cdc2fd3418d9b45d636e24ab",
+    "operand-route-1-v2/checkpoints.sha256": "1b413f5d4b1fed66374f93c39def163bf03bb13100904a9e33b69e6fb6ed3990",
+    "operand-route-1-v2/dsp_ce_route.tsv": "493ca827f77e9b9297e4be8a3211f2853bea4cc9ac9dc768985cce8b12c2c3b1",
+    "operand-route-1-v2/dsp_ce_synth.tsv": "493ca827f77e9b9297e4be8a3211f2853bea4cc9ac9dc768985cce8b12c2c3b1",
+    "operand-route-1-v2/dsp_route.tsv": "988a5fe916aafd684e17d12374c2b7d2faaefb7e3098ba4fc30fde1b74df81cf",
+    "operand-route-1-v2/dsp_synth.tsv": "988a5fe916aafd684e17d12374c2b7d2faaefb7e3098ba4fc30fde1b74df81cf",
+    "operand-route-1-v2/failing_hold_route.tsv": "90e7b94bc48494d952f87ca8f8e78c2e98b04ea5129c88de0235d0be0dfcc045",
+    "operand-route-1-v2/failing_hold_synth.tsv": "cc99d5f415c81b81cde8fef81c2881d60aeef89878410e7a318c556c92d387a7",
+    "operand-route-1-v2/failing_setup_route.tsv": "cc99d5f415c81b81cde8fef81c2881d60aeef89878410e7a318c556c92d387a7",
+    "operand-route-1-v2/failing_setup_synth.tsv": "cc99d5f415c81b81cde8fef81c2881d60aeef89878410e7a318c556c92d387a7",
+    "operand-route-1-v2/frozen_sources/measure_spectrum_operand_boundary.tcl": "a3a733013e03e5bb60c8aeeb6ac029ef88136f2d407543c5a19368facc1d57d4",
+    "operand-route-1-v2/frozen_sources/starlink_pss_spectrum_operand_register_ooc.xdc": "5ec96ae2f5a6e4b074a1c0ee2305f9fa7bb3d1a859e53f864789049d76a75ed9",
+    "operand-route-1-v2/frozen_sources/starlink_pss_spectrum_product.v": "4f9046d0efc395d68caa9b63911fcf5c18ab335b1f2707ad19d3794e0cc2329b",
+    "operand-route-1-v2/frozen_sources/starlink_pss_spectrum_product_operand_register.v": "dfb04b76e5ba9069565a8671794a365adcd2d516013d4f588eda8581f037b69d",
+    "operand-route-1-v2/frozen_sources/tb_starlink_spectrum_operand_parameters.sv": "1bd5698740bb9c36df67260093cf20e67863d3416256ed3ea6ac67053efd4fc6",
+    "operand-route-1-v2/frozen_sources/test_starlink_spectrum_operand_physical_policy.py": "20b609a5f61f0bcfe7ab59329e8aa2d51ad987c5cb40b4337da6189ad91c91b8",
+    "operand-route-1-v2/hold_route.rpt": "910c17dac33a1b0ce685225077a0538ad461d5607a20326274c4f27d01868042",
+    "operand-route-1-v2/hold_synth.rpt": "d9906b194f3b821836d2078d0ccdb800b0d6e8a50ee9fdaeacf8f30fe6bb9d10",
+    "operand-route-1-v2/input_sources.sha256": "2c432f4fa6afa794f1a4587eaace0cf5b8a6ccd79ef2f93ece2d7a77438f96bb",
+    "operand-route-1-v2/internal_hold_route.rpt": "01ad5e2b9f96ca2196aa9e2295dae454954c26d5088847871efb7b878909280b",
+    "operand-route-1-v2/internal_hold_synth.rpt": "ed15a1d9ceb7bc35637894c0e4b713e6241f990f04ef6b646b2a557fe4d8300c",
+    "operand-route-1-v2/internal_setup_route.rpt": "aa7944239916dbfb7672fd7c5c8640681150db3c3fc79b142b796e56b05f4cc2",
+    "operand-route-1-v2/internal_setup_synth.rpt": "5c2eddd15a088de3b7cff7c8eea2353e10cb6feb40c8f9de8a4072b2573c5b34",
+    "operand-route-1-v2/methodology.rpt": "b8c9c7357d1381b01564bda03672e3ffab828d85559ed0d1f76ad00b542dbf8b",
+    "operand-route-1-v2/operand1_opt.dcp": "291039675b4c14f1c2b428db22f42ef8b477f428327d05120e3d8818dddb851b",
+    "operand-route-1-v2/operand1_route.dcp": "f5e6ecba7d57d5ea6963a90e8f1ec3fa353ccca924dc0086c854db5fffd893e2",
+    "operand-route-1-v2/operand1_synth.dcp": "c62a81571cd3022ca0eed9fcf45be7f12fdda3b1063e0d40bb5281cbfa156207",
+    "operand-route-1-v2/parameter_compile.log": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "operand-route-1-v2/parameter_probe.log": "170323d25911d621b7db26feb731c01791dd3cf9845191b2dcdab412407a2305",
+    "operand-route-1-v2/result.txt": "ba2a7657647818aca098515906b68b073a4340a73a24cb41fcd95d7a621ccb21",
+    "operand-route-1-v2/route_status.rpt": "e318740b103afb0c23e5192ff80f730d65773d3f0891c797cdeb8aa808c38869",
+    "operand-route-1-v2/scope.txt": "c6be097698dd7ed9197a647812bddadfc640189a1c9cfb48a8deb0f5a868af5f",
+    "operand-route-1-v2/setup_route.rpt": "58fc09953f3bf2c20aae4ba9ab0d8fb11d6f6aab0a0c284f8822692abba40c3d",
+    "operand-route-1-v2/setup_synth.rpt": "5034598be0412390306a81c84b8fabbafb39d9fd4398bd88022ee7b4ed2ed880",
+    "operand-route-1-v2/timing_route.rpt": "920b5fe624f9595678886683f866ee973523d3bafbf0dbb79cdc6e1b6f150566",
+    "operand-route-1-v2/timing_route.txt": "d7a6eb795728fc9b1316a72fd947da02394c550a61e34bb72721832100c21ac9",
+    "operand-route-1-v2/timing_synth.rpt": "9591b4800141b50a6cf7b18de024b33cb2972f31239ae503cbba870205f73d67",
+    "operand-route-1-v2/timing_synth.txt": "04768d88090b06e5007c3504a91afedd7c6fea85b6d9d124dabd93b2814411cf",
+    "operand-route-1-v2/utilization_opt.rpt": "529a7c63db0cf9a77b114cff5172b5cc70996896915ec4e2bbbca214e3438ea4",
+    "operand-route-1-v2/utilization_route.rpt": "c305cf6a325a72fd84773afb39d16a74de7e95f0d6df12a3e385c895a3c93cf0",
+    "operand-route-1-v2/utilization_synth.rpt": "b02cabc4d36432703bfb47c4eaa31c580667a622aede75546db6f7bdde31faf3"
+  }
+}
