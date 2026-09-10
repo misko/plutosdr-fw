@@ -13,6 +13,11 @@ def test_held_phase_is_exact_tuple_only_delta():
         "git", "-C", str(HDL), "show", f"{BASELINE}:library/starlink_pss_acquisition/{name}",
     ], text=True, capture_output=True, check=True, timeout=10).stdout
     candidate = (ACQ / name).read_text()
+    # The later comparator checkpoint is tested separately against d99c251e;
+    # erase only its exact registered-only opt-in before this whole-body check.
+    opt_in = ",\n    .BALANCED_IDENTITY_EQ(REGISTERED_SCHEDULING)"
+    assert candidate.count(opt_in) == 1
+    candidate = candidate.replace(opt_in, "", 1)
     start = candidate.index("  // Discovery/preflight may select by scheduler state.")
     end = candidate.index("  wire selected_lease", start)
     added = candidate[start:end]

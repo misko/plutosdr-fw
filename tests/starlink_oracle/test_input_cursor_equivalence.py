@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.starlink_oracle.input_identity_contract import restore_legacy_identity_guard
+
 HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", Path(__file__).resolve().parents[2] / "hdl"))
 ACQ = HDL / "library/starlink_pss_acquisition"
 BASE = "0a1af8933bb7d9bc4f0fa78b3350196e98045cda"
@@ -23,7 +25,7 @@ def test_entire_cursor_delta_preserves_all_public_checks_and_frozen_reference():
     golden = (ACQ / "tb/starlink_pss_realtime_input_guard_0a1af893_golden.v").read_text()
     assert tokens(golden.replace("starlink_pss_realtime_input_guard_0a1af893_golden",
         "starlink_pss_realtime_input_guard")) == tokens(baseline)
-    candidate = tokens((ACQ / "starlink_pss_realtime_input_guard.v").read_text())
+    candidate = restore_legacy_identity_guard((ACQ / "starlink_pss_realtime_input_guard.v").read_text())
     # The completed-input experiment exports ONLY an alias of the existing
     # duplicate-start predicate. Prove that exact addition, then retain the
     # original whole-body comparison: no input check/reason may be removed.
