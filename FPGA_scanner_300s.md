@@ -19,19 +19,21 @@ descriptor register enable; other reported paths reach kernel-ROM enables.
 This is worse than earlier P1 (-1.492 ns), not a release candidate. Five
 critical CDC findings and real 175 MHz board-clock integration remain open.
 
-Next: separately tested private-descriptor/admission factoring and an exact
-closed-input cutover predicate, parallel checked-product actual-FFT
-qualification, then fresh physical closure and full receiver/continuous
+Next: actual-FFT qualification of the combined private-descriptor/closed-input
+candidate, parallel checked-product actual-FFT qualification, then fresh
+physical closure and full receiver/continuous
 acquisition/IIO/board qualification before `.18`→`.17` deployment. No radio
 operation or production HDL gitlink promotion. See
 [physical failure and targeted next changes](reports/experiments/20260910-retained-physical-parent-review.md)
 and [actual PASS and independent3306 evidence](reports/experiments/20260910-retained-actual-pass-and-product3306.md).
 
-The first default-off descriptor-offer candidate is now implemented separately
-and passes independent32 offline tests, with40 source pins unchanged. The
-parallel checked-product actual-harness/observer preparation passes independent93
-offline tests, with27 source pins unchanged. Neither result is a new actual FFT
-or routed timing result. The closed-input/ROM-path candidate remains next.
+The first default-off descriptor-offer candidate passes independent32 offline
+tests. Its separately implemented closed-input/combined gate now passes
+independent39 tests, with49 source pins unchanged, including all40 private-only
+pins. An independent zero-strobe predicate evaluation also passes. The parallel
+checked-product actual-harness/observer preparation passes independent93 offline
+tests. These are not new actual FFT or routed timing results. See
+[combined candidate qualification](reports/experiments/20260910-retained-closed-input-parent-review.md).
 
 ## Earlier verification history
 
