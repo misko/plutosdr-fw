@@ -73,9 +73,75 @@ The actual remaining limits include:
 The earlier DSP enable cut remains realized with positive CEA2 margins, but
 that does not qualify the operand or output arithmetic paths. Physical scripts,
 constraints and all seven tested RTL source files were unchanged for this trial.
-CDC, external delays and complete receiver gates remain open. A new stage-local
-fault/publication and arithmetic-pipeline proposal is under read-only review;
-no new runtime implementation or physical retry is authorized yet.
+CDC, external delays and complete receiver gates remain open.
+
+### Next exact-control candidates: fast tests authorized, not physical trials
+
+Following source/proposal review, two separately default-off candidates are
+authorized in the isolated completed-input-fence worktree:
+
+1. Distribute the scalar sticky-fault recurrence into local sticky causes with
+   the identical common-epoch reset. Their OR must equal the frozen scalar
+   recurrence on every edge, including simultaneous causes and resets. Keep
+   all detailed reasons and raw publication fences. Registering existing sticky
+   reasons one cycle later is not equivalent and is not this proposal.
+2. Permit only the private64-bit expected-next kernel scratch value to update
+   on a ready final-bin slot, including invalid bubbles. All other state/accepts/
+   faults stay literal. Prove that the scratch value equals the old value whenever
+   a nonfaulted new-block identity actually consumes it. Include every identity
+   bit, wrap, invalid/X bubbles, malformed finals, stalls and overwrite mutants.
+
+Implement and test each separately plus combined; default-off inverse restoration
+and independent frozen references are required. No actual FFT simulation,
+synthesis or route is authorized until those fast evidence/source changes are
+reviewed. Duplicating source/product70-bit comparisons is deferred pending area
+and path evidence. A real multiplier operand stage is a separate future change:
+it must capture both complex operands and metadata together, preserve token
+ownership and backpressure, and explicitly account for shifted overflow latency.
+It would not by itself solve the separate rounding/saturation path.
+
+## High-rate integration: offline fixture work authorized
+
+An independently reviewed source audit confirms that existing native30/60 and
+rate-conditioned coarse/pilot components are not yet a public high-rate bank+
+boundary-stop composition. The acquisition and PSMA guards explicitly restrict
+the current shared/STOP profiles to15MS/s; the Linux driver also checks that
+rate/version/DDC identity. Preserve those checks until a new explicit opt-in
+contract is implemented and tested.
+
+Two easily missed requirements were confirmed directly in current code:
+
+- STOP's current fatal mask0x57ff excludes conditioner saturation bit13.
+  A future conditioned/shared profile needs the combined0x77ff health policy,
+  including matching driver acceptance; silently permitting higher rates would
+  be unsafe. Current15MS/s behavior must remain unchanged.
+- Linux exposes wide DDC observations only for ABI1.4. Internal64-bit counting
+  at30MS/s does not mean high words are part of that older public contract.
+
+The old paired startup waits for canonical outputs while conditioning is
+disabled; at30/60 it needs real raw-CDC cleanup/drain before public enable,
+without masking a gap in an active capture. Lower-edge operation requires
+actual shared edge/kernel/native-coefficient/pilot configuration, not relabeling
+the current upper-only integrated profile.
+
+Next independent worktree: `codex/starlink-rx-only-do-not-merge-high-rate-paired`,
+starting FWe2f957b0a/HDLb49553c1. Only implementation/offline testing of a new
+30-upper common native-source oracle is authorized. Use real integerx2
+conditioning, the frozen30 conditioned kernel/energy, explicit18-bit C-model,
+original-rate132tap native correlation and the independent2.5MS/s pilot oracle.
+No public guard/profile, runtime, driver, receiver or physical changes yet.
+
+With ratioD=2/4 and conditioner half-supportH=7/21, a canonical interval ofN
+samples startingP needs raw inclusive support
+`[D*P-H, D*(P+N-1)+H]`, or `D*(N-1)+2H+1` raw words. The proposed4096-canonical
+envelope therefore needs8205/16423 raw words at30/60, not a plain8192/16384
+rescale. Freeze phase/startup/halo support independently before actual RTL use.
+Pilot newest canonical indexn has raw support
+`[D*(n-538)-H, D*n+H]` and raw center `D*(n-269)`; do not subtract conditioner
+delay twice. Every available transform prefix, native tuple and pilot output
+must come from this same raw fixture. A dedicated-core high-rate numerical
+composition, if used later, is only an intermediate test and cannot replace
+bank/STOP deployment qualification.
 
 ## Preserved operational scope
 
