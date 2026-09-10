@@ -4,13 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
-The next default-off bank-local identity candidate passes independent comparison
-probes and the complete seven-context scripted replay in modes0/1: all77953 CSV
-rows and complete prior results match,122 pins unchanged. It moves source/product
-metadata comparisons before phase selection while retaining exact X/Z fallback.
-Clocked adversarial qualification and new actual/physical evaluation are pending;
-the last measured route remains-2.504ns below.
+The next default-off bank-local identity candidate passes independent **59 tests**
+in18.81s,127 source pins unchanged. Full original guard state/output comparisons,
+clocked and X/Z controls, fault/ACK boundaries and the complete seven-context
+scripted replay pass in modes0/1: all77953 CSV rows and complete prior results
+match. It moves source/product metadata comparisons before phase selection with
+exact X/Z fallback. Actual-vendor preparation is next; no new physical result.
 See [bank-local candidate checks and remaining gates](reports/experiments/20260910-bank-local-identity-parent.md).
+
+In parallel, independent **15 tests** pass the contextual destination-readiness
+proof, including333056 aggregate comparisons and four executed fault/fallback
+negative controls. The unrestricted shortcut is rejected by a real X-to-clean0
+counterexample. Exact contextual runtime implementation is next, not yet tested
+RTL or a timing result. See [contextual proof and limitations](reports/experiments/20260910-destination-context-parent.md).
 
 The offered-summary candidate now completes source-matched synthesis and route,
 but timing still FAILS: **WNS-2.504ns**,TNS-829.822ns,679 failing setup endpoints.
