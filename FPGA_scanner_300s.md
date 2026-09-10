@@ -78,9 +78,13 @@ bubble semantics and held-overflow fault/publication fences.
 The additive bank arithmetic port now passes101 independently repeated offline
 tests, including exact token math and held-overflow ownership checks. Parent
 verified all5850 archived files and31 frozen sources. Its zero-frame bank test
-interface is synthetic, not vendor FFT evidence. Actual-FFT preparation is the
-next isolated step; no new complete-bank routing or runtime promotion has
-occurred. The control test-stimulus correction now handles the low-phase
+interface is synthetic, not vendor FFT evidence. Final actual-FFT preparation
+now passes180 independent parent tests, including failed-run integrity and
+delayed success-receipt publication. The175 baseline/candidate pair is authorized
+from separate frozen v2 profiles; no result or new complete-bank routing is
+claimed yet. The control R1/D1/S1 settings-only freeze passes94 independent
+parent tests and its single175 actual run is also authorized. Neither branch
+is promoted. The control test-stimulus correction now handles the low-phase
 early-publication boundary found in its first attempt; old assertions remain.
 
 The30MS/s common-source offline cohort is frozen and independently verified.
@@ -98,9 +102,13 @@ outputs. Parent independently reran the frozen verifiers and checked all636
 run-file hashes. Native capture overlaps actual FFT consumption and refinement
 survives coarse STOP. The additional healthy30-upper343x2 actual run also passes:
 686 admitted/687 visible scores,343 exact map words, unchanged fine/pilot results
-and native budgets. Negative cases and runtime promotion remain open. The343/late case packages
+and native budgets. The late447 actual negative now passes: one expired command
+is rejected with no native capture, computation, packet or interrupt, while894
+coarse scores,447 map words and512 pilot samples remain exact. Parent reran its
+frozen verifier and checked all794 original-run and536 portable artifact hashes.
+Other negative cases and runtime promotion remain open. The343/late case packages
 pass253 independent parent tests and652 agent regressions with unchanged
-original447 inputs; one actual late447 negative is authorized after343 archival.
+original447 inputs; both actual results are archived separately.
 Actual60 bank/native/pilot
 integration remains open. Latest
 source-specific decisions and measurements:

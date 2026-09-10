@@ -622,3 +622,72 @@ runner review identified subprocess-environment and failed-run integrity gaps;
 only those runner safeguards and their offline tests are being repaired before
 freezing an actual arithmetic launch. No runtime logic, numerical gates,
 physical timing constraints, radio or PPU configuration changed here.
+
+## Final30 rejection proof and source-specific timing-candidate launches
+
+Late30-upper447 original4358 completed exit0. Parent reran the frozen result
+verifier: expected-late-rejection PASS. Actual command handshake17179870177,
+capture-start lead-50 and58 control clocks meet the predeclared negative bounds.
+Native admission/capture/compute/raw/qualified/packet/result/IRQ all remain0
+through the complete12303-sample source. Coarse894 scores,447 map words and512
+pilot samples match their independent goldens. This is successful rejection,
+not a native detection or RF result. All794 full-run hashes and536 portable
+hashes independently verify. Portable archive SHA256:
+`690ae23ad0fa0bc7a8b5e59d3b6923186067fe29e7c865295e2efab4df760353`.
+Final30 FW5bf4019a4bd151ee2769703a81c3112d63da4fc0 is pushed on its isolated
+DO NOT MERGE branch; HDL529dc8e8d33afc237c7b26f8969ec32fa97cdbdd was already pushed.
+Healthy343 also has791 original-run and533 portable hashes independently
+verified, archive5df8821406402188ef7d1eb5dd59d155583fc15247c43081e8d3f86841b2cbc4.
+Passing control baseline22816 is archived at FWd802dbc3716ca79d7e3a10aec00e76d2ab1a97ff /
+HDL04724da01d8917dbdb2abfbd54edf01e77d962fa; all69 archive hashes verify.
+
+Parent read the complete settings-only control preparer, its new tests and
+report. Independent94-test repetition passed in14.62s, original86375 exit0,
+retained at `/tmp/starlink-combined-final-parent.qw8qxJ`. All298 archived hashes
+and the complete live freeze verify; project was absent. One actual175
+R1/D1/S1/extras1/QUICK0 run is now authorized from
+`/tmp/starlink-completed-input.5EaJuD/extra-edge-combined-prepared-v1`, inventory
+`8e9251fe06e41917e9e0b5ebceef36db444bc39770efe7acb940dbfcc4ed7906`.
+Final FW6a8bce26b7ecc408a610efc139b60fb0d3c97414 /
+HDL5c18664368eeaf1bf2f76a2a672dfbd3f78c167f. Frozen source bytes remain exactly
+those of the passing phase-aware baseline; only settings/provenance differ.
+Historical registered25ab9d06 CSV, both extra suites and independent status
+accounting are mandatory. Baseline29 invalid-only rows are not a combined
+expected count; no original raw217 PASS is inferred.
+
+Parent finished arithmetic runner/test review, including sanitized Python
+children, original-error retention, independent after-run source verification
+and publication of results.json only after both statuses succeed. A deliberate
+early-publication mutant retains the misleading JSON as negative evidence.
+Independent180-test repetition passed in20.50s, original47153 exit0, retained at
+`/tmp/starlink-arithmetic-final-parent.GFCzUe`. All3775 final-v2 archive members,
+six new live sources and both42-file freezes independently verify; neither had
+a project or launch receipt. Archive SHA256:
+`d8ebb01d798fd8bcc4ce0cf15eda588a5f2f857210d0046a66a5ae84415b7ce8`.
+FW4e7103d67d8372628d0162b0e196050ab20ea4d6 /
+HDL5e4c2ad291ac682308ea65b2a48758b2d445b75c are authorized for the175-only pair:
+R1/B0/O0 baseline manifestc0366928757d83ec61e8e772e01e498a5aa8c680ce8ef8e375d59d8c72ad445b;
+R1/B1/O1 candidate manifestdf31efc303aee3bf3fb2b065839b672d70e9d8d7f454ff7e3602a77b0f10ad52.
+Use only the final v2 freezes, runner33ba72515e0198fae920ef0b0e477a6c07b6c95f3552f3d5671078c2bef90ae9,
+unchanged original bounds/assertions and event-indexed independent numerical
+comparison. Output-derived scores are oracle-only, not scorer RTL integration.
+Each agent owns its original handles; observation timeout never permits restart.
+Failure is retained without retuning. No physical launch or promotion follows
+automatically from these simulation authorizations.
+
+The authorized runs have now launched once: control original79656 at08:40:10UTC;
+arithmetic baseline44608 and candidate34776 concurrently. Their agents own
+polling and original terminal receipts. No terminal result is claimed here.
+
+The60 numerical work now has separate FW/HDL worktrees at
+`/tmp/starlink-coarse-alternatives.Y3JzOI/high-rate60-paired`, branch
+`codex/starlink-rx-only-do-not-merge-high-rate60-paired`, based on final30
+FW5bf4019a/HDL529dc8e8. Parent reviewed the pre-evaluation recipebd39c5fd:
+approved198 support files are byte-exact, PCG64 seed0x600052020260910 is fixed,
+16423 raw samples, separate x2 rounding twice, native264-tap exact replacement,
+520-sample capture,257 raw/241 qualified lags, seven447-score coarse blocks and
+512 independent pilot samples. Identity probes at offsets0/42/127/14023/16422
+are fixed outside native capture before evaluation. No new runtime profile,
+native60 service budget, actual FFT, RF accuracy or causal acquisition is claimed.
+Primary runtime, radios and PPU remain unchanged; full-bank setup still fails
+at-1.907ns. Hardware qualification and .18-before-.17 deployment remain open.
