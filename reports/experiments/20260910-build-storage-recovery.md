@@ -268,3 +268,21 @@ The agent owns original handle **11476**, launched at
 Its output and TMPDIR are non-`/tmp`; the new run was absent and paths were
 checked for symlinks before launch. There is no retry, route, runtime promotion
 or radio authorization. A terminal synthesis result is not yet recorded here.
+
+### Original ROM synthesis terminal: successful resource measurement
+
+Original 11476 subsequently terminated with exit 0 at
+2026-09-10T13:37:57.844715 UTC, elapsed 131.839 seconds. Owner before-audit,
+tool, after-audit and overall statuses are all zero. Parent independently read
+the complete receipt and reports, checked all eight nonempty product byte counts
+and hashes, all 12 copied-source identities and all 13 pre-synthesis source/IP
+hashes, and required one original completion marker, no ERROR/FATAL and zero
+black boxes.
+
+The isolated three-bank island uses 2,059 LUTs, 4,607 FFs, 21 DSP48E1s and
+15 RAMB18E1s. Relative to the C1 synthesis this is +73 LUTs/+107 FFs, with
+unchanged DSP and RAM counts. The synthesized checkpoint is 2,181,849 bytes,
+SHA-256 `264b7dbb89ccef59b1b41dbaee2e01d4138b8d9a368f64ebc6532efd04f5405e`.
+These are synthesis resource results, not achieved timing or full receiver
+utilization. A source-specific unchanged-constraint diagnostic route is the
+next measurement; no route result or hardware authorization follows yet.

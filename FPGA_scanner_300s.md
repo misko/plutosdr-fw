@@ -2,7 +2,7 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
-Latest update (2026-09-10, after 13:35 UTC): build-output storage recovered
+Latest update (2026-09-10, after 13:37 UTC): build-output storage recovered
 without discarding evidence. The corrected late-request testbench independently
 passes694 offline tests and its fresh vendor run2011 now passes the unchanged
 late-rejection/coarse/pilot gates, independently verified by the parent.
@@ -13,7 +13,9 @@ a `/tmp` quota error; it is not a passing run. Its unchanged-source successor101
 now PASSES the full functional suite: all four historical traces are unchanged,
 and parent verification confirms complete ROM/CDC/control receipts and stored
 source integrity. ROM physical preparation independently passes 43 tests; its
-source-specific one-shot synthesis has launched, with no result or route yet.
+source-specific one-shot synthesis passes with 2059 LUTs, 4607 FFs, 21 DSPs and
+15 RAMB18s (+73 LUTs/+107 FFs versus C1). Parent verified all products and source
+identities. Diagnostic routing is still pending; no timing pass follows.
 An additive sealed-bank
 pipeline is separately being implemented and independently reviewed; see
 [first-slice scope](reports/experiments/20260910-sealed-bank-first-slice-review.md).
