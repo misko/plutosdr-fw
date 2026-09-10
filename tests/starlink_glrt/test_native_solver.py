@@ -30,6 +30,8 @@ def solver(tmp_path_factory):
     lib = ctypes.CDLL(str(root/"solver.so"))
     lib.glrt_native_solve.argtypes = [ctypes.POINTER(ctypes.c_uint32),ctypes.POINTER(Estimate)]
     lib.glrt_native_solve.restype = ctypes.c_int
+    lib.glrt_native_solve_capture.argtypes = lib.glrt_native_solve.argtypes
+    lib.glrt_native_solve_capture.restype = ctypes.c_int
     lib.exact_center.argtypes = [ctypes.POINTER(ctypes.c_uint32),ctypes.POINTER(ctypes.c_uint32)]
     lib.exact_center.restype = ctypes.c_double
     return lib
@@ -63,10 +65,18 @@ def packet(iq, raw):
     return w+[RATE,SAMPLES,0,0,0,0,0]
 
 
-def call(solver,w):
+def call(solver,w,*,capture=False):
     out = Estimate()
-    rc = solver.glrt_native_solve((ctypes.c_uint32*32)(*w),ctypes.byref(out))
+    function = solver.glrt_native_solve_capture if capture else solver.glrt_native_solve
+    rc = function((ctypes.c_uint32*32)(*w),ctypes.byref(out))
     return rc,out
+
+
+def captured(w):
+    w = list(w)
+    w[0] = 0x474c4e31
+    w[27:30] = [1,SAMPLES,SAMPLES]
+    return w
 
 
 def dense_fit(basis, iq):
@@ -92,13 +102,15 @@ def test_generated_gram_is_bound_to_exact_integer_reference():
 
 @pytest.mark.parametrize("delay,cfo,phase", [(0,0,0),(.07,.06,.4),(-.09,-.08,-1.7),
     (.173,.177,2.9),(-.2,.19,1.2),(.4,0,-.7),(0,-.4,1.1)])
-def test_native_moments_match_independent_dense_fit(solver,model,delay,cfo,phase):
+@pytest.mark.parametrize("capture", [False,True])
+def test_native_moments_match_independent_dense_fit(solver,model,delay,cfo,phase,capture):
     basis,raw = model
     rng = np.random.default_rng(981)
     values = .3*np.exp(1j*phase)*(basis@np.array([1,delay,cfo]))
     iq = np.rint(np.column_stack((values.real,values.imag))+rng.normal(0,50,(SAMPLES,2))).astype(np.int64)
     expected,coherence,improved = dense_fit(basis,iq)
-    rc,estimate = call(solver,packet(iq,raw))
+    w = packet(iq,raw)
+    rc,estimate = call(solver,captured(w) if capture else w,capture=capture)
     assert rc == 0
     np.testing.assert_allclose([estimate.delay*1e6,estimate.residual/1000],
                                np.clip(expected,-.25,.25),atol=2e-12,rtol=0)
@@ -109,7 +121,8 @@ def test_native_moments_match_independent_dense_fit(solver,model,delay,cfo,phase
 
 
 @pytest.mark.parametrize("control", ["noise","tone","zero"])
-def test_controls_cannot_produce_supported_updates(solver,model,control):
+@pytest.mark.parametrize("capture", [False,True])
+def test_controls_cannot_produce_supported_updates(solver,model,control,capture):
     _,raw = model
     if control == "noise":
         iq = np.rint(np.random.default_rng(852).normal(0,1000,(SAMPLES,2))).astype(np.int64)
@@ -118,9 +131,31 @@ def test_controls_cannot_produce_supported_updates(solver,model,control):
         iq = np.rint(np.column_stack((signal.real,signal.imag))).astype(np.int64)
     else:
         iq = np.zeros((SAMPLES,2),dtype=np.int64)
-    rc,estimate = call(solver,packet(iq,raw))
+    w = packet(iq,raw)
+    rc,estimate = call(solver,captured(w) if capture else w,capture=capture)
     assert rc == 0 and estimate.rejection
     assert estimate.rejection & (4 if control == "zero" else 64)
+
+
+@pytest.mark.parametrize("index,value", [(0,MAGIC),(27,0),(27,2),(28,SAMPLES-1),
+    (29,SAMPLES-1),(30,1),(31,1),(8,2048)])
+def test_original_iq_header_is_validated_as_gln1_not_gls1(solver,model,index,value):
+    _,raw = model
+    w = captured(packet(np.zeros((SAMPLES,2),dtype=np.int64),raw))
+    w[index] = value
+    assert call(solver,w,capture=True)[0] == -1
+
+
+def test_native_capture_fault_and_delivered_prefix_prevent_a_supported_fit(solver,model):
+    _,raw = model
+    w = captured(packet(np.zeros((SAMPLES,2),dtype=np.int64),raw))
+    w[7:9] = [10,1024]
+    w[28:30] = [12,12]
+    rc,out = call(solver,w,capture=True)
+    assert rc == 0 and out.rejection == 3 and out.delay == out.residual == 0
+    # A delivered original-IQ prefix cannot wrap even if arithmetic stopped early.
+    w[3:5] = packed(2**64-11,2)
+    assert call(solver,w,capture=True)[0] == -1
 
 
 @pytest.mark.parametrize("r", [2**51-1,-2**51,2**40+1,-2**40+1,1,-1])

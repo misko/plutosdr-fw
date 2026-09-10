@@ -29,4 +29,11 @@ struct glrt_native_estimate {
  * Native start remains an integer in the caller; delay is a separate offset.
  */
 int glrt_native_solve(const uint32_t words[32], struct glrt_native_estimate *out);
+
+/* GLN1 original-IQ result, with its own capture flags/counts/fault validation.
+ * The caller must bind tag/start/phase and independently replay the saved IQ.
+ * Uses the same full-pilot numerical fit and rejection gates as GLS1, without
+ * rewriting the persisted packet into another wire contract. Supported local
+ * fits do not by themselves establish acquisition or physical continuity. */
+int glrt_native_solve_capture(const uint32_t words[32], struct glrt_native_estimate *out);
 #endif

@@ -36,6 +36,19 @@ result and emits `starlink-gln1-native-exact-start-replay/v1`. Its
 acquisition, prediction-source and physical-precision flags remain false.
 Legacy relative captures keep their existing replay schema.
 
+For the additional pilot-support check, build a host shared library from
+`tools/glrt_native_solver.c` and pin its SHA-256. Run
+`python3 -m tools.starlink_glrt_native_support --capture CAPTURE_DIRECTORY
+--bank BANK_FILE --solver LIBRARY --solver-sha256 DIGEST --output SUPPORT_JSON`.
+It first verifies the complete original-IQ arithmetic, then calls the explicit
+`glrt_native_solve_capture` GLN1 entry point. The existing GLS1 solver still
+requires GLS1 packets; no saved header is rewritten. Both entry points use
+the same full-pilot Gram matrix, ±250 ns/±250 Hz local bounds and coherence
+gate. The support output retains replay and rejection evidence. Rejected
+fits have null timing/CFO estimates and cannot be treated as measurements.
+Supported local fits still do not establish physical source continuity,
+absolute acquisition identity or an accuracy improvement.
+
 Exact-start captures also retain `timing.json`, including failed attempts.
 Its `starlink-gln1-native-host-timing/v1` milestones use decimal-string host
 monotonic nanoseconds around context creation, verification, configuration,

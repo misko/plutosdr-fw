@@ -57,7 +57,7 @@ static double centered(const uint32_t *reference, const uint32_t *prefix)
 static double norm2(double complex z) { return creal(z)*creal(z)+cimag(z)*cimag(z); }
 static double clip(double x, double low, double high) { return fmax(low,fmin(high,x)); }
 
-int glrt_native_solve(const uint32_t w[32], struct glrt_native_estimate *out)
+static int solve(const uint32_t w[32], struct glrt_native_estimate *out, int capture)
 {
     double complex g[3][3], p[3], amplitude, residual[2];
     double norm, energy, gain, h00, h01, h11, r0, r1, discriminant, eigen_low, eigen_high;
@@ -67,12 +67,20 @@ int glrt_native_solve(const uint32_t w[32], struct glrt_native_estimate *out)
     if (!w || !out)
         return -1;
     memset(out,0,sizeof(*out));
-    if (w[0] != 0x474c5331U || !w[2] || w[25] != NATIVE_RATE || w[26] != NATIVE_SAMPLES ||
-        w[27] >= 64 || w[28] || w[29] || w[30] || w[31] || (w[8] & ~0x3ffU) ||
+    if (!w[2] || w[25] != NATIVE_RATE || w[26] != NATIVE_SAMPLES ||
         w[7] > NATIVE_SAMPLES || (!w[8] && w[7] != NATIVE_SAMPLES))
         return -1;
+    if (capture) {
+        if (w[0] != 0x474c4e31U || w[27] != 1 || w[30] || w[31] ||
+            (w[8] & ~0x7ffU) || w[28] != w[29] || w[28] > NATIVE_SAMPLES ||
+            w[7] > w[28] || (!w[8] && w[28] != NATIVE_SAMPLES))
+            return -1;
+    } else if (w[0] != 0x474c5331U || w[27] >= 64 || w[28] || w[29] ||
+               w[30] || w[31] || (w[8] & ~0x3ffU)) {
+        return -1;
+    }
     start = ((uint64_t)w[4] << 32) | w[3];
-    if (w[7] && start > UINT64_MAX-(w[7]-1))
+    if ((capture ? w[28] : w[7]) && start > UINT64_MAX-((capture ? w[28] : w[7])-1))
         return -1;
     for (i=9; i<17; i+=2)
         if (!canonical(w+i,2,52,1)) return -1;
@@ -142,4 +150,14 @@ int glrt_native_solve(const uint32_t w[32], struct glrt_native_estimate *out)
     }
     if (out->coherence < .05) out->rejection |= GLRT_NATIVE_LOW_COHERENCE;
     return 0;
+}
+
+int glrt_native_solve(const uint32_t w[32], struct glrt_native_estimate *out)
+{
+    return solve(w,out,0);
+}
+
+int glrt_native_solve_capture(const uint32_t w[32], struct glrt_native_estimate *out)
+{
+    return solve(w,out,1);
 }
