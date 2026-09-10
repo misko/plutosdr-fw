@@ -2,6 +2,16 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest overlap evidence (2026-09-10): parent independently compiles/replays the
+frozen retained-output prototype:17 PASS, all42 sources unchanged. Separate log
+audit confirms8-clock next-forward dispatch,3645-clock nominal publication
+interval, and4911–4912 with the reader parked. Parked-reader timing would exceed
+the29.8us block budget at140MHz; no lower-clock or actual FFT claim. Full fault,
+reset, graph and resource qualification is still in progress. The parallel
+product-interface feedback partition is approved for additive implementation,
+not top/vendor/radio promotion. See
+[retained-output parent review](reports/experiments/20260910-retained17-parent-review.md).
+
 Latest interface snapshot (2026-09-10): parent fresh compile/replay passes20
 focused behaviors, including the repaired exactREADY seam and retained raw
 closed/X/Z diagnostics. Complete3246-node graph still finds acceptance-derived

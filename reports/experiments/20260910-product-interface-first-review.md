@@ -52,10 +52,14 @@ Contains fresh compiled sources/netlist, all20 run receipts/logs, replay and
 complete graph audit/result. Tar comparison exited0. Recovery:
 `product-interface-parent.bGlYti6z` under the persistent20260910 root.
 
-Parallel retained-output composition reports17 initial scripted cases passing,
+At this first-interface checkpoint, parallel retained-output composition
+reported17 initial scripted cases passing,
 including nominal8-clock dispatch/3645 recurrence and parked-reader4911–4912
-recurrence that waits for actual ACK. Parent has not repeated that snapshot;
-full guard/fault/graph qualification remains pending, with no vendor run.
+recurrence that waits for actual ACK. Parent had not repeated that snapshot;
+full guard/fault/graph qualification remained pending, with no vendor run. Parent
+has since independently repeated those17 cases and audited their schedule; see
+[later retained-output review](20260910-retained17-parent-review.md). This does
+not qualify the wider matrix or actual FFT.
 The independent graph-scope audit reports that final inverse-sealed proofs
 already used the correctedLS-aware parser; its earlier defective attempt was
 recorded FAIL before final qualification. No blanket numerical invalidation.
