@@ -1,0 +1,12 @@
+{
+  "archive_bytes": 2078315,
+  "archive_sha256": "690ae23ad0fa0bc7a8b5e59d3b6923186067fe29e7c865295e2efab4df760353",
+  "artifact_inventory_sha256": "3166ed561bce09dfa9308916d74ea083dfc5edead0ccf62d2a8d43d7581d7ba7",
+  "case": "late447",
+  "outcome": "expected-late-rejection",
+  "raw_run_bytes": 48975978,
+  "raw_run_inventory_files": 794,
+  "receipt_files": 536,
+  "regular_members": 537,
+  "source_signature": "b9d4d306fd9665133e36dc21e24125bce9ac7a6b3b34ed335b45fd5e2ba9ab09"
+}
