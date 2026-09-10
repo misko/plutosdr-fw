@@ -2,6 +2,13 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest execution gate (2026-09-10): the frozen inverse bundle and nine-edit
+execution owner pass parent review and independent source verification. One
+actual FFT evaluation has started, owned by the inverse agent as original21014,
+with no retry or automatic physical promotion. A result is still pending; this
+does not supersede the failed P1 route. Exact source pins and scope are in the
+[inverse preparation review](reports/experiments/20260910-inverse-actual-preparation-review.md).
+
 Latest offline gate (2026-09-10, after 15:49 UTC): parent independently repeats
 65 inverse actual-preparation tests, all PASS with unchanged source pins. This
 qualifies the source/clock/protocol test harness, not a new FFT execution.

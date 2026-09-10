@@ -1,8 +1,37 @@
 # Inverse actual-core preparation: independent offline review
 
-2026-09-10, after 15:49 UTC. **Preparation only; no new vendor execution or
-deployment approval.** The failed P1 route remains failed. This is a separate
-inverse-output candidate, not a union with the ROM/product experiments.
+2026-09-10. **The offline preparation passes; one source-pinned actual run is
+now authorized and started, with no result yet.** The failed P1 route remains
+failed. This is a separate inverse-output candidate, not a union with the
+ROM/product experiments. No physical or deployment approval is implied.
+
+## One actual execution approved
+
+After the 65-test repeat, parent fully read the owner, original owner, strict
+inverse checker and full generated Tcl. Parent repeated the nine-edit owner
+inverse and the standalone frozen source verifier from `/`; both exited 0.
+The 64-file bundle has manifest SHA
+`2c1bf9badc769aeae54fe1848d8ce8a3f1cda810e096a541ea5b5840618feb8a`,
+runner SHA `23e9e9b989e35f013113bd6356288952bf05d58c57d7803c8baa1d74b8239972`,
+and owner SHA `c77a1a119df74e7e3a93281e59f03a0050bb9e29f03354253618152a6ab1d96f`.
+
+Exact owner is `own_inverse_sealed_actual_v1.py` beneath recovery directory
+`inverse-actual-prepared-v1.sUupdgsv`; prepared bundle is its child
+`inverse-sealed-actual-R1B1O1L1E1-175-prepared-v1`. The owner creates exclusive
+child `inverse-sealed-L1E1-175-actual-owned-v1` and uses a task-local TMPDIR.
+All other process/exception/post-integrity behavior is unchanged from original
+6473's reviewed owner. Vivado remains 2022.2, two threads, 175/100 MHz; launch
+uses explicit Python `-B` with PYTHONOPTIMIZE and Python environment overrides
+unset. Parent checked 41 GiB free before authorization.
+
+The inverse agent owns **original 21014**, launched once after this exact-source
+approval. It must poll that same handle to terminal; no retry follows observation
+timeouts or failure. All source, generated IP, logs, numerical/protocol CSV and
+WDB evidence must remain. No synthesis, route, source mutation, radio access or
+automatic promotion is included. Actual result and recorded waveform-history
+review are still pending. The parent audit script is prepared separately at
+recovery `inverse-actual-audit-parent.WkCdfycM/verify.py`; it cannot pass before
+the successful original terminal receipt and independent result repeat exist.
 
 ## Reviewed source and independent repeat
 
@@ -62,9 +91,8 @@ with `-B -m pytest tests/starlink_oracle/test_inverse_sealed_actual_policy.py
   Diagnostic tests cover plain/escaped roots, missing/duplicate objects and
   mixed roots. Inventory success is not recorded waveform-history proof.
 
-The next gate is an exclusive frozen bundle and fully reviewed source-specific
-execution owner, followed by one explicitly approved actual FFT evaluation.
-Creating either preparation does not authorize execution, retries or routing.
+The exclusive bundle and owner review subsequently passed as recorded above.
+Creating a preparation alone never authorizes execution, retries or routing.
 
 ## Parallel implementation decisions
 
