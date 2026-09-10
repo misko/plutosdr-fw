@@ -90,3 +90,49 @@ is FW `61d5ff33c5faff20c4a05540e8efdb08f03c7709` / HDL
 report and verified the committed outer archive closure (three payload files,
 manifest `d4789a8f56a233e6ffad03d3a15e1f97c2f0f367d09f8de5d243d16cb8fa7aed`).
 That integrity check is not a new test run or independent inner-archive audit.
+
+## Actual-controller preparation independently repeated
+
+Parent read the complete additive preparation helper, actual observer/binding,
+all new tests and the result report at FW
+`e2abf283b08e73c439bade8b5df5335aeb9410f5` / HDL
+`eb20e3940e69d28c7d26d05877e3006549da86c0`. Independent original **48393
+exited 0: 60 tests passed in 28.28 seconds** (34 preparation/observer tests plus
+the unchanged 26 local-fence tests). Five source hashes matched before/after.
+Artifacts: recovery-parent `product-actual-parent.hMYnJBQr`.
+Log: `190d3f8dfa26fee28b8d04e6e0578e4f920221d71ddb310a282c17de7a8f9ea6`.
+JUnit: `6f548dda2bbabd5b52f9e478927c7cd954dbbfce2c9935420249d84628e3b730`.
+
+Parent also independently checked every file in the proposed 65-file bundle,
+the exact runner/helper identities and the frozen helper's own admission from
+the prepared directory. Preparation is
+`/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/product-final-actual-prepared-v1`:
+
+- Inventory: `7adf2efa0a242b89ccfbb387b00210e76841ba544cbae4cef97efc861acf59b2`.
+- Runner: `2d3b5008f0d087614000ae518421cd9d800aadeb98a747f47fce01d8e76cc6e3`.
+- Helper: `39141329e600b15c2ff9357d952d3cd148d6db3126fff2c394108073db49b853`.
+- Observer: `632273d1d31829964a2197d1cb967dbceb9ee72ac77cda213c172fb7d9ba1087`.
+- Binding: `4b04032bb8eda1d597cc03b972c02839880caf4b28bf70de2176dda43fca3211`.
+
+The whole bench and runner invert to the accepted K1/M1 preparation. All old
+vectors, references and observers remain literal. The old 217-field inventory
+compares 216 fields unconditionally, including all 18 internal product-bank and
+nine wrapper fields. Only core status payload may differ when both status-valid
+bits are exactly zero; there is no product-bank or inactive guard-data exception.
+Old stimulus forces public ready/valid aliases, so an extra input-only mailbox
+shadow would not share its environment. Instead, the unchanged independently
+driven complete reference retains those comparisons. The additive observer
+checks actual sampled authorization and predicts the old request transition;
+it does not drive or mask the DUT. The standalone four-state observer fixture
+checks 1,024 branch tuples, not real-controller reachability.
+
+Complete parent test receipts are archived in adjacent
+`20260910-product-final-parent-preparation.tgz`: 5,487,690 bytes, SHA-256
+`53e86f079cf1f4457b1717689fefd0290fa3735746c8c7faa626b28bc720c1cb`.
+Contents compare back to the original tree; redundant pytest `*current` aliases
+are omitted. Original files remain intact.
+
+No vendor execution is implied by this repeat. A unique runner owner, exact
+external source pins, pre/post source/IP checks, preserved failure exits and an
+independent observer-scheduling review are the remaining launch gate. No retry,
+physical run, receiver image or radio operation follows automatically.
