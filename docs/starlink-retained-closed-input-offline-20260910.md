@@ -30,6 +30,8 @@ unchanged afterward. Replay:
 -p no:cacheprovider --basetemp=<unique-non-tmp-directory>/cases`.
 Raw evidence is `retained-closed-input-tests-v2.gu0WbmpG` under
 `/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz`.
+Parent independently repeated **39 PASS / 5.90 s**, original3251 terminal0,
+with all49 source pins unchanged in `retained-closed-parent.X69SNqBk`.
 
 - Literal source-expression comparison: 8192 binary predicate-state/control
   valuations plus 212992 single-X/Z substitutions, 221184 executions. Repeated
@@ -80,3 +82,16 @@ candidate nor the seven-context actual FFT qualification, continuous15/60 rate
 proof, arbitrary stalled service capacity or lower-clock approval. New ports
 and parameters support the source-bound named instantiations, not a general
 positional-port ABI compatibility claim.
+
+## Portable publication
+
+Tested source FW675ec3cc22f358074a206d18b819db70de07131b /
+HDL468cb764071163cd07aabddec7e672fd339a7801.
+Archive `artifacts/retained-closed-input-v1.tar.gz`: SHA256
+`a78cd5b2e2dd5561a0f56992e6940aef21f3cf56fe723a4f315ab2188217d8cc`,
+537,360 bytes,315 safe regular members /314 hash-and-length receipts.
+It includes the original compile-failed attempt, owner39, full independent
+parent49-source snapshot and parent221184 real-module algebra/three negative
+mutants. Full363 regular-file inventory is included; sim.vvp payloads remain in
+place and21 symlink aliases are recorded instead of archived. Collection changes
+no test inputs and is separate from the39-test gate. Publication is DNM-only.

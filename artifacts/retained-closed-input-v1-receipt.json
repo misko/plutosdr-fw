@@ -1,0 +1,11 @@
+{
+  "archive": {
+    "bytes": 537360,
+    "sha256": "a78cd5b2e2dd5561a0f56992e6940aef21f3cf56fe723a4f315ab2188217d8cc"
+  },
+  "excluded_symlink_aliases": 21,
+  "file_receipts": 314,
+  "members": 315,
+  "raw_regular_files": 363,
+  "selected_unchanged": true
+}
