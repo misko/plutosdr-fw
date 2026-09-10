@@ -14,6 +14,13 @@ set sources [list $cordic $rotation $rtl]
 set top starlink_glrt_native_products_ooc_wrapper
 set generics {}
 set mode products
+set synthesis_directive Default
+if {[info exists ::env(STARLINK_GLRT_OOC_SYNTH_DIRECTIVE)]} {
+  set synthesis_directive $::env(STARLINK_GLRT_OOC_SYNTH_DIRECTIVE)
+  if {$synthesis_directive ni {Default AreaOptimized_high}} {
+    error "unsupported OOC synthesis directive"
+  }
+}
 set lut_budget 1800
 set ff_budget 3500
 set bram_half_tile_budget 0
@@ -47,7 +54,7 @@ foreach name $names { set digest($name) [lindex [exec sha256sum [set $name]] 0] 
 create_project -in_memory -part xc7z010clg400-1
 set_msg_config -id {Synth 8-311} -new_severity ERROR
 read_verilog $sources
-synth_design -top $top -mode out_of_context -flatten_hierarchy none -generic $generics
+synth_design -top $top -mode out_of_context -flatten_hierarchy none -generic $generics -directive $synthesis_directive
 create_clock -name arithmetic_clk -period 10.0 [get_ports clk]
 set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 set_clock_uncertainty 0.1 [get_clocks arithmetic_clk]
@@ -98,6 +105,7 @@ foreach name $names {
 set fd [open [file join $output summary.txt] {WRONLY CREAT EXCL}]
 puts $fd "scope=out_of_context_native_${mode}_with_registered_boundaries"
 puts $fd "vivado=2022.2"
+puts $fd "synthesis_directive=$synthesis_directive"
 puts $fd "part=xc7z010clg400-1"
 puts $fd "clock_mhz=100"
 puts $fd "clock_source_site=BUFGCTRL_X0Y0"
