@@ -1,6 +1,8 @@
 """Physical runner admission only: synthesis commands are forbidden stubs."""
 import hashlib
 import re
+import shlex
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -14,19 +16,19 @@ PROBE = RTL / "tb/tb_starlink_spectrum_operand_parameters.sv"
 MARKER = "OPERAND_PARAMETERS_VERIFIED width=18 round=1 registered=0 child_width=18 child_round=1 clocks=0"
 
 
-def invoke(path, option, *, version="2022.2", cwd=None, after="", probe_stdout=None, probe_error=False):
+def invoke(path, option, *, version="2022.2", cwd=None, before="", after="", probe_stdout=None, probe_error=False):
     injection = ""
     if probe_stdout is not None:
         injection = f"""set injected_probe [encoding convertfrom utf-8 [binary format H* {{{probe_stdout.encode().hex()}}}]]
 rename exec original_exec
 proc exec {{args}} {{
-  if {{[lindex $args 0] eq "vvp"}} {{
+  if {{[lrange $args 0 3] eq {{env -u LD_LIBRARY_PATH vvp}}}} {{
     {'error' if probe_error else 'return'} $::injected_probe
   }}
   return [uplevel 1 [linsert $args 0 original_exec]]
 }}
 """
-    script = injection + f"""proc version {{args}} {{return {version}}}
+    script = injection + before + f"""\nproc version {{args}} {{return {version}}}
 proc set_param {{args}} {{}}
 proc read_verilog {{args}} {{}}
 proc synth_design {{args}} {{error SYNTHESIS_FENCED_NO_PHYSICAL_RUN}}
@@ -84,6 +86,52 @@ def test_relative_output_is_resolved_before_cwd_change(tmp_path):
     result = invoke("relative-run", 1, cwd=tmp_path)
     assert "SYNTHESIS_FENCED_NO_PHYSICAL_RUN" in result.stdout
     assert (tmp_path / "relative-run/frozen_sources").is_dir()
+
+
+@pytest.mark.parametrize("option", [0, 1])
+def test_both_icarus_children_remove_library_path_but_parent_preserves_it(tmp_path, option):
+    binaries = tmp_path / "bin"
+    binaries.mkdir()
+    for program in ("iverilog", "vvp"):
+        executable = shutil.which(program)
+        assert executable is not None
+        trace = tmp_path / f"{program}.environment.log"
+        shim = binaries / program
+        shim.write_text(
+            "#!/bin/sh\n"
+            f"printf '%s\\n' \"${{LD_LIBRARY_PATH-UNSET}}\" > {shlex.quote(str(trace))}\n"
+            f"exec {shlex.quote(executable)} \"$@\"\n")
+        shim.chmod(0o755)
+    inherited = "/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/Ubuntu"
+    output = tmp_path / "run"
+    result = invoke(output, option, before=(
+        f"set ::env(LD_LIBRARY_PATH) {{{inherited}}}\n"
+        f"set ::env(PATH) [join [list {{{binaries}}} $::env(PATH)] :]\n"
+        'puts "PARENT_BEFORE $::env(LD_LIBRARY_PATH)"\n'),
+        after='puts "PARENT_AFTER $::env(LD_LIBRARY_PATH)"')
+    (tmp_path / "parent.log").write_text(result.stdout + result.stderr)
+    assert result.returncode == 0 and not result.stderr
+    assert f"PARENT_BEFORE {inherited}" in result.stdout
+    assert f"PARENT_AFTER {inherited}" in result.stdout
+    assert "RESULT 1 SYNTHESIS_FENCED_NO_PHYSICAL_RUN" in result.stdout
+    for program in ("iverilog", "vvp"):
+        assert (tmp_path / f"{program}.environment.log").read_text() == "UNSET\n"
+    assert (output / "parameter_probe.log").read_text().strip() == MARKER.replace(
+        "registered=0", f"registered={option}")
+    assert "tool_error=1 source_integrity_error=0" in (output / "result.txt").read_text()
+
+
+def test_runner_diff_is_only_the_two_child_environment_prefixes():
+    before = subprocess.run([
+        "git", "-C", str(ROOT / "hdl"), "show",
+        "7d4efdb36629e45187d992a7b86e94825b021dbd:library/starlink_pss_acquisition/measure_spectrum_operand_boundary.tcl",
+    ], text=True, capture_output=True, check=True).stdout
+    after = RUNNER.read_text()
+    for program in ("iverilog", "vvp"):
+        added = f"exec env -u LD_LIBRARY_PATH {program}"
+        assert after.count(added) == 1
+        after = after.replace(added, f"exec {program}")
+    assert after == before
 
 
 @pytest.mark.parametrize("receipt", [
