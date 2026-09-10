@@ -1,0 +1,225 @@
+{
+  "scope": "one_authorized_L1_diagnostic_route_TOOL_EXIT0_TIMING_FAIL_NO_RELEASE",
+  "original_handle": 30536,
+  "owner": "/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/local-admission-route-v1.EzXzzuNB",
+  "owner_terminal": {
+    "deployment_eligible": false,
+    "elapsed_seconds": 74.51798458909616,
+    "ended_utc": "2026-09-10T12:49:15.078927+00:00",
+    "errors": [],
+    "marker_count": 1,
+    "original_pid": 648733,
+    "products": {
+      "route/cdc_unqualified.rpt": {
+        "bytes": 27041,
+        "sha256": "183586bc8708bf6a5c98d7ed0a1e1693ab3de4ba755d07441c7767de7506c0c9"
+      },
+      "route/check_timing_unqualified.rpt": {
+        "bytes": 7669,
+        "sha256": "10f20512a780199834c5097477fe31c00394ec2feeac4a627ba92044865643f9"
+      },
+      "route/clocks_before.rpt": {
+        "bytes": 1565,
+        "sha256": "9a8fadf5e1aa92ef70af16508beccf0ad44b6510cc889c07621f09a188034555"
+      },
+      "route/completed_input_diagnostic_routed.dcp": {
+        "bytes": 3430318,
+        "sha256": "8a20a37373e03b12f8546dad6762ac879a02b1eb94ed815fce4790644803b3d7"
+      },
+      "route/hierarchy.rpt": {
+        "bytes": 7622,
+        "sha256": "974743ec7e926ba65c1f17d730288ff441350f9f0579680b2550b9d81f59a702"
+      },
+      "route/inherited_constraints.xdc": {
+        "bytes": 1029,
+        "sha256": "abdc1edecef13a84d657810ffcf74aa97941a6c3cebc6ec7d2b329dfeba5fb03"
+      },
+      "route/island_175_max.rpt": {
+        "bytes": 106926,
+        "sha256": "d92847899dcdfdd99ea3a3ff965044b52ee14193cb9564281d78685782c6455a"
+      },
+      "route/island_175_min.rpt": {
+        "bytes": 79854,
+        "sha256": "5f349c2affa1b5617e0bd160cc1087045dddb2675156f1d962da3d6f5c0c901b"
+      },
+      "route/probe.tcl": {
+        "bytes": 3090,
+        "sha256": "0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a"
+      },
+      "route/receipt.txt": {
+        "bytes": 991,
+        "sha256": "b70399b7ccdf48af7b75780f33c69332cdad5faebac55efc1206cd6de60a505f"
+      },
+      "route/route_status.rpt": {
+        "bytes": 651,
+        "sha256": "1c3b8c5192f7e5856ba812ab5873605e65521ad0da536a4bb514faa6233898d1"
+      },
+      "route/source_100_max.rpt": {
+        "bytes": 76602,
+        "sha256": "9b3442ff1dc477d028c258626322eca25133f04018f5e41daaf844b88c6339e4"
+      },
+      "route/source_100_min.rpt": {
+        "bytes": 64300,
+        "sha256": "21b73f1dd24ac463a4f802548b4068f70cfcaf79d44748859bac80a010b65319"
+      },
+      "route/timing_unqualified.rpt": {
+        "bytes": 984276,
+        "sha256": "cc4ffdb1e7e029e93804e06f115fc1f85b0099a97e9ef32bd952ae28e198abda"
+      },
+      "route/utilization.rpt": {
+        "bytes": 11008,
+        "sha256": "7d235154ac792d1d947288e4e69ab9dd39ab098b860fc02d4b412e2e22f7d02d"
+      }
+    },
+    "source_hashes_after": {
+      "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/fft_bank_owned_synth.dcp": "a6a8e404b90924bb538a0da2ae7be7fc9ebc9e0c323b8f1a17661b4550648242",
+      "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-prepared-v1/route_completed_input_fence.tcl": "0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a"
+    },
+    "source_hashes_before": {
+      "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/fft_bank_owned_synth.dcp": "a6a8e404b90924bb538a0da2ae7be7fc9ebc9e0c323b8f1a17661b4550648242",
+      "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-prepared-v1/route_completed_input_fence.tcl": "0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a"
+    },
+    "started_utc": "2026-09-10T12:48:00.560954+00:00",
+    "tool_returncode": 0
+  },
+  "archive": "20260910-local-admission-ooc-route-v1.tgz",
+  "archive_sha256": "45d3d8b433bca8dc373e3bdad23a23c3c7049cd48a1b7f241c2633684a97cc8b",
+  "archive_bytes": 5548907,
+  "safe_unique_regular_files": 45,
+  "file_sha256": {
+    "owner/before.json": "4f3b8ba58344d7e9456ead061c7ac38c04e25e3f2a70e718497ecdc7e734d6b4",
+    "owner/outer.log": "edb1d90a95a4bfa1c888763fa7f468e5cc134f3b91ca176baf778258497ad5b1",
+    "owner/own_route.py": "874e02470ee8d39ef9eba05fc0161bc6dffcafb7db645adfbd27faeb6296b0f4",
+    "owner/route/cdc_unqualified.rpt": "183586bc8708bf6a5c98d7ed0a1e1693ab3de4ba755d07441c7767de7506c0c9",
+    "owner/route/check_timing_unqualified.rpt": "10f20512a780199834c5097477fe31c00394ec2feeac4a627ba92044865643f9",
+    "owner/route/clocks_before.rpt": "9a8fadf5e1aa92ef70af16508beccf0ad44b6510cc889c07621f09a188034555",
+    "owner/route/completed_input_diagnostic_routed.dcp": "8a20a37373e03b12f8546dad6762ac879a02b1eb94ed815fce4790644803b3d7",
+    "owner/route/hierarchy.rpt": "974743ec7e926ba65c1f17d730288ff441350f9f0579680b2550b9d81f59a702",
+    "owner/route/inherited_constraints.xdc": "abdc1edecef13a84d657810ffcf74aa97941a6c3cebc6ec7d2b329dfeba5fb03",
+    "owner/route/island_175_max.rpt": "d92847899dcdfdd99ea3a3ff965044b52ee14193cb9564281d78685782c6455a",
+    "owner/route/island_175_min.rpt": "5f349c2affa1b5617e0bd160cc1087045dddb2675156f1d962da3d6f5c0c901b",
+    "owner/route/probe.tcl": "0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a",
+    "owner/route/receipt.txt": "b70399b7ccdf48af7b75780f33c69332cdad5faebac55efc1206cd6de60a505f",
+    "owner/route/route_status.rpt": "1c3b8c5192f7e5856ba812ab5873605e65521ad0da536a4bb514faa6233898d1",
+    "owner/route/source_100_max.rpt": "9b3442ff1dc477d028c258626322eca25133f04018f5e41daaf844b88c6339e4",
+    "owner/route/source_100_min.rpt": "21b73f1dd24ac463a4f802548b4068f70cfcaf79d44748859bac80a010b65319",
+    "owner/route/timing_unqualified.rpt": "cc4ffdb1e7e029e93804e06f115fc1f85b0099a97e9ef32bd952ae28e198abda",
+    "owner/route/utilization.rpt": "7d235154ac792d1d947288e4e69ab9dd39ab098b860fc02d4b412e2e22f7d02d",
+    "owner/terminal.json": "6476f9b1e14c0e8e3d8174a5d8ed184afae8220f49bb296888a4fe3fb99ae928",
+    "owner/vivado.jou": "06810e21f6e5158b37eb8b5d4fce3e5f3fcd8d10f37d60a52961997a691de0f7",
+    "owner/vivado.log": "b49c1c835f685fdfb983300dc0a4156859d64bf468a0b13c24a8ec30fee7519d",
+    "synthesis_frozen_sources/create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "synthesis_frozen_sources/fft_bank_owned_resource_probe.xdc": "bac30eff84cc71d1f273104b716b388b55e51d33be10f9beaf1901232193ba3f",
+    "synthesis_frozen_sources/fft_bank_owned_synth_threads.tcl": "aec974f2800f01285e888d1b188cd089534941922531914926a8e1b568d4c227",
+    "synthesis_frozen_sources/starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "synthesis_frozen_sources/starlink_pss_fft_bank_owned_local_admission_probe.v": "0cb54617eb6757e1d6c719d97b0fd5002ec7f6105c8c4b50c41eba67d4306235",
+    "synthesis_frozen_sources/starlink_pss_forward_kernel_join.v": "87e40b3cc9025502c05d2afbd6b0d9658618cd7204d4fd8ddc3f0ba74e68843a",
+    "synthesis_frozen_sources/starlink_pss_kernel_rom.v": "0b4ee87d93d61c6fa12ee9992aa517a3a8be568835075531d9af4453f4ec80e5",
+    "synthesis_frozen_sources/starlink_pss_realtime_input_guard_local_admission.v": "55438743eede0d346cec67351e079eb6ae21da437d4088a131a2a258b43ff233",
+    "synthesis_frozen_sources/starlink_pss_realtime_result_guard.v": "09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2",
+    "synthesis_frozen_sources/starlink_pss_spectrum_product_bank_arithmetic.v": "515d29534dab921601c37564ad8a9957eed9befb9dff2e1c8c5f1f79fc6b5f70",
+    "synthesis_frozen_sources/starlink_pss_spectrum_product_operand_register.v": "dead8e465b4bd982cebcab0c4a4e7eb4f3b20c038938f74c7663a79e0779893d",
+    "synthesis_frozen_sources/synthesize_local_admission_prepared.tcl": "45eadaf8042a34451d40a555b35343fc84b214dd61b4d4fb5426c29c7a2e3281",
+    "synthesis_frozen_sources/upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+    "source/fft_bank_owned_synth.dcp": "a6a8e404b90924bb538a0da2ae7be7fc9ebc9e0c323b8f1a17661b4550648242",
+    "source/synthesis_scope.txt": "5a861c69de6c39585b1e232eec82ee2b2522688d20c93f580a3bbf4af63060d0",
+    "source/prepared_SHA256SUMS": "4ebd909dad1ade64272a33dcc034b9f791270ce1191827266c83ad23ee86703b",
+    "source/synthesis_receipt.json": "78f660ebdcecd401f60630af3db9796f7e4e58dce805f41340beba05db8bf10c",
+    "arithmetic_baseline/receipt.txt": "b380366427b0b5b6fd2b9bc4d5fc761c33b495d619ae1dc13f539778345fd278",
+    "arithmetic_baseline/timing_unqualified.rpt": "ea1f9f59d527c82b3802e5aa4f6370ffb84a78579c6b9e550a01fcb6fb2c0814",
+    "arithmetic_baseline/island_175_max.rpt": "f95ce06d3d00cdab59b43622b75ecd89d7280699cf3397ed6498ca99aebc1b74",
+    "arithmetic_baseline/utilization.rpt": "c2703e03eb65d8dfff2aca4d38a07a588a6d408973211e980ea1b21a6465d519",
+    "arithmetic_baseline/route_status.rpt": "f071e155e69856b4c8688cdb656ac14986ae04586821b400af94ebaadb982f7f",
+    "docs/starlink-local-admission-ooc-route-20260910.md": "24949d76dbc1075864d2824fe036ec44334d2a68342222ea71d636df2de77674",
+    "archive_route.py": "c1f7d199ac685a22179b2650d66347306d18c11f548392af4bbbf53c07aeda70"
+  },
+  "source_after_route_matches_original_synthesis_before_sha256": {
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/synthesize_local_admission_prepared.tcl": "45eadaf8042a34451d40a555b35343fc84b214dd61b4d4fb5426c29c7a2e3281",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/fft_bank_owned_resource_probe.xdc": "bac30eff84cc71d1f273104b716b388b55e51d33be10f9beaf1901232193ba3f",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/fft_bank_owned_synth_threads.tcl": "aec974f2800f01285e888d1b188cd089534941922531914926a8e1b568d4c227",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_spectrum_product_bank_arithmetic.v": "515d29534dab921601c37564ad8a9957eed9befb9dff2e1c8c5f1f79fc6b5f70",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_spectrum_product_operand_register.v": "dead8e465b4bd982cebcab0c4a4e7eb4f3b20c038938f74c7663a79e0779893d",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_kernel_rom.v": "0b4ee87d93d61c6fa12ee9992aa517a3a8be568835075531d9af4453f4ec80e5",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_forward_kernel_join.v": "87e40b3cc9025502c05d2afbd6b0d9658618cd7204d4fd8ddc3f0ba74e68843a",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_realtime_result_guard.v": "09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_realtime_input_guard_local_admission.v": "55438743eede0d346cec67351e079eb6ae21da437d4088a131a2a258b43ff233",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/frozen_sources/starlink_pss_fft_bank_owned_local_admission_probe.v": "0cb54617eb6757e1d6c719d97b0fd5002ec7f6105c8c4b50c41eba67d4306235",
+    "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis/project/fft_bank_owned_synthesis.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+  },
+  "unqualified_timing_groups": {
+    "island_175": [
+      -1.549,
+      -305.523,
+      413,
+      9822,
+      0.058
+    ],
+    "source_100": [
+      1.281,
+      0,
+      0,
+      257,
+      0.1
+    ],
+    "source_100    island_175": [
+      -0.652,
+      -8.873,
+      50,
+      67,
+      0.128
+    ],
+    "island_175    source_100": [
+      -1.241,
+      -75.032,
+      78,
+      78,
+      0.118
+    ],
+    "**async_default**  island_175         island_175": [
+      0.673,
+      0,
+      0,
+      265,
+      0.711
+    ]
+  },
+  "unqualified_check_timing": {
+    "no_clock": "0",
+    "constant_clock": "0",
+    "pulse_width_clock": "0",
+    "unconstrained_internal_endpoints": "0",
+    "no_input_delay": "114",
+    "no_output_delay": "124",
+    "multiple_clock": "0",
+    "generated_clocks": "0",
+    "loops": "0",
+    "partial_input_delay": "0",
+    "partial_output_delay": "0",
+    "latch_loops": "0"
+  },
+  "unqualified_CDC": [
+    [
+      "CDC-3",
+      "Info",
+      "6"
+    ],
+    [
+      "CDC-15",
+      "Warning",
+      "139"
+    ]
+  ],
+  "routed_resource": {
+    "Slice LUTs": 1960,
+    "LUT as Logic": 1772,
+    "LUT as Memory": 188,
+    "Slice Registers": 4551,
+    "Slice": 1087,
+    "DSPs": 21,
+    "RAMB18": 15
+  },
+  "deployment_eligible": false
+}
