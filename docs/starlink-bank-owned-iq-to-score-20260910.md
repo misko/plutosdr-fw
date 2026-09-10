@@ -145,9 +145,53 @@ simulate_iq_to_score_bank_owned.tcl NEW_OUTPUT capacity nominal|bursty-stalled 1
 python -m tests.starlink_oracle.iq_bank_owned_evidence hdl/library/starlink_pss_acquisition/build --output REPORT.json
 ```
 
-The new full composition's synthesis resource measurement is the next separate
-gate; the existing 1,834-LUT/4,375-FF/21-DSP/7.5-BRAM result is **slice-only**, not
-a complete coarse or receiver area budget. No area saving is inferred.
+## Complete coarse OOC synthesis resource gate
+
+The isolated `bank-iq-synthesis-v1` run exited zero at 2026-09-10 01:26:13 UTC.
+It copied the actual passing numeric200-v3 frozen RTL, checked selected source
+hashes against that pre-run scope, regenerated the original certified XFFT
+configuration, and hashed all inputs before synthesis. The generated FFT wrapper
+is byte-identical to the numerical simulation's wrapper. Both spawned synthesis
+processes used `general.maxThreads=2`, area-optimized synthesis, original IP OOC
+clock, and unchanged resource-probe clocks of 100/175 MHz. There was no place or
+route and there are **zero black boxes**.
+
+| OOC hierarchy | Total LUTs | FFs | DSPs | BRAM tiles |
+| --- | ---: | ---: | ---: | ---: |
+| Complete coarse composition | 3868 | 6499 | 27 | 14 |
+| Scheduler | 245 | 404 | 0 | 2 |
+| Energy cache | 397 | 427 | 2 | 2.5 |
+| Candidate qualifier/FIFO/normalization/scoring | 1398 | 1198 | 4 | 2 |
+| Three-bank transform island | 1829 | 4375 | 21 | 7.5 |
+| Generated FFT within island | 1205 | 2989 | 17 | 5.5 |
+
+The top total is 3616 logic LUTs + 64 LUTRAM + 188 SRLs, and 6 RAMB36 + 16
+RAMB18. The three FFT banks still each occupy one RAMB18. Hierarchical LUT totals
+are not additive because synthesis can combine logic across hierarchy. Do not
+subtract these standalone synthesis numbers from the parent's placed receiver
+hierarchy to claim receiver area savings. The previous 1,834-LUT standalone
+slice result was not a full coarse budget; this measurement includes the actual
+scheduler, energy retention and scoring costs.
+
+The unqualified timing check retains **103 input ports without input delays** and
+**101 output ports without output delays**. CDC reports **139 clock-enable-control
+warnings**, six synchronized-bit informational records and one synchronized-reset
+informational record, with no exceptions applied. Bundled-data ownership, reset
+release and actual receiver clock relationships still require independent CDC
+review. This synthesis report does not undo the earlier route's −2.557 ns failure.
+
+Full frozen sources, source hashes, hierarchy/utilization, clocks, open-I/O/CDC
+diagnostics, primitive receipt and `iq_bank_owned_synth.dcp` are in
+`hdl/library/starlink_pss_acquisition/build/bank-iq-synthesis-v1/`. Portable complete
+report text and hashes are in
+`reports/starlink-bank-owned-iq-to-score-resources-20260910.json`.
+The resource collector verifies the exact required source inventory, pre-synthesis
+hashes, equality to passing actual-core sources/core, complete hierarchy and
+primitive totals. Two resource-table unit tests bring the local suite to **80
+tests**, all passing; these are collector tests, not more hardware evidence.
+
+Reproduce this resource-only gate using
+`synthesize_iq_to_score_bank_owned.tcl NEW_OUTPUT PASSED_NUMERIC_SIMULATION_DIRECTORY`.
 
 The full objective is unchanged: continuous canonical15 coarse at source15/30/60,
 original native samples for sparse fine search, 2.5 MS/s pilot IIO inspection,
