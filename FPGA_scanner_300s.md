@@ -2,12 +2,15 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
-Latest update (2026-09-10, after 12:49 UTC): build-output storage recovered
+Latest update (2026-09-10, after 12:55 UTC): build-output storage recovered
 without discarding evidence. The corrected late-request testbench independently
-passes694 offline tests; its vendor rerun is still pending. L1 synthesis passed,
+passes694 offline tests and its fresh vendor run2011 now passes the unchanged
+late-rejection/coarse/pilot gates, independently verified by the parent.
+L1 synthesis passed,
 but its first diagnostic route **fails** setup at -1.549 ns, worse than the
 -1.341 ns arithmetic baseline. ROM-prefetch actual23845 remains incomplete after
-a `/tmp` quota error; it is not a passing run. No runtime promotion or radio
+a `/tmp` quota error; it is not a passing run. An unchanged-source successor10102
+is running on recovered storage, with no result yet. No runtime promotion or radio
 operation followed. See [storage recovery and new routing evidence](reports/experiments/20260910-build-storage-recovery.md).
 
 Earlier measured increment: the first combined60 common-source coarse/native/
