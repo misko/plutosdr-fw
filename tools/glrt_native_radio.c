@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <math.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -77,6 +78,8 @@ int main(int argc, char **argv)
     uint64_t frames, seconds;
     char raw[256];
     size_t size;
+    uint64_t ticks = 0;
+    double begin, previous, max_tick = 0, max_gap = 0, elapsed;
     int rc;
     if (argc != 6 || integer(argv[4],10,&frames) || integer(argv[5],10,&seconds) ||
         !frames || frames > 225000 || !seconds || seconds > 300 || bootstrap(argv[3],&b,raw,&size)) {
@@ -91,15 +94,26 @@ int main(int argc, char **argv)
     action.sa_handler = interrupt_run;
     sigemptyset(&action.sa_mask);
     if (sigaction(SIGINT,&action,NULL) || sigaction(SIGTERM,&action,NULL) ||
-        p.retain(p.context,"acquisition_seed",raw,size)) { glrt_native_posix_close(&io); return 2; }
+        p.retain(p.context,"bootstrap_seed",raw,size)) { glrt_native_posix_close(&io); return 2; }
+    begin = previous = p.clock(p.context);
     do {
+        double before = p.clock(p.context), duration;
+        if (isfinite(before-previous) && before-previous > max_gap) max_gap = before-previous;
+        previous = before;
         if (interrupted) glrt_native_controller_request_stop(&controller);
         rc = glrt_native_controller_tick(&controller);
+        duration = p.clock(p.context)-before;
+        if (isfinite(duration) && duration > max_tick) max_tick = duration;
+        ticks++;
         if (rc == GLRT_NATIVE_RUNNING) nanosleep(&pause,NULL);
     } while (rc == GLRT_NATIVE_RUNNING);
+    elapsed = p.clock(p.context)-begin;
+    if (!isfinite(elapsed) || elapsed < 0) elapsed = 0;
     if (glrt_native_posix_close(&io) && !rc) rc = GLRT_NATIVE_IO_ERROR;
     printf("{\"scope\":\"finite_radio_local_feedback\",\"result\":%d,"
            "\"configured\":%" PRIu32 ",\"retained_popped\":%" PRIu32 ","
-           "\"journal_bytes\":%" PRIu64 "}\n",rc,controller.configured,controller.sequence,io.bytes);
+           "\"journal_bytes\":%" PRIu64 ",\"ticks\":%" PRIu64 ",\"elapsed_s\":%.9g,"
+           "\"max_tick_us\":%.9g,\"max_poll_gap_us\":%.9g}\n",rc,controller.configured,
+           controller.sequence,io.bytes,ticks,elapsed,max_tick*1e6,max_gap*1e6);
     return rc ? 1 : 0;
 }

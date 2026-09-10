@@ -46,6 +46,8 @@ ends the process with best-effort cancellation and leaves remaining heads for
 the operator. Do not CLEAR those heads merely to restart. A successful end
 requires full drain followed by CLEAR and a verified empty, invalidated epoch.
 The final JSON result describes runtime completion, not detection or precision.
+It includes the largest observed controller step and polling interval; these
+are bounded-run observations, not worst-case Linux latency guarantees.
 
 `GLRJ1` is an internal length-framed journal: `GLRJ1\n`, then repeated
 `kind length\n` headers followed by exactly `length` payload bytes. Files are
@@ -54,6 +56,14 @@ finishes `fdatasync` before returning. On `/tmp` tmpfs this protects against
 process failure, not power loss. Export the journal before removal; it is not
 automatically deleted. Spool exhaustion fails closed without releasing the
 unretained head. The wrapper must budget and verify available RAM before RF.
+
+`starlink_glrt_native_journal.py` independently checks journal framing, retained
+descriptor order, exact head/estimate association and drained/final counters.
+Its recovery port requires the PPU owner to confirm that the writer has stopped.
+It cancels future work, retains and associates each outstanding head, and only
+clears after drain. An uncertain POP is reconciled against one counter advance;
+it is never blindly retried. A truncated last journal record cannot authorize
+an unretained descriptor. Structural review is distinct from numerical replay.
 
 `glrt_native_io_probe.c` uses the same POSIX adapter but never sends a schedule
 command. It measures 512 idle snapshots and retained writes, bounded to five

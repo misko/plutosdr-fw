@@ -87,6 +87,7 @@ def test_runner_requires_operator_rebase_and_never_starts_rx_or_submits_without_
     assert result.returncode == 1
     summary = json.loads(result.stdout)
     assert summary["result"] == -3 and summary["configured"] == summary["retained_popped"] == 0
+    assert summary["ticks"] == 1 and summary["max_tick_us"] > 0 and summary["elapsed_s"] > 0
     assert (tmp_path/"native_schedule_command").read_text() == "2\n"
     assert not (tmp_path/"native_schedule_submit").exists()
     assert (tmp_path/"native_schedule_snapshot").read_text() == raw
