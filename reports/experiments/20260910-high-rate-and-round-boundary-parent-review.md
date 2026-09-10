@@ -492,3 +492,19 @@ not permission to disable or delay an assertion. Read-only diagnosis and a
 proposal to move only added stimulus away from that sample boundary are in
 scope; no source correction or actual retry is authorized yet. The complete
 bank setup result remains-1.907ns, and no radio or PPU operation occurred.
+
+Subsequent read-only saved-waveform inspection confirms extra_kind1/epoch54
+at the failure; the partial extra CSV has three held no-output rows. The exact
+relative process execution order remains unproven. Offline preparation of a
+new following-negedge drive for only the added fault kinds0/1 is now authorized,
+with still-held-final/ownership assertions before injection and all original
+checker delays, current-veto/sticky checks and reset kinds2/3 unchanged.
+No actual control retry is authorized by that offline correction scope.
+
+Actual30 result evidence is committed/pushed at FW94de11b912 / unchanged
+HDL446a8617. Parent verified all379 portable hashes /380 safe unique members,
+archive SHA256
+`229cd4500d3fff062c2fe8a091567f54298db98b76d962193944e5820dbf5454`.
+The complete original636-file run is retained separately; the portable archive
+omits duplicate generated executables and default waveform, not source or
+numerical evidence. No receiver runtime or radio changes were promoted.
