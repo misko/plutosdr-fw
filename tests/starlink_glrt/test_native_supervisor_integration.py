@@ -94,7 +94,7 @@ def test_supervisor_retains_lost_then_reacquired_C_episodes_before_clean_shutdow
     session = Session()
 
     class Transport:
-        def run_prepared_stdin(self, command, *, byte_count, prepare, timeout_s):
+        def run_prepared_stdin(self, command, *, byte_count, prepare, timeout_s, cancelled=None):
             assert command == 'sh -s' and byte_count == 4096
             radio.advance(30_000_000)  # Authentication cost occurs before fresh prediction.
             payload = prepare()
