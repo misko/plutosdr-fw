@@ -16,7 +16,9 @@ abort passed. Root verified103 receipts and the strict terminal postprocessor.
 Its additive harness/oracle/evidence are integrated on primary FW205b7eb0b /
 HDLc8ad25a7;352 combined policy tests pass, with no runtime RTL changes.
 The new independently reviewed true-PSS520 fixture passes244 offline tests;
-actual175/200 original53217/88546 reportPASS, pending final evidence review.
+actual175/200 original53217/88546 pass, with all238 archive hashes and ordered
+native/pilot observations independently reviewed. The additive tests/evidence
+are now primary FW72fa003a3/HDLb49553c1;415 combined policy tests pass.
 These remain digital simulation results, not live60MS/s deployment qualification.
 
 Previous measured checkpoint:

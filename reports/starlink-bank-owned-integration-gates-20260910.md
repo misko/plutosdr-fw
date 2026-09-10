@@ -211,9 +211,14 @@ oracle/tests/runner delta, repeated244 tests, regenerated the complete cohort,
 and verified all24 cohort files plus12 runtime dependencies in the archive.
 The frozen source is FWc42ebde9/HDL5ad9ba4a on the separate native branch,
 fixtureSHA aa4330480879e5f44abdfeb34b5ddeca098f1b22352715743f0db32e6672de81.
-Both authorized actual175/200 runs report terminalPASS (original53217/88546),
-including exact zero-lag native packets, coarse/pilot bytes and positive
-concurrency. Final source/log/archive review is pending. This synthetic static
+Both authorized actual175/200 runs pass (original53217/88546), including exact
+zero-lag native packets, coarse/pilot bytes and positive concurrency. Parent
+verified all108 frozen files/run,52 packet reads/run,512 ordered pilot words/run
+and238 archive members/hashes. Additive tests/oracle/evidence are integrated at
+FW72fa003a3/HDLb49553c1;415 combined primary tests pass. See
+`experiments/20260910-true-pss-and-forward-retirement-parent-review.md`.
+Next is an additive late-command negative test; implementation/offline tests
+only are authorized before another reviewed actual run. This synthetic static
 anchor does not establish causal acquisition, RF accuracy or high-rate support.
 
 The30/60 extension cannot merely change a test parameter: current realtime and
