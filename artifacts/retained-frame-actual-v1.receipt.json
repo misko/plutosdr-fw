@@ -1,0 +1,12 @@
+{
+  "archive": {
+    "bytes": 1510205,
+    "sha256": "3e70328c934ba6ae767806e4738134152d41bca5ad0a074b3a13dc6126d05d68"
+  },
+  "file_receipts": 125,
+  "members": 126,
+  "raw_before_after_equal": true,
+  "raw_run_bytes": 37205852,
+  "raw_run_files": 214,
+  "selected_before_after_equal": true
+}
