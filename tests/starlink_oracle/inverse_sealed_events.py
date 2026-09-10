@@ -33,6 +33,8 @@ EVENTS = {
     "OUT": r"OUT (\d+) (\d+) (\d+) mode=([01]) pos=(\d+) data=([0-9a-f]+) metadata=([0-9a-f]+)",
     "CAUSE": r"CAUSE (\d+) (\d+) ([0-9a-f]+)",
     "S1": r"S1 (\d+) reads=(\d+)",
+    "EARLY_STATUS": r"EARLY_STATUS (\d+) (\d+) (\d+) data=9 raw_position=(\d+)",
+    "EARLY_SERVICE": r"EARLY_SERVICE job=(\d+) admit=(\d+) publication=(\d+) reader_ack=(\d+) release=(\d+) original_reuse=(\d+) candidate_reuse=(\d+)",
     "LIFECYCLE": r"LIFECYCLE job=(\d+) publication_delta=(\d+) ack_to_release=(\d+) reuse_delta=(\d+) takes=(\d+)",
     "RESET_STAGE": r"RESET_STAGE phase=(\d+) takes=(\d+) certs=(\d+) pubs=(\d+) reads=(\d+) ack=([01])",
     "RESET_REARM": r"RESET_REARM epoch=(\d+) phase=(\d+) side=([01])",
@@ -46,7 +48,8 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
     External current faults need not be observed instantaneously in the slow
     domain. Only S1 is the pre-edge sampling anchor for the exact S3 cutoff.
     """
-    require(case in range(13), "unknown profile")
+    require(case in range(15), "unknown profile")
+    early_position = {13: 0, 14: 2}.get(case)
     require(not re.search(r"(?i)\b(?:fatal|error|fail)\b", log), "failed simulation")
     terminal = (
         f"INVERSE_GUARD_OFFLINE_PASS case={case} phase_ps={phase} synthetic_not_fft=1"
@@ -72,7 +75,16 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
         match = re.fullmatch(EVENTS.get(kind, r"(?!)"), line)
         require(match is not None, "unknown/malformed receipt: " + line)
         fields = match.groups()
-        if kind in ("ADMIT", "TAKE", "CERT", "PUB", "ACK", "RELEASE", "CAUSE"):
+        if kind in (
+            "ADMIT",
+            "TAKE",
+            "CERT",
+            "PUB",
+            "ACK",
+            "RELEASE",
+            "CAUSE",
+            "EARLY_STATUS",
+        ):
             cycle, tag_epoch = map(int, fields[:2])
             require(cycle >= fast and tag_epoch == epoch, "fast cycle/epoch")
             fast = cycle
@@ -83,6 +95,7 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
                 "admission ownership",
             )
             active = {
+                "admit": fast,
                 "job": job,
                 "epoch": epoch,
                 "lease": lease,
@@ -148,13 +161,36 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
                 "lifecycle without release",
             )
             require(
-                pub_delta == 2
+                pub_delta == (3 if early_position is not None else 2)
                 and ack_delta == owner["release"][0] - owner["ack"][0] == 1
                 and 0 <= reuse_delta <= 8,
                 "lifecycle timing",
             )
             require("lifecycle" not in owner, "duplicate lifecycle")
             owner["lifecycle"] = reuse_delta
+        elif kind == "EARLY_SERVICE":
+            job, admit, publication, ack, release, old_reuse, new_reuse = map(
+                int, fields
+            )
+            require(early_position is not None and job < len(jobs), "unexpected early service profile")
+            owner = jobs[job]
+            require(
+                (admit, publication, ack, release)
+                == (
+                    owner["admit"],
+                    owner["pub"][0],
+                    owner["ack"][0],
+                    owner["release"][0],
+                ),
+                "early absolute lifecycle receipt",
+            )
+            require(
+                "early_service" not in owner
+                and new_reuse - old_reuse == owner["lifecycle"]
+                and new_reuse > release > ack > publication > admit,
+                "early complete ownership interval",
+            )
+            owner["early_service"] = new_reuse - admit
         elif kind == "METADATA_REJECT":
             require(
                 case in (7, 8, 9) and "metadata" not in evidence,
@@ -174,7 +210,7 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
             evidence["metadata"] = True
         else:
             require(active is not None, "event without owned job")
-            if kind in ("TAKE", "CERT", "PUB", "ACK", "RELEASE", "OUT"):
+            if kind in ("TAKE", "CERT", "PUB", "ACK", "RELEASE", "OUT", "EARLY_STATUS"):
                 require(
                     int(fields[2]) == active["job"]
                     and int(fields[1]) == active["epoch"],
@@ -226,10 +262,29 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
                     "publication before check drain",
                 )
                 require(
-                    fast - int(fields[3]) == fast - int(fields[4]) == 2,
+                    fast - int(fields[3])
+                    == fast - int(fields[4])
+                    == (3 if early_position is not None else 2),
                     "publication latency",
                 )
                 active["pub"].append(fast)
+                if early_position is not None:
+                    require(
+                        fast == active["last_take"] + 3
+                        and active.get("early_status")
+                        == active["last_take"] - 512 + early_position
+                        and active["cert"] == [active["last_take"] + 1],
+                        "position-bound early status/final/check/certificate order",
+                    )
+            elif kind == "EARLY_STATUS":
+                require(
+                    early_position is not None
+                    and int(fields[3]) == early_position
+                    and active["takes"] == max(0, early_position - 1)
+                    and "early_status" not in active,
+                    "early status must coincide with the declared raw output position",
+                )
+                active["early_status"] = fast
             elif kind == "OUT":
                 output_cycle, mode, position, data, metadata = (
                     int(fields[0]),
@@ -286,7 +341,7 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
                 active["release"].append(fast)
                 active = None
                 lease = (lease + 1) % 4
-    require(len(jobs) == (2 if case in (0, 1, 10) else 1), "missing jobs/stimulus")
+    require(len(jobs) == (2 if case in (0, 1, 10, 13, 14) else 1), "missing jobs/stimulus")
     if case in expected_literals:
         require("literal" in evidence, "missing bounded case receipt")
     if case in (7, 8, 9):
@@ -294,8 +349,13 @@ def verify_guard_events(log, case, phase=0, bit=0, side=0):
     if case == 10:
         require("reset" in evidence and "rearm" in evidence, "missing reset/rearm")
     for owner in jobs:
-        healthy = case in (0, 1, 11) or (case == 10 and owner["epoch"] == 2)
+        healthy = case in (0, 1, 11, 13, 14) or (case == 10 and owner["epoch"] == 2)
         if healthy:
+            if early_position is not None:
+                require(
+                    "early_service" in owner,
+                    "missing complete early-status service receipt",
+                )
             require(
                 owner["takes"] == 512
                 and owner["reads"] == [512, 512]

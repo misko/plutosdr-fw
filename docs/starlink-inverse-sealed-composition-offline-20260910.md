@@ -213,3 +213,54 @@ python -B tools/starlink_reconstruct_archive_parts.py \
   --manifest reports/experiments/20260910-inverse-sealed-offline-v1.parts.json \
   --output-dir /absolute/new/output
 ```
+
+## Additive early-status ordering follow-up
+
+The published235-test source/archive above is unchanged. The new CASE13 sends
+status with raw position0 (first-word early-status control); CASE14 sends it
+with raw position2 (the ordering observed in the accepted actual FFT trace).
+The former is not relabeled as actual timing. Both are nonzero synthetic raw
+results through the unchanged real guard, not FFT arithmetic simulation.
+Strict inverse removes only these two additive cases/receipts and restores the
+exact final235 bench SHA `ce1b2a785f956691aa786d0de2f1e0ee11fb1fe3a0a527125a7040d5a1f0ad70`.
+The independent event model binds status position explicitly; missing status,
+missing absolute service, wrong +2 publication and exchanged pos0/pos2 receipts
+are rejected. It retains separate fast and slow event ordering cursors.
+
+Original27088 EXIT0:14PASS1.13s (first-word-only draft), retained at recovery
+`inverse-early-status-v1.akHrHzab`. Original44587 EXIT0: **252PASS17.33s**, including
+the unchanged235 plus17 early-status tests, retained at recovery
+`inverse-early-status-final-v1.f7QlhHPs`; RuffPASS. The command adds
+`tests/starlink_oracle/test_inverse_sealed_early_status.py` to the two files above.
+Each executed case freezes the imported Python closure and RTL/bench inputs,
+checks before/after identity, and retains exact command/log/event assessments.
+
+CASE13:10 slow-clock phases x2 jobs; CASE14:phase0 x2 jobs. All22 jobs measured
+publication +3 fast clocks, actual ACK-to-release1, complete reuse +6–7 versus
+the simultaneous old mailbox. CASE14 job0:
+admission11, status530, final private take1040, certificate1041,
+publication1043, ACK1950, release1951, old reuse1946, candidate reuse1952.
+Job1: admission1954, status2473, publication2986, ACK3893, release3894,
+old reuse3888, candidate reuse3895. These absolute cycles describe this bounded
+synthetic source, not a measured vendor FFT service interval.
+
+Independent streaming review of immutable accepted L1 actual CSV SHA
+`e7127798f315772b95aff63b75fffcd9cf5d1af8ca3c96e878bae4b39e443d71`
+finds all76 healthy nominal/stalled jobs have raw outputs +1298..+1809,
+status +1300 (third word), and old commit +1810. Thus the new early-status
+join predicts private final take +1810, seal +1812, publication +1813;
+that prediction still requires source-specific actual evaluation. The prior
+delayed-status +2 cannot substitute for it.
+
+The <=8 inverse lifecycle increment is a nominal/intrinsic planning allocation
+within the earlier <=24/pair architecture allocation, not a universal bound on
+stalled completion differences. With the old periodic slow READY condition
+`slow_cycle % 17 < 13`, shifting first accepted phase8 to10 moves a512-word
+completion from675 to681: +6 slow clocks, before extra idle/release. Actual
+preparation must model that same absolute READY schedule, not widen bounds
+after execution or erase stream timestamps. Forward/product CSV cycles are
+fast-domain; inverse CSV cycles are slow-domain. The unchanged absolute
+175 MHz canonical15 budget is5215 fast clocks/pair (29.8us); guard8192,
+drain25000, fault observation24, watchdog1500000 and provisional-prefix
+[128,132] gates remain unchanged. No actual FFT, synthesis or route was run
+for this follow-up; all runtime bytes remain unchanged.
