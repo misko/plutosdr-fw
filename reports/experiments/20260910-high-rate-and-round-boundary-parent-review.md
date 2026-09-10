@@ -971,3 +971,79 @@ public readback as well. That is a possible test-model error, not yet a measured
 diagnosis: the failure message does not include the returned index. A minimal
 print-only diagnostic is under review. Any correction must preserve the real
 handshake window, original source, full native search and all declared deadlines.
+
+## Arithmetic v3 complete benches; automation log-source failure
+
+Both original actual handles65522/58122 have terminated EXIT1; agent reports
+vendor exit09:27:00 baseline and09:26:54 candidate. Both benches reached all11
+functional terminal markers, including the complete original fault/reset suites
+and `BANK_ARITHMETIC_ACTUAL_PASS`. The collector then failed because the custom
+Tcl diagnostic marker is in the outer Vivado log, not the HDL `simulate.log`
+that it reads. Both `run_status=1`, `after_status=0` and absent `results.json`
+remain unchanged. This is not a successful automation run.
+
+Parent independently ran the unchanged helper's terminal/event checks and
+verified all11 markers,76 nominal/stalled core-job records with the original
+service contract,19456 exact ordered words/stream and16986 output-derived
+oracle-only scores per mode. Baseline full historical CSV remains
+`25ab9d06ca0e03f280540cda625a7826b3c4cbaa6322ce3266c59e1fbad94122`.
+Candidate accept-to-bank latency is4 clocks versus baseline3, as predeclared.
+All44 frozen inputs and generated FFT wrapper before/after/live hashes verify.
+No scorer RTL or physical timing claim follows from these oracle scores.
+
+The same unchanged diagnostic receipt predicate passes on original outer logs
+with111 baseline/115 candidate signal paths. Parent-verified outer log SHA256:
+baseline `1be6604273852b95b0f900cc7e10470612dcd517ab8e43ac72b38c3e2b70268d`;
+candidate `3a8037b2e7b9fbcfb1f3b86b2884d76a10db33e57634e7eff957c5fd482dc033`.
+Actual internal waveform histories remain under read-only verification. A
+minimal log-provenance correction and separately labeled post-hoc assessment
+are being prepared; original automation records will not be overwritten, and
+an identical simulation rerun is not authorized merely to relocate a marker.
+
+The native60 v1 failure archive also independently matches all241 original
+files:1709940 bytes, SHA256
+`200ec173c89f24dea9ca50d3633d8e1c7e74a3b5060d701702660794cc9bfaa0`.
+The public interface README explicitly documents readback synchronization lag.
+A new-copy print-only diagnostic may be prepared, but execution awaits exact
+source-delta review; the original failed bundle and search gates are unchanged.
+
+## Actual internal histories and native readback diagnosis
+
+Parent read the complete read-only WDB query script and independently checked
+all333 baseline/345 candidate values against the exact111/115-path inventories
+at three fixed times. All queried internal histories are recorded, not blank;
+before/after query hashes match the original live WDB/inventory files. At the
+former epoch14 failure time all four119-bit monitor vectors in each run equal
+`600ba0066440280000000800380000`. Both references and inner arithmetic overflow
+are0 while wrapper/raw overflow are1, directly observing the intended
+register-versus-forced-wire boundary in the actual bank. Query processes
+79313/1613 terminated0 without advancing simulation. A dedicated exclusive
+diagnostic receipt file is approved for offline collector preparation only;
+the current assessment uses hashed original outer logs and preserves EXIT1.
+
+The independently verified native print-only diagnostic bundle is
+`16fc0b020b9a42f74863aa1f5af8871f7f47777233cf20168f7762679a606438`.
+Parent verified exact inverse of two displays/read-line split, all86 other
+sources,69 numbers,87 live originals and unchanged budget before authorizing
+one diagnostic execution. Original tool chunk10ed81 terminated1 in0.2249s,
+without a live session, in
+`/tmp/starlink-bank-route.I50MDJ/main-native60-service-diag-v1`.
+
+Observed low-read completion: cycle8288, public high half intentionally not
+read yet, low word000000bf, hardware captured snapshot00000008000000bf.
+High-read completion: cycle8295, coherent public00000008000000bf, live index
+00000008000000c7, synchronized00000008000000c6; trigger cycle8282. The returned
+index34359738559 is exactly trigger minus one. The original assertion still
+fails at cycle8295/source3357, with zero capture or raw tuples. Parent verified
+full source/fixture before-after integrity and exact equality of all source,
+capture,raw and hold logs to the original failure. No service PASS is claimed.
+
+Offline test-only correction is authorized: witness the actual low-register
+capture and require exact completed64-bit public coherence, separately bound
+CDC/readback age, and keep the actual command/lead/source/service bounds literal.
+At low-register capture the ideal-clock offered-index lag is at most
+ceil((2*10000000+8333333)/16666666)=2 samples. At completed readback, two
+<=24-cycle transactions permit at most48 control cycles and an additional
+ceil(480000000/16666666)=29 samples. These are separately derived readback bounds,
+not a relaxed command deadline. Missing/duplicate/future/stale/incoherent
+readback cases must fail. Corrected service execution is not yet authorized.
