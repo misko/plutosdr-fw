@@ -1,0 +1,12 @@
+{
+  "all71_live_sources_before_after_equal": true,
+  "archive": {
+    "bytes": 4879707,
+    "sha256": "14bb6ddb4b3c9148ff025111f7a29c403eb559270a5f70ad636c4602b15d1e6f"
+  },
+  "members": 876,
+  "raw_bytes": 318228959,
+  "raw_inputs_before_after_equal": true,
+  "raw_regular_files": 4465,
+  "regular_file_receipts": 875
+}
