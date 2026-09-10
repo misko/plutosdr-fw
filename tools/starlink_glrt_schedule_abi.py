@@ -6,7 +6,10 @@ import struct
 from dataclasses import dataclass
 from fractions import Fraction
 
-from tools.starlink_glrt_native_abi import RATE, SAMPLES, require, wide
+if __package__:
+    from .starlink_glrt_native_abi import RATE, SAMPLES, require, wide
+else:
+    from starlink_glrt_native_abi import RATE, SAMPLES, require, wide
 
 MAGIC = 0x474C5331
 VERSION = 0x10000

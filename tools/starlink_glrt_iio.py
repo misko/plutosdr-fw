@@ -130,6 +130,14 @@ class Device(Attributes):
         self.context, self.api, self.pointer = context, context.api, pointer
         self._read, self._write = self.api.device_attr_read, self.api.device_attr_write
 
+    def command(self, name, value):
+        """Write an acknowledged command attribute that has no readback value.
+
+        Configuration still uses write() and its equality readback. Command
+        callers must inspect the command's documented result/status interface.
+        """
+        checked(self._write(self.pointer, name.encode(), str(value).encode()), f"command {name}")
+
     def channel(self, name, output=False):
         pointer = self.api.device_find_channel(self.pointer, name.encode(), output)
         if not pointer:
