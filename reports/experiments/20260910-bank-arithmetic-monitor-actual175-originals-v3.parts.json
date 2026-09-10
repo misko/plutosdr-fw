@@ -1,0 +1,47 @@
+{
+  "format": "starlink-portable-archive-parts-v1",
+  "max_part_bytes": 41943040,
+  "archive": {
+    "name": "20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz",
+    "bytes": 241304017,
+    "sha256": "470f5a8c81ca725d77efcdbbe8bd506a2b02921d9be88ac40602eb5c0304848e"
+  },
+  "parts": [
+    {
+      "index": 0,
+      "name": "20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz.part000",
+      "bytes": 41943040,
+      "sha256": "7d1c35015991968ac7b3fb69c92a24948d7fefe7cf03891cf1322cae02b720d9"
+    },
+    {
+      "index": 1,
+      "name": "20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz.part001",
+      "bytes": 41943040,
+      "sha256": "2d8ac91ece9b9fa1a5018fa68246f81690318131c8f805b986ae0a6c8fab550e"
+    },
+    {
+      "index": 2,
+      "name": "20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz.part002",
+      "bytes": 41943040,
+      "sha256": "32b3275505e09a11f1ca352cea3b62996dc2e6d205b413519ce44cad1d79c1f2"
+    },
+    {
+      "index": 3,
+      "name": "20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz.part003",
+      "bytes": 41943040,
+      "sha256": "06b3cf6d57c4c769808bc1f6b29e271bba6dd8ee736f0a318936e4790f6adb84"
+    },
+    {
+      "index": 4,
+      "name": "20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz.part004",
+      "bytes": 41943040,
+      "sha256": "f484dfcf3908e83f361cc44fe1ebe9389c0a746f528c29bb1b22b60b64c0df3c"
+    },
+    {
+      "index": 5,
+      "name": "20260910-bank-arithmetic-monitor-actual175-originals-v3.tgz.part005",
+      "bytes": 31588817,
+      "sha256": "baf03db64e3420319f32653c1c275d112383e327e4e229753a2ca3ca6762a9fa"
+    }
+  ]
+}
