@@ -130,20 +130,24 @@ def bind_source(*, journal, recording, owner, protocol, summary, final_snapshot,
     }
 
 
+def hash_stable_iq(path):
+    with path.open('rb') as stream:
+        before = os.fstat(stream.fileno())
+        digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+        after = os.fstat(stream.fileno())
+        if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
+                after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+            raise ValueError('coarse IQ changed while hashing')
+    return digest, before.st_size
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ('journal', 'recording', 'owner', 'protocol', 'summary', 'final-snapshot', 'iq', 'output'):
         parser.add_argument('--'+name, type=Path, required=True)
     parser.add_argument('--episode-index', type=int, required=True)
     args = parser.parse_args()
-    with args.iq.open('rb') as stream:
-        before = os.fstat(stream.fileno())
-        iq_digest = hashlib.file_digest(stream, 'sha256').hexdigest()
-        after = os.fstat(stream.fileno())
-        if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
-                after.st_size, after.st_mtime_ns, after.st_ctime_ns):
-            raise ValueError('coarse IQ changed while hashing')
-        iq_bytes = before.st_size
+    iq_digest, iq_bytes = hash_stable_iq(args.iq)
     result = bind_source(**{name: getattr(args, name).read_bytes() for name in
         ('journal', 'recording', 'owner', 'protocol', 'summary', 'final_snapshot')},
         iq_sha256=iq_digest, iq_bytes=iq_bytes, episode_index=args.episode_index)
