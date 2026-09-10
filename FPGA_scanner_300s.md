@@ -72,6 +72,14 @@ input-register inference, not bank timing closure; upstream BRAM and the full
 receiver are absent. Integration must preserve the bank's existing private
 bubble semantics and held-overflow fault/publication fences.
 
+The additive bank arithmetic port now passes101 independently repeated offline
+tests, including exact token math and held-overflow ownership checks. Parent
+verified all5850 archived files and31 frozen sources. Its zero-frame bank test
+interface is synthetic, not vendor FFT evidence. Actual-FFT preparation is the
+next isolated step; no new complete-bank routing or runtime promotion has
+occurred. The control test-stimulus correction remains offline after its first
+attempt exposed a low-phase early-publication boundary; old assertions remain.
+
 The30MS/s common-source offline cohort is frozen and independently verified.
 A new explicit30-upper bank+STOP public interface remains isolated/offline;
 its unknown-parameter guard repair and legacy regressions pass340 independent

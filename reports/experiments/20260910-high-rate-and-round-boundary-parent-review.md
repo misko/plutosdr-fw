@@ -508,3 +508,42 @@ archive SHA256
 The complete original636-file run is retained separately; the portable archive
 omits duplicate generated executables and default waveform, not source or
 numerical evidence. No receiver runtime or radio changes were promoted.
+
+## Bank arithmetic independently qualified offline; actual preparation next
+
+Parent reviewed the complete additive arithmetic implementation, both benches,
+policy and final report at isolated FW5235285a60 / HDL41e539e768. Independent
+repetition of the same suite passed101 tests in14.76s (original46097 exit0),
+retained at `/tmp/starlink-bank-arithmetic-parent.USIztK` with unique basetemp,
+raw log and XML. This includes65 new tests and36 unchanged regressions.
+Parent also checked all31 frozen live source hashes and all5850 safe unique
+regular archive members, SHA256
+`08c2720c9f7d639548836427d079f5c720ecb64c60bf5f3feb8f203b11dee316`.
+
+The new core/top are additive and strictly invertible to dec20, including
+private-bubble behavior and held-overflow publication vetoes. The operand
+stage adds one token of capacity and one no-stall clock (2 to3); numerical,
+metadata, stalls, reset/flush and mutation checks pass. The bank ownership
+tests use an explicitly synthetic zero-frame FFT interface: this evidence
+does not prove vendor arithmetic, throughput, DSP mapping or bank timing.
+
+The next authorized scope is OFFLINE preparation of an actual-generated-FFT
+comparison, preserving original numerical/fault checks and rejecting the
+synthetic interface in the actual source closure. Baseline and candidate
+parameter identities, latency-sensitive checks, source/oracle closure and
+cycle bounds must be frozen before launch. No actual FFT or physical launch
+is authorized by this checkpoint. Primary runtime remains unchanged.
+
+Parent independently verified all64 files of the control8757 failure archive.
+The first offline fault-edge correction is also retained:7 tests passed and5
+failed. Blindly waiting for the next falling edge can permit an intervening
+commit when kind0 qualification already arrives in the low clock phase.
+The next offline correction must handle that phase explicitly, reject unknown
+phase, preserve kind1's three held positive edges and leave every original
+checker unchanged. Both declared provider phases must be exercised before
+any actual retry. This is test-stimulus work, not a runtime timing fix.
+
+Actual30 healthy447 remains the verified positive result. Separate343 and
+late-native30 cases are being prepared without changing its goldens. Full
+bank setup remains-1.907ns;60 integration, full receiver timing/IO/CDC, RX
+calibration, .18 canary and .17 Ethernet deployment remain required.
