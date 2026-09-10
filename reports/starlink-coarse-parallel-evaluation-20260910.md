@@ -52,6 +52,17 @@ separate default-off comparator experiment retains all70 identity bits and
 same-edge certification/reasons with balanced equality leaves. No held-phase
 or comparator physical result is claimed yet.
 
+The balanced comparator is now separately frozen at FW `eb9e008e7` / HDL
+`9f598dd1` (tested design `447183b8`). Both actual modes exit0 and their complete
+24-column control traces byte-match held-only. The258-test regression passes
+with eight unchanged explicit physical skips. Root reviewed the exact all70-bit
+delta, immutable reference,420 corruption rows per mode, retained final-edge
+vetoes and all evidence checksums; its independent nine-test run passes including
+bit69 and duplicate-veto omission mutants. One fresh100/175 synthesis/diagnostic
+route is authorized with unchanged source/constraints/strategy. Synthesis is
+running at `/tmp/starlink-completed-input.5EaJuD/balanced-synth-v1`; no comparator
+physical result or primary runtime promotion is claimed yet.
+
 A separate active-clock verification worktree now exists at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch
 `codex/starlink-rx-only-do-not-merge-clock-traffic` in FW/HDL, starting FW

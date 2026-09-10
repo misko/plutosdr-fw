@@ -84,3 +84,41 @@ logs, but no checkpoint or vendor IP. Neither attempt is a physical pass.
 
 No radio was accessed or allocated. No PPU, Linux, receiver runtime, deployed
 firmware, clock or physical constraint changed.
+
+## Source-backed follow-up, not applied constraints
+
+Analog Devices' AD9361 Rev.G data sheet, page8, specifies the1.8V CMOS
+DATA_CLK-to-data delay as0..1.5ns and DATA_CLK-to-RX_FRAME delay as0..1.0ns.
+These are different bounds; the frame must not inherit an invented identical
+data-bus delay. The table also specifies45..55% clock pulse width. Board skew,
+selected programmable delays and their supported operating assumptions are
+still needed before translating these into this receiver's constraints.
+[AD9361 data sheet](https://www.analog.com/media/en/technical-documentation/data-sheets/AD9361.pdf).
+
+UG-570 distinguishes asynchronous SPI state-machine control from ENABLE/TXNRX
+pin control. Therefore a source- and runtime-verified SPI-only contract may
+justify treating those two controls differently from sampled RX data, but their
+names alone cannot establish such a contract or authorize an exception.
+[AD9361 reference manual, pages26–27](https://www.analog.com/media/en/technical-documentation/user-guides/ad9361.pdf).
+
+Local Linux pin `4357f41a721df9d89a66be7a2a3f921a71d46bad` gives relevant
+**build intent**, not live radio readback:
+
+- `arch/arm/boot/dts/zynq-pluto-sdr.dtsi` selects CMOS/full-port, RX frame pulse,
+  RX-only digital tuning (`skip-mode=1`) and omits ENSM pin-control/FDD options.
+  No explicit receive clock/data delay properties appear there.
+- `drivers/iio/adc/ad9361.c` initially defaults absent receive delay properties
+  to zero. `ad9361_conv.c` subsequently programs receive delay register0x006
+  during interface tuning; absence from the DTS is not proof of zero live delay.
+- The existing FPGA `library/xilinx/common/ad_data_in.v` uses loadable IDELAYE2
+  taps, with elaborated initial value0 and a runtime load/readback interface.
+  Static timing at that elaborated value does not prove every programmed tap.
+
+Important hardware-test boundary: the debugfs timing-analysis operation is
+**not passive inspection**. In `ad9361_conv.c`,
+`ad9361_dig_interface_timing_analysis` saves state, mutes TX, changes ENSM mode,
+injects internal RX PRBS, sweeps16x16 clock/data delays, then restores state.
+The debugfs read path in `ad9361.c` invokes it only after its command is armed.
+Treat that entire operation as an explicitly reserved, bounded .18 calibration
+test with before/after state verification, not as an unannounced .17 status read.
+No such hardware operation was run during this audit.
