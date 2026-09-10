@@ -70,8 +70,8 @@ def prepared(tmp_path_factory):
 def test_exact_bundle_source_closure(prepared):
     path, expected = prepared
     result = b.verify(path, expected, live=True)
-    assert result["sources"] == 71
-    assert result["files"] == 74
+    assert result["sources"] == 73
+    assert result["files"] == 76
     manifest = json.loads((path / "manifest.json").read_text())
     assert len(manifest["vectors"]) == 8
     assert not any("scripted_fft_ports" in p for p in manifest["compiled"])

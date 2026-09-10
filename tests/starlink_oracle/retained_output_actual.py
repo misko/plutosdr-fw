@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 
 from . import retained_output_prototype as original
+from . import retained_completion_declaration as completion_declaration
 
 ROOT = Path(__file__).resolve().parents[2]
 RTL = ROOT / "hdl/library/starlink_pss_acquisition/retained_output_actual"
@@ -57,7 +58,13 @@ def verify_originals() -> None:
         if not name.startswith("source/") or ".." in Path(name).parts:
             raise ValueError("original46 relative source path")
         path = ROOT / name.removeprefix("source/")
-        if path.is_symlink() or sha(path) != expected:
+        actual_sha = sha(path)
+        if name.removeprefix("source/") == completion_declaration.PATH:
+            if expected != completion_declaration.ORIGINAL_SHA:
+                raise ValueError("completion original source pin")
+            restored = completion_declaration.inverse(path.read_text())
+            actual_sha = hashlib.sha256(restored.encode()).hexdigest()
+        if path.is_symlink() or actual_sha != expected:
             raise ValueError(f"original46 source changed: {name}")
 
 

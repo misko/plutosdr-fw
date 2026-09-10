@@ -17,6 +17,8 @@ EXTRAS = (
     "tests/starlink_oracle/retained_output_actual_bundle.py",
     "tests/starlink_oracle/retained_output_actual_recipe.json",
     "tests/starlink_oracle/retained_output_actual_abi.json",
+    "tests/starlink_oracle/retained_completion_declaration.py",
+    "tests/test_starlink_retained_completion_declaration.py",
     "tests/test_starlink_retained_output_actual.py",
     "tests/test_starlink_retained_output_actual_bundle.py",
     "tools/prepare_starlink_retained_output_actual.py",
