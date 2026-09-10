@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest vendor attempt (2026-09-10): parent138 offline preparation tests PASS
+with71 frozen sources, but first real vendor invocation49345 exits1 during
+compilation: SystemVerilog wildcard connections in a `.v` wrapper were compiled
+as Verilog. No simulation result exists. Both input copies and generated FFT
+wrapper verify unchanged. A launch-profile-only language correction and new
+frozen bundle are next; no RTL/numerical/timing relaxation or radio operation.
+See [first actual attempt and isolated cause](reports/experiments/20260910-retained-actual-first-run.md).
+
 Latest actual-FFT harness gate (2026-09-10): parent independently repeats112
 offline tests; all66 source pins unchanged. Fresh77953-row scripted replay
 passes inventory and19456 exact raw-row/job-time joins. Both original malformed
