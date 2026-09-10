@@ -2,6 +2,21 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest verification increment (2026-09-10): parent repeats111 inverse parser
+tests and the complete saved-run reassessment, both successful. The bounded
+drained profile transition is now tested; all211 original files remain intact
+and original21014 remains automation FAIL. An exclusive v2 preparation with
+only the parser/manifest change is next, not an authorized vendor retry. See
+[transition correction and full reassessment](reports/experiments/20260910-inverse-transition-review.md).
+
+Latest architecture evidence (2026-09-10): parent independently repeats111
+overlap-ledger tests, all PASS. The original38-block/76-job timing is exactly
+reconstructed; a separately labeled retained-output schedule predicts3645
+cycles/pair, or3669 with+24 sensitivity. It is not implemented RTL or a lower
+clock qualification. Explicit old/new raw-event cutover, retained real ACK,
+fault/reset ownership and resource design are next. See
+[overlap review and limits](reports/experiments/20260910-output-overlap-review.md).
+
 Latest actual result (2026-09-10, after15:58 UTC): original21014 exits1 in
 the trace parser, with source integrity intact. Parent independently isolates
 one quiescent profile-switch-before-reset row, zero healthy-running fault rows.
