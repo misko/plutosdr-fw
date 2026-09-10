@@ -1,0 +1,648 @@
+{
+  "schema": "starlink-bank-clock-traffic-evidence-v1",
+  "date_utc": "2026-09-10",
+  "worktree": "/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic",
+  "branch": "codex/starlink-rx-only-do-not-merge-clock-traffic",
+  "starting_firmware_commit": "135769292a8282d2d7a9e7beb30332e60eab2387",
+  "starting_hdl_commit": "dbe744c015217c7b9c33a5f89e4745916b43100a",
+  "additive_hdl_commit": "7d4d6d8cb482e60cf7ee557f2e86905d26155dd5",
+  "unchanged": {
+    "runtime_rtl_modules": 18,
+    "numeric_golden_files": 7,
+    "kernel": true,
+    "clock_helper": true,
+    "fft_helper": true,
+    "existing_benches": true
+  },
+  "actual_generated_ip": {
+    "tool": "Vivado 2022.2",
+    "host": "gauss x86_64 Linux",
+    "clocking_wizard": "6.0",
+    "xfft": "9.1",
+    "input_mhz": 100,
+    "nominal_fft_mhz": 175,
+    "source_msps": 15
+  },
+  "frozen_expectations": {
+    "asynchronous_closure_observation_ns": 0.002,
+    "closure_origin": "observed fft_resetn fall, not raw MMCM reset",
+    "outer_fault_observation_bound_ns": 10.0021,
+    "sticky_while_enable_held_through_relock": true,
+    "recovery": "explicit enable cycle and distinct source-index epoch",
+    "exact_healthy_epochs": [
+      1,
+      3,
+      5,
+      7,
+      9
+    ],
+    "reset_kinds": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "force_statements": 0,
+    "all_observed_score_and_transform_prefixes_checked": true
+  },
+  "runs": [
+    {
+      "version": "v1",
+      "status": "then_current_contract_terminal_pass",
+      "retained_policy_failure": "Initial protected-file assertion incorrectly named map/PSMA sources; 60 pass and 1 failure; frozen initial policy source and transcribed failure receipt retained."
+    },
+    {
+      "version": "v2",
+      "status": "then_current_contract_terminal_pass",
+      "difference": "Corrected policy snapshot plus unique healthy-epoch/count postprocessing."
+    },
+    {
+      "version": "v3",
+      "status": "final_contract_terminal_pass",
+      "difference": "Added explicit no-stale-fast-input/score/inverse-output guard in reset and pre-source recovery intervals.",
+      "accepted_exact_scores": 7853,
+      "held_valid_score_also_checked": true,
+      "exact_forward_words": 10752,
+      "exact_product_words": 10752,
+      "exact_inverse_words": 9985,
+      "full_healthy_replay_scores": 6705,
+      "measured_clock_edges": 5120,
+      "simulation_duration_ns": 1074922.142,
+      "host_simulator_kernel_cpu_seconds": 61,
+      "host_launch_simulation_elapsed_seconds": 77
+    }
+  ],
+  "reset_witnesses": [
+    {
+      "kind": 0,
+      "target": "second forward core input acceptance position128",
+      "accepted_exact_prefix": 179,
+      "raw_reset_ns": 222990.716,
+      "locked_drop_ns": 222991.716,
+      "fft_epoch_fall_ns": 222991.716,
+      "closure_observed_ns": 222991.718,
+      "outer_fault_ns": 222995.002,
+      "relock_ns": 225827.5
+    },
+    {
+      "kind": 1,
+      "target": "second inverse core input acceptance position128",
+      "accepted_exact_prefix": 387,
+      "raw_reset_ns": 457290.715,
+      "locked_drop_ns": 457291.715,
+      "fft_epoch_fall_ns": 457291.715,
+      "closure_observed_ns": 457291.717,
+      "outer_fault_ns": 457295.002,
+      "relock_ns": 460127.5
+    },
+    {
+      "kind": 2,
+      "target": "second slow inverse output acceptance position256",
+      "accepted_exact_prefix": 482,
+      "raw_reset_ns": 703775.002,
+      "locked_drop_ns": 703776.002,
+      "fft_epoch_fall_ns": 703776.002,
+      "closure_observed_ns": 703776.004,
+      "outer_fault_ns": 703785.002,
+      "relock_ns": 706607.5
+    },
+    {
+      "kind": 3,
+      "target": "retained VALID score and nonempty candidate FIFO; manual FFT-only reset",
+      "accepted_exact_prefix": 100,
+      "raw_reset_ns": 923750.002,
+      "locked_drop_ns": null,
+      "fft_epoch_fall_ns": 923750.002,
+      "closure_observed_ns": 923750.004,
+      "outer_fault_ns": 923755.002,
+      "relock_ns": null,
+      "locked_remained_high": true
+    }
+  ],
+  "qualification": {
+    "input_clock_loss_detection": false,
+    "physical_timing_or_cdc": false,
+    "receiver_profile": false,
+    "registered_control_route_variant": false,
+    "pilot_or_native_fine": false,
+    "dma_iio": false,
+    "rf": false
+  },
+  "tests": {
+    "new_policy_passed": 70,
+    "combined_focused_suites_passed": 149,
+    "ruff": "pass",
+    "git_diff_check": "pass"
+  },
+  "case_receipts": [
+    "BANK_CLOCK_TRAFFIC_EXACT epoch=1 scores=1341 forward=1536 product=1536 inverse=1536 source_base=1065536 mean_period_ns=5.714286133",
+    "BANK_CLOCK_TRAFFIC_RESET kind=0 exact_score_prefix=179 forward=512 product=512 inverse=512 raw_reset_ns=222990.716 locked_drop_ns=222991.716 fft_epoch_fall_ns=222991.716 closure_observed_ns=222991.718 outer_fault_ns=222995.002 relock_ns=225827.500 retained_score=0 sticky_enabled_epoch=1",
+    "BANK_CLOCK_TRAFFIC_EXACT epoch=3 scores=1341 forward=1536 product=1536 inverse=1536 source_base=1196608 mean_period_ns=5.714285156",
+    "BANK_CLOCK_TRAFFIC_RESET kind=1 exact_score_prefix=387 forward=1024 product=1024 inverse=512 raw_reset_ns=457290.715 locked_drop_ns=457291.715 fft_epoch_fall_ns=457291.715 closure_observed_ns=457291.717 outer_fault_ns=457295.002 relock_ns=460127.500 retained_score=0 sticky_enabled_epoch=1",
+    "BANK_CLOCK_TRAFFIC_EXACT epoch=5 scores=1341 forward=1536 product=1536 inverse=1536 source_base=1327680 mean_period_ns=5.714285156",
+    "BANK_CLOCK_TRAFFIC_RESET kind=2 exact_score_prefix=482 forward=1024 product=1024 inverse=769 raw_reset_ns=703775.002 locked_drop_ns=703776.002 fft_epoch_fall_ns=703776.002 closure_observed_ns=703776.004 outer_fault_ns=703785.002 relock_ns=706607.500 retained_score=0 sticky_enabled_epoch=1",
+    "BANK_CLOCK_TRAFFIC_EXACT epoch=7 scores=1341 forward=1536 product=1536 inverse=1536 source_base=1458752 mean_period_ns=5.714285156",
+    "BANK_CLOCK_TRAFFIC_RESET kind=3 exact_score_prefix=100 forward=512 product=512 inverse=512 raw_reset_ns=923750.002 locked_drop_ns=-1.000 fft_epoch_fall_ns=923750.002 closure_observed_ns=923750.004 outer_fault_ns=923755.002 relock_ns=-1.000 retained_score=1 sticky_enabled_epoch=1",
+    "BANK_CLOCK_TRAFFIC_EXACT epoch=9 scores=1341 forward=1536 product=1536 inverse=1536 source_base=1589824 mean_period_ns=5.714286133",
+    "BANK_CLOCK_TRAFFIC_TOTAL exact_scores=7853 forward=10752 product=10752 inverse=9985",
+    "BANK_CLOCK_TRAFFIC_PASS exact_epochs=5 exact_full_scores=6705 reset_cases=4 mmcm_active_resets=3 manual_fft_only_resets=1 measured_edges=5120 ACTUAL_IP_NO_INPUT_CLOCK_LOSS_RECEIVER_PHYSICAL_OR_RF_CLAIM"
+  ],
+  "files_sha256": [
+    {
+      "path": "docs/starlink-bank-clock-traffic-20260910.md",
+      "sha256": "e4a4ecbacfc3f72f5ca6a6525f743f53f773ff26d8d823b5375507685aa368af"
+    },
+    {
+      "path": "reports/experiments/20260910-bank-clock-traffic.tgz",
+      "sha256": "2a1bbe146df0c61c5848c83eb437f48251097be6789e100215b2c9be7340e386"
+    },
+    {
+      "path": "tests/test_starlink_bank_clock_traffic_policy.py",
+      "sha256": "b35a925af34cdf2851a814ce5fa4517ee30446cfc2cf4425a6bb2c223f2e5086"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_bank_clock_traffic.sv",
+      "sha256": "e318822e96fc82f87c906a4b024daa47a83fd2c94e02d6edbe811d17dea7a2c3"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/simulate_bank_owned_clock_traffic.tcl",
+      "sha256": "42df150d985e7ff5ddc042cfd243aec2cf6fab71290cfcdcbfe9422b7e2a45e8"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/create_bank_owned_clock_ip.tcl",
+      "sha256": "94f1360d1f0a505293edf5c6f6cbb5339fb0028a7db620be09b4caca0edd0b55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/create_shared_realtime_xfft_ip.tcl",
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/forward_exponents.mem",
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/forward_q17.mem",
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/inverse_exponents.mem",
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/inverse_q17.mem",
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/product_q17.mem",
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/samples_ci16.mem",
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/scores_u8.mem",
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/simulate_bank_owned_clock_traffic.tcl",
+      "sha256": "4c3dc2f5dd82139490790f192fd7235c516ef6c174c482b9e48fafb1b727ae87"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_block_mailbox.v",
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_candidate_score_path.v",
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_energy_cache.v",
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_energy_join.v",
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_fft_bank_owned_slice.v",
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_forward_kernel_join.v",
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_ifft_qualifier.v",
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_iq_to_score_bank_owned.v",
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_kernel_rom.v",
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_overlap_scheduler.v",
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_raw_result_fifo.v",
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_realtime_input_guard.v",
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_realtime_result_guard.v",
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_score_divider.v",
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_score_divider_radix4.v",
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_score_lanes.v",
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_score_prepare.v",
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/starlink_pss_spectrum_product.v",
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/tb_starlink_pss_bank_clock_traffic.sv",
+      "sha256": "1df34db03cb1f17844d6e80064d3326c4bdc628f3aa6ac1a09e3e85790983ecf"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/test_starlink_bank_clock_traffic_policy.py",
+      "sha256": "53370625969e5933979fcfe7060b4e1831bf7e6ea4155e1b333623c62fe16272"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/upper_edge_pss_kernel_q17.mem",
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/frozen_sources/verify_realtime_probe_result.tcl",
+      "sha256": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/scope.txt",
+      "sha256": "da3958ccd52fb091b7ffc3a4bc45ae2ab72b2e9c700b2540813a0dcf58ec50e2"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/generated_ip.txt",
+      "sha256": "55630444a64b573bec866b6b93cd042d68308ad079021735586af1114c52802d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/verified-run-vivado.log",
+      "sha256": "e5df3d44c68f075e871ed6de53a94ed02916bedc11e0c5cdd82f360b43a33170"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/project/bank_clock_traffic.sim/sim_1/behav/xsim/simulate.log",
+      "sha256": "83e9da8cab690d3b64c8dacbd2206272554e169bbe745159d95bac7f9dd572d9"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/project/bank_clock_traffic.gen/sources_1/ip/starlink_bank_clock175_candidate/starlink_bank_clock175_candidate.v",
+      "sha256": "862789262b9799660e3acde6330a38542a24e92d628b08e3530aaeec84ed22f7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/project/bank_clock_traffic.gen/sources_1/ip/starlink_bank_clock175_candidate/starlink_bank_clock175_candidate_clk_wiz.v",
+      "sha256": "ca069bc37de99c84459775ff8a21f9a04156b9fb7fc735325568d6a8bd52dc5a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/project/bank_clock_traffic.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd",
+      "sha256": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/create_bank_owned_clock_ip.tcl",
+      "sha256": "94f1360d1f0a505293edf5c6f6cbb5339fb0028a7db620be09b4caca0edd0b55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/create_shared_realtime_xfft_ip.tcl",
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/forward_exponents.mem",
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/forward_q17.mem",
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/inverse_exponents.mem",
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/inverse_q17.mem",
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/product_q17.mem",
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/samples_ci16.mem",
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/scores_u8.mem",
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/simulate_bank_owned_clock_traffic.tcl",
+      "sha256": "42df150d985e7ff5ddc042cfd243aec2cf6fab71290cfcdcbfe9422b7e2a45e8"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_block_mailbox.v",
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_candidate_score_path.v",
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_energy_cache.v",
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_energy_join.v",
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_fft_bank_owned_slice.v",
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_forward_kernel_join.v",
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_ifft_qualifier.v",
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_iq_to_score_bank_owned.v",
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_kernel_rom.v",
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_overlap_scheduler.v",
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_raw_result_fifo.v",
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_realtime_input_guard.v",
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_realtime_result_guard.v",
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_score_divider.v",
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_score_divider_radix4.v",
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_score_lanes.v",
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_score_prepare.v",
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/starlink_pss_spectrum_product.v",
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/tb_starlink_pss_bank_clock_traffic.sv",
+      "sha256": "1df34db03cb1f17844d6e80064d3326c4bdc628f3aa6ac1a09e3e85790983ecf"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/test_starlink_bank_clock_traffic_policy.py",
+      "sha256": "307fcc6913cbbff2b3ac880c7982e100f52608bf4ab3177ede91222a5567c35d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/upper_edge_pss_kernel_q17.mem",
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/frozen_sources/verify_realtime_probe_result.tcl",
+      "sha256": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/scope.txt",
+      "sha256": "336dc761b38336861009fef281159949de142fe0c4b7602807ed83bb7eb85158"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/generated_ip.txt",
+      "sha256": "9c4b1dcc47cf398dff2d4b78cfa0106bf96431c2dac9891f50d7f27def0dbeda"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/verified-run-vivado.log",
+      "sha256": "926d18427f9321de315e6636e25c035925b92540309ee45671b48a13e085f2c7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/project/bank_clock_traffic.sim/sim_1/behav/xsim/simulate.log",
+      "sha256": "8e99d5d31f34f93a34f5428215511ad2afaac75cf701e26c1d2284bd03f590cb"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/project/bank_clock_traffic.gen/sources_1/ip/starlink_bank_clock175_candidate/starlink_bank_clock175_candidate.v",
+      "sha256": "862789262b9799660e3acde6330a38542a24e92d628b08e3530aaeec84ed22f7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/project/bank_clock_traffic.gen/sources_1/ip/starlink_bank_clock175_candidate/starlink_bank_clock175_candidate_clk_wiz.v",
+      "sha256": "ca069bc37de99c84459775ff8a21f9a04156b9fb7fc735325568d6a8bd52dc5a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v2/project/bank_clock_traffic.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd",
+      "sha256": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/create_bank_owned_clock_ip.tcl",
+      "sha256": "94f1360d1f0a505293edf5c6f6cbb5339fb0028a7db620be09b4caca0edd0b55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/create_shared_realtime_xfft_ip.tcl",
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/forward_exponents.mem",
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/forward_q17.mem",
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/inverse_exponents.mem",
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/inverse_q17.mem",
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/product_q17.mem",
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/samples_ci16.mem",
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/scores_u8.mem",
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/simulate_bank_owned_clock_traffic.tcl",
+      "sha256": "42df150d985e7ff5ddc042cfd243aec2cf6fab71290cfcdcbfe9422b7e2a45e8"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_block_mailbox.v",
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_candidate_score_path.v",
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_energy_cache.v",
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_energy_join.v",
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_fft_bank_owned_slice.v",
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_forward_kernel_join.v",
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_ifft_qualifier.v",
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_iq_to_score_bank_owned.v",
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_kernel_rom.v",
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_overlap_scheduler.v",
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_raw_result_fifo.v",
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_realtime_input_guard.v",
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_realtime_result_guard.v",
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_score_divider.v",
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_score_divider_radix4.v",
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_score_lanes.v",
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_score_prepare.v",
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/starlink_pss_spectrum_product.v",
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/tb_starlink_pss_bank_clock_traffic.sv",
+      "sha256": "e318822e96fc82f87c906a4b024daa47a83fd2c94e02d6edbe811d17dea7a2c3"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/test_starlink_bank_clock_traffic_policy.py",
+      "sha256": "b35a925af34cdf2851a814ce5fa4517ee30446cfc2cf4425a6bb2c223f2e5086"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/upper_edge_pss_kernel_q17.mem",
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/frozen_sources/verify_realtime_probe_result.tcl",
+      "sha256": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/scope.txt",
+      "sha256": "7d59201a74a28a4dee73a0b9f3038c20a394994641041b317640881d2c9cea1e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/generated_ip.txt",
+      "sha256": "e3a59c5387cadfd7baf9f2b2a2e140542d88f474bab7bdd764b8fef819e4b4d8"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/verified-run-vivado.log",
+      "sha256": "89dda64a163823d459a7198bdff50395e3772504dd9c20673098ebd1329fcb44"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/project/bank_clock_traffic.sim/sim_1/behav/xsim/simulate.log",
+      "sha256": "ac349b0bfb38908dd91cdf23a3a35b2d2adc59c1f46f90328c709b359688ff71"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/project/bank_clock_traffic.gen/sources_1/ip/starlink_bank_clock175_candidate/starlink_bank_clock175_candidate.v",
+      "sha256": "862789262b9799660e3acde6330a38542a24e92d628b08e3530aaeec84ed22f7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/project/bank_clock_traffic.gen/sources_1/ip/starlink_bank_clock175_candidate/starlink_bank_clock175_candidate_clk_wiz.v",
+      "sha256": "ca069bc37de99c84459775ff8a21f9a04156b9fb7fc735325568d6a8bd52dc5a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/project/bank_clock_traffic.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd",
+      "sha256": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v1/initial-policy-failure.txt",
+      "sha256": "9227771184b84385f7150faa267c3ca22d1111a1d5d5a26efc40938e4ff3a75d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-clock-traffic-175-v3/policy-tests.xml",
+      "sha256": "7ea111337a182b21c0d410e61d79bc9bcccb142451767765dca426fa658faf73"
+    }
+  ]
+}
