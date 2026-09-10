@@ -73,6 +73,8 @@ def test_full_unconditional_shadow_known_unknown_stall_fault_reset(
     code, log = run(tmp_path, width, balanced, scratch)
     assert code == 0 and log.count("ROM_READ_AHEAD_OFFLINE_PASS") == 1, log
     assert "healthy=3 faults=64 unknown_metadata=2" in log
+    assert log.count("ROM_READ_AHEAD_ACTIVE_BOUNDARIES_PASS") == 1
+    assert "occupied_unknown_ready=2 flush_selector_zero=1 flush_selector_one=1" in log
 
 
 @pytest.mark.parametrize("before,after", [
@@ -104,10 +106,28 @@ def test_alternate_speculation_enable_is_not_a_semantic_mutant(tmp_path):
     assert code == 0 and log.count("ROM_READ_AHEAD_OFFLINE_PASS") == 1, log
 
 
+@pytest.mark.parametrize("call", [
+    "occupied_unknown_ready_case(1'bx);",
+    "occupied_unknown_ready_case(1'bz);",
+    "flush_occupied_selector(0);",
+    "flush_occupied_selector(1);",
+])
+def test_each_directed_active_boundary_is_mandatory(tmp_path, call):
+    bench = (ACQ / "tb/tb_starlink_pss_rom_read_ahead.sv").read_text()
+    assert bench.count(call) == 1
+    code, log = run(tmp_path, bench=bench.replace(call, "", 1))
+    assert code != 0 and "missing directed active four-state/flush coverage" in log, log
+    assert "ROM_READ_AHEAD_OFFLINE_PASS" not in log
+
+
 @pytest.mark.parametrize("value", ["-1", "2", "32'bx", "32'bz"])
 def test_invalid_unknown_option_rejects_at_time_zero(tmp_path, value):
     bench = (ACQ / "tb/tb_starlink_pss_rom_read_ahead.sv").read_text()
     bench = bench.replace(".PRIVATE_ROM_READ_AHEAD(1)", f".PRIVATE_ROM_READ_AHEAD({value})", 1)
+    # X/Z selects no enabled generate scope. This test must reach the existing
+    # RTL time-zero parameter fatal, not fail elaboration on a monitor path.
+    # Active-state witnesses are required only in the valid-option runs above.
+    bench = bench.replace("candidate.private_rom_read_ahead.use_speculative", "1'bx")
     code, log = run(tmp_path, bench=bench)
     assert code != 0 and "PRIVATE_ROM_READ_AHEAD must be zero or one" in log, log
     assert "Time: 0 " in log
