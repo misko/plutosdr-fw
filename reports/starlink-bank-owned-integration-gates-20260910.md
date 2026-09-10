@@ -111,6 +111,13 @@ This audit did not apply or waive constraints.
 Require complete route, setup/hold/recovery, reviewed CDC/reset paths, and actual
 board-I/O constraints. A generated bitstream or isolated positive slack is not
 permission to flash. Preserve current deployed reference and pinned rollback.
+The saved full-receiver board-I/O audit now identifies the13 missing input
+delays as all12 RX data pins plus RX frame, and the2 missing outputs as enable
+and txnrx. RX port-to-IDDR setup/hold show infinite/unconstrained slack, not
+positive margin; internal RX slack cannot qualify these board paths. The actual
+AD9361 IDELAYCTRL reference remains200MHz. See
+`experiments/20260910-receiver-io-inventory.md` for exact evidence and remaining
+external timing/calibration contracts. No exception was applied.
 Qualify .18 first with exact serial/ownership and reversible testing, including
 actual RX calibration and source15/30/60 fine timing against independent evidence.
 Then deploy the pinned qualified package to .17 through PPU over Ethernet only.
