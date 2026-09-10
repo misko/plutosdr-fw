@@ -10,16 +10,18 @@ Whole-coarse synthesis measures 3,868 LUTs, 6,499 FFs, 27 DSPs and 14 BRAM tiles
 this is not routed receiver area or timing qualification. Paired digital PSS/PIL1
 replay now passes both reduced geometries at bank175/bank200/shared200 with exact
 independent pilot bytes. Eight separate bank-map fault/reset/re-enable cases pass.
-The latest isolated held-phase/balanced-identity route improves175MHz setup from
--2.438ns to -1.596ns but still fails and is not promoted. Both actual-core modes
-pass with unchanged control traces. The next held-preflight/two-comparator
-refactor passes both actual-core modes and264 tests (eight explicit physical
-skips), with independently computed old current/sticky fault predicates. Root
-reviewed the frozen source/evidence and independently passed20 focused tests;
-one unchanged100/175 physical measurement is authorized, not yet a timing pass.
+The held-phase/balanced-identity route improved175MHz setup from-2.438ns to
+-1.596ns. The subsequent held-preflight/two-comparator refactor passes both
+actual-core modes and264 tests (eight explicit physical skips), including
+independent old current/sticky fault predicates and20 root-repeated focused
+tests, but its single route still fails at-1.614ns. The dominant paths now involve
+product-bank current faults and kernel metadata validation driving arithmetic
+enables; no runtime promotion or further physical trial is authorized.
 Generated175 MMCM active-traffic reset/recovery also passes
 an independent primary replay with 7,853 exact accepted scores. The original
-4,096-block soak is still running. Production-map smoke passes two exact maps
+4,096-block175 burst/stall soak completed:1,830,912 ordered scores, FIFO358/512
+and no ingress stalls. This is the frozen alternative source, not an exact
+primary-source4096 replay or physical qualification. Production-map smoke passes two exact maps
 and a fresh447-score classified partial abort; the separately reviewed full
 20,000-by-64 simulation is now running, not yet passed. No receiver profile or radio has
 been changed. Completed alternative studies are preserved

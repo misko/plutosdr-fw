@@ -9,8 +9,13 @@ detector removal, timing waiver or replacement of fine evidence is authorized.
 ## 1. Integrate the local transform engine without changing score arithmetic
 
 Checkpoint: the additive complete scorer passes the six 64-block/numeric
-alternative runs and two independent primary-branch 175 MHz reruns. The
-4,096-block soak and physical gates below remain open. No receiver profile
+alternative runs and two independent primary-branch 175 MHz reruns. The frozen
+alternative175 burst/stall4,096-block soak now passes:1,830,912 ordered scores,
+2,097,152 words per transform stage,FIFO358/512,energy lookup age847/2048 and
+no input stalls. Root independently reconstructed its full source/log/ordered
+inventory receipt. Primary has a separate default-off idle-mailbox guard
+extension, so this is not an exact primary-source4096 replay; it also does not
+qualify the later control-path variants. The physical gates remain open. No receiver profile
 selects this module yet.
 
 The default-off phase-map selector now passes reduced 447-bin/three-frame
@@ -28,6 +33,11 @@ PSS plus independent pilot replay also passes at bank175/bank200/shared200 for
 These do not establish production map capacity, arbitrary reset/CDC races,
 DMA/IIO receipt or concurrent native-fine support; qualify these before exposing
 the selector through AXI/receiver packaging.
+
+Root also refreshed the separate native tracker baseline: all15/30/60 public
+AXI geometry cases and210 recorded15-rate windows pass on primary. See
+`experiments/20260910-native-tracker-primary-baseline.md`. This is not a combined
+bank/coarse/native/pilot test or a measured60MS/s timing/throughput claim.
 
 Production-map prelaunch is frozen at FW `e2f3a582` / HDL `22aa00d4` on the
 separate `-production-map` branch. Two343x2 maps match exactly:1,821 visible
@@ -120,6 +130,15 @@ and three RAMB18 payload banks; see `experiments/20260910-bank-cdc-inventory.md`
 The product bank is same-clock, not a CDC exception target. The inherited139
 metadata CDC warnings and103/101 OOC input/output delay gaps remain open.
 This audit did not apply or waive constraints.
+
+Latest isolated registered/held-preflight physical trial remains failing at
+175MHz setup-1.614ns,hold+0.071ns,501 same-clock failing endpoints. This follows
+the prior-1.596ns result; fewer LUTs did not improve worst timing. Current faults
+feeding private product work and kernel metadata comparisons now dominate.
+Before another implementation, review whether a separately certified private
+forward path can remove that coupling without changing public retirement,
+same-edge fault reasons, final commit or bank ownership. No such change is
+implemented or authorized by this plan, and no further route is authorized.
 
 Require complete route, setup/hold/recovery, reviewed CDC/reset paths, and actual
 board-I/O constraints. A generated bitstream or isolated positive slack is not

@@ -103,6 +103,19 @@ fresh unchanged100/175 synthesis and diagnostic route; the previous−1.596ns
 remains the latest physical result until that measurement completes. No runtime
 promotion, full receiver, constraint relaxation or radio action is authorized.
 
+The single measurement completed at03:43:14 UTC:175 setup-1.614ns,hold+0.071ns,
+TNS-497.942ns/501 failing same-clock endpoints;100 setup+3.052ns,hold+0.110ns.
+All6,624 routable nets complete;1,981 LUTs,4,547 FFs,1,185 slices,21 DSPs and
+7.5 BRAM tiles. Worst product metadata→current bank framing fault→guard public
+valid→product DSP enable is6.747ns (78.33% routing), with a near-tied-1.613ns
+kernel-ROM metadata/CE path. Root read both paths and the full report, verified
+all44 archive checksums and allfive checkpoint hashes. Failed evidence is pinned
+at FW `b6d911fb` / HDL `b594a25f`. No retry or source/constraint change occurred.
+A read-only proposal will compare a private-forward acceptance boundary against
+further comparator-only changes; healthy retirement, exact current/sticky fault
+reasons and final publication/ownership cannot be relaxed. No implementation or
+new physical trial is authorized for that proposal.
+
 A separate active-clock verification worktree now exists at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch
 `codex/starlink-rx-only-do-not-merge-clock-traffic` in FW/HDL, starting FW
@@ -117,9 +130,17 @@ The root independently completed a read-only exact-bank CDC inventory of the
 earlier complete-coarse DCP; see `experiments/20260910-bank-cdc-inventory.md`.
 No CDC exceptions were added and no physical pass is claimed.
 
-The original 4,096-block175 burst/stall soak remains active; its latest agent
-observation before03:35 UTC reached3,598 blocks/1,608,306 ordered scores with FIFO maximum358 and
-no observed error. That partial count is not a terminal capacity PASS.
+The original4,096-block175 burst/stall soak completed with process exit0 at
+03:43:59 UTC, without restart:1,830,977 source samples,1,830,912 ordered scores
+and2,097,152 words per forward/product/inverse stage. FIFO maximum358/512,
+overlap queue1,ring retention589,energy lookup age847/2048,score age915,input
+stalls0. Root independently reconstructed the exact26-source/all4,096-ordered
+inventory receipt and passed allsix false-receipt tests. The strict RUN_JOB
+next-input and three-epoch overlap witness counts are both0; do not infer those
+overlap cases from bounded capacity. Simulated time122.115045ms is not a300s
+scanner test. Seventeen of18 runtime modules byte-match primary; its result
+guard has the earlier default-off USE_IDLE_MAILBOX_FAULT extension. This is
+not an exact primary-source4096 replay or a test of later scheduling variants.
 
 A new independent FW/HDL worktree at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/production-map`, branch
