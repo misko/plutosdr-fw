@@ -147,3 +147,49 @@ payload/reader metadata/cursor bits and 95 control/check bits, plus the same
 18,432-bit payload RAM. The 95-bit control subtotal is not a mapped resource
 measurement or a net FF increase versus all old mailbox controls. External
 issuer and eventual cross-clock adapter state is not included.
+
+## Frozen standalone result and next composition
+
+Final standalone source FW `f8754e23afc136870d1dd68228bdecb197a6e6c7` / HDL
+`2c2460ad55981ed0833eeadfef60463f1d1bca10` resolves the two reviewer-requested
+test gaps. Parent read the complete revised contract, model/profile inventories,
+bench checks and executed mutation selectors. Independent original **96302
+exited 0: 526 tests passed in 8.17 seconds**, including all 15 RTL mutants.
+The five RTL/bench/model/test source hashes were unchanged across the repeat.
+Artifacts are in recovery-parent `epoch-sealed-parent.vWc0Zi`:
+log `a77309363a1749efc21534846807c81417134272b251a93302d6451092e4669e`,
+XML `3a85a2c72a860ce706fd77b675baaf7e99aea02deefda9e2ceefdcd176fcefef`.
+The startup-X exception is confined to the documented pre-first-reset receipt;
+unknown owned-epoch faults are rejected. Failed intermediate parser/mutation
+selection attempts remain preserved, not relabelled as RTL failures or passes.
+
+The next authorized implementation is additive and inverse-output-only: a true
+175/100 dual-clock bank plus concrete issuer adapter, leaving the fast-only
+prototype, original result guard, arithmetic, forward/product/source banks and
+FFT unchanged. Source review identified four separate lifecycle receipts:
+
+1. Idle/nonfinal transport capacity.
+2. Held-final retirement on actual sealed publication.
+3. Guard ACK retirement on synchronized actual final read.
+4. Scheduler completion only after explicit release makes the bank reusable.
+
+Using private readiness as final retirement deadlocks after the final take;
+using reuse as guard ACK creates another release/reference-drain cycle. The
+certificate source is held `return_commit_valid`, not the later commit pulse.
+Its loss before publication (including watchdog expiry) remains a same-edge
+veto; the normal post-publication drop must not create a false fault.
+
+The slow reader must retain proper request/ACK CDC, immutable metadata through
+release, and existing slow sticky-fault visibility. It must not gate slow VALID
+from raw fast-domain publication/fault/armed signals. Implement real producer,
+certificate and reader reference ownership and common-reset rearm; ordinary
+per-transform reset cannot clear common quarantine.
+
+Offline composition tests must exercise exact 512-word data/metadata, delayed
+status and once-only final take, publication-edge deadline, final-read/ACK/release
+faults, real 175/100 clocks and reset skew, and N+1 source movement. Initial
+adapter allocation is at most 24 extra state bits and eight added fast clocks
+per inverse lifecycle within the earlier 24-clock pair allocation. These are
+planning budgets; report any safety-required overshoot, not omitted checks.
+No vendor, synthesis, route or receiver deployment is authorized for this next
+composition until its actual source and offline evidence are reviewed.

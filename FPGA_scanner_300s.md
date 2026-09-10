@@ -2,7 +2,7 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
-Latest update (2026-09-10, after 13:37 UTC): build-output storage recovered
+Latest update (2026-09-10, after 13:47 UTC): build-output storage recovered
 without discarding evidence. The corrected late-request testbench independently
 passes694 offline tests and its fresh vendor run2011 now passes the unchanged
 late-rejection/coarse/pilot gates, independently verified by the parent.
@@ -15,9 +15,12 @@ and parent verification confirms complete ROM/CDC/control receipts and stored
 source integrity. ROM physical preparation independently passes 43 tests; its
 source-specific one-shot synthesis passes with 2059 LUTs, 4607 FFs, 21 DSPs and
 15 RAMB18s (+73 LUTs/+107 FFs versus C1). Parent verified all products and source
-identities. Diagnostic routing is still pending; no timing pass follows.
-An additive sealed-bank
-pipeline is separately being implemented and independently reviewed; see
+identities. Its diagnostic route improves C1 setup from -1.830 ns to -1.360 ns,
+but still FAILS (575 setup endpoints); hold is +0.058 ns. Product metadata through
+input validation into publication is now the worst path. The additive sealed-bank
+controller independently passes 526 standalone tests; a source-specific inverse
+adapter and dual-clock bank are the next offline composition, not yet a timing
+or receiver result. See
 [first-slice scope](reports/experiments/20260910-sealed-bank-first-slice-review.md).
 No runtime promotion or radio
 operation followed. See [storage recovery and new routing evidence](reports/experiments/20260910-build-storage-recovery.md).

@@ -286,3 +286,35 @@ SHA-256 `264b7dbb89ccef59b1b41dbaee2e01d4138b8d9a368f64ebc6532efd04f5405e`.
 These are synthesis resource results, not achieved timing or full receiver
 utilization. A source-specific unchanged-constraint diagnostic route is the
 next measurement; no route result or hardware authorization follows yet.
+
+### Original ROM diagnostic route: improved versus C1, still FAIL
+
+Parent verified the complete route owner restores to the earlier reviewed owner
+with only four literal substitutions (build root, DCP path, Tcl path and expected
+DCP hash). The new owner SHA is
+`e9b7ca13900d5b04e807bed408aab87022d05cab81c18cec33e79305f700c3b0`;
+route Tcl remains `0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a`.
+One run was authorized, no retry. Original **87839 exited 0**, with execution
+from 13:45:49.908096 to 13:47:00.050372 UTC (70.142 seconds). Parent independently
+verified all 15 required nonempty product lengths/hashes, both unchanged input
+hashes, one original completion marker and no ERROR/FATAL. Tool completion is
+not a timing pass.
+
+- Global/internal175 setup **-1.360 ns**; global TNS -412.105 ns, 575 failing
+  endpoints. Internal175 accounts for 441 failures/TNS -316.134 ns.
+- Source100 setup +2.391 ns. Crossings 100-to-175 fail -0.507 ns (45 endpoints)
+  and 175-to-100 fail -1.280 ns (89 endpoints).
+- Global hold +0.058 ns, zero hold failures. All 6,911 routable nets complete,
+  zero routing errors. Routed resource count: 2,111 LUTs/4,689 FFs, unchanged
+  21 DSP/15 RAMB18; external 114 input/124 output delays remain unqualified.
+- Worst path: product-bank metadata bit57 through input identity/current-fault
+  and completion/publication control to product-bank request toggle. Data delay
+  7.021 ns, including 5.435 ns routing, eight logic levels. The next path reaches
+  result-guard active state at -1.338 ns through the same source/control chain.
+- Routed checkpoint: 3,522,763 bytes, SHA-256
+  `2a79b297bc2102c1e26c18be718f144e087f93d09d9c52c669b9afddac94c834`.
+
+This improves setup by 0.470 ns versus the source C1 route, but does not close
+timing or outperform every separate arithmetic experiment. It supports continuing
+the explicit private-check/publication pipeline work, not promoting K/M into the
+receiver or combining unqualified variants. No radio or PPU operation followed.
