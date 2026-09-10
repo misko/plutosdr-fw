@@ -1,0 +1,52 @@
+{
+  "starlink_pss_result_guard_owner_view.v": [
+    [
+      "  parameter integer WATCHDOG_CYCLES = 8192,",
+      "  parameter integer WATCHDOG_CYCLES = 8192,\n  parameter integer USE_PRIVATE_DESCRIPTOR_OFFER = 0,"
+    ],
+    [
+      "  input wire job_valid,",
+      "  input wire job_valid,\n  // Private metadata offer is NOT admission; caller must assert it on every accepted job.\n  input wire private_descriptor_offer,"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (USE_PRIVATE_DESCRIPTOR_OFFER !== 0 && USE_PRIVATE_DESCRIPTOR_OFFER !== 1)\n      $fatal(1, \"private descriptor mode must be known zero or one\");\n"
+    ],
+    [
+      "      if (!active && !awaiting_ack && !protocol_fault && job_valid)\n",
+      "      if (!active && !awaiting_ack && !protocol_fault &&\n          (USE_PRIVATE_DESCRIPTOR_OFFER ? private_descriptor_offer : job_valid))\n"
+    ]
+  ],
+  "starlink_pss_fft_retained_output_impl.v": [
+    [
+      "  parameter integer LOCAL_FIRST_ADMISSION = 0\n",
+      "  parameter integer LOCAL_FIRST_ADMISSION = 0,\n  parameter integer PRIVATE_DESCRIPTOR_OFFER = 0\n"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (PRIVATE_DESCRIPTOR_OFFER !== 0 && PRIVATE_DESCRIPTOR_OFFER !== 1)\n      $fatal(1, \"private descriptor mode must be known zero or one\");\n"
+    ],
+    [
+      "  starlink_pss_result_guard_owner_view #(.USE_COMPLETED_INPUT_FAULT(1),",
+      "  starlink_pss_result_guard_owner_view #(.USE_COMPLETED_INPUT_FAULT(1),\n    .USE_PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER),"
+    ],
+    [
+      "    .job_valid(job_valid && job_ready && next_inverse == OWNER), .job_ready(guard_ready[OWNER]),",
+      "    .job_valid(job_valid && job_ready && next_inverse == OWNER), .job_ready(guard_ready[OWNER]),\n    .private_descriptor_offer(job_valid && next_inverse == OWNER),"
+    ]
+  ],
+  "starlink_pss_fft_bank_owned_retained_output_probe.v": [
+    [
+      "  parameter integer LOCAL_FIRST_ADMISSION = 0\n",
+      "  parameter integer LOCAL_FIRST_ADMISSION = 0,\n  parameter integer PRIVATE_DESCRIPTOR_OFFER = 0\n"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (PRIVATE_DESCRIPTOR_OFFER !== 0 && PRIVATE_DESCRIPTOR_OFFER !== 1)\n      $fatal(1, \"private descriptor mode must be known zero or one\");\n"
+    ],
+    [
+      "      .LOCAL_FIRST_ADMISSION(LOCAL_FIRST_ADMISSION)) island (.*);\n  end else",
+      "      .LOCAL_FIRST_ADMISSION(LOCAL_FIRST_ADMISSION),\n      .PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER)) island (.*);\n  end else"
+    ]
+  ]
+}
