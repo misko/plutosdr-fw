@@ -33,6 +33,15 @@ comparisons PASS. Missing READY and inverted LAST mutants both fail at concrete
 known-zero counterexamples. This is an algebra check, not reachable RTL state,
 whole-design formal proof, vendor behavior or hardware validation.
 
+Parent subsequently replays the frozen **real input-guard** premise:512 healthy
+clocked words and65536 non-sampling four-state probes at first, second, final
+and closed-input states. It passes6844 known-zero cases, including30 unknown
+offered beats and3392 masked unknown-identity cases, plus27376 owner-mask
+comparisons. Three mutations (missing READY, wrong LAST, wrong owner) are
+independently rejected. Bench, unchanged input guard and runner pins remain
+exact. Bad/XZ probes are not clocked into state; this does not establish the
+separate malformed-input/current-ACK composition requirement.
+
 ## Parent scripted composition smoke
 
 Root78127 completes exit0: **six cases PASS**, summary0/1 × original stall0/2/5.
@@ -71,8 +80,11 @@ Under `/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz`:
   reference and two rejected mutations, full logs and result receipt.
 - `retained-summary-smoke-parent.wO6w9uMv`: parent runner,33 source pins
   before/after, six generated benches and complete compile/simulation logs.
+- `retained-real-premise-parent.xigrZuV8`: frozen real guard/bench/helper
+  snapshots, bounded parent replay, reference and three rejected mutation logs.
 - `checked-publication-parent.qZW4cGCP`: independent root Git-object verification
-  of all308 prior checked actual/synthesis archive payloads.
+  of all308 prior checked actual/synthesis archive payloads; separate
+  `route_audit.py` verifies all28 later route payloads at exact commitbe867adb.
 
 Full15MS/s coarse acquisition from15/30/60, native-rate fine search, independent
 2.5MS/s IIO, continuous buffering and causal scheduling,120ms visits/300s blind
