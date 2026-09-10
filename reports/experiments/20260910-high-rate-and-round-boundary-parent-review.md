@@ -717,6 +717,11 @@ baseline CSV gate or full-run terminal contract. Both results.json files are abs
 the runner reports original failure with after-integrity success. No routed
 timing, bank throughput, scorer RTL or deployment qualification follows.
 
+Both failed runs are now preserved in the full-project/WDB archive
+`22cdaa34c00226790ed1759a459eab4a28425111d53e169bfab93c73fb514b8e`.
+Parent independently verified its93,784,281-byte archive and all336 safe unique
+member hashes. No failed source, log, original terminal or waveform was replaced.
+
 ## Upper60 common-source numerical cohort independently repeated
 
 Parent read the full465-line numerical helper, final tests/CLI and unchanged
