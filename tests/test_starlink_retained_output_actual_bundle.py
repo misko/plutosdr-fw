@@ -15,6 +15,50 @@ from tests.starlink_oracle import retained_output_actual_bundle as b
 BASE_PYTHON = Path('/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/bin/python3.11')
 
 
+@pytest.mark.parametrize("mutation", ["none", "missing_property", "wildcard_scope", "wrong_language", "omit_bench", "generated_in_list"])
+def test_exact_language_selection_fragment(tmp_path, mutation):
+    """Execute only the frozen runner's compile-plan fragment using Tcl stubs."""
+    runner = (a.ROOT / b.RUNNER).read_text()
+    begin = "  foreach name $compiled_names {\n"
+    end = "  foreach name $vector_names {"
+    assert runner.count(begin) == runner.count(end) == 1
+    fragment = runner[runner.index(begin):runner.index(end)]
+    property_line = "    set_property file_type SystemVerilog [get_files -of_objects [get_filesets sim_1] $compiled_file]\n"
+    assert fragment.count(property_line) == 1
+    names = ["runtime.v", "witness.sv", "bench.sv"]
+    if mutation == "missing_property":
+        fragment = fragment.replace(property_line, "")
+    elif mutation == "wildcard_scope":
+        fragment = fragment.replace("[get_files -of_objects [get_filesets sim_1] $compiled_file]", "[get_files *]")
+    elif mutation == "wrong_language":
+        fragment = fragment.replace("file_type SystemVerilog", "file_type Verilog")
+    elif mutation == "omit_bench":
+        names.pop()
+    elif mutation == "generated_in_list":
+        names.append("generated_fft.vhd")
+    script = tmp_path / "language_fragment.tcl"
+    script.write_text('''# OFFLINE COMPILE-PLAN STUB; NO VIVADO OR COMPILATION.
+set inputs /frozen/inputs
+set sv_files {}
+proc add_files args {}
+proc get_filesets args {return sim_1}
+proc get_files args {return [lindex $args end]}
+proc set_property {name value selected} {
+  global sv_files
+  if {$name ne "file_type" || $value ne "SystemVerilog" || [file extension $selected] ni {.v .sv}} {error WRONG_LANGUAGE_OR_SCOPE}
+  lappend sv_files $selected
+}
+set compiled_names {''' + " ".join(names) + "}\n" + fragment + '''
+if {$sv_files ne {/frozen/inputs/runtime.v /frozen/inputs/witness.sv /frozen/inputs/bench.sv}} {error COMPILE_PLAN_INVENTORY}
+puts OFFLINE_EXACT_LANGUAGE_FRAGMENT_PASS
+''')
+    run = subprocess.run(["tclsh", str(script)], capture_output=True, text=True, timeout=10)
+    (tmp_path / "fragment.log").write_text(run.stdout + run.stderr)
+    assert (run.returncode == 0) == (mutation == "none"), run.stdout + run.stderr
+    if mutation == "none":
+        assert run.stdout.strip() == "OFFLINE_EXACT_LANGUAGE_FRAGMENT_PASS"
+
+
 @pytest.fixture(scope="module")
 def prepared(tmp_path_factory):
     p = tmp_path_factory.mktemp("retained_actual_bundle") / "bundle"
@@ -139,11 +183,24 @@ def test_runner_stubs_preserve_failure_and_after_integrity(prepared, tmp_path, s
     generics = re.search(r"set required_generics \{(.*?)\n  \}", factory, re.S).group(1)
     mutation = f'set f [open {{{output}/inputs/bench.sv}} a];puts $f MUTATED;close $f;' if stage == "launch_mutation" else ""
     script = tmp_path / "offline_stubs.tcl"
+    manifest = json.loads((bundle / "manifest.json").read_text())
+    expected_sv = [str(output / "inputs" / name) for name in manifest["compiled"] + ["bench.sv"]]
+    expected_sv_tcl = " ".join("{" + name + "}" for name in expected_sv)
+    language_receipt = tmp_path / "offline_language_selection.txt"
     script.write_text(f'''# OFFLINE TCL STUBS: NO VIVADO/FFT/IP EXECUTION.
 proc version args {{return 2022.2}}
 proc set_param {{name value}} {{if {{$name ne "general.maxThreads" || $value != 2}} {{error THREADS}}}}
 proc create_project args {{ {'error EXPECTED_OFFLINE_CREATE_FAILURE' if stage == 'create' else 'return'} }}
-proc set_property args {{}}
+set sv_files {{}}
+set added_files {{}}
+proc set_property args {{
+  global sv_files added_files
+  if {{[lindex $args 0] eq "file_type" && [lindex $args 1] eq "SystemVerilog"}} {{
+    set selected [lindex $args 2]
+    if {{$selected ni $added_files || [file extension $selected] ni {{.v .sv}}}} {{error BAD_LANGUAGE_SELECTION}}
+    lappend sv_files $selected
+  }}
+}}
 proc current_project args {{return OFFLINE}}
 set created 0
 proc get_ips args {{global created;if {{$created}} {{return OFFLINE}};return {{}}}}
@@ -157,10 +214,18 @@ proc generate_target args {{
   foreach {{key value}} {{{generics}}} {{puts $f "$key => $value,"}}
   close $f
 }}
-proc add_files args {{}}
+proc add_files args {{global added_files;lappend added_files [lindex $args end]}}
 proc get_filesets args {{return OFFLINE}}
-proc get_files args {{return OFFLINE}}
-proc launch_simulation args {{{mutation}error EXPECTED_OFFLINE_LAUNCH_FAILURE}}
+proc get_files args {{return [lindex $args end]}}
+proc launch_simulation args {{
+  global sv_files
+  if {{$sv_files ne [list {expected_sv_tcl}]}} {{error INCOMPLETE_OR_EXCESS_LANGUAGE_SELECTION}}
+  set f [open {{{language_receipt}}} {{WRONLY CREAT EXCL}}]
+  puts $f "OFFLINE_STUB_EXACT_SYSTEMVERILOG_COMPILE_PLAN_NOT_VENDOR"
+  foreach name $sv_files {{puts $f $name}}
+  close $f
+  {mutation}error EXPECTED_OFFLINE_LAUNCH_FAILURE
+}}
 set argc 4
 set argv [list {{{bundle}}} {{{BASE_PYTHON}}} {expected} {{{output}}}]
 source {{{runner}}}
@@ -180,6 +245,11 @@ source {{{runner}}}
     assert (output / "generated_ip_after.txt").is_file()
     if stage != "create":
         assert (output / "generated_ip_before.txt").read_bytes() == (output / "generated_ip_after.txt").read_bytes()
+        assert language_receipt.read_text().splitlines() == ["OFFLINE_STUB_EXACT_SYSTEMVERILOG_COMPILE_PLAN_NOT_VENDOR", *expected_sv]
+        assert len(expected_sv) == len(set(expected_sv)) == 27
+        assert all(Path(name).suffix in (".v", ".sv") for name in expected_sv)
+    else:
+        assert not language_receipt.exists()
     if stage != "launch_mutation":
         assert (output / "after.json").is_file()
 
