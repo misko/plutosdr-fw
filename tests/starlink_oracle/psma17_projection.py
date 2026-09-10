@@ -14,6 +14,10 @@ def inverse_stage_a(path: str, source: str) -> str:
     manifest = json.loads(Path(__file__).with_name("psma17_stage_a_delta.json").read_text())
     entry = manifest["files"][path]
     digest = hashlib.sha256(source.encode()).hexdigest()
+    if digest not in (entry["before_sha256"], entry["after_sha256"]):
+        from .psma18_projection import inverse_stage_a60
+        source = inverse_stage_a60(path, source)
+        digest = hashlib.sha256(source.encode()).hexdigest()
     # Historical isolated HDL trees remain valid inputs to the old tests.
     if digest == entry["before_sha256"]:
         return source

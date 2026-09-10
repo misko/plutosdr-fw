@@ -1,0 +1,150 @@
+{
+  "base_hdl_commit": "706ffb7b5b842409d8a8714c056203d8b5555034",
+  "files": {
+    "library/axi_starlink_pss_acquisition/axi_starlink_pss_acquisition.v": {
+      "after_sha256": "a54a51018bedc2141896411e289bd45a13534132163760a96025fea3e07a6e2a",
+      "before_sha256": "2ce3a4943b43af7120500ba5064bedf0e7b1338517cc1d41b7ea30a33b0951d0",
+      "hunks": [
+        {
+          "after": [
+            "  parameter integer USE_BANK_OWNED_XFFT = 0,",
+            "  parameter integer ENABLE_BANK60_PAIRED = 0"
+          ],
+          "before": [
+            "  parameter integer USE_BANK_OWNED_XFFT = 0"
+          ],
+          "new_index": 18,
+          "old_index": 18
+        },
+        {
+          "after": [
+            "    if (ENABLE_BANK60_PAIRED !== 0 && ENABLE_BANK60_PAIRED !== 1)",
+            "      $fatal(1, \"ENABLE_BANK60_PAIRED must be zero or one\");",
+            "    if (ENABLE_BANK60_PAIRED === 1 && (INPUT_RATE_MSPS !== 60 ||",
+            "        USE_BANK_OWNED_XFFT !== 1 || ENABLE_PILOT_TAP !== 1 ||",
+            "        USE_SHARED_XFFT !== 1 || USE_REALTIME_XFFT !== 1 ||",
+            "        ENABLE_BOUNDARY_STOP !== 1 ||",
+            "        ACQUISITION_COEFFICIENT_ENERGY !== 31'd1073765335))",
+            "      $fatal(1, \"bank-owned PSMA 1.8 requires explicit 60 MS/s upper paired-pilot realtime shared STOP and conditioned energy\");"
+          ],
+          "before": [],
+          "new_index": 184,
+          "old_index": 183
+        },
+        {
+          "after": [
+            "    if (ENABLE_BANK60_PAIRED === 0) begin"
+          ],
+          "before": [],
+          "new_index": 194,
+          "old_index": 185
+        },
+        {
+          "after": [
+            "    end"
+          ],
+          "before": [],
+          "new_index": 201,
+          "old_index": 191
+        },
+        {
+          "after": [
+            "      wire [32:0] discontinuity_sum =",
+            "          {1'b0, stage_60_discontinuity_count} +",
+            "          {1'b0, stage_30_discontinuity_count};"
+          ],
+          "before": [],
+          "new_index": 274,
+          "old_index": 263
+        },
+        {
+          "after": [
+            "      // ABI 1.8 counts stage events, not distinct raw discontinuities: one",
+            "      // propagated gap may count twice. A first-stage event remains visible",
+            "      // even if disable/flush prevents propagation to the second stage.",
+            "      // Both cumulative producers reset only under s_axi_aresetn; legacy",
+            "      // source-60 keeps its historical second-stage-only observation.",
+            "      assign ddc_discontinuity_count = ENABLE_BANK60_PAIRED ?",
+            "          (discontinuity_sum[32] ? 32'hffff_ffff : discontinuity_sum[31:0]) :",
+            "          stage_30_discontinuity_count;"
+          ],
+          "before": [
+            "      assign ddc_discontinuity_count = stage_30_discontinuity_count;"
+          ],
+          "new_index": 334,
+          "old_index": 320
+        },
+        {
+          "after": [
+            "    .ENABLE_BANK60_PAIRED(ENABLE_BANK60_PAIRED),"
+          ],
+          "before": [],
+          "new_index": 433,
+          "old_index": 412
+        }
+      ]
+    },
+    "library/axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v": {
+      "after_sha256": "e63cd0e218cb388f11e8c0f76fbf51eee3284379d96ed941dce65b2c6f9b9f77",
+      "before_sha256": "8911f045cb0811b9aabb008f8954f8c00f19bae7ba596996ec1e3c6b61f6bd4a",
+      "hunks": [
+        {
+          "after": [
+            "  parameter integer ENABLE_PILOT_TAP = 0,",
+            "  parameter integer ENABLE_BANK60_PAIRED = 0"
+          ],
+          "before": [
+            "  parameter integer ENABLE_PILOT_TAP = 0"
+          ],
+          "new_index": 31,
+          "old_index": 31
+        },
+        {
+          "after": [
+            "    if (ENABLE_BANK60_PAIRED !== 0 && ENABLE_BANK60_PAIRED !== 1)",
+            "      $fatal(1, \"ENABLE_BANK60_PAIRED must be zero or one\");",
+            "    if (ENABLE_BANK60_PAIRED === 1 && (INPUT_RATE_MSPS !== 60 ||",
+            "        USE_BANK_OWNED_XFFT !== 1 || ENABLE_PILOT_TAP !== 1 ||",
+            "        USE_SHARED_XFFT !== 1 || USE_REALTIME_XFFT !== 1 ||",
+            "        ENABLE_BOUNDARY_STOP !== 1 || COEFFICIENT_ENERGY !== 31'd1073765335))",
+            "      $fatal(1, \"bank-owned PSMA 1.8 requires explicit 60 MS/s upper paired-pilot realtime shared STOP and conditioned energy\");"
+          ],
+          "before": [],
+          "new_index": 127,
+          "old_index": 126
+        },
+        {
+          "after": [
+            "    if (ENABLE_BANK60_PAIRED === 0) begin"
+          ],
+          "before": [],
+          "new_index": 136,
+          "old_index": 128
+        },
+        {
+          "after": [
+            "    end"
+          ],
+          "before": [],
+          "new_index": 142,
+          "old_index": 133
+        },
+        {
+          "after": [
+            "  // ABI 1.8 is separately opted-in upper source-60 bank paired STOP. It",
+            "  // retains the existing feature bits and x4 kernel/filter identity; its",
+            "  // DDC discontinuity input counts cumulative events from BOTH x2 stages.",
+            "  localparam [31:0] VERSION = ENABLE_BANK60_PAIRED ? 32'h0001_0008 :",
+            "      USE_BANK_OWNED_XFFT ? 32'h0001_0007 :"
+          ],
+          "before": [
+            "  localparam [31:0] VERSION = USE_BANK_OWNED_XFFT ? 32'h0001_0007 :"
+          ],
+          "new_index": 162,
+          "old_index": 152
+        }
+      ]
+    }
+  },
+  "scope": "strict default-off PSMA1.8 Stage A inverse; no arithmetic change"
+}
