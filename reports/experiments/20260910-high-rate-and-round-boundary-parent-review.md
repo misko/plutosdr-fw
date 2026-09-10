@@ -1484,3 +1484,28 @@ admission gaps in new local-enable preparation; corrected sources will be
 separately frozen/tested without overwriting the unlaunched original bundles.
 These are preparer/verifier corrections before vendor evaluation, not changes
 to radio code, signal goldens, or acceptance thresholds.
+
+## Local first-admission actual preparation independently accepted
+
+Parent read the final362-line preparer/verifier,506-line tests, complete155-bit
+original/default observer and binding include, frozen runner and diagnostics.
+Independent121 tests PASS5.91s, original72855 terminal0,
+`/tmp/starlink-local-actual-parent.PzGP6P`. Lexical aliases are now rejected before
+Python/Tcl normalization, including dangling and ancestor/source/manifest aliases.
+All original stimulus, two119-bit product observers and current fault/latency
+checks restore exactly. The new observer derives its independent guard from
+actual input ports, not candidate predicates; no epoch/valid/fault mask applies.
+Mocked collector histories remain explicitly not actual execution evidence.
+
+Parent executed the frozen verifier on L1-v2:45 files,19 compiled,8 runtime,
+manifest `a84e723cb3de7b2c3382dbc88b89b6edc533d7493856540d1871d4ecd31831d5`,
+runner `f76090eba45113c44eff258fa1482198b663747787b76b14ce24a39bee7ebb98`;
+project and launch receipt were absent. Tested FW5c479ff19740e473501d90353cd0c376bec20d15 /
+HDLe0e075d72711e27a866bdadebc1c14ef19c58326. One actual R1B1O1L1/175 execution
+is authorized from `bank-arithmetic/hdl/library/starlink_pss_acquisition/build/
+local-admission-actual-R1B1O1-L1-175-prepared-v2`, using the exact manifest,
+SuSE2022.2 loader, two threads and original-handle ownership. Preserve process
+status and after-integrity on failure, original11 receipts/76 jobs/19456 ordered
+words per stream and historical candidate CSV e7127798. No L0 execution,
+D/S/CDC union, synthesis, route or radio operation follows automatically.
+No actual result is claimed by this preparation approval.
