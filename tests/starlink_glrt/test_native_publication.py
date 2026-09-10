@@ -1,5 +1,6 @@
 """Closed native publication, including failure and interrupted-write behavior."""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -91,3 +92,21 @@ def test_publication_cli_reports_manifest_digest(tmp_path,controller,pilot_words
     report=json.loads(result.stdout)
     assert report['manifest_sha256']==p.sha(Path(report['manifest']).read_bytes())
     assert report['head_count']==16 and report['publication_status']=='complete'
+
+
+def test_published_evidence_is_readable_by_api_user_with_private_producer_umask(
+        tmp_path,controller,pilot_words):
+    args=inputs(tmp_path,controller,pilot_words)
+    private_modes={path:path.stat().st_mode for name,path in args.items()
+                   if isinstance(path,Path) and name!='output'}
+    private_modes[tmp_path]=tmp_path.stat().st_mode
+    previous=os.umask(0o077)
+    try:
+        p.publish_episode(**args)
+    finally:
+        os.umask(previous)
+    assert args['output'].stat().st_mode & 0o777 == 0o755
+    for path in args['output'].iterdir():
+        assert path.stat().st_mode & 0o777 == 0o644
+    # Original private commissioning files and ancestor directories are not changed.
+    assert all(path.stat().st_mode==mode for path,mode in private_modes.items())

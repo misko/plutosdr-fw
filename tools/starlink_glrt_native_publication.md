@@ -25,6 +25,12 @@ failure leaves no complete manifest. Consumers must require and validate the
 manifest and all declared artifact hashes; an output directory alone is not
 proof of publication. A storage failure is not an instruction to resume RF.
 
+Published directories have mode 0755 and their payloads and manifest have mode
+0644, set explicitly before final publication even under a private producer
+umask. These selected evidence files are intended for the read-only application
+account. Original commissioning files and existing ancestor permissions are not
+changed; the caller must select a traversable publication parent.
+
 The manifest schema is `starlink-glrt-native-recording-bundle/v1`. It contains
 `publication_status: complete`, radio serial, boot ID, FIT hash, source visit,
 native epoch, owner episode index, original runtime result and owner status,
@@ -48,3 +54,13 @@ native result; a seeded episode whose evidence is incomplete fails publication.
 Publication never rewrites the original owner outcome. Overall operator
 success additionally requires complete publication. This post-stop hook has
 unit coverage but has not yet run on recovered hardware.
+
+The prepared operator then invokes `leo.cli.native_recording_register` through
+the host application's own Python environment for each complete publication.
+It retains a separate `recording-registration.json`, verifies the returned
+recording ID, bounds each invocation to 30 seconds, and continues to the next
+publication after an individual failure. Missing or failed publications do not
+launch registration. Owner/runtime outcomes remain unchanged, and operator
+success additionally requires complete registration. This is a public CLI
+handoff, with no application-module imports into the radio runtime. Registered
+files alone do not attest production UI deployment.

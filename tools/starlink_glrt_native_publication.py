@@ -30,6 +30,9 @@ def read_bounded(path, maximum):
 
 def write_payload(path, data):
     with path.open('xb') as stream:
+        # These are the explicitly published application evidence, not private
+        # radio credentials. The read-only API runs as a different local user.
+        os.fchmod(stream.fileno(), 0o644)
         stream.write(data); stream.flush(); os.fsync(stream.fileno())
 
 
@@ -76,6 +79,7 @@ def publish_episode(*, journal: Path, owner: Path, protocol: Path, summary: Path
     # Validate everything before creating output. An existing/partial output
     # cannot be silently resumed or mistaken for this publication.
     output.mkdir(exist_ok=False)
+    output.chmod(0o755)
     sync_directory(output.parent)
     for name, data in payloads.items():
         write_payload(output/name, data)
@@ -83,6 +87,7 @@ def publish_episode(*, journal: Path, owner: Path, protocol: Path, summary: Path
     fd, temporary = tempfile.mkstemp(prefix='.manifest-',dir=output)
     try:
         with os.fdopen(fd,'wb') as stream:
+            os.fchmod(stream.fileno(), 0o644)
             stream.write(encoded(manifest));stream.flush();os.fsync(stream.fileno())
         os.link(temporary, output/'manifest.json')
     finally:
