@@ -98,6 +98,13 @@ see `experiments/20260910-bank-island-clock-generation.md` and
 claimed. Its active-traffic lock/reset and new exact bank-CDC endpoint contracts
 are additional full-integration gates.
 
+The read-only complete-coarse checkpoint inventory now identifies all208
+surviving held-metadata destinations, six ownership chains, two fault chains
+and three RAMB18 payload banks; see `experiments/20260910-bank-cdc-inventory.md`.
+The product bank is same-clock, not a CDC exception target. The inherited139
+metadata CDC warnings and103/101 OOC input/output delay gaps remain open.
+This audit did not apply or waive constraints.
+
 Require complete route, setup/hold/recovery, reviewed CDC/reset paths, and actual
 board-I/O constraints. A generated bitstream or isolated positive slack is not
 permission to flash. Preserve current deployed reference and pinned rollback.

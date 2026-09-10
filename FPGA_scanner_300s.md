@@ -10,8 +10,8 @@ Whole-coarse synthesis measures 3,868 LUTs, 6,499 FFs, 27 DSPs and 14 BRAM tiles
 this is not routed receiver area or timing qualification. Paired digital PSS/PIL1
 replay now passes both reduced geometries at bank175/bank200/shared200 with exact
 independent pilot bytes. Eight separate bank-map fault/reset/re-enable cases pass.
-The latest isolated registered-scheduler route still fails at -2.461 ns; it is
-not promoted. A focused preflight/active-fault separation is being tested, and
+The latest isolated preflight-separated route still fails at -2.438 ns; it is
+not promoted. A held-phase active-input selection refinement is being tested, and
 the original 4,096-block soak is still running. No receiver profile or radio has
 been changed. Completed alternative studies are preserved
 on remote do-not-merge branches. See

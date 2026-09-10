@@ -34,7 +34,24 @@ regression is247passed/eight explicit physical skips; root independently reran
 the reason-only, final-authorization and phase-input suites:20passed/two explicit
 physical skips. Root checked the source/log hashes and complete evidence
 checksums, then authorized one unchanged100/175 OOC synthesis/diagnostic route.
-That pending measurement is not a timing fix or deployment qualification.
+That one measurement is now complete and still fails175 setup at -2.438ns
+(hold +0.071ns), with1,991 LUTs,4,543 FFs,21 DSPs and7.5 BRAM tiles. All6,590
+routable nets routed, but688 fast-clock endpoints fail setup; this is not just
+one isolated outlier. Physical evidence is separately frozen at FW `091d0e663`
+/ HDL `691966ae`, with no design-RTL change. Root verified its report and full
+checksums. The worst path moved to state-dependent input selection through the
+active input guard's full metadata equality into admission. An explicit held-
+phase delivery tuple is the next test-only/default-preserving experiment;
+per-beat identity/framing/delivery fault checks remain required on their edge.
+
+A separate active-clock verification worktree now exists at
+`/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch
+`codex/starlink-rx-only-do-not-merge-clock-traffic` in FW/HDL, starting FW
+`135769292` / HDL `dbe744c0`. It will exercise the actual generated175 MMCM with
+complete coarse traffic and active reset/recovery, not change receiver clocks.
+The root independently completed a read-only exact-bank CDC inventory of the
+earlier complete-coarse DCP; see `experiments/20260910-bank-cdc-inventory.md`.
+No CDC exceptions were added and no physical pass is claimed.
 
 The original 4,096-block175 burst/stall soak remains active; its latest agent
 observation reached 1,554 blocks/694,638 ordered scores with FIFO maximum358 and
