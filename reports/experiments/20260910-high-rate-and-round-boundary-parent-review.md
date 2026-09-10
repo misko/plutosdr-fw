@@ -1323,3 +1323,37 @@ added source tail. Full257 native drainage,512 pilot outputs,447x2 coarse STOP,
 every visible FFT/score boundary and measured clock-level overlap are required.
 Historical30 benches and native arithmetic stay untouched. This authorization
 does not include actual FFT execution, host/kernel ABI1.8 or radio access.
+
+## Repeatable committed-evidence gate
+
+Parent added read-only `tools/verify_starlink_git_evidence.py` and30 tests to
+prevent the discovered ignored-file publication defect recurring. It requires
+an immutable commit ID, an externally pinned manifest digest, exact committed
+regular-file closure and every committed blob's SHA256. Working-tree/index
+files do not satisfy the gate; it does not claim network publication or test
+validity. Initial30PASS0.20s and real five-archive598-member Git-object checks
+pass; the same checker rejects the original incomplete route commit2ccfac2e.
+An initial shebang/filemode lint failure was fixed without behavioral changes.
+Usage and evidence scope are in
+`reports/experiments/20260910-git-evidence-publication-check.md`.
+Final checker30PASS0.23s at `/tmp/starlink-git-evidence-final.Q0wsRK`; lint/diff
+checks pass. This is additive firmware verification tooling, not PPU or RTL.
+
+## StageA60 portable package verified from Git
+
+Parent read the complete final report and collector (collector is not executed
+by the660-test suite). At FW82cb23a5e787727d8e8bc26e97cfa95a06a97d64, read both
+tar and inventory directly from Git objects and independently verified every
+one of5254 safe regular members, including exact embedded receipt contents.
+Archive4675650bytes, SHA256
+`4887cee88e664b0deb2b9dfde571aff0246a1d63574e689bf22eb0ddc47d2111`.
+All109 before/after/snapshot/live source identities independently match signature
+`27aff0c356977ea1597256488c76b8dbcdb6cb36e9d22d66b5e8f494399b983f`.
+Tested code remains FW6e561ee5/HDLf16dc564 and parent660PASS25.11s; final agent
+already-running repeat74096 terminated0,660PASS25.21s. Collector-only failures
+(symlink executable, executable size, oversized duplicate-trace selection) stay
+explicit. Earlier repeated public traces remain local with portable hash/size
+receipts; all final traces, logs/XML and simulated sources are included. No
+numerical/runtime changes or extra actual FFT execution occurred. Combined60
+harness work proceeds separately; repeated unchanged suite runs solely to
+qualify packaging revisions are not required.
