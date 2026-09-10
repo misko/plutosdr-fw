@@ -37,7 +37,7 @@ struct glrt_native_controller {
     int64_t bootstrap_delay_q16, bootstrap_cfo_q48;
     uint32_t frames, next_frame, next_tag, sequence, configured;
     double deadline, cleanup_deadline;
-    int started, stopping, cancelled, clearing, done, failure, bootstrap_active;
+    int started, stopping, cancelled, clearing, done, failure, bootstrap_active, bootstrap_offset_valid;
 };
 /* Bootstrap is a retained acquisition prediction in a freshly rebased source
  * epoch, with zero scheduled counters. It begins at global frame zero. The

@@ -113,6 +113,7 @@ static void bootstrap_observe(struct glrt_native_controller *c, uint32_t frame,
     if (!isfinite(samples) || !isfinite(hz) || fabs(samples) > 15 || fabs(hz) > 250) return;
     c->bootstrap_delay_q16 = (int64_t)llround(samples*65536.0);
     c->bootstrap_cfo_q48 = (int64_t)llround(hz*(281474976710656.0/60000000.0));
+    c->bootstrap_offset_valid = 1;
 }
 
 static void bootstrap_correct(struct glrt_native_controller *c, struct glrt_native_batch *b)
@@ -280,7 +281,11 @@ int glrt_native_controller_tick(struct glrt_native_controller *c)
             predicted = !glrt_native_trend_batch(&c->trend,c->next_frame,count,c->next_tag,
                     c->slots[0].batch.seed,&b,&rate);
             if (predicted) c->bootstrap_active = 0;
-            else if (c->bootstrap_active && c->next_frame < c->bootstrap.repeats) {
+            else if (c->bootstrap_active && c->next_frame < c->bootstrap.repeats &&
+                     (c->bootstrap_offset_valid || c->sequence+4 >= c->next_frame)) {
+                /* Let the first supported result correct the continuation.
+                 * Without one, queue with four unconsumed opportunities left
+                 * instead of waiting until the preceding batch has ended. */
                 count = c->bootstrap.repeats-c->next_frame;
                 if (count > 4) count = 4;
                 if (bootstrap_slice(&c->bootstrap,c->next_frame,count,c->next_tag,&b))

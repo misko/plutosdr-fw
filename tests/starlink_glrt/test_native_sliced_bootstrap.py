@@ -84,12 +84,15 @@ def test_uncertain_slice_submission_is_not_retried(controller,pilot_words):
     assert len(radio.writes('submit'))==2
     assert radio.writes('command')==[b'2\n',b'4\n']
     checked=review(journal(radio),epoch=3)
-    assert checked['drained'].configured==checked['drained'].cancelled==16
+    assert checked['drained'].configured==16
+    assert checked['drained'].cancelled+len(checked['heads'])==16
+    assert len(checked['heads'])==8
     assert not radio.queue and not radio.pending and not radio.valid
 
 
 @pytest.mark.parametrize('direction',[-1,1])
-def test_supported_startup_offsets_correct_next_slice_but_do_not_invent_rate(controller,model,direction):
+@pytest.mark.parametrize('slice_index',[1,2])
+def test_supported_startup_offsets_correct_next_slice_but_do_not_invent_rate(controller,model,direction,slice_index):
     basis,raw=model
     values=.3*(basis@np.array([1,direction*.07,direction*.06]))
     iq=np.rint(np.column_stack((values.real,values.imag))).astype(np.int64)
@@ -98,15 +101,17 @@ def test_supported_startup_offsets_correct_next_slice_but_do_not_invent_rate(con
     radio.initialize()
     for _ in range(1000):
         assert radio.tick()==1
-        if len(radio.descriptors)==3:break
+        if len(radio.descriptors)==slice_index+1:break
         radio.advance()
     else:pytest.fail('bounded third startup slice was not submitted')
     estimates=[body.split() for kind,name,body in radio.events if (kind,name)==('retain','estimate')]
     supported=[fields for fields in estimates if int(fields[8])==0]
-    assert len(supported)==3 and int(supported[-1][2])==8
-    slice16=radio.descriptors[2]
+    assert len(supported)==(1 if slice_index==1 else 3)
+    assert int(supported[-1][2])==(0 if slice_index==1 else 8)
+    slice16=radio.descriptors[slice_index]
     expected_shift=round(float(supported[-1][3])*60_000_000*65536)
-    assert (slice16.start-radio.seed.start-16*80000)*65536+slice16.fraction==expected_shift
+    first_frame=12 if slice_index==1 else 16
+    assert (slice16.start-radio.seed.start-first_frame*80000)*65536+slice16.fraction==expected_shift
     original_step=radio.seed.step if radio.seed.step<2**47 else radio.seed.step-2**48
     correction_hz=float(supported[-1][5])-original_step*(60_000_000/2**48)
     expected_phase=(radio.seed.step+round(correction_hz*(2**48/60_000_000)))%(2**48)
