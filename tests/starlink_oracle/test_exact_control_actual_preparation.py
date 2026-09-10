@@ -47,7 +47,8 @@ def restore_reference(text):
     text = PREPARE.once(
         text,
         "  parameter integer EXACT_EXTRA_EPOCHS = 0;\n"
-        "  reg exact_reference_done = 0;\n"
+        + PREPARE.EXTRA_PARAMETER_CHECK
+        + "  reg exact_reference_done = 0;\n"
         '  `include "starlink_pss_exact_control_extra_epochs.svh"\n',
         "",
     )
@@ -259,3 +260,142 @@ def test_future_launcher_has_fixed_gates_and_is_never_called_by_preparer():
     ):
         assert marker in launcher
     assert "synth_design" not in launcher and "route_design" not in launcher
+
+
+@pytest.mark.parametrize("reference", [False, True])
+@pytest.mark.parametrize("value", ["0", "1", "-1", "2", "1'bx", "1'bz"])
+def test_each_generated_extra_parameter_entry_fails_closed_without_fft(
+    tmp_path, reference, value
+):
+    original = PREPARE.git_file(
+        HDL, PREPARE.BASE, f"library/starlink_pss_acquisition/tb/{PREPARE.TOP}.sv"
+    ).decode()
+    generate = PREPARE.reference_bench if reference else PREPARE.candidate_bench
+    generated = generate(original)
+    assert generated.count(PREPARE.EXTRA_PARAMETER_CHECK) == 1
+    # Execute only the literal entry check, never either actual bench/stub.
+    entry = tmp_path / "extra_entry.sv"
+    entry.write_text(
+        "module extra_entry; parameter integer EXACT_EXTRA_EPOCHS=0;\n"
+        + PREPARE.EXTRA_PARAMETER_CHECK
+        + 'initial begin #1; $display("EXTRA_PARAMETER_VALID_NO_FFT"); $finish; end\nendmodule\n'
+        + f"module extra_test; extra_entry #(.EXACT_EXTRA_EPOCHS({value})) dut(); endmodule\n"
+    )
+    executable = tmp_path / "extra_entry.vvp"
+    subprocess.run(
+        [
+            "iverilog",
+            "-g2012",
+            "-s",
+            "extra_test",
+            "-o",
+            str(executable),
+            str(entry),
+        ],
+        check=True,
+        timeout=10,
+    )
+    result = subprocess.run(
+        ["vvp", str(executable)],
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    log = result.stdout + result.stderr
+    (tmp_path / "simulate.log").write_text(log)
+    if value in ("0", "1"):
+        assert result.returncode == 0 and "EXTRA_PARAMETER_VALID_NO_FFT" in log
+    else:
+        assert (
+            result.returncode != 0 and "EXACT_EXTRA_EPOCHS_REQUIRES_ZERO_OR_ONE" in log
+        ), log
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "none",
+        "disabled_extra",
+        "wrong_registered",
+        "wrong_distributed",
+        "wrong_scratch",
+        "wrong_extra",
+        "unknown_knob",
+        "zero_checks",
+        "zero_active",
+        "zero_consumed",
+        "missing_reference_extra",
+        "wrong_final_faults",
+        "wrong_stalls",
+        "wrong_resets",
+        "wrong_recoveries",
+        "missing_active_final",
+        "missing_owned_stalls",
+        "duplicate_terminal",
+    ],
+)
+def test_future_terminal_settings_and_both_extra_receipts_offline(tmp_path, mutation):
+    launcher = (ACQ / "simulate_exact_control_prepared.tcl").read_text()
+    checker = re.search(
+        r"# BEGIN EXACT_CONTROL_RECEIPTS\n(.*?)# END EXACT_CONTROL_RECEIPTS",
+        launcher,
+        flags=re.DOTALL,
+    ).group(1)
+    terminal = (
+        "EXACT_CONTROL_ACTUAL_PASS registered=1 distributed=1 scratch=1 extra=1 "
+        "checks=500 active=300 consumed=2 private_differences=19 final_fault_edges=2 "
+        "owned_stalls=9 reset_owned_edges=0 independent_actual_core=1"
+    )
+    extra = (
+        "EXACT_CONTROL_EXTRA_EPOCHS_PASS final_faults=2 held_final_stalls=3 "
+        "one_sided_resets=2 healthy_recoveries=4"
+    )
+    log = f"{extra}\n{extra}\n{terminal}\n"
+    settings = "1 1 1 1"
+    changes = {
+        "wrong_registered": ("registered=1", "registered=0"),
+        "wrong_distributed": ("distributed=1", "distributed=0"),
+        "wrong_scratch": ("scratch=1", "scratch=0"),
+        "wrong_extra": ("extra=1", "extra=0"),
+        "unknown_knob": ("scratch=1", "scratch=x"),
+        "zero_checks": ("checks=500", "checks=0"),
+        "zero_active": ("active=300", "active=0"),
+        "zero_consumed": ("consumed=2", "consumed=0"),
+        "wrong_final_faults": ("final_faults=2", "final_faults=1"),
+        "wrong_stalls": ("held_final_stalls=3", "held_final_stalls=2"),
+        "wrong_resets": ("one_sided_resets=2", "one_sided_resets=1"),
+        "wrong_recoveries": ("healthy_recoveries=4", "healthy_recoveries=3"),
+        "missing_active_final": ("final_fault_edges=2", "final_fault_edges=0"),
+        "missing_owned_stalls": ("owned_stalls=9", "owned_stalls=0"),
+    }
+    if mutation in changes:
+        log = log.replace(*changes[mutation], 1)
+    elif mutation == "missing_reference_extra":
+        log = log.replace(extra + "\n", "", 1)
+    elif mutation == "duplicate_terminal":
+        log += terminal + "\n"
+    elif mutation == "disabled_extra":
+        log = terminal.replace("extra=1", "extra=0") + "\n"
+        settings = "1 1 1 0"
+    invocation = (
+        checker
+        + f"\nset log {{{log}}}\n"
+        + f"if {{[catch {{exact_verify_receipts $log {settings}}} reason]}} {{puts $reason; exit 1}}\n"
+        + "puts $reason\n"
+    )
+    (tmp_path / "receipt_test.tcl").write_text(invocation)
+    result = subprocess.run(
+        ["tclsh"],
+        input=invocation,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+    )
+    output = result.stdout + result.stderr
+    (tmp_path / "receipt_test.log").write_text(output)
+    if mutation in ("none", "disabled_extra"):
+        assert result.returncode == 0 and "EXACT_CONTROL_RECEIPTS_VERIFIED" in output
+    else:
+        assert result.returncode != 0, output
