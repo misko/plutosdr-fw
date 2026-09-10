@@ -43,6 +43,8 @@ def core(tmp_path_factory):
     lib.glrt_native_trend_observe.argtypes = [c.POINTER(Trend),c.c_uint32,c.c_uint32,c.c_uint64,c.POINTER(Estimate)]
     lib.glrt_native_trend_batch.argtypes = [c.POINTER(Trend),c.c_uint32,c.c_uint32,c.c_uint32,c.c_uint32,
         c.POINTER(Batch),c.POINTER(c.c_double)]
+    lib.glrt_native_associated_solve.argtypes = [c.POINTER(Batch),c.c_uint32,c.c_uint32,
+        c.POINTER(c.c_uint32),c.POINTER(Estimate)]
     return lib
 
 
@@ -182,3 +184,77 @@ def test_native_u64_overflow_cannot_create_wrapped_schedule(core):
     anchor = 2**64-800000
     for frame in range(8): observe(core,t,frame,anchor=anchor)
     assert predict(core,t,8,16)[0] == -1
+
+
+@pytest.mark.parametrize("cfo_rate", [-4000,4000])
+def test_full_moment_association_solver_feedback_chain_uses_only_past_batches(core,cfo_rate):
+    # Component integration with quantized IQ in the local linear signal model.
+    # This is not the independent nonlinear/receive-filter qualification: it
+    # exercises actual wide moments, association, rejection and future feedback.
+    from tools.starlink_glrt_native_replay import coefficients
+    root = Path(__file__).resolve().parents[2]
+    raw = np.asarray(coefficients((root/"hdl/library/starlink_glrt/native_cubic_60000000_upper.mem")
+                                 .read_bytes()),dtype=np.int64)
+    ri,rq,di,dq = raw.T
+    reference = ri+1j*rq
+    delay_column = -di-1j*dq
+    frequency_column = 2j*np.pi*1000*(np.arange(79200)-79199/2)/60000000*reference
+    weights = 79199-np.arange(79200)
+    anchor = 2**60
+    rng = np.random.default_rng(49381)
+    trend = fresh(core)
+    # One bounded acquisition seed. Neither true rate nor future observations
+    # initialize its carrier increment; the trend must infer that from results.
+    b = Batch(epoch=3,tag=1,start=anchor+10,period=80000*65536,
+        step=round((100000+177)/60000000*2**48),delta=0,
+        expires=anchor+16*80000+100, fraction=0,seed=17,repeats=16)
+    errors = []
+    rejected_controls = 0
+    last_rate = None
+    for first in range(0,128,16):
+        if first:
+            rc,b,last_rate = predict(core,trend,first,16)
+            assert rc == 0, (first,trend.last_supported,trend.last_seen)
+        retained = bytes(b)
+        descriptor = pybatch(b)
+        for repeat in range(16):
+            frame = first+repeat
+            start,step = descriptor.prediction(repeat)
+            true_offset = .003*frame
+            true_cfo = 100000+cfo_rate*frame/750
+            timing_samples = (anchor+frame*80000-start)+true_offset
+            residual = true_cfo-step*60000000/2**32
+            control = frame in (32,33,34,35,88)
+            signal = .3*np.exp(1j*rng.uniform(-np.pi,np.pi))*(reference+
+                timing_samples/60*delay_column+residual/1000*frequency_column)
+            if control:
+                signal = np.zeros(79200,complex) if frame != 88 else 1000*np.exp(
+                    2j*np.pi*38171*np.arange(79200)/60000000)
+            signal += 20*(rng.normal(size=79200)+1j*rng.normal(size=79200))
+            a,q = np.rint(signal.real).astype(np.int64),np.rint(signal.imag).astype(np.int64)
+            products = (a*ri+q*rq,q*ri-a*rq,-a*di-q*dq,a*dq-q*di)
+            values = [int(p.sum()) for p in products]+[
+                int((weights*p).sum()) for p in products[:2]]+[int((a*a+q*q).sum())]
+            words = [0x474c5331,frame,b.tag,start%2**32,start>>32,b.seed,step,79200,0]
+            for value,width in zip(values,(2,2,2,2,3,3,2),strict=True):
+                words.extend((value>>(32*n))%2**32 for n in range(width))
+            words += [60000000,79200,repeat,0,0,0,0]
+            estimate = Estimate()
+            assert core.glrt_native_associated_solve(c.byref(b),3,frame,
+                (c.c_uint32*32)(*words),c.byref(estimate)) == 0
+            supported = core.glrt_native_trend_observe(c.byref(trend),3,frame,start,c.byref(estimate))
+            assert supported >= 0
+            if control:
+                assert supported == 0
+                rejected_controls += 1
+            elif frame >= 8:
+                errors.append((supported,(start-anchor-frame*80000)/60+estimate.delay*1e6-
+                    true_offset/60,estimate.cfo-true_cfo))
+        assert bytes(b) == retained  # Later feedback cannot rewrite this batch.
+    assert rejected_controls == 5
+    assert sum(row[0] for row in errors) >= .95*len(errors)
+    assert last_rate is not None and abs(last_rate-cfo_rate) < 200
+    # An actual source gap fences this complete fitted chain; no auto-reseed.
+    fault = Estimate(0,0,0,0,0,1|2)
+    assert core.glrt_native_trend_observe(c.byref(trend),3,128,anchor+128*80000,c.byref(fault)) == -1
+    assert predict(core,trend,129,16)[0] == -1
