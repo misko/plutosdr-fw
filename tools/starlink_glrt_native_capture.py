@@ -88,6 +88,10 @@ def require_stopped_status(text):
 
 
 def validate_request(args):
+    start = getattr(args, "start_sample", None)
+    if start is not None and (type(start) is not int or not 0 < start <= (1 << 64)-SAMPLES
+                              or args.jobs != 1):
+        raise ValueError("exact native start requires one job and a complete u64 pilot interval")
     if getattr(args, "base_abi", BASE_ABIS[0]) not in BASE_ABIS:
         raise ValueError("unsupported pinned base ABI")
     if not args.uri.startswith("ip:") or not args.serial or args.serial == EXCLUDED_SERIAL:
@@ -107,12 +111,19 @@ def collect(args, *, library=None, context_factory=Context):
     started = time.monotonic()
     deadline = started+60
     protocol = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
+    exact_start = getattr(args, "start_sample", None)
+    if exact_start is None:
+        protocol.pop("start_sample", None)
     files = [Path(__file__), Path(__file__).with_name("starlink_glrt_native_abi.py"),
         Path(__file__).with_name("starlink_glrt_iio.py"), Path(__file__).with_name("starlink_glrt_capture.py")]
     protocol.update(schema="starlink-gln1-native-bringup/v1", sample_rate_hz=RATE,
         samples_per_job=SAMPLES, maximum_collection_seconds=60,
         source_sha256={str(path.resolve()): hashlib.sha256(path.read_bytes()).hexdigest() for path in files},
         precision_qualified=False, arithmetic_replay_required=True)
+    if exact_start is not None:
+        protocol.update(schema="starlink-gln1-native-exact-start/v1",
+            start_sample=str(exact_start), acquisition_verified=False,
+            prediction_source_verified=False)
     save(args.output/"protocol.json", protocol)
     context = buffer = device = None
     driver_validated = False
@@ -136,10 +147,16 @@ def collect(args, *, library=None, context_factory=Context):
                 raise TimeoutError("bounded native campaign has insufficient time for another job")
             root = args.output/f"job-{index}"
             root.mkdir()
-            for name, value in (("native_capture_tag", args.tag+index),
+            configuration = [("native_capture_tag", args.tag+index),
                     ("native_capture_phase_seed", args.phase_seed), ("native_capture_phase_step", args.phase_step),
-                    ("native_capture_lead_samples", args.lead_samples), ("native_capture_enable", 1)):
+                    ("native_capture_lead_samples", args.lead_samples)]
+            if exact_start is not None:
+                configuration.append(("native_capture_start_sample", exact_start))
+            for name, value in configuration:
                 device.write(name, value)
+            if exact_start is not None and device.read("native_capture_start_sample") != str(exact_start):
+                raise ValueError("native exact-start readback differs")
+            device.write("native_capture_enable", 1)
             if device.read("capture_abi") != "GLN1-1.0-native-iq":
                 raise ValueError("native buffer ABI did not switch")
             # One complete native observation per descriptor; the second
@@ -158,6 +175,8 @@ def collect(args, *, library=None, context_factory=Context):
             result.require_complete()
             if result.sequence != 0 or result.phase_seed != args.phase_seed or result.phase_step != args.phase_step:
                 raise ValueError("native result differs from the requested phase/sequence")
+            if exact_start is not None and result.start != exact_start:
+                raise ValueError("native result differs from the requested exact start")
             buffer.close()
             buffer = None
             wait_default(device, deadline=min(deadline, time.monotonic()+3), base_abi=base_abi)
@@ -224,6 +243,8 @@ def main():
     parser.add_argument("--phase-seed", type=int, default=0)
     parser.add_argument("--phase-step", type=int, default=0)
     parser.add_argument("--lead-samples", type=int, default=600000)
+    parser.add_argument("--start-sample", type=int,
+        help="one exact native sample index; requires the additive driver attribute and --jobs 1")
     parser.add_argument("--libiio")
     result = collect(parser.parse_args())
     print(json.dumps(result, indent=2))

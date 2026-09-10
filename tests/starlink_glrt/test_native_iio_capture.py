@@ -94,6 +94,9 @@ class Fake:
         w[2] = int(self.values["native_capture_tag"]) + int(self.fault == "tag")
         w[5] = int(self.values["native_capture_phase_seed"])
         w[6] = int(self.values["native_capture_phase_step"]) + int(self.fault == "phase")
+        if "native_capture_start_sample" in self.values:
+            start = int(self.values["native_capture_start_sample"]) + int(self.fault == "start")
+            w[3], w[4] = start & 0xffffffff, start >> 32
         w[8] = 1 if self.fault == "arithmetic" else 0
         self.record = "GLN1 00010000 " + " ".join(f"{value:08x}" for value in w)
         fake = self
@@ -170,6 +173,57 @@ def test_invalid_request_is_rejected_before_context_or_output(tmp_path, name, va
     with pytest.raises(ValueError):
         validate_request(args)
     assert not args.output.exists()
+
+
+@pytest.mark.parametrize("fault", [None, "start", "readback", "missing_attribute"])
+def test_exact_start_is_preserved_and_never_replaced_by_relative_capture(tmp_path, fault):
+    args = arguments(tmp_path)
+    args.jobs, args.start_sample = 1, 2**55 + 12345
+    fake = Fake(fault)
+    read = fake.read
+    def checked_read(name):
+        if name == "native_capture_start_sample":
+            if fault == "missing_attribute":
+                raise OSError(errno.ENOENT, "older driver")
+            if fault == "readback":
+                return str(args.start_sample + 1)
+        return read(name)
+    fake.read = checked_read
+    result = collect(args, library=fake, context_factory=fake.context)
+    assert result["status"] == ("failed" if fault else "transport_pass")
+    protocol = json.loads((args.output/"protocol.json").read_text())
+    assert protocol["schema"] == "starlink-gln1-native-exact-start/v1"
+    assert protocol["start_sample"] == str(args.start_sample)
+    assert not protocol["acquisition_verified"] and not protocol["prediction_source_verified"]
+    if fault in ("readback", "missing_attribute"):
+        assert fake.opens == 0
+        assert not any(row[:2] == ("write", "native_capture_enable") for row in fake.events)
+    else:
+        assert fake.opens == 1 and (args.output/"job-0/iq.ci16").exists()
+        if not fault:
+            assert result["jobs"][0]["start"] == args.start_sample
+    assert fake.values["native_capture_enable"] == "0"
+
+
+@pytest.mark.parametrize("start,jobs", [(0, 1), (-1, 1), (2**64-SAMPLES+1, 1),
+                                      (12345, 2), (True, 1)])
+def test_bad_exact_start_is_rejected_before_access(tmp_path, start, jobs):
+    args = arguments(tmp_path)
+    args.start_sample, args.jobs = start, jobs
+    with pytest.raises(ValueError, match="exact native start"):
+        validate_request(args)
+    assert not args.output.exists()
+
+
+def test_no_exact_start_preserves_published_bringup_protocol(tmp_path):
+    args = arguments(tmp_path)
+    args.start_sample = None
+    fake = Fake()
+    assert collect(args, library=fake, context_factory=fake.context)["status"] == "transport_pass"
+    protocol = json.loads((args.output/"protocol.json").read_text())
+    assert protocol["schema"] == "starlink-gln1-native-bringup/v1"
+    assert "start_sample" not in protocol
+    assert not any(row[:2] == ("write", "native_capture_start_sample") for row in fake.events)
 
 
 def test_asynchronous_result_and_close_waits_are_bounded_and_preserve_real_io_errors():
