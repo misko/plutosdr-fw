@@ -1,0 +1,479 @@
+{
+  "schema": "starlink-bank-map-lifecycle-receipt-v1",
+  "date_utc": "2026-09-10",
+  "worktree": "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-map-lifecycle",
+  "branch": "codex/starlink-rx-only-do-not-merge-bank-map-lifecycle",
+  "starting_firmware_commit": "249edd4b535bea7e6537e8c102f49ad1b5f8b07f",
+  "starting_hdl_commit": "69f84febf0a2788f23e04f2f6b3cfec5b33b9c9a",
+  "additive_hdl_commit": "1800c665a29ebcc7aae3218ba7189001674d9687",
+  "existing_rtl_arithmetic_modified": false,
+  "production_receiver_paired_fine_capacity_rf_physical_qualified": false,
+  "tool": "Vivado 2022.2",
+  "host": "gauss Linux 7.0.0-30-generic x86_64",
+  "clock_mhz": {
+    "fft": 175,
+    "slow": 100,
+    "source": 15
+  },
+  "fft_initial_phase_ns": 1.3,
+  "geometry": {
+    "phase_bins": 447,
+    "tile_frames": 2,
+    "fixture_ci16_samples": 1406,
+    "fixture_scores": 1341
+  },
+  "runs": [
+    {
+      "version": "v1",
+      "status": "incomplete_stimulus_rejected",
+      "reason": "No subsequent live vendor core available at requested later-prefix injection; terminated only this simulator; missing terminal PASS rejected; not an RTL failure/pass.",
+      "frozen_input_count": 43
+    },
+    {
+      "version": "v2",
+      "status": "terminal_pass",
+      "cases": 8,
+      "exact_visible_scores": 7560,
+      "exact_map_words": 3129,
+      "hardware_reset_epochs": 8,
+      "frozen_input_count": 43,
+      "simulation_duration_ns": 1377570,
+      "simulator_kernel_cpu_seconds": 73.07,
+      "launch_simulation_elapsed_seconds": 87
+    }
+  ],
+  "runner_policy_tests": {
+    "new_suite_passed": 67,
+    "combined_suites_passed": 218,
+    "ruff": "passed",
+    "git_diff_check": "passed"
+  },
+  "remote_boundary": {
+    "raw_vendor_event_ns": 1329241.366,
+    "healthy_final_acceptance_ns": 1329245,
+    "first_slow_consumer_fault_edge_ns": 1329275,
+    "first_posedge_ready_observation_ns": 1329275,
+    "raw_to_slow_consumer_ns": 33.634,
+    "completed_map_retained": true,
+    "terminal_failed": true,
+    "qualified_worst_case_latency": false
+  },
+  "case_receipts": [
+    "BANK_MAP_LIFECYCLE_CASE healthy_reenable=1 external_reset_between=0 tickets=2 exact_scores=1788 exact_map_words=894",
+    "BANK_MAP_LIFECYCLE_CASE retained_map_partial_fault=1 exact_map_words=447 exact_prefix=1002 current_domain_fault=1 remote_latency_claim=0",
+    "BANK_MAP_LIFECYCLE_CASE independent_fft_reset=1 slow_epoch_preserved=1 exact_prefix=300 sticky_health=00000001",
+    "BANK_MAP_LIFECYCLE_CASE post_fault_epoch_reset_replay=1 exact_scores=894 exact_map_words=447",
+    "BANK_MAP_LIFECYCLE_CASE local_boundary=0 completed=0 exact_scores=894 current_domain_fault=1 remote_latency_claim=0",
+    "BANK_MAP_LIFECYCLE_CASE local_boundary=1 completed=1 exact_scores=894 current_domain_fault=1 remote_latency_claim=0",
+    "BANK_MAP_LIFECYCLE_CASE local_boundary=2 completed=1 exact_scores=894 current_domain_fault=1 remote_latency_claim=0",
+    "BANK_MAP_LIFECYCLE_CASE remote_boundary=1 completed=1 exact_scores=894 raw_event_ns=1329241.366 local_fault_ns=1329275.000 final_accept_ns=1329245.000 publish_ns=1329275.000",
+    "BANK_MAP_LIFECYCLE_TOTAL exact_scores=7560 exact_map_words=3129 hardware_resets=8",
+    "BANK_MAP_LIFECYCLE_PASS cases=8 actual_core=1 source_mhz=15 slow_mhz=100 fft_mhz=175 REDUCED_GEOMETRY_NO_PAIRED_FINE_CAPACITY_OR_RF_CLAIM"
+  ],
+  "files_sha256": [
+    {
+      "path": "docs/starlink-bank-map-lifecycle-20260910.md",
+      "sha256": "f61b0bf9dfebbd5924563b2646a0941daa4ba2ed98bdbd71e6e555317815bb19"
+    },
+    {
+      "path": "tests/test_starlink_bank_map_lifecycle_policy.py",
+      "sha256": "2097bb8f57171db5c1d00c46ada1746e3e5e13c432edfd6b65b77b99fecadc32"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/simulate_bank_map_lifecycle.tcl",
+      "sha256": "2ce831f2d3283bb596e39d18bcecaa43ff948aa03d06948787371a24f6f35d51"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_bank_map_lifecycle.sv",
+      "sha256": "7650408dbe628041007539258c30474690714aa7982d5b32b0df19978943418b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/scope.txt",
+      "sha256": "5e050f894cf1988613c1f8b88b71c95d310557e9d54a161020919bf25e8cfa23"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/generated_ip.txt",
+      "sha256": "880e9e39b41544090d5e9814cbbd5a4192b84b11140aaea14dc840b4cfc69496"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/project/bank_map_lifecycle.sim/sim_1/behav/xsim/simulate.log",
+      "sha256": "eb2845f0368ffed2e46239b1ca4628076c8435a04a4cd6978112be8cff30d4b6"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/project/bank_map_lifecycle.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd",
+      "sha256": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/axi_starlink_pss_phase_map_sync.v",
+      "sha256": "1a6efd511d7b8bcd7a023b4e55c5a61b4c3455ada764482e33f3a8ce8cbee1bb"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/create_shared_realtime_xfft_ip.tcl",
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/forward_exponents.mem",
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/forward_q17.mem",
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/inverse_exponents.mem",
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/inverse_q17.mem",
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/product_q17.mem",
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/samples_ci16.mem",
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/scores_u8.mem",
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/simulate_bank_map_lifecycle.tcl",
+      "sha256": "2ce831f2d3283bb596e39d18bcecaa43ff948aa03d06948787371a24f6f35d51"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_acquisition_health.v",
+      "sha256": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_axi_lite.v",
+      "sha256": "7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_block_mailbox.v",
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_candidate_score_path.v",
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_energy_cache.v",
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_energy_join.v",
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_fft_bank_owned_slice.v",
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_forward_kernel_join.v",
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_ifft_qualifier.v",
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_iq_to_phase_map.v",
+      "sha256": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_iq_to_score.v",
+      "sha256": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_iq_to_score_bank_owned.v",
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_iq_to_score_shared.v",
+      "sha256": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_kernel_rom.v",
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_overlap_scheduler.v",
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_phase_map.v",
+      "sha256": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_phase_map_bank.v",
+      "sha256": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_raw_result_fifo.v",
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_realtime_input_guard.v",
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_realtime_result_guard.v",
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_score_divider.v",
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_score_divider_radix4.v",
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_score_lanes.v",
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_score_phase_tagger.v",
+      "sha256": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_score_prepare.v",
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_shared_realtime_xfft_service.v",
+      "sha256": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_shared_xfft_service.v",
+      "sha256": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_spectrum_product.v",
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_transform_fifo.v",
+      "sha256": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/starlink_pss_xfft_block_adapter.v",
+      "sha256": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/tb_starlink_pss_bank_map_lifecycle.sv",
+      "sha256": "89ac102ed4d8449d9b85984b318c93cf2cc15778b74e4a0929dce2d8306663dd"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/upper_edge_pss_kernel_q17.mem",
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/frozen_sources/verify_realtime_probe_result.tcl",
+      "sha256": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/scope.txt",
+      "sha256": "7695104751803ded2157034f7c736cd6117bfe4f070bbad70d22da95d2823b5b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/generated_ip.txt",
+      "sha256": "10be070da3eae9ec052205e1d7c2b1ce5c03b77701c99b5ef2845dfa6efd4c7d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/project/bank_map_lifecycle.sim/sim_1/behav/xsim/simulate.log",
+      "sha256": "e786260867a22b16a6e93e74b44b9274053f6f4a2a56f687ecb13c1673a8e1c5"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/project/bank_map_lifecycle.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd",
+      "sha256": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/axi_starlink_pss_phase_map_sync.v",
+      "sha256": "1a6efd511d7b8bcd7a023b4e55c5a61b4c3455ada764482e33f3a8ce8cbee1bb"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/create_shared_realtime_xfft_ip.tcl",
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/forward_exponents.mem",
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/forward_q17.mem",
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/inverse_exponents.mem",
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/inverse_q17.mem",
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/product_q17.mem",
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/samples_ci16.mem",
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/scores_u8.mem",
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/simulate_bank_map_lifecycle.tcl",
+      "sha256": "2ce831f2d3283bb596e39d18bcecaa43ff948aa03d06948787371a24f6f35d51"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_acquisition_health.v",
+      "sha256": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_axi_lite.v",
+      "sha256": "7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_block_mailbox.v",
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_candidate_score_path.v",
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_energy_cache.v",
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_energy_join.v",
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_fft_bank_owned_slice.v",
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_forward_kernel_join.v",
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_ifft_qualifier.v",
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_iq_to_phase_map.v",
+      "sha256": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_iq_to_score.v",
+      "sha256": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_iq_to_score_bank_owned.v",
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_iq_to_score_shared.v",
+      "sha256": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_kernel_rom.v",
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_overlap_scheduler.v",
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_phase_map.v",
+      "sha256": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_phase_map_bank.v",
+      "sha256": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_raw_result_fifo.v",
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_realtime_input_guard.v",
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_realtime_result_guard.v",
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_score_divider.v",
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_score_divider_radix4.v",
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_score_lanes.v",
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_score_phase_tagger.v",
+      "sha256": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_score_prepare.v",
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_shared_realtime_xfft_service.v",
+      "sha256": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_shared_xfft_service.v",
+      "sha256": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_spectrum_product.v",
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_transform_fifo.v",
+      "sha256": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/starlink_pss_xfft_block_adapter.v",
+      "sha256": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/tb_starlink_pss_bank_map_lifecycle.sv",
+      "sha256": "7650408dbe628041007539258c30474690714aa7982d5b32b0df19978943418b"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/upper_edge_pss_kernel_q17.mem",
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/frozen_sources/verify_realtime_probe_result.tcl",
+      "sha256": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v1/rejected-run-vivado.log",
+      "sha256": "6bd0dd9bd60bc82a6f600d7f89a0eb8756e0078bfe77cd0892fdcacdd8bed5a0"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/verified-run-vivado.log",
+      "sha256": "9d73bdb0540dc317029f838ed05004400919da8a84fe196d881c858b9f36e619"
+    },
+    {
+      "path": "hdl/library/starlink_pss_acquisition/build/bank-map-lifecycle-175-v2/policy-tests.xml",
+      "sha256": "d80554653ed98b386fa2628ea226cab9aa1b6335ecef2973a2f0a5294fb72bf9"
+    }
+  ]
+}
