@@ -216,6 +216,41 @@ def test_every_repeat_feedback_retains_before_submit_and_pop(controller, pilot_w
     assert radio.events[-1][:2] == ("retain", "final")
 
 
+@pytest.mark.parametrize("initial_repeats", [9, 12, 16])
+def test_short_bootstrap_then_full_batches_preserve_every_frame(controller, pilot_words, initial_repeats):
+    radio = Radio(controller, pilot_words, frames=64)
+    radio.seed.repeats = initial_repeats
+    radio.seed.expires = radio.seed.start+initial_repeats*80000-801
+    assert controller.glrt_native_controller_init(radio.state, c.byref(radio.ports),
+        c.byref(radio.seed), 64, 2) == 0
+    assert radio.run() == 0
+    estimates = [body.split() for kind, name, body in radio.events
+                 if (kind, name) == ("retain", "estimate")]
+    assert [int(row[2]) for row in estimates] == list(range(64))
+    assert all(int(row[8]) == 0 for row in estimates)
+    starts = [batch.prediction(repeat)[0] for batch in radio.descriptors
+              for repeat in range(batch.repeats)]
+    assert starts == [radio.seed.start+frame*80000 for frame in range(64)]
+    assert radio.descriptors[0].repeats == initial_repeats
+    assert all(batch.repeats == 16 for batch in radio.descriptors[1:-1])
+    assert sum(batch.repeats for batch in radio.descriptors) == 64
+    assert radio.writes("command") == [b"4\n"]
+
+
+def test_eight_bootstrap_frames_leave_no_lead_for_the_first_feedback_batch(controller, pilot_words):
+    radio = Radio(controller, pilot_words, frames=64)
+    radio.seed.repeats = 8
+    assert controller.glrt_native_controller_init(radio.state, c.byref(radio.ports),
+        c.byref(radio.seed), 64, 2) == 0
+    # The trend requires eight observations. The last one completes only 800
+    # source samples before frame 8; submission requires at least 6,000 samples.
+    assert radio.run() == -5
+    assert len(radio.descriptors) == 1
+    assert len(radio.writes("pop")) == 8
+    assert radio.writes("command") == [b"2\n", b"4\n"]
+    assert not radio.pending and not radio.queue and not radio.valid
+
+
 @pytest.mark.parametrize("kind", ["initial", "descriptor", "head", "estimate", "drained", "final"])
 def test_retention_failure_never_acknowledges_unretained_head(controller, pilot_words, kind):
     radio = Radio(controller, pilot_words, frames=16)
