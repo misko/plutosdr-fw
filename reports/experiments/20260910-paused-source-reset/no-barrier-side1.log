@@ -1,0 +1,2 @@
+FATAL: tb_source_purge_barrier.sv:76: stale source reader reopened before remote purge
+       Time: 5302592  Scope: tb_source_purge_barrier

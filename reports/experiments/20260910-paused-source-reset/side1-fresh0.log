@@ -1,0 +1,1 @@
+SOURCE_PURGE_BARRIER_PROTOTYPE_PASS side=1 fill_before_fast=0 words=512
