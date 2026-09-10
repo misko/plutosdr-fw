@@ -7,7 +7,9 @@ Status: implementation started; hardware qualification is NOT complete.
 The next retained offered-input fault-summary candidate passes parent **51 tests**
 (6.96s),50 source pins unchanged. It includes the six scripted compositions,
 real-input/XZ premises, old guard shadows and bounded current-fault/ACK module
-tests; source-bound graph review remains open. A separate proposed pulse-only
+tests. Independent graph replay now passes5347 nodes/69LS,19 retained roots,
+11 excluded echoes, nine source mutants and ten parser controls;27 inputs stay
+unchanged. Actual replay preparation is next. A separate proposed pulse-only
 write-side change is rejected by a concrete premature-ACK counterexample.
 This is not actual FFT or timing qualification.
 See [initial parent checks and explicit coverage limits](reports/experiments/20260910-retained-offer-summary-parent.md).

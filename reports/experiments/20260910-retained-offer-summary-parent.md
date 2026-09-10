@@ -68,9 +68,9 @@ Dedicated boundary tests must cover that condition separately.
 
 The FFT ports in this campaign are scripted; real unchanged arithmetic and
 mailboxes are used, but no new actual vendor FFT qualification follows. The
-full offline fault/XZ/boundary/mutation suite now passes below. The source-bound
-graph remains under review. Only after its review can the new candidate advance
-to actual FFT replay and source-matched synthesis/routing.
+full offline fault/XZ/boundary/mutation suite and independent source-bound graph
+now pass below. The source-specific actual replay package is being prepared;
+actual FFT replay and source-matched synthesis/routing remain required.
 
 ## Full51 independent gate
 
@@ -104,8 +104,43 @@ The agent's first run had32 passes and two missing-mailbox dependency compile
 errors in the new guard test fixture. That failed attempt is retained. Adding
 the unchanged mailbox source fixed only the fixture; its second run passes51
 in7.05s. Tested commits: FWff84cb93d3e90f84b0c658a7d24622319310387b,
-HDL48b82653d6fcc85ac0276ca1e7b159715cdfc59f. Publication/preparation follow
-separately; no actual FFT or timing result is implied by these tests.
+HDL48b82653d6fcc85ac0276ca1e7b159715cdfc59f. The evidence package is published
+at FWca8a1164d5d75973de88e8b91ed088c8e667a40f; both remote DNM heads were
+verified. Parent independently verified all457 hash/length receipts from the
+committed archive,458 safe members,496578 bytes, SHA256
+9dc1224cd76778e6f6429210d1feefde21ffa5823a201751fc8afcba71c95616.
+No actual FFT or timing result is implied by these tests.
+
+## Independent source-bound graph accepted
+
+Parent replays the unchanged final graph scriptd0285b2df3e7694e9286f07d34c89372939ca61337ad34af9bc5c02790ebe7e2
+in a new directory: exit0,27 frozen/live inputs unchanged, all ten Icarus
+elaborations successful without diagnostics. No VVP or vendor execution occurs.
+All semantic result fields match the independently generated original result.
+
+The selected RTL has5347 continuous nodes,69 LS nodes and no cycles. All19
+required roots remain,11 specified certificate/full-fault echoes are absent,
+and original-cone positive controls retain the old paths. Nine compiled source
+mutants and ten parser controls pass. Reintroduced echoes are rejected by
+ancestry, not mislabeled as combinational-cycle failures.
+
+The three guard-return wire arrays are followed through their actual element
+drivers; they are not mistaken for registers. Real RAM and edge-triggered
+variables are boundaries. Whole-vector traversal is conservative, so exact
+compiled scalar OR operands plus two missing-owner mutants separately check
+each owner contribution. The real19-port FFT interface is represented by an
+explicit opaque boundary, not vendor internals or the scripted FFT model.
+
+The summary cone has1241 nodes versus1240 in the original expression. This is
+evidence of removal of the targeted serial paths, not a measured timing, area
+or global-depth improvement. Direct metadata fault paths intentionally remain.
+Earlier graph-development failures are preserved; the v4 draft that incorrectly
+cut wire arrays is explicitly superseded by v5, not accepted as complete proof.
+
+These gates authorize review of actual replay preparation, not a flash or a
+physical pass. The frozen third-option actual recipe at FW93b9210a8b46ef2858265d365279d28cf56631f6
+retains all97 prior sources and the complete seven-context result policy;
+it requires unchanged CSV and old parsed results plus two non-driving receipts.
 
 ## Separate write-side counterexample: pulse-only change rejected
 
@@ -135,6 +170,11 @@ Under `/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz`:
   snapshots, bounded parent replay, reference and three rejected mutation logs.
 - `retained-summary-parent.lSiN2UN2`: full51 parent runner,50 source snapshots,
   before/after hashes, complete pytest logs/XML and execution receipt.
+- `retained-summary-graph-island-v5.cwe7eS6U`: original complete graph audit and
+  report identifying every retained earlier development attempt.
+- `retained-summary-graph-parent.Y4nrivfy`: bounded parent replay,27 source
+  receipts, ten elaborations, source mutants/parser controls and semantic audit.
+- `retained-summary-package-parent.O1jtjeFk`: committed457-payload archive audit.
 - `commit-pulse-ack-parent.xkh8BtdU`: original baseline and rejected pulse-only
   generated mutant, source pins, exact first-failure logs and result receipt.
 - `checked-publication-parent.qZW4cGCP`: independent root Git-object verification
