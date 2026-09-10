@@ -27,6 +27,15 @@ index as a decimal string and both `acquisition_verified` and
 `prediction_source_verified` false. These are diagnostic inputs supplied by
 the caller, not evidence that the prediction came from a detected pilot.
 
+Run `python3 -m tools.starlink_glrt_native_replay --capture CAPTURE_DIRECTORY
+--bank BANK_FILE --output REPLAY_JSON` from the firmware repository to check
+the saved original IQ against every reported integer moment. For exact-start
+captures, replay also checks the requested decimal index against the returned
+result and emits `starlink-gln1-native-exact-start-replay/v1`. Its
+`exact_start_verified` flag establishes request/result correspondence;
+acquisition, prediction-source and physical-precision flags remain false.
+Legacy relative captures keep their existing replay schema.
+
 The kernel requires 6,000–6,000,000 samples of lead at its local post-DMA
 snapshot, and rejects u64 end-of-pilot overflow. A request can become late
 after that check; fault-free complete FPGA evidence remains required.

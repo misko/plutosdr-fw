@@ -5,10 +5,11 @@ import argparse
 import hashlib
 import json
 import math
+import re
 import struct
 from pathlib import Path
 
-from tools.starlink_glrt_native_abi import SAMPLES, NativeResult
+from tools.starlink_glrt_native_abi import RATE, SAMPLES, NativeResult
 
 BANK_SHA256 = "b04a2fab04e89229916afedfa1b34ba327d99d50968b2a81ddb48a4f8293f5e8"
 ANGLES = tuple(round(math.atan(2**-stage)*2**18/(2*math.pi)) for stage in range(16))
@@ -97,7 +98,21 @@ def verify_capture(capture: Path, bank: Path) -> dict[str, object]:
     protocol_bytes = (capture/"protocol.json").read_bytes()
     summary_bytes = (capture/"summary.json").read_bytes()
     protocol, summary = json.loads(protocol_bytes), json.loads(summary_bytes)
-    if (protocol.get("schema") != "starlink-gln1-native-bringup/v1"
+    exact = protocol.get("schema") == "starlink-gln1-native-exact-start/v1"
+    requested_start = None
+    if exact:
+        start = protocol.get("start_sample")
+        if (not isinstance(start, str) or re.fullmatch(r"[1-9][0-9]{0,19}", start) is None
+                or not 0 < int(start) <= (1 << 64)-SAMPLES
+                or type(protocol.get("jobs")) is not int or protocol["jobs"] != 1
+                or protocol.get("sample_rate_hz") != RATE
+                or protocol.get("samples_per_job") != SAMPLES
+                or protocol.get("acquisition_verified") is not False
+                or protocol.get("prediction_source_verified") is not False):
+            raise ValueError("capture lacks a valid exact-start diagnostic request")
+        requested_start = int(start)
+    if (protocol.get("schema") not in (
+                "starlink-gln1-native-bringup/v1", "starlink-gln1-native-exact-start/v1")
             or summary.get("status") != "transport_pass" or summary.get("failures") != []
             or type(protocol.get("jobs")) is not int or not 1 <= protocol["jobs"] <= 3
             or len(summary["jobs"]) != protocol["jobs"]):
@@ -110,17 +125,24 @@ def verify_capture(capture: Path, bank: Path) -> dict[str, object]:
         result = NativeResult.decode(payload)
         if digest(payload) != receipt["result_sha256"] or digest(iq) != receipt["iq_sha256"]:
             raise ValueError("saved native evidence differs from its transport hashes")
+        if requested_start is not None and result.start != requested_start:
+            raise ValueError("native evidence differs from the requested exact start")
         if (result.tag != protocol["tag"]+index or result.tag != receipt["tag"]
                 or result.start != receipt["start"] or result.count != receipt["samples"]
                 or result.phase_seed != protocol["phase_seed"] or result.phase_step != protocol["phase_step"]
                 or result.sequence != 0):
             raise ValueError("native evidence differs from the requested job or transport receipt")
         jobs.append(verify(result, iq, bank_bytes))
-    return {"schema": "starlink-gln1-native-replay/v1", "status": "arithmetic_pass", "jobs": jobs,
+    replay = {"schema": "starlink-gln1-native-replay/v1", "status": "arithmetic_pass", "jobs": jobs,
             "protocol_sha256": digest(protocol_bytes), "transport_summary_sha256": digest(summary_bytes),
             "source_sha256": {str(path.resolve()): digest(path.read_bytes()) for path in (
                 Path(__file__), Path(__file__).with_name("starlink_glrt_native_abi.py"))},
             "precision_qualified": False, "hardware_identity_and_calibration_required": True}
+    if exact:
+        replay.update(schema="starlink-gln1-native-exact-start-replay/v1",
+            start_sample=str(requested_start), exact_start_verified=True,
+            acquisition_verified=False, prediction_source_verified=False)
+    return replay
 
 
 def main() -> int:
