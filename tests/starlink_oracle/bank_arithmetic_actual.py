@@ -32,6 +32,11 @@ OLD_BENCH = "tb_starlink_pss_fft_bank_owned_slice"
 NEW_BENCH = "tb_starlink_pss_bank_arithmetic_actual"
 OLD_SHADOW = "starlink_pss_payload_bubble_shadow"
 NEW_SHADOW = "starlink_pss_bank_arithmetic_shadow"
+PRODUCT_MONITOR_FIELDS = ("output_bin_index", "output_block_start_index", "output_overflow")
+PRODUCT_BOUNDARY_HASHES = {
+    "starlink_pss_spectrum_product_operand_register.v": "dead8e465b4bd982cebcab0c4a4e7eb4f3b20c038938f74c7663a79e0779893d",
+    "starlink_pss_spectrum_product_bank_arithmetic.v": "515d29534dab921601c37564ad8a9957eed9befb9dff2e1c8c5f1f79fc6b5f70",
+}
 RTL = ["starlink_pss_fft_bank_owned_arithmetic_probe", "starlink_pss_realtime_input_guard",
        "starlink_pss_realtime_result_guard", "starlink_pss_block_mailbox",
        "starlink_pss_forward_kernel_join", "starlink_pss_kernel_rom",
@@ -68,7 +73,16 @@ def bench_edits():
              (f"  {OLD_SHADOW} payload_shadow (", f"  {NEW_SHADOW} #(.O(O)) payload_shadow ("),
              (f"  {OLD_SHADOW} forward_chain_shadow (", f"  {NEW_SHADOW} #(.O(O)) forward_chain_shadow (")]
     for instance in ("payload_shadow", "forward_chain_shadow"):
-        # Same exact old public ports; only private state moved below the wrapper.
+        # Three externally forced wires must retain the old register observation
+        # boundary. No field is discarded; wrapper-specific ready stays outside.
+        old_outputs = (".product_outputs({dut.product.input_ready, dut.product.output_valid, dut.product.output_i,\n"
+            "      dut.product.output_q, dut.product.output_bin_index, dut.product.output_block_exponent,\n"
+            "      dut.product.output_last, dut.product.output_block_start_index, dut.product.output_overflow,\n"
+            "      dut.product.overflow_pulse})")
+        new_outputs = old_outputs
+        for field in PRODUCT_MONITOR_FIELDS:
+            new_outputs = once(new_outputs, "dut.product." + field, "dut.product.arithmetic." + field)
+        edits.append((instance + "_MONITOR", (old_outputs, new_outputs)))
         old = ".product_private({dut.product.product_valid, dut.product.product_ii, dut.product.product_qq,\n      dut.product.product_iq, dut.product.product_qi})"
         new = old.replace("dut.product.", "dut.product.arithmetic.")
         # These two literal blocks intentionally use a context-local transform.
@@ -81,8 +95,8 @@ def bench_edits():
 def adapt_bench(source, inverse=False):
     edits = bench_edits()
     for old, new in reversed(edits) if inverse else edits:
-        if old.endswith("_PRIVATE"):
-            instance = old[:-8]
+        if old.endswith(("_PRIVATE", "_MONITOR")):
+            instance = old.rsplit("_", 1)[0]
             start = source.index(" " + instance + " (")
             end = source.index("\n  );", start)
             before, after = new
@@ -144,7 +158,18 @@ def shadow_source(old):
             "  end endgenerate\nendmodule\n\n" + elastic_shadow(old))
 
 
+def verify_product_monitor_boundary(payloads=None):
+    """A register rebind must never hide changed wrapper transport wiring."""
+    if payloads is None:
+        payloads = {name: (ACQ / name).read_bytes() for name in PRODUCT_BOUNDARY_HASHES}
+    if set(payloads) != set(PRODUCT_BOUNDARY_HASHES) or any(
+            hashlib.sha256(payloads[name]).hexdigest() != expected
+            for name, expected in PRODUCT_BOUNDARY_HASHES.items()):
+        raise ValueError("reviewed product monitor/transport source boundary changed")
+
+
 def verify_adaptations():
+    verify_product_monitor_boundary()
     old = original(f"tb/{OLD_BENCH}.sv")
     current = (ACQ / "tb" / f"{NEW_BENCH}.sv").read_text()
     if adapt_bench(current, inverse=True) != old or (ACQ / "tb" / f"{OLD_BENCH}.sv").read_text() != old:
@@ -239,7 +264,8 @@ def freeze(output, vectors, frequency, r, b, o):
     verify_adaptations()
     oracle = verify_vectors(vectors)
     paths = [ACQ / (name + ".v") for name in RTL] + [ACQ / "tb" / name for name in TB]
-    paths += [ACQ / "create_shared_realtime_xfft_ip.tcl", ACQ / "simulate_bank_arithmetic_actual.tcl"]
+    paths += [ACQ / "create_shared_realtime_xfft_ip.tcl", ACQ / "simulate_bank_arithmetic_actual.tcl",
+              ACQ / "simulate_bank_arithmetic_diagnostics.tcl"]
     payloads = {path.name: path.read_bytes() for path in paths}
     if len(payloads) != len(paths):
         raise ValueError("source filename collision")
@@ -259,7 +285,8 @@ def freeze(output, vectors, frequency, r, b, o):
         path = Path(filename).resolve()
         if path.suffix == ".py" and ROOT in path.parents:
             python_sources[path.relative_to(ROOT).as_posix()] = path
-    for relative in ("tests/test_starlink_bank_arithmetic_actual_policy.py",):
+    for relative in ("tests/test_starlink_bank_arithmetic_actual_policy.py",
+                     "tests/test_starlink_bank_arithmetic_monitor_boundary.py"):
         python_sources[relative] = ROOT / relative
     # Executable standalone copy avoids importing a mutable package after freeze.
     payloads["bank_arithmetic_actual.py"] = Path(__file__).read_bytes()
@@ -291,6 +318,9 @@ def verify_freeze(output):
     actual = {p.name: sha(p) for p in source.iterdir() if p.is_file() and not p.is_symlink()}
     if len(list(source.iterdir())) != len(actual) or actual != manifest["source_sha256"]:
         raise ValueError("complete frozen source inventory/hash mismatch")
+    verify_product_monitor_boundary({name: (source / name).read_bytes() for name in PRODUCT_BOUNDARY_HASHES})
+    if "simulate_bank_arithmetic_diagnostics.tcl" not in actual:
+        raise ValueError("missing frozen monitor waveform diagnostics")
     if actual.get("create_shared_realtime_xfft_ip.tcl") != IP_SHA:
         raise ValueError("wrong generated FFT configuration")
     if manifest.get("schema") != "bank-arithmetic-actual-preparation-v1" or manifest.get("base_hdl") != BASE or \
@@ -401,6 +431,23 @@ def verify_events(path, vectors):
             "score_scope": "oracle_only_no_scorer_RTL", "events_sha256": sha(path)}
 
 
+def require_wave_diagnostics(log, inventory):
+    pattern = r"(?m)^ARITHMETIC_WAVE_DIAGNOSTICS_ENABLED objects=(\d+) monitors=4 references=2 wrapper=1 inner=1 transport=1$"
+    rows = re.findall(pattern, log)
+    paths = inventory.splitlines()
+    if len(rows) != 1 or not 1 <= int(rows[0]) <= 256 or len(paths) != len(set(paths)) or len(paths) != int(rows[0]):
+        raise ValueError("missing/duplicate/malformed diagnostic waveform inventory")
+    if any(not path.startswith("/") or "\n" in path for path in paths):
+        raise ValueError("invalid diagnostic waveform path")
+    for suffix, expected in (("/product_outputs", 4), ("/p_overflow", 2),
+                             ("/dut/product/output_overflow", 1),
+                             ("/dut/product/arithmetic/output_overflow", 1),
+                             ("/dut/product_overflow", 1)):
+        if sum(path.endswith(suffix) for path in paths) != expected:
+            raise ValueError("incomplete diagnostic comparison/transport inventory")
+    return {"objects": len(paths), "comparison_width": 119, "recorded_internal_signals": paths}
+
+
 def verify_results(output):
     output = Path(output).resolve()
     manifest = verify_freeze(output)
@@ -420,6 +467,7 @@ def verify_results(output):
     log_path = simulation / "simulate.log"
     log = log_path.read_text()
     receipts = require_terminal(log, manifest)
+    require_wave_diagnostics(log, (simulation / "arithmetic_diagnostic_signals.txt").read_text())
     trace = simulation / "fft_bank_owned_trace.csv"
     if manifest["baseline_complete_csv_match_required"] and sha(trace) != HISTORICAL_R1_CSV:
         raise ValueError("R1/B0/O0 complete historical baseline CSV changed")
