@@ -9,11 +9,12 @@ adds no state/cycles at source level and leaves original global checks intact,
 but has no actual-controller or physical timing result yet. Next is additive
 actual-core preparation and observer testing, not deployment. See
 [scope and exact evidence](reports/experiments/20260910-product-final-fence-review.md).
-The separate inverse sealed-bank integration now independently passes its first
-16 frozen smoke tests (synthetic zero-return interface, not actual FFT). Source
-review finds no remaining combinational feedback loop in that revision; nonzero
-data, paused-source reset and actual ACK/release latency qualification continue.
-See [integration evidence](reports/experiments/20260910-sealed-bank-first-slice-review.md).
+The separate inverse sealed-bank integration now independently passes 136 frozen
+offline tests, including nonzero real-guard data, paused-source resets, ten
+targeted mutants and a clock-phase sweep. Observed healthy reuse overhead is
+4–6 fast clocks in that sweep, not complete FFT throughput. Next is additive
+actual-core preparation; physical timing remains unqualified. See
+[integration evidence](reports/experiments/20260910-inverse-sealed-integration-review.md).
 
 Latest update (2026-09-10, after 13:47 UTC): build-output storage recovered
 without discarding evidence. The corrected late-request testbench independently

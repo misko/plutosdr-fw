@@ -1,5 +1,9 @@
 # Sealed-bank pipeline: first implementation scope
 
+Later checkpoint: [136-test independent integration review](20260910-inverse-sealed-integration-review.md)
+records the completed nonzero/reset/phase/mutation cut and its next gate.
+The chronological findings below retain their original qualification scope.
+
 The L1 diagnostic route failed setup (-1.549 ns). Its two worst reported paths
 cross module boundaries: input metadata/current faults into result-fault state,
 and output-bank metadata/current faults into admission. Moving one descriptor
