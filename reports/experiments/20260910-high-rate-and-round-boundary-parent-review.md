@@ -1795,3 +1795,48 @@ Reviewed publication completed: root pushed FW75c8e044/HDL62da6a39 to the
 bank-arithmetic DNM remote and FW03ba61b4/HDL32b20cb7 to the ROM-prefetch DNM
 remote. All four original push commands exited0. No firmware-main push or
 primary runtime gitlink promotion occurred.
+
+## Read-only recorded-history review completed
+
+The single saved-WDB loader5578 exited0 in8.022s, with no simulation advance.
+Root read the exact Tcl and owner, then independently rehashed all11 inputs
+against before/after receipts, including unchanged130MiB WDB
+52f4ccf572df859e21cdb6e92a82c3b22459b551874acf241f0ea8acd7539a31.
+Root independently parsed2193 unique recorded values:115 arithmetic plus14
+observer paths at17 physical timestamps. Every actual/original/default155-bit
+view matches, including the mixed-X startup values. The original physical
+snapshots are evidence of recorded history, not merely selected wave paths.
+
+At0fs counters are pre1/post0, at1000fs1/1; the first subsequent edge is2/1,
+then2/2 at+1ps. Immediately before the final edge counters are1180131/1180131;
+at the edge1180132/1180131, remaining so at the exact final+1ps/$finish time.
+The outstanding final counter increment is directly localized by these saved
+values. This finite sample set does not prove every prior edge independently,
+resolve intra-timestamp Active/Inactive/NBA ordering, or retroactively explain
+the prior14041 failure. Those limits remain explicit.
+
+Raw read-only extraction is retained under the arithmetic worktree's
+`hdl/library/starlink_pss_acquisition/build/local-admission-wdb-history-v1.7RQSIW`.
+Tcl SHA05d9b02626d2849b4b18bd8c0dfd533d2a102e0fb874a9ffaaeefa9d3a60b7fb;
+owner SHA3d59d459dcf4e75f28339722c33f85a0e16beefbe7127645983bdbf0e1247a07.
+No new actual simulation or physical evaluation has run. The next bounded work
+is the source-specific L1 physical preparation and ROM/late60 integration tests.
+
+## Interim ROM integration review: stronger inherited-source admission required
+
+The first additive C1 ROM integration draft passes76 offline tests in3.50s
+(agent-owned original17052 terminal0). Root reviewed the264-line helper,
+96-line observer,96-line real-joiner/ROM fixture and277-line test suite before
+any vendor launch. Full C1 hierarchy tests are compile-only; the separate
+executed fixture uses real ROM/joiner RTL but no vendor FFT or bank lifecycle.
+
+Review found that verify_prepared bound seven canonical RTL files and the
+top/runner inverses, but trusted a rehashable new metadata map for the other
+inherited C1 observers, references and helpers. Root requested a pinned original
+C1 inventory and full inherited-file/in-memory-inverse comparison, with
+rehashed old-observer/reference/helper negative tests. The first passing draft
+is retained, not relabeled as the corrected gate. Root also questioned allowing
+zero sampled private-reset edges: the new predicate includes the accepted C1
+faulted-private-reset observations, so zero is unjustified for the planned run.
+The corrected gate must require positive coverage and preserve its distinction
+from reset-event counts. No actual or physical launch is approved for this draft.

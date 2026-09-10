@@ -49,8 +49,11 @@ gates with the complete historical CSV unchanged. Parent independently reran
 the frozen result verifier and verified the189-file actual archive from Git.
 All155 guard bits remain unconditional, with zero added hardware cycles. The
 final pre/post counters differ by one at the shared finish/+1ps time slot;
-this is retained explicitly, not rewritten. Saved waveform-history review and
-source-specific physical preparation are next; no physical benefit, explanation
+this is retained explicitly, not rewritten. Read-only saved waveform inspection
+now confirms all155-bit views match at17 sampled times and localizes the pending
+counter increment to the final edge. It cannot resolve individual simulator
+regions within a timestamp. Source-specific physical preparation is next;
+no physical benefit, explanation
 of the earlier vendor startup mismatch, or D/S/CDC union is established. Their
 reviewed sources/evidence are pushed to their respective experimental DNM
 branches, not firmware main. The60 public bank/STOP/pilot interface independently
