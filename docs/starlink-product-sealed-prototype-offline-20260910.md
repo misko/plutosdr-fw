@@ -145,6 +145,15 @@ review must precede any actual-core preparation/top integration or physical
 trial. There is no claim that this fixes the independent remaining ROM CE cone
 or composes automatically with inverse sealed-bank or scheduling alternatives.
 
+Portable archive: HDLd7b73a9b8012ac7ace5e3c697bd4acdfcdad4cea,
+`library/starlink_pss_acquisition/evidence/product-sealed-prototype-offline-v1`.
+Outer manifest7cd9a28245c978b71abe67706986f266ff33fa5cad9538d8bc3b052d721a36e0:
+all7 payloads/8 tracked Git-object files verified. The tar holds all13726
+regular files (37,618,093 uncompressed bytes), each independently hash-checked.
+Absolute pytest convenience links are listed, not shipped as live links.
+All seven tested source hashes were rechecked after packaging. No source
+changes occurred between the final test and the archive commit.
+
 Replay from this FW worktree with a fresh nonexisting base:
 
 ```sh
