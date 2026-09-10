@@ -1,0 +1,750 @@
+{
+  "archive": "20260910-local-admission-actual175-startup-failure-v2.tgz",
+  "archive_bytes": 16306679,
+  "archive_sha256": "f6f47375fae3d0f72881808198e7e8d6c14b39b3ef51734e2ce5add036088d9f",
+  "members": {
+    "original_attempt/frozen_sources/bank_arithmetic_actual.py": {
+      "bytes": 30464,
+      "sha256": "de13f13c54531a9e13fe872cc5b4be82ab917487c448f25ee744b0b555cca07d"
+    },
+    "original_attempt/frozen_sources/create_shared_realtime_xfft_ip.tcl": {
+      "bytes": 3158,
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    "original_attempt/frozen_sources/failed_actual_arithmetic_diagnostic_signals.txt": {
+      "bytes": 13340,
+      "sha256": "f2cc4bee468b97cec08e8f71417150cf16e56841df43741f9266b6365132ace6"
+    },
+    "original_attempt/frozen_sources/forward_exponents.mem": {
+      "bytes": 9,
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    "original_attempt/frozen_sources/forward_q17.mem": {
+      "bytes": 15360,
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    "original_attempt/frozen_sources/history_manifest.json": {
+      "bytes": 7675,
+      "sha256": "6376f1fb2508f357933d4cb9cd9949d8da452d155a47084701aa29fb99df1954"
+    },
+    "original_attempt/frozen_sources/history_posthoc_assessment.json": {
+      "bytes": 14929,
+      "sha256": "a1e7eebc49fba088327109643d9beb120276eb2f6f230a885d5a9438e048da0f"
+    },
+    "original_attempt/frozen_sources/history_run_outcome.txt": {
+      "bytes": 2865,
+      "sha256": "f42eff39aeeb9632c4ec7064e453146b958047d5a96c219821f66c2f0ef63af3"
+    },
+    "original_attempt/frozen_sources/inverse_exponents.mem": {
+      "bytes": 9,
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    "original_attempt/frozen_sources/inverse_q17.mem": {
+      "bytes": 15360,
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    "original_attempt/frozen_sources/local_admission.py": {
+      "bytes": 2636,
+      "sha256": "8b413b323dd55f347bbed4babef74a1faba7754672c01f9122231b82aa9a51ef"
+    },
+    "original_attempt/frozen_sources/local_admission_actual.py": {
+      "bytes": 24201,
+      "sha256": "2f3b957f33f3b2ed43e84c2348a0d971929434cdc6505f50b3201d9b30111ddc"
+    },
+    "original_attempt/frozen_sources/local_admission_original_guard.v": {
+      "bytes": 6232,
+      "sha256": "c69e1c02cdca75780b3dd850497869899defd9a3348b66c522c4bf26902e5354"
+    },
+    "original_attempt/frozen_sources/product_q17.mem": {
+      "bytes": 15360,
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    "original_attempt/frozen_sources/profile.tcl": {
+      "bytes": 1042,
+      "sha256": "a3664d75341b9618b0ba188446b8310b753f3bcf64e8137ab40231ca77d0fe56"
+    },
+    "original_attempt/frozen_sources/samples_ci16.mem": {
+      "bytes": 12654,
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    "original_attempt/frozen_sources/scores_u8.mem": {
+      "bytes": 4023,
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    "original_attempt/frozen_sources/simulate_bank_arithmetic_actual.tcl": {
+      "bytes": 4469,
+      "sha256": "684f8e788f7a3550d85ccc30eb32a56b7b72a4c8067c2aa59513d416bd177eb9"
+    },
+    "original_attempt/frozen_sources/simulate_bank_arithmetic_diagnostics.tcl": {
+      "bytes": 3002,
+      "sha256": "7efe69d2f3896c50ee97bce6b52bd70493ba757b2e0e16c80aaf5b6d1f7748c6"
+    },
+    "original_attempt/frozen_sources/simulate_local_admission_actual.tcl": {
+      "bytes": 5240,
+      "sha256": "f76090eba45113c44eff258fa1482198b663747787b76b14ce24a39bee7ebb98"
+    },
+    "original_attempt/frozen_sources/simulate_local_admission_diagnostics.tcl": {
+      "bytes": 5036,
+      "sha256": "260e9dc61259ca3c6901fc46ad0fbaf9994943f2c30e2fa1f8041d15960865c7"
+    },
+    "original_attempt/frozen_sources/starlink_pss_bank_arithmetic_actual_checks.svh": {
+      "bytes": 5061,
+      "sha256": "73f6b586f09c613a7d652e36704fa41f2e78004b246c06263df72dd8699ee6dd"
+    },
+    "original_attempt/frozen_sources/starlink_pss_bank_arithmetic_shadow.sv": {
+      "bytes": 6575,
+      "sha256": "c58e50c6853cd0519f018b4c362e70aabcf6d157a414f6b6748b49496aec01ad"
+    },
+    "original_attempt/frozen_sources/starlink_pss_block_mailbox.v": {
+      "bytes": 10098,
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    "original_attempt/frozen_sources/starlink_pss_fft_bank_owned_arithmetic_probe.v": {
+      "bytes": 27195,
+      "sha256": "ee4ded7f8aafd6ce3b52ac1960b1162e33e4771692cb82469519b6e5e6dc3857"
+    },
+    "original_attempt/frozen_sources/starlink_pss_fft_bank_owned_local_admission_probe.v": {
+      "bytes": 27314,
+      "sha256": "0cb54617eb6757e1d6c719d97b0fd5002ec7f6105c8c4b50c41eba67d4306235"
+    },
+    "original_attempt/frozen_sources/starlink_pss_forward_kernel_join.v": {
+      "bytes": 4166,
+      "sha256": "87e40b3cc9025502c05d2afbd6b0d9658618cd7204d4fd8ddc3f0ba74e68843a"
+    },
+    "original_attempt/frozen_sources/starlink_pss_forward_kernel_join_7ee87258_golden.v": {
+      "bytes": 3680,
+      "sha256": "eb2e28fd92ccf7b28d0adf68da09ac761a55ca6fdddc507187680c3ef1d857da"
+    },
+    "original_attempt/frozen_sources/starlink_pss_forward_retirement_shadow.sv": {
+      "bytes": 4331,
+      "sha256": "8ed19931be00db932b52d5bf57015168a185e31987db1af8924ba1c93774702b"
+    },
+    "original_attempt/frozen_sources/starlink_pss_kernel_rom.v": {
+      "bytes": 6729,
+      "sha256": "0b4ee87d93d61c6fa12ee9992aa517a3a8be568835075531d9af4453f4ec80e5"
+    },
+    "original_attempt/frozen_sources/starlink_pss_kernel_rom_7ee87258_golden.v": {
+      "bytes": 5419,
+      "sha256": "00e27e3a506c0a21510de18baba5c6d014fdb2a43ff352f1481438432e1d3c35"
+    },
+    "original_attempt/frozen_sources/starlink_pss_local_admission_actual_checks.svh": {
+      "bytes": 1979,
+      "sha256": "4c8f2d7260072355808370cdc2eb448cfee17a916b127f6875aab2f6cdfe6a66"
+    },
+    "original_attempt/frozen_sources/starlink_pss_local_admission_actual_observer.sv": {
+      "bytes": 4710,
+      "sha256": "ea16d902560799e4ddb694b8172fb689d6c2468378053ddad127655f9be7d368"
+    },
+    "original_attempt/frozen_sources/starlink_pss_payload_bubble_shadow.sv": {
+      "bytes": 4512,
+      "sha256": "f151676631d6fdd1290e91a285063114010ab0c8103ecf754b2be618d11409a3"
+    },
+    "original_attempt/frozen_sources/starlink_pss_realtime_input_guard.v": {
+      "bytes": 6235,
+      "sha256": "eb1f968a30ae0371421cfb0766c7f8bf0c23411e730717cd0d4924be0604109e"
+    },
+    "original_attempt/frozen_sources/starlink_pss_realtime_input_guard_local_admission.v": {
+      "bytes": 6999,
+      "sha256": "55438743eede0d346cec67351e079eb6ae21da437d4088a131a2a258b43ff233"
+    },
+    "original_attempt/frozen_sources/starlink_pss_realtime_result_guard.v": {
+      "bytes": 21006,
+      "sha256": "09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2"
+    },
+    "original_attempt/frozen_sources/starlink_pss_realtime_result_guard_ce6a885e_golden.v": {
+      "bytes": 19179,
+      "sha256": "b406adf0af7bee95594a62b8929ae8743f60b17c9f55798f2977f485ee068e5f"
+    },
+    "original_attempt/frozen_sources/starlink_pss_spectrum_product_7ee87258_golden.v": {
+      "bytes": 6859,
+      "sha256": "c79a1f2f4356c20cd615e963cebb28dbcca7b1cf809691165e2f30debc7f58c9"
+    },
+    "original_attempt/frozen_sources/starlink_pss_spectrum_product_bank_arithmetic.v": {
+      "bytes": 9601,
+      "sha256": "515d29534dab921601c37564ad8a9957eed9befb9dff2e1c8c5f1f79fc6b5f70"
+    },
+    "original_attempt/frozen_sources/starlink_pss_spectrum_product_operand_register.v": {
+      "bytes": 4502,
+      "sha256": "dead8e465b4bd982cebcab0c4a4e7eb4f3b20c038938f74c7663a79e0779893d"
+    },
+    "original_attempt/frozen_sources/tb_starlink_pss_bank_arithmetic_actual.sv": {
+      "bytes": 64621,
+      "sha256": "4e283b7f45e641a7b4d6ea58eb985da506514e212e8d81f9a3c04f2fc2764756"
+    },
+    "original_attempt/frozen_sources/tb_starlink_pss_fft_bank_owned_slice.sv.reference": {
+      "bytes": 64228,
+      "sha256": "6a64a130c01ca28f89da9ab67f772884d093db27b2923e86faa211051f79902c"
+    },
+    "original_attempt/frozen_sources/tb_starlink_pss_local_admission_actual.sv": {
+      "bytes": 64782,
+      "sha256": "a347cd6ec4bb3e888f0ce171aedb7c4a85cebea4932bc880f348a75ada5ae238"
+    },
+    "original_attempt/frozen_sources/test_starlink_local_admission_actual_policy.py": {
+      "bytes": 34282,
+      "sha256": "40ed66bb27201b1aa222abd286e116dce726813188cf6e61a773388aa552ef29"
+    },
+    "original_attempt/frozen_sources/upper_edge_pss_kernel_q17.mem": {
+      "bytes": 5120,
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    "original_attempt/generated_ip_after.txt": {
+      "bytes": 355,
+      "sha256": "6d3a5ca54ecf57c2a9d3dbcd80bf74d7e032bef9ce87fef3a251ead2f543fd12"
+    },
+    "original_attempt/generated_ip_before.txt": {
+      "bytes": 355,
+      "sha256": "6d3a5ca54ecf57c2a9d3dbcd80bf74d7e032bef9ce87fef3a251ead2f543fd12"
+    },
+    "original_attempt/launch_started.txt": {
+      "bytes": 62,
+      "sha256": "b8956f950113aba1dba41402e894e255b145c777813d6c2a7902a38e3ee7a37b"
+    },
+    "original_attempt/manifest.json": {
+      "bytes": 7394,
+      "sha256": "ae2173b877d75fc6f97246e612415e9c33a1f9d0215a6e5b1d3eb49bf6ae2f22"
+    },
+    "original_attempt/postflight.json": {
+      "bytes": 7394,
+      "sha256": "ae2173b877d75fc6f97246e612415e9c33a1f9d0215a6e5b1d3eb49bf6ae2f22"
+    },
+    "original_attempt/preflight.json": {
+      "bytes": 7394,
+      "sha256": "ae2173b877d75fc6f97246e612415e9c33a1f9d0215a6e5b1d3eb49bf6ae2f22"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.cache/sim/ssm.db": {
+      "bytes": 571,
+      "sha256": "5e8c0ddf6f132f27e2f1f773260c7c3f9cfd0ae72b7f0c27d8b1f3269ad84f51"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.cache/wt/project.wpc": {
+      "bytes": 62,
+      "sha256": "e1bd4932faa3b707d55b82fc531e93592f7959f5d97a41973e4457952530179d"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.cache/wt/xsim.wdf": {
+      "bytes": 235,
+      "sha256": "c6143924cb55d7cfd38bb2c26e019e784f296f92ce70d3c7721f0edf2619cff3"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/cmodel/xfft_v9_1_bitacc_cmodel_lin64.zip": {
+      "bytes": 309254,
+      "sha256": "0f264e0e15f93fcf5df9c60e715fe51c9bcd9639b578a5ae67be4df5cf2d5f87"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/cmodel/xfft_v9_1_bitacc_cmodel_nt64.zip": {
+      "bytes": 474348,
+      "sha256": "3dffded07d86520efc92b5b8f0ffe7e4e17c162874f2aca0ab88e15fb37c4a76"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/demo_tb/tb_starlink_pss_fft512_bfp18_rt_candidate.vhd": {
+      "bytes": 23366,
+      "sha256": "632d6aef3513854608faf5e7b7010aaddf33a2842c36bc0dadd2ea4a58443ec8"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/doc/xfft_v9_1_changelog.txt": {
+      "bytes": 10362,
+      "sha256": "c904889a88ab2a4cd41f08fc21d5a5cd9e6a2c6e67cb55ac3972ff12b7db2091"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/axi_utils_v2_0_vh_rfs.vhd": {
+      "bytes": 294150,
+      "sha256": "5a37cfbcb9f273641f484eaca4c08a062cc00bc4419ec33f7638c10d2105d017"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/c_addsub_v12_0_vh_rfs.vhd": {
+      "bytes": 405329,
+      "sha256": "064def01fc5da5a17e8a18da7aa854dbdb87ea99bac86a1ba5ff407fd5ecd7f1"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/c_mux_bit_v12_0_vh_rfs.vhd": {
+      "bytes": 241757,
+      "sha256": "e0f3759617b11bb15ad00438c5a8da9c86b7714d717c277674c058312b93013e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/c_reg_fd_v12_0_vh_rfs.vhd": {
+      "bytes": 40981,
+      "sha256": "0e6d9329a217f45ff63731cd813267a953b7435c7b235d40595a26d7ff643f49"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/c_shift_ram_v12_0_vh_rfs.vhd": {
+      "bytes": 174990,
+      "sha256": "eaafb455fe692b3365e2bb3f6af2539b54a774150004263382ae9f0ded4076a6"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/cmpy_v6_0_vh_rfs.vhd": {
+      "bytes": 924630,
+      "sha256": "108ce8d4068eb02151ca0ad945fbbcb7b06455ebe941fba9d2d76383ce7c4839"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/floating_point_v7_0_vh_rfs.vhd": {
+      "bytes": 5362684,
+      "sha256": "4aa84c21b48b85b890b99d377a721ef772b7b26986822a8b514714cd6be55a37"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/mult_gen_v12_0_vh_rfs.vhd": {
+      "bytes": 1312385,
+      "sha256": "875ca2ef2bb8eaa34f93520c2016423a564f1d22d11c67fbb36da3d934abe34b"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/xbip_addsub_v3_0_vh_rfs.vhd": {
+      "bytes": 36077,
+      "sha256": "97ca96261075f8fb31a270e9aa4e1f3ff9d2e9c9dc6e145e8e23fb1682bfbe1c"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/xbip_bram18k_v3_0_vh_rfs.vhd": {
+      "bytes": 105219,
+      "sha256": "a7c66eba966be880fc8c0018dcfc43a5f92187faafcf8455006d54fd45b40880"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/xbip_dsp48_addsub_v3_0_vh_rfs.vhd": {
+      "bytes": 101373,
+      "sha256": "754efab84b2bb993f13093a6daf181cfc0a8ca75f0703b36fb99ef4601ac6d4b"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/xbip_dsp48_wrapper_v3_0_vh_rfs.vhd": {
+      "bytes": 184976,
+      "sha256": "7f9578535fd3384827289c00cfee627b4f6e3a2dcaf0410968165398298c141e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/xbip_pipe_v3_0_vh_rfs.vhd": {
+      "bytes": 32122,
+      "sha256": "16813fd7c0721f5873ead7f837a12b46ed9f110051541d2b2f0e465c4118e6b4"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/xbip_utils_v3_0_vh_rfs.vhd": {
+      "bytes": 191480,
+      "sha256": "85ec75845c2d2ddb9172f82f828a425f041babbc3183eb204c1ebfc303600fc2"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/hdl/xfft_v9_1_vh_rfs.vhd": {
+      "bytes": 5272403,
+      "sha256": "c44161f4cef6805e9a1bb880218df025172bb31af643fbaeef39b9547951c664"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/sim/starlink_pss_fft512_bfp18_rt_candidate.vhd": {
+      "bytes": 12563,
+      "sha256": "4f4cccc8bc41a3639b9d719afddba04f2bc2c86e75e6008066e7dbe2eab2d390"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/starlink_pss_fft512_bfp18_rt_candidate.veo": {
+      "bytes": 4735,
+      "sha256": "8acf4e9408970143d9e6304441db0aedcfda68521972f73f7b11710a74b0f333"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/starlink_pss_fft512_bfp18_rt_candidate.vho": {
+      "bytes": 4848,
+      "sha256": "eed0e601159fdc65966564d933dfd78919fab2b3438fa4ef9306f8e1dd7ae5e7"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/starlink_pss_fft512_bfp18_rt_candidate.xml": {
+      "bytes": 140166,
+      "sha256": "b6b7875c5fd5aa0e231a077642ab026efa7adf4083ef8e9651576be8fb215c3a"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/starlink_pss_fft512_bfp18_rt_candidate_ooc.xdc": {
+      "bytes": 2447,
+      "sha256": "6e9fc6f38fe2ce7ca388b12daa56a5af6a4871dd2b943f444e17f5822da2d916"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd": {
+      "bytes": 13908,
+      "sha256": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.hw/fft_bank_arithmetic_actual.lpr": {
+      "bytes": 284,
+      "sha256": "6820d0a53eed4bc1815172ae33cf648afcbd512437e9d6b61b1ec1a35e99c50e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/README.txt": {
+      "bytes": 129,
+      "sha256": "9f0bfb88c6756a2a1d75afb4819f8331cd1c6f6c8ebaeb203905899d8410c468"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/ip/starlink_pss_fft512_bfp18_rt_candidate/starlink_pss_fft512_bfp18_rt_candidate.veo": {
+      "bytes": 4735,
+      "sha256": "8acf4e9408970143d9e6304441db0aedcfda68521972f73f7b11710a74b0f333"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/ip/starlink_pss_fft512_bfp18_rt_candidate/starlink_pss_fft512_bfp18_rt_candidate.vho": {
+      "bytes": 4848,
+      "sha256": "eed0e601159fdc65966564d933dfd78919fab2b3438fa4ef9306f8e1dd7ae5e7"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/forward_exponents.mem": {
+      "bytes": 9,
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/forward_q17.mem": {
+      "bytes": 15360,
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/inverse_exponents.mem": {
+      "bytes": 9,
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/inverse_q17.mem": {
+      "bytes": 15360,
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/product_q17.mem": {
+      "bytes": 15360,
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/samples_ci16.mem": {
+      "bytes": 12654,
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/scores_u8.mem": {
+      "bytes": 4023,
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.ip_user_files/mem_init_files/upper_edge_pss_kernel_q17.mem": {
+      "bytes": 5120,
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/arithmetic_diagnostic_receipt.txt": {
+      "bytes": 102,
+      "sha256": "769c8bdf49bc18f8359ee9db0d80780ef9abab0d429075e369c054065e75e724"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/arithmetic_diagnostic_signals.txt": {
+      "bytes": 13340,
+      "sha256": "f2cc4bee468b97cec08e8f71417150cf16e56841df43741f9266b6365132ace6"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/bank_arithmetic_events.csv": {
+      "bytes": 58,
+      "sha256": "1e11c89aa2a5cdabb661c8ddf4232776573fe177fb762796e46650e80a71099d"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/compile.log": {
+      "bytes": 13536,
+      "sha256": "1a186be27e0ac776ef86302326cea865d5364ca70581e6b1c53f7b6f69457764"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/compile.sh": {
+      "bytes": 1084,
+      "sha256": "99b7b541c381a4b56df7111b800c1df6070663c960ce1184aa0da4f7ca6247fb"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/elaborate.log": {
+      "bytes": 25929,
+      "sha256": "5d6e2e23b3b6db4a2320dfe8cbae1e181b716ab9f57b5a9aaedfd80417092f08"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/elaborate.sh": {
+      "bytes": 1966,
+      "sha256": "adbacada5c8466ebd9b926eb68306f41a7576b24449532b892cd3a956b31b226"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/fft_bank_owned_trace.csv": {
+      "bytes": 267,
+      "sha256": "5f06d2988d39e78cf5a2917c360b57120c6f0850ac0719f2f3617282e3aa878e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/forward_exponents.mem": {
+      "bytes": 9,
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/forward_q17.mem": {
+      "bytes": 15360,
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/glbl.v": {
+      "bytes": 1762,
+      "sha256": "6270251cf35e1fce3119fc79f8fb968912f7983027e43cf030409ba68f048936"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/inverse_exponents.mem": {
+      "bytes": 9,
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/inverse_q17.mem": {
+      "bytes": 15360,
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/local_guard_diagnostic_receipt.txt": {
+      "bytes": 58,
+      "sha256": "b93a7f4e5f102941a68593064188eea02f469676ef2e725f6bc37b70556799ae"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/local_guard_diagnostic_signals.txt": {
+      "bytes": 1412,
+      "sha256": "72aedb62c9e36dc28e4f1cbcaf7b4882ef2f258709c226472e2e77cc5f5c00a1"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/product_q17.mem": {
+      "bytes": 15360,
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/samples_ci16.mem": {
+      "bytes": 12654,
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/scores_u8.mem": {
+      "bytes": 4023,
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/simulate.log": {
+      "bytes": 847,
+      "sha256": "6f8355e475bcc1aa417fc248720a34001913c412787b479d6430080e58f555cf"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/simulate.sh": {
+      "bytes": 1294,
+      "sha256": "12991b9bd9ac71381a9113733fe2f4932d3c2349d6e3d67dbc139ec729747d89"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/tb_starlink_pss_local_admission_actual_behav.wdb": {
+      "bytes": 492970,
+      "sha256": "61b685f55940d89f1124d4fd4869c6f146e6a54207354f5ab1a15ba4c722177f"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/tb_starlink_pss_local_admission_actual_vhdl.prj": {
+      "bytes": 240,
+      "sha256": "1e10778972510eaa13b3cccebe176e60c29e3d3bc7a8bd6825a665464c0f874e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/tb_starlink_pss_local_admission_actual_vlog.prj": {
+      "bytes": 1708,
+      "sha256": "153e04f75ae0d82a737eac781cd5121a32d8a0fc503d7dce69fe7af0ac6ac2a0"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/upper_edge_pss_kernel_q17.mem": {
+      "bytes": 5120,
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xelab.pb": {
+      "bytes": 43862,
+      "sha256": "8656f744e43cdb774bbf66ce30dd8d0212cb6f7a0aee2060736d0f5fffb998a5"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/Compile_Options.txt": {
+      "bytes": 749,
+      "sha256": "613438883f9d89d6ffb229790fe76abb325cfec811261b5e0ecadbf4324c0286"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/TempBreakPointFile.txt": {
+      "bytes": 28,
+      "sha256": "b4cb40d28ae548744312392beffad452d7b3cc0d8a3c187635a7e3925f3c3aa7"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_0.lnx64.o": {
+      "bytes": 205184,
+      "sha256": "139d28631f14d528a343c144b65fb5aac7e7994673f8afdea52605f4f11f93cb"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_1.lnx64.o": {
+      "bytes": 1224456,
+      "sha256": "1b7a8f8530d43facd9150000199d3ad21145588fabcec43cf1097a452e1555c5"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_10.lnx64.o": {
+      "bytes": 5552,
+      "sha256": "f7a86a250afa9ce8f59e8c14ae7f81299cea46c0b98298232221ac94bc716dcf"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_11.c": {
+      "bytes": 413012,
+      "sha256": "3cc468913c37cb45f1c807dfa11c0b268bb613351be7e14559957f4f368e224d"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_11.lnx64.o": {
+      "bytes": 327736,
+      "sha256": "4bb49be1289685445e28ededb68b9aa0824746df5fb51fb2b1efc4f09a95fe2e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_2.lnx64.o": {
+      "bytes": 1135696,
+      "sha256": "49680a77adacfa55574a50bd4b87dba950e254d811510c4e8c2d011e609feb1f"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_3.lnx64.o": {
+      "bytes": 294712,
+      "sha256": "cddfd808eb49f7c023d7aeafcbe85c6aadc3ad51aa6029d29af82b5346b4fd9e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_4.lnx64.o": {
+      "bytes": 288104,
+      "sha256": "8442f45d7965483872a518e33c2964926af947762954cc63aacb648c6ecf84ba"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_5.lnx64.o": {
+      "bytes": 384928,
+      "sha256": "65d615722d8f48e768c3b56bcd948d815e5c9ddb32f138b343567895048e5baa"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_6.lnx64.o": {
+      "bytes": 1242424,
+      "sha256": "437c08c994b2dae3cface25889effbd1adff905a3966125f9c9608770312065e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_7.lnx64.o": {
+      "bytes": 466320,
+      "sha256": "c6c051cd9538e8e6cf8a174d1a8aa83c6c4bb678449db2ce1fd443e7e044ca7a"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_8.lnx64.o": {
+      "bytes": 224672,
+      "sha256": "139da66304ada68b21ed5a2c178318db0221c37551d01be24a4ffe70ade83013"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/obj/xsim_9.lnx64.o": {
+      "bytes": 852336,
+      "sha256": "e20d38f0122e81eb7ba45c94a6ca83c2943d78e809ff1cb806ee8800148698af"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.dbg": {
+      "bytes": 286472,
+      "sha256": "377e940dd122e654c01a224a981a2163dcd8adbd02e35842682fa62d2ba73d00"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.mem": {
+      "bytes": 688878,
+      "sha256": "6be6c3b7c02ddb3c020c907d957ff3d026de58f864be3bac7d5942571e14ea20"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.reloc": {
+      "bytes": 800420,
+      "sha256": "c3335813c46c3a98cb733217c741d7fbed59da2aa60f5dd9065504f66317671c"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.rlx": {
+      "bytes": 2047,
+      "sha256": "e5e9a97f2d5e2ce223cc7a58c87a076e50f7763beea91590bbe8684095d6836b"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.rtti": {
+      "bytes": 650,
+      "sha256": "42f990d79473eada2a02319fcd0f6b96b95c6c559e7a6ecb0d39c197c9bcd8ec"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.svtype": {
+      "bytes": 109,
+      "sha256": "e9ea42657dd33366c11dd0b125e2416fc58af980fbb7fe81824974d0dc37a701"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.type": {
+      "bytes": 73616,
+      "sha256": "2f53d024f12aed133738ff3d03303e8208ca0448f44db1601b9406c69d1d0f87"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsim.xdbg": {
+      "bytes": 249568,
+      "sha256": "fd1a08d9d46f185cf1a14ff3e24abbebe5f86043bc1055d1d3a12374d129389e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsimSettings.ini": {
+      "bytes": 1360,
+      "sha256": "8210be8e31dba30e3b19bf96d4ea3abe4ef35dae8994ad85ea99c7cac1eeb3e4"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsimcrash.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsimk": {
+      "bytes": 5465816,
+      "sha256": "2bcdc0a3300eabb4e67de49eeba055e24c8216adcff480dec05a8f7fa5c52785"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/tb_starlink_pss_local_admission_actual_behav/xsimkernel.log": {
+      "bytes": 379,
+      "sha256": "5b0d61eab9f4fe763d6e9bb850055234bff25ab5ab516b3d2338f7661aa3f122"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/glbl.sdb": {
+      "bytes": 5708,
+      "sha256": "63d02d37c22e58ba7457be77c6311aa103854fb648d5528cf366fb270bf8b847"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/local_admission_original_guard.sdb": {
+      "bytes": 11166,
+      "sha256": "45ceff20b7e3f11d509a8e261080a52f418f124c15c5731e6ddbdfe32b1a64b9"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_bank_arithmetic_shadow.sdb": {
+      "bytes": 4032,
+      "sha256": "65fafc5b48915e26b5f896b4e52f7ac00b07d82de4196d3b427b147c86a19e9e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_bank_arithmetic_shadow_elastic.sdb": {
+      "bytes": 13215,
+      "sha256": "00212a13b7d7660353cb82d504aea208c4ab4639121c8b74da4e358f88eb9cf2"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_block_mailbox.sdb": {
+      "bytes": 19984,
+      "sha256": "c92e9cdde3a9554e0528a6283c556b3d225db3c93d1c2dcc2e501b0ca405d0b9"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_fft512_bfp18_rt_candidate.vdb": {
+      "bytes": 32863,
+      "sha256": "c34008f640a12c875951371a68a7acdb101a565a0020c9e4702b820fef46fa64"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_fft_bank_owned_local_admission_probe.sdb": {
+      "bytes": 50799,
+      "sha256": "c4983c9e3087b4e702c9480096b828494ca7aa4f6cd18791ebc19f537d405436"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_forward_kernel_join.sdb": {
+      "bytes": 7315,
+      "sha256": "86258c2a13896a0dd25db4dfcc0f0c83c2b903e30ea1894d3648561f44b21a1e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_forward_kernel_join_7ee87258_golden.sdb": {
+      "bytes": 6693,
+      "sha256": "fe910ae4ba0da8b54296569b3c0a116ef56511b48e5afdf25ebf322202a099f2"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_forward_retirement_shadow.sdb": {
+      "bytes": 9324,
+      "sha256": "b65d1070e9b39733acb46b73b6dec3b233ea3077c0818b8ba0f4a11fc5196146"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_kernel_rom.sdb": {
+      "bytes": 14401,
+      "sha256": "137f5fc8f8fcc13d154a904538d0e9ec84362928f6d9163a31b27f7f70c48565"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_kernel_rom_7ee87258_golden.sdb": {
+      "bytes": 10553,
+      "sha256": "bc3e5132884c52953709c74f91860327e564e3ad33662f36f8fb91ba462b0c27"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_local_admission_actual_observer.sdb": {
+      "bytes": 13934,
+      "sha256": "5cc66ac8966774bb56ed255e01e20b42c45a6b61b9baf280e034007b84448ae3"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_payload_bubble_shadow.sdb": {
+      "bytes": 10705,
+      "sha256": "9a285c0ecb7475dafb0e794436225f81eb1c0490845c793e7ea9ec4d586bb26a"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_realtime_input_guard.sdb": {
+      "bytes": 11393,
+      "sha256": "fd5e37a1b045b80916477421acd8cbd35298e4f9a25f0b72d738a5d1e2b79400"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_realtime_input_guard_local_admission.sdb": {
+      "bytes": 12175,
+      "sha256": "a6596329eeb961fd7c8495f95634e4e468d8f172d1fd2c5fde30072b7cd002ad"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_realtime_result_guard.sdb": {
+      "bytes": 25959,
+      "sha256": "37bb88fa7b930183915c064c2f23590d0b29e6dab3582f8d89cce46fb1859158"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_realtime_result_guard_ce6a885e_golden.sdb": {
+      "bytes": 23922,
+      "sha256": "50f59ba8ed84d0aed7a67e4407469805fb84a86c615b16b72a4ee2c4666731eb"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_spectrum_product_7ee87258_golden.sdb": {
+      "bytes": 16132,
+      "sha256": "5e90a060e868dd91fd5fbb945eba28f50724193b2bb7b4a108124a4e4778090f"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_spectrum_product_bank_arithmetic.sdb": {
+      "bytes": 20648,
+      "sha256": "58e4d96de857182ca105e25c4b53df7faa737ba21ba4387f94d25055402329f8"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/starlink_pss_spectrum_product_operand_register.sdb": {
+      "bytes": 9835,
+      "sha256": "671c92d36ec343a63fa27691b936c8d844cd6bd106c3e07416a1921fdb934abd"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/tb_starlink_pss_local_admission_actual.sdb": {
+      "bytes": 163096,
+      "sha256": "e70f2eae0190aeaa5c0b3485f7923eb9ba067f6e90de6d59243dbd5936ccbaea"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.dir/xil_defaultlib/xil_defaultlib.rlx": {
+      "bytes": 10964,
+      "sha256": "0c755cc479a5edf267c8914f58a1ba4bfa36076ed7113cfb0c173e8b5617e78f"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.ini": {
+      "bytes": 29689,
+      "sha256": "c9f2b37367603729e5367d96358100c678cf7584eb1c154a7b10cdeb7faf2f6e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xsim.ini.bak": {
+      "bytes": 29689,
+      "sha256": "c9f2b37367603729e5367d96358100c678cf7584eb1c154a7b10cdeb7faf2f6e"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xvhdl.log": {
+      "bytes": 436,
+      "sha256": "be0398fd5f1d8bd234eb2c23502323f2608113bafc30c505a8e33fce4260cf38"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xvhdl.pb": {
+      "bytes": 572,
+      "sha256": "a6407ed3bc0935e69522a556fe213286c58d1388f5bd3a177e7d05798417e88d"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xvlog.log": {
+      "bytes": 13100,
+      "sha256": "d31b2501857b1222cbc99a59eee0ff4e79c749a8b6f9cf7530b95629f3d0f5d1"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/xvlog.pb": {
+      "bytes": 17756,
+      "sha256": "e856a39a30a492c4577281bc665e45f6a0a6341015e7f0f8c5601457ca09c6e7"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.srcs/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/starlink_pss_fft512_bfp18_rt_candidate.xci": {
+      "bytes": 26656,
+      "sha256": "80c403b308f7c2d49997395b0ff7b22959334bb469a79ffec05ce5f04d3d32af"
+    },
+    "original_attempt/project/fft_bank_arithmetic_actual.xpr": {
+      "bytes": 19043,
+      "sha256": "1c6f1be5c054f2d0b0fef60a432f61b6137a32603026b6c5292bbd38b9f1cc5c"
+    },
+    "original_attempt/run_outcome.txt": {
+      "bytes": 2832,
+      "sha256": "042f0dbc630c767944e806116a764a8251f8b357fbfdb0fbf3796c3a467c36c2"
+    },
+    "owner/before.json": {
+      "bytes": 6899,
+      "sha256": "c4b100e104e7a7620cba7de68955ae6298560558467a83c6c5c9499e5f507fa0"
+    },
+    "owner/outer.log": {
+      "bytes": 63389,
+      "sha256": "df35b65a7dbe73951124f3b5a2b18879970392be797bc3213609ff7ce50151f0"
+    },
+    "owner/terminal.json": {
+      "bytes": 6153,
+      "sha256": "236c583777ede2171d232834970dd13b2e5ed939e06a19bff63affa85173e678"
+    },
+    "owner/vivado.jou": {
+      "bytes": 2169,
+      "sha256": "645850f5637662b159b8b12a20c4077437cccbd5a81d3020bdf1eb60a7ee0ab9"
+    },
+    "owner/vivado.log": {
+      "bytes": 64933,
+      "sha256": "943d8ed6d83b0274dbd6ed41e9e8f208d0cef60084a1c68f5ea778eb473b219b"
+    },
+    "recipe/archive_local_admission_startup_failure.py": {
+      "bytes": 3526,
+      "sha256": "3399f8f521bd2b6fc3f9decb91ddd0117ec5880ee4d41f0086e5d133033d8cd3"
+    },
+    "recipe/own_local_admission_L1_actual_v2.py": {
+      "bytes": 3226,
+      "sha256": "a8948955e31ee4ebfc39aa605b57e8407a079fefa5b9d3ebf9535c0bb5bfab99"
+    },
+    "report/starlink-local-admission-actual175-startup-failure-20260910.md": {
+      "bytes": 3397,
+      "sha256": "db0845ffad57fe2ffce5faff1089f1667c8e7744afc93fa232b0ad75528ecf79"
+    }
+  },
+  "original_handle": 14041,
+  "original_process_exit": 1,
+  "results_json_present": false,
+  "safe_unique_regular_files": 184,
+  "schema": "local-admission-actual-startup-failure-v2",
+  "scope": "FAIL_phase0_time0_guard_comparison_NO_healthy_numeric_result",
+  "source_unchanged": true
+}
