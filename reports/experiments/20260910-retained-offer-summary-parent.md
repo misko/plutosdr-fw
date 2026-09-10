@@ -1,4 +1,4 @@
-# Offered-input fault summary: initial parent checks PASS, qualification open
+# Offered-input fault summary: full51 parent checks PASS, physical gate open
 
 The next retained candidate is additive and default-off. It separates the
 common fault summary from repeated certificate-derived fault expressions.
@@ -68,9 +68,60 @@ Dedicated boundary tests must cover that condition separately.
 
 The FFT ports in this campaign are scripted; real unchanged arithmetic and
 mailboxes are used, but no new actual vendor FFT qualification follows. The
-complete new fault/XZ/boundary/mutation suite and source-bound graph are still
-in progress. Only after their review can the new candidate advance to actual
-FFT replay and source-matched synthesis/routing.
+full offline fault/XZ/boundary/mutation suite now passes below. The source-bound
+graph remains under review. Only after its review can the new candidate advance
+to actual FFT replay and source-matched synthesis/routing.
+
+## Full51 independent gate
+
+Root49606 completes exit0: **51 PASS in6.96s**,50 source/helper/vector pins
+unchanged. The exact test/helper hashes are2fdd8ec285ff2898f053fae7cb9094720e1aec45ed601c5dd4e5a0138fe422c3
+and e945d76e9d02e6cee2389f35524c031390a4925ceb708585e087e07d3455a84b.
+This suite includes the preceding premise/composition case families; counts
+must not be added as51+6+4 independent coverage.
+
+Coverage includes strict source inverses/mutations, default/invalid modes,
+the65536 real-input probes and three mutants,1015808 forced-state cutover
+comparisons (not reachability), literal common-root decomposition, and16452
+common-expression valuations including8192 explicit unknown-fault tightenings.
+Both modes retain the original guard stimulus's23 healthy/37 rejection/12 reset
+cases, all old state/output shadows, and219315 local-summary observations.
+Six composition cases preserve2480 declared bits and three payload banks;
+these are logical inventories, not mapped resources or physical performance.
+
+Eight additional module-boundary cases clock an old inverse result guard and
+retained owner into their real ACK-wait state, then use the real input guard for
+a later forward job. Healthy release passes. Wrong ordinal, early/missing LAST,
+delivery gap, duplicate start and X/Z metadata reject release/publication on the
+current edge and preserve ownership through quarantine. Four direct-fence
+mutants are rejected. In X/Z cases the original guard ACK is X, not silently
+coerced to0; both owners' known-zero authority rejects release while the new
+summary asserts a known-one veto. Bank READY/request/ACK are driven module
+interfaces, not a live mailbox read campaign. A separate publication-request
+probe is explicitly not simultaneous two-phase single-FFT reachability proof.
+
+The agent's first run had32 passes and two missing-mailbox dependency compile
+errors in the new guard test fixture. That failed attempt is retained. Adding
+the unchanged mailbox source fixed only the fixture; its second run passes51
+in7.05s. Tested commits: FWff84cb93d3e90f84b0c658a7d24622319310387b,
+HDL48b82653d6fcc85ac0276ca1e7b159715cdfc59f. Publication/preparation follow
+separately; no actual FFT or timing result is implied by these tests.
+
+## Separate write-side counterexample: pulse-only change rejected
+
+A proposed future write-side cut would consume existing registered guard_commit
+instead of combinational final_commit to set forward_committed. Root identified
+that this also delays the forward READY mux's transition to published-bank
+ownership. A dedicated scripted test confirms the violation: baseline passes;
+the pulse-only mutant acknowledges at cycle2736 with committed=0,commit_pulse=1,
+bank_valid=0,awaiting_ack=1,ready=1. Its first failure is an ACK before actual
+product-bank publication. The later final-inventory failure is secondary to
+intentional early stopping.
+
+This mutation is not part of the accepted summary candidate. Any future design
+must also prove READY-phase and head-fault observation over the whole retained
+token lifetime; final-product pipeline latency alone does not make it safe.
+No write-side runtime change is authorized or promoted by this counterexample.
 
 ## Evidence and remaining release scope
 
@@ -82,6 +133,10 @@ Under `/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz`:
   before/after, six generated benches and complete compile/simulation logs.
 - `retained-real-premise-parent.xigrZuV8`: frozen real guard/bench/helper
   snapshots, bounded parent replay, reference and three rejected mutation logs.
+- `retained-summary-parent.lSiN2UN2`: full51 parent runner,50 source snapshots,
+  before/after hashes, complete pytest logs/XML and execution receipt.
+- `commit-pulse-ack-parent.xkh8BtdU`: original baseline and rejected pulse-only
+  generated mutant, source pins, exact first-failure logs and result receipt.
 - `checked-publication-parent.qZW4cGCP`: independent root Git-object verification
   of all308 prior checked actual/synthesis archive payloads; separate
   `route_audit.py` verifies all28 later route payloads at exact commitbe867adb.

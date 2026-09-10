@@ -4,11 +4,12 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
-The next retained offered-input fault-summary candidate passes parent six-case
-scripted composition smoke (option0/1 × reader policies0/2/5), with33 source pins
-unchanged and all original arithmetic/state/ACK checks retained. Independent
-abstract four-state premise and two rejected mutants pass; the complete new
-boundary/graph suite is still open. This is not actual FFT or timing qualification.
+The next retained offered-input fault-summary candidate passes parent **51 tests**
+(6.96s),50 source pins unchanged. It includes the six scripted compositions,
+real-input/XZ premises, old guard shadows and bounded current-fault/ACK module
+tests; source-bound graph review remains open. A separate proposed pulse-only
+write-side change is rejected by a concrete premature-ACK counterexample.
+This is not actual FFT or timing qualification.
 See [initial parent checks and explicit coverage limits](reports/experiments/20260910-retained-offer-summary-parent.md).
 
 Latest checked-product candidate PASSES actual vendor FFT verification, but its
