@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+The combined private-descriptor/closed-input refactor now also PASSES the actual
+vendor FFT seven-context campaign (root61512, exit0,57.31s). Independent73
+preparation tests pass; all77953 actual CSV rows and the complete original
+parsed results exactly match v5. Both new options and44 ownership/phase receipts
+are checked. Fresh synthesis/routing is next; no physical or RX claim follows.
+See [combined refactor actual qualification](reports/experiments/20260910-retained-control-actual-parent.md).
+
+The parallel checked-product actual campaign completed but was rejected: its
+final nominal job lacks a sampled live ready/drain row before the bench starts
+reset. The other31 nominal and all6 stalled services meet the unchanged5215
+limit; all624233 trace rows and ownership counts agree. A bounded bench-only
+drain witness is being developed, without accepting fewer completed jobs.
+See [preserved actual failure and diagnosis](reports/experiments/20260910-checked-actual-drain-boundary.md).
+
 Retained-output actual vendor FFT now PASSES all seven contexts:19 complete
 forward/inverse pairs,40 frame events, two interrupted forward jobs and both
 reset recoveries. Independent251 preparation tests pass; all77953 actual CSV
@@ -19,8 +33,8 @@ descriptor register enable; other reported paths reach kernel-ROM enables.
 This is worse than earlier P1 (-1.492 ns), not a release candidate. Five
 critical CDC findings and real 175 MHz board-clock integration remain open.
 
-Next: actual-FFT qualification of the combined private-descriptor/closed-input
-candidate, parallel checked-product actual-FFT qualification, then fresh
+Next: fresh physical evaluation of the actual-qualified combined control
+candidate, parallel checked-product drain-witness qualification and replay, then
 physical closure and full receiver/continuous
 acquisition/IIO/board qualification before `.18`→`.17` deployment. No radio
 operation or production HDL gitlink promotion. See
