@@ -89,6 +89,20 @@ differ; forward-phase expected-product-cache mismatches remain ignored exactly
 as before. No further synthesis/route or primary runtime promotion is authorized
 until those source-specific tests are reviewed.
 
+That review is now complete at FW `dddcdc454` / HDL `1780040f`, tested design
+`7ee87258`. Both original actual175 runs exit0;264 tests pass with eight unchanged
+explicit physical skips. Root independently passed20 focused tests, inspected
+the exact41-line wrapper delta, frozen whole-body inverse and independent old
+preflight/result-shadow predicates, and verified every evidence checksum.
+Registered coverage includes84 raw-bank boundary cases,12 phase-qualified
+expected-cache cases,1,179,896 current-cause comparisons and1,850 preparing
+tuple/lease comparisons. The private44/8/60 versus prior60/12/60 counters reflect
+the declared raw-readiness injector change, not an unchanged registered trace.
+No fault/publication/ownership exemption is introduced. Root authorized one
+fresh unchanged100/175 synthesis and diagnostic route; the previous−1.596ns
+remains the latest physical result until that measurement completes. No runtime
+promotion, full receiver, constraint relaxation or radio action is authorized.
+
 A separate active-clock verification worktree now exists at
 `/tmp/starlink-coarse-alternatives.Y3JzOI/clock-traffic`, branch
 `codex/starlink-rx-only-do-not-merge-clock-traffic` in FW/HDL, starting FW
@@ -104,7 +118,7 @@ earlier complete-coarse DCP; see `experiments/20260910-bank-cdc-inventory.md`.
 No CDC exceptions were added and no physical pass is claimed.
 
 The original 4,096-block175 burst/stall soak remains active; its latest agent
-observation at02:52:37 UTC reached2,417 blocks/1,080,399 ordered scores with FIFO maximum358 and
+observation before03:35 UTC reached3,598 blocks/1,608,306 ordered scores with FIFO maximum358 and
 no observed error. That partial count is not a terminal capacity PASS.
 
 A new independent FW/HDL worktree at
@@ -118,7 +132,15 @@ geometry stress, not RF or750 Hz acquisition evidence. The full1,280,000 selecte
 scores must be distinguished from the supporting2,864 FFT blocks and208 potential
 tail scores. Root must review frozen expectations and a reduced wiring smoke
 before the long production simulation is launched. No runtime/profile/radio or
-physical-build work is delegated to that task.
+physical-build work is delegated to that task. Prelaunch now passes at FW
+`e2f3a582` / HDL `22aa00d4`: two complete reduced maps plus fresh447-score partial
+abort,151 policy tests, and336 source/artifact receipts independently checked by
+root. All14 independently regenerated vectors byte-match. The single full run
+is authorized on exact reviewed signature
+`b10e4f2384084f7caff844d7508fff0a538e09caf8f3713d6fddcb7f2f39b75a` and is active
+under the original agent-owned handle88186 in `bank-production-map-full-v1`.
+Its61 frozen files byte-match the approved smoke-v5; no full-map PASS is claimed.
+See that branch's `docs/starlink-bank-production-map-prelaunch-20260910.md`.
 
 An additional independent verification worktree was allocated after the
 read-only map integration review: `/tmp/starlink-coarse-alternatives.Y3JzOI/bank-map-lifecycle`,

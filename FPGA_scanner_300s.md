@@ -12,12 +12,16 @@ replay now passes both reduced geometries at bank175/bank200/shared200 with exac
 independent pilot bytes. Eight separate bank-map fault/reset/re-enable cases pass.
 The latest isolated held-phase/balanced-identity route improves175MHz setup from
 -2.438ns to -1.596ns but still fails and is not promoted. Both actual-core modes
-pass with unchanged control traces. The worst path now goes through preflight
-metadata validation; its next refactor requires exact same-edge fault evidence
-before another physical run. Generated175 MMCM active-traffic reset/recovery also passes
+pass with unchanged control traces. The next held-preflight/two-comparator
+refactor passes both actual-core modes and264 tests (eight explicit physical
+skips), with independently computed old current/sticky fault predicates. Root
+reviewed the frozen source/evidence and independently passed20 focused tests;
+one unchanged100/175 physical measurement is authorized, not yet a timing pass.
+Generated175 MMCM active-traffic reset/recovery also passes
 an independent primary replay with 7,853 exact accepted scores. The original
-4,096-block soak is still running; full production-map verification is being
-implemented in its own worktree. No receiver profile or radio has
+4,096-block soak is still running. Production-map smoke passes two exact maps
+and a fresh447-score classified partial abort; the separately reviewed full
+20,000-by-64 simulation is now running, not yet passed. No receiver profile or radio has
 been changed. Completed alternative studies are preserved
 on remote do-not-merge branches. See
 [`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)

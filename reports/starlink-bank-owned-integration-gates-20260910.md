@@ -29,6 +29,19 @@ These do not establish production map capacity, arbitrary reset/CDC races,
 DMA/IIO receipt or concurrent native-fine support; qualify these before exposing
 the selector through AXI/receiver packaging.
 
+Production-map prelaunch is frozen at FW `e2f3a582` / HDL `22aa00d4` on the
+separate `-production-map` branch. Two343x2 maps match exactly:1,821 visible
+scores,1,819 admitted and two checked excluded tails across those maps and a
+fresh447-score partial abort. Root independently regenerated all14 oracle files,
+passed151 policy tests and verified336 artifact receipts. The single full
+20,000x64 actual-core simulation is running on reviewed source signature
+`b10e4f2384084f7caff844d7508fff0a538e09caf8f3713d6fddcb7f2f39b75a`.
+It must check1,280,000 selected scores and every map word, plus a fresh447-score
+partial-abort recovery; it does not qualify a second full production map after
+recovery. The periodic synthetic source tests arithmetic/geometry, not RF
+acquisition or live120ms/750Hz performance. Native map fault is a separate output
+from detector health; the failed partial terminal must remain explicit.
+
 Keep the existing overlap scheduler,2048-entry energy cache, inverse output
 register,447-candidate extraction,512-entry result FIFO and normalization.
 Replace only the forward/inverse dispatch and intervening cross-domain copies
