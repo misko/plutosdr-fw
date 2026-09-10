@@ -250,3 +250,62 @@ fence experiment targeting its measured product-publication path. It retains
 all active input checks, global reasons and ACK/ownership validation; it is not
 automatically composed with this inverse-only controller. Neither draft has
 authorization for a vendor build or radio deployment.
+
+## Independent integration smoke repeat and source review (14:29 UTC)
+
+Parent read the complete synthetic ownership bench, source derivation recipe,
+tests and revised issuer. A fresh isolated tree was reconstructed from original
+49267's immutable per-case source copies, plus the three unchanged originals
+whose hashes the strict inverse test checks. No mutable new testbench was used.
+Original **28212 exited 0: 16 tests passed in 5.33 seconds**. All 15 executable
+cases independently reproduced exactly the original 17-file source inventory.
+Artifacts: recovery-parent `inverse-smoke-parent.KEtWbD7y`.
+
+This checks default/enabled banks under both scheduler settings with two jobs,
+plus all 11 inherited current/late-fault/reset cases. Every case retains the old
+guard shadow and its original assertions. Healthy cases return 1,024 ordered
+zero words with exact metadata; fault cases recover a distinct fresh epoch and
+512 outputs. The FFT interface is explicitly synthetic and returns zeros.
+Therefore this is ownership/reset smoke evidence, not nonzero arithmetic,
+paused-clock reset, FFT timing/capacity, full receiver or RF qualification.
+
+Reviewed and repeated source hashes:
+
+- Issuer: `8ad9c2e7185e4077857c8cc9ee0c27a6df75be9534ffc0bdee686ec0b89c9e67`.
+- CDC bank: `ea27c4e2062d360d541e3c27f869beb73bb90add3cf847194718e0047ae3b43e`.
+- Integrated top: `2f988a16bf02c0a0032fc86049d9169393d811929236a7891513b5395c178f01`.
+- Result guard: `09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2`.
+- Parent log: `4904401a6f860f1bfc2618bd3ad84d1a14b08028d58b62d87e5b8dcb9ce20a66`.
+- Parent JUnit: `e3214690bb239b39ee66572391f273f344c940ef4a048a9e42aa368656b883bd`.
+
+Complete parent source/case/log receipts are in adjacent
+`20260910-inverse-sealed-parent-smoke.tgz` (1,887,792 bytes; SHA-256
+`76c4bed93f67db0299aa94d5f97a7088dc126568d9f41edf39f4285fdc0dbe08`).
+Archive contents were compared back to the original tree with `tar --compare`.
+Only redundant pytest `*current` symlink aliases are omitted; originals and an
+earlier archive retaining their identities remain in the recovery directory.
+
+The independent read-only reviewer found no additional combinational cycle in
+these revisions. The bad-admission diagnostic now crosses a register before
+publication control. Guard commit-valid is independent of destination READY;
+bank framing-now comes from registered checker stages. The apparent route
+through slot error and forward retirement stops at registered kernel/product
+outputs. Its phase exclusion is additional reasoning, not the structural proof.
+Owned reservation now persists through admission, publication and reader drain;
+free/reusable capacity remains a separate scheduler-completion condition.
+
+Source review also supports the fresh slow-idle reset barrier, but execution is
+still required for two separately reachable pre-reset states: an unread healthy
+full source bank, and a sticky framing fault from an accepted malformed source
+beat. Do not force these into an impossible combined state. For both raw-reset
+sides, pause slow clock, reset, resume without new writes, reject stale data and
+stale fault propagation, then verify a fresh block identity. Per-core reset must
+not clear common ownership or rearm the bank.
+
+The implementation-side first seven nonzero real-guard cases passed separately;
+parent has reviewed that draft bench but has not independently qualified it.
+Required next evidence remains phase-swept actual ACK/release latency, the above
+paused-source tests, and mutations of certificate-loss/ACK/barrier mechanisms.
+The draft lifecycle `ack_to_release` print currently includes post-release test
+settling; it must use the actual release edge before serving as a latency metric.
+No vendor execution, synthesis, routing or deployment follows from this smoke.

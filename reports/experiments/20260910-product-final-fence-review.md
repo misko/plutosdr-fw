@@ -81,3 +81,12 @@ verify complete hierarchy binding and exact source closure, and reject weakened
 observers through directed mutations. Freeze and independently review preparation
 before any vendor execution. No synthesis, route, receiver image or flash is
 authorized by this local result. The main runtime HDL gitlink remains unchanged.
+
+The implementation-side source/evidence is now published on the separate
+ROM-prefetch DNM branch: FW `51ed772274e560ec52210df707d1db5014aa2884`,
+HDL `f8c175444f29898022782175cf97647f3c7f0372`; tested sticky-witness source
+is FW `61d5ff33c5faff20c4a05540e8efdb08f03c7709` / HDL
+`a226dd615db76830928c83253d204deccdff41e8`. Parent read the complete result
+report and verified the committed outer archive closure (three payload files,
+manifest `d4789a8f56a233e6ffad03d3a15e1f97c2f0f367d09f8de5d243d16cb8fa7aed`).
+That integrity check is not a new test run or independent inner-archive audit.
