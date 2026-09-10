@@ -2,6 +2,15 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest actual result (2026-09-10, after15:58 UTC): original21014 exits1 in
+the trace parser, with source integrity intact. Parent independently isolates
+one quiescent profile-switch-before-reset row, zero healthy-running fault rows.
+Separate post-hoc checking verifies all76 jobs, exact words and38 full inverse
+lifetimes; max nominal4555/stalled4835 remain within predeclared bounds. This
+does NOT relabel the original failed automation. Narrow parser-boundary tests
+are next, without retry or physical promotion. See
+[failed run and diagnostic evidence](reports/experiments/20260910-inverse-actual-first-result.md).
+
 Latest execution gate (2026-09-10): the frozen inverse bundle and nine-edit
 execution owner pass parent review and independent source verification. One
 actual FFT evaluation has started, owned by the inverse agent as original21014,

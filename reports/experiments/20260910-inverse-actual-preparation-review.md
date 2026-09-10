@@ -1,9 +1,12 @@
 # Inverse actual-core preparation: independent offline review
 
-2026-09-10. **The offline preparation passes; one source-pinned actual run is
-now authorized and started, with no result yet.** The failed P1 route remains
-failed. This is a separate inverse-output candidate, not a union with the
-ROM/product experiments. No physical or deployment approval is implied.
+2026-09-10. **The offline preparation passes; the subsequent original actual
+run21014 FAILED in trace parsing.** Separate post-hoc diagnosis found one
+quiescent testbench profile transition and verifies the recorded numerical and
+protocol work; it does not reclassify the failed automation. See the
+[first actual result](20260910-inverse-actual-first-result.md).
+The failed P1 route also remains failed. This is a separate inverse-output
+candidate, not a union with ROM/product experiments. No deployment approval.
 
 ## One actual execution approved
 
@@ -24,14 +27,15 @@ All other process/exception/post-integrity behavior is unchanged from original
 uses explicit Python `-B` with PYTHONOPTIMIZE and Python environment overrides
 unset. Parent checked 41 GiB free before authorization.
 
-The inverse agent owns **original 21014**, launched once after this exact-source
-approval. It must poll that same handle to terminal; no retry follows observation
-timeouts or failure. All source, generated IP, logs, numerical/protocol CSV and
-WDB evidence must remain. No synthesis, route, source mutation, radio access or
-automatic promotion is included. Actual result and recorded waveform-history
-review are still pending. The parent audit script is prepared separately at
+The inverse agent owned **original 21014**, launched once after this exact-source
+approval and subsequently consumed to terminal exit1. No retry follows this
+failure. All source, generated IP, logs, numerical/protocol CSV and WDB evidence
+must remain. No synthesis, route, frozen-source mutation, radio access or
+automatic promotion is included. Recorded waveform-history review remains
+pending. The success-only parent audit script is prepared separately at
 recovery `inverse-actual-audit-parent.WkCdfycM/verify.py`; it cannot pass before
-the successful original terminal receipt and independent result repeat exist.
+the successful original terminal receipt and independent result repeat exist;
+it has not been changed to accept the original failure.
 
 ## Reviewed source and independent repeat
 
