@@ -1,0 +1,98 @@
+--- source
++++ source
+@@ -1,7 +1,7 @@
+ // Independent raw-result/source actors through REAL guards and spectrum_product.
+ // No vendor FFT/controller model, no actual numerical FFT or physical claim.
+ `timescale 1ns/1ps
+-module tb_starlink_pss_product_sealed_adapter #(parameter integer ENABLED=1);
++module tb_starlink_pss_product_sealed_interface #(parameter integer ENABLED=1);
+   reg clk=0,resetn=0,peer_resetn=0,private_resetn=0;
+   always #5 clk=~clk;
+   reg forward_phase=1,engine_reset_held=1,peer_epoch_idle=0;
+@@ -32,9 +32,14 @@
+   wire adapter_fault,consumer_complete,consumer_fault,consumer_duplicate,consumer_beat;
+   wire consumer_valid,consumer_last;
+   wire [47:0] consumer_data;
++  // These independent raw actors are NOT the real consumer's certificates.
++  // Do not feed full guard.fault_now/slot readiness back into this transport.
++  wire closed_raw_fault=forward_phase && (dut.completion_reference || dut.handoff_seen) &&
++    (raw_valid || status_valid || frame || input_beat || input_done);
+   wire [7:0] current_faults=injected_faults |
+-    {product_overflow,guard.fault_now,guard_fault,consumer_duplicate,consumer_fault,3'b0};
+-  wire destination_ready=guard.awaiting_ack ? handoff_valid : product_input_ready && reservation;
++    {product_overflow,closed_raw_fault,guard_fault,consumer_duplicate,consumer_fault,3'b0};
++  wire producer_link_ready=dut.producer_owned ? product_ready : reusable;
++  wire destination_ready=guard.awaiting_ack ? dut.handoff_capacity : product_input_ready && reservation && producer_link_ready;
+   wire forward_completion=return_commit && destination_ready;
+   wire [69:0] product_metadata={1'b1,product_start,product_exponent};
+   wire [69:0] offered_metadata=kind==4 && product_position==target ?
+@@ -50,14 +55,15 @@
+   integer first_core=-1,prior_core=-1,core_holes=0;
+   integer stalled_offer_edges=0,verdict_cycle=-1,corruption_cycle=-1;
+   integer admission_cycle=-1,release_cycle=-1;
+-  starlink_pss_product_sealed_adapter #(.SEALED_PRODUCT_ADAPTER(ENABLED)) dut (
++  starlink_pss_product_sealed_interface #(.SEALED_PRODUCT_ADAPTER(ENABLED)) dut (
+     .clk(clk),.resetn(resetn),.peer_resetn(peer_resetn),.engine_reset_held(engine_reset_held),
+     .peer_epoch_idle(peer_epoch_idle),.forward_guard_busy(guard_busy),.forward_phase(forward_phase),
+     .forward_job_accept(job_valid && job_ready),.forward_descriptor(descriptor),
+     .forward_completion(forward_completion),.forward_exponent(return_metadata[4:0]),
+     .product_valid(product_valid),.product_ready(product_ready),.product_data({product_q,product_i}),
+     .product_position(offered_position),.product_last(offered_last),.product_metadata(offered_metadata),
+-    .forward_handoff_valid(handoff_valid),.forward_handoff_ready(!guard_fault),
++    .forward_handoff_valid(handoff_valid),
++    .forward_handoff_ready(resetn && peer_resetn && guard.awaiting_ack && destination_ready && !guard_fault && !guard.idle_fault_now),
+     .inverse_job_start(inverse_start),.inverse_input_enable(inverse_enable),.core_ready(physical_ready),
+     .consumer_complete(consumer_complete && (kind!=9 || completion_gate)),.core_valid(core_valid),.core_data(core_data),
+     .core_position(core_position),.core_last(core_last),.core_metadata(core_metadata),
+@@ -70,8 +76,8 @@
+     .clk(clk),.resetn(resetn && peer_resetn),.job_valid(job_valid),.job_ready(job_ready),
+     .job_descriptor(descriptor),.input_bank_reserved(1'b1),.output_bank_reserved(1'b1),
+     .certified_input_beat(input_beat),.certified_input_complete(input_done),
+-    .final_fence_certified(input_closed),.external_fault_now(adapter_fault),.phase_input_fault_now(1'b0),
+-    .completed_input_certified(input_closed),.completed_input_fault_now(adapter_fault),
++    .final_fence_certified(input_closed),.external_fault_now(adapter_fault || dut.handoff_fault_now),.phase_input_fault_now(1'b0),
++    .completed_input_certified(input_closed),.completed_input_fault_now(adapter_fault || dut.handoff_fault_now),
+     .preflight_fault_evidence_now(1'b0),.core_event_frame_started(frame),
+     .core_output_tdata(raw_data),.core_output_tuser(raw_user),.core_output_tvalid(raw_valid),.core_output_tlast(raw_last),
+     .core_status_tdata(status_data),.core_status_tvalid(status_valid),
+@@ -83,7 +89,7 @@
+   );
+   starlink_pss_spectrum_product #(.DATA_WIDTH(18)) product (
+     .clk(clk),.resetn(resetn && peer_resetn),.flush(1'b0),
+-    .input_valid(return_valid && !guard.awaiting_ack),.input_ready(product_input_ready),
++    .input_valid(return_valid && !guard.awaiting_ack && producer_link_ready),.input_ready(product_input_ready),
+     .input_i(return_data[17:0]),.input_q(return_data[35:18]),.kernel_i(18'h20000),
+     .kernel_q(kind==1 && return_position==target ? 18'h20000 : 18'b0),
+     .input_bin_index(return_position),.input_block_exponent(return_metadata[4:0]),.input_last(return_last),
+@@ -208,6 +214,7 @@
+       $display("PRODUCT_ADAPTER_RESET_PASS side=%0d boundary=%0d",bit_index,target);$finish;
+     end
+   endtask
++  `include "product_sealed_interface_cases.svh"
+   initial begin
+     if(!$value$plusargs("CASE=%d",kind))kind=0;
+     if(!$value$plusargs("BIT=%d",bit_index))bit_index=0;
+@@ -223,6 +230,7 @@
+       $display("PRODUCT_ADAPTER_DEFAULT_INERT_PASS");$finish;
+     end
+     reset_epoch();
++    interface_before_jobs();
+     repeat(kind==0 ? 8 : 1) begin
+       takes=0;received=0;pubs=0;handoffs=0;releases=0;
+       first_core=-1;prior_core=-1;core_holes=0;
+@@ -251,6 +259,7 @@
+           if(handoffs==1)disable await_handoff;
+         end
+       end
++      interface_after_wait();
+       if(kind==1 || kind==4 || kind==13 || (kind==6 && target<3) || (kind==5 && target<4)) begin
+         if(!adapter_fault || handoffs || releases) $fatal(1,"PREHANDOFF_FAULT_NOT_QUARANTINED");
+         if((kind==1 || kind==4 || kind==13 || (kind==6 && target<2)) && pubs) $fatal(1,"POISONED_BANK_PUBLISHED");
+@@ -276,6 +285,7 @@
+           if(releases==1)disable deliver;
+         end
+       end
++      interface_after_deliver();
+       if(kind==2) begin
+         physical_ready=0;
+         repeat(8)tick();

@@ -1,0 +1,150 @@
+--- source
++++ source
+@@ -3,7 +3,7 @@
+ // Fixed product70 encoding is zero-extended to the opaque d9c75-bit checker.
+ // Common epoch reset/peer-purge attestation is external; never use core reset.
+ `timescale 1ns/1ps
+-module starlink_pss_product_sealed_adapter #(
++module starlink_pss_product_sealed_interface #(
+   parameter integer SEALED_PRODUCT_ADAPTER = 0
+ ) (
+   input wire clk, resetn, peer_resetn,
+@@ -32,7 +32,19 @@
+   output wire [1:0] current_lease,
+   output wire [15:0] bank_reasons, reader_reasons,
+   output wire [7:0] issuer_reasons,
+-  output wire fault
++  output wire fault,
++  output wire producer_owned,
++  output wire read_head_valid,
++  output wire [74:0] read_head_metadata,
++  output wire [1:0] read_head_lease,
++  output wire handoff_owned,
++  output wire handoff_capacity, handoff_fault_now,
++  output wire [74:0] admitted_metadata,
++  output wire [1:0] admitted_lease,
++  output wire producer_verdict_fault_now, reader_validation_fault_now,
++  output wire reader_token_fault_now, reader_offer_fault_now,
++  output wire [15:0] reader_fault_events_now,
++  output wire [7:0] issuer_fault_events_now
+ );
+   initial if (SEALED_PRODUCT_ADAPTER !== 0 && SEALED_PRODUCT_ADAPTER !== 1)
+     $fatal(1,"SEALED_PRODUCT_ADAPTER must be zero or one");
+@@ -68,27 +80,65 @@
+   wire [7:0] issuer_current;
+   assign issuer_current[0] = invalid_admission;
+   assign issuer_current[1] = invalid_completion;
+-  assign issuer_current[2] = (producer_reference && forward_phase !== 1'b1) ||
++  wire phase_error = (producer_reference && forward_phase !== 1'b1) ||
+     (consumer_started && !consumer_complete && forward_phase !== 1'b0);
+   // The concrete spectrum_product consumes final on READY and advances its
+   // output stage. Unlike guard-held final VALID, a remaining product is NEW.
+-  assign issuer_current[3] = final_taken && product_valid !== 1'b0;
+-  assign issuer_current[4] = product_valid === 1'b1 && !producer_reference && !final_taken;
+-  assign issuer_current[5] = inverse_job_start &&
++  wire closed_product = final_taken && product_valid !== 1'b0;
++  wire unowned_product = product_valid === 1'b1 && !producer_reference && !final_taken;
++  wire invalid_inverse_start = inverse_job_start &&
+     (!handoff_seen || consumer_started || forward_phase !== 1'b0);
+-  assign issuer_current[6] = queue_final && bank_valid !== 1'b0;
++  wire extra_bank_offer = queue_final && bank_valid !== 1'b0;
++  assign issuer_current[2] = phase_error;
++  assign issuer_current[3] = closed_product;
++  assign issuer_current[4] = unowned_product;
++  assign issuer_current[5] = invalid_inverse_start;
++  assign issuer_current[6] = extra_bank_offer;
+   assign issuer_current[7] = any_reference &&
+     ((product_valid !== 1'b0 && product_valid !== 1'b1) ||
+-     (forward_completion !== 1'b0 && forward_completion !== 1'b1));
++     (forward_completion !== 1'b0 && forward_completion !== 1'b1) ||
++     (product_valid !== 1'b0 && product_ready !== 1'b0 && product_ready !== 1'b1));
+   assign issuer_reasons = reasons;
+   assign fault = |bank_reasons || |reader_reasons || |reasons;
+-  wire direct_clean = current_faults === 8'b0 && issuer_current == 0 && !queue_validation_fault;
++  // D0/D1 and unknown completion classify qualified handshakes: feeding them
++  // upstream would feed acceptance back into its own READY/current-fault cone.
++  // Capture rejects and exact reason bits stay immediate; their upstream veto
++  // is reasons Q. The real guard/product ordering obligation is tested apart
++  // from deliberately forged standalone qualified pulses.
++  wire raw_product_uncertain = any_reference &&
++    ((product_valid !== 1'b0 && product_valid !== 1'b1) ||
++     (product_valid !== 1'b0 && product_ready !== 1'b0 && product_ready !== 1'b1));
++  // Named scalar causes make the direction of each dependency explicit;
++  // do not reconstruct these predicates from the aggregate diagnostic bus.
++  wire issuer_bank_current = raw_product_uncertain || phase_error ||
++    closed_product || unowned_product || invalid_inverse_start;
++  wire issuer_reader_current = issuer_bank_current || extra_bank_offer;
++  assign handoff_fault_now = current_faults !== 8'b0 || issuer_reader_current ||
++    queue_validation_fault || producer_verdict_fault_now;
++  wire direct_clean = !handoff_fault_now;
++  assign producer_owned = epoch_resetn && producer_reference;
++  assign admitted_metadata = expected_metadata;
++  assign admitted_lease = lease_reference;
++  assign read_head_metadata = queue_metadata;
++  assign issuer_fault_events_now = issuer_current;
++  assign reader_validation_fault_now = queue_validation_fault;
++  assign handoff_owned = epoch_resetn && handoff_seen && published_reference &&
++    reader_reference && direct_clean && !fault;
++  // Capacity is NOT authorization. In ACK phase the real guard sees this
++  // state/GOOD-only capacity and independently checks handoff_fault_now plus
++  // its exact current idle faults before clearing ownership.
++  assign handoff_capacity = epoch_resetn && epoch_active && published_reference &&
++    reader_reference && completion_reference && queue_prefetched && !handoff_seen &&
++    forward_phase && !fault;
+   // Full original raw cause bits remain separately present; local summaries
+   // share bit7 ONLY here, with complete issuer/reader/bank reason ports retained.
+   wire [7:0] bank_live = current_faults |
+-    {(|issuer_current || |reasons || |reader_reasons),7'b0};
++    {(issuer_bank_current || |reasons || |reader_reasons),7'b0};
+   wire [7:0] reader_live = current_faults |
+-    {(|issuer_current || |reasons || |bank_reasons),7'b0};
++    {(issuer_reader_current || |reasons || |bank_reasons),7'b0};
++  // issuer6 observes bank_valid. It must not feed bank_live, which determines
++  // that same bank_valid. It remains immediate at reader/ACK/release and in
++  // its detailed reason register; bank summary sees that reason next cycle.
+   wire certificate_valid = completion_reference && !certificate_consumed;
+   wire certificate_take = certificate_valid && certificate_ready;
+   wire producer_idle = !producer_reference && !product_valid;
+@@ -99,18 +149,19 @@
+   wire bank_release_valid = published_reference && handoff_seen && queue_drained &&
+     !producer_reference && !completion_reference && direct_clean && !fault;
+   assign product_ready = producer_reference && bank_input_ready && !fault;
+-  assign forward_handoff_valid = epoch_resetn && published_reference && reader_reference &&
+-    completion_reference && queue_prefetched && !handoff_seen && forward_phase &&
+-    direct_clean && !fault;
++  assign forward_handoff_valid = handoff_capacity && direct_clean;
+   assign handoff = forward_handoff_valid && forward_handoff_ready;
+   assign current_lease = bank_lease;
+   assign core_metadata = queue_metadata[69:0];
+   starlink_pss_epoch_sealed_bank #(.SEALED_PUBLICATION(1)) bank (
+     .clk(clk), .input_resetn(epoch_resetn), .output_resetn(epoch_resetn),
+-    .input_valid(product_valid && producer_reference && !fault), .input_offer_new(!final_taken),
++    // RAW offers remain observable even when READY is low or ownership closed.
++    // Only private take uses the exact exported handshake. The issuer retains
++    // independent closed/unowned/X observation; d9c remains byte-identical.
++    .input_valid(product_valid), .input_offer_new(producer_reference && !final_taken && product_ready),
+     .input_ready(bank_input_ready), .input_data(product_data), .input_position(product_position),
+     .input_last(product_last), .input_metadata({5'b0,product_metadata}),
+-    .input_commit_authorized(1'b0), .input_fault(bank_input_fault), .input_framing_fault_now(),
++    .input_commit_authorized(1'b0), .input_fault(bank_input_fault), .input_framing_fault_now(producer_verdict_fault_now),
+     .output_valid(bank_valid), .output_ready(bank_ready), .output_data(bank_data),
+     .output_position(bank_position), .output_last(bank_last), .output_metadata(bank_metadata),
+     .rearm_valid(rearm), .engine_reset_held(engine_reset_held),
+@@ -127,7 +178,7 @@
+     .private_take(product_take), .checked_seal(checked_seal), .publish(publication),
+     .lease_release(lease_release), .sealed(), .published(bank_published)
+   );
+-  starlink_pss_checked_product_read #(.CHECKED_PRODUCT_READ(1)) reader (
++  starlink_pss_checked_product_read_interface #(.CHECKED_PRODUCT_READ(1)) reader (
+     .clk(clk), .resetn(epoch_resetn), .admit_valid(queue_admit_valid), .admit_ready(queue_admit_ready),
+     .admit_lease(lease_reference), .admit_metadata(expected_metadata),
+     .raw_valid(bank_valid && reader_reference), .raw_ready(bank_ready), .raw_data(bank_data),
+@@ -139,6 +190,8 @@
+     .release_ready(queue_release_ready), .released(queue_released), .live_faults(reader_live),
+     .active(queue_active), .prefetched(queue_prefetched), .final_consumed(queue_final), .drained(queue_drained),
+     .private_take(), .core_take(core_take), .validation_fault_now(queue_validation_fault), .fault_reasons(reader_reasons),
++    .head_valid(read_head_valid), .head_lease(read_head_lease), .fault_events_now(reader_fault_events_now),
++    .token_fault_now(reader_token_fault_now), .offer_fault_now(reader_offer_fault_now),
+     .fault_token_valid(), .fault_token_position(), .fault_token_lease()
+   );
+   always @(posedge clk or negedge epoch_resetn) begin

@@ -1,0 +1,47 @@
+--- source
++++ source
+@@ -3,7 +3,7 @@
+ // Default is inert, not a substitute for any production caller. No RAM/FFT.
+ // The common epoch, NEVER a per-transform core reset, owns this state.
+ `timescale 1ns/1ps
+-module starlink_pss_checked_product_read #(
++module starlink_pss_checked_product_read_interface #(
+   parameter integer CHECKED_PRODUCT_READ = 0
+ ) (
+   input wire clk, resetn,
+@@ -35,6 +35,10 @@
+   // Narrow current checker evidence, excluding release-request validation to
+   // avoid a release-valid feedback loop. The issuer must fence handoff too.
+   output wire validation_fault_now,
++  output wire token_fault_now, offer_fault_now,
++  output wire head_valid,
++  output wire [1:0] head_lease,
++  output wire [15:0] fault_events_now,
+   output wire [15:0] fault_reasons,
+   output wire fault_token_valid,
+   output wire [8:0] fault_token_position,
+@@ -105,14 +109,20 @@
+     assign errors_now[i+8] = owned && live_faults[i] !== 1'b0;
+   end
+   wire current_clean = errors_now == 0;
+-  assign validation_fault_now = verdict_bad || tag_bad || head_bad || count>3 ||
+-    uncertain || closed_offer || admission_bad;
++  assign fault_events_now = errors_now;
++  // Token evidence depends only on held/checker state. Offered-bus diagnostics
++  // remain current too, but must not be fed back into the producer of raw_valid.
++  assign token_fault_now = verdict_bad || tag_bad || head_bad || count>3;
++  assign offer_fault_now = uncertain || closed_offer || admission_bad;
++  assign validation_fault_now = token_fault_now || offer_fault_now;
+   assign active = enabled && owned;
+   assign raw_ready = enabled && owned && clean && live_clean && issued<512 &&
+     (count<3 || core_take);
+   assign private_take = raw_valid === 1'b1 && raw_ready;
+-  assign core_valid = enabled && owned && clean && live_clean && current_clean &&
+-    core_enable && count!=0 && occupied[head] && good[head];
++  assign head_valid = enabled && owned && clean && live_clean && current_clean &&
++    count!=0 && occupied[head] && good[head];
++  assign head_lease = lease_slot[head];
++  assign core_valid = head_valid && core_enable;
+   assign core_take = core_valid && core_ready === 1'b1;
+   assign core_data = data_slot[head];
+   assign core_position = position_slot[head];
