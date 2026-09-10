@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="12" failures="0" skipped="0" tests="15" time="0.159" timestamp="2026-09-10T07:37:56.314699+00:00" hostname="gauss"><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_exact_additive_round_port_retains_entire_dec20_sequential_behavior" time="0.009" /><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_original_bank_core_bench_and_all_control_modules_byte_unchanged" time="0.013" /><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_exact_derived_top_inverse_and_held_fault_bindings" time="0.003" /><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[2-0-0]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[2-0-1]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[2-1-0]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[2-1-1]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[18-0-0]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[18-0-1]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[18-1-0]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[18-1-1]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[24-0-0]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[24-0-1]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[24-1-0]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase><testcase classname="tests.test_starlink_bank_arithmetic_offline" name="test_all_eight_options_exact_math_latency_bubbles_stalls_reset_flush[24-1-1]" time="0.000"><error message="failed on setup with &quot;FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'&quot;">self = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1')
+mode = 448, parents = False, exist_ok = False
+
+    def mkdir(self, mode=0o777, parents=False, exist_ok=False):
+        """
+        Create a new directory at this given path.
+        """
+        try:
+&gt;           os.mkdir(self, mode)
+E           FileNotFoundError: [Errno 2] No such file or directory: '/tmp/starlink-coarse-alternatives.Y3JzOI/bank-arithmetic/hdl/library/starlink_pss_acquisition/build/bank-arithmetic-offline-v1'
+
+/home/mouse9911/.local/share/uv/python/cpython-3.11.16-linux-x86_64-gnu/lib/python3.11/pathlib.py:1116: FileNotFoundError</error></testcase></testsuite></testsuites>
