@@ -35,6 +35,8 @@ def prepare(qualified, actual, output):
     qualified, actual, output = map(safe, (qualified, actual, output))
     if output.exists():
         raise ValueError('refusing preparation overwrite')
+    if any(output.is_relative_to(parent) for parent in (qualified, actual, ROOT)):
+        raise ValueError('output must be outside qualified, actual and source roots')
     assert digest(qualified/'manifest.json') == EXPECTED
     assert digest(ROOT/ASSETS['clocks.xdc']) == 'bac30eff84cc71d1f273104b716b388b55e51d33be10f9beaf1901232193ba3f'
     assert digest(ROOT/ASSETS['threads.tcl']) == 'aec974f2800f01285e888d1b188cd089534941922531914926a8e1b568d4c227'

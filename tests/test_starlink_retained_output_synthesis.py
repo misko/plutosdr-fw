@@ -52,6 +52,15 @@ def test_path_admission(prepared,tmp_path,kind):
         p.prepare(QUALIFIED,ACTUAL,path)
 
 
+@pytest.mark.parametrize('parent',[QUALIFIED,ACTUAL,ROOT])
+def test_new_child_output_rejects_before_copy(parent):
+    output=parent/'retained_synthesis_forbidden_child'
+    assert not output.exists()
+    with pytest.raises(ValueError,match='outside qualified, actual and source roots'):
+        p.prepare(QUALIFIED,ACTUAL,output)
+    assert not output.exists()
+
+
 @pytest.mark.parametrize('kind',['digest','source','clock','wrong_argc','relative_output','inside_prepared','overwrite'])
 def test_runner_admission_rejects_before_create(prepared,tmp_path,kind):
     original,digest=prepared;bundle=tmp_path/'bundle';shutil.copytree(original,bundle)
