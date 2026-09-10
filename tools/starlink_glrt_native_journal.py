@@ -85,6 +85,7 @@ def review(data: bytes, *, epoch: int) -> dict:
     heads = []
     estimates = []
     pending = None
+    previous_frame = -1
     drained = final = None
     for record in entries:
         text = record.payload.decode("ascii")
@@ -101,7 +102,11 @@ def review(data: bytes, *, epoch: int) -> dict:
                 raise ValueError("head precedes retained ownership")
             first, b = owners[head.tag]
             head.require_association(b, sequence=len(heads))
-            pending = (head, first+head.repeat)
+            frame = first+head.repeat
+            if frame <= previous_frame:
+                raise ValueError("retained repeat order regresses or duplicates a frame")
+            previous_frame = frame
+            pending = (head, frame)
             heads.append(head)
         elif record.kind == "estimate":
             fields = text.split()
@@ -115,6 +120,8 @@ def review(data: bytes, *, epoch: int) -> dict:
             values = list(map(float, fields[3:8]))
             if not all(math.isfinite(v) for v in values) or int(fields[8]) & ~127:
                 raise ValueError("nonfinite fit or unknown rejection")
+            if int(fields[8]) == 0:
+                head.require_complete()
             estimates.append(dict(epoch=epoch, sequence=head.sequence, frame=frame,
                 delay_s=values[0], residual_hz=values[1], cfo_hz=values[2], coherence=values[3],
                 linearized_coherence=values[4], rejection=int(fields[8])))
