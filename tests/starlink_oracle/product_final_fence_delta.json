@@ -1,0 +1,57 @@
+{
+  "base": "efc97d8ac92578e1e37eb0bb28c64780b86cf76a",
+  "modules": {
+    "starlink_pss_fft_bank_owned_product_fence": {
+      "original": "starlink_pss_fft_bank_owned_rom_read_ahead",
+      "original_sha256": "802194523b990517f470762d3dcf39fd5ae641b697ade7a62491c09391635c07",
+      "edits": [
+        [
+          "module starlink_pss_fft_bank_owned_rom_read_ahead #(\n",
+          "module starlink_pss_fft_bank_owned_product_fence #(\n"
+        ],
+        [
+          "  parameter integer PRIVATE_BLOCK_METADATA_READ_AHEAD = 0\n",
+          "  parameter integer PRIVATE_BLOCK_METADATA_READ_AHEAD = 0,\n  parameter integer PRODUCER_LOCAL_FINAL_FENCE = 0\n"
+        ],
+        [
+          "",
+          "    if (PRODUCER_LOCAL_FINAL_FENCE !== 0 && PRODUCER_LOCAL_FINAL_FENCE !== 1)\n      $fatal(1, \"PRODUCER_LOCAL_FINAL_FENCE must be zero or one\");\n"
+        ],
+        [
+          "  starlink_pss_block_mailbox #(.RESET_RELEASE_EXTERNAL(1), .EXPLICIT_COMMIT(1)) product_bank (\n",
+          "  // Final producer writes follow the certified forward completion. Input\n  // framing/delivery are closed, but duplicate start and all sticky/current\n  // causes below remain live. Producer READY excludes product consumer VALID,\n  // hence handoff mismatch cannot affect this sampled final-write edge.\n  // Keep the original authorization/global reasons literal and observable;\n  // this private predicate may differ outside the mailbox's final-write slot.\n  wire producer_final_fault_now = duplicate_start_fault_now || input_guard_fault ||\n    source_fault_fast[1] || vendor_fault_now || fast_fault || kernel_fault ||\n    product_overflow || product_bank_fault || product_bank_framing_fault_now || result_fault;\n  wire producer_final_seal_authorized = forward_committed && !producer_final_fault_now;\n  starlink_pss_product_fence_mailbox #(.RESET_RELEASE_EXTERNAL(1), .EXPLICIT_COMMIT(1),\n    .USE_PRODUCER_FINAL_FENCE(PRODUCER_LOCAL_FINAL_FENCE)) product_bank (\n"
+        ],
+        [
+          "",
+          "    .input_final_seal_authorized(producer_final_seal_authorized),\n"
+        ]
+      ]
+    },
+    "starlink_pss_product_fence_mailbox": {
+      "original": "starlink_pss_block_mailbox",
+      "original_sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+      "edits": [
+        [
+          "module starlink_pss_block_mailbox #(\n",
+          "module starlink_pss_product_fence_mailbox #(\n"
+        ],
+        [
+          "  parameter integer EXPLICIT_COMMIT = 0\n",
+          "  parameter integer EXPLICIT_COMMIT = 0,\n  parameter integer USE_PRODUCER_FINAL_FENCE = 0\n"
+        ],
+        [
+          "",
+          "  // Only sampled at the original healthy producer-final write. The caller\n  // proves completed forward input and exclusive producer ownership; this\n  // is not an authorization to ignore any active input or mailbox fault.\n  input wire input_final_seal_authorized,\n"
+        ],
+        [
+          "",
+          "    if (USE_PRODUCER_FINAL_FENCE !== 0 && USE_PRODUCER_FINAL_FENCE !== 1)\n      $fatal(1, \"USE_PRODUCER_FINAL_FENCE must be zero or one\");\n"
+        ],
+        [
+          "          if (!EXPLICIT_COMMIT || input_commit_authorized)\n",
+          "          if (!EXPLICIT_COMMIT || (USE_PRODUCER_FINAL_FENCE ?\n              input_final_seal_authorized : input_commit_authorized))\n"
+        ]
+      ]
+    }
+  }
+}
