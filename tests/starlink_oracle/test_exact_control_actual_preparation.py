@@ -151,6 +151,21 @@ def test_all_eight_preparations_hashes_independent_sources_and_stub_elaboration_
     )
     (tmp_path / "elaboration.log").write_text(result.stdout + result.stderr)
     assert result.returncode == 0, result.stdout + result.stderr
+    # Inspect the actual compiled expression, not an assumed declared bus
+    # width. Hierarchical $bits previously resolved to zero in a localparam
+    # even though compilation succeeded. Self-sized equality must observe the
+    # full concatenation, and the monitor receives only its exact boolean.
+    compiled = executable.read_text()
+    driver = re.search(r'\.net "exact_public_equal", 0 0, (\S+);', compiled)
+    assert driver is not None
+    comparison = re.search(
+        rf"^{re.escape(driver.group(1))} \.cmp/eeq (\d+),", compiled, re.MULTILINE
+    )
+    assert comparison is not None
+    assert int(comparison.group(1)) == 2168
+    (tmp_path / "observer_width.log").write_text(
+        f"ELABORATED_FULL_PUBLIC_EQUALITY_BITS={comparison.group(1)} fields={len(PREPARE.FIELDS)} no_actual_execution=1\n"
+    )
     with pytest.raises(FileExistsError):
         PREPARE.prepare(output, VECTORS, registered, distributed, scratch, 1)
 
