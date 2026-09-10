@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from tests.starlink_oracle import test_realtime_private_bank as private_bank
+from tests.starlink_oracle.idle_mailbox_contract import restore_guard, restore_service
 from tests.starlink_oracle.mailbox_metadata_contract import (
     restore_legacy_metadata_comparison,
 )
@@ -38,7 +39,7 @@ def replace_once(source, old, new):
 
 def test_guard_delta_is_only_final_qualification_export_and_exact_handshake():
     name = "starlink_pss_realtime_result_guard"
-    source = tokens((ACQ / f"{name}.v").read_text())
+    source = restore_guard((ACQ / f"{name}.v").read_text())
     source = replace_once(source, "outputwiremailbox_commit_valid,", "")
     source = replace_once(source,
         ("assignmailbox_commit_valid=resetn&&active&&!protocol_fault&&return_valid&&"
@@ -51,7 +52,7 @@ def test_guard_delta_is_only_final_qualification_export_and_exact_handshake():
 
 def test_service_delta_is_only_final_authorization_and_mailbox_retains_its_contract():
     name = "starlink_pss_shared_realtime_xfft_service"
-    source = tokens((ACQ / f"{name}.v").read_text())
+    source = restore_service((ACQ / f"{name}.v").read_text())
     source = replace_once(source,
         "wirereturn_valid,return_private_valid,return_commit_valid,return_last;",
         "wirereturn_valid,return_private_valid,return_last;")

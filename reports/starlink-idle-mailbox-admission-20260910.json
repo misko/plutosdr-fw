@@ -1,0 +1,211 @@
+{
+  "schema": "starlink-idle-mailbox-admission-v1",
+  "scope": "Idle-only job admission and ACK fault predicate; retain original active/final validation, exact numerics, both PSS stages, pilot DMA, original clocks and constraints.",
+  "source": {
+    "hdl_commit": "d1b3107b56c869d59724df2a8d695112a1f6ac3c",
+    "baseline_hdl_commit": "eb96c64738697c10b9c0abb379ab64f6a4a5c59c",
+    "branch": "codex/starlink-rx-only-do-not-merge",
+    "remote_verified": true,
+    "files": [
+      {
+        "path": "library/starlink_pss_acquisition/simulate_shared_realtime_xfft_service.tcl",
+        "sha256": "7735f4aab4664111175bbe5cefca2d80b45f951d9065aaa0432c9ce78265543a"
+      },
+      {
+        "path": "library/starlink_pss_acquisition/starlink_pss_realtime_result_guard.v",
+        "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+      },
+      {
+        "path": "library/starlink_pss_acquisition/starlink_pss_shared_realtime_xfft_service.v",
+        "sha256": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7"
+      },
+      {
+        "path": "library/starlink_pss_acquisition/tb/starlink_pss_final_auth_probe.sv",
+        "sha256": "e5d3c6851c300c024d29ebb4a8c97dbf6239c7efdd44052588c1947133818ee5"
+      },
+      {
+        "path": "library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_final_veto_equivalence.sv",
+        "sha256": "a8ff0129d6de539cec69717ebd40e4c7ee769ae8e1f9f201c73e60a0dc2f9628"
+      },
+      {
+        "path": "library/starlink_pss_acquisition/tb/tb_starlink_pss_realtime_occupancy.sv",
+        "sha256": "5cb176dd61cabb6b53cc5e18edc80dd78cac98f0a0c0628739e639c37a40a1ad"
+      },
+      {
+        "path": "library/starlink_pss_acquisition/tb/tb_starlink_pss_shared_realtime_xfft_service.sv",
+        "sha256": "d0355310ffd163d68d624c3b9706ac1006823c1551e6ec840e794a57c09b665d"
+      },
+      {
+        "path": "library/starlink_pss_acquisition/measure_idle_mailbox_guard.tcl",
+        "sha256": "4c0540e2d0608848cacb97fe0e90251768f19a125174b916d437c8c86bc7895d"
+      }
+    ]
+  },
+  "contract": {
+    "real_link_premise": "Current framing fault requires an accepted private write; private-write valid requires an active guard. Idle admission and ACK release require inactivity; sticky mailbox faults remain included.",
+    "runtime_delta": "Explicit opt-in USE_IDLE_MAILBOX_FAULT; only idle_fault_now uses the supplied predicate. Service supplies output_mailbox_fault and preserves combined sticky/current fault at the original mailbox_input_fault port.",
+    "unchanged": [
+      "Full fault-reason accumulation",
+      "Nonfinal retirement and final publication same-edge vetoes",
+      "Default generic caller behavior",
+      "Cycle latency, data arithmetic, public ABI, original clocks/constraints"
+    ],
+    "proof_limits": "Algebraic source review plus executed RTL, actual core and functional netlist tests; not an exhaustive formal proof of all receiver states."
+  },
+  "targeted_rtl": {
+    "new_contract_cases": 18,
+    "early_combined_passed": 33,
+    "early_combined_skipped": 2,
+    "skip_reason": "Early run omitted fresh phase-mode netlists; these were supplied and passed in later broad regression.",
+    "log": "/tmp/starlink-idle-mailbox.N0l1fN/idle-contract-v2.log",
+    "log_sha256": "41a7e7b5ea9e669dc5b919e6a957af94769f913d9dd1985713d539850f4d5fab",
+    "coverage": [
+      "Complete-source allowed-delta comparison against eb96c647",
+      "Default pin 0/1/X/Z inertness and invalid mode rejection",
+      "256-job full-tuple public callers against ff4229",
+      "Three clock pairs with real private bank, 23 healthy/37 rejected jobs and 12 resets each",
+      "Real ACK/current-link corruption against frozen eb96 public guard",
+      "Mutation witnesses for omitted sticky, final-veto and reason-accumulation checks"
+    ]
+  },
+  "structural_synthesis": {
+    "tool": "Vivado 2022.2",
+    "scope": "actual result guard out-of-context synthesis only; not routing or timing",
+    "phase_directory": "/tmp/starlink-idle-mailbox.N0l1fN/phase-guard-synth-v1",
+    "idle_directory": "/tmp/starlink-idle-mailbox.N0l1fN/idle-guard-synth-v1",
+    "idle_scope_sha256": "0eb124160655e793d68f43ae8d5ed99757270e0836d54a58c9fae4781c073fbd",
+    "mode0": {
+      "LUT": 111,
+      "FF": 180,
+      "DSP": 0,
+      "BRAM": 0,
+      "job_ready_full_fault_ports": 1,
+      "job_ready_idle_fault_ports": 0
+    },
+    "mode1": {
+      "LUT": 111,
+      "FF": 180,
+      "DSP": 0,
+      "BRAM": 0,
+      "job_ready_full_fault_ports": 0,
+      "job_ready_idle_fault_ports": 1
+    },
+    "retained": "Full current mailbox fault remains in nonfinal valid, final commit-valid and fault reason bit0 for both modes. No claim that every state-control cone loses it."
+  },
+  "netlist_replay": {
+    "actual_idle_mode_cases": 4,
+    "measurement_policy_cases": 7,
+    "passed": 11,
+    "log": "/tmp/starlink-idle-mailbox.N0l1fN/netlist-tests-v3.log",
+    "log_sha256": "ad275221dc3d5d18acb36279ce6ec9c0739d780999612bdb9e943a47de75209c",
+    "scope": "Both actual idle-mode netlists run 256 jobs/131072 words each against ff4229. Enabled netlist + real mailbox compares eb96 public control/payload through 1536 healthy published words and six nonfinal/held-final link faults.",
+    "retained_failed_attempts": [
+      {
+        "log": "/tmp/starlink-idle-mailbox.N0l1fN/netlist-tests-v1.log",
+        "failed": 3,
+        "passed": 27,
+        "cause": "One test-only declaration-order elaboration failure; two reference comparisons sampled before UNISIM FDCE 100ps Q delay."
+      },
+      {
+        "log": "/tmp/starlink-idle-mailbox.N0l1fN/netlist-tests-v2.log",
+        "failed": 2,
+        "passed": 2,
+        "cause": "Strict test source replacement encountered multiple unrelated benches; select the entire target module before same-edge sampling adjustment."
+      }
+    ],
+    "correction": "No RTL, primitive model, fault expectation or clock-cycle change. Netlist observations occur 200ps after the same edge."
+  },
+  "regression": {
+    "passed": 970,
+    "skipped": 2,
+    "seconds": 238.94,
+    "log": "/tmp/starlink-idle-mailbox.N0l1fN/oracle-v1.log",
+    "log_sha256": "a3e12eb1a704e012cee54661c72d5bd57dfa12c7aaaf934a64d4a0f63b0f2039",
+    "skip_scope": "Two older occupancy-netlist measurements are optional and not supplied; fresh phase/idle guard netlists plus unchanged cursor/metadata fixtures were supplied.",
+    "ruff": "passed for all seven changed/new Python files"
+  },
+  "actual_fft_service": {
+    "directory": "/tmp/starlink-idle-mailbox.N0l1fN/service-v2",
+    "exit_code": 0,
+    "console_sha256": "f67ec001437b7b8bc09fe3fe2304c0ab89a07509c213e2c58468e4bb71e7db06",
+    "healthy_jobs": 26,
+    "exact_words": 13312,
+    "idle_observation_rows": 157971,
+    "ACK_observation_rows": 75344,
+    "private_write_observation_rows": 34816,
+    "faults": "Starvation6, final-veto3, malformed input-bank2, independent resets6, configure resets2, partial-input resets2, postcommit ACK fault1, duplicate input-start at final and ACK.",
+    "reference": "Immutable public result guard ff4229 and input guard0a1; original final fence and exact core/transport words retained.",
+    "retained_first_attempt": "service-v1 simulation passed its bench, but runner rejected five required markers under its four-marker limit. Corrected runner uses two bounded verifier calls; service-v2 reran successfully, unchanged runtime RTL."
+  },
+  "numeric": {
+    "directory": "/tmp/starlink-idle-mailbox.N0l1fN/numeric-v1",
+    "exit_code": 0,
+    "exact_scores": 1341,
+    "reset_quarantine_and_recovery": true,
+    "console_sha256": "839f7c9e572b4b5237587cacd27638be5de598a5aed3b1d359887d7e52da7239"
+  },
+  "capacity": {
+    "directory": "/tmp/starlink-idle-mailbox.N0l1fN/capacity64-v1",
+    "exit_code": 0,
+    "blocks": 64,
+    "profile": "bursty-stalled",
+    "source_samples": 28673,
+    "scores": 28608,
+    "FIFO_high_water": 358,
+    "console_sha256": "ac4a14bf4673f78e590d24995621c191ea1e5275aa4d73ea05c90e97e4bcd99c",
+    "limit": "Bounded simulated throughput/order/backlog, not production-duration numerics or native RX."
+  },
+  "paired": {
+    "directory": "/tmp/starlink-idle-mailbox.N0l1fN/paired-v1",
+    "exit_code": 0,
+    "exact_scores": 894,
+    "map_words": 447,
+    "pilot_bytes": 2048,
+    "late_invalid_release_fault_retained": true,
+    "console_sha256": "d23b46918dbc978cfd5fafe54dcd683cf1071fd5ad8dc009088655d643b5ebb5",
+    "limit": "Actual digital shell/CDC/canonical/FFT/PSMA/PIL1 at reduced447x2 geometry; not ADC, DMA, native IIO, fine engine, production duration, physical timing or RF."
+  },
+  "portable_evidence": {
+    "path": "reports/experiments/20260909-idle-mailbox-guard-synthesis.tgz",
+    "bytes": 48270,
+    "sha256": "05ae6c6b4081b7fc81db8093dcb40c56dac81b929e3dc5933b3a34a8d407f083",
+    "relocated_directory": "/tmp/starlink-idle-replay.1W926y",
+    "relocated_passed": 12,
+    "relocated_seconds": 45.58,
+    "relocated_log_sha256": "27d72b71e699b3da14a3ecdc7b1195370e9625535e78f3f8e1741147a6efdc48"
+  },
+  "packaging": {
+    "exit_code": 0,
+    "console": "/tmp/starlink-idle-mailbox.N0l1fN/packaging-v1.console.log",
+    "component_sha256": "4560a97325c405cc5f454caf25b811594107102fe86453fa23f39b4ae1f0c5f6"
+  },
+  "full_receiver": {
+    "status": "running_not_qualified",
+    "directory": "hdl/projects/pluto/shared-realtime-idle-admission-v1",
+    "exec_session": 46513,
+    "observed_launch_utc": "2026-09-10T00:04:18Z",
+    "source_hdl_commit": "d1b3107b56c869d59724df2a8d695112a1f6ac3c",
+    "launch_configuration": "paired-pilot15, shared realtime FFT, boundary stop, coarse+exact-DSP-fine+pilotDMA, global synthesis, threshold4, medium placement, original100/200MHz, no reference DCP",
+    "deployment_eligible": false,
+    "best_previous_physical_baseline": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873;100MHz+.019ns,200MHz-.421ns. Preserve regardless of new result."
+  },
+  "radios": {
+    "accessed": [],
+    "configured": [],
+    "flashed": [],
+    "TX_enabled": []
+  },
+  "PPU": {
+    "changed_by_this_work": false,
+    "unrelated_four_file_diff_sha256": "eb87e8049367ba2a2f8fccf89123b6c2bb58518175e79dba3f41cddabd07848d"
+  },
+  "remaining": [
+    "Complete physical timing/board-I/O/CDC/reset gates",
+    "Native paired finite/persistent DMA/IIO and calibration on exact serial .18",
+    "Causal CFO/coarse/fine scheduling and short-dwell lock policy",
+    "PPU Ethernet .17 deployment/rollback and independent live GLRT/PSS agreement",
+    "Eight lower/upper targets,120ms valid visits over300s",
+    "Full 30/60MS/s qualification retaining original-rate fine search and2.5MS/s pilot output"
+  ],
+  "parallel_alternatives": "User-requested independent worktrees/agents; see reports/starlink-coarse-parallel-evaluation-20260910.md. No architecture replacement or alternate deployment selected."
+}

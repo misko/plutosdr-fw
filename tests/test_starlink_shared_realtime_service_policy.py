@@ -161,3 +161,16 @@ def test_actual_service_covers_active_epoch_resets_and_final_metadata_mismatch()
         "postcommit_ACK_fault_cases=1 CAUSE_FENCE_REVIEW_REQUIRED CAPACITY_AND_PHYSICAL_UNQUALIFIED"
     )
     assert marker in bench and marker in runner
+
+
+def test_actual_service_requires_idle_mailbox_premise_and_frozen_public_checks():
+    bench, runner = BENCH.read_text(), RUNNER.read_text()
+    marker = ("IDLE_MAILBOX_SERVICE_PREMISE_PASS actual_mailbox_and_FFT=1 "
+              "inactive_and_ACK=1 private_writes_active=1 public_golden=1")
+    assert marker in bench and marker in runner
+    assert "IDLE_MAILBOX_SERVICE_PREMISE_MISSING" in bench
+    assert "IDLE_MAILBOX_SERVICE_ACK_ACTIVE" in bench
+    assert "IDLE_MAILBOX_SERVICE_WRITE_INACTIVE" in bench
+    assert "IDLE_MAILBOX_SERVICE_COVERAGE_MISSING" in bench
+    assert "RETIRED_SERVICE_PUBLIC_MISMATCH" in bench
+    assert "FINAL_AUTH_SERVICE_MISMATCH" in bench

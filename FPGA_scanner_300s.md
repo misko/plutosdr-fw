@@ -363,6 +363,48 @@ the subsequent comparison interval free of PSS timing/frequency seeds.
 
 ## Current progress
 
+### Idle mailbox admission and parallel alternatives — 2026-09-10
+
+HDL `d1b3107b56c869d59724df2a8d695112a1f6ac3c` is pushed only to the
+experimental DNM branch. It opts the actual service into an idle-only mailbox
+fault predicate. Current output framing faults require a private write, which
+requires an active guard; idle admission and ACK release require inactivity.
+The sticky mailbox fault remains included. Active/nonfinal/final publication
+checks and all fault reasons retain the full current mailbox fault; default
+callers are unchanged. No arithmetic, latency, ABI or constraint change.
+
+The expanded regression passes **970 tests**, with two older optional-netlist
+cases skipped. Fresh phase-input and idle-mailbox guard netlists are included;
+both idle modes match the frozen public guard over256jobs/131072words each.
+The enabled netlist also passes real-bank ACK and six current-link corruption
+cases against a frozen reference. Actual synthesis removes the full framing
+input from job-ready only, retaining active/final/reason checks; both isolated
+modes use111LUT/180FF. This is not an isolated or complete timing improvement
+claim. Portable evidence also replays after relocation (12tests).
+
+The actual FFT service passes26healthy jobs/13312exact words plus adversarial
+reset/input/final/ACK cases, with actual idle/ACK/private-write premise checks.
+Full coarse numeric replay returns1341exact scores, the64-block burst/stall
+run returns28608ordered scores, and reduced paired PSMA/PIL1 replay preserves
+894scores/2048pilot bytes plus a late real fault. These do not exercise native
+ADC/DMA/IIO, fine timing or production duration.
+
+The fresh complete15MS/s receiver build was launched at00:04UTC in
+`hdl/projects/pluto/shared-realtime-idle-admission-v1`, with both detectors,
+pilot DMA, boundary stop and the original clocks/constraints. Its final timing
+result is pending; no emitted artifact is yet eligible for deployment. Keep
+`18c96bb9` as the best measured physical baseline until a completed comparison.
+No radio was accessed or flashed.
+
+At the user's explicit request, three independent agents and firmware/HDL
+worktrees now evaluate (1) a consolidated FFT processing island, (2) a direct
+time-shared66-tap coarse correlator and (3) narrower-rate/causal-GLRT assistance.
+They do not change the selected receiver or the required native60MS/s fine
+search. Worktree/branch ownership and bounded comparison gates are recorded in
+`reports/starlink-coarse-parallel-evaluation-20260910.md` and
+`docs/starlink-coarse-architecture-review-20260909.md`. Detailed current
+candidate evidence is `reports/starlink-idle-mailbox-admission-20260910.json`.
+
 ### Balanced private output-metadata check — 2026-09-09
 
 HDL `65adf692da07422f10fea6c342b2711807ff7a89` is pushed only to the
