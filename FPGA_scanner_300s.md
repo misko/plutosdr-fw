@@ -391,19 +391,27 @@ ADC/DMA/IIO, fine timing or production duration.
 
 The fresh complete15MS/s receiver build was launched at00:04UTC in
 `hdl/projects/pluto/shared-realtime-idle-admission-v1`, with both detectors,
-pilot DMA, boundary stop and the original clocks/constraints. Its final timing
-result is pending; no emitted artifact is yet eligible for deployment. Keep
-`18c96bb9` as the best measured physical baseline until a completed comparison.
-No radio was accessed or flashed.
+pilot DMA, boundary stop and the original clocks/constraints. It completed at
+00:20:46UTC, exit1: setup WNS **-1.269ns**, TNS **-125.326ns**,355 failing
+endpoints (351 on200MHz and four asynchronous recovery paths).100MHz passes
+at+0.009ns; hold passes at+0.002ns. All34008 nets route without errors, but
+timing regresses from the best `18c96bb9` reference. This candidate is rejected
+for deployment; generated bitstream/bad-timing XSA are not qualified firmware.
+The original13 input/two output delay gaps also remain. No radio was accessed
+or flashed.
 
 At the user's explicit request, three independent agents and firmware/HDL
-worktrees now evaluate (1) a consolidated FFT processing island, (2) a direct
+worktrees completed first studies of (1) a consolidated FFT processing island, (2) a direct
 time-shared66-tap coarse correlator and (3) narrower-rate/causal-GLRT assistance.
 They do not change the selected receiver or the required native60MS/s fine
 search. Worktree/branch ownership and bounded comparison gates are recorded in
 `reports/starlink-coarse-parallel-evaluation-20260910.md` and
 `docs/starlink-coarse-architecture-review-20260909.md`. Detailed current
 candidate evidence is `reports/starlink-idle-mailbox-admission-20260910.json`.
+The root independently reran20 new tests across the three studies successfully.
+No alternative is yet selected: the island has no physical/outer-bank proof,
+the direct slice fails numerical comparison and hold gates, and narrowband
+assistance retains unresolved CFO aliases and unmeasured live handoff costs.
 
 ### Balanced private output-metadata check — 2026-09-09
 

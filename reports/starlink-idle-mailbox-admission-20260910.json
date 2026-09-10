@@ -180,13 +180,44 @@
     "component_sha256": "4560a97325c405cc5f454caf25b811594107102fe86453fa23f39b4ae1f0c5f6"
   },
   "full_receiver": {
-    "status": "running_not_qualified",
+    "status": "completed_failed_timing_not_qualified",
     "directory": "hdl/projects/pluto/shared-realtime-idle-admission-v1",
     "exec_session": 46513,
     "observed_launch_utc": "2026-09-10T00:04:18Z",
+    "completed_utc": "2026-09-10T00:20:46Z",
+    "exit_code": 1,
     "source_hdl_commit": "d1b3107b56c869d59724df2a8d695112a1f6ac3c",
     "launch_configuration": "paired-pilot15, shared realtime FFT, boundary stop, coarse+exact-DSP-fine+pilotDMA, global synthesis, threshold4, medium placement, original100/200MHz, no reference DCP",
     "deployment_eligible": false,
+    "checkpoint_sha256": "f7c337695f06dbe95e8659569f4cb7ce9f56c681efb0fc473dc58c70bd121e8e",
+    "final_timing_report_sha256": "e4012d6ea119bae01a328ef4b237e4541f212b48bc5ae0d7edba214b1768c1a4",
+    "final_timing": {
+      "setup_WNS_ns": -1.269,
+      "setup_TNS_ns": -125.326,
+      "setup_failing_endpoints": 355,
+      "clock100_WNS_ns": 0.009,
+      "clock200_WNS_ns": -1.269,
+      "clock200_failing_endpoints": 351,
+      "async_recovery_WNS_ns": -0.042,
+      "async_recovery_failing_endpoints": 4,
+      "hold_WHS_ns": 0.002,
+      "hold_failing_endpoints": 0,
+      "RX_WNS_ns": 3.080,
+      "missing_input_delays": 13,
+      "missing_output_delays": 2,
+      "worst_path": "input_guard/expected_position_reg[3] to result_guard/input_count_reg[1], 5ns requirement, 6.100ns data delay including 4.900ns routing"
+    },
+    "route_status": {"fully_routed_nets": 34008, "routing_errors": 0},
+    "placed_utilization_not_postroute_audit": {"LUT": 12995, "FF": 18571, "slices": 4400, "BRAM_tiles": 53.5, "DSP": 54},
+    "read_only_endpoint_audit": {
+      "status": "incomplete_failed_closed",
+      "directory": "/tmp/starlink-idle-mailbox.N0l1fN/routed-audit-v2",
+      "exit_code": 1,
+      "reason": "Existing audit requires a timed metadata-to-job-start path. All75 metadata flops, job-start flop and5ns clocks exist, but get_timing_paths returns no path after the admission change. Absence alone is not a timing/CDC pass; remaining audit reports were not executed.",
+      "retained_first_attempt": "Audit-v1 command placed log/journal options after tclargs; argument-count rejection occurred before opening any checkpoint. Corrected invocation uses new v2 evidence paths.",
+      "constraint_changes": false
+    },
+    "disposition": "Reject for deployment; physical timing regressed. Generated bitstream and bad_timing XSA are not qualified firmware. Retain best18c and all failed evidence.",
     "best_previous_physical_baseline": "18c96bb93f0aea5f868fb8b4c15a2eb1bce7a873;100MHz+.019ns,200MHz-.421ns. Preserve regardless of new result."
   },
   "radios": {
