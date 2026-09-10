@@ -935,3 +935,39 @@ Before physical execution, independent Python children must clear vendor and
 Python path overrides without changing Vivado's parent environment; offline
 poisoned-environment coverage and a post-failure integrity audit are being
 prepared. No control physical launch or full-receiver promotion is authorized.
+
+## Native60 first service attempt: pre-command readback failure
+
+Parent independently repeated517 preparation/numerical tests PASS in21.96s at
+`/tmp/starlink-native60-preparation-parent.QNdffV` (original6536,terminal0).
+The generated parent-test bundle is byte-identical to the final prelaunch
+bundle, SHA256
+`45e61eec6c2f40916af9f767631ca8281cef338bab06674732bcc5ee6af7ca1a`.
+Parent verified its158 file receipts,87 live/snapshot source hashes, unchanged69
+numerical files and compile-only pre/post integrity. Source signature is
+`d85c9db9e6f7d84217dc17b0d923f5ddcd9a37b5ecd1d3033a8f50a3244bd897`.
+FW`6fb7944aff1230652ba952c824f22902a5b0aa7e` and
+HDL`50880a4a57c8105c91097651a2dae8ea3ff8d366` are pushed to the60 DO NOT MERGE
+remotes (original98845/56202,terminal0). No runtime HDL changed.
+
+Root authorized one native-only service run of that exact frozen bundle in
+`/tmp/starlink-bank-route.I50MDJ/main-native60-service-v1`. It terminated EXIT1
+in0.1725s (original agent tool chunke3a218; no live session was issued), before
+submitting a command. Configuration readback passed. At control cycle8295,
+source count3357, the bench reports
+`native60 public current-index snapshot outside admission window`.
+No native service result or timing bound is established.
+
+Parent inspected the original log/status and independently verified the frozen
+bundle, identical before/after source and69-fixture inventories, compile exit0,
+simulation exit1, no integrity error and no success terminal. All3357 logged
+source beats equal the original prefix. Capture, raw-tuple and hold logs are
+empty. Original failed inputs and output remain intact; no retry is authorized.
+
+The public current index is sampled through a source Gray register and two
+control-domain registers; reading the low word captures the high-word snapshot.
+The bench currently applies the actual command-handshake window to this earlier
+public readback as well. That is a possible test-model error, not yet a measured
+diagnosis: the failure message does not include the returned index. A minimal
+print-only diagnostic is under review. Any correction must preserve the real
+handshake window, original source, full native search and all declared deadlines.
