@@ -2,7 +2,15 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
-Latest measured increment: the first combined60 common-source coarse/native/
+Latest update (2026-09-10, after 12:49 UTC): build-output storage recovered
+without discarding evidence. The corrected late-request testbench independently
+passes694 offline tests; its vendor rerun is still pending. L1 synthesis passed,
+but its first diagnostic route **fails** setup at -1.549 ns, worse than the
+-1.341 ns arithmetic baseline. ROM-prefetch actual23845 remains incomplete after
+a `/tmp` quota error; it is not a passing run. No runtime promotion or radio
+operation followed. See [storage recovery and new routing evidence](reports/experiments/20260910-build-storage-recovery.md).
+
+Earlier measured increment: the first combined60 common-source coarse/native/
 pilot vendor-FFT simulation now passes (original5432 terminal0). It checks894
 exact coarse scores/447 retained map words,520 native captured samples,257 raw
 hypotheses/241 qualified tuples, two26-word public packet reads and512 independent
