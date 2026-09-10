@@ -139,6 +139,18 @@ The unintegrated RTL SHA is
 old mailbox remains
 `e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55`.
 Portable inventories bind the remaining bench/model/test bytes and original logs.
+Source pins: FW`f8754e23afc136870d1dd68228bdecb197a6e6c7`,
+HDL`2c2460ad55981ed0833eeadfef60463f1d1bca10`.
+The [portable archive](../reports/experiments/20260910-epoch-sealed-offline-v1.tgz)
+and [complete member receipt](../reports/experiments/20260910-epoch-sealed-offline-v1.json)
+preserve5705 unique regular files,9,372,940 compressed bytes, SHA
+`a0742fb322eb2382088b49aa273f5e9068679f30cb944ebbbb9a3d6fafd55fef`.
+Every member hash and all final compile-source inventories were checked after
+creation, and the live six-source cohort still matches its pre-run snapshots.
+The first archive script's classification assertion is retained: the RAM-corruption
+mutant legitimately reaches vvp EXIT0 and is killed by the independent numerical
+oracle, not an HDL fatal. The final receipt records the actual rejection layer
+and reason for each15 mutant; it does not rewrite any simulation outcome.
 The independent event model checks full512×36 payload/order and75-bit descriptor,
 actual offered lease, seal/publication/release epoch/lease/cycle, and delayed
 fault-token tags. Every profile requires its exact finite stimulus/event/cause
