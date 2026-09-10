@@ -117,8 +117,8 @@ and route at 200 MHz:
 | Automatic DSP post-add absorption | 1895 | 2244 | 645 | 24 | 0 | +0.543 ns | −0.713 ns |
 | Explicit fabric post-adds | 2087 | 2442 | 690 | 18 | 0 | +0.453 ns | −0.713 ns |
 
-Both have eight unique control sets and zero methodology violations and
-nonzero check-timing categories. Both physical gates **fail**. The worst hold
+Both have eight unique control sets and zero methodology violations; every
+check-timing category is zero. Both physical gates **fail**. The worst hold
 path starts at an OOC input timestamp port; the explicit input/output delays
 remain unchanged. A positive setup margin does not qualify hold, full receiver
 placement, CDC, or board I/O.
