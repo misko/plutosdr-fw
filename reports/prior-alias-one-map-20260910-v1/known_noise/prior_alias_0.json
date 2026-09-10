@@ -1,0 +1,215 @@
+{
+  "branch": {
+    "cfo_hz": 285941.79442491336,
+    "cluster": {
+      "distinct_probe_count": 2,
+      "maximum_hz": 286139.20454545174,
+      "median_hz": 285941.79442491336,
+      "members": [
+        {
+          "cfo_hz": 286139.20454545174,
+          "margin": 0.4485741650808185,
+          "probe_index": 0
+        },
+        {
+          "cfo_hz": 285744.384304375,
+          "margin": 0.463637828642399,
+          "probe_index": 1
+        }
+      ],
+      "minimum_hz": 285744.384304375,
+      "supported": true
+    },
+    "kind": "supported_prior_cluster",
+    "name": "prior_alias_0"
+  },
+  "corrected_input_ci16_sha256": "411b323a5ffd06de1e2bd64e2af15599a4546ec76e7792ce91e5dd05497b04cd",
+  "derotation_saturations": 0,
+  "frozen_score_prefix_bit_identical": null,
+  "full_fft_source_support": {
+    "canonical_bounds": [
+      20000,
+      1300273
+    ],
+    "original25_full_support_bounds": [
+      33254,
+      2167201
+    ],
+    "original25_support_seconds": 0.08535788
+  },
+  "input_ci16_sha256_before_correction": "219889a1d267db19f0db9d0950fa4c6fe59654ffa08da656044349e79b9e5004",
+  "map": {
+    "artifact": {
+      "bytes": 40000,
+      "path": "/tmp/starlink-coarse-alternatives.Y3JzOI/narrow-coarse/reports/prior-alias-one-map-20260910-v1/known_noise/prior_alias_0.maps.u16le",
+      "sha256": "1d2c66c69ffc467de64486bdf0258a102ee34323b503966af852f64799dbcfa4"
+    },
+    "bounded_search_maximum_ppm": 10.0,
+    "combined_candidate": {
+      "combined_median": 246.0,
+      "combined_score": 378,
+      "drift_bins_per_tile": -12.0,
+      "estimated_frame_period_samples": 19999.8125,
+      "estimated_period_error_ppm": -9.37499999997815,
+      "passes_existing_epoch_gates": false,
+      "peak_to_median": 1.5365853658536586,
+      "peak_to_median_unbounded": false,
+      "phase_bin": 17863,
+      "phase_bin_center_sample": 17863.0,
+      "phase_bin_start_sample": 17863,
+      "robust_z": 4.239656202424313,
+      "robust_z_unbounded": false,
+      "tile_count": 1
+    },
+    "discarded_leading_scores": 0,
+    "discarded_trailing_scores": 0,
+    "drift_bank_bins_per_tile": [
+      -12.0,
+      -8.0,
+      -4.0,
+      0.0,
+      4.0,
+      8.0,
+      12.0
+    ],
+    "drift_bank_ppm": [
+      -9.375,
+      -6.25,
+      -3.125,
+      0.0,
+      3.125,
+      6.25,
+      9.375
+    ],
+    "encoding": "row-major unsigned16 little-endian; one row per complete map",
+    "hardware_qualified": false,
+    "lock_proven": false,
+    "maps": [
+      {
+        "candidate_zero_drift": {
+          "combined_median": 246.0,
+          "combined_score": 378,
+          "drift_bins_per_tile": 0.0,
+          "estimated_frame_period_samples": 20000.0,
+          "estimated_period_error_ppm": 0.0,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.5365853658536586,
+          "peak_to_median_unbounded": false,
+          "phase_bin": 17863,
+          "phase_bin_center_sample": 17863.0,
+          "phase_bin_start_sample": 17863,
+          "robust_z": 4.239656202424313,
+          "robust_z_unbounded": false,
+          "tile_count": 1
+        },
+        "canonical_full_fft_dependency_start_index": 20000,
+        "canonical_full_fft_dependency_stop_index": 1300273,
+        "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+        "map_index": 0,
+        "source_full_fft_and_fir_dependency_start_index": 33254,
+        "source_full_fft_and_fir_dependency_stop_index": 2167201,
+        "start_sample_index": 20000,
+        "stop_sample_index": 1300000
+      }
+    ],
+    "period_step_ppm": 3.125,
+    "phase_bin_samples": 1,
+    "shape": [
+      1,
+      20000
+    ],
+    "three_map_existing_epoch_gates_pass": false,
+    "tile_frames": 64
+  },
+  "model_overflow_blocks": 0,
+  "numerical_qualification_pass": true,
+  "offline_processing_seconds": 3.73608313605655,
+  "one_map_exploratory_candidate": false,
+  "production_status": "insufficient_integration",
+  "rf_truth": false,
+  "score_count": 1280000,
+  "score_sha256": "d28241aa0cd2fa7f1b9ed9f1783863171c92381758b756f08afa947cfb416535",
+  "scrambled_control": {
+    "artifact": {
+      "bytes": 40000,
+      "path": "/tmp/starlink-coarse-alternatives.Y3JzOI/narrow-coarse/reports/prior-alias-one-map-20260910-v1/known_noise/prior_alias_0.frame-scrambled.maps.u16le",
+      "sha256": "751868b5b6153d60e64b7f8473d64be133a67d20b93c445a29d7f78611159b05"
+    },
+    "bounded_search_maximum_ppm": 10.0,
+    "combined_candidate": {
+      "combined_median": 246.0,
+      "combined_score": 387,
+      "drift_bins_per_tile": -12.0,
+      "estimated_frame_period_samples": 19999.8125,
+      "estimated_period_error_ppm": -9.37499999997815,
+      "passes_existing_epoch_gates": false,
+      "peak_to_median": 1.5731707317073171,
+      "peak_to_median_unbounded": false,
+      "phase_bin": 5789,
+      "phase_bin_center_sample": 5789.0,
+      "phase_bin_start_sample": 5789,
+      "robust_z": 4.5287236707714245,
+      "robust_z_unbounded": false,
+      "tile_count": 1
+    },
+    "discarded_leading_scores": 0,
+    "discarded_trailing_scores": 0,
+    "drift_bank_bins_per_tile": [
+      -12.0,
+      -8.0,
+      -4.0,
+      0.0,
+      4.0,
+      8.0,
+      12.0
+    ],
+    "drift_bank_ppm": [
+      -9.375,
+      -6.25,
+      -3.125,
+      0.0,
+      3.125,
+      6.25,
+      9.375
+    ],
+    "encoding": "row-major unsigned16 little-endian; one row per complete map",
+    "hardware_qualified": false,
+    "lock_proven": false,
+    "maps": [
+      {
+        "candidate_zero_drift": {
+          "combined_median": 246.0,
+          "combined_score": 387,
+          "drift_bins_per_tile": 0.0,
+          "estimated_frame_period_samples": 20000.0,
+          "estimated_period_error_ppm": 0.0,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.5731707317073171,
+          "peak_to_median_unbounded": false,
+          "phase_bin": 5789,
+          "phase_bin_center_sample": 5789.0,
+          "phase_bin_start_sample": 5789,
+          "robust_z": 4.5287236707714245,
+          "robust_z_unbounded": false,
+          "tile_count": 1
+        },
+        "canonical_full_fft_dependency_start_index": 20000,
+        "canonical_full_fft_dependency_stop_index": 1300273,
+        "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+        "map_index": 0,
+        "source_full_fft_and_fir_dependency_start_index": 33254,
+        "source_full_fft_and_fir_dependency_stop_index": 2167201,
+        "start_sample_index": 20000,
+        "stop_sample_index": 1300000
+      }
+    ],
+    "period_step_ppm": 3.125,
+    "phase_bin_samples": 1,
+    "shape": [
+      1,
+      20000
+    ],
+    "three_map_existing_epoch_gates_pass": false,
+    "tile_frames": 64
+  }
+}

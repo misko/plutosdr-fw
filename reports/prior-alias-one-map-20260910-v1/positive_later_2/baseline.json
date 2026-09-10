@@ -1,0 +1,196 @@
+{
+  "branch": {
+    "cfo_hz": 0.0,
+    "kind": "uncorrected_baseline",
+    "name": "baseline"
+  },
+  "corrected_input_ci16_sha256": "ad216c12600110f19b77531251d58a066fd29cddece9b5c75c373977e051a699",
+  "derotation_saturations": 0,
+  "frozen_score_prefix_bit_identical": true,
+  "full_fft_source_support": {
+    "canonical_bounds": [
+      555000000,
+      556280273
+    ],
+    "original25_full_support_bounds": [
+      924999920,
+      927133867
+    ],
+    "original25_support_seconds": 0.08535788
+  },
+  "input_ci16_sha256_before_correction": "ad216c12600110f19b77531251d58a066fd29cddece9b5c75c373977e051a699",
+  "map": {
+    "artifact": {
+      "bytes": 40000,
+      "path": "/tmp/starlink-coarse-alternatives.Y3JzOI/narrow-coarse/reports/prior-alias-one-map-20260910-v1/positive_later_2/baseline.maps.u16le",
+      "sha256": "81668cf901a141ce23dc7e51c7a65c01581dbf9dc70469c2ff98a84700d5344c"
+    },
+    "bounded_search_maximum_ppm": 10.0,
+    "combined_candidate": {
+      "combined_median": 257.0,
+      "combined_score": 402,
+      "drift_bins_per_tile": -12.0,
+      "estimated_frame_period_samples": 19999.8125,
+      "estimated_period_error_ppm": -9.37499999997815,
+      "passes_existing_epoch_gates": false,
+      "peak_to_median": 1.5642023346303502,
+      "peak_to_median_unbounded": false,
+      "phase_bin": 4535,
+      "phase_bin_center_sample": 4535.0,
+      "phase_bin_start_sample": 4535,
+      "robust_z": 4.252224353222013,
+      "robust_z_unbounded": false,
+      "tile_count": 1
+    },
+    "discarded_leading_scores": 0,
+    "discarded_trailing_scores": 0,
+    "drift_bank_bins_per_tile": [
+      -12.0,
+      -8.0,
+      -4.0,
+      0.0,
+      4.0,
+      8.0,
+      12.0
+    ],
+    "drift_bank_ppm": [
+      -9.375,
+      -6.25,
+      -3.125,
+      0.0,
+      3.125,
+      6.25,
+      9.375
+    ],
+    "encoding": "row-major unsigned16 little-endian; one row per complete map",
+    "hardware_qualified": false,
+    "lock_proven": false,
+    "maps": [
+      {
+        "candidate_zero_drift": {
+          "combined_median": 257.0,
+          "combined_score": 402,
+          "drift_bins_per_tile": 0.0,
+          "estimated_frame_period_samples": 20000.0,
+          "estimated_period_error_ppm": 0.0,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.5642023346303502,
+          "peak_to_median_unbounded": false,
+          "phase_bin": 4535,
+          "phase_bin_center_sample": 4535.0,
+          "phase_bin_start_sample": 4535,
+          "robust_z": 4.252224353222013,
+          "robust_z_unbounded": false,
+          "tile_count": 1
+        },
+        "canonical_full_fft_dependency_start_index": 555000000,
+        "canonical_full_fft_dependency_stop_index": 556280273,
+        "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+        "map_index": 0,
+        "source_full_fft_and_fir_dependency_start_index": 924999920,
+        "source_full_fft_and_fir_dependency_stop_index": 927133867,
+        "start_sample_index": 555000000,
+        "stop_sample_index": 556280000
+      }
+    ],
+    "period_step_ppm": 3.125,
+    "phase_bin_samples": 1,
+    "shape": [
+      1,
+      20000
+    ],
+    "three_map_existing_epoch_gates_pass": false,
+    "tile_frames": 64
+  },
+  "model_overflow_blocks": 0,
+  "numerical_qualification_pass": true,
+  "offline_processing_seconds": 3.8206570899346843,
+  "one_map_exploratory_candidate": false,
+  "production_status": "insufficient_integration",
+  "rf_truth": false,
+  "score_count": 1280000,
+  "score_sha256": "8f9c9833741f8979850f28465a53db3a21f56e2f062a7eefc223f48b430d8503",
+  "scrambled_control": {
+    "artifact": {
+      "bytes": 40000,
+      "path": "/tmp/starlink-coarse-alternatives.Y3JzOI/narrow-coarse/reports/prior-alias-one-map-20260910-v1/positive_later_2/baseline.frame-scrambled.maps.u16le",
+      "sha256": "fbeccd62f279283b45af085cb3839da98718cc1f1e54de30c92c3d5971380292"
+    },
+    "bounded_search_maximum_ppm": 10.0,
+    "combined_candidate": {
+      "combined_median": 258.0,
+      "combined_score": 405,
+      "drift_bins_per_tile": -12.0,
+      "estimated_frame_period_samples": 19999.8125,
+      "estimated_period_error_ppm": -9.37499999997815,
+      "passes_existing_epoch_gates": false,
+      "peak_to_median": 1.569767441860465,
+      "peak_to_median_unbounded": false,
+      "phase_bin": 7687,
+      "phase_bin_center_sample": 7687.0,
+      "phase_bin_start_sample": 7687,
+      "robust_z": 4.506824620139068,
+      "robust_z_unbounded": false,
+      "tile_count": 1
+    },
+    "discarded_leading_scores": 0,
+    "discarded_trailing_scores": 0,
+    "drift_bank_bins_per_tile": [
+      -12.0,
+      -8.0,
+      -4.0,
+      0.0,
+      4.0,
+      8.0,
+      12.0
+    ],
+    "drift_bank_ppm": [
+      -9.375,
+      -6.25,
+      -3.125,
+      0.0,
+      3.125,
+      6.25,
+      9.375
+    ],
+    "encoding": "row-major unsigned16 little-endian; one row per complete map",
+    "hardware_qualified": false,
+    "lock_proven": false,
+    "maps": [
+      {
+        "candidate_zero_drift": {
+          "combined_median": 258.0,
+          "combined_score": 405,
+          "drift_bins_per_tile": 0.0,
+          "estimated_frame_period_samples": 20000.0,
+          "estimated_period_error_ppm": 0.0,
+          "passes_existing_epoch_gates": false,
+          "peak_to_median": 1.569767441860465,
+          "peak_to_median_unbounded": false,
+          "phase_bin": 7687,
+          "phase_bin_center_sample": 7687.0,
+          "phase_bin_start_sample": 7687,
+          "robust_z": 4.506824620139068,
+          "robust_z_unbounded": false,
+          "tile_count": 1
+        },
+        "canonical_full_fft_dependency_start_index": 555000000,
+        "canonical_full_fft_dependency_stop_index": 556280273,
+        "dependency_scope": "whole 512-input BFP blocks plus centered 481-tap 75MHz FIR support",
+        "map_index": 0,
+        "source_full_fft_and_fir_dependency_start_index": 924999920,
+        "source_full_fft_and_fir_dependency_stop_index": 927133867,
+        "start_sample_index": 555000000,
+        "stop_sample_index": 556280000
+      }
+    ],
+    "period_step_ppm": 3.125,
+    "phase_bin_samples": 1,
+    "shape": [
+      1,
+      20000
+    ],
+    "three_map_existing_epoch_gates_pass": false,
+    "tile_frames": 64
+  }
+}
