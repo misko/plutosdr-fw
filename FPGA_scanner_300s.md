@@ -59,7 +59,9 @@ output and literal veto logic. All216 other fields agree. The narrowly qualified
 payload observer now passes29 independent parent tests, including valid-status
 fault and same-edge publication checks. The baseline actual run reproduces
 both complete historical CSVs but fails later in an added fault epoch; a
-stimulus/checker same-time race is under read-only diagnosis. The original
+stimulus/checker same-time hazard was identified. The phase-aware added-stimulus
+correction passes53 independent parent tests; one frozen actual baseline retry
+is running, without any original assertion changes. The original
 raw217 failure remains retained and no candidate is promoted.
 A separate one-stage operand-register prototype targets the
 BRAM-to-DSP path with explicit added latency and offline qualification. Its
@@ -77,8 +79,8 @@ tests, including exact token math and held-overflow ownership checks. Parent
 verified all5850 archived files and31 frozen sources. Its zero-frame bank test
 interface is synthetic, not vendor FFT evidence. Actual-FFT preparation is the
 next isolated step; no new complete-bank routing or runtime promotion has
-occurred. The control test-stimulus correction remains offline after its first
-attempt exposed a low-phase early-publication boundary; old assertions remain.
+occurred. The control test-stimulus correction now handles the low-phase
+early-publication boundary found in its first attempt; old assertions remain.
 
 The30MS/s common-source offline cohort is frozen and independently verified.
 A new explicit30-upper bank+STOP public interface remains isolated/offline;
@@ -94,7 +96,10 @@ scores/447 map words,260 native capture samples,129 raw tuples and512 pilot
 outputs. Parent independently reran the frozen verifiers and checked all636
 run-file hashes. Native capture overlaps actual FFT consumption and refinement
 survives coarse STOP. This is healthy30-upper447x2 simulation only;343 geometry,
-negative cases and runtime promotion remain open. Actual60 bank/native/pilot
+negative cases and runtime promotion remain open. The new343/late case packages
+pass253 independent parent tests and652 agent regressions with unchanged
+original447 inputs; one actual healthy343 run is authorized after archival.
+Actual60 bank/native/pilot
 integration remains open. Latest
 source-specific decisions and measurements:
 [`reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md`](reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md).
