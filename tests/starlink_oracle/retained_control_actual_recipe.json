@@ -1,0 +1,15 @@
+{
+  "kind": "retained-control-candidate-actual-preparation-v1",
+  "qualified_manifest_sha256": "c3936f7e8552d7d377ca1e6fc5ba220d0667b68d00a24e24f524de33e75cbae8",
+  "original_recipe_sha256": "ba063c99010f1a43d64db52fb9fd86e040b499a0730d70714f74a507e5b3a94e",
+  "candidate_hdl": "468cb764071163cd07aabddec7e672fd339a7801",
+  "options": {"PRIVATE_DESCRIPTOR_OFFER": 1, "CLOSED_INPUT_CUTOVER": 1},
+  "contexts": ["H0", "H1", "H2", "H4", "H5", "R1", "R2"],
+  "unchanged": ["all original runtime outside four explicitly substituted candidate files", "all vectors and numerical lanes and packing", "175/100 ideal clock phases", "causal frame and complete numerical row time joins", "all original service and watchdog bounds", "all original arithmetic/input/retirement shadows", "unconditional 136-bit forward shadow and both original guard state shadows"],
+  "reference_binding": "All three original guard completed_input_fault_now inputs receive the literal original unrestricted completed-input expression; never the candidate reduced expression.",
+  "witness": {"flags": 1, "accepted_jobs": 40, "forward_accepted": 21, "inverse_accepted": 19, "forward_real_ack": 19, "inverse_real_ack": 17, "complete_final_inputs": 38, "owner_receipts": 2, "proof_receipts": 1, "marker_total": 44},
+  "proof": ["accepted same-edge descriptor and known-one private offer", "active/parked/real-ACK-edge descriptor retention", "pre-final complete certificate zero", "pre-edge and settled post-edge known-complete implies both certified input strobes exactly zero and full/restricted predicates equal", "all three public return paths require known-complete and original full completed-input predicate clear"],
+  "acceptance": "Unchanged original verifier on original complete log and CSV, followed by exact new marker inventory and joins. No migrated or synthesized legacy evidence. Actual execution remains separately authorized.",
+  "scope": "Seven available-bank-source contexts only; not continuous15/native60/lower-clock/causal/RF/physical qualification. Private descriptor changes are non-authoritative before real admission. Known-one public visibility is explicit candidate-only X/Z fail-closed tightening.",
+  "execution_authorized": false
+}
