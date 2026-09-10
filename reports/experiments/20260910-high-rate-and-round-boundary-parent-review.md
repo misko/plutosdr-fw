@@ -1243,6 +1243,19 @@ Read-only next-path/combination diagnosis is authorized, no new RTL/physical run
 Synthesis archive134regularmembers independently verified,24033138bytes, SHA
 `5ea5d69dade968670665c8773eec48cc55fe55a7ac95490e50f2de695c41dd07`;
 FWe7142938e097cfeb22c7ce38f409023e3fc66739 pushed (root72369terminal0).
+Parent subsequently read the complete route report and verified28 safe regular
+archive members,5472969bytes, SHA256
+`dac5af7b24c94615fc3cffd2e4c83ae0ccfd632b0a51b8d3fda76194a7d6c5c0`.
+Route package FW2d050cea9e5769681911c7c3e1d86420c65f837f retains unchanged HDL.
+After reading the complete input guard, parent authorized an OFFLINE default-off
+local first-admission CE candidate: capture only job_started/descriptor with
+!protocol_fault&&job_start&&!job_started inside the existing reset branch.
+slot_open already requires job_started, so pre-admission framing/delivery faults
+are closed; duplicate starts still prevent any second capture. This is a proposed
+exact predicate factorization, not a delayed fault check or speculative descriptor.
+All other fault/certificate/cursor/complete equations must remain literal, with
+full old-field/transition/X-Z/reset/mutation proof before any actual or physical
+execution. D/S/CDC branches are not combined by this authorization.
 
 ## Per-cause CDC offline recurrence reviewed
 
@@ -1302,3 +1315,11 @@ pilot/coefficient/support tests are included. No actual paired FFT/native/PIL1
 composition, live profile switching, host/kernel1.8 admission or deployment is
 proved. Portable archive/report publication and next combined-harness preparation
 remain in progress; no actual vendor simulation is authorized for this source yet.
+Tested runtime/source pins f16dc564/6e561ee5 are now pushed to the60 DO NOT MERGE
+remotes (root51007/98657terminal0). Parent authorized OFFLINE additive combined60
+harness/preparer/strict oracle work using the unchanged69 numerical artifacts,
+original native command/service limits, explicit two disabled prime beats and no
+added source tail. Full257 native drainage,512 pilot outputs,447x2 coarse STOP,
+every visible FFT/score boundary and measured clock-level overlap are required.
+Historical30 benches and native arithmetic stay untouched. This authorization
+does not include actual FFT execution, host/kernel ABI1.8 or radio access.
