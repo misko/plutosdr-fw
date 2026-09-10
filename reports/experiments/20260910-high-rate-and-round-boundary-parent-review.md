@@ -691,3 +691,62 @@ are fixed outside native capture before evaluation. No new runtime profile,
 native60 service budget, actual FFT, RF accuracy or causal acquisition is claimed.
 Primary runtime, radios and PPU remain unchanged; full-bank setup still fails
 at-1.907ns. Hardware qualification and .18-before-.17 deployment remain open.
+
+## Actual arithmetic pair: numerical prefix verified, full runs FAIL
+
+Both original arithmetic handles terminate exit1: baseline44608 and candidate34776,
+Vivado exits08:42:39/08:42:40UTC. Parent read both original simulate.log failures:
+epoch14 PAYLOAD_PRODUCT_OUTPUT_MISMATCH, baseline old-shadow line72 at1261662920227fs,
+candidate elastic-shadow line124 at1261765777375fs. This epoch deliberately forces
+the bank product-overflow net; it follows the nominal/stalled and earlier fault
+epochs. The wrapper's wire output versus the old core's register output may alter
+what a hierarchical force exposes to the comparison monitor. That is a hypothesis
+requiring independent diagnosis, not an established testbench defect or a pass.
+Original assertions, source freezes and failures remain intact; no retry is
+authorized. The agent is archiving both runs and may perform read-only saved-waveform
+analysis plus a separate offline force-propagation reproduction.
+
+Parent independently ran each frozen helper's verify_events on its recorded event
+CSV. Both complete nominal/stall event sets pass19456 ordered words per transform
+stream and16986 output-derived oracle-only scores. Baseline event SHA256:
+`e475315242f059b6c38166bc858e21b1b302f17b8b36f9513b3a53263e452b97`;
+candidate event SHA256:
+`7bbe79fd2648984f0901296d69c1e168cac400426eb2642e91e24ff3815803f3`.
+This prefix evidence does not satisfy the incomplete fault suite, original full
+baseline CSV gate or full-run terminal contract. Both results.json files are absent;
+the runner reports original failure with after-integrity success. No routed
+timing, bank throughput, scorer RTL or deployment qualification follows.
+
+## Upper60 common-source numerical cohort independently repeated
+
+Parent read the full465-line numerical helper, final tests/CLI and unchanged
+pre-evaluation recipe. The separate x2 FIR stages use independent convolution
+and per-stage rounding, checked against streaming x4 conditioning. Native257
+integer tuples independently match the fixed correlation contract; coefficient
+packing is checked separately from sample packing. Explicit18-bit C-model calls
+reproduce the existing conditioned60 kernel and all seven blocks' forward,
+product/inverse words and BFP exponents without changing global model width.
+Wrong30 kernel/energy, wrong native66/132 geometry, component swaps, missing
+halos, flattened single-round cascade and corrupted receipts/goldens are tested.
+All26 native packet words and every coarse input/index/energy/map word are checked.
+
+Independent final256-test repetition passed in16.94s, original55259 exit0,
+retained at `/tmp/starlink-highrate60-cohort-parent.sQf2cv`. Parent then executed
+the immutable v2 source_snapshot CLI's full rederivation: all69 numerical files
+PASS. The v2 cohort is at the high-rate60-paired worktree's
+`build/high-rate60-offline-v2/cohort`, source signature
+`c56f812b79f5bb8d5b60bc70af43ad0b5f1579e5af0e74dd8516fabeb2237c0a`, cohort hash
+`6de2f3645459f8649d8fee127e479991fb1cc55b75001a37c763223e716b4dfa`.
+All69 numeric files remain identical to v1; added tests change source closure,
+not recipe or numerical acceptance. Numerical stages16423→8205→4096 have zero
+clips; coarse3129 scores use conditioned60 Eh1073765335. Native264-tap Eh1073758594,
+520 capture samples,257 raw/241 qualified tuples, known winner0 and power
+1152957518188856836 are exact deterministic-fixture results. Pilot512 selected
+outputs have raw support[34359735227,34359749686), step24; full683 offline outputs
+and90 initial unsupported outputs do not predict hardware auto-stop counts.
+
+Archival/pins remain in progress. The next stage is offline preparation of a
+native60 service probe with a genuinely60MHz sample clock and declared admission,
+capture, compute and release bounds BEFORE measuring service. The old generic
+native bench's #7 clock is not a60MHz source. No actual60 simulation, continuation
+tail, public profile admission or routing is authorized by the numerical result.

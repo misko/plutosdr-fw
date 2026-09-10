@@ -80,9 +80,13 @@ tests, including exact token math and held-overflow ownership checks. Parent
 verified all5850 archived files and31 frozen sources. Its zero-frame bank test
 interface is synthetic, not vendor FFT evidence. Final actual-FFT preparation
 now passes180 independent parent tests, including failed-run integrity and
-delayed success-receipt publication. The175 baseline/candidate pair is authorized
-from separate frozen v2 profiles; no result or new complete-bank routing is
-claimed yet. The control R1/D1/S1 settings-only freeze passes94 independent
+delayed success-receipt publication. The175 baseline/candidate actual pair both
+terminate with PAYLOAD_PRODUCT_OUTPUT_MISMATCH during the deliberate epoch14
+product-overflow injection. Parent independently verifies their preceding
+19456 ordered words/stream and16986 output-derived oracle scores each, but both
+full runs remain FAIL. Wrapper force/monitor visibility is under diagnosis;
+no checker bypass, retry or new complete-bank routing is authorized.
+The control R1/D1/S1 settings-only freeze passes94 independent
 parent tests and its single175 actual run is also authorized. Neither branch
 is promoted. The control test-stimulus correction now handles the low-phase
 early-publication boundary found in its first attempt; old assertions remain.
@@ -115,6 +119,10 @@ source-specific decisions and measurements:
 [`reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md`](reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md).
 The separate60 sample-support contract is now tested:16423 raw samples map to
 4096 canonical samples, with520-sample native capture and exact pilot support.
+The new upper60 common-source numerical cohort also passes256 independently
+repeated tests and full frozen-helper rederivation of all69 numerical artifacts:
+seven coarse blocks,264-tap native257 raw/241 qualified tuples and512 pilot outputs.
+This remains offline arithmetic, not actual60 composition or a service bound.
 Its39 new tests plus unchanged30/60 golden regressions pass132 tests. This is
 coordinate preparation only, not a60 common-source numerical or hardware pass:
 [`reports/experiments/20260910-high-rate60-support-contract.md`](reports/experiments/20260910-high-rate60-support-contract.md).
