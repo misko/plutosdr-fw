@@ -1,5 +1,9 @@
 # Offered-input fault summary: actual FFT PASS, physical gate open
 
+Subsequent source-matched routing completes but still fails at-2.504ns setup
+slack. See [physical results and remaining path](20260910-retained-summary-physical-parent.md).
+The preparation-next statements below retain earlier development history.
+
 The next retained candidate is additive and default-off. It separates the
 common fault summary from repeated certificate-derived fault expressions.
 Actual input certification, counters, detailed guard faults, state recurrences,

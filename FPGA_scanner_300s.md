@@ -4,6 +4,15 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+The offered-summary candidate now completes source-matched synthesis and route,
+but timing still FAILS: **WNS-2.504ns**,TNS-829.822ns,679 failing setup endpoints.
+This improves from-2.697ns/848 endpoints, without closing timing. Hold+0.049ns
+passes;7253 nets route with0 errors. Independent77 physical-preparation tests
+pass. Worst paths now start in epoch release or held-phase state and traverse
+destination/preflight/fault/admission logic. Source-bound review of that path is
+next; no radio deployment is authorized by this result.
+See [summary physical result and remaining critical path](reports/experiments/20260910-retained-summary-physical-parent.md).
+
 The next retained offered-input fault-summary candidate passes parent **51 tests**
 (6.96s),50 source pins unchanged. It includes the six scripted compositions,
 real-input/XZ premises, old guard shadows and bounded current-fault/ACK module
@@ -13,8 +22,8 @@ unchanged. Actual vendor FFT replay now PASSES: root84113 exit0 in59.09s,
 all77953 CSV rows byte-identical to the preceding accepted actual run, and the
 complete old parsed result unchanged apart from the additive summary evidence.
 Independent67 preparation tests pass with116 source pins and120 prepared files
-unchanged. Independent60 physical-preparation tests pass, but the new candidate
-has not yet been synthesized or routed. A separate proposed pulse-only
+unchanged. Independent60 initial physical-preparation tests pass; the subsequent
+bound77 and physical result are recorded above. A separate proposed pulse-only
 write-side change is rejected by a concrete premature-ACK counterexample.
 This is seven-context actual FFT qualification, not continuous RX or timing closure.
 See [initial parent checks and explicit coverage limits](reports/experiments/20260910-retained-offer-summary-parent.md).
@@ -67,8 +76,8 @@ descriptor register enable; other reported paths reach kernel-ROM enables.
 This is worse than earlier P1 (-1.492 ns), not a release candidate. Five
 critical CDC findings and real 175 MHz board-clock integration remain open.
 
-Next: source-matched synthesis/routing of the actual-qualified fault-summary
-refactor, then physical closure and full receiver/continuous
+Next: measured destination/preflight/admission-path restructuring,
+then physical closure and full receiver/continuous
 acquisition/IIO/board qualification before `.18`→`.17` deployment. No radio
 operation or production HDL gitlink promotion. See
 [physical failure and targeted next changes](reports/experiments/20260910-retained-physical-parent-review.md)
