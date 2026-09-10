@@ -1,0 +1,23 @@
+{
+  "kind": "retained-output-first-actual-proposal-v1",
+  "proposal_sha256": "8aad40607839aa002bd5c248cffad28f826523de8139430829b4761d1f982c1a",
+  "runtime_hdl": "2e8a7de221889084ea58cc6c44dd9a8407c56c9f",
+  "frozen46_manifest_sha256": "a4dfa8d603d1d7782b51106c6224a3dc6dfbc67d07e241abac8d7c390f83aeb8",
+  "clocks": {"precision_fs": 1, "fast_half_fs": 2857143, "slow_half_fs": 5000000, "slow_offset_fs": 1300000},
+  "options": {"ENABLE_RETAINED_OUTPUT": 1, "REGISTERED_SCHEDULING": 1, "BOUNDARY_ROUND_SAT": 1, "REGISTER_OPERANDS": 1, "LOCAL_FIRST_ADMISSION": 1},
+  "contexts": [
+    {"id": "H0", "stall": 0, "reset_side": 0},
+    {"id": "H1", "stall": 1, "reset_side": 0},
+    {"id": "H2", "stall": 2, "reset_side": 0},
+    {"id": "H4", "stall": 4, "reset_side": 0},
+    {"id": "H5", "stall": 5, "reset_side": 0},
+    {"id": "R1", "stall": 0, "reset_side": 1},
+    {"id": "R2", "stall": 0, "reset_side": 2}
+  ],
+  "geometry": {"windows_per_context": 3, "words_per_window": 512, "sample_hop": 447, "underlying_samples": 1406, "metadata_first": 1000},
+  "inventory": {"source": 10752, "forward_admissions": 21, "inverse_admissions": 19, "aborted_forward_prefixes": 2, "complete_pairs": 19, "forward": 9728, "product": 9728, "inverse": 9728, "slow_read": 8704, "raw_output": 19456, "status": 38, "old_unread_reset_discard": 1024},
+  "timing": {"config_from_admit": 3, "input_span": 513, "input_last_to_raw_first": 781, "raw_last_from_admit": 1809, "publication_from_admit": 1810, "status_raw_ordinal": 2, "eligible_next_forward_dispatch": 8},
+  "limits": {"whole_fast": 1500000, "drain_fast": 25000, "active_watchdog_fast": 8192, "healthy_after_drain_fast": 20, "ready_profiles_service_fast": 5215, "minimum_reset_samples": 2, "aborted_input_prefix_minimum": 64},
+  "scope": "ideal175/100; seven sequential contexts; burst available bank source; no continuous15/native60/lower-clock/415-vendor/RF/physical claim",
+  "execution_authorized": false
+}
