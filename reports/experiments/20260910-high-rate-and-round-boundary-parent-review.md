@@ -29,6 +29,15 @@ producer must remain immutable when runtime sources change: verify it from
 its archived source snapshot and independently bind the reviewed DUT delta.
 Do not regenerate golden arithmetic merely to absorb a public ABI change.
 
+After direct wrapper/PSMA identity-source review, parent authorized isolated
+Stage A implementation/offline tests only: new30-upper bank+STOP ABI1.7,
+capabilities0x7ff, DDC0x000f0203/delay7, explicit default-off bank selector and
+exact pilot/shared/realtime/bank/STOP combination. Preserve all old profiles.
+New-mode health includes0x77ff plus DDC discontinuity, coherent high words and
+retained-map failure semantics. Actual FFT,60/lower admission, Linux edits,
+receiver BD/build, physical or radio work are not authorized by this stage.
+Return the driver delta proposal and module/offline evidence before advancing.
+
 ## Separate rounding candidate: real local physical improvement, not closure
 
 Root created FW/HDL `codex/starlink-rx-only-do-not-merge-round-boundary` under
