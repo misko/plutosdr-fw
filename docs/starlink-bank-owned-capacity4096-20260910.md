@@ -102,3 +102,17 @@ with its top Vivado log/journal moved inside that same evidence directory after
 completion. The detector RTL and original generated FFT remain byte-identical to
 the preceding exact numerical study; only the capacity runner was parameterized.
 All 101 unit tests and Ruff were rerun successfully after collection.
+
+### Source scope versus the later primary tree
+
+The completed soak is an exact-source replay of the frozen bank-owned numerical
+v3 detector/core described above, **not an exact-source 4096-block replay of the
+later primary HDL `9759cf12`**. Parent's independent comparison found 17 of the 18
+runtime RTL files byte-identical to that primary tree. The exception is
+`starlink_pss_realtime_result_guard.v`: primary includes an earlier, default-off
+`USE_IDLE_MAILBOX_FAULT` parameter/port/idle-predicate addition that is absent from
+this frozen soak. The bank-owned caller does not opt into that addition, but a
+default-off source difference is still a source difference; functional similarity
+does not establish an exact primary-source replay. No rerun or retrospective
+promotion of this receipt is implied. The numerical-v3 byte-identity claim and
+the original frozen hashes remain unchanged.
