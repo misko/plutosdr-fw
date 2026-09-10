@@ -1,0 +1,13 @@
+{
+  "scope": "syntax/elaboration only; missing generated FFT ignored by -i; NO actual core simulation",
+  "parameters": [
+    "MAP_BINS=447",
+    "USE_BANK_OWNED_XFFT=1",
+    "FAST_MHZ=175",
+    "NATIVE_OFFSET=520",
+    "NATIVE_TRUE_PSS=1"
+  ],
+  "syntax_returncode": 3,
+  "syntax_stdout": "",
+  "syntax_stderr": ":0: error: Cannot override parameter `NATIVE_OFFSET` in `tb_starlink_bank_native_expired`. Parameter cannot be overridden in the scope it has been declared in.\n:0: error: Cannot override parameter `NATIVE_TRUE_PSS` in `tb_starlink_bank_native_expired`. Parameter cannot be overridden in the scope it has been declared in.\n3 error(s) during elaboration.\n"
+}
