@@ -96,15 +96,21 @@ def output_reads(clocks, profile, publication, ready=None):
         ready = lambda s: profile == 0 or s % 17 < 13
     s = clocks.next_slow(clocks.fast(publication)) + 4
     accepted = []
-    for _ in range(25_000):
+    # Defensive OFFLINE cap in FAST clocks, anchored here at publication.
+    # The original bench's same numeric drain limit starts at await_results,
+    # so this per-bank bound is NOT a replay of that whole-bench deadline.
+    stop_fs = clocks.fast(publication + recipe()["unchanged_bench_drain_fast_cycles"])
+    while clocks.slow(s) < stop_fs:
         if ready(s):
             accepted.append(s)
             if len(accepted) == 512:
                 break
         s += 1
     require(len(accepted) == 512, "reader did not drain within unchanged bounded observation")
+    ack = clocks.next_fast(clocks.slow(accepted[-1])) + 2
+    require(ack <= publication+25_000, "reader ACK exceeds offline fast-cycle cap")
     return {"first_read_slow": accepted[0], "last_read_slow": accepted[-1],
-            "ack_observed_fast": clocks.next_fast(clocks.slow(accepted[-1])) + 2}
+            "ack_observed_fast": ack}
 
 
 def read_actual(trace, log):
@@ -205,7 +211,7 @@ def reconstruct(epochs, markers):
                 require(f["admit"] == max(previous["ack_observed_fast"]+7,
                                          source["source_visible_fast"]+2), "original dispatch replay")
             else:
-                source["source_ready_observed_fast"] = None
+                source["source_ready_observed_fast"] = data["source_ready"][0]
                 require(f["admit"] == source["source_visible_fast"]+2, "initial dispatch")
             read = output_reads(clocks, profile, ip)
             require(read["first_read_slow"] == markers[e,b,"OUTPUT_START"] and

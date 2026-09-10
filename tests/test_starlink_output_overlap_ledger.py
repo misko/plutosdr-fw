@@ -154,6 +154,18 @@ def test_arbitrary_reader_stall_is_not_hidden_without_bound():
     assert late["ack_observed_fast"] > 4582+8+1810+17
 
 
+@pytest.mark.parametrize("mhz", [125,175])
+def test_offline_reader_cap_uses_fast_not_slow_domain(mhz):
+    c = Clocks(mhz); publication = 4582
+    # Last accepted slow edge that still permits a pre-edge ACK observation
+    # by publication+25000; this independently accounts the two fast sync FFs.
+    last = c.next_slow(c.fast(publication+25_000-2))-1
+    allowed = output_reads(c, 0, publication, ready=lambda s: s >= last-511)
+    assert allowed["ack_observed_fast"] <= publication+25_000
+    with pytest.raises(ValueError):
+        output_reads(c, 0, publication, ready=lambda s: s >= last-510)
+
+
 def test_naive_phase_and_orphan_issuer_counterexamples():
     # Exact Boolean leaves from frozen issuer 8ad9c2e7, not RTL execution.
     producer = certificate = 0; published = reader = final_taken = 1
