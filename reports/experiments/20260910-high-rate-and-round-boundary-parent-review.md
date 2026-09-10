@@ -299,3 +299,62 @@ This is not an ARM/network arbitration bound or causal acquisition proof.
 The additive combined30 harness remains offline-only pending full source and
 provenance review; no actual FFT, physical receiver, radio or PPU work is
 authorized by this budget result. Full15/30/60 deployment gates are unchanged.
+
+## Corrected operand A/B routed: mapping proven, not bank closure
+
+Parent reviewed the subprocess-only delta and independently repeated60 tests
+(6403,2.82s), retaining `/tmp/starlink-operand-env-parent.6WORFY` with explicit
+basetemp/log/XML. Both child tools omit LD_LIBRARY_PATH while the parent keeps
+it; inverse-diff verifies that only the two exec prefixes changed. All six live
+hashes and archive SHA match the frozen report at operand FW881a838570 /
+HDLf7345ab655. Preparation archive SHA256:
+`19bea65015daa7e7f0c2528b83da70ec75030e3011f58a9436a76b60cdb9a533`.
+
+Exactly two new source-frozen v2 physical runs were authorized. Original2548
+(REGISTER0) and30333 (REGISTER1) completed exit0 at07:23:10/11 UTC. Parent read
+the generated synthesis and route inventories, timing text, CE drivers and
+route status, and verified all six synth/opt/route checkpoint hashes. Results
+are isolated at the same175MHz constraints, D18 and ROUND1:
+
+| Measurement | REGISTER0 | REGISTER1 |
+| --- | ---: | ---: |
+| DSPs; AREG/BREG on each of four | 4;0/0 | 4;1/1 |
+| Routed LUTs / fabric FFs | 62 /278 | 59 /358 |
+| All-path setup slack, ns | +0.207 | +0.085 |
+| Internal setup slack, ns | +0.964 | +0.441 |
+| All-path hold slack, ns | -0.685 | -0.685 |
+| Internal hold slack, ns | +0.103 | +0.152 |
+| Negative hold endpoints, all from top ports | 176 | 272 |
+| Fully routed nets / routing errors | 398 /0 | 494 /0 |
+
+The extra operand state is absorbed into DSP input registers;80 extra fabric
+FFs hold metadata/valid. Routed A2/B2 clock enables connect to the registered
+operand payload enable; A1/B1 are tied low for the one-register configuration.
+MREG/PREG configuration stays unchanged. This proves the intended input-register
+mapping in isolation, not improved bank timing: isolated setup margin actually
+decreases, and both designs still fail all-path hold. The OOC missing-partition-
+pin-location warnings and top-port timing limitations are retained, not waived.
+Neither arm includes the actual upstream kernel BRAM or complete receiver.
+
+Route DCP SHA256 REGISTER0:
+`f1288c1f9d439614840f94df9bd2d5306dee7fa7ea1b8e78d48538b51272c5b1`;
+REGISTER1:
+`f5e6ecba7d57d5ea6963a90e8f1ec3fa353ccca924dc0086c854db5fffd893e2`.
+Full measurement directories remain under operand-boundary
+`hdl/library/starlink_pss_acquisition/build/operand-route-{0,1}-v2`.
+
+Next is a source-specific bank integration proposal, not a receiver route or
+runtime promotion. Preserve the tested dec20 forward-retirement baseline,
+including its PRIVATE_PAYLOAD_BUBBLES parameter: the older standalone arithmetic
+must not overwrite that implementation. Port only the reviewed rounding choice
+and add the operand wrapper with explicit latency. Preserve the bank's held
+`output_overflow` current/sticky/publication vetoes (not just overflow_pulse),
+then requalify owned final words, reset/flush and delayed-fault behavior before
+any bank physical run. The separate qualified-status observer is now authorized
+for offline implementation only, retaining its original raw217 witness and all
+other216 exact fields; no actual control retry is authorized yet.
+
+FW/HDL operand preparation881a838570/f7345ab655 and diagnostic evidence
+f98abdb333/0c1a23a701 have been pushed to their respective experimental branches.
+Parent independently verified all57 diagnostic archive entries. No primary
+runtime, firmware main, PPU or radio change occurred.

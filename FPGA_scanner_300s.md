@@ -60,8 +60,13 @@ payload-comparison proposal is under review, not accepted or rerun. No candidate
 is promoted. A separate one-stage operand-register prototype targets the
 BRAM-to-DSP path with explicit added latency and offline qualification. Its
 first two physical attempts failed before synthesis due to an inherited tool
-library conflict; a subprocess-only environment repair is being tested. No
-operand-stage mapping or timing result exists yet.
+library conflict. A subprocess-only repair passes60 independent parent tests;
+both subsequent isolated routes complete. The new stage maps AREG/BREG1/1 in
+all four DSPs with80 additional fabric FFs and no extra DSP. Internal setup/hold
+are+0.441/+0.152ns, but all-path hold remains-0.685ns from top ports. This is
+input-register inference, not bank timing closure; upstream BRAM and the full
+receiver are absent. Integration must preserve the bank's existing private
+bubble semantics and held-overflow fault/publication fences.
 
 The30MS/s common-source offline cohort is frozen and independently verified.
 A new explicit30-upper bank+STOP public interface remains isolated/offline;
