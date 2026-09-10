@@ -1,0 +1,1343 @@
+{
+  "archive": "20260910-high-rate60-harness-prelaunch-v1.tgz",
+  "bundle_sha256": "b5f7d48a96217691d7a034634d3bdc7006e489066e571d93b00ce2ed5f741714",
+  "bytes": 1927867,
+  "files": {
+    "attempt-v1/junit.xml": {
+      "bytes": 26605,
+      "sha256": "6709ad596a379269a5dea6068f2f86ac81f5d38429abb6b4cd54336ab82883a9"
+    },
+    "attempt-v1/pytest.log": {
+      "bytes": 3197,
+      "sha256": "8b689b284d33ef06b37f1c72ee15755897efe7766bd2ab0747cd5a6b8b0b8163"
+    },
+    "attempt-v2/junit.xml": {
+      "bytes": 52033,
+      "sha256": "ab0f2769f0bb579ea6281e3183c7b6692801c37e106f6af90376d0659fb1ae18"
+    },
+    "attempt-v2/pytest.log": {
+      "bytes": 5191,
+      "sha256": "34404a4e2a851c0e57a1c3df27a50ba3d863b88c3bf65f5d4cfbbdda0aa862c8"
+    },
+    "attempt-v3/junit.xml": {
+      "bytes": 48387,
+      "sha256": "a75701f5292bb7d006e4857ca00917974d9105b0ada35ba67bd74cd369b476bb"
+    },
+    "attempt-v3/pytest.log": {
+      "bytes": 420,
+      "sha256": "f8c7703fb520711978161c9bc9f4495d57a1f6731abdde0a9001dbc0ab6b02b5"
+    },
+    "attempt-v4/junit.xml": {
+      "bytes": 48387,
+      "sha256": "cd8cd832b8a904c3708517111fb2447421a9d754e773c14c191c7b14bb7f7286"
+    },
+    "attempt-v4/pytest.log": {
+      "bytes": 420,
+      "sha256": "59db73de1dc63d47c9354ddca0494221c7fe490e8d5ddf3804072cb75563880d"
+    },
+    "collector.py": {
+      "bytes": 4265,
+      "sha256": "9e93cb3a40ffac6094eaeef4ce8447bb8ac81101bf550503021d31cc513e1476"
+    },
+    "inputs/bundle.json": {
+      "bytes": 58068,
+      "sha256": "b5f7d48a96217691d7a034634d3bdc7006e489066e571d93b00ce2ed5f741714"
+    },
+    "inputs/cohort/block_start_u64.mem": {
+      "bytes": 119,
+      "sha256": "fc54bc171d774411f0cf87b1b21341eb38935d76cdcf687d7c3753031fe92160"
+    },
+    "inputs/cohort/canonical_ci16.mem": {
+      "bytes": 36864,
+      "sha256": "cf33eed371ec41b15af30b063a3680d985e20254b7d753664946449914eaf685"
+    },
+    "inputs/cohort/canonical_index_u64.mem": {
+      "bytes": 69632,
+      "sha256": "13ae470363e12ebaecc0606e445c3bc6eafb9a50e8e1ed7967a63497f5793489"
+    },
+    "inputs/cohort/canonical_raw_center_u64.mem": {
+      "bytes": 69632,
+      "sha256": "3205ef2e81b0e4c38c0bd33e16b2a81e87f30c8af353f38b75c56b5f5ca4c15a"
+    },
+    "inputs/cohort/canonical_raw_support_first_u64.mem": {
+      "bytes": 69632,
+      "sha256": "a35758bd2beffc7f8223af41d4b7728861f8a296fe15cd6f0a8eec314caaeed3"
+    },
+    "inputs/cohort/canonical_raw_support_last_u64.mem": {
+      "bytes": 69632,
+      "sha256": "558275657c9a35d13fdf0e7de99a40406d99df6f09650bcd319c0d15d652d234"
+    },
+    "inputs/cohort/cohort.json": {
+      "bytes": 35124,
+      "sha256": "6de2f3645459f8649d8fee127e479991fb1cc55b75001a37c763223e716b4dfa"
+    },
+    "inputs/cohort/conditioned_coefficients_q15.mem": {
+      "bytes": 594,
+      "sha256": "7e82186286c9316e315e7ad813d71d65e089a95a65c37d7f330fb3900eba79d9"
+    },
+    "inputs/cohort/conditioned_kernel_q17.mem": {
+      "bytes": 5120,
+      "sha256": "7b006bac23a3c58f614728dbfdb17d28bd77defb3d6d0d24aaa76255669c0c67"
+    },
+    "inputs/cohort/ddc30_to15_ci16.mem": {
+      "bytes": 36864,
+      "sha256": "cf33eed371ec41b15af30b063a3680d985e20254b7d753664946449914eaf685"
+    },
+    "inputs/cohort/ddc30_to15_index_u64.mem": {
+      "bytes": 69632,
+      "sha256": "13ae470363e12ebaecc0606e445c3bc6eafb9a50e8e1ed7967a63497f5793489"
+    },
+    "inputs/cohort/ddc30_to15_mixed_s17.mem": {
+      "bytes": 82050,
+      "sha256": "9432d7ea1007a74f1c508a2cba79ac3382c1f01c7a8b19937c565ff04ec76aea"
+    },
+    "inputs/cohort/ddc30_to15_sums_s40.mem": {
+      "bytes": 86016,
+      "sha256": "6908e00602d449cbd83967c767e820777043c89e7764210a6ddb4201ab02e0ba"
+    },
+    "inputs/cohort/ddc60_to30_ci16.mem": {
+      "bytes": 73845,
+      "sha256": "738b0a4d07c6ce5a80b953e2accfc29b8d2f3ace2a7017bfd783c1325aa723d7"
+    },
+    "inputs/cohort/ddc60_to30_index_u64.mem": {
+      "bytes": 139485,
+      "sha256": "84d0c7ee61b6508ae63b69ac805a1fbf08cd52685f51d837756d4a1fb7e7b7c2"
+    },
+    "inputs/cohort/ddc60_to30_mixed_s17.mem": {
+      "bytes": 164230,
+      "sha256": "232b846b738358f69142e647facf051fed2c98d36a49141a2560345927f2d8a4"
+    },
+    "inputs/cohort/ddc60_to30_sums_s40.mem": {
+      "bytes": 172305,
+      "sha256": "87f18701b19b36a2807e1b8a257069415c90aeda8fa82cc1f8ee80b2bb4a02d1"
+    },
+    "inputs/cohort/denominators_u69.mem": {
+      "bytes": 59451,
+      "sha256": "d894b01da43b5a00aff12f1d94598e2533b15717df41c17fdfb1bb99f4986eaf"
+    },
+    "inputs/cohort/energies_u38.mem": {
+      "bytes": 34419,
+      "sha256": "40a19ed7128b5983e0d7679ba8ebc68dd0d49fc089affe1138393bc93fe50001"
+    },
+    "inputs/cohort/fft_input_axi48.mem": {
+      "bytes": 46592,
+      "sha256": "a3b1e32c9f70595bc30ffda5747e47ffb97543bf92e55f3809fa604f2039aa5a"
+    },
+    "inputs/cohort/fft_input_index_u64.mem": {
+      "bytes": 60928,
+      "sha256": "865376cc48e7c71a6b0dc10dd3d6eb7ddcbd241cee490e2e2f8ad489299aa6d5"
+    },
+    "inputs/cohort/fft_input_q17.mem": {
+      "bytes": 35840,
+      "sha256": "86fe67a0663644d88ad2e481616fe579d1543fc1afcbb139817f91b87519c001"
+    },
+    "inputs/cohort/fft_position_u9.mem": {
+      "bytes": 14336,
+      "sha256": "3064492d9df70f358076ca9b58de629db5cbcebd9e67070186806c02cf1b53a2"
+    },
+    "inputs/cohort/forward_exponents.mem": {
+      "bytes": 21,
+      "sha256": "0bdcb41411b0cae781bc8009d6450fa37f8fa832c41dfb618adc4419880249d3"
+    },
+    "inputs/cohort/forward_q17.mem": {
+      "bytes": 35840,
+      "sha256": "4463aa1cb087e8a5096c444faf79a802c9e19e5a724f07b0afa66b73a15467e7"
+    },
+    "inputs/cohort/inverse_exponents.mem": {
+      "bytes": 21,
+      "sha256": "02ac599929687bc2744e70996a7bf2b0308223b3c61b4bf7cb1c4ca97004f0c2"
+    },
+    "inputs/cohort/inverse_q17.mem": {
+      "bytes": 35840,
+      "sha256": "65b58cb4516118ac32c847ad8f987a67d65f2ca8bb0fe4cfb6c0727729800914"
+    },
+    "inputs/cohort/map_343x2_u16.mem": {
+      "bytes": 1715,
+      "sha256": "fca7f63acaa8f024b30449283c7b17c555b2b5b9f9cd9f603b2ea1f8abf00853"
+    },
+    "inputs/cohort/map_447x2_u16.mem": {
+      "bytes": 2235,
+      "sha256": "e9fce09ca610965209dad27b6c0fb0307dc62e81cd1915877c8efe4817a38b8b"
+    },
+    "inputs/cohort/native_all_raw_tuples.json": {
+      "bytes": 67991,
+      "sha256": "5d1e89a428c717ec94922ac79ec6a99b5387e586824559c09666e4dee5b7b5b0"
+    },
+    "inputs/cohort/native_capture_ci16.mem": {
+      "bytes": 4680,
+      "sha256": "6862502734a3cd4bb17d7003f16aa0b2cd76c363d42828fc1ad0b79c5581409b"
+    },
+    "inputs/cohort/native_coefficients_q15.mem": {
+      "bytes": 2376,
+      "sha256": "6aed4f4883fce03982f12af0d28ea9186599daa5564e045cb9bc636c1fef3289"
+    },
+    "inputs/cohort/native_eh_u48.mem": {
+      "bytes": 3133,
+      "sha256": "33ef958cc4b2412f7b21922e2ba918f60d2a75519492e7007a573e419ea056b4"
+    },
+    "inputs/cohort/native_ex_u48.mem": {
+      "bytes": 3133,
+      "sha256": "a0cd635807a5692bd0937508421351dcd446413e3ec87ee7f5c0e5019a6aa029"
+    },
+    "inputs/cohort/native_expected_packet.mem": {
+      "bytes": 234,
+      "sha256": "f12be45865c7bf19b0390f6a6c9f44fe8543888699749284cf070aba961660e5"
+    },
+    "inputs/cohort/native_imag_s48.mem": {
+      "bytes": 3133,
+      "sha256": "76566e0a6dc5b4551da6759ee42887867921640a653cb2009d7c56c955bf19d4"
+    },
+    "inputs/cohort/native_lags_s32.mem": {
+      "bytes": 2169,
+      "sha256": "3a5f3a2bdcea99fb1d6d07cb97bd2145483455d82db7c0155312c31ef98a6bab"
+    },
+    "inputs/cohort/native_power_u96.mem": {
+      "bytes": 6025,
+      "sha256": "eca9203a94bfce728e1309750b99249b9170b7961978113119278a06e02e501e"
+    },
+    "inputs/cohort/native_qualified_u1.mem": {
+      "bytes": 482,
+      "sha256": "bb4fa18cbf53cef62aa566d39b4f784663dd90e47d7a00d78dd40f74741f5378"
+    },
+    "inputs/cohort/native_raw_eh_u48.mem": {
+      "bytes": 3341,
+      "sha256": "b468e964d4dbfc30b433bbd8493fce317f4bae90d770a6ff270e5ea2be6a09fa"
+    },
+    "inputs/cohort/native_raw_ex_u48.mem": {
+      "bytes": 3341,
+      "sha256": "9c3668659ecbe2211c5b56c444055c2867e189ddf213de46012d620599fac7f2"
+    },
+    "inputs/cohort/native_raw_imag_s48.mem": {
+      "bytes": 3341,
+      "sha256": "7b0f0db2b6a387d68e7ced72616be5a0acbde2251799f1959c4cb74e4010c951"
+    },
+    "inputs/cohort/native_raw_lags_s32.mem": {
+      "bytes": 2313,
+      "sha256": "06eb0ef64c42182c7e519a281f11e78ba3ef0578c75feffab22ef35502bfc32e"
+    },
+    "inputs/cohort/native_raw_power_u96.mem": {
+      "bytes": 6425,
+      "sha256": "b79ec32a00f29d36fa874c8856fdfe8655601f389e2d9e2e7450633b57cb00f0"
+    },
+    "inputs/cohort/native_raw_qualified_u1.mem": {
+      "bytes": 514,
+      "sha256": "8025914359e494479c824b00c5766c8b22c07440cf791f279738d3736351020f"
+    },
+    "inputs/cohort/native_raw_real_s48.mem": {
+      "bytes": 3341,
+      "sha256": "28cdca8ee6db1f972952dbde6ee21445794af97adef2f43594e8f7e5c06a670d"
+    },
+    "inputs/cohort/native_raw_saturation_u12.mem": {
+      "bytes": 1028,
+      "sha256": "4582d4c91c81a10a74a8619898932e0a1c6bc1f9052c7cff8948b44140e84511"
+    },
+    "inputs/cohort/native_raw_start_u64.mem": {
+      "bytes": 4369,
+      "sha256": "9fe422826b73bf8906db5705fcc46c80025276431108b3e3d0ae9e0497fd497e"
+    },
+    "inputs/cohort/native_real_s48.mem": {
+      "bytes": 3133,
+      "sha256": "786a912d89c92c5376eebdd0a4b5851822ddde42a20f54ff08dd1cef5c8c58e1"
+    },
+    "inputs/cohort/native_saturation_u12.mem": {
+      "bytes": 964,
+      "sha256": "747274fcd5908f9278ef1f3c7e17fda2855ad85f4e379711672359a5d64748b5"
+    },
+    "inputs/cohort/native_start_u64.mem": {
+      "bytes": 4097,
+      "sha256": "eb1bbcdfe7c9042b37d53feffea3b154db994d386cc7344d292952e53827cf7b"
+    },
+    "inputs/cohort/numerators_u69.mem": {
+      "bytes": 59451,
+      "sha256": "998ce94b3e10da91ee11c50fec8d0a83acc592c21abdfb52a5a51eb5d2124503"
+    },
+    "inputs/cohort/pilot_all_ci16.mem": {
+      "bytes": 6147,
+      "sha256": "17fe7f1abe4f63bac8157e728bf353969a994345ad5cae212e41967cefef502e"
+    },
+    "inputs/cohort/pilot_all_index_u64.mem": {
+      "bytes": 11611,
+      "sha256": "9e89ee064977e53df98704a1dbfa28acfa3a9e7e7f90c97998a7853a04546f16"
+    },
+    "inputs/cohort/pilot_all_support_u1.mem": {
+      "bytes": 1366,
+      "sha256": "21693b1b808a5bf925868e10d0a352ce25dbaed64792d358ef53f0f4d0ce42ae"
+    },
+    "inputs/cohort/pilot_expected.ci16": {
+      "bytes": 2048,
+      "sha256": "6f753571a771b048009e4b52534183c748a925e194f3f4eb792720c02ea75013"
+    },
+    "inputs/cohort/pilot_expected_ci16.mem": {
+      "bytes": 4608,
+      "sha256": "0eccc4e0ab5b3a7b645e882bf8e14f31f1b13412b9e8771440628750b4697400"
+    },
+    "inputs/cohort/pilot_expected_index_u64.mem": {
+      "bytes": 8704,
+      "sha256": "9a863a0b9ae5a71d469cb7a79d3d4424df31e1a40d3236eb5a08471c1ed8c65f"
+    },
+    "inputs/cohort/pilot_half_ci16.mem": {
+      "bytes": 18432,
+      "sha256": "ca0c46ce733f2652c5c5f0b3dbaa6bcf0182e00eb3ce89c21a78839ad28ea30d"
+    },
+    "inputs/cohort/pilot_half_index_u64.mem": {
+      "bytes": 34816,
+      "sha256": "2a54b9b236099d8b95097c141635026ab809fd9022ce162f3fbcb33d4d73c5fd"
+    },
+    "inputs/cohort/pilot_mixed_ci16.mem": {
+      "bytes": 36864,
+      "sha256": "a8f3832f56e176a8e4ac3e0cdba9eabf93e51fd93c8be874bae7b815fb42f1f5"
+    },
+    "inputs/cohort/pilot_raw_support_first_u64.mem": {
+      "bytes": 8704,
+      "sha256": "657504d0dcd7cb1f9ccb3354a507b49ea10331619b12c2eb165a6ea37e35cfad"
+    },
+    "inputs/cohort/pilot_raw_support_last_u64.mem": {
+      "bytes": 8704,
+      "sha256": "8ea43907bc5a279600f0c990ae30fe4ee2c3b7cecac27042a0d72aca349ebdf0"
+    },
+    "inputs/cohort/power_shift_u7.mem": {
+      "bytes": 21,
+      "sha256": "3596dee781a88409e252597b278a4f8e2f1dcff83cef38684d23b867c8f7281f"
+    },
+    "inputs/cohort/product_q17.mem": {
+      "bytes": 35840,
+      "sha256": "21498e28337b2a16387357ca04ea5171495e5a3c7d19f110ddef71ce47458b9a"
+    },
+    "inputs/cohort/saturated_u1.mem": {
+      "bytes": 6258,
+      "sha256": "ace10591b13761ccf27eacd452f6a0d94b934bdd31a25eacca1edb3de5a8b275"
+    },
+    "inputs/cohort/score_index_u64.mem": {
+      "bytes": 53193,
+      "sha256": "a0a80535c24e0f55e1dc8bcae939845cb6fc644adf339b0df23cf7e993b62587"
+    },
+    "inputs/cohort/scores_u8.mem": {
+      "bytes": 9387,
+      "sha256": "ffa72e8a1b3a7c63d2d1e7178a373f76793d7b0f4a50a3a93d059e3837b5d8dd"
+    },
+    "inputs/cohort/source_ci16.mem": {
+      "bytes": 147807,
+      "sha256": "43ab385c98d4db6dd9b3bbe4897a6c62b12b44fc91551505ae02266060449604"
+    },
+    "inputs/cohort/source_index_u64.mem": {
+      "bytes": 279191,
+      "sha256": "19aff338dbb2cd96e6e1f1db3f042048085e49ddea4289afa9f911cd155577d5"
+    },
+    "inputs/source_snapshot/docs/starlink-high-rate60-harness-recipe-before-evaluation-20260910.md": {
+      "bytes": 5480,
+      "sha256": "891cf4f508b632acfc920995c9010280cac275cda930e8fa7f6a497ab71f3c5b"
+    },
+    "inputs/source_snapshot/docs/starlink-high-rate60-recipe-before-evaluation-20260910.md": {
+      "bytes": 3082,
+      "sha256": "38cc7604781486b29e3b4bdf90e5cf99ac5f3c35270e61a7a64cbd66480ff461"
+    },
+    "inputs/source_snapshot/docs/starlink-native60-readback-correction-20260910.md": {
+      "bytes": 4002,
+      "sha256": "e59ffc87e65aca7460cca2dde7b2e1686c8d2a1331472919419ddf46547f2918"
+    },
+    "inputs/source_snapshot/docs/starlink-native60-service-recipe-before-evaluation-20260910.md": {
+      "bytes": 5639,
+      "sha256": "6c2a27ec89382c6fb140092699770abd8e7f591b8d8898d0dc8d4c5acd83356b"
+    },
+    "inputs/source_snapshot/hdl/library/axi_starlink_pilot_capture/CAPTURE_ABI.md": {
+      "bytes": 9073,
+      "sha256": "fd1c1c721c9b2df0b4479fea343e5890dfe43e68403b3e4ab00ab43aa32ccb0e"
+    },
+    "inputs/source_snapshot/hdl/library/axi_starlink_pilot_capture/axi_starlink_pilot_capture.v": {
+      "bytes": 13900,
+      "sha256": "dc2b3126354363b14931e0616358160cb68563001b811f04e44eba1ffdfa96d0"
+    },
+    "inputs/source_snapshot/hdl/library/axi_starlink_pss_acquisition/axi_starlink_pss_acquisition.v": {
+      "bytes": 26108,
+      "sha256": "a54a51018bedc2141896411e289bd45a13534132163760a96025fea3e07a6e2a"
+    },
+    "inputs/source_snapshot/hdl/library/axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v": {
+      "bytes": 38820,
+      "sha256": "e63cd0e218cb388f11e8c0f76fbf51eee3284379d96ed941dce65b2c6f9b9f77"
+    },
+    "inputs/source_snapshot/hdl/library/axi_starlink_pss_phase_map/starlink_pss_axi_lite.v": {
+      "bytes": 4872,
+      "sha256": "7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c"
+    },
+    "inputs/source_snapshot/hdl/library/axi_starlink_pss_tracker/axi_starlink_pss_tracker.v": {
+      "bytes": 43841,
+      "sha256": "0f95565c6989e17915d0d9311958f8f0bfa720e58fe62f3d4aaa2252c6bcae46"
+    },
+    "inputs/source_snapshot/hdl/library/axi_starlink_pss_tracker/starlink_pss_injection_mux.v": {
+      "bytes": 15409,
+      "sha256": "f9b77edd045854c65ca7a2f2cadc9a7f677a7a0365699d1d23c58f43f17cfc30"
+    },
+    "inputs/source_snapshot/hdl/library/common/ad_mem.v": {
+      "bytes": 2572,
+      "sha256": "472d518b7f3d7b77a86dc8826169c910a48098f14f78eb1ef78c620fe518e9c4"
+    },
+    "inputs/source_snapshot/hdl/library/common/up_axi.v": {
+      "bytes": 8437,
+      "sha256": "161efc9d4cb6f0358c1614cf2b6307b14524b399409b0b8c3a953ac0030ce409"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/create_shared_realtime_xfft_ip.tcl": {
+      "bytes": 3158,
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/pilot_fir3_q17.mem": {
+      "bytes": 768,
+      "sha256": "64581ef90abaf17e5855b80f85e15480979095ff3f75b87ec35041f0d6c371c3"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/pilot_halfband2_q17.mem": {
+      "bytes": 54,
+      "sha256": "5c05bd36e2a19ce7c292427bf067ba1dbca008f57ed8f313688dfaa2943fe5cd"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/pilot_mixer_q16.mem": {
+      "bytes": 640,
+      "sha256": "2618a424eddcebb6ba5da48af13db0b0ad8a119bd48ac0760e1721a528979a11"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/simulate_high_rate60_bank_native_paired.tcl": {
+      "bytes": 5243,
+      "sha256": "c8233d7200a7dbbefe1ac5644350101ebc70784151095cfb3166e290cbaa471d"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pilot_ddc.v": {
+      "bytes": 11155,
+      "sha256": "031c0495a7d2e0abe0f7b5dcbe52f614e19a80a7e04ca3286ef5b6e4111c4884"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pilot_fir3.v": {
+      "bytes": 9874,
+      "sha256": "506f40ec5a58350abaa8fbaf1e75ed29c98c414e36bee7d80518e3ec0854c49a"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pilot_halfband2.v": {
+      "bytes": 7186,
+      "sha256": "7f5050971075f65a29ef6a41f7d143ff85c731fccaca208c67466031af4e6ac6"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_acquisition_health.v": {
+      "bytes": 5154,
+      "sha256": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_block_mailbox.v": {
+      "bytes": 10098,
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_candidate_score_path.v": {
+      "bytes": 10847,
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_energy_cache.v": {
+      "bytes": 9647,
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_energy_join.v": {
+      "bytes": 6039,
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_fft_bank_owned_slice.v": {
+      "bytes": 16140,
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_fft_island_slice.v": {
+      "bytes": 5404,
+      "sha256": "27de8125b5cb4ff9ce69253e0ec00e71be1f3621b0cc12ac75b0502d37e9a740"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_forward_kernel_join.v": {
+      "bytes": 3648,
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_ifft_qualifier.v": {
+      "bytes": 5748,
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_phase_map.v": {
+      "bytes": 18212,
+      "sha256": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_score.v": {
+      "bytes": 31646,
+      "sha256": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_score_bank_owned.v": {
+      "bytes": 9689,
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_score_shared.v": {
+      "bytes": 25762,
+      "sha256": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_kernel_rom.v": {
+      "bytes": 5403,
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_overlap_scheduler.v": {
+      "bytes": 11106,
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_phase_map.v": {
+      "bytes": 29457,
+      "sha256": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_phase_map_bank.v": {
+      "bytes": 3222,
+      "sha256": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_raw_result_fifo.v": {
+      "bytes": 4647,
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_realtime_input_guard.v": {
+      "bytes": 4778,
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_realtime_result_guard.v": {
+      "bytes": 16867,
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_sample_cdc.v": {
+      "bytes": 13669,
+      "sha256": "333eab0ffcdee24a06439eadf55077c26cf6c7fd8e7c86eee845936631cbb16a"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_divider.v": {
+      "bytes": 6144,
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_divider_radix4.v": {
+      "bytes": 6902,
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_lanes.v": {
+      "bytes": 5584,
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_phase_tagger.v": {
+      "bytes": 3905,
+      "sha256": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_prepare.v": {
+      "bytes": 6907,
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_shared_realtime_xfft_service.v": {
+      "bytes": 14226,
+      "sha256": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_shared_xfft_service.v": {
+      "bytes": 12731,
+      "sha256": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_spectrum_product.v": {
+      "bytes": 6843,
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_transform_fifo.v": {
+      "bytes": 5913,
+      "sha256": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_x2_ddc.v": {
+      "bytes": 13620,
+      "sha256": "93f702ae50cf6cfb675512572bb6bb18f609e9948f4b1d8acc94b4c9ce07b387"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_xfft_block_adapter.v": {
+      "bytes": 15629,
+      "sha256": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_xfft_intermediate_buffer.v": {
+      "bytes": 5772,
+      "sha256": "9cd6f1a6cfaf69ea50313ee2e9a92209a5eecf5878c76a0f6110d8b86411b346"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/bank_native60_clock_checks.svh": {
+      "bytes": 3141,
+      "sha256": "a380e54ed38172b5cf732f9e817b6ef9813111246c8e7fff392801c4a837962a"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/bank_native60_fft_checks.svh": {
+      "bytes": 9003,
+      "sha256": "2186b457c7a1477bcb1122712a9ba751104de78c489a6abc785eeb5a5cbd2a37"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/bank_native60_source_checks.svh": {
+      "bytes": 11418,
+      "sha256": "8f9a803af35ac7ee25f71a16002854f71faf117a0d9c5e540a2f72af0e50405c"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/high_rate_paired_axi.svh": {
+      "bytes": 2577,
+      "sha256": "5fc5e08a1c80a908fa40e9f8e3982d77f42dc2a82eefa24bdb4f33a61c427548"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/native60_budget_checks.svh": {
+      "bytes": 17483,
+      "sha256": "223f002054f0675a7fccfad234d60478ae17b53f5d26c7f892fa281921b36422"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/native60_readback_checks.svh": {
+      "bytes": 3456,
+      "sha256": "3e13e9fec0bfd57668781d27d2995863895025fe2b3445994e7046b98ab96b6f"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/tb_starlink_native60_budget.sv": {
+      "bytes": 7164,
+      "sha256": "9b88844dc174385d2a05b6a3211b88b1ed4c68705a94d5713daf3211f71bf227"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_60_bank_native_paired.sv": {
+      "bytes": 19026,
+      "sha256": "f358c83d6556fc6bad09bd46aa87ad8af83cae32a55d237b7826d1499637fe05"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/upper_edge_pss60_x4_ddc_kernel_q17.json": {
+      "bytes": 746,
+      "sha256": "90eb97c8f72126a723db8264ab3a159b5f03fb9a34778b57faf2d84be43216f2"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_acquisition/tb/upper_edge_pss60_x4_ddc_kernel_q17.mem": {
+      "bytes": 5120,
+      "sha256": "7b006bac23a3c58f614728dbfdb17d28bd77defb3d6d0d24aaa76255669c0c67"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_async_fifo.v": {
+      "bytes": 4989,
+      "sha256": "a07f1bf38da80b3a0f125351af439af5b58aae1ab783597ba15086d40f3cbc0d"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_candidate_scheduler.v": {
+      "bytes": 13709,
+      "sha256": "e3d60269e598ff6fa8998cbb9055ae83ba3939b5cd0bf1ee90a378e55e52b790"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_capture_bridge.v": {
+      "bytes": 14333,
+      "sha256": "950d9a5b1cafd4fc685039af49df5782b254bff908d46459e7c5f25eb3447a2f"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_exact_reducer.v": {
+      "bytes": 16646,
+      "sha256": "7ec973ea0c5687cce0e8e94513921449f894d1c9525710639567302ed628898a"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_exact_track_reducer.v": {
+      "bytes": 12917,
+      "sha256": "9c63183cc7a353935a2cb744aa2bad798b4552ed7c7cbd30d46f104d7b72797a"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_raw_correlator.v": {
+      "bytes": 19160,
+      "sha256": "8ff38261cf8f12895d37412bd4d5947b49a242ae2e4b9854e605f83bf68f066f"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_reduced_tracking_core.v": {
+      "bytes": 19221,
+      "sha256": "4838876ecf0607ac9a7adba3f0b1d2f24383aba5ca98c27efc69629be77e3b92"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_result_store.v": {
+      "bytes": 10840,
+      "sha256": "b9a2c833a9a128f93ae25e806fb48e4df4da7b27f6fa8bf3a3db2be7262deff8"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_sliding_correlator.v": {
+      "bytes": 29415,
+      "sha256": "670c74842d4366e6a72688b94c53a22b59ae057055889f07b218825b2b0ae284"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_tracking_core.v": {
+      "bytes": 13697,
+      "sha256": "7d1a845a3ad1d2d78df59f0c1c44a9a5e25338c4dc440ef7ff087e793c207599"
+    },
+    "inputs/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_sat_add48.v": {
+      "bytes": 1158,
+      "sha256": "bb8a3c43ef197264d88eb4eb7a3bdcccc07254b71c2da8c16343ecbeeafc34a5"
+    },
+    "inputs/source_snapshot/tests/__init__.py": {
+      "bytes": 25,
+      "sha256": "1b6a77b6d966d9da304ea19eb14c75653f23291995976bab0940a96a504b372b"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/__init__.py": {
+      "bytes": 4493,
+      "sha256": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/acquisition.py": {
+      "bytes": 19370,
+      "sha256": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/ddc.py": {
+      "bytes": 14195,
+      "sha256": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/fixed.py": {
+      "bytes": 6667,
+      "sha256": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_bundle.py": {
+      "bytes": 12816,
+      "sha256": "43e4df89cf8bc4a0cd5f047e8886a6c7cc51e18d6b214e27b0996c9e7d19bfa4"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_harness.py": {
+      "bytes": 5191,
+      "sha256": "0bbaa63d3264b36d3285cded8968d1e739e1ae0bf3a643a2e507bb45d7665da6"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_harness_recipe.py": {
+      "bytes": 5684,
+      "sha256": "1b24f01680b09313dcfd827cce45a8771d86892adef6773f0457c7b5fefba385"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_harness_result.py": {
+      "bytes": 17337,
+      "sha256": "2c3a36b9b852e25f8148e7b0a1484a222398ecae8fec69cf7ed52e799fc18d74"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_native_source_pins.json": {
+      "bytes": 12363,
+      "sha256": "7c3793f72d5673d09c7ff6fe2dc0039387e8bb23b89e2ab596d77851122c8f0a"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_paired.py": {
+      "bytes": 28893,
+      "sha256": "fd507a582ca0abdece7f5445f6413c467380c5eefe732256e34a4ad715496112"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_recipe.py": {
+      "bytes": 2792,
+      "sha256": "bd39c5fdf850dc6ec1ecbbf6476ac6a8e2990ce1be7455e98a0fc5294647f4c4"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate60_support.py": {
+      "bytes": 3967,
+      "sha256": "fbd2b193f683b77a59c93d75fa2efa75856790ed7b76b20c0149436bac71ee68"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/high_rate_paired.py": {
+      "bytes": 30826,
+      "sha256": "7f9f4a62b1ebcc619702793df73a6dea800efc2d76855f1db744f2e6ba033277"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/native60_budget.py": {
+      "bytes": 27503,
+      "sha256": "95c27a648cde43461741b79633c8cc8d8edb32170d1382ecf4d3e443c82149cb"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/native60_budget_recipe.py": {
+      "bytes": 2785,
+      "sha256": "5f4bb5cefd59492f34d45e7b60e24fa00c0bd6b8950e1be71bfb6ab09b555423"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/native60_readback_contract.py": {
+      "bytes": 1698,
+      "sha256": "0574366b24c74e95ab85f17c73c2765218cd228b81fc4e01ef78194df758a2af"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/numerology.py": {
+      "bytes": 2159,
+      "sha256": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/pilot_ddc.py": {
+      "bytes": 7965,
+      "sha256": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/search.py": {
+      "bytes": 5374,
+      "sha256": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/waveforms.py": {
+      "bytes": 8470,
+      "sha256": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984"
+    },
+    "inputs/source_snapshot/tests/starlink_oracle/xfft_bitacc.py": {
+      "bytes": 20325,
+      "sha256": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e"
+    },
+    "inputs/source_snapshot/tests/test_starlink_high_rate60_bundle.py": {
+      "bytes": 8307,
+      "sha256": "d4cc1b3c173a875f7bea09e393cf4878e47f6890bff2262ff3b5d97e21c5b92b"
+    },
+    "inputs/source_snapshot/tests/test_starlink_high_rate60_harness.py": {
+      "bytes": 9808,
+      "sha256": "f11492a1679ad7b8aca812a4b7ea34ea4a1aa17b1bef0dfbb8e8ef0e64aca847"
+    },
+    "inputs/source_snapshot/tests/test_starlink_high_rate60_harness_result.py": {
+      "bytes": 10231,
+      "sha256": "e4f6be38ffec9f35e13da706181e64fdbccfcb03835138511293c7ed58913c5c"
+    },
+    "inputs/source_snapshot/tests/test_starlink_high_rate60_paired.py": {
+      "bytes": 17000,
+      "sha256": "c1e9144350b243d7ab1781c96298ff429e7bf10bdc59ec7c02dea2100008d30c"
+    },
+    "inputs/source_snapshot/tests/test_starlink_high_rate60_support.py": {
+      "bytes": 6077,
+      "sha256": "27009f25bce43929dbcf89b399bc5e98dbe1403787114c601caecffc6a7a8509"
+    },
+    "inputs/source_snapshot/tests/test_starlink_native60_budget.py": {
+      "bytes": 20750,
+      "sha256": "9d3f6845e28346776b768299c285f3eb26f224b49fbf31a5c62677fd836789eb"
+    },
+    "inputs/source_snapshot/tests/test_starlink_native60_readback.py": {
+      "bytes": 7910,
+      "sha256": "5dfe046adc8c4d83c5d90a3586aed09146ee20d6eb888894ff003b2124d17713"
+    },
+    "inputs/source_snapshot/tools/generate_starlink_high_rate60_paired.py": {
+      "bytes": 999,
+      "sha256": "5eab0358e1c059bce1fb74242a621eab83fd496a25a0ac27223cd44cd2415d38"
+    },
+    "inputs/source_snapshot/tools/generate_starlink_periodic_map_vectors.py": {
+      "bytes": 13488,
+      "sha256": "62d009c9aa5dd910eb98265a243b00087b3d79eb6c20c921ef6bf668dfd6b490"
+    },
+    "inputs/source_snapshot/tools/prepare_starlink_high_rate60_harness.py": {
+      "bytes": 1640,
+      "sha256": "e3a40191ef03027f02b3e9265f6d369b13d1acab95344cf59fdc2df397a35781"
+    },
+    "inputs/source_snapshot/tools/prepare_starlink_native60_budget.py": {
+      "bytes": 1898,
+      "sha256": "d088d1cef7e022ca9daa77cc83d9cf08128e2e4f653eb65ad4130420bf9dcc2b"
+    },
+    "inputs/vectors/block_start_u64.mem": {
+      "bytes": 119,
+      "sha256": "fc54bc171d774411f0cf87b1b21341eb38935d76cdcf687d7c3753031fe92160"
+    },
+    "inputs/vectors/canonical_ci16.mem": {
+      "bytes": 36864,
+      "sha256": "cf33eed371ec41b15af30b063a3680d985e20254b7d753664946449914eaf685"
+    },
+    "inputs/vectors/canonical_index_u64.mem": {
+      "bytes": 69632,
+      "sha256": "13ae470363e12ebaecc0606e445c3bc6eafb9a50e8e1ed7967a63497f5793489"
+    },
+    "inputs/vectors/canonical_raw_center_u64.mem": {
+      "bytes": 69632,
+      "sha256": "3205ef2e81b0e4c38c0bd33e16b2a81e87f30c8af353f38b75c56b5f5ca4c15a"
+    },
+    "inputs/vectors/canonical_raw_support_first_u64.mem": {
+      "bytes": 69632,
+      "sha256": "a35758bd2beffc7f8223af41d4b7728861f8a296fe15cd6f0a8eec314caaeed3"
+    },
+    "inputs/vectors/canonical_raw_support_last_u64.mem": {
+      "bytes": 69632,
+      "sha256": "558275657c9a35d13fdf0e7de99a40406d99df6f09650bcd319c0d15d652d234"
+    },
+    "inputs/vectors/conditioned_coefficients_q15.mem": {
+      "bytes": 594,
+      "sha256": "7e82186286c9316e315e7ad813d71d65e089a95a65c37d7f330fb3900eba79d9"
+    },
+    "inputs/vectors/conditioned_kernel_q17.mem": {
+      "bytes": 5120,
+      "sha256": "7b006bac23a3c58f614728dbfdb17d28bd77defb3d6d0d24aaa76255669c0c67"
+    },
+    "inputs/vectors/ddc30_to15_ci16.mem": {
+      "bytes": 36864,
+      "sha256": "cf33eed371ec41b15af30b063a3680d985e20254b7d753664946449914eaf685"
+    },
+    "inputs/vectors/ddc30_to15_index_u64.mem": {
+      "bytes": 69632,
+      "sha256": "13ae470363e12ebaecc0606e445c3bc6eafb9a50e8e1ed7967a63497f5793489"
+    },
+    "inputs/vectors/ddc30_to15_mixed_s17.mem": {
+      "bytes": 82050,
+      "sha256": "9432d7ea1007a74f1c508a2cba79ac3382c1f01c7a8b19937c565ff04ec76aea"
+    },
+    "inputs/vectors/ddc30_to15_sums_s40.mem": {
+      "bytes": 86016,
+      "sha256": "6908e00602d449cbd83967c767e820777043c89e7764210a6ddb4201ab02e0ba"
+    },
+    "inputs/vectors/ddc60_to30_ci16.mem": {
+      "bytes": 73845,
+      "sha256": "738b0a4d07c6ce5a80b953e2accfc29b8d2f3ace2a7017bfd783c1325aa723d7"
+    },
+    "inputs/vectors/ddc60_to30_index_u64.mem": {
+      "bytes": 139485,
+      "sha256": "84d0c7ee61b6508ae63b69ac805a1fbf08cd52685f51d837756d4a1fb7e7b7c2"
+    },
+    "inputs/vectors/ddc60_to30_mixed_s17.mem": {
+      "bytes": 164230,
+      "sha256": "232b846b738358f69142e647facf051fed2c98d36a49141a2560345927f2d8a4"
+    },
+    "inputs/vectors/ddc60_to30_sums_s40.mem": {
+      "bytes": 172305,
+      "sha256": "87f18701b19b36a2807e1b8a257069415c90aeda8fa82cc1f8ee80b2bb4a02d1"
+    },
+    "inputs/vectors/denominators_u69.mem": {
+      "bytes": 59451,
+      "sha256": "d894b01da43b5a00aff12f1d94598e2533b15717df41c17fdfb1bb99f4986eaf"
+    },
+    "inputs/vectors/energies_u38.mem": {
+      "bytes": 34419,
+      "sha256": "40a19ed7128b5983e0d7679ba8ebc68dd0d49fc089affe1138393bc93fe50001"
+    },
+    "inputs/vectors/fft_input_axi48.mem": {
+      "bytes": 46592,
+      "sha256": "a3b1e32c9f70595bc30ffda5747e47ffb97543bf92e55f3809fa604f2039aa5a"
+    },
+    "inputs/vectors/fft_input_index_u64.mem": {
+      "bytes": 60928,
+      "sha256": "865376cc48e7c71a6b0dc10dd3d6eb7ddcbd241cee490e2e2f8ad489299aa6d5"
+    },
+    "inputs/vectors/fft_input_q17.mem": {
+      "bytes": 35840,
+      "sha256": "86fe67a0663644d88ad2e481616fe579d1543fc1afcbb139817f91b87519c001"
+    },
+    "inputs/vectors/fft_position_u9.mem": {
+      "bytes": 14336,
+      "sha256": "3064492d9df70f358076ca9b58de629db5cbcebd9e67070186806c02cf1b53a2"
+    },
+    "inputs/vectors/forward_exponents.mem": {
+      "bytes": 21,
+      "sha256": "0bdcb41411b0cae781bc8009d6450fa37f8fa832c41dfb618adc4419880249d3"
+    },
+    "inputs/vectors/forward_q17.mem": {
+      "bytes": 35840,
+      "sha256": "4463aa1cb087e8a5096c444faf79a802c9e19e5a724f07b0afa66b73a15467e7"
+    },
+    "inputs/vectors/harness.json": {
+      "bytes": 22699,
+      "sha256": "32a60fdb10afbcf8c73f535ce38de4046af72b605098d3a414384aa5910437f2"
+    },
+    "inputs/vectors/inverse_exponents.mem": {
+      "bytes": 21,
+      "sha256": "02ac599929687bc2744e70996a7bf2b0308223b3c61b4bf7cb1c4ca97004f0c2"
+    },
+    "inputs/vectors/inverse_q17.mem": {
+      "bytes": 35840,
+      "sha256": "65b58cb4516118ac32c847ad8f987a67d65f2ca8bb0fe4cfb6c0727729800914"
+    },
+    "inputs/vectors/map_343x2_u16.mem": {
+      "bytes": 1715,
+      "sha256": "fca7f63acaa8f024b30449283c7b17c555b2b5b9f9cd9f603b2ea1f8abf00853"
+    },
+    "inputs/vectors/map_447x2_u16.mem": {
+      "bytes": 2235,
+      "sha256": "e9fce09ca610965209dad27b6c0fb0307dc62e81cd1915877c8efe4817a38b8b"
+    },
+    "inputs/vectors/native_all_raw_tuples.json": {
+      "bytes": 67991,
+      "sha256": "5d1e89a428c717ec94922ac79ec6a99b5387e586824559c09666e4dee5b7b5b0"
+    },
+    "inputs/vectors/native_capture_ci16.mem": {
+      "bytes": 4680,
+      "sha256": "6862502734a3cd4bb17d7003f16aa0b2cd76c363d42828fc1ad0b79c5581409b"
+    },
+    "inputs/vectors/native_coefficients_q15.mem": {
+      "bytes": 2376,
+      "sha256": "6aed4f4883fce03982f12af0d28ea9186599daa5564e045cb9bc636c1fef3289"
+    },
+    "inputs/vectors/native_eh_u48.mem": {
+      "bytes": 3133,
+      "sha256": "33ef958cc4b2412f7b21922e2ba918f60d2a75519492e7007a573e419ea056b4"
+    },
+    "inputs/vectors/native_ex_u48.mem": {
+      "bytes": 3133,
+      "sha256": "a0cd635807a5692bd0937508421351dcd446413e3ec87ee7f5c0e5019a6aa029"
+    },
+    "inputs/vectors/native_expected_packet.mem": {
+      "bytes": 234,
+      "sha256": "f12be45865c7bf19b0390f6a6c9f44fe8543888699749284cf070aba961660e5"
+    },
+    "inputs/vectors/native_imag_s48.mem": {
+      "bytes": 3133,
+      "sha256": "76566e0a6dc5b4551da6759ee42887867921640a653cb2009d7c56c955bf19d4"
+    },
+    "inputs/vectors/native_lags_s32.mem": {
+      "bytes": 2169,
+      "sha256": "3a5f3a2bdcea99fb1d6d07cb97bd2145483455d82db7c0155312c31ef98a6bab"
+    },
+    "inputs/vectors/native_power_u96.mem": {
+      "bytes": 6025,
+      "sha256": "eca9203a94bfce728e1309750b99249b9170b7961978113119278a06e02e501e"
+    },
+    "inputs/vectors/native_qualified_u1.mem": {
+      "bytes": 482,
+      "sha256": "bb4fa18cbf53cef62aa566d39b4f784663dd90e47d7a00d78dd40f74741f5378"
+    },
+    "inputs/vectors/native_raw_eh_u48.mem": {
+      "bytes": 3341,
+      "sha256": "b468e964d4dbfc30b433bbd8493fce317f4bae90d770a6ff270e5ea2be6a09fa"
+    },
+    "inputs/vectors/native_raw_ex_u48.mem": {
+      "bytes": 3341,
+      "sha256": "9c3668659ecbe2211c5b56c444055c2867e189ddf213de46012d620599fac7f2"
+    },
+    "inputs/vectors/native_raw_imag_s48.mem": {
+      "bytes": 3341,
+      "sha256": "7b0f0db2b6a387d68e7ced72616be5a0acbde2251799f1959c4cb74e4010c951"
+    },
+    "inputs/vectors/native_raw_lags_s32.mem": {
+      "bytes": 2313,
+      "sha256": "06eb0ef64c42182c7e519a281f11e78ba3ef0578c75feffab22ef35502bfc32e"
+    },
+    "inputs/vectors/native_raw_power_u96.mem": {
+      "bytes": 6425,
+      "sha256": "b79ec32a00f29d36fa874c8856fdfe8655601f389e2d9e2e7450633b57cb00f0"
+    },
+    "inputs/vectors/native_raw_qualified_u1.mem": {
+      "bytes": 514,
+      "sha256": "8025914359e494479c824b00c5766c8b22c07440cf791f279738d3736351020f"
+    },
+    "inputs/vectors/native_raw_real_s48.mem": {
+      "bytes": 3341,
+      "sha256": "28cdca8ee6db1f972952dbde6ee21445794af97adef2f43594e8f7e5c06a670d"
+    },
+    "inputs/vectors/native_raw_saturation_u12.mem": {
+      "bytes": 1028,
+      "sha256": "4582d4c91c81a10a74a8619898932e0a1c6bc1f9052c7cff8948b44140e84511"
+    },
+    "inputs/vectors/native_raw_start_u64.mem": {
+      "bytes": 4369,
+      "sha256": "9fe422826b73bf8906db5705fcc46c80025276431108b3e3d0ae9e0497fd497e"
+    },
+    "inputs/vectors/native_real_s48.mem": {
+      "bytes": 3133,
+      "sha256": "786a912d89c92c5376eebdd0a4b5851822ddde42a20f54ff08dd1cef5c8c58e1"
+    },
+    "inputs/vectors/native_saturation_u12.mem": {
+      "bytes": 964,
+      "sha256": "747274fcd5908f9278ef1f3c7e17fda2855ad85f4e379711672359a5d64748b5"
+    },
+    "inputs/vectors/native_start_u64.mem": {
+      "bytes": 4097,
+      "sha256": "eb1bbcdfe7c9042b37d53feffea3b154db994d386cc7344d292952e53827cf7b"
+    },
+    "inputs/vectors/numerators_u69.mem": {
+      "bytes": 59451,
+      "sha256": "998ce94b3e10da91ee11c50fec8d0a83acc592c21abdfb52a5a51eb5d2124503"
+    },
+    "inputs/vectors/paired_source_ci16.mem": {
+      "bytes": 147825,
+      "sha256": "1300fe7a8876dad1d1b30be16ec6e900425ec9705d5cda0dc0366e35e0d4e722"
+    },
+    "inputs/vectors/paired_source_index_u64.mem": {
+      "bytes": 279225,
+      "sha256": "eec47ba8fb76163fd6e61f7db60a45ea6fc3b228fd72c1058e22f2848e38df35"
+    },
+    "inputs/vectors/pilot_all_ci16.mem": {
+      "bytes": 6147,
+      "sha256": "17fe7f1abe4f63bac8157e728bf353969a994345ad5cae212e41967cefef502e"
+    },
+    "inputs/vectors/pilot_all_index_u64.mem": {
+      "bytes": 11611,
+      "sha256": "9e89ee064977e53df98704a1dbfa28acfa3a9e7e7f90c97998a7853a04546f16"
+    },
+    "inputs/vectors/pilot_all_support_u1.mem": {
+      "bytes": 1366,
+      "sha256": "21693b1b808a5bf925868e10d0a352ce25dbaed64792d358ef53f0f4d0ce42ae"
+    },
+    "inputs/vectors/pilot_expected.ci16": {
+      "bytes": 2048,
+      "sha256": "6f753571a771b048009e4b52534183c748a925e194f3f4eb792720c02ea75013"
+    },
+    "inputs/vectors/pilot_expected_ci16.mem": {
+      "bytes": 4608,
+      "sha256": "0eccc4e0ab5b3a7b645e882bf8e14f31f1b13412b9e8771440628750b4697400"
+    },
+    "inputs/vectors/pilot_expected_index_u64.mem": {
+      "bytes": 8704,
+      "sha256": "9a863a0b9ae5a71d469cb7a79d3d4424df31e1a40d3236eb5a08471c1ed8c65f"
+    },
+    "inputs/vectors/pilot_half_ci16.mem": {
+      "bytes": 18432,
+      "sha256": "ca0c46ce733f2652c5c5f0b3dbaa6bcf0182e00eb3ce89c21a78839ad28ea30d"
+    },
+    "inputs/vectors/pilot_half_index_u64.mem": {
+      "bytes": 34816,
+      "sha256": "2a54b9b236099d8b95097c141635026ab809fd9022ce162f3fbcb33d4d73c5fd"
+    },
+    "inputs/vectors/pilot_mixed_ci16.mem": {
+      "bytes": 36864,
+      "sha256": "a8f3832f56e176a8e4ac3e0cdba9eabf93e51fd93c8be874bae7b815fb42f1f5"
+    },
+    "inputs/vectors/pilot_raw_support_first_u64.mem": {
+      "bytes": 8704,
+      "sha256": "657504d0dcd7cb1f9ccb3354a507b49ea10331619b12c2eb165a6ea37e35cfad"
+    },
+    "inputs/vectors/pilot_raw_support_last_u64.mem": {
+      "bytes": 8704,
+      "sha256": "8ea43907bc5a279600f0c990ae30fe4ee2c3b7cecac27042a0d72aca349ebdf0"
+    },
+    "inputs/vectors/power_shift_u7.mem": {
+      "bytes": 21,
+      "sha256": "3596dee781a88409e252597b278a4f8e2f1dcff83cef38684d23b867c8f7281f"
+    },
+    "inputs/vectors/product_q17.mem": {
+      "bytes": 35840,
+      "sha256": "21498e28337b2a16387357ca04ea5171495e5a3c7d19f110ddef71ce47458b9a"
+    },
+    "inputs/vectors/saturated_u1.mem": {
+      "bytes": 6258,
+      "sha256": "ace10591b13761ccf27eacd452f6a0d94b934bdd31a25eacca1edb3de5a8b275"
+    },
+    "inputs/vectors/score_index_u64.mem": {
+      "bytes": 53193,
+      "sha256": "a0a80535c24e0f55e1dc8bcae939845cb6fc644adf339b0df23cf7e993b62587"
+    },
+    "inputs/vectors/scores_u8.mem": {
+      "bytes": 9387,
+      "sha256": "ffa72e8a1b3a7c63d2d1e7178a373f76793d7b0f4a50a3a93d059e3837b5d8dd"
+    },
+    "inputs/vectors/source_ci16.mem": {
+      "bytes": 147807,
+      "sha256": "43ab385c98d4db6dd9b3bbe4897a6c62b12b44fc91551505ae02266060449604"
+    },
+    "inputs/vectors/source_index_u64.mem": {
+      "bytes": 279191,
+      "sha256": "19aff338dbb2cd96e6e1f1db3f042048085e49ddea4289afa9f911cd155577d5"
+    },
+    "offline-tests/test_entire_composition_compil0/compile-status.json": {
+      "bytes": 9781,
+      "sha256": "a50b251301e8268fe0ac475dcbb5ede67c7a0cdf7ab404de00990405cc95fb39"
+    },
+    "offline-tests/test_entire_composition_compil0/compile.log": {
+      "bytes": 704,
+      "sha256": "51f277bb7dec1472c1c5807f6ef4be5a42c9926053d17e49f630998208afc806"
+    },
+    "offline-tests/test_entire_composition_compil0/source-after.json": {
+      "bytes": 8801,
+      "sha256": "2967373e2cc511572a097b8d3139bb98da2a5293b4ba0d7c48673e0ab0f6fd52"
+    },
+    "offline-tests/test_entire_composition_compil0/source-before.json": {
+      "bytes": 8801,
+      "sha256": "2967373e2cc511572a097b8d3139bb98da2a5293b4ba0d7c48673e0ab0f6fd52"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/axi_starlink_pilot_capture/axi_starlink_pilot_capture.v": {
+      "bytes": 13900,
+      "sha256": "dc2b3126354363b14931e0616358160cb68563001b811f04e44eba1ffdfa96d0"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/axi_starlink_pss_acquisition/axi_starlink_pss_acquisition.v": {
+      "bytes": 26108,
+      "sha256": "a54a51018bedc2141896411e289bd45a13534132163760a96025fea3e07a6e2a"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v": {
+      "bytes": 38820,
+      "sha256": "e63cd0e218cb388f11e8c0f76fbf51eee3284379d96ed941dce65b2c6f9b9f77"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/axi_starlink_pss_phase_map/starlink_pss_axi_lite.v": {
+      "bytes": 4872,
+      "sha256": "7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/axi_starlink_pss_tracker/axi_starlink_pss_tracker.v": {
+      "bytes": 43841,
+      "sha256": "0f95565c6989e17915d0d9311958f8f0bfa720e58fe62f3d4aaa2252c6bcae46"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/axi_starlink_pss_tracker/starlink_pss_injection_mux.v": {
+      "bytes": 15409,
+      "sha256": "f9b77edd045854c65ca7a2f2cadc9a7f677a7a0365699d1d23c58f43f17cfc30"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/common/ad_mem.v": {
+      "bytes": 2572,
+      "sha256": "472d518b7f3d7b77a86dc8826169c910a48098f14f78eb1ef78c620fe518e9c4"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/common/up_axi.v": {
+      "bytes": 8437,
+      "sha256": "161efc9d4cb6f0358c1614cf2b6307b14524b399409b0b8c3a953ac0030ce409"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pilot_ddc.v": {
+      "bytes": 11155,
+      "sha256": "031c0495a7d2e0abe0f7b5dcbe52f614e19a80a7e04ca3286ef5b6e4111c4884"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pilot_fir3.v": {
+      "bytes": 9874,
+      "sha256": "506f40ec5a58350abaa8fbaf1e75ed29c98c414e36bee7d80518e3ec0854c49a"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pilot_halfband2.v": {
+      "bytes": 7186,
+      "sha256": "7f5050971075f65a29ef6a41f7d143ff85c731fccaca208c67466031af4e6ac6"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_acquisition_health.v": {
+      "bytes": 5154,
+      "sha256": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_block_mailbox.v": {
+      "bytes": 10098,
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_candidate_score_path.v": {
+      "bytes": 10847,
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_energy_cache.v": {
+      "bytes": 9647,
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_energy_join.v": {
+      "bytes": 6039,
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_fft_bank_owned_slice.v": {
+      "bytes": 16140,
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_fft_island_slice.v": {
+      "bytes": 5404,
+      "sha256": "27de8125b5cb4ff9ce69253e0ec00e71be1f3621b0cc12ac75b0502d37e9a740"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_forward_kernel_join.v": {
+      "bytes": 3648,
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_ifft_qualifier.v": {
+      "bytes": 5748,
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_phase_map.v": {
+      "bytes": 18212,
+      "sha256": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_score.v": {
+      "bytes": 31646,
+      "sha256": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_score_bank_owned.v": {
+      "bytes": 9689,
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_iq_to_score_shared.v": {
+      "bytes": 25762,
+      "sha256": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_kernel_rom.v": {
+      "bytes": 5403,
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_overlap_scheduler.v": {
+      "bytes": 11106,
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_phase_map.v": {
+      "bytes": 29457,
+      "sha256": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_phase_map_bank.v": {
+      "bytes": 3222,
+      "sha256": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_raw_result_fifo.v": {
+      "bytes": 4647,
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_realtime_input_guard.v": {
+      "bytes": 4778,
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_realtime_result_guard.v": {
+      "bytes": 16867,
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_sample_cdc.v": {
+      "bytes": 13669,
+      "sha256": "333eab0ffcdee24a06439eadf55077c26cf6c7fd8e7c86eee845936631cbb16a"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_divider.v": {
+      "bytes": 6144,
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_divider_radix4.v": {
+      "bytes": 6902,
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_lanes.v": {
+      "bytes": 5584,
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_phase_tagger.v": {
+      "bytes": 3905,
+      "sha256": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_score_prepare.v": {
+      "bytes": 6907,
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_shared_realtime_xfft_service.v": {
+      "bytes": 14226,
+      "sha256": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_shared_xfft_service.v": {
+      "bytes": 12731,
+      "sha256": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_spectrum_product.v": {
+      "bytes": 6843,
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_transform_fifo.v": {
+      "bytes": 5913,
+      "sha256": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_x2_ddc.v": {
+      "bytes": 13620,
+      "sha256": "93f702ae50cf6cfb675512572bb6bb18f609e9948f4b1d8acc94b4c9ce07b387"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_xfft_block_adapter.v": {
+      "bytes": 15629,
+      "sha256": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/starlink_pss_xfft_intermediate_buffer.v": {
+      "bytes": 5772,
+      "sha256": "9cd6f1a6cfaf69ea50313ee2e9a92209a5eecf5878c76a0f6110d8b86411b346"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/tb/bank_native60_clock_checks.svh": {
+      "bytes": 3141,
+      "sha256": "a380e54ed38172b5cf732f9e817b6ef9813111246c8e7fff392801c4a837962a"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/tb/bank_native60_fft_checks.svh": {
+      "bytes": 9003,
+      "sha256": "2186b457c7a1477bcb1122712a9ba751104de78c489a6abc785eeb5a5cbd2a37"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/tb/bank_native60_source_checks.svh": {
+      "bytes": 11418,
+      "sha256": "8f9a803af35ac7ee25f71a16002854f71faf117a0d9c5e540a2f72af0e50405c"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/tb/high_rate_paired_axi.svh": {
+      "bytes": 2577,
+      "sha256": "5fc5e08a1c80a908fa40e9f8e3982d77f42dc2a82eefa24bdb4f33a61c427548"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/tb/native60_budget_checks.svh": {
+      "bytes": 17483,
+      "sha256": "223f002054f0675a7fccfad234d60478ae17b53f5d26c7f892fa281921b36422"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/tb/native60_readback_checks.svh": {
+      "bytes": 3456,
+      "sha256": "3e13e9fec0bfd57668781d27d2995863895025fe2b3445994e7046b98ab96b6f"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_acquisition/tb/tb_starlink_pss_60_bank_native_paired.sv": {
+      "bytes": 19026,
+      "sha256": "f358c83d6556fc6bad09bd46aa87ad8af83cae32a55d237b7826d1499637fe05"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_async_fifo.v": {
+      "bytes": 4989,
+      "sha256": "a07f1bf38da80b3a0f125351af439af5b58aae1ab783597ba15086d40f3cbc0d"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_candidate_scheduler.v": {
+      "bytes": 13709,
+      "sha256": "e3d60269e598ff6fa8998cbb9055ae83ba3939b5cd0bf1ee90a378e55e52b790"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_capture_bridge.v": {
+      "bytes": 14333,
+      "sha256": "950d9a5b1cafd4fc685039af49df5782b254bff908d46459e7c5f25eb3447a2f"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_exact_reducer.v": {
+      "bytes": 16646,
+      "sha256": "7ec973ea0c5687cce0e8e94513921449f894d1c9525710639567302ed628898a"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_exact_track_reducer.v": {
+      "bytes": 12917,
+      "sha256": "9c63183cc7a353935a2cb744aa2bad798b4552ed7c7cbd30d46f104d7b72797a"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_raw_correlator.v": {
+      "bytes": 19160,
+      "sha256": "8ff38261cf8f12895d37412bd4d5947b49a242ae2e4b9854e605f83bf68f066f"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_reduced_tracking_core.v": {
+      "bytes": 19221,
+      "sha256": "4838876ecf0607ac9a7adba3f0b1d2f24383aba5ca98c27efc69629be77e3b92"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_result_store.v": {
+      "bytes": 10840,
+      "sha256": "b9a2c833a9a128f93ae25e806fb48e4df4da7b27f6fa8bf3a3db2be7262deff8"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_sliding_correlator.v": {
+      "bytes": 29415,
+      "sha256": "670c74842d4366e6a72688b94c53a22b59ae057055889f07b218825b2b0ae284"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_pss_tracking_core.v": {
+      "bytes": 13697,
+      "sha256": "7d1a845a3ad1d2d78df59f0c1c44a9a5e25338c4dc440ef7ff087e793c207599"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/hdl/library/starlink_pss_raw_correlator/starlink_sat_add48.v": {
+      "bytes": 1158,
+      "sha256": "bb8a3c43ef197264d88eb4eb7a3bdcccc07254b71c2da8c16343ecbeeafc34a5"
+    },
+    "offline-tests/test_entire_composition_compil0/source_snapshot/inert_fft.v": {
+      "bytes": 1041,
+      "sha256": "98b8239cf7b43f147823e2690ec79366d2950fe4efa198b64683a264571eaf69"
+    },
+    "offline-tests/test_tiny_clock_and_unknown_he0/unit-compile.log": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "offline-tests/test_tiny_clock_and_unknown_he0/unit-only.log": {
+      "bytes": 165,
+      "sha256": "980bbb6c7d7b9943388cddeadc61fb0a092afa04669e88819d31cb64e9ee5a65"
+    },
+    "offline-tests/test_tiny_clock_and_unknown_he0/unit.sv": {
+      "bytes": 4082,
+      "sha256": "17e431b8a356a86065df31f91685814e70d9e41a8ae7f4b1d4130086a75f9208"
+    },
+    "packaging-receipt.json": {
+      "bytes": 15415,
+      "sha256": "6ac7c5d936af58399ab0ad165252e8eb4d93f929f0cad19b3ceaf9585b75feee"
+    },
+    "report.md": {
+      "bytes": 9888,
+      "sha256": "a09b10ba9dabbb8a1634810ca2603f3824d936a03f3b09d5b013ee4df72284bc"
+    },
+    "source-after.json": {
+      "bytes": 14315,
+      "sha256": "26f33d8727828eabd56d24466984168be3bdc52fc5e0166ba8ffe94f0e89b8e8"
+    }
+  },
+  "members": 334,
+  "receipt_files": 333,
+  "sha256": "60980bcc984b4c4b396de4429d95cb79d4b62d2a52b291552d402316af7f8f20",
+  "source_signature": "26f33d8727828eabd56d24466984168be3bdc52fc5e0166ba8ffe94f0e89b8e8"
+}
