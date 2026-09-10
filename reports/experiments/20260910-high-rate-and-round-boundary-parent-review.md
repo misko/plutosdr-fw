@@ -226,3 +226,76 @@ zero recoverable candidate/reference field pairs among the217 compared fields;
 names exist but the original waveform did not log their values. A new baseline
 diagnostic preparation may print exact mismatching fields immediately before
 the same unchanged fatal/2ps observation. No diagnostic rerun is authorized yet.
+
+## Diagnostic outcome and next source-specific preparation
+
+The subsequent observation-only preparation passed50 independent parent tests
+(25748,2.16s); parent verified62 archived hashes before authorizing exactly one
+baseline diagnostic, frozen FWc13a04e539 / HDLf43cdcf9. Original handle69434
+completed exit1 at the same1198594347644fs failure point. Parent read its raw
+terminal: only `dut.core_status_data` differs among217 fields, candidate
+`xx100101` versus reference `00000101`; original and freshly evaluated exact
+comparisons both fail. Bit5 is1 as well as bits7:6 being unknown, so this is
+not explained merely as unknown padding. All other216 fields agree. Original
+and diagnostic partial CSVs remain byte-identical; no complete-run CSV or
+terminal PASS is claimed.
+
+Read-only saved-waveform analysis records the old independent guard's public
+valid high at the fatal instant. Together with its literal current-status
+veto and equality of the two status-valid fields, this implies both raw status
+valids were0. This is a source-backed inference, not direct capture of those
+unlogged raw aliases. Parent read the runtime guard: every status-data consumer
+is gated by status valid, including all three reserved bits and the five-bit
+exponent. The protected mixed-language vendor driver after force/release is
+not proven. No status-bit mask or runtime change has been approved.
+
+The next requested proposal is narrowly protocol-qualified observation of
+this one payload: retain unconditional status-valid and all216 other fields,
+retain all8 payload bits whenever either valid is not exactly0, and separately
+record invalid-only differences. It must preserve valid reserved-bit/exponent
+fault tests, all numerical/CSV/public reason gates and original raw mismatch
+evidence. At this checkpoint that is a proposal, not an implemented comparison
+change or authorized actual rerun.
+
+## Operand physical preparation and first launch failure
+
+Parent read the complete physical runner/XDC/probe/policy and independently
+repeated57 tests (61687,2.72s), then verified953 archived hashes. Preparation
+FW184223801 / HDL7d4efdb3 froze six sources, fixed D18/ROUND1/175MHz and changed
+only REGISTER_OPERANDS between the two arms. Archive SHA256:
+`a2567f8255033677990d81db22be292a85aed9686904bd93ed8759fd34fc13be`.
+
+The two authorized first runs19364/49440 both terminated exit1 before synthesis
+at07:08:40 UTC. Parent checked both compile logs and receipts. System Icarus
+inherited Vivado's incompatible `libstdc++.so.6` and could not find
+`GLIBCXX_3.4.32`; both source-integrity checks stayed clean. There are no DSP,
+resource, placement or timing results from these runs. The failure archive is
+preserved on operand FW83d17873 / unchanged HDL7d4efdb3, SHA256
+`95f9a5df380fe98eeb0aeff6e7536ec46973192a3fb4aee81f587fd7f5bd9514`.
+
+A subprocess-only correction is authorized for implementation/offline testing:
+remove LD_LIBRARY_PATH only for Icarus compiler/runtime children, preserving
+the parent Vivado environment and all RTL/constraints/probe rejection gates.
+New source freeze and parent review are required before any physical rerun.
+The original failures remain retained. Parent's initial preflight pytest temp
+directory was removed by shared pytest retention; its equivalent agent-owned
+raw failures are archived, not substituted for the missing parent raw files.
+Future tests use unique explicit basetemp directories and retained logs.
+
+## Native30 service budget independently checked
+
+Parent read the complete new standalone native30 bench/helpers/tests and
+repeated3 tests (58296,1.05s). With the unchanged public native engine/reducer,
+both the complete8205-sample input and early source-disable case publish in
+19911 engine cycles after capture and finish indexed packet reads/release in
+20700 cycles. All260 samples,129 raw/121 qualified tuples and52 ordered packet
+reads match the frozen independent cohort. Maximum direct AXI transaction
+latency is7 cycles.
+
+The predeclared healthy configured-job bound is22404 derived cycles,24000 for
+publication and28000 including bounded direct AXI readout. A new4096-raw-sample
+continuation leaves31740 engine cycles after capture, with3740 cycles margin.
+This is not an ARM/network arbitration bound or causal acquisition proof.
+The additive combined30 harness remains offline-only pending full source and
+provenance review; no actual FFT, physical receiver, radio or PPU work is
+authorized by this budget result. Full15/30/60 deployment gates are unchanged.

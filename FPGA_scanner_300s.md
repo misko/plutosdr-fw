@@ -53,16 +53,24 @@ isolated hold failures start at top-level ports; those are not waived, and
 neither this local result nor its74-fabric-FF reduction closes bank timing.
 The first active control-candidate comparison failed in both baseline and
 combined modes during the original missing-forward-status epoch. Both failures
-are retained and under read-only diagnosis; no comparison was relaxed and no
-candidate promoted. A separate one-stage operand-register prototype targets
-the BRAM-to-DSP path with explicit added latency and offline qualification.
+are retained. A subsequent unchanged-comparison diagnostic isolates one raw
+FFT status-byte mismatch; status valid was inferred low from the saved guard
+output and literal veto logic. All216 other fields agree. A narrowly qualified
+payload-comparison proposal is under review, not accepted or rerun. No candidate
+is promoted. A separate one-stage operand-register prototype targets the
+BRAM-to-DSP path with explicit added latency and offline qualification. Its
+first two physical attempts failed before synthesis due to an inherited tool
+library conflict; a subprocess-only environment repair is being tested. No
+operand-stage mapping or timing result exists yet.
 
 The30MS/s common-source offline cohort is frozen and independently verified.
 A new explicit30-upper bank+STOP public interface remains isolated/offline;
 its unknown-parameter guard repair and legacy regressions pass340 independent
 parent tests. The unchanged51-file numerical cohort independently rederives.
 Preparation of a real30 common-source bank/native132/PIL1 harness is authorized,
-but no actual FFT launch or runtime promotion yet. Actual30/60 bank/native/pilot
+but no actual FFT launch or runtime promotion yet. Its standalone native service
+budget passes3 independent parent tests, including continued computation after
+source disable; this does not prove the combined FFT composition. Actual30/60 bank/native/pilot
 integration remains open. Latest
 source-specific decisions and measurements:
 [`reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md`](reports/experiments/20260910-high-rate-and-round-boundary-parent-review.md).
