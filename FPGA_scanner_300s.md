@@ -2,6 +2,15 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest retained-output gate (2026-09-10): parent independently repeats415
+offline tests with exact-original clock precision; all46 sources remain pinned.
+Separate403-simulation receipt audit and stricter typed5893-node/69LS graph
+check pass. Nominal3645 and parked4911–4912 cycles remain conditional scripted
+results, not physical/lower-clock qualification. Actual-FFT recipe preparation
+only is next. The parallel sealed-product path needs exact sampled READY and
+publication-only fault seams before P1 integration; no top/vendor/radio action.
+See [full retained-output parent review](reports/experiments/20260910-retained415-parent-review.md).
+
 Latest independent repaired-interface gate (2026-09-10): parent fresh1444 replay
 PASSES (596 new plus848 unchanged). All54 source manifests/498 file entries
 verify; independent full graph has3302nodes/36LS/no cycle and six restored
