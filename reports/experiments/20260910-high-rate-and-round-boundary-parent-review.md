@@ -850,3 +850,45 @@ stimuli and runtime source bytes; observe the same register boundary for those
 three fields without masking fault epochs or dropping comparisons. Genuine
 arithmetic-corruption mutations and wrapper-transport consistency must remain
 detectable. No actual bank retry or arithmetic physical trial is authorized yet.
+
+## Portable control evidence and narrow monitor-test review
+
+Control evidence packaging is now independently qualified. Parent read the full
+lossless reconstruction helper, ten tests and archive README; repeated10 tests
+PASS in0.52s at `/tmp/starlink-wdb-parts-parent.B2lsyM`, including the actual
+105807603-byte gzip and116445321-byte WDB reconstruction. Original hashes remain
+bbc9ffd1d907b80ed4522b0b2d28b1ee62ead1810fc542681a12908b6e8341ea and
+12d13666cf7d62c65581d66150539e2105c5db06d0c621357affb54da3f8a20f.
+All83 portable inventory entries verify, manifest
+`62cfb6821f8a2a4e98664103cffd083b2e92f6690da9293d287b009a671e6914`.
+Parent also checked both original unpublished backup refs, exclusion of those
+oversized commits from pushable ancestry and every newly reachable blob<=40MiB.
+FW45c2f8a325e4911d31f117098e17f591e7149c9e /
+HDL903f9b6823506847b078ee36b893a095ce756b78 are pushed to the existing control
+DO NOT MERGE remotes. The only removal was the monolithic gzip's tracked entry;
+the complete local file and original WDB/project remain intact, and remote parts
+reconstruct both exactly. There was no physical or simulation change.
+
+Arithmetic failure diagnosis is committed and pushed at
+FW2547051646fd759b9b513b8d7f1e57e3673447c3, HDL unchanged5e4c2ad2.
+Parent independently verified all120 diagnosis archive members, SHA256
+`cddc86d78eb0e2275af50006391ecca3cf1ecb239bc699bd3e1abd182b72a3a9`.
+The original336-file failed-run archive remains unchanged and is also remote.
+
+Parent reviewed the draft monitor-boundary tests and exact six-reference delta
+(three fields in each of two observers). No field/checker/epoch is removed;
+the entire old bench inverse remains checked. Frozen wrapper/core hashes prevent
+a changed transport assignment from being hidden by the register observation.
+Offline tests cover healthy option combinations, genuine overflow/position/start/
+I/Q arithmetic corruption, missing/extra rebinding and real guard/mailbox veto
+with an explicitly synthetic non-FFT interface. Offline execution is authorized;
+no actual-bank retry is authorized. Additional bounded internal-wave logging is
+being prepared so a future failure does not again lack its compared vectors.
+
+Parent also read the initial native60 bench/check include. Before measurement,
+the final preparation must explicitly check per-tuple reducer hold<=16 and held
+tuple stability, plus known valid/ready/command/capture flags after configuration;
+the total deadline alone cannot prove these per-step conditions. The clock origin
+is unambiguous: starts0,2.1ns offset then first half-period; first positive edge
+10433333fs, first negative edge18766666fs. Source/numerical/deadline contracts
+remain frozen, and the first native service measurement is still not launched.
