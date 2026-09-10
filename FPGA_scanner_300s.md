@@ -2,6 +2,17 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Next physical gate (2026-09-10, after 15:16 UTC): product-final physical
+preparation independently passes33 tests and closes19 frozen files, including
+eight actual-qualified runtime modules. Exact clocks/constraints/strategy and
+the synthesis owner remain unchanged. One source-pinned OOC synthesis is now
+approved at recovery `product-final-synthesis-v1`, without retry or automatic
+route/promotion. This approval is not a synthesis or timing result. The inverse
+alternative independently passes252 tests, adding actual-third-word status
+ordering. Its observed +3 publication/+6..7 reuse overhead is an unstalled
+fixture result; periodic backpressure needs phase-aware absolute timing checks.
+Neither alternative is a full receiver or radio qualification.
+
 Latest verified increment (2026-09-10, after 14:59 UTC): the product-local final
 publication alternative now PASSES its full vendor FFT run (original50316,
 terminal0, 588.57 seconds). Parent independently checked all65 frozen sources,

@@ -170,3 +170,40 @@ The owner's directed first-word early-status test reports14PASS and publication
 +3/reuse+6..7, separately from the old delayed-status+2/+4..6. Root requested
 an additional actual-third-word witness before the next source freeze; this
 owner result is not yet a parent repeated test or actual-core throughput pass.
+
+### First/third-word cases independently repeated
+
+Parent original89119 exited0: **252 passed in16.93 seconds** at frozen FW
+`26688d6b622355003d4a670e6fceab2754a8dfea` / HDL
+`c121892c028582de04cf6e0479efd3e01385fd80`. The three pytest files are
+`test_inverse_sealed.py`, `test_inverse_sealed_receipts.py` and
+`test_inverse_sealed_early_status.py`; all nine explicit before/after source
+hashes remained stable, including runtime issuer/CDC/top. Recovery tree:
+`inverse-early-parent.c6zzBY4f`. Log SHA-256
+`c92f0e9e4d40e9b3633f23f469091b20a93f513adac5d7245dc5a4946397b819`;
+JUnit `409eabe16860eef1ca837f1d5f4f8553124efdadd710ca0ac60e4cb4900bae66`.
+
+CASE13 retains first-word early status over ten clock offsets. CASE14 adds
+two actual-third-word-order jobs at phase0, with explicit position2 receipts
+and negative first/third receipt substitutions. Both publish three fast clocks
+later than the original guard/mailbox, ACK-to-release remains one, and observed
+complete reuse is6..7 clocks later. Strict whole-bench inverse restores the
+235-test stimulus; runtime and all old fault cases remain unchanged. These are
+nonzero synthetic raw-result tests, not vendor FFT or full-pair measurements.
+
+The <=8 intrinsic/nominal planning allocation is NOT a blanket stalled bound.
+Parent independently enumerated the unchanged `slow_cycle % 17 < 13` READY
+schedule:512 samples starting at available phase8 finish at absolute edge675;
+starting at phase10 finishes at681. The six-slow-edge shift equals10.5 fast
+clocks at175/100MHz before additional release overhead. The reviewer also found
+phase8 in the old sixth stalled block, but cumulative candidate admission drift
+means this counterfactual does not predict that candidate block's result.
+Actual preparation must independently check the unchanged readiness schedule,
+per-domain event times, nominal5215-cycle service requirement and original25k
+drain/8192 guard watchdog bounds. No deadline widening is authorized.
+
+Complete parent252 results/source copies are preserved as
+`20260910-inverse-early-parent.tgz`,18902115 bytes, SHA-256
+`a046ab797cd4d36131502fe36b1f897537dd801f372d77e6467d8e061598213c`.
+`tar --compare` matches retained originals; redundant pytest `*current` aliases
+are omitted. The earlier235 and first-word14-test results remain separate.

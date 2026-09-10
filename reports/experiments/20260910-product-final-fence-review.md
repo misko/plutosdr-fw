@@ -233,3 +233,40 @@ Physical derivation must retain the canonical source/output mailbox AND add
 the product-fence mailbox: eight runtime Verilog files, not the old seven.
 Rename only the top, explicitly bind P1, and use the new `fence-preparation.json`
 settings; the inherited `preparation.json` intentionally describes the old base.
+
+## Physical preparation repeated; one synthesis approved
+
+Parent original10408 exited0: **33 passed in63.32 seconds**, at tested FW
+`3bdaaf06440f969520acaa8828b6c39bc60dc820` / HDL
+`6923f5352951f8e03b9c29b6d4ef3c091a3cac90`.
+Recovery `product-physical-tests-parent.hdSEEaNh`; generator/test before/after
+identities remain exact. Parent read the complete generator/tests, unchanged
+synthesis owner and whole114-line generated Tcl, including its literal inverse
+to the old ROM runner. The separate parent offline smoke1136 also exited0 at
+`product-physical-smoke-parent.3qV9fpx4`.
+
+The owner's frozen `product-final-physical-prepared-v1` matches parent smoke:
+19-file inventory `b3c446578c0c35f8e0f199aa12f66d8635b6f7d21c9b97713a5ffed2ac2b0f06`,
+generated helper `d22bda330f571774a3099d0da9615a6a445e58fb4aecf43d10e6657fc954e876`,
+runner `d46e1f2f1def64f6021c652b65b792ecfc554116b791ef99bec525380ea86406`,
+unchanged owner `d0f36ce2817ab20baaff8668b6743e367d296f7a60e714099fe69aa5b6912111`.
+Parent verifies all19 source hashes; clocks, part, strategy and constraints are
+unchanged. Incorrect/missing/duplicate/X settings, rewritten source inventories,
+old-only actual evidence and damaged owner/terminal receipts are rejected by
+the offline suite. No vendor project is created in those tests.
+
+One exact-source OOC synthesis is approved using that unchanged owner, the
+external inventory above and NEW recovery target `product-final-synthesis-v1`.
+The implementation agent owns the original process to terminal, preserves all
+source/IP/resource evidence and may not retry or route automatically. This is
+not a timing, full-receiver or radio approval. The target was checked absent
+and non-symlink; no prior build is overwritten.
+
+Parent33-test log SHA-256
+`44b148ad2f7f8b85e4290826b5e4cfe46d381dd9bcaf585305b954cc59625e09`;
+JUnit `3b4398a7dab472e080a60afd2c708d49af089b677f682bd614f145a29d18c379`.
+Both parent smoke and full-test trees are preserved in
+`20260910-product-physical-parent.tgz`,13195187 bytes, SHA-256
+`3db77b435be7294f60a2f0754826c9695b35d6b95a7a21d5a489fc9d5dc411d9`.
+Archive compares to retained originals; redundant pytest `*current` aliases
+are omitted, not followed or deleted.
