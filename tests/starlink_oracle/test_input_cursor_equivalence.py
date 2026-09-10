@@ -24,6 +24,13 @@ def test_entire_cursor_delta_preserves_all_public_checks_and_frozen_reference():
     assert tokens(golden.replace("starlink_pss_realtime_input_guard_0a1af893_golden",
         "starlink_pss_realtime_input_guard")) == tokens(baseline)
     candidate = tokens((ACQ / "starlink_pss_realtime_input_guard.v").read_text())
+    # The completed-input experiment exports ONLY an alias of the existing
+    # duplicate-start predicate. Prove that exact addition, then retain the
+    # original whole-body comparison: no input check/reason may be removed.
+    alias_port = "outputwireduplicate_start_fault_now,"
+    alias_assign = "assignduplicate_start_fault_now=duplicate_start;"
+    assert candidate.count(alias_port) == candidate.count(alias_assign) == 1
+    candidate = candidate.replace(alias_port, "", 1).replace(alias_assign, "", 1)
     private = ("if(slot_open&&input_enable&&input_valid&&core_input_tready&&expected_position!=511)"
                "expected_position<=expected_position+1'b1;")
     assert candidate.count(private) == 1
