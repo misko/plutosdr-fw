@@ -20,6 +20,7 @@ else:
     from starlink_glrt_native_abi import RATE, SAMPLES, NativeResult
 
 EXCLUDED_SERIAL = "1040007c4a94000211000b009186843ef2"
+BASE_ABIS = ("GLR1-1.0-upper-only", "GLF1-1.0-upper-only")
 
 
 def save(path, value):
@@ -51,20 +52,20 @@ def wait_result(device, *, deadline, clock=time.monotonic, sleep=time.sleep):
     raise TimeoutError("native result did not become readable")
 
 
-def wait_default(device, *, deadline, clock=time.monotonic, sleep=time.sleep):
+def wait_default(device, *, deadline, base_abi=BASE_ABIS[0], clock=time.monotonic, sleep=time.sleep):
     # IIOD CLOSE can return before asynchronous kernel teardown has completed.
     while clock() < deadline:
-        if device.read("capture_abi") == "GLR1-1.0-upper-only" and device.read("native_capture_enable") == "0":
+        if device.read("capture_abi") == base_abi and device.read("native_capture_enable") == "0":
             return
         sleep(0.01)
-    raise TimeoutError("native teardown did not return to GLR1 mode")
+    raise TimeoutError("native teardown did not return to the pinned base ABI")
 
 
-def restore_default(device, *, deadline, clock=time.monotonic, sleep=time.sleep):
+def restore_default(device, *, deadline, base_abi=BASE_ABIS[0], clock=time.monotonic, sleep=time.sleep):
     # CLOSE may still be retiring DMA. Retry only the driver's EBUSY response;
     # do not treat a failed recovery or another I/O error as successful cleanup.
     while clock() < deadline:
-        if device.read("capture_abi") == "GLR1-1.0-upper-only" and device.read("native_capture_enable") == "0":
+        if device.read("capture_abi") == base_abi and device.read("native_capture_enable") == "0":
             return
         try:
             device.write("native_capture_enable", 0)
@@ -87,6 +88,8 @@ def require_stopped_status(text):
 
 
 def validate_request(args):
+    if getattr(args, "base_abi", BASE_ABIS[0]) not in BASE_ABIS:
+        raise ValueError("unsupported pinned base ABI")
     if not args.uri.startswith("ip:") or not args.serial or args.serial == EXCLUDED_SERIAL:
         raise ValueError("requires Ethernet and a permitted exact receiver serial")
     if not args.firmware_version or not 1 <= args.jobs <= 3:
@@ -99,6 +102,7 @@ def validate_request(args):
 
 def collect(args, *, library=None, context_factory=Context):
     validate_request(args)
+    base_abi = getattr(args, "base_abi", BASE_ABIS[0])
     args.output.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
     deadline = started+60
@@ -111,6 +115,7 @@ def collect(args, *, library=None, context_factory=Context):
         precision_qualified=False, arithmetic_replay_required=True)
     save(args.output/"protocol.json", protocol)
     context = buffer = device = None
+    driver_validated = False
     failures, jobs = [], []
     before = after = None
     try:
@@ -122,8 +127,9 @@ def collect(args, *, library=None, context_factory=Context):
                 before["rx_lo_hz"] != args.lo_hz or before["rf_bandwidth_hz"] != args.bandwidth_hz):
             raise ValueError("RF rate/LO/bandwidth or TX mute differs from pinned request")
         device = context.device("starlink-glrt-iq")
-        if device.read("capture_abi") != "GLR1-1.0-upper-only" or device.read("native_capture_abi") != "GLN1-1.0":
+        if device.read("capture_abi") != base_abi or device.read("native_capture_abi") != "GLN1-1.0":
             raise ValueError("native capture requires the default receiver and GLN1 driver")
+        driver_validated = True
         device.scan(count=2, bits=16, signed=True)
         for index in range(args.jobs):
             if time.monotonic()+5 >= deadline:
@@ -154,7 +160,7 @@ def collect(args, *, library=None, context_factory=Context):
                 raise ValueError("native result differs from the requested phase/sequence")
             buffer.close()
             buffer = None
-            wait_default(device, deadline=min(deadline, time.monotonic()+3))
+            wait_default(device, deadline=min(deadline, time.monotonic()+3), base_abi=base_abi)
             status = device.read("native_capture_status")
             (root/"final-status.txt").write_text(status+"\n")
             require_stopped_status(status)
@@ -180,11 +186,11 @@ def collect(args, *, library=None, context_factory=Context):
             except (OSError, ValueError, RuntimeError) as error:
                 failures.append(f"buffer cleanup: {type(error).__name__}: {error}")
         if device is not None:
-            if buffer is None:
+            if buffer is None and driver_validated:
                 try:
                     # Also cover an error after opt-in but before buffer OPEN.
                     # The kernel refuses this write if recovery is unsafe.
-                    restore_default(device, deadline=time.monotonic()+3)
+                    restore_default(device, deadline=time.monotonic()+3, base_abi=base_abi)
                 except (OSError, ValueError, RuntimeError) as error:
                     failures.append(f"mode cleanup: {type(error).__name__}: {error}")
             for name in ("native_capture_result", "native_capture_status", "capture_abi"):
@@ -209,6 +215,7 @@ def main():
     parser.add_argument("--uri", required=True)
     parser.add_argument("--serial", required=True)
     parser.add_argument("--firmware-version", required=True)
+    parser.add_argument("--base-abi", choices=BASE_ABIS, default=BASE_ABIS[0])
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--lo-hz", type=int, required=True)
     parser.add_argument("--bandwidth-hz", type=int, required=True)

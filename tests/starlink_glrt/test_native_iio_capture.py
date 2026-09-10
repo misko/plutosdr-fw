@@ -37,8 +37,9 @@ def arguments(tmp_path):
 
 
 class Fake:
-    def __init__(self, fault=None):
+    def __init__(self, fault=None, base_abi="GLR1-1.0-upper-only"):
         self.fault = fault
+        self.base_abi = base_abi
         self.values = {"native_capture_enable": "0"}
         self.pending = self.live = False
         self.opens = 0
@@ -70,7 +71,7 @@ class Fake:
 
     def read(self, name):
         if name == "capture_abi":
-            return "GLN1-1.0-native-iq" if self.values["native_capture_enable"] == "1" else "GLR1-1.0-upper-only"
+            return "GLN1-1.0-native-iq" if self.values["native_capture_enable"] == "1" else self.base_abi
         if name == "native_capture_abi":
             return "none" if self.fault == "abi" else "GLN1-1.0"
         if name == "native_capture_result":
@@ -119,9 +120,12 @@ class Fake:
         self.events.append(("context_close",))
 
 
-def test_two_jobs_reopen_native_mode_and_keep_identity_iq_results_and_cleanup(tmp_path):
-    fake = Fake()
-    result = collect(arguments(tmp_path), library=fake, context_factory=fake.context)
+@pytest.mark.parametrize("base_abi", ["GLR1-1.0-upper-only", "GLF1-1.0-upper-only"])
+def test_two_jobs_reopen_native_mode_and_keep_identity_iq_results_and_cleanup(tmp_path, base_abi):
+    fake = Fake(base_abi=base_abi)
+    args = arguments(tmp_path)
+    args.base_abi = base_abi
+    result = collect(args, library=fake, context_factory=fake.context)
     assert result["status"] == "transport_pass" and len(result["jobs"]) == 2
     assert result["precision_qualified"] is False and result["arithmetic_replay_required"] is True
     assert fake.opens == 2 and fake.events[-1] == ("context_close",)
@@ -129,6 +133,21 @@ def test_two_jobs_reopen_native_mode_and_keep_identity_iq_results_and_cleanup(tm
     assert (tmp_path/"capture/job-0/iq.ci16").stat().st_size == 316800
     assert (tmp_path/"capture/job-1/result.raw").stat().st_size == 128
     assert json.loads((tmp_path/"capture/protocol.json").read_text())["sample_rate_hz"] == 60000000
+
+
+@pytest.mark.parametrize("expected,actual", [
+    ("GLR1-1.0-upper-only", "GLF1-1.0-upper-only"),
+    ("GLF1-1.0-upper-only", "GLR1-1.0-upper-only"),
+    ("GLF1-1.0-upper-only", "GLN1-1.0-native-iq"),
+])
+def test_wrong_base_profile_rejected_without_writes_or_capture(tmp_path, expected, actual):
+    fake = Fake(base_abi=actual)
+    args = arguments(tmp_path)
+    args.base_abi = expected
+    result = collect(args, library=fake, context_factory=fake.context)
+    assert result["status"] == "failed" and fake.opens == 0
+    assert not any(entry[0] == "write" for entry in fake.events)
+    assert fake.events[-1] == ("context_close",)
 
 
 @pytest.mark.parametrize("fault", ["abi", "tx", "open", "timeout", "cancel", "short", "tag", "phase", "arithmetic", "cleanup"])
@@ -143,7 +162,8 @@ def test_failed_capture_preserves_failure_and_does_not_start_another_job(tmp_pat
 
 
 @pytest.mark.parametrize("name,value", [("uri", "usb:1.2.3"), ("serial", "1040007c4a94000211000b009186843ef2"),
-    ("jobs", 0), ("jobs", 4), ("tag", 0), ("phase_step", 2**32), ("lead_samples", 5999)])
+    ("jobs", 0), ("jobs", 4), ("tag", 0), ("phase_step", 2**32), ("lead_samples", 5999),
+    ("base_abi", "GLF1-2.0-upper-only")])
 def test_invalid_request_is_rejected_before_context_or_output(tmp_path, name, value):
     args = arguments(tmp_path)
     setattr(args, name, value)

@@ -78,7 +78,7 @@ def write_newc(entries: list[Entry]) -> bytes:
     return bytes(result)
 
 
-def stamp_rootfs(compressed: bytes, versions: str) -> bytes:
+def stamp_rootfs(compressed: bytes, versions: str, *, lean_init: bytes | None = None) -> bytes:
     entries = read_newc(gzip.decompress(compressed))
     by_name = {entry.name.removeprefix("./"): entry for entry in entries}
     if len(by_name) != len(entries):
@@ -91,6 +91,10 @@ def stamp_rootfs(compressed: bytes, versions: str) -> bytes:
     if by_name["opt/VERSIONS"].fields[1] & 0o170000 != 0o100000:
         raise ValueError("rootfs VERSIONS is not a regular file")
     by_name["opt/VERSIONS"].data = versions.encode()
+    if lean_init is not None:
+        if by_name["etc/init.d/S22starlink_glrt_iio"].fields[1] & 0o170000 != 0o100000:
+            raise ValueError("rootfs GLRT init is not a regular file")
+        by_name["etc/init.d/S22starlink_glrt_iio"].data = lean_init
     return gzip.compress(write_newc(entries), mtime=0)
 
 
@@ -147,6 +151,7 @@ def package(args):
     if rate not in (2_500_000, 5_000_000, 10_000_000, 25_000_000, 60_000_000):
         raise ValueError("unsupported board source rate")
     native_inputs = verify_native_selection(board, audit, rate)
+    lean_profile = (board / "legacy_scorer.txt").exists() and (board / "legacy_scorer.txt").read_text().strip() == "0"
     bit = board / "hdl/projects/pluto/pluto.runs/impl_1/system_top.bit"
     xsa = board / "hdl/projects/pluto/pluto.sdk/system_top.xsa"
     frozen_outputs = dict(line.split(maxsplit=1)[::-1] for line in (board / "outputs.sha256").read_text().splitlines())
@@ -178,8 +183,12 @@ def package(args):
     inputs = [bit, xsa, rootfs, dtb, kernel / "arch/arm/boot/zImage", kernel / ".config",
               ROOT / "scripts/pluto-glrt.its", Path(__file__), mkimage, dtc,
               audit_root / "audit.tsv", audit_root / "bus_skew.rpt", *native_inputs]
+    lean_init = ROOT / "buildroot/board/pluto/S22starlink_glrt_iio"
+    if lean_profile:
+        inputs.append(lean_init)
     hashes = {str(path): digest(path) for path in inputs}
-    stamped = stamp_rootfs(rootfs.read_bytes(), versions)
+    stamped = stamp_rootfs(rootfs.read_bytes(), versions,
+                          lean_init=lean_init.read_bytes() if lean_profile else None)
     args.output.mkdir(parents=True, exist_ok=False)
     build, scripts = args.output / "build", args.output / "scripts"
     build.mkdir()
@@ -204,7 +213,8 @@ def package(args):
     manifest = {"schema": "starlink-glrt-ram-package/v1", "firmware_label": args.label,
                 "source_rate_hz": rate, "output_rate_hz": 2_500_000, "edge": "upper",
                 "source_commits": source_commits, "kernel_release": release,
-                "input_sha256": hashes, "rootfs_replaced_members": ["opt/VERSIONS"],
+                "input_sha256": hashes, "rootfs_replaced_members": ["opt/VERSIONS"] +
+                    (["etc/init.d/S22starlink_glrt_iio"] if lean_profile else []),
                 "commands": commands, "outputs_sha256": {p.name: digest(p) for p in (fit, dfu)},
                 "internal_setup_slack_ns": float(audit["setup_slack_ns"]),
                 "internal_hold_slack_ns": float(audit["hold_slack_ns"]),

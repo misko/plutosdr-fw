@@ -30,10 +30,11 @@ def extract(archive, name):
                           input=gzip.decompress(archive), capture_output=True, check=True).stdout
 
 
-def test_stamped_archive_preserves_binary_members_modes_and_links(tmp_path):
+@pytest.mark.parametrize("lean_init", [None, b"#!/bin/sh\necho GLF1\n"])
+def test_stamped_archive_preserves_binary_members_modes_and_links(tmp_path, lean_init):
     original = rootfs(tmp_path)
     versions = "device-fw glrt-fixture\nhdl 123456789\n"
-    stamped = stamp_rootfs(original, versions)
+    stamped = stamp_rootfs(original, versions, lean_init=lean_init)
     assert extract(stamped, "opt/VERSIONS") == versions.encode()
     assert extract(original, "opt/VERSIONS") == b"device-fw old\nhdl old\n"
     assert extract(stamped, "usr/sbin/iiod") == b"\0BIN\xff\x10"
@@ -41,9 +42,12 @@ def test_stamped_archive_preserves_binary_members_modes_and_links(tmp_path):
     assert [e.name for e in before] == [e.name for e in after]
     for a, b in zip(before, after):
         assert a.fields[:6] == b.fields[:6] and a.fields[7:] == b.fields[7:]
-        if a.name != "opt/VERSIONS":
+        if a.name == "etc/init.d/S22starlink_glrt_iio" and lean_init is not None:
+            assert b.data == lean_init
+            assert extract(stamped, a.name) == lean_init
+        elif a.name != "opt/VERSIONS":
             assert a.data == b.data
-    assert stamp_rootfs(original, versions) == stamped  # Stable gzip header.
+    assert stamp_rootfs(original, versions, lean_init=lean_init) == stamped  # Stable gzip header.
 
 
 def test_legacy_pss_rootfs_and_truncated_archives_are_rejected(tmp_path):
