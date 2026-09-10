@@ -1,0 +1,78 @@
+{
+  "starlink_pss_result_guard_owner_view.v": [
+    [
+      "  parameter integer USE_PRIVATE_DESCRIPTOR_OFFER = 0,",
+      "  parameter integer USE_PRIVATE_DESCRIPTOR_OFFER = 0,\n  parameter integer REQUIRE_KNOWN_COMPLETED_INPUT = 0,"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (REQUIRE_KNOWN_COMPLETED_INPUT !== 0 && REQUIRE_KNOWN_COMPLETED_INPUT !== 1)\n      $fatal(1, \"known completed-input mode must be zero or one\");\n    if (REQUIRE_KNOWN_COMPLETED_INPUT === 1 && USE_COMPLETED_INPUT_FAULT !== 1)\n      $fatal(1, \"known completed-input mode requires completed-return contract\");\n"
+    ],
+    [
+      "  wire return_phase_allowed = !USE_COMPLETED_INPUT_FAULT || completed_input_certified;",
+      "  // Opt-in fail-closed visibility: X/Z certification is not publication authority.\n  // Private storage, unrestricted diagnostics and all ACK gates are unchanged.\n  wire return_phase_allowed = !USE_COMPLETED_INPUT_FAULT ||\n    (REQUIRE_KNOWN_COMPLETED_INPUT ? completed_input_certified === 1'b1 : completed_input_certified);"
+    ]
+  ],
+  "starlink_pss_fft_retained_output_impl.v": [
+    [
+      "  parameter integer PRIVATE_DESCRIPTOR_OFFER = 0\n",
+      "  parameter integer PRIVATE_DESCRIPTOR_OFFER = 0,\n  parameter integer CLOSED_INPUT_CUTOVER = 0\n"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (CLOSED_INPUT_CUTOVER !== 0 && CLOSED_INPUT_CUTOVER !== 1)\n      $fatal(1, \"closed-input cutover mode must be known zero or one\");\n"
+    ],
+    [
+      "  wire [7:0] cutover_reasons, retained_reasons;",
+      "  wire [7:0] cutover_reasons, retained_reasons;\n  wire cutover_closed_input_fault_now;"
+    ],
+    [
+      "    .USE_PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER),",
+      "    .USE_PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER),\n    .REQUIRE_KNOWN_COMPLETED_INPUT(CLOSED_INPUT_CUTOVER),"
+    ],
+    [
+      "    cutover_fault_now || (|cutover_reasons) || retained_fault_now || (|retained_reasons);\n  wire [1:0] guard_ready",
+      "    (CLOSED_INPUT_CUTOVER ? cutover_closed_input_fault_now : cutover_fault_now) ||\n    (|cutover_reasons) || retained_fault_now || (|retained_reasons);\n  wire [1:0] guard_ready"
+    ],
+    [
+      "  starlink_pss_core_job_cutover cutover (",
+      "  starlink_pss_core_job_cutover #(.ENABLE_CLOSED_INPUT_VIEW(CLOSED_INPUT_CUTOVER)) cutover ("
+    ],
+    [
+      "    .fault_now(cutover_fault_now), .routed_inverse(routed_inverse), .fault_reasons(cutover_reasons)",
+      "    .fault_now(cutover_fault_now), .routed_inverse(routed_inverse), .fault_reasons(cutover_reasons),\n    .closed_input_fault_now(cutover_closed_input_fault_now)"
+    ]
+  ],
+  "starlink_pss_fft_bank_owned_retained_output_probe.v": [
+    [
+      "  parameter integer PRIVATE_DESCRIPTOR_OFFER = 0\n",
+      "  parameter integer PRIVATE_DESCRIPTOR_OFFER = 0,\n  parameter integer CLOSED_INPUT_CUTOVER = 0\n"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (CLOSED_INPUT_CUTOVER !== 0 && CLOSED_INPUT_CUTOVER !== 1)\n      $fatal(1, \"closed-input cutover mode must be known zero or one\");\n"
+    ],
+    [
+      "      .PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER)) island (.*);",
+      "      .PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER),\n      .CLOSED_INPUT_CUTOVER(CLOSED_INPUT_CUTOVER)) island (.*);"
+    ]
+  ],
+  "starlink_pss_core_job_cutover.v": [
+    [
+      "module starlink_pss_core_job_cutover (",
+      "module starlink_pss_core_job_cutover #(\n  parameter integer ENABLE_CLOSED_INPUT_VIEW = 0\n) ("
+    ],
+    [
+      "  output wire routed_inverse,",
+      "  output wire routed_inverse,\n  output wire closed_input_fault_now,"
+    ],
+    [
+      "  // Seventeen state bits, all common-epoch reset except the reset observations.",
+      "  initial begin\n    if (ENABLE_CLOSED_INPUT_VIEW !== 0 && ENABLE_CLOSED_INPUT_VIEW !== 1)\n      $fatal(1, \"closed-input cutover view must be known zero or one\");\n  end\n  // Seventeen state bits, all common-epoch reset except the reset observations."
+    ],
+    [
+      "  assign routed_inverse = owner_inverse;",
+      "  // Parallel observation only: literal fault predicate with the two input\n  // strobes set to zero. Caller may consume only in a KNOWN completed-input\n  // public-return phase. Unrestricted current diagnostics remain above/below.\n  wire closed_known = (core_resetn === 1'b0 || core_resetn === 1'b1) &&\n    (raw_frame === 1'b0 || raw_frame === 1'b1) &&\n    (raw_output === 1'b0 || raw_output === 1'b1) &&\n    (raw_status === 1'b0 || raw_status === 1'b1) &&\n    (^raw_vendor_faults !== 1'bx) &&\n    (1'b0 === 1'b0 || 1'b0 === 1'b1) &&\n    (1'b0 === 1'b0 || 1'b0 === 1'b1);\n  wire closed_early_result = (raw_output || raw_status) &&\n    (!(fresh_frame || raw_frame) || !(fresh_full || 1'b0));\n  assign closed_input_fault_now = ENABLE_CLOSED_INPUT_VIEW ? resetn &&\n    (!closed_known || raw_vendor_faults !== 3'b0 || orphan || closed_early_result || premature_reset) : 1'b0;\n  assign routed_inverse = owner_inverse;"
+    ]
+  ]
+}
