@@ -1,0 +1,15 @@
+{
+  "archive": "20260910-high-rate60-late-original-failure-v1.tgz",
+  "sha256": "b731571cbd8ed78af1224d585d483db98b8bcd53a6764f734edf7a255ed55c33",
+  "bytes": 2411027,
+  "safe_regular_members": 452,
+  "hash_receipts": 451,
+  "classification": "original actual88460 overallFAIL; bench completed, frozen first-audit cycle gate failed",
+  "tested_fw": "ba2f8ca59b76a07f0fcbac84371dd2e8a8010056",
+  "tested_hdl": "813f9eb17c8c1680ef160f202756e25c6a2878b2",
+  "raw_files": 670,
+  "raw_bytes": 55780194,
+  "raw_run": "/tmp/starlink-bank-route.I50MDJ/main-high-rate60-bank175-late447-v1",
+  "source_changes_after_original_launch": false,
+  "retries": 0
+}
