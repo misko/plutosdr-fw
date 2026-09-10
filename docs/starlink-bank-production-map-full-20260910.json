@@ -1,0 +1,468 @@
+{
+  "schema": "starlink-bank-production-map-full-v1",
+  "status": "pass",
+  "tested_firmware_commit": "e2f3a582be5d24aef3bf72029a4af0fb2c046d99",
+  "tested_hdl_commit": "22aa00d457576927dcb11927fc9e6e6a6aaf32df",
+  "source_signature": "b10e4f2384084f7caff844d7508fff0a538e09caf8f3713d6fddcb7f2f39b75a",
+  "original_process": {
+    "original_session_id": 88186,
+    "vivado_pid": 3119763,
+    "xsim_kernel_pid": 3120347,
+    "exit_code": 0,
+    "poll_count": 95,
+    "polling_elapsed_seconds": 5651,
+    "polling_interval_maximum_ms": 60000,
+    "restarts": 0,
+    "observed_vivado_exit_log_utc": "2026-09-10 05:12:16",
+    "verified_after_close_sim_and_close_project": true,
+    "source_signature": "b10e4f2384084f7caff844d7508fff0a538e09caf8f3713d6fddcb7f2f39b75a"
+  },
+  "frozen_files_byte_match_reviewed_smoke": 61,
+  "bench_rows": {
+    "BANK_PRODUCTION_MAP_PROGRESS": [
+      "BANK_PRODUCTION_MAP_PROGRESS selected_prefix=200000 time_ns=13592095.000",
+      "BANK_PRODUCTION_MAP_PROGRESS selected_prefix=400000 time_ns=26922235.000",
+      "BANK_PRODUCTION_MAP_PROGRESS selected_prefix=600000 time_ns=40259835.000",
+      "BANK_PRODUCTION_MAP_PROGRESS selected_prefix=800000 time_ns=53589995.000",
+      "BANK_PRODUCTION_MAP_PROGRESS selected_prefix=1000000 time_ns=66927595.000",
+      "BANK_PRODUCTION_MAP_PROGRESS selected_prefix=1200000 time_ns=80257735.000"
+    ],
+    "BANK_PRODUCTION_MAP_COMPLETE": [
+      "BANK_PRODUCTION_MAP_COMPLETE epoch=1 bins=20000 frames=64 selected=1280000 residue=239 fft_support=1280273 source_at_stop=1280854 potential_tail=208 visible_scores=1280001 visible_tail=1 forward_input=1466880 inverse_input=1466368 forward=1466368 product=1466368 inverse=1466368 energies=1280004 ratios=1280003 retained_source=19520 map_words=20000 elapsed_ns=85390294.998"
+    ],
+    "BANK_PRODUCTION_MAP_PARTIAL": [
+      "BANK_PRODUCTION_MAP_PARTIAL fresh_scores=447 accepted=447 aborts=1 failed=1 historical_generation=1 reason=10 full_production_map_recovery=0"
+    ],
+    "BANK_PRODUCTION_MAP_TOTAL": [
+      "BANK_PRODUCTION_MAP_TOTAL exact_scores=1280448 admitted_scores=1280447 visible_tail_scores=1 exact_source=1301644 exact_forward_input=1467904 exact_inverse_input=1467392 exact_forward=1467392 exact_product=1467392 exact_inverse=1466880 exact_energies=1280451 exact_ratios=1280450 exact_map_words=20000 terminals=2"
+    ],
+    "BANK_PRODUCTION_MAP_PASS": [
+      "BANK_PRODUCTION_MAP_PASS production=1 complete_maps=1 fresh_partial=447 actual_core=1 slow_mhz=100 fft_mhz=175 PERIODIC_GEOMETRY_ARITHMETIC_NOT_RF_OR_PHYSICAL_TIMING"
+    ]
+  },
+  "runtime_receipt": "launch_compile_elaborate_simulation_wall_ms=5715646",
+  "simulation_cpu_receipt": [
+    "INFO: xsimkernel Simulation Memory Usage: 135536 KB (Peak: 184844 KB), Simulation CPU Usage: 5683370 ms"
+  ],
+  "simulation_finish_receipt": [
+    "$finish called at time : 86977990 ns : File \"/tmp/starlink-coarse-alternatives.Y3JzOI/production-map/hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/tb_starlink_pss_bank_production_map.sv\" Line 380"
+  ],
+  "scope": "one full20000x64 periodic synthetic geometry/arithmetic map plus fresh447 partial abort; ideal100/175 clocks; not full second-map recovery, RF, native fine, pilot, physical timing, or live capacity",
+  "prelaunch_receipt": "docs/starlink-bank-production-map-prelaunch-20260910.json",
+  "prelaunch_archive_sha256": "56ef3a428bd29d174a5939d231b8d964dc4a3f730ff0845eba2f5ef39e0abed9",
+  "omissions": "No large waves, generated vendor IP projects/binaries or C-model shared libraries. Original seven goldens, all14 periodic files, oracle dependencies and wrapper/archive/library hashes retained.",
+  "files": {
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/__init__.py": {
+      "bytes": 4493,
+      "sha256": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/acquisition.py": {
+      "bytes": 19370,
+      "sha256": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/create_shared_realtime_xfft_ip.tcl": {
+      "bytes": 3158,
+      "sha256": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/ddc.py": {
+      "bytes": 14195,
+      "sha256": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/denominators_u69.mem": {
+      "bytes": 8493,
+      "sha256": "60407fcfe6598b56d8973967a88b2cd84b00b7f18b521ba49bdb30429149ac9f"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/energies_u38.mem": {
+      "bytes": 4917,
+      "sha256": "96d8bce6c6eea213159a550d6568e90ef1629d2f4966e52688225b2346ad1244"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/fixed.py": {
+      "bytes": 6667,
+      "sha256": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/forward_exponents.mem": {
+      "bytes": 3,
+      "sha256": "037c23a98251fd952216f9ea80cd5c1e74ce33f8f14e071f703a4fd92040eb65"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/forward_q17.mem": {
+      "bytes": 5120,
+      "sha256": "1a332e0e2ec4eec0401df35106e07a44a7e934c91844c3e2f380c52ba70280bf"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/generate_starlink_periodic_map_vectors.py": {
+      "bytes": 13488,
+      "sha256": "62d009c9aa5dd910eb98265a243b00087b3d79eb6c20c921ef6bf668dfd6b490"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/inverse_exponents.mem": {
+      "bytes": 3,
+      "sha256": "037c23a98251fd952216f9ea80cd5c1e74ce33f8f14e071f703a4fd92040eb65"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/inverse_q17.mem": {
+      "bytes": 5120,
+      "sha256": "83d8d60b32c9accea3f7a4f006920001b543fe8254975f0adfb147173bd9d742"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/map_production_u16.mem": {
+      "bytes": 100000,
+      "sha256": "7dedc4a434401a50183a53ca33d5e966c2c435a014121a53d2e7a1490fae4f9f"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/map_smoke_u16.mem": {
+      "bytes": 1715,
+      "sha256": "e89aa2bddaa91b9776ee03aee1a820c82b4ad5ae0748ae377fbe55da793a1622"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/numerators_u69.mem": {
+      "bytes": 8493,
+      "sha256": "883884d24760964425a64ba6150d6bc3601c114ce5165682f0334b9aa6747be7"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/numerology.py": {
+      "bytes": 2159,
+      "sha256": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/period_ci16.mem": {
+      "bytes": 4023,
+      "sha256": "295747fbbcc02bcf7bf2811e4ae12c3934e1670b44c1032a03d85af468a2c239"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/periodic_vectors.json": {
+      "bytes": 7280,
+      "sha256": "4785961b61782f978c58f0e35c6d52a3ad1c406798e8bb55ff1311dc14dd01dc"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/power_shift_u7.mem": {
+      "bytes": 3,
+      "sha256": "b08368ef607f585d9c4b89b802233a66b5d6f7dc729ff9798214c68aae3a62bc"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/product_q17.mem": {
+      "bytes": 5120,
+      "sha256": "ab3cdc164f7d776cf10c635c6402407e2e50c2bb80540643b8914da227664fe9"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/run_bank_map_no_waves.tcl": {
+      "bytes": 88,
+      "sha256": "97e06788109c25a7d095054a73b72b2ebfb9ee0a2350c2b13a226608a4aed97a"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/saturated_u1.mem": {
+      "bytes": 894,
+      "sha256": "36f3ec324e9c6f3472ac134fd099768274eee315d0620404b397cd5fbd95434d"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/scores_u8.mem": {
+      "bytes": 1341,
+      "sha256": "82b2b0a3e72566df87784aeaf06eca1c122b36e30b8d7377c17b936c2a654ac2"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/search.py": {
+      "bytes": 5374,
+      "sha256": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/simulate_bank_production_map.tcl": {
+      "bytes": 10012,
+      "sha256": "2903ff7040e772e571215cd99874235faccfd551ef0df5f8ed40d1ea3133d1dc"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_acquisition_health.v": {
+      "bytes": 5154,
+      "sha256": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_block_mailbox.v": {
+      "bytes": 10098,
+      "sha256": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_candidate_score_path.v": {
+      "bytes": 10847,
+      "sha256": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_energy_cache.v": {
+      "bytes": 9647,
+      "sha256": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_energy_join.v": {
+      "bytes": 6039,
+      "sha256": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_fft_bank_owned_slice.v": {
+      "bytes": 16140,
+      "sha256": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_forward_kernel_join.v": {
+      "bytes": 3648,
+      "sha256": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_ifft_qualifier.v": {
+      "bytes": 5748,
+      "sha256": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_iq_to_phase_map.v": {
+      "bytes": 18212,
+      "sha256": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_iq_to_score.v": {
+      "bytes": 31646,
+      "sha256": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_iq_to_score_bank_owned.v": {
+      "bytes": 9689,
+      "sha256": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_iq_to_score_shared.v": {
+      "bytes": 25762,
+      "sha256": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_kernel_rom.v": {
+      "bytes": 5403,
+      "sha256": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_overlap_scheduler.v": {
+      "bytes": 11106,
+      "sha256": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_phase_map.v": {
+      "bytes": 29457,
+      "sha256": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_phase_map_bank.v": {
+      "bytes": 3222,
+      "sha256": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_raw_result_fifo.v": {
+      "bytes": 4647,
+      "sha256": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_realtime_input_guard.v": {
+      "bytes": 4778,
+      "sha256": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_realtime_result_guard.v": {
+      "bytes": 16867,
+      "sha256": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_score_divider.v": {
+      "bytes": 6144,
+      "sha256": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_score_divider_radix4.v": {
+      "bytes": 6902,
+      "sha256": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_score_lanes.v": {
+      "bytes": 5584,
+      "sha256": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_score_phase_tagger.v": {
+      "bytes": 3905,
+      "sha256": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_score_prepare.v": {
+      "bytes": 6907,
+      "sha256": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_shared_realtime_xfft_service.v": {
+      "bytes": 14226,
+      "sha256": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_shared_xfft_service.v": {
+      "bytes": 12731,
+      "sha256": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_spectrum_product.v": {
+      "bytes": 6843,
+      "sha256": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_transform_fifo.v": {
+      "bytes": 5913,
+      "sha256": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/starlink_pss_xfft_block_adapter.v": {
+      "bytes": 15629,
+      "sha256": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/tb_starlink_pss_bank_production_map.sv": {
+      "bytes": 23595,
+      "sha256": "05a7581a5664ad152974d1f01912eefbf7aa1ca4ebf2c31bcecced7073b1ffe9"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/test_starlink_bank_production_map_policy.py": {
+      "bytes": 14004,
+      "sha256": "474fa0dd57b74285b9975863d084b41c6f1e95d5c3c78d0dce23dab67beb018b"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/upper_edge_pss_kernel_q17.mem": {
+      "bytes": 5120,
+      "sha256": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/verify_bank_production_map_result.tcl": {
+      "bytes": 5309,
+      "sha256": "8c15bfa801f18a85b62b15fb6ab0a374ebee8bae95a66cb21ddccf8a26e4d261"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/verify_realtime_probe_result.tcl": {
+      "bytes": 1694,
+      "sha256": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/waveforms.py": {
+      "bytes": 8470,
+      "sha256": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/frozen_sources/xfft_bitacc.py": {
+      "bytes": 20325,
+      "sha256": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/generated_ip.txt": {
+      "bytes": 351,
+      "sha256": "2f125fd76c2cc8523437b78c06545a9d0401d0352c075a11f99edf5bd83a98fa"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/process_terminal.json": {
+      "bytes": 421,
+      "sha256": "1bc050b37b2b7f9823ad77ca7a04c0bb26c44d83411a7f3978f58849e8b03446"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/project/bank_production_map.sim/sim_1/behav/xsim/elaborate.log": {
+      "bytes": 25950,
+      "sha256": "ac3ca0d638198408a15560fe7c229bc75ac42055b91dc45c7ee22f2a638f919d"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/project/bank_production_map.sim/sim_1/behav/xsim/simulate.log": {
+      "bytes": 1798,
+      "sha256": "08edeb25f5b3ba3cc887dc2399c9f4fd63f96b83594ee9451da142f6f00bd937"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/project/bank_production_map.sim/sim_1/behav/xsim/xvhdl.log": {
+      "bytes": 407,
+      "sha256": "937c1bbc5ad799d8d71c7b4f823a9584dffa788748b94d77107ae4c9f434c0fd"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/project/bank_production_map.sim/sim_1/behav/xsim/xvlog.log": {
+      "bytes": 9724,
+      "sha256": "6104593579694bc589b608051f30531bf8fcbe6fce6d46856da5612c0d2da4c8"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/runtime.txt": {
+      "bytes": 52,
+      "sha256": "4954de36734646d65f791b6cc10f81a07ced047ba521e504b1521782d0da1b39"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1/scope.txt": {
+      "bytes": 15276,
+      "sha256": "49fc2b4ce69e23be42bdbde426b5c79819c2bcaf7779601a8d06105603ec1dc3"
+    },
+    "hdl/library/starlink_pss_acquisition/build/bank-production-map-full-v1.vivado.log": {
+      "bytes": 71811,
+      "sha256": "d1aff13f172b53f60a35a3934a2e20dcd2f12529ac396ea4c85653f96afd829b"
+    },
+    "hdl/library/starlink_pss_acquisition/build/package_production_map_full.py": {
+      "bytes": 4399,
+      "sha256": "e3cdc921d9ffb01a025fa8cf0403785ef50eeb532ec5597ae27f129d172ba883"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/denominators_u69.mem": {
+      "bytes": 8493,
+      "sha256": "60407fcfe6598b56d8973967a88b2cd84b00b7f18b521ba49bdb30429149ac9f"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/energies_u38.mem": {
+      "bytes": 4917,
+      "sha256": "96d8bce6c6eea213159a550d6568e90ef1629d2f4966e52688225b2346ad1244"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/forward_exponents.mem": {
+      "bytes": 3,
+      "sha256": "037c23a98251fd952216f9ea80cd5c1e74ce33f8f14e071f703a4fd92040eb65"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/forward_q17.mem": {
+      "bytes": 5120,
+      "sha256": "1a332e0e2ec4eec0401df35106e07a44a7e934c91844c3e2f380c52ba70280bf"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/inverse_exponents.mem": {
+      "bytes": 3,
+      "sha256": "037c23a98251fd952216f9ea80cd5c1e74ce33f8f14e071f703a4fd92040eb65"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/inverse_q17.mem": {
+      "bytes": 5120,
+      "sha256": "83d8d60b32c9accea3f7a4f006920001b543fe8254975f0adfb147173bd9d742"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/map_production_u16.mem": {
+      "bytes": 100000,
+      "sha256": "7dedc4a434401a50183a53ca33d5e966c2c435a014121a53d2e7a1490fae4f9f"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/map_smoke_u16.mem": {
+      "bytes": 1715,
+      "sha256": "e89aa2bddaa91b9776ee03aee1a820c82b4ad5ae0748ae377fbe55da793a1622"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/numerators_u69.mem": {
+      "bytes": 8493,
+      "sha256": "883884d24760964425a64ba6150d6bc3601c114ce5165682f0334b9aa6747be7"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/__init__.py": {
+      "bytes": 4493,
+      "sha256": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/acquisition.py": {
+      "bytes": 19370,
+      "sha256": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/ddc.py": {
+      "bytes": 14195,
+      "sha256": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/fixed.py": {
+      "bytes": 6667,
+      "sha256": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/generate_starlink_periodic_map_vectors.py": {
+      "bytes": 13488,
+      "sha256": "62d009c9aa5dd910eb98265a243b00087b3d79eb6c20c921ef6bf668dfd6b490"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/numerology.py": {
+      "bytes": 2159,
+      "sha256": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/search.py": {
+      "bytes": 5374,
+      "sha256": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/waveforms.py": {
+      "bytes": 8470,
+      "sha256": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/oracle_sources/xfft_bitacc.py": {
+      "bytes": 20325,
+      "sha256": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/original_goldens/forward_exponents.mem": {
+      "bytes": 9,
+      "sha256": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/original_goldens/forward_q17.mem": {
+      "bytes": 15360,
+      "sha256": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/original_goldens/inverse_exponents.mem": {
+      "bytes": 9,
+      "sha256": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/original_goldens/inverse_q17.mem": {
+      "bytes": 15360,
+      "sha256": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/original_goldens/product_q17.mem": {
+      "bytes": 15360,
+      "sha256": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/original_goldens/samples_ci16.mem": {
+      "bytes": 12654,
+      "sha256": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/original_goldens/scores_u8.mem": {
+      "bytes": 4023,
+      "sha256": "c22f751a2a82244268dd9ea4989c4ff3b5364c172526e80886c5da3d1959e45d"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/period_ci16.mem": {
+      "bytes": 4023,
+      "sha256": "295747fbbcc02bcf7bf2811e4ae12c3934e1670b44c1032a03d85af468a2c239"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/periodic_vectors.json": {
+      "bytes": 7280,
+      "sha256": "4785961b61782f978c58f0e35c6d52a3ad1c406798e8bb55ff1311dc14dd01dc"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/power_shift_u7.mem": {
+      "bytes": 3,
+      "sha256": "b08368ef607f585d9c4b89b802233a66b5d6f7dc729ff9798214c68aae3a62bc"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/product_q17.mem": {
+      "bytes": 5120,
+      "sha256": "ab3cdc164f7d776cf10c635c6402407e2e50c2bb80540643b8914da227664fe9"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/saturated_u1.mem": {
+      "bytes": 894,
+      "sha256": "36f3ec324e9c6f3472ac134fd099768274eee315d0620404b397cd5fbd95434d"
+    },
+    "hdl/library/starlink_pss_acquisition/build/periodic-map-vectors-v4/scores_u8.mem": {
+      "bytes": 1341,
+      "sha256": "82b2b0a3e72566df87784aeaf06eca1c122b36e30b8d7377c17b936c2a654ac2"
+    },
+    "hdl/library/starlink_pss_acquisition/build/production-map-policy-v4.xml": {
+      "bytes": 22166,
+      "sha256": "25ba636f29937d5b9411f341657d9c353407373488bdd8478e13f145a6820628"
+    }
+  }
+}
