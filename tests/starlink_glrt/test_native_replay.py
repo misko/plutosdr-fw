@@ -2,6 +2,8 @@
 import hashlib
 import json
 import struct
+import subprocess
+import sys
 from dataclasses import replace
 from fractions import Fraction
 
@@ -9,10 +11,12 @@ import pytest
 
 from tools.starlink_glrt_native_abi import RATE, SAMPLES, NativeResult
 from tools.starlink_glrt_native_replay import round_even, verify, verify_capture
+from tools.starlink_glrt_native_capture import collect
 
 from .ddc import BANK_ROOT
 from .test_native_capture_rtl import native_bank
 from .test_native_control_rtl import record
+from .test_native_iio_capture import Fake, arguments
 
 
 @pytest.fixture(scope="module")
@@ -135,3 +139,36 @@ def test_exact_capture_rejects_wrong_start_even_with_self_consistent_transport(t
     (tmp_path/"protocol.json").write_text(json.dumps(protocol))
     with pytest.raises(ValueError, match="requested exact start"):
         verify_capture(tmp_path, BANK_ROOT/"native_cubic_60000000_upper.mem")
+
+
+def test_collector_output_replays_through_cli_without_receipt_translation(tmp_path, evidence):
+    payload, iq = evidence
+    result = NativeResult.decode(payload)
+    args = arguments(tmp_path)
+    args.jobs, args.start_sample, args.tag = 1, result.start, result.tag
+    args.phase_seed, args.phase_step = result.phase_seed, result.phase_step
+    args.base_abi = "GLF1-1.0-upper-only"
+    fake = Fake(base_abi=args.base_abi)
+    open_buffer = fake.buffer
+
+    def oracle_buffer(samples, kernel_buffers):
+        buffer = open_buffer(samples, kernel_buffers)
+        fake.record = "GLN1 00010000 " + " ".join(
+            f"{word:08x}" for word in struct.unpack("<32I", payload))
+        buffer.refill = lambda: iq
+        return buffer
+
+    fake.buffer = oracle_buffer
+    assert collect(args, library=fake, context_factory=fake.context)["status"] == "transport_pass"
+    output = tmp_path/"replay.json"
+    process = subprocess.run([
+        sys.executable, "-m", "tools.starlink_glrt_native_replay",
+        "--capture", str(args.output), "--bank", str(BANK_ROOT/"native_cubic_60000000_upper.mem"),
+        "--output", str(output),
+    ], capture_output=True, text=True, timeout=30, check=False)
+    assert process.returncode == 0, process.stderr + process.stdout
+    replay = json.loads(output.read_text())
+    assert replay["status"] == "arithmetic_pass" and replay["exact_start_verified"] is True
+    assert replay["jobs"][0]["iq_sha256"] == hashlib.sha256(iq).hexdigest()
+    assert replay["acquisition_verified"] is False
+    assert fake.events[-1] == ("context_close",) and not fake.live
