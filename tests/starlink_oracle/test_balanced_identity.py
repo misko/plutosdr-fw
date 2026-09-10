@@ -8,6 +8,9 @@ from tests.starlink_oracle.input_identity_contract import (
     restore_legacy_identity_guard,
     tokens,
 )
+from tests.starlink_oracle.preflight_identity_contract import (
+    restore_held_preflight_wrapper,
+)
 
 HDL = Path(__file__).resolve().parents[2] / "hdl"
 ACQ = HDL / "library/starlink_pss_acquisition"
@@ -41,7 +44,7 @@ def test_balanced_entire_guard_delta_and_immutable_reference():
         "starlink_pss_realtime_input_guard") == baseline
     assert restore_legacy_identity_guard((ACQ / name).read_text()) == tokens(baseline)
     wrapper = "starlink_pss_fft_bank_owned_slice.v"
-    candidate = (ACQ / wrapper).read_text()
+    candidate = restore_held_preflight_wrapper((ACQ / wrapper).read_text())
     opt_in = ",\n    .BALANCED_IDENTITY_EQ(REGISTERED_SCHEDULING)"
     assert candidate.count(opt_in) == 1
     assert candidate.replace(opt_in, "", 1) == frozen(wrapper)

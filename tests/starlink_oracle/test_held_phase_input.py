@@ -2,6 +2,10 @@
 import subprocess
 from pathlib import Path
 
+from tests.starlink_oracle.preflight_identity_contract import (
+    restore_held_preflight_wrapper,
+)
+
 HDL = Path(__file__).resolve().parents[2] / "hdl"
 ACQ = HDL / "library/starlink_pss_acquisition"
 BASELINE = "691966aed6d6ed52c7589a38b68d26cffee65dd4"
@@ -12,7 +16,7 @@ def test_held_phase_is_exact_tuple_only_delta():
     baseline = subprocess.run([
         "git", "-C", str(HDL), "show", f"{BASELINE}:library/starlink_pss_acquisition/{name}",
     ], text=True, capture_output=True, check=True, timeout=10).stdout
-    candidate = (ACQ / name).read_text()
+    candidate = restore_held_preflight_wrapper((ACQ / name).read_text())
     # The later comparator checkpoint is tested separately against d99c251e;
     # erase only its exact registered-only opt-in before this whole-body check.
     opt_in = ",\n    .BALANCED_IDENTITY_EQ(REGISTERED_SCHEDULING)"
