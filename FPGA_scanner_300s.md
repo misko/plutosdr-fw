@@ -4,6 +4,13 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+The next retained offered-input fault-summary candidate passes parent six-case
+scripted composition smoke (option0/1 × reader policies0/2/5), with33 source pins
+unchanged and all original arithmetic/state/ACK checks retained. Independent
+abstract four-state premise and two rejected mutants pass; the complete new
+boundary/graph suite is still open. This is not actual FFT or timing qualification.
+See [initial parent checks and explicit coverage limits](reports/experiments/20260910-retained-offer-summary-parent.md).
+
 Latest checked-product candidate PASSES actual vendor FFT verification, but its
 completed diagnostic route FAILS at **-8.324 ns**,2309 failing setup endpoints.
 The unchanged runtime passes44 healthy numerical blocks,32 nominal and6 stalled
