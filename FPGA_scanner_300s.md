@@ -2,6 +2,15 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest product integration gate (2026-09-10): independent parent2752 PASS
+(1308 additive plus unchanged1444), all154 source pins unchanged. Separate
+80-manifest/804-entry audit confirms96 exact reason/read rows and identical
+eight-job enabled/disabled timing. Complete3488-node/38LS graph is acyclic;
+actual driver-based publication dependencies and three restored cycles check.
+Original failed alias-ID graph test is preserved, not relabeled. Additive real
+P1 controller integration is now authorized; no vendor/routing/radio promotion.
+See [full publication-seams parent review](reports/experiments/20260910-publication-seams-parent-review.md).
+
 Latest actual-FFT preparation review (2026-09-10): parent saved-data probes
 show the draft parser accepts a clock-grid-valid but wrong first-output time,
 and an impossible slow-edge counter. Per-sample numerical equality alone is
