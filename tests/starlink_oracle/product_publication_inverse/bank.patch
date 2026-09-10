@@ -1,0 +1,70 @@
+--- source
++++ source
+@@ -13,8 +13,9 @@
+ // reader/ACK controller. Their queues must be flushed before those acknowledgements.
+ // Those external controllers are NOT implemented or counted as state here.
+ `timescale 1ns/1ps
+-module starlink_pss_epoch_sealed_bank #(
+-  parameter integer SEALED_PUBLICATION = 0
++module starlink_pss_epoch_sealed_publication_bank #(
++  parameter integer SEALED_PUBLICATION = 0,
++  parameter integer PUBLICATION_ONLY_FAULTS = 0
+ ) (
+   input wire clk, input_resetn, output_resetn,
+   input wire input_valid,
+@@ -57,6 +58,7 @@
+   // Remaining raw publication vetoes, including vendor/orphan/reset/timeout.
+   // A held valid offer stalled by ownership is not by itself an orphan event.
+   input wire [7:0] live_faults,
++  input wire [7:0] publication_faults,
+   output wire [15:0] fault_reasons,
+   output wire fault_token_valid,
+   output wire [8:0] fault_token_position,
+@@ -65,6 +67,8 @@
+   output wire sealed, published
+ );
+   initial begin
++    if (PUBLICATION_ONLY_FAULTS !== 0 && PUBLICATION_ONLY_FAULTS !== 1)
++      $fatal(1, "PUBLICATION_ONLY_FAULTS must be zero or one");
+     if (SEALED_PUBLICATION !== 0 && SEALED_PUBLICATION !== 1)
+       $fatal(1, "SEALED_PUBLICATION must be zero or one");
+   end
+@@ -187,6 +191,16 @@
+       assign errors_now[cause+8] = armed && live_faults[cause] !== 1'b0;
+     end
+     wire local_current_clean = errors_now == 0;
++    // The same eight logical causes may arrive via a publication-only route.
++    // Keep them OUT of errors_now/live_clean: those also control reader VALID,
++    // certificates and release. Only their existing reason-Q category merges.
++    // Pre-armed pulses are outside this observation window, as for live causes.
++    wire [7:0] publication_causes;
++    for (genvar publication_cause = 0; publication_cause < 8; publication_cause = publication_cause + 1) begin : publication_only
++      assign publication_causes[publication_cause] = PUBLICATION_ONLY_FAULTS && armed &&
++        publication_faults[publication_cause] !== 1'b0;
++    end
++    wire publication_only_clean = !(|publication_causes);
+     // SEALED/PUBLISHED means input_ready=0 and the validation pipe is drained;
+     // certificate_seen forbids another certificate take. Only genuinely new
+     // closed-lease offers and raw live events can fault these publication edges.
+@@ -194,10 +208,10 @@
+     // this fence. Open/checking states cannot publish, even before error Q arrives.
+     wire publication_current_clean = live_clean && !closed_input_offer && !duplicate_certificate_offer && !uncertain_interface;
+     assign checked_seal = running && armed && clean && full && !seal_q &&
+-      check_valid[1] && check_last[1] && !pipeline_bad && local_current_clean;
++      check_valid[1] && check_last[1] && !pipeline_bad && local_current_clean && publication_only_clean;
+     assign publish = running && armed && clean && publication_current_clean &&
+       seal_q && full && certificate_seen && pipe_empty && !published_q &&
+-      request_toggle == acknowledge_sync[1];
++      request_toggle == acknowledge_sync[1] && publication_only_clean;
+     assign lease_release = release_take && !release_bad && local_current_clean;
+     assign rearm_ready = running && !armed && clean &&
+       engine_reset_held === 1'b1 && producer_epoch_idle === 1'b1 &&
+@@ -237,7 +251,7 @@
+         check_position0 <= 0; check_position1 <= 0;
+         fault_token_q <= 0; fault_position_q <= 0; fault_lease_q <= 0;
+       end else if (running) begin
+-        reasons <= reasons | errors_now;
++        reasons <= reasons | errors_now | {publication_causes,8'b0};
+         if (rearm_valid === 1'b1 && rearm_ready) armed <= 1;
+         request_sync <= {request_sync[0], request_toggle};
+         acknowledge_sync <= {acknowledge_sync[0], acknowledge_toggle};

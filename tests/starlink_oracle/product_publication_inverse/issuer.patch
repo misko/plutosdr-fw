@@ -1,0 +1,94 @@
+--- source
++++ source
+@@ -3,8 +3,9 @@
+ // Fixed product70 encoding is zero-extended to the opaque d9c75-bit checker.
+ // Common epoch reset/peer-purge attestation is external; never use core reset.
+ `timescale 1ns/1ps
+-module starlink_pss_product_sealed_interface #(
+-  parameter integer SEALED_PRODUCT_ADAPTER = 0
++module starlink_pss_product_sealed_publication_interface #(
++  parameter integer SEALED_PRODUCT_ADAPTER = 0,
++  parameter integer SEPARATE_PRODUCT_SEAMS = 0
+ ) (
+   input wire clk, resetn, peer_resetn,
+   input wire engine_reset_held, peer_epoch_idle, forward_guard_busy, forward_phase,
+@@ -14,6 +15,8 @@
+   input wire [4:0] forward_exponent,
+   input wire product_valid,
+   output wire product_ready,
++  input wire sampled_product_ready,
++  input wire [7:0] publication_faults,
+   input wire [35:0] product_data,
+   input wire [8:0] product_position,
+   input wire product_last,
+@@ -48,6 +51,8 @@
+ );
+   initial if (SEALED_PRODUCT_ADAPTER !== 0 && SEALED_PRODUCT_ADAPTER !== 1)
+     $fatal(1,"SEALED_PRODUCT_ADAPTER must be zero or one");
++  initial if (SEPARATE_PRODUCT_SEAMS !== 0 && SEPARATE_PRODUCT_SEAMS !== 1)
++    $fatal(1,"SEPARATE_PRODUCT_SEAMS must be zero or one");
+   wire epoch_resetn = resetn && peer_resetn && SEALED_PRODUCT_ADAPTER;
+   reg producer_reference, final_taken, completion_reference, certificate_consumed;
+   reg published_reference, reader_reference, handoff_seen, consumer_started;
+@@ -78,6 +83,17 @@
+     (!producer_reference || completion_reference || published_reference ||
+      forward_phase !== 1'b1 || ^forward_exponent === 1'bx);
+   wire [7:0] issuer_current;
++  // Capacity is registered-state-derived; A is the caller's ACTUAL arithmetic
++  // READY. Raw VALID still reaches the bank even when A=0 or unknown.
++  wire sampled_ready = SEPARATE_PRODUCT_SEAMS ? sampled_product_ready : product_ready;
++  // A may only reduce advertised capacity. A forged high cannot bypass C
++  // while issuer-only reason Q has closed C but inner bank capacity is still1.
++  wire sampled_offer = SEPARATE_PRODUCT_SEAMS ?
++    (producer_reference && !final_taken && sampled_ready && product_ready) :
++    (producer_reference && !final_taken && product_ready);
++  wire sampled_ready_error = SEPARATE_PRODUCT_SEAMS && product_valid !== 1'b0 &&
++    ((sampled_product_ready !== 1'b0 && sampled_product_ready !== 1'b1) ||
++     (sampled_product_ready === 1'b1 && product_ready !== 1'b1));
+   assign issuer_current[0] = invalid_admission;
+   assign issuer_current[1] = invalid_completion;
+   wire phase_error = (producer_reference && forward_phase !== 1'b1) ||
+@@ -97,7 +113,7 @@
+   assign issuer_current[7] = any_reference &&
+     ((product_valid !== 1'b0 && product_valid !== 1'b1) ||
+      (forward_completion !== 1'b0 && forward_completion !== 1'b1) ||
+-     (product_valid !== 1'b0 && product_ready !== 1'b0 && product_ready !== 1'b1));
++     (product_valid !== 1'b0 && product_ready !== 1'b0 && product_ready !== 1'b1)) || sampled_ready_error;
+   assign issuer_reasons = reasons;
+   assign fault = |bank_reasons || |reader_reasons || |reasons;
+   // D0/D1 and unknown completion classify qualified handshakes: feeding them
+@@ -107,7 +123,7 @@
+   // from deliberately forged standalone qualified pulses.
+   wire raw_product_uncertain = any_reference &&
+     ((product_valid !== 1'b0 && product_valid !== 1'b1) ||
+-     (product_valid !== 1'b0 && product_ready !== 1'b0 && product_ready !== 1'b1));
++     (product_valid !== 1'b0 && product_ready !== 1'b0 && product_ready !== 1'b1)) || sampled_ready_error;
+   // Named scalar causes make the direction of each dependency explicit;
+   // do not reconstruct these predicates from the aggregate diagnostic bus.
+   wire issuer_bank_current = raw_product_uncertain || phase_error ||
+@@ -153,12 +169,13 @@
+   assign handoff = forward_handoff_valid && forward_handoff_ready;
+   assign current_lease = bank_lease;
+   assign core_metadata = queue_metadata[69:0];
+-  starlink_pss_epoch_sealed_bank #(.SEALED_PUBLICATION(1)) bank (
++  starlink_pss_epoch_sealed_publication_bank #(.SEALED_PUBLICATION(1),
++    .PUBLICATION_ONLY_FAULTS(SEPARATE_PRODUCT_SEAMS)) bank (
+     .clk(clk), .input_resetn(epoch_resetn), .output_resetn(epoch_resetn),
+     // RAW offers remain observable even when READY is low or ownership closed.
+     // Only private take uses the exact exported handshake. The issuer retains
+     // independent closed/unowned/X observation; d9c remains byte-identical.
+-    .input_valid(product_valid), .input_offer_new(producer_reference && !final_taken && product_ready),
++    .input_valid(product_valid), .input_offer_new(sampled_offer),
+     .input_ready(bank_input_ready), .input_data(product_data), .input_position(product_position),
+     .input_last(product_last), .input_metadata({5'b0,product_metadata}),
+     .input_commit_authorized(1'b0), .input_fault(bank_input_fault), .input_framing_fault_now(producer_verdict_fault_now),
+@@ -174,6 +191,9 @@
+     .certificate_metadata(expected_metadata), .certificate_good(completion_reference),
+     .lease_release_valid(bank_release_valid), .lease_release_ready(bank_release_ready),
+     .lease_release_tag(lease_reference), .live_faults(bank_live), .fault_reasons(bank_reasons),
++    // Deliberately NOT returned to bank_live/reader_live/direct_clean. Caller
++    // separately protects its actual ACK/result publication from these causes.
++    .publication_faults(publication_faults),
+     .fault_token_valid(), .fault_token_position(), .fault_token_lease(),
+     .private_take(product_take), .checked_seal(checked_seal), .publish(publication),
+     .lease_release(lease_release), .sealed(), .published(bank_published)
