@@ -41,6 +41,7 @@ foreach name $digest_names {
   set digest($name) [lindex [exec sha256sum [set $name]] 0]
 }
 create_project -in_memory -part xc7z010clg400-1
+set_msg_config -id {Synth 8-311} -new_severity ERROR
 read_verilog $sources
 synth_design -top $top -mode out_of_context \
   -flatten_hierarchy none -generic TEMPLATE_FILE=$bank
@@ -55,6 +56,7 @@ opt_design
 place_design
 phys_opt_design
 route_design
+write_verilog -mode funcsim -force [file join $output functional_netlist.v]
 report_utilization -file [file join $output utilization.rpt]
 report_utilization -cells [get_cells dut] -file [file join $output dut_utilization.rpt]
 report_timing_summary -delay_type min_max -report_unconstrained -file [file join $output timing_summary.rpt]
@@ -80,7 +82,8 @@ set hold_path [get_timing_paths -quiet -delay_type min -max_paths 1]
 if {[llength $setup_path] != 1 || [llength $hold_path] != 1} { error "missing setup/hold path" }
 set setup [get_property SLACK $setup_path]
 set hold [get_property SLACK $hold_path]
-if {$lut > $lut_budget || $ff > $ff_budget || $dsp != 0 || 2*$ramb36+$ramb18 > 24} {
+if {$lut > $lut_budget || $ff > $ff_budget || $dsp != 0 ||
+    2*$ramb36+$ramb18 < 20 || 2*$ramb36+$ramb18 > 24} {
   error "native reference budget exceeded: LUT=$lut FF=$ff DSP=$dsp RAMB36=$ramb36 RAMB18=$ramb18"
 }
 if {$setup < 0 || $hold < 0} { error "native reference timing failed: setup=$setup hold=$hold" }

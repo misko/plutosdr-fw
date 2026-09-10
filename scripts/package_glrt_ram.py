@@ -106,7 +106,19 @@ def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
         raise ValueError("implemented native engine differs from build selection")
     if enabled == "1" and rate != 60_000_000:
         raise ValueError("native refinement requires a 60 MS/s board")
-    return [selection] if selection.exists() else []
+    legacy_path = board / "legacy_scorer.txt"
+    legacy = legacy_path.read_text().strip() if legacy_path.exists() else "1"
+    if legacy not in ("0", "1"):
+        raise ValueError("invalid legacy scorer build selection")
+    if legacy == "0" and enabled != "1":
+        raise ValueError("lean profile requires native refinement")
+    # New selections require exact topology evidence. Reference artifacts
+    # predating this selector remain valid under their original gates.
+    if legacy_path.exists():
+        for block in ("legacy_correlators", "legacy_scorers", "legacy_vector_stages"):
+            if audit.get(block) != legacy:
+                raise ValueError("implemented legacy blocks differ from build selection")
+    return [path for path in (selection, legacy_path) if path.exists()]
 
 
 def package(args):

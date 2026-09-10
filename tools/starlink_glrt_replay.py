@@ -171,7 +171,7 @@ def main():
                             'if(dut.selected_valid) $display("C %h %d %d %d",dut.selected_epoch,dut.admit,dut.reject_busy,source_closed ? 1 : 0);\n'
                             '  if(source_closed && dut.waiting_valid && dut.converted_valid) '
                             '$display("C %h 0 0 1",dut.converted_start-64\'d22*(RATE)/2500000);\n'
-                            '  if(dut.native.truncate_tail) $display("F %h",dut.native.job_epoch);')
+                            '  if(dut.legacy_scoring.native.truncate_tail) $display("F %h",dut.legacy_scoring.native.job_epoch);')
     source = source.replace("(RATE)", f"({args.source_rate})")
     source = source.replace("$finish;", '$display("E %d %d %d %d %d %d %d %d %d %d", source_closed,detector_settled,stage_fault,'
                             'incomplete_native_tails,aborted_selector_groups,completed_native_vectors,result_count,'

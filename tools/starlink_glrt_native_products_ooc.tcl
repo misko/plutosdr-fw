@@ -45,6 +45,7 @@ if {[file exists [file join $output summary.txt]]} { error "output already compl
 file mkdir $output
 foreach name $names { set digest($name) [lindex [exec sha256sum [set $name]] 0] }
 create_project -in_memory -part xc7z010clg400-1
+set_msg_config -id {Synth 8-311} -new_severity ERROR
 read_verilog $sources
 synth_design -top $top -mode out_of_context -flatten_hierarchy none -generic $generics
 create_clock -name arithmetic_clk -period 10.0 [get_ports clk]
@@ -86,6 +87,9 @@ set setup [get_property SLACK $setup_path]
 set hold [get_property SLACK $hold_path]
 if {$lut+$srl > $lut_budget || $ff > $ff_budget || $dsp != 8 || 2*$bram36+$bram18 > $bram_half_tile_budget} {
   error "native arithmetic budget exceeded: LUT=$lut SRL=$srl FF=$ff DSP=$dsp BRAM36=$bram36 BRAM18=$bram18"
+}
+if {$mode eq "engine" && 2*$bram36+$bram18 < 20} {
+  error "native reference ROM is missing from the synthesized engine"
 }
 if {$setup < 0 || $hold < 0} { error "native products timing failed: setup=$setup hold=$hold" }
 foreach name $names {

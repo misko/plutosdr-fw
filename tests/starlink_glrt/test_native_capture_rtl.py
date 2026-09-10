@@ -53,13 +53,14 @@ def test_refinement_image_preserves_blind_reference_iq_scores_and_irq(captures, 
     check_reference_events(60000000, lambda rate: captures(rate, native=True), tmp_path)
 
 
-def test_full_native_dma_uses_original_60m_coordinates_and_returns_to_glr1(captures, tmp_path):
+@pytest.mark.parametrize("legacy", [True, False])
+def test_full_native_dma_uses_original_60m_coordinates_and_returns_to_base(captures, tmp_path, legacy):
     rows = [(0, 11, 0, 3, 0), wait(2000), *native_config(), (0, 14, 0, 6000, 0), wait(150000),
         *native_head(), *native_finish(), *snapshot(), *native_config(),
         (0, 14, 0, 6000, 0), wait(150000), *native_head(), *native_finish(),
         write(8, 4), wait(500), write(0x20, 19), write(0x30, 128), write(8, 1), wait(20000),
         write(8, 2), *snapshot(), read(0x400), read(0x404), read(0x458), read(0x45c), read(0x460)]
-    output, reads, final = run(captures(60000000, continuous=True, native=True), rows, tmp_path)
+    output, reads, final = run(captures(60000000, continuous=True, native=True, legacy=legacy), rows, tmp_path)
     headers = [v for a, v in reads if 0x600 <= a < 0x680]
     assert len(headers) == 64
     bank = native_bank()
@@ -88,7 +89,8 @@ def test_full_native_dma_uses_original_60m_coordinates_and_returns_to_glr1(captu
 
 @pytest.mark.parametrize("fifo_bits", [5, 8])
 @pytest.mark.parametrize("backpressure", ["periodic", "full"])
-def test_varying_native_iq_preserves_order_across_stalls_and_fifo_wrap(captures, tmp_path, fifo_bits, backpressure):
+@pytest.mark.parametrize("legacy", [True, False])
+def test_varying_native_iq_preserves_order_across_stalls_and_fifo_wrap(captures, tmp_path, fifo_bits, backpressure, legacy):
     # The source emits a distinct deterministic CI16 word at each ADC index.
     # Periodic 20-cycle stalls build and drain the queue repeatedly, including
     # single-word replacements and many wraps at the actual board FIFO depth.
@@ -97,7 +99,7 @@ def test_varying_native_iq_preserves_order_across_stalls_and_fifo_wrap(captures,
     rows = [(0, 11, 0, 3, 1), wait(2000), *native_config(),
             (0, 14, 0, 6000, 0), pressure, wait(150000), (0, 4, 0, 1, 0), wait(500),
             (0, 16, 0, required_coverage, 0), *native_head(), *native_finish()]
-    output, reads, final = run(captures(60000000, continuous=True, native=True, fifo_bits=fifo_bits), rows, tmp_path)
+    output, reads, final = run(captures(60000000, continuous=True, native=True, fifo_bits=fifo_bits, legacy=legacy), rows, tmp_path)
     header = [value for address, value in reads if 0x600 <= address < 0x680]
     decoded = NativeResult.decode(struct.pack("<32I", *header))
     decoded.require_complete()
@@ -114,13 +116,14 @@ def test_varying_native_iq_preserves_order_across_stalls_and_fifo_wrap(captures,
     assert dict(reads)[0x410] == 0 and final == (0, 0)
 
 
-def test_native_dma_overflow_preserves_offered_words_across_invalid_clear(captures, tmp_path):
+@pytest.mark.parametrize("legacy", [True, False])
+def test_native_dma_overflow_preserves_offered_words_across_invalid_clear(captures, tmp_path, legacy):
     rows = [(0, 11, 0, 3, 0), wait(2000), *native_config(), (0, 4, 0, 0, 0),
         (0, 14, 0, 6000, 0), wait(12000), read(0x40c), *native_head(),
         write(8, 4), write(0x408, 8), write(0x408, 4), wait(100),
         (0, 4, 0, 1, 0), wait(100), *native_head(), *native_finish(),
         write(8, 4), wait(500), *snapshot()]
-    output, reads, final = run(captures(60000000, continuous=True, native=True), rows, tmp_path)
+    output, reads, final = run(captures(60000000, continuous=True, native=True, legacy=legacy), rows, tmp_path)
     headers = [v for a, v in reads if 0x600 <= a < 0x680]
     assert headers[:32] == [0]*32
     failed = headers[32:]

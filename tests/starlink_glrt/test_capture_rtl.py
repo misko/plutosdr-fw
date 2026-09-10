@@ -19,8 +19,8 @@ IP_ROOT = BANK_ROOT.parent/"axi_starlink_glrt"
 def captures(tmp_path_factory):
     root = tmp_path_factory.mktemp("capture-compile")
     cache = {}
-    def get(rate, continuous=False, native=False, fifo_bits=5):
-        key = rate, continuous, native, fifo_bits
+    def get(rate, continuous=False, native=False, fifo_bits=5, legacy=True):
+        key = rate, continuous, native, fifo_bits, legacy
         if key not in cache:
             source = (IP_ROOT/"tb/tb_starlink_glrt_capture.sv").read_text()
             for token, filename in {
@@ -29,13 +29,14 @@ def captures(tmp_path_factory):
                 "REFINEMENT_FILE": "native_cubic_60000000_upper.mem",
             }.items():
                 source = source.replace(f'"{token}"', f'"{BANK_ROOT/filename}"')
-            suffix = f"{rate}_{int(continuous)}_{int(native)}_{fifo_bits}"
+            suffix = f"{rate}_{int(continuous)}_{int(native)}_{fifo_bits}_{int(legacy)}"
             bench, executable = root/f"tb_{suffix}.sv", root/f"sim_{suffix}"
             bench.write_text(source)
             top = "tb_starlink_glrt_capture"
             process = subprocess.run(["iverilog", "-g2012", "-s", top, f"-P{top}.SOURCE_RATE_HZ={rate}",
                                       f"-P{top}.SOURCE_CONTINUOUS={int(continuous)}",
                                       f"-P{top}.ENABLE_NATIVE_REFINEMENT={int(native)}",
+                                      f"-P{top}.ENABLE_LEGACY_SCORER={int(legacy)}",
                                       f"-P{top}.OUTPUT_FIFO_BITS={fifo_bits}",
                                       "-o", str(executable), str(bench),
                                       *map(str, sorted(BANK_ROOT.glob("*.v"))),
@@ -77,8 +78,8 @@ def extension_snapshot():
     return [read(0x5c), read(0x60), read(0x64), *(read(address) for address in range(0x300, 0x340, 4))]
 
 
-@pytest.mark.parametrize("native", [False, True])
-def test_entire_axi_aperture_preserves_registers_and_zero_reserved_pages(native, captures, tmp_path):
+@pytest.mark.parametrize("native,legacy", [(False, True), (True, True), (True, False)])
+def test_entire_axi_aperture_preserves_registers_and_zero_reserved_pages(native, legacy, captures, tmp_path):
     # Exercise all 1024 word addresses, including every unmapped page and both
     # snapshot boundaries. No source/job is running and snapshots are reset.
     rows = [write(0x20, 0x23456789), write(0x30, 12345)]
@@ -96,8 +97,10 @@ def test_entire_axi_aperture_preserves_registers_and_zero_reserved_pages(native,
         expected.update(config)
         expected.update({0x400: 0x474c4e31, 0x404: 0x10000, 0x42c: 79200,
                          0x454: 0xb04a2fab, 0x458: 1, 0x45c: 60000000, 0x460: 3})
+    if not legacy:
+        expected.update({0x000: 0x474c4631, 0x05c: 0x474c4631, 0x068: 7})
     rows.extend(read(address) for address in range(0, 4096, 4))
-    output, reads, _ = run(captures(60000000, native=native), rows, tmp_path)
+    output, reads, _ = run(captures(60000000, native=native, legacy=legacy), rows, tmp_path)
     assert not output and len(reads) == 1024
     for address, value in reads:
         # Source readiness is dynamic telemetry, checked by the capture tests.

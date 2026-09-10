@@ -69,8 +69,8 @@ initial begin
   if(dut.selected_valid) $display("C %h %d %d",dut.selected_epoch,dut.admit,dut.reject_busy);
   if(dut.selected_valid && $test$plusargs("TRACE"))
    $display("D %h %d %d %d %d %d %d %d %d",dut.selected_epoch,dut.native_ready,dut.stage_ready,
-    dut.score_ready,dut.vector_stage.state,dut.native.newest_index,dut.native.next_index,
-    dut.scorer.state,dut.scorer.frequency_bin);
+    dut.score_ready,dut.legacy_scoring.vector_stage.state,dut.legacy_scoring.native.newest_index,dut.legacy_scoring.native.next_index,
+    dut.legacy_scoring.scorer.state,dut.legacy_scoring.scorer.frequency_bin);
   #1;
   if(iq_valid) $display("O %h %d %d %d",iq_index,iq_i,iq_q,iq_support);
   if(dut.proposal_valid) $display("P %h",dut.proposal_epoch);

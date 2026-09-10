@@ -83,3 +83,28 @@ def test_native_package_requires_matching_implemented_engine(tmp_path, selection
     else:
         with pytest.raises(ValueError):
             verify_native_selection(tmp_path, audit, rate)
+
+
+@pytest.mark.parametrize("legacy,enabled,counts,accepted", [
+    ("0", "1", ("0", "0", "0"), True),
+    ("1", "1", ("1", "1", "1"), True),
+    ("0", "1", (None, "0", "0"), False),
+    ("0", "1", ("1", "0", "0"), False),
+    ("0", "1", ("0", "1", "0"), False),
+    ("0", "1", ("0", "0", "1"), False),
+    ("1", "1", ("0", "0", "0"), False),
+    ("0", "0", ("0", "0", "0"), False),
+    ("2", "1", ("0", "0", "0"), False),
+])
+def test_lean_profile_requires_exact_implemented_topology(tmp_path, legacy, enabled, counts, accepted):
+    native = tmp_path / "native_refinement.txt"
+    scorer = tmp_path / "legacy_scorer.txt"
+    native.write_text(enabled + "\n")
+    scorer.write_text(legacy + "\n")
+    audit = {"native_refinement_engines": enabled}
+    audit.update(zip(("legacy_correlators", "legacy_scorers", "legacy_vector_stages"), counts, strict=True))
+    if accepted:
+        assert verify_native_selection(tmp_path, audit, 60000000) == [native, scorer]
+    else:
+        with pytest.raises(ValueError):
+            verify_native_selection(tmp_path, audit, 60000000)

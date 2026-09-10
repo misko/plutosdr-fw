@@ -33,6 +33,9 @@ set native_dma {}
 set glrt {}
 set glrt_dma {}
 set native_engines {}
+set legacy_correlators {}
+set legacy_scorers {}
+set legacy_vector_stages {}
 foreach cell [get_cells -hierarchical] {
   set name [get_property NAME $cell]
   set ref [get_property REF_NAME $cell]
@@ -44,6 +47,11 @@ foreach cell [get_cells -hierarchical] {
   if {[string match */starlink_glrt_dma $name]} { lappend glrt_dma $name }
   if {[string match starlink_glrt_native_engine* $ref] || [string match starlink_glrt_native_engine* $orig]} {
     lappend native_engines $name
+  }
+  foreach {base destination} {starlink_glrt_correlator legacy_correlators starlink_glrt_score legacy_scorers starlink_glrt_vector_stage legacy_vector_stages} {
+    if {[string match ${base}* $ref] || [string match ${base}* $orig]} {
+      lappend $destination $name
+    }
   }
 }
 close $f
@@ -60,6 +68,9 @@ puts $f "native_dma_cells\t[llength $native_dma]"
 puts $f "glrt_ip_cells\t[llength $glrt]"
 puts $f "glrt_dma_cells\t[llength $glrt_dma]"
 puts $f "native_refinement_engines\t[llength $native_engines]"
+puts $f "legacy_correlators\t[llength $legacy_correlators]"
+puts $f "legacy_scorers\t[llength $legacy_scorers]"
+puts $f "legacy_vector_stages\t[llength $legacy_vector_stages]"
 puts $f "hardware_eligible\t0"
 puts $f "qualification\tTiming, CDC, I/O and exception reports require review; audit alone grants no deployment."
 close $f
