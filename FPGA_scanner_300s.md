@@ -2,6 +2,15 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest actual-core result (2026-09-10, after16:20 UTC): inverse v2 original77697
+PASSES complete automation; parent92874 independently repeats the full audit.
+All76 jobs/38 tagged lifetimes and exact numerical/timestamp checks pass, with
+all three full CSV hashes identical to the preserved first run. Only the
+offline parser changed; no RTL/clock/budget relaxation. Recorded-WDB inspection
+preparation and the separate staged/retained-context prototypes are next.
+No routed timing or deployment pass is implied. See
+[clean v2 result](reports/experiments/20260910-inverse-actual-v2-result.md).
+
 Latest verification increment (2026-09-10): parent repeats111 inverse parser
 tests and the complete saved-run reassessment, both successful. The bounded
 drained profile transition is now tested; all211 original files remain intact
