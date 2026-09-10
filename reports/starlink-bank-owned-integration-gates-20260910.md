@@ -179,6 +179,14 @@ native packet read twice across stop,894scores/447map words/2048pilot bytes.
 Its independently calculated winner-17 has normalized score about0.098; this
 is concurrent arithmetic/ownership evidence, not the injected PSS start447 or
 timing lock. True-PSS concurrent capture and causal acquisition remain gates.
+These additive tests/helpers/evidence are now integrated on primary at
+FW `aea211988` / HDL `8e2d11a8`, without changing runtime RTL. Independent
+primary175replay also passes and freezes all ten project-local Python runtime
+modules before simulation;201policy tests pass. See
+`experiments/20260910-bank-native-paired-primary-replay.md` for exact source/
+provenance distinctions. The next stage is offline implementation/testing of
+a new true-PSS520fixture with independently regenerated FFT/map/native/pilot
+goldens; no actual run is authorized until those inputs are reviewed.
 
 The30/60 extension cannot merely change a test parameter: current realtime and
 boundary-stop wrapper/profile guards explicitly require15MS/s. Rate-conditioned
