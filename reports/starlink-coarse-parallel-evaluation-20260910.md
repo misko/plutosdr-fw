@@ -2,6 +2,15 @@
 
 ## Latest checkpoint: complete scorer and control-path counterevidence
 
+An additional independent verification worktree was allocated after the
+read-only map integration review: `/tmp/starlink-coarse-alternatives.Y3JzOI/bank-map-lifecycle`,
+firmware and HDL branch `codex/starlink-rx-only-do-not-merge-bank-map-lifecycle`,
+starting FW `249edd4b535bea7e6537e8c102f49ad1b5f8b07f` and HDL
+`69f84febf0a2788f23e04f2f6b3cfec5b33b9c9a`. The previous narrow-agent study is
+preserved unchanged. The bounded new task is actual-core map retention,
+publication-edge fault visibility and reset/re-enable lifecycle verification;
+no radio, PPU, full receiver, synthesis/route or remote changes are delegated.
+
 The complete bank-owned coarse composition is now additive code on the primary
 experimental branch, not selected by receiver defaults. Six alternative-branch
 actual-core runs cover numerical/fault replay and nominal/burst-stall 64-block

@@ -16,8 +16,11 @@ selects this module yet.
 The default-off phase-map selector now passes reduced 447-bin/three-frame
 actual-core bank175/bank200 replay and existing shared200 regression, including
 partial-tile vendor-fault abort and exact map reads. See
-`experiments/20260910-bank-phase-map-replay.md`. This does not establish bank
-boundary-stop, publication-edge fault behavior, independent-domain restart,
+`experiments/20260910-bank-phase-map-replay.md`. Reduced 447-by-2 bank boundary
+stop also passes at 175/200 MHz, including exact AXI map reads, actual later FFT
+work in flight, source-tail shutdown and two negative stop cases; see
+`experiments/20260910-bank-boundary-stop-replay.md`. These do not establish
+publication-edge fault behavior, independent-domain restart,
 production map capacity or concurrent pilot/fine support; qualify these before
 exposing the selector through AXI/receiver packaging.
 
