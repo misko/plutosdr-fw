@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="14" time="0.476" timestamp="2026-09-10T06:56:47.206116+00:00" hostname="gauss"><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_real_preflight_freezes_and_proves_parameters_before_synthesis[0]" time="0.085"><failure message="AssertionError: assert 'RESULT 1 SYNTHESIS_FENCED_NO_PHYSICAL_RUN' in 'RESULT 1 parameter probe did not exactly qualify\n'&#10; +  where 'RESULT 1 parameter probe did not exactly qualify\n' = CompletedProcess(args=['tclsh'], returncode=0, stdout='RESULT 1 parameter probe did not exactly qualify\n', stderr='').stdout">tmp_path = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/operand-boundary/hdl/library/starlink_pss_acquisition/build/operand-physical-preparation-v1/test_real_preflight_freezes_an0')
+option = 0
+
+    @pytest.mark.parametrize("option", [0, 1])
+    def test_real_preflight_freezes_and_proves_parameters_before_synthesis(tmp_path, option):
+        output = tmp_path / "run"
+        result = invoke(output, option)
+        assert result.returncode == 0 and not result.stderr, result.stderr
+&gt;       assert "RESULT 1 SYNTHESIS_FENCED_NO_PHYSICAL_RUN" in result.stdout
+E       AssertionError: assert 'RESULT 1 SYNTHESIS_FENCED_NO_PHYSICAL_RUN' in 'RESULT 1 parameter probe did not exactly qualify\n'
+E        +  where 'RESULT 1 parameter probe did not exactly qualify\n' = CompletedProcess(args=['tclsh'], returncode=0, stdout='RESULT 1 parameter probe did not exactly qualify\n', stderr='').stdout
+
+tests/test_starlink_spectrum_operand_physical_policy.py:35: AssertionError</failure></testcase><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_real_preflight_freezes_and_proves_parameters_before_synthesis[1]" time="0.086"><failure message="AssertionError: assert 'RESULT 1 SYNTHESIS_FENCED_NO_PHYSICAL_RUN' in 'RESULT 1 parameter probe did not exactly qualify\n'&#10; +  where 'RESULT 1 parameter probe did not exactly qualify\n' = CompletedProcess(args=['tclsh'], returncode=0, stdout='RESULT 1 parameter probe did not exactly qualify\n', stderr='').stdout">tmp_path = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/operand-boundary/hdl/library/starlink_pss_acquisition/build/operand-physical-preparation-v1/test_real_preflight_freezes_an1')
+option = 1
+
+    @pytest.mark.parametrize("option", [0, 1])
+    def test_real_preflight_freezes_and_proves_parameters_before_synthesis(tmp_path, option):
+        output = tmp_path / "run"
+        result = invoke(output, option)
+        assert result.returncode == 0 and not result.stderr, result.stderr
+&gt;       assert "RESULT 1 SYNTHESIS_FENCED_NO_PHYSICAL_RUN" in result.stdout
+E       AssertionError: assert 'RESULT 1 SYNTHESIS_FENCED_NO_PHYSICAL_RUN' in 'RESULT 1 parameter probe did not exactly qualify\n'
+E        +  where 'RESULT 1 parameter probe did not exactly qualify\n' = CompletedProcess(args=['tclsh'], returncode=0, stdout='RESULT 1 parameter probe did not exactly qualify\n', stderr='').stdout
+
+tests/test_starlink_spectrum_operand_physical_policy.py:35: AssertionError</failure></testcase><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_invalid_selection_never_allocates[-1]" time="0.006" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_invalid_selection_never_allocates[2]" time="0.006" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_invalid_selection_never_allocates[1.0]" time="0.006" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_invalid_selection_never_allocates[x]" time="0.005" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_invalid_selection_never_allocates[]" time="0.007" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_invalid_selection_never_allocates[00]" time="0.004" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_version_and_nonoverwrite" time="0.008" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_relative_output_is_resolved_before_cwd_change" time="0.034"><failure message="AssertionError: assert 'SYNTHESIS_FENCED_NO_PHYSICAL_RUN' in 'RESULT 1 parameter probe did not exactly qualify\n'&#10; +  where 'RESULT 1 parameter probe did not exactly qualify\n' = CompletedProcess(args=['tclsh'], returncode=0, stdout='RESULT 1 parameter probe did not exactly qualify\n', stderr='').stdout">tmp_path = PosixPath('/tmp/starlink-coarse-alternatives.Y3JzOI/operand-boundary/hdl/library/starlink_pss_acquisition/build/operand-physical-preparation-v1/test_relative_output_is_resolv0')
+
+    def test_relative_output_is_resolved_before_cwd_change(tmp_path):
+        result = invoke("relative-run", 1, cwd=tmp_path)
+&gt;       assert "SYNTHESIS_FENCED_NO_PHYSICAL_RUN" in result.stdout
+E       AssertionError: assert 'SYNTHESIS_FENCED_NO_PHYSICAL_RUN' in 'RESULT 1 parameter probe did not exactly qualify\n'
+E        +  where 'RESULT 1 parameter probe did not exactly qualify\n' = CompletedProcess(args=['tclsh'], returncode=0, stdout='RESULT 1 parameter probe did not exactly qualify\n', stderr='').stdout
+
+tests/test_starlink_spectrum_operand_physical_policy.py:72: AssertionError</failure></testcase><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_source_guard_rejects_full_inventory_change[delete]" time="0.036" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_source_guard_rejects_full_inventory_change[extra]" time="0.092" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_source_guard_rejects_full_inventory_change[payload]" time="0.062" /><testcase classname="tests.test_starlink_spectrum_operand_physical_policy" name="test_fixed_flow_constraints_and_inventory_contract" time="0.000" /></testsuite></testsuites>
