@@ -7,7 +7,8 @@ import pytest
 
 @pytest.mark.parametrize("rate,flag", [("2500000", "--native-refinement"),
     ("25000000", "--native-refinement"), ("60000000", "--native"), ("60000001", "--native-refinement"),
-    ("25000000", "--native-lean"), ("60000001", "--native-lean")])
+    ("25000000", "--native-lean"), ("60000001", "--native-lean"),
+    ("25000000", "--native-scheduled"), ("60000001", "--native-scheduled")])
 def test_invalid_native_build_selection_creates_no_evidence_directory(tmp_path, rate, flag):
     repo = Path(__file__).resolve().parents[2]
     output = tmp_path/"board"
@@ -22,7 +23,8 @@ def test_invalid_native_build_selection_creates_no_evidence_directory(tmp_path, 
     ("2500000", "0", "1", True), ("60000000", "0", "0", False),
     ("25000000", "1", "0", False), ("60000000", "1", "2", False),
 ])
-def test_block_design_profile_selection(tmp_path, rate, native, legacy, accepted):
+@pytest.mark.parametrize("schedule", ["0", "1", "2"])
+def test_block_design_profile_selection(tmp_path, rate, native, legacy, accepted, schedule):
     # Execute the real selection/validation Tcl. Only Vivado's BD operations
     # are stubbed; the parameter values and rejected combinations are real.
     repo = Path(__file__).resolve().parents[2]
@@ -31,12 +33,16 @@ def test_block_design_profile_selection(tmp_path, rate, native, legacy, accepted
         f"set ::env(STARLINK_GLRT_RATE_HZ) {rate}",
         f"set ::env(STARLINK_GLRT_NATIVE_REFINEMENT) {native}",
         f"set ::env(STARLINK_GLRT_LEGACY_SCORER) {legacy}",
+        f"set ::env(STARLINK_GLRT_NATIVE_SCHEDULE) {schedule}",
         "proc unknown {args} { return {} }",
         'proc ad_ip_parameter {cell key value} { puts "$key=$value" }',
         f"source {{{repo / 'hdl/projects/pluto/system_glrt_bd.tcl'}}}",
     ]) + "\n")
     result = subprocess.run(["tclsh", str(bench)], capture_output=True, text=True, timeout=10, check=False)
+    accepted = accepted and (schedule == "0" or
+        (schedule == "1" and rate == "60000000" and native == "1" and legacy == "0"))
     assert (result.returncode == 0) == accepted, result.stdout + result.stderr
     if accepted:
+        assert f"CONFIG.ENABLE_NATIVE_SCHEDULE={schedule}" in result.stdout
         assert f"CONFIG.ENABLE_LEGACY_SCORER={legacy}" in result.stdout
         assert ("CONFIG.ENABLE_NATIVE_REFINEMENT=1" in result.stdout) == (native == "1")

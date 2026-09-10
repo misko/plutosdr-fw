@@ -9,6 +9,27 @@ import pytest
 from scripts.package_glrt_ram import package, read_newc, stamp_rootfs, verify_native_selection
 
 
+@pytest.mark.parametrize("selection,controls,queues,legacy,accepted", [
+    ("1", "1", "1", "0", True), ("0", "0", "0", "0", True),
+    ("1", "0", "1", "0", False), ("1", "1", "0", "0", False),
+    ("1", "2", "1", "0", False), ("0", "1", "1", "0", False),
+    ("1", "1", "1", "1", False), ("2", "2", "2", "0", False),
+])
+def test_scheduled_package_requires_one_shared_engine_control_and_queue(
+        tmp_path, selection, controls, queues, legacy, accepted):
+    paths = [tmp_path/name for name in ("native_refinement.txt", "legacy_scorer.txt", "native_schedule.txt")]
+    for path, value in zip(paths, ("1", legacy, selection), strict=True):
+        path.write_text(value+"\n")
+    audit = {"native_refinement_engines": "1", "native_schedule_controls": controls,
+             "native_result_queues": queues, "legacy_correlators": legacy,
+             "legacy_scorers": legacy, "legacy_vector_stages": legacy}
+    if accepted:
+        assert verify_native_selection(tmp_path, audit, 60000000) == paths
+    else:
+        with pytest.raises(ValueError):
+            verify_native_selection(tmp_path, audit, 60000000)
+
+
 def rootfs(root, *, pss=False):
     files = {"opt/VERSIONS": b"device-fw old\nhdl old\n", "usr/sbin/iiod": b"\0BIN\xff\x10",
              "etc/init.d/S22starlink_glrt_iio": b"#!/bin/sh\nexit 0\n"}

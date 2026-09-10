@@ -123,7 +123,15 @@ def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
         for block in ("legacy_correlators", "legacy_scorers", "legacy_vector_stages"):
             if audit.get(block) != legacy:
                 raise ValueError("implemented legacy blocks differ from build selection")
-    return [path for path in (selection, legacy_path) if path.exists()]
+    schedule_path = board / "native_schedule.txt"
+    scheduled = schedule_path.read_text().strip() if schedule_path.exists() else "0"
+    if scheduled not in ("0", "1") or (scheduled == "1" and (enabled != "1" or legacy != "0")):
+        raise ValueError("native scheduling requires the lean native profile")
+    if schedule_path.exists():
+        for block in ("native_schedule_controls", "native_result_queues"):
+            if audit.get(block) != scheduled:
+                raise ValueError("implemented schedule/queue differs from build selection")
+    return [path for path in (selection, legacy_path, schedule_path) if path.exists()]
 
 
 def package(args):

@@ -3,19 +3,21 @@
 # This script never opens, configures or deploys to a radio.
 set -euo pipefail
 if [[ $# -lt 2 || $# -gt 3 ]]; then
-  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY [--native-refinement|--native-lean]' >&2
+  echo 'usage: build_glrt_board.sh RATE_HZ NEW_OUTPUT_DIRECTORY [--native-refinement|--native-lean|--native-scheduled]' >&2
   exit 2
 fi
 case "$1" in 2500000|5000000|10000000|25000000|60000000) ;; *) exit 2 ;; esac
 native_refinement=0
 legacy_scorer=1
+native_schedule=0
 if [[ $# -eq 3 ]]; then
-  if [[ ( "$3" != --native-refinement && "$3" != --native-lean ) || "$1" != 60000000 ]]; then
-    echo 'native refinement requires --native-refinement or --native-lean and 60000000 Hz' >&2
+  if [[ ( "$3" != --native-refinement && "$3" != --native-lean && "$3" != --native-scheduled ) || "$1" != 60000000 ]]; then
+    echo 'native profiles require 60000000 Hz and an explicit native build selection' >&2
     exit 2
   fi
   native_refinement=1
-  if [[ "$3" == --native-lean ]]; then legacy_scorer=0; fi
+  if [[ "$3" == --native-lean || "$3" == --native-scheduled ]]; then legacy_scorer=0; fi
+  if [[ "$3" == --native-scheduled ]]; then native_schedule=1; fi
 fi
 repository=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 output=$(realpath -m "$2")
@@ -33,11 +35,13 @@ printf '%s\n' "$hdl_commit" >"$output/hdl_commit.txt"
 printf '%s\n' "$1" >"$output/source_rate_hz.txt"
 printf '%s\n' "$native_refinement" >"$output/native_refinement.txt"
 printf '%s\n' "$legacy_scorer" >"$output/legacy_scorer.txt"
+printf '%s\n' "$native_schedule" >"$output/native_schedule.txt"
 git -C "$repository" rev-parse HEAD >"$output/firmware_parent_commit.txt"
 sha256sum "$repository/scripts/build_glrt_board.sh" >"$output/build_script.sha256"
 export STARLINK_GLRT_RATE_HZ="$1"
 export STARLINK_GLRT_NATIVE_REFINEMENT="$native_refinement"
 export STARLINK_GLRT_LEGACY_SCORER="$legacy_scorer"
+export STARLINK_GLRT_NATIVE_SCHEDULE="$native_schedule"
 export ADI_HDL_DIR="$output/hdl"
 export ADI_USE_OOC_SYNTHESIS=n
 export ADI_MAX_OOC_JOBS=4

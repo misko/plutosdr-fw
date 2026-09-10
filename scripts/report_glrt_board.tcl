@@ -33,6 +33,8 @@ set native_dma {}
 set glrt {}
 set glrt_dma {}
 set native_engines {}
+set native_schedules {}
+set native_result_queues {}
 set legacy_correlators {}
 set legacy_scorers {}
 set legacy_vector_stages {}
@@ -47,6 +49,9 @@ foreach cell [get_cells -hierarchical] {
   if {[string match */starlink_glrt_dma $name]} { lappend glrt_dma $name }
   if {[string match starlink_glrt_native_engine* $ref] || [string match starlink_glrt_native_engine* $orig]} {
     lappend native_engines $name
+  }
+  foreach {base destination} {starlink_glrt_native_schedule_control native_schedules starlink_glrt_native_result_queue native_result_queues} {
+    if {[string match ${base}* $ref] || [string match ${base}* $orig]} { lappend $destination $name }
   }
   foreach {base destination} {starlink_glrt_correlator legacy_correlators starlink_glrt_score legacy_scorers starlink_glrt_vector_stage legacy_vector_stages} {
     if {[string match ${base}* $ref] || [string match ${base}* $orig]} {
@@ -68,6 +73,8 @@ puts $f "native_dma_cells\t[llength $native_dma]"
 puts $f "glrt_ip_cells\t[llength $glrt]"
 puts $f "glrt_dma_cells\t[llength $glrt_dma]"
 puts $f "native_refinement_engines\t[llength $native_engines]"
+puts $f "native_schedule_controls\t[llength $native_schedules]"
+puts $f "native_result_queues\t[llength $native_result_queues]"
 puts $f "legacy_correlators\t[llength $legacy_correlators]"
 puts $f "legacy_scorers\t[llength $legacy_scorers]"
 puts $f "legacy_vector_stages\t[llength $legacy_vector_stages]"
