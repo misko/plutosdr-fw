@@ -46,3 +46,44 @@ def test_block_design_profile_selection(tmp_path, rate, native, legacy, accepted
         assert f"CONFIG.ENABLE_NATIVE_SCHEDULE={schedule}" in result.stdout
         assert f"CONFIG.ENABLE_LEGACY_SCORER={legacy}" in result.stdout
         assert ("CONFIG.ENABLE_NATIVE_REFINEMENT=1" in result.stdout) == (native == "1")
+
+
+@pytest.mark.parametrize("scheduled", [None, "0", "1"])
+def test_postroute_optimization_is_selected_only_for_scheduled_profile(tmp_path, scheduled):
+    repo = Path(__file__).resolve().parents[2]
+    project = repo / "hdl/projects/pluto/system_project.tcl"
+    bench = tmp_path / "project.tcl"
+    # Run the real project selection with external ADI/Vivado commands stubbed.
+    # The emitted property must identify an existing executable hook, and the
+    # hook must run physical optimization without adding timing exceptions.
+    lines = [
+        "set ::env(STARLINK_GLRT_RATE_HZ) 60000000",
+        "set ::env(STARLINK_GLRT_NATIVE_REFINEMENT) 1",
+        "unset -nocomplain ::env(STARLINK_GLRT_NATIVE_SCHEDULE)",
+        "set ADI_USE_OOC_SYNTHESIS 0",
+        f"set ad_hdl_dir {{{repo / 'hdl'}}}",
+        "rename source real_source",
+        "proc source {path} {}",
+        "proc unknown {args} { return {} }",
+        'proc set_property {name value args} { puts "$name=$value" }',
+    ]
+    if scheduled is not None:
+        lines.append(f"set ::env(STARLINK_GLRT_NATIVE_SCHEDULE) {scheduled}")
+    lines.append(f"real_source {{{project}}}")
+    bench.write_text("\n".join(lines) + "\n")
+    result = subprocess.run(["tclsh", str(bench)], cwd=project.parent,
+        capture_output=True, text=True, timeout=10, check=True)
+    key = "STEPS.POST_ROUTE_PHYS_OPT_DESIGN.TCL.POST="
+    hooks = [line.removeprefix(key) for line in result.stdout.splitlines() if line.startswith(key)]
+    assert len(hooks) == (1 if scheduled == "1" else 0)
+    if hooks:
+        hook = Path(hooks[0])
+        assert hook.is_file()
+        bench.write_text("\n".join([
+            'proc report_timing_summary {args} {}',
+            'proc phys_opt_design {args} { puts "optimize $args" }',
+            f"source {{{hook}}}",
+        ]) + "\n")
+        result = subprocess.run(["tclsh", str(bench)], capture_output=True,
+            text=True, timeout=10, check=True)
+        assert result.stdout.strip() == "optimize -directive AlternateReplication"
