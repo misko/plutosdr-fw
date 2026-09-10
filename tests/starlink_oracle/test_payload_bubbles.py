@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.starlink_oracle.forward_retirement_contract import restore_forward_actual
 from tests.starlink_oracle.input_identity_contract import tokens
 from tests.starlink_oracle.payload_bubble_contract import (
     restore_payload_module,
@@ -41,7 +42,7 @@ def test_exact_four_module_inverse_and_three_unmodified_frozen_mirrors():
 
 def test_actual_stimulus_and_all_previous_fences_remain_literal():
     name = "tb/tb_starlink_pss_fft_bank_owned_slice.sv"
-    candidate = (ACQ / name).read_text()
+    candidate = restore_forward_actual((ACQ / name).read_text())
     for addition in ("SHADOW", "RECEIPT"):
         pattern = rf"^  *// BEGIN PAYLOAD_BUBBLE_{addition}.*?^  *// END PAYLOAD_BUBBLE_{addition}\n"
         candidate, count = re.subn(pattern, "", candidate, flags=re.MULTILINE | re.DOTALL)

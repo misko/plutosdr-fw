@@ -7,6 +7,8 @@ sequential logic are left untouched for the older complete-source comparison.
 """
 import re
 
+from tests.starlink_oracle.forward_retirement_contract import restore_forward_guard
+
 
 def _tokens(source):
     return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", source))
@@ -14,6 +16,7 @@ def _tokens(source):
 
 def restore_preflight_reason_only_guard(source):
     """Remove only the opt-in reason-register OR; no control cone may change."""
+    source = restore_forward_guard(source)
     source = _tokens(source)
     additions = (
         ", parameter integer USE_PREFLIGHT_REASON_ONLY = 0",

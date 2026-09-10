@@ -1,4 +1,5 @@
 """Exact inverses of the data-only enables and both full ROM equalities."""
+from tests.starlink_oracle.forward_retirement_contract import restore_forward_wrapper
 from tests.starlink_oracle.input_identity_contract import tokens
 
 
@@ -8,6 +9,7 @@ def once(source, new, old=""):
 
 
 def restore_payload_wrapper(source):
+    source = restore_forward_wrapper(source)
     source = once(source,
         ".DATA_WIDTH(18),\n    .PRIVATE_PAYLOAD_BUBBLES(REGISTERED_SCHEDULING),\n"
         "    .BALANCED_BLOCK_IDENTITY_EQ(REGISTERED_SCHEDULING)) joiner",
