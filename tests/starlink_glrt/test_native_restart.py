@@ -1,10 +1,12 @@
 """Automatic restart gates use journals from the actual C controller."""
 from dataclasses import replace
+import ctypes as c
 
 import pytest
 
 from tests.starlink_glrt.test_native_controller import Radio, controller, pilot_words
 from tests.starlink_glrt.test_native_journal import journal
+from tools.starlink_glrt_native_journal import review
 from tools.starlink_glrt_native_restart import RestartFence, restart_fence
 from tools.starlink_glrt_schedule_abi import ScheduleSnapshot
 
@@ -66,3 +68,34 @@ def test_reacquisition_cannot_reuse_any_guard_sample_from_previous_episode(chang
     if change == 'float': starts[0] = float(starts[0])
     with pytest.raises(ValueError):
         fence.require_fresh_observations(tuple(starts))
+
+
+@pytest.mark.parametrize('supported_phases', [(0,), (0, 1)])
+@pytest.mark.parametrize('bootstrap_repeats', [12, 64])
+def test_long_finite_seed_collects_sparse_pilots_without_accepting_rejected_frames(
+    controller, pilot_words, supported_phases, bootstrap_repeats
+):
+    # This test qualifies controller scheduling with a declared availability
+    # pattern. Zero moments represent rejected input, not generated RF truth.
+    class SparseRadio(Radio):
+        def advance(self, samples=3000):
+            before=len(self.queue)
+            super().advance(samples)
+            for words in self.queue[before:]:
+                frame=sum(b.repeats for b in self.descriptors if b.tag<words[2])+words[27]
+                if frame%4 not in supported_phases:
+                    words[9:25]=[0]*16
+
+    radio=SparseRadio(controller,pilot_words,frames=128)
+    radio.seed.repeats=bootstrap_repeats
+    radio.seed.expires=radio.seed.start+bootstrap_repeats*80000
+    assert controller.glrt_native_controller_init(radio.state,c.byref(radio.ports),
+        c.byref(radio.seed),128,2)==0
+    assert radio.run()==(-4 if bootstrap_repeats==12 else 0)
+    checked=review(journal(radio),epoch=3)
+    expected_count=12 if bootstrap_repeats==12 else 128
+    assert len(checked['heads'])==expected_count
+    assert [row['frame'] for row in checked['estimates']]==list(range(expected_count))
+    assert [row['rejection']==0 for row in checked['estimates']]==[
+        frame%4 in supported_phases for frame in range(expected_count)]
+    assert not radio.queue and not radio.pending and not radio.valid
