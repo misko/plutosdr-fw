@@ -2,6 +2,23 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest verified increment (2026-09-10, after 14:59 UTC): the product-local final
+publication alternative now PASSES its full vendor FFT run (original50316,
+terminal0, 588.57 seconds). Parent independently checked all65 frozen sources,
+19 generated-IP files, four zero owner exits, the composed result verifier and
+all four complete historical numerical CSV hashes. The new observer checks
+623129 edges and140 sampled publications, all authorized; its sampled negative
+rows are zero and are not claimed as actual-controller coverage. Those veto
+witnesses remain separate directed offline tests. No physical timing pass is
+implied. Source-specific physical preparation is next; no new synthesis/route
+or radio launch is authorized yet. See
+[actual result](reports/experiments/20260910-product-final-fence-review.md).
+The inverse sealed-bank alternative independently passes the final combined
+235-test suite, including the corrected independent timestamp-order checker.
+Runtime RTL is unchanged from the136-test cut. Actual preparation must measure
+early-status join latency rather than borrowing delayed-status test bounds;
+see [inverse review](reports/experiments/20260910-inverse-sealed-integration-review.md).
+
 Parent-reviewed increment (2026-09-10): the independent producer-local final
 publication alternative passes 26 repeated offline tests, including a newly
 required real-checker sticky-fault witness and its missing-veto mutation. It

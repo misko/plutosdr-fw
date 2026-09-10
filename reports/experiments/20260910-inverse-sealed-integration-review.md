@@ -93,3 +93,50 @@ execution. No synthesis, routing, full receiver promotion or deployment is
 authorized by this result. Firmware main and the primary runtime HDL gitlink
 remain unchanged. Source 15/30/60, native fine search, independent 2.5 MS/s IIO,
 causal 120 ms/300 s scanning and staged hardware deployment remain the full goal.
+
+## Final independent event/source/graph repeat
+
+Parent original82374 exited0: **235 passed in15.98 seconds**, using both
+`test_inverse_sealed.py` and `test_inverse_sealed_receipts.py` at source FW
+`4ebd11f8a1653f3c8dffc5b81c3812d709fe66cb` / HDL
+`1df9b316216d7d35866d87a0d34dd8bb1846a482`. Recovery tree:
+`inverse-final-parent.eIGWIG5L`. Log SHA-256
+`eaa7932225b6a0279b05a2f21364e116d59047fe432678915d1cb289b52078e1`;
+JUnit `c3b7b1ea472d5a82e73e4e1179e2e80f3d9f4f4fbf720c2da9715a449d51fa7d`.
+
+The sole HDL delta from the136 cut is11 testbench lines for an actual tagged
+release opportunity: after512 reads and ACK, a current fault must suppress
+release/reuse. Its missing-veto mutant fails the specific edge assertion.
+Runtime issuer/bank/top are unchanged. New tests also enforce invalid/X/Z
+parameter rejection, exact imported Python source closure and compiler errors
+even if Icarus exits0. Continuous/net graph checks detect deliberate registered-
+diagnostic bypass feedback; procedural state is a cut, not a physical CDC proof.
+
+Parent review found a verifier timestamp gap: S1 checked slow-clock order but
+did not advance its cursor. The one-line model fix plus a post-S1 OUT moved to
+S1-1 now fails specifically for slow event order; the missing-update mutant
+accepts that same19-word negative log. This changes evidence validation, not RTL.
+The previous234 run and separate99-test correction remain preserved, not
+retroactively described as one235-test execution.
+
+All parent results and per-case source copies are in
+`20260910-inverse-final-parent.tgz`,17694601 bytes, SHA-256
+`9d87de080bbef872d75b4212d661a20b3e04bdfccf9bae365bef62cf9d916c42`.
+`tar --compare` matches originals, excluding redundant pytest `*current` aliases.
+Publication to the separate DNM branch is approved; no runtime gitlink promotion.
+
+Next: additive actual-core preparation. Inspection of the old actual CSV shows
+status preceding the last raw result, unlike the delayed-status fixture. A
+directed early-status case must measure that join before fixing service bounds;
+the delayed-status +2 publication observation is not a universal latency claim.
+Preserve the original absolute service budget, arithmetic and fault intents.
+
+Parent also independently reconstructed the two committed archive parts at FW
+`652e2ea37aa7c2e08e4adb19006d8fd0b19fc240`:72134497 bytes, SHA-256
+`1701af578e98da39555a0aecfbe757c7fe4a8907f5aaa797d6fc02c7140d3c71`.
+All11890 payload hashes plus the separately pinned inventory hash verify;
+11891 unique safe regular members, exact closure, no extraction. First audit
+11630 rejected the distinct inventory entry with `KeyError: inventory.json`;
+corrected audit54371 explicitly checks its existing external hash and exits0.
+No archive/source was modified. The owner's FW32532 and HDL64538 pushes report
+terminal0 to the inverse DNM remote, not main.

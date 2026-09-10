@@ -171,3 +171,41 @@ The reviewed preparation/evidence is pushed to the separate DNM remotes at FW
 committed outer closure, manifest
 `f3d5631fb84b00289a969de32bc3396df0882288537615e90f6d52a742be043e`.
 This is archive integrity, not an independent inner-tar or new behavioral pass.
+
+## Completed actual run and independent parent audit (after 14:59 UTC)
+
+Original owner50316 exited0, 14:49:52.450519799 to14:59:41.029770790 UTC;
+vendor wall time588.57 seconds. Process, after-integrity, IP audit and result
+receipt exit files each contain exactly `0\n`. No retry occurred.
+
+Parent audit original69441 exited0 at recovery
+`product-actual-verify-parent.ybhwMNFo`. It independently rechecks the externally
+pinned owner/helper/runner/65-file manifest, every frozen source, matching
+before/after snapshots, all19 generated `.xci`/`.vhd` files with exact inventory,
+the frozen composed result verifier and the unique original terminal marker.
+Generated-IP checks are after-run identity, not precompile equivalence.
+
+All four complete CSVs retain the historical hashes above: main candidate and
+reference each589950 lines/35655334 bytes, extra pair each33180/2055036.
+The existing ROM, fault-CDC, exact-control and extra-epoch gates all pass.
+The new producer-final observer records pre/post623129, sampled140,
+authorized140, closed140, nonsampled-private3, inverse-owned38950,
+owned-stalls5458, current-fault7882, resets4011 and private-reset164648.
+Public-overlap63 is observed, not used to mask a comparison.
+
+Sampled veto/unknown/malformed counts are explicitly zero: this actual run
+does not replace the directed local-fence fault witnesses. Qualified core status
+records1246258 samples =953795 raw-equal +292463 invalid-only differences;
+this is NOT a raw217-field equivalence claim. The216 other fields remain
+unconditional, including product ownership and payload fields.
+
+Parent audit source and JSON are archived as
+`20260910-product-actual-parent-audit.tgz`,2510 bytes, SHA-256
+`5c0dc865c522f7a7c832631590907a5e7cf8d4585d50d8a88cf1da87138be552`;
+`tar --compare` matches retained originals. The implementation owner separately
+archives the complete vendor evidence, not merely this compact audit.
+
+This qualifies source-specific OFFLINE physical preparation for the same
+product runtime8923b42b/e4f4c56d, preserving the ROM baseline and constraints.
+No synthesis/routing launch, receiver promotion, timing pass or radio operation
+follows automatically. Physical timing remains the deployment blocker.
