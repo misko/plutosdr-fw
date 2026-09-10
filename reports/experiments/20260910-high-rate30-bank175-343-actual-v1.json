@@ -1,0 +1,12 @@
+{
+  "archive_bytes": 2077471,
+  "archive_sha256": "5df8821406402188ef7d1eb5dd59d155583fc15247c43081e8d3f86841b2cbc4",
+  "artifact_inventory_sha256": "e1837836fe0f94bcf74a6c94ac11f196a1b9cb2037d4244ccbfce9f98321fb28",
+  "case": "healthy343",
+  "outcome": "healthy",
+  "raw_run_bytes": 49086372,
+  "raw_run_inventory_files": 791,
+  "receipt_files": 533,
+  "regular_members": 534,
+  "source_signature": "b9d4d306fd9665133e36dc21e24125bce9ac7a6b3b34ed335b45fd5e2ba9ab09"
+}
