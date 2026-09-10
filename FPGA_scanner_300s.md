@@ -14,6 +14,11 @@ its diagnostic route, but timing FAILS: island175 setup -1.761 ns, global setup
 recovery and external I/O qualification remain open. The original failed route
 is archived before a separate default-off per-cause CDC candidate. No release,
 full-receiver timing or on-radio qualification follows.
+The separate R1/B1/O1 arithmetic candidate has now also synthesized and routed:
+island175/global setup -1.341 ns, hold +0.038 ns, all6762 routable nets complete.
+This still FAILS, with379 internal and118 crossing setup failures. It is not the
+combined control/CDC candidate or a full receiver. Its worst internal path is
+input validation into descriptor capture; no physical release is authorized.
 
 Latest checkpoint (2026-09-10): the additive complete three-bank coarse scorer
 passes actual-core numerical/fault replay and 64-block continuous capacity tests

@@ -1212,8 +1212,37 @@ HDL5b68bb8b488a886c3861537eaf9643ec940003e0 are reviewed and pushed to the
 arithmetic DO NOT MERGE remotes (root66302/45851terminal0). Exactly one synthesis
 is authorized from the frozen owner, new
 `hdl/library/starlink_pss_acquisition/build/arithmetic-ooc-R1B1O1-175-owned-v1`
-in that worktree. Agent owns original59427; outcome pending. No route or actual
-replay is authorized by this step. No runtime promotion or radio operation.
+in that worktree. Original59427 terminated0 after98.743s at10:09:40UTC, with
+before/after audits0 and a unique synthesis completion marker. Parent independently
+verified all8 product hashes,15 scope hashes (14 synthesis inputs including the
+generated VHDL plus original simulation log), explicitR/B/O111, frozen copied-source
+closure and actual clock/resource/CDC reports. Synthesis1944LUT,4547FF,21DSP,
+15RAMB18(7.5tiles),zero black boxes. Product wrapper/core55LUT357FF4DSP; no
+whole-receiver fit or arithmetic mapped-register claim follows from this count.
+Source100 period10ns/island175 period5.714000225ns; CDC139warnings6info,
+114/124 missing I/O delays,zero unconstrained internal endpoints. These remain
+unqualified. DCP2128454bytes, SHA256
+`de5b7ca6849c8111ccfce29ca39bbf8899276c0dea309abb576e70546daf06bf`.
+Parent subsequently authorized one diagnostic route on that exact DCP with the
+unchanged0873675f route script, clocks/directives/two threads, unique owner/output
+directories and independent before/after DCP/script receipts. Original42281
+terminated0 after58.32s; owner `/tmp/starlink-arithmetic-route-v1.VNX5gK`, output
+`route/`. Parent read original process-time exit0/unique completion marker,
+route status and all timing-summary groups, verified original before/after
+input DCP/script hashes and routed DCP
+`e8a6336eb4079d8d27ac9596cd6fcb7322da656d0f8f04d6ac67e619ed5a7413`.
+All6762 routable nets complete,zero routing errors. Still timingFAIL:
+global -1.341ns/TNS -386.804/497 failing; island175 -1.341ns/TNS -304.384/379;
+source100 +2.454ns;100-to175 -0.629ns/40fail;175-to100 -1.222ns/78fail.
+Global hold +0.038ns withzero failures; async recovery/removal +0.292/+0.621ns,
+zero failures. Routed1994LUT4557FF1082slices21DSP15RAMB18; CDC/IO still open.
+Worst internal expected_position[1] to descriptor CE:6.766ns=1.863logic+4.903route,
+six levels. It remains a current-input validation/control path. This is separate
+from the exact111 control/CDC branch, not a combined candidate or fullreceiver.
+Read-only next-path/combination diagnosis is authorized, no new RTL/physical run.
+Synthesis archive134regularmembers independently verified,24033138bytes, SHA
+`5ea5d69dade968670665c8773eec48cc55fe55a7ac95490e50f2de695c41dd07`;
+FWe7142938e097cfeb22c7ce38f409023e3fc66739 pushed (root72369terminal0).
 
 ## Per-cause CDC offline recurrence reviewed
 
@@ -1231,6 +1260,45 @@ the destination stages; fast-domain current fault and publication fences are
 unchanged. Nominal digital recurrence,4096 subsets,48 X/Z rows,three clock phases,
 both scheduling modes and epoch/private reset separation pass. Quiescent FFT
 stub/forced source-Q snapshots are explicit: not actual FFT, analog CDC or physical
-closure. Candidate source pin/archive and actual-preparation review remain next.
-The immutable preceding failed-route pins FWbdd2fd5/HDL2ccfac2e are pushed
-(root66608/88574terminal0); the failed route was not modified to add this candidate.
+closure. Tested sources FW640cf54b8a28e979e62f90a8c57e911bb789ac7c /
+HDL02de07cc7a6c241dd6cc8cf5b733037d89eac6bd. Parent read the complete report and
+verified306 local archive members, manifest
+`ed977a4e8cb185869ff355a474bde01ff9dcf8b72e252f50834fadf286984891`.
+Offline actual-preparation is authorized: keep frozen dec20R1D0S0 independent
+reference, old predicates/stimulus and historical passing111 main/extraCSV
+expectations literal; new candidate R1D1S1C1 adds a slow-clock scalar stage
+observer and explicit knob binding. No vendor actual execution yet.
+
+Parent found a publication defect before pushing the CDC package: global ignore
+rules omitted logs/reports from Git despite local manifest checks. The previously
+pushed synthesis/route/physical-offline archives had the same issue; original
+actual83-member package was already complete. All original files remained local.
+Agent additively committed312 exact manifest-listed ignored files, no runtime,
+test, manifest or original result changes. Parent independently checked ALL598
+member SHA256 values and five manifest hashes through Git objects at
+HDLae7c0ec29812efb2c0d442cbe9dfb6b3b0eaab24; each tracked path set equals exactly
+its manifest members plusSHA256SUMS (307/38/44/130/84files). Earlier local checks
+are not retroactively described as remote completeness. Corrected
+FWf3393233375c4af8a8be15f59723b63fe1412b42 / HDLae7c0ec2 are now pushed to
+control DO NOT MERGE remotes (root79563/16467terminal0). Prior failed-route
+source/DCP and CDC122-test identities are unchanged.
+
+## StageA60 public interface independently tested
+
+Parent reviewed both runtime changes (40 additions/4 deletions), the153-line real
+cascade/counter-specimen bench, complete new test/helper/inverse/manifest files
+and four-line legacy inverse composition. Independent660 tests PASS25.11s,
+original90816terminal0, `/tmp/starlink-psma18-parent.EdANJN`. Exact sources
+FW6e561ee50b299d32991f636932eeccc467159303 /
+HDLf16dc564c541df614a7c2b27c489aece5320dc43; unchanged during the replay.
+Coverage includes strict opt-in initial admission and X/Z guard mutations,
+exact ABI/kernel/Eh/DDC identities, positional/default legacy profiles, both-stage
+discontinuity sum, first-stage-only and propagated real cascade faults, saturating
+sum boundary specimens, cumulative reset/flush/disable semantics and four complete
+public PSMA/map lifecycle variants with a real x2 fault producer. No specimen
+counter interface is described as real filtering; the wrapper test uses an
+inactive acquisition core. Old30/boundary/health/shared plus numerical30/60 and
+pilot/coefficient/support tests are included. No actual paired FFT/native/PIL1
+composition, live profile switching, host/kernel1.8 admission or deployment is
+proved. Portable archive/report publication and next combined-harness preparation
+remain in progress; no actual vendor simulation is authorized for this source yet.
