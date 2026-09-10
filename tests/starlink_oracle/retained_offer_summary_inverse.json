@@ -1,0 +1,94 @@
+{
+  "starlink_pss_fft_bank_owned_retained_output_probe.v": [
+    [
+      "  parameter integer CLOSED_INPUT_CUTOVER = 0\n",
+      "  parameter integer CLOSED_INPUT_CUTOVER = 0,\n  parameter integer INPUT_OFFER_FAULT_SUMMARY = 0\n"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (INPUT_OFFER_FAULT_SUMMARY !== 0 && INPUT_OFFER_FAULT_SUMMARY !== 1)\n      $fatal(1, \"input-offer summary mode must be known zero or one\");\n"
+    ],
+    [
+      "      .CLOSED_INPUT_CUTOVER(CLOSED_INPUT_CUTOVER)) island (.*);",
+      "      .CLOSED_INPUT_CUTOVER(CLOSED_INPUT_CUTOVER),\n      .INPUT_OFFER_FAULT_SUMMARY(INPUT_OFFER_FAULT_SUMMARY)) island (.*);"
+    ]
+  ],
+  "starlink_pss_fft_retained_output_impl.v": [
+    [
+      "  parameter integer CLOSED_INPUT_CUTOVER = 0\n",
+      "  parameter integer CLOSED_INPUT_CUTOVER = 0,\n  parameter integer INPUT_OFFER_FAULT_SUMMARY = 0\n"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (INPUT_OFFER_FAULT_SUMMARY !== 0 && INPUT_OFFER_FAULT_SUMMARY !== 1)\n      $fatal(1, \"input-offer summary mode must be known zero or one\");\n"
+    ],
+    [
+      "  wire vendor_fault_now =",
+      "  // Offered events are summary-only. They NEVER drive delivery or counters.\n  // Caller premise: input_fault_now===0 implies offers case-equal certificates.\n  wire summary_offer_beat = guard_valid && transport_ready;\n  wire summary_offer_complete = summary_offer_beat && guard_last;\n  wire cutover_offered_fault_now;\n  wire [1:0] guard_offered_local_fault;\n  wire vendor_fault_now ="
+    ],
+    [
+      "  wire external_fault_now = input_fault_now || input_guard_fault || source_fault_fast[1] ||\n    vendor_fault_now || fast_fault || kernel_fault || product_overflow || product_bank_fault ||\n    product_bank_framing_fault_now || handoff_fault_now || cutover_fault_now ||\n    (|cutover_reasons) || retained_fault_now || (|retained_reasons);",
+      "  wire external_fault_now = input_fault_now || input_guard_fault || source_fault_fast[1] ||\n    vendor_fault_now || fast_fault || kernel_fault || product_overflow || product_bank_fault ||\n    product_bank_framing_fault_now || handoff_fault_now || cutover_fault_now ||\n    (|cutover_reasons) || retained_fault_now || (|retained_reasons);\n  // Direct unknown input fault is explicitly fail-closed in this opt-in summary.\n  // All original full diagnostic/current predicates remain above and in guards.\n  wire offered_external_fault_now = (input_fault_now !== 1'b0) || input_guard_fault || source_fault_fast[1] ||\n    vendor_fault_now || fast_fault || kernel_fault || product_overflow || product_bank_fault ||\n    product_bank_framing_fault_now || handoff_fault_now || cutover_offered_fault_now ||\n    (|cutover_reasons) || retained_fault_now || (|retained_reasons);"
+    ],
+    [
+      "  assign common_current_fault = external_fault_now || forward_fault_now || inverse_fault_now ||\n    output_bank_fault || output_bank_framing_fault_now || preparation_fault_now || result_fault;",
+      "  wire original_common_current_fault = external_fault_now || forward_fault_now || inverse_fault_now ||\n    output_bank_fault || output_bank_framing_fault_now || preparation_fault_now || result_fault;\n  wire offered_common_current_fault = offered_external_fault_now ||\n    guard_offered_local_fault[0] || guard_offered_local_fault[1] ||\n    output_bank_fault || output_bank_framing_fault_now || preparation_fault_now || result_fault;\n  assign common_current_fault = INPUT_OFFER_FAULT_SUMMARY ?\n    offered_common_current_fault : original_common_current_fault;"
+    ],
+    [
+      "    .USE_PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER),",
+      "    .USE_PRIVATE_DESCRIPTOR_OFFER(PRIVATE_DESCRIPTOR_OFFER),\n    .ENABLE_OFFERED_FAULT_SUMMARY(INPUT_OFFER_FAULT_SUMMARY),"
+    ],
+    [
+      "    .certified_input_complete(certified_input_complete && this_raw_owner),",
+      "    .certified_input_complete(certified_input_complete && this_raw_owner),\n    .offered_input_beat(summary_offer_beat && this_raw_owner),\n    .offered_input_complete(summary_offer_complete && this_raw_owner),\n    .offered_local_fault_now(guard_offered_local_fault[OWNER]),"
+    ],
+    [
+      "  starlink_pss_core_job_cutover #(.ENABLE_CLOSED_INPUT_VIEW(CLOSED_INPUT_CUTOVER)) cutover (",
+      "  starlink_pss_core_job_cutover #(.ENABLE_CLOSED_INPUT_VIEW(CLOSED_INPUT_CUTOVER),\n    .ENABLE_OFFERED_FAULT_SUMMARY(INPUT_OFFER_FAULT_SUMMARY)) cutover ("
+    ],
+    [
+      "    .input_complete(certified_input_complete), .raw_frame(event_frame),",
+      "    .input_complete(certified_input_complete), .raw_frame(event_frame),\n    .offered_input_beat(summary_offer_beat), .offered_input_complete(summary_offer_complete),\n    .offered_fault_now(cutover_offered_fault_now),"
+    ]
+  ],
+  "starlink_pss_core_job_cutover.v": [
+    [
+      "  parameter integer ENABLE_CLOSED_INPUT_VIEW = 0",
+      "  parameter integer ENABLE_CLOSED_INPUT_VIEW = 0,\n  parameter integer ENABLE_OFFERED_FAULT_SUMMARY = 0"
+    ],
+    [
+      "  input wire input_beat, input_complete,",
+      "  input wire input_beat, input_complete,\n  input wire offered_input_beat, offered_input_complete,"
+    ],
+    [
+      "  output wire closed_input_fault_now,",
+      "  output wire closed_input_fault_now,\n  output wire offered_fault_now,"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (ENABLE_OFFERED_FAULT_SUMMARY !== 0 && ENABLE_OFFERED_FAULT_SUMMARY !== 1)\n      $fatal(1, \"offered fault summary mode must be known zero or one\");\n"
+    ],
+    [
+      "  // Parallel observation only:",
+      "  // Summary-only parallel predicate. No offered input is sampled into state.\n  wire summary_fault_now;\n  wire summary_known = (core_resetn === 1'b0 || core_resetn === 1'b1) &&\n    (raw_frame === 1'b0 || raw_frame === 1'b1) &&\n    (raw_output === 1'b0 || raw_output === 1'b1) &&\n    (raw_status === 1'b0 || raw_status === 1'b1) &&\n    (^raw_vendor_faults !== 1'bx) &&\n    (offered_input_beat === 1'b0 || offered_input_beat === 1'b1) &&\n    (offered_input_complete === 1'b0 || offered_input_complete === 1'b1);\n  wire summary_any_raw = raw_frame || raw_output || raw_status;\n  wire summary_configured_owner = owner_open && configured && core_resetn === 1'b1 && reset_flushed;\n  wire summary_orphan = summary_any_raw && !summary_configured_owner;\n  wire summary_premature_reset = owner_open && configured && core_resetn === 1'b0;\n  wire summary_early_result = (raw_output || raw_status) &&\n    (!(fresh_frame || raw_frame) || !(fresh_full || offered_input_complete));\n  assign summary_fault_now = resetn && (!summary_known || raw_vendor_faults !== 3'b0 || summary_orphan || summary_early_result || summary_premature_reset);\n  assign offered_fault_now = ENABLE_OFFERED_FAULT_SUMMARY ? summary_fault_now : 1'b0;\n  // Parallel observation only:"
+    ]
+  ],
+  "starlink_pss_result_guard_owner_view.v": [
+    [
+      "  parameter integer USE_PRIVATE_DESCRIPTOR_OFFER = 0,",
+      "  parameter integer USE_PRIVATE_DESCRIPTOR_OFFER = 0,\n  parameter integer ENABLE_OFFERED_FAULT_SUMMARY = 0,"
+    ],
+    [
+      "  input wire certified_input_complete,",
+      "  input wire certified_input_complete,\n  input wire offered_input_beat, offered_input_complete,\n  output wire offered_local_fault_now,"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (ENABLE_OFFERED_FAULT_SUMMARY !== 0 && ENABLE_OFFERED_FAULT_SUMMARY !== 1)\n      $fatal(1, \"offered fault summary mode must be known zero or one\");\n"
+    ],
+    [
+      "  assign protocol_fault =",
+      "  // No inherited external-fault echo. This view does not replace the guard's own\n  // state/ACK/publication predicates or delivered-input certification.\n  wire summary_effective_input_full = (input_count == 511 && offered_input_beat) ||\n    (input_count == 512 && !offered_input_beat);\n  wire summary_effective_input_complete = input_complete_seen || offered_input_complete;\n  wire summary_effective_frame_seen = frame_seen || core_event_frame_started;\n  wire summary_reservation_error = active && (!output_bank_reserved ||\n    (!input_complete_seen && !input_bank_reserved));\n  wire summary_input_error = (offered_input_beat &&\n    (!active || input_complete_seen || input_count == 512)) ||\n    (offered_input_complete &&\n    (!active || input_complete_seen || !summary_effective_input_full));\n  wire summary_frame_error = core_event_frame_started &&\n    (!active || frame_seen || (input_count == 0 && !offered_input_beat));\n  wire summary_status_error = core_status_tvalid &&\n    (!active || status_seen || core_status_tdata[7:5] != 0 ||\n     (exponent_seen && core_status_tdata[4:0] != output_exponent));\n  // Preserve the existing BFP18 layout: two 18-bit values in 24-bit AXI slots;\n  // TUSER is {3'b0, exponent[4:0], 7'b0, XK_INDEX[8:0]}.\n  // The unused upper component-slot bits are ignored, as in the old adapter.\n  wire summary_output_error = core_output_tvalid &&\n    (!active || output_count == 512 || !summary_effective_input_complete ||\n     !summary_effective_input_full || !summary_effective_frame_seen ||\n     core_output_tuser[15:9] != 0 || core_output_tuser[23:21] != 0 ||\n     core_output_tuser[8:0] != output_count[8:0] ||\n     core_output_tlast != (output_count == 511) ||\n     (exponent_seen && core_output_tuser[20:16] != output_exponent) ||\n     (status_seen && core_output_tuser[20:16] != status_exponent) ||\n     (core_status_tvalid && core_output_tuser[20:16] != core_status_tdata[4:0]));\n  wire summary_slot_error = active && return_valid &&\n    ((!return_last && !mailbox_input_ready) ||\n     (core_output_tvalid && (return_last || !mailbox_input_ready)));\n  wire summary_watchdog_error = active && age == WATCHDOG_CYCLES - 1;\n  wire [7:0] summary_faults_now = {summary_watchdog_error, summary_slot_error, summary_output_error, summary_status_error,\n    summary_frame_error, summary_input_error, summary_reservation_error, 1'b0 || mailbox_input_fault};\n  wire summary_fault_now = |summary_faults_now;\n  assign offered_local_fault_now = ENABLE_OFFERED_FAULT_SUMMARY ? summary_fault_now : 1'b0;\n  assign protocol_fault ="
+    ]
+  ]
+}
