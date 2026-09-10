@@ -12,6 +12,7 @@ from .native60_budget import encoded, require, sha
 ADDITIVE = [LOGIC, "tools/prepare_starlink_high_rate60_late.py",
     *["tests/starlink_oracle/high_rate60_late"+suffix+".py" for suffix in ["","_recipe","_result","_bundle"]],
     *["tests/test_starlink_high_rate60_late"+suffix+".py" for suffix in ["","_result","_bundle"]],
+    "tests/test_starlink_high_rate60_late_settle.py",
     "docs/starlink-high-rate60-late-recipe-before-evaluation-20260910.md"]
 
 
@@ -36,6 +37,8 @@ def check_logic(root):
         "native.candidate_command_handshake===1'b1", "native.candidate_submit_accepted===1'b1",
         "cycles-begin_cycle>512", "cycles-begin_cycle>1328", "cycles-source_off_cycle>2048",
         "late_register_reads!=62", "repeat(8)", "late_snapshot(1)", "late_snapshot(2)",
+        "while(cycles-late_handshake_cycle<8) @(negedge clk);",
+        "while(cycles-source_off_cycle<8) @(negedge clk);",
         "core_input_ready===1'b1", "next_inverse===1'b0", "pilot.ddc.accept===1'b1",
         "source_checked!=16425", "!source_finished || !coarse_stopped || !map_retained"]:
         count = 2 if token in {"cycles-native_trigger_cycle>256", "continuous_source}!==3'b111",
