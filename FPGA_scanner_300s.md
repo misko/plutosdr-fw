@@ -2,15 +2,21 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
-Latest checkpoint (2026-09-10): the experimental three-bank FFT engine passes
-actual-core numerical/fault tests and has a tested175MHz slice service interval
-below the canonical block-arrival period. Its isolated route still fails an
-internal metadata/fault-to-kernel-enable path at-2.557ns. The additive complete
-scoring composition is being implemented separately; no receiver profile or
-radio has been changed. All three completed alternative studies are preserved
+Latest checkpoint (2026-09-10): the additive complete three-bank coarse scorer
+passes actual-core numerical/fault replay and 64-block continuous capacity tests
+at 175/200 MHz. Independent primary-branch 175 MHz replay also passes: 5,364
+exact scores and 28,608 ordered burst/stall scores with no ingress stalls.
+Whole-coarse synthesis measures 3,868 LUTs, 6,499 FFs, 27 DSPs and 14 BRAM tiles;
+this is not routed receiver area or timing qualification. The earlier isolated
+bank route still fails at -2.557 ns; the first completed-input control refactor
+regresses to -3.855 ns and is not promoted. A second control-path experiment and
+the longer 4,096-block soak are the next tests. No receiver profile or radio has
+been changed. All three completed alternative studies are preserved
 on remote do-not-merge branches. See
 [`reports/starlink-coarse-parallel-evaluation-20260910.md`](reports/starlink-coarse-parallel-evaluation-20260910.md)
 and [`reports/starlink-bank-owned-integration-gates-20260910.md`](reports/starlink-bank-owned-integration-gates-20260910.md).
+Primary replay evidence:
+[`reports/experiments/20260910-bank-composition-primary-replay.md`](reports/experiments/20260910-bank-composition-primary-replay.md).
 
 ## Objective and completion gate
 
