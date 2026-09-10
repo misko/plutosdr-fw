@@ -547,3 +547,41 @@ Actual30 healthy447 remains the verified positive result. Separate343 and
 late-native30 cases are being prepared without changing its goldens. Full
 bank setup remains-1.907ns;60 integration, full receiver timing/IO/CDC, RX
 calibration, .18 canary and .17 Ethernet deployment remain required.
+
+## Phase-aware actual retry and additional30 case qualification
+
+The final phase-aware correction preserves every original checker and passes
+53 independently repeated tests in13.49s, original81158 exit0, retained at
+`/tmp/starlink-extra-edge-final-parent.U6Xc8O`. Additive provider witnesses
+confirm exactly one qualification edge in each declared clock phase. Parent
+read the final report and verified all540 offline-archive hashes, manifest
+`a268fbd0350165c92fa2cae47ad7f24faa8a6c734f8fe57027ad3741f505469e`.
+Tested source FW48b88f6786 / HDL12ce2854b3; report-only pins FWc9e191f898 /
+HDLbed131df57. The runtime remains ae50; no arithmetic/control RTL was changed.
+
+One source-specific actual baseline was authorized and launched at08:16:56UTC,
+agent-owned original22816, in
+`/tmp/starlink-completed-input.5EaJuD/extra-edge-prepared-v1`.
+Its freeze hash is8efa2657fd43d4c7d2804d90abf9aa169fb8d916136ee681d38d4b533885ad92.
+R0/D0/S0/extras1/175/QUICK0, unchanged runner496a3ed4, explicit SuSE parent
+Vivado2022.2 environment and two threads. No terminal result yet. Both the
+unchanged runner gates and the independent frozen qualified-observer receipt
+audit are required; no original raw217 PASS is inferred. No candidate,
+attribution or physical retry is authorized by this baseline launch.
+
+Additional30 healthy343 and late447 cases are now frozen with104 sources:
+original95 byte-identical plus nine additive files. Parent reviewed every new
+file, strict whole-source inverses, geometry-specific816 slow-output minimum,
+config-qualified continuous late/no-work guards and context-specific result
+verifiers. Independent repetition passed253 tests in18.91s (162 new plus91
+unchanged harness/native-budget tests), original9587 exit0, retained at
+`/tmp/starlink-highrate-cases-parent.4zVDl8`. Agent full regression passes652.
+Parent independently verified all515/518 bundle files and104 live sources;
+shared signature b9d4d306fd9665133e36dc21e24125bce9ac7a6b3b34ed335b45fd5e2ba9ab09.
+Healthy343 bundle SHA256:
+`bbec5b49d80caf3ec50b6d595e33e7cf62d4ca18e665caa1573099e90ad99bd7`;
+late447 bundle SHA256:
+`9cfded42cd006d0524531dc36739461d86d8612c908e55810e81b4c08fa566ae`.
+One actual healthy343 run is authorized after source/evidence commits; actual
+late447 remains pending separate authorization. All original447 goldens, runtime,
+24000/28000 native limits and4096-sample continuation remain unchanged.
