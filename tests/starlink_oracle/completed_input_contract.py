@@ -12,8 +12,29 @@ def _tokens(source):
     return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", source))
 
 
-def restore_default_completed_input_guard(source):
+def restore_preflight_reason_only_guard(source):
+    """Remove only the opt-in reason-register OR; no control cone may change."""
     source = _tokens(source)
+    additions = (
+        ", parameter integer USE_PREFLIGHT_REASON_ONLY = 0",
+        "input wire preflight_fault_evidence_now,",
+        ('if (USE_PREFLIGHT_REASON_ONLY != 0 && USE_PREFLIGHT_REASON_ONLY != 1) '
+         '$fatal(1, "USE_PREFLIGHT_REASON_ONLY must be zero or one");'),
+    )
+    for addition in additions:
+        addition = _tokens(addition)
+        assert source.count(addition) == 1
+        source = source.replace(addition, "", 1)
+    old = _tokens("""
+        fault_reasons <= fault_reasons | faults_now |
+          {7'b0, (USE_PREFLIGHT_REASON_ONLY && preflight_fault_evidence_now)};
+    """)
+    assert source.count(old) == 1
+    return source.replace(old, _tokens("fault_reasons <= fault_reasons | faults_now;"), 1)
+
+
+def restore_default_completed_input_guard(source):
+    source = restore_preflight_reason_only_guard(source)
     additions = (
         ", parameter integer USE_COMPLETED_INPUT_FAULT = 0",
         "input wire completed_input_certified,",
