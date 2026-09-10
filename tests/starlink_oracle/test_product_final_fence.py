@@ -102,6 +102,7 @@ def test_real_checker_paired_mailbox_all_public_state_data_and_sampled_fence(tmp
     assert "input_bits=70 final_rows=71 current_rows=7 inverse_epochs=1" in log
     words = (1 << width) if width == 9 else (1 << width) - 1
     assert f"epoch_resets=2 words={words} short_inverse_poison={int(width != 9)}" in log
+    assert "unknown_final_rows=4" in log and "sampled=14 " in log
     assert re.search(r"nonsampled_private=[1-9]\d*", log)
 
 
