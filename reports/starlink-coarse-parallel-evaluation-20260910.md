@@ -2,6 +2,19 @@
 
 ## Latest checkpoint: complete scorer and control-path counterevidence
 
+Newest data-only payload experiment: FW `c62118a9` / HDL `97adf891`, tested
+RTL `b7dac802`. Both actual-core modes pass with identical prior control traces;
+root independently verifies416 artifact hashes and19 focused tests. Its one
+unchanged100/175 route completes at04:34:36 UTC but fails175 setup-1.559ns,
+hold+0.071ns,TNS-518.092ns/553 same-clock failing endpoints. The worst path is
+output-bank framing metadata through result validity to kernel history CE.
+No runtime promotion or physical retry is authorized. The seven missing-Linux
+test failures in its752-pass broad sweep are retained; the exact same seven
+tests pass separately on primary with the pinned initialized Linux submodule.
+See `experiments/20260910-payload-bubbles-parent-review.md` for parent evidence,
+the concurrent native test's diagnosed early-capture failure, and its separately
+reviewed later-window arithmetic/ownership test. Historical checkpoints follow.
+
 The map-lifecycle task below is complete at FW `b709f683` / HDL `1800c665`:
 eight actual175 cases, 7,560 exact scores and 3,129 exact map words. Root checked
 all 101 source/artifact hash receipts and integrated only additive tests/reports

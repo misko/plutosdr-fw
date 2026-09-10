@@ -14,9 +14,13 @@ The held-phase/balanced-identity route improved175MHz setup from-2.438ns to
 -1.596ns. The subsequent held-preflight/two-comparator refactor passes both
 actual-core modes and264 tests (eight explicit physical skips), including
 independent old current/sticky fault predicates and20 root-repeated focused
-tests, but its single route still fails at-1.614ns. The dominant paths now involve
-product-bank current faults and kernel metadata validation driving arithmetic
-enables; no runtime promotion or further physical trial is authorized.
+tests, but its single route still fails at-1.614ns. A subsequent data-only
+payload-enable/balanced-kernel-identity refactor also passes both actual-core
+modes and preserves prior control traces. Its single route is still failing:
+175MHz setup-1.559ns/hold+0.071ns,553 failing same-clock endpoints. The worst
+path now crosses output-bank current framing checks into forward kernel state
+enables. This is not timing closure; exact phase separation is under read-only
+review, with no further physical trial or runtime promotion authorized.
 Generated175 MMCM active-traffic reset/recovery also passes
 an independent primary replay with 7,853 exact accepted scores. The original
 4,096-block175 burst/stall soak completed:1,830,912 ordered scores, FIFO358/512

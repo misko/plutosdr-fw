@@ -48,10 +48,39 @@ Original synthesis handle70333 targets
 It completed exit0 at04:32:40 UTC:1973LUT/4467FF/21DSP/15RAMB18,
 zero blackboxes, all seven source and option checks passed. Input DCP SHA256
 `5165b1c7f2e641c6c747334cfcdc47c7244f9e8335d4174b622ec23f561c60c1`.
-The original diagnostic route53502 and read-only DSP inventory87489 are running;
-no new routed result exists at this checkpoint. The previous
-175MHz setup result remains **-1.614ns**, not closed timing. A successful tool
-exit alone cannot qualify CDC, external I/O, full receiver or deployment.
+Original route53502 completed exit0 at04:34:36 UTC. Its physical gate fails:
+175setup-1.559ns/hold+0.071ns,TNS-518.092ns/553 failing endpoints;
+100setup+1.851ns/hold+0.100ns. Routed1973LUT/4545FF/1045slices/21DSP/7.5BRAM,
+all6668routable nets complete. Worst descriptor[51] to kernel history CE is
+6.984ns (1.634logic/5.350route),9LUT levels through output-bank framing checks.
+Routed DCP SHA256
+`aa8ec6210d3e495ca39567bb3dd74eb276c06dbca247e13ac45f60fae060b955`.
+The worst slack improves0.055ns, but same-clock failing endpoints increase
+from501 to553 and TNS worsens; do not claim overall timing closure or better
+quality from WNS alone. Parent read the raw terminal/receipt/top path, utilization
+and route status. Synthesized DSP inventory87489 and routed inventory37187
+both completed exit0. Parent rehashed both checkpoints unchanged and inspected
+the actual routed DSP properties/cones. All four product DSP input-register
+enables now exclude descriptor/metadata/current raw-checker startpoints; their
+worst setup slacks are+0.708,+1.250,+1.241,+0.426ns. This establishes removal
+of that measured enable-path problem, not closure of the entire design. Final
+DSP AREG=1/BREG=0; the two sum primitives use MREG=1/PREG=0 after physical
+optimization, so preliminary inference alone would have been misleading.
+No physical retry is authorized.
+
+Final physical/archive pins are FW `5c563826608397ba5783f3ce9d58ecd6f68ebbd5`
+and HDL `ce6a885e60592a926c4c2d8b8c069ea45397b900`, with tested RTL unchanged.
+Parent read `docs/starlink-payload-bubbles-physical-20260910.md` and independently
+verified all70 physical-archive SHA256SUMS entries. These remain on the
+separate completed-input-fence do-not-merge branch, not primary runtime.
+
+Read-only next-cone review will examine phase separation: output-bank current
+framing faults require an inverse-phase private write, while forward joiner
+retirement requires forward phase. The sticky bank fault and global same-edge
+reason/commit vetoes must remain. A source-level invariant is not a timing
+exception; any proposed refactor needs its own exact-source tests before a
+new physical trial. A successful tool exit alone cannot qualify CDC, external
+I/O, full receiver or deployment.
 
 ## Concurrent native/coarse/pilot counterevidence
 
@@ -84,3 +113,16 @@ not a substitute for observing it. The default447 profile remains unchanged.
 This is concurrent arithmetic/ownership evidence only. True-PSS concurrent
 capture and causal acquisition remain required. Neither static15MHz fixture
 qualifies the guarded30/60MHz paired interface or live60MS/s RX.
+
+The original520/175 run99570 now passes:319 fast-clock capture/FFT overlap
+cycles,842 native-compute/coarse/pilot accept observations,130raw capture
+samples,52exact public reads of the26-word packet retained across coarse stop,
+894scores/447map words/2048pilot bytes. Parent inspected the raw terminal and
+strict postprocessing receipts. The identical-source200 run62551 also passes:
+366capture/FFT cycles,842compute/coarse/pilot observations and the same exact
+packet/map/pilot counts. Both actual admissions have461samples of capture lead.
+Parent inspected its raw terminal and independently ran all58 new policy tests:
+58passed in2.99s. A later additive dependency audit must separately record six
+package/transitive Python modules not copied in the original four-math-module
+freeze; original manifests and run inputs must not be rewritten retroactively.
+No RF or PSS-lock claim follows from this static later-window control.

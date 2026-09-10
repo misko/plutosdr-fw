@@ -131,7 +131,7 @@ The product bank is same-clock, not a CDC exception target. The inherited139
 metadata CDC warnings and103/101 OOC input/output delay gaps remain open.
 This audit did not apply or waive constraints.
 
-Latest isolated registered/held-preflight physical trial remains failing at
+The preceding isolated registered/held-preflight physical trial remains failing at
 175MHz setup-1.614ns,hold+0.071ns,501 same-clock failing endpoints. This follows
 the prior-1.596ns result; fewer LUTs did not improve worst timing. Current faults
 feeding private product work and kernel metadata comparisons now dominate.
@@ -142,9 +142,13 @@ logical accepts, valid/metadata/overflow behavior, current/sticky faults, final
 commit and bank ownership stay unchanged. The completed-input-fence worktree
 has completed this opt-in experiment at FW `c62118a9` / HDL `97adf891`.
 Both actual-core modes pass with byte-identical prior control traces; root
-independently passed19 tests and verified416 artifact hashes. One unchanged
-100/175 synthesis/diagnostic route is now authorized and synthesis is running;
-no new timing result or primary runtime promotion is claimed. See
+independently passed19 tests and verified416 artifact hashes. Its one unchanged
+100/175 synthesis/diagnostic route completed:175 setup-1.559ns,hold+0.071ns,
+TNS-518.092ns/553 failing endpoints.100 setup+1.851ns,hold+0.100ns.
+All6668nets route, but the timing gate still fails. The worst path now runs
+through output-bank current framing checks into forward kernel state enables.
+Read-only phase-exclusivity analysis is next; no new physical trial, exemption
+or primary runtime promotion is authorized. See
 `experiments/20260910-payload-bubbles-parent-review.md` for scope and the separate
 missing-Linux-source regression evidence.
 
@@ -162,6 +166,13 @@ fails the required positive capture/FFT overlap gate. Anchor447 appears too
 early relative to real outer-bank fill. Preserve this failure and the strict
 gate; diagnostic timestamps and a separately reviewed later supported capture
 window must demonstrate concurrency, not merely correct sequential results.
+The diagnosed gap is3.046826us between capture end and first actual FFT input.
+An explicit520 later-window profile now passes at175/200:319/366 fast-clock
+capture-overlap cycles,842compute/coarse/pilot observations, exact26-word
+native packet read twice across stop,894scores/447map words/2048pilot bytes.
+Its independently calculated winner-17 has normalized score about0.098; this
+is concurrent arithmetic/ownership evidence, not the injected PSS start447 or
+timing lock. True-PSS concurrent capture and causal acquisition remain gates.
 
 The30/60 extension cannot merely change a test parameter: current realtime and
 boundary-stop wrapper/profile guards explicitly require15MS/s. Rate-conditioned
