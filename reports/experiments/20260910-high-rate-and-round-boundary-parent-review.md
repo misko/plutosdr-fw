@@ -1840,3 +1840,148 @@ zero sampled private-reset edges: the new predicate includes the accepted C1
 faulted-private-reset observations, so zero is unjustified for the planned run.
 The corrected gate must require positive coverage and preserve its distinction
 from reset-event counts. No actual or physical launch is approved for this draft.
+
+## Corrected ROM integration independently passes; one actual run authorized
+
+The correction binds the full inherited C1 inventory to its fixed digest,
+restores TOP/RUNNER in memory and checks every inherited artifact, including
+byte-exact original settings/preparation backups. Six rehashed inherited
+observer/reference/helper/vector mutations and three original-inventory/backup
+mutations reject. Private-reset sampled-edge count must be positive in both
+the actual observer and Tcl receipt; zero-count negative controls reject.
+Root reviewed the entire helper, observer, standalone fixture and tests, the
+corrective deltas, both additive runtime module diffs and frozen original runner.
+
+Tested FW e7d8b229e1719eb4fd40810b4e5be5fad98a96d6 /
+HDL54af5727801b3f0cb3a9a178b3135cc6e5a311fd. Root original95792 terminal0:
+147 PASS19.28s, `/tmp/starlink-rom-actual-parent.ZzUfJJnV`, comprising87 new
+integration/admission tests and60 retained ROM tests. Vendor-free actual
+hierarchy compilation is not actual execution; real joiner/ROM fixtures are
+not bank lifecycle simulations. The unchanged C1 actual suite provides that
+next check without altering original stimulus, four numerical CSVs or fault gates.
+
+Root verified the frozen helper from `/` and exact56-member prepared inventory
+at `/tmp/starlink-rom-prefetch.j829ht/rom-actual-prepared-v1`:
+6f5eddb99510e869bbe65548acc6ed64cd76bd98908aacfcd6e1c0361ccbe4ae.
+Runner9f198abf60d9119eae2ef565ae3d65b64104f93ce5f1b5be4b2e89776dd3deed;
+helperbca85ff4affb7fd4650489103ee5750567fe031d225fda057303007defb840b3;
+observerde1dc6d2590014ed80351038077c2af52ba71ce7d200c704169f8243ab2ae45a.
+Project absent at approval. One R/D/S/C/K/M111111/extras1/175/QUICK0 actual
+evaluation is authorized, distinct absent owner/output/logs,2022.2/SuSE/2threads,
+no retries or source changes. Preserve original exit, before/after source/IP
+receipts on failure, every old qualified-status/CSV/fault gate and new
+unconditional ROM check. This is not a synthesis/route/radio approval.
+
+## Expected-late60 independently passes preparation; one actual run authorized
+
+Frozen pre-evaluation recipe remains cddf9d8f8. Final tested source is FW
+ba2f8ca59b76a07f0fcbac84371dd2e8a8010056 / HDL813f9eb17c8c1680ef160f202756e25c6a2878b2.
+Only an additive186-line late bench include was added to HDL; healthy runtime,
+108 healthy sources and69 golden files remain unchanged. Root reviewed the
+complete adapter, negative verifier, bundle helper, CLI, late RTL observer and
+all three test files, including final per-register and unknown-protocol mutations.
+The first291PASS/4FAIL source-token test attempt is retained; requiring exact
+repeated guard counts fixes its test-admission weakness without changing runtime,
+bench, recipe or numerical acceptance.
+
+Root original53185 terminal0:681 PASS13.89s (370 new plus311 healthy), retained
+at `/tmp/starlink-highrate60-late-parent.4MaUmktU`. These are parser specimens,
+source/inverse checks, compile-only and Tcl failure/ownership mocks, not service.
+Root ran frozen CLI verification from `/` and rehashed all118 live source files.
+Bundle375-file inventory SHA b31f0b1612d18ca926eb9698e5beab5c06c4839f49a7cf2da85934e65a46c7f0;
+source signature8989b0a7d5353fe657173c64576b8f0b057246e3541750e2c7b890ca4675b997;
+runner1ca8c38a649bcfc299afb608977ac6487acb68eb16fe0a00d0a4324591e67e2c.
+
+One actual vendor-FFT expected-expiry evaluation is authorized with this exact
+freeze, ideal60/100/175,264 configured coefficients,447x2 map/PIL1. Require
+one actual late command, zero native captures/results/packet reads/IRQ, both
+31-register public audits, unchanged894 scores/447 map/512 pilot and continuous
+post-preroll source. Distinct run/owner/external logs and original exit plus all
+input/generated-IP after-audits must survive failure. No retry, parser/source
+change, physical evaluation or radio action is authorized by this gate.
+
+## First expected-late60 actual failed the frozen settling gate
+
+Original88460 terminal1, vendor exit12:25:41UTC. Root read original run_status:
+run_tcl_exit1/integrity_exit0. The bench printed its final terminal, but the
+unchanged strict verifier rejected first-audit settling. Actual handshake index
+34359740319/lead-64 at cycle13558; audit1 begins13565, a seven-cycle difference
+against frozen minimum eight. Audit2 begins32423 after source-off32415, meeting
+the eight-cycle minimum. Audit ends13851/32709; both31-register receipts and
+bench zero-native assertions are present, but do not qualify this failed run.
+No success receipt or runtime/deployment claim is inferred from its HDL terminal.
+
+Root authorized offline-only phase/scheduling reproduction and a stimulus fix
+that explicitly reaches the frozen eight-control-cycle lower bound. Preserve
+original eight falling-edge observations as appropriate; do not relax the
+parser/recipe or1328/2048/global upper limits. Eight subsequent falling edges
+can span only seven numbered cycles when the first occurs in the handshake's
+current cycle. Full original receipts may be inspected diagnostically, not
+relabeled PASS. No new vendor run is yet authorized.
+
+Original run: `/tmp/starlink-bank-route.I50MDJ/main-high-rate60-bank175-late447-v1`,
+separate sibling owner. The original118 sources and both375-file bundles are
+reported unchanged; root archive/full-run review follows packaging. No radio
+or PPU action. ROM actual23845 remains separately agent-owned and is not retried.
+
+## L1 source-specific synthesis approval after independent physical-prep gate
+
+Tested FW38dfe9d80c33d841d75ebc2ffb46de09eb03b37b /
+HDL67a1692e3b09f3aa7166fb8f83b1cf787b363f78; runtime is byte-identical to tested62da.
+Root read full admission/helper/owner and295-line policy tests, including the
+explicit corrected frozen baseline-reference digest check. Original57PASS/1FAIL
+is retained: in-process verification previously checked the live baseline but
+not the separately rehashed frozen copy. The added exact hash check fixes that
+admission gap without runtime or recipe changes.
+
+Root original98058 terminal0:58 PASS24.16s, `/tmp/starlink-local-ooc-parent.ez5jvS3k`.
+Frozen CLI from `/` passes33-file inventory
+4ebd909dad1ade64272a33dcc034b9f791270ce1191827266c83ad23ee86703b, with11 actual
+terminals,345 historical arithmetic values and17 equal guard snapshots.
+Bundle: arithmetic worktree `hdl/library/starlink_pss_acquisition/build/local-admission-ooc-L1R1B1O1-175-prepared-v1`.
+Tcl45eadaf8042a34451d40a555b35343fc84b214dd61b4d4fb5426c29c7a2e3281;
+ownerdedbf5b126d53f3858b8947096c1b33559e1e27ec5fb21b634b9f4fda4d35adb.
+The exact33-file closure includes12 physical inputs/eight runtime modules.
+
+One isolated L1/R1B1O1/175 OOC synthesis is authorized after absent-path checks,
+using the frozen owner and external inventory digest. Retain100/175 XDC,
+generated-IP factory,2022.2/SuSE,2threads,AreaOptimized_high and threshold4.
+Require original terminal, eight nonempty products, zero black boxes, exact
+copied12-input-plus-Tcl closure and all source/IP audits. No route, retry,
+constraint relaxation, RTL changes or radio operation is authorized yet.
+
+The saved-WDB loader preserved all180 original actual files but created an
+incidental xsimSettings.ini sidecar. Original WDB/source/result/log bytes are
+unchanged; do not claim that the entire directory had no additions. The sidecar
+is retained separately from the immutable actual archive.
+
+## L1 synthesis PASS and one unchanged diagnostic route approved
+
+Original57050 terminal0,102.587s,12:29:08.979369–12:30:51.566419UTC. Root read
+terminal/scope and independently rehashed all eight products plus14 recorded
+pre-synthesis source/IP entries. Owner before_audit/tool/after_audit all0,
+one completion marker, zero black boxes, exact12 copied physical inputs plus Tcl.
+Synthesized area1945 LUTs (1757 logic/188 memory),4547 FFs,21 DSPs,15 RAMB18s:
+one additional LUT, unchanged FF/DSP/BRAM versus the arithmetic baseline.
+Source100 and island175 clock periods remain10 and5.714000225ns. CDC remains
+6 information/139 warnings;114 inputs/124 outputs lack delays and internal
+unconstrained count is0. No achieved-frequency or physical-pass claim follows.
+
+Synthesis DCP a6a8e404b90924bb538a0da2ae7be7fc9ebc9e0c323b8f1a17661b4550648242,
+2135458 bytes, under arithmetic build `local-admission-ooc-L1R1B1O1-175-owned-v1/synthesis`.
+Root read and hash-verified the unchanged route Tcl0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a.
+Exactly one diagnostic route of this checkpoint is authorized, unique absent
+route/owner/logs,2022.2/SuSE/2threads, inherited100/175 constraints, unchanged
+opt/place/phys_opt/route directives and no exceptions. Preserve original exit,
+all source-DCP/Tcl before/after hashes and outputs even if timing fails. No retry,
+extra optimization, full receiver or radio promotion is authorized here.
+
+Reviewed source publications completed to the three DNM remotes:
+ROM FW e7d8b229/HDL54af5727, late60 FWba2f8ca5/HDL813f9eb1,
+L1 physical FW38dfe9d8/HDL67a1692e. All six original pushes exited0; no firmware
+main or primary runtime-gitlink update. Late60 failed-run packagef31036760f33a49fa08f1937bf88b79cdb1c8329
+also passed parent Git archive verification:452 safe members/451 length/hash
+receipts,2411027 bytes,SHAb731571cbd8ed78af1224d585d483db98b8bcd53a6764f734edf7a255ed55c33.
+Parent independently rehashed all670 raw-run files/55780194 bytes and both
+external logs, with absent terminal_receipt.json. Failure package is root-pushed;
+original88460 remains FAIL, not reclassified by preservation or partial facts.

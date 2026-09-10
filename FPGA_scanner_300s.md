@@ -70,8 +70,23 @@ unconditionally. Additional directed occupied X/Z-ready and flush coverage
 passes31 tests. The additive metadata-prefetch extension now independently
 passes60 tests (31 retained plus29 new), targeting the separate measured
 kernel block-metadata capture-enable path. It adds70 logical bits beyond the
-word-only variant and no nominal cycles. Actual FFT integration preparation
-is in progress; neither prefetch option has a measured physical benefit yet.
+word-only variant and no nominal cycles. Its additive C1 joiner/bank integration
+now passes147 independently repeated offline tests, including all inherited
+source checks and positive private-reset coverage. One exact K1/M1 actual-core
+run is authorized after frozen-source verification; no result or physical
+benefit is claimed yet. The separate expected-late60 composition passes681
+independently repeated preparation/verifier tests; its one vendor-core rejection
+run completed but its overall result FAILS: the first status audit started after
+seven numbered control cycles rather than the required minimum eight. Original
+failure and sources are retained; only an offline stimulus-scheduling correction
+is authorized, with rejection/settling/upper bounds unchanged. Healthy60 runtime
+and golden samples remain unchanged. Separately, L1 physical preparation passes
+58 parent-repeated tests and its first isolated synthesis57050 now PASSES:
+1945 LUTs/4547 FFs/21 DSPs/15 RAMB18s, zero black boxes. This is one additional
+LUT and unchanged FF/DSP/BRAM versus the arithmetic baseline. Root independently
+verified all eight products and14 recorded source/IP hashes. One unchanged-
+constraint diagnostic route is authorized; no timing benefit or receiver
+promotion is established by synthesis alone.
 
 Latest checkpoint (2026-09-10): the additive complete three-bank coarse scorer
 passes actual-core numerical/fault replay and 64-block continuous capacity tests
