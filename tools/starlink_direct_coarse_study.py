@@ -272,9 +272,16 @@ def run(output: Path, frozen: Path) -> dict:
                 ("zero", 0, None, None, False),
                 ("clipped", 0, 12, 447, True),
                 ("signed_endpoints", 0, None, None, False),
+                ("isolated_fullscale_impulse", 0, None, None, False),
+                ("nearzero_remote_fullscale", 0, None, None, False),
             ]
             for label, cfo, snr, start, clipped in specs:
-                xfloat = (rng.normal(size=1536) + 1j * rng.normal(size=1536)) * 1000
+                # Extra dynamic-range probes have a separate RNG so all 98
+                # initial comparison inputs retain their original identities.
+                case_rng = np.random.default_rng(66400) if "fullscale" in label else rng
+                xfloat = (
+                    case_rng.normal(size=1536) + 1j * case_rng.normal(size=1536)
+                ) * 1000
                 if start is not None:
                     # SNR is mean per complex sample over the 66-sample PSS.
                     amplitude = math.sqrt(66 * 2 * 1000**2 * 10 ** (snr / 10))
@@ -284,6 +291,12 @@ def run(output: Path, frozen: Path) -> dict:
                     xfloat[start : start + 66] += amplitude * template * phase
                 if label == "zero":
                     xfloat[:] = 0
+                if label == "isolated_fullscale_impulse":
+                    xfloat[:] = 0
+                    xfloat[400] = 32767 - 32768j
+                if label == "nearzero_remote_fullscale":
+                    xfloat /= 1000
+                    xfloat[400] = 32767 - 32768j
                 raw = np.column_stack((np.rint(xfloat.real), np.rint(xfloat.imag)))
                 clip_count = int(np.count_nonzero((raw < -32768) | (raw > 32767)))
                 x = np.clip(raw, -32768, 32767).astype(np.int16)
@@ -339,6 +352,9 @@ def run(output: Path, frozen: Path) -> dict:
         + [
             schedule(200_000_000, 6, stall_every=100, stall_length=s)
             for s in (100, 200, 400, 1000)
+        ]
+        + [
+            schedule(200_000_000, 6, count=1_800_000, stall_every=100, stall_length=200)
         ],
         "limits": [
             "No change to production RTL or goldens",
