@@ -259,6 +259,9 @@ def test_runner_does_not_weaken_runtime_or_physical_gates():
     assert "NO_ADC_DMA_IIO_FINE_PRODUCTION_OR_PHYSICAL_CLAIM" in bench
     assert "defparam dut.acquisition.USE_BANK_OWNED_XFFT = USE_BANK_OWNED_XFFT" in bench
     assert "parameter integer USE_BANK_OWNED_XFFT = 0" in bench
+    assert "bank_quiet_cycles < 32" in bench
+    assert "bank_quiet_cycles >= 8" in bench
+    assert "if (!expected_late_fault) healthy()" not in bench
 
 
 @pytest.mark.parametrize("map_bins", [447, 343])
@@ -286,11 +289,14 @@ def _verify_receipt(tmp_path, map_bins, bank_owned, fast_mhz, *, failure=None, m
          "NO_ADC_DMA_IIO_FINE_PRODUCTION_OR_PHYSICAL_CLAIM"),
     ]
     log = markers + [f"PAIRED_PILOT_WORD ordinal={n}" for n in range(512)]
+    if mutation != "missing_tail":
+        log += [f"PAIRED_STOP_TAIL map_bins={map_bins}"] * (2 if mutation == "duplicate_tail" else 1)
     if map_bins == 343:
-        log += ["PAIRED_STOP_TAIL map_bins=343",
-                ("PAIRED_RESIDUE_PASS selected_scores=686 map_words=343 residue=239 "
+        log += [("PAIRED_RESIDUE_PASS selected_scores=686 map_words=343 residue=239 "
                  "post_fence_tail_not_map_admission=1")]
     if bank_owned and mutation != "missing_bank":
+        if mutation != "missing_quiescence":
+            log += ["PAIRED_BANK_QUIESCENCE_PASS reset_held=1 minimum_fast_cycles=32 no_fast_restart=1"]
         receipt_clock = 200 if mutation == "wrong_clock" and fast_mhz == 175 else fast_mhz
         if mutation == "wrong_clock" and fast_mhz == 200:
             receipt_clock = 175
@@ -318,7 +324,8 @@ def _verify_receipt(tmp_path, map_bins, bank_owned, fast_mhz, *, failure=None, m
 
 @pytest.mark.parametrize("map_bins", [447, 343])
 @pytest.mark.parametrize("fast_mhz", [175, 200])
-@pytest.mark.parametrize("mutation", ["missing_bank", "wrong_clock", "duplicate_bank", "pilot_byte"])
+@pytest.mark.parametrize("mutation", ["missing_bank", "wrong_clock", "duplicate_bank", "pilot_byte",
+                                      "missing_quiescence", "missing_tail", "duplicate_tail"])
 def test_bank_verifier_requires_exact_receipt_and_independent_bytes(tmp_path, map_bins, fast_mhz, mutation):
     result = _verify_receipt(tmp_path, map_bins, 1, fast_mhz, mutation=mutation)
     assert result.returncode == 2, result.stdout + result.stderr
