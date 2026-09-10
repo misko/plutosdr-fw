@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest interface snapshot (2026-09-10): parent fresh compile/replay passes20
+focused behaviors, including the repaired exactREADY seam and retained raw
+closed/X/Z diagnostics. Complete3246-node graph still finds acceptance-derived
+feedback via issuer/current-bank/read checks and handoff readiness. This
+behaviorPASS/structuralFAIL snapshot is preserved; dependency repair remains
+required before integration. See
+[first interface review](reports/experiments/20260910-product-interface-first-review.md).
+
 Latest correction (2026-09-10): original848 run remains recorded PASS, but its
 product-fixture graph test omitted36LS concatenation nodes. Parent independently
 reproduces the false negative: corrected3159-node graph exposes guard-fault /
