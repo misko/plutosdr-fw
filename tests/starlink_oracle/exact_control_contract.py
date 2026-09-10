@@ -1,5 +1,7 @@
 """Literal inverse to the frozen pre-experiment three-module bodies."""
 
+from tests.starlink_oracle.fault_cdc_contract import restore_fault_cdc
+
 BASE = "dec20d6371f2d77b6e09c4bcdda2f3d7f8715776"
 
 
@@ -10,6 +12,8 @@ def once(source, new, old=""):
 
 def restore_exact_control(source, kind):
     if kind == "fft_bank_owned_slice":
+        if "parameter integer PER_CAUSE_FAULT_CDC" in source:
+            source = restore_fault_cdc(source)
         source = once(source, "  parameter integer REGISTERED_SCHEDULING = 0,\n"
             "  parameter integer DISTRIBUTED_FAST_FAULT = 0,\n"
             "  parameter integer PRIVATE_NEXT_START_SCRATCH = 0\n",
