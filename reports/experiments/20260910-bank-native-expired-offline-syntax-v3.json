@@ -1,0 +1,12 @@
+{
+  "scope": "syntax/elaboration only; missing generated FFT ignored by -i; NO actual core simulation",
+  "parameters": [
+    "MAP_BINS=447",
+    "USE_BANK_OWNED_XFFT=1",
+    "FAST_MHZ=175"
+  ],
+  "native_body_parameters": "existing defaults520/1; Icarus cannot override body parameters in an ANSI-parameter module",
+  "syntax_returncode": 0,
+  "syntax_stdout": "",
+  "syntax_stderr": ""
+}

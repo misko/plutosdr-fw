@@ -1,0 +1,1264 @@
+{
+  "schema": "bank-native-expired-corrected-actual-v1",
+  "run_fw": "b07e0419261db5d465328367b534a61d7ed234a3",
+  "run_hdl": "1ece302ec9ea2dd1a6ccad713c75c4abfcc682b1",
+  "bounded_expired_profile_qualified": true,
+  "native_request_outcome": "REJECTED_LATE_NOT_A_HEALTHY_NATIVE_VISIT",
+  "full_receiver_RF_physical_high_rate_causal_qualified": false,
+  "fixture_sha256": "aa4330480879e5f44abdfeb34b5ddeca098f1b22352715743f0db32e6672de81",
+  "event_contract_sha256": "680cdbdd674809de536a3323f99d74aa803174af650447cd816bd4ec7b6dfef7",
+  "frozen_inputs_per_run": 115,
+  "runtime_python_modules_per_run": 13,
+  "cohort_files_per_run": 24,
+  "original_handles_consumed": [
+    2476,
+    48117
+  ],
+  "source_edits_or_retries_during_runs": false,
+  "earlier_failed_attempts_preserved": "20260910-bank-native-expired-actual-failure-frozen.tgz",
+  "earlier_failed_archive_sha256": "a690d6d45308fd19c32093bb601c60bda8f5f949e9065651ad4e392c3f31ab2e",
+  "runs": [
+    {
+      "directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-native-paired/hdl/library/starlink_pss_acquisition/build/bank-native-expired-175-corrected-v3",
+      "fast_mhz": 175,
+      "original_handle": 2476,
+      "exit_code": 0,
+      "terminal": "PASS",
+      "terminal_utc": "2026-09-10 06:22:07 UTC",
+      "simulation_end_ns": 311310,
+      "source_before_after_and_offline_freeze_match": true,
+      "source_enable_implicit_warning_absent": true,
+      "public_submit_index": 8589935196,
+      "sample_reject_index": 8589935199,
+      "capture_start_index": 8589935064,
+      "center_index": 8589935096,
+      "request_hex": "15005202",
+      "coefficient_generation_hex": "15000002",
+      "signed_command_lead_samples": -136,
+      "command_lead_hex": "ffffffffffffff78",
+      "command_handshakes": {
+        "public_submit": 1,
+        "wrapper": 1,
+        "fifo_accepted": 1,
+        "sample": 1
+      },
+      "native": {
+        "rejected": 1,
+        "late": 1,
+        "admitted": 0,
+        "capture_words": 0,
+        "completed_capture": 0,
+        "packets": 0,
+        "IRQ": 0
+      },
+      "public_register_reads": [
+        {
+          "generation": 1,
+          "ordinal": 0,
+          "address": 56,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 1,
+          "address": 60,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 2,
+          "address": 128,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 3,
+          "address": 132,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 4,
+          "address": 136,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 5,
+          "address": 140,
+          "value": 1
+        },
+        {
+          "generation": 1,
+          "ordinal": 6,
+          "address": 144,
+          "value": 1
+        },
+        {
+          "generation": 1,
+          "ordinal": 7,
+          "address": 148,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 8,
+          "address": 152,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 9,
+          "address": 156,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 10,
+          "address": 160,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 11,
+          "address": 164,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 12,
+          "address": 168,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 13,
+          "address": 172,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 14,
+          "address": 176,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 15,
+          "address": 180,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 16,
+          "address": 184,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 17,
+          "address": 188,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 18,
+          "address": 192,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 19,
+          "address": 196,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 20,
+          "address": 200,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 21,
+          "address": 204,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 22,
+          "address": 208,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 23,
+          "address": 212,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 24,
+          "address": 216,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 25,
+          "address": 220,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 26,
+          "address": 224,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 27,
+          "address": 76,
+          "value": 352321538
+        },
+        {
+          "generation": 1,
+          "ordinal": 28,
+          "address": 92,
+          "value": 436207616
+        },
+        {
+          "generation": 1,
+          "ordinal": 29,
+          "address": 96,
+          "value": 1073742825
+        },
+        {
+          "generation": 1,
+          "ordinal": 30,
+          "address": 100,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 0,
+          "address": 56,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 1,
+          "address": 60,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 2,
+          "address": 128,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 3,
+          "address": 132,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 4,
+          "address": 136,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 5,
+          "address": 140,
+          "value": 1
+        },
+        {
+          "generation": 2,
+          "ordinal": 6,
+          "address": 144,
+          "value": 1
+        },
+        {
+          "generation": 2,
+          "ordinal": 7,
+          "address": 148,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 8,
+          "address": 152,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 9,
+          "address": 156,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 10,
+          "address": 160,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 11,
+          "address": 164,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 12,
+          "address": 168,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 13,
+          "address": 172,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 14,
+          "address": 176,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 15,
+          "address": 180,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 16,
+          "address": 184,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 17,
+          "address": 188,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 18,
+          "address": 192,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 19,
+          "address": 196,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 20,
+          "address": 200,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 21,
+          "address": 204,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 22,
+          "address": 208,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 23,
+          "address": 212,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 24,
+          "address": 216,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 25,
+          "address": 220,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 26,
+          "address": 224,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 27,
+          "address": 76,
+          "value": 352321538
+        },
+        {
+          "generation": 2,
+          "ordinal": 28,
+          "address": 92,
+          "value": 436207616
+        },
+        {
+          "generation": 2,
+          "ordinal": 29,
+          "address": 96,
+          "value": 1073742825
+        },
+        {
+          "generation": 2,
+          "ordinal": 30,
+          "address": 100,
+          "value": 0
+        }
+      ],
+      "native_empty_across_coarse_stop": true,
+      "bounded_fft_run_fast_cycles": 49,
+      "first_fast_after_reject_is_RUN_JOB": true,
+      "bounded_pilot_input_accepts": 4,
+      "pilot_words": 512,
+      "pilot_bytes": 2048,
+      "pilot_sha256": "3c754ff064c7fbfd4bcbe4560353f14fba0d2fd7cde68b5c4bba3a49681f8108",
+      "ordered_pilot_words_indices_bytes_independently_compared": true,
+      "bench_exact_coarse_scores": 894,
+      "bench_exact_public_map_words": 447,
+      "coarse_raw_words_not_individually_logged": true,
+      "inherited_late_invalid_map_release_joint_failed_health_test": "PASS",
+      "inherited_minimum32_fast_cycles_reset_quiescence_test": "PASS",
+      "terminal_rows": [
+        "BANK_EXPIRED_EXACT_PASS public_submits=1 wrapper_handshakes=1 fifo_accepts=1 sample_handshakes=1 rejected=1 late=1 admitted=0 capture_words=0 completed=0 packets=0 irq=0 public_register_reads=62 empty_across_stop=1",
+        "BANK_NATIVE_EXPIRED_PASS source_msps=15 fast_mhz=175 profile=520-pss-expired source_words=4096 scores=894 map_words=447 pilot_bytes=2048 NATIVE_REQUEST_REJECTED_COARSE_PILOT_HEALTHY_NOT_CAUSAL",
+        "PAIRED_MAP_PILOT_PASS exact_scores=894 exact_map_words=447 exact_pilot_words=512 exact_bytes=2048 shared_support_envelope=959 pilot_after_stop=1 healthy_snapshot=1",
+        "PAIRED_LATE_FAULT_PASS actual_invalid_release=1 failed_joint_health=1 terminal_coordinates_retained=1 pilot_bytes_preserved=1",
+        "PAIRED_REALTIME_PSMA_STOP_PASS source_words=4096 pilot_words=512 map_words=447 NO_ADC_DMA_IIO_FINE_PRODUCTION_OR_PHYSICAL_CLAIM",
+        "PAIRED_BANK_QUIESCENCE_PASS reset_held=1 minimum_fast_cycles=32 no_fast_restart=1",
+        "PAIRED_BANK_PASS map_bins=447 selected_scores=894 exact_pilot_bytes=2048 fast_mhz=175 TEST_ONLY_SELECTOR_NOT_RECEIVER"
+      ],
+      "independent_frozen_negative_postprocessor": "BANK_NATIVE_EXPIRED_SIMULATION_VERIFIED fast_mhz=175 profile=520-pss-expired rejected=1 late=1 packets=0 exact_pilot_bytes=2048"
+    },
+    {
+      "directory": "/tmp/starlink-coarse-alternatives.Y3JzOI/bank-native-paired/hdl/library/starlink_pss_acquisition/build/bank-native-expired-200-corrected-v3",
+      "fast_mhz": 200,
+      "original_handle": 48117,
+      "exit_code": 0,
+      "terminal": "PASS",
+      "terminal_utc": "2026-09-10 06:22:10 UTC",
+      "simulation_end_ns": 311310,
+      "source_before_after_and_offline_freeze_match": true,
+      "source_enable_implicit_warning_absent": true,
+      "public_submit_index": 8589935196,
+      "sample_reject_index": 8589935199,
+      "capture_start_index": 8589935064,
+      "center_index": 8589935096,
+      "request_hex": "15005202",
+      "coefficient_generation_hex": "15000002",
+      "signed_command_lead_samples": -136,
+      "command_lead_hex": "ffffffffffffff78",
+      "command_handshakes": {
+        "public_submit": 1,
+        "wrapper": 1,
+        "fifo_accepted": 1,
+        "sample": 1
+      },
+      "native": {
+        "rejected": 1,
+        "late": 1,
+        "admitted": 0,
+        "capture_words": 0,
+        "completed_capture": 0,
+        "packets": 0,
+        "IRQ": 0
+      },
+      "public_register_reads": [
+        {
+          "generation": 1,
+          "ordinal": 0,
+          "address": 56,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 1,
+          "address": 60,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 2,
+          "address": 128,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 3,
+          "address": 132,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 4,
+          "address": 136,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 5,
+          "address": 140,
+          "value": 1
+        },
+        {
+          "generation": 1,
+          "ordinal": 6,
+          "address": 144,
+          "value": 1
+        },
+        {
+          "generation": 1,
+          "ordinal": 7,
+          "address": 148,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 8,
+          "address": 152,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 9,
+          "address": 156,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 10,
+          "address": 160,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 11,
+          "address": 164,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 12,
+          "address": 168,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 13,
+          "address": 172,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 14,
+          "address": 176,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 15,
+          "address": 180,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 16,
+          "address": 184,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 17,
+          "address": 188,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 18,
+          "address": 192,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 19,
+          "address": 196,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 20,
+          "address": 200,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 21,
+          "address": 204,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 22,
+          "address": 208,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 23,
+          "address": 212,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 24,
+          "address": 216,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 25,
+          "address": 220,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 26,
+          "address": 224,
+          "value": 0
+        },
+        {
+          "generation": 1,
+          "ordinal": 27,
+          "address": 76,
+          "value": 352321538
+        },
+        {
+          "generation": 1,
+          "ordinal": 28,
+          "address": 92,
+          "value": 436207616
+        },
+        {
+          "generation": 1,
+          "ordinal": 29,
+          "address": 96,
+          "value": 1073742825
+        },
+        {
+          "generation": 1,
+          "ordinal": 30,
+          "address": 100,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 0,
+          "address": 56,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 1,
+          "address": 60,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 2,
+          "address": 128,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 3,
+          "address": 132,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 4,
+          "address": 136,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 5,
+          "address": 140,
+          "value": 1
+        },
+        {
+          "generation": 2,
+          "ordinal": 6,
+          "address": 144,
+          "value": 1
+        },
+        {
+          "generation": 2,
+          "ordinal": 7,
+          "address": 148,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 8,
+          "address": 152,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 9,
+          "address": 156,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 10,
+          "address": 160,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 11,
+          "address": 164,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 12,
+          "address": 168,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 13,
+          "address": 172,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 14,
+          "address": 176,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 15,
+          "address": 180,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 16,
+          "address": 184,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 17,
+          "address": 188,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 18,
+          "address": 192,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 19,
+          "address": 196,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 20,
+          "address": 200,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 21,
+          "address": 204,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 22,
+          "address": 208,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 23,
+          "address": 212,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 24,
+          "address": 216,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 25,
+          "address": 220,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 26,
+          "address": 224,
+          "value": 0
+        },
+        {
+          "generation": 2,
+          "ordinal": 27,
+          "address": 76,
+          "value": 352321538
+        },
+        {
+          "generation": 2,
+          "ordinal": 28,
+          "address": 92,
+          "value": 436207616
+        },
+        {
+          "generation": 2,
+          "ordinal": 29,
+          "address": 96,
+          "value": 1073742825
+        },
+        {
+          "generation": 2,
+          "ordinal": 30,
+          "address": 100,
+          "value": 0
+        }
+      ],
+      "native_empty_across_coarse_stop": true,
+      "bounded_fft_run_fast_cycles": 57,
+      "first_fast_after_reject_is_RUN_JOB": true,
+      "bounded_pilot_input_accepts": 4,
+      "pilot_words": 512,
+      "pilot_bytes": 2048,
+      "pilot_sha256": "3c754ff064c7fbfd4bcbe4560353f14fba0d2fd7cde68b5c4bba3a49681f8108",
+      "ordered_pilot_words_indices_bytes_independently_compared": true,
+      "bench_exact_coarse_scores": 894,
+      "bench_exact_public_map_words": 447,
+      "coarse_raw_words_not_individually_logged": true,
+      "inherited_late_invalid_map_release_joint_failed_health_test": "PASS",
+      "inherited_minimum32_fast_cycles_reset_quiescence_test": "PASS",
+      "terminal_rows": [
+        "BANK_EXPIRED_EXACT_PASS public_submits=1 wrapper_handshakes=1 fifo_accepts=1 sample_handshakes=1 rejected=1 late=1 admitted=0 capture_words=0 completed=0 packets=0 irq=0 public_register_reads=62 empty_across_stop=1",
+        "BANK_NATIVE_EXPIRED_PASS source_msps=15 fast_mhz=200 profile=520-pss-expired source_words=4096 scores=894 map_words=447 pilot_bytes=2048 NATIVE_REQUEST_REJECTED_COARSE_PILOT_HEALTHY_NOT_CAUSAL",
+        "PAIRED_MAP_PILOT_PASS exact_scores=894 exact_map_words=447 exact_pilot_words=512 exact_bytes=2048 shared_support_envelope=959 pilot_after_stop=1 healthy_snapshot=1",
+        "PAIRED_LATE_FAULT_PASS actual_invalid_release=1 failed_joint_health=1 terminal_coordinates_retained=1 pilot_bytes_preserved=1",
+        "PAIRED_REALTIME_PSMA_STOP_PASS source_words=4096 pilot_words=512 map_words=447 NO_ADC_DMA_IIO_FINE_PRODUCTION_OR_PHYSICAL_CLAIM",
+        "PAIRED_BANK_QUIESCENCE_PASS reset_held=1 minimum_fast_cycles=32 no_fast_restart=1",
+        "PAIRED_BANK_PASS map_bins=447 selected_scores=894 exact_pilot_bytes=2048 fast_mhz=200 TEST_ONLY_SELECTOR_NOT_RECEIVER"
+      ],
+      "independent_frozen_negative_postprocessor": "BANK_NATIVE_EXPIRED_SIMULATION_VERIFIED fast_mhz=200 profile=520-pss-expired rejected=1 late=1 packets=0 exact_pilot_bytes=2048"
+    }
+  ],
+  "archive": "20260910-bank-native-expired-actual-corrected-frozen.tgz",
+  "archive_sha256": "61290438624552f8a3af9a0d733150f0dfd3ac5b06fe79fc1ecba39216348707",
+  "archive_bytes": 4545814,
+  "archive_safe_unique_regular_files": 256,
+  "frozen_source_sha256": {
+    "ad_mem.v": "472d518b7f3d7b77a86dc8826169c910a48098f14f78eb1ef78c620fe518e9c4",
+    "axi_starlink_pilot_capture.v": "dc2b3126354363b14931e0616358160cb68563001b811f04e44eba1ffdfa96d0",
+    "axi_starlink_pss_acquisition.v": "2da9b9b9a2eea82c166fa9bb6b2a78b945ba10df6cdba2f62c96c5fe87688a4a",
+    "axi_starlink_pss_phase_map_sync.v": "1a6efd511d7b8bcd7a023b4e55c5a61b4c3455ada764482e33f3a8ce8cbee1bb",
+    "axi_starlink_pss_tracker.v": "0f95565c6989e17915d0d9311958f8f0bfa720e58fe62f3d4aaa2252c6bcae46",
+    "bank_native_expired.py": "42d2dcb491a2da1a00347aa0b0f23f0dbec7edbbe156b52b5e183e56596c9cd3",
+    "bank_native_expired_checks.svh": "ebdc56ee9752704678acd989f0c22b6b7be11a7af2f239e2a7d1d24092249aad",
+    "bank_native_paired.py": "de81facd4d9ea3e4bd319f2abfa759daad805adfd55c47d8a66be4491f187b1c",
+    "bank_native_true_pss.py": "b2b306e5a79adf7278aa6279aaef0df96a2de7c1260b21010fb1f88b198a8e04",
+    "create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "denominators_u69.mem": "e2e15e4191a256ec5e13bfea08b37c0258198f38df4e048788f79a58531ef632",
+    "energies_u38.mem": "9e328ca7ac288efb001ad383d109f7c65ed198f9c86e173b6dbdda880909a81b",
+    "fixed.py": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9",
+    "fixture.json": "aa4330480879e5f44abdfeb34b5ddeca098f1b22352715743f0db32e6672de81",
+    "forward_exponents.mem": "98b96cca039fb66f8f491628d538e3df029623de2614b5cc3a2665c1c1df047d",
+    "forward_q17.mem": "7c16b3de1a707d6925ece52f1f25de89436dc03de745866b3280911e3cd313a8",
+    "inverse_exponents.mem": "8ef055e8dcd7d2c6a38b65220d9967e961d53e21104a6eaccb3c73c29a7f2aeb",
+    "inverse_q17.mem": "3a64a10a9bd0f4b78eb65e8f4b2b6f6a38bcaee11cac74ec275a281991649de6",
+    "native_coefficients_q15.mem": "ca06f7fbabbb1566a420d0409c2dab3785bd57f219a10fb7f66ca381c6069488",
+    "native_expected_packet.mem": "f8488f2393a08d17e57d8d1ec0e59b1369f0357de37934c6ed0dec66778a9699",
+    "native_expired_contract.json": "680cdbdd674809de536a3323f99d74aa803174af650447cd816bd4ec7b6dfef7",
+    "native_expired_registers.mem": "e17ab5ada48e7fd3f40381a9ed53804a81b791a9044f87c85f2fa3ad4966dee1",
+    "native_oracle.json": "ae83cc184381832f3f3610c9838718710bc3393584f97508ed65834b51e79112",
+    "numerators_u69.mem": "9ec130208f1dc95f514e66eed7d9e71ee4e334253542e1d93d2c5cfe5ddbc94e",
+    "numerology.py": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+    "paired_map_u32.mem": "0a6a5ab38faf6d4b4cc7636eea859fc16f80c925c1c5d3b5554b94f74769fe16",
+    "paired_metadata.mem": "41401bd4a40ae9661980268dd02f9843146898866b951f49bea71492325b7b40",
+    "paired_oracle.json": "8dfa1dd2839243596b945340b5f7b05cc1bd69f6939cf0fc379c025b54434b1c",
+    "paired_pilot_ci16.mem": "5b659dce933c0e2ff0c729e787ae8fd672c4d5c87976f82cfe2209e3a552f275",
+    "paired_pilot_expected.ci16": "3c754ff064c7fbfd4bcbe4560353f14fba0d2fd7cde68b5c4bba3a49681f8108",
+    "paired_pilot_newest.mem": "9a863a0b9ae5a71d469cb7a79d3d4424df31e1a40d3236eb5a08471c1ed8c65f",
+    "paired_source_ci16.mem": "dd331abb7a7347a361ab81c39228ef2b3758e308fac41da34806ad2bcf098099",
+    "pilot_ddc.py": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf",
+    "pilot_fir3_q17.mem": "64581ef90abaf17e5855b80f85e15480979095ff3f75b87ec35041f0d6c371c3",
+    "pilot_halfband2_q17.mem": "5c05bd36e2a19ce7c292427bf067ba1dbca008f57ed8f313688dfaa2943fe5cd",
+    "pilot_mixer_q16.mem": "2618a424eddcebb6ba5da48af13db0b0ad8a119bd48ac0760e1721a528979a11",
+    "pipeline_vectors.json": "938b56a7b08c1cfede82a90b6228cacdd918d4ac757a7ab6b7d8f555984358de",
+    "prepare_bank_native_expired.tcl": "d73f126e1609ff616c9e17116d1a8c30f00a3ed8eb0f2b270006a635d5fe4a7f",
+    "prepare_bank_native_paired.tcl": "27ac6f38ea1b2c7f3058f7114c2b91c3f8195b4b26e40ea941cc9934a0f1cdf5",
+    "product_q17.mem": "26045f0a0b72fd598eae4d24e89b69af5420085536dd1fa381fc6354e827334b",
+    "python_runtime__tests____init__.py": "1b6a77b6d966d9da304ea19eb14c75653f23291995976bab0940a96a504b372b",
+    "python_runtime__tests__starlink_oracle____init__.py": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa",
+    "python_runtime__tests__starlink_oracle__acquisition.py": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b",
+    "python_runtime__tests__starlink_oracle__bank_native_expired.py": "42d2dcb491a2da1a00347aa0b0f23f0dbec7edbbe156b52b5e183e56596c9cd3",
+    "python_runtime__tests__starlink_oracle__bank_native_paired.py": "de81facd4d9ea3e4bd319f2abfa759daad805adfd55c47d8a66be4491f187b1c",
+    "python_runtime__tests__starlink_oracle__bank_native_true_pss.py": "b2b306e5a79adf7278aa6279aaef0df96a2de7c1260b21010fb1f88b198a8e04",
+    "python_runtime__tests__starlink_oracle__ddc.py": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05",
+    "python_runtime__tests__starlink_oracle__fixed.py": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9",
+    "python_runtime__tests__starlink_oracle__numerology.py": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+    "python_runtime__tests__starlink_oracle__pilot_ddc.py": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf",
+    "python_runtime__tests__starlink_oracle__search.py": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086",
+    "python_runtime__tests__starlink_oracle__waveforms.py": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+    "python_runtime__tests__starlink_oracle__xfft_bitacc.py": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e",
+    "python_runtime_inventory.txt": "276b8ecab1d8da51ca754f311486d9ba2490ddd4b0698dbe3313ea25284a38a1",
+    "samples_ci16.mem": "0bef7049693657b1f058a42495fe3ed9823001d4542b0e41432984649707f4b4",
+    "saturated_u1.mem": "dd18e9c6c9db2c69cdd834f611aa20225d7e67f575e7e81a632293e9355b2710",
+    "scores_u8.mem": "cdc83107ab52f5756f3bb79c4663b7a10dae3234b529996c25c2b4a142b2a057",
+    "simulate_bank_native_expired.tcl": "fd349ce3d32c8d9a2a45e86ce96e7b41fb9fcfa6cf0fad4a2cd867294e009947",
+    "simulate_bank_native_paired.tcl": "c5321ebc0bf356c348e6c3bcc4056769920dc59b07ce91752f8a0399ea2583db",
+    "simulate_paired_realtime_psma_stop.tcl": "6b025a657707f592d6e0525b8dad0d39ee6eabd1ee4654df8560e598d149173a",
+    "starlink_pilot_ddc.v": "031c0495a7d2e0abe0f7b5dcbe52f614e19a80a7e04ca3286ef5b6e4111c4884",
+    "starlink_pilot_fir3.v": "506f40ec5a58350abaa8fbaf1e75ed29c98c414e36bee7d80518e3ec0854c49a",
+    "starlink_pilot_halfband2.v": "7f5050971075f65a29ef6a41f7d143ff85c731fccaca208c67466031af4e6ac6",
+    "starlink_pss_acquisition_health.v": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78",
+    "starlink_pss_async_fifo.v": "a07f1bf38da80b3a0f125351af439af5b58aae1ab783597ba15086d40f3cbc0d",
+    "starlink_pss_axi_lite.v": "7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c",
+    "starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "starlink_pss_candidate_scheduler.v": "e3d60269e598ff6fa8998cbb9055ae83ba3939b5cd0bf1ee90a378e55e52b790",
+    "starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+    "starlink_pss_capture_bridge.v": "950d9a5b1cafd4fc685039af49df5782b254bff908d46459e7c5f25eb3447a2f",
+    "starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+    "starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+    "starlink_pss_exact_reducer.v": "7ec973ea0c5687cce0e8e94513921449f894d1c9525710639567302ed628898a",
+    "starlink_pss_exact_track_reducer.v": "9c63183cc7a353935a2cb744aa2bad798b4552ed7c7cbd30d46f104d7b72797a",
+    "starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+    "starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+    "starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+    "starlink_pss_injection_mux.v": "f9b77edd045854c65ca7a2f2cadc9a7f677a7a0365699d1d23c58f43f17cfc30",
+    "starlink_pss_iq_to_phase_map.v": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3",
+    "starlink_pss_iq_to_score.v": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7",
+    "starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+    "starlink_pss_iq_to_score_shared.v": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26",
+    "starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+    "starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+    "starlink_pss_phase_map.v": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89",
+    "starlink_pss_phase_map_bank.v": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802",
+    "starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+    "starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+    "starlink_pss_realtime_result_guard.v": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d",
+    "starlink_pss_reduced_tracking_core.v": "4838876ecf0607ac9a7adba3f0b1d2f24383aba5ca98c27efc69629be77e3b92",
+    "starlink_pss_result_store.v": "b9a2c833a9a128f93ae25e806fb48e4df4da7b27f6fa8bf3a3db2be7262deff8",
+    "starlink_pss_sample_cdc.v": "333eab0ffcdee24a06439eadf55077c26cf6c7fd8e7c86eee845936631cbb16a",
+    "starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+    "starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+    "starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+    "starlink_pss_score_phase_tagger.v": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e",
+    "starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+    "starlink_pss_shared_realtime_xfft_service.v": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7",
+    "starlink_pss_shared_xfft_service.v": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8",
+    "starlink_pss_sliding_correlator.v": "670c74842d4366e6a72688b94c53a22b59ae057055889f07b218825b2b0ae284",
+    "starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+    "starlink_pss_tracking_core.v": "7d1a845a3ad1d2d78df59f0c1c44a9a5e25338c4dc440ef7ff087e793c207599",
+    "starlink_pss_transform_fifo.v": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0",
+    "starlink_pss_xfft_block_adapter.v": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5",
+    "starlink_sat_add48.v": "bb8a3c43ef197264d88eb4eb7a3bdcccc07254b71c2da8c16343ecbeeafc34a5",
+    "tb_starlink_bank_native_expired.sv": "5ed40f87f29a4e1bde34a6f53d887d9d5d0474b2be9ee45bb6bfc309a9cd7105",
+    "tb_starlink_pss_paired_realtime_psma_stop.sv": "ca44bcd7b018fed6f2a92dc46ca5691d1bcd66b1085d21094934d0cd44a982cd",
+    "test_starlink_bank_native_expired.py": "49e204ee97137ff913d5b63035ce0baeb59e04d9a36871f27bc866d4edbd663c",
+    "test_starlink_bank_native_paired.py": "977bf80331f47c0dfc10598d399806ce130f60fb94566fd65e6bc1f8bcaf37bd",
+    "test_starlink_bank_native_true_pss.py": "76d9c1bf75451ef719ae089a00c1f72b79c6bdbb32d7eb519e404a89bd7efd88",
+    "test_starlink_paired_realtime_psma_stop_policy.py": "5d4199792bed498da8651fd7c8305bd18c4d234f17d93c66303de9fd5ed7dd1d",
+    "up_axi.v": "161efc9d4cb6f0358c1614cf2b6307b14524b399409b0b8c3a953ac0030ce409",
+    "upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+    "verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452",
+    "waveforms.py": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984"
+  },
+  "frozen_inventories_identical_between_clocks_and_offline": true,
+  "archive_file_sha256": {
+    "bank-native-expired-175-corrected-v3.vivado.jou": "60cc35589ef9c2a4a4e14aea89880f8c8693728a859f2c4345d6d735dbdfb87a",
+    "bank-native-expired-175-corrected-v3.vivado.log": "851ce2c94a072c2759af9a731c3e91f59d7d8cd863504dcd2937f4a8e8b2bc01",
+    "bank-native-expired-175-corrected-v3/frozen_sources/ad_mem.v": "472d518b7f3d7b77a86dc8826169c910a48098f14f78eb1ef78c620fe518e9c4",
+    "bank-native-expired-175-corrected-v3/frozen_sources/axi_starlink_pilot_capture.v": "dc2b3126354363b14931e0616358160cb68563001b811f04e44eba1ffdfa96d0",
+    "bank-native-expired-175-corrected-v3/frozen_sources/axi_starlink_pss_acquisition.v": "2da9b9b9a2eea82c166fa9bb6b2a78b945ba10df6cdba2f62c96c5fe87688a4a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/axi_starlink_pss_phase_map_sync.v": "1a6efd511d7b8bcd7a023b4e55c5a61b4c3455ada764482e33f3a8ce8cbee1bb",
+    "bank-native-expired-175-corrected-v3/frozen_sources/axi_starlink_pss_tracker.v": "0f95565c6989e17915d0d9311958f8f0bfa720e58fe62f3d4aaa2252c6bcae46",
+    "bank-native-expired-175-corrected-v3/frozen_sources/bank_native_expired.py": "42d2dcb491a2da1a00347aa0b0f23f0dbec7edbbe156b52b5e183e56596c9cd3",
+    "bank-native-expired-175-corrected-v3/frozen_sources/bank_native_expired_checks.svh": "ebdc56ee9752704678acd989f0c22b6b7be11a7af2f239e2a7d1d24092249aad",
+    "bank-native-expired-175-corrected-v3/frozen_sources/bank_native_paired.py": "de81facd4d9ea3e4bd319f2abfa759daad805adfd55c47d8a66be4491f187b1c",
+    "bank-native-expired-175-corrected-v3/frozen_sources/bank_native_true_pss.py": "b2b306e5a79adf7278aa6279aaef0df96a2de7c1260b21010fb1f88b198a8e04",
+    "bank-native-expired-175-corrected-v3/frozen_sources/create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "bank-native-expired-175-corrected-v3/frozen_sources/denominators_u69.mem": "e2e15e4191a256ec5e13bfea08b37c0258198f38df4e048788f79a58531ef632",
+    "bank-native-expired-175-corrected-v3/frozen_sources/energies_u38.mem": "9e328ca7ac288efb001ad383d109f7c65ed198f9c86e173b6dbdda880909a81b",
+    "bank-native-expired-175-corrected-v3/frozen_sources/fixed.py": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9",
+    "bank-native-expired-175-corrected-v3/frozen_sources/fixture.json": "aa4330480879e5f44abdfeb34b5ddeca098f1b22352715743f0db32e6672de81",
+    "bank-native-expired-175-corrected-v3/frozen_sources/forward_exponents.mem": "98b96cca039fb66f8f491628d538e3df029623de2614b5cc3a2665c1c1df047d",
+    "bank-native-expired-175-corrected-v3/frozen_sources/forward_q17.mem": "7c16b3de1a707d6925ece52f1f25de89436dc03de745866b3280911e3cd313a8",
+    "bank-native-expired-175-corrected-v3/frozen_sources/inverse_exponents.mem": "8ef055e8dcd7d2c6a38b65220d9967e961d53e21104a6eaccb3c73c29a7f2aeb",
+    "bank-native-expired-175-corrected-v3/frozen_sources/inverse_q17.mem": "3a64a10a9bd0f4b78eb65e8f4b2b6f6a38bcaee11cac74ec275a281991649de6",
+    "bank-native-expired-175-corrected-v3/frozen_sources/native_coefficients_q15.mem": "ca06f7fbabbb1566a420d0409c2dab3785bd57f219a10fb7f66ca381c6069488",
+    "bank-native-expired-175-corrected-v3/frozen_sources/native_expected_packet.mem": "f8488f2393a08d17e57d8d1ec0e59b1369f0357de37934c6ed0dec66778a9699",
+    "bank-native-expired-175-corrected-v3/frozen_sources/native_expired_contract.json": "680cdbdd674809de536a3323f99d74aa803174af650447cd816bd4ec7b6dfef7",
+    "bank-native-expired-175-corrected-v3/frozen_sources/native_expired_registers.mem": "e17ab5ada48e7fd3f40381a9ed53804a81b791a9044f87c85f2fa3ad4966dee1",
+    "bank-native-expired-175-corrected-v3/frozen_sources/native_oracle.json": "ae83cc184381832f3f3610c9838718710bc3393584f97508ed65834b51e79112",
+    "bank-native-expired-175-corrected-v3/frozen_sources/numerators_u69.mem": "9ec130208f1dc95f514e66eed7d9e71ee4e334253542e1d93d2c5cfe5ddbc94e",
+    "bank-native-expired-175-corrected-v3/frozen_sources/numerology.py": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+    "bank-native-expired-175-corrected-v3/frozen_sources/paired_map_u32.mem": "0a6a5ab38faf6d4b4cc7636eea859fc16f80c925c1c5d3b5554b94f74769fe16",
+    "bank-native-expired-175-corrected-v3/frozen_sources/paired_metadata.mem": "41401bd4a40ae9661980268dd02f9843146898866b951f49bea71492325b7b40",
+    "bank-native-expired-175-corrected-v3/frozen_sources/paired_oracle.json": "8dfa1dd2839243596b945340b5f7b05cc1bd69f6939cf0fc379c025b54434b1c",
+    "bank-native-expired-175-corrected-v3/frozen_sources/paired_pilot_ci16.mem": "5b659dce933c0e2ff0c729e787ae8fd672c4d5c87976f82cfe2209e3a552f275",
+    "bank-native-expired-175-corrected-v3/frozen_sources/paired_pilot_expected.ci16": "3c754ff064c7fbfd4bcbe4560353f14fba0d2fd7cde68b5c4bba3a49681f8108",
+    "bank-native-expired-175-corrected-v3/frozen_sources/paired_pilot_newest.mem": "9a863a0b9ae5a71d469cb7a79d3d4424df31e1a40d3236eb5a08471c1ed8c65f",
+    "bank-native-expired-175-corrected-v3/frozen_sources/paired_source_ci16.mem": "dd331abb7a7347a361ab81c39228ef2b3758e308fac41da34806ad2bcf098099",
+    "bank-native-expired-175-corrected-v3/frozen_sources/pilot_ddc.py": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf",
+    "bank-native-expired-175-corrected-v3/frozen_sources/pilot_fir3_q17.mem": "64581ef90abaf17e5855b80f85e15480979095ff3f75b87ec35041f0d6c371c3",
+    "bank-native-expired-175-corrected-v3/frozen_sources/pilot_halfband2_q17.mem": "5c05bd36e2a19ce7c292427bf067ba1dbca008f57ed8f313688dfaa2943fe5cd",
+    "bank-native-expired-175-corrected-v3/frozen_sources/pilot_mixer_q16.mem": "2618a424eddcebb6ba5da48af13db0b0ad8a119bd48ac0760e1721a528979a11",
+    "bank-native-expired-175-corrected-v3/frozen_sources/pipeline_vectors.json": "938b56a7b08c1cfede82a90b6228cacdd918d4ac757a7ab6b7d8f555984358de",
+    "bank-native-expired-175-corrected-v3/frozen_sources/prepare_bank_native_expired.tcl": "d73f126e1609ff616c9e17116d1a8c30f00a3ed8eb0f2b270006a635d5fe4a7f",
+    "bank-native-expired-175-corrected-v3/frozen_sources/prepare_bank_native_paired.tcl": "27ac6f38ea1b2c7f3058f7114c2b91c3f8195b4b26e40ea941cc9934a0f1cdf5",
+    "bank-native-expired-175-corrected-v3/frozen_sources/product_q17.mem": "26045f0a0b72fd598eae4d24e89b69af5420085536dd1fa381fc6354e827334b",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests____init__.py": "1b6a77b6d966d9da304ea19eb14c75653f23291995976bab0940a96a504b372b",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle____init__.py": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__acquisition.py": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__bank_native_expired.py": "42d2dcb491a2da1a00347aa0b0f23f0dbec7edbbe156b52b5e183e56596c9cd3",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__bank_native_paired.py": "de81facd4d9ea3e4bd319f2abfa759daad805adfd55c47d8a66be4491f187b1c",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__bank_native_true_pss.py": "b2b306e5a79adf7278aa6279aaef0df96a2de7c1260b21010fb1f88b198a8e04",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__ddc.py": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__fixed.py": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__numerology.py": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__pilot_ddc.py": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__search.py": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__waveforms.py": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__xfft_bitacc.py": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e",
+    "bank-native-expired-175-corrected-v3/frozen_sources/python_runtime_inventory.txt": "276b8ecab1d8da51ca754f311486d9ba2490ddd4b0698dbe3313ea25284a38a1",
+    "bank-native-expired-175-corrected-v3/frozen_sources/samples_ci16.mem": "0bef7049693657b1f058a42495fe3ed9823001d4542b0e41432984649707f4b4",
+    "bank-native-expired-175-corrected-v3/frozen_sources/saturated_u1.mem": "dd18e9c6c9db2c69cdd834f611aa20225d7e67f575e7e81a632293e9355b2710",
+    "bank-native-expired-175-corrected-v3/frozen_sources/scores_u8.mem": "cdc83107ab52f5756f3bb79c4663b7a10dae3234b529996c25c2b4a142b2a057",
+    "bank-native-expired-175-corrected-v3/frozen_sources/simulate_bank_native_expired.tcl": "fd349ce3d32c8d9a2a45e86ce96e7b41fb9fcfa6cf0fad4a2cd867294e009947",
+    "bank-native-expired-175-corrected-v3/frozen_sources/simulate_bank_native_paired.tcl": "c5321ebc0bf356c348e6c3bcc4056769920dc59b07ce91752f8a0399ea2583db",
+    "bank-native-expired-175-corrected-v3/frozen_sources/simulate_paired_realtime_psma_stop.tcl": "6b025a657707f592d6e0525b8dad0d39ee6eabd1ee4654df8560e598d149173a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pilot_ddc.v": "031c0495a7d2e0abe0f7b5dcbe52f614e19a80a7e04ca3286ef5b6e4111c4884",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pilot_fir3.v": "506f40ec5a58350abaa8fbaf1e75ed29c98c414e36bee7d80518e3ec0854c49a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pilot_halfband2.v": "7f5050971075f65a29ef6a41f7d143ff85c731fccaca208c67466031af4e6ac6",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_acquisition_health.v": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_async_fifo.v": "a07f1bf38da80b3a0f125351af439af5b58aae1ab783597ba15086d40f3cbc0d",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_axi_lite.v": "7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_candidate_scheduler.v": "e3d60269e598ff6fa8998cbb9055ae83ba3939b5cd0bf1ee90a378e55e52b790",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_capture_bridge.v": "950d9a5b1cafd4fc685039af49df5782b254bff908d46459e7c5f25eb3447a2f",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_exact_reducer.v": "7ec973ea0c5687cce0e8e94513921449f894d1c9525710639567302ed628898a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_exact_track_reducer.v": "9c63183cc7a353935a2cb744aa2bad798b4552ed7c7cbd30d46f104d7b72797a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_injection_mux.v": "f9b77edd045854c65ca7a2f2cadc9a7f677a7a0365699d1d23c58f43f17cfc30",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_iq_to_phase_map.v": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_iq_to_score.v": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_iq_to_score_shared.v": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_phase_map.v": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_phase_map_bank.v": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_realtime_result_guard.v": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_reduced_tracking_core.v": "4838876ecf0607ac9a7adba3f0b1d2f24383aba5ca98c27efc69629be77e3b92",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_result_store.v": "b9a2c833a9a128f93ae25e806fb48e4df4da7b27f6fa8bf3a3db2be7262deff8",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_sample_cdc.v": "333eab0ffcdee24a06439eadf55077c26cf6c7fd8e7c86eee845936631cbb16a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_score_phase_tagger.v": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_shared_realtime_xfft_service.v": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_shared_xfft_service.v": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_sliding_correlator.v": "670c74842d4366e6a72688b94c53a22b59ae057055889f07b218825b2b0ae284",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_tracking_core.v": "7d1a845a3ad1d2d78df59f0c1c44a9a5e25338c4dc440ef7ff087e793c207599",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_transform_fifo.v": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_pss_xfft_block_adapter.v": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5",
+    "bank-native-expired-175-corrected-v3/frozen_sources/starlink_sat_add48.v": "bb8a3c43ef197264d88eb4eb7a3bdcccc07254b71c2da8c16343ecbeeafc34a5",
+    "bank-native-expired-175-corrected-v3/frozen_sources/tb_starlink_bank_native_expired.sv": "5ed40f87f29a4e1bde34a6f53d887d9d5d0474b2be9ee45bb6bfc309a9cd7105",
+    "bank-native-expired-175-corrected-v3/frozen_sources/tb_starlink_pss_paired_realtime_psma_stop.sv": "ca44bcd7b018fed6f2a92dc46ca5691d1bcd66b1085d21094934d0cd44a982cd",
+    "bank-native-expired-175-corrected-v3/frozen_sources/test_starlink_bank_native_expired.py": "49e204ee97137ff913d5b63035ce0baeb59e04d9a36871f27bc866d4edbd663c",
+    "bank-native-expired-175-corrected-v3/frozen_sources/test_starlink_bank_native_paired.py": "977bf80331f47c0dfc10598d399806ce130f60fb94566fd65e6bc1f8bcaf37bd",
+    "bank-native-expired-175-corrected-v3/frozen_sources/test_starlink_bank_native_true_pss.py": "76d9c1bf75451ef719ae089a00c1f72b79c6bdbb32d7eb519e404a89bd7efd88",
+    "bank-native-expired-175-corrected-v3/frozen_sources/test_starlink_paired_realtime_psma_stop_policy.py": "5d4199792bed498da8651fd7c8305bd18c4d234f17d93c66303de9fd5ed7dd1d",
+    "bank-native-expired-175-corrected-v3/frozen_sources/up_axi.v": "161efc9d4cb6f0358c1614cf2b6307b14524b399409b0b8c3a953ac0030ce409",
+    "bank-native-expired-175-corrected-v3/frozen_sources/upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+    "bank-native-expired-175-corrected-v3/frozen_sources/verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452",
+    "bank-native-expired-175-corrected-v3/frozen_sources/waveforms.py": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+    "bank-native-expired-175-corrected-v3/generated_ip.txt": "82d8dcb04e49971e836e7419a07fcc8c8a00ec02bf744bbf478e2c5fdce7c6cb",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/compile.log": "979ed41c5c8783452c9aa03bc45245a12d93a858581680f1370b6cea21b7ee46",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/elaborate.log": "2cc7c56e091b839a01282ef7dec1562db5954f637d8f2d5dad14ff0064557ec6",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/paired_pilot_actual.ci16": "3c754ff064c7fbfd4bcbe4560353f14fba0d2fd7cde68b5c4bba3a49681f8108",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/simulate.log": "680730349402e7d695df3e26bffc7d1b3536c52e5747a272f0335c386eca0023",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/tb_starlink_bank_native_expired.tcl": "af087f4da6b18b802d206a258bda51dc5ab06ac779fbfa4684d7c53e9f508664",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/tb_starlink_bank_native_expired_behav.wdb": "40f10cd1c0f776ddf7ea973a935bfa8383b511bd282699859c4ccddcad87be1c",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/xvhdl.log": "aa9eb0bdb1f8a6d31ae3a2d7372e86e129a86e65ca0a0853d106950ea1f3f78b",
+    "bank-native-expired-175-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/xvlog.log": "4784e28cc8b777996fef7a0671ae7a03b25c7e40f655b726d3c87ccf144b940d",
+    "bank-native-expired-175-corrected-v3/scope.txt": "6547a78aa9395de11ed649956a3d9b22f2bcc88bb58d5328ab8643d41e312025",
+    "bank-native-expired-200-corrected-v3.vivado.jou": "cb69bf0c8fb3cbad0f19227fcfa2b23b76e881dd7359d95faf0f6c2cd8b9377b",
+    "bank-native-expired-200-corrected-v3.vivado.log": "509b4c5471756de9fe7b1fdda5c55eb8e0293f1e7db44109677494213b645c7a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/ad_mem.v": "472d518b7f3d7b77a86dc8826169c910a48098f14f78eb1ef78c620fe518e9c4",
+    "bank-native-expired-200-corrected-v3/frozen_sources/axi_starlink_pilot_capture.v": "dc2b3126354363b14931e0616358160cb68563001b811f04e44eba1ffdfa96d0",
+    "bank-native-expired-200-corrected-v3/frozen_sources/axi_starlink_pss_acquisition.v": "2da9b9b9a2eea82c166fa9bb6b2a78b945ba10df6cdba2f62c96c5fe87688a4a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/axi_starlink_pss_phase_map_sync.v": "1a6efd511d7b8bcd7a023b4e55c5a61b4c3455ada764482e33f3a8ce8cbee1bb",
+    "bank-native-expired-200-corrected-v3/frozen_sources/axi_starlink_pss_tracker.v": "0f95565c6989e17915d0d9311958f8f0bfa720e58fe62f3d4aaa2252c6bcae46",
+    "bank-native-expired-200-corrected-v3/frozen_sources/bank_native_expired.py": "42d2dcb491a2da1a00347aa0b0f23f0dbec7edbbe156b52b5e183e56596c9cd3",
+    "bank-native-expired-200-corrected-v3/frozen_sources/bank_native_expired_checks.svh": "ebdc56ee9752704678acd989f0c22b6b7be11a7af2f239e2a7d1d24092249aad",
+    "bank-native-expired-200-corrected-v3/frozen_sources/bank_native_paired.py": "de81facd4d9ea3e4bd319f2abfa759daad805adfd55c47d8a66be4491f187b1c",
+    "bank-native-expired-200-corrected-v3/frozen_sources/bank_native_true_pss.py": "b2b306e5a79adf7278aa6279aaef0df96a2de7c1260b21010fb1f88b198a8e04",
+    "bank-native-expired-200-corrected-v3/frozen_sources/create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "bank-native-expired-200-corrected-v3/frozen_sources/denominators_u69.mem": "e2e15e4191a256ec5e13bfea08b37c0258198f38df4e048788f79a58531ef632",
+    "bank-native-expired-200-corrected-v3/frozen_sources/energies_u38.mem": "9e328ca7ac288efb001ad383d109f7c65ed198f9c86e173b6dbdda880909a81b",
+    "bank-native-expired-200-corrected-v3/frozen_sources/fixed.py": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9",
+    "bank-native-expired-200-corrected-v3/frozen_sources/fixture.json": "aa4330480879e5f44abdfeb34b5ddeca098f1b22352715743f0db32e6672de81",
+    "bank-native-expired-200-corrected-v3/frozen_sources/forward_exponents.mem": "98b96cca039fb66f8f491628d538e3df029623de2614b5cc3a2665c1c1df047d",
+    "bank-native-expired-200-corrected-v3/frozen_sources/forward_q17.mem": "7c16b3de1a707d6925ece52f1f25de89436dc03de745866b3280911e3cd313a8",
+    "bank-native-expired-200-corrected-v3/frozen_sources/inverse_exponents.mem": "8ef055e8dcd7d2c6a38b65220d9967e961d53e21104a6eaccb3c73c29a7f2aeb",
+    "bank-native-expired-200-corrected-v3/frozen_sources/inverse_q17.mem": "3a64a10a9bd0f4b78eb65e8f4b2b6f6a38bcaee11cac74ec275a281991649de6",
+    "bank-native-expired-200-corrected-v3/frozen_sources/native_coefficients_q15.mem": "ca06f7fbabbb1566a420d0409c2dab3785bd57f219a10fb7f66ca381c6069488",
+    "bank-native-expired-200-corrected-v3/frozen_sources/native_expected_packet.mem": "f8488f2393a08d17e57d8d1ec0e59b1369f0357de37934c6ed0dec66778a9699",
+    "bank-native-expired-200-corrected-v3/frozen_sources/native_expired_contract.json": "680cdbdd674809de536a3323f99d74aa803174af650447cd816bd4ec7b6dfef7",
+    "bank-native-expired-200-corrected-v3/frozen_sources/native_expired_registers.mem": "e17ab5ada48e7fd3f40381a9ed53804a81b791a9044f87c85f2fa3ad4966dee1",
+    "bank-native-expired-200-corrected-v3/frozen_sources/native_oracle.json": "ae83cc184381832f3f3610c9838718710bc3393584f97508ed65834b51e79112",
+    "bank-native-expired-200-corrected-v3/frozen_sources/numerators_u69.mem": "9ec130208f1dc95f514e66eed7d9e71ee4e334253542e1d93d2c5cfe5ddbc94e",
+    "bank-native-expired-200-corrected-v3/frozen_sources/numerology.py": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+    "bank-native-expired-200-corrected-v3/frozen_sources/paired_map_u32.mem": "0a6a5ab38faf6d4b4cc7636eea859fc16f80c925c1c5d3b5554b94f74769fe16",
+    "bank-native-expired-200-corrected-v3/frozen_sources/paired_metadata.mem": "41401bd4a40ae9661980268dd02f9843146898866b951f49bea71492325b7b40",
+    "bank-native-expired-200-corrected-v3/frozen_sources/paired_oracle.json": "8dfa1dd2839243596b945340b5f7b05cc1bd69f6939cf0fc379c025b54434b1c",
+    "bank-native-expired-200-corrected-v3/frozen_sources/paired_pilot_ci16.mem": "5b659dce933c0e2ff0c729e787ae8fd672c4d5c87976f82cfe2209e3a552f275",
+    "bank-native-expired-200-corrected-v3/frozen_sources/paired_pilot_expected.ci16": "3c754ff064c7fbfd4bcbe4560353f14fba0d2fd7cde68b5c4bba3a49681f8108",
+    "bank-native-expired-200-corrected-v3/frozen_sources/paired_pilot_newest.mem": "9a863a0b9ae5a71d469cb7a79d3d4424df31e1a40d3236eb5a08471c1ed8c65f",
+    "bank-native-expired-200-corrected-v3/frozen_sources/paired_source_ci16.mem": "dd331abb7a7347a361ab81c39228ef2b3758e308fac41da34806ad2bcf098099",
+    "bank-native-expired-200-corrected-v3/frozen_sources/pilot_ddc.py": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf",
+    "bank-native-expired-200-corrected-v3/frozen_sources/pilot_fir3_q17.mem": "64581ef90abaf17e5855b80f85e15480979095ff3f75b87ec35041f0d6c371c3",
+    "bank-native-expired-200-corrected-v3/frozen_sources/pilot_halfband2_q17.mem": "5c05bd36e2a19ce7c292427bf067ba1dbca008f57ed8f313688dfaa2943fe5cd",
+    "bank-native-expired-200-corrected-v3/frozen_sources/pilot_mixer_q16.mem": "2618a424eddcebb6ba5da48af13db0b0ad8a119bd48ac0760e1721a528979a11",
+    "bank-native-expired-200-corrected-v3/frozen_sources/pipeline_vectors.json": "938b56a7b08c1cfede82a90b6228cacdd918d4ac757a7ab6b7d8f555984358de",
+    "bank-native-expired-200-corrected-v3/frozen_sources/prepare_bank_native_expired.tcl": "d73f126e1609ff616c9e17116d1a8c30f00a3ed8eb0f2b270006a635d5fe4a7f",
+    "bank-native-expired-200-corrected-v3/frozen_sources/prepare_bank_native_paired.tcl": "27ac6f38ea1b2c7f3058f7114c2b91c3f8195b4b26e40ea941cc9934a0f1cdf5",
+    "bank-native-expired-200-corrected-v3/frozen_sources/product_q17.mem": "26045f0a0b72fd598eae4d24e89b69af5420085536dd1fa381fc6354e827334b",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests____init__.py": "1b6a77b6d966d9da304ea19eb14c75653f23291995976bab0940a96a504b372b",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle____init__.py": "0b81cc30ed6c57d344f46df3cff91abd5947e11c0868ddf3447f5dcc7918ebfa",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__acquisition.py": "9d407e8c5bd19bca72fa634bdb80b8a31fe9f7565c50a58ad74476d7f232006b",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__bank_native_expired.py": "42d2dcb491a2da1a00347aa0b0f23f0dbec7edbbe156b52b5e183e56596c9cd3",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__bank_native_paired.py": "de81facd4d9ea3e4bd319f2abfa759daad805adfd55c47d8a66be4491f187b1c",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__bank_native_true_pss.py": "b2b306e5a79adf7278aa6279aaef0df96a2de7c1260b21010fb1f88b198a8e04",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__ddc.py": "89df4c64e331b13bfbd4de0a0a4d3964ba0ea75d60ea19f51ca2b93d38e50c05",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__fixed.py": "85286478353c736e266e8ac7b9038c6ff95624e7980d96619ae0a746810f37f9",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__numerology.py": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__pilot_ddc.py": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__search.py": "e5062bab192e85089481cf76788dfb5cc50a2ffd150c34b755bac979cfba0086",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__waveforms.py": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime__tests__starlink_oracle__xfft_bitacc.py": "a7dd69d190765aa71077120183b1da01ea51b662eff20423053419db8948c67e",
+    "bank-native-expired-200-corrected-v3/frozen_sources/python_runtime_inventory.txt": "276b8ecab1d8da51ca754f311486d9ba2490ddd4b0698dbe3313ea25284a38a1",
+    "bank-native-expired-200-corrected-v3/frozen_sources/samples_ci16.mem": "0bef7049693657b1f058a42495fe3ed9823001d4542b0e41432984649707f4b4",
+    "bank-native-expired-200-corrected-v3/frozen_sources/saturated_u1.mem": "dd18e9c6c9db2c69cdd834f611aa20225d7e67f575e7e81a632293e9355b2710",
+    "bank-native-expired-200-corrected-v3/frozen_sources/scores_u8.mem": "cdc83107ab52f5756f3bb79c4663b7a10dae3234b529996c25c2b4a142b2a057",
+    "bank-native-expired-200-corrected-v3/frozen_sources/simulate_bank_native_expired.tcl": "fd349ce3d32c8d9a2a45e86ce96e7b41fb9fcfa6cf0fad4a2cd867294e009947",
+    "bank-native-expired-200-corrected-v3/frozen_sources/simulate_bank_native_paired.tcl": "c5321ebc0bf356c348e6c3bcc4056769920dc59b07ce91752f8a0399ea2583db",
+    "bank-native-expired-200-corrected-v3/frozen_sources/simulate_paired_realtime_psma_stop.tcl": "6b025a657707f592d6e0525b8dad0d39ee6eabd1ee4654df8560e598d149173a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pilot_ddc.v": "031c0495a7d2e0abe0f7b5dcbe52f614e19a80a7e04ca3286ef5b6e4111c4884",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pilot_fir3.v": "506f40ec5a58350abaa8fbaf1e75ed29c98c414e36bee7d80518e3ec0854c49a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pilot_halfband2.v": "7f5050971075f65a29ef6a41f7d143ff85c731fccaca208c67466031af4e6ac6",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_acquisition_health.v": "682956accfe36498651d8b6270f848fca5437a52735578b170d75b0f44b29a78",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_async_fifo.v": "a07f1bf38da80b3a0f125351af439af5b58aae1ab783597ba15086d40f3cbc0d",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_axi_lite.v": "7ccf4a8a297670c43f9184d9965f533bfd7ff5e32954dff6267b4d083299be7c",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_candidate_scheduler.v": "e3d60269e598ff6fa8998cbb9055ae83ba3939b5cd0bf1ee90a378e55e52b790",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_candidate_score_path.v": "ce40c3b22beff01f671be282f0f6e6dd7291194a6bd9836ecc3aea61a61fd1d1",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_capture_bridge.v": "950d9a5b1cafd4fc685039af49df5782b254bff908d46459e7c5f25eb3447a2f",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_energy_cache.v": "6f1a91ac41fe6d95f50e11e45b43638143db2bbf08f1cc354532fbb818122009",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_energy_join.v": "6fab739480f863467a175b73293f1e9103dfb21eb359f8c07689fceba345ab32",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_exact_reducer.v": "7ec973ea0c5687cce0e8e94513921449f894d1c9525710639567302ed628898a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_exact_track_reducer.v": "9c63183cc7a353935a2cb744aa2bad798b4552ed7c7cbd30d46f104d7b72797a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_fft_bank_owned_slice.v": "b1f08826f70d9cd0fdd729803dcbeca44dce11ab4bc263ae6da3470f1bf2648a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_forward_kernel_join.v": "61a1357bc0611a1cf0e098b3bccd94447d395a10f771c04799e108fd3e8ce04f",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_ifft_qualifier.v": "2d1474635308a48f5bda27cca19439142b4d2cf9aab03f232c0ed922fc0051ae",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_injection_mux.v": "f9b77edd045854c65ca7a2f2cadc9a7f677a7a0365699d1d23c58f43f17cfc30",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_iq_to_phase_map.v": "30cbd81f71c2203f106370f9b09be0819c5ff65e1e3aecaf9417584616463ca3",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_iq_to_score.v": "474d48dc52d3dd2381d125d88b27a1e4a153c17169d4dc911b280748ff0b5cb7",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_iq_to_score_bank_owned.v": "3f2e23a49c9fcaff5c9d845e49b6e68f11ba30b9a3c19daa3840c9421b68a32e",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_iq_to_score_shared.v": "5a9ccea80010eb96e1f55b1a1253000a06dc61df04de4ab5772dd6057ed2cb26",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_kernel_rom.v": "47f4521ee4d821bbd4077a3cddbb2831310efd78c8ea066522d8c446eb3b41db",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_overlap_scheduler.v": "f88418aceb8b771f4d4b2db12af81fd99f446eba89e6f5aca9f7e3f793ceef93",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_phase_map.v": "c048547cbb86f4429f5ebc9055a2b29a6e21770917488842f9fcba4313c42f89",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_phase_map_bank.v": "aa59781673ae7db4e60f1300019afbe3b942114f72a05bcbd11c3734da5bd802",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_raw_result_fifo.v": "05aec7dce984d99c215b07a7c555ca3c2f7ce487085d9446aeee707a8cfa3f7f",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_realtime_input_guard.v": "0158e5bcfd13b8c2833f7c18a8362f7fddebcf78a792a183d5d36c8b684d3c81",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_realtime_result_guard.v": "116aab63f3f0c74e590ee384d5afb7ae996dbf863554afb5a4d17684b498ba1d",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_reduced_tracking_core.v": "4838876ecf0607ac9a7adba3f0b1d2f24383aba5ca98c27efc69629be77e3b92",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_result_store.v": "b9a2c833a9a128f93ae25e806fb48e4df4da7b27f6fa8bf3a3db2be7262deff8",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_sample_cdc.v": "333eab0ffcdee24a06439eadf55077c26cf6c7fd8e7c86eee845936631cbb16a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_score_divider.v": "54797e429949e7bc3a45364cf68c0d9dd27079bdfddc511845ff52ec360a80b9",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_score_divider_radix4.v": "15434fb8136cc4ea29841e694ba76c7357fcf31f87bfca772330652d1a0fde79",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_score_lanes.v": "f287bb4671fc02d1901f517b2439c7224354c6bbb6de90f8ba97529187f55806",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_score_phase_tagger.v": "a68ea4b89caf8283b6f1aec41aed9bf26430566822e96ed20b3d5acba40c328e",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_score_prepare.v": "10adbfe81e157409277fdd3c4ac157a363f7b01abfac1fd6d75ee7d604a8aa3b",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_shared_realtime_xfft_service.v": "15d3950a337b304c2626c73f5b078b487f3d1fcde13677035fe13ed744a325c7",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_shared_xfft_service.v": "5b84fcd6facc9f0830470450efc0629b2f8f8cc76ad609ed5d07d5342734bbf8",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_sliding_correlator.v": "670c74842d4366e6a72688b94c53a22b59ae057055889f07b218825b2b0ae284",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_spectrum_product.v": "147147ab1af297ff985001ae938c41adcb182233903f86f39da73814a8a7b68d",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_tracking_core.v": "7d1a845a3ad1d2d78df59f0c1c44a9a5e25338c4dc440ef7ff087e793c207599",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_transform_fifo.v": "6327cb8d4f496b3d5acb0969bcd6db122024e9760ff5259081d732b295ae19a0",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_pss_xfft_block_adapter.v": "58d927e9c90e377bc2e8dbd1cfd6aee084f0431d78ee7630abdd2e8cef08dcc5",
+    "bank-native-expired-200-corrected-v3/frozen_sources/starlink_sat_add48.v": "bb8a3c43ef197264d88eb4eb7a3bdcccc07254b71c2da8c16343ecbeeafc34a5",
+    "bank-native-expired-200-corrected-v3/frozen_sources/tb_starlink_bank_native_expired.sv": "5ed40f87f29a4e1bde34a6f53d887d9d5d0474b2be9ee45bb6bfc309a9cd7105",
+    "bank-native-expired-200-corrected-v3/frozen_sources/tb_starlink_pss_paired_realtime_psma_stop.sv": "ca44bcd7b018fed6f2a92dc46ca5691d1bcd66b1085d21094934d0cd44a982cd",
+    "bank-native-expired-200-corrected-v3/frozen_sources/test_starlink_bank_native_expired.py": "49e204ee97137ff913d5b63035ce0baeb59e04d9a36871f27bc866d4edbd663c",
+    "bank-native-expired-200-corrected-v3/frozen_sources/test_starlink_bank_native_paired.py": "977bf80331f47c0dfc10598d399806ce130f60fb94566fd65e6bc1f8bcaf37bd",
+    "bank-native-expired-200-corrected-v3/frozen_sources/test_starlink_bank_native_true_pss.py": "76d9c1bf75451ef719ae089a00c1f72b79c6bdbb32d7eb519e404a89bd7efd88",
+    "bank-native-expired-200-corrected-v3/frozen_sources/test_starlink_paired_realtime_psma_stop_policy.py": "5d4199792bed498da8651fd7c8305bd18c4d234f17d93c66303de9fd5ed7dd1d",
+    "bank-native-expired-200-corrected-v3/frozen_sources/up_axi.v": "161efc9d4cb6f0358c1614cf2b6307b14524b399409b0b8c3a953ac0030ce409",
+    "bank-native-expired-200-corrected-v3/frozen_sources/upper_edge_pss_kernel_q17.mem": "694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a",
+    "bank-native-expired-200-corrected-v3/frozen_sources/verify_realtime_probe_result.tcl": "84d0ab6a405626575180995585138b7b8aa9955338bb823eb6884127c3c80452",
+    "bank-native-expired-200-corrected-v3/frozen_sources/waveforms.py": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+    "bank-native-expired-200-corrected-v3/generated_ip.txt": "c4ddcb1a77b33d866e2dff157338c41cf0cdd5a1e4eff92d49c6fdf1cee5367e",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.gen/sources_1/ip/starlink_pss_fft512_bfp18_rt_candidate/synth/starlink_pss_fft512_bfp18_rt_candidate.vhd": "a3a650654118016012bdfb8553114ee4a89866466d8ca774fa0f281640168a68",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/compile.log": "2ab3162750926e25f5ea07a883eca36b582fda4d3366e8c368024a7ea6cb55f6",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/elaborate.log": "b1a8de84f50f738194caf83cbe1298da2d7a4584ec69218b8b8e878c9588c64d",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/paired_pilot_actual.ci16": "3c754ff064c7fbfd4bcbe4560353f14fba0d2fd7cde68b5c4bba3a49681f8108",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/simulate.log": "3cc0325af47f61fcb19a9cf21048262800615ff06f5c1c88ee642baceb473ac5",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/tb_starlink_bank_native_expired.tcl": "af087f4da6b18b802d206a258bda51dc5ab06ac779fbfa4684d7c53e9f508664",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/tb_starlink_bank_native_expired_behav.wdb": "0175957523085f9704566d2bd8d334697e67fdbe8cff474bd30cc24fa89c0b2c",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/xvhdl.log": "d7ca959317e91839d54707e045892d6f68d37e9167d68f3ca05ea9d6c777bff5",
+    "bank-native-expired-200-corrected-v3/project/bank_native_expired.sim/sim_1/behav/xsim/xvlog.log": "1d5beb7188a731878aa194892e57a041bf93b4b35dbaa8adf8d374b4a472d324",
+    "bank-native-expired-200-corrected-v3/scope.txt": "900e5e35586480d952eb50f66924271f084a9e139a6063998d0378a4667393ef"
+  }
+}
