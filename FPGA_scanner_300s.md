@@ -2,6 +2,16 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest staged-validation result (2026-09-10): parent independently repeats848
+offline product-reader/issuer tests, all PASS; eight healthy leases each deliver
+512 consecutive checked words without gaps. Four real-controller integration
+seams remain: reusable capacity, preflight checked head, retained handoff receipt,
+and non-cyclic current-fault wiring. A source-specific integration design is
+next, not a top or physical promotion. Recorded inverse-WDB extraction and
+independent interpretation pass9472 values,64 guard snapshots and116 qualified
+arithmetic comparisons; no simulation advancement or physical claim. See
+[parent prototype review and next gate](reports/experiments/20260910-product-sealed-parent-review.md).
+
 Latest actual-core result (2026-09-10, after16:20 UTC): inverse v2 original77697
 PASSES complete automation; parent92874 independently repeats the full audit.
 All76 jobs/38 tagged lifetimes and exact numerical/timestamp checks pass, with
