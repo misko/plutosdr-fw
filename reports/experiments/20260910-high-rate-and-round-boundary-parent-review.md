@@ -1717,3 +1717,81 @@ a3c691ffc12a10c3742c40f118e9cf391c167c1f: root directly verified6662 preparation
 archive members from Git objects (first archive reconstructed from two exact
 parts). All lengths/hashes/exact safe member sets match; all failures retained.
 Reviewed FW/HDLe0e075d are pushed to the bank-arithmetic DNM remote.
+
+## Local admission actual6473: independent parent verification
+
+The observer-only settled-pre-NBA correction at FW8130a750734c6fd9fc8cedb4131cfa9e56b71d22 /
+HDL62da6a39edb8e40e08d41cbb13ba04af7584842d independently passes188 tests in7.88s,
+original98004 terminal0, retained at `/tmp/starlink-local-schedule-parent.BDQZlu7W`.
+Only two #0 waits precede PRE checks; all155 bits, events and +1ps POST checks
+remain. The offline original-as-DUT counterexample demonstrates a sufficient
+alias-ordering mechanism, not the exact vendor cause of original14041.
+
+One authorized actual6473 completed at12:01:46.110204UTC,234.513s, process0,
+run_status0/after_status0, with49 frozen sources plus manifest unchanged.
+Parent reran the exact frozen result CLI from `/` and obtained the same result
+object as original results.json: all11 old terminals,76 original core jobs,
+19456 ordered words per transform stream,16986 output-derived oracle-only
+scores, complete historical CSV e7127798f315772b95aff63b75fffcd9cf5d1af8ca3c96e878bae4b39e443d71,
+event CSV7bbe79fd2648984f0901296d69c1e168cac400426eb2642e91e24ff3815803f3.
+This does not execute scorer RTL or prove physical timing.
+
+Guard observations are pre1180132/post1180131/reset256,150 forward/71 inverse
+starts,17 current faults,897 sticky faults,320098 completion checks,13859 closed
+prefetch checks and2 duplicates; all155 bits unmasked, zero added latency.
+The final clock's +1ps and $finish share a physical timestamp; the unconditional
+final compare executes before $finish. The one-counter difference is explicitly
+retained pending saved-history review, not asserted equal or explained away.
+Read-only WDB extraction and offline L1 physical adaptation are authorized;
+no simulation restart, synthesis, route, union or radio action is authorized
+by this checkpoint.
+
+Parent directly verified Git archive closure at FW75c8e044cefe5e8ad8fa3f88997436d405107746:
+four parts reconstruct144578850 bytes SHA80b06a8826ebc180324c1f16ccb4f2552f6d028f14fc8086a3916422fb139857,
+all189 safe regular members match exact lengths/hashes. Preparation4197 members
+at FW9d1bb7c732ee39a98b0ca799d0abcd7a9874ed77 also verify,30683393 bytes,
+SHAb8585feb1c71fa0beb4240700d3611fa55b32f1d270cce69076f76910811397f.
+Original22656/14041 failures remain unchanged.
+
+## Word plus metadata prefetch: independent offline and publication gate
+
+Root repeated the final suite at FW4e61c9dbda24a4a437f1d00b596c366edd267b3b /
+HDL32b20cb750caeede27561193728f088bc249195e:60 PASS16.10s, original72716 terminal0,
+`/tmp/starlink-rom-metadata-parent.WaYEp9Z4`. This includes31 old word tests and29
+new tests, unconditional old/public coefficient, metadata and state comparisons,
+four option combinations, current faults, unknowns, stalls and reset/flush.
+Metadata prefetch moves the current-validation dependency from69 capture enables
+to a retained/speculative selector in RTL, with+70 logical bits and no new cycle.
+Mapped critical-path removal is unmeasured; word-only prefetch does not target
+the separate measured block-metadata enable path.
+
+Root verified all836 safe Git archive members (835 source/artifact entries plus
+embedded receipt) at FW03ba61b4decf7a41cc0a0d1e83f3cdfaff6d8a69,4113301 bytes,
+SHA10390700c7d77202e35ae3b1d3fb019e5a62fc67bb42ca12687d795895e1b8fe.
+Five final changed-source bindings match the tested FW/HDL objects. Initial
+read-only parent archive checks assumed the other archive schema (members map
+and plural receipts filename); those diagnostic checks failed before correction.
+The exact singular receipt.json/count schema was inspected and fully verified;
+no archive bytes, tests or simulations were changed or rerun for that correction.
+The first parent local result command also tried the unrelated run_status.txt
+name after successful result equality; actual run_outcome.txt was then read
+directly and reports both zero statuses. No original run was restarted.
+
+Offline additive joiner/bank integration preparation is authorized in the ROM
+worktree, with the accepted C1 seven runtime files byte-identical and original
+stimulus, numerical CSVs and fault gates retained. No actual or physical launch
+is yet approved. Healthy paired60 final evidence at FW7c62a3382baef4b922cec92c1e71c0fa67061970
+was already root-pushed: compact286-member archive SHA
+c2118ae7a34231c86be5e13e2e857e570bae9844162686c3414243dc1ff8c5b6,
+plus independent parent checks of all544 raw-run files/64345759 bytes.
+The next paired60 negative has a frozen late/expired-command recipe before
+evaluation; healthy runtime, source and golden data remain unchanged.
+
+No radio, PPU or deployment state changed. Full receiver timing/CDC/I/O,
+calibration, causal acquisition, continuous host service and RF verification
+remain necessary; neither arithmetic equivalence nor archive closure replaces them.
+
+Reviewed publication completed: root pushed FW75c8e044/HDL62da6a39 to the
+bank-arithmetic DNM remote and FW03ba61b4/HDL32b20cb7 to the ROM-prefetch DNM
+remote. All four original push commands exited0. No firmware-main push or
+primary runtime gitlink promotion occurred.

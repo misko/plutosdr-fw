@@ -41,9 +41,17 @@ attempt stopped before simulated traffic because its diagnostic lookup did not
 handle Vivado's escaped parameterized top name. The failed attempt is retained;
 the recorder-only correction independently passes143 tests with runtime,
 stimulus and numerical comparisons unchanged. Corrected frozen L1 actual14041
-now passes waveform discovery but fails its new155-bit observer at time zero,
-before healthy traffic. Initialization/event ordering is under read-only review;
-no comparison exception or D/S/CDC union is accepted. Their
+passed waveform discovery but failed its new155-bit observer at time zero,
+before healthy traffic. Both original failures remain preserved. A separately
+proved settled-pre-NBA observer schedule passes188 independent offline tests;
+the successor L1/R1B1O1/175 actual6473 now PASSES all original numerical/fault
+gates with the complete historical CSV unchanged. Parent independently reran
+the frozen result verifier and verified the189-file actual archive from Git.
+All155 guard bits remain unconditional, with zero added hardware cycles. The
+final pre/post counters differ by one at the shared finish/+1ps time slot;
+this is retained explicitly, not rewritten. Saved waveform-history review and
+source-specific physical preparation are next; no physical benefit, explanation
+of the earlier vendor startup mismatch, or D/S/CDC union is established. Their
 reviewed sources/evidence are pushed to their respective experimental DNM
 branches, not firmware main. The60 public bank/STOP/pilot interface independently
 passes660 tests; its combined common-source coarse/native/pilot harness passes311
@@ -55,7 +63,12 @@ pass; the first healthy common-source60 vendor-FFT simulation now PASSES
 An additional isolated ROM read-ahead/last-visible-retention prototype passes149
 offline tests, including continuous512-beat traffic; it adds37 logical bits at
 D18 and no nominal cycles. All old visible coefficient/control fields compare
-unconditionally. No actual FFT integration or physical benefit is claimed.
+unconditionally. Additional directed occupied X/Z-ready and flush coverage
+passes31 tests. The additive metadata-prefetch extension now independently
+passes60 tests (31 retained plus29 new), targeting the separate measured
+kernel block-metadata capture-enable path. It adds70 logical bits beyond the
+word-only variant and no nominal cycles. Actual FFT integration preparation
+is in progress; neither prefetch option has a measured physical benefit yet.
 
 Latest checkpoint (2026-09-10): the additive complete three-bank coarse scorer
 passes actual-core numerical/fault replay and 64-block continuous capacity tests
