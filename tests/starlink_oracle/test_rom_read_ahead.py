@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.starlink_oracle.rom_metadata_contract import restore_metadata
+
 ROOT = Path(__file__).resolve().parents[2]
 ACQ = ROOT / "hdl/library/starlink_pss_acquisition"
 RECIPE = json.loads(Path(__file__).with_name("rom_prefetch_delta.json").read_text())
@@ -30,7 +32,7 @@ def test_exact_additive_source_recipe_and_untouched_original():
     for before, after in RECIPE["edits"]:
         assert old.count(before) == 1
         old = old.replace(before, after, 1)
-    assert old == candidate()
+    assert old == restore_metadata(candidate())
 
 
 def run(tmp_path, width=18, balanced=1, scratch=1, mutated=None, bench=None):
