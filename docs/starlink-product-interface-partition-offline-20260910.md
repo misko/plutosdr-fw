@@ -57,6 +57,9 @@ Named scalar causes avoid reconnecting the aggregate diagnostic bus upstream.
   the complete original848 fixture. Unreviewed body additions are rejected.
   Default-off and invalid0/1/X/Z parameter tests execute. Late exit0 ERROR and
   missing-count receipts are rejected;8 admissions/8 completions are required.
+  Disabled-mode inertness refers to ownership/transfer controls, not every new
+  observation port: current diagnostic exports may report hostile inputs even
+  while disabled. The new ports remain unconnected to P1.
 - The complete graph includes3302 nodes/36 LS nodes and has no cycle. Six
   independently restored backedges each fail: D0→guard current, D1→completed
   current, issuer6→bank live, reader offer→bank live, consumer certificate→shared
