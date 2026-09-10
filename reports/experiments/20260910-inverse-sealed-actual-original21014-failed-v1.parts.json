@@ -1,0 +1,35 @@
+{
+  "archive": {
+    "bytes": 140853340,
+    "name": "20260910-inverse-sealed-actual-original21014-failed-v1.tgz",
+    "sha256": "07485ace45c94c72bf084de4e0cfbf1529ac6f30b2ae58ac36b72404052b4b63"
+  },
+  "format": "starlink-portable-archive-parts-v1",
+  "max_part_bytes": 41943040,
+  "parts": [
+    {
+      "bytes": 41943040,
+      "index": 0,
+      "name": "20260910-inverse-sealed-actual-original21014-failed-v1.tgz.part000",
+      "sha256": "166ce4a59bc04fa91b5c683fd0d574a8bcb01c6fdbad0c6a43cfbf0f49b8cafd"
+    },
+    {
+      "bytes": 41943040,
+      "index": 1,
+      "name": "20260910-inverse-sealed-actual-original21014-failed-v1.tgz.part001",
+      "sha256": "da755238ca93f049e7aac19b4a943686c91794c361660833cb68463accd1ac2f"
+    },
+    {
+      "bytes": 41943040,
+      "index": 2,
+      "name": "20260910-inverse-sealed-actual-original21014-failed-v1.tgz.part002",
+      "sha256": "a97350d4baa2f10272e85064bc09e2e73126644c9dec757e2ce3dfe17e4af80a"
+    },
+    {
+      "bytes": 15024220,
+      "index": 3,
+      "name": "20260910-inverse-sealed-actual-original21014-failed-v1.tgz.part003",
+      "sha256": "5f42e56a717e50028af8116726e52f6bd18e1eb66ed9e928c2924f8bf52808de"
+    }
+  ]
+}
