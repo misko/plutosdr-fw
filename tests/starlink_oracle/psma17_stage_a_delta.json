@@ -1,0 +1,205 @@
+{
+  "schema": 1,
+  "base_hdl": "b49553c16319f59ad8d7b44fd24c494f96eba142",
+  "scope": "Stage A public PSMA 1.7 only; exact inverse, no whitespace projection",
+  "files": {
+    "library/axi_starlink_pss_acquisition/axi_starlink_pss_acquisition.v": {
+      "before_sha256": "2da9b9b9a2eea82c166fa9bb6b2a78b945ba10df6cdba2f62c96c5fe87688a4a",
+      "after_sha256": "2ce3a4943b43af7120500ba5064bedf0e7b1338517cc1d41b7ea30a33b0951d0",
+      "hunks": [
+        {
+          "old_index": 17,
+          "new_index": 17,
+          "before": [
+            "  parameter integer ENABLE_BOUNDARY_STOP = 0"
+          ],
+          "after": [
+            "  parameter integer ENABLE_BOUNDARY_STOP = 0,",
+            "  parameter integer USE_BANK_OWNED_XFFT = 0"
+          ]
+        },
+        {
+          "old_index": 182,
+          "new_index": 183,
+          "before": [],
+          "after": [
+            "    if (USE_BANK_OWNED_XFFT !== 0 && USE_BANK_OWNED_XFFT !== 1)",
+            "      $fatal(1, \"USE_BANK_OWNED_XFFT must be zero or one\");",
+            "    // Public bank admission is deliberately narrower than the internal core.",
+            "    // No source-60/lower-edge or historical-profile promotion is implied.",
+            "    if (USE_BANK_OWNED_XFFT === 1 && (INPUT_RATE_MSPS !== 30 ||",
+            "        ENABLE_PILOT_TAP !== 1 || USE_SHARED_XFFT !== 1 ||",
+            "        USE_REALTIME_XFFT !== 1 || ENABLE_BOUNDARY_STOP !== 1))",
+            "      $fatal(1, \"bank-owned PSMA 1.7 requires 30 MS/s upper paired-pilot realtime shared STOP\");"
+          ]
+        },
+        {
+          "old_index": 184,
+          "new_index": 193,
+          "before": [
+            "    if (ENABLE_BOUNDARY_STOP && (USE_SHARED_XFFT != 1 || INPUT_RATE_MSPS != 15))"
+          ],
+          "after": [
+            "    if (ENABLE_BOUNDARY_STOP && !USE_BANK_OWNED_XFFT &&",
+            "        (USE_SHARED_XFFT != 1 || INPUT_RATE_MSPS != 15))"
+          ]
+        },
+        {
+          "old_index": 188,
+          "new_index": 198,
+          "before": [
+            "    if (USE_REALTIME_XFFT &&"
+          ],
+          "after": [
+            "    if (USE_REALTIME_XFFT && !USE_BANK_OWNED_XFFT &&"
+          ]
+        },
+        {
+          "old_index": 322,
+          "new_index": 332,
+          "before": [],
+          "after": [
+            "    .USE_BANK_OWNED_XFFT(USE_BANK_OWNED_XFFT),"
+          ]
+        },
+        {
+          "old_index": 401,
+          "new_index": 412,
+          "before": [],
+          "after": [
+            "    .USE_BANK_OWNED_XFFT(USE_BANK_OWNED_XFFT),",
+            "    .USE_REALTIME_XFFT(USE_REALTIME_XFFT),",
+            "    .ENABLE_PILOT_TAP(ENABLE_PILOT_TAP),"
+          ]
+        }
+      ]
+    },
+    "library/axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v": {
+      "before_sha256": "1a6efd511d7b8bcd7a023b4e55c5a61b4c3455ada764482e33f3a8ce8cbee1bb",
+      "after_sha256": "8911f045cb0811b9aabb008f8954f8c00f19bae7ba596996ec1e3c6b61f6bd4a",
+      "hunks": [
+        {
+          "old_index": 28,
+          "new_index": 28,
+          "before": [
+            "  parameter [30:0] COEFFICIENT_ENERGY = 31'd1073742825"
+          ],
+          "after": [
+            "  parameter [30:0] COEFFICIENT_ENERGY = 31'd1073742825,",
+            "  parameter integer USE_BANK_OWNED_XFFT = 0,",
+            "  parameter integer USE_REALTIME_XFFT = 0,",
+            "  parameter integer ENABLE_PILOT_TAP = 0"
+          ]
+        },
+        {
+          "old_index": 123,
+          "new_index": 126,
+          "before": [],
+          "after": [
+            "    if (USE_BANK_OWNED_XFFT !== 0 && USE_BANK_OWNED_XFFT !== 1)",
+            "      $fatal(1, \"USE_BANK_OWNED_XFFT must be zero or one\");",
+            "    if (USE_BANK_OWNED_XFFT === 1 && (INPUT_RATE_MSPS !== 30 ||",
+            "        ENABLE_PILOT_TAP !== 1 || USE_SHARED_XFFT !== 1 ||",
+            "        USE_REALTIME_XFFT !== 1 || ENABLE_BOUNDARY_STOP !== 1 ||",
+            "        COEFFICIENT_ENERGY !== 31'd1073744004))",
+            "      $fatal(1, \"bank-owned PSMA 1.7 requires 30 MS/s upper paired-pilot realtime shared STOP and conditioned energy\");"
+          ]
+        },
+        {
+          "old_index": 129,
+          "new_index": 139,
+          "before": [
+            "    if (ENABLE_BOUNDARY_STOP && (USE_SHARED_XFFT != 1 || INPUT_RATE_MSPS != 15))"
+          ],
+          "after": [
+            "    if (ENABLE_BOUNDARY_STOP && !USE_BANK_OWNED_XFFT &&",
+            "        (USE_SHARED_XFFT != 1 || INPUT_RATE_MSPS != 15))"
+          ]
+        },
+        {
+          "old_index": 133,
+          "new_index": 144,
+          "before": [
+            "    if (USE_SHARED_XFFT && INPUT_RATE_MSPS != 15)"
+          ],
+          "after": [
+            "    if (USE_SHARED_XFFT && !USE_BANK_OWNED_XFFT && INPUT_RATE_MSPS != 15)"
+          ]
+        },
+        {
+          "old_index": 139,
+          "new_index": 150,
+          "before": [
+            "  localparam [31:0] VERSION = ENABLE_BOUNDARY_STOP ? 32'h0001_0006 :"
+          ],
+          "after": [
+            "  // ABI 1.7 is explicit source-30/upper bank-owned paired STOP only. Bit 10",
+            "  // identifies bank ownership; bit 7 exposes the existing 64-bit counters.",
+            "  localparam [31:0] VERSION = USE_BANK_OWNED_XFFT ? 32'h0001_0007 :",
+            "      ENABLE_BOUNDARY_STOP ? 32'h0001_0006 :"
+          ]
+        },
+        {
+          "old_index": 143,
+          "new_index": 157,
+          "before": [
+            "  localparam [31:0] CAPABILITIES = ENABLE_BOUNDARY_STOP ? 32'h0000_033f :"
+          ],
+          "after": [
+            "  localparam [31:0] CAPABILITIES = USE_BANK_OWNED_XFFT ? 32'h0000_07ff :",
+            "      ENABLE_BOUNDARY_STOP ? 32'h0000_033f :"
+          ]
+        },
+        {
+          "old_index": 331,
+          "new_index": 346,
+          "before": [],
+          "after": [
+            "  // The legacy 1.6 mask stays exact. In 1.7 DDC saturation (bit 13) and",
+            "  // cumulative source discontinuity are independently fatal, including when",
+            "  // the pilot keeps the conditioner running after coarse STOP. These counts",
+            "  // survive disable/flush; only the upstream s_axi_aresetn clears them. A late",
+            "  // failure changes terminal health, never retroactively unpublishes a map.",
+            "  wire stop_conditioned_upstream_fault_now =",
+            "      |(snapshot_health_flags & 32'h0000_77ff) ||",
+            "      |ddc_discontinuity_count || |ingress_dropped_sample_count ||",
+            "      stop_detector_counter_fault;"
+          ]
+        },
+        {
+          "old_index": 346,
+          "new_index": 370,
+          "before": [
+            "      {3'd0, stop_bridge_fault_now, stop_map_fault_now, stop_upstream_fault_now};"
+          ],
+          "after": [
+            "      {3'd0, stop_bridge_fault_now, stop_map_fault_now,",
+            "       (USE_BANK_OWNED_XFFT ? stop_conditioned_upstream_fault_now : stop_upstream_fault_now)};"
+          ]
+        },
+        {
+          "old_index": 525,
+          "new_index": 550,
+          "before": [
+            "          register_value = (INPUT_RATE_MSPS == 60) ?"
+          ],
+          "after": [
+            "          // As in 1.4: live high/low/high retry, not an atomic counter pair",
+            "          // or a PSMA snapshot. Each accepted AXI response remains held.",
+            "          register_value = ((INPUT_RATE_MSPS == 60) || USE_BANK_OWNED_XFFT) ?"
+          ]
+        },
+        {
+          "old_index": 528,
+          "new_index": 555,
+          "before": [
+            "          register_value = (INPUT_RATE_MSPS == 60) ?"
+          ],
+          "after": [
+            "          register_value = ((INPUT_RATE_MSPS == 60) || USE_BANK_OWNED_XFFT) ?"
+          ]
+        }
+      ]
+    }
+  }
+}

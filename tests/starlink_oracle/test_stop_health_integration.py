@@ -13,6 +13,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.starlink_oracle.psma17_projection import inverse_stage_a
+
 ROOT = Path(__file__).resolve().parents[2]
 HDL = Path(os.environ.get("STARLINK_PSS_TEST_HDL", str(ROOT / "hdl")))
 CONTROL_PATH = "library/axi_starlink_pss_acquisition/axi_starlink_pss_phase_map_sync.v"
@@ -119,7 +121,7 @@ def test_runtime_changes_are_only_the_explicit_and_atomic_summaries():
         return re.sub(r"\s+", "", re.sub(r"//[^\n]*", "", text))
 
     baseline = tokens(frozen(CONTROL_PATH))
-    candidate = tokens((HDL / CONTROL_PATH).read_text())
+    candidate = tokens(inverse_stage_a(CONTROL_PATH, (HDL / CONTROL_PATH).read_text()))
     # The three private bridge counters share a reset and never wrap. The new
     # summary is set atomically at each existing increment, not delayed from
     # the counter value. All current-event veto terms must remain unchanged.
@@ -171,7 +173,7 @@ def test_runtime_changes_are_only_the_explicit_and_atomic_summaries():
         "|ingress_dropped_sample_count||stop_detector_counter_fault;"
     )
     assert candidate.replace(new_expression.group(), old_expression.group(), 1) == baseline
-    wrapper = tokens((HDL / WRAPPER_PATH).read_text())
+    wrapper = tokens(inverse_stage_a(WRAPPER_PATH, (HDL / WRAPPER_PATH).read_text()))
     for fragment, count in [("wiremap_counter_fault;", 1),
                             (".map_counter_fault(map_counter_fault),", 2),
                             (".MAP_COUNTERS_FROM_FLAG(ENABLE_BOUNDARY_STOP),", 1)]:
