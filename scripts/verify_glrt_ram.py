@@ -22,6 +22,37 @@ def digest(path):
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
+def verify_lean_init(archive, members, manifest, cpio):
+    """Independently bind the embedded GLF1 init script to its frozen input."""
+    selectors = [Path(path) for path in manifest["input_sha256"]
+                 if Path(path).name == "legacy_scorer.txt"]
+    if len(selectors) > 1:
+        raise ValueError("ambiguous legacy scorer selection")
+    lean = False
+    if selectors:
+        selection = selectors[0]
+        if digest(selection) != manifest["input_sha256"][str(selection)]:
+            raise ValueError("legacy scorer selection changed")
+        value = selection.read_text().strip()
+        if value not in ("0", "1"):
+            raise ValueError("invalid legacy scorer selection")
+        lean = value == "0"
+    expected = ["opt/VERSIONS"] + (["etc/init.d/S22starlink_glrt_iio"] if lean else [])
+    if manifest["rootfs_replaced_members"] != expected:
+        raise ValueError("rootfs replacements differ from the selected profile")
+    if not lean:
+        return
+    inputs = [value for path, value in manifest["input_sha256"].items()
+              if Path(path).name == "S22starlink_glrt_iio"]
+    names = [name for name in members if name.removeprefix("./") == "etc/init.d/S22starlink_glrt_iio"]
+    if len(inputs) != 1 or len(names) != 1:
+        raise ValueError("lean init input or archive member is ambiguous/missing")
+    embedded = subprocess.run([str(cpio), "-i", "--to-stdout", "--quiet", names[0]],
+                              input=archive, check=True, capture_output=True).stdout
+    if hashlib.sha256(embedded).hexdigest() != inputs[0]:
+        raise ValueError("embedded lean init differs from the frozen input")
+
+
 def verify(package, output, *, dumpimage=None):
     package, output = package.resolve(), output.resolve()
     manifest_path = package / "manifest.json"
@@ -67,6 +98,7 @@ def verify(package, output, *, dumpimage=None):
     for required in ("opt/VERSIONS", "etc/init.d/S22starlink_glrt_iio", "usr/sbin/iiod"):
         if required not in normalized:
             raise ValueError("missing GLRT rootfs member: " + required)
+    verify_lean_init(archive, members, manifest, cpio)
     versions_name = members[normalized.index("opt/VERSIONS")]
     versions = subprocess.run([str(cpio), "-i", "--to-stdout", "--quiet", versions_name],
                               input=archive, check=True, capture_output=True).stdout

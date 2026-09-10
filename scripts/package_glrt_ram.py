@@ -3,7 +3,8 @@
 
 No radio access, deployment, bootloader or flash update. Packaging is separate
 from CDC/I/O review and hardware qualification. The input rootfs is preserved;
-only its copied /opt/VERSIONS is stamped for the exact assembled components.
+its copy receives exact component versions and, for GLF1, the profile-aware
+boot inventory script. Both replacements are recorded.
 """
 from __future__ import annotations
 
