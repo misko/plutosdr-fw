@@ -103,3 +103,56 @@ No radios were allocated or contacted. Full15/30/60 fine search, independent
 2.5MS/s IIO pilot, causal120ms visits/eight targets/300s scanner, blind host
 comparison, receiver timing/CDC/reset/IO/calibration and `.18` then Ethernet
 PPU `.17` deployment all remain the unchanged objective.
+
+## Follow-up: corrected actual evidence accepted; control pair launched
+
+Both corrected late-command simulations completed exit0 at06:22:07/10 UTC,
+175/200MHz respectively, without intervening source edits or retries. Parent
+read the complete final report and independently verified every one of256
+safe unique archive files, both complete115-source inventories, all13 pinned
+Python runtime files/run,62 ordered public register values/run and512 pilot
+ordinal/index/data tuples plus2048 bytes/run against the frozen contracts.
+The exact scheduler lead was -136 samples: rejected/late1, capture/completion/
+packet/IRQ0. Coarse894/map447 checks and later deliberate invalid-release and
+reset quiescence gates passed. This is actual-generated-core simulation, not
+physical hardware or RF evidence. Archive SHA256:
+`61290438624552f8a3af9a0d733150f0dfd3ac5b06fe79fc1ecba39216348707`.
+
+The additive expiry harness was merged into experimental primary HDL
+`0b4bf2f0fd8c58c79852266b07f9e95770f75f36`: exactly three new test/helper files
+relative to b49553c1, no runtime edits or deletion of existing map tests.
+FW evidence21a404d8f was merged with all earlier failed attempts retained.
+Primary regression original65080 completed303 PASS in12.34s. No firmware-main
+merge, radio access, flash or PPU change occurred.
+
+Parent also independently reran93 control-preparation/fast tests in15.91s
+(50353 exit0), reviewed the final strict parameter/receipt delta, and verified
+447 archived hashes. Two actual175 configurations were authorized and launched
+06:35:55 UTC: baseline r0-d0-s0 handle60442 and combined r1-d1-s1 handle8914,
+both extras1, frozen FW613b14e673 / HDL027a903f7d. The owning agent polls those
+original handles; neither has a terminal result recorded here. No physical
+trial, attribution modes or source changes are authorized by that launch.
+
+Separate root rounding checkpoint inspection completed without DCP mutation.
+Internal setup/hold moved -1.577/+0.084ns to +0.964/+0.103ns; all176 negative
+hold endpoints in each isolated design launch at top-level ports. The old
+physical log records37 registers pushed out of each sum DSP; new PREG1/PREG1
+retention explains the74 fewer fabric FFs. Port holds are not waived and the
+bank remains at its authoritative -1.907ns setup result. Separate immutable
+audit archive SHA256:
+`e86f7ca743bbc004bd3d57b5da08390752e7381f1f90b81cf985468bdd5af3e8`,
+on round-boundary FW90fc402229 / HDLce9c863a. The runtime is unchanged.
+
+An isolated standalone operand-register wrapper implementation/offline test
+was authorized on a new operand-boundary worktree, based on those rounding
+pins. It must explicitly add one no-stall token latency, capture both complex
+operands and79 metadata bits, preserve exact default passthrough and prove
+accepted-token arithmetic/conservation/reset/flush semantics. Logical added
+state is4D+80 bits (152 at D18). No bank integration, physical mapping claim,
+actual FFT or radio operation is authorized for that prototype yet.
+
+Stage A30 interface review found that its new parameter guards used logical
+inequality, which can miss X/Z values. The isolated agent is requested to
+harden only the new bank admission with case inequality and literal-instance
+unknown-parameter tests, retaining the initial310-pass receipt and every old
+numerical/legacy contract. Stage A is not yet promoted or actual-FFT-qualified.
