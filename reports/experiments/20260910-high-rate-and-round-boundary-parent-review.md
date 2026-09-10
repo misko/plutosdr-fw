@@ -585,3 +585,40 @@ late447 bundle SHA256:
 One actual healthy343 run is authorized after source/evidence commits; actual
 late447 remains pending separate authorization. All original447 goldens, runtime,
 24000/28000 native limits and4096-sample continuation remain unchanged.
+
+## Two actual-core results independently verified
+
+Control baseline original22816 completed exit0, Vivado exit08:22:56UTC.
+Parent independently executed the frozen Tcl receipt procedure and qualified
+observer validator, and rechecked the entire input freeze. Both complete
+original CSVs retain historical b0d60e80...; both extra CSVs have SHA256
+`d3a4aaff96db5c9a9d15cc9f4af8400f42b52fd4f97c08712dfce4d3d585562b`.
+The qualified observer accounts for717760 samples:717731 raw-equal and29
+invalid-only rows with both valid bits exactly0. The raw candidate pattern in
+this run is1xx00101 versus00000101; original raw217 equality is NOT a PASS.
+Both independently driven extra-epoch receipts prove two faults, three held
+stalls, two one-sided resets and four recoveries. This is R0/D0/S0 only;
+registered preflight and inverse-current/sticky-forward counters remain0.
+Combined R1/D1/S1 preparation is now authorized offline, with no new source
+or numerical-check changes and no actual/physical launch yet.
+
+Healthy30-upper343 original69687 completed exit0, Vivado exit08:22:25UTC.
+Parent reran the frozen context-specific result verifier successfully. Exactly
+686 scores entered343 map words;687 were visible, with one checked provisional
+tail. Forward input1536, forward/product/inverse-input/inverse1024 each,
+prepare690 and ratio689 are actual stage exposure, not three completed jobs.
+Native capture260, raw129/qualified121 tuples and52 packet reads match goldens;
+publication19910/read-release20700 clocks, maxAXI8, remain inside old limits.
+All12303 source/ingress samples are counted; canonical3618 and pilot512 exact.
+Overlap witnesses: capture273, compute/coarse+pilot5393, compute-afterSTOP14259.
+Map remains retained through native release8991, then releases at9000.
+One actual late447 negative is authorized only after this outcome is archived.
+
+The healthy343 preparation is committed at FWf9c595998e / HDL529dc8e8d3.
+Parent checked all1663 portable hashes/1664 safe unique members, archive
+`05bbf148e9651ceab0b3d3f0bf5eab31369c744e203727c9718bff7121c030df`.
+Actual-result archives are being completed separately. The arithmetic actual
+runner review identified subprocess-environment and failed-run integrity gaps;
+only those runner safeguards and their offline tests are being repaired before
+freezing an actual arithmetic launch. No runtime logic, numerical gates,
+physical timing constraints, radio or PPU configuration changed here.

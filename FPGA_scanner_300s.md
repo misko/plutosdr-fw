@@ -60,8 +60,9 @@ payload observer now passes29 independent parent tests, including valid-status
 fault and same-edge publication checks. The baseline actual run reproduces
 both complete historical CSVs but fails later in an added fault epoch; a
 stimulus/checker same-time hazard was identified. The phase-aware added-stimulus
-correction passes53 independent parent tests; one frozen actual baseline retry
-is running, without any original assertion changes. The original
+correction passes53 independent parent tests; its frozen actual baseline retry
+now passes the complete old/extra suite and qualified-status audit, without
+any original assertion changes. This is R0/D0/S0 only. The original
 raw217 failure remains retained and no candidate is promoted.
 A separate one-stage operand-register prototype targets the
 BRAM-to-DSP path with explicit added latency and offline qualification. Its
@@ -95,10 +96,11 @@ path; the environment-corrected run now PASSES with unchanged inputs:894 exact
 scores/447 map words,260 native capture samples,129 raw tuples and512 pilot
 outputs. Parent independently reran the frozen verifiers and checked all636
 run-file hashes. Native capture overlaps actual FFT consumption and refinement
-survives coarse STOP. This is healthy30-upper447x2 simulation only;343 geometry,
-negative cases and runtime promotion remain open. The new343/late case packages
+survives coarse STOP. The additional healthy30-upper343x2 actual run also passes:
+686 admitted/687 visible scores,343 exact map words, unchanged fine/pilot results
+and native budgets. Negative cases and runtime promotion remain open. The343/late case packages
 pass253 independent parent tests and652 agent regressions with unchanged
-original447 inputs; one actual healthy343 run is authorized after archival.
+original447 inputs; one actual late447 negative is authorized after343 archival.
 Actual60 bank/native/pilot
 integration remains open. Latest
 source-specific decisions and measurements:
