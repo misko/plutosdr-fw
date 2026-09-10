@@ -10,8 +10,9 @@ but has no actual-controller or physical timing result yet. Next is additive
 actual-core preparation and observer testing, not deployment. See
 [scope and exact evidence](reports/experiments/20260910-product-final-fence-review.md).
 That preparation now independently passes 60 tests and its exact 65-file bundle
-verifies. Unique execution-owner and sampling-order review remain before the
-proposed actual FFT run; no new vendor result or physical pass is claimed.
+verifies. Unique execution-owner and independent sampling-order reviews now
+pass; one exact-source actual FFT run is approved, without retry or physical
+promotion. No new vendor result or physical pass is claimed.
 The separate inverse sealed-bank integration now independently passes 136 frozen
 offline tests, including nonzero real-guard data, paused-source resets, ten
 targeted mutants and a clock-phase sweep. Observed healthy reuse overhead is

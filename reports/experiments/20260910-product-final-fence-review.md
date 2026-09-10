@@ -136,3 +136,38 @@ No vendor execution is implied by this repeat. A unique runner owner, exact
 external source pins, pre/post source/IP checks, preserved failure exits and an
 independent observer-scheduling review are the remaining launch gate. No retry,
 physical run, receiver image or radio operation follows automatically.
+
+### Source-specific execution approval (14:49 UTC)
+
+The independent sampling/force-seam review found no concrete counterexample in
+the frozen stimulus: observer `632273d1`, binding `4b04032b`, actual bench
+`68aab9352336490972dba7b05b59c9fcd6c3a813f741af8ee4590f25aec7870b`, extras
+`0fe41dfe61e375e9cc4dadc9d1eff4179ba34fe1c068a49cb2e28d20079cb9b3`.
+Sampled authorization remains unconditional before phase/ownership assertions.
+The inherited public-valid force occurs in the drained missing-status epoch;
+ready forces only drive low. No frozen same-edge writer was found that invalidates
+the observer's pre-NBA prediction and post-NBA request-toggle comparison. This
+review does not cover arbitrary future posedge stimulus.
+
+Parent completely read and independently checked the unique owner:
+`/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/product-final-actual-owner-v1/owner.sh`,
+SHA-256 `62e4fa75b645f200b9c6bbccc0a43cf6e7cda0c2f58d04245128f5da9b24cb68`.
+Its literal inverse restores the old successful owner with eight declared
+replacements and an added three-line exact before/after pin check. Bash syntax
+passes; launch/project/start/receipt targets were absent and non-symlink, TMPDIR
+was writable and about 47 GiB was available on the non-/tmp filesystem.
+
+One actual functional vendor run is approved for that owner and the exact
+65-file `7adf2efa` preparation, R/D/S/C/K/M/P=1111111, extras=1, 175 MHz,
+QUICK_MUTATION=0. The implementation agent owns its original process through
+terminal completion. No retry, source edit, synthesis, routing or radio action
+is authorized. The owner preserves tool failure plus post-source/IP/receipt
+audits, and success still requires all four unchanged complete numerical CSVs
+and every old/new terminal gate. Approval is not a passing result.
+
+The reviewed preparation/evidence is pushed to the separate DNM remotes at FW
+`b187e467e948362500e531935f9fd92756aa1b22` / HDL
+`420606aa1cd7e7691332387782a894fc88cda7d7`. Parent verified its seven-member
+committed outer closure, manifest
+`f3d5631fb84b00289a969de32bc3396df0882288537615e90f6d52a742be043e`.
+This is archive integrity, not an independent inner-tar or new behavioral pass.
