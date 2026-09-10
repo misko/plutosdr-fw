@@ -227,3 +227,151 @@ def test_no_unavailable_packet_read_or_runtime_force():
     assert "#0.001; // Observe the scheduler's same-edge NBA branch" in checks
     assert "expired_fast_handshake_witness != 1" in checks
     assert "expired_pilot_accepts < 1" in checks
+
+
+COEFFICIENT_STATES = {
+    "STATE_IDLE": 0, "STATE_COEFFICIENT_ENERGY": 1,
+    "STATE_COEFFICIENT_CHECK": 2, "STATE_COEFFICIENT_COPY": 3,
+    "STATE_COEFFICIENT_COPY_FINISH": 9, "STATE_COEFFICIENT_ENERGY_FLUSH": 10,
+}
+
+
+def configuration_guard():
+    return re.search(r"  task automatic native_configuration_guard;.*?  endtask",
+                     CHECKS.read_text(), re.DOTALL).group()
+
+
+def test_configuration_names_match_actual_rtl_and_all_other_guards_unconditional():
+    rtl = (ROOT / "hdl/library/starlink_pss_raw_correlator/starlink_pss_sliding_correlator.v").read_text()
+    states = {name: int(value) for name, value in re.findall(
+        r"localparam \[3:0\] (STATE_\w+)\s*= 4'd(\d+);", rtl)}
+    guard = configuration_guard()
+    assert {name: states[name] for name in set(re.findall(r"STATE_\w+", guard))} == COEFFICIENT_STATES
+    assert "assign o_busy = (state != STATE_IDLE);" in rtl
+    assert "else if (i_coefficient_commit && o_coefficient_commit_ready) begin\n            state <= STATE_COEFFICIENT_ENERGY;" in rtl
+    checks = CHECKS.read_text()
+    task = checks.split("task automatic native_empty;", 1)[1].split("endtask", 1)[0]
+    condition = task.split("if (", 1)[1].split(") begin", 1)[0]
+    expected = ["native_injected", "native_irq", "native.result_available", "native.result_word_read",
+                "native.result_release", "native.candidate_command_overrun_count",
+                "native.coefficient_write_overrun_count", "native.queue_overrun_count",
+                "native.engine_consumed_count", "native.correlator_bound_error_count",
+                "native.reducer_processed_job_count", "native.reducer_emitted_result_count",
+                "native.reducer_invalid_tuple_count", "native.reducer_bound_error_count",
+                "native.reducer_protocol_error_count", "native.result_published_count",
+                "native.result_overrun_count", "native.result_consumed_count"]
+    assert condition.split() == " || ".join(f"{name} !== 0" for name in expected).split()
+    assert task.index("native_configuration_guard();") > task.index('fail("expired request unexpectedly')
+    for anchor, end in (("if (`EN_SCHED.command_handshake) begin", "expired_sample_handshakes ="),
+                        ("if (native.up_wreq", "expired_public_submits =")):
+        event = checks.split(anchor, 1)[1].split(end, 1)[0]
+        for name in ("native_configured", "source_enable", "sample_strobe"):
+            assert f"{name} !== 1'b1" in event
+
+
+@pytest.mark.parametrize("mutation", [None, "extra_state", "busy_off", "unknown_config", "unknown_state",
+                                     "unknown_source", "unknown_strobe", "postcommit_state", "postcommit_busy"])
+def test_executed_configuration_guard_four_state_matrix(tmp_path, mutation):
+    """Execute the exact extracted test task; no receiver/vendor clocks run."""
+    task = configuration_guard()
+    replacements = {
+        "extra_state": ("STATE_COEFFICIENT_COPY_FINISH:", "STATE_COEFFICIENT_COPY_FINISH,\n        `EN_RAW.i_sliding_correlator.STATE_SAMPLE_ENERGY:"),
+        "busy_off": ("`EN_RAW.correlator_busy !== 1'b1", "1'b0"),
+        "unknown_config": ("native_configured === 1'b0", "native_configured !== 1'b1"),
+        "unknown_state": ("case (", "casez ("),
+        "unknown_source": ("source_enable !== 1'b0", "source_enable != 1'b0"),
+        "unknown_strobe": ("sample_strobe !== 1'b0", "sample_strobe != 1'b0"),
+        "postcommit_state": ("`EN_RAW.i_sliding_correlator.state !== `EN_RAW.i_sliding_correlator.STATE_IDLE", "1'b0"),
+        "postcommit_busy": ("`EN_RAW.correlator_busy !== 1'b0)\n        fail(\"expired configured", "1'b0)\n        fail(\"expired configured"),
+    }
+    if mutation:
+        old, new = replacements[mutation]
+        assert task.count(old) == 1
+        task = task.replace(old, new)
+    task = task.replace("`EN_RAW.i_sliding_correlator.", "").replace("`EN_RAW.correlator_busy", "busy")
+    rtl = (ROOT / "hdl/library/starlink_pss_raw_correlator/starlink_pss_sliding_correlator.v").read_text()
+    definitions = "\n".join(re.findall(r"  localparam \[3:0\] STATE_\w+\s*= 4'd\d+;", rtl))
+    program = """module guard_matrix;
+reg native_configured, source_enable, sample_strobe, busy;
+reg [3:0] state;
+reg choices [0:3];
+integer c, s, b, e, v, failures, total;
+reg expected;
+task automatic fail(input [1023:0] message); failures = failures + 1; endtask
+""" + definitions + "\n" + task + """
+initial begin
+  choices[0]=0; choices[1]=1; choices[2]=1'bx; choices[3]=1'bz; total=0;
+  for(c=0;c<4;c=c+1) for(s=0;s<18;s=s+1) for(b=0;b<4;b=b+1)
+    for(e=0;e<4;e=e+1) for(v=0;v<4;v=v+1) begin
+      native_configured=choices[c]; busy=choices[b]; source_enable=choices[e]; sample_strobe=choices[v];
+      if(s==16) state=4'bxxxx; else if(s==17) state=4'bzzzz; else state=s;
+      expected=((c==0 && e==0 && v==0 && (s==0 || s==1 || s==2 || s==3 || s==9 || s==10) && b==(s==0 ? 0:1)) ||
+                (c==1 && s==0 && b==0));
+      failures=0; native_configuration_guard();
+      if((failures==0) !== expected) $fatal(1,"CONFIG_GUARD_MATRIX_MISMATCH c=%0d s=%0d b=%0d e=%0d v=%0d",c,s,b,e,v);
+      total=total+1;
+    end
+  if(total != 4608) $fatal(1,"bad matrix inventory");
+  $display("CONFIG_GUARD_MATRIX_PASS cases=4608 exact_task=1 product_simulation=0"); $finish;
+end
+endmodule
+"""
+    source = tmp_path / "guard.sv"; source.write_text(program)
+    binary = tmp_path / "guard.vvp"
+    subprocess.run(["iverilog", "-g2012", "-s", "guard_matrix", "-o", str(binary), str(source)],
+                   text=True, capture_output=True, check=True, timeout=15)
+    result = subprocess.run(["vvp", str(binary)], text=True, capture_output=True, check=False, timeout=15)
+    assert (result.returncode == 0) == (mutation is None), result.stdout + result.stderr
+    assert ("CONFIG_GUARD_MATRIX_PASS cases=4608" in result.stdout) == (mutation is None)
+
+
+def compose_expired(bench, checks, tmp_path):
+    original = tmp_path / "input.sv"; original.write_text(bench)
+    include = tmp_path / "checks.svh"; include.write_text(checks)
+    return tcl(f"source {{{HELPER}}}\nset f [open {{{original}}}]; set b [read $f]; close $f\n"
+               f"set f [open {{{include}}}]; set c [read $f]; close $f\n"
+               'if {[catch {prepare_expired_paired_bench $b $c} e]} {puts stderr $e; exit 2} else {puts -nonewline $e}\n')
+
+
+def test_negative_declaration_order_inverse_and_offline_compile(inputs, tmp_path):
+    cohort, contract = inputs
+    run = tmp_path / "run"
+    result = probe([run, cohort / "score", cohort / "pilot", cohort / "native", contract, 175, oracle.PROFILE])
+    assert result.returncode == 2 and result.stderr.strip() == "ADMITTED"
+    frozen = run / "frozen_sources"
+    bench_path = frozen / "tb_starlink_bank_native_expired.sv"
+    bench = bench_path.read_text()
+    declaration = "  reg source_enable = 0;"
+    assert bench.count(declaration) == 1 and bench.index(declaration) < bench.index(".sample_enable(source_enable)")
+    # Reverse only declaration relocation and module rename. The original
+    # healthy composition with the same negative checks stays byte-identical.
+    inverse = bench.replace(declaration + "\n  reg sample_strobe = 0;", "  reg sample_strobe = 0;")
+    inverse = inverse.replace("  localparam [31:0] NATIVE_GENERATION = 32'h15000002;\n\n",
+                              "  localparam [31:0] NATIVE_GENERATION = 32'h15000002;\n" + declaration + "\n")
+    inverse = inverse.replace("module tb_starlink_bank_native_expired #(", "module tb_starlink_bank_native_paired #(")
+    base_path = ACQ / "tb/tb_starlink_pss_paired_realtime_psma_stop.sv"
+    legacy = tcl(f"source {{{ACQ / 'prepare_bank_native_paired.tcl'}}}\n"
+                 f"set f [open {{{base_path}}}]; set b [read $f]; close $f\n"
+                 f"set f [open {{{CHECKS}}}]; set c [read $f]; close $f\n"
+                 'puts -nonewline [prepare_native_paired_bench $b $c]\n')
+    assert legacy.returncode == 0 and inverse == legacy.stdout
+    command = ["iverilog", "-g2012", "-Wimplicit", "-i", "-tnull", "-s", "tb_starlink_bank_native_expired",
+               "-Ptb_starlink_bank_native_expired.MAP_BINS=447", "-Ptb_starlink_bank_native_expired.USE_BANK_OWNED_XFFT=1",
+               "-Ptb_starlink_bank_native_expired.FAST_MHZ=175", *map(str, sorted(frozen.glob("*.v"))), str(bench_path)]
+    compiled = subprocess.run(command, text=True, capture_output=True, check=False, timeout=30)
+    assert compiled.returncode == 0, compiled.stderr
+    assert "source_enable" not in compiled.stderr, compiled.stderr
+    # Compile/elaboration-only; -i ignores the absent generated FFT.
+
+
+@pytest.mark.parametrize("anchor", ["  reg source_enable = 0;", "  reg sample_strobe = 0;"])
+@pytest.mark.parametrize("mutation", ["missing", "duplicate"])
+def test_negative_declaration_single_anchor_fail_closed(tmp_path, anchor, mutation):
+    base = (ACQ / "tb/tb_starlink_pss_paired_realtime_psma_stop.sv").read_text()
+    checks = CHECKS.read_text()
+    if anchor in checks:
+        checks = checks.replace(anchor, "" if mutation == "missing" else anchor + "\n" + anchor)
+    else:
+        base = base.replace(anchor, "" if mutation == "missing" else anchor + "\n" + anchor)
+    result = compose_expired(base, checks, tmp_path)
+    assert result.returncode == 2 and "anchor missing or duplicated" in result.stderr
