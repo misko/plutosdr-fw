@@ -30,6 +30,36 @@ def test_literal_seven_module_inverse_and_actual_stimulus_unchanged():
     assert (ACQ / name).read_text() == frozen(name)
 
 
+def test_compatibility_composition_leaves_entire_prior_python_bodies_literal():
+    additions = {
+        "forward_retirement_contract.py": [
+            ("\nfrom tests.starlink_oracle.exact_control_contract import restore_exact_control\n", ""),
+            (('    if "parameter integer DISTRIBUTED_FAST_FAULT" in source:\n'
+              '        source = restore_exact_control(source, "fft_bank_owned_slice")\n'), ""),
+        ],
+        "payload_bubble_contract.py": [
+            ("from tests.starlink_oracle.exact_control_contract import restore_exact_control\n", ""),
+            (('    if "parameter integer PRIVATE_NEXT_START_SCRATCH" in source:\n'
+              '        source = restore_exact_control(source, kind)\n'), ""),
+        ],
+        "test_forward_retirement.py": [
+            ("from tests.starlink_oracle.exact_control_contract import restore_exact_control\n", ""),
+            (('        assert restore_exact_control((ACQ / name).read_text(),\n'
+              '            name.removeprefix("starlink_pss_").removesuffix(".v")) == frozen(name)\n'),
+             '        assert (ACQ / name).read_text() == frozen(name)\n'),
+        ],
+    }
+    for name, changes in additions.items():
+        source = Path(__file__).with_name(name).read_text()
+        for new, old in changes:
+            assert source.count(new) == 1
+            source = source.replace(new, old, 1)
+        baseline = subprocess.run(["git", "-C", str(HDL.parent), "show",
+            f"01c89ea07ab7b55cb03ee1e7a9a9e3333b1071c2:tests/starlink_oracle/{name}"],
+            capture_output=True, text=True, check=True, timeout=10).stdout
+        assert source == baseline
+
+
 STUB = """module starlink_pss_fft512_bfp18_rt_candidate (
 input aclk, aresetn, input [7:0] s_axis_config_tdata, input s_axis_config_tvalid,
 output s_axis_config_tready, input [47:0] s_axis_data_tdata, input s_axis_data_tvalid,

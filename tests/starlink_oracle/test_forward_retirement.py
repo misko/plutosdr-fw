@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from tests.starlink_oracle.exact_control_contract import restore_exact_control
 from tests.starlink_oracle.forward_retirement_contract import (
     FORWARD_BODY,
     restore_forward_actual,
@@ -35,7 +36,8 @@ def test_literal_whole_guard_wrapper_and_frozen_old_guard_inverse():
     assert restore_forward_wrapper((ACQ / wrapper).read_text()) == frozen(wrapper)
     for name in ("block_mailbox", "realtime_input_guard", "forward_kernel_join", "kernel_rom", "spectrum_product"):
         name = f"starlink_pss_{name}.v"
-        assert (ACQ / name).read_text() == frozen(name)
+        assert restore_exact_control((ACQ / name).read_text(),
+            name.removeprefix("starlink_pss_").removesuffix(".v")) == frozen(name)
 
 
 def test_actual_all_old_stimulus_shadow_assertions_and_csv_operations_literal():

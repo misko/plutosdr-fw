@@ -1,6 +1,8 @@
 """Literal inverse of the additive forward-only certified retirement output."""
 import re
 
+from tests.starlink_oracle.exact_control_contract import restore_exact_control
+
 
 def once(source, new, old=""):
     assert source.count(new) == 1, new
@@ -47,6 +49,8 @@ def restore_forward_guard(source):
 
 
 def restore_forward_wrapper(source):
+    if "parameter integer DISTRIBUTED_FAST_FAULT" in source:
+        source = restore_exact_control(source, "fft_bank_owned_slice")
     source = once(source, "  wire forward_retirement_valid;\n")
     source = once(source, '''    .USE_PREFLIGHT_REASON_ONLY(REGISTERED_SCHEDULING),
     .USE_FORWARD_RETIREMENT(REGISTERED_SCHEDULING)) result_guard''',

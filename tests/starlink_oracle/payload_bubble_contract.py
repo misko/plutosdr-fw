@@ -1,4 +1,5 @@
 """Exact inverses of the data-only enables and both full ROM equalities."""
+from tests.starlink_oracle.exact_control_contract import restore_exact_control
 from tests.starlink_oracle.forward_retirement_contract import restore_forward_wrapper
 from tests.starlink_oracle.input_identity_contract import tokens
 
@@ -19,6 +20,8 @@ def restore_payload_wrapper(source):
 
 
 def restore_payload_module(source, kind):
+    if "parameter integer PRIVATE_NEXT_START_SCRATCH" in source:
+        source = restore_exact_control(source, kind)
     source = tokens(source)
     if kind in {"forward_kernel_join", "spectrum_product"}:
         source = once(source, ",parameterintegerPRIVATE_PAYLOAD_BUBBLES=0")
