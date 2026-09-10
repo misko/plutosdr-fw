@@ -31,6 +31,10 @@ def test_entire_cursor_delta_preserves_all_public_checks_and_frozen_reference():
     alias_assign = "assignduplicate_start_fault_now=duplicate_start;"
     assert candidate.count(alias_port) == candidate.count(alias_assign) == 1
     candidate = candidate.replace(alias_port, "", 1).replace(alias_assign, "", 1)
+    event_port = "outputwire[2:0]fault_events_now,"
+    event_assign = "assignfault_events_now=errors_now;"
+    assert candidate.count(event_port) == candidate.count(event_assign) == 1
+    candidate = candidate.replace(event_port, "", 1).replace(event_assign, "", 1)
     private = ("if(slot_open&&input_enable&&input_valid&&core_input_tready&&expected_position!=511)"
                "expected_position<=expected_position+1'b1;")
     assert candidate.count(private) == 1
