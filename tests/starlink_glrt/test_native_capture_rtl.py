@@ -53,6 +53,40 @@ def test_refinement_image_preserves_blind_reference_iq_scores_and_irq(captures, 
     check_reference_events(60000000, lambda rate: captures(rate, native=True), tmp_path)
 
 
+def test_coarse_stop_clear_then_exact_native_start_preserves_source_coordinates(captures, tmp_path):
+    # A varying source makes a rebase, displaced pilot or wrong DMA prefix
+    # observable. This is coordinate/arithmetic evidence, not RF acquisition.
+    start = 40000
+    rows = [(0, 11, 0, 3, 1), write(8, 4), wait(2000),
+        write(0x20, 31), write(0x30, 128), write(8, 1), wait(12000),
+        write(8, 2), *snapshot(), write(8, 4), wait(500), *native_config(),
+        write(0x418, start), write(0x41c, 0), write(0x408, 1), wait(220000),
+        *native_head(), *native_finish()]
+    output, reads, final = run(
+        captures(60000000, continuous=True, native=True, legacy=False, schedule=True),
+        rows, tmp_path)
+    coarse = dict(reads[:65])
+    assert u64(coarse, 0x90) == u64(coarse, 0x98) == 128
+    assert coarse[0xc8] == 0
+    header = [value for address, value in reads if 0x600 <= address < 0x680]
+    decoded = NativeResult.decode(struct.pack("<32I", *header))
+    decoded.require_complete()
+    assert decoded.start == start
+    assert len(output) == 128 + 79200
+    expected = []
+    for index in range(start, start + 79200):
+        pair = ((index*73+19) & 65535, (index & 65535) ^ 0xa5a5)
+        expected.append(tuple(value if value < 32768 else value-65536 for value in pair))
+    assert output[128:] == expected
+    original = b"".join(struct.pack("<hh", *value) for value in output[128:])
+    decoded.require_native_evidence(received_bytes=len(original), expected_tag=17,
+                                    expected_start=start)
+    replay = verify_original_iq(decoded, original,
+        (BANK_ROOT/"native_cubic_60000000_upper.mem").read_bytes())
+    assert replay["exact_integer_match"] and not replay["precision_qualified"]
+    assert dict(reads)[0x410] == 0 and final == (0, 0)
+
+
 @pytest.mark.parametrize("legacy", [True, False])
 def test_full_native_dma_uses_original_60m_coordinates_and_returns_to_base(captures, tmp_path, legacy):
     rows = [(0, 11, 0, 3, 0), wait(2000), *native_config(), (0, 14, 0, 6000, 0), wait(150000),
