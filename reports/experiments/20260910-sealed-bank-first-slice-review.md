@@ -115,3 +115,35 @@ failure is to be retained separately from the corrected standalone tests.
 The additional issuer/reset bookkeeping must enter the eventual full resource
 and latency budget; the controller's conditional interface alone is not an
 end-to-end lease freshness or CDC proof.
+
+## Revised standalone review (13:39 UTC)
+
+The independent read-only reviewer found no additional RTL safety counterexample
+under the explicitly conditional issuer contracts in RTL
+`d9c2382f9087ccd2088fa5a5d3fed5c6fe885359d6d4c367ed2ea81ce099d9f6`.
+Exact-next payload and certificate offers can now survive old release; early
+certificates are pinned to immutable first-word metadata. Unknown offer controls
+veto publication, and missing-status testing uses an external 8,192-cycle issuer.
+The wide payload checks now actually pass through leaf/group registers; this is
+a source-level timing cut, not a physical pass.
+
+Two test-strength gaps were identified before independent qualification:
+
+- The receipt model accepted a terminal-only negative case with no stimulus or
+  rejection evidence. Parent reproduced this with case 7 and model
+  `3fe32d1e59c25f3c496b0f19413b2809e3e07826cc25bc251c33d4512bbd1545`.
+  Case-specific event inventories and removed-event mutations are required.
+- The stalled-output check only tested an unchanged tuple when current VALID
+  remained high. It must also reject a healthy one-cycle VALID withdrawal while
+  stalled, except for a genuine reset or current/sticky quarantine event.
+
+These are verifier/bench gaps, not observed failures of the current RTL.
+The implementation agent's 476-test pass remains standalone evidence pending
+these corrections, source freeze, and parent repeat. Earlier failed test attempts
+remain retained rather than replaced by the later count.
+
+Parent independently counted 317 declared logical register bits: 222 reused
+payload/reader metadata/cursor bits and 95 control/check bits, plus the same
+18,432-bit payload RAM. The 95-bit control subtotal is not a mapped resource
+measurement or a net FF increase versus all old mailbox controls. External
+issuer and eventual cross-clock adapter state is not included.
