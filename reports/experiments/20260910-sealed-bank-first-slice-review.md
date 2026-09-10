@@ -205,3 +205,48 @@ oracle; the other cases terminate with their retained simulator fatal evidence.
 The initial archive classifier incorrectly required every mutant to abort the
 simulator; that packaging attempt is preserved separately. No RTL or test result
 was changed to repair that classification.
+
+## First dual-clock composition review: still unqualified
+
+New draft files are `starlink_pss_epoch_sealed_bank_cdc.v`,
+`starlink_pss_inverse_sealed_issuer.v` and
+`starlink_pss_fft_bank_owned_inverse_sealed_probe.v`. The opt-in is
+`SEALED_INVERSE_OUTPUT`; old standalone and L1 source bytes remain the reference.
+Reviews identified these implementation-specific requirements before acceptance:
+
+- Bind the payload and certificate lease to an actual admitted inverse job,
+  before its first return. The initial self-tagging draft compared live bank
+  lease to itself. The revised issuer now captures a held admission lease and
+  rejects unowned returns; this is source review, not yet composition evidence.
+- Keep reservation through the accepted-job/preflight receipt window distinct
+  from bank availability. Setting producer ownership drops `reusable`, while
+  the L1 scheduler remains in ARM_JOB for its admission receipt edge. Feeding
+  that free-bank signal straight back into live reservation falsely quarantines
+  a healthy job. The exact admission and following two edges need tests.
+- Prove the complete guard/issuer admission-publication graph has no
+  combinational feedback, including the new bad-admission current cause. Phase
+  exclusivity alone is not a structural no-loop measurement.
+- Preserve the source-reader and source-fault synchronization reset barrier
+  until a fresh slow purge acknowledgement. The inherited hazard and an
+  independently tested prototype are recorded in
+  [the paused-source diagnostic](20260910-paused-source-reset.md).
+
+The registered slow-idle receipt adds a real slow edge after final read, then
+two fast synchronization edges; its latency must enter the measured budget.
+Initially, S1/S2 qualify the slow reset release and S3 may emit that fresh idle
+receipt. Fast rearm follows synchronization, not elapsed wall time. A paused
+slow clock before S3 must not admit an old source block. A full legitimate new
+forward source must not prevent inverse-reference idleness.
+
+Existing slow-fault visibility is not instantaneous: with fast fault already
+high before the first resumed slow sampling edge S1, transfers may occur on S1
+and S2; none may occur at S3. Thus a paused 17-word prefix can reach 19, and a
+510-word prefix can reach 512 with failed health. Even then the fast issuer must
+refuse release. Tests must anchor sampled pre-edge values, especially with
+coincident clock edges, rather than retroactively invalidating accepted words.
+
+In parallel, the ROM worktree is implementing a separate offline producer-final
+fence experiment targeting its measured product-publication path. It retains
+all active input checks, global reasons and ACK/ownership validation; it is not
+automatically composed with this inverse-only controller. Neither draft has
+authorization for a vendor build or radio deployment.

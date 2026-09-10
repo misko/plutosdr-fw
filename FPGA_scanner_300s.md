@@ -22,6 +22,12 @@ controller independently passes 526 standalone tests; a source-specific inverse
 adapter and dual-clock bank are the next offline composition, not yet a timing
 or receiver result. See
 [first-slice scope](reports/experiments/20260910-sealed-bank-first-slice-review.md).
+Integration review additionally reproduced an inherited paused-slow-clock reset
+hazard: a stale source request can leave an old prefetched word after the producer
+finally purges. An independent remote-purge barrier prototype passes four fresh
+recovery cases and rejects both barrier-disabled controls. The actual new
+dual-clock/issuer/top composition must still pass those scenarios; see
+[reset diagnostic and prototype](reports/experiments/20260910-paused-source-reset.md).
 No runtime promotion or radio
 operation followed. See [storage recovery and new routing evidence](reports/experiments/20260910-build-storage-recovery.md).
 
