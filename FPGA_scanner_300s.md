@@ -2,6 +2,14 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Latest logger isolation (2026-09-10): parent runs12 tiny actual XSim cases.
+All four conditional-string calls kernel-crash; all eight literal/explicit-if
+cases emit exact expected rows. No FFT/runtime is involved. Parent also proves
+the frozen parser misses the underscored FATAL_ERROR marker in an otherwise
+complete log; current incomplete actual attempt was still correctly rejected.
+Two-site logging-only correction and stricter fatal-marker rejection are next.
+See [minimal logger reproduction](reports/experiments/20260910-retained-logger-repro-parent.md).
+
 Latest actual correction (2026-09-10): the two-edit completion declaration fix
 passes independent155 preparation tests and actual compilation. Vendor43908
 passes startup, admits job1 at cycle934, then suffers an XSim kernel crash in
