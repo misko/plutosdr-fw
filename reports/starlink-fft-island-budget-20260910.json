@@ -1,0 +1,1021 @@
+{
+  "schema": "isolated-fft-island-trace-budget-v1",
+  "reference_hashes": {
+    "samples_ci16": "4abe27ba953cf49f84d9979966625a2436ad59359b616321e881b42dd4c84723",
+    "forward_q17": "d934a8ecd0888c294fc0abfbdbe7c439bff7097ea169b937638c4b7000479bfd",
+    "product_q17": "b316522a68529a73d3d8e4121badea61e24621c93a97365e894f5bd416bcecb7",
+    "inverse_q17": "c8c5b4e28ab621d0b1d5c1dc288f6e66495b3319d348442ce5d7b8f6ea8025a1",
+    "forward_exponents": "18ac6df6a1ae3f19e5153524b33f336a60eabdd6dbd182d46c43450302e4b52f",
+    "inverse_exponents": "899b7a2486fd3759c6e4905110fc4d86ffdb6ec884da2a7f2aca4acdfd363dff"
+  },
+  "measurement": {
+    "trace_sha256": "5ce67c392baf0840fad08ef0718772bea4ccffbcb16c0cc0328aad27f69388c7",
+    "log_sha256": "6a48a8d5310e2947b304b16c76ce4986d27abb1c13afcbdc423e286e05dcdd08",
+    "actual_clock_hz": 200000000,
+    "nominal_observed_max_start_interval_cycles": 5182,
+    "nominal_first_output_offset_cycles": 4664,
+    "blocks": [
+      {
+        "case": 1,
+        "profile": 0,
+        "fixture": 0,
+        "first_input": 29,
+        "last_output": 5204,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 545,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 2879,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 2,
+        "profile": 0,
+        "fixture": 1,
+        "first_input": 5211,
+        "last_output": 10386,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 5727,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 8061,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 3,
+        "profile": 0,
+        "fixture": 2,
+        "first_input": 10393,
+        "last_output": 15568,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 10909,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 13243,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 4,
+        "profile": 0,
+        "fixture": 0,
+        "first_input": 15575,
+        "last_output": 20750,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 16091,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 18425,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 5,
+        "profile": 0,
+        "fixture": 1,
+        "first_input": 20757,
+        "last_output": 25932,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 21273,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 23607,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 6,
+        "profile": 0,
+        "fixture": 2,
+        "first_input": 25939,
+        "last_output": 31114,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 26455,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 28789,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 7,
+        "profile": 1,
+        "fixture": 0,
+        "first_input": 31149,
+        "last_output": 36836,
+        "inclusive_cycles": 5688,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 31665,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 33999,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4665,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 8,
+        "profile": 1,
+        "fixture": 1,
+        "first_input": 36843,
+        "last_output": 42530,
+        "inclusive_cycles": 5688,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 37359,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 39693,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4665,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 9,
+        "profile": 1,
+        "fixture": 2,
+        "first_input": 42537,
+        "last_output": 48224,
+        "inclusive_cycles": 5688,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 43053,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 45387,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4665,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 10,
+        "profile": 1,
+        "fixture": 0,
+        "first_input": 48231,
+        "last_output": 53918,
+        "inclusive_cycles": 5688,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 48747,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 51081,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4665,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 11,
+        "profile": 1,
+        "fixture": 1,
+        "first_input": 53925,
+        "last_output": 59612,
+        "inclusive_cycles": 5688,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 54441,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 56775,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4665,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 12,
+        "profile": 1,
+        "fixture": 2,
+        "first_input": 59619,
+        "last_output": 65306,
+        "inclusive_cycles": 5688,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 60135,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 62469,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4665,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 13,
+        "profile": 2,
+        "fixture": 0,
+        "first_input": 65341,
+        "last_output": 71460,
+        "inclusive_cycles": 6120,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 65977,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 68311,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4785,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 14,
+        "profile": 2,
+        "fixture": 1,
+        "first_input": 71467,
+        "last_output": 77590,
+        "inclusive_cycles": 6124,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 72103,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 74437,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4785,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 15,
+        "profile": 2,
+        "fixture": 2,
+        "first_input": 77597,
+        "last_output": 83716,
+        "inclusive_cycles": 6120,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 78233,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 80567,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4785,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 16,
+        "profile": 2,
+        "fixture": 0,
+        "first_input": 83723,
+        "last_output": 89846,
+        "inclusive_cycles": 6124,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 84359,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 86693,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4785,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 17,
+        "profile": 2,
+        "fixture": 1,
+        "first_input": 89853,
+        "last_output": 95974,
+        "inclusive_cycles": 6122,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 90489,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 92823,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4787,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 18,
+        "profile": 2,
+        "fixture": 2,
+        "first_input": 95981,
+        "last_output": 102104,
+        "inclusive_cycles": 6124,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 96617,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 98951,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4785,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 20,
+        "profile": 0,
+        "fixture": 2,
+        "first_input": 102719,
+        "last_output": 107894,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 103235,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 105569,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 22,
+        "profile": 0,
+        "fixture": 2,
+        "first_input": 108509,
+        "last_output": 113684,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 109025,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 111359,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 24,
+        "profile": 0,
+        "fixture": 2,
+        "first_input": 116633,
+        "last_output": 121808,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 117149,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 119483,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 26,
+        "profile": 0,
+        "fixture": 2,
+        "first_input": 124757,
+        "last_output": 129932,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 125273,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 127607,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      },
+      {
+        "case": 31,
+        "profile": 0,
+        "fixture": 2,
+        "first_input": 140243,
+        "last_output": 145418,
+        "inclusive_cycles": 5176,
+        "jobs": [
+          {
+            "inverse": 0,
+            "admit_cycle": 140759,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          },
+          {
+            "inverse": 1,
+            "admit_cycle": 143093,
+            "admit_to_config": 2,
+            "config_to_first_input": 2,
+            "input_transfer_span": 513,
+            "last_input_to_first_output": 781,
+            "output_transfer_span": 512,
+            "status_from_admission": 1299,
+            "last_output_to_commit": 1,
+            "admission_to_commit": 1809
+          }
+        ],
+        "first_output_offset": 4664,
+        "forward_to_inverse_admission": 2334
+      }
+    ],
+    "universal_latency_bound_proved": false
+  },
+  "added_outer_banks": {
+    "ingress_words": 512,
+    "egress_words": 512,
+    "payload_width": 36,
+    "total_payload_bits": 36864,
+    "metadata_bits_at_least": 145,
+    "physically_measured_BRAM": false
+  },
+  "retained_internal_banks": {
+    "count": 2,
+    "words_each": 512,
+    "width": 36
+  },
+  "CDC_assumptions": {
+    "request_to_readable_destination_cycles": 4,
+    "final_read_to_ACK_source_cycles": 3,
+    "slow_hz": 100000000,
+    "energy_lookup_extra_slow_cycles": 8
+  },
+  "estimates": [
+    {
+      "fast_hz": 150000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 0,
+      "egress_stall_slow_cycles_per_block": 0,
+      "nominal_island_us": 34.54666666666667,
+      "block_budget_us": 29.8,
+      "island_slack_us": -4.746666666666666,
+      "maximum_start_backlog_us": 19437.6,
+      "final_start_backlog_us": 19437.6,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 292617,
+      "first_energy_expiry_block": 14,
+      "maximum_pending_input_blocks": 653,
+      "sustained_under_declared_model": false
+    },
+    {
+      "fast_hz": 150000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 0,
+      "egress_stall_slow_cycles_per_block": 1000,
+      "nominal_island_us": 34.54666666666667,
+      "block_budget_us": 29.8,
+      "island_slack_us": -4.746666666666666,
+      "maximum_start_backlog_us": 19437.6,
+      "final_start_backlog_us": 19437.6,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 292767,
+      "first_energy_expiry_block": 12,
+      "maximum_pending_input_blocks": 653,
+      "sustained_under_declared_model": false
+    },
+    {
+      "fast_hz": 150000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 64,
+      "egress_stall_slow_cycles_per_block": 0,
+      "nominal_island_us": 34.973333333333336,
+      "block_budget_us": 29.8,
+      "island_slack_us": -5.173333333333334,
+      "maximum_start_backlog_us": 21184.8,
+      "final_start_backlog_us": 21184.8,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 318831,
+      "first_energy_expiry_block": 13,
+      "maximum_pending_input_blocks": 712,
+      "sustained_under_declared_model": false
+    },
+    {
+      "fast_hz": 175000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 0,
+      "egress_stall_slow_cycles_per_block": 0,
+      "nominal_island_us": 29.611428571428572,
+      "block_budget_us": 29.8,
+      "island_slack_us": 0.18857142857142856,
+      "maximum_start_backlog_us": 0.0,
+      "final_start_backlog_us": 0.0,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 979,
+      "first_energy_expiry_block": null,
+      "maximum_pending_input_blocks": 1,
+      "sustained_under_declared_model": true
+    },
+    {
+      "fast_hz": 175000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 0,
+      "egress_stall_slow_cycles_per_block": 1000,
+      "nominal_island_us": 29.611428571428572,
+      "block_budget_us": 29.8,
+      "island_slack_us": 0.18857142857142856,
+      "maximum_start_backlog_us": 0.0,
+      "final_start_backlog_us": 0.0,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 1129,
+      "first_energy_expiry_block": null,
+      "maximum_pending_input_blocks": 1,
+      "sustained_under_declared_model": true
+    },
+    {
+      "fast_hz": 175000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 64,
+      "egress_stall_slow_cycles_per_block": 0,
+      "nominal_island_us": 29.97714285714286,
+      "block_budget_us": 29.8,
+      "island_slack_us": -0.17714285714285713,
+      "maximum_start_backlog_us": 725.4,
+      "final_start_backlog_us": 725.4,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 11865,
+      "first_energy_expiry_block": 401,
+      "maximum_pending_input_blocks": 25,
+      "sustained_under_declared_model": false
+    },
+    {
+      "fast_hz": 200000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 0,
+      "egress_stall_slow_cycles_per_block": 0,
+      "nominal_island_us": 25.91,
+      "block_budget_us": 29.8,
+      "island_slack_us": 3.89,
+      "maximum_start_backlog_us": 0.0,
+      "final_start_backlog_us": 0.0,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 923,
+      "first_energy_expiry_block": null,
+      "maximum_pending_input_blocks": 1,
+      "sustained_under_declared_model": true
+    },
+    {
+      "fast_hz": 200000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 0,
+      "egress_stall_slow_cycles_per_block": 1000,
+      "nominal_island_us": 25.91,
+      "block_budget_us": 29.8,
+      "island_slack_us": 3.89,
+      "maximum_start_backlog_us": 0.0,
+      "final_start_backlog_us": 0.0,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 1073,
+      "first_energy_expiry_block": null,
+      "maximum_pending_input_blocks": 1,
+      "sustained_under_declared_model": true
+    },
+    {
+      "fast_hz": 200000000,
+      "blocks": 4096,
+      "extra_island_cycles_per_block": 64,
+      "egress_stall_slow_cycles_per_block": 0,
+      "nominal_island_us": 26.23,
+      "block_budget_us": 29.8,
+      "island_slack_us": 3.5700000000000003,
+      "maximum_start_backlog_us": 0.0,
+      "final_start_backlog_us": 0.0,
+      "maximum_egress_wait_us": 0.0,
+      "maximum_energy_age_samples": 928,
+      "first_energy_expiry_block": null,
+      "maximum_pending_input_blocks": 1,
+      "sustained_under_declared_model": true
+    }
+  ],
+  "physical_CDC_full_receiver_RF_qualified": false,
+  "source_rates_share_canonical_rate": [
+    15000000,
+    30000000,
+    60000000
+  ],
+  "numerical_scope": "unchanged upper-edge FFT/product/IFFT frozen vectors; no new scores or lower-edge evidence"
+}
