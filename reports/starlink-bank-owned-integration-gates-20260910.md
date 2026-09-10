@@ -19,10 +19,15 @@ partial-tile vendor-fault abort and exact map reads. See
 `experiments/20260910-bank-phase-map-replay.md`. Reduced 447-by-2 bank boundary
 stop also passes at 175/200 MHz, including exact AXI map reads, actual later FFT
 work in flight, source-tail shutdown and two negative stop cases; see
-`experiments/20260910-bank-boundary-stop-replay.md`. These do not establish
-publication-edge fault behavior, independent-domain restart,
-production map capacity or concurrent pilot/fine support; qualify these before
-exposing the selector through AXI/receiver packaging.
+`experiments/20260910-bank-boundary-stop-replay.md`. Eight additional reduced-map
+lifecycle cases now pass, including publication-boundary fault visibility,
+retained completed evidence and independent FFT reset; see
+`../docs/starlink-bank-map-lifecycle-20260910.md`. Paired digital-shell/canonical
+PSS plus independent pilot replay also passes at bank175/bank200/shared200 for
+447x2 and 343x2 maps; see `experiments/20260910-bank-paired-pilot-replay.md`.
+These do not establish production map capacity, arbitrary reset/CDC races,
+DMA/IIO receipt or concurrent native-fine support; qualify these before exposing
+the selector through AXI/receiver packaging.
 
 Keep the existing overlap scheduler,2048-entry energy cache, inverse output
 register,447-candidate extraction,512-entry result FIFO and normalization.

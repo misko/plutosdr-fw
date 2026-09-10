@@ -2,6 +2,35 @@
 
 ## Latest checkpoint: complete scorer and control-path counterevidence
 
+The map-lifecycle task below is complete at FW `b709f683` / HDL `1800c665`:
+eight actual175 cases, 7,560 exact scores and 3,129 exact map words. Root checked
+all 101 source/artifact hash receipts and integrated only additive tests/reports
+into the primary experimental branch. Both rejected v1 and successful v2 logs
+are archived in `experiments/20260910-bank-map-lifecycle.tgz`; see the original
+report in `../docs/starlink-bank-map-lifecycle-20260910.md`.
+
+The registered-scheduling study is frozen separately at FW `9b324979` / HDL
+`ba000e48`. Actual-core tests pass, but its single175 route fails setup -2.461 ns
+(hold +0.071 ns), with 1,935 LUTs, 4,540 FFs, 21 DSPs and 7.5 BRAM tiles.
+The worst path still runs from scheduling state through wide preparation
+validation into guard admission: 8.122 ns, including 5.492 ns routing. Root
+reviewed the report and preserved it on the completed-input-fence remote branch;
+no control-path variant has been merged into primary or deployed. The repaired
+exact-source tests pass 244 with eight explicit physical-test skips; the original
+239/8/3 stale-anchor result and failed route remain retained.
+
+The next separately opt-in experiment splits preflight from active fault
+handling. Raw preflight must still record its reason on the original edge and
+quarantine the epoch, but must not create a wide admission combinational path.
+An emitted start token must be suppressed even on the latest receipt-consume
+mismatch. All active fault/publication vetoes and bank retirement checks remain
+unchanged; exact status/orphan reason tests precede any new route. This is an
+implementation under test, not a timing fix claimed from the proposal.
+
+The original 4,096-block175 burst/stall soak remains active; its latest agent
+observation reached 1,554 blocks/694,638 ordered scores with FIFO maximum358 and
+no observed error. That partial count is not a terminal capacity PASS.
+
 An additional independent verification worktree was allocated after the
 read-only map integration review: `/tmp/starlink-coarse-alternatives.Y3JzOI/bank-map-lifecycle`,
 firmware and HDL branch `codex/starlink-rx-only-do-not-merge-bank-map-lifecycle`,
@@ -18,7 +47,7 @@ capacity at 175/200 MHz. Independent primary-branch 175 MHz numeric and stalled
 capacity runs also pass; see `experiments/20260910-bank-composition-primary-replay.md`.
 Whole-coarse synthesis measures 3,868 LUTs, 6,499 FFs, 27 DSPs and 14 BRAM tiles,
 with no black boxes. These are not routed receiver resource savings or a timing
-pass. A separately frozen 4,096-block soak is being prepared.
+pass. The separately frozen 4,096-block soak described above is running.
 
 The completed-input refactor is intentionally NOT merged into the primary HDL.
 Its first isolated route regresses from the original bank's -2.557 ns to
