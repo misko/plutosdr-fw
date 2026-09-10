@@ -24,12 +24,27 @@ Next timing cuts are independently checked offline: CDC actual preparation101
 PASS and local first-admission descriptor enable349 PASS. One frozen CDC
 R1D1S1C1/extras1/175 actual-core simulation now PASSES (original20091 terminal0,
 580.44s), with all four historical CSVs unchanged and independent CDC/status
-receipt verification. No new timing claim yet. The local-enable candidate is in
-offline actual-equivalence preparation, without a D/S/CDC combination. Their
+receipt verification. Its exact C1 synthesis now passes with zero black boxes,
+1986 LUTs/4500 FFs/21 DSPs/15 RAMB18s; the targeted CDC-10 finding is absent,
+but139 mailbox CDC warnings remain. Root independently verified all8 products
+and13 source/IP hashes. The unchanged-constraint diagnostic route completed
+(original49744 terminal0), but timing FAILS: island/global setup-1.830ns,
+653 global setup failures, hold+0.058ns. The worst path ends at the input
+descriptor capture enable; the CDC change alone does not close timing.
+The first local-enable actual
+attempt stopped before simulated traffic because its diagnostic lookup did not
+handle Vivado's escaped parameterized top name. The failed attempt is retained;
+the recorder-only correction independently passes143 tests with runtime,
+stimulus and numerical comparisons unchanged. Corrected frozen L1 actual14041
+now passes waveform discovery but fails its new155-bit observer at time zero,
+before healthy traffic. Initialization/event ordering is under read-only review;
+no comparison exception or D/S/CDC union is accepted. Their
 reviewed sources/evidence are pushed to their respective experimental DNM
 branches, not firmware main. The60 public bank/STOP/pilot interface independently
-passes660 tests; its combined common-source coarse/native/pilot harness is being
-prepared under a frozen no-tail numerical/service contract. No radios changed.
+passes660 tests; its combined common-source coarse/native/pilot harness passes311
+independent preparation/verifier tests under a frozen no-tail numerical/service
+contract. Full source review remains in progress; no combined60 vendor run or
+radio operation follows from the offline test counts.
 An additional isolated ROM read-ahead/last-visible-retention prototype passes149
 offline tests, including continuous512-beat traffic; it adds37 logical bits at
 D18 and no nominal cycles. All old visible coefficient/control fields compare

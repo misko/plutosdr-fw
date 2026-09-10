@@ -1509,3 +1509,109 @@ status and after-integrity on failure, original11 receipts/76 jobs/19456 ordered
 words per stream and historical candidate CSV e7127798. No L0 execution,
 D/S/CDC union, synthesis, route or radio operation follows automatically.
 No actual result is claimed by this preparation approval.
+
+## First local-enable actual: diagnostic failure before time advances
+
+Original22656 exited1,27.525s,11:10:48.649453 through11:11:16.174700 UTC.
+Parent read the exclusive owner wrapper, original terminal, outer log and
+simulation log. All45 sources plus manifest remain unchanged; after-integrity0.
+`simulate.log` contains only `Time resolution is 1 fs`: no healthy block,
+numerical event or guard comparison ran. The final missing-FFT-terminal error
+is downstream of the actual cause: `LOCAL_GUARD_WAVE_PATH_MISSING actual_view`
+in the new diagnostic Tcl before its unchanged `run all`.
+
+Parent independently read original arithmetic diagnostic inventory: Xsim used
+the escaped root `/\\tb_starlink_pss_local_admission_actual(FAST_MHZ=175,B=1,O=1,L=1) /`.
+The new lookup hardcoded a plain unparameterized root. Existing recursive
+arithmetic recording found115 objects correctly. This is not an arithmetic or
+equivalence failure. All original sources/project/WDB/logs are preserved.
+Authorize only an offline correction to additive discovery/verification:
+collect exact observer/leaf suffixes recursively, require all14 unique with the
+same allowed actual root as arithmetic evidence, preserve the real recorded
+paths, and test real escaped/plain roots plus mixed/wrong/duplicate/missing
+paths. No RTL, stimulus, comparison, debug/generic, latency or existing assertion
+change is authorized. A new frozen bundle requires separate actual approval.
+
+Parent also independently replayed29 C1 physical-preparation tests in31.12s
+(original26713 terminal0, `/tmp/starlink-cdc-physical-parent.ZMmRil`), then read
+the entire frozen synthesis adapter and unchanged external owner. All18 prepared
+members match `66001eba6a4bd5773f73ea1eaac9b730cd11e620900bbce072b1b0c5d0accb65`;
+settings explicitly select R/D/S/C1111. Full combined60 new-only offline scope
+independently passes311 tests in5.83s (original92837 terminal0,
+`/tmp/starlink-combined60-parent.d9y4WZ`). Its complete source review is still
+in progress; no combined60 vendor execution is authorized by these test counts.
+
+## C1 synthesis accepted; one diagnostic route launched
+
+Original3292 synthesis terminal0,116.863291s,11:17:10.832780 through11:19:07.696160
+UTC. Parent independently verified the committed56-member archive at HDL
+096ab760b91198e8101614ed8b712f44f74707e2, manifest
+c1b5e9210497458e6524b7abd8d8efb29485e22392613e83dff97d36a428d12f,
+then rehashed all8 live synthesis products and13 copied/source/generated-IP
+inputs. Owner before/tool/after/overall all0, zero black boxes. Isolated counts
+1986 LUTs/4500 FFs/21 DSPs/15 RAMB18s: +16 LUT/+22 FF versus prior111 synthesis.
+All12 per-cause synchronizers are recognized as depth2; CDC-10 is absent in
+this report, but139 CDC-15 mailbox warnings and114/124 external I/O coverage
+gaps remain. This is not a routed timing, full CDC or receiver qualification.
+
+Parent read unchanged route Tcl in full and verified SHA
+0873675fcec384f676a80b75b746460fbff2ecc3ee162f6111705ead2fad6d4a.
+One diagnostic route of exact checkpoint
+8c87cbd93869a376ca727c601b47dc36ff6bc480e359abca5f12f3988ba426bd
+is authorized with unchanged100/175 constraints and two threads. Agent owns
+original49744, output `/tmp/starlink-completed-input.5EaJuD/fault-cdc-route-v1`,
+separate exclusive owner `fault-cdc-route-owner-v1`. No retries or waivers.
+Source checkpoint/script hashes must be checked after termination even on failure.
+
+## Corrected local-admission diagnostics independently accepted
+
+Parent reviewed full helper/test delta and complete frozen diagnostic Tcl and
+runner. Independent143 tests PASS7.04s, original23760 terminal0,
+`/tmp/starlink-local-wave-parent.B4icQu5u`. These include literal original115-path
+escaped-root fixtures, complete mocked Tcl to the unchanged run-all trap, and
+negative mixed/duplicate/missing/wrong-profile paths. Policy proves all compiled
+runtime, observer, bench, numerical and runner bytes unchanged from failedv2.
+Frozen standalone verification from `/` passed L1v3's46-source inventory,
+manifest ae2173b877d75fc6f97246e612415e9c33a1f9d0215a6e5b1d3eb49bf6ae2f22.
+Tested code FW6951006e63997f63f6f3bf0cd73cb4e5cea66b65 /
+HDLe0e075d72711e27a866bdadebc1c14ef19c58326; runner remains f76090eba45113c44eff258fa1482198b663747787b76b14ce24a39bee7ebb98.
+
+One actual L1/R1B1O1/175 run of this exact v3 freeze is authorized. Original14041
+is owned by the arithmetic agent; exclusive owner `local-admission-L1-175-actual-owned-v2`.
+Only four substitutions to the prior owner are allowed: preparedv3, new owner,
+new manifest and45→46 source count. Preserve original22656 failure, all existing
+functional/numerical/WDB gates and terminal/after-integrity receipts. No L0,
+control/CDC union, physical promotion or radio operation is authorized here.
+
+## New route and actual results: failures retained, not promoted
+
+C1 route original49744 terminal0 completes all6736 routable nets without route
+errors, but setup timing FAILS: island175/global WNS-1.830ns; global TNS-673.636ns,
+653 failing endpoints. Island alone has535 failures/TNS-583.930ns. Hold+0.058ns
+with zero failures; recovery/removal+0.615/+0.752ns. CDC remains0critical,
+17information and139 unwaived mailbox warnings. Parent directly read the routed
+receipt, timing-summary tables and full worst-path report. Worst path is held
+phase→product metadata selection/checks→input_fault_now→descriptor capture CE:
+7.291ns total,2.083ns logic/5.208ns route,71-load final enable. This supports
+evaluating the separately tested local first-admission cut, not claiming the
+CDC change has closed timing. No route retry or receiver promotion.
+
+Local actual14041 terminal1,28.0999s,11:28:49.030957 through11:29:17.130980 UTC.
+Parent read original terminal and simulation log. All46 sources plus manifest
+unchanged; both diagnostic inventories now succeed, so the original discovery
+failure is fixed. The new guard observer instead fails phase0 at time0fs,
+iteration1, with unknown reset/start/metadata and differing155-bit views.
+No healthy FFT job or numerical event ran. Root requested read-only field-level
+and initialization/event-order diagnosis from preserved artifacts; no masking,
+changed comparison or retry is authorized. Original22656 and14041 remain FAIL.
+
+ROM read-ahead independent review identified missing directed healthy occupied
+X/Z-ready and selector0/1-flush witnesses. Root added checked preconditions,
+retention/stall/drain/refill assertions and four missing-case negative tests,
+with runtime and unconditional old/default/candidate comparison unchanged.
+Changed standalone suite31 PASS6.91s (original3382 terminal0),
+`/tmp/starlink-rom-active-boundaries-final.59q91XWV`. Earlier25PASS/2FAIL illegal
+parameter-fixture elaboration attempt and subsequent27PASS are preserved.
+This extends standalone coverage, not the earlier149 combined-test claim or
+actual FFT/physical qualification. Full details in the isolated ROM branch's
+`docs/starlink-rom-active-boundaries-20260910.md`.
