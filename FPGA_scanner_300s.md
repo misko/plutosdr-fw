@@ -12,11 +12,20 @@ service limits are unchanged. Parallel checked-product controller integration
 passes independent3306 tests, including distinct fresh payloads after reset;
 its FFT remains a control actor, not an actual numerical FFT qualification.
 
-Next: retained-output synthesis/routing with unchanged comparable constraints,
-parallel checked-product actual-FFT qualification, then full receiver/continuous
-acquisition/IIO/board qualification and `.18`→`.17` deployment. No new physical
-timing result or radio operation; last routed P1 WNS remains−1.492ns. See
-[actual PASS and independent3306 evidence](reports/experiments/20260910-retained-actual-pass-and-product3306.md).
+Retained-output synthesis and diagnostic routing have now completed, but
+physical timing FAILS: WNS -4.068 ns, TNS -1952.796 ns, 1266 failing setup
+endpoints. The worst path is same-domain metadata/fault control into a private
+descriptor register enable; other reported paths reach kernel-ROM enables.
+This is worse than earlier P1 (-1.492 ns), not a release candidate. Five
+critical CDC findings and real 175 MHz board-clock integration remain open.
+
+Next: separately tested private-descriptor/admission factoring and an exact
+closed-input cutover predicate, parallel checked-product actual-FFT
+qualification, then fresh physical closure and full receiver/continuous
+acquisition/IIO/board qualification before `.18`→`.17` deployment. No radio
+operation or production HDL gitlink promotion. See
+[physical failure and targeted next changes](reports/experiments/20260910-retained-physical-parent-review.md)
+and [actual PASS and independent3306 evidence](reports/experiments/20260910-retained-actual-pass-and-product3306.md).
 
 ## Earlier verification history
 
