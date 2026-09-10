@@ -1,0 +1,9 @@
+{
+  "input": "DUT zero pads each18-bit lane to24 bits; all48 input bits compared",
+  "output": "PG109 requires each18-bit TDATA lane sign-extended to24 bits; original18-bit numerical lanes unchanged",
+  "tuser": "XK_INDEX9 zero-extended to16; BLK_EXP5 zero-extended to8",
+  "source": "https://www.amd.com/content/dam/xilinx/support/documents/ip_documentation/xfft/v9_1/pg109-xfft.pdf",
+  "version": "PG109 v9.1 May4 2022",
+  "printed_pages": [21, 23, 24],
+  "offline_script_adapter": "only output-lane sign-extension, exact inverse to frozen script; not actualFFT evidence"
+}
