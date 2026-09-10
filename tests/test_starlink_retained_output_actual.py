@@ -103,7 +103,9 @@ def test_receipt_payload_mutants(scripted, tmp_path, before, after):
         verify_result(log, scripted / "actual_words.csv", kind="OFFLINE_SCRIPT_NOT_FFT")
 
 
-@pytest.mark.parametrize("failure", ["Fatal: injected", "eRrOr: injected", "FATAL injected"])
+@pytest.mark.parametrize("failure", ["Fatal: injected", "eRrOr: injected", "FATAL injected",
+    "FATAL_ERROR: Vivado Simulator kernel has discovered an exceptional condition from which it cannot recover.",
+    "fAtAl_ErRoR: Vivado Simulator kernel has discovered an exceptional condition from which it cannot recover."])
 def test_mixed_case_failure_is_not_hidden(scripted, tmp_path, failure):
     log = tmp_path / "parser_only.log"
     log.write_text((scripted / "simulation.log").read_text() + failure + "\n")

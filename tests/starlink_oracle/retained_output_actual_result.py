@@ -77,7 +77,7 @@ def verify_result(log: Path, numerical: Path, *, kind: str) -> dict:
     _require(kind in ("OFFLINE_SCRIPT_NOT_FFT", "ACTUAL_VENDOR_FFT"), "result kind")
     _require(log.stat().st_size <= 2_000_000 and numerical.stat().st_size <= 20_000_000, "bounded result size")
     text = log.read_text()
-    _require(re.search(r"\b(fatal|error)\b", text, re.I) is None, "fatal/error in simulation")
+    _require(re.search(r"\b(fatal|error|fatal_error)\b", text, re.I) is None, "fatal/error in simulation")
     records = {}
     for line in text.splitlines():
         if line.startswith("RACT_"):
