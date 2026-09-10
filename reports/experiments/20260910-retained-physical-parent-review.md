@@ -59,8 +59,18 @@ candidate will expose the literal cutover fault predicate restricted to zero
 input strobes, and use it only in the already-registered input-complete return
 phase. The full predicate, sticky reasons and unrestricted admission/config
 checks stay live. This is phase-specific equivalence, not a delayed fault veto.
-Closed input must imply zero certified strobes, and the selected predicate must
-equal the original on every use, including boundary and unknown-control tests.
+Known-complete input must imply zero certified strobes, and the selected
+predicate must equal the original under that premise. Review identified an
+important four-state exception: an X completion certificate and X strobe can
+make the restricted predicate expose X where the full predicate returned zero.
+The separately authorized candidate will therefore test a documented fail-closed
+visibility rule: in enabled mode, the three public return paths require a
+known-one completion certificate. This preserves known 0/1 behavior and makes
+X/Z certificates unable to publish; it is not a claim of four-state equivalence.
+The full diagnostics and all ACK paths remain literal. In particular, a retained
+inverse ACK must remain possible during the next forward's incomplete input
+epoch. The full predicate remains necessary at the final input's pre-NBA edge;
+the closed-input premise holds after the registered completion update settles.
 
 Only additive implementation and offline tests have been authorized so far.
 Each candidate needs a default/inverse check and independent original shadows.
@@ -71,6 +81,33 @@ The parallel checked-product design instead places checked metadata in an
 owned, registered token before consumption. Its 3306 offline tests are useful
 control evidence; its actual-FFT harness is still being prepared. It has not
 been composed with retained scheduling or physically qualified.
+
+Root has now independently passed its next **93 offline preparation/observer
+tests in 5.48 seconds**, original process 16830 terminal exit 0. All 27 source
+pins remained unchanged; four compiled-source manifests / 147 entries were
+independently rehashed. These tests include literal disabled/enabled harness
+elaboration, exact whole-source inverses, four healthy controller-actor pairs,
+current/raw/reset cases, a continuous retained-owner watcher, the six pre-GOOD
+metadata/ordinal/TLAST corruptions crossed with READY 0/1, and six deliberately
+corrupted independent-observer evidence cases that each hit their named fatal.
+An earlier independent 14-test binding-only replay passed in 0.92 seconds with
+23 source pins unchanged; it overlaps the 93 and must not be added to its count.
+
+The changed enabled contract distinguishes live VALID from retained ownership,
+and actual ACK capacity from the scheduler's persistent receipt. Continuous
+ownership checks run before the sampled edge update and after both settled fast
+edges, not just at the end of a waiting interval. Active inverse corruption is
+explicitly tested at the raw offered token before GOOD, not misrepresented as
+the old post-GOOD wire fault. This authorizes preparing a source-specific actual
+runner/result gate, **not** launching vendor simulation or claiming FFT evidence.
+The absolute 5215-clock service cap and numerical/reference vectors are retained.
+
+Raw independent receipts are in `checked-bindings-parent.oXANs8Wf` and
+`checked-observer-parent.3BJkm3qG` under the recovery root below. The observer
+source SHA256 is
+`e0fc22ae7975db53790b0fc46115dbfe9ab3bbcf18c8c37784011d7248dd5647`;
+the source-specific preparation helper is
+`9d06f33d810eb69e9a9112c06756cadf3906c91935b80f53c98477c0904601e3`.
 
 ## CDC and board clock remain independent gates
 
