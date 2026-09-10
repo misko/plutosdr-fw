@@ -1,0 +1,23 @@
+{
+  "format": "starlink-portable-archive-parts-v1",
+  "max_part_bytes": 41943040,
+  "archive": {
+    "name": "20260910-local-admission-actual-preparation-v2.tgz",
+    "bytes": 56624929,
+    "sha256": "dc0bb8f457e764119f0cf5ed2decf6a4ea1a15d92a1b35d6b45781af69c38caa"
+  },
+  "parts": [
+    {
+      "index": 0,
+      "name": "20260910-local-admission-actual-preparation-v2.tgz.part000",
+      "bytes": 41943040,
+      "sha256": "fb639644c0fd60ff0b56acaf1c0f4500337d2b401a1f83cc7d0b50eeb75580dd"
+    },
+    {
+      "index": 1,
+      "name": "20260910-local-admission-actual-preparation-v2.tgz.part001",
+      "bytes": 14681889,
+      "sha256": "1e18eb8c70ce26b48945d660b5a05b9a52dabfb850b281d1c88264af31e799f3"
+    }
+  ]
+}
