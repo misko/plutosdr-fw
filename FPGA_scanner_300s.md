@@ -2,6 +2,24 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+## Current verified status (2026-09-10)
+
+Retained-output actual vendor FFT now PASSES all seven contexts:19 complete
+forward/inverse pairs,40 frame events, two interrupted forward jobs and both
+reset recoveries. Independent251 preparation tests pass; all77953 actual CSV
+rows match the frozen reference byte-for-byte. Runtime, clocks, numerical and
+service limits are unchanged. Parallel checked-product controller integration
+passes independent3306 tests, including distinct fresh payloads after reset;
+its FFT remains a control actor, not an actual numerical FFT qualification.
+
+Next: retained-output synthesis/routing with unchanged comparable constraints,
+parallel checked-product actual-FFT qualification, then full receiver/continuous
+acquisition/IIO/board qualification and `.18`→`.17` deployment. No new physical
+timing result or radio operation; last routed P1 WNS remains−1.492ns. See
+[actual PASS and independent3306 evidence](reports/experiments/20260910-retained-actual-pass-and-product3306.md).
+
+## Earlier verification history
+
 Latest actual frame finding (2026-09-10): independent180 preparation tests PASS;
 the two-site logger fix preserves all77953 scripted CSV rows exactly. Actual
 vendor25461 passes the former logger crash, then stops on a testbench frame

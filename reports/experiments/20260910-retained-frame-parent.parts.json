@@ -1,0 +1,20 @@
+{
+  "archive": "20260910-retained-frame-parent.tgz",
+  "sha256": "73ebece958895ce408a026bfe08409952fec603cc20bddc4a44d2d0000eb6335",
+  "bytes": 44547176,
+  "parts": [
+    {
+      "name": "20260910-retained-frame-parent.tgz.part-00",
+      "bytes": 25165824,
+      "sha256": "5a0ab647b49ac8ba5ab700e5df8ad7044f86543fae7c1bcc8f90eb275a831936"
+    },
+    {
+      "name": "20260910-retained-frame-parent.tgz.part-01",
+      "bytes": 19381352,
+      "sha256": "e78b31912b7bdd355b5d59502772d7f50bf7880e4c6e4629c10e4c33078ff1a4"
+    }
+  ],
+  "reassembly": "Concatenate parts in listed order; verify full archive SHA before opening.",
+  "original_preserved": "/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/parent-progress-package.3rnLRswT/20260910-retained-frame-parent.tgz",
+  "reason": "Archive passed full byte verification but exceeded 40MiB per-file packaging target."
+}
