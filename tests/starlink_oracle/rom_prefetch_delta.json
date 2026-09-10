@@ -1,0 +1,33 @@
+{
+  "base": "597a8ab65ce9d4ee68b4ca0fe4a98ab48604beb7",
+  "edits": [
+    [
+      "module starlink_pss_kernel_rom #(",
+      "module starlink_pss_kernel_rom_read_ahead #("
+    ],
+    [
+      "  parameter integer PRIVATE_NEXT_START_SCRATCH = 0\n",
+      "  parameter integer PRIVATE_NEXT_START_SCRATCH = 0,\n  parameter integer PRIVATE_ROM_READ_AHEAD = 0\n"
+    ],
+    [
+      "  reg [2*DATA_WIDTH-1:0] output_kernel_word;",
+      "  wire [2*DATA_WIDTH-1:0] output_kernel_word;"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (PRIVATE_ROM_READ_AHEAD !== 0 && PRIVATE_ROM_READ_AHEAD !== 1)\n      $fatal(1, \"PRIVATE_ROM_READ_AHEAD must be zero or one\");\n"
+    ],
+    [
+      "  always @(posedge clk) begin\n",
+      "  // Read-ahead is private. The mux and retained word preserve every visible\n  // coefficient bit, including invalid and fault cycles, without added latency.\n  // The read enable excludes current framing/metadata checks. Publication and\n  // every old checker below keep their original same-edge semantics.\n  generate if (PRIVATE_ROM_READ_AHEAD) begin : private_rom_read_ahead\n    reg [2*DATA_WIDTH-1:0] speculative_word;\n    reg [2*DATA_WIDTH-1:0] retained_word;\n    reg use_speculative;\n    always @(posedge clk)\n      if (input_ready)\n        speculative_word <= kernel_memory[input_bin_index];\n    always @(posedge clk) begin\n      if (!resetn || flush) begin\n        retained_word <= 0;\n        use_speculative <= 0;\n      end else begin\n        if (use_speculative)\n          retained_word <= speculative_word;\n        use_speculative <= 0;\n        // Preserve procedural four-state interpretation of both old tests.\n        if (input_accept) begin\n          if (protocol_error_now)\n            use_speculative <= 0;\n          else\n            use_speculative <= 1;\n        end\n      end\n    end\n    assign output_kernel_word = use_speculative ? speculative_word : retained_word;\n  end else begin : legacy_rom_read\n    reg [2*DATA_WIDTH-1:0] legacy_word;\n    always @(posedge clk) begin\n      if (!resetn || flush)\n        legacy_word <= 0;\n      else if (input_accept) begin\n        if (protocol_error_now) begin\n          // The original fault branch does not update the coefficient.\n        end else\n          legacy_word <= kernel_memory[input_bin_index];\n      end\n    end\n    assign output_kernel_word = legacy_word;\n  end endgenerate\n\n  always @(posedge clk) begin\n"
+    ],
+    [
+      "      output_kernel_word <= 0;\n",
+      ""
+    ],
+    [
+      "          output_kernel_word <= kernel_memory[input_bin_index];\n",
+      ""
+    ]
+  ]
+}
