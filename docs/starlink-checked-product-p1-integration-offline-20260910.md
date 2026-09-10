@@ -5,6 +5,12 @@ It is not composed with inverse-sealed output or retained-output scheduling.
 No vendor FFT, synthesis, route, radio, receiver build, or promotion is part of
 this gate. The canonical P1 and the reviewed 2,752 primitive tests remain intact.
 
+Owner functional results: preserved **3304PASS135.97s** (552 integration plus
+unchanged2752), followed by **554PASS57.77s** for the entire integration suite
+after adding only two distinct-payload reset rows. There is no claim that a
+single3306-case owner process ran on the final test-only addition. No runtime
+RTL changed between these two passes.
+
 ## Source boundary
 
 The additive top is
@@ -128,6 +134,16 @@ arbitrary paused-fast reset with old inverse output outstanding is unclaimed.
 No source/output mailbox architecture was extended to make the extra
 full-bank-fill expectation pass.
 
+The original3304 pass reused the sample pattern across epochs; its data
+freshness evidence alone could not distinguish old payload with new metadata.
+The additive CASE19 closes that bounded blind spot in both raw-reset directions:
+fresh `I=n%23-4107`, `Q=n%17+3064`, rather than old `I=n%23-11`, `Q=n%17-8`.
+All512 source words differ. An independent integer calculation establishes
+that all512 rounded product outputs also differ, and every complete fresh
+output tuple is checked against that new expected file. Prefix word2 remains
+stable for eight slow edges before rejoin. This is explicit fresh data
+evidence, still not an arbitrary RAM-upset guarantee.
+
 ## Offline proof scope
 
 `tb/starlink_pss_fft512_control_actor.v` is explicitly an identity/control actor,
@@ -233,6 +249,40 @@ No previous run/project is overwritten or relabeled.
 - `checked-product-prejoin-v2.1ofXzHIy`, original95398:6PASS2.27s/546deselected;
   two healthy, two explicit rejected assumptions, two compliant held-prefix
   rejoin completions. No runtime change from the3300-pass source.
+- `checked-product-top-final-v2.blnGVNR0`, original16693:3304PASS135.97s;
+  source FW1238e7d542e37c9ce5456842cc346a05edede7f7 /
+  HDLccf8b8189d0757a7d467afb9f2ae4a858d7d1ee0, held throughout.
+- `checked-product-distinct-reset-v1.ZWeaqwS4`, original18575:554PASS57.77s;
+  all552 old integration rows and both new distinct-payload reset rows.
+  Only the additive bench/expected-vector test policy changed; all five
+  runtime files and original2752 sources stayed byte-identical.
+
+Final runtime SHA256 bindings:
+
+- top `56f341f02623698d23e66a4b46146eaaca29a25de36aad1b3cdfa5f1d56ed062`
+- checked input guard `7e0b6e674a8c70898c050571f66513fd06208c9738954385a3d3207d0cc65d37`
+- reader observation `222d09935af40ccd742f6df7344ae6c6682edb435b65fd7481877bdd33b2b344`
+- issuer observation `386323152dff509f64688a1d3ea6827d6fb668430365180396df7baf94910f15`
+- result ACK observation `b052874e6f1e40d5ee1149256fe89a47abdf35cb06f7a9b46c5c4d4615dcc22e`
+
+Reproduction uses the existing repository/history at the frozen FW/HDL pins,
+the existing Icarus toolchain, and the following selected files with Python-B,
+`PYTHONDONTWRITEBYTECODE=1`, pytest cache disabled and a fresh persistent
+`--basetemp`/JUnit/log directory:
+
+```text
+tests/starlink_oracle/test_checked_product_top.py
+tests/starlink_oracle/test_product_publication_seams.py
+tests/starlink_oracle/test_product_sealed_interface.py
+tests/starlink_oracle/test_product_sealed_adapter.py
+tests/starlink_oracle/test_checked_product_read.py
+```
+
+On the final source this combined selection contains3306 cases. It is an
+independent reviewer replay recipe, not an invented owner terminal receipt.
+Ruff passes for the new test. A `git diff --check` warning on the required
+single-space blank context line inside `result.patch` is unified-diff data;
+the whole-body inverse passes and that context is not stripped.
 
 No actual or physical launch is authorized by this report. Final source pins,
 all raw receipts and retained failures remain review gates before such a run.

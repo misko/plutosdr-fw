@@ -23,7 +23,7 @@ MODULES = ["fft_bank_owned_checked_product", "fft_bank_owned_product_fence",
            "kernel_rom_read_ahead", "spectrum_product"]
 
 
-def expected_actor_payload(kernel_text):
+def expected_actor_payload(kernel_text, fresh=False):
     """Independent integer complex multiply/ties-even for identity actor only."""
     def signed(value):
         return value - (1 << 18) if value & (1 << 17) else value
@@ -38,6 +38,8 @@ def expected_actor_payload(kernel_text):
         word = int(line, 16)
         ki, kq = signed(word & ((1 << 18) - 1)), signed(word >> 18)
         i, q = n % 23 - 11, n % 17 - 8
+        if fresh:
+            i, q = i - 4096, q + 3072
         result.append(rounded(i * ki - q * kq) | (rounded(i * kq + q * ki) << 18))
     assert len(result) == 512
     return "".join(f"{word:09x}\n" for word in result)
@@ -75,6 +77,9 @@ def build(path, enabled=1, mutation=None, reference_purge=1, expect_cycle=False)
         assert body.count("parameter integer ENABLED=1,") == 1
         bench.write_text(body.replace("parameter integer ENABLED=1,", f"parameter integer ENABLED={enabled},"))
     (path / "actor_expected_product.mem").write_text(expected_actor_payload((path / "upper_edge_pss_kernel_q17.mem").read_text()))
+    fresh_expected = expected_actor_payload((path / "upper_edge_pss_kernel_q17.mem").read_text(), fresh=True)
+    (path / "actor_fresh_expected_product.mem").write_text(fresh_expected)
+    assert sum(a != b for a, b in zip(fresh_expected.splitlines(), (path / "actor_expected_product.mem").read_text().splitlines(), strict=True)) == 512
     shutil.copyfile(ACQ / "prepare_exact_control_actual.py", path / "original_field_policy.py")
     assert hashlib.sha256((path / "original_field_policy.py").read_bytes()).hexdigest() == "3491798ccf8da4d145f6891653d8c799c598ac78b7afb9f9abf1afb59123a895"
     observer, fields = default_observer((path / "original_field_policy.py").read_text())
@@ -287,4 +292,12 @@ def test_held_fresh_prefix_rejoins_and_completes(integrated, reset):
     code, log = run(integrated, 18, reset)
     assert code == 0 and "FATAL" not in log and "ERROR" not in log, log
     marker = f"CHECKED_TOP_PREJOIN_HELD_PASS reset={reset} accepted_while_fast_paused=2 held_edges=8 accepted_total=512 independent_expected=512 starts=2 ack=1 releases=1 secondary_reference_held_reset=1 control_actor_not_fft=1"
+    assert log.count(marker) == 1, log
+
+
+@pytest.mark.parametrize("reset", [0, 1])
+def test_distinct_payload_reset_prefix_and_full_fresh_completion(integrated, reset):
+    code, log = run(integrated, 19, reset)
+    assert code == 0 and "FATAL" not in log and "ERROR" not in log, log
+    marker = f"CHECKED_TOP_DISTINCT_PAYLOAD_PASS reset={reset} input_words_changed=512 expected_outputs_changed=512 independently_checked=512 starts=2 ack=1 releases=1 control_actor_not_fft=1"
     assert log.count(marker) == 1, log
