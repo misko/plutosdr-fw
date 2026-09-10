@@ -24,6 +24,7 @@ HISTORY_FILES = {
     "history_posthoc_assessment.json": "a1e7eebc49fba088327109643d9beb120276eb2f6f230a885d5a9438e048da0f",
 }
 FIXED = {
+    "failed_actual_arithmetic_diagnostic_signals.txt": "f2cc4bee468b97cec08e8f71417150cf16e56841df43741f9266b6365132ace6",
     "bank_arithmetic_actual.py": "de13f13c54531a9e13fe872cc5b4be82ab917487c448f25ee744b0b555cca07d",
     "local_admission.py": "8b413b323dd55f347bbed4babef74a1faba7754672c01f9122231b82aa9a51ef",
     "simulate_bank_arithmetic_actual.tcl": "684f8e788f7a3550d85ccc30eb32a56b7b72a4c8067c2aa59513d416bd177eb9",
@@ -109,19 +110,55 @@ foreach requested_path [list [lindex $argv 0] [info script]] {
 """
 
 
-WAVE_ADD = """# Extra observer recording, independent of existing arithmetic diagnostics.
+def allowed_wave_roots(option):
+    if type(option) is not int or option not in (0, 1):
+        raise ValueError("unknown local diagnostic profile")
+    parameters = "FAST_MHZ=175,B=1,O=1" + (",L=1" if option else "")
+    return (f"/{BENCH}", f"/\\{BENCH}({parameters}) ")
+
+
+WAVE_TEMPLATE = """# Extra observer recording, tied to existing arithmetic diagnostic root.
+set local_allowed_roots [list __ALLOWED_ROOTS__]
+set local_by_leaf [dict create]
+foreach object [get_objects -r *] {
+  foreach leaf {FIELDS} {
+    if {[string match */local_guard_observer/$leaf $object]} {
+      if {[dict exists $local_by_leaf $leaf]} { error "LOCAL_GUARD_WAVE_DUPLICATE_LEAF $leaf" }
+      dict set local_by_leaf $leaf $object
+    }
+  }
+}
 set local_objects {}
+set local_root {}
 foreach leaf {FIELDS} {
-  set object [get_objects /TOP/local_guard_observer/$leaf]
-  if {[llength $object] != 1} { error "LOCAL_GUARD_WAVE_PATH_MISSING $leaf" }
-  lappend local_objects {*}$object
+  if {![dict exists $local_by_leaf $leaf]} { error "LOCAL_GUARD_WAVE_PATH_MISSING $leaf" }
+  set object [dict get $local_by_leaf $leaf]
+  set object_root /[lindex [split $object /] 1]
+  if {$object_root ni $local_allowed_roots || $object ne "$object_root/local_guard_observer/$leaf"} {
+    error "LOCAL_GUARD_WAVE_WRONG_PROFILE_OR_PATH $object"
+  }
+  if {$local_root eq {}} { set local_root $object_root }
+  if {$object_root ne $local_root} { error "LOCAL_GUARD_WAVE_MIXED_ROOTS" }
+  lappend local_objects $object
+}
+if {[llength $diagnostic_objects] == 0} { error "LOCAL_GUARD_WAVE_ARITHMETIC_INVENTORY_ABSENT" }
+foreach object $diagnostic_objects {
+  set object_root /[lindex [split $object /] 1]
+  if {$object_root ne $local_root} {
+    error "LOCAL_GUARD_WAVE_ARITHMETIC_ROOT_MISMATCH"
+  }
 }
 log_wave $local_objects
 set channel [open local_guard_diagnostic_signals.txt {WRONLY CREAT EXCL}]
 foreach object $local_objects { puts $channel $object }; close $channel
 set channel [open local_guard_diagnostic_receipt.txt {WRONLY CREAT EXCL}]
 puts $channel "LOCAL_GUARD_WAVE_DIAGNOSTICS_ENABLED objects=14 width=155"; close $channel
-""".replace("FIELDS", " ".join(WAVE_FIELDS)).replace("TOP", BENCH)
+"""
+
+
+def wave_add(option):
+    roots = " ".join("{" + root + "}" for root in allowed_wave_roots(option))
+    return WAVE_TEMPLATE.replace("FIELDS", " ".join(WAVE_FIELDS)).replace("__ALLOWED_ROOTS__", roots)
 
 
 def adapt(source, edits, inverse=False):
@@ -184,7 +221,7 @@ def verify_payloads(payloads, option):
         raise ValueError("observer is not literal original guard")
     if adapt(payloads[RUNNER].decode(), edits_runner(), True) != payloads["simulate_bank_arithmetic_actual.tcl"].decode():
         raise ValueError("runner inverse changed")
-    if adapt(payloads[DIAGNOSTICS].decode(), (("run all\n", WAVE_ADD + "run all\n"),), True) != payloads["simulate_bank_arithmetic_diagnostics.tcl"].decode():
+    if adapt(payloads[DIAGNOSTICS].decode(), (("run all\n", wave_add(option) + "run all\n"),), True) != payloads["simulate_bank_arithmetic_diagnostics.tcl"].decode():
         raise ValueError("wave-only diagnostics inverse changed")
     rtl, compiled, expected_profile = profile(base, option)
     if payloads["profile.tcl"] != expected_profile:
@@ -216,6 +253,7 @@ def freeze(output, old_actual, option):
     payloads.update({name: (old_source / name).read_bytes() for name in base.VECTOR_HASHES})
     for name in ("create_shared_realtime_xfft_ip.tcl", base.OLD_BENCH + ".sv.reference"):
         payloads[name] = (old_source / name).read_bytes()
+    payloads["failed_actual_arithmetic_diagnostic_signals.txt"] = (ACQ / "build/local-admission-actual-R1B1O1-L1-175-prepared-v2/project/fft_bank_arithmetic_actual.sim/sim_1/behav/xsim/arithmetic_diagnostic_signals.txt").read_bytes()
     for name in (recipe.TOP + ".v", recipe.GUARD + ".v", "simulate_bank_arithmetic_actual.tcl", "simulate_bank_arithmetic_diagnostics.tcl"):
         payloads[name] = (ACQ / name).read_bytes()
     for name in (CHECKS, OBSERVER):
@@ -225,7 +263,7 @@ def freeze(output, old_actual, option):
     payloads["test_starlink_local_admission_actual_policy.py"] = (ROOT / "tests/test_starlink_local_admission_actual_policy.py").read_bytes()
     payloads[BENCH + ".sv"] = adapt(payloads[OLD_BENCH + ".sv"].decode(), edits_bench()).encode()
     payloads[RUNNER] = adapt(payloads["simulate_bank_arithmetic_actual.tcl"].decode(), edits_runner()).encode()
-    payloads[DIAGNOSTICS] = adapt(payloads["simulate_bank_arithmetic_diagnostics.tcl"].decode(), (("run all\n", WAVE_ADD + "run all\n"),)).encode()
+    payloads[DIAGNOSTICS] = adapt(payloads["simulate_bank_arithmetic_diagnostics.tcl"].decode(), (("run all\n", wave_add(option) + "run all\n"),)).encode()
     payloads["local_admission_original_guard.v"] = payloads[recipe.OLD_GUARD + ".v"].replace(
         b"module starlink_pss_realtime_input_guard #(", b"module local_admission_original_guard #(", 1)
     payloads["profile.tcl"] = profile(base, option)[2]
@@ -296,9 +334,16 @@ def require_guard_terminal(log, option):
     return row
 
 
-def require_guard_wave(receipt, inventory):
+def require_guard_wave(receipt, inventory, option, arithmetic_inventory):
     paths = inventory.splitlines()
-    expected = [f"/{BENCH}/local_guard_observer/{name}" for name in WAVE_FIELDS]
+    arithmetic_paths = arithmetic_inventory.splitlines()
+    if not arithmetic_paths or len(set(arithmetic_paths)) != len(arithmetic_paths) or any(not p.startswith("/") for p in arithmetic_paths):
+        raise ValueError("invalid arithmetic diagnostic root inventory")
+    roots = {"/" + p.split("/")[1] for p in arithmetic_paths}
+    if len(roots) != 1 or not roots.issubset(allowed_wave_roots(option)):
+        raise ValueError("arithmetic diagnostic profile/root mismatch")
+    root = roots.pop()
+    expected = [f"{root}/local_guard_observer/{name}" for name in WAVE_FIELDS]
     if receipt != "LOCAL_GUARD_WAVE_DIAGNOSTICS_ENABLED objects=14 width=155\n" or paths != expected:
         raise ValueError("guard waveform path/closed receipt mismatch")
     return paths
@@ -323,7 +368,7 @@ def results(output, expected):
     receipts = base.require_terminal(log, manifest)
     guard = require_guard_terminal(log, manifest["L"])
     base.require_closed_wave_receipt((sim / "arithmetic_diagnostic_receipt.txt").read_text(), (sim / "arithmetic_diagnostic_signals.txt").read_text())
-    paths = require_guard_wave((sim / "local_guard_diagnostic_receipt.txt").read_text(), (sim / "local_guard_diagnostic_signals.txt").read_text())
+    paths = require_guard_wave((sim / "local_guard_diagnostic_receipt.txt").read_text(), (sim / "local_guard_diagnostic_signals.txt").read_text(), manifest["L"], (sim / "arithmetic_diagnostic_signals.txt").read_text())
     trace = base.sha(sim / "fft_bank_owned_trace.csv")
     if trace != HISTORICAL_CANDIDATE_CSV:
         raise ValueError("full historical R1B1O1 trace changed; no latency retiming allowed")

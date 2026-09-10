@@ -60,7 +60,7 @@ def test_strict_inverse_preserves_all_stimulus_faults_and_two_119bit_boundaries(
     assert re.findall(r"\$fatal.*?;", derived) == re.findall(r"\$fatal.*?;", old)
     for name, original, edits in (
         (STUDY.RUNNER, "simulate_bank_arithmetic_actual.tcl", STUDY.edits_runner()),
-        (STUDY.DIAGNOSTICS, "simulate_bank_arithmetic_diagnostics.tcl", (("run all\n", STUDY.WAVE_ADD + "run all\n"),)),
+        (STUDY.DIAGNOSTICS, "simulate_bank_arithmetic_diagnostics.tcl", (("run all\n", STUDY.wave_add(STUDY.verify(prepared)["L"]) + "run all\n"),)),
     ):
         assert STUDY.adapt((source / name).read_text(), edits, True) == (source / original).read_text()
 
@@ -206,14 +206,16 @@ def test_terminal_contract_is_exact_and_late_failure_always_rejected(mutation):
 
 
 def test_exact_guard_wave_inventory_and_original_run_all_preserved(prepared):
+    option = STUDY.verify(prepared)["L"]
     receipt = "LOCAL_GUARD_WAVE_DIAGNOSTICS_ENABLED objects=14 width=155\n"
     inventory = "".join(f"/{STUDY.BENCH}/local_guard_observer/{name}\n" for name in STUDY.WAVE_FIELDS)
-    assert len(STUDY.require_guard_wave(receipt, inventory)) == 14
+    arithmetic = f"/{STUDY.BENCH}/dut/product_overflow\n"
+    assert len(STUDY.require_guard_wave(receipt, inventory, option, arithmetic)) == 14
     for changed in (inventory + inventory, inventory.replace("original_view", "masked_view"), inventory.split("\n", 1)[1]):
-        with pytest.raises(ValueError): STUDY.require_guard_wave(receipt, changed)
+        with pytest.raises(ValueError): STUDY.require_guard_wave(receipt, changed, option, arithmetic)
     runner = (prepared / "frozen_sources" / STUDY.DIAGNOSTICS).read_text()
     assert runner.count("run all") == 1
-    assert "force " not in runner and "run " not in STUDY.WAVE_ADD
+    assert "force " not in runner and "run " not in STUDY.wave_add(option)
     assert runner.count("WRONLY CREAT EXCL") == 4
 
 
@@ -358,11 +360,13 @@ def policy_result_files(output):
     for name in ("simulate.log", "bank_arithmetic_events.csv", "fft_bank_owned_trace.csv", "arithmetic_diagnostic_signals.txt"):
         shutil.copy(source_sim / name, sim / name)
     manifest = STUDY.verify(output)
+    shutil.copy(output / "frozen_sources/failed_actual_arithmetic_diagnostic_signals.txt", sim / "arithmetic_diagnostic_signals.txt")
     with (sim / "simulate.log").open("a") as stream:
         stream.write(good_guard(manifest["L"]))
     (sim / "arithmetic_diagnostic_receipt.txt").write_text("ARITHMETIC_WAVE_DIAGNOSTICS_ENABLED objects=115 monitors=4 references=2 wrapper=1 inner=1 transport=1\n")
     (sim / "local_guard_diagnostic_receipt.txt").write_text("LOCAL_GUARD_WAVE_DIAGNOSTICS_ENABLED objects=14 width=155\n")
-    (sim / "local_guard_diagnostic_signals.txt").write_text("".join(f"/{STUDY.BENCH}/local_guard_observer/{name}\n" for name in STUDY.WAVE_FIELDS))
+    root = STUDY.allowed_wave_roots(manifest["L"])[1]
+    (sim / "local_guard_diagnostic_signals.txt").write_text("".join(f"{root}/local_guard_observer/{name}\n" for name in STUDY.WAVE_FIELDS))
     wrapper = next((ACTUAL / "project").glob("*.gen/sources_1/ip/*/synth/*.vhd"))
     copied = output / "project/generated-source.vhd"
     shutil.copy(wrapper, copied)
@@ -504,3 +508,87 @@ def test_frozen_tcl_rejects_alias_before_file_normalize(prepared, tmp_path, kind
     (tmp_path / "alias.log").write_text(result.stdout + result.stderr)
     assert result.returncode != 0 and "symlink actual output/runner path forbidden" in result.stderr
     assert not (prepared / "preflight.json").exists() and not (prepared / "launch_started.txt").exists()
+
+
+def diagnostic_fixture(prepared, escaped=True):
+    option = STUDY.verify(prepared)["L"]
+    observed = (prepared / "frozen_sources/failed_actual_arithmetic_diagnostic_signals.txt").read_text()
+    assert STUDY.digest(observed.encode()) == STUDY.FIXED["failed_actual_arithmetic_diagnostic_signals.txt"]
+    real_root = "/" + observed.splitlines()[0].split("/")[1]
+    assert real_root == STUDY.allowed_wave_roots(1)[1]
+    root = STUDY.allowed_wave_roots(option)[int(escaped)]
+    arithmetic = observed.replace(real_root, root).splitlines()
+    guards = [f"{root}/local_guard_observer/{name}" for name in STUDY.WAVE_FIELDS]
+    return option, root, arithmetic, guards
+
+
+@pytest.mark.parametrize("escaped", [False, True])
+def test_archived_root_fixture_and_mocked_complete_tcl_reaches_original_run_all(prepared, tmp_path, escaped):
+    option, _, arithmetic, guards = diagnostic_fixture(prepared, escaped)
+    result = execute_diagnostic_mock(prepared, tmp_path, arithmetic + guards)
+    assert result.returncode == 1 and "OFFLINE_UNCHANGED_RUN_ALL_TRAP" in result.stdout, result.stdout + result.stderr
+    assert "LOCAL_GUARD_WAVE_" not in result.stderr
+    receipt = (tmp_path / "local_guard_diagnostic_receipt.txt").read_text()
+    inventory = (tmp_path / "local_guard_diagnostic_signals.txt").read_text()
+    assert inventory == "\n".join(guards) + "\n"
+    assert STUDY.require_guard_wave(receipt, inventory, option, "\n".join(arithmetic) + "\n") == guards
+    assert (tmp_path / "arithmetic_diagnostic_signals.txt").read_text() == "\n".join(arithmetic) + "\n"
+
+
+def execute_diagnostic_mock(prepared, directory, objects):
+    # Braced Tcl list preserves exact backslashes/spaces; nothing is eval'd.
+    values = " ".join("{" + value + "}" for value in objects)
+    program = """proc current_wave_config {args} {return existing_offline_wave}
+proc get_objects {args} {
+  if {$args ne {-r *}} {error "UNREVIEWED_LITERAL_LOOKUP"}
+  return $::offline_objects
+}
+proc log_wave {args} {}
+proc run {args} {
+  if {$args ne {all}} {error "ORIGINAL_RUN_ARGUMENT_CHANGED"}
+  puts OFFLINE_UNCHANGED_RUN_ALL_TRAP
+  error "OFFLINE_STOP_NO_SIMULATION"
+}
+"""
+    program += f"set offline_objects [list {values}]\nsource {{{prepared / 'frozen_sources' / STUDY.DIAGNOSTICS}}}\n"
+    script = directory / "diagnostic-mock-NO-Vivado.tcl"
+    script.write_text(program)
+    result = subprocess.run(["tclsh", str(script)], cwd=directory, env=env(), capture_output=True, text=True, timeout=10, check=False)
+    (directory / "diagnostic-mock.log").write_text(result.stdout + result.stderr)
+    return result
+
+
+@pytest.mark.parametrize("mutation", ["duplicate", "missing", "mixed", "wrong_profile", "arithmetic_root", "nested", "injection", "unknown_leaf"])
+def test_tcl_and_parser_reject_root_leaf_profile_and_path_injection(prepared, tmp_path, mutation):
+    option, root, arithmetic, guards = diagnostic_fixture(prepared)
+    if mutation == "duplicate": guards.append(guards[0])
+    elif mutation == "missing": guards.pop(0)
+    elif mutation == "mixed": guards[0] = guards[0].replace(root, STUDY.allowed_wave_roots(option)[0])
+    elif mutation == "wrong_profile":
+        guards = [path.replace("O=1", "O=0") for path in guards]
+        arithmetic = [path.replace("O=1", "O=0") for path in arithmetic]
+    elif mutation == "arithmetic_root": arithmetic = [path.replace(root, STUDY.allowed_wave_roots(option)[0]) for path in arithmetic]
+    elif mutation == "nested": guards[0] = guards[0].replace("/local_guard_observer/", "/nested/local_guard_observer/")
+    elif mutation == "injection": guards[0] = guards[0].replace("/local_guard_observer/", "/[exec touch UNAUTHORIZED]/local_guard_observer/")
+    else: guards[0] = guards[0].replace("/actual_view", "/unknown_view")
+    result = execute_diagnostic_mock(prepared, tmp_path, arithmetic + guards)
+    assert result.returncode == 1 and "OFFLINE_UNCHANGED_RUN_ALL_TRAP" not in result.stdout
+    assert "LOCAL_GUARD_WAVE_" in result.stderr
+    assert not (tmp_path / "local_guard_diagnostic_receipt.txt").exists()
+    assert not (tmp_path / "UNAUTHORIZED").exists()
+    with pytest.raises(ValueError):
+        STUDY.require_guard_wave("LOCAL_GUARD_WAVE_DIAGNOSTICS_ENABLED objects=14 width=155\n", "\n".join(guards) + "\n", option, "\n".join(arithmetic) + "\n")
+
+
+def test_diagnostic_fix_changes_no_compiled_runtime_observer_bench_numeric_or_runner_bytes(prepared):
+    manifest = STUDY.verify(prepared)
+    old = ACQ / f"build/local-admission-actual-R1B1O1-L{manifest['L']}-175-prepared-v2"
+    old_manifest = json.loads((old / "manifest.json").read_text())
+    changed = {name for name, expected in old_manifest["source_sha256"].items()
+               if manifest["source_sha256"].get(name) != expected}
+    assert changed == {"local_admission_actual.py", "test_starlink_local_admission_actual_policy.py", STUDY.DIAGNOSTICS}
+    assert set(manifest["source_sha256"]) - set(old_manifest["source_sha256"]) == {"failed_actual_arithmetic_diagnostic_signals.txt"}
+    for key in old_manifest:
+        if key != "source_sha256": assert old_manifest[key] == manifest[key]
+    for name in manifest["compiled"] + [STUDY.CHECKS, STUDY.RUNNER, "starlink_pss_bank_arithmetic_actual_checks.svh"]:
+        assert (prepared / "frozen_sources" / name).read_bytes() == (old / "frozen_sources" / name).read_bytes()
