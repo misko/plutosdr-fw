@@ -318,3 +318,13 @@ This improves setup by 0.470 ns versus the source C1 route, but does not close
 timing or outperform every separate arithmetic experiment. It supports continuing
 the explicit private-check/publication pipeline work, not promoting K/M into the
 receiver or combining unqualified variants. No radio or PPU operation followed.
+
+Portable synthesis evidence was independently verified from HDL
+`cb57e4482329a473d8924412f6c587d1ef549a2a`: 76 manifest members/77 tracked files,
+manifest `074833c6e78a21cad7ecbddca96b217dd9f107a90295b3b02e5b64e8736ac237`.
+Its firmware report is `18df876cf85f9982b978c4b78580ac38212a0f2a`; both original
+pushes succeeded. Final failed-route evidence was independently verified from HDL
+`efc97d8ac92578e1e37eb0bb28c64780b86cf76a`: 36 manifest members/37 tracked files,
+manifest `53517d03e68ce9c7000369e1f6cb6fb9f987c6f0cb41f98946a1d1956e667c14`.
+Its firmware report is `44ac853f9f553e29ff65398d1bd3d262606a7b18`. The ROM
+experiment has stopped with both original tool handles terminal and no promotion.

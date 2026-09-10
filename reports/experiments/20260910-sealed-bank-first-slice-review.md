@@ -193,3 +193,15 @@ per inverse lifecycle within the earlier 24-clock pair allocation. These are
 planning budgets; report any safety-required overshoot, not omitted checks.
 No vendor, synthesis, route or receiver deployment is authorized for this next
 composition until its actual source and offline evidence are reviewed.
+
+Standalone portable evidence is now committed and pushed at FW
+`b2dfc0d6546810a4ffbc1b331c371c2af0939fc6` (unchanged source f8754e23a / HDL
+2c2460ad). Parent independently verified all 5,705 safe unique archive members
+directly from Git: 9,372,940 compressed bytes, SHA-256
+`a0742fb322eb2382088b49aa273f5e9068679f30cb944ebbbb9a3d6fafd55fef`.
+All 15 mutant receipts retain their actual rejection layer: the RAM corruption
+case reaches simulator exit 0 and is rejected by the independent numerical
+oracle; the other cases terminate with their retained simulator fatal evidence.
+The initial archive classifier incorrectly required every mutant to abort the
+simulator; that packaging attempt is preserved separately. No RTL or test result
+was changed to repair that classification.
