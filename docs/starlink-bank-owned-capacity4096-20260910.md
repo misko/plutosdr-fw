@@ -55,7 +55,50 @@ profile's high-water marks. Its complete portable receipt is
 `reports/starlink-bank-owned-capacity64-extension-20260910.json`. All **101** local
 runner/collector/resource/slice unit tests and Ruff pass at extension freeze.
 
-At this extension's initial freeze, the 4096 soak has **not completed**. Its
-eventual status must come from its own terminal receipt; neither unit tests nor
-the preceding 64-block passes count as a 4096 result. A tool poll timeout is not
-permission to restart the simulation or overwrite evidence.
+## Completed original soak
+
+The original `bank-iq-capacity-175-bursty-stalled-4096-v1` run completed with
+**terminal PASS and process exit zero at 2026-09-10 03:43:59 UTC**. It was launched
+once from frozen HDL `032a8db1d86223c3f0892d415225c6b6a710bf1b`; no simulator
+restart, source change or profile change occurred. Intermediate read-only polling
+did not consume or restart the underlying Vivado/xsim process.
+
+The complete inventory is 4096 ordered score blocks, 1,830,977 continuous source
+samples, 2,097,152 accepted words in each forward/product/inverse stage, and
+1,830,912 ordered scores. Every independent frame/metadata check completed, and
+the full transcript contains no FAIL/FAULT/Fatal/ERROR diagnostic. The postprocessor
+and portable collector both require the exact long-run inventory; a 64-block
+receipt or truncated set of progress rows cannot qualify this run.
+
+| Observed quantity | 4096-block result | Original bound |
+| --- | ---: | ---: |
+| Candidate FIFO maximum | 358 | <512 |
+| Overlap scheduler queue maximum | 1 | ≤4 |
+| Scheduler ring retention age maximum | 589 samples | ≤2048 |
+| Energy lookup age maximum | 847 samples | <2048 |
+| Score age maximum | 915 samples | diagnostic |
+| Forward ingress stall cycles maximum | 0 | diagnostic |
+| Forward admission interval | 5197–5233 fast clocks | arrival-paced, not service WCET |
+
+The longer run observes one additional clock of admission variation on each side
+of the short run's 5198–5232 interval, and one additional source sample of maximum
+score age (915 versus 914). Energy/FIFO/ring/queue maxima remain unchanged. These
+are actual profile observations, not universal worst-case bounds. Strict tagged
+capture-N+1/transform-N and three-epoch overlap counts remain zero; their predicate
+requires `RUN_JOB` and excludes `ACK_DRAIN`. No three-way compute overlap is claimed.
+
+The simulated completion time is 122.115045 ms; reported simulation CPU time is
+7610.6 seconds. Long wall-clock simulation duration is not equivalent to a
+300-second source/RF scan. No source-rate adapter, native fine search, pilot IIO,
+dwell retune, receiver implementation or physical qualification was added.
+
+Portable evidence is in
+`reports/starlink-bank-owned-capacity4096-20260910.json`: all 4096 progress records,
+exact terminal/count/metadata/backlog receipts, full frozen source inventory and
+pre-run hashes, generated bench/core hashes, and simulator/top-log hashes. Full
+artifacts remain in
+`hdl/library/starlink_pss_acquisition/build/bank-iq-capacity-175-bursty-stalled-4096-v1/`,
+with its top Vivado log/journal moved inside that same evidence directory after
+completion. The detector RTL and original generated FFT remain byte-identical to
+the preceding exact numerical study; only the capacity runner was parameterized.
+All 101 unit tests and Ruff were rerun successfully after collection.
