@@ -1186,3 +1186,51 @@ It must retain native full257 drainage after source-off, independent pilot512,
 numerical boundaries. Existing30 startup/release assumptions must not be copied
 blindly: source60 ends before native completion. Causal acquisition, shared-bus
 capacity, full receiver timing and 300s RF comparison remain separate gates.
+
+## Arithmetic OOC preparation independently qualified
+
+Parent read all three new Python helpers,662-line test file, the complete adapted
+synthesis Tcl and report. Independent316 tests PASS48.37s, original35834terminal0,
+`/tmp/starlink-arithmetic-ooc-parent.T00php`. This is70 new preparation tests plus
+246 existing monitor/policy/arithmetic/retirement/payload/archive tests, including
+the original six-part archive reconstruction. All7469 safe regular members of
+the preparation archive independently verify,22493729bytes, SHA256
+`34de20f4867838aebab0e8f3748c0462e0467434831687347b8282d906916bee`.
+
+Frozen preparation inventory
+`c249a13a4e34aa393513fa955199407eef0a569484025d1e5cdb5fc83cb185ce`
+contains23 inputs/receipts and independently passes its frozen verifier against
+the unchanged original v3 evidence. Source-specific admission preserves the exact
+original automation FAIL while reverifying11 functional terminals,76 core jobs,
+19456 ordered words per stream and345 recorded WDB values. No generic failed-run
+admission, replacement result, altered source or future receipt substitution.
+The adapter strictly restores f843af03, binds and reads back R1/B1/O1, preserves
+100/175 clocks/IP/directives/two threads and independently audits copied inputs.
+
+FWa17b6656f8e48be562063d0adcc8c2d791128a1f /
+HDL5b68bb8b488a886c3861537eaf9643ec940003e0 are reviewed and pushed to the
+arithmetic DO NOT MERGE remotes (root66302/45851terminal0). Exactly one synthesis
+is authorized from the frozen owner, new
+`hdl/library/starlink_pss_acquisition/build/arithmetic-ooc-R1B1O1-175-owned-v1`
+in that worktree. Agent owns original59427; outcome pending. No route or actual
+replay is authorized by this step. No runtime promotion or radio operation.
+
+## Per-cause CDC offline recurrence reviewed
+
+Parent read the default-off wrapper delta,110-line bench, strict inverse and
+mutation tests. Independently122 tests PASS22.60s, original67758terminal0,
+`/tmp/starlink-fault-cdc-parent.SqQ3mm`:37 new CDC/compatibility checks plus unchanged
+49 exact-control,17 forward-retirement and19 payload checks. Full old seven-module
+bodies and actual bench restore exactly; the only old test-helper change is a
+four-line composition before the untouched inverse. Six malformed CDC bodies
+reject rather than being stripped. Original30PASS and48PASS/1structuralFAIL
+attempts remain preserved before the compatibility correction.
+
+The new branch synchronizes twelve sticky cause bits independently and ORs only
+the destination stages; fast-domain current fault and publication fences are
+unchanged. Nominal digital recurrence,4096 subsets,48 X/Z rows,three clock phases,
+both scheduling modes and epoch/private reset separation pass. Quiescent FFT
+stub/forced source-Q snapshots are explicit: not actual FFT, analog CDC or physical
+closure. Candidate source pin/archive and actual-preparation review remain next.
+The immutable preceding failed-route pins FWbdd2fd5/HDL2ccfac2e are pushed
+(root66608/88574terminal0); the failed route was not modified to add this candidate.
