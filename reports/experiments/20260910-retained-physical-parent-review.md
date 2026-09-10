@@ -77,6 +77,26 @@ Each candidate needs a default/inverse check and independent original shadows.
 Another actual FFT run and physical build require review of the resulting
 frozen sources. No timing success is predicted from a source-level cut alone.
 
+The **private-descriptor-only candidate is now implemented and independently
+passes 32 offline tests in 7.22 seconds**, original root process 49914 terminal
+exit 0. All 40 source pins remain unchanged. The original runtime remains
+untouched; the three candidate RTL files live in `retained_output_candidate`.
+Strict inverses restore the exact original wrapper, implementation and guard.
+The mode defaults off. Tests cover unchanged default behavior, the original
+guard matrix, same-edge accepted metadata, descriptor hold through active/ACK,
+full composition shadows with three stall profiles, rejected X/Z offers,
+accepted missing/X/Z offer violations, wrong descriptor/phase mutants and
+invalid mode parameters. Root additionally inspected the four generated X/Z
+offer benches to rule out a silently unmatched test replacement.
+
+Private-only frozen source commits: FW
+`19c1436f3e8d1a84a6e35381a86e8ea7f6e904cc`, HDL
+`75fa090855e872ec1fd56877af218a5900882429`. Root receipts, full source snapshot,
+generated benches and logs are retained in `retained-private-parent.PmtrTqnC`
+under the recovery root below. This gate permits proceeding to the separately
+tested closed-input candidate; it does not establish physical path removal,
+no added mapped resources, actual-FFT equivalence or deployment eligibility.
+
 The parallel checked-product design instead places checked metadata in an
 owned, registered token before consumption. Its 3306 offline tests are useful
 control evidence; its actual-FFT harness is still being prepared. It has not

@@ -27,6 +27,12 @@ operation or production HDL gitlink promotion. See
 [physical failure and targeted next changes](reports/experiments/20260910-retained-physical-parent-review.md)
 and [actual PASS and independent3306 evidence](reports/experiments/20260910-retained-actual-pass-and-product3306.md).
 
+The first default-off descriptor-offer candidate is now implemented separately
+and passes independent32 offline tests, with40 source pins unchanged. The
+parallel checked-product actual-harness/observer preparation passes independent93
+offline tests, with27 source pins unchanged. Neither result is a new actual FFT
+or routed timing result. The closed-input/ROM-path candidate remains next.
+
 ## Earlier verification history
 
 Latest actual frame finding (2026-09-10): independent180 preparation tests PASS;
