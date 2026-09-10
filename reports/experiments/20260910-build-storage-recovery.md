@@ -225,3 +225,13 @@ The corrected late60 result package was independently verified from Git at FW
 hash/length receipts, 2,291,252 bytes, SHA-256
 `0c0d31b9d5c907f3453597c751064a5c15df26f54fd0281683e947ce783e9af8`.
 Its original push to the high-rate60 do-not-merge branch succeeded.
+
+ROM successful-terminal preservation subsequently completed at firmware
+`ee341aab42b25dd191188dfbdd127a215b13d3f4` and HDL
+`7ef21048255669918b0fc8ee2be46b0c665579a8`. Parent read the complete result
+report and verified all 130 payload members / 131 tracked files directly from
+Git, against manifest
+`0b83a3933d7d02211a2f0e6f5dbd6cde0c624f7a78a9abbd4db4acecd806d4d3`.
+The portable archive includes complete traces/logs and the full WDB in parts;
+its payload totals 142,282,627 bytes. Both original pushes to the ROM
+do-not-merge branches succeeded. Physical preparation remains offline-only.

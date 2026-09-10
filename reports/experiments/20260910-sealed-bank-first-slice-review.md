@@ -83,3 +83,35 @@ parallel with implementation.
 The complete goal remains source 15/30/60 MS/s with native fine search,
 independent 2.5 MS/s host evidence, causal scheduling, the 120 ms/300 s scanner,
 full receiver physical/calibration qualification, and staged hardware deployment.
+
+## Draft RTL review findings (before qualification)
+
+Parent and independent review of the first 250-line draft found issues to fix
+before any passing claim:
+
+- Closed-current-lease offers were ignored when READY was low, allowing
+  publication despite an extra token; an already-seen certificate had the
+  analogous duplicate-offer ambiguity. The new interface must distinguish
+  the legacy held final from a genuinely new offer, with executable issuer
+  behavior and a direct current-event veto.
+- Releasing N required `input_valid==0`, while N+1 could legally hold VALID
+  waiting for READY. READY stayed low until release, creating deadlock. Only
+  qualified future-lease offers may be tolerated during old-lease release;
+  old-reference drainage must still be established.
+- A parallel full-width metadata comparison still fed immediate reasons and
+  publication control, despite the added pipelined equality tree. The revised
+  design must actually break the wide path. Bounded delayed observation of a
+  private metadata fault is acceptable only with the original token identity
+  preserved and no seal/publication/reuse before all checks drain. Legacy
+  externally visible reason/counter timing needs a later explicit adapter,
+  not an automatic compatibility claim.
+- A missing certificate needs a modeled bounded timeout issuer. A bench-wide
+  watchdog does not establish the controller's rejection behavior. Normal
+  two-stage drain and final-read/ACK turnaround did not reveal another
+  two-state counterexample in the independent read-only review.
+
+The draft is not an integrated receiver change. Its original source/compile
+failure is to be retained separately from the corrected standalone tests.
+The additional issuer/reset bookkeeping must enter the eventual full resource
+and latency budget; the controller's conditional interface alone is not an
+end-to-end lease freshness or CDC proof.
