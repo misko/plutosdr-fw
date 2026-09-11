@@ -2,6 +2,17 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, local fault pipeline: **functional boundary gate FAILS;
+no routing or deployment.** 1,306 unit/regression tests pass and healthy actual
+FFT numerics/service remain unchanged, but late status at product publication
+does not immediately close the internal ownership gate. Separate actual-FFT
+probes reproduce the same gap on the parent; both quarantine without host
+output in the held-reader tests. Next fix current guard-local product vetoes,
+then rerun all boundary/numerical tests before route. Branch
+`codex/starlink-rx-only-do-not-merge-local-fault-pipeline`, FW `45c01efb9`,
+HDL `da38d32b1`. Failed evidence is retained; primary HDL, radios and PPU/main
+remain unchanged. See [rejection and parent reproduction](reports/experiments/20260911-local-fault-pipeline-rejection.md).
+
 Update 2026-09-11, registered private abort: **1,241 tests pass**, both actual
 FFT campaigns retain 64,512 exact numerical words and 4,178 service clocks.
 Six direct guard-fault cases exercise extra private work without new publication
