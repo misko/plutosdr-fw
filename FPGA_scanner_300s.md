@@ -2,6 +2,19 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, same-edge forward-final handshake: **1009 distinct tests and
+both actual FFT campaigns pass**; all 64512 records/CSV and service clocks remain
+exact. Handoff-to-ACK improves -1.046→-0.255 ns and product-position-to-active
+-1.045→+0.152 ns, but global routing regresses **-1.245→-1.331 ns WNS**,
+453→526 setup failures. NO promotion/deployment. New same-domain worst is actual
+FFT flushing/READY through fault accounting to fast_fault (-1.189 ns). Next
+prove parallel sticky-fault capture at the existing register boundary, preserving
+same-edge current vetoes, reset/X/Z semantics and forced-summary behavior.
+Branch `codex/starlink-rx-only-do-not-merge-forward-final-commit`, FW `9c21b369a`,
+HDL `dbff0b303`. CDC remains nine CDC-3 / 208 CDC-15, unqualified. No radios,
+PPU/main or primary HDL changes; native 60 MS/s fine and 2.5 MS/s inspection
+remain required. See [forward-final route](reports/experiments/20260911-forward-final-commit-actual-route.md).
+
 Update 2026-09-11, two READY KEEP attributes removed: **992 regression tests
 and both actual FFT campaigns pass**, preserving all 64512 records/CSV and
 service clocks. Matched routing improves WNS **-1.434 to -1.245 ns**, same-domain
