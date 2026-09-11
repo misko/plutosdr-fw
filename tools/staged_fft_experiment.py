@@ -206,6 +206,16 @@ def audit_certification_sim(output):
     result['certification']={'boundaries':rows,'checks':checks,'private_differences':differences,'snapshot_cancelled':True,'consume_cancelled':True,'fresh_recovery':True}
     return result
 
+def audit_guardfacts_sim(output):
+    result=audit_certification_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_GUARDFACTS_CASE_PASS gate=(\d+) owner=(\d+) fact=(\d+) starts=0 reads=0 releases=0$',text,re.M)
+    require(rows==[(str(g),str(o),str(f)) for g in range(2) for o in range(2) for f in range(8)],'all independently clocked guard facts exercised')
+    cycles=re.findall(r'^STAGED_GUARDFACTS_PASS cases=32 cycles=(\d+) exact_certificates=1 fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(len(cycles)==1 and int(cycles[0])>=1000,'exact certificate state and fresh recovery coverage')
+    result['guardfacts']={'boundaries':rows,'cycles':int(cycles[0]),'exact_certificates':True,'fresh_recovery':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -223,7 +233,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_certification_sim(output)
+        if mode=='sim':result['audit']=audit_guardfacts_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

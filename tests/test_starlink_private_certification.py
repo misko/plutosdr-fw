@@ -14,10 +14,16 @@ ROOT=Path(__file__).resolve().parents[1]
 TOP=ROOT/'hdl/library/starlink_pss_acquisition/staged_control/starlink_pss_fft_staged_output_impl.v'
 ORIGINAL=ROOT.parent/'staged-sequence-prepared-v1/starlink_pss_fft_staged_output_impl.v'
 
-def test_only_private_capture_expression_changed():
+def test_original_private_capture_inverse_and_current_expression():
     old=ORIGINAL.read_bytes()
     assert hashlib.sha256(old).hexdigest()=='2df734a229635ef94cc1017ab1bba6d0bcdfad762655619c0e28fd68c80df68d'
-    text=TOP.read_text()
+    # The current top also has independently inverse-checked guard-fact wiring.
+    # Retain this historical expression inverse on its pinned certification
+    # snapshot and require the live expression to remain exactly the same.
+    certified=ROOT.parent/'staged-certification-prepared-v1/starlink_pss_fft_staged_output_impl.v'
+    assert hashlib.sha256(certified.read_bytes()).hexdigest()=='6c181d830143c998ffa3fba15d51fe34cf087d08eb622591f698229b07b1a4a4'
+    text=certified.read_text()
+    assert re.findall(r'descriptor_certified <= preparation_valid[^;]+;',TOP.read_text())==re.findall(r'descriptor_certified <= preparation_valid[^;]+;',text)
     start=text.index('          // In certified mode this is only a private descriptor snapshot.')
     end=text.index(';',start)+1
     restored=text[:start]+'          descriptor_certified <= preparation_valid && !any_fast_fault;'+text[end:]
