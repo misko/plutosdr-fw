@@ -16,6 +16,7 @@ from staged_fft_experiment import output_metadata_compiled, audit_outputmetadata
 from staged_fft_experiment import balanced_handoff_compiled, audit_balancedhandoff
 from staged_fft_experiment import completion_slot_compiled, audit_completion_slot
 from staged_fft_experiment import private_facts_compiled, audit_private_facts
+from staged_fft_experiment import replay_quiet_compiled, audit_replay_quiet, replay_fence_compiled, audit_replay_fence, verify_replay_fence_configuration
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -38,6 +39,7 @@ def verify_ack_auxiliary(auxiliary,expected,prepared):
     if balanced_handoff_compiled(prepared):audited=audit_balancedhandoff(auxiliary,auxiliary=True)
     if completion_slot_compiled(prepared):audited=audit_completion_slot(auxiliary,auxiliary=True)
     if private_facts_compiled(prepared):audited=audit_private_facts(auxiliary,auxiliary=True)
+    if replay_quiet_compiled(prepared):audited=audit_replay_fence(auxiliary,auxiliary=True) if replay_fence_compiled(prepared) else audit_replay_quiet(auxiliary,auxiliary=True)
     require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
     return audited
 
@@ -86,6 +88,10 @@ def run(actual,synthesis,output,ack_actual=None):
     require(('private_facts' in a['audit'])==private_facts_compiled(prepared),
             'main audit and compiled private facts campaign differ')
     if private_facts_compiled(prepared):audited=audit_private_facts(actual)
+    require(('replay_quiet' in a['audit'])==replay_quiet_compiled(prepared),'main audit and compiled replay quiet campaign differ')
+    require(('replay_fence' in a['audit'])==replay_fence_compiled(prepared),'main audit and compiled replay fence campaign differ')
+    if replay_quiet_compiled(prepared):audited=audit_replay_fence(actual) if replay_fence_compiled(prepared) else audit_replay_quiet(actual)
+    if replay_fence_compiled(prepared):verify_replay_fence_configuration(prepared)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])

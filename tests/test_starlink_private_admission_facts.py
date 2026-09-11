@@ -24,6 +24,9 @@ PAYLOAD='''  // Invalid evidence is private and has no reset value contract in o
 '''
 
 def undo_top(text):
+    if '// BEGIN REPLAY QUIET PUBLICATION FENCE' in text:
+        from tests.test_starlink_replay_quiet_fence import undo_top as undo_fence
+        text=undo_fence(text)
     old='#(.CHECKS(36),.PRIVATE_FACT_CAPTURE(1)) admission_gate ('
     assert text.count(old)==1
     return text.replace(old,'#(.CHECKS(36)) admission_gate (',1)

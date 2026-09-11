@@ -387,20 +387,40 @@ def audit_private_facts(output,auxiliary=False):
 def replay_quiet_compiled(prepared):
     return '// BEGIN REPLAY QUIET WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
 
-def audit_replay_quiet(output,auxiliary=False):
+def audit_replay_quiet(output,auxiliary=False,integrated=False):
     result=audit_private_facts(output,auxiliary)
     text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
-    rows=re.findall(r'^STAGED_REPLAY_QUIET_PASS checks=(\d+) offers=(\d+) accepts=(\d+) sweep=(\d+) paused=(\d+) current_exact=1 runtime_unchanged=1$',text,re.M)
+    rows=re.findall(r'^STAGED_REPLAY_QUIET_PASS checks=(\d+) offers=(\d+) accepts=(\d+) sweep=(\d+) paused=(\d+) current_exact=1 runtime_unchanged=([01])$',text,re.M)
     require(len(rows)==1 and int(rows[0][0])>=1000 and min(map(int,rows[0][1:3]))>=18,'complete replay quiet witness')
+    require(int(rows[0][5])==int(not integrated),'replay shadow/integrated classification')
     require(int(rows[0][3])==(512 if auxiliary else 0),'complete replay status byte sweep')
     require(int(rows[0][4])==0 if auxiliary else int(rows[0][4])>=384,'forced stall remains separately checked')
     cases=re.findall(r'^STAGED_REPLAY_QUIET_CASE_PASS boundary=(\d+) blocked_publication=1 fresh_reads=512 fresh_releases=1$',text,re.M)
     require(cases==([str(n) for n in range(10)] if auxiliary else []),'complete replay late event recovery')
-    result['replay_quiet']={'checks':int(rows[0][0]),'offers':int(rows[0][1]),'accepts':int(rows[0][2]),'sweep':int(rows[0][3]),'paused':int(rows[0][4]),'boundaries':cases,'current_exact':True,'runtime_unchanged':True}
+    result['replay_quiet']={'checks':int(rows[0][0]),'offers':int(rows[0][1]),'accepts':int(rows[0][2]),'sweep':int(rows[0][3]),'paused':int(rows[0][4]),'boundaries':cases,'current_exact':True,'runtime_unchanged':not integrated}
+    return result
+
+def replay_fence_compiled(prepared):
+    return '.REPLAY_QUIET_PUBLICATION(1)' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def verify_replay_fence_configuration(prepared):
+    bench=(prepared/'tb_fft_staged_output.sv').read_text()
+    tcl=(prepared/'staged_fft_experiment.tcl').read_text()
+    require(bench.count('.REPLAY_QUIET_PUBLICATION(1)')==1 and
+            bench.count('// BEGIN INTEGRATED REPLAY FENCE WITNESS')==1 and
+            tcl.count(' REPLAY_QUIET_PUBLICATION=1')==1,'matching enabled actual/synthesis replay fence')
+
+def audit_replay_fence(output,auxiliary=False):
+    result=audit_replay_quiet(output,auxiliary,integrated=True)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    require(text.count('STAGED_REPLAY_FENCE_PASS enabled=1 profile=1 independent_shadow=1 current_publication_exact=1')==1,'complete integrated replay fence evidence')
+    result['replay_fence']={'enabled':True,'profile':True,'independent_shadow':True,'current_publication_exact':True}
     return result
 
 def run(mode,prepared,expected,output):
-    verify(prepared,expected);fresh(output)
+    verify(prepared,expected)
+    if replay_fence_compiled(prepared):verify_replay_fence_configuration(prepared)
+    fresh(output)
     env=dict(os.environ)
     for key in ['PYTHONHOME','PYTHONPATH','PYTHONOPTIMIZE','LD_LIBRARY_PATH']:env.pop(key,None)
     env.update(LD_LIBRARY_PATH='/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE',TMPDIR=str(output))
@@ -429,7 +449,7 @@ def run(mode,prepared,expected,output):
         if mode in {'sim','ack'} and private_facts_compiled(prepared):
             result['audit']=audit_private_facts(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and replay_quiet_compiled(prepared):
-            result['audit']=audit_replay_quiet(output,auxiliary=mode=='ack')
+            result['audit']=audit_replay_fence(output,auxiliary=mode=='ack') if replay_fence_compiled(prepared) else audit_replay_quiet(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

@@ -10,6 +10,9 @@ RTL=ROOT/'hdl/library/starlink_pss_acquisition/staged_control'
 PARENT=Path('/dev/shm/starlink-private-admission.jU5bmytc/prepared-v1')
 
 def undo_bench(text):
+    if '// BEGIN INTEGRATED REPLAY FENCE WITNESS' in text:
+        from tests.test_starlink_replay_quiet_fence import undo_bench as undo_fence
+        text=undo_fence(text)
     for label in ['WITNESS','BOUNDARIES','AUXILIARY']:
         text,count=re.subn(r' *// BEGIN REPLAY QUIET '+label+r'\n.*? *// END REPLAY QUIET '+label+r'\n','',text,flags=re.S)
         assert count==1
@@ -23,10 +26,18 @@ def test_runtime_byte_identical_and_exact_additive_bench():
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
-        if (RTL/name).exists():assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+        if (RTL/name).exists():
+            text=(RTL/name).read_text()
+            if name=='starlink_pss_fft_staged_output_impl.v' and '// BEGIN REPLAY QUIET PUBLICATION FENCE' in text:
+                from tests.test_starlink_replay_quiet_fence import undo_top
+                text=undo_top(text)
+            assert text==(PARENT/name).read_text(),name
     name='tb_fft_staged_output.sv'
     assert undo_bench((RTL/name).read_text())==(PARENT/name).read_text()
     top=(RTL/'starlink_pss_fft_staged_output_impl.v').read_text()
+    if '// BEGIN REPLAY QUIET PUBLICATION FENCE' in top:
+        from tests.test_starlink_replay_quiet_fence import undo_top
+        top=undo_top(top)
     original=re.search(r'wire output_replay_accept = ([^;]+);',top)[1]
     shadow=re.search(r'wire replay_original_predicate = ([^;]+);',(RTL/name).read_text())[1]
     assert re.sub(r'\s+','',shadow.replace('dut.',''))==re.sub(r'\s+','',original)
