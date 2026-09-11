@@ -3,14 +3,16 @@ module starlink_glrt_native_engine_ooc_wrapper #(
   parameter TEMPLATE_FILE="native_cubic_60000000_upper.mem",
   parameter integer REFERENCE_STRIDE=1,
   parameter DIRECT_COEFFICIENT_FILE="",
+  parameter integer DIRECT_REFERENCE_PHASES=1,
+  parameter integer REFERENCE_PHASE_BITS=DIRECT_REFERENCE_PHASES <= 1 ? 1 : $clog2(DIRECT_REFERENCE_PHASES),
   parameter integer SAMPLE_COUNT=79200/REFERENCE_STRIDE
 ) (
   input wire clk,
-  input wire [231:0] stimulus,
-  output reg [554:0] observation
+  input wire [231+REFERENCE_PHASE_BITS:0] stimulus,
+  output reg [554+REFERENCE_PHASE_BITS:0] observation
 );
-  reg [231:0] launch;
-  wire [554:0] response;
+  reg [231+REFERENCE_PHASE_BITS:0] launch;
+  wire [554+REFERENCE_PHASE_BITS:0] response;
   always @(posedge clk) begin
     launch <= stimulus;
     observation <= response;
@@ -18,6 +20,7 @@ module starlink_glrt_native_engine_ooc_wrapper #(
   wire resetn,flush,job_valid,input_valid,input_gap,input_closed,input_clipped,result_ready;
   wire [63:0] job_start,input_index,result_start;
   wire [31:0] seed,step,result_seed,result_step;
+  wire [REFERENCE_PHASE_BITS-1:0] reference_phase,result_reference_phase;
   wire signed [15:0] ii,iq;
   wire job_ready,active,result_valid;
   localparam C=$clog2(SAMPLE_COUNT+1),S=35+$clog2(SAMPLE_COUNT);
@@ -28,13 +31,14 @@ module starlink_glrt_native_engine_ooc_wrapper #(
   wire signed [T-1:0] ti,tq;
   wire [E-1:0] energy;
   assign {resetn,flush,job_valid,job_start,seed,step,input_valid,input_gap,input_closed,
-      input_clipped,input_index,ii,iq,result_ready} = launch;
-  assign response = {job_ready,active,result_valid,result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy};
+      input_clipped,input_index,ii,iq,result_ready,reference_phase} = launch;
+  assign response = {job_ready,active,result_valid,result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy,result_reference_phase};
   (* keep_hierarchy="yes" *) starlink_glrt_native_engine #(.TEMPLATE_FILE(TEMPLATE_FILE),
     .REFERENCE_STRIDE(REFERENCE_STRIDE),.SAMPLE_COUNT(SAMPLE_COUNT),
-    .DIRECT_COEFFICIENT_FILE(DIRECT_COEFFICIENT_FILE)) dut (
+    .DIRECT_COEFFICIENT_FILE(DIRECT_COEFFICIENT_FILE),.DIRECT_REFERENCE_PHASES(DIRECT_REFERENCE_PHASES)) dut (
     .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),
     .job_start(job_start),.job_phase_seed(seed),.job_phase_step(step),.input_valid(input_valid),
+    .job_reference_phase(reference_phase),.result_reference_phase(result_reference_phase),
     .input_gap(input_gap),.input_closed(input_closed),.input_clipped(input_clipped),
     .input_index(input_index),.input_i(ii),.input_q(iq),.active(active),
     .result_valid(result_valid),.result_ready(result_ready),.result_start(result_start),

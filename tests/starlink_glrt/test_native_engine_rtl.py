@@ -5,6 +5,8 @@ import subprocess
 
 import pytest
 
+from tools.generate_glrt_direct_phase_rom import pack_phase_rom
+
 from .ddc import BANK_ROOT
 from .test_cubic_coefficients_rtl import expected as coefficient_oracle
 from .test_cubic_reference_rtl import packed_words
@@ -15,6 +17,7 @@ BENCH = r'''
 module tb;
 localparam N=COUNT_VALUE,SEGMENTS=SEGMENT_VALUE;
 localparam C=$clog2(N+1),S=35+$clog2(N),T=S+$clog2(N),E=36+$clog2(N);
+localparam PHASES=PHASE_VALUE,PB=PHASES<=1 ? 1 : $clog2(PHASES);
 reg clk=0;always #5 clk=~clk;
 reg resetn=0,flush=0,job_valid=0,input_valid=0,input_gap=0,input_closed=0,input_clipped=0,result_ready=1;
 reg [63:0] job_start=0,input_index=0;
@@ -23,6 +26,7 @@ reg signed [15:0] ii=0,iq=0;
 wire job_ready,active,result_valid;
 wire [63:0] result_start;
 wire [31:0] result_seed,result_step;
+wire [PB-1:0] result_reference_phase;
 wire [C-1:0] count;
 wire [7:0] fault;
 wire signed [S-1:0] ri,rq,di,dq;
@@ -30,17 +34,18 @@ wire signed [T-1:0] ti,tq;
 wire [E-1:0] energy;
 starlink_glrt_native_engine #(.SAMPLE_COUNT(N),.SEGMENT_COUNT(SEGMENTS),
  .REFERENCE_STRIDE(STRIDE_VALUE),.TEMPLATE_FILE("BANK_PATH"),
- .DIRECT_COEFFICIENT_FILE("DIRECT_PATH")) dut (
+ .DIRECT_COEFFICIENT_FILE("DIRECT_PATH"),.DIRECT_REFERENCE_PHASES(PHASES)) dut (
  .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),
  .job_start(job_start),.job_phase_seed(seed),.job_phase_step(step),.input_valid(input_valid),
+ .job_reference_phase(seed[PB-1:0]),.result_reference_phase(result_reference_phase),
  .input_gap(input_gap),.input_closed(input_closed),.input_clipped(input_clipped),
  .input_index(input_index),.input_i(ii),.input_q(iq),.active(active),
  .result_valid(result_valid),.result_ready(result_ready),.result_start(result_start),
  .result_phase_seed(result_seed),.result_phase_step(result_step),.result_count(count),.result_fault(fault),
  .reference_sum_i(ri),.reference_sum_q(rq),.delay_sum_i(di),.delay_sum_q(dq),
  .reference_prefix_integral_i(ti),.reference_prefix_integral_q(tq),.observed_energy(energy));
-localparam PAYLOAD=64+64+C+8+4*S+2*T+E;
-wire [PAYLOAD-1:0] payload={result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy};
+localparam PAYLOAD=64+64+C+8+4*S+2*T+E+PB;
+wire [PAYLOAD-1:0] payload={result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy,result_reference_phase};
 reg stalled=0;
 reg [PAYLOAD-1:0] previous_payload;
 always @(posedge clk) if(resetn) begin
@@ -50,7 +55,7 @@ always @(posedge clk) if(resetn) begin
  stalled <= result_valid && !result_ready;
  previous_payload <= payload;
  if(result_valid && result_ready)
-  $display("R %h %h %h %d %d %d %d %d %d %d %d %d",result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy);
+  $display("R %h %h %h %d %d %d %d %d %d %d %d %d %d",result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy,result_reference_phase);
 end else stalled <= 0;
 integer fd,rc;
 reg [4095:0] path;
@@ -101,20 +106,21 @@ def expected(job, samples, coefficients, fault=0):
     return [start,seed,step,n,fault,*sums,*prefix,sum(value[5] for value in values)]
 
 
-def simulate(tmp_path, count, bank, rows, stride=1, direct=None):
+def simulate(tmp_path, count, bank, rows, stride=1, direct=None, phases=1):
     bank_path,bench,trace,executable = [tmp_path/name for name in ("bank.mem","tb.sv","input.txt","sim")]
     bank_path.write_text("".join(f"{word:027x}\n" for word in packed_words(bank)))
     direct_path = ""
     if direct is not None:
         direct_path = str(tmp_path/"direct.mem")
-        assert len(direct) == count
-        with open(direct_path,"w") as stream:
-            for coefficients in direct:
-                word = sum((v & 65535) << (16*n) for n,v in enumerate(coefficients))
-                stream.write(f"{word:016x}\n")
+        assert len(direct) == count*phases
+        phase_major = "".join(
+            f"{sum((v & 65535) << (16*n) for n,v in enumerate(coefficients)):016x}\n"
+            for coefficients in direct).encode()
+        with open(direct_path,"wb") as stream:
+            stream.write(pack_phase_rom(phase_major, phases=phases, samples=count))
     bench.write_text(BENCH.replace("COUNT_VALUE",str(count)).replace("SEGMENT_VALUE",str(len(bank)))
                      .replace("BANK_PATH",str(bank_path)).replace("STRIDE_VALUE",str(stride))
-                     .replace("DIRECT_PATH",direct_path))
+                     .replace("DIRECT_PATH",direct_path).replace("PHASE_VALUE",str(phases)))
     with trace.open("w") as file:
         file.writelines(rows)
     sources = [BANK_ROOT/f"starlink_glrt_{name}.v" for name in (
@@ -124,7 +130,7 @@ def simulate(tmp_path, count, bank, rows, stride=1, direct=None):
     assert build.returncode == 0,build.stdout+build.stderr
     run = subprocess.run(["vvp",str(executable),f"+INPUT={trace}"],capture_output=True,text=True,timeout=120,check=False)
     assert run.returncode == 0,run.stdout+run.stderr
-    return [[*(int(word,16) for word in words[1:4]),*map(int,words[4:])]
+    return [[*(int(word,16) for word in words[1:4]),*map(int,words[4:] if phases>1 else words[4:-1])]
         for line in run.stdout.splitlines() if (words:=line.split()) and words[0]=="R"]
 
 
@@ -133,14 +139,12 @@ def complete_job(job, count, *, ready=1):
         row(value=sample(job[0]+n),closed=int(n==count-1),ready=ready) for n in range(count)]
 
 
-@pytest.mark.parametrize("stride,direct_bank", [(24, True), (24, False), (4, False), (2, False), (1, False)],
-                         ids=["2p5MSs-direct", "2p5MSs-cubic-diagnostic", "15MSs", "30MSs", "60MSs"])
-def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(tmp_path, stride, direct_bank):
+@pytest.mark.parametrize("stride,direct_bank,phases", [(24, True, 1), (24, True, 4), (24, False, 1), (4, False, 1), (2, False, 1), (1, False, 1)],
+                         ids=["2p5MSs-direct", "2p5MSs-phase4", "2p5MSs-cubic-diagnostic", "15MSs", "30MSs", "60MSs"])
+def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(tmp_path, stride, direct_bank, phases):
     count,base = 79200//stride,2**55+73
     bank = bank_for(79200)
-    direct = [tuple((n*(k+1)*13+37) % 4000-2000 for k in range(4)) for n in range(count)] if direct_bank else None
-    coefficients = ([[n,*c,int(n==count-1),0] for n,c in enumerate(direct)]
-                    if direct_bank else coefficient_oracle(bank,24,count,stride))
+    direct = [tuple((n*(k+1)*13+37) % 4000-2000 for k in range(4)) for n in range(count*phases)] if direct_bank else None
     # Integer rounding at each absolute rational epoch, not a repeatedly
     # rounded 3,333-sample period at 2.5 MS/s.
     jobs = [(base+(64+stride-1)//stride+(frame*80000+stride//2)//stride,
@@ -152,8 +156,15 @@ def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(
             valid = (cycle+1)*3//(5*stride) != cycle*3//(5*stride)
             yield row(job=job,value=sample(base+native_index) if valid else None)
             native_index += int(valid)
-    result = simulate(tmp_path,count,bank,rows(),stride,direct)
-    assert result == [expected(job,[sample(job[0]+n) for n in range(count)],coefficients) for job in jobs]
+    result = simulate(tmp_path,count,bank,rows(),stride,direct,phases)
+    truth = []
+    for job in jobs:
+        phase = job[1] % phases
+        coefficients = ([[n,*c,int(n==count-1),0] for n,c in enumerate(direct[phase*count:(phase+1)*count])]
+                        if direct_bank else coefficient_oracle(bank,24,count,stride))
+        truth.append(expected(job,[sample(job[0]+n) for n in range(count)],coefficients)
+                     + ([phase] if phases>1 else []))
+    assert result == truth
 
 
 @pytest.mark.parametrize("failure,fault", [("gap",1),("index",1),("closed",2),("clipped",0x42),("flush",8)])

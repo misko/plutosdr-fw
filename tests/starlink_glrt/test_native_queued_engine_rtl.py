@@ -112,6 +112,7 @@ endmodule
 '''
     for key, value in {"COUNT_VALUE": count, "SEGMENT_VALUE": len(bank), "BANK_PATH": bank_path,
                        "BASE_VALUE": base, "STEP_Q16": step*65536, "SEED_VALUE": seed,
+                       "STRIDE_VALUE": 1, "DIRECT_PATH": "", "PHASE_VALUE": 1,
                        "EXPIRY_OFFSET": 1024+5*period, "PERIOD_Q16": period*65536,
                        "TOTAL_CYCLES": 669000 if not fault_mode else 10000,
                        "DRAIN_CYCLE": 399000 if not fault_mode else 8000,
@@ -122,14 +123,14 @@ endmodule
         bench = bench.replace(key, str(value))
     bench_path.write_text(bench)
     sources = [BANK_ROOT/f"starlink_glrt_{name}.v" for name in (
-        "cubic_reference", "cubic_coefficients", "native_rotate", "native_products",
+        "cubic_reference", "cubic_coefficients", "direct_coefficients", "native_rotate", "native_products",
         "local_moments", "native_engine", "native_schedule", "native_result_queue",
         "native_scheduled_results")]
     sources.append(BANK_ROOT.parent/"common/ad_dds_cordic_pipe.v")
     build = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable),
-                            str(bench_path), *map(str, sources)], capture_output=True, text=True)
+                            str(bench_path), *map(str, sources)], capture_output=True, text=True, check=False)
     assert build.returncode == 0, build.stdout+build.stderr
-    run = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=120)
+    run = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=120, check=False)
     assert run.returncode == 0, run.stdout+run.stderr
     records = [[int(word, 16) for word in line.split()[1:]]
                for line in run.stdout.splitlines() if line.startswith("Q ")]

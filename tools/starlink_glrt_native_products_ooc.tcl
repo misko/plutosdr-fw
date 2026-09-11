@@ -1,6 +1,6 @@
 # Native derotation and exact products, isolated from the complete receiver.
-# Usage: vivado -mode batch -source THIS -tclargs OUTPUT ?TEMPLATE_BANK? ?RATE?
-if {$argc < 1 || $argc > 3} { error "expected output, optional engine bank and rate" }
+# Usage: vivado -mode batch -source THIS -tclargs OUTPUT ?TEMPLATE_BANK? ?RATE? ?PHASES?
+if {$argc < 1 || $argc > 4} { error "expected output, optional engine bank, rate and phases" }
 if {[version -short] ne "2022.2"} { error "requires Vivado 2022.2" }
 set output [file normalize [lindex $argv 0]]
 set repo [file dirname [file dirname [file normalize [info script]]]]
@@ -15,9 +15,14 @@ set top starlink_glrt_native_products_ooc_wrapper
 set generics {}
 set mode products
 set rate 60000000
-if {$argc == 3} {
+if {$argc >= 3} {
   set rate [lindex $argv 2]
   if {$rate ni {2500000 15000000 30000000 60000000}} { error "unsupported tracking rate" }
+}
+set reference_phases 1
+if {$argc == 4} {
+  set reference_phases [lindex $argv 3]
+  if {$reference_phases ni {1 2 4 8} || $rate != 2500000} { error "unsupported direct reference phases" }
 }
 set stride [expr {60000000/$rate}]
 set synthesis_directive Default
@@ -41,17 +46,23 @@ if {$argc >= 2} {
   set wrapper [file join $repo tools starlink_glrt_native_engine_ooc_wrapper.v]
   set top starlink_glrt_native_engine_ooc_wrapper
   set generics [list TEMPLATE_FILE=$bank REFERENCE_STRIDE=$stride]
-  if {$rate == 2500000} { lappend generics DIRECT_COEFFICIENT_FILE=$bank }
+  if {$rate == 2500000} {
+    lappend generics DIRECT_COEFFICIENT_FILE=$bank DIRECT_REFERENCE_PHASES=$reference_phases
+  }
   lappend sources $reference $coefficients $direct $moments $engine
   lappend names bank reference coefficients direct moments engine
   set lut_budget 3659
   set ff_budget 5500
   set bram_half_tile_budget 24
+  if {$rate == 2500000 && $reference_phases > 1} {
+    set bram_half_tile_budget [expr {14*$reference_phases}]
+  }
   set fd [open $bank r]
   set words [split [string trim [read $fd]] \n]
   close $fd
   set expected_words [expr {$rate == 2500000 ? 3300 : 3302}]
-  set word_pattern [expr {$rate == 2500000 ? {^[0-9a-fA-F]{16}$} : {^[0-9a-fA-F]{27}$}}]
+  set digits [expr {$rate == 2500000 ? 16*$reference_phases : 27}]
+  set word_pattern [format {^[0-9a-fA-F]{%d}$} $digits]
   if {[llength $words] != $expected_words} { error "tracking engine template length differs" }
   foreach word $words {
     if {![regexp $word_pattern $word]} { error "invalid rate-specific template word" }
@@ -105,7 +116,7 @@ set hold [get_property SLACK $hold_path]
 if {$lut+$srl > $lut_budget || $ff > $ff_budget || $dsp != 8 || 2*$bram36+$bram18 > $bram_half_tile_budget} {
   error "native arithmetic budget exceeded: LUT=$lut SRL=$srl FF=$ff DSP=$dsp BRAM36=$bram36 BRAM18=$bram18"
 }
-set minimum_rom_half_tiles [expr {$rate == 2500000 ? 12 : 20}]
+set minimum_rom_half_tiles [expr {$rate == 2500000 ? 12*$reference_phases : 20}]
 if {$mode eq "engine" && 2*$bram36+$bram18 < $minimum_rom_half_tiles} {
   error "native reference ROM is missing from the synthesized engine"
 }
@@ -121,6 +132,7 @@ puts $fd "part=xc7z010clg400-1"
 puts $fd "clock_mhz=100"
 puts $fd "source_rate_hz=$rate"
 puts $fd "reference_stride=$stride"
+puts $fd "reference_phases=$reference_phases"
 set direct_mode [expr {$mode eq "engine" && $rate == 2500000}]
 puts $fd "direct_coefficients=$direct_mode"
 puts $fd "clock_source_site=BUFGCTRL_X0Y0"

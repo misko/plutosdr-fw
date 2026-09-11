@@ -75,23 +75,24 @@ endmodule
                        "BANK_PATH": bank_path, "BASE_VALUE": base,
                        "STEP_Q16": step*65536, "SEED_VALUE": seed,
                        "BLOCK_VALUE": int(blocked_middle),
+                       "STRIDE_VALUE": 1, "DIRECT_PATH": "", "PHASE_VALUE": 1,
                        "EXPECTED_RESULTS": 3-int(blocked_middle)}.items():
         bench = bench.replace(key, str(value))
     bench_path, executable = tmp_path / "tb.sv", tmp_path / "sim"
     bench_path.write_text(bench)
     sources = [BANK_ROOT/f"starlink_glrt_{name}.v" for name in (
-        "cubic_reference", "cubic_coefficients", "native_rotate", "native_products",
+        "cubic_reference", "cubic_coefficients", "direct_coefficients", "native_rotate", "native_products",
         "local_moments", "native_engine", "native_schedule")]
     sources.append(BANK_ROOT.parent / "common/ad_dds_cordic_pipe.v")
     build = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable),
-                            str(bench_path), *map(str, sources)], capture_output=True, text=True)
+                            str(bench_path), *map(str, sources)], capture_output=True, text=True, check=False)
     assert build.returncode == 0, build.stdout+build.stderr
-    run = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=120)
+    run = subprocess.run(["vvp", str(executable)], capture_output=True, text=True, timeout=120, check=False)
     assert run.returncode == 0, run.stdout+run.stderr
-    observed = [[*map(lambda word: int(word, 16), words[1:4]), *map(int, words[4:])]
+    observed = [[*(int(word, 16) for word in words[1:4]), *map(int, words[4:])]
                 for line in run.stdout.splitlines() if (words := line.split()) and words[0] == "R"]
     coefficients = coefficient_oracle(bank, 24, count)
     frames = (0, 2) if blocked_middle else (0, 1, 2)
     jobs = [(base+1024+frame*80000, seed, step+frame*1357) for frame in frames]
-    assert observed == [expected(job, [sample(job[0]+n) for n in range(count)], coefficients)
+    assert observed == [expected(job, [sample(job[0]+n) for n in range(count)], coefficients)+[0]
                         for job in jobs]
