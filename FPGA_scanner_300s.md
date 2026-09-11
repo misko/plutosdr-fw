@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private replay and staged writer validation: both actual-FFT
+versions independently match **64,512 numerical records**. **366 regression
+tests** pass, including replay-veto and pending-descriptor cancellation checks.
+Private replay separation improves the route to **-2.265 ns**, TNS -1021.803 ns,
+936 failing endpoints; adding the writer comparison stage regresses to
+**-3.251 ns**, TNS -1733.553 ns, 1364 endpoints. Neither passes timing or is
+promoted. The new worst path is fault-qualified completion acceptance driving
+181 descriptor-register enables. Next separate private data capture from
+authorization with explicit held-bundle stability, retest and reroute before
+new features. Native 60 MS/s fine search, 2.5 MS/s IIO and every full-receiver/
+deployment gate remain required. No radio/PPU/main or production HDL changes.
+See [replay/writer verification and routed comparison](reports/experiments/20260911-staged-replay-actual-route-parent.md).
+
 Update 2026-09-11, clocked completion/private ROM loads: all **64,512 actual FFT
 records** match, including ten new completion-cancellation cases; **346 tests**
 pass. The completion-only route regresses to -3.637 ns. The private ROM revision
