@@ -2,6 +2,21 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, flat fault sources with the original scalar register:
+**1035 tests and both actual FFT campaigns pass**; all numerical records and
+service clocks remain exact. Direct registered fault CDC is restored, removing
+the distributed candidate's critical CDC-10. Route is still failing:
+**-1.283 ns WNS / -255.361 ns TNS / 607 failures**, same-domain -1.219 ns.
+This recovers the rejected distributed regression but does not outperform the
+earlier READY-absorption reference overall. **No promotion/deployment.**
+Next budget a block-owned forward-return buffer with separate capture/replay
+control to break the long downstream readiness/retirement dependency. Its
+resource, sustained-service and timing benefit must be demonstrated. Branch
+`codex/starlink-rx-only-do-not-merge-scalar-fault-sources`, FW `294249757`,
+HDL `2a028e8ed`. No radios, PPU/main or primary HDL changes. Native 60 MS/s fine
+and independent 2.5 MS/s inspection remain required; .20/.21 excluded. See
+[scalar fault result](reports/experiments/20260911-scalar-fault-sources-actual-route.md).
+
 Update 2026-09-11, distributed same-edge sticky-fault capture: **1027 distinct
 tests and both actual FFT campaigns pass**, with 941191 exact sticky-clock
 checks and unchanged numerical CSV/service. The targeted FFT-to-capture path
