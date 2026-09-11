@@ -213,10 +213,10 @@ class EthernetNativeSource:
     def __init__(self, *, transport, deployment, controller_sha256, host, visit,
                  pipeline, evidence, station_lease, predict, samples=450_000_000,
                  clock=time.monotonic, sleep=time.sleep):
-        if (host != '192.168.1.20' or type(visit) is not int or not 0 < visit < 2**32
+        if (host not in ('192.168.1.20', '192.168.1.21') or type(visit) is not int or not 0 < visit < 2**32
                 or type(samples) is not int or not 0 < samples <= 1_250_000_000
                 or samples % 250000 or re.fullmatch('[0-9a-f]{64}', controller_sha256) is None):
-            raise ValueError('requires the current bounded .20 deployment target')
+            raise ValueError('requires a bounded authorized .20 or .21 deployment target')
         self.transport, self.deployment, self.controller_sha256 = transport, deployment, controller_sha256
         self.host, self.visit, self.samples = host, visit, samples
         self.pipeline, self.evidence = pipeline, evidence
@@ -253,8 +253,12 @@ class EthernetNativeSource:
             rx_lo_hz=int(configured['configured']['rf_state']['rx_lo']))
 
     def open(self, identity, deadline, cancel):
-        if self.used or identity.serial != '1040005e0b100007100010000bf33a5d4d':
-            raise ValueError('source is single-use and restricted to the commissioned .20 serial')
+        endpoints = {
+            '192.168.1.20': '1040005e0b100007100010000bf33a5d4d',
+            '192.168.1.21': '10400056f695001322002d0010ad1719f2',
+        }
+        if self.used or identity.serial != endpoints[self.host]:
+            raise ValueError('source is single-use and requires the exact authorized serial/address pair')
         self.used, self.identity = True, identity
         self.evidence.mkdir(parents=True, exist_ok=False)
         self.stack.enter_context(self.station_lease(identity, deadline))

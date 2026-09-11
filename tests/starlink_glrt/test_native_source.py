@@ -439,10 +439,34 @@ def test_invalid_tuning_is_rejected_before_configuration(lo):
 
 
 def test_unapproved_target_rejected_before_any_source_action(tmp_path):
-    with pytest.raises(ValueError, match='current bounded .20'):
+    with pytest.raises(ValueError, match='bounded authorized'):
         source.EthernetNativeSource(transport=None, deployment=tmp_path/'deployment',
             controller_sha256='b'*64, host='192.168.1.14', visit=7, pipeline=None,
             evidence=tmp_path/'evidence', station_lease=None, predict=None)
+
+
+@pytest.mark.parametrize('host,serial', [
+    ('192.168.1.21', IDENTITY.serial),
+    ('192.168.1.20', '10400056f695001322002d0010ad1719f2'),
+])
+def test_authorized_address_cannot_be_combined_with_other_serial(tmp_path, host, serial):
+    owner = source.EthernetNativeSource(transport=None, deployment=tmp_path/'deployment',
+        controller_sha256='b'*64, host=host, visit=7, pipeline=None,
+        evidence=tmp_path/'evidence', station_lease=None, predict=None)
+    with pytest.raises(ValueError, match='exact authorized serial/address'):
+        owner.open(replace(IDENTITY, serial=serial), 10, Event())
+    assert not (tmp_path/'evidence').exists()
+
+
+def test_radio21_accepts_identity_then_requires_station_lease(tmp_path):
+    def refuse(identity, deadline):
+        assert identity.serial == '10400056f695001322002d0010ad1719f2'
+        raise RuntimeError('station busy')
+    owner = source.EthernetNativeSource(transport=None, deployment=tmp_path/'deployment',
+        controller_sha256='b'*64, host='192.168.1.21', visit=7, pipeline=None,
+        evidence=tmp_path/'evidence', station_lease=refuse, predict=None)
+    with pytest.raises(RuntimeError, match='station busy'):
+        owner.open(replace(IDENTITY, serial='10400056f695001322002d0010ad1719f2'), 10, Event())
 
 
 @pytest.mark.parametrize('owned', [True, False])
