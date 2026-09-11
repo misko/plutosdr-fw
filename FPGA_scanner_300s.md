@@ -2,6 +2,18 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, private output retirement from real bank ownership:
+output occupancy now passes at **+1.432 ns**. **1,869 tests and all 71 actual FFT
+fault/reset/delay cases pass**, with unchanged arithmetic and 4,178-clock service.
+Whole timing improves but still FAILS: **-1.152 ns WNS / -343.090 ns TNS / 867
+endpoints**; same-domain worst is -1.095 ns at product-bank publication. Output
+publication, including its physical replica, remains -0.831 ns. Next investigate
+the held-bank metadata/current publication-control cone without weakening fault
+vetoes. Branch `codex/starlink-rx-only-do-not-merge-output-retirement-receipt`,
+FW `70c411533` (routed evidence `32a69f329`), HDL `e56d60284`, pushed. No primary HDL promotion, radio or
+PPU/main changes. Native 60 MS/s fine search and 2.5 MS/s inspection remain required.
+See [output retirement proof and route](reports/experiments/20260911-output-retirement-receipt-actual-route.md).
+
 Update 2026-09-11, private forward descriptor capture: all 70 descriptor CE
 endpoints now pass (worst **+0.129 ns**); descriptor data is +2.226 ns and prior
 product occupancy/identity remain positive. **1,753 tests and 65 actual FFT
