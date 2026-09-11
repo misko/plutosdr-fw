@@ -137,6 +137,24 @@ def audit_completion_sim(output):
     result['completion']={'boundaries':rows,'partition_checked':True}
     return result
 
+def audit_replay_sim(output):
+    result=audit_completion_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_REPLAY_CASE_PASS boundary=(\d+) private_step=(\d+) publications=0 releases=0$',text,re.M)
+    require(rows==[(str(n),str(int(n<3))) for n in range(5)],'complete replay cancellation boundaries')
+    require(text.count('STAGED_REPLAY_PASS cases=5 actual_authorization_checked=1')==1,'replay authorization terminal evidence')
+    result['replay']={'boundaries':rows,'actual_authorization_checked':True}
+    return result
+
+def audit_writer_sim(output):
+    result=audit_replay_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_WRITER_CASE_PASS boundary=(\d+) publications=0 releases=0$',text,re.M)
+    require(rows==list(map(str,range(4))),'complete writer validation cancellation boundaries')
+    require(text.count('STAGED_WRITER_PASS cases=4 pending_fenced=1')==1,'pending writer fence terminal evidence')
+    result['writer']={'boundaries':rows,'pending_fenced':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -154,7 +172,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_completion_sim(output)
+        if mode=='sim':result['audit']=audit_writer_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

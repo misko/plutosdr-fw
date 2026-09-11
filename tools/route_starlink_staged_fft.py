@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import time
 
-from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, fresh, require, sha, verify
+from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, fresh, require, sha, verify
 
 def run(actual,synthesis,output):
     a=json.loads((actual/'outcome.json').read_text())
@@ -18,9 +18,11 @@ def run(actual,synthesis,output):
     require(a['prepared_sha']==s['prepared_sha'],'actual/synthesis source mismatch')
     # Regex rows are tuples in memory and lists after JSON serialization.
     # Compare canonical serialized values, retaining every field and value.
-    audited=audit_completion_sim(actual) if 'completion' in a['audit'] else (
+    audited=audit_writer_sim(actual) if 'writer' in a['audit'] else (
+        audit_replay_sim(actual) if 'replay' in a['audit'] else (
+        audit_completion_sim(actual) if 'completion' in a['audit'] else (
         audit_admission_sim(actual) if 'admission' in a['audit'] else (
-        audit_handover_sim(actual,fault_cases=len(a['audit']['handover']['faults'])) if 'handover' in a['audit'] else audit_sim(actual)))
+        audit_handover_sim(actual,fault_cases=len(a['audit']['handover']['faults'])) if 'handover' in a['audit'] else audit_sim(actual)))))
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])
@@ -31,6 +33,8 @@ def run(actual,synthesis,output):
     before={str(p):sha(p) for p in [dcp,runner,actual/'outcome.json',synthesis/'outcome.json',Path(__file__).resolve()]}
     fresh(output)
     shutil.copyfile(runner,output/'route.tcl')
+    # Preserve the exact orchestration source alongside the immutable recipe.
+    shutil.copyfile(Path(__file__).resolve(),output/'route_runner.py')
     command=['/opt/Xilinx/Vivado/2022.2/bin/vivado','-mode','batch','-nojournal','-log',str(output/'vivado.log'),
              '-source',str(output/'route.tcl'),'-tclargs',str(dcp),dcp_sha,str(output/'route')]
     env=dict(os.environ)
@@ -55,6 +59,7 @@ def run(actual,synthesis,output):
         result['elapsed']=time.time()-started
         try:
             require(before=={p:sha(Path(p)) for p in before},'route inputs changed')
+            require(sha(output/'route_runner.py')==before[str(Path(__file__).resolve())],'copied route runner changed')
             verify(prepared,s['prepared_sha']);result['sources_unchanged']=True
         finally:(output/'outcome.json').write_text(json.dumps(result,indent=2)+'\n')
     return result
