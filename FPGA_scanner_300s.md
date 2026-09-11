@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private kernel sequence on final-capture candidate: **435
+tests** and **64,512 actual FFT records** pass with unchanged latency. Hidden
+bin/next-block state advances privately; public validation/completion and final
+qualification remain. Six new actual fault/late-status/stall cases prove
+quarantine, including a rejected final offer. Route has another mixed result:
+**-2.047 ns WNS / -550.201 ns TNS / 825 failures**, versus parent -2.005 /
+-634.847 / 856. Keep references; physical gate still fails. Worst path now feeds
+descriptor certification through shared metadata/fault logic. Next separate
+private descriptor preparation from admission permission with exact snapshot/
+consume cancellation proof. Branch: `codex/starlink-rx-only-do-not-merge-private-kernel-sequence`.
+No radio/PPU/main or primary production HDL changes; all native 60 MS/s fine
+search, 2.5 MS/s inspection and full deployment gates remain required.
+See [private sequence proof and physical comparison](reports/experiments/20260911-staged-sequence-actual-route-parent.md).
+
 Update 2026-09-11, private adapter final-data capture: **417 tests** and all
 **64,512 actual FFT records** pass with unchanged service latency. The private
 69-bit bundle tracks only in EMPTY and freezes on original qualified acceptance
