@@ -2,6 +2,22 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, whole forward-return bank component: **1077 tests pass**.
+Both corrected actual-FFT observer campaigns pass, checking 75144 replay words
+and 144 complete blocks. All 22 original runtime modules, original numerical
+CSV and service are unchanged: this is an observer, **not receiver integration**.
+Standalone bank cost is one RAMB18 / 75 LUT / 111 FF / zero DSP; routed capture
+capacity and complete RAM write controls are independent of downstream READY.
+Standalone timing still fails **-0.181 ns / -7.073 ns / 59 setup endpoints**,
+on descriptor validation to the capture counter. No promotion/deployment.
+Next fix that private capture-control path, then integrate qualified capture,
+sealed replay and actual product-ownership return and measure the full service
+budget before routing the actual FFT subsystem. Branch
+`codex/starlink-rx-only-do-not-merge-forward-return-bank`, FW `b0387b8eb`,
+HDL `b10eaac324`. Native 60 MS/s fine and 2.5 MS/s inspection remain required;
+no radios, PPU/main or primary HDL pointer changed. See
+[forward-return evidence](reports/experiments/20260911-forward-return-bank-actual-observer.md).
+
 Update 2026-09-11, flat fault sources with the original scalar register:
 **1035 tests and both actual FFT campaigns pass**; all numerical records and
 service clocks remain exact. Direct registered fault CDC is restored, removing
