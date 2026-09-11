@@ -6,13 +6,22 @@ import re
 
 from staged_fft_experiment import require, sha
 
-def audit(root):
+def audit(root, record=True):
     outcome=json.loads((root/'outcome.json').read_text())
     require(outcome.get('returncode')==0 and outcome.get('sources_unchanged') is True and 'error' not in outcome,'terminal route success')
     require(all(sha(Path(p))==value for p,value in outcome['before'].items()),'source receipt mismatch')
     reports=root/'route'
     require(sha(reports/'retained_output_routed.dcp')==outcome['routed_dcp_sha'],'routed checkpoint mismatch')
     require(sha(reports/'probe.tcl')==sha(root/'route.tcl')=='034d1eaa197757b762644acd0cad9dc267338ae23fd5d757290c8485d0f1ac9a','route recipe mismatch')
+    result=summarize(reports)
+    result['source_and_checkpoint_verified']=True
+    if record:
+        destination=root/'audit.json';require(not destination.exists(),'no audit overwrite')
+        destination.write_text(json.dumps(result,indent=2)+'\n')
+    return result
+
+def summarize(reports):
+    """Cross-check reports only; this does NOT certify checkpoint provenance."""
     text=(reports/'timing_unqualified.rpt').read_text()
     summary=re.search(r'\n\s*WNS\(ns\).*?\n\s*-+[^\n]*\n([^\n]+)',text,re.S)
     require(summary is not None,'timing summary missing')
@@ -52,9 +61,8 @@ def audit(root):
             'internal_timing_pass':wns>=0 and setup_fail==0 and whs>=0 and hold_fail==0 and pulse_fail==0,
             'unconstrained_inputs':int(re.search(r'checking no_input_delay \((\d+)\)',text)[1]),
             'unconstrained_outputs':int(re.search(r'checking no_output_delay \((\d+)\)',text)[1]),
-            'source_and_checkpoint_verified':True,'full_receiver_or_physical_signoff':False,'deployment_eligible':False}
-    destination=root/'audit.json';require(not destination.exists(),'no audit overwrite')
-    destination.write_text(json.dumps(result,indent=2)+'\n');return result
+            'source_and_checkpoint_verified':False,'full_receiver_or_physical_signoff':False,'deployment_eligible':False}
+    return result
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('root',type=Path)
