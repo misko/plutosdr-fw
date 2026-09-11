@@ -38,6 +38,9 @@ def parent_runtime_bytes(path):
     return undo_payload(path.read_text()).encode() if path.name==NAME else path.read_bytes()
 
 def undo_bench(text):
+    if '// BEGIN REPLAY QUIET WITNESS' in text:
+        from tests.test_starlink_replay_quiet_contract import undo_bench as undo_replay
+        text=undo_replay(text)
     before='''        if({dut.admission_permit,dut.admission_gate.snapshot_valid,dut.admission_gate.consumed} !==
            {legacy_admission_permit,legacy_admission.snapshot_valid,legacy_admission.consumed} ||
            (dut.admission_gate.snapshot_valid && compressed_admission!==legacy_admission.snapshot_good) ||'''

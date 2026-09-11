@@ -384,6 +384,21 @@ def audit_private_facts(output,auxiliary=False):
     result['private_facts']={'checks':int(rows[0][0]),'owned':int(rows[0][1]),'invalid_differences':int(rows[0][2]),'permit_exact':True,'owned_exact':True}
     return result
 
+def replay_quiet_compiled(prepared):
+    return '// BEGIN REPLAY QUIET WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_replay_quiet(output,auxiliary=False):
+    result=audit_private_facts(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_REPLAY_QUIET_PASS checks=(\d+) offers=(\d+) accepts=(\d+) sweep=(\d+) paused=(\d+) current_exact=1 runtime_unchanged=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0][0])>=1000 and min(map(int,rows[0][1:3]))>=18,'complete replay quiet witness')
+    require(int(rows[0][3])==(512 if auxiliary else 0),'complete replay status byte sweep')
+    require(int(rows[0][4])==0 if auxiliary else int(rows[0][4])>=384,'forced stall remains separately checked')
+    cases=re.findall(r'^STAGED_REPLAY_QUIET_CASE_PASS boundary=(\d+) blocked_publication=1 fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(cases==([str(n) for n in range(10)] if auxiliary else []),'complete replay late event recovery')
+    result['replay_quiet']={'checks':int(rows[0][0]),'offers':int(rows[0][1]),'accepts':int(rows[0][2]),'sweep':int(rows[0][3]),'paused':int(rows[0][4]),'boundaries':cases,'current_exact':True,'runtime_unchanged':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -413,6 +428,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_completion_slot(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and private_facts_compiled(prepared):
             result['audit']=audit_private_facts(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and replay_quiet_compiled(prepared):
+            result['audit']=audit_replay_quiet(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
