@@ -17,14 +17,20 @@ reg resetn=0,flush=0,arm=0,input_valid=0,input_gap=0;
 reg signed [15:0] input_i=0,input_q=0;
 reg [63:0] input_index=0;
 reg output_ready=1;
+reg copy_enable=0;
+reg [13:0] copy_address=0;
+wire copy_ready,copy_valid;
+wire [13:0] copy_offset;
+wire [31:0] copy_data;
 wire busy,done,fault,output_valid;
 wire [63:0] window_first_index;
 wire [11:0] output_epoch;
+wire output_epoch_left_tie;
 wire [3:0] output_frequency;
 wire [16:0] output_score;
 wire [5:0] output_support;
 wire [31:0] rejected_arms;
-starlink_glrt_coarse_window #(.EPOCH_COUNT(12),.COEFFICIENT_FILE("COEFF"),.ENERGY_FILE("ENERGY")) dut(.*);
+starlink_glrt_coarse_window #(.EPOCH_COUNT(12),.SOURCE_INDEX_STRIDE(STRIDE),.COEFFICIENT_FILE("COEFF"),.ENERGY_FILE("ENERGY")) dut(.*);
 integer fd,rc,si,sq,cycles=0,waits=0;
 reg [2047:0] path;
 reg held=0;
@@ -57,6 +63,15 @@ initial begin
  if(fault || !done || rejected_arms!=1 || window_first_index!=64'h10000000000001)
    $fatal(1,"closure failed fault=%d done=%d rejected=%d",fault,done,rejected_arms);
  $display("DONE %d",waits);
+ // Copy uses the same RAM read port and returns every original CI16 word.
+ $fclose(fd);fd=$fopen(path,"r");
+ for(cycles=0;cycles<14000;cycles=cycles+1) begin
+  rc=$fscanf(fd,"%d %d\n",si,sq);if(rc!=2 || !copy_ready) $fatal(1,"copy not ready");
+  copy_enable=1;copy_address=cycles;@(negedge clk);
+  if(!copy_valid || copy_offset!=cycles || $signed(copy_data[15:0])!=si || $signed(copy_data[31:16])!=sq)
+    $fatal(1,"copy mismatch at %d",cycles);
+ end
+ copy_enable=0;@(negedge clk);if(copy_valid) $fatal(1,"unexpected copy response");
  // A source gap during capture must fence the job before any result.
  arm=1;@(negedge clk);arm=0;input_valid=1;input_gap=1;
  @(negedge clk);input_valid=0;input_gap=0;
@@ -70,7 +85,8 @@ endmodule
 
 
 @pytest.mark.parametrize("with_peaks", [False, True])
-def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path, with_peaks):
+@pytest.mark.parametrize("stride", [1,24])
+def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path, with_peaks, stride):
     rng=np.random.default_rng(6014250)
     values=rng.integers(-128,129,(14000,2),dtype=np.int16)
     coefficients=rng.integers(-512,513,(12,12,11,2),dtype=np.int64)
@@ -127,6 +143,7 @@ def test_complete_coarse_grid_prefix_reuse_backpressure_and_source_gap(tmp_path,
         names.extend(['peaks', 'search'])
         rows = [[item[2] for item in expected[e*11:e*11+11]] for e in range(12)]
         expected = [(epoch, frequency, score, rank) for rank, epoch, frequency, score in retained_reference(rows)]
+    source=source.replace('(STRIDE)',f'({stride})').replace('cycles*24',f'cycles*{stride}').replace('14001*24',f'14001*{stride}')
     bench=tmp_path/'tb.sv';bench.write_text(source.replace('"COEFF"',f'"{coeff_path}"').replace('"ENERGY"',f'"{energy_path}"'))
     executable=tmp_path/'sim'
     root=Path(__file__).parents[2]/'hdl/library/starlink_glrt'

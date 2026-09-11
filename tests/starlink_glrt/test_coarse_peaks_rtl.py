@@ -17,20 +17,21 @@ reg [16:0] input_score=0;
 wire input_ready,busy,output_valid,done,fault;
 wire [2:0] output_rank;
 wire [11:0] output_epoch;
+wire output_epoch_left_tie;
 wire [3:0] output_frequency;
 wire [16:0] output_score;
 starlink_glrt_coarse_peaks #(.EPOCH_COUNT(EPOCHS)) dut(.*);
 integer fd,rc,e,f,s,cycles=0;
 reg [4095:0] path;
 reg held=0;
-reg [35:0] previous;
+reg [36:0] previous;
 always @(posedge clk) begin
  if(resetn && !flush) begin
-  if(held && (!output_valid || {output_rank,output_epoch,output_frequency,output_score}!==previous))
+  if(held && (!output_valid || {output_rank,output_epoch,output_frequency,output_score,output_epoch_left_tie}!==previous))
     $fatal(1,"candidate changed under backpressure");
   held<=output_valid && !output_ready;
-  previous<={output_rank,output_epoch,output_frequency,output_score};
-  if(output_valid && output_ready) $display("R %d %d %d %d",output_rank,output_epoch,output_frequency,output_score);
+  previous<={output_rank,output_epoch,output_frequency,output_score,output_epoch_left_tie};
+  if(output_valid && output_ready) $display("R %d %d %d %d %d",output_rank,output_epoch,output_frequency,output_score,output_epoch_left_tie);
  end else held<=0;
 end
 initial begin
@@ -89,13 +90,15 @@ def reference(rows):
     return selected
 
 
-@pytest.mark.parametrize("kind", ["zero", "plateau", "ties", "random", "full_grid", "dense_ties"])
+@pytest.mark.parametrize("kind", ["zero", "plateau", "long_plateau", "ties", "random", "full_grid", "dense_ties"])
 def test_complete_selection_matches_independent_sort(tmp_path, kind):
     rng = random.Random(602508)
     epochs = 3333 if kind in ("full_grid", "dense_ties") else 64
     rows = [[0] * 11 for _ in range(epochs)]
     if kind == "plateau":
         rows = [[12345] * 11 for _ in range(epochs)]
+    elif kind == "long_plateau":
+        for epoch in range(10,51):rows[epoch][5]=65536
     elif kind == "ties":
         for epoch, frequency, score in [(0, 5, 65536), (epochs - 1, 5, 65536),
                 (20, 4, 65536), (20, 6, 65536), (39, 5, 65536), (40, 3, 65536),
@@ -117,4 +120,5 @@ def test_complete_selection_matches_independent_sort(tmp_path, kind):
         capture_output=True, text=True, timeout=60)
     assert run.returncode == 0, run.stdout + run.stderr
     actual = [tuple(map(int, line.split()[1:])) for line in run.stdout.splitlines() if line.startswith("R ")]
-    assert actual == reference(rows)
+    assert actual == [(*row,int(row[1]>0 and rows[row[1]-1][row[2]]==row[3])) for row in reference(rows)]
+    if kind == "long_plateau":assert any(row[-1] for row in actual)
