@@ -44,7 +44,7 @@ always @(posedge clk) begin
   if(n==50000 && busy) overlapped=1;
  end
  if(cycles>30000000) $fatal(1,"timeout n=%d decisions=%d busy=%d fault=%d",n,decisions,busy,fault);
- if(resetn && !flush && !fault && !input_gap) begin
+ if(resetn && !flush && !fault && !dut.source_fault) begin
   if(held && (!output_valid || evidence!==previous)) $fatal(1,"unstable window/evidence");
   held<=output_valid && !output_ready;previous<=evidence;
   if(output_valid && output_ready) begin
@@ -56,7 +56,7 @@ always @(posedge clk) begin
  end else held<=0;
 end
 always @(negedge clk) if(driving) begin
- output_ready=cycles%11<7;
+ output_ready=inject_gap>=2 ? 0 : cycles%11<7;
  arm=0;input_valid=0;input_gap=0;
  if(divider==0 && (n==0 || n==50000 || n==100)) begin
   arm=1;
@@ -66,7 +66,17 @@ always @(negedge clk) if(driving) begin
   if(n<14000) {input_q,input_i}=samples[n];
   else if(n>=50000 && n<64000) {input_q,input_i}=samples[14000+n-50000];
   else begin input_i=0;input_q=0;end
-  if(inject_gap!=0 && n==60000) input_gap=1;
+  if(inject_gap==1 && n==60000) input_gap=1;
+  // Hold a real candidate at the public output, then corrupt the live source.
+  // Cancellation must suppress that candidate before the next clock edge,
+  // even though the internal arithmetic reset is registered.
+  if(inject_gap>=2 && dut.controller_output_valid) begin
+   if(inject_gap==2) input_gap=1;
+   else input_index=input_index+17;
+   #1;
+   if(output_valid || arm_ready) $fatal(1,"fault-edge candidate escaped fence");
+   $display("HELD_FAULT_FENCED %d",inject_gap);
+  end
   n=n+1;
  end else divider=divider+1;
 end
@@ -79,6 +89,8 @@ initial begin
  if(inject_gap!=0) begin
   wait(fault);@(posedge clk);driving=0;@(negedge clk);input_valid=0;input_gap=0;arm=0;
   if(decisions!=0 || output_valid) $fatal(1,"incomplete window escaped gap fence");
+  repeat(4) @(negedge clk);
+  if(busy || output_valid || arm_ready) $fatal(1,"faulted stages did not drain");
  end else begin
   wait(decisions==2);@(posedge clk);driving=0;@(negedge clk);input_valid=0;arm=0;
   while(busy && !fault) @(negedge clk);
@@ -181,7 +193,7 @@ def local_engine(tmp_path_factory):
     return path,coefficients,pilot,wave,subsets
 
 
-@pytest.mark.parametrize('kind',['pilot','zero','gap'])
+@pytest.mark.parametrize('kind',['pilot','zero','gap','held_gap','held_index'])
 def test_two_windows_copy_overlap_absolute_coordinates_and_fault_fences(tmp_path,local_engine,kind):
     path,coefficients,pilot,wave,subsets=local_engine
     rng=np.random.default_rng(21300)
@@ -198,12 +210,13 @@ def test_two_windows_copy_overlap_absolute_coordinates_and_fault_fences(tmp_path
         windows.append(iq)
     stimulus=tmp_path/'iq.mem'
     stimulus.write_text(''.join(f'{(int(i)&65535)|((int(q)&65535)<<16):08x}\n' for iq in windows for i,q in iq))
-    run=subprocess.run([str(path/'obj/sim'),f'+INPUT={stimulus}',f'+GAP={int(kind=="gap")}',
+    fault_mode = {'gap': 1, 'held_gap': 2, 'held_index': 3}.get(kind, 0)
+    run=subprocess.run([str(path/'obj/sim'),f'+INPUT={stimulus}',f'+GAP={fault_mode}',
         f'+OVERLAP={int(kind!="zero")}'],capture_output=True,text=True,timeout=90)
     (tmp_path/'simulation.log').write_text(run.stdout+run.stderr)
     assert run.returncode==0,run.stdout+run.stderr
     actual=[list(map(int,line.split()[1:])) for line in run.stdout.splitlines() if line.startswith('R ')]
-    if kind!='gap':
+    if not fault_mode:
         expected=[]
         for index,iq in enumerate(windows):
             records=reference(iq,coefficients,pilot,wave,subsets)
@@ -213,5 +226,9 @@ def test_two_windows_copy_overlap_absolute_coordinates_and_fault_fences(tmp_path
                 assert records[-1][3]==(17 if index==0 else 31)
             expected.extend([[0x20000000000003+index*50000,*r] for r in records])
         assert actual==expected
-    else:assert not any(r[1] for r in actual)
+    else:
+        assert not any(r[1] for r in actual)
+        if fault_mode >= 2:
+            assert f'HELD_FAULT_FENCED {fault_mode:11d}' in run.stdout
+            assert not actual
     assert 'PASS' in run.stdout
