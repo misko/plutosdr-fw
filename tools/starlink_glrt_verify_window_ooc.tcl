@@ -20,6 +20,7 @@ foreach path $tracked {
 }
 set fd [open $output/build-environment.txt {WRONLY CREAT EXCL}]
 puts $fd "vivado=[version -short]\nos=[exec uname -a]"
+puts $fd "userspace=[exec cat /etc/os-release]"
 foreach key {LD_PRELOAD LD_LIBRARY_PATH TMPDIR} {
   if {[info exists ::env($key)]} { puts $fd "$key=$::env($key)" }
 }
@@ -37,16 +38,25 @@ set stubs [list]
 foreach {name tag_width} {verify_mac3 1 verify_rotate3 34 coarse_norm 2} {
   set module starlink_glrt_$name
   set source $repo/hdl/library/starlink_glrt/$module.v
-  create_project -in_memory -part xc7z010clg400-1
-  set_msg_config -id {Synth 8-311} -new_severity ERROR
-  read_verilog -sv $source
-  synth_design -top $module -mode out_of_context -generic TAG_WIDTH=$tag_width \
-    -flatten_hierarchy rebuilt -directive AreaOptimized_high
-  report_utilization -hierarchical -file $output/${module}_synthesis.rpt
   set netlist $output/$module.edf
-  write_edif $netlist
+  # Each synthesis gets its own process: reusing one Vivado process across
+  # projects also triggers stale Tcl collection destruction in 2022.2.
+  set component_script $output/${module}_synthesize.tcl
+  set fd [open $component_script {WRONLY CREAT EXCL}]
+  puts $fd [list set_param general.maxThreads 1]
+  puts $fd [list create_project -in_memory -part xc7z010clg400-1]
+  puts $fd [list set_msg_config -id {Synth 8-311} -new_severity ERROR]
+  puts $fd [list cd $roms]
+  puts $fd [list read_verilog -sv $source]
+  puts $fd [list synth_design -top $module -mode out_of_context -generic TAG_WIDTH=$tag_width \
+    -flatten_hierarchy rebuilt -directive AreaOptimized_high]
+  puts $fd [list report_utilization -hierarchical -file $output/${module}_synthesis.rpt]
+  puts $fd [list write_edif $netlist]
+  puts $fd exit
+  close $fd
+  exec /opt/Xilinx/Vivado/2022.2/bin/vivado -mode batch -nojournal \
+    -log $output/${module}.log -source $component_script > $output/${module}.console.log 2>@1
   lappend netlists $netlist
-  close_project
   set fd [open $source r];set content [read $fd];close $fd
   set start [string first "module $module" $content]
   set finish [string first "\n);" $content $start]
@@ -55,7 +65,7 @@ foreach {name tag_width} {verify_mac3 1 verify_rotate3 34 coarse_norm 2} {
   regsub {TAG_WIDTH=[0-9]+} $header TAG_WIDTH=$tag_width header
   set stub $output/${module}_stub.v
   set fd [open $stub {WRONLY CREAT EXCL}]
-  puts $fd "(* black_box=\"yes\" *) $header;\nendmodule"
+  puts $fd "(* black_box=\"yes\" *) $header\nendmodule"
   close $fd
   lappend stubs $stub
 }
