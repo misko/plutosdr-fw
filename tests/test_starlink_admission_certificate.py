@@ -59,7 +59,7 @@ def run(tmp_path,source,width=22):
     (tmp_path/'run.log').write_text(result.stdout+result.stderr)
     return result
 
-@pytest.mark.parametrize('width',[22,28],ids=['admission','completion'])
+@pytest.mark.parametrize('width',[7,22,28],ids=['inverse-final','admission','completion'])
 def test_clocked_admission_contract(tmp_path,width):
     result=run(tmp_path,RTL.read_text(),width)
     assert result.returncode==0,result.stdout+result.stderr
@@ -67,7 +67,7 @@ def test_clocked_admission_contract(tmp_path,width):
     assert 'FATAL' not in result.stdout
 
 @pytest.mark.parametrize('change',['bypass','refresh','reuse','quarantine'])
-@pytest.mark.parametrize('width',[22,28],ids=['admission','completion'])
+@pytest.mark.parametrize('width',[7,22,28],ids=['inverse-final','admission','completion'])
 def test_unsafe_certificate_mutant_rejected(tmp_path,change,width):
     before,after={
         'bypass':('((&snapshot_good) === 1\'b1)',"((&checks_good) === 1'b1)"),

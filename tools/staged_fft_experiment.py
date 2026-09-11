@@ -169,6 +169,17 @@ def audit_capture_sim(output):
                        'private_load_checked':True,'held_until_release':True}
     return result
 
+def audit_final_sim(output):
+    result=audit_capture_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_FINAL_CASE_PASS boundary=(\d+) private_consume=(\d+) reads=(\d+) releases=(\d+)$',text,re.M)
+    expected=[(str(n),str(int(n==1 or n>=4)),str(512 if n>=6 else 0),str(int(n>=6))) for n in range(8)]
+    require(rows==expected,'complete staged final cancellation/late status/stall boundaries')
+    require(text.count('STAGED_FINAL_REWRITES_PASS words=18 no_extra_samples=1')==1,'exact held-final rewrite evidence')
+    require(text.count('STAGED_FINAL_PASS cases=8 partition_checked=1 fault_consume_checked=1')==1,'final validation terminal evidence')
+    result['final']={'boundaries':rows,'partition_checked':True,'fault_consume_checked':True,'held_final_rewrites':18}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -186,7 +197,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_capture_sim(output)
+        if mode=='sim':result['audit']=audit_final_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
