@@ -14,6 +14,16 @@ def args(tmp_path):
         output=tmp_path/"coarse", libiio=None)
 
 
+def test_500_second_bound_preserves_complete_dma_blocks(tmp_path):
+    request = args(tmp_path)
+    request.samples = 1_250_000_000
+    request.chunk_samples = 250_000
+    validate(request)
+    request.samples += request.chunk_samples
+    with pytest.raises(ValueError):
+        validate(request)
+
+
 class Fake:
     def __init__(self, fault=None):
         self.fault = fault

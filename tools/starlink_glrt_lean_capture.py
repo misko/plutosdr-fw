@@ -38,7 +38,7 @@ def validate(args):
     if (not args.uri.startswith("ip:") or not args.serial or args.serial == EXCLUDED or
         not args.firmware_version or not 0 < args.visit < 2**32 or args.lo_hz <= 0 or args.bandwidth_hz <= 0 or
         not 2 <= args.chunk_samples <= 250000 or args.chunk_samples % 2 or
-        not 0 < args.samples <= 750000000 or args.samples % args.chunk_samples):
+        not 0 < args.samples <= 1250000000 or args.samples % args.chunk_samples):
         raise ValueError("requires a finite whole-buffer GLF1 Ethernet capture on a permitted receiver")
 
 

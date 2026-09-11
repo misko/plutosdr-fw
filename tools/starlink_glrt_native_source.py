@@ -16,7 +16,7 @@ import signal
 import subprocess
 import time
 from contextlib import ExitStack
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 
 from pluto_plus import glrt_canary as g
@@ -67,6 +67,11 @@ class CapturePrograms:
     firmware_cwd: Path
     bank: Path
     ddc_manifest: Path
+    rx_lo_hz: int = 1690312496
+
+    def __post_init__(self):
+        if type(self.rx_lo_hz) is not int or not 70_000_000 <= self.rx_lo_hz <= 6_000_000_000:
+            raise ValueError('requires a bounded integer RX LO')
 
     def commands(self, root, identity, host, visit, samples):
         capture, live, work = (root / name for name in ('capture', 'live', 'work'))
@@ -80,10 +85,11 @@ class CapturePrograms:
             '--records', str(live/'records.jsonl'), '--precision-summary', str(live/'summary.json'),
             '--bank', str(self.bank), '--ddc-manifest', str(self.ddc_manifest),
             '--output', str(work), '--samples', str(samples), '--serial', identity.serial,
-            '--timeout', '300', '--follow', '--template-relative', '--bridge-one-rejected-frame']
+            '--timeout', str(max(300, samples/2_500_000+120)), '--follow',
+            '--template-relative', '--bridge-one-rejected-frame']
         collector = [str(self.capture_python), '-m', 'tools.starlink_glrt_lean_capture',
             '--uri', 'ip:'+host, '--serial', identity.serial, '--firmware-version', identity.firmware,
-            '--visit', str(visit), '--samples', str(samples), '--lo-hz', '1690312496',
+            '--visit', str(visit), '--samples', str(samples), '--lo-hz', str(self.rx_lo_hz),
             '--bandwidth-hz', '2500000', '--chunk-samples', '250000', '--output', str(capture)]
         return [('precision', precision, self.host_cwd), ('companion', follower, self.host_cwd),
                 ('coarse', collector, self.firmware_cwd)]
@@ -208,7 +214,7 @@ class EthernetNativeSource:
                  pipeline, evidence, station_lease, predict, samples=450_000_000,
                  clock=time.monotonic, sleep=time.sleep):
         if (host != '192.168.1.20' or type(visit) is not int or not 0 < visit < 2**32
-                or type(samples) is not int or not 0 < samples <= 600_000_000
+                or type(samples) is not int or not 0 < samples <= 1_250_000_000
                 or samples % 250000 or re.fullmatch('[0-9a-f]{64}', controller_sha256) is None):
             raise ValueError('requires the current bounded .20 deployment target')
         self.transport, self.deployment, self.controller_sha256 = transport, deployment, controller_sha256
@@ -238,8 +244,13 @@ class EthernetNativeSource:
         return result
 
     def _configure(self):
-        self.retain('rf-configuration', g.configure_native_source(host=self.host,
-            serial=self.identity.serial, firmware=self.identity.firmware))
+        configured = g.configure_native_source(host=self.host,
+            serial=self.identity.serial, firmware=self.identity.firmware,
+            lo_hz=self.pipeline.programs.rx_lo_hz)
+        self.retain('rf-configuration', configured)
+        # Bind collection to actual synthesizer readback, including integer rounding.
+        self.pipeline.programs = replace(self.pipeline.programs,
+            rx_lo_hz=int(configured['configured']['rf_state']['rx_lo']))
 
     def open(self, identity, deadline, cancel):
         if self.used or identity.serial != '1040005e0b100007100010000bf33a5d4d':
@@ -275,8 +286,7 @@ class EthernetNativeSource:
         self.native_runtime_seconds = min(45, max(1, int(self.samples/2_500_000)-10))
         # Keep the observation's export/bookkeeping allowance, but permit a
         # shorter controller run near source end. SSH chunks remain bounded.
-        self.launch_deadline = min(deadline-90, self.clock()+180,
-            self.pipeline.source_end-6)
+        self.launch_deadline = min(deadline-90, self.pipeline.source_end-6)
 
     def _stage(self, deadline):
         transport = DeadlineTransport(self.transport, deadline, self.clock)

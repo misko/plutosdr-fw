@@ -280,17 +280,19 @@ def test_complete_source_hooks_execute_export_reacquire_and_close_under_both_lea
     assert not harness.leases
 
 
-def test_late_candidate_in_60_second_capture_gets_shorter_native_run(
-    tmp_path, monkeypatch, controller, pilot_words
+@pytest.mark.parametrize('samples,delay,budget', [(150_000_000, 50, 240),
+                                                (1_250_000_000, 450, 600)])
+def test_late_candidate_gets_bounded_native_run(
+    tmp_path, monkeypatch, controller, pilot_words, samples, delay, budget
 ):
     harness = Harness(tmp_path, monkeypatch, controller, pilot_words)
-    harness.owner.samples = 150_000_000
+    harness.owner.samples = samples
     command, transport = harness.command, harness.run_prepared_stdin
     scripts = []
 
     def delayed_history(name, value):
         if value == 16:
-            harness.sleep(50)
+            harness.sleep(delay)
         return command(name, value)
 
     def capture_script(command, *, prepare, **kwargs):
@@ -304,11 +306,12 @@ def test_late_candidate_in_60_second_capture_gets_shorter_native_run(
     monkeypatch.setattr(harness, 'run_prepared_stdin', capture_script)
     session = PreparedNativeSession(harness, harness.owner, clock=harness.clock)
     result = supervise_native(session, identity=IDENTITY, events_path=tmp_path/'events.jsonl',
-        limits=NativeSupervisorLimits(240, 1, 30), clock=harness.clock)
+        limits=NativeSupervisorLimits(budget, 1, 30), clock=harness.clock)
     assert result['outcome'] == 'episode_limit_reached' and result['cleanup_verified'], result
     assert len(scripts) == 1
     seconds = int(re.search(rb'32768 ([0-9]+) --bootstrap-slices', scripts[0])[1])
-    assert 1 <= seconds < 10
+    assert 1 <= seconds <= min(45, samples/2_500_000-delay-5)
+    assert harness.clock() >= harness.pipeline.source_end
 
 
 @pytest.mark.parametrize('failure', ['identity', 'history_identity', 'seed_epoch', 'controller_hash',
@@ -386,6 +389,32 @@ def test_capture_commands_use_ethernet_complete_buffer_and_declared_public_clis(
     assert collector[collector.index('--chunk-samples')+1] == '250000'
     assert collector[collector.index('--samples')+1] == '600000000'
     assert 'leo.cli.glrt_precision' in commands[0][1]
+
+
+def test_selected_tuning_and_long_follower_budget_reach_collector(tmp_path, monkeypatch):
+    pipeline = source.CapturePipeline(replace(PROGRAMS, rx_lo_hz=1440312500), tmp_path/'source')
+    owner = source.EthernetNativeSource(transport=None, deployment=tmp_path/'deployment',
+        controller_sha256='b'*64, host='192.168.1.20', visit=7, pipeline=pipeline,
+        evidence=tmp_path/'evidence', station_lease=None, predict=None, samples=1_250_000_000)
+    owner.identity = IDENTITY
+    requests = []
+    def configure(**kwargs):
+        requests.append(kwargs)
+        return {'configured': {'rf_state': {'rx_lo': '1440312498'}}}
+    monkeypatch.setattr(source.g, 'configure_native_source', configure)
+    monkeypatch.setattr(owner, 'retain', lambda *args: None)
+    owner._configure()
+    assert requests[0]['lo_hz'] == 1440312500
+    commands = pipeline.programs.commands(tmp_path, IDENTITY, '192.168.1.20', 7, 1_250_000_000)
+    collector, follower = commands[-1][1], commands[1][1]
+    assert collector[collector.index('--lo-hz')+1] == '1440312498'
+    assert float(follower[follower.index('--timeout')+1]) == 620
+
+
+@pytest.mark.parametrize('lo', [True, 0, 6_000_000_001, '1440312500'])
+def test_invalid_tuning_is_rejected_before_configuration(lo):
+    with pytest.raises(ValueError, match='RX LO'):
+        replace(PROGRAMS, rx_lo_hz=lo)
 
 
 def test_unapproved_target_rejected_before_any_source_action(tmp_path):
