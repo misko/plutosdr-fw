@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, clocked inverse-final validation: **64,512 actual FFT records**
+match and **397 regression tests** pass. Eight new cases cover final snapshot/
+consume faults, resets, late status and completion stalls. Private close is
+separate from current-fault publication authorization. Normal service is 3660
+clocks, still within 5215. Routing **regresses to -2.379 ns**, TNS -941.022 ns,
+1038 failing endpoints versus private capture -1.969 ns / 914. Not promoted.
+The worst path now feeds the kernel expected-bin index through shared fault
+checks. Next inspect forward/kernel ordinal control with unchanged public
+identity/backpressure/fault safeguards; compare against the better reference,
+retest and route. No radio/PPU/main or production HDL changes. Native 60 MS/s
+fine search, 2.5 MS/s IIO and every receiver/deployment gate remain required.
+See [staged-final tests, retained failures and routed result](reports/experiments/20260911-staged-final-actual-route-parent.md).
+
 Update 2026-09-11, private descriptor capture: **64,512 actual FFT records**
 match and **382 regression tests** pass. Local ownership permits private payload
 loading; accepted completion freezes the bundle through validation/publication/
