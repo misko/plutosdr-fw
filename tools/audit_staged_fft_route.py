@@ -28,21 +28,25 @@ def audit(root):
                 report=(reports/f'{source}_{destination}_{kind}.rpt').read_text()
                 match=re.search(r'Slack \((?:VIOLATED|MET)\)\s*:\s*([-\d.]+)ns',report)
                 require(match is not None and float(match[1])==float(paths[key+'.slack']),'timing pair disagreement')
-                if kind=='max':setup.append(float(match[1]))
-    require(min(setup)==wns,'summary/clock-pair worst slack disagreement')
+                if kind=='max':setup.append((float(match[1]),source,destination))
+    worst_slack,worst_source,worst_destination=min(setup)
+    require(worst_slack==wns,'summary/clock-pair worst slack disagreement')
     route=(reports/'route_status.rpt').read_text()
     def route_count(label):return int(re.search(re.escape(label)+r'\.*\s*:\s*(\d+)',route)[1])
     nets=route_count('# of fully routed nets')
     require(nets==route_count('# of routable nets') and route_count('# of nets with routing errors')==0,'incomplete/error routing')
     utilization=(reports/'utilization.rpt').read_text()
     def used(label):return int(re.search(r'\|\s*'+re.escape(label)+r'\s*\|\s*(\d+)\s*\|',utilization)[1])
-    worst=(reports/'island_175_island_175_max.rpt').read_text()
-    first=worst.split('Slack (VIOLATED)',2)[1]
+    worst=(reports/f'{worst_source}_{worst_destination}_max.rpt').read_text()
+    first=re.split(r'Slack \((?:VIOLATED|MET)\)',worst,maxsplit=2)[1]
+    worst_key=f'{worst_source}.{worst_destination}.max'
     result={'wns_ns':wns,'tns_ns':tns,'setup_failing_endpoints':setup_fail,'setup_total_endpoints':setup_total,
             'hold_slack_ns':whs,'hold_failures':hold_fail,'pulse_slack_ns':pulse,'pulse_failures':pulse_fail,
             'fully_routed_nets':nets,'routing_errors':0,'lut':used('Slice LUTs'),'ff':used('Slice Registers'),
             'dsp':used('DSPs'),'ramb18':used('RAMB18'),'ramb36':used('RAMB36/FIFO*'),
-            'worst_start':paths['island_175.island_175.max.start'],'worst_end':paths['island_175.island_175.max.end'],
+            'worst_start':paths[worst_key+'.start'],'worst_end':paths[worst_key+'.end'],
+            'worst_clock_pair':[worst_source,worst_destination],
+            'same_domain_175_setup_ns':float(paths['island_175.island_175.max.slack']),
             'logic_levels':int(re.search(r'Logic Levels:\s*(\d+)',first)[1]),
             'data_delay_ns':float(re.search(r'Data Path Delay:\s*([\d.]+)ns',first)[1]),
             'internal_timing_pass':wns>=0 and setup_fail==0 and whs>=0 and hold_fail==0 and pulse_fail==0,

@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import time
 
-from staged_fft_experiment import ROOT, audit_sim, fresh, require, sha, verify
+from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, fresh, require, sha, verify
 
 def run(actual,synthesis,output):
     a=json.loads((actual/'outcome.json').read_text())
@@ -18,7 +18,8 @@ def run(actual,synthesis,output):
     require(a['prepared_sha']==s['prepared_sha'],'actual/synthesis source mismatch')
     # Regex rows are tuples in memory and lists after JSON serialization.
     # Compare canonical serialized values, retaining every field and value.
-    require(json.dumps(audit_sim(actual),sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
+    audited=audit_handover_sim(actual,fault_cases=len(a['audit']['handover']['faults'])) if 'handover' in a['audit'] else audit_sim(actual)
+    require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])
     require(str(prepared)==a['command'][-3],'actual/synthesis prepared roots differ')

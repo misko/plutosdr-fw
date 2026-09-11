@@ -64,15 +64,16 @@ def verify(path,expected):
     require(all(sha(Path(p))==value for p,value in m['sources'].items()),'live sources changed')
     require(all(sha(path/p)==value for p,value in m['files'].items()),'copied sources changed')
 
-def audit_sim(output):
+def audit_sim(output,contexts=4):
     sim=output/'project/staged_fft.sim/sim_1/behav/xsim'
     text=(sim/'simulate.log').read_text()
     require(not re.search(r'FATAL|ERROR|FAIL',text,re.I),'simulator failure')
     rows=re.findall(r'^STAGED_FFT_CONTEXT_PASS mode=(\d+) reads=1536 inputs=3072 raw=3072 status=6 publications=3 releases=3 max_service=(\d+) overlap_inputs=(\d+) overlap_reads=(\d+)$',text,re.M)
-    require(len(rows)==4 and [int(r[0]) for r in rows]==list(range(4)),'four complete contexts')
+    require(contexts in (4,6),'explicit supported numerical campaign')
+    require(len(rows)==contexts and [int(r[0]) for r in rows]==list(range(contexts)),'complete numerical contexts')
     require(all(int(r[2])>0 and (int(r[0])>=2 or int(r[3])>0) for r in rows),'actual overlap')
-    require(all(int(r[1])<=5215 for r in rows[:3]),'coarse service deadline')
-    require(text.count('STAGED_FFT_PASS contexts=4 no_continuous_or_physical_claim')==1,'one terminal success')
+    require(all(int(r[1])<=5215 for r in rows if int(r[0])!=3),'coarse service deadline')
+    require(text.count(f'STAGED_FFT_PASS contexts={contexts} no_continuous_or_physical_claim')==1,'one terminal success')
     # Independently compare every recorded numerical field against prior actual
     # generated FFT evidence, not merely the candidate bench's PASS marker.
     old=RECOVERY/'destination-actual-parent.LQnQo9ny/run/project/retained_output_actual.sim/sim_1/behav/xsim/actual_words.csv'
@@ -89,12 +90,30 @@ def audit_sim(output):
     with (sim/'staged_words.csv').open() as f:
         for r in csv.DictReader(f):
             key=(r['stream'],r['job'],r['position']);identity=(r['context'],*key)
-            require(r['context'] in {'0','1','2','3'} and identity not in seen,'duplicate/unknown new word')
+            require(r['context'] in {str(n) for n in range(contexts)} and identity not in seen,'duplicate/unknown new word')
             require(reference.get(key)==(r['data'],r['exponent']),'old/new exact numerical mismatch: '+str(identity))
             seen.add(identity)
-    require(len(seen)==43008,'all four complete numerical inventories')
+    require(len(seen)==10752*contexts,'all complete numerical inventories')
     return {'contexts':rows,'numerical_rows':len(seen),'sha256':sha(sim/'staged_words.csv'),
             'actual_fft':True,'continuous_rx':False,'physical_signoff':False}
+
+def audit_handover_sim(output,fault_cases=6):
+    require(fault_cases in (6,7),'explicit supported fault campaign')
+    result=audit_sim(output,contexts=6)
+    sim=output/'project/staged_fft.sim/sim_1/behav/xsim'
+    text=(sim/'simulate.log').read_text()
+    timestamps=re.findall(r'^STAGED_TIMESTAMP_PASS mode=(\d+) base=([0-9a-f]{16}) words=1536$',text,re.M)
+    require(timestamps==[('4','a5a5a5a5a5a5a000'),('5','5a5a5a5a5a5a5000')],'full-width reader timestamp contexts')
+    resets=re.findall(r'^STAGED_RESET_PASS side=(\d+) old_unread=512 aborted_forward_prefix=(\d+) fresh_reads=512 slow_purge_edges=(\d+)$',text,re.M)
+    require(len(resets)==2 and [int(r[0]) for r in resets]==[1,2] and
+            all(64<=int(r[1])<512 and int(r[2])>=4 for r in resets),'both stopped-reader reset epochs')
+    faults=re.findall(r'^STAGED_FAULT_PASS boundary=(\d+) no_late_publication=1 releases=0 reads=(\d+)$',text,re.M)
+    require(len(faults)==fault_cases and [(int(r[0]),int(r[1])) for r in faults]==[(n,512 if n==5 else 0) for n in range(fault_cases)],
+            'all fault/quarantine boundaries')
+    handover=re.findall(rf'^STAGED_HANDOVER_PASS admissions=(\d+) completions=(\d+) reset_cases=2 fault_cases={fault_cases}$',text,re.M)
+    require(len(handover)==1 and all(int(n)>=36 for n in handover[0]),'terminal registered handover coverage')
+    result['handover']={'resets':resets,'faults':faults,'timestamps':timestamps,'admissions':int(handover[0][0]),'completions':int(handover[0][1])}
+    return result
 
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
@@ -113,7 +132,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_sim(output)
+        if mode=='sim':result['audit']=audit_handover_sim(output,fault_cases=7)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
