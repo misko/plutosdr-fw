@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, monotonic reset-release contract: **948 distinct tests pass**
+(921 regression + 16 enabled mailbox + 11 evidence tests). Both actual FFT
+campaigns preserve all 64512 numerical records/CSV and service latency. Both old
+reset-stage-1 paths disappear and setup failures fall 580→446, but same-domain
+WNS regresses -1.037→-1.324 ns; global WNS is -1.399 ns, TNS -250.635 ns.
+Timing is NOT closed and this is not promoted over the parent. The remaining
+release-receipt→product-ready→forward-fault cone has ten logic levels and high
+fanout; prove exact fault next-state/public transfers before simplifying it.
+CDC remains independently unqualified (nine CDC-3 / 208 CDC-15, no waivers).
+Branch `codex/starlink-rx-only-do-not-merge-monotonic-reset-release`, FW
+`fd574fe0b`, HDL `5b8589c99`, both pushed. No radios, PPU/main, primary HDL,
+clocks, exceptions or TX touched. Native 60 MS/s fine and 2.5 MS/s inspection
+remain required. See [monotonic reset release](reports/experiments/20260911-monotonic-reset-release-actual-route.md).
+
 Update 2026-09-11, compare metadata before phase selection: **874 regression +
 ten new evidence tests pass (884 distinct)**; both actual FFT campaigns pass,
 with exact 64512 records/CSV and unchanged service. The former product-metadata
