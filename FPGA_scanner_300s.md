@@ -2,6 +2,18 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, inverse-output identity stage: **1,200 tests pass** and both
+actual FFT runs match 64,512 numerical words. Nine new output-stage fault/reset
+cases recover correctly. Service is **4,178 clocks**, only one more than the
+buffered parent. WNS/TNS improve to **-1.406 ns / -324.725 ns**, but **763 setup
+endpoints still fail**; no deployment. The worst path now carries an already-
+latched guard fault through control logic to the global fault register. Next
+test registered global aborts for private stages while retaining immediate
+publication vetoes. Branch `codex/starlink-rx-only-do-not-merge-output-identity-stage`,
+FW `0ad3ae560`, HDL `61944956c`. No radios, PPU/main or primary HDL pointer changed.
+Native 60 MS/s fine and 2.5 MS/s inspection remain required. See
+[output-stage result and retained evidence](reports/experiments/20260911-output-identity-stage-actual-route.md).
+
 Update 2026-09-11, local private completion facts: **1,191 tests pass**; actual
 FFT numerics/service remain unchanged at 4,177 clocks, with cycle-exact original
 certificate comparison and ten additional completion cancellation tests.
