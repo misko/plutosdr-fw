@@ -305,6 +305,18 @@ def audit_productstage(output,auxiliary=False):
         'original_identity':True,'private_conservation':True,'boundaries':cases,'auxiliary_required':not auxiliary}
     return result
 
+def final_capacity_compiled(prepared):
+    return '// BEGIN FINAL CAPACITY WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_finalcapacity(output,auxiliary=False):
+    result=audit_productstage(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_FINAL_CAPACITY_PASS finals=(\d+) starts=(\d+) no_refill=1 producer_quiet=1 actual_bank_return=1$',text,re.M)
+    require(len(rows)==1 and min(map(int,rows[0]))>=12,'actual final capacity and bank return coverage')
+    result['finalcapacity']={'finals':int(rows[0][0]),'starts':int(rows[0][1]),'no_refill':True,
+        'producer_quiet':True,'actual_bank_return':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -322,8 +334,8 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_productstage(output) if product_stage_compiled(prepared) else (audit_forwardreceipt(output) if forward_receipt_compiled(prepared) else audit_ackcombined_sim(output))
-        elif mode=='ack':result['audit']=audit_productstage(output,auxiliary=True) if product_stage_compiled(prepared) else (audit_forwardreceipt(output,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(output))
+        if mode=='sim':result['audit']=audit_finalcapacity(output) if final_capacity_compiled(prepared) else (audit_productstage(output) if product_stage_compiled(prepared) else (audit_forwardreceipt(output) if forward_receipt_compiled(prepared) else audit_ackcombined_sim(output)))
+        elif mode=='ack':result['audit']=audit_finalcapacity(output,auxiliary=True) if final_capacity_compiled(prepared) else (audit_productstage(output,auxiliary=True) if product_stage_compiled(prepared) else (audit_forwardreceipt(output,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(output)))
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
