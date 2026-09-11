@@ -2,6 +2,18 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, balanced forward descriptor comparison: **1,412 tests pass**,
+actual arithmetic/service and all 43 fault/reset cases remain unchanged.
+Routed inspection confirms all 24 comparison groups / four reductions with
+no carry cells upstream. **Timing still FAILS: -1.420 ns WNS / -420.378 ns
+TNS / 939 endpoints**; worst slack regresses despite lower aggregate failure.
+The remaining descriptor-to-guard fault path is 77.306% routing. Preserve this
+experiment; investigate registered private bank status while keeping same-edge
+public vetoes and seal/ACK/reset proofs. Branch
+`codex/starlink-rx-only-do-not-merge-balanced-forward-identity`, FW `d3d6e86c7`,
+HDL `10996fd95`. No radios, PPU/main or primary HDL pointer changed. See
+[balanced topology and routed evidence](reports/experiments/20260911-balanced-forward-identity-actual-route.md).
+
 Update 2026-09-11, current product-publication fence: **the reproduced gate gap
 is fixed in the experimental top; all 43 actual fault/reset/delay cases pass**.
 1,347 tests pass; both actual FFT runs retain 64,512 exact numerical words and
