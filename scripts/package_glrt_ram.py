@@ -100,6 +100,14 @@ def stamp_rootfs(compressed: bytes, versions: str, *, lean_init: bytes | None = 
 
 
 def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
+    local_path = board / "local_search.txt"
+    local = local_path.read_text().strip() if local_path.exists() else "0"
+    if local not in ("0", "1"):
+        raise ValueError("invalid local search build selection")
+    for block in ("local_search_controls", "local_search_engines", "local_search_cadences"):
+        count = audit.get(block, None if local_path.exists() else "0")
+        if count != local:
+            raise ValueError("implemented local search differs from build selection")
     selection = board / "native_refinement.txt"
     enabled = selection.read_text().strip() if selection.exists() else "0"
     if enabled not in ("0", "1"):
@@ -115,8 +123,10 @@ def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
     legacy = legacy_path.read_text().strip() if legacy_path.exists() else "1"
     if legacy not in ("0", "1"):
         raise ValueError("invalid legacy scorer build selection")
-    if legacy == "0" and enabled != "1":
-        raise ValueError("lean profile requires native refinement")
+    if local == "1" and (rate != 2_500_000 or enabled != "0" or legacy != "0"):
+        raise ValueError("local search requires direct 2.5 MS/s without native or legacy scoring")
+    if legacy == "0" and enabled != "1" and local != "1":
+        raise ValueError("lean profile requires native refinement or local search")
     # New selections require exact topology evidence. Reference artifacts
     # predating this selector remain valid under their original gates.
     if legacy_path.exists():
@@ -131,7 +141,7 @@ def verify_native_selection(board: Path, audit: dict, rate: int) -> list[Path]:
         for block in ("native_schedule_controls", "native_result_queues"):
             if audit.get(block) != scheduled:
                 raise ValueError("implemented schedule/queue differs from build selection")
-    return [path for path in (selection, legacy_path, schedule_path) if path.exists()]
+    return [path for path in (selection, legacy_path, schedule_path, local_path) if path.exists()]
 
 
 def package(args):

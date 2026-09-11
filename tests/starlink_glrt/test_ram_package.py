@@ -133,3 +133,30 @@ def test_lean_profile_requires_exact_implemented_topology(tmp_path, legacy, enab
     else:
         with pytest.raises(ValueError):
             verify_native_selection(tmp_path, audit, 60000000)
+
+
+@pytest.mark.parametrize("change", [None, "missing_control", "extra_engine", "missing_cadence",
+    "native", "legacy", "schedule", "wrong_rate", "invalid_selector", "unselected_engine"])
+def test_local_package_requires_complete_exclusive_implemented_topology(tmp_path, change):
+    selectors = {"native_refinement.txt": "0", "legacy_scorer.txt": "0",
+                 "native_schedule.txt": "0", "local_search.txt": "1"}
+    audit = {"native_refinement_engines": "0", "native_schedule_controls": "0",
+             "native_result_queues": "0", "legacy_correlators": "0", "legacy_scorers": "0",
+             "legacy_vector_stages": "0", "local_search_controls": "1",
+             "local_search_engines": "1", "local_search_cadences": "1"}
+    if change == "missing_control": del audit["local_search_controls"]
+    elif change == "extra_engine": audit["local_search_engines"] = "2"
+    elif change == "missing_cadence": audit["local_search_cadences"] = "0"
+    elif change == "native": selectors["native_refinement.txt"] = audit["native_refinement_engines"] = "1"
+    elif change == "legacy": selectors["legacy_scorer.txt"] = "1"
+    elif change == "schedule": selectors["native_schedule.txt"] = "1"
+    elif change == "invalid_selector": selectors["local_search.txt"] = "2"
+    elif change == "unselected_engine": del selectors["local_search.txt"]
+    for name, value in selectors.items():
+        (tmp_path/name).write_text(value+"\n")
+    rate = 60000000 if change == "wrong_rate" else 2500000
+    if change is None:
+        assert verify_native_selection(tmp_path, audit, rate) == [tmp_path/name for name in selectors]
+    else:
+        with pytest.raises(ValueError):
+            verify_native_selection(tmp_path, audit, rate)

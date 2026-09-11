@@ -38,6 +38,9 @@ set native_result_queues {}
 set legacy_correlators {}
 set legacy_scorers {}
 set legacy_vector_stages {}
+set local_controls {}
+set local_engines {}
+set local_cadences {}
 foreach cell [get_cells -hierarchical] {
   set name [get_property NAME $cell]
   set ref [get_property REF_NAME $cell]
@@ -57,6 +60,9 @@ foreach cell [get_cells -hierarchical] {
     if {[string match ${base}* $ref] || [string match ${base}* $orig]} {
       lappend $destination $name
     }
+  }
+  foreach {base destination} {starlink_glrt_local_control local_controls starlink_glrt_local_search local_engines starlink_glrt_local_cadence local_cadences} {
+    if {[string match ${base}* $ref] || [string match ${base}* $orig]} { lappend $destination $name }
   }
 }
 close $f
@@ -78,6 +84,9 @@ puts $f "native_result_queues\t[llength $native_result_queues]"
 puts $f "legacy_correlators\t[llength $legacy_correlators]"
 puts $f "legacy_scorers\t[llength $legacy_scorers]"
 puts $f "legacy_vector_stages\t[llength $legacy_vector_stages]"
+puts $f "local_search_controls\t[llength $local_controls]"
+puts $f "local_search_engines\t[llength $local_engines]"
+puts $f "local_search_cadences\t[llength $local_cadences]"
 puts $f "hardware_eligible\t0"
 puts $f "qualification\tTiming, CDC, I/O and exception reports require review; audit alone grants no deployment."
 close $f

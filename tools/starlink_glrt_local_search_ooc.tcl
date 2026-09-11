@@ -41,9 +41,10 @@ set netlists [list]
 set stubs [list]
 # Give the two normalizer specializations distinct private module names so
 # their structural netlists cannot collide when linked. Only names change.
-foreach {name tag_width original} {coarse_mac6 5 coarse_mac6 verify_mac3 1 verify_mac3 verify_rotate3 34 verify_rotate3 coarse_norm4 4 coarse_norm coarse_norm2 2 coarse_norm} {
+foreach {name tag_width original} {coarse_mac6 5 coarse_mac6 verify_mac3 1 verify_mac3 verify_rotate3 34 verify_rotate3 coarse_norm4 4 coarse_norm verify_norm 2 verify_norm} {
   set module starlink_glrt_$name
   set path $repo/hdl/library/starlink_glrt/starlink_glrt_$original.v
+  if {$original eq "verify_norm"} { set path $repo/hdl/library/starlink_glrt/starlink_glrt_coarse_norm.v }
   set fd [open $path r];set content [read $fd];close $fd
   if {$original eq "coarse_norm"} {
     set content [string map [list starlink_glrt_coarse_norm $module \
@@ -84,7 +85,6 @@ foreach name $shell_names {
   set path $repo/hdl/library/starlink_glrt/starlink_glrt_$name.v
   set fd [open $path r];set content [read $fd];close $fd
   if {$name eq "coarse_window"} { set content [string map {starlink_glrt_coarse_norm starlink_glrt_coarse_norm4} $content] }
-  if {$name eq "verify_window3"} { set content [string map {starlink_glrt_coarse_norm starlink_glrt_coarse_norm2} $content] }
   set copied $output/source-snapshot/starlink_glrt_${name}_linked.v
   set fd [open $copied w];puts -nonewline $fd $content;close $fd
   lappend shell_sources $copied
