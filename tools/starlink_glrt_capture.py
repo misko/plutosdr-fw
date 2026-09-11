@@ -40,8 +40,9 @@ def sha256(path):
 
 
 class EventReader:
-    def __init__(self, buffer, stream, visit):
+    def __init__(self, buffer, stream, visit, *, decoder=Event):
         self.buffer, self.stream, self.visit = buffer, stream, visit
+        self.decoder = decoder
         self.condition = threading.Condition()
         self.stopping = threading.Event()
         self.error = None
@@ -63,7 +64,7 @@ class EventReader:
                         break
                     raise
                 self.stream.write(raw)  # Retain even malformed records as evidence.
-                event = Event.decode(raw)
+                event = self.decoder.decode(raw)
                 with self.condition:
                     if event.visit == self.visit:
                         self.events.append(event)
@@ -124,6 +125,11 @@ def validate_request(args):
     profile((args.acquisition_q16, args.threshold_q16, args.margin_q16), requested=getattr(args, "profile", None))
     if args.lo_hz <= 0 or args.bandwidth_hz <= 0:
         raise ValueError("expected RX LO and bandwidth must be positive")
+    if getattr(args, "local_search", False):
+        if (args.source_rate != 2_500_000 or getattr(args, "prefill", False) or args.decisions_off
+                or getattr(args, "profile", None) is not None
+                or (args.acquisition_q16, args.threshold_q16, args.margin_q16) != (13107, 19661, 9831)):
+            raise ValueError("GLA1 requires direct 2.5 MS/s, fixed local gates and no legacy overrides/prefill")
 
 
 def wait_for_prefill(iq, args, *, clock=time.monotonic, sleep=time.sleep):
@@ -157,7 +163,7 @@ def wait_for_prefill(iq, args, *, clock=time.monotonic, sleep=time.sleep):
         sleep(.01)
 
 
-def wait_for_final(iq, visit, *, timeout=3.0, clock=time.monotonic, sleep=time.sleep):
+def wait_for_final(iq, visit, *, timeout=3.0, clock=time.monotonic, sleep=time.sleep, snapshot_type=Snapshot):
     """Await this visit's kernel teardown on the separate attribute socket.
 
     IIOD can acknowledge a nonexclusive buffer CLOSE before its worker disables
@@ -168,7 +174,7 @@ def wait_for_final(iq, visit, *, timeout=3.0, clock=time.monotonic, sleep=time.s
     while True:
         try:
             wire = iq.read("capture_final_snapshot")
-            if Snapshot.decode(wire).words[20] == visit:
+            if snapshot_type.decode(wire).words[20] == visit:
                 return wire
         except OSError as error:
             if error.errno != errno.ENODATA:
@@ -180,6 +186,20 @@ def wait_for_final(iq, visit, *, timeout=3.0, clock=time.monotonic, sleep=time.s
 
 def collect(args, *, library=None, context_factory=Context):
     validate_request(args)
+    local = bool(getattr(args, "local_search", False))
+    snapshot_type, closure_type, event_type = Snapshot, Closure, Event
+    expected_extension = "GLX1-1.0"
+    if local:
+        if __package__:
+            from .starlink_glrt_local_abi import (
+                LocalEvent, LocalIQSnapshot, LocalSearchSnapshot, LocalSourceClosure, attest_capture,
+            )
+        else:
+            from starlink_glrt_local_abi import (
+                LocalEvent, LocalIQSnapshot, LocalSearchSnapshot, LocalSourceClosure, attest_capture,
+            )
+        snapshot_type, closure_type, event_type = LocalIQSnapshot, LocalSourceClosure, LocalEvent
+        expected_extension = "GLA1-1.0"
     args.output.mkdir(parents=True, exist_ok=False)
     protocol = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
     protocol.update(schema="starlink-glrt-iio-capture/v1", output_rate_hz=2_500_000,
@@ -191,14 +211,26 @@ def collect(args, *, library=None, context_factory=Context):
                     purpose=getattr(args, "purpose", DEFAULT_PURPOSE))
     protocol["closure_extension_required"] = (protocol["detector_profile"]["name"] == CANDIDATE or
                                                bool(getattr(args, "require_closure", False)))
+    if local:
+        protocol.update(schema="starlink-glrt-local-iio-capture/v1", closure_extension_required=True,
+                        detector_profile={"name": "gla1-upper-local-v1", "period_samples": 250000,
+                            "window_samples": 14000, "epochs": 3333, "coarse_cfo_bins": 11,
+                            "verify_minimum_q16": 5243, "margin_minimum_q16": 2622,
+                            "minimum_frame_support": 2, "alias_separation_q16": 656,
+                            "cfo_unit_hz": 100, "thresholds": "fixed in pinned FPGA image"})
+        for key in ("acquisition_q16", "threshold_q16", "margin_q16", "profile", "decisions_off"):
+            protocol.pop(key, None)
     source_files = [Path(__file__).resolve(), Path(__file__).with_name("starlink_glrt_abi.py").resolve(),
                     Path(__file__).with_name("starlink_glrt_iio.py").resolve(),
                     Path(__file__).with_name("starlink_glrt_profile.py").resolve()]
+    if local:
+        source_files.append(Path(__file__).with_name("starlink_glrt_local_abi.py").resolve())
     protocol["source_sha256"] = {str(path): sha256(path) for path in source_files}
     save(args.output / "protocol.json", protocol)
     api = library or Library(args.libiio)
     context = event_context = iq_buffer = event_buffer = reader = baseline = final = None
     extension_abi = baseline_closure = final_closure = None
+    baseline_search = final_search = local_evidence = None
     failures, blocks = [], []
     prefill = drain_seconds = None
     received, began = 0, time.monotonic()
@@ -215,8 +247,10 @@ def collect(args, *, library=None, context_factory=Context):
                     or radio_before["rf_bandwidth_hz"] != args.bandwidth_hz or radio_before["tx_powerdown"] != 1):
                 raise ValueError("configured RF rate/LO/bandwidth or TX mute differs from request")
             iq = context.device("starlink-glrt-iq")
-            if iq.read("capture_abi") != "GLR1-1.0-upper-only":
-                raise ValueError("unsupported GLR1 kernel ABI")
+            if iq.read("capture_abi") != ("GLA1-1.0-upper-only" if local else "GLR1-1.0-upper-only"):
+                raise ValueError("kernel ABI differs from requested capture profile")
+            if local and iq.read("local_search_abi") != "GLA1-1.0":
+                raise ValueError("unsupported local search ABI")
             try:
                 extension_abi = iq.read("capture_extension_abi")
             except OSError as error:
@@ -224,13 +258,13 @@ def collect(args, *, library=None, context_factory=Context):
                     raise
                 extension_abi = "none"
             (args.output/"extension_abi.txt").write_text(extension_abi+"\n")
-            if extension_abi not in ("none", "GLX1-1.0"):
+            if extension_abi not in ("none", expected_extension):
                 raise ValueError("unsupported finite closure extension")
-            if protocol["closure_extension_required"] and extension_abi != "GLX1-1.0":
-                raise ValueError("candidate capture requires the GLX1 finite closure extension")
+            if protocol["closure_extension_required"] and extension_abi != expected_extension:
+                raise ValueError(f"candidate capture requires the {expected_extension.split('-')[0]} finite closure extension")
             initial_text = iq.read("capture_snapshot")
             (args.output / "initial_snapshot.txt").write_text(initial_text + "\n")
-            initial = Snapshot.decode(initial_text)
+            initial = snapshot_type.decode(initial_text)
             if initial.words[19] & 3 or initial.words[20] == args.visit:
                 raise ValueError("capture is active/queued or visit ID repeats the previous observation")
             if initial.source_rate != args.source_rate:
@@ -245,24 +279,29 @@ def collect(args, *, library=None, context_factory=Context):
             # A quiet detector is valid for the entire bounded IQ observation.
             event_context.timeout(0)
             event_buffer = events.buffer(1, 1024)
-            reader = EventReader(event_buffer, event_file, args.visit)
+            reader = EventReader(event_buffer, event_file, args.visit, decoder=event_type) if local else \
+                EventReader(event_buffer, event_file, args.visit)
             reader.start()
-            for name, value in {
-                "capture_visit_id": args.visit, "capture_sample_limit": args.samples,
-                "acquisition_threshold_q16": args.acquisition_q16, "glrt_threshold_q16": args.threshold_q16,
-                "glrt_margin_q16": args.margin_q16, "glrt_decision_enable": int(not args.decisions_off),
-            }.items():
+            settings = {"capture_visit_id": args.visit, "capture_sample_limit": args.samples}
+            if not local:
+                settings.update(acquisition_threshold_q16=args.acquisition_q16, glrt_threshold_q16=args.threshold_q16,
+                                glrt_margin_q16=args.margin_q16, glrt_decision_enable=int(not args.decisions_off))
+            for name, value in settings.items():
                 iq.write(name, value)
             began = time.monotonic()
             iq_buffer = iq.buffer(args.chunk_samples, 4)  # Posts DMA, then ARM.
             baseline_text = iq.read("capture_baseline_snapshot")
             (args.output / "baseline_snapshot.txt").write_text(baseline_text + "\n")
-            baseline = Snapshot.decode(baseline_text)
-            if extension_abi == "GLX1-1.0":
+            baseline = snapshot_type.decode(baseline_text)
+            if extension_abi == expected_extension:
                 wire = iq.read("capture_baseline_extension_snapshot")
                 (args.output/"baseline_extension_snapshot.txt").write_text(wire+"\n")
-                baseline_closure = Closure.decode(wire)
+                baseline_closure = closure_type.decode(wire)
                 baseline_closure.require_pair(baseline)
+            if local:
+                wire = iq.read("local_search_baseline_snapshot")
+                (args.output/"baseline_local_search_snapshot.txt").write_text(wire+"\n")
+                baseline_search = LocalSearchSnapshot.decode(wire)
             if baseline.words[20] != args.visit or baseline.samples or baseline.words[19] & 0x1f:
                 raise ValueError("driver baseline is not the requested pre-ARM observation")
             if protocol["prefill"]:
@@ -289,13 +328,18 @@ def collect(args, *, library=None, context_factory=Context):
                     failures.append(f"IQ disable: {error}")
             if context is not None:
                 try:
-                    final_text = wait_for_final(context.device("starlink-glrt-iq"), args.visit)
+                    final_text = wait_for_final(context.device("starlink-glrt-iq"), args.visit,
+                                                snapshot_type=snapshot_type)
                     (args.output / "final_snapshot.txt").write_text(final_text + "\n")
-                    final = Snapshot.decode(final_text)
-                    if extension_abi == "GLX1-1.0":
+                    final = snapshot_type.decode(final_text)
+                    if extension_abi == expected_extension:
                         wire = context.device("starlink-glrt-iq").read("capture_final_extension_snapshot")
                         (args.output/"final_extension_snapshot.txt").write_text(wire+"\n")
-                        final_closure = Closure.decode(wire)
+                        final_closure = closure_type.decode(wire)
+                    if local:
+                        wire = context.device("starlink-glrt-iq").read("local_search_final_snapshot")
+                        (args.output/"final_local_search_snapshot.txt").write_text(wire+"\n")
+                        final_search = LocalSearchSnapshot.decode(wire)
                 except BaseException as error:
                     failures.append(f"final evidence: {error}")
                 try:
@@ -348,8 +392,15 @@ def collect(args, *, library=None, context_factory=Context):
             raise ValueError("complete baseline/final/event evidence is unavailable")
         if reader.error is not None:
             raise ValueError(f"event reader failed ({type(reader.error).__name__}): {reader.error}")
-        final.require_events(reader.events, baseline=baseline)
-        if extension_abi == "GLX1-1.0":
+        if local:
+            if any(value is None for value in (final_search, baseline_search, final_closure, baseline_closure)):
+                raise ValueError("complete local search evidence is unavailable")
+            local_evidence = attest_capture(final=final, baseline=baseline, source=final_closure,
+                source_baseline=baseline_closure, search=final_search, search_baseline=baseline_search,
+                events=reader.events, received_bytes=(args.output/"iq.ci16").stat().st_size)
+        else:
+            final.require_events(reader.events, baseline=baseline)
+        if not local and extension_abi == expected_extension:
             if final_closure is None or baseline_closure is None:
                 raise ValueError("paired finite closure evidence is unavailable")
             final_closure.require_complete(final, baseline=baseline_closure, base_snapshot=baseline)
@@ -368,8 +419,10 @@ def collect(args, *, library=None, context_factory=Context):
     if protocol["prefill"]:
         evidence_names += ("prefill_snapshot.txt",)
     evidence_names += ("extension_abi.txt",)
-    if extension_abi == "GLX1-1.0":
+    if extension_abi == expected_extension:
         evidence_names += ("baseline_extension_snapshot.txt", "final_extension_snapshot.txt")
+    if local:
+        evidence_names += ("baseline_local_search_snapshot.txt", "final_local_search_snapshot.txt")
     summary = {"schema": protocol["schema"], "status": "complete" if not failures else "failed",
                "failures": failures, "received_bytes": received,
                "iq_prefix_attested": iq_pass, "event_transport_attested": event_pass,
@@ -387,8 +440,9 @@ def collect(args, *, library=None, context_factory=Context):
                "detector_pending_bits": final.words[61] if final else None,
                "ddc_clipping_count": final.words[16] if final else None}
     summary["extension_abi"] = extension_abi
-    summary["finite_detector_closure_attested"] = event_pass and extension_abi == "GLX1-1.0"
-    summary["finite_detector_closure"] = final_closure.evidence() if final_closure is not None else None
+    summary["finite_detector_closure_attested"] = event_pass and extension_abi == expected_extension
+    summary["finite_detector_closure"] = local_evidence if local else \
+        final_closure.evidence() if final_closure is not None else None
     if protocol["prefill"]:
         summary["prefill"] = prefill
         valid_drain = bool(prefill and drain_seconds and not failures)
@@ -408,6 +462,7 @@ def main():
     parser.add_argument("--serial", required=True)
     parser.add_argument("--firmware-version", required=True)
     parser.add_argument("--source-rate", type=int, choices=RATES, required=True)
+    parser.add_argument("--local-search", action="store_true", help="record the GLA1 autonomous local-search profile")
     parser.add_argument("--lo-hz", type=int, required=True)
     parser.add_argument("--bandwidth-hz", type=int, required=True)
     parser.add_argument("--visit", type=int, required=True)

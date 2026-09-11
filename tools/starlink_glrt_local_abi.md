@@ -96,6 +96,15 @@ comparison. RF identity and numerical equivalence are separate release gates.
 IQ, through real cadence/MMIO/FIFO RTL with the host reader delayed 250 ms.
 It compares every record with the independent integer model. No radio is used.
 
+`python -m tools.starlink_glrt_capture --local-search` records GLA1 IQ and events
+using the existing bounded capture lifecycle. It requires direct 2.5 MS/s,
+rejects legacy threshold/profile overrides, enables the event consumer before
+IQ and keeps it running through stop/drain. It persists both baseline/final
+local search snapshots and attests the exact saved IQ windows. The command
+requires an already configured and authorized radio; it does not tune or flash.
+Its schema is `starlink-glrt-local-iio-capture/v1`. Successful transport does not
+set `independent_host_glrt_run` or `live_detector_qualified` to true.
+
 `starlink_glrt_local_search_ooc.tcl OUTPUT ROMS --control-netlist` produces a
 linked, unplaced component with its source hashes. The board build consumes it
 with `scripts/build_glrt_board.sh 2500000 OUTPUT --local-search NETLIST`.

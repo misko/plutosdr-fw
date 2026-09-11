@@ -10,7 +10,10 @@ import re
 import struct
 from dataclasses import dataclass
 
-from .starlink_glrt_abi import U64_MAX, Closure, Snapshot, integer, require
+if __package__:
+    from .starlink_glrt_abi import U64_MAX, Closure, Snapshot, integer, require
+else:
+    from starlink_glrt_abi import U64_MAX, Closure, Snapshot, integer, require
 
 RATE = 2_500_000
 PERIOD = 250_000
@@ -63,6 +66,10 @@ class LocalSourceClosure(Closure):
 @dataclass(frozen=True)
 class LocalEvent:
     words: tuple[int, ...]
+
+    @property
+    def visit(self) -> int:
+        return self.words[1]
 
     @classmethod
     def decode(cls, data: bytes) -> LocalEvent:
