@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, registered input identity components: **16 focused tests pass**.
+A one-beat private register captures payload and identity evidence together;
+the actual input-checker variant retains ordinal/LAST/demand/certification checks.
+Tests cover continuous refill, held final word, 350 bad/unknown identities,
+randomized conservation, malformed prefixes, delivery gaps and reset recovery.
+This moves the proposed boundary before FFT delivery rather than delaying a
+publication veto. **Not yet integrated with the actual FFT, synthesized or
+routed**; all 17 existing integrated runtime modules remain unchanged. Next wire
+actual bank acceptance versus FFT consumption, preserve final-word ownership,
+then perform actual FFT service/numerical tests and unchanged-constraint routing.
+Branch: `codex/starlink-rx-only-do-not-merge-input-validation-stage`.
+No radio/PPU/main or production HDL change. Native 60 MS/s fine search, 2.5 MS/s
+inspection and all full receiver/deployment gates remain required.
+See [component evidence and integration gate](reports/experiments/20260911-input-identity-stage-components.md).
+
 Update 2026-09-11, publication-specific fault scope: **496 tests** and **64512
 actual FFT records** pass with unchanged service. The integrated controller,
 actual FFT and buffers route, but setup regresses to **-1.888 ns WNS /

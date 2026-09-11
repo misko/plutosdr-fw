@@ -1,0 +1,10 @@
+{
+  "bytes": 367213,
+  "members": 217,
+  "regular_files": 185,
+  "sha256": "d9393036451de5fe593bb01db1ce6aa64160fb34cdd24a4bee00d59062794640",
+  "all_members_compared_with_sources": true,
+  "no_links_or_unsafe_paths": true,
+  "compiled_vvp_and_pytest_current_links_excluded": true,
+  "full_receiver_or_deployment_claim": false
+}
