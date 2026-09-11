@@ -4,6 +4,22 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, publication-specific fault scope: **496 tests** and **64512
+actual FFT records** pass with unchanged service. The integrated controller,
+actual FFT and buffers route, but setup regresses to **-1.888 ns WNS /
+-598.888 ns TNS / 881 failing endpoints**, versus guard facts -1.340 /
+-463.636 / 821. Do not promote or deploy. Authorization matches over 479822
+checked cycles, with six new retained-fault/recovery cases. Failed V1 test
+injection and corrected V2 evidence are both preserved. The critical path still
+connects phase-dependent input identity and fault aggregation to publication;
+83 fewer LUTs did not solve it. Next specify a registered validation/publication
+boundary with explicit fault/reset cancellation, ownership and service cost,
+then verify and route before features. Branch:
+`codex/starlink-rx-only-do-not-merge-publication-fault-scope`.
+Native 60 MS/s fine search and independent 2.5 MS/s inspection remain unchanged.
+No radio, PPU/main or production HDL changes; all deployment gates remain open.
+See [integrated test and route evidence](reports/experiments/20260911-staged-publicationscope-actual-route-parent.md).
+
 Update 2026-09-11, preflight/publication ordering: **479 tests** and **64512
 actual FFT records** pass with unchanged service. All 17 runtime modules are
 unchanged from guard facts; no new synthesis/route or timing improvement is
