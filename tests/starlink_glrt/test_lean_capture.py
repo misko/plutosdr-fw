@@ -95,7 +95,7 @@ class Fake:
         self.events.append(("write", name, value))
 
     def buffer(self, samples, count):
-        assert (samples, count) == (1000, 4)
+        assert (samples, count) == (1000, 16)
         self.events.append(("open",))
         if self.fault == "open": raise OSError("open failed")
         self.live = True

@@ -26,6 +26,10 @@ from .starlink_glrt_schedule_abi import ScheduleSnapshot
 
 SCHEMA = "starlink-glrt-lean-iio-capture/v1"
 EXCLUDED = "1040007c4a94000211000b009186843ef2"
+# Keep bounded startup headroom while baseline snapshots and durable evidence
+# are collected after ARM. Four 100 ms buffers overflowed during a measured
+# 640 ms startup on Ethernet; sixteen reserve 1.6 s at the maximum chunk size.
+KERNEL_BUFFERS = 16
 
 
 def retain(path, value):
@@ -73,7 +77,7 @@ def collect(args, *, library=None, context_factory=Context, clock=time.monotonic
     hashes = {str(path.resolve()): sha256(path) for path in files}
     retain(args.output/"protocol.json", dict(schema=SCHEMA, **{k:str(v) if isinstance(v,Path) else v
         for k,v in vars(args).items()}, source_rate=60000000, output_rate_hz=2500000,
-        base_abi="GLF1-1.0-upper-only", source_sha256=hashes, kernel_buffers=4,
+        base_abi="GLF1-1.0-upper-only", source_sha256=hashes, kernel_buffers=KERNEL_BUFFERS,
         purpose="finite coarse IQ and provisional native mapping; no scored FPGA events"))
     context = device = buffer = baseline = base_closure = final = closure = None
     before = after = origin = None
@@ -117,7 +121,7 @@ def collect(args, *, library=None, context_factory=Context, clock=time.monotonic
                                 ("glrt_decision_enable", 0)):
                 device.write(name, value)
             mark("buffer_open_begin")
-            buffer = device.buffer(args.chunk_samples, 4)
+            buffer = device.buffer(args.chunk_samples, KERNEL_BUFFERS)
             mark("buffer_open_end")
             raw = device.read("capture_baseline_snapshot")
             retain(args.output/"baseline_snapshot.txt", (raw+"\n").encode())
