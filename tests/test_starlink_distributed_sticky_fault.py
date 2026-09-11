@@ -14,6 +14,8 @@ OLD="""  always @(posedge fft_clk)
 """
 
 def undo_top(text):
+    from tests.test_starlink_scalar_fault_sources import undo_top as undo_scalar
+    text=undo_scalar(text)
     if '// BEGIN DISTRIBUTED STICKY FAULT' not in text:return text
     text,n=re.subn(r'  // BEGIN DISTRIBUTED STICKY FAULT\n.*?  // END DISTRIBUTED STICKY FAULT\n',
         lambda _:OLD,text,flags=re.S)
@@ -49,12 +51,19 @@ def declaration(source,name):
     assert len(rows)==1,name
     return rows[0]
 
-def run(tmp_path,mutation=None):
+def run(tmp_path,mutation=None,scalar=False):
     source=(RTL/TOP).read_text()
-    block=re.search(r'  // BEGIN DISTRIBUTED STICKY FAULT\n.*?  // END DISTRIBUTED STICKY FAULT\n',source,re.S)[0]
+    if not scalar:
+        from tests.test_starlink_scalar_fault_sources import undo_top as undo_scalar
+        source=undo_scalar(source)
+    label='SCALAR FAULT SOURCES' if scalar else 'DISTRIBUTED STICKY FAULT'
+    block=re.search(r'  // BEGIN '+label+r'\n.*?  // END '+label+r'\n',source,re.S)[0]
     if mutation:
         before=block
         if mutation=='reset':block=block.replace('if (!fast_running)',"if (1'b0)",1)
+        elif mutation=='not_sticky' and scalar:block=block.replace('else if (|sticky_fault_sources) fast_fault <= 1;','else fast_fault <= |sticky_fault_sources;',1)
+        elif mutation=='skip_first' and scalar:block=block.replace('(|sticky_fault_sources)','(|sticky_fault_sources[18:1])',1)
+        elif mutation=='skip_last' and scalar:block=block.replace('(|sticky_fault_sources)','(|sticky_fault_sources[17:0])',1)
         elif mutation=='not_sticky':block=block.replace("else if (sticky_fault_sources[cause_index]) sticky_fault_latched[cause_index] <= 1'b1;",
             "else sticky_fault_latched[cause_index] <= sticky_fault_sources[cause_index];",1)
         elif mutation=='skip_first':block=block.replace('else if (sticky_fault_sources[cause_index])','else if (cause_index!=0 && sticky_fault_sources[cause_index])',1)
@@ -129,6 +138,7 @@ initial begin
 end
 endmodule
 """.replace('__REFERENCE__',reference).replace('__BLOCK__',block)
+    if scalar:bench=bench.replace('wire fast_fault;','reg fast_fault;',1)
     tb=tmp_path/'tb.sv';tb.write_text(bench)
     result=subprocess.run(['iverilog','-g2012','-s','tb','-o',str(tmp_path/'sim'),str(tb)],capture_output=True,text=True,timeout=30)
     (tmp_path/'compile.log').write_text(result.stdout+result.stderr)
