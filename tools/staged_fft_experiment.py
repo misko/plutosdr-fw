@@ -46,7 +46,8 @@ def prepare(path):
     runtime.extend(NEW/name for name in ['starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v',
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
                                        'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
-                                       'starlink_pss_input_identity_stage.v','starlink_pss_realtime_input_guard_staged_identity.v'])
+                                       'starlink_pss_input_identity_stage.v','starlink_pss_realtime_input_guard_staged_identity.v',
+                                       'starlink_pss_product_identity_stage.v','starlink_pss_product_mailbox_staged_identity.v'])
     support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
                     ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
     sources=runtime+support
@@ -287,6 +288,23 @@ def audit_forwardreceipt(output,auxiliary=False):
         'ack_exact':True,'publication_subset':True,'boundaries':cases,'auxiliary_required':not auxiliary}
     return result
 
+def product_stage_compiled(prepared):
+    return '// BEGIN ACTUAL PRODUCT STAGE WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_productstage(output,auxiliary=False):
+    result=audit_forwardreceipt(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_PRODUCT_STAGE_PASS pushes=(\d+) pops=(\d+) checks=(\d+) updates=(\d+) holds=(\d+) original_identity=1 private_conservation=1$',text,re.M)
+    require(len(rows)==1,'one actual product identity/conservation receipt')
+    pushes,pops,checks,updates,holds=map(int,rows[0])
+    require(min(pushes,pops)>=6144 and checks>=1000 and updates>=12 and pushes>=pops,'actual product stage coverage')
+    if auxiliary:require(holds>=96,'held product LAST coverage')
+    cases=re.findall(r'^STAGED_PRODUCT_STAGE_CASE_PASS boundary=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(cases==([str(n) for n in range(12)] if auxiliary else []),'actual product stage boundary inventory')
+    result['productstage']={'pushes':pushes,'pops':pops,'checks':checks,'updates':updates,'holds':holds,
+        'original_identity':True,'private_conservation':True,'boundaries':cases,'auxiliary_required':not auxiliary}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -304,8 +322,8 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_forwardreceipt(output) if forward_receipt_compiled(prepared) else audit_ackcombined_sim(output)
-        elif mode=='ack':result['audit']=audit_forwardreceipt(output,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(output)
+        if mode=='sim':result['audit']=audit_productstage(output) if product_stage_compiled(prepared) else (audit_forwardreceipt(output) if forward_receipt_compiled(prepared) else audit_ackcombined_sim(output))
+        elif mode=='ack':result['audit']=audit_productstage(output,auxiliary=True) if product_stage_compiled(prepared) else (audit_forwardreceipt(output,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(output))
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

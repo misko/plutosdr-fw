@@ -5,6 +5,7 @@ import re
 import subprocess
 
 import pytest
+from tests.test_starlink_product_stage_integration import undo_product_stage
 
 ROOT = Path(__file__).resolve().parents[1]
 RTL = ROOT / 'hdl/library/starlink_pss_acquisition/staged_control'
@@ -13,6 +14,7 @@ BASE = ROOT.parent / 'staged-ackcombined-prepared-v1'
 
 
 def undo_forward_receipt(text):
+    text=undo_product_stage(text)
     start = text.index('  // BEGIN FORWARD COMPLETION RECEIPT\n')
     end = text.index('  // END FORWARD COMPLETION RECEIPT\n', start) + len('  // END FORWARD COMPLETION RECEIPT\n')
     text = text[:start] + text[end:]

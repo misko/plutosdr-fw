@@ -1,5 +1,9 @@
 # Product-buffer validation boundary — component checkpoint, DO NOT MERGE
 
+Historical component checkpoint. The integrated FFT rejected its one-clock
+refill pause; see [actual integration and replacement](starlink-product-identity-integrated-20260911.md)
+for the current write-through implementation and measurements.
+
 Branch `codex/starlink-rx-only-do-not-merge-product-validation-stage`.
 Parent FW `0e40f84933f942df232da9c01ff9420889579530`, HDL
 `48d3dd376693b8c0e3adb9bfb451e01ee7dc58a1`.

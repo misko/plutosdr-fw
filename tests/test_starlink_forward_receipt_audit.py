@@ -8,6 +8,7 @@ import shutil
 import sys
 
 import pytest
+from tests.test_starlink_product_stage_integration import undo_product_stage_bench
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'tools'))
@@ -25,6 +26,7 @@ def test_existing_bench_and_deadlines_exact_after_inverse():
     parent=ROOT.parent/'staged-ackcombined-prepared-v1'
     assert experiment.sha(parent/'SHA256SUMS')=='ecb302eab62a44de27a6b27d4d0414effe487e270498d2adb1ec83f79d01a38a'
     text=(ROOT/'hdl/library/starlink_pss_acquisition/staged_control/tb_fft_staged_output.sv').read_text()
+    text=undo_product_stage_bench(text)
     for label in ['WITNESS','BOUNDARIES','AUXILIARY']:
         text,count=re.subn(r' *// BEGIN FORWARD RECEIPT '+label+r'\n.*? *// END FORWARD RECEIPT '+label+r'\n','',text,flags=re.S)
         assert count==1

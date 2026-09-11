@@ -5,6 +5,7 @@ import re
 import subprocess
 
 import pytest
+from tests.test_starlink_product_stage_integration import undo_product_stage
 
 ROOT=Path(__file__).resolve().parents[1]
 RTL=ROOT/'hdl/library/starlink_pss_acquisition/staged_control'
@@ -32,13 +33,15 @@ def test_mailbox_inverse_preserves_all_other_checks():
     assert text.rstrip()==old.rstrip()
 
 
-def test_existing_fft_runtime_is_not_yet_changed():
+def test_existing_fft_runtime_delta_is_separately_inverted():
     parent=Path('/dev/shm/starlink-forward-receipt.7z0zKX/prepared-v1')
     assert hashlib.sha256((parent/'SHA256SUMS').read_bytes()).hexdigest()=='0d222aa4968145b0026ac4e8c9288c9b1ad5fc9f8f9b1bdd07a6d3eda4f1af8b'
     names=(parent/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==19
     for name in names:
-        if (RTL/name).exists():assert (RTL/name).read_bytes()==(parent/name).read_bytes(),name
+        if name=='starlink_pss_fft_staged_output_impl.v':
+            assert undo_product_stage((RTL/name).read_text())==(parent/name).read_text()
+        elif (RTL/name).exists():assert (RTL/name).read_bytes()==(parent/name).read_bytes(),name
 
 
 def run(tmp_path,mutant=None):
@@ -48,7 +51,7 @@ def run(tmp_path,mutant=None):
     elif mutant=='live_metadata':stage=stage.replace('output_metadata<=input_metadata;','output_metadata<=~input_metadata;',1)
     elif mutant=='lost_reset':stage=stage.replace('full<=0;fault_q<=0;', 'full<=1;fault_q<=0;',1)
     elif mutant=='lost_abort':stage=stage.replace("(abort_epoch !== 1'b0)","1'b0",1)
-    elif mutant=='missing_reference_pause':stage=stage.replace("(output_ready && (reference_update === 1'b0))",'output_ready',1)
+    elif mutant=='no_write_through':bench=bench.replace('metadata_load ? staged_metadata : held_metadata','held_metadata',1)
     elif mutant=='drop_unpublished_last':bench=bench.replace("((staged_last===1'b0) || bank_commit)","1'b1",1)
     elif mutant=='bypass_certificate':bank=bank.replace("input_metadata_certified === 1'b1","1'b1",1)
     files=[]
@@ -65,14 +68,14 @@ def run(tmp_path,mutant=None):
 def test_actual_mailbox_conservation_faults_and_recovery(tmp_path):
     result=run(tmp_path)
     assert result.returncode==0,result.stdout+result.stderr
-    match=re.search(r'PRODUCT_IDENTITY_COMPONENT_PASS good_blocks=(\d+) bad_metadata=420 bad_framing=6 resets=8 reads=(\d+) refills=(\d+) holds=(\d+) oracle=(\d+) pauses=(\d+)',result.stdout)
+    match=re.search(r'PRODUCT_IDENTITY_COMPONENT_PASS good_blocks=(\d+) bad_metadata=420 bad_framing=6 resets=8 reads=(\d+) refills=(\d+) holds=(\d+) oracle=(\d+) updates=(\d+)',result.stdout)
     assert match,result.stdout
     good,reads,refills,holds,oracle,pauses=map(int,match.groups())
     assert good==12 and reads==6144 and refills>=510 and holds>=200 and oracle>=1000 and pauses>=12
 
 
 @pytest.mark.parametrize('mutant',['unchecked_identity','live_metadata','lost_reset','lost_abort',
-                                  'missing_reference_pause','drop_unpublished_last','bypass_certificate'])
+                                  'no_write_through','drop_unpublished_last','bypass_certificate'])
 def test_unsafe_boundary_mutants_rejected(tmp_path,mutant):
     result=run(tmp_path,mutant)
     assert result.returncode!=0 and 'FATAL' in result.stdout,result.stdout+result.stderr
