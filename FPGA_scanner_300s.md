@@ -4,6 +4,22 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, balanced current handoff equality: **682 regression + eight
+new actual-evidence tests pass**. Both corrected actual FFT campaigns pass;
+64512 numerical records, CSV bytes and service intervals remain exact. An
+additive monitor delta-cycle race is documented; runtime did not change during
+the correction, and 28 focused tests pass afterward. The targeted original
+exponent-to-publication path improves **−1.370 → +0.086 ns**, with no carry chain.
+Overall setup nonetheless regresses: **−1.736 ns WNS / −430.075 ns TNS / 715
+failures**. New worst is output replay metadata/framing into controller phase.
+Reset CDC cleanup remains intact; no constraints changed. Keep both candidates;
+no promotion/deployment. Next address output-validation/state feedback without
+stale authorization or delayed current fault vetoes. Branch:
+`codex/starlink-rx-only-do-not-merge-balanced-handoff`, FW `a2313deeb`, HDL
+`d999ec011`. Native 60 MS/s fine search and 2.5 MS/s inspection remain unchanged;
+no radio, PPU/main or primary HDL changes.
+See [balanced handoff proof and route](reports/experiments/20260911-balanced-handoff-actual-route.md).
+
 Update 2026-09-11, local reset receipts integrated: **670 regression + seven
 new evidence tests pass**, both actual FFT campaigns pass, and all **64512
 indexed numerical records** remain exact with unchanged service intervals.
