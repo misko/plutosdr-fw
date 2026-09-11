@@ -47,7 +47,7 @@ def prepare(path):
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
                                        'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
                                        'starlink_pss_input_identity_stage.v','starlink_pss_realtime_input_guard_staged_identity.v',
-                                       'starlink_pss_product_identity_stage.v','starlink_pss_product_mailbox_staged_identity.v'])
+                                       'starlink_pss_product_identity_split_capacity.v','starlink_pss_product_mailbox_staged_identity.v'])
     support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
                     ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
     sources=runtime+support
@@ -317,6 +317,18 @@ def audit_finalcapacity(output,auxiliary=False):
         'producer_quiet':True,'actual_bank_return':True}
     return result
 
+def split_capacity_compiled(prepared):
+    return '// BEGIN SPLIT CAPACITY WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_splitcapacity(output,auxiliary=False):
+    result=audit_finalcapacity(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_SPLIT_CAPACITY_PASS checks=(\d+) nonfinal=(\d+) input_ready_exact=1 current_retirement_exact=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0][0])>=1000 and int(rows[0][1])>=6144,'split capacity exact acceptance and retirement coverage')
+    result['splitcapacity']={'checks':int(rows[0][0]),'nonfinal':int(rows[0][1]),
+        'input_ready_exact':True,'current_retirement_exact':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -336,6 +348,8 @@ def run(mode,prepared,expected,output):
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
         if mode=='sim':result['audit']=audit_finalcapacity(output) if final_capacity_compiled(prepared) else (audit_productstage(output) if product_stage_compiled(prepared) else (audit_forwardreceipt(output) if forward_receipt_compiled(prepared) else audit_ackcombined_sim(output)))
         elif mode=='ack':result['audit']=audit_finalcapacity(output,auxiliary=True) if final_capacity_compiled(prepared) else (audit_productstage(output,auxiliary=True) if product_stage_compiled(prepared) else (audit_forwardreceipt(output,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(output)))
+        if mode in {'sim','ack'} and split_capacity_compiled(prepared):
+            result['audit']=audit_splitcapacity(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

@@ -51,6 +51,10 @@ def test_stage_quarantine_feeds_all_existing_product_fault_summaries():
 
 
 def undo_product_stage_bench(text):
+    text,count=re.subn(r'  // BEGIN SPLIT CAPACITY WITNESS\n.*?  // END SPLIT CAPACITY WITNESS\n','',text,flags=re.S)
+    assert count==1
+    text=text.replace('      report_split_capacity; // SPLIT CAPACITY AUXILIARY\n','',1)
+    text=text.replace('    report_split_capacity; // SPLIT CAPACITY MAIN\n','',1)
     text,count=re.subn(r'  // BEGIN FINAL CAPACITY WITNESS\n.*?  // END FINAL CAPACITY WITNESS\n','',text,flags=re.S)
     assert count==1
     text=text.replace('      report_final_capacity; // FINAL CAPACITY AUXILIARY\n','',1)
