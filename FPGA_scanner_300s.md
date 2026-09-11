@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private descriptor certification: **new best measured
+development reference**, with **449 tests** and **64,512 actual FFT records**
+passing at unchanged latency. Snapshot/consume cancellation and six fresh-reset
+recoveries pass. Route improves to **-1.452 ns WNS / -451.168 ns TNS / 704
+failing endpoints** (parent -2.047 / -550.201 / 825). Still NOT timing-closed or
+deployment-qualified. Worst path now ends at completion snapshot bit 9 through
+output-bank metadata and a compound guard-local fault predicate. Next split
+those exact facts and inspect inverse retirement, retaining all public vetoes.
+Branch: `codex/starlink-rx-only-do-not-merge-private-certification`. No radio,
+PPU/main or primary production HDL changes; native 60 MS/s fine search,
+2.5 MS/s inspection and all full-receiver/deployment gates remain required.
+See [private certification proof and improved route](reports/experiments/20260911-staged-certification-actual-route-parent.md).
+
 Update 2026-09-11, private kernel sequence on final-capture candidate: **435
 tests** and **64,512 actual FFT records** pass with unchanged latency. Hidden
 bin/next-block state advances privately; public validation/completion and final
