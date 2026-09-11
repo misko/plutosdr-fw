@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, whole held bank handoff: **496 tests** and **64,512 actual
+FFT records** pass at unchanged service latency. The original-input bank and
+441,088 rising-edge ownership/offer checks match; six new late-event, paused
+replay and reset cases recover with 512 correct reads and one real release.
+Route improves over metadata-only to **-1.868 ns WNS / -565.807 ns TNS / 720
+failing endpoints**, but is still worse than private certification on all three
+metrics. Do not promote as timing reference or deploy. Worst path now feeds
+inverse awaiting-ACK through current input-identity validation; investigate
+that exact ACK/reuse contract next, preserving current faults and real release.
+Branch: `codex/starlink-rx-only-do-not-merge-held-bank-handoff`. No radio,
+PPU/main or primary production HDL changes. Native 60 MS/s fine search,
+2.5 MS/s inspection and every full-receiver/deployment gate remain required.
+See [held handoff proof and physical comparison](reports/experiments/20260911-staged-heldhandoff-actual-route-parent.md).
+
 Update 2026-09-11, held output-bank metadata: **479 tests** and **64,512 actual
 FFT records** pass at unchanged service latency. An original-mux real-bank
 witness matches through 385,028 writer-state observations plus reader, stall,
