@@ -4,6 +4,22 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, qualified forward-completion receipt: **545 regression + 14
+evidence + seven archive tests pass**. All **64512 indexed actual FFT records**
+and service intervals match. The token updates from the guard's registered
+qualified pulse; an explicit ACK interlock prevents early kernel-readiness ACK.
+Main witness: 500638 cycles / 98 receipt windows; auxiliary: 12 new boundary
+cases, all with fresh recovery. Route completes but setup remains open:
+**-1.567 ns WNS / -497.191 ns TNS / 681 failures**. 132 fewer failing endpoints,
+47 fewer LUTs and eight fewer registers, but worse WNS/TNS than combined ACK;
+retain as an alternate, no promotion/deployment. Worst path now crosses product
+metadata/framing validation into forward ACK and kernel-output control. Next
+investigate a product-buffer validation boundary, not a delayed fault bit.
+Branch: `codex/starlink-rx-only-do-not-merge-forward-completion-receipt`.
+No radios, PPU/main or primary HDL changes. Native 60 MS/s fine search, 2.5 MS/s
+inspection and all full receiver/deployment gates remain required.
+See [registered forward receipt and measured route](reports/experiments/20260911-staged-forwardreceipt-actual-route.md).
+
 Update 2026-09-11, combined private ACK retirement: **521 regression + 18
 paired-evidence tests pass**, **64512 actual FFT records** and service unchanged.
 The separate bounded ACK campaign passes six fault/reset/recovery cases; routing
