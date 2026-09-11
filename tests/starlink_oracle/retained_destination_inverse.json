@@ -1,0 +1,68 @@
+{
+  "owner": [
+    [
+      "module starlink_pss_retained_output_owner (",
+      "module starlink_pss_retained_destination_owner ("
+    ],
+    [
+      "  output wire [1:0] current_lease, admitted_lease",
+      "  output wire [1:0] current_lease, admitted_lease,\n  output wire reserved_state_known"
+    ],
+    [
+      "  assign current_lease = lease;",
+      "  // Read-only four-state observation; no physical unknown detector claim.\n  assign reserved_state_known = reserved === 1'b0 || reserved === 1'b1;\n  assign current_lease = lease;"
+    ]
+  ],
+  "top": [
+    [
+      "module starlink_pss_fft_retained_output_impl #(",
+      "module starlink_pss_fft_retained_destination_impl #("
+    ],
+    [
+      "  parameter integer INPUT_OFFER_FAULT_SUMMARY = 0",
+      "  parameter integer INPUT_OFFER_FAULT_SUMMARY = 0,\n  parameter integer CONTEXTUAL_DESTINATION_SUMMARY = 0"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (CONTEXTUAL_DESTINATION_SUMMARY !== 0 && CONTEXTUAL_DESTINATION_SUMMARY !== 1)\n      $fatal(1, \"contextual destination summary mode must be known zero or one\");\n"
+    ],
+    [
+      "  wire retained_reusable, retained_reserved, retained_published, retained_fault_now;",
+      "  wire retained_reusable, retained_reserved, retained_published, retained_fault_now;\n  wire retained_reserved_known;"
+    ],
+    [
+      "  assign common_current_fault = INPUT_OFFER_FAULT_SUMMARY ?\n    offered_common_current_fault : original_common_current_fault;",
+      "  // Contextual scalar absorption affects only the common summary. Keep the\n  // complete original detailed preflight vector and both old aggregates above.\n  wire summary_destination_ready = next_inverse ? output_bank_ready : product_bank_ready;\n  wire summary_destination_event = REGISTERED_SCHEDULING && fast_running && preparing ?\n    !summary_destination_ready : 1'b0;\n  wire [5:0] summary_preflight_events =\n    {preflight_events_now[5], summary_destination_event, preflight_events_now[3:0]};\n  wire destination_original_common = external_fault_now || forward_fault_now || inverse_fault_now ||\n    output_bank_fault || output_bank_framing_fault_now || (|summary_preflight_events) || result_fault;\n  wire destination_offered_common = offered_external_fault_now ||\n    guard_offered_local_fault[0] || guard_offered_local_fault[1] ||\n    output_bank_fault || output_bank_framing_fault_now || (|summary_preflight_events) || result_fault;\n  wire contextual_destination_common = (fast_running === 1'b1 && retained_reserved_known) ?\n    (INPUT_OFFER_FAULT_SUMMARY ? destination_offered_common : destination_original_common) :\n    (INPUT_OFFER_FAULT_SUMMARY ? offered_common_current_fault : original_common_current_fault);\n  generate if (CONTEXTUAL_DESTINATION_SUMMARY === 0) begin : original_destination_summary\n  assign common_current_fault = INPUT_OFFER_FAULT_SUMMARY ?\n    offered_common_current_fault : original_common_current_fault;\n  end else begin : contextual_destination_summary\n    assign common_current_fault = contextual_destination_common;\n  end endgenerate"
+    ],
+    [
+      "  starlink_pss_retained_output_owner retained_owner (",
+      "  starlink_pss_retained_destination_owner retained_owner ("
+    ],
+    [
+      "    .fault_reasons(retained_reasons), .current_lease(), .admitted_lease()",
+      "    .fault_reasons(retained_reasons), .current_lease(), .admitted_lease(),\n    .reserved_state_known(retained_reserved_known)"
+    ]
+  ],
+  "wrapper": [
+    [
+      "module starlink_pss_fft_bank_owned_retained_output_probe #(",
+      "module starlink_pss_fft_bank_owned_retained_destination_probe #("
+    ],
+    [
+      "  parameter integer INPUT_OFFER_FAULT_SUMMARY = 0",
+      "  parameter integer INPUT_OFFER_FAULT_SUMMARY = 0,\n  parameter integer CONTEXTUAL_DESTINATION_SUMMARY = 0"
+    ],
+    [
+      "  initial begin\n",
+      "  initial begin\n    if (CONTEXTUAL_DESTINATION_SUMMARY !== 0 && CONTEXTUAL_DESTINATION_SUMMARY !== 1)\n      $fatal(1, \"contextual destination summary mode must be known zero or one\");\n"
+    ],
+    [
+      "    starlink_pss_fft_retained_output_impl #(",
+      "    starlink_pss_fft_retained_destination_impl #("
+    ],
+    [
+      "      .INPUT_OFFER_FAULT_SUMMARY(INPUT_OFFER_FAULT_SUMMARY)) island (.*);",
+      "      .INPUT_OFFER_FAULT_SUMMARY(INPUT_OFFER_FAULT_SUMMARY),\n      .CONTEXTUAL_DESTINATION_SUMMARY(CONTEXTUAL_DESTINATION_SUMMARY)) island (.*);"
+    ]
+  ]
+}

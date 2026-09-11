@@ -1,0 +1,163 @@
+{
+  "helper": {
+    "reference": "reference/prepare_starlink_retained_summary_synthesis.py",
+    "sha256": "26a4e81835ca8504873e85699645e73b193e2c3e4fd5e5573a9fa18925a3858b",
+    "target": "tools/prepare_starlink_retained_destination_synthesis.py",
+    "edits": [
+      [
+        "Offered-summary copier; UNBOUND until original actual owner is accepted.",
+        "Destination copier; bound to the independently accepted actual run."
+      ],
+      [
+        "retained_summary_synthesis",
+        "retained_destination_synthesis"
+      ],
+      [
+        "synthesize_retained_summary.tcl",
+        "synthesize_retained_destination.tcl"
+      ],
+      [
+        "prepare_starlink_retained_summary_actual.py",
+        "prepare_starlink_retained_destination_actual.py"
+      ],
+      [
+        "    'derive.py': 'tools/retained_destination_synthesis/derive.py',",
+        "    'derive.py': 'tools/retained_destination_synthesis/derive.py',\n    'recipes.json': 'tools/retained_destination_synthesis/recipes.json',"
+      ]
+    ],
+    "counts": [
+      1,
+      10,
+      2,
+      1,
+      1
+    ]
+  },
+  "tcl": {
+    "reference": "reference/synthesize_retained_summary.tcl",
+    "sha256": "d233ce418555b626fe4dbeb822c46a4d1c3d1ea9e0daadb748f4d2450c688d6b",
+    "target": "tools/retained_destination_synthesis/synthesize_retained_destination.tcl",
+    "edits": [
+      [
+        "Exact offered-summary runtime; unbound until reviewed original actual success.",
+        "Exact contextual-destination runtime; independently accepted actual source."
+      ],
+      [
+        "synthesize_retained_summary.tcl",
+        "synthesize_retained_destination.tcl"
+      ],
+      [
+        "prepare_starlink_retained_summary_actual.py",
+        "prepare_starlink_retained_destination_actual.py"
+      ],
+      [
+        "b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368",
+        "183a0ccce954efc48d30f598d4965459695e756e20e8ca32ba47c7ee21bf3363"
+      ],
+      [
+        "[string match */retained_output_summary_candidate/*.v $name]) && ![string match */tb/* $name]",
+        "[string match */retained_output_summary_candidate/*.v $name] || [string match */retained_destination_candidate/*.v $name]) && ![string match */tb/* $name] && ![string match */retained_output/starlink_pss_retained_output_owner.v $name]"
+      ],
+      [
+        "starlink_pss_fft_bank_owned_retained_output_probe",
+        "starlink_pss_fft_bank_owned_retained_destination_probe"
+      ],
+      [
+        "INPUT_OFFER_FAULT_SUMMARY=1]",
+        "INPUT_OFFER_FAULT_SUMMARY=1 CONTEXTUAL_DESTINATION_SUMMARY=1]"
+      ],
+      [
+        "closed-input/offered-summary generics",
+        "closed-input/offered-summary/contextual-destination generics"
+      ],
+      [
+        "RETAINED_SUMMARY_SYNTHESIS_RECORDED",
+        "RETAINED_DESTINATION_SYNTHESIS_RECORDED"
+      ]
+    ],
+    "counts": [
+      1,
+      3,
+      1,
+      1,
+      1,
+      2,
+      1,
+      1,
+      1
+    ]
+  },
+  "admission": {
+    "reference": "reference/admission.py",
+    "sha256": "6d9dadfdf9fb3ad3df87a771bc151e854b65c19ab518e6dd501b1ed0f0f9cc84",
+    "target": "tools/retained_destination_synthesis/admission.py",
+    "edits": [
+      [
+        "ACCEPTED_ACTUAL = {\n    'manifest_sha256': 'b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368',\n    'qualified': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/retained-summary-actual-prelaunch-v1',\n    'actual': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/retained-summary-actual-parent.XYAbt6Np/run',\n    'owner': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/retained-summary-actual-parent.XYAbt6Np',\n    'owner_files': {\n        'owner.py': 'e60edf3106189468601f4d5def0e0aaefca6cd442ac42c4dc27ea50e3889717f',\n        'execution.json': '3e87e9cfcb1fc2bca476ae27a8f47552355e55d6e9ba518c470d2bb548ff6783',\n        'outcome.json': 'cdc5bdae42a199ad0d604ff9ee9b0e27b3c29207f942e6b3f8792605b7d451ac',\n        'command.json': 'a41db3307f827367d8761e73f9f366fb30586c7d62ab83f21774641e380c4351',\n        'stdout.log': 'a8e2dfb9f00edd946d4b851a109dc7df4cbc25f65315a7b827f4892df29b6cee',\n        'run/run_outcome.txt': '9c8daa782fbaed9a06a183e16209ce4389d3a27726c283bfb590a39c65716b88',\n    },\n    'results_sha256': '6605a2db8c69ffb94bea47e421f76fae5af9a473c5f05d81f5a344329eb2185e',\n    'cli_sha256': 'e0d91e6c5942e6a6d6d2a358e6e9f0c485c7e6d7ea3078eba2874f25f3107875',\n}",
+        "ACCEPTED_ACTUAL = {'manifest_sha256': '183a0ccce954efc48d30f598d4965459695e756e20e8ca32ba47c7ee21bf3363', 'qualified': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/destination-actual-prelaunch-parent-v1', 'actual': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/destination-actual-parent.LQnQo9ny/run', 'owner': '/home/mouse9911/gits/starlink-build-recovery-20260910.vHzUVnBz/destination-actual-parent.LQnQo9ny', 'owner_files': {'owner.py': 'f107ba2380e51f0cb744b387c014944b40b6038c00425a431eaa7043041a40b9', 'execution.json': 'f1be2f4d5fcb4bda75a36c60876082bb40556090ceaa0d11c4da296dde9200db', 'outcome.json': '9209dd7026d01549c9d946032cf7724a5f21db047c110694dece549f9fb396d4', 'command.json': '033fbb5fa9028f93814854d770953dc7f9319e17d7d2f8c092d5269ac223ac82', 'stdout.log': '30fd9474f26089e9fc1fdfece4239125fbf18b8b7182e7626ae5039f644ee85e', 'run/run_outcome.txt': '578abe39508efcfe313dceea39ce5c20218dcdd2b44fda221758c79b4e7efc02'}, 'results_sha256': '54bb594b9835fd080a66a96c9bdf061ef0106889063d0210bfd5416dba189906', 'cli_sha256': 'dc7b05033cfc1c6d8b799e483978c4c9a9671d6986b392a135e1916f5885fe0f'}"
+      ],
+      [
+        "EXPECTED = 'b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368'",
+        "EXPECTED = '183a0ccce954efc48d30f598d4965459695e756e20e8ca32ba47c7ee21bf3363'"
+      ],
+      [
+        "('/retained_output/' in name or '/retained_output_summary_candidate/' in name)",
+        "('/retained_output/' in name or '/retained_output_summary_candidate/' in name or '/retained_destination_candidate/' in name) and not name.endswith('/retained_output/starlink_pss_retained_output_owner.v')"
+      ],
+      [
+        "RETAINED_SUMMARY_ACTUAL_VERIFIED",
+        "RETAINED_DESTINATION_ACTUAL_VERIFIED"
+      ],
+      [
+        "prepare_starlink_retained_summary_actual.py",
+        "prepare_starlink_retained_destination_actual.py"
+      ],
+      [
+        "offered-summary actual",
+        "contextual-destination actual"
+      ]
+    ],
+    "counts": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      2
+    ]
+  },
+  "tests": {
+    "reference": "reference/test_starlink_retained_summary_synthesis.py",
+    "sha256": "1ea6534987113cc0045315efa8d42837921044cda890355c7487dcc13fbf848a",
+    "target": "tests/test_starlink_retained_destination_synthesis.py",
+    "edits": [
+      [
+        "retained_summary_synthesis",
+        "retained_destination_synthesis"
+      ],
+      [
+        "synthesize_retained_summary.tcl",
+        "synthesize_retained_destination.tcl"
+      ],
+      [
+        "prepare_starlink_retained_summary_actual.py",
+        "prepare_starlink_retained_destination_actual.py"
+      ],
+      [
+        "assert len(four)==4",
+        "assert len(four)==2"
+      ],
+      [
+        "RETAINED_SUMMARY_SYNTHESIS_RECORDED",
+        "RETAINED_DESTINATION_SYNTHESIS_RECORDED"
+      ]
+    ],
+    "counts": [
+      3,
+      8,
+      3,
+      1,
+      1
+    ]
+  }
+}
