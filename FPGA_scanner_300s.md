@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, private admission fact capture: **745 regression + nine new
+actual-evidence tests pass** (754 distinct). Both actual FFT campaigns pass;
+64512 numerical records, CSV bytes and service clocks remain exact. The wide
+private snapshot clear path is removed; its replacement data path is +0.271 ns.
+Permit, validity and consumed behavior remain exact; default callers unchanged.
+Whole setup still fails and is not promoted: **−1.661 ns WNS / −474.560 ns TNS /
+944 failures**, versus parent's −1.560 / −479.076 / 837. New worst runs from
+FFT status through shared fault logic into output publication. Next map that
+predicate by ownership/phase before further RTL changes; preserve genuine
+current publication vetoes. Branch:
+`codex/starlink-rx-only-do-not-merge-private-admission-facts`, FW `be1292429`,
+HDL `36ae980a0`. No radio, PPU/main, primary HDL, clock or constraint changes;
+native 60 MS/s fine search and 2.5 MS/s inspection remain required.
+See [private admission facts proof and route](reports/experiments/20260911-private-admission-facts-actual-route.md).
+
 Update 2026-09-11, one-entry completion receipt integrated with actual FFT and
 buffers: **720 regression + eleven new evidence tests pass** (731 distinct).
 40 focused tests pass after an ownership-monitor correction; runtime unchanged.
