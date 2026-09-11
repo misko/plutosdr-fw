@@ -46,9 +46,11 @@ initial begin #20000;$fatal(1,"watchdog");end
 endmodule
 '''
 
-def run(tmp_path,source):
+def run(tmp_path,source,width=22):
     rtl=tmp_path/'certificate.v';rtl.write_text(source)
-    bench=tmp_path/'tb.sv';bench.write_text(BENCH)
+    text=BENCH.replace('21:0',f'{width-1}:0').replace('CHECKS(22)',f'CHECKS({width})')
+    text=text.replace('bitno<22',f'bitno<{width}').replace('rejected=66',f'rejected={width*3}')
+    bench=tmp_path/'tb.sv';bench.write_text(text)
     compile=subprocess.run(['iverilog','-g2012','-s','tb','-o',str(tmp_path/'sim'),str(rtl),str(bench)],
                            capture_output=True,text=True,timeout=30)
     (tmp_path/'compile.log').write_text(compile.stdout+compile.stderr)
@@ -57,14 +59,16 @@ def run(tmp_path,source):
     (tmp_path/'run.log').write_text(result.stdout+result.stderr)
     return result
 
-def test_clocked_admission_contract(tmp_path):
-    result=run(tmp_path,RTL.read_text())
+@pytest.mark.parametrize('width',[22,28],ids=['admission','completion'])
+def test_clocked_admission_contract(tmp_path,width):
+    result=run(tmp_path,RTL.read_text(),width)
     assert result.returncode==0,result.stdout+result.stderr
-    assert result.stdout.splitlines()[0]=='ADMISSION_CERTIFICATE_PASS rejected=66 held=1 single_use=1 cancel=2 fresh=1'
+    assert result.stdout.splitlines()[0]==f'ADMISSION_CERTIFICATE_PASS rejected={width*3} held=1 single_use=1 cancel=2 fresh=1'
     assert 'FATAL' not in result.stdout
 
 @pytest.mark.parametrize('change',['bypass','refresh','reuse','quarantine'])
-def test_unsafe_certificate_mutant_rejected(tmp_path,change):
+@pytest.mark.parametrize('width',[22,28],ids=['admission','completion'])
+def test_unsafe_certificate_mutant_rejected(tmp_path,change,width):
     before,after={
         'bypass':('((&snapshot_good) === 1\'b1)',"((&checks_good) === 1'b1)"),
         'refresh':('if (!snapshot_valid && !consumed)', 'if (!consumed)'),
@@ -72,5 +76,5 @@ def test_unsafe_certificate_mutant_rejected(tmp_path,change):
         'quarantine':('request && !quarantine && snapshot_valid', 'request && snapshot_valid'),
     }[change]
     source=RTL.read_text();assert source.count(before)==1
-    result=run(tmp_path,source.replace(before,after,1))
+    result=run(tmp_path,source.replace(before,after,1),width)
     assert result.returncode!=0 and 'FATAL' in result.stdout and 'watchdog' not in result.stdout,result.stdout

@@ -32,10 +32,11 @@ def prepare(path):
     names=re.search(r'set compiled_names \{([^}]+)\}',profile)[1].split()
     vectors=re.search(r'set vector_names \{([^}]+)\}',profile)[1].split()
     removed={'starlink_pss_fft_bank_owned_retained_output_probe.v','starlink_pss_fft_retained_output_impl.v','starlink_pss_retained_output_owner.v',
-             'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v'}
+             'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v',
+             'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v'}
     runtime=[BASE/name for name in names if name.endswith('.v') and
              '/retained_output_actual/' not in name and Path(name).name not in removed]
-    require(len(runtime)==11,'exact inherited runtime count')
+    require(len(runtime)==9,'exact inherited runtime count')
     support=[BASE/name for name in vectors]
     support.append(BASE/'source_snapshot'/ACQ/'retained_output_actual/reference/create_shared_realtime_xfft_ip.tcl')
     support.append(BASE/'source_snapshot'/ACQ/'retained_output_actual/run_retained_output_actual.tcl')
@@ -43,7 +44,8 @@ def prepare(path):
         relative=str(source.relative_to(BASE/'source_snapshot'))
         require(sha(source)==manifest['sources'][relative]['sha256'],'reference source changed: '+relative)
     runtime.extend(NEW/name for name in ['starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v',
-                                       'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v'])
+                                       'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
+                                       'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v'])
     support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
                     ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
     sources=runtime+support
@@ -126,6 +128,15 @@ def audit_admission_sim(output):
     result['admission']={'boundaries':rows,'partition_checked':True}
     return result
 
+def audit_completion_sim(output):
+    result=audit_admission_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_COMPLETION_CASE_PASS boundary=(\d+) phase=(\d+) reuse_after_cancel=0 publications=0 releases=0$',text,re.M)
+    require(rows==[(str(n),str(n//3 if n<6 else int(n>=8))) for n in range(10)],'complete producer cancellation boundaries')
+    require(text.count('STAGED_COMPLETION_PASS cases=10 partition_checked=1')==1,'completion partition terminal evidence')
+    result['completion']={'boundaries':rows,'partition_checked':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -143,7 +154,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_admission_sim(output)
+        if mode=='sim':result['audit']=audit_completion_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

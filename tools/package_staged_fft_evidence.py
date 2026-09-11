@@ -13,8 +13,8 @@ def digest(data):return hashlib.sha256(data).hexdigest()
 
 def package(output,campaign='output'):
     if output.exists():raise ValueError('no artifact overwrite')
-    if campaign not in {'output','handover','admission'}:raise ValueError('explicit campaign required')
-    final_version={'output':5,'handover':4,'admission':3}[campaign]
+    if campaign not in {'output','handover','admission','completion'}:raise ValueError('explicit campaign required')
+    final_version={'output':5,'handover':4,'admission':3,'completion':2}[campaign]
     sources={}
     def add(name,path):
         if name in sources or path.is_symlink() or not path.is_file():raise ValueError('invalid artifact member '+name)
@@ -29,7 +29,7 @@ def package(output,campaign='output'):
         sim=folder/'project/staged_fft.sim/sim_1/behav/xsim'
         for name in ['simulate.log','staged_words.csv','xvlog.log','xvhdl.log','elaborate.log']:
             if (sim/name).is_file():add(f'actual-v{version}/sim/{name}',sim/name)
-    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3]}[campaign]):
+    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2]}[campaign]):
         for kind in ['synth','route']:
             if campaign=='admission' and version==1 and kind=='route':continue
             folder=RECOVERY/f'staged-{campaign}-{kind}-v{version}'
@@ -60,20 +60,30 @@ def package(output,campaign='output'):
                 if p.is_file() and p.suffix in {'.xml','.log','.json','.sv','.v','.txt'}:
                     add('tests/'+name+'/'+str(p.relative_to(folder)),p)
             add('tests/'+name+'.xml',RECOVERY/(name+'.xml'))
+    if campaign=='completion':
+        for name in ['staged-completion-lint-v1','staged-completion-unit-v1','staged-completion-regression-v1',
+                     'staged-completion-lint-v2','staged-completion-private-rom-v2','staged-completion-regression-v2']:
+            folder=RECOVERY/name
+            for p in sorted(folder.rglob('*')):
+                if p.is_file() and p.suffix in {'.xml','.log','.json','.sv','.v','.txt'}:
+                    add('tests/'+name+'/'+str(p.relative_to(folder)),p)
+            add('tests/'+name+'.xml',RECOVERY/(name+'.xml'))
     for p in sorted((ROOT/'tests').glob('test_starlink*')):
         if p.name in {'test_starlink_descriptor_commands_mailbox.py','test_starlink_staged_mailbox_control.py',
                       'test_starlink_staged_fft_lint.py','test_starlink_staged_fft_audit.py','test_starlink_handover_audit.py',
                       'test_starlink_route_report_audit.py','test_starlink_admission_certificate.py',
-                      'test_starlink_admission_audit.py'}:
+                      'test_starlink_admission_audit.py','test_starlink_completion_audit.py','test_starlink_private_kernel_payload.py'}:
             add('current/tests/'+p.name,p)
     for name in ['staged_fft_experiment.py','staged_fft_experiment.tcl','route_starlink_staged_fft.py','audit_staged_fft_route.py','package_staged_fft_evidence.py']:
         add('current/tools/'+name,ROOT/'tools'/name)
     add('current/docs/starlink-staged-output-integration-20260911.md',ROOT/'docs/starlink-staged-output-integration-20260911.md')
-    if campaign in {'handover','admission'}:
+    if campaign in {'handover','admission','completion'}:
         add('current/docs/starlink-staged-handover-20260911.md',ROOT/'docs/starlink-staged-handover-20260911.md')
         add('reference/actual_words.csv',RECOVERY/'destination-actual-parent.LQnQo9ny/run/project/retained_output_actual.sim/sim_1/behav/xsim/actual_words.csv')
-    if campaign=='admission':
+    if campaign in {'admission','completion'}:
         add('current/docs/starlink-staged-admission-20260911.md',ROOT/'docs/starlink-staged-admission-20260911.md')
+    if campaign=='completion':
+        add('current/docs/starlink-staged-completion-20260911.md',ROOT/'docs/starlink-staged-completion-20260911.md')
     manifest={name:{'source':str(path),'sha256':digest(path.read_bytes()),'bytes':path.stat().st_size} for name,path in sources.items()}
     def insert(archive,name,data):
         info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o644;archive.addfile(info,io.BytesIO(data))
@@ -101,5 +111,5 @@ def package(output,campaign='output'):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('output',type=Path)
-    parser.add_argument('--campaign',choices=['output','handover','admission'],default='output')
+    parser.add_argument('--campaign',choices=['output','handover','admission','completion'],default='output')
     args=parser.parse_args();print(json.dumps(package(args.output,args.campaign),indent=2))
