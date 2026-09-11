@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, replay quiet-phase shadow contract: **767 regression + eleven
+new evidence tests pass**, with 59 focused and 30 compatibility tests after a
+forced-stall monitor correction. Both corrected actual FFT campaigns pass;
+64512 numerical records, CSV bytes and service remain exact. The inactive-guard
+fault reduction matches the original replay predicate, including 3075 forced-
+stall observations, a 512-entry status-byte/valid sweep and ten late-event
+rejection/fresh-recovery cases. All 22 runtime modules are unchanged; no new
+route or timing improvement is claimed. Next implement an opt-in phase-specific
+publication fence, retaining active-job validation and current external faults,
+then verify and route that actual change. Inherited timing remains −1.661 ns
+WNS / 944 failures. Branch `codex/starlink-rx-only-do-not-merge-replay-quiet-contract`,
+FW `476a32b89`, HDL `ae352b231`. No radios, PPU/main, primary HDL or scope removal.
+See [replay quiet-phase contract](reports/experiments/20260911-replay-quiet-contract.md).
+
 Update 2026-09-11, private admission fact capture: **745 regression + nine new
 actual-evidence tests pass** (754 distinct). Both actual FFT campaigns pass;
 64512 numerical records, CSV bytes and service clocks remain exact. The wide
