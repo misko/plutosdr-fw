@@ -2,6 +2,18 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, registered private forward-bank status: **1,497 tests and all
+54 actual fault/reset/delay cases pass**, with unchanged arithmetic/service.
+The bank's existing sticky register now drives private readiness; current
+publication vetoes remain explicit. **Timing regresses: -1.608 ns WNS /
+-640.951 ns TNS / 1,344 failing endpoints. No promotion or deployment.**
+The worst path is reset/release through first-word metadata selection into
+product identity equality. Next test parallel reference comparisons followed by
+one-bit selection, with exact X/Z and same-edge refill proof. Branch
+`codex/starlink-rx-only-do-not-merge-forward-private-status`, FW `2ed446223`,
+HDL `d3cc39201`. Primary HDL, radios and PPU/main remain unchanged. See
+[private-status evidence and next step](reports/experiments/20260911-forward-private-status-actual-route.md).
+
 Update 2026-09-11, balanced forward descriptor comparison: **1,412 tests pass**,
 actual arithmetic/service and all 43 fault/reset cases remain unchanged.
 Routed inspection confirms all 24 comparison groups / four reductions with
