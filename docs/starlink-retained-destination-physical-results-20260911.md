@@ -37,7 +37,7 @@ plus SHA256SUMS, whose SHA256 is
 
 Same FPGA part, single FFT, 100/175 MHz diagnostic clocks, synthesis settings,
 route recipe and constraints as the reference. No new timing exceptions.
-Synthesis and routing results must be recorded separately before any promotion.
+Synthesis and routing results are recorded below; this candidate is not promoted.
 The recipe still depends on the pinned recovery-local original actual bundle;
 it is an experimental source-specific reproduction, not a portable release tool.
 
@@ -53,6 +53,44 @@ All paths below are under
 - `destination-physical-prep-parent.NJlhw5AK`: 69-test gate and 22-source snapshot.
 - `destination-synthesis-prepared-parent-v1`: frozen physical inputs.
 - `destination-synth-parent.G1XLB1ik`: source-specific synthesis owner and run.
+- `destination-route-parent.ZwqAjdhv`: completed route and independent audit.
+
+## Physical result: setup timing FAIL
+
+Synthesis session 27610 terminates successfully in 178.42 seconds. Independent
+source, hierarchy, resource, constraint and report cross-checks pass. Resources
+are 2246 LUT, 4759 FF, 21 DSP, 15 RAMB18: two fewer LUTs than offered-summary.
+All 149 prepared files and original/copied actual sources remain unchanged.
+Synthesis DCP SHA256:
+`aee99502f0665256bc1e063582a086c72fa14c0c55e17a3f4049b97b28486ddf`.
+
+Route session 72265 terminates successfully in 76.89 seconds, but tool exit is
+not timing acceptance. Independent audit finds WNS **-3.106 ns**, TNS
+**-1106.223 ns**, 827 failing setup endpoints out of 11065. Hold +0.064 ns and
+pulse width +1.830 ns pass with zero failures. All 7216 nets route without errors.
+Routed resources: 2314 LUT, 4769 FF, 21 DSP, 15 RAMB18, 66 control sets.
+Routed DCP SHA256:
+`5a8630d45468dea398069f297ac6822923e75f2323a8228fcccdb45aa8c9e90d`.
+
+Setup/hold clock-pair slacks (ns): 100→100 +3.104/+0.110;
+100→175 -0.542/+0.127; 175→100 -1.222/+0.100;
+175→175 -3.106/+0.064. Five critical CDC findings, 139 warnings and three
+informational findings remain. The diagnostic model still has 114 input and
+124 output delays unconstrained. Constraints are unchanged, not waived.
+
+The worst same-domain path starts at held_phase and ends at retained-owner
+reserved/D. It has 14 logic levels, including input metadata validation,
+fault aggregation and ownership/release logic: 8.854 ns data delay, comprising
+2.856 ns logic and 5.998 ns routing. Another path from engine_metadata[44] into
+cutover owner_inverse/D fails by -3.103 ns. This is not an FFT DSP arithmetic
+path and cannot be fixed solely by declaring the clock crossings asynchronous.
+
+The candidate regresses from the offered-summary reference (-2.504 ns), so it
+stays default-off. Do not combine it with the also-regressed bank-local variant
+and presume a benefit. Next implement explicit registered validation/control
+boundaries, with tagged certificates, bounded latency and fault-safe publication.
+This deliberately changes the private scheduling contract; it needs new
+end-to-end acceptance tests, not weakened claims of cycle-identical behavior.
 
 Remaining release gates: routed island timing, complete receiver setup/hold,
 CDC/reset/board-I/O qualification, sustained acquisition plus 2.5 MS/s IIO,
