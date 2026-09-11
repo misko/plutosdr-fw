@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private kernel ordinal on the better private-capture reference:
+**64,512 actual FFT records** and the complete CSV match; **397 tests** pass.
+Private/public handshake, fault-edge quarantine, late status and held-final
+backpressure tests pass with unchanged 3659-clock normal service. Routing still
+regresses to **-2.347 ns**, TNS -967.661 ns, 1093 failing endpoints versus the
+reference's -1.969 ns / 914. Not promoted. The worst path now feeds guard fault
+accumulation through input validation/cutover. Next investigate exact source-
+local fault aggregation, preserving diagnostics and current publication/ACK
+vetoes. Work is separately preserved on `codex/starlink-rx-only-do-not-merge-kernel-ordinal`;
+staged-final work remains on its previous branch. No radio/PPU/main or production
+HDL changes. All native 60 MS/s, 2.5 MS/s IIO and deployment gates remain required.
+See [private ordinal comparison and next fault-path gate](reports/experiments/20260911-staged-ordinal-actual-route-parent.md).
+
 Update 2026-09-11, clocked inverse-final validation: **64,512 actual FFT records**
 match and **397 regression tests** pass. Eight new cases cover final snapshot/
 consume faults, resets, late status and completion stalls. Private close is
