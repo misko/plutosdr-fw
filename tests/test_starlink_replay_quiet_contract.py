@@ -28,6 +28,9 @@ def test_runtime_byte_identical_and_exact_additive_bench():
     for name in names:
         if (RTL/name).exists():
             text=(RTL/name).read_text()
+            if name=='starlink_pss_reset_receipt_barrier.v' and '// BEGIN MONOTONIC RESET RELEASE' in text:
+                from tests.test_starlink_monotonic_reset_release import undo_barrier
+                text=undo_barrier(text)
             if name=='starlink_pss_result_guard_owner_view.v' and '// BEGIN PRIVATE QUARANTINE OFFER' in text:
                 from tests.test_starlink_private_quarantine_offer import undo_guard
                 text=undo_guard(text)

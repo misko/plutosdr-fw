@@ -451,11 +451,29 @@ def audit_split_preflight(output,auxiliary=False):
     result['split_preflight']={'checks':int(rows[0][0]),'source':int(rows[0][1]),'product':int(rows[0][2]),'current_exact':True,'latency_unchanged':True}
     return result
 
+def monotonic_reset_compiled(prepared):
+    return '.MONOTONIC_OUTER_RESET(1)' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def verify_monotonic_reset_configuration(prepared):
+    verify_split_preflight_configuration(prepared)
+    require((prepared/'tb_fft_staged_output.sv').read_text().count('.MONOTONIC_OUTER_RESET(1)')==1 and
+            (prepared/'staged_fft_experiment.tcl').read_text().count(' MONOTONIC_OUTER_RESET=1')==1,
+            'matching enabled monotonic reset profile')
+
+def audit_monotonic_reset(output,auxiliary=False):
+    result=audit_split_preflight(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_MONOTONIC_RESET_PASS fast=(\d+) slow=(\d+) resets=(\d+) current_exact=1 latency_unchanged=1$',text,re.M)
+    require(len(rows)==1 and min(map(int,rows[0][:2]))>=1000 and int(rows[0][2])>=4,'complete monotonic reset witness')
+    result['monotonic_reset']={'fast':int(rows[0][0]),'slow':int(rows[0][1]),'resets':int(rows[0][2]),'current_exact':True,'latency_unchanged':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected)
     if replay_fence_compiled(prepared):verify_replay_fence_configuration(prepared)
     if private_quarantine_compiled(prepared):verify_private_quarantine_configuration(prepared)
     if split_preflight_compiled(prepared):verify_split_preflight_configuration(prepared)
+    if monotonic_reset_compiled(prepared):verify_monotonic_reset_configuration(prepared)
     fresh(output)
     env=dict(os.environ)
     for key in ['PYTHONHOME','PYTHONPATH','PYTHONOPTIMIZE','LD_LIBRARY_PATH']:env.pop(key,None)
@@ -490,6 +508,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_private_quarantine(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and split_preflight_compiled(prepared):
             result['audit']=audit_split_preflight(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and monotonic_reset_compiled(prepared):
+            result['audit']=audit_monotonic_reset(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

@@ -14,12 +14,18 @@ def strip_block(text,label,replacement=''):
     assert n==1;return text
 
 def undo_top(text):
+    if 'parameter integer MONOTONIC_OUTER_RESET' in text:
+        from tests.test_starlink_monotonic_reset_release import undo_top as undo_reset
+        text=undo_reset(text)
     text=strip_block(text,'SPLIT PREFLIGHT PROFILE')
     text=strip_block(text,'SPLIT PREFLIGHT COMPARISON','      assign preflight_identity_equal[comparison] = &group_equal;\n')
     before='  parameter integer PRIVATE_QUARANTINE_OFFER = 0,\n  parameter integer SPLIT_PREFLIGHT_IDENTITY = 0'
     assert text.count(before)==1;return text.replace(before,'  parameter integer PRIVATE_QUARANTINE_OFFER = 0',1)
 
 def undo_bench(text):
+    if '// BEGIN MONOTONIC RESET WITNESS' in text:
+        from tests.test_starlink_monotonic_reset_release import undo_bench as undo_reset
+        text=undo_reset(text)
     text=strip_block(text,'SPLIT PREFLIGHT WITNESS')
     for value in ['      report_split_preflight; // SPLIT PREFLIGHT REPORT\n',',.SPLIT_PREFLIGHT_IDENTITY(1)']:
         assert text.count(value)==1;text=text.replace(value,'',1)
@@ -28,11 +34,16 @@ def undo_bench(text):
 def test_exact_source_delta():
     assert undo_top((RTL/TOP).read_text())==(PARENT/TOP).read_text()
     name='tb_fft_staged_output.sv';assert undo_bench((RTL/name).read_text())==(PARENT/name).read_text()
-    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
+    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' MONOTONIC_OUTER_RESET=1','',1).replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
-        if name!=TOP and (RTL/name).exists():assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+        if name!=TOP and (RTL/name).exists():
+            text=(RTL/name).read_text()
+            if name=='starlink_pss_reset_receipt_barrier.v' and '// BEGIN MONOTONIC RESET RELEASE' in text:
+                from tests.test_starlink_monotonic_reset_release import undo_barrier
+                text=undo_barrier(text)
+            assert text==(PARENT/name).read_text(),name
 
 def run(tmp_path,mode='1',registered=1,seed=1,mutation=None):
     text=(RTL/TOP).read_text()

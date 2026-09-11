@@ -44,11 +44,14 @@ def test_exact_runtime_bench_and_synthesis_profile_delta():
     for name in names:
         if name!=TOP and (RTL/name).exists():
             text=(RTL/name).read_text()
+            if name=='starlink_pss_reset_receipt_barrier.v' and '// BEGIN MONOTONIC RESET RELEASE' in text:
+                from tests.test_starlink_monotonic_reset_release import undo_barrier
+                text=undo_barrier(text)
             if name=='starlink_pss_result_guard_owner_view.v' and '// BEGIN PRIVATE QUARANTINE OFFER' in text:
                 from tests.test_starlink_private_quarantine_offer import undo_guard
                 text=undo_guard(text)
             assert text==(PARENT/name).read_text(),name
-    tcl=(ROOT/'tools/staged_fft_experiment.tcl').read_text()
+    tcl=(ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' MONOTONIC_OUTER_RESET=1','',1)
     assert tcl.count(' REPLAY_QUIET_PUBLICATION=1')==1
     assert tcl.replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1).replace(' PRIVATE_QUARANTINE_OFFER=1','',1).replace(' REPLAY_QUIET_PUBLICATION=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
 

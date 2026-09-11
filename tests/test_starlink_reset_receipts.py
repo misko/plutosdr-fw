@@ -67,7 +67,11 @@ def test_exact_barrier_delta():
       "slow_purge_count <= slow_purge_count + 1'b1;\n"
       '      // A registered monotonic receipt crosses clocks, never the counter decode.\n'
       "      if (outer_slow_running && slow_purge_count == 2) slow_purged <= 1;")
-    assert expected==(RTL/'starlink_pss_reset_receipt_barrier.v').read_text()
+    text=(RTL/'starlink_pss_reset_receipt_barrier.v').read_text()
+    if '// BEGIN MONOTONIC RESET RELEASE' in text:
+        from tests.test_starlink_monotonic_reset_release import undo_barrier
+        text=undo_barrier(text)
+    assert expected==text
 
 
 def configure(tmp_path,monkeypatch):
