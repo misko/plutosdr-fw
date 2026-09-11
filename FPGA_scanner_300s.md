@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private descriptor capture: **64,512 actual FFT records**
+match and **382 regression tests** pass. Local ownership permits private payload
+loading; accepted completion freezes the bundle through validation/publication/
+real reader release. Actual tests cover invalid/X churn and fault-edge capture.
+Routing improves from -3.251 ns to **-1.969 ns**, TNS **-813.676 ns**, 914 failing
+endpoints, also improving on replay-only V1. Timing still FAILS. The worst path
+now ends at a single completion-pending bit, not wide payload enables. Next
+stage final validation/ownership transfer and awaiting-ACK controls together,
+preserving immediate publication vetoes; retest and route before new features.
+Native 60 MS/s fine search, 2.5 MS/s IIO and all receiver/deployment gates remain
+required. No radio/PPU/main or production HDL changes.
+See [private capture verification and timing result](reports/experiments/20260911-staged-capture-actual-route-parent.md).
+
 Update 2026-09-11, private replay and staged writer validation: both actual-FFT
 versions independently match **64,512 numerical records**. **366 regression
 tests** pass, including replay-veto and pending-descriptor cancellation checks.
