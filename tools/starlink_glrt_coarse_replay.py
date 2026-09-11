@@ -58,7 +58,29 @@ def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def replay(iq_path: Path, expected_path: Path, roms: Path, output: Path) -> dict:
+def expected_candidates(grid):
+    """Independent exhaustive selection, without a heap or RTL memory layout."""
+    peaks = []
+    for frequency, row in enumerate(grid):
+        for epoch, score in enumerate(row):
+            left = int(row[epoch - 1]) if epoch else -1
+            right = int(row[epoch + 1]) if epoch + 1 < len(row) else -1
+            if score > 0 and score >= left and score >= right and (score > left or score > right):
+                peaks.append((int(score), epoch, frequency))
+    peaks.sort(key=lambda p: (-p[0], abs(p[2] - 5), p[1], p[2]))
+    selected = []
+    for score, epoch, frequency in peaks:
+        if any(min(abs(epoch - e), 3333 - abs(epoch - e)) < 20 and abs(frequency - f) <= 1
+                for e, f, _, _ in selected):
+            continue
+        selected.append((epoch, frequency, score, len(selected)))
+        if len(selected) == 8:
+            break
+    return selected
+
+
+def replay(iq_path: Path, expected_path: Path, roms: Path, output: Path, *,
+           simulator="iverilog", with_peaks=False) -> dict:
     iq = np.fromfile(iq_path, dtype="<i2")
     expected = np.fromfile(expected_path, dtype="<u4")
     if iq.size != 28_000 or expected.size != 11 * 3333 or np.any(expected > 65536):
@@ -73,20 +95,35 @@ def replay(iq_path: Path, expected_path: Path, roms: Path, output: Path) -> dict
             raise ValueError("ROM digest mismatch")
     root = Path(__file__).resolve().parents[1] / "hdl/library/starlink_glrt"
     sources = [root / f"starlink_glrt_coarse_{name}.v" for name in ("window", "mac6", "norm")]
+    if with_peaks:
+        sources.extend(root / f"starlink_glrt_coarse_{name}.v" for name in ("peaks", "search"))
     tracked = [*sources, iq_path, expected_path, roms / "manifest.json", Path(__file__).resolve()]
     hashes = {str(path): digest(path) for path in tracked}
     output.mkdir(parents=True, exist_ok=False)
     bench, stimulus, executable = (output / name for name in ("tb.sv", "iq.txt", "sim"))
-    bench.write_text(BENCH.replace("COEFF_PATH", str(roms / "coarse_upper_q9.mem"))
+    source = BENCH
+    if with_peaks:
+        source = source.replace("starlink_glrt_coarse_window #", "starlink_glrt_coarse_search #")
+        source = source.replace("wire [5:0] output_support;", "wire [2:0] output_rank;")
+        source = source.replace("output_support", "output_rank")
+    bench.write_text(source.replace("COEFF_PATH", str(roms / "coarse_upper_q9.mem"))
         .replace("ENERGY_PATH", str(roms / "coarse_upper_energy.mem")))
     stimulus.write_text("".join(f"{i} {q}\n" for i, q in iq))
-    build = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable),
-        str(bench), *map(str, sources)], capture_output=True, text=True)
+    if simulator == "verilator":
+        executable = output / "obj_dir/sim"
+        command = ["verilator", "--binary", "--timing", "--top-module", "tb", "-Wno-fatal",
+            "--Mdir", str(output / "obj_dir"), "-o", "sim", "-j", "4", str(bench), *map(str, sources)]
+    elif simulator == "iverilog":
+        command = ["iverilog", "-g2012", "-s", "tb", "-o", str(executable), str(bench), *map(str, sources)]
+    else:
+        raise ValueError("unknown simulator")
+    build = subprocess.run(command, capture_output=True, text=True, timeout=300)
     (output / "compile.log").write_text(build.stdout + build.stderr)
     build.check_returncode()
     started = time.monotonic()
     with (output / "simulation.log").open("w") as log:
-        run = subprocess.run(["vvp", str(executable), f"+INPUT={stimulus}"], stdout=log,
+        command = (["vvp"] if simulator == "iverilog" else []) + [str(executable), f"+INPUT={stimulus}"]
+        run = subprocess.run(command, stdout=log,
             stderr=subprocess.STDOUT, timeout=900)
     run.check_returncode()
     rows = []
@@ -96,21 +133,24 @@ def replay(iq_path: Path, expected_path: Path, roms: Path, output: Path) -> dict
             rows.append(tuple(map(int, line.split()[1:])))
         elif line.startswith("DONE "):
             clocks = int(line.split()[1])
-    if len(rows) != 11 * 3333 or clocks is None:
+    if (not with_peaks and len(rows) != 11 * 3333) or clocks is None:
         raise ValueError("incomplete grid or closure")
     mismatches = []
-    for index, (epoch, frequency, score, support) in enumerate(rows):
+    for index, (epoch, frequency, score, support) in enumerate(rows if not with_peaks else []):
         expected_support = sum(epoch + 22 + 286 * symbol + offset + 11 <= 14000
             for symbol in range(12) for offset in (0, 3333, 6667, 10000, 13333))
         if (epoch, frequency) != divmod(index, 11) or support != expected_support:
             raise ValueError("grid coordinate/support mismatch")
         if score != int(expected[frequency, epoch]):
             mismatches.append([epoch, frequency, score, int(expected[frequency, epoch])])
+    if with_peaks and rows != expected_candidates(expected):
+        mismatches = [{"actual": rows, "expected": expected_candidates(expected)}]
     for path in tracked:
         if digest(path) != hashes[str(path)]:
             raise ValueError("source/evidence changed during replay")
     result = {"scope": "complete_coarse_grid_rtl_not_local_detection_or_board_verification",
-        "grid_scores": len(rows), "mismatch_count": len(mismatches), "first_mismatches": mismatches[:20],
+        "grid_scores": 11 * 3333, "output_records": len(rows), "with_peaks": with_peaks,
+        "simulator": simulator, "mismatch_count": len(mismatches), "first_mismatches": mismatches[:20],
         "clocks_after_last_input": clocks, "compute_ms_at_100mhz": clocks / 100_000,
         "observation_ms_at_2_5msps": 5.6, "simulation_seconds": time.monotonic() - started,
         "sources": hashes, "passed": not mismatches}
@@ -124,5 +164,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("iq", "expected", "roms", "output"):
         parser.add_argument(f"--{name}", type=Path, required=True)
+    parser.add_argument("--simulator", choices=("iverilog", "verilator"), default="iverilog")
+    parser.add_argument("--with-peaks", action="store_true")
     args = parser.parse_args()
-    print(json.dumps(replay(args.iq, args.expected, args.roms, args.output), indent=2))
+    print(json.dumps(replay(args.iq, args.expected, args.roms, args.output,
+        simulator=args.simulator, with_peaks=args.with_peaks), indent=2))

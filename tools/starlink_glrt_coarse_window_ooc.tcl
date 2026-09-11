@@ -2,7 +2,7 @@
 if {$argc ni {2 3} || [version -short] ne "2022.2"} { error "requires Vivado 2022.2, fresh output, ROM directory, optional grid/search" }
 set mode grid
 if {$argc==3} { set mode [lindex $argv 2] }
-if {$mode ni {grid search}} { error "invalid mode" }
+if {$mode ni {grid search peaks}} { error "invalid mode" }
 set output [file normalize [lindex $argv 0]]
 set roms [file normalize [lindex $argv 1]]
 if {[file exists $output]} { error "output exists" }
@@ -19,12 +19,36 @@ if {$mode eq "search"} {
   set ram_limit 40
   set lut_limit 8500
 }
+if {$mode eq "peaks"} {
+  set modules {peaks}
+  set wrapper_name peaks
+  set ram_limit 2
+  set lut_limit 3000
+}
 foreach name $modules {
   lappend sources $repo/hdl/library/starlink_glrt/starlink_glrt_coarse_$name.v
 }
 lappend sources $repo/tools/starlink_glrt_coarse_${wrapper_name}_ooc_wrapper.v
 set tracked [concat $sources [list [file normalize [info script]] \
     $roms/coarse_upper_q9.mem $roms/coarse_upper_energy.mem $roms/manifest.json]]
+set elaboration_sources $sources
+set stitch [expr {$mode eq "search" && [info exists ::env(COARSE_STITCH_GRID_DIR)]}]
+if {$stitch} {
+  set grid_dir [file normalize $::env(COARSE_STITCH_GRID_DIR)]
+  set grid_dcp $grid_dir/synthesized.dcp
+  set grid_summary $grid_dir/summary.txt
+  set fd [open $grid_summary r];set grid_evidence [split [read $fd] "\n"];close $fd
+  foreach name {window mac6 norm} {
+    set path $repo/hdl/library/starlink_glrt/starlink_glrt_coarse_$name.v
+    if {[lsearch -exact $grid_evidence "$path=[lindex [exec sha256sum $path] 0]"]<0} {
+      error "grid checkpoint source mismatch: $path"
+    }
+  }
+  if {[lsearch -exact $grid_evidence "clock_mhz=100"]<0} { error "grid clock mismatch" }
+  set stub $repo/tools/starlink_glrt_coarse_window_blackbox.v
+  set elaboration_sources [concat [lrange $sources 3 end] [list $stub]]
+  lappend tracked $stub $grid_dcp $grid_summary
+}
 foreach path $tracked { set hashes($path) [lindex [exec sha256sum $path] 0] }
 file mkdir $output/source-snapshot
 foreach path $tracked { file copy $path $output/source-snapshot/[file tail $path] }
@@ -38,12 +62,38 @@ if {[info exists ::env(LD_PRELOAD)] && [file isfile $::env(LD_PRELOAD)]} {
 }
 close $fd
 set_param general.maxThreads 1
+if {$stitch} {
+  open_checkpoint $grid_dcp
+  file mkdir $output/grid-netlist
+  write_edif -cell [get_cells dut] $output/grid-netlist
+  close_project
+  create_project -in_memory -part xc7z010clg400-1
+  set grid_netlists [glob -nocomplain $output/grid-netlist/*/*.edf $output/grid-netlist/*/*.edn]
+  if {[llength $grid_netlists]!=1} { error "expected one extracted grid netlist" }
+  read_edif $grid_netlists
+  link_design -top starlink_glrt_coarse_window -part xc7z010clg400-1 -mode out_of_context
+  write_checkpoint $output/grid_cell.dcp
+  close_project
+}
 create_project -in_memory -part xc7z010clg400-1
 set_msg_config -id {Synth 8-311} -new_severity ERROR
 cd $roms
-read_verilog -sv $sources
+read_verilog -sv $elaboration_sources
 synth_design -top starlink_glrt_coarse_${wrapper_name}_ooc_wrapper -mode out_of_context \
-  -flatten_hierarchy rebuilt -directive Default
+  -flatten_hierarchy none -directive Default
+if {$stitch} {
+  # Link both structural netlists in a fresh design. Importing a cell DCP
+  # into this in-memory RTL project fails in Vivado 2022.2 (Project 1-9).
+  set shell_edif $output/starlink_glrt_coarse_${wrapper_name}_ooc_wrapper.edf
+  write_edif $shell_edif
+  close_project
+  create_project -in_memory -part xc7z010clg400-1
+  read_edif $grid_netlists
+  read_edif $shell_edif
+  link_design -top starlink_glrt_coarse_${wrapper_name}_ooc_wrapper \
+    -part xc7z010clg400-1 -mode out_of_context
+  if {[llength [get_cells -hier -filter {IS_BLACKBOX == 1}]]} { error "unresolved search blackbox" }
+}
 create_clock -name coarse_clk -period 10.0 [get_ports clk]
 set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 set_clock_uncertainty 0.1 [get_clocks coarse_clk]
@@ -54,6 +104,8 @@ write_checkpoint $output/synthesized.dcp
 opt_design
 place_design
 phys_opt_design
+route_design
+phys_opt_design -directive AggressiveExplore
 route_design
 report_utilization -hierarchical -file $output/utilization.rpt
 report_timing_summary -delay_type min_max -report_unconstrained -file $output/timing.rpt
