@@ -273,10 +273,10 @@ class EthernetNativeSource:
             raise TimeoutError('finite source plus its I/O margin exceeds the session deadline')
         self.pipeline.start(identity, self.host, self.visit, self.samples, min(deadline, self.clock()+30), cancel)
         self.native_runtime_seconds = min(45, max(1, int(self.samples/2_500_000)-10))
-        # Reserve the 45 s controller bound, measured ~29 s journal export and
-        # remaining bookkeeping. SSH chunks still enforce the absolute deadline.
+        # Keep the observation's export/bookkeeping allowance, but permit a
+        # shorter controller run near source end. SSH chunks remain bounded.
         self.launch_deadline = min(deadline-90, self.clock()+180,
-            self.pipeline.source_end-self.native_runtime_seconds-5)
+            self.pipeline.source_end-6)
 
     def _stage(self, deadline):
         transport = DeadlineTransport(self.transport, deadline, self.clock)
@@ -351,9 +351,15 @@ class EthernetNativeSource:
                 raise ValueError('noncanonical native bootstrap')
             self.retain('history', history)
             self.retain('seed', asdict(seed))
+            # A late acquired pilot may use a shorter run; never reserve all
+            # 45 seconds up front and discard most of a short observation.
+            runtime_seconds = min(self.native_runtime_seconds,
+                int(self.pipeline.source_end-self.clock()-5))
+            if runtime_seconds < 1 or self.clock() >= min(deadline, self.launch_deadline):
+                return None
             script = "trap '' HUP\nd="+shlex.quote(self.remote)+'\n'
             script += 'printf \'%s\\n\' '+shlex.quote(text)+' > "$d/bootstrap"\n'
-            script += '"$d/controller" '+shlex.quote(self.directory)+' "$d/journal" "$d/bootstrap" 32768 '+str(self.native_runtime_seconds)+' --bootstrap-slices > "$d/runtime-output" 2>&1 &\n'
+            script += '"$d/controller" '+shlex.quote(self.directory)+' "$d/journal" "$d/bootstrap" 32768 '+str(runtime_seconds)+' --bootstrap-slices > "$d/runtime-output" 2>&1 &\n'
             script += 'pid=$!\nprintf "%s\\n" "$pid" > "$d/pid"\nwait "$pid"\n'
             script += 'code=$?\nprintf "%s\\n" "$code" > "$d/exit"\ncat "$d/runtime-output"\nprintf "GLRT_RUNTIME_EXIT %s\\n" "$code"\n'
             self.prepared = True

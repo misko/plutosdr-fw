@@ -126,4 +126,4 @@ def test_short_rf_session_bounds_native_execution_before_source_end(tmp_path, mo
     result = harness.supervise()
     assert result['outcome'] == 'episode_limit_reached', result
     assert harness.owner.native_runtime_seconds == 10
-    assert harness.owner.launch_deadline <= harness.pipeline.source_end-15
+    assert harness.owner.launch_deadline <= harness.pipeline.source_end-6

@@ -14,7 +14,11 @@ from types import SimpleNamespace
 
 import pytest
 from pluto_plus.native_prepared_session import PreparedNativeSession
-from pluto_plus.native_supervisor import NativeIdentity, supervise_native
+from pluto_plus.native_supervisor import (
+    NativeIdentity,
+    NativeSupervisorLimits,
+    supervise_native,
+)
 
 from tests.starlink_glrt.test_native_controller import Radio
 from tests.starlink_glrt.test_native_journal import journal
@@ -274,6 +278,37 @@ def test_complete_source_hooks_execute_export_reacquire_and_close_under_both_lea
     assert harness.clock() >= harness.pipeline.source_end
     assert harness.actions.count('scratch-remove') == 4
     assert not harness.leases
+
+
+def test_late_candidate_in_60_second_capture_gets_shorter_native_run(
+    tmp_path, monkeypatch, controller, pilot_words
+):
+    harness = Harness(tmp_path, monkeypatch, controller, pilot_words)
+    harness.owner.samples = 150_000_000
+    command, transport = harness.command, harness.run_prepared_stdin
+    scripts = []
+
+    def delayed_history(name, value):
+        if value == 16:
+            harness.sleep(50)
+        return command(name, value)
+
+    def capture_script(command, *, prepare, **kwargs):
+        def retain_script():
+            script = prepare()
+            scripts.append(script)
+            return script
+        return transport(command, prepare=retain_script, **kwargs)
+
+    monkeypatch.setattr(harness, 'command', delayed_history)
+    monkeypatch.setattr(harness, 'run_prepared_stdin', capture_script)
+    session = PreparedNativeSession(harness, harness.owner, clock=harness.clock)
+    result = supervise_native(session, identity=IDENTITY, events_path=tmp_path/'events.jsonl',
+        limits=NativeSupervisorLimits(240, 1, 30), clock=harness.clock)
+    assert result['outcome'] == 'episode_limit_reached' and result['cleanup_verified'], result
+    assert len(scripts) == 1
+    seconds = int(re.search(rb'32768 ([0-9]+) --bootstrap-slices', scripts[0])[1])
+    assert 1 <= seconds < 10
 
 
 @pytest.mark.parametrize('failure', ['identity', 'history_identity', 'seed_epoch', 'controller_hash',
