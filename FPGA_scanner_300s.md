@@ -2,6 +2,17 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, current product-publication fence: **the reproduced gate gap
+is fixed in the experimental top; all 43 actual fault/reset/delay cases pass**.
+1,347 tests pass; both actual FFT runs retain 64,512 exact numerical words and
+4,178 service clocks. **Routing still FAILS: -1.224 ns WNS / -519.788 ns TNS /
+1,217 endpoints**, same-domain WNS -1.174 ns. Worst slack improves but aggregate
+timing worsens. Next isolate forward-bank descriptor checking from private
+guard/control without removing current publication vetoes. Branch
+`codex/starlink-rx-only-do-not-merge-product-current-fence`, FW `919ad3b59`,
+HDL `8cf551add`. No radios, PPU/main or primary HDL pointer changed. See
+[functional fix and routed evidence](reports/experiments/20260911-product-current-fence-actual-route.md).
+
 Update 2026-09-11, local fault pipeline: **functional boundary gate FAILS;
 no routing or deployment.** 1,306 unit/regression tests pass and healthy actual
 FFT numerics/service remain unchanged, but late status at product publication
