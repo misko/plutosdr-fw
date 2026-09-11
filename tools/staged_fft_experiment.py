@@ -248,6 +248,16 @@ def audit_privateack_sim(output):
     result['privateack']={'boundaries':rows,'checks':int(counts[0][0]),'quarantined':int(counts[0][1]),'public_exact':True,'fresh_recovery':True}
     return result
 
+def audit_privateinput_sim(output):
+    result=audit_privateack_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_PRIVATEINPUT_CASE_PASS boundary=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(rows==[str(n) for n in range(5)],'all private input framing/identity/last/duplicate/unknown recovery cases')
+    counts=re.findall(r'^STAGED_PRIVATEINPUT_PASS cases=5 checks=(\d+) quarantined=(\d+) public_exact=1 unknown_exact=1$',text,re.M)
+    require(len(counts)==1 and int(counts[0][0])>=1000 and int(counts[0][1])>=400,'private input differences quarantined and unknown fallback exact')
+    result['privateinput']={'boundaries':rows,'checks':int(counts[0][0]),'quarantined':int(counts[0][1]),'public_exact':True,'unknown_exact':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -265,7 +275,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_privateack_sim(output)
+        if mode=='sim':result['audit']=audit_privateinput_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

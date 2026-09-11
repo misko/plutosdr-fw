@@ -16,7 +16,11 @@ def test_complete_guard_and_top_inverse():
     for name,pin in [(TOP,'dac566ab9dbca3fbdfb748610e05835cc315196d65dac8528bce2270e70cf3c4'),
                      (GUARD,'ba0b9e308e2747e43edeec6c9b4bb486b2c1fc12d7d850d2bbf6a6ff02cc4431')]:
         old=(BASE/name).read_bytes();assert hashlib.sha256(old).hexdigest()==pin
-        text=(RTL/name).read_text()
+        parent=ROOT.parent/'staged-privateack-prepared-v1'/name
+        expected={'starlink_pss_fft_staged_output_impl.v':'0b9c0df873e15c0d85af87cd71a51f28d1740649c41d91c0c135bf53b55ef0e4',
+                  'starlink_pss_result_guard_owner_view.v':'f61335a983f7757ea15a97619eb33fb972945da09e72cadc45ba31c3f1838b0f'}
+        assert hashlib.sha256(parent.read_bytes()).hexdigest()==expected[name]
+        text=parent.read_text()
         if name==TOP:
             text=text.replace('    .PRIVATE_ACK_RETIREMENT(CERTIFIED_ADMISSION && OWNER==1),\n','',1)
         else:
