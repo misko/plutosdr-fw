@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
+from staged_fft_experiment import audit_inputstage_sim, audit_preflightpublication_sim
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -18,7 +19,7 @@ def run(actual,synthesis,output):
     require(a['prepared_sha']==s['prepared_sha'],'actual/synthesis source mismatch')
     # Regex rows are tuples in memory and lists after JSON serialization.
     # Compare canonical serialized values, retaining every field and value.
-    audited=audit_guardfacts_sim(actual) if 'guardfacts' in a['audit'] else (
+    audited=audit_inputstage_sim(actual) if 'inputstage' in a['audit'] else (audit_preflightpublication_sim(actual) if 'preflightpublication' in a['audit'] else (audit_guardfacts_sim(actual) if 'guardfacts' in a['audit'] else (
         audit_certification_sim(actual) if 'certification' in a['audit'] else (
         audit_sequence_sim(actual) if 'sequence' in a['audit'] else (
         audit_finalcapture_sim(actual) if 'finalcapture' in a['audit'] else (
@@ -27,7 +28,7 @@ def run(actual,synthesis,output):
         audit_replay_sim(actual) if 'replay' in a['audit'] else (
         audit_completion_sim(actual) if 'completion' in a['audit'] else (
         audit_admission_sim(actual) if 'admission' in a['audit'] else (
-        audit_handover_sim(actual,fault_cases=len(a['audit']['handover']['faults'])) if 'handover' in a['audit'] else audit_sim(actual))))))))))
+        audit_handover_sim(actual,fault_cases=len(a['audit']['handover']['faults'])) if 'handover' in a['audit'] else audit_sim(actual))))))))))))
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])

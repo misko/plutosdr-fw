@@ -45,7 +45,8 @@ def prepare(path):
         require(sha(source)==manifest['sources'][relative]['sha256'],'reference source changed: '+relative)
     runtime.extend(NEW/name for name in ['starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v',
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
-                                       'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v'])
+                                       'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
+                                       'starlink_pss_input_identity_stage.v','starlink_pss_realtime_input_guard_staged_identity.v'])
     support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
                     ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
     sources=runtime+support
@@ -229,6 +230,19 @@ def audit_preflightpublication_sim(output):
     result['preflightpublication']={'boundaries':rows,'checks':checks,'replay':replay,'unread':unread,'phase_exact':True}
     return result
 
+def audit_inputstage_sim(output):
+    result=audit_preflightpublication_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_INPUT_IDENTITY_PASS pushes=(\d+) pops=(\d+) checks=(\d+) final_holds=(\d+) exact_payload=1 admitted_descriptor=1$',text,re.M)
+    require(len(rows)==1,'one actual staged input receipt')
+    pushes,pops,checks,final_holds=map(int,rows[0])
+    require(min(pushes,pops,checks)>=18432 and final_holds>=36,'actual staged input coverage')
+    boundaries=re.findall(r'^STAGED_INPUT_IDENTITY_CASE_PASS boundary=(\d+) stale_reads=0 publications=0 fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(boundaries==[str(n) for n in range(6)],'all staged identity/reset cancellations and fresh recoveries')
+    result['inputstage']={'pushes':pushes,'pops':pops,'checks':checks,'final_holds':final_holds,
+                          'exact_payload':True,'admitted_descriptor':True,'boundaries':boundaries}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -246,7 +260,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_preflightpublication_sim(output)
+        if mode=='sim':result['audit']=audit_inputstage_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

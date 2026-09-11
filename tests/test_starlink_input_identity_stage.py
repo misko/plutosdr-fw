@@ -57,11 +57,25 @@ def test_unsafe_stage_mutants_rejected(tmp_path, mutant):
     assert result.returncode != 0 and 'FATAL' in result.stdout, result.stdout
 
 
-def test_existing_integrated_top_unchanged():
+def test_integrated_top_inverse():
     top = RTL / 'starlink_pss_fft_staged_output_impl.v'
-    assert hashlib.sha256(top.read_bytes()).hexdigest() == (
+    parent = ROOT.parent / 'staged-preflightpublication-prepared-v1' / top.name
+    old = parent.read_text()
+    assert hashlib.sha256(old.encode()).hexdigest() == (
         'b3511a70b97b91e3e9b4106ea0c9bab8df4f7a43a07ff30a5447cd522dc5d143')
-    assert 'starlink_pss_input_identity_stage' not in top.read_text()
+    new = top.read_text()
+    start = new.index('  // BEGIN REGISTERED INPUT IDENTITY\n')
+    end = new.index('  // END REGISTERED INPUT IDENTITY\n') + len('  // END REGISTERED INPUT IDENTITY\n')
+    old_start = old.index('  assign source_read_ready =')
+    old_end = old.index('\n\n  wire return_valid,', old_start)
+    new = new[:start] + old[old_start:old_end] + '\n' + new[end:]
+    new = new.replace('wire summary_offer_beat = staged_input_valid && transport_ready;',
+                      'wire summary_offer_beat = guard_valid && transport_ready;', 1)
+    new = new.replace('wire summary_offer_complete = summary_offer_beat && staged_input_last;',
+                      'wire summary_offer_complete = summary_offer_beat && guard_last;', 1)
+    new = new.replace('wire completed_input_fault_now = staged_input_fault || duplicate_start_fault_now',
+                      'wire completed_input_fault_now = duplicate_start_fault_now', 1)
+    assert new == old
 
 
 def test_checker_changes_only_identity_input():

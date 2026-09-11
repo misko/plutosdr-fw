@@ -13,8 +13,8 @@ def digest(data):return hashlib.sha256(data).hexdigest()
 
 def package(output,campaign='output'):
     if output.exists():raise ValueError('no artifact overwrite')
-    if campaign not in {'output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication'}:raise ValueError('explicit campaign required')
-    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1,'finalcapture':1,'sequence':1,'certification':1,'guardfacts':1,'preflightpublication':1}[campaign]
+    if campaign not in {'output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:raise ValueError('explicit campaign required')
+    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1,'finalcapture':1,'sequence':1,'certification':1,'guardfacts':1,'preflightpublication':1,'inputidentity':2}[campaign]
     sources={}
     def add(name,path):
         if name in sources or path.is_symlink() or not path.is_file():raise ValueError('invalid artifact member '+name)
@@ -29,7 +29,7 @@ def package(output,campaign='output'):
         sim=folder/'project/staged_fft.sim/sim_1/behav/xsim'
         for name in ['simulate.log','staged_words.csv','xvlog.log','xvhdl.log','elaborate.log']:
             if (sim/name).is_file():add(f'actual-v{version}/sim/{name}',sim/name)
-    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1],'finalcapture':[1],'sequence':[1],'certification':[1],'guardfacts':[1],'preflightpublication':[1]}[campaign]):
+    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1],'finalcapture':[1],'sequence':[1],'certification':[1],'guardfacts':[1],'preflightpublication':[1],'inputidentity':[2]}[campaign]):
         for kind in ['synth','route']:
             if campaign=='admission' and version==1 and kind=='route':continue
             measured_campaign='guardfacts' if campaign=='preflightpublication' else campaign
@@ -70,8 +70,9 @@ def package(output,campaign='output'):
                 if p.is_file() and p.suffix in {'.xml','.log','.json','.sv','.v','.txt'}:
                     add('tests/'+name+'/'+str(p.relative_to(folder)),p)
             add('tests/'+name+'.xml',RECOVERY/(name+'.xml'))
-    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication'}:
-        names=(['staged-preflightpublication-unit-v1','staged-preflightpublication-regression-v1'] if campaign=='preflightpublication' else
+    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:
+        names=(['staged-inputidentity-preflight-v1','staged-inputidentity-regression-v2','staged-inputidentity-audit-v2','staged-inputidentity-boundary-inverse-v2'] if campaign=='inputidentity' else
+               ['staged-preflightpublication-unit-v1','staged-preflightpublication-regression-v1'] if campaign=='preflightpublication' else
                ['staged-replay-preflight-v1','staged-replay-unit-v1','staged-replay-regression-v1',
                 'staged-replay-preflight-v2','staged-replay-regression-v2'] if campaign=='replay' else
                ['staged-guardfacts-unit-v1','staged-guardfacts-preflight-v1','staged-guardfacts-regression-v1'] if campaign=='guardfacts' else
@@ -96,34 +97,34 @@ def package(output,campaign='output'):
                       'test_starlink_private_kernel_sequence.py','test_starlink_sequence_audit.py',
                       'test_starlink_private_certification.py','test_starlink_certification_audit.py',
                       'test_starlink_guard_facts.py','test_starlink_guardfacts_audit.py',
-                      'test_starlink_preflight_publication.py','test_starlink_preflightpublication_audit.py'}:
+                      'test_starlink_preflight_publication.py','test_starlink_preflightpublication_audit.py','test_starlink_input_identity_stage.py','test_starlink_inputstage_audit.py'}:
             add('current/tests/'+p.name,p)
     for name in ['staged_fft_experiment.py','staged_fft_experiment.tcl','route_starlink_staged_fft.py','audit_staged_fft_route.py','package_staged_fft_evidence.py']:
         add('current/tools/'+name,ROOT/'tools'/name)
     add('current/docs/starlink-staged-output-integration-20260911.md',ROOT/'docs/starlink-staged-output-integration-20260911.md')
-    if campaign in {'handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication'}:
+    if campaign in {'handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-staged-handover-20260911.md',ROOT/'docs/starlink-staged-handover-20260911.md')
         add('reference/actual_words.csv',RECOVERY/'destination-actual-parent.LQnQo9ny/run/project/retained_output_actual.sim/sim_1/behav/xsim/actual_words.csv')
-    if campaign in {'admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication'}:
+    if campaign in {'admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-staged-admission-20260911.md',ROOT/'docs/starlink-staged-admission-20260911.md')
-    if campaign in {'completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication'}:
+    if campaign in {'completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-staged-completion-20260911.md',ROOT/'docs/starlink-staged-completion-20260911.md')
-    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication'}:
+    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-staged-replay-20260911.md',ROOT/'docs/starlink-staged-replay-20260911.md')
-    if campaign in {'capture','finalcapture','sequence','certification','guardfacts','preflightpublication'}:
+    if campaign in {'capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-staged-capture-20260911.md',ROOT/'docs/starlink-staged-capture-20260911.md')
         add('reference/qualified_capture.v',RECOVERY/'staged-replay-prepared-v2/starlink_pss_fft_staged_output_impl.v')
-    if campaign in {'finalcapture','sequence','certification','guardfacts','preflightpublication'}:
+    if campaign in {'finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-private-final-capture-20260911.md',ROOT/'docs/starlink-private-final-capture-20260911.md')
         add('reference/original_adapter.v',RECOVERY/'staged-capture-prepared-v1/starlink_pss_staged_mailbox_control.v')
         add('current/hdl/tb_staged_mailbox_control.sv',ROOT/'hdl/library/starlink_pss_acquisition/staged_control/tb_staged_mailbox_control.sv')
-    if campaign in {'sequence','certification','guardfacts','preflightpublication'}:
+    if campaign in {'sequence','certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-private-kernel-sequence-20260911.md',ROOT/'docs/starlink-private-kernel-sequence-20260911.md')
         add('reference/original_kernel.v',RECOVERY/'staged-completion-prepared-v1/starlink_pss_kernel_rom.v')
-    if campaign in {'certification','guardfacts','preflightpublication'}:
+    if campaign in {'certification','guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-private-certification-20260911.md',ROOT/'docs/starlink-private-certification-20260911.md')
         add('reference/original_certification.v',RECOVERY/'staged-sequence-prepared-v1/starlink_pss_fft_staged_output_impl.v')
-    if campaign in {'guardfacts','preflightpublication'}:
+    if campaign in {'guardfacts','preflightpublication','inputidentity'}:
         add('current/docs/starlink-guard-facts-20260911.md',ROOT/'docs/starlink-guard-facts-20260911.md')
         for name in ['starlink_pss_fft_staged_output_impl.v','starlink_pss_result_guard_owner_view.v']:
             add('reference/certification/'+name,RECOVERY/'staged-certification-prepared-v1'/name)
@@ -136,6 +137,13 @@ def package(output,campaign='output'):
         for name in runtime_names:
             if (current/name).read_bytes()!=(parent/name).read_bytes():raise ValueError('runtime changed '+name)
             add('reference/guardfacts-runtime/'+name,parent/name)
+    if campaign=='inputidentity':
+        add('tests/staged-inputidentity-regression-v1.xml',RECOVERY/'staged-inputidentity-regression-v1.xml')
+        add('current/docs/starlink-input-identity-integrated-20260911.md',ROOT/'docs/starlink-input-identity-integrated-20260911.md')
+        for name in ['starlink_pss_fft_staged_output_impl.v','starlink_pss_realtime_input_guard_local_admission.v']:
+            add('reference/preflight-runtime/'+name,RECOVERY/'staged-preflightpublication-prepared-v1'/name)
+        for name in ['tb_input_identity_stage.sv','tb_input_identity_checker.sv']:
+            add('current/hdl/'+name,ROOT/'hdl/library/starlink_pss_acquisition/staged_control'/name)
     manifest={name:{'source':str(path),'sha256':digest(path.read_bytes()),'bytes':path.stat().st_size} for name,path in sources.items()}
     def insert(archive,name,data):
         info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o644;archive.addfile(info,io.BytesIO(data))
@@ -163,5 +171,5 @@ def package(output,campaign='output'):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('output',type=Path)
-    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication'],default='output')
+    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity'],default='output')
     args=parser.parse_args();print(json.dumps(package(args.output,args.campaign),indent=2))
