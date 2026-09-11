@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, product validation integrated with actual FFT/buffers:
+**584 regression + 16 evidence tests pass**, all **64512 indexed numerical
+results** match. V1's first-reference pause overflowed the real FFT return slot;
+V2 restores continuous write-through and passes both actual campaigns, including
+12 new product fault/reset cases. Service increases one clock to 3662 normally.
+Route completes but regresses to **-4.115 ns WNS / -3456.457 ns TNS / 2297
+failures**: do not promote/deploy. Final publication authorization now feeds
+backward through private-slot READY into arithmetic/FFT control. Next test
+inhibiting refill only while holding LAST, retaining publication-qualified final
+retirement and continuous nonfinal flow, then re-run actual FFT and route.
+Branch remains `codex/starlink-rx-only-do-not-merge-product-validation-stage`.
+No radios, PPU/main or primary HDL changes; native 60 MS/s fine search, 2.5 MS/s
+inspection and all full receiver/deployment gates remain required.
+See [actual integration, rejected pause and measured route](reports/experiments/20260911-staged-productidentity-actual-route.md).
+
 Update 2026-09-11, product-buffer validation components: **15 tests pass**.
 A private word/identity register and actual-mailbox variant preserve ordinal,
 LAST, publication and real ACK checks. One first-reference refill pause removes
