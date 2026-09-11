@@ -13,7 +13,11 @@ OLD=ROOT.parent/'staged-guardfacts-prepared-v1'/TOP.name
 def test_complete_top_inverse():
     old=OLD.read_bytes()
     assert hashlib.sha256(old).hexdigest()=='b3511a70b97b91e3e9b4106ea0c9bab8df4f7a43a07ff30a5447cd522dc5d143'
-    text=TOP.read_text()
+    # Historical metadata-only inverse; today's full handoff delta has its own
+    # complete inverse against this SHA-pinned parent.
+    parent=ROOT.parent/'staged-heldmeta-prepared-v1'/TOP.name
+    assert hashlib.sha256(parent.read_bytes()).hexdigest()=='ad60442023cacf132a79ca384fe0612b83d7014421b8d11a1d01762779fa4270'
+    text=parent.read_text()
     start=text.index('  // BEGIN HELD BANK METADATA\n')
     end=text.index('  // END HELD BANK METADATA\n',start)+len('  // END HELD BANK METADATA\n')
     text=text[:start]+text[end:]

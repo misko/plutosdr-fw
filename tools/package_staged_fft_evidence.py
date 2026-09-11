@@ -13,8 +13,8 @@ def digest(data):return hashlib.sha256(data).hexdigest()
 
 def package(output,campaign='output'):
     if output.exists():raise ValueError('no artifact overwrite')
-    if campaign not in {'output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta'}:raise ValueError('explicit campaign required')
-    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1,'finalcapture':1,'sequence':1,'certification':1,'guardfacts':1,'heldmeta':1}[campaign]
+    if campaign not in {'output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:raise ValueError('explicit campaign required')
+    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1,'finalcapture':1,'sequence':1,'certification':1,'guardfacts':1,'heldmeta':1,'heldhandoff':1}[campaign]
     sources={}
     def add(name,path):
         if name in sources or path.is_symlink() or not path.is_file():raise ValueError('invalid artifact member '+name)
@@ -29,7 +29,7 @@ def package(output,campaign='output'):
         sim=folder/'project/staged_fft.sim/sim_1/behav/xsim'
         for name in ['simulate.log','staged_words.csv','xvlog.log','xvhdl.log','elaborate.log']:
             if (sim/name).is_file():add(f'actual-v{version}/sim/{name}',sim/name)
-    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1],'finalcapture':[1],'sequence':[1],'certification':[1],'guardfacts':[1],'heldmeta':[1]}[campaign]):
+    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1],'finalcapture':[1],'sequence':[1],'certification':[1],'guardfacts':[1],'heldmeta':[1],'heldhandoff':[1]}[campaign]):
         for kind in ['synth','route']:
             if campaign=='admission' and version==1 and kind=='route':continue
             folder=RECOVERY/f'staged-{campaign}-{kind}-v{version}'
@@ -68,8 +68,9 @@ def package(output,campaign='output'):
                 if p.is_file() and p.suffix in {'.xml','.log','.json','.sv','.v','.txt'}:
                     add('tests/'+name+'/'+str(p.relative_to(folder)),p)
             add('tests/'+name+'.xml',RECOVERY/(name+'.xml'))
-    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta'}:
-        names=(['staged-heldmeta-unit-v1','staged-heldmeta-regression-v1'] if campaign=='heldmeta' else
+    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:
+        names=(['staged-heldhandoff-unit-v1','staged-heldhandoff-regression-v1'] if campaign=='heldhandoff' else
+               ['staged-heldmeta-unit-v1','staged-heldmeta-regression-v1'] if campaign=='heldmeta' else
                ['staged-replay-preflight-v1','staged-replay-unit-v1','staged-replay-regression-v1',
                 'staged-replay-preflight-v2','staged-replay-regression-v2'] if campaign=='replay' else
                ['staged-guardfacts-unit-v1','staged-guardfacts-preflight-v1','staged-guardfacts-regression-v1'] if campaign=='guardfacts' else
@@ -94,40 +95,44 @@ def package(output,campaign='output'):
                       'test_starlink_private_kernel_sequence.py','test_starlink_sequence_audit.py',
                       'test_starlink_private_certification.py','test_starlink_certification_audit.py',
                       'test_starlink_guard_facts.py','test_starlink_guardfacts_audit.py',
-                      'test_starlink_held_bank_metadata.py','test_starlink_heldmeta_audit.py'}:
+                      'test_starlink_held_bank_metadata.py','test_starlink_heldmeta_audit.py',
+                      'test_starlink_held_bank_handoff.py','test_starlink_heldhandoff_audit.py'}:
             add('current/tests/'+p.name,p)
     for name in ['staged_fft_experiment.py','staged_fft_experiment.tcl','route_starlink_staged_fft.py','audit_staged_fft_route.py','package_staged_fft_evidence.py']:
         add('current/tools/'+name,ROOT/'tools'/name)
     add('current/docs/starlink-staged-output-integration-20260911.md',ROOT/'docs/starlink-staged-output-integration-20260911.md')
-    if campaign in {'handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta'}:
+    if campaign in {'handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-staged-handover-20260911.md',ROOT/'docs/starlink-staged-handover-20260911.md')
         add('reference/actual_words.csv',RECOVERY/'destination-actual-parent.LQnQo9ny/run/project/retained_output_actual.sim/sim_1/behav/xsim/actual_words.csv')
-    if campaign in {'admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta'}:
+    if campaign in {'admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-staged-admission-20260911.md',ROOT/'docs/starlink-staged-admission-20260911.md')
-    if campaign in {'completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta'}:
+    if campaign in {'completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-staged-completion-20260911.md',ROOT/'docs/starlink-staged-completion-20260911.md')
-    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta'}:
+    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-staged-replay-20260911.md',ROOT/'docs/starlink-staged-replay-20260911.md')
-    if campaign in {'capture','finalcapture','sequence','certification','guardfacts','heldmeta'}:
+    if campaign in {'capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-staged-capture-20260911.md',ROOT/'docs/starlink-staged-capture-20260911.md')
         add('reference/qualified_capture.v',RECOVERY/'staged-replay-prepared-v2/starlink_pss_fft_staged_output_impl.v')
-    if campaign in {'finalcapture','sequence','certification','guardfacts','heldmeta'}:
+    if campaign in {'finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-private-final-capture-20260911.md',ROOT/'docs/starlink-private-final-capture-20260911.md')
         add('reference/original_adapter.v',RECOVERY/'staged-capture-prepared-v1/starlink_pss_staged_mailbox_control.v')
         add('current/hdl/tb_staged_mailbox_control.sv',ROOT/'hdl/library/starlink_pss_acquisition/staged_control/tb_staged_mailbox_control.sv')
-    if campaign in {'sequence','certification','guardfacts','heldmeta'}:
+    if campaign in {'sequence','certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-private-kernel-sequence-20260911.md',ROOT/'docs/starlink-private-kernel-sequence-20260911.md')
         add('reference/original_kernel.v',RECOVERY/'staged-completion-prepared-v1/starlink_pss_kernel_rom.v')
-    if campaign in {'certification','guardfacts','heldmeta'}:
+    if campaign in {'certification','guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-private-certification-20260911.md',ROOT/'docs/starlink-private-certification-20260911.md')
         add('reference/original_certification.v',RECOVERY/'staged-sequence-prepared-v1/starlink_pss_fft_staged_output_impl.v')
-    if campaign in {'guardfacts','heldmeta'}:
+    if campaign in {'guardfacts','heldmeta','heldhandoff'}:
         add('current/docs/starlink-guard-facts-20260911.md',ROOT/'docs/starlink-guard-facts-20260911.md')
         for name in ['starlink_pss_fft_staged_output_impl.v','starlink_pss_result_guard_owner_view.v']:
             add('reference/certification/'+name,RECOVERY/'staged-certification-prepared-v1'/name)
-    if campaign=='heldmeta':
+    if campaign in {'heldmeta','heldhandoff'}:
         add('current/docs/starlink-held-bank-metadata-20260911.md',ROOT/'docs/starlink-held-bank-metadata-20260911.md')
         add('reference/guardfacts_top.v',RECOVERY/'staged-guardfacts-prepared-v1/starlink_pss_fft_staged_output_impl.v')
+    if campaign=='heldhandoff':
+        add('current/docs/starlink-held-bank-handoff-20260911.md',ROOT/'docs/starlink-held-bank-handoff-20260911.md')
+        add('reference/heldmeta_top.v',RECOVERY/'staged-heldmeta-prepared-v1/starlink_pss_fft_staged_output_impl.v')
     manifest={name:{'source':str(path),'sha256':digest(path.read_bytes()),'bytes':path.stat().st_size} for name,path in sources.items()}
     def insert(archive,name,data):
         info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o644;archive.addfile(info,io.BytesIO(data))
@@ -155,5 +160,5 @@ def package(output,campaign='output'):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('output',type=Path)
-    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta'],default='output')
+    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','heldmeta','heldhandoff'],default='output')
     args=parser.parse_args();print(json.dumps(package(args.output,args.campaign),indent=2))
