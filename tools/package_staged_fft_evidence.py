@@ -12,12 +12,12 @@ RECOVERY=ROOT.parent
 def digest(data):return hashlib.sha256(data).hexdigest()
 
 def package(output,campaign='output',test_root=None):
-    if test_root is not None and (campaign!='enginecapture' or not test_root.is_absolute() or not test_root.is_dir()):
+    if test_root is not None and (campaign not in {'enginecapture','ackcombined'} or not test_root.is_absolute() or not test_root.is_dir()):
         raise ValueError('existing absolute engine-capture test root required')
     test_root=test_root or RECOVERY
     if output.exists():raise ValueError('no artifact overwrite')
-    if campaign not in {'output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:raise ValueError('explicit campaign required')
-    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1,'finalcapture':1,'sequence':1,'certification':1,'guardfacts':1,'preflightpublication':1,'inputidentity':2,'enginecapture':1}[campaign]
+    if campaign not in {'output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:raise ValueError('explicit campaign required')
+    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1,'finalcapture':1,'sequence':1,'certification':1,'guardfacts':1,'preflightpublication':1,'inputidentity':2,'enginecapture':1,'ackcombined':1}[campaign]
     sources={}
     def add(name,path):
         if name in sources or path.is_symlink() or not path.is_file():raise ValueError('invalid artifact member '+name)
@@ -32,7 +32,7 @@ def package(output,campaign='output',test_root=None):
         sim=folder/'project/staged_fft.sim/sim_1/behav/xsim'
         for name in ['simulate.log','staged_words.csv','xvlog.log','xvhdl.log','elaborate.log']:
             if (sim/name).is_file():add(f'actual-v{version}/sim/{name}',sim/name)
-    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1],'finalcapture':[1],'sequence':[1],'certification':[1],'guardfacts':[1],'preflightpublication':[1],'inputidentity':[2],'enginecapture':[1]}[campaign]):
+    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1],'finalcapture':[1],'sequence':[1],'certification':[1],'guardfacts':[1],'preflightpublication':[1],'inputidentity':[2],'enginecapture':[1],'ackcombined':[1]}[campaign]):
         for kind in ['synth','route']:
             if campaign=='admission' and version==1 and kind=='route':continue
             measured_campaign='guardfacts' if campaign=='preflightpublication' else campaign
@@ -73,8 +73,9 @@ def package(output,campaign='output',test_root=None):
                 if p.is_file() and p.suffix in {'.xml','.log','.json','.sv','.v','.txt'}:
                     add('tests/'+name+'/'+str(p.relative_to(folder)),p)
             add('tests/'+name+'.xml',RECOVERY/(name+'.xml'))
-    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
-        names=(['staged-enginecapture-preflight-v1','staged-enginecapture-regression-v1','staged-enginecapture-audit-v1'] if campaign=='enginecapture' else
+    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
+        names=(['staged-ackcombined-preflight-v1','staged-ackcombined-regression-v1','staged-ackcombined-auxaudit-v1','staged-ackcombined-audit-v1'] if campaign=='ackcombined' else
+               ['staged-enginecapture-preflight-v1','staged-enginecapture-regression-v1','staged-enginecapture-audit-v1'] if campaign=='enginecapture' else
                ['staged-inputidentity-preflight-v1','staged-inputidentity-regression-v2','staged-inputidentity-audit-v2','staged-inputidentity-boundary-inverse-v2'] if campaign=='inputidentity' else
                ['staged-preflightpublication-unit-v1','staged-preflightpublication-regression-v1'] if campaign=='preflightpublication' else
                ['staged-replay-preflight-v1','staged-replay-unit-v1','staged-replay-regression-v1',
@@ -85,11 +86,11 @@ def package(output,campaign='output',test_root=None):
                ['staged-finalcapture-unit-v1','staged-finalcapture-preflight-v1','staged-finalcapture-regression-v1'] if campaign=='finalcapture' else
                ['staged-capture-preflight-v1','staged-capture-unit-v1','staged-capture-unit-v2','staged-capture-regression-v1'])
         for name in names:
-            folder=(test_root if campaign=='enginecapture' else RECOVERY)/name
+            folder=(test_root if campaign in {'enginecapture','ackcombined'} else RECOVERY)/name
             for p in sorted(folder.rglob('*')):
                 if p.is_file() and p.suffix in {'.xml','.log','.json','.sv','.v','.txt'}:
                     add('tests/'+name+'/'+str(p.relative_to(folder)),p)
-            add('tests/'+name+'.xml',(test_root if campaign=='enginecapture' else RECOVERY)/(name+'.xml'))
+            add('tests/'+name+'.xml',(test_root if campaign in {'enginecapture','ackcombined'} else RECOVERY)/(name+'.xml'))
     for p in sorted((ROOT/'tests').glob('test_starlink*')):
         if p.name in {'test_starlink_descriptor_commands_mailbox.py','test_starlink_staged_mailbox_control.py',
                       'test_starlink_staged_fft_lint.py','test_starlink_staged_fft_audit.py','test_starlink_handover_audit.py',
@@ -101,34 +102,34 @@ def package(output,campaign='output',test_root=None):
                       'test_starlink_private_kernel_sequence.py','test_starlink_sequence_audit.py',
                       'test_starlink_private_certification.py','test_starlink_certification_audit.py',
                       'test_starlink_guard_facts.py','test_starlink_guardfacts_audit.py',
-                      'test_starlink_preflight_publication.py','test_starlink_preflightpublication_audit.py','test_starlink_input_identity_stage.py','test_starlink_inputstage_audit.py','test_starlink_private_engine_descriptor.py','test_starlink_enginecapture_audit.py'}:
+                      'test_starlink_preflight_publication.py','test_starlink_preflightpublication_audit.py','test_starlink_input_identity_stage.py','test_starlink_inputstage_audit.py','test_starlink_private_engine_descriptor.py','test_starlink_enginecapture_audit.py','test_starlink_combined_private_ack.py','test_starlink_ackcombined_audit.py'}:
             add('current/tests/'+p.name,p)
     for name in ['staged_fft_experiment.py','staged_fft_experiment.tcl','route_starlink_staged_fft.py','audit_staged_fft_route.py','package_staged_fft_evidence.py']:
         add('current/tools/'+name,ROOT/'tools'/name)
     add('current/docs/starlink-staged-output-integration-20260911.md',ROOT/'docs/starlink-staged-output-integration-20260911.md')
-    if campaign in {'handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-staged-handover-20260911.md',ROOT/'docs/starlink-staged-handover-20260911.md')
         add('reference/actual_words.csv',RECOVERY/'destination-actual-parent.LQnQo9ny/run/project/retained_output_actual.sim/sim_1/behav/xsim/actual_words.csv')
-    if campaign in {'admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-staged-admission-20260911.md',ROOT/'docs/starlink-staged-admission-20260911.md')
-    if campaign in {'completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-staged-completion-20260911.md',ROOT/'docs/starlink-staged-completion-20260911.md')
-    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-staged-replay-20260911.md',ROOT/'docs/starlink-staged-replay-20260911.md')
-    if campaign in {'capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-staged-capture-20260911.md',ROOT/'docs/starlink-staged-capture-20260911.md')
         add('reference/qualified_capture.v',RECOVERY/'staged-replay-prepared-v2/starlink_pss_fft_staged_output_impl.v')
-    if campaign in {'finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-private-final-capture-20260911.md',ROOT/'docs/starlink-private-final-capture-20260911.md')
         add('reference/original_adapter.v',RECOVERY/'staged-capture-prepared-v1/starlink_pss_staged_mailbox_control.v')
         add('current/hdl/tb_staged_mailbox_control.sv',ROOT/'hdl/library/starlink_pss_acquisition/staged_control/tb_staged_mailbox_control.sv')
-    if campaign in {'sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-private-kernel-sequence-20260911.md',ROOT/'docs/starlink-private-kernel-sequence-20260911.md')
         add('reference/original_kernel.v',RECOVERY/'staged-completion-prepared-v1/starlink_pss_kernel_rom.v')
-    if campaign in {'certification','guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-private-certification-20260911.md',ROOT/'docs/starlink-private-certification-20260911.md')
         add('reference/original_certification.v',RECOVERY/'staged-sequence-prepared-v1/starlink_pss_fft_staged_output_impl.v')
-    if campaign in {'guardfacts','preflightpublication','inputidentity','enginecapture'}:
+    if campaign in {'guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'}:
         add('current/docs/starlink-guard-facts-20260911.md',ROOT/'docs/starlink-guard-facts-20260911.md')
         for name in ['starlink_pss_fft_staged_output_impl.v','starlink_pss_result_guard_owner_view.v']:
             add('reference/certification/'+name,RECOVERY/'staged-certification-prepared-v1'/name)
@@ -151,6 +152,15 @@ def package(output,campaign='output',test_root=None):
     if campaign=='enginecapture':
         add('current/docs/starlink-private-engine-descriptor-20260911.md',ROOT/'docs/starlink-private-engine-descriptor-20260911.md')
         add('reference/input-stage-top.v',RECOVERY/'staged-inputidentity-prepared-v2/starlink_pss_fft_staged_output_impl.v')
+    if campaign=='ackcombined':
+        add('current/docs/starlink-combined-private-ack-20260911.md',ROOT/'docs/starlink-combined-private-ack-20260911.md')
+        for name in ['starlink_pss_fft_staged_output_impl.v','starlink_pss_result_guard_owner_view.v','tb_fft_staged_output.sv']:
+            add('reference/enginecapture/'+name,RECOVERY/'staged-enginecapture-prepared-v1'/name)
+        auxiliary=RECOVERY/'staged-ackcombined-aux-v1'
+        for name in ['command.json','process.json','outcome.json','stdout.log','vivado.log','generated_fft.sha256']:
+            add('auxiliary-v1/'+name,auxiliary/name)
+        for name in ['simulate.log','staged_words.csv','xvlog.log','xvhdl.log','elaborate.log']:
+            add('auxiliary-v1/sim/'+name,auxiliary/'project/staged_fft.sim/sim_1/behav/xsim'/name)
     manifest={name:{'source':str(path),'sha256':digest(path.read_bytes()),'bytes':path.stat().st_size} for name,path in sources.items()}
     def insert(archive,name,data):
         info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o644;archive.addfile(info,io.BytesIO(data))
@@ -178,6 +188,6 @@ def package(output,campaign='output',test_root=None):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('output',type=Path)
-    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture'],default='output')
+    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture','finalcapture','sequence','certification','guardfacts','preflightpublication','inputidentity','enginecapture','ackcombined'],default='output')
     parser.add_argument('--test-root',type=Path)
     args=parser.parse_args();print(json.dumps(package(args.output,args.campaign,args.test_root),indent=2))

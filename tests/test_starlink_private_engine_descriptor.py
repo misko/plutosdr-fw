@@ -21,6 +21,8 @@ def test_complete_engine_capture_inverse():
     old=(BASE/TOP.name).read_text()
     assert hashlib.sha256(old.encode()).hexdigest()=='2711556e640f6fd64995a755af9ba328529b38c498afe87b26ef842c84b35002'
     text,start,end=capture_block();text=text[:start]+text[end:]
+    # New ACK delta has a separate complete top/guard inverse.
+    text=text.replace('    .PRIVATE_ACK_RETIREMENT(CERTIFIED_ADMISSION && OWNER==1),\n','',1)
     start=text.index('  end else begin : registered_scheduling\n')
     legacy=text[:start];registered=text[start:]
     registered=registered.replace('        engine_input_reserved <= 0; engine_output_reserved <= 0;',
@@ -29,7 +31,7 @@ def test_complete_engine_capture_inverse():
         '          WAIT_BANK: if (selected_valid && destination_reserved) begin\n            engine_metadata <= selected_metadata;\n',1)
     assert legacy+registered==old
     for name in (BASE/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split():
-        if name!=TOP.name and (RTL/name).exists():assert (RTL/name).read_bytes()==(BASE/name).read_bytes(),name
+        if name not in {TOP.name,'starlink_pss_result_guard_owner_view.v'} and (RTL/name).exists():assert (RTL/name).read_bytes()==(BASE/name).read_bytes(),name
 
 
 def run(tmp_path,mutant=None):

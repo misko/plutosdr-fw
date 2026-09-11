@@ -2,7 +2,7 @@
 # A successful command is not routed timing closure or a receiver release.
 if {$argc!=4 || [version -short] ne "2022.2"} {error "Vivado2022.2 MODE PREPARED SHA OUTPUT required"}
 lassign $argv mode inputs expected output
-if {$mode ni {sim synth}} {error "explicit experiment mode required"}
+if {$mode ni {sim ack synth}} {error "explicit experiment mode required"}
 if {[lindex [exec sha256sum [file join $inputs SHA256SUMS]] 0] ne $expected} {error "source inventory identity"}
 set saved [pwd];cd $inputs;exec sha256sum -c SHA256SUMS --quiet;cd $saved
 set_param general.maxThreads 2
@@ -20,11 +20,11 @@ foreach name $runtime_names {
   add_files -fileset sources_1 -norecurse [file join $inputs $name]
   set_property file_type SystemVerilog [get_files [file join $inputs $name]]
 }
-if {$mode eq "sim"} {
+if {$mode in {sim ack}} {
   add_files -fileset sim_1 -norecurse [file join $inputs tb_fft_staged_output.sv]
   foreach name $vector_names {add_files -fileset sim_1 -norecurse [file join $inputs $name]}
   set_property file_type {Memory Initialization Files} [get_files -of_objects [get_filesets sim_1] *.mem]
-  set_property top tb [get_filesets sim_1]
+  set_property top [expr {$mode eq "ack" ? "tb_ack_only" : "tb"}] [get_filesets sim_1]
   set_property xsim.simulate.runtime all [get_filesets sim_1]
   set_property xsim.simulate.custom_tcl [file join $inputs run_retained_output_actual.tcl] [get_filesets sim_1]
   launch_simulation -simset sim_1 -mode behavioral

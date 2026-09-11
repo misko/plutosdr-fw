@@ -7,10 +7,27 @@ import shutil
 import subprocess
 import time
 from staged_fft_experiment import audit_enginecapture_sim, audit_inputstage_sim, audit_preflightpublication_sim
+from staged_fft_experiment import audit_ackcombined_sim, audit_ackcombined_aux
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
-def run(actual,synthesis,output):
+def ack_auxiliary_required(prepared,audit):
+    compiled='module tb #(parameter integer ACK_ONLY=0);' in (prepared/'tb_fft_staged_output.sv').read_text()
+    require(('ackcombined' in audit)==compiled,'main audit and compiled combined campaign differ')
+    return compiled
+
+def verify_ack_auxiliary(auxiliary,expected,prepared):
+    require(auxiliary is not None,'combined ACK requires its auxiliary real-FFT proof')
+    result=json.loads((auxiliary/'outcome.json').read_text())
+    require(result.get('mode')=='ack' and result.get('returncode')==0 and
+            result.get('sources_unchanged') is True and 'error' not in result,'successful source-bound ACK auxiliary required')
+    require(result['prepared_sha']==expected and result['command'][-3]==str(prepared),
+            'ACK auxiliary must use the same prepared sources')
+    audited=audit_ackcombined_aux(auxiliary)
+    require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
+    return audited
+
+def run(actual,synthesis,output,ack_actual=None):
     a=json.loads((actual/'outcome.json').read_text())
     s=json.loads((synthesis/'outcome.json').read_text())
     for result,mode in [(a,'sim'),(s,'synth')]:
@@ -29,14 +46,19 @@ def run(actual,synthesis,output):
         audit_completion_sim(actual) if 'completion' in a['audit'] else (
         audit_admission_sim(actual) if 'admission' in a['audit'] else (
         audit_handover_sim(actual,fault_cases=len(a['audit']['handover']['faults'])) if 'handover' in a['audit'] else audit_sim(actual)))))))))))))
+    if 'ackcombined' in a['audit']:audited=audit_ackcombined_sim(actual)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])
     require(str(prepared)==a['command'][-3],'actual/synthesis prepared roots differ')
+    ack_audit=verify_ack_auxiliary(ack_actual,s['prepared_sha'],prepared) if ack_auxiliary_required(prepared,a['audit']) else None
     dcp=synthesis/'staged_output_synth.dcp';dcp_sha=sha(dcp)
     runner=ROOT/'tools/retained_destination_synthesis/route_retained_output.tcl'
     require(sha(runner)=='034d1eaa197757b762644acd0cad9dc267338ae23fd5d757290c8485d0f1ac9a','unchanged diagnostic routing recipe required')
     before={str(p):sha(p) for p in [dcp,runner,actual/'outcome.json',synthesis/'outcome.json',Path(__file__).resolve()]}
+    if ack_audit is not None:
+        for p in [ack_actual/'outcome.json',ack_actual/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log']:
+            before[str(p)]=sha(p)
     fresh(output)
     shutil.copyfile(runner,output/'route.tcl')
     # Preserve the exact orchestration source alongside the immutable recipe.
@@ -49,6 +71,7 @@ def run(actual,synthesis,output):
     started=time.time()
     result={'command':command,'started':started,'before':before,'actual_audit':a['audit'],
             'prepared_sha':s['prepared_sha'],'physical_signoff':False,'deployment_eligible':False}
+    if ack_audit is not None:result['ack_auxiliary_audit']=ack_audit
     (output/'command.json').write_text(json.dumps(result,indent=2)+'\n')
     try:
         with (output/'stdout.log').open('w') as log:
@@ -73,4 +96,5 @@ def run(actual,synthesis,output):
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     for name in ['actual','synthesis','output']:parser.add_argument(name,type=Path)
-    args=parser.parse_args();print(json.dumps(run(args.actual,args.synthesis,args.output),indent=2))
+    parser.add_argument('--ack-actual',type=Path)
+    args=parser.parse_args();print(json.dumps(run(args.actual,args.synthesis,args.output,args.ack_actual),indent=2))

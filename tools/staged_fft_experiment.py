@@ -253,6 +253,25 @@ def audit_enginecapture_sim(output):
     result['enginecapture']={'boundaries':rows,'checks':int(counts[0][0]),'private_differences':int(counts[0][1]),'owned_exact':True}
     return result
 
+def audit_ackcombined_sim(output):
+    result=audit_enginecapture_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_ACKCOMBINED_MAIN_PASS checks=(\d+) public_exact=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0])>=1000,'combined main original ACK witness')
+    result['ackcombined']={'checks':int(rows[0]),'public_exact':True,'auxiliary_required':True}
+    return result
+
+def audit_ackcombined_aux(output):
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    require(not re.search(r'FATAL|ERROR|FAIL',text,re.I),'auxiliary simulator failure')
+    rows=re.findall(r'^STAGED_PRIVATEACK_CASE_PASS boundary=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(rows==[str(n) for n in range(6)],'all combined ACK real-reader boundaries and fresh recovery')
+    counts=re.findall(r'^STAGED_ACKCOMBINED_AUX_PASS cases=6 checks=(\d+) quarantined=(\d+) public_exact=1 fresh_recovery=1$',text,re.M)
+    require(len(counts)==1 and int(counts[0][0])>=1000 and int(counts[0][1])>=300,'combined ACK public equivalence and quarantine coverage')
+    return {'boundaries':rows,'checks':int(counts[0][0]),'quarantined':int(counts[0][1]),
+            'public_exact':True,'fresh_recovery':True,'actual_fft':True,'main_numerical_campaign_required':True,
+            'physical_signoff':False,'continuous_rx':False}
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -270,7 +289,8 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_enginecapture_sim(output)
+        if mode=='sim':result['audit']=audit_ackcombined_sim(output)
+        elif mode=='ack':result['audit']=audit_ackcombined_aux(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
@@ -283,7 +303,7 @@ def run(mode,prepared,expected,output):
 if __name__=='__main__':
     parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
     prep=sub.add_parser('prepare');prep.add_argument('output',type=Path)
-    run_parser=sub.add_parser('run');run_parser.add_argument('mode',choices=['sim','synth'])
+    run_parser=sub.add_parser('run');run_parser.add_argument('mode',choices=['sim','ack','synth'])
     run_parser.add_argument('prepared',type=Path);run_parser.add_argument('expected');run_parser.add_argument('output',type=Path)
     a=parser.parse_args()
     print(json.dumps(prepare(a.output) if a.command=='prepare' else run(a.mode,a.prepared,a.expected,a.output),indent=2))

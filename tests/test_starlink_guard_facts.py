@@ -17,6 +17,9 @@ def test_complete_guard_and_top_inverses():
                      (GUARD,'6b3f4ff240f3f81edaaf694f7b2a926be320da71bfc3641d84a6ce3c87104f45')]:
         old=(BASE/name).read_bytes();assert hashlib.sha256(old).hexdigest()==pin
         text=(RTL/name).read_text()
+        if name==GUARD:
+            text=(ROOT.parent/'staged-enginecapture-prepared-v1'/name).read_text()
+            assert hashlib.sha256(text.encode()).hexdigest()=='ba0b9e308e2747e43edeec6c9b4bb486b2c1fc12d7d850d2bbf6a6ff02cc4431'
         if name==TOP:
             # Historical guard-fact transformation; the current input-stage
             # delta has a separate complete inverse and live predicate tests.
