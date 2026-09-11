@@ -183,3 +183,22 @@ initial begin
 end
 endmodule
 ''')
+
+
+@pytest.mark.parametrize("cancel", ["clear=1;", "source_abort=1;source_closed=1;"])
+def test_pending_launch_is_owned_and_cancelled_before_first_sample(tmp_path, cancel):
+    simulate(tmp_path, r'''
+initial begin
+ repeat(3) tick;resetn=1;enabled=1;
+ input_valid=1;input_index=64'h20000000000003;input_i=517;input_q=-731;
+ tick;input_valid=0;
+ if(!reserved || !dut.launch_pending || dut.engine_input_valid || dut.engine.test_busy)
+  $fatal(1,"launch pipeline did not retain ownership before engine arm");
+ CANCEL
+ tick;clear=0;repeat(4) tick;
+ if(reserved || dut.launch_pending || dut.engine_input_valid || dut.engine.test_busy || records_pending)
+  $fatal(1,"cancelled pending launch escaped");
+ $display("PASS");$finish;
+end
+endmodule
+'''.replace("CANCEL", cancel))
