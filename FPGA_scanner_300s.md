@@ -2,7 +2,23 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
-## Current verified status (2026-09-10)
+## Current verified status (2026-09-11)
+
+Update 2026-09-11, bank-local input identity: **480 tests** and **64512 actual
+FFT records** pass with unchanged service intervals. The default/enabled real
+checker matches in four-state and sequential tests; the live original checker
+witness matches for 421667 observations. Both owners pass selected/unselected
+metadata-corruption and fresh recovery cases. Routing is not an improvement:
+**-1.940 ns WNS / -579.273 ns TNS / 785 failing endpoints**, versus parent
+-1.340 / -463.636 / 821. Retain as a tested alternate; do not promote.
+Worst path now goes from held source metadata through preflight comparison and
+shared faults to output publication. Investigate the complete preflight/
+publication ownership boundary before another local refactor; core reuse is
+not reader release, so phase-based exemptions need proof. Branch:
+`codex/starlink-rx-only-do-not-merge-bank-local-identity`. No radio/PPU/main or
+primary production HDL changes. Native 60 MS/s fine search, 2.5 MS/s inspection
+and all full receiver/deployment gates remain required.
+See [bank-local checker proof and route comparison](reports/experiments/20260911-staged-bankidentity-actual-route-parent.md).
 
 Update 2026-09-11, bounded post-route physical optimization on retained
 references: **19 tool/audit tests pass**, both implementation passes complete,
