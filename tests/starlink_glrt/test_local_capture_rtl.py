@@ -2,6 +2,7 @@
 import re
 
 import numpy as np
+import pytest
 
 from .test_capture_rtl import arm, read, run, samples, snapshot, u64, wait, write
 from .test_capture_rtl import captures as captures  # noqa: PLC0414
@@ -42,3 +43,17 @@ def test_partial_stop_and_clear_preserve_exact_iq_and_local_accounting(captures,
     assert before[0xD34] == 512
     assert u64(before, 0xD38) == u64(before, 0x80)
     assert reads[-3:] == [(0xC38, 0), (0xC48, 0), (0xC0C, 0)]
+
+
+@pytest.mark.parametrize("count", [0, 1])
+def test_visit_reservation_fences_early_clear_and_releases_after_abort(captures, tmp_path, count):
+    raw = np.array([[517, -731]], dtype=np.int16)[:count]
+    rows = [*arm(visit=513), *samples(raw), wait(100), write(8, 4), read(0x10),
+            write(8, 2), wait(300), write(8, 4), wait(100), read(0x10), read(0xC0C),
+            (0, 9, 0, 16, 0), wait(), write(0x20, 514), read(0x20), write(8, 1), read(0x10),
+            write(8, 2), wait(300), write(8, 4), wait(), read(0x10), read(0xC0C)]
+    output, reads, final = run(captures(2500000, legacy=False, local=True), rows, tmp_path)
+    assert reads == [(0x10, 16), (0x10, 0), (0xC0C, 0), (0x20, 514),
+                     (0x10, 0), (0x10, 0), (0xC0C, 0)]
+    np.testing.assert_array_equal(np.asarray(output).reshape(-1, 2), raw)
+    assert final == (0, 0)
