@@ -4,6 +4,15 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, staged command controller: implemented registered validation
+and next-edge ownership application, with held responses and abort/reset
+cancellation. 41 component tests and the full 231-test combined regression pass.
+The registered-boundary probe now passes internal timing at 175 MHz:
+**WNS +0.765 ns**, hold +0.132 ns, no violations. Controller resources are
+182 LUT / 384 FF. This is **not** full-island or board timing closure; real
+FFT/payload-bank integration and all 60 MS/s/IIO/deployment gates remain open.
+See [staged command timing result and integration path](reports/experiments/20260911-staged-commands-timing-parent.md).
+
 Update 2026-09-11, staged-control work: a separate compact descriptor-ownership
 table now passes 36 tests, including stale-tag/abort/reset controls and RTL
 mutants. Early registered-boundary routes fail at -0.012 ns and -0.246 ns;
