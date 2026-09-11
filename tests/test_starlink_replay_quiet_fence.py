@@ -50,7 +50,7 @@ def test_exact_runtime_bench_and_synthesis_profile_delta():
             assert text==(PARENT/name).read_text(),name
     tcl=(ROOT/'tools/staged_fft_experiment.tcl').read_text()
     assert tcl.count(' REPLAY_QUIET_PUBLICATION=1')==1
-    assert tcl.replace(' PRIVATE_QUARANTINE_OFFER=1','',1).replace(' REPLAY_QUIET_PUBLICATION=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
+    assert tcl.replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1).replace(' PRIVATE_QUARANTINE_OFFER=1','',1).replace(' REPLAY_QUIET_PUBLICATION=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
 
 def run(tmp_path,mode='1',profile=31,mutation=None):
     text=(RTL/TOP).read_text()

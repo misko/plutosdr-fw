@@ -18,6 +18,7 @@ from staged_fft_experiment import completion_slot_compiled, audit_completion_slo
 from staged_fft_experiment import private_facts_compiled, audit_private_facts
 from staged_fft_experiment import replay_quiet_compiled, audit_replay_quiet, replay_fence_compiled, audit_replay_fence, verify_replay_fence_configuration
 from staged_fft_experiment import private_quarantine_compiled, audit_private_quarantine, verify_private_quarantine_configuration
+from staged_fft_experiment import split_preflight_compiled, audit_split_preflight, verify_split_preflight_configuration
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -42,6 +43,7 @@ def verify_ack_auxiliary(auxiliary,expected,prepared):
     if private_facts_compiled(prepared):audited=audit_private_facts(auxiliary,auxiliary=True)
     if replay_quiet_compiled(prepared):audited=audit_replay_fence(auxiliary,auxiliary=True) if replay_fence_compiled(prepared) else audit_replay_quiet(auxiliary,auxiliary=True)
     if private_quarantine_compiled(prepared):audited=audit_private_quarantine(auxiliary,auxiliary=True)
+    if split_preflight_compiled(prepared):audited=audit_split_preflight(auxiliary,auxiliary=True)
     require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
     return audited
 
@@ -98,6 +100,10 @@ def run(actual,synthesis,output,ack_actual=None):
     if private_quarantine_compiled(prepared):
         verify_private_quarantine_configuration(prepared)
         audited=audit_private_quarantine(actual)
+    require(('split_preflight' in a['audit'])==split_preflight_compiled(prepared),'main audit and compiled split preflight campaign differ')
+    if split_preflight_compiled(prepared):
+        verify_split_preflight_configuration(prepared)
+        audited=audit_split_preflight(actual)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])

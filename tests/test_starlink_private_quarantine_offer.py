@@ -20,6 +20,9 @@ def undo_guard(text):
     assert text.count(line)==1;return text.replace(line,'',1)
 
 def undo_top(text):
+    if '// BEGIN SPLIT PREFLIGHT PROFILE' in text:
+        from tests.test_starlink_split_preflight_identity import undo_top as undo_split
+        text=undo_split(text)
     text=remove_block(text,'PRIVATE QUARANTINE PROFILE')
     before='  parameter integer REPLAY_QUIET_PUBLICATION = 0,\n  parameter integer PRIVATE_QUARANTINE_OFFER = 0'
     assert text.count(before)==1;text=text.replace(before,'  parameter integer REPLAY_QUIET_PUBLICATION = 0',1)
@@ -27,6 +30,9 @@ def undo_top(text):
     assert text.count(line)==1;return text.replace(line,'',1)
 
 def undo_bench(text):
+    if '// BEGIN SPLIT PREFLIGHT WITNESS' in text:
+        from tests.test_starlink_split_preflight_identity import undo_bench as undo_split
+        text=undo_split(text)
     text=remove_block(text,'PRIVATE QUARANTINE WITNESS')
     text=text.replace('      report_private_quarantine; // PRIVATE QUARANTINE REPORT\n','',1)
     text=text.replace(',.PRIVATE_QUARANTINE_OFFER(1)) dut',') dut',1)
@@ -40,7 +46,7 @@ def test_exact_opt_in_source_delta():
     assert undo_guard((RTL/GUARD).read_text())==(PARENT/GUARD).read_text()
     assert undo_top((RTL/TOP).read_text())==(PARENT/TOP).read_text()
     name='tb_fft_staged_output.sv';assert undo_bench((RTL/name).read_text())==(PARENT/name).read_text()
-    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' PRIVATE_QUARANTINE_OFFER=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
+    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1).replace(' PRIVATE_QUARANTINE_OFFER=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
 
 def run(tmp_path,mode=1,mutation=None):
     source=(RTL/GUARD).read_text()

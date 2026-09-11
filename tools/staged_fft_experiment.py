@@ -434,10 +434,28 @@ def audit_private_quarantine(output,auxiliary=False):
     result['private_quarantine']={'checks':int(rows[0][0]),'differences':int(rows[0][1]),'public_fenced':True,'healthy_exact':True}
     return result
 
+def split_preflight_compiled(prepared):
+    return '.SPLIT_PREFLIGHT_IDENTITY(1)' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def verify_split_preflight_configuration(prepared):
+    verify_private_quarantine_configuration(prepared)
+    require((prepared/'tb_fft_staged_output.sv').read_text().count('.SPLIT_PREFLIGHT_IDENTITY(1)')==1 and
+            (prepared/'staged_fft_experiment.tcl').read_text().count(' SPLIT_PREFLIGHT_IDENTITY=1')==1,
+            'matching enabled split preflight profile')
+
+def audit_split_preflight(output,auxiliary=False):
+    result=audit_private_quarantine(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_SPLIT_PREFLIGHT_PASS checks=(\d+) source=(\d+) product=(\d+) current_exact=1 latency_unchanged=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0][0])>=1000 and min(map(int,rows[0][1:]))>=20,'complete split preflight witness')
+    result['split_preflight']={'checks':int(rows[0][0]),'source':int(rows[0][1]),'product':int(rows[0][2]),'current_exact':True,'latency_unchanged':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected)
     if replay_fence_compiled(prepared):verify_replay_fence_configuration(prepared)
     if private_quarantine_compiled(prepared):verify_private_quarantine_configuration(prepared)
+    if split_preflight_compiled(prepared):verify_split_preflight_configuration(prepared)
     fresh(output)
     env=dict(os.environ)
     for key in ['PYTHONHOME','PYTHONPATH','PYTHONOPTIMIZE','LD_LIBRARY_PATH']:env.pop(key,None)
@@ -470,6 +488,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_replay_fence(output,auxiliary=mode=='ack') if replay_fence_compiled(prepared) else audit_replay_quiet(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and private_quarantine_compiled(prepared):
             result['audit']=audit_private_quarantine(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and split_preflight_compiled(prepared):
+            result['audit']=audit_split_preflight(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
