@@ -2,6 +2,18 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, private forward descriptor capture: all 70 descriptor CE
+endpoints now pass (worst **+0.129 ns**); descriptor data is +2.226 ns and prior
+product occupancy/identity remain positive. **1,753 tests and 65 actual FFT
+fault/reset cases pass**, with unchanged arithmetic and service. Whole timing
+still FAILS: **-1.304 ns WNS / -663.577 ns TNS / 1,647 endpoints**. Aggregate
+slack regresses; this is only targeted path closure. Next test receipt-based
+private output-slot retirement while preserving current publication vetoes.
+FW `dac9d92d6`, HDL `e61c02019`, branch
+`codex/starlink-rx-only-do-not-merge-private-forward-descriptor`, both pushed.
+No primary HDL promotion, radio access or PPU/main changes. See
+[descriptor proof and route](reports/experiments/20260911-private-forward-descriptor-actual-route.md).
+
 Update 2026-09-11, private product retirement from registered bank ownership:
 the product occupancy endpoint now passes at **+1.551 ns**; identity remains
 passing at **+1.222 ns**. **1,646 tests and all 59 actual fault/reset cases pass**,
