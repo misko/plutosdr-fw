@@ -4,6 +4,22 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, authoritative parallel kernel READY integrated: **988 distinct
+tests pass** (971 regression + six four-state + eleven evidence tests). Both actual
+FFT campaigns preserve 64512 records/CSV, service, original guard wiring and all
+direct-ready/forced-valid fault tests. Five runtime modules change through explicit
+occupancy/capacity ports; arithmetic and storage are preserved. Routing regresses
+to **-1.434 ns WNS / -302.161 ns TNS / 590 failures** (parent -1.399 / -250.635 /
+446). No promotion. The release-to-fast-fault path improves to -0.774 ns, but the
+new READY→guard→kernel protocol-fault path is twelve levels and worst at -1.434.
+Release register replication was explicitly queried: old paths remain via the
+replica, not removed. Next remove only the two new KEEP hints and remeasure before
+changing behavior. CDC remains nine CDC-3 / 208 CDC-15, no waivers. Branch
+`codex/starlink-rx-only-do-not-merge-parallel-kernel-ready`, FW `11b374d18`, HDL
+`36ce5b2f9`, both pushed. No radios, PPU/main or primary HDL changed; native 60 MS/s
+fine and 2.5 MS/s inspection remain required. See
+[integrated parallel READY route](reports/experiments/20260911-parallel-kernel-ready-actual-route.md).
+
 Update 2026-09-11, parallel forward capacity shadow: **964 distinct tests pass**
 (956 corrected regression + eight evidence tests). Both corrected actual FFT
 campaigns pass, preserving all 64512 records/CSV and service. Parallel readiness
