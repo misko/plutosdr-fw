@@ -4,6 +4,15 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11: the independent destination candidate passes actual FFT
+simulation (all 77953 rows and previous results identical), 85 preparation
+tests, 69 physical-policy tests and source-matched synthesis. Routing completes
+but regresses to **WNS -3.106 ns**, 827 failing setup endpoints; hold passes.
+It stays default-off. The next implementation is registered validation/control
+boundaries with tagged, fault-safe certificates—not further unmeasured
+combinational factoring. Full RX/IIO/board and `.18`→`.17` deployment gates remain.
+See [destination actual/physical evidence](reports/experiments/20260911-destination-actual-physical-parent.md).
+
 Update2026-09-11: bank-local identity now passes the actual vendor FFT campaign.
 All77953 rows and every prior parsed result field match;3230028 full guard-field
 comparisons pass. Independent64 actual preparation,80 physical policy and19 real
