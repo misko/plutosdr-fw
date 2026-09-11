@@ -9,6 +9,8 @@ PARENT=Path('/dev/shm/starlink-forward-receipt.7z0zKX/prepared-v1')
 
 
 def undo_product_stage(text):
+    from tests.test_starlink_split_output_metadata import undo_output_top
+    text=undo_output_top(text)
     for label in ['WIRES','STAGE']:
         text,count=re.subn(r'  // BEGIN PRODUCT IDENTITY '+label+r'\n.*?  // END PRODUCT IDENTITY '+label+r'\n','',text,flags=re.S)
         assert count==1
@@ -51,6 +53,11 @@ def test_stage_quarantine_feeds_all_existing_product_fault_summaries():
 
 
 def undo_product_stage_bench(text):
+    for label in ['WITNESS','BOUNDARIES','AUXILIARY']:
+        text,count=re.subn(r' *// BEGIN OUTPUT METADATA '+label+r'\n.*? *// END OUTPUT METADATA '+label+r'\n','',text,flags=re.S)
+        assert count==1
+    text=text.replace('    report_output_metadata; // OUTPUT METADATA MAIN\n','',1)
+    text=text.replace('      report_output_metadata; // OUTPUT METADATA AUXILIARY\n','',1)
     text,count=re.subn(r'  // BEGIN SPLIT CAPACITY WITNESS\n.*?  // END SPLIT CAPACITY WITNESS\n','',text,flags=re.S)
     assert count==1
     text=text.replace('      report_split_capacity; // SPLIT CAPACITY AUXILIARY\n','',1)

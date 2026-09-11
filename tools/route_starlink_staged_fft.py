@@ -12,6 +12,7 @@ from staged_fft_experiment import forward_receipt_compiled, audit_forwardreceipt
 from staged_fft_experiment import product_stage_compiled, audit_productstage
 from staged_fft_experiment import final_capacity_compiled, audit_finalcapacity
 from staged_fft_experiment import split_capacity_compiled, audit_splitcapacity
+from staged_fft_experiment import output_metadata_compiled, audit_outputmetadata
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -30,6 +31,7 @@ def verify_ack_auxiliary(auxiliary,expected,prepared):
     audited=audit_productstage(auxiliary,auxiliary=True) if product_stage_compiled(prepared) else (audit_forwardreceipt(auxiliary,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(auxiliary))
     if final_capacity_compiled(prepared):audited=audit_finalcapacity(auxiliary,auxiliary=True)
     if split_capacity_compiled(prepared):audited=audit_splitcapacity(auxiliary,auxiliary=True)
+    if output_metadata_compiled(prepared):audited=audit_outputmetadata(auxiliary,auxiliary=True)
     require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
     return audited
 
@@ -66,6 +68,9 @@ def run(actual,synthesis,output,ack_actual=None):
     require(('splitcapacity' in a['audit'])==split_capacity_compiled(prepared),
             'main audit and compiled split capacity campaign differ')
     if split_capacity_compiled(prepared):audited=audit_splitcapacity(actual)
+    require(('outputmetadata' in a['audit'])==output_metadata_compiled(prepared),
+            'main audit and compiled output metadata campaign differ')
+    if output_metadata_compiled(prepared):audited=audit_outputmetadata(actual)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])

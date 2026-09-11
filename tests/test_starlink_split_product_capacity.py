@@ -17,6 +17,8 @@ COMMENT=('  // Physical nonfinal capacity, derived from actual destination owner
 
 
 def undo_split_top(text):
+    from tests.test_starlink_split_output_metadata import undo_output_top
+    text=undo_output_top(text)
     old='starlink_pss_product_identity_split_capacity product_identity_stage ('
     new='starlink_pss_product_identity_stage product_identity_stage ('
     assert text.count(old)==1;text=text.replace(old,new,1)

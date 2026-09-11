@@ -47,7 +47,8 @@ def prepare(path):
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
                                        'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
                                        'starlink_pss_input_identity_stage.v','starlink_pss_realtime_input_guard_staged_identity.v',
-                                       'starlink_pss_product_identity_split_capacity.v','starlink_pss_product_mailbox_staged_identity.v'])
+                                       'starlink_pss_product_identity_split_capacity.v','starlink_pss_product_mailbox_staged_identity.v',
+                                       'starlink_pss_mailbox_split_metadata_view.v'])
     support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
                     ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
     sources=runtime+support
@@ -329,6 +330,21 @@ def audit_splitcapacity(output,auxiliary=False):
         'input_ready_exact':True,'current_retirement_exact':True}
     return result
 
+def output_metadata_compiled(prepared):
+    return '// BEGIN OUTPUT METADATA WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_outputmetadata(output,auxiliary=False):
+    result=audit_splitcapacity(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_OUTPUT_METADATA_PASS checks=(\d+) live=(\d+) replay=(\d+) current_exact=1 unchanged_publication=1$',text,re.M)
+    require(len(rows)==1 and min(map(int,rows[0][:2]))>=6144 and int(rows[0][2])>=12,
+            'output metadata actual branch comparison coverage')
+    cases=re.findall(r'^STAGED_OUTPUT_METADATA_CASE_PASS boundary=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(cases==([str(n) for n in range(6)] if auxiliary else []),'output metadata actual boundary inventory')
+    result['outputmetadata']={'checks':int(rows[0][0]),'live':int(rows[0][1]),'replay':int(rows[0][2]),
+        'current_exact':True,'unchanged_publication':True,'boundaries':cases}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -350,6 +366,8 @@ def run(mode,prepared,expected,output):
         elif mode=='ack':result['audit']=audit_finalcapacity(output,auxiliary=True) if final_capacity_compiled(prepared) else (audit_productstage(output,auxiliary=True) if product_stage_compiled(prepared) else (audit_forwardreceipt(output,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(output)))
         if mode in {'sim','ack'} and split_capacity_compiled(prepared):
             result['audit']=audit_splitcapacity(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and output_metadata_compiled(prepared):
+            result['audit']=audit_outputmetadata(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
