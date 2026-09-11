@@ -44,8 +44,9 @@ def prepare(path):
         relative=str(source.relative_to(BASE/'source_snapshot'))
         require(sha(source)==manifest['sources'][relative]['sha256'],'reference source changed: '+relative)
     runtime = [p for p in runtime if p.name not in
-               {'starlink_pss_mailbox_owner_view.v', 'starlink_pss_retained_epoch_barrier.v'}]
-    runtime.extend(NEW/name for name in ['starlink_pss_mailbox_reset_receipt.v','starlink_pss_reset_receipt_barrier.v',
+               {'starlink_pss_mailbox_owner_view.v', 'starlink_pss_retained_epoch_barrier.v',
+                'starlink_pss_spectrum_product_bank_arithmetic.v','starlink_pss_spectrum_product_operand_register.v'}]
+    runtime.extend(NEW/name for name in ['starlink_pss_spectrum_product_bank_arithmetic.v','starlink_pss_spectrum_product_operand_register.v','starlink_pss_mailbox_reset_receipt.v','starlink_pss_reset_receipt_barrier.v',
                                        'starlink_pss_descriptor_commands.v','starlink_pss_completion_mailbox_stage.v','starlink_pss_fft_staged_output_impl.v',
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
                                        'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
@@ -471,13 +472,31 @@ def audit_monotonic_reset(output,auxiliary=False):
 def forward_capacity_compiled(prepared):
     return '// BEGIN FORWARD CAPACITY SHADOW' in (prepared/'tb_fft_staged_output.sv').read_text()
 
-def audit_forward_capacity(output,auxiliary=False):
+def audit_forward_capacity(output,auxiliary=False,integrated=False):
     result=audit_monotonic_reset(output,auxiliary)
     text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
-    rows=re.findall(r'^STAGED_FORWARD_CAPACITY_SHADOW_PASS checks=(\d+) healthy=(\d+) faults=(\d+) ready_overrides=(\d+) summary_overrides=(\d+) common_differences=(\d+) unexplained=0 runtime_unchanged=1$',text,re.M)
+    rows=re.findall(r'^STAGED_FORWARD_CAPACITY_SHADOW_PASS checks=(\d+) healthy=(\d+) faults=(\d+) ready_overrides=(\d+) summary_overrides=(\d+) common_differences=(\d+) unexplained=0 runtime_unchanged=([01])$',text,re.M)
     require(len(rows)==1 and min(map(int,rows[0][:2]))>=1000 and int(rows[0][2])>=10,'complete forward capacity shadow')
+    require(int(rows[0][6])==int(not integrated),'forward capacity runtime profile')
     result['forward_capacity_shadow']=dict(zip(['checks','healthy','faults','ready_overrides','summary_overrides','common_differences'],map(int,rows[0])))
-    result['forward_capacity_shadow'].update(unexplained=0,runtime_unchanged=True,production_interface_proven=False)
+    result['forward_capacity_shadow'].update(unexplained=0,runtime_unchanged=not integrated,production_interface_proven=False)
+    return result
+
+def parallel_ready_compiled(prepared):
+    return '.PARALLEL_KERNEL_READY(1)' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def verify_parallel_ready_configuration(prepared):
+    verify_monotonic_reset_configuration(prepared)
+    require((prepared/'tb_fft_staged_output.sv').read_text().count('.PARALLEL_KERNEL_READY(1)')==1 and
+            (prepared/'staged_fft_experiment.tcl').read_text().count(' PARALLEL_KERNEL_READY=1')==1,
+            'matching enabled parallel kernel ready profile')
+
+def audit_parallel_ready(output,auxiliary=False):
+    result=audit_forward_capacity(output,auxiliary,integrated=True)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_PARALLEL_READY_PASS checks=(\d+) ports=1 current_exact=1 original_guard_wiring=1 latency_unchanged=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0])>=1000,'complete parallel kernel ready witness')
+    result['parallel_ready']={'checks':int(rows[0]),'ports':True,'current_exact':True,'original_guard_wiring':True,'latency_unchanged':True}
     return result
 
 def run(mode,prepared,expected,output):
@@ -486,6 +505,7 @@ def run(mode,prepared,expected,output):
     if private_quarantine_compiled(prepared):verify_private_quarantine_configuration(prepared)
     if split_preflight_compiled(prepared):verify_split_preflight_configuration(prepared)
     if monotonic_reset_compiled(prepared):verify_monotonic_reset_configuration(prepared)
+    if parallel_ready_compiled(prepared):verify_parallel_ready_configuration(prepared)
     fresh(output)
     env=dict(os.environ)
     for key in ['PYTHONHOME','PYTHONPATH','PYTHONOPTIMIZE','LD_LIBRARY_PATH']:env.pop(key,None)
@@ -523,7 +543,7 @@ def run(mode,prepared,expected,output):
         if mode in {'sim','ack'} and monotonic_reset_compiled(prepared):
             result['audit']=audit_monotonic_reset(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and forward_capacity_compiled(prepared):
-            result['audit']=audit_forward_capacity(output,auxiliary=mode=='ack')
+            result['audit']=audit_parallel_ready(output,auxiliary=mode=='ack') if parallel_ready_compiled(prepared) else audit_forward_capacity(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

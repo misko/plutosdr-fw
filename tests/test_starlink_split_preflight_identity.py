@@ -34,12 +34,14 @@ def undo_bench(text):
 def test_exact_source_delta():
     assert undo_top((RTL/TOP).read_text())==(PARENT/TOP).read_text()
     name='tb_fft_staged_output.sv';assert undo_bench((RTL/name).read_text())==(PARENT/name).read_text()
-    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' MONOTONIC_OUTER_RESET=1','',1).replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
+    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' PARALLEL_KERNEL_READY=1','',1).replace(' MONOTONIC_OUTER_RESET=1','',1).replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
         if name!=TOP and (RTL/name).exists():
             text=(RTL/name).read_text()
+            from tests.test_starlink_parallel_kernel_ready import undo_runtime
+            text=undo_runtime(text,name)
             if name=='starlink_pss_reset_receipt_barrier.v' and '// BEGIN MONOTONIC RESET RELEASE' in text:
                 from tests.test_starlink_monotonic_reset_release import undo_barrier
                 text=undo_barrier(text)

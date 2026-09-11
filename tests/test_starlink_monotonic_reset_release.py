@@ -24,6 +24,8 @@ def test_exact_barrier_delta():
     assert undo_barrier((RTL/BARRIER).read_text())==(PARENT/BARRIER).read_text()
 
 def undo_top(text):
+    from tests.test_starlink_parallel_kernel_ready import undo_runtime
+    text=undo_runtime(text,TOP)
     for old,new in [
         ('  parameter integer SPLIT_PREFLIGHT_IDENTITY = 0,\n  parameter integer MONOTONIC_OUTER_RESET = 0','  parameter integer SPLIT_PREFLIGHT_IDENTITY = 0'),
         ('starlink_pss_reset_receipt_barrier #(.MONOTONIC_OUTER_RESET(MONOTONIC_OUTER_RESET)) epoch_barrier (','starlink_pss_reset_receipt_barrier epoch_barrier (')]:
@@ -43,11 +45,13 @@ def undo_bench(text):
 def test_exact_integration_delta():
     assert undo_top((RTL/TOP).read_text())==(PARENT/TOP).read_text()
     name='tb_fft_staged_output.sv';assert undo_bench((RTL/name).read_text())==(PARENT/name).read_text()
-    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' MONOTONIC_OUTER_RESET=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
+    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' PARALLEL_KERNEL_READY=1','',1).replace(' MONOTONIC_OUTER_RESET=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
-        if name not in {TOP,BARRIER} and (RTL/name).exists():assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+        if name not in {TOP,BARRIER} and (RTL/name).exists():
+            from tests.test_starlink_parallel_kernel_ready import undo_runtime
+            assert undo_runtime((RTL/name).read_text(),name)==(PARENT/name).read_text(),name
 
 def run(tmp_path,fast=2857,slow=5000,phase=0,mode='1',mutation=None,negative=0):
     text=(RTL/BARRIER).read_text()

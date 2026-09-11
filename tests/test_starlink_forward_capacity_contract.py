@@ -9,6 +9,9 @@ RTL=ROOT/'hdl/library/starlink_pss_acquisition/staged_control'
 PARENT=Path('/dev/shm/starlink-monotonic-reset.pL4aOpKf/prepared-v1')
 
 def undo_bench(text):
+    if '// BEGIN PARALLEL READY WITNESS' in text:
+        from tests.test_starlink_parallel_kernel_ready import undo_bench as undo_ready
+        text=undo_ready(text)
     text,n=re.subn(r'  // BEGIN FORWARD CAPACITY SHADOW\n.*?  // END FORWARD CAPACITY SHADOW\n','',text,flags=re.S)
     assert n==1
     line='      report_forward_capacity; // FORWARD CAPACITY REPORT\n'
@@ -19,8 +22,10 @@ def test_unchanged_runtime_and_exact_bench_delta():
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
-        if (RTL/name).exists():assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
-    assert (ROOT/'tools/staged_fft_experiment.tcl').read_bytes()==(PARENT/'staged_fft_experiment.tcl').read_bytes()
+        if (RTL/name).exists():
+            from tests.test_starlink_parallel_kernel_ready import undo_runtime
+            assert undo_runtime((RTL/name).read_text(),name)==(PARENT/name).read_text(),name
+    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' PARALLEL_KERNEL_READY=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
     name='tb_fft_staged_output.sv';assert undo_bench((RTL/name).read_text())==(PARENT/name).read_text()
 
 def test_capacity_observes_owned_state_not_forced_transport_valid():

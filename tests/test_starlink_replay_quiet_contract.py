@@ -28,6 +28,8 @@ def test_runtime_byte_identical_and_exact_additive_bench():
     for name in names:
         if (RTL/name).exists():
             text=(RTL/name).read_text()
+            from tests.test_starlink_parallel_kernel_ready import undo_runtime
+            text=undo_runtime(text,name)
             if name=='starlink_pss_reset_receipt_barrier.v' and '// BEGIN MONOTONIC RESET RELEASE' in text:
                 from tests.test_starlink_monotonic_reset_release import undo_barrier
                 text=undo_barrier(text)

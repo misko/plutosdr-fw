@@ -20,6 +20,7 @@ from staged_fft_experiment import replay_quiet_compiled, audit_replay_quiet, rep
 from staged_fft_experiment import private_quarantine_compiled, audit_private_quarantine, verify_private_quarantine_configuration
 from staged_fft_experiment import split_preflight_compiled, audit_split_preflight, verify_split_preflight_configuration
 from staged_fft_experiment import monotonic_reset_compiled, audit_monotonic_reset, verify_monotonic_reset_configuration
+from staged_fft_experiment import forward_capacity_compiled, audit_forward_capacity, parallel_ready_compiled, audit_parallel_ready, verify_parallel_ready_configuration
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -46,6 +47,7 @@ def verify_ack_auxiliary(auxiliary,expected,prepared):
     if private_quarantine_compiled(prepared):audited=audit_private_quarantine(auxiliary,auxiliary=True)
     if split_preflight_compiled(prepared):audited=audit_split_preflight(auxiliary,auxiliary=True)
     if monotonic_reset_compiled(prepared):audited=audit_monotonic_reset(auxiliary,auxiliary=True)
+    if forward_capacity_compiled(prepared):audited=audit_parallel_ready(auxiliary,auxiliary=True) if parallel_ready_compiled(prepared) else audit_forward_capacity(auxiliary,auxiliary=True)
     require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
     return audited
 
@@ -110,6 +112,12 @@ def run(actual,synthesis,output,ack_actual=None):
     if monotonic_reset_compiled(prepared):
         verify_monotonic_reset_configuration(prepared)
         audited=audit_monotonic_reset(actual)
+    require(('forward_capacity_shadow' in a['audit'])==forward_capacity_compiled(prepared),'main audit and compiled capacity shadow differ')
+    require(('parallel_ready' in a['audit'])==parallel_ready_compiled(prepared),'main audit and compiled parallel kernel ready differ')
+    if forward_capacity_compiled(prepared):audited=audit_forward_capacity(actual,integrated=parallel_ready_compiled(prepared))
+    if parallel_ready_compiled(prepared):
+        verify_parallel_ready_configuration(prepared)
+        audited=audit_parallel_ready(actual)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])

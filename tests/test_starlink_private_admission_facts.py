@@ -38,13 +38,15 @@ def undo_payload(text):
       '        snapshot_valid<=1;','        snapshot_good<=checks_good;snapshot_valid<=1;',1)
 
 def parent_runtime_bytes(path):
+    from tests.test_starlink_parallel_kernel_ready import undo_runtime
+    text=undo_runtime(path.read_text(),path.name)
     if path.name=='starlink_pss_reset_receipt_barrier.v' and '// BEGIN MONOTONIC RESET RELEASE' in path.read_text():
         from tests.test_starlink_monotonic_reset_release import undo_barrier
         return undo_barrier(path.read_text()).encode()
     if path.name=='starlink_pss_result_guard_owner_view.v' and '// BEGIN PRIVATE QUARANTINE OFFER' in path.read_text():
         from tests.test_starlink_private_quarantine_offer import undo_guard
         return undo_guard(path.read_text()).encode()
-    return undo_payload(path.read_text()).encode() if path.name==NAME else path.read_bytes()
+    return undo_payload(text).encode() if path.name==NAME else text.encode()
 
 def undo_bench(text):
     if '// BEGIN REPLAY QUIET WITNESS' in text:

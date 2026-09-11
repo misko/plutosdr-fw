@@ -46,7 +46,7 @@ def test_exact_opt_in_source_delta():
     assert undo_guard((RTL/GUARD).read_text())==(PARENT/GUARD).read_text()
     assert undo_top((RTL/TOP).read_text())==(PARENT/TOP).read_text()
     name='tb_fft_staged_output.sv';assert undo_bench((RTL/name).read_text())==(PARENT/name).read_text()
-    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' MONOTONIC_OUTER_RESET=1','',1).replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1).replace(' PRIVATE_QUARANTINE_OFFER=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
+    assert (ROOT/'tools/staged_fft_experiment.tcl').read_text().replace(' PARALLEL_KERNEL_READY=1','',1).replace(' MONOTONIC_OUTER_RESET=1','',1).replace(' SPLIT_PREFLIGHT_IDENTITY=1','',1).replace(' PRIVATE_QUARANTINE_OFFER=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
 
 def run(tmp_path,mode=1,mutation=None):
     source=(RTL/GUARD).read_text()
