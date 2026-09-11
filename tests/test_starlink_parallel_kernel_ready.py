@@ -22,6 +22,9 @@ def block(text,label,replacement=''):
     return text
 
 def undo_runtime(text,name):
+    if name==TOP:
+        from tests.test_starlink_distributed_sticky_fault import undo_top
+        text=undo_top(text)
     if name=='starlink_pss_result_guard_owner_view.v':
         from tests.test_starlink_forward_final_commit import undo_guard
         text=undo_guard(text)

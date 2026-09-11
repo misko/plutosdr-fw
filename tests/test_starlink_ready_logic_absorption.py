@@ -16,6 +16,9 @@ def current_runtime():
 def verify_runtime(sources):
     changed=[]
     for name,text in sources.items():
+        if name=='starlink_pss_fft_staged_output_impl.v':
+            from tests.test_starlink_distributed_sticky_fault import undo_top
+            text=undo_top(text)
         if name=='starlink_pss_result_guard_owner_view.v':
             from tests.test_starlink_forward_final_commit import undo_guard
             text=undo_guard(text)

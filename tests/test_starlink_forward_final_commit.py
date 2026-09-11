@@ -17,6 +17,8 @@ def undo_guard(text):
     return text
 
 def undo_bench(text):
+    from tests.test_starlink_distributed_sticky_fault import undo_bench as undo_sticky
+    text=undo_sticky(text)
     if '// BEGIN FORWARD FINAL COMMIT WITNESS' not in text:return text
     text,n=re.subn(r'  // BEGIN FORWARD FINAL COMMIT WITNESS\n.*?  // END FORWARD FINAL COMMIT WITNESS\n','',text,flags=re.S)
     assert n==1
@@ -31,6 +33,9 @@ def test_exact_one_guard_delta():
     for name in names:
         if not (RTL/name).exists():continue
         text=(RTL/name).read_text()
+        if name=='starlink_pss_fft_staged_output_impl.v':
+            from tests.test_starlink_distributed_sticky_fault import undo_top
+            text=undo_top(text)
         if text!=(PARENT/name).read_text():changed.append(name)
         assert (undo_guard(text) if name==GUARD else text)==(PARENT/name).read_text(),name
     assert changed==[GUARD]
