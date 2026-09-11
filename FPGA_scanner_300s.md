@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, private engine descriptor capture: **504 regression + nine
+evidence tests pass**, **64512 actual FFT records** and service remain exact.
+Across 500505 cycles, 171981 extra private captures never reach an owned/public
+operation; all six new boundary cases recover cleanly. Route is mixed:
+**-1.686 ns WNS / -478.515 ns TNS / 748 failing endpoints**, versus input stage
+-1.503 / -521.325 / 896. Fewer violations but worse worst slack; no promotion
+or deployment. Worst path now ends in inverse awaiting-ACK through product-bank
+framing faults. Next evaluate the already tested private ACK-retirement alternate
+on this runtime, revalidating ownership/current-fault behavior and routing.
+Branch: `codex/starlink-rx-only-do-not-merge-private-engine-descriptor`.
+No radio, PPU/main or production HDL changes. Native 60 MS/s fine search, 2.5 MS/s
+inspection and all full receiver/deployment gates remain required.
+See [private descriptor proof and route comparison](reports/experiments/20260911-staged-enginecapture-actual-route.md).
+
 Update 2026-09-11, registered input identity integrated with actual FFT/buffers:
 **489 regression tests plus nine audit/inverse cases pass**, all **64512 numerical
 records** match, six new identity/reset cases recover cleanly. Normal service is
