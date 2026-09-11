@@ -13,7 +13,9 @@ OLD=ROOT.parent/'staged-heldmeta-prepared-v1'/TOP.name
 def test_complete_handoff_inverse():
     old=OLD.read_bytes()
     assert hashlib.sha256(old).hexdigest()=='ad60442023cacf132a79ca384fe0612b83d7014421b8d11a1d01762779fa4270'
-    text=TOP.read_text()
+    parent=ROOT.parent/'staged-heldhandoff-prepared-v1'/TOP.name
+    assert hashlib.sha256(parent.read_bytes()).hexdigest()=='dac566ab9dbca3fbdfb748610e05835cc315196d65dac8528bce2270e70cf3c4'
+    text=parent.read_text()
     start=text.index('  // BEGIN HELD BANK HANDOFF\n')
     end=text.index('  // END HELD BANK HANDOFF\n',start)+len('  // END HELD BANK HANDOFF\n')
     text=text[:start]+text[end:]

@@ -238,6 +238,16 @@ def audit_heldhandoff_sim(output):
     result['heldhandoff']={'boundaries':rows,'checks':int(counts[0][0]),'replays':int(counts[0][1]),'exact_offers':True,'immediate_veto':True}
     return result
 
+def audit_privateack_sim(output):
+    result=audit_heldhandoff_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_PRIVATEACK_CASE_PASS boundary=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(rows==[str(n) for n in range(6)],'all private ACK fault/reset/healthy recovery cases')
+    counts=re.findall(r'^STAGED_PRIVATEACK_PASS cases=6 checks=(\d+) quarantined=(\d+) public_exact=1 fresh_recovery=1$',text,re.M)
+    require(len(counts)==1 and int(counts[0][0])>=1000 and int(counts[0][1])>=300,'original guard equivalence and quarantined private ACK differences')
+    result['privateack']={'boundaries':rows,'checks':int(counts[0][0]),'quarantined':int(counts[0][1]),'public_exact':True,'fresh_recovery':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -255,7 +265,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_heldhandoff_sim(output)
+        if mode=='sim':result['audit']=audit_privateack_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
