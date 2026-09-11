@@ -2,6 +2,17 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, private product retirement from registered bank ownership:
+the product occupancy endpoint now passes at **+1.551 ns**; identity remains
+passing at **+1.222 ns**. **1,646 tests and all 59 actual fault/reset cases pass**,
+with exact arithmetic and unchanged service. Whole timing still FAILS:
+**-1.426 ns WNS / -446.926 ns TNS / 839 endpoints**; same-domain worst is -1.348 ns.
+Next isolate private forward-descriptor loading from current-fault comparison,
+without changing public ownership or quarantine. Branch
+`codex/starlink-rx-only-do-not-merge-product-retirement-receipt`, FW `1be34b17b`,
+HDL `32a267dcc`. No primary HDL promotion, radio access or PPU/main changes. See
+[retirement receipt proof and route](reports/experiments/20260911-product-retirement-receipt-actual-route.md).
+
 Update 2026-09-11, parallel product reference comparison: the targeted identity
 certificate endpoint now passes at **+0.729 ns**, physically verified as two
 comparisons feeding a final selection LUT. **1,565 tests and all 54 actual
