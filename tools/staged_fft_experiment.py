@@ -373,6 +373,17 @@ def audit_completion_slot(output,auxiliary=False):
         'immediate_ownership':True,'held_payload':True,'boundaries':cases}
     return result
 
+def private_facts_compiled(prepared):
+    return '// BEGIN PRIVATE ADMISSION FACTS WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_private_facts(output,auxiliary=False):
+    result=audit_completion_slot(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_PRIVATE_FACTS_PASS checks=(\d+) owned=(\d+) invalid_differences=(\d+) permit_exact=1 owned_exact=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0][0])>=1000 and int(rows[0][1])>=10 and int(rows[0][2])>=100,'complete private admission facts witness')
+    result['private_facts']={'checks':int(rows[0][0]),'owned':int(rows[0][1]),'invalid_differences':int(rows[0][2]),'permit_exact':True,'owned_exact':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -400,6 +411,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_balancedhandoff(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and completion_slot_compiled(prepared):
             result['audit']=audit_completion_slot(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and private_facts_compiled(prepared):
+            result['audit']=audit_private_facts(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

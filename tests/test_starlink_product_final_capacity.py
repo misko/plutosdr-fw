@@ -25,7 +25,8 @@ def test_exact_stage_delta_and_other_twenty_modules_unchanged():
     assert len(names)==21
     for name in names:
         if name!=NAME and (RTL/name).exists():
-            source=(RTL/name).read_bytes()
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            source=parent_runtime_bytes(RTL/name)
             if name=='starlink_pss_fft_staged_output_impl.v':
                 from tests.test_starlink_split_product_capacity import undo_split_top
                 source=undo_split_top(source.decode()).encode()

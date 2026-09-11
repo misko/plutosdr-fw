@@ -33,7 +33,8 @@ def test_entire_runtime_delta_is_receipt_and_ack_interlock():
     names = (BASE/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     for name in names:
         if name != TOP.name and (RTL/name).exists():
-            assert (RTL/name).read_bytes() == (BASE/name).read_bytes(), name
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(RTL/name) == (BASE/name).read_bytes(), name
     guard = (RTL/'starlink_pss_result_guard_owner_view.v').read_text()
     assert 'commit_pulse <= final_commit;' in guard
     assert 'wire final_commit = mailbox_commit_valid && mailbox_input_ready;' in guard

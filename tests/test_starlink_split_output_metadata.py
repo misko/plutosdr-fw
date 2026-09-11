@@ -43,7 +43,8 @@ def test_exact_mailbox_and_top_inverse():
     assert len(names)==21
     for name in names:
         if (RTL/name).exists():
-            current=(RTL/name).read_text()
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            current=parent_runtime_bytes(RTL/name).decode()
             if name=='starlink_pss_fft_staged_output_impl.v':current=undo_output_top(current)
             assert current==(PARENT/name).read_text(),name
 

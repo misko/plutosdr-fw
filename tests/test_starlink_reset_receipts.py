@@ -48,7 +48,8 @@ def test_exact_runtime_delta():
     assert undo_top((RTL/top).read_text())==(PARENT/top).read_text()
     for name in (PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split():
         if name!=top and (RTL/name).exists():
-            assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(RTL/name)==(PARENT/name).read_bytes(),name
 
 
 def test_exact_barrier_delta():

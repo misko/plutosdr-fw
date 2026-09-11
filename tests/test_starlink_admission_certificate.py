@@ -71,7 +71,8 @@ def test_clocked_admission_contract(tmp_path,width):
 def test_unsafe_certificate_mutant_rejected(tmp_path,change,width):
     before,after={
         'bypass':('((&snapshot_good) === 1\'b1)',"((&checks_good) === 1'b1)"),
-        'refresh':('if (!snapshot_valid && !consumed)', 'if (!consumed)'),
+        'refresh':('else if (!snapshot_valid && !consumed) snapshot_good<=checks_good;',
+                   'else if (!consumed) snapshot_good<=checks_good;'),
         'reuse':('snapshot_valid<=0;consumed<=1;', 'snapshot_valid<=0;consumed<=0;'),
         'quarantine':('request && !quarantine && snapshot_valid', 'request && snapshot_valid'),
     }[change]

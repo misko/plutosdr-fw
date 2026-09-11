@@ -41,7 +41,8 @@ def test_complete_top_delta_and_other_runtime_preserved():
     assert undo_product_stage((RTL/name).read_text())==(PARENT/name).read_text()
     for name in (PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split():
         if name!='starlink_pss_fft_staged_output_impl.v' and (RTL/name).exists():
-            assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(RTL/name)==(PARENT/name).read_bytes(),name
 
 
 def test_stage_quarantine_feeds_all_existing_product_fault_summaries():

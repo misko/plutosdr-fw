@@ -33,7 +33,9 @@ def test_complete_engine_capture_inverse():
         '          WAIT_BANK: if (selected_valid && destination_reserved) begin\n            engine_metadata <= selected_metadata;\n',1)
     assert legacy+registered==old
     for name in (BASE/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split():
-        if name not in {TOP.name,'starlink_pss_result_guard_owner_view.v'} and (RTL/name).exists():assert (RTL/name).read_bytes()==(BASE/name).read_bytes(),name
+        if name not in {TOP.name,'starlink_pss_result_guard_owner_view.v'} and (RTL/name).exists():
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(RTL/name)==(BASE/name).read_bytes(),name
 
 
 def run(tmp_path,mutant=None):

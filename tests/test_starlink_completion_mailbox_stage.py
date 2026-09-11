@@ -11,11 +11,17 @@ NAME='starlink_pss_completion_mailbox_stage'
 
 
 def undo_adapter_top(text):
+    if 'PRIVATE_FACT_CAPTURE(1)' in text:
+        from tests.test_starlink_private_admission_facts import undo_top
+        text=undo_top(text)
     assert text.count(NAME)==1
     return text.replace(NAME,'starlink_pss_staged_mailbox_control',1)
 
 
 def undo_completion_bench(text):
+    if '// BEGIN PRIVATE ADMISSION FACTS WITNESS' in text:
+        from tests.test_starlink_private_admission_facts import undo_bench
+        text=undo_bench(text)
     for before,after in [
       ('final_open=!dut.output_publication_busy;','final_open=dut.output_control.phase==0;'),
       ('if(dut.output_publication_busy &&\n           {dut.output_control.active_tag',
@@ -62,7 +68,9 @@ def test_exact_adapter_delta_and_other_runtime_preserved():
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
-        if name!=top and (RTL/name).exists():assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+        if name!=top and (RTL/name).exists():
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(RTL/name)==(PARENT/name).read_bytes(),name
 
 
 def run(tmp_path,cancel=0,stall=37,private=1,mutant=None):

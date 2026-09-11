@@ -41,7 +41,9 @@ def test_existing_fft_runtime_delta_is_separately_inverted():
     for name in names:
         if name=='starlink_pss_fft_staged_output_impl.v':
             assert undo_product_stage((RTL/name).read_text())==(parent/name).read_text()
-        elif (RTL/name).exists():assert (RTL/name).read_bytes()==(parent/name).read_bytes(),name
+        elif (RTL/name).exists():
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(RTL/name)==(parent/name).read_bytes(),name
 
 
 def run(tmp_path,mutant=None):

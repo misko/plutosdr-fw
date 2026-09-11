@@ -26,7 +26,8 @@ def test_runtime_unchanged_and_publication_order(tmp_path):
                         'starlink_pss_mailbox_split_metadata_view.v',
                         'starlink_pss_mailbox_reset_receipt.v','starlink_pss_output_reset_receipt.v',
                         'starlink_pss_reset_receipt_barrier.v','starlink_pss_completion_mailbox_stage.v'}:
-            assert (tmp_path/'inputs'/name).read_bytes()==(BASE/name).read_bytes(),name
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(tmp_path/'inputs'/name)==(BASE/name).read_bytes(),name
     top=(RTL/'starlink_pss_fft_staged_output_impl.v').read_text()
     # Current top has a complete input-stage inverse in its dedicated tests.
     assert hashlib.sha256((BASE/'starlink_pss_fft_staged_output_impl.v').read_bytes()).hexdigest()=='b3511a70b97b91e3e9b4106ea0c9bab8df4f7a43a07ff30a5447cd522dc5d143'

@@ -42,7 +42,9 @@ def test_exact_top_bench_delta_and_runtime_inventory():
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
-        if name!=TOP and (RTL/name).exists():assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+        if name!=TOP and (RTL/name).exists():
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            assert parent_runtime_bytes(RTL/name)==(PARENT/name).read_bytes(),name
 
 
 @pytest.mark.parametrize('mutant',[None,'skip_top','skip_middle','ignore_exponent'])

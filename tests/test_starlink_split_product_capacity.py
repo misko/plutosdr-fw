@@ -38,7 +38,8 @@ def test_exact_runtime_delta_and_physical_separation():
     assert text==(PARENT/OLD).read_text()
     for name in (PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split():
         if (RTL/name).exists():
-            text=(RTL/name).read_text()
+            from tests.test_starlink_private_admission_facts import parent_runtime_bytes
+            text=parent_runtime_bytes(RTL/name).decode()
             if name=='starlink_pss_fft_staged_output_impl.v':text=undo_split_top(text)
             assert text==(PARENT/name).read_text(),name
     # Capacity explicitly follows real bank readiness, not a delayed credit or
