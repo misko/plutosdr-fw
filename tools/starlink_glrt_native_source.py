@@ -491,6 +491,15 @@ printf 'OWNED_STOP_SENT\\n'
                 errors.append('pipeline: '+str(error))
             if self.context is not None:
                 try:
+                    raw = self.device.read('capture_snapshot')
+                    self.retain('final-coarse', raw.encode())
+                    coarse = LeanSnapshot.decode(raw)
+                    if (coarse.recovery_failed or coarse.dma_error or
+                            coarse.words[17] or coarse.words[18] or coarse.words[19] & 3):
+                        raise ValueError('coarse capture fault or ownership remains latched')
+                except BaseException as error:  # noqa: BLE001 -- still check independent scheduler/identity state
+                    errors.append('coarse: '+str(error))
+                try:
                     final = ScheduleSnapshot.from_sysfs(self.device.read('native_schedule_snapshot'))
                     final.require_drained()
                     if final.configured or final.faults or final.status & 16:

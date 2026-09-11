@@ -80,7 +80,8 @@ class Harness:
         monkeypatch.setattr(source, 'Library', lambda: None)
         monkeypatch.setattr(source, 'Context', lambda *a, **kw: self)
         monkeypatch.setattr(source.LeanSnapshot, 'decode', lambda raw: SimpleNamespace(
-            require_live_prefix=lambda **kw: self.radio.origin))
+            require_live_prefix=lambda **kw: self.radio.origin,
+            recovery_failed=False, dma_error=0, words=[0]*64))
 
     def clock(self):
         return self.radio.time
@@ -312,6 +313,26 @@ def test_late_candidate_gets_bounded_native_run(
     seconds = int(re.search(rb'32768 ([0-9]+) --bootstrap-slices', scripts[0])[1])
     assert 1 <= seconds <= min(45, samples/2_500_000-delay-5)
     assert harness.clock() >= harness.pipeline.source_end
+
+
+@pytest.mark.parametrize('failure', ['recovery', 'fault', 'queued'])
+def test_cleanup_cannot_claim_reusable_radio_with_latched_coarse_fault(
+    tmp_path, monkeypatch, controller, pilot_words, failure
+):
+    harness = Harness(tmp_path, monkeypatch, controller, pilot_words, 'no_pilot')
+    words = [0]*64
+    if failure == 'fault':
+        words[18] = 4
+    if failure == 'queued':
+        words[19] = 2
+    monkeypatch.setattr(source.LeanSnapshot, 'decode', lambda raw: SimpleNamespace(
+        require_live_prefix=lambda **kw: harness.radio.origin,
+        recovery_failed=failure == 'recovery', dma_error=0, words=words))
+    result = harness.supervise()
+    assert result['outcome'] == 'failed' and not result['cleanup_verified']
+    assert not harness.leases
+    retained = [json.loads(p.read_text()) for p in (tmp_path/'evidence').glob('*-cleanup')]
+    assert any('coarse capture fault' in error for entry in retained for error in entry['errors'])
 
 
 @pytest.mark.parametrize('failure', ['identity', 'history_identity', 'seed_epoch', 'controller_hash',
