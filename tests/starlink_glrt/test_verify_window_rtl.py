@@ -59,7 +59,11 @@ initial begin
  if($value$plusargs("INVALID=%d",invalid) && invalid!=0) begin
   rc=$fscanf(jobs,"%d %d %d %d %d\n",job_epoch,job_cfo_units,job_step_500,job_frequency_count,job_subset);
   if(rc!=5) $fatal;
-  job_valid=1;@(negedge clk);job_valid=0;repeat(60) @(negedge clk);
+  job_valid=1;@(negedge clk);job_valid=0;
+  repeat(60) begin
+   @(negedge clk);
+   if(dut.state==dut.ISSUE || output_valid) $fatal(1,"malformed job issued samples/results");
+  end
   if(!fault || window_loaded || busy || output_valid) $fatal(1,"malformed job not fenced");
   $display("INVALID_PASS");$finish;
  end

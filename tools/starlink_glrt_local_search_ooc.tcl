@@ -103,7 +103,9 @@ route_design
 phys_opt_design -directive AggressiveExplore
 route_design
 report_utilization -hierarchical -file $output/utilization.rpt
+report_utilization -cells [get_cells dut] -file $output/dut_utilization.rpt
 report_timing_summary -delay_type min_max -report_unconstrained -file $output/timing.rpt
+report_timing -delay_type max -max_paths 20 -nworst 1 -file $output/critical_paths.rpt
 report_drc -file $output/drc.rpt
 check_timing -verbose -file $output/check_timing.rpt
 set fd [open $output/check_timing.rpt r];set checks [read $fd];close $fd
@@ -113,7 +115,11 @@ foreach check {no_clock unconstrained_internal_endpoints multiple_clock loops la
 if {[llength [get_drc_violations -quiet -filter {SEVERITY == Error || SEVERITY == "Critical Warning"}]]} {
   error "local acquisition DRC failed"
 }
-set lut [llength [get_cells -hier -filter {NAME =~ dut/* && REF_NAME =~ LUT*}]]
+set fd [open $output/dut_utilization.rpt r];set utilization [read $fd];close $fd
+# Include distributed RAM and shift-register LUTs in the resource gate.
+if {![regexp -line {^\|\s*Slice LUTs\*?\s*\|\s*([0-9]+)\s*\|} $utilization unused lut]} {
+  error "cannot read total DUT LUT utilization"
+}
 set ff [llength [get_cells -hier -filter {NAME =~ dut/* && REF_NAME =~ FD*}]]
 set dsp [llength [get_cells -hier -filter {REF_NAME == DSP48E1}]]
 set ram36 [llength [get_cells -hier -filter {REF_NAME == RAMB36E1}]]
