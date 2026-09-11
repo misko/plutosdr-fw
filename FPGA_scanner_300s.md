@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, exact guard-facing fault summary on private-capture reference:
+**64,512 actual FFT records** match, **397 tests** pass, and each guard's full
+fault accumulator matches the original for 259,384 cycles. The real checker/
+cutover proof covers 524,288 four-state cases. Service latency is unchanged.
+Routing nevertheless regresses to **-2.566 ns**, TNS -921.237 ns, 958 failing
+endpoints; keep the **-1.969 ns** reference. The worst path now ends at mailbox
+final-data capture through bank metadata/fault/completion qualification. Next
+inspect that complete local capture/ownership boundary before another route.
+Separate DNM branch: `codex/starlink-rx-only-do-not-merge-fault-summary`.
+No radio/PPU/main or production HDL changes; native 60 MS/s fine search and
+2.5 MS/s inspection remain required. No deployment or physical signoff claim.
+See [exact fault summary and routed comparison](reports/experiments/20260911-staged-guardfault-actual-route-parent.md).
+
 Update 2026-09-11, private kernel ordinal on the better private-capture reference:
 **64,512 actual FFT records** and the complete CSV match; **397 tests** pass.
 Private/public handshake, fault-edge quarantine, late status and held-final
