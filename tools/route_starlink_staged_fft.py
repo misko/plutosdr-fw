@@ -13,6 +13,7 @@ from staged_fft_experiment import product_stage_compiled, audit_productstage
 from staged_fft_experiment import final_capacity_compiled, audit_finalcapacity
 from staged_fft_experiment import split_capacity_compiled, audit_splitcapacity
 from staged_fft_experiment import output_metadata_compiled, audit_outputmetadata
+from staged_fft_experiment import balanced_handoff_compiled, audit_balancedhandoff
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -32,6 +33,7 @@ def verify_ack_auxiliary(auxiliary,expected,prepared):
     if final_capacity_compiled(prepared):audited=audit_finalcapacity(auxiliary,auxiliary=True)
     if split_capacity_compiled(prepared):audited=audit_splitcapacity(auxiliary,auxiliary=True)
     if output_metadata_compiled(prepared):audited=audit_outputmetadata(auxiliary,auxiliary=True)
+    if balanced_handoff_compiled(prepared):audited=audit_balancedhandoff(auxiliary,auxiliary=True)
     require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
     return audited
 
@@ -71,6 +73,9 @@ def run(actual,synthesis,output,ack_actual=None):
     require(('outputmetadata' in a['audit'])==output_metadata_compiled(prepared),
             'main audit and compiled output metadata campaign differ')
     if output_metadata_compiled(prepared):audited=audit_outputmetadata(actual)
+    require(('balancedhandoff' in a['audit'])==balanced_handoff_compiled(prepared),
+            'main audit and compiled balanced handoff campaign differ')
+    if balanced_handoff_compiled(prepared):audited=audit_balancedhandoff(actual)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])

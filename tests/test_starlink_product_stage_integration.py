@@ -53,6 +53,9 @@ def test_stage_quarantine_feeds_all_existing_product_fault_summaries():
 
 
 def undo_product_stage_bench(text):
+    if '// BEGIN BALANCED HANDOFF WITNESS' in text:
+        from tests.test_starlink_balanced_handoff import undo_bench
+        text=undo_bench(text)
     for label in ['WITNESS','BOUNDARIES','AUXILIARY']:
         text,count=re.subn(r' *// BEGIN OUTPUT METADATA '+label+r'\n.*? *// END OUTPUT METADATA '+label+r'\n','',text,flags=re.S)
         assert count==1

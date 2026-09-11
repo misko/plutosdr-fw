@@ -348,6 +348,17 @@ def audit_outputmetadata(output,auxiliary=False):
         'current_exact':True,'unchanged_publication':True,'boundaries':cases}
     return result
 
+def balanced_handoff_compiled(prepared):
+    return '// BEGIN BALANCED HANDOFF WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_balancedhandoff(output,auxiliary=False):
+    result=audit_outputmetadata(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_BALANCED_HANDOFF_PASS checks=(\d+) owned=(\d+) exact_current=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0][0])>=1000 and int(rows[0][1])>=12,'complete actual balanced handoff comparison')
+    result['balancedhandoff']={'checks':int(rows[0][0]),'owned':int(rows[0][1]),'exact_current':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -371,6 +382,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_splitcapacity(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and output_metadata_compiled(prepared):
             result['audit']=audit_outputmetadata(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and balanced_handoff_compiled(prepared):
+            result['audit']=audit_balancedhandoff(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

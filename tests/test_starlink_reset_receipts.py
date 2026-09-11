@@ -17,6 +17,9 @@ PAIRS={
 
 
 def undo_top(text):
+    if '// BEGIN BALANCED HANDOFF IDENTITY' in text:
+        from tests.test_starlink_balanced_handoff import undo_handoff
+        text=undo_handoff(text)
     for new,old in PAIRS.items():
         assert text.count(new)==1
         text=text.replace(new,old,1)
