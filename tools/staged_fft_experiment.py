@@ -1,0 +1,132 @@
+"""Frozen actual-XFFT/route experiment. Never loads a radio or receiver build."""
+import argparse
+import csv
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import time
+
+ROOT=Path(__file__).resolve().parents[1]
+RECOVERY=ROOT.parent
+BASE=RECOVERY/'retained-summary-actual-prelaunch-v1'
+ACQ='hdl/library/starlink_pss_acquisition/'
+NEW=ROOT/ACQ/'staged_control'
+BASE_SHA='b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368'
+
+def sha(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+def require(ok,message):
+    if not ok:raise ValueError(message)
+def fresh(path):
+    require(path.is_absolute() and not path.exists() and '..' not in path.parts,'new absolute output required')
+    require(not path.is_relative_to(ROOT) and not path.is_relative_to(BASE),'output outside source trees')
+    path.mkdir(parents=True)
+
+def prepare(path):
+    require(sha(BASE/'manifest.json')==BASE_SHA,'reference manifest changed')
+    manifest=json.loads((BASE/'manifest.json').read_text())
+    profile=(BASE/'profile.tcl').read_text()
+    names=re.search(r'set compiled_names \{([^}]+)\}',profile)[1].split()
+    vectors=re.search(r'set vector_names \{([^}]+)\}',profile)[1].split()
+    removed={'starlink_pss_fft_bank_owned_retained_output_probe.v','starlink_pss_fft_retained_output_impl.v','starlink_pss_retained_output_owner.v'}
+    runtime=[BASE/name for name in names if name.endswith('.v') and
+             '/retained_output_actual/' not in name and Path(name).name not in removed]
+    require(len(runtime)==13,'exact inherited runtime count')
+    support=[BASE/name for name in vectors]
+    support.append(BASE/'source_snapshot'/ACQ/'retained_output_actual/reference/create_shared_realtime_xfft_ip.tcl')
+    support.append(BASE/'source_snapshot'/ACQ/'retained_output_actual/run_retained_output_actual.tcl')
+    for source in runtime+support:
+        relative=str(source.relative_to(BASE/'source_snapshot'))
+        require(sha(source)==manifest['sources'][relative]['sha256'],'reference source changed: '+relative)
+    runtime.extend(NEW/name for name in ['starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v'])
+    support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
+                    ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
+    sources=runtime+support
+    require(len({p.name for p in sources})==len(sources),'flat snapshot collision')
+    before={str(p):sha(p) for p in sources}
+    fresh(path)
+    for p in sources:shutil.copyfile(p,path/p.name)
+    (path/'profile.tcl').write_text('set runtime_names {'+' '.join(p.name for p in runtime)+'}\nset vector_names {'+' '.join(Path(v).name for v in vectors)+'}\n')
+    require(before=={str(p):sha(p) for p in sources},'sources changed during copy')
+    files={p.name:sha(p) for p in path.iterdir() if p.is_file()}
+    (path/'snapshot.json').write_text(json.dumps({'sources':before,'files':files,'reference':BASE_SHA},indent=2)+'\n')
+    files['snapshot.json']=sha(path/'snapshot.json')
+    (path/'SHA256SUMS').write_text(''.join(f'{digest}  {name}\n' for name,digest in sorted(files.items())))
+    return {'prepared':str(path),'sha256sums':sha(path/'SHA256SUMS'),'files':len(files)}
+
+def verify(path,expected):
+    require(sha(path/'SHA256SUMS')==expected,'external source inventory digest')
+    subprocess.run(['sha256sum','-c','SHA256SUMS','--quiet'],cwd=path,check=True)
+    m=json.loads((path/'snapshot.json').read_text())
+    require(all(sha(Path(p))==value for p,value in m['sources'].items()),'live sources changed')
+    require(all(sha(path/p)==value for p,value in m['files'].items()),'copied sources changed')
+
+def audit_sim(output):
+    sim=output/'project/staged_fft.sim/sim_1/behav/xsim'
+    text=(sim/'simulate.log').read_text()
+    require(not re.search(r'FATAL|ERROR|FAIL',text,re.I),'simulator failure')
+    rows=re.findall(r'^STAGED_FFT_CONTEXT_PASS mode=(\d+) reads=1536 inputs=3072 raw=3072 status=6 publications=3 releases=3 max_service=(\d+) overlap_inputs=(\d+) overlap_reads=(\d+)$',text,re.M)
+    require(len(rows)==4 and [int(r[0]) for r in rows]==list(range(4)),'four complete contexts')
+    require(all(int(r[2])>0 and (int(r[0])>=2 or int(r[3])>0) for r in rows),'actual overlap')
+    require(all(int(r[1])<=5215 for r in rows[:3]),'coarse service deadline')
+    require(text.count('STAGED_FFT_PASS contexts=4 no_continuous_or_physical_claim')==1,'one terminal success')
+    # Independently compare every recorded numerical field against prior actual
+    # generated FFT evidence, not merely the candidate bench's PASS marker.
+    old=RECOVERY/'destination-actual-parent.LQnQo9ny/run/project/retained_output_actual.sim/sim_1/behav/xsim/actual_words.csv'
+    require(sha(old)=='07321b026a637e5922c56a84a955e58549056337198c952a9d73b1245cb4efaa','old numerical authority')
+    reference={}
+    with old.open() as f:
+        for r in csv.DictReader(f):
+            if r['context']=='0' and r['stream'] in {'inputF','inputI','rawF','rawI','product','privateI','read'}:
+                key=(r['stream'],r['job'],r['position'])
+                require(key not in reference,'duplicate old word')
+                reference[key]=(r['data'],r['exponent'])
+    require(len(reference)==10752,'complete old seven-stream numerical reference')
+    seen=set()
+    with (sim/'staged_words.csv').open() as f:
+        for r in csv.DictReader(f):
+            key=(r['stream'],r['job'],r['position']);identity=(r['context'],*key)
+            require(r['context'] in {'0','1','2','3'} and identity not in seen,'duplicate/unknown new word')
+            require(reference.get(key)==(r['data'],r['exponent']),'old/new exact numerical mismatch: '+str(identity))
+            seen.add(identity)
+    require(len(seen)==43008,'all four complete numerical inventories')
+    return {'contexts':rows,'numerical_rows':len(seen),'sha256':sha(sim/'staged_words.csv'),
+            'actual_fft':True,'continuous_rx':False,'physical_signoff':False}
+
+def run(mode,prepared,expected,output):
+    verify(prepared,expected);fresh(output)
+    env=dict(os.environ)
+    for key in ['PYTHONHOME','PYTHONPATH','PYTHONOPTIMIZE','LD_LIBRARY_PATH']:env.pop(key,None)
+    env.update(LD_LIBRARY_PATH='/opt/Xilinx/Vivado/2022.2/lib/lnx64.o/SuSE',TMPDIR=str(output))
+    cmd=['/opt/Xilinx/Vivado/2022.2/bin/vivado','-mode','batch','-nojournal','-log',str(output/'vivado.log'),
+         '-source',str(prepared/'staged_fft_experiment.tcl'),'-tclargs',mode,str(prepared),expected,str(output)]
+    started=time.time();result={'mode':mode,'command':cmd,'prepared_sha':expected,'started':started}
+    (output/'command.json').write_text(json.dumps(result,indent=2)+'\n')
+    try:
+        with (output/'stdout.log').open('w') as log:
+            p=subprocess.Popen(cmd,cwd=output,env=env,stdout=log,stderr=subprocess.STDOUT)
+            (output/'process.json').write_text(json.dumps({'pid':p.pid,'started':started})+'\n')
+            try:result['returncode']=p.wait(timeout=660)
+            except subprocess.TimeoutExpired:
+                p.terminate();p.wait(timeout=30);raise
+        require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
+        if mode=='sim':result['audit']=audit_sim(output)
+    except Exception as exc:
+        result['error']=f'{type(exc).__name__}: {exc}'
+        raise
+    finally:
+        result['elapsed']=time.time()-started
+        try:verify(prepared,expected);result['sources_unchanged']=True
+        finally:(output/'outcome.json').write_text(json.dumps(result,indent=2)+'\n')
+    return result
+
+if __name__=='__main__':
+    parser=argparse.ArgumentParser();sub=parser.add_subparsers(dest='command',required=True)
+    prep=sub.add_parser('prepare');prep.add_argument('output',type=Path)
+    run_parser=sub.add_parser('run');run_parser.add_argument('mode',choices=['sim','synth'])
+    run_parser.add_argument('prepared',type=Path);run_parser.add_argument('expected');run_parser.add_argument('output',type=Path)
+    a=parser.parse_args()
+    print(json.dumps(prepare(a.output) if a.command=='prepare' else run(a.mode,a.prepared,a.expected,a.output),indent=2))
