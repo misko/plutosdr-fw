@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private adapter final-data capture: **417 tests** and all
+**64,512 actual FFT records** pass with unchanged service latency. The private
+69-bit bundle tracks only in EMPTY and freezes on original qualified acceptance
+through real reader ACK/release. Routing has mixed improvement: **-2.005 ns WNS**
+(reference -1.969), **-634.847 ns TNS** (reference -813.676), **856 failures**
+(reference 914). Retain both candidates; no timing/deployment pass. Worst paths
+now feed kernel ordinal and next-block identity through shared metadata/fault
+qualification; inspect that boundary together before composing changes.
+Separate branch `codex/starlink-rx-only-do-not-merge-private-final-capture`;
+no radio/PPU/main or primary production HDL changes. Native 60 MS/s fine search,
+2.5 MS/s inspection and full receiver/deployment gates remain required.
+See [private final capture proof and mixed route result](reports/experiments/20260911-staged-finalcapture-actual-route-parent.md).
+
 Update 2026-09-11, exact guard-facing fault summary on private-capture reference:
 **64,512 actual FFT records** match, **397 tests** pass, and each guard's full
 fault accumulator matches the original for 259,384 cycles. The real checker/
