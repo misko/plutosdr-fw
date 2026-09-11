@@ -9,6 +9,7 @@ import time
 from contextlib import contextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
+from threading import Event
 from types import SimpleNamespace
 
 import pytest
@@ -24,6 +25,25 @@ IDENTITY = NativeIdentity('1040005e0b100007100010000bf33a5d4d', 'native-test', '
 pytest_plugins = ('tests.starlink_glrt.test_native_controller',)
 PROGRAMS = source.CapturePrograms(*(Path('/declared')/name for name in
     ('host-python', 'host-cwd', 'follower.py', 'capture-python', 'fw-cwd', 'bank.mem', 'ddc.json')))
+
+
+@pytest.mark.parametrize('mode', ['complete', 'failed', 'cancelled', 'deadline'])
+def test_finite_pipeline_wait_is_bounded_and_rejects_failed_children(tmp_path, mode):
+    now = [0.0]
+    cancel = Event()
+    pipeline = source.CapturePipeline(PROGRAMS, tmp_path, clock=lambda: now[0],
+        sleep=lambda seconds: now.__setitem__(0, now[0]+seconds))
+    pipeline.children = [('coarse', SimpleNamespace(poll=lambda:
+        1 if mode == 'failed' else 0 if now[0] >= .03 else None), None)]
+    if mode == 'cancelled':
+        cancel.set()
+    if mode == 'complete':
+        pipeline.finish(1, cancel)
+        assert .03 <= now[0] < 1
+    else:
+        error = {'failed': RuntimeError, 'cancelled': InterruptedError, 'deadline': TimeoutError}[mode]
+        with pytest.raises(error):
+            pipeline.finish(.01 if mode == 'deadline' else 1, cancel)
 
 
 class Harness:
@@ -152,6 +172,9 @@ class Harness:
             code = None
 
             def poll(self):
+                if (self.code is None and harness.pipeline.source_end is not None
+                        and harness.clock() >= harness.pipeline.source_end+1):
+                    self.code = 0
                 return self.code
 
             def send_signal(self, signum):
@@ -247,7 +270,8 @@ def test_complete_source_hooks_execute_export_reacquire_and_close_under_both_lea
     assert [episode['epoch'] for episode in result['episodes']] == [3, 4]
     assert len(list((tmp_path/'evidence').glob('episode-*.glrj'))) == 2
     assert harness.actions[-2:] == ['release-ppu', 'release-station']
-    assert harness.actions.index('stop-capture') < harness.actions.index('context-close')
+    assert not any(action.startswith('stop-') for action in harness.actions)
+    assert harness.clock() >= harness.pipeline.source_end
     assert harness.actions.count('scratch-remove') == 4
     assert not harness.leases
 

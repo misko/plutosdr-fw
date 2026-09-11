@@ -75,7 +75,7 @@ class CapturePrograms:
             '--collector-protocol', str(capture/'protocol.json'),
             '--collector-summary', str(capture/'summary.json'),
             '--collector-final-snapshot', str(capture/'final_snapshot.txt'),
-            '--output', str(live), '--follow']
+            '--output', str(live), '--follow', '--require-compiled-acquisition']
         follower = [str(self.host_python), str(self.follower), '--capture', str(capture),
             '--records', str(live/'records.jsonl'), '--precision-summary', str(live/'summary.json'),
             '--bank', str(self.bank), '--ddc-manifest', str(self.ddc_manifest),
@@ -150,19 +150,25 @@ class CapturePipeline:
                 return
             self.sleep(.005)
 
+    def finish(self, deadline, cancel):
+        """Natural finite-source completion belongs to the observation budget."""
+        while True:
+            codes = [child.poll() for _, child, _ in self.children]
+            if any(code is not None and code != 0 for code in codes):
+                raise RuntimeError('a native source pipeline failed before completion')
+            if cancel.is_set():
+                raise InterruptedError('finite source completion cancelled')
+            if self.clock() > deadline:
+                raise TimeoutError('finite source completion exceeded observation deadline')
+            if all(code == 0 for code in codes):
+                return
+            self.sleep(.01)
+
     def close(self, deadline):
         """Native writer must already be stopped. Never erase a partial corpus."""
         outcomes = []
         for name, child, log in reversed(self.children):
             try:
-                # Let a nearly completed finite collector retain complete source
-                # evidence when its natural end fits the existing cleanup bound.
-                if (name == 'coarse' and child.poll() is None and self.source_end is not None
-                        and self.source_end+3 < deadline):
-                    try:
-                        child.wait(timeout=max(.001, self.source_end+3-self.clock()))
-                    except subprocess.TimeoutExpired:
-                        pass
                 if child.poll() is None:
                     child.send_signal(signal.SIGINT)
                     child.wait(timeout=max(.001, min(8, deadline-self.clock())))
@@ -460,7 +466,10 @@ printf 'OWNED_STOP_SENT\\n'
                 except BaseException as error:  # noqa: BLE001 -- cleanup must survive interruption
                     errors.append('native: '+str(error))
             try:
-                if self.pipeline.children and not self.pipeline.close(deadline-10):
+                # Full FIT/flash/idle attestation measured about 20 s on .20.
+                # Successful observations already closed their finite sources;
+                # failures cancel promptly and preserve an explicitly partial corpus.
+                if self.pipeline.children and not self.pipeline.close(deadline-25):
                     errors.append('source children did not close')
             except BaseException as error:  # noqa: BLE001 -- continue independent cleanup attempts
                 errors.append('pipeline: '+str(error))
@@ -487,3 +496,17 @@ printf 'OWNED_STOP_SENT\\n'
             return not errors and hasattr(self, 'plan') and self.clock() <= deadline
         finally:
             self.stack.close()
+
+    def finish_observation(self, deadline, cancel):
+        if self.prepared or self.pending is not None:
+            raise ValueError('native writer has unresolved evidence')
+        # A no-candidate attempt may have rebased an idle scheduler. Clear it
+        # before the finite collector closes its DMA and invalidates the epoch.
+        if self.rebased:
+            current = ScheduleSnapshot.from_sysfs(self.device.read('native_schedule_snapshot'))
+            if current.epoch != self.state.epoch+1:
+                raise ValueError('source epoch changed before observation completion')
+            recover(self.device, b'GLRJ1\n', epoch=current.epoch, writer_stopped=True,
+                retain=self.retain, deadline=deadline, clock=self.clock, sleep=self.sleep)
+            self.rebased = False
+        self.pipeline.finish(deadline, cancel)

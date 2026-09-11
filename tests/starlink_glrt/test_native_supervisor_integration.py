@@ -8,13 +8,19 @@ import hashlib
 import json
 import os
 
-from pluto_plus.native_supervisor import (
-    NativeCandidate, NativeEpisode, NativeIdentity, supervise_native,
-)
 from pluto_plus.native_prepared_session import PreparedNativeSession
-from tests.starlink_glrt.test_native_controller import Radio, controller, pilot_words
+from pluto_plus.native_supervisor import (
+    NativeCandidate,
+    NativeEpisode,
+    NativeIdentity,
+    supervise_native,
+)
+
+from tests.starlink_glrt.test_native_controller import Radio
 from tests.starlink_glrt.test_native_journal import journal
 from tools.starlink_glrt_native_journal import review
+
+pytest_plugins = ('tests.starlink_glrt.test_native_controller',)
 
 
 def test_supervisor_retains_lost_then_reacquired_C_episodes_before_clean_shutdown(
@@ -87,6 +93,9 @@ def test_supervisor_retains_lost_then_reacquired_C_episodes_before_clean_shutdow
         def finish_execution(self, output, candidate, deadline):
             assert output == 'authenticated simulated native output'
             return self.execute(candidate, deadline, None)
+
+        def finish_observation(self, deadline, cancel):
+            pass
 
         def close(self, deadline):
             return not radio.valid and not radio.pending and not radio.queue and radio.time < deadline
