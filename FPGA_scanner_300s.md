@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, combined private ACK retirement: **521 regression + 18
+paired-evidence tests pass**, **64512 actual FFT records** and service unchanged.
+The separate bounded ACK campaign passes six fault/reset/recovery cases; routing
+requires both source-matched campaigns. Route completes but setup fails:
+**-1.421 ns WNS / -413.225 ns TNS / 813 failing endpoints**. WNS/TNS improve over
+the descriptor parent, but 65 more endpoints fail; not an overall best reference.
+The worst path now ends at `forward_committed`. Next investigate a registered
+qualified completion receipt, preserving actual product-bank ACK and fault/reset
+veto; simply delaying the token can cause premature ACK. No next-boundary RTL,
+radio, PPU/main or primary production HDL change. Native 60 MS/s fine search,
+2.5 MS/s inspection and all full receiver/deployment gates remain required.
+Candidate: `codex/starlink-rx-only-do-not-merge-combined-private-ack`.
+See [combined ACK proof and route evidence](reports/experiments/20260911-staged-ackcombined-actual-route.md).
+
 Update 2026-09-11, private engine descriptor capture: **504 regression + nine
 evidence tests pass**, **64512 actual FFT records** and service remain exact.
 Across 500505 cycles, 171981 extra private captures never reach an owned/public
