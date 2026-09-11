@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private inverse input observations: **533 tests** and
+**64,512 actual FFT records** pass with unchanged service intervals. Across
+543,731 monitored cycles, all 424 private count/completion differences are
+known-quarantined; five malformed/unknown-input cases recover cleanly. Routing
+regresses to **-1.645 ns WNS / -607.093 ns TNS / 1011 failing endpoints**.
+Do not promote this experiment. Retain private-certification and guard-fact
+references. The worst path now reaches output publication through reset-release
+and shared input/guard fault logic; inspect that complete registered boundary,
+not another isolated private enable. Preserve current-edge reset/fault veto,
+real reader release and the existing service budget. Branch:
+`codex/starlink-rx-only-do-not-merge-private-input-observations`.
+No radio/PPU/main or primary production HDL changes. Native 60 MS/s fine search,
+2.5 MS/s inspection and full receiver/deployment gates remain required.
+See [private input proof and route regression](reports/experiments/20260911-staged-privateinput-actual-route-parent.md).
+
 Update 2026-09-11, private inverse ACK retirement: **514 tests** and **64,512
 actual FFT records** pass with unchanged service latency. Original-guard public
 and diagnostic outputs match across 501,911 cycles; 306 private occupancy
