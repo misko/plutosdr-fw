@@ -2,6 +2,17 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, parallel product reference comparison: the targeted identity
+certificate endpoint now passes at **+0.729 ns**, physically verified as two
+comparisons feeding a final selection LUT. **1,565 tests and all 54 actual
+fault/reset cases pass**, with unchanged arithmetic/service. Whole-subsystem
+timing still FAILS: **-1.435 ns WNS / -635.472 ns TNS / 1,175 endpoints**;
+same-domain 175 MHz WNS improves to -1.255 ns. Next investigate private final-slot
+retirement from a real publication receipt, retaining same-edge public vetoes.
+Branch `codex/starlink-rx-only-do-not-merge-parallel-product-identity`, FW
+`25d6ec8a7`, HDL `d41ed450e`. No primary HDL promotion, radio access or PPU/main
+changes. See [parallel identity proof and route](reports/experiments/20260911-parallel-product-identity-actual-route.md).
+
 Update 2026-09-11, registered private forward-bank status: **1,497 tests and all
 54 actual fault/reset/delay cases pass**, with unchanged arithmetic/service.
 The bank's existing sticky register now drives private readiness; current
