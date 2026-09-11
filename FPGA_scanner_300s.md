@@ -4,6 +4,18 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, actual staged-output integration: the new command arbiter and
+real inverse-output buffer pass four generated-FFT contexts, with all **43,008
+numerical records** independently matching the prior actual evidence. 259
+combined tests plus nine audit tests pass. Source-matched routing still fails:
+**WNS -2.726 ns**, TNS -1156.969 ns, 1110 setup failures. The old inverse-owner
+endpoint is gone; the worst path is now metadata/shared-fault validation into
+FFT cutover/reset state. Next stage that handover and restore/qualify the
+reader-clock descriptor boundary, then rerun full reset/fault tests and routing.
+No promotion or radio changes. Native 60 MS/s fine search, independent 2.5 MS/s
+IIO and all `.18`→`.17` deployment gates remain required.
+See [actual FFT integration and routed result](reports/experiments/20260911-staged-output-actual-route-parent.md).
+
 Update 2026-09-11, staged command controller: implemented registered validation
 and next-edge ownership application, with held responses and abort/reset
 cancellation. 41 component tests and the full 231-test combined regression pass.
