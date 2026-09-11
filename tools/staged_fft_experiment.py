@@ -155,6 +155,20 @@ def audit_writer_sim(output):
     result['writer']={'boundaries':rows,'pending_fenced':True}
     return result
 
+def audit_capture_sim(output):
+    result=audit_writer_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_CAPTURE_CASE_PASS boundary=(\d+) reads=(\d+) releases=(\d+)$',text,re.M)
+    require(rows==[('0','512','1'),('1','512','1'),('2','0','0')],'complete private capture/churn/release boundaries')
+    counts=re.findall(r'^STAGED_CAPTURE_CYCLES_PASS loads=(\d+) holds=(\d+) accepts=(\d+)$',text,re.M)
+    require(len(counts)==1,'private capture cycle evidence')
+    loads,holds,accepts=map(int,counts[0])
+    require(loads>=1000 and holds>=1000 and accepts==18,'private capture load/hold/accept coverage')
+    require(text.count('STAGED_CAPTURE_PASS cases=3 private_load_checked=1 held_until_release=1')==1,'capture ownership terminal evidence')
+    result['capture']={'boundaries':rows,'loads':loads,'holds':holds,'accepts':accepts,
+                       'private_load_checked':True,'held_until_release':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -172,7 +186,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_writer_sim(output)
+        if mode=='sim':result['audit']=audit_capture_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
