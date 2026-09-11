@@ -15,6 +15,7 @@ import shlex
 import signal
 import subprocess
 import time
+from collections import Counter
 from contextlib import ExitStack
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
@@ -228,6 +229,7 @@ class EthernetNativeSource:
         self.index, self.counter = 0, 0
         self.rebased = self.prepared = False
         self.used = False
+        self.launch_audits = []
 
     def retain(self, kind, data):
         save(self.evidence/f'evidence-{self.counter:05d}-{kind}', data)
@@ -308,10 +310,34 @@ class EthernetNativeSource:
         transport.run('sha256sum -c', stdin=(self.controller_sha256+'  '+remote+'/controller\n').encode(), timeout_s=5)
 
     def prepare_launch(self, deadline, cancel):
+        # A missing launch must remain distinguishable from a missing signal.
+        # Bound detailed evidence while counting every retry reason.
+        self.launch_counts = Counter()
+        self.launch_attempts = []
+        self.launch_history_count = 0
+        self.launch_error = None
+        try:
+            return self._prepare_launch(deadline, cancel)
+        except BaseException as error:
+            self.launch_counts['exception'] += 1
+            self.launch_error = f'{type(error).__name__}: {error}'
+            raise
+        finally:
+            # Do not insert JSON serialization/fsync between prediction and
+            # SSH dispatch. Retain this bounded evidence after RX has stopped.
+            self.launch_audits.append({
+                'schema': 'native-launch-decisions/v1',
+                'counts': dict(self.launch_counts), 'attempts': self.launch_attempts,
+                'attempts_omitted': self.launch_history_count-len(self.launch_attempts),
+                'error': self.launch_error,
+            })
+
+    def _prepare_launch(self, deadline, cancel):
         if self.pending is not None or self.prepared or self.rebased:
             raise ValueError('prior source execution has not been reconciled')
         self.pipeline.require_running()
         if cancel.is_set() or self.clock() >= min(deadline, self.launch_deadline):
+            self.launch_counts['cancelled_or_deadline'] += 1
             return None
         self._stage(deadline)
         self.rebased = True  # A failed command is uncertain, never retry it.
@@ -320,8 +346,16 @@ class EthernetNativeSource:
             self.pipeline.require_running()
             history = read_publication(self.pipeline.root/'work/ready.json')
             if history is None:
+                self.launch_counts['waiting_for_history'] += 1
                 self.sleep(.005)
                 continue
+            self.launch_history_count += 1
+            attempt = {'read_monotonic_s': self.clock(),
+                'publication_monotonic_s': history.get('published_monotonic_s'),
+                'update': history.get('update'), 'history': history,
+                'decision': 'validating'}
+            if len(self.launch_attempts) < 64:
+                self.launch_attempts.append(attempt)
             if (history.get('schema') != 'glrt-coarse-bootstrap-history/v2'
                     or history.get('epoch_reference') != 'acquired_full_pilot_template'
                     or history.get('physical_frame_epoch_qualified') is not False
@@ -337,16 +371,24 @@ class EthernetNativeSource:
                     or current.status & 0x30 != 0x30):
                 raise ValueError('bootstrap source no longer matches the rebased capture')
             current.require_drained()
+            attempt.update(native_latest=current.latest_index, native_origin=origin,
+                snapshot_epoch=current.epoch, snapshot_finished_monotonic_s=self.clock(),
+                observation_age_s=(current.latest_index-origin-24*(
+                    history['history'][-1]['available_through_sample']-1))/60_000_000)
             starts = tuple(origin+24*(row['sample_start']-80)-1272 for row in history['history'])
             if self.fence is not None:
                 try:
                     self.fence.require_fresh_observations(starts)
-                except ValueError:
+                except ValueError as error:
+                    attempt.update(decision='history_not_fresh', reason=str(error))
+                    self.launch_counts['history_not_fresh'] += 1
                     self.sleep(.005)
                     continue
             try:
                 seed = self.predict(history, current, origin)
-            except ValueError:
+            except ValueError as error:
+                attempt.update(decision='prediction_rejected', reason=str(error))
+                self.launch_counts['prediction_rejected'] += 1
                 self.sleep(.005)
                 continue
             if (not isinstance(seed, ScheduleBatch) or seed.epoch != current.epoch
@@ -359,6 +401,10 @@ class EthernetNativeSource:
                     'serial', 'visit', 'native_origin')
             if (latest is None or any(history.get(k) != latest.get(k) for k in keys)
                     or len(latest.get('history', [])) != 24 or history['history'][-1] not in latest['history']):
+                attempt.update(decision='history_withdrawn_or_replaced',
+                    rechecked_monotonic_s=self.clock(), latest_update=(
+                        latest.get('update') if latest is not None else None))
+                self.launch_counts['history_withdrawn_or_replaced'] += 1
                 continue
             text = seed.encode().strip()
             if not re.fullmatch(r'[0-9a-f]+(?: [0-9a-f]+){9}', text):
@@ -370,6 +416,8 @@ class EthernetNativeSource:
             runtime_seconds = min(self.native_runtime_seconds,
                 int(self.pipeline.source_end-self.clock()-5))
             if runtime_seconds < 1 or self.clock() >= min(deadline, self.launch_deadline):
+                attempt['decision'] = 'deadline_after_validation'
+                self.launch_counts['deadline_after_validation'] += 1
                 return None
             script = "trap '' HUP\nd="+shlex.quote(self.remote)+'\n'
             script += 'printf \'%s\\n\' '+shlex.quote(text)+' > "$d/bootstrap"\n'
@@ -377,7 +425,10 @@ class EthernetNativeSource:
             script += 'pid=$!\nprintf "%s\\n" "$pid" > "$d/pid"\nwait "$pid"\n'
             script += 'code=$?\nprintf "%s\\n" "$code" > "$d/exit"\ncat "$d/runtime-output"\nprintf "GLRT_RUNTIME_EXIT %s\\n" "$code"\n'
             self.prepared = True
+            attempt.update(decision='prepared', prepared_monotonic_s=self.clock())
+            self.launch_counts['prepared'] += 1
             return NativeCandidate(self.identity, seed.epoch, starts, seed.start), script.encode()
+        self.launch_counts['cancelled_or_deadline'] += 1
         return None
 
     def _stopped(self, deadline):
@@ -520,6 +571,9 @@ printf 'OWNED_STOP_SENT\\n'
                     self.retain('after', self._attest(deadline))
                 except BaseException as error:  # noqa: BLE001 -- retain failure before releasing leases
                     errors.append('attestation: '+str(error))
+            for audit in self.launch_audits:
+                self.retain('launch-decisions', audit)
+            self.launch_audits.clear()
             self.retain('cleanup', {'errors': errors, 'physical_precision_qualified': False,
                 'autonomous_service_deployed': False})
             return not errors and hasattr(self, 'plan') and self.clock() <= deadline

@@ -357,6 +357,65 @@ def test_absent_pilot_clears_unlaunched_epoch_and_stops_bounded_source(tmp_path,
     assert result['cleanup_verified'] and harness.episodes == 0
     assert not harness.radio.valid and not harness.leases
     assert 'command-4' in harness.actions
+    decision, = (json.loads(p.read_text()) for p in (tmp_path/'evidence').glob('*-launch-decisions'))
+    assert decision['counts']['waiting_for_history'] > 0
+    assert decision['counts']['cancelled_or_deadline'] == 1
+    assert not decision['attempts'] and decision['attempts_omitted'] == 0
+
+
+@pytest.mark.parametrize('reason', ['withdrawn', 'prediction'])
+def test_transient_candidate_is_not_submitted_and_retains_rejection_reason(
+    tmp_path, monkeypatch, controller, pilot_words, reason
+):
+    harness = Harness(tmp_path, monkeypatch, controller, pilot_words)
+    harness.owner.samples = 150_000_000
+    original = harness.owner.predict
+
+    def predict(history, snapshot, origin):
+        seed = original(history, snapshot, origin)
+        (harness.pipeline.root/'work/ready.json').unlink()
+        if reason == 'prediction':
+            raise ValueError('bootstrap prediction is stale')
+        return seed
+
+    harness.owner.predict = predict
+    result = harness.supervise()
+    assert result['outcome'] == 'no_supported_candidate' and result['cleanup_verified']
+    assert harness.episodes == 0 and not harness.leases
+    decision, = (json.loads(p.read_text()) for p in (tmp_path/'evidence').glob('*-launch-decisions'))
+    expected = 'prediction_rejected' if reason == 'prediction' else 'history_withdrawn_or_replaced'
+    assert decision['counts'][expected] == 1 and len(decision['attempts']) == 1
+    attempt = decision['attempts'][0]
+    assert attempt['decision'] == expected and attempt['history']['serial'] == IDENTITY.serial
+    assert attempt['native_latest'] >= attempt['native_origin']
+    if reason == 'prediction':
+        assert attempt['reason'] == 'bootstrap prediction is stale'
+    else:
+        assert attempt['latest_update'] is None
+
+
+def test_retry_diagnostics_are_bounded_and_do_not_prevent_a_later_valid_launch(
+    tmp_path, monkeypatch, controller, pilot_words
+):
+    harness = Harness(tmp_path, monkeypatch, controller, pilot_words)
+    original = harness.owner.predict
+    retries = [80]
+
+    def predict(history, snapshot, origin):
+        if retries[0]:
+            retries[0] -= 1
+            raise ValueError('formal uncertainty exceeds local basin')
+        assert not list((tmp_path/'evidence').glob('*-launch-decisions'))
+        return original(history, snapshot, origin)
+
+    harness.owner.predict = predict
+    result = harness.supervise()
+    assert result['outcome'] == 'episode_limit_reached' and result['cleanup_verified']
+    decisions = [json.loads(p.read_text()) for p in (tmp_path/'evidence').glob('*-launch-decisions')]
+    decision, = [d for d in decisions if d['counts'].get('prediction_rejected')]
+    assert decision['counts']['prediction_rejected'] == 80
+    assert decision['counts']['prepared'] == 1
+    assert len(decision['attempts']) == 64 and decision['attempts_omitted'] == 17
 
 
 def test_cancellation_stops_owned_writer_keeps_remote_journal_and_does_not_reacquire(
