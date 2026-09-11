@@ -15,6 +15,8 @@ def remove_block(text,label,replacement=''):
     assert count==1;return text
 
 def undo_guard(text):
+    from tests.test_starlink_forward_final_commit import undo_guard as undo_final
+    text=undo_final(text)
     text=remove_block(text,'PRIVATE QUARANTINE OFFER','  assign mailbox_private_valid = resetn && active && !protocol_fault && return_valid;\n')
     line='  parameter integer PRIVATE_QUARANTINE_OFFER = 0,\n'
     assert text.count(line)==1;return text.replace(line,'',1)

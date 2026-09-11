@@ -22,6 +22,9 @@ def block(text,label,replacement=''):
     return text
 
 def undo_runtime(text,name):
+    if name=='starlink_pss_result_guard_owner_view.v':
+        from tests.test_starlink_forward_final_commit import undo_guard
+        text=undo_guard(text)
     if name not in CHANGED:return text
     if name==TOP:
         if '// BEGIN PARALLEL KERNEL CAPACITY' not in text:return text
@@ -43,6 +46,8 @@ def undo_runtime(text,name):
     return text
 
 def undo_bench(text):
+    from tests.test_starlink_forward_final_commit import undo_bench as undo_final
+    text=undo_final(text)
     text=block(text,'PARALLEL READY WITNESS')
     for line in ['      report_parallel_ready; // PARALLEL READY REPORT\n',',.PARALLEL_KERNEL_READY(1)']:
         text=replace(text,line,'')
@@ -56,6 +61,9 @@ def test_exact_runtime_and_profile_delta():
     for name in names:
         if (RTL/name).exists():
             text=(RTL/name).read_text()
+            if name=='starlink_pss_result_guard_owner_view.v':
+                from tests.test_starlink_forward_final_commit import undo_guard
+                text=undo_guard(text)
             if text!=(PARENT/name).read_text():changes.append(name)
             assert undo_runtime(text,name)==(PARENT/name).read_text(),name
     assert set(changes)==CHANGED

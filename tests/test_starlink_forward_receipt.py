@@ -36,6 +36,8 @@ def test_entire_runtime_delta_is_receipt_and_ack_interlock():
             from tests.test_starlink_private_admission_facts import parent_runtime_bytes
             assert parent_runtime_bytes(RTL/name) == (BASE/name).read_bytes(), name
     guard = (RTL/'starlink_pss_result_guard_owner_view.v').read_text()
+    from tests.test_starlink_forward_final_commit import undo_guard
+    guard = undo_guard(guard)
     assert 'commit_pulse <= final_commit;' in guard
     assert 'wire final_commit = mailbox_commit_valid && mailbox_input_ready;' in guard
 

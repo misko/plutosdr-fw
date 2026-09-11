@@ -16,6 +16,9 @@ def current_runtime():
 def verify_runtime(sources):
     changed=[]
     for name,text in sources.items():
+        if name=='starlink_pss_result_guard_owner_view.v':
+            from tests.test_starlink_forward_final_commit import undo_guard
+            text=undo_guard(text)
         original=(PARENT/name).read_text()
         if text!=original:changed.append(name)
         if name in TARGETS:
@@ -31,7 +34,11 @@ def test_exact_two_attribute_delta():
     for name,path in [('tb_fft_staged_output.sv',RTL/'tb_fft_staged_output.sv'),
                       ('staged_fft_experiment.tcl',ROOT/'tools/staged_fft_experiment.tcl'),
                       ('staged_fft_experiment.py',ROOT/'tools/staged_fft_experiment.py')]:
-        assert path.read_bytes()==(PARENT/name).read_bytes(),name
+        text=path.read_text()
+        if name=='tb_fft_staged_output.sv':
+            from tests.test_starlink_forward_final_commit import undo_bench
+            text=undo_bench(text)
+        assert text==(PARENT/name).read_text(),name
 
 @pytest.mark.parametrize('mutation',['fault_gate','capacity_logic','extra_state'])
 def test_behavioral_changes_rejected(mutation):
