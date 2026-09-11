@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, held output-bank metadata: **479 tests** and **64,512 actual
+FFT records** pass at unchanged service latency. An original-mux real-bank
+witness matches through 385,028 writer-state observations plus reader, stall,
+fault and reset checks. The metadata mux is removed in registered scheduling,
+but routing **regresses to -2.203 ns WNS / -672.268 ns TNS / 796 failing
+endpoints**. Do not promote; retain private-certification and guard-fact
+references. The remaining phase -> bank framing -> completion -> phase path
+requires examining the complete private-write/replay handoff, not metadata alone.
+Branch: `codex/starlink-rx-only-do-not-merge-held-bank-metadata`. No radio,
+PPU/main or primary production HDL changes. Native 60 MS/s fine search,
+2.5 MS/s inspection and all full receiver/deployment gates remain required.
+See [held metadata proof and route regression](reports/experiments/20260911-staged-heldmeta-actual-route-parent.md).
+
 Update 2026-09-11, expanded guard facts: **464 tests** and **64,512 actual FFT
 records** pass at unchanged service latency. Original and expanded certificates
 agree for 384,922 live cycles; 32 fact-mapping fault injections block stale work.
