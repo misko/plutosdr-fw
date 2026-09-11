@@ -74,14 +74,14 @@ initial begin #300000;$fatal(1,"watchdog");end
 endmodule
 '''
 
-def execute(tmp_path,source):
+def execute(tmp_path,source,bench_text=None):
     assert hashlib.sha256((BASE/'starlink_pss_kernel_rom.v').read_bytes()).hexdigest()=='0b4ee87d93d61c6fa12ee9992aa517a3a8be568835075531d9af4453f4ec80e5'
     assert hashlib.sha256((BASE/'upper_edge_pss_kernel_q17.mem').read_bytes()).hexdigest()=='694d0d9b8dd55368bcaaedec37a7cda3a837d491d592ede60eec57a9821fc99a'
     original=(BASE/'starlink_pss_kernel_rom.v').read_text()
     (tmp_path/'golden.v').write_text(original.replace('module starlink_pss_kernel_rom #(','module golden_kernel #(',1))
     (tmp_path/'candidate.v').write_text(source)
     (tmp_path/'kernel.mem').write_bytes((BASE/'upper_edge_pss_kernel_q17.mem').read_bytes())
-    (tmp_path/'tb.sv').write_text(bench())
+    (tmp_path/'tb.sv').write_text(bench() if bench_text is None else bench_text)
     result=subprocess.run(['iverilog','-g2012','-s','tb','-o','sim','golden.v','candidate.v','tb.sv'],cwd=tmp_path,capture_output=True,text=True,timeout=30)
     (tmp_path/'compile.log').write_text(result.stdout+result.stderr)
     assert result.returncode==0,result.stdout+result.stderr

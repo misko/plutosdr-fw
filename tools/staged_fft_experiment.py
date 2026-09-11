@@ -169,6 +169,18 @@ def audit_capture_sim(output):
                        'private_load_checked':True,'held_until_release':True}
     return result
 
+def audit_ordinal_sim(output):
+    result=audit_capture_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_ORDINAL_CASE_PASS boundary=(\d+) private_advance=1 reads=(\d+) releases=(\d+)$',text,re.M)
+    require(rows==[(str(n),str(512 if n>=3 else 0),str(int(n>=3))) for n in range(5)],'complete ordinal fault/status/stall boundaries')
+    counts=re.findall(r'^STAGED_ORDINAL_CYCLES_PASS advances=(\d+) holds=(\d+)$',text,re.M)
+    require(len(counts)==1 and counts[0][0]=='9216' and int(counts[0][1])>=1000,'healthy ordinal advance/freeze coverage')
+    require(text.count('STAGED_ORDINAL_PASS cases=5 public_acceptance_preserved=1 quarantine_checked=1')==1,'ordinal caller contract terminal evidence')
+    result['ordinal']={'boundaries':rows,'advances':9216,'holds':int(counts[0][1]),
+                       'public_acceptance_preserved':True,'quarantine_checked':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -186,7 +198,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_capture_sim(output)
+        if mode=='sim':result['audit']=audit_ordinal_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
