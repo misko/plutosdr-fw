@@ -4,6 +4,18 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, clocked completion/private ROM loads: all **64,512 actual FFT
+records** match, including ten new completion-cancellation cases; **346 tests**
+pass. The completion-only route regresses to -3.637 ns. The private ROM revision
+routes at **-3.134 ns**, TNS -1304.699 ns, 1398 failing endpoints: mixed versus
+the -3.080 ns admission baseline, and still FAILING. The worst path now feeds
+publication-controller sequencing through preflight/current faults. Next inspect
+private replay versus actual authorization, preserving request/ACK ownership and
+current publication fences; retest and reroute before further features. No
+radio/PPU/main changes. Native 60 MS/s fine search, 2.5 MS/s inspection and every
+full-receiver/deployment gate remain open.
+See [completion and private ROM evidence](reports/experiments/20260911-staged-completion-actual-route-parent.md).
+
 Update 2026-09-11, clocked private admission and held lookup: all **64,512 actual
 FFT numerical records** and the full reset/fault campaign pass, including six
 new admission-cancellation cases. **321 tests** pass. Source-matched routing
