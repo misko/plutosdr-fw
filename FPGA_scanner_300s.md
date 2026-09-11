@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, output metadata CDC contract: **17 digital contract tests,
+12 assessment tests and seven archive tests pass**. Bounded runs cover 156
+complete reader blocks and 120 reset cases. Read-only routed inspection finds
+all 37 metadata paths at 0.737–1.158 ns, but also first-stage synchronizer fanout
+into reset-purge counters on all four source/output request/ACK crossings.
+Four CDC-1 and one CDC-10 critical findings keep structural qualification and
+timing-constraint authorization closed. No observed corruption is claimed.
+Runtime, constraints and route are unchanged: **−1.258 ns WNS**, **−1.215 ns
+same-domain**; not timing closure. Next refactor local reset-idle receipts and
+register the purge indication, then repeat actual FFT/reset/route/CDC checks.
+No radios, PPU/main or primary HDL changes; native 60 MS/s fine search and
+2.5 MS/s inspection remain required. Branch:
+`codex/starlink-rx-only-do-not-merge-output-cdc-contract`.
+See [CDC contract and remaining structural gate](reports/experiments/20260911-output-cdc-contract.md).
+
 Update 2026-09-11, parallel output metadata comparisons: **652 distinct tests
 pass**, both corrected actual-FFT campaigns pass and **64512 numerical records
 and service intervals remain exact**. Compare live/replay metadata before
