@@ -4,6 +4,22 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, preflight/publication ordering: **479 tests** and **64512
+actual FFT records** pass with unchanged service. All 17 runtime modules are
+unchanged from guard facts; no new synthesis/route or timing improvement is
+claimed. With the next source block queued, inverse publication pauses for
+1025/1024/1024 observed clocks without early preflight or producer reuse.
+Across 419084 phase observations, 3122 live replay observations have preflight
+events known zero; 62 preflight observations overlap a published/unread bank.
+Healthy resume, preflight fault and paused fast reset all recover cleanly.
+This is source-bound finite evidence plus an abstract model, not RTL formal
+signoff. It supports investigating a publication-specific current fault summary
+while retaining registered preflight faults, diagnostics and unread-bank checks.
+Branch: `codex/starlink-rx-only-do-not-merge-preflight-publication-proof`.
+No radio, PPU/main, production HDL, native 60 MS/s fine-search or 2.5 MS/s
+inspection change. Full receiver/deployment gates remain open.
+See [ordering evidence and next implementation gate](reports/experiments/20260911-staged-preflightpublication-proof.md).
+
 Update 2026-09-11, bank-local input identity: **480 tests** and **64512 actual
 FFT records** pass with unchanged service intervals. The default/enabled real
 checker matches in four-state and sequential tests; the live original checker
