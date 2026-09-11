@@ -16,7 +16,14 @@ def test_complete_guard_and_top_inverses():
     for name,pin in [(TOP,'6c181d830143c998ffa3fba15d51fe34cf087d08eb622591f698229b07b1a4a4'),
                      (GUARD,'6b3f4ff240f3f81edaaf694f7b2a926be320da71bfc3641d84a6ce3c87104f45')]:
         old=(BASE/name).read_bytes();assert hashlib.sha256(old).hexdigest()==pin
-        text=(RTL/name).read_text()
+        # New bank-local identity wiring has its own complete source inverse.
+        # Preserve this historical guard-fact inverse on the pinned parent;
+        # the predicate test below continues to extract live RTL expressions.
+        reference=ROOT.parent/'staged-guardfacts-prepared-v1'/name
+        pin_current={'starlink_pss_fft_staged_output_impl.v':'b3511a70b97b91e3e9b4106ea0c9bab8df4f7a43a07ff30a5447cd522dc5d143',
+                     'starlink_pss_result_guard_owner_view.v':'ba0b9e308e2747e43edeec6c9b4bb486b2c1fc12d7d850d2bbf6a6ff02cc4431'}
+        assert hashlib.sha256(reference.read_bytes()).hexdigest()==pin_current[name]
+        text=reference.read_text()
         if name==GUARD:
             text=text.replace('  output wire [7:0] offered_local_faults_now,\n','',1)
             start=text.index('  // Same facts as the scalar view, before its OR reduction.')

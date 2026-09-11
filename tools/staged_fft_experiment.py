@@ -33,10 +33,11 @@ def prepare(path):
     vectors=re.search(r'set vector_names \{([^}]+)\}',profile)[1].split()
     removed={'starlink_pss_fft_bank_owned_retained_output_probe.v','starlink_pss_fft_retained_output_impl.v','starlink_pss_retained_output_owner.v',
              'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v',
-             'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v'}
+             'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
+             'starlink_pss_realtime_input_guard_local_admission.v'}
     runtime=[BASE/name for name in names if name.endswith('.v') and
              '/retained_output_actual/' not in name and Path(name).name not in removed]
-    require(len(runtime)==9,'exact inherited runtime count')
+    require(len(runtime)==8,'exact inherited runtime count')
     support=[BASE/name for name in vectors]
     support.append(BASE/'source_snapshot'/ACQ/'retained_output_actual/reference/create_shared_realtime_xfft_ip.tcl')
     support.append(BASE/'source_snapshot'/ACQ/'retained_output_actual/run_retained_output_actual.tcl')
@@ -45,7 +46,8 @@ def prepare(path):
         require(sha(source)==manifest['sources'][relative]['sha256'],'reference source changed: '+relative)
     runtime.extend(NEW/name for name in ['starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v',
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
-                                       'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v'])
+                                       'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
+                                       'starlink_pss_realtime_input_guard_local_admission.v'])
     support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
                     ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
     sources=runtime+support
@@ -216,6 +218,18 @@ def audit_guardfacts_sim(output):
     result['guardfacts']={'boundaries':rows,'cycles':int(cycles[0]),'exact_certificates':True,'fresh_recovery':True}
     return result
 
+def audit_bankidentity_sim(output):
+    result=audit_guardfacts_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_BANKIDENTITY_CASE_PASS owner=(\d+) selected=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(rows==[(str(o),str(s)) for o in range(2) for s in range(2)],'both banks selected/unselected and fresh recovery')
+    counts=re.findall(r'^STAGED_BANKIDENTITY_PASS cases=4 checks=(\d+) forward=(\d+) inverse=(\d+) checker_exact=1$',text,re.M)
+    require(len(counts)==1,'one exact original checker witness receipt')
+    checks,forward,inverse=map(int,counts[0])
+    require(checks>=1000 and min(forward,inverse)>=9216,'real checker cycle/owner coverage')
+    result['bankidentity']={'boundaries':rows,'checks':checks,'forward':forward,'inverse':inverse,'checker_exact':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -233,7 +247,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_guardfacts_sim(output)
+        if mode=='sim':result['audit']=audit_bankidentity_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
