@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, product-buffer validation components: **15 tests pass**.
+A private word/identity register and actual-mailbox variant preserve ordinal,
+LAST, publication and real ACK checks. One first-reference refill pause removes
+the wide write-through mux. Tests cover 6144 correct reads, 420 bad metadata
+cases, framing faults, stalls, 200-clock unpublished LAST and reset recovery.
+**Not yet integrated into the FFT, synthesized or routed**; all 19 compiled
+parent runtime modules remain unchanged. Next wire actual producer acceptance,
+retained final ownership and fault summaries; run both real-FFT campaigns and
+service/numerical checks, then unchanged-constraint routing. Branch:
+`codex/starlink-rx-only-do-not-merge-product-validation-stage`. No radios,
+PPU/main or primary HDL change; native 60 MS/s fine search, 2.5 MS/s inspection
+and all full receiver/deployment gates remain required.
+See [product identity component proof and integration gate](reports/experiments/20260911-product-identity-components.md).
+
 Update 2026-09-11, qualified forward-completion receipt: **545 regression + 14
 evidence + seven archive tests pass**. All **64512 indexed actual FFT records**
 and service intervals match. The token updates from the guard's registered
