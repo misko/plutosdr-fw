@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, opt-in quiet publication fence integrated with actual FFT and
+buffers: **820 regression + twelve new evidence tests pass (832 distinct)**.
+Both actual FFT campaigns pass; all 64512 records, CSV bytes and service clocks
+remain exact. The former FFT-status-payload-to-output-request path is absent
+for all five synthesized status bits. Route improves **-1.661 to -1.241 ns WNS,
+-474.560 to -274.139 ns TNS, 944 to 572 failing endpoints**, but still fails.
+Remaining same-domain guard fault/commit feedback is -1.235 ns; the global worst
+is a separate held-metadata CDC path. Next isolate the guard's local phase/fault
+contract and qualify CDC independently; no timing waivers or deployment.
+Branch `codex/starlink-rx-only-do-not-merge-replay-quiet-fence`, FW `d146246cd`,
+HDL `587c2dd53`, both pushed. Native 60 MS/s fine and 2.5 MS/s inspection remain
+required. No radios, PPU/main, primary HDL or TX removal.
+See [quiet publication fence actual route](reports/experiments/20260911-replay-quiet-fence-actual-route.md).
+
 Update 2026-09-11, replay quiet-phase shadow contract: **767 regression + eleven
 new evidence tests pass**, with 59 focused and 30 compatibility tests after a
 forced-stall monitor correction. Both corrected actual FFT campaigns pass;
