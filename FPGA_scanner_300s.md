@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, split product capacity interface: **631 distinct tests pass**,
+both actual-FFT campaigns pass, **64512 numerical records and service times
+remain identical**. Explicitly separate actual bank capacity from qualified
+final retirement; no RTL state or delayed faults added. New witnesses compare
+producer acceptance over 500595 main and 243356 auxiliary clocks. Route improves
+to **-1.938 ns WNS / -541.200 ns TNS / 981 failures**, versus -3.252 / -2279.503
+/ 1330, but remains failing and worse than the older forward-receipt reference.
+Worst path now crosses output metadata selection/equality into inverse result
+control. Next investigate stable output descriptor/identity certification with
+original current-fault/ownership protection, then actual FFT tests and route.
+Branch: `codex/starlink-rx-only-do-not-merge-split-product-capacity`.
+No promotion, radios, PPU/main or primary HDL changes. Native 60 MS/s fine
+search, 2.5 MS/s inspection and all full receiver/deployment gates remain.
+See [split capacity proof and routed result](reports/experiments/20260911-staged-splitcapacity-actual-route.md).
+
 Update 2026-09-11, held-final product capacity isolation: **616 distinct
 regression/evidence tests pass**, all **64512 actual FFT numerical records**
 and service times remain exact. Both source-matched actual campaigns pass.
