@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 
 import pytest
+from tests.test_starlink_forward_receipt import undo_forward_receipt
 
 ROOT=Path(__file__).resolve().parents[1]
 RTL=ROOT/'hdl/library/starlink_pss_acquisition/staged_control'
@@ -21,6 +22,7 @@ def test_complete_engine_capture_inverse():
     old=(BASE/TOP.name).read_text()
     assert hashlib.sha256(old.encode()).hexdigest()=='2711556e640f6fd64995a755af9ba328529b38c498afe87b26ef842c84b35002'
     text,start,end=capture_block();text=text[:start]+text[end:]
+    text=undo_forward_receipt(text)
     # New ACK delta has a separate complete top/guard inverse.
     text=text.replace('    .PRIVATE_ACK_RETIREMENT(CERTIFIED_ADMISSION && OWNER==1),\n','',1)
     start=text.index('  end else begin : registered_scheduling\n')

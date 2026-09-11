@@ -272,6 +272,21 @@ def audit_ackcombined_aux(output):
             'public_exact':True,'fresh_recovery':True,'actual_fft':True,'main_numerical_campaign_required':True,
             'physical_signoff':False,'continuous_rx':False}
 
+def forward_receipt_compiled(prepared):
+    return '// BEGIN FORWARD RECEIPT WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_forwardreceipt(output,auxiliary=False):
+    result=audit_ackcombined_aux(output) if auxiliary else audit_ackcombined_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    counts=re.findall(r'^STAGED_FORWARD_RECEIPT_PASS checks=(\d+) pending=(\d+) ack_exact=1 publication_subset=1$',text,re.M)
+    require(len(counts)==1 and int(counts[0][0])>=1000 and int(counts[0][1])>=10,
+            'qualified forward receipt and actual ACK interlock coverage')
+    cases=re.findall(r'^STAGED_FORWARD_RECEIPT_CASE_PASS boundary=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(cases==([str(n) for n in range(12)] if auxiliary else []),'forward receipt boundary inventory')
+    result['forwardreceipt']={'checks':int(counts[0][0]),'pending':int(counts[0][1]),
+        'ack_exact':True,'publication_subset':True,'boundaries':cases,'auxiliary_required':not auxiliary}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -289,8 +304,8 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_ackcombined_sim(output)
-        elif mode=='ack':result['audit']=audit_ackcombined_aux(output)
+        if mode=='sim':result['audit']=audit_forwardreceipt(output) if forward_receipt_compiled(prepared) else audit_ackcombined_sim(output)
+        elif mode=='ack':result['audit']=audit_forwardreceipt(output,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

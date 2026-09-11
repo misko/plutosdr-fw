@@ -161,6 +161,14 @@ def package(output,campaign='output',test_root=None):
             add('auxiliary-v1/'+name,auxiliary/name)
         for name in ['simulate.log','staged_words.csv','xvlog.log','xvhdl.log','elaborate.log']:
             add('auxiliary-v1/sim/'+name,auxiliary/'project/staged_fft.sim/sim_1/behav/xsim'/name)
+    return write_verified_archive(output,sources)
+
+def write_verified_archive(output,sources):
+    """Shared regular-file archive writer; verify every byte after read-back."""
+    if output.exists() or output.with_suffix('.json').exists():raise ValueError('no artifact/receipt overwrite')
+    for name,path in sources.items():
+        if Path(name).is_absolute() or '..' in Path(name).parts or name=='manifest.json' or path.is_symlink() or not path.is_file():
+            raise ValueError('invalid archive member '+name)
     manifest={name:{'source':str(path),'sha256':digest(path.read_bytes()),'bytes':path.stat().st_size} for name,path in sources.items()}
     def insert(archive,name,data):
         info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o644;archive.addfile(info,io.BytesIO(data))

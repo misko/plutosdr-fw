@@ -5,6 +5,7 @@ import re
 import subprocess
 
 import pytest
+from tests.test_starlink_forward_receipt import undo_forward_receipt
 
 ROOT=Path(__file__).resolve().parents[1]
 RTL=ROOT/'hdl/library/starlink_pss_acquisition/staged_control'
@@ -18,6 +19,7 @@ def test_complete_guard_and_top_inverse():
         old=(BASE/name).read_bytes();assert hashlib.sha256(old).hexdigest()==pin
         text=(RTL/name).read_text()
         if name==TOP:
+            text=undo_forward_receipt(text)
             text=text.replace('    .PRIVATE_ACK_RETIREMENT(CERTIFIED_ADMISSION && OWNER==1),\n','',1)
         else:
             text=text.replace('  parameter integer PRIVATE_ACK_RETIREMENT = 0,\n','',1)

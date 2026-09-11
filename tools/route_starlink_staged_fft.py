@@ -8,6 +8,7 @@ import subprocess
 import time
 from staged_fft_experiment import audit_enginecapture_sim, audit_inputstage_sim, audit_preflightpublication_sim
 from staged_fft_experiment import audit_ackcombined_sim, audit_ackcombined_aux
+from staged_fft_experiment import forward_receipt_compiled, audit_forwardreceipt
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -23,7 +24,7 @@ def verify_ack_auxiliary(auxiliary,expected,prepared):
             result.get('sources_unchanged') is True and 'error' not in result,'successful source-bound ACK auxiliary required')
     require(result['prepared_sha']==expected and result['command'][-3]==str(prepared),
             'ACK auxiliary must use the same prepared sources')
-    audited=audit_ackcombined_aux(auxiliary)
+    audited=audit_forwardreceipt(auxiliary,auxiliary=True) if forward_receipt_compiled(prepared) else audit_ackcombined_aux(auxiliary)
     require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
     return audited
 
@@ -47,6 +48,10 @@ def run(actual,synthesis,output,ack_actual=None):
         audit_admission_sim(actual) if 'admission' in a['audit'] else (
         audit_handover_sim(actual,fault_cases=len(a['audit']['handover']['faults'])) if 'handover' in a['audit'] else audit_sim(actual)))))))))))))
     if 'ackcombined' in a['audit']:audited=audit_ackcombined_sim(actual)
+    prepared=Path(s['command'][-3])
+    require(('forwardreceipt' in a['audit'])==forward_receipt_compiled(prepared),
+            'main audit and compiled forward receipt campaign differ')
+    if forward_receipt_compiled(prepared):audited=audit_forwardreceipt(actual)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])
