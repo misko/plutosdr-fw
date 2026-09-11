@@ -106,8 +106,45 @@ Its schema is `starlink-glrt-local-iio-capture/v1`. Successful transport does no
 set `independent_host_glrt_run` or `live_detector_qualified` to true.
 
 `starlink_glrt_local_search_ooc.tcl OUTPUT ROMS --control-netlist` produces a
-linked, unplaced component with its source hashes. The board build consumes it
-with `scripts/build_glrt_board.sh 2500000 OUTPUT --local-search NETLIST`.
+linked, unplaced component with its source hashes. Convert that verified bundle
+with `starlink_glrt_local_checkpoint.tcl NETLIST CHECKPOINT_DIRECTORY` under
+Vivado. The converter verifies source/output hashes and emits an unplaced DCP;
+it adds no clocks or timing exceptions. The board build consumes that bundle
+with `scripts/build_glrt_board.sh 2500000 OUTPUT --local-search CHECKPOINT_DIRECTORY`.
+The pre-optimization hook inserts the DCP into exactly one explicit black box
+and rejects remaining unresolved modules. Successful insertion alone proves
+neither device fit nor board timing.
 This component has no fixture registers or exported timing exceptions. Full
 board route, CDC, calibration, firmware packaging, PPU deployment and matched
 physical capture remain required before deployment verification is complete.
+
+## Independent host comparison
+
+After collecting a complete capture, run these offline steps from the respective
+firmware and host worktrees. `CAPTURE`, `PLAN`, `HOST_OUTPUT`, and `COMPARISON`
+are absolute paths; outputs must be new. The host requires its compiled
+acquisition extension and scientific Python environment.
+
+```sh
+# Firmware worktree: attest raw transport and select every complete cadence window.
+python -m tools.starlink_glrt_local_compare --capture CAPTURE --plan PLAN
+# Host worktree: independent acquisition, with no FPGA timing/CFO seeds.
+PYTHONPATH=src python tools/replay_local_glrt_windows.py --plan PLAN --iq CAPTURE/iq.ci16 --output HOST_OUTPUT
+# Firmware worktree: compare both detectors on identical sample windows.
+python -m tools.starlink_glrt_local_compare --capture CAPTURE --plan PLAN --host HOST_OUTPUT --output COMPARISON
+```
+
+The host runs an unchanged, fresh `PrecisionTracker` for each 14,000-sample
+window and records its actual acquisition verdict. Its receipt binds the IQ,
+configuration, source files and compiled extension by SHA-256. The comparison
+rechecks raw records, closure, full profile metadata and individual IQ windows.
+Windows without a completed FPGA decision are reported separately; they do not
+become detector misses or disappear from coverage accounting.
+
+The frozen acquisition-match gate is at least 95% recovery within two samples
+and 80 kHz, with at least 20 host-positive windows spanning three episodes
+(gaps greater than 10 seconds). Additional FPGA detections require review.
+This broad CFO tolerance tests acquisition neighborhoods, not fine estimation
+accuracy. Too few positive observations produce an inconclusive result.
+Physical deployment, calibration and real-time operation remain separate gates;
+the comparator never marks the live detector qualified by itself.
