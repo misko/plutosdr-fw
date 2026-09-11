@@ -2,6 +2,20 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, buffered forward FFT integration: **1,159 distinct tests
+pass**, and the real FFT/kernel/product/inverse subsystem passes 64,512-word
+numerical comparisons, six fault injections, eight reset boundaries and two
+delay cases. Service is **4,177 clocks / 23.87 us at 175 MHz**, below the
+5,215-clock budget. **Routed timing still FAILS: -1.559 ns WNS / -348.591 ns
+TNS / 742 endpoints**, worse than the scalar-fault reference. The worst path
+now reaches the completion snapshot through descriptor preflight checks;
+next prove state-local completion facts while retaining all public current
+fault vetoes. No deployment, full receiver integration or continuous-RX claim.
+Branch `codex/starlink-rx-only-do-not-merge-buffered-forward-integration`,
+FW `46db23d6a`, HDL `2dce66a13`. Native 60 MS/s fine and independent 2.5 MS/s
+inspection remain required. No radios, PPU/main or primary HDL pointer changed.
+See [integrated result and retained failure evidence](reports/experiments/20260911-buffered-forward-integration-actual-route.md).
+
 Update 2026-09-11, private forward capture progress: **standalone internal
 timing passes +0.186 ns WNS / 0 TNS / 0 setup failures**, same clock/recipe,
 72 LUT / 111 FF / one RAMB18 / zero DSP. The wide descriptor-to-counter path
