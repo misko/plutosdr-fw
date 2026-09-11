@@ -1,14 +1,14 @@
 """Q11 reference/derivative hardware against independent exact rational math."""
 from __future__ import annotations
 
-from fractions import Fraction
 import subprocess
+from fractions import Fraction
 
 import pytest
 
 from .ddc import BANK_ROOT
-from .test_cubic_reference_rtl import coefficients, expected as raw_expected, packed_words
-
+from .test_cubic_reference_rtl import SHIFTS, coefficients, packed_words
+from .test_cubic_reference_rtl import expected as raw_expected
 
 BENCH = r'''
 `timescale 1ns/1ps
@@ -22,7 +22,7 @@ wire signed [15:0] ri,rq,di,dq;
 wire [B-1:0] output_index;
 wire [3:0] clipped;
 starlink_glrt_cubic_coefficients #(.SEGMENT_COUNT(SEGMENTS),
- .TEMPLATE_FILE("BANK_PATH"),.FIRST_SAMPLE(FIRST),.SAMPLE_COUNT(N)) dut (
+ .TEMPLATE_FILE("BANK_PATH"),.FIRST_SAMPLE(FIRST),.SAMPLE_COUNT(N),.OUTPUT_STRIDE(STRIDE_VALUE)) dut (
  .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),
  .output_valid(output_valid),.output_ready(output_ready),.reference_i(ri),.reference_q(rq),
  .derivative_i(di),.derivative_q(dq),.output_index(output_index),.output_last(output_last),
@@ -60,29 +60,35 @@ endmodule
 '''
 
 
-def expected(segments, first, count):
+def expected(segments, first, count, stride=1):
     raw = raw_expected(segments)
     result = []
     for offset in range(count):
-        index = first+offset
+        index = first+offset*stride
         values = raw[index][1:3] + [30*(raw[index+1][k]-raw[index-1][k]) for k in (1, 2)]
+        if stride != 1:
+            phase = index % 24
+            weights = (0, 60, 60*phase-30, 30*phase*phase-60*phase+20)
+            values[2:] = [sum(weights[k]*segments[index//24][k][channel]*(1 << SHIFTS[k])
+                              for k in range(4)) for channel in range(2)]
         rounded = [round(Fraction(value, 2048)) for value in values]
         clipped = sum(int(value < -32768 or value > 32767) << k for k, value in enumerate(rounded))
         result.append([offset, *[max(-32768, min(32767, value)) for value in rounded], int(offset == count-1), clipped])
     return result
 
 
-def simulate(tmp_path, segments, first, count, cycles):
+def simulate(tmp_path, segments, first, count, cycles, stride=1):
     bank, bench, trace, executable = [tmp_path/name for name in ("bank.mem", "tb.sv", "input.txt", "sim")]
     bank.write_text("".join(f"{word:027x}\n" for word in packed_words(segments)))
     source = BENCH.replace("SEGMENT_VALUE", str(len(segments))).replace("FIRST_VALUE", str(first))
-    bench.write_text(source.replace("COUNT_VALUE", str(count)).replace("BANK_PATH", str(bank)))
+    bench.write_text(source.replace("COUNT_VALUE", str(count)).replace("BANK_PATH", str(bank))
+                    .replace("STRIDE_VALUE", str(stride)))
     with trace.open("w") as file:
         file.writelines(f"{reset} {flush} {start} {ready}\n" for reset,flush,start,ready in cycles)
     build = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable), str(bench),
-        str(BANK_ROOT/"starlink_glrt_cubic_reference.v"), str(BANK_ROOT/"starlink_glrt_cubic_coefficients.v")], capture_output=True, text=True)
+        str(BANK_ROOT/"starlink_glrt_cubic_reference.v"), str(BANK_ROOT/"starlink_glrt_cubic_coefficients.v")], capture_output=True, text=True, check=False)
     assert build.returncode == 0, build.stdout+build.stderr
-    run = subprocess.run(["vvp", str(executable), f"+INPUT={trace}"], capture_output=True, text=True, timeout=90)
+    run = subprocess.run(["vvp", str(executable), f"+INPUT={trace}"], capture_output=True, text=True, timeout=90, check=False)
     assert run.returncode == 0, run.stdout+run.stderr
     lines = run.stdout.splitlines()
     return [list(map(int, line.split()[1:])) for line in lines if line.startswith("R ")], lines.count("A")
@@ -105,6 +111,20 @@ def test_positive_and_negative_half_ties_round_to_even(tmp_path):
     assert result[0][1:5] == [0, 0, 30, -30]
     assert result[2][1:5] == [2, -2, 30, -30]
     assert aborted == 0
+
+
+@pytest.mark.parametrize("stride", [2, 4, 24])
+@pytest.mark.parametrize("reset", [False, True])
+def test_multirate_polynomial_derivative_stalls_and_restart(tmp_path, stride, reset):
+    segments = coefficients(8)
+    first, count = 23, 6
+    cycles = [(1,0,1,0)] + [(1,0,0,int(n % 11 < 2)) for n in range(85)]
+    cycles += [(0,0,0,0) if reset else (1,1,0,0), (1,0,0,0), (1,0,1,0)]
+    cycles += [(1,0,0,int(n % 13 < 3)) for n in range(500)]
+    result, _ = simulate(tmp_path, segments, first, count, cycles, stride)
+    truth = expected(segments, first, count, stride)
+    assert result[-count:] == truth
+    assert result[:-count] == truth[:len(result)-count]
 
 
 def test_full_79200_sample_coefficients_on_three_750_hz_opportunities(tmp_path):

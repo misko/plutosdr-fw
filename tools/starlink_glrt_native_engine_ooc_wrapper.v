@@ -1,6 +1,9 @@
 // Same-clock registered boundaries for every native-engine DUT data port.
 module starlink_glrt_native_engine_ooc_wrapper #(
-  parameter TEMPLATE_FILE="native_cubic_60000000_upper.mem"
+  parameter TEMPLATE_FILE="native_cubic_60000000_upper.mem",
+  parameter integer REFERENCE_STRIDE=1,
+  parameter DIRECT_COEFFICIENT_FILE="",
+  parameter integer SAMPLE_COUNT=79200/REFERENCE_STRIDE
 ) (
   input wire clk,
   input wire [231:0] stimulus,
@@ -17,15 +20,19 @@ module starlink_glrt_native_engine_ooc_wrapper #(
   wire [31:0] seed,step,result_seed,result_step;
   wire signed [15:0] ii,iq;
   wire job_ready,active,result_valid;
-  wire [16:0] count;
+  localparam C=$clog2(SAMPLE_COUNT+1),S=35+$clog2(SAMPLE_COUNT);
+  localparam T=S+$clog2(SAMPLE_COUNT),E=36+$clog2(SAMPLE_COUNT);
+  wire [C-1:0] count;
   wire [7:0] fault;
-  wire signed [51:0] ri,rq,di,dq;
-  wire signed [68:0] ti,tq;
-  wire [52:0] energy;
+  wire signed [S-1:0] ri,rq,di,dq;
+  wire signed [T-1:0] ti,tq;
+  wire [E-1:0] energy;
   assign {resetn,flush,job_valid,job_start,seed,step,input_valid,input_gap,input_closed,
       input_clipped,input_index,ii,iq,result_ready} = launch;
   assign response = {job_ready,active,result_valid,result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy};
-  (* keep_hierarchy="yes" *) starlink_glrt_native_engine #(.TEMPLATE_FILE(TEMPLATE_FILE)) dut (
+  (* keep_hierarchy="yes" *) starlink_glrt_native_engine #(.TEMPLATE_FILE(TEMPLATE_FILE),
+    .REFERENCE_STRIDE(REFERENCE_STRIDE),.SAMPLE_COUNT(SAMPLE_COUNT),
+    .DIRECT_COEFFICIENT_FILE(DIRECT_COEFFICIENT_FILE)) dut (
     .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),
     .job_start(job_start),.job_phase_seed(seed),.job_phase_step(step),.input_valid(input_valid),
     .input_gap(input_gap),.input_closed(input_closed),.input_clipped(input_clipped),

@@ -1,6 +1,6 @@
 # Native derotation and exact products, isolated from the complete receiver.
-# Usage: vivado -mode batch -source THIS -tclargs FRESH_OUTPUT ?ENGINE_TEMPLATE_BANK?
-if {$argc < 1 || $argc > 2} { error "expected output directory and optional full-engine template bank" }
+# Usage: vivado -mode batch -source THIS -tclargs OUTPUT ?TEMPLATE_BANK? ?RATE?
+if {$argc < 1 || $argc > 3} { error "expected output, optional engine bank and rate" }
 if {[version -short] ne "2022.2"} { error "requires Vivado 2022.2" }
 set output [file normalize [lindex $argv 0]]
 set repo [file dirname [file dirname [file normalize [info script]]]]
@@ -14,6 +14,12 @@ set sources [list $cordic $rotation $rtl]
 set top starlink_glrt_native_products_ooc_wrapper
 set generics {}
 set mode products
+set rate 60000000
+if {$argc == 3} {
+  set rate [lindex $argv 2]
+  if {$rate ni {2500000 15000000 30000000 60000000}} { error "unsupported tracking rate" }
+}
+set stride [expr {60000000/$rate}]
 set synthesis_directive Default
 if {[info exists ::env(STARLINK_GLRT_OOC_SYNTH_DIRECTIVE)]} {
   set synthesis_directive $::env(STARLINK_GLRT_OOC_SYNTH_DIRECTIVE)
@@ -24,27 +30,31 @@ if {[info exists ::env(STARLINK_GLRT_OOC_SYNTH_DIRECTIVE)]} {
 set lut_budget 1800
 set ff_budget 3500
 set bram_half_tile_budget 0
-if {$argc == 2} {
+if {$argc >= 2} {
   set mode engine
   set bank [file normalize [lindex $argv 1]]
   set reference [file join $repo hdl library starlink_glrt starlink_glrt_cubic_reference.v]
   set coefficients [file join $repo hdl library starlink_glrt starlink_glrt_cubic_coefficients.v]
+  set direct [file join $repo hdl library starlink_glrt starlink_glrt_direct_coefficients.v]
   set moments [file join $repo hdl library starlink_glrt starlink_glrt_local_moments.v]
   set engine [file join $repo hdl library starlink_glrt starlink_glrt_native_engine.v]
   set wrapper [file join $repo tools starlink_glrt_native_engine_ooc_wrapper.v]
   set top starlink_glrt_native_engine_ooc_wrapper
-  set generics [list TEMPLATE_FILE=$bank]
-  lappend sources $reference $coefficients $moments $engine
-  lappend names bank reference coefficients moments engine
+  set generics [list TEMPLATE_FILE=$bank REFERENCE_STRIDE=$stride]
+  if {$rate == 2500000} { lappend generics DIRECT_COEFFICIENT_FILE=$bank }
+  lappend sources $reference $coefficients $direct $moments $engine
+  lappend names bank reference coefficients direct moments engine
   set lut_budget 3659
   set ff_budget 5500
   set bram_half_tile_budget 24
   set fd [open $bank r]
   set words [split [string trim [read $fd]] \n]
   close $fd
-  if {[llength $words] != 3302} { error "native engine requires exactly 3302 template words" }
+  set expected_words [expr {$rate == 2500000 ? 3300 : 3302}]
+  set word_pattern [expr {$rate == 2500000 ? {^[0-9a-fA-F]{16}$} : {^[0-9a-fA-F]{27}$}}]
+  if {[llength $words] != $expected_words} { error "tracking engine template length differs" }
   foreach word $words {
-    if {![regexp {^[0-9a-fA-F]{27}$} $word]} { error "invalid 108-bit native template word" }
+    if {![regexp $word_pattern $word]} { error "invalid rate-specific template word" }
   }
 }
 lappend sources $wrapper
@@ -95,7 +105,8 @@ set hold [get_property SLACK $hold_path]
 if {$lut+$srl > $lut_budget || $ff > $ff_budget || $dsp != 8 || 2*$bram36+$bram18 > $bram_half_tile_budget} {
   error "native arithmetic budget exceeded: LUT=$lut SRL=$srl FF=$ff DSP=$dsp BRAM36=$bram36 BRAM18=$bram18"
 }
-if {$mode eq "engine" && 2*$bram36+$bram18 < 20} {
+set minimum_rom_half_tiles [expr {$rate == 2500000 ? 12 : 20}]
+if {$mode eq "engine" && 2*$bram36+$bram18 < $minimum_rom_half_tiles} {
   error "native reference ROM is missing from the synthesized engine"
 }
 if {$setup < 0 || $hold < 0} { error "native products timing failed: setup=$setup hold=$hold" }
@@ -108,6 +119,10 @@ puts $fd "vivado=2022.2"
 puts $fd "synthesis_directive=$synthesis_directive"
 puts $fd "part=xc7z010clg400-1"
 puts $fd "clock_mhz=100"
+puts $fd "source_rate_hz=$rate"
+puts $fd "reference_stride=$stride"
+set direct_mode [expr {$mode eq "engine" && $rate == 2500000}]
+puts $fd "direct_coefficients=$direct_mode"
 puts $fd "clock_source_site=BUFGCTRL_X0Y0"
 puts $fd "clock_uncertainty_ns=0.1"
 puts $fd "external_fixture_io_timing=excluded"

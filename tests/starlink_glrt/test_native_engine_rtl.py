@@ -28,7 +28,9 @@ wire [7:0] fault;
 wire signed [S-1:0] ri,rq,di,dq;
 wire signed [T-1:0] ti,tq;
 wire [E-1:0] energy;
-starlink_glrt_native_engine #(.SAMPLE_COUNT(N),.SEGMENT_COUNT(SEGMENTS),.TEMPLATE_FILE("BANK_PATH")) dut (
+starlink_glrt_native_engine #(.SAMPLE_COUNT(N),.SEGMENT_COUNT(SEGMENTS),
+ .REFERENCE_STRIDE(STRIDE_VALUE),.TEMPLATE_FILE("BANK_PATH"),
+ .DIRECT_COEFFICIENT_FILE("DIRECT_PATH")) dut (
  .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),
  .job_start(job_start),.job_phase_seed(seed),.job_phase_step(step),.input_valid(input_valid),
  .input_gap(input_gap),.input_closed(input_closed),.input_clipped(input_clipped),
@@ -99,20 +101,30 @@ def expected(job, samples, coefficients, fault=0):
     return [start,seed,step,n,fault,*sums,*prefix,sum(value[5] for value in values)]
 
 
-def simulate(tmp_path, count, bank, rows):
+def simulate(tmp_path, count, bank, rows, stride=1, direct=None):
     bank_path,bench,trace,executable = [tmp_path/name for name in ("bank.mem","tb.sv","input.txt","sim")]
     bank_path.write_text("".join(f"{word:027x}\n" for word in packed_words(bank)))
-    bench.write_text(BENCH.replace("COUNT_VALUE",str(count)).replace("SEGMENT_VALUE",str(len(bank))).replace("BANK_PATH",str(bank_path)))
+    direct_path = ""
+    if direct is not None:
+        direct_path = str(tmp_path/"direct.mem")
+        assert len(direct) == count
+        with open(direct_path,"w") as stream:
+            for coefficients in direct:
+                word = sum((v & 65535) << (16*n) for n,v in enumerate(coefficients))
+                stream.write(f"{word:016x}\n")
+    bench.write_text(BENCH.replace("COUNT_VALUE",str(count)).replace("SEGMENT_VALUE",str(len(bank)))
+                     .replace("BANK_PATH",str(bank_path)).replace("STRIDE_VALUE",str(stride))
+                     .replace("DIRECT_PATH",direct_path))
     with trace.open("w") as file:
         file.writelines(rows)
     sources = [BANK_ROOT/f"starlink_glrt_{name}.v" for name in (
-        "cubic_reference", "cubic_coefficients", "native_rotate", "native_products", "local_moments", "native_engine")]
+        "cubic_reference", "cubic_coefficients", "direct_coefficients", "native_rotate", "native_products", "local_moments", "native_engine")]
     sources.append(BANK_ROOT.parent/"common/ad_dds_cordic_pipe.v")
-    build = subprocess.run(["iverilog","-g2012","-s","tb","-o",str(executable),str(bench),*map(str,sources)],capture_output=True,text=True)
+    build = subprocess.run(["iverilog","-g2012","-s","tb","-o",str(executable),str(bench),*map(str,sources)],capture_output=True,text=True,check=False)
     assert build.returncode == 0,build.stdout+build.stderr
-    run = subprocess.run(["vvp",str(executable),f"+INPUT={trace}"],capture_output=True,text=True,timeout=120)
+    run = subprocess.run(["vvp",str(executable),f"+INPUT={trace}"],capture_output=True,text=True,timeout=120,check=False)
     assert run.returncode == 0,run.stdout+run.stderr
-    return [[*map(lambda word:int(word,16),words[1:4]),*map(int,words[4:])]
+    return [[*(int(word,16) for word in words[1:4]),*map(int,words[4:])]
         for line in run.stdout.splitlines() if (words:=line.split()) and words[0]=="R"]
 
 
@@ -121,19 +133,26 @@ def complete_job(job, count, *, ready=1):
         row(value=sample(job[0]+n),closed=int(n==count-1),ready=ready) for n in range(count)]
 
 
-def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(tmp_path):
-    count,base = 79200,2**55+73
-    bank = bank_for(count)
-    coefficients = coefficient_oracle(bank,24,count)
-    jobs = [(base+64+frame*80000,(2**32-1-frame*711) % 2**32,(7310173+frame*1357) % 2**32) for frame in range(3)]
+@pytest.mark.parametrize("stride,direct_bank", [(24, True), (24, False), (4, False), (2, False), (1, False)],
+                         ids=["2p5MSs-direct", "2p5MSs-cubic-diagnostic", "15MSs", "30MSs", "60MSs"])
+def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(tmp_path, stride, direct_bank):
+    count,base = 79200//stride,2**55+73
+    bank = bank_for(79200)
+    direct = [tuple((n*(k+1)*13+37) % 4000-2000 for k in range(4)) for n in range(count)] if direct_bank else None
+    coefficients = ([[n,*c,int(n==count-1),0] for n,c in enumerate(direct)]
+                    if direct_bank else coefficient_oracle(bank,24,count,stride))
+    # Integer rounding at each absolute rational epoch, not a repeatedly
+    # rounded 3,333-sample period at 2.5 MS/s.
+    jobs = [(base+(64+stride-1)//stride+(frame*80000+stride//2)//stride,
+             (2**32-1-frame*711) % 2**32,(7310173+frame*1357) % 2**32) for frame in range(3)]
     def rows():
         native_index = 0
         for cycle in range(400000):
             job = jobs[0] if cycle==0 else jobs[1] if cycle==133333 else jobs[2] if cycle==266667 else None
-            valid = (cycle+1)*3//5 != cycle*3//5
+            valid = (cycle+1)*3//(5*stride) != cycle*3//(5*stride)
             yield row(job=job,value=sample(base+native_index) if valid else None)
             native_index += int(valid)
-    result = simulate(tmp_path,count,bank,rows())
+    result = simulate(tmp_path,count,bank,rows(),stride,direct)
     assert result == [expected(job,[sample(job[0]+n) for n in range(count)],coefficients) for job in jobs]
 
 
