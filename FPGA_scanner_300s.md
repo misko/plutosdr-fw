@@ -2,6 +2,20 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, distributed same-edge sticky-fault capture: **1027 distinct
+tests and both actual FFT campaigns pass**, with 941191 exact sticky-clock
+checks and unchanged numerical CSV/service. The targeted FFT-to-capture path
+improves -1.189→+0.624 ns, but the post-register OR regresses global timing to
+**-2.514 ns WNS / -678.141 ns TNS / 1184 failures** and adds one critical CDC-10
+before the slow fault synchronizer. **Rejected; no promotion/deployment.**
+Next preserve the original scalar register/direct CDC source and test the
+flatter cause expression only on its input. Branch
+`codex/starlink-rx-only-do-not-merge-distributed-sticky-fault`, FW `9de467790`,
+HDL `6ae94a386`. Actual cause coverage misses groups 12/15/16, explicitly
+distinguished from finite source checks. No radios, PPU/main or primary HDL
+changes; native 60 MS/s fine and 2.5 MS/s inspection remain required. See
+[distributed sticky result](reports/experiments/20260911-distributed-sticky-fault-actual-route.md).
+
 Update 2026-09-11, same-edge forward-final handshake: **1009 distinct tests and
 both actual FFT campaigns pass**; all 64512 records/CSV and service clocks remain
 exact. Handoff-to-ACK improves -1.046→-0.255 ns and product-position-to-active
