@@ -4,6 +4,23 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, held-final product capacity isolation: **616 distinct
+regression/evidence tests pass**, all **64512 actual FFT numerical records**
+and service times remain exact. Both source-matched actual campaigns pass.
+Only one runtime assignment changes: prohibit simultaneous LAST retirement
+and refill while preserving nonfinal streaming and publication/fault authority.
+Route improves over the integrated product parent but still fails:
+**-3.252 ns WNS / -2279.503 ns TNS / 1330 endpoints**, versus -4.115 / -3456.457
+/ 2297. Shared fault/readiness control still reaches admission reset and
+arithmetic enables. No promotion/deployment; the forward-receipt candidate is
+still a better physical baseline. Next prove block-scoped local capacity from
+actual destination ownership, keeping final publication separate, then repeat
+actual FFT tests and route. Branch:
+`codex/starlink-rx-only-do-not-merge-product-final-capacity`.
+No radio, PPU/main or primary HDL changes; native 60 MS/s fine search,
+2.5 MS/s inspection and all full receiver/deployment gates remain required.
+See [final-capacity correction and measured route](reports/experiments/20260911-staged-finalcapacity-actual-route.md).
+
 Update 2026-09-11, product validation integrated with actual FFT/buffers:
 **584 regression + 16 evidence tests pass**, all **64512 indexed numerical
 results** match. V1's first-reference pause overflowed the real FFT return slot;
