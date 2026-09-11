@@ -4,6 +4,23 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, one-entry completion receipt integrated with actual FFT and
+buffers: **720 regression + eleven new evidence tests pass** (731 distinct).
+40 focused tests pass after an ownership-monitor correction; runtime unchanged.
+Successful main/auxiliary actual FFT campaigns verify **64512 indexed numerical
+records**, pending fault/reset recovery and a one-clock normal service cost.
+The original metadata-to-controller-phase path is cut; the new pending path
+passes at +0.096 ns, but publication-seen remains −0.008 ns. Overall route still
+fails: **−1.560 ns WNS / −479.076 ns TNS / 837 failures**. Worst slack improves,
+total failures worsen; no promotion. New worst crosses reset/readiness into
+admission snapshot control. Next isolate that private housekeeping path while
+retaining current public cancellation, then repeat actual FFT and route before
+features. Diagnostics and verified evidence are preserved. Branch:
+`codex/starlink-rx-only-do-not-merge-completion-mailbox-stage`, FW `14af35ec6`,
+HDL `cbb36f3b6`. Native 60 MS/s fine and 2.5 MS/s inspection remain required;
+no radio, PPU/main, primary HDL or constraint changes.
+See [completion receipt actual FFT and route](reports/experiments/20260911-completion-mailbox-stage-actual-route.md).
+
 Update 2026-09-11, balanced current handoff equality: **682 regression + eight
 new actual-evidence tests pass**. Both corrected actual FFT campaigns pass;
 64512 numerical records, CSV bytes and service intervals remain exact. An
