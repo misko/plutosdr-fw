@@ -63,10 +63,26 @@ def assess(root):
 
 def package(root,output):
     require(assess(root)==json.loads((root/'assessment.json').read_text()),'assessment drift')
-    sources={};suffixes={'.json','.log','.txt','.rpt','.xml','.v','.sv','.svh','.vhd','.tcl','.xdc','.csv','.mem','.coe','.dcp','.sha256'}
+    sources={};vhdl_seen={};omitted={}
+    suffixes={'.json','.log','.txt','.rpt','.xml','.v','.sv','.svh','.vhd','.tcl','.xdc','.csv','.mem','.coe','.dcp','.sha256'}
     for p in sorted(root.rglob('*')):
         if not p.is_file() or p.is_symlink() or any(x.is_symlink() for x in p.parents) or '.Xil' in p.parts:continue
-        if p.suffix in suffixes or p.name=='SHA256SUMS':sources[str(p.relative_to(root))]=p
+        relative=str(p.relative_to(root));folder=p.relative_to(root).parts[0]
+        # Historical regression copies can be hundreds of MB; retain their
+        # tests/logs and hashed omission inventory, not duplicate CSV/DCPs.
+        # Every current actual FFT CSV and actual routed bank DCP stays included.
+        if folder.startswith('regression-') and p.suffix in {'.csv','.dcp'}:
+            omitted[relative]={'sha256':sha(p),'reason':'historical regression artifact; raw retained'}
+            continue
+        if p.suffix=='.vhd':
+            digest=sha(p)
+            if digest in vhdl_seen:
+                omitted[relative]={'sha256':digest,'identical_member':vhdl_seen[digest]}
+                continue
+            vhdl_seen[digest]=relative
+        if p.suffix in suffixes or p.name=='SHA256SUMS':sources[relative]=p
+    inventory=root/'archive-omissions-v2.json';require(not inventory.exists(),'no omission inventory overwrite')
+    inventory.write_text(json.dumps(omitted,indent=2)+'\n');sources[inventory.name]=inventory
     for folder,patterns in [('tools',['*.py','*forward_return*.tcl']),('tests',['test_*.py'])]:
         for pattern in patterns:
             for p in (ROOT/folder).glob(pattern):sources['current/'+str(p.relative_to(ROOT))]=p
