@@ -96,6 +96,7 @@ class CapturePipeline:
         self.programs, self.root = programs, root
         self.popen, self.clock, self.sleep = popen, clock, sleep
         self.children = []
+        self.source_end = None
 
     def require_running(self):
         if any(child.poll() is not None for _, child, _ in self.children):
@@ -126,6 +127,8 @@ class CapturePipeline:
                     self.sleep(.005)
             log = (self.root/(name+'.log')).open('x')
             try:
+                if name == 'coarse':
+                    self.source_end = self.clock()+samples/2_500_000
                 child = self.popen(argv, cwd=cwd, stdout=log, stderr=subprocess.STDOUT)
             except BaseException:
                 log.close()
@@ -152,6 +155,14 @@ class CapturePipeline:
         outcomes = []
         for name, child, log in reversed(self.children):
             try:
+                # Let a nearly completed finite collector retain complete source
+                # evidence when its natural end fits the existing cleanup bound.
+                if (name == 'coarse' and child.poll() is None and self.source_end is not None
+                        and self.source_end+3 < deadline):
+                    try:
+                        child.wait(timeout=max(.001, self.source_end+3-self.clock()))
+                    except subprocess.TimeoutExpired:
+                        pass
                 if child.poll() is None:
                     child.send_signal(signal.SIGINT)
                     child.wait(timeout=max(.001, min(8, deadline-self.clock())))
@@ -255,9 +266,11 @@ class EthernetNativeSource:
         if self.samples/2_500_000+30 > deadline-self.clock():
             raise TimeoutError('finite source plus its I/O margin exceeds the session deadline')
         self.pipeline.start(identity, self.host, self.visit, self.samples, min(deadline, self.clock()+30), cancel)
+        self.native_runtime_seconds = min(45, max(1, int(self.samples/2_500_000)-10))
         # Reserve the 45 s controller bound, measured ~29 s journal export and
         # remaining bookkeeping. SSH chunks still enforce the absolute deadline.
-        self.launch_deadline = min(deadline-90, self.clock()+180)
+        self.launch_deadline = min(deadline-90, self.clock()+180,
+            self.pipeline.source_end-self.native_runtime_seconds-5)
 
     def _stage(self, deadline):
         transport = DeadlineTransport(self.transport, deadline, self.clock)
@@ -334,7 +347,7 @@ class EthernetNativeSource:
             self.retain('seed', asdict(seed))
             script = "trap '' HUP\nd="+shlex.quote(self.remote)+'\n'
             script += 'printf \'%s\\n\' '+shlex.quote(text)+' > "$d/bootstrap"\n'
-            script += '"$d/controller" '+shlex.quote(self.directory)+' "$d/journal" "$d/bootstrap" 32768 45 --bootstrap-slices > "$d/runtime-output" 2>&1 &\n'
+            script += '"$d/controller" '+shlex.quote(self.directory)+' "$d/journal" "$d/bootstrap" 32768 '+str(self.native_runtime_seconds)+' --bootstrap-slices > "$d/runtime-output" 2>&1 &\n'
             script += 'pid=$!\nprintf "%s\\n" "$pid" > "$d/pid"\nwait "$pid"\n'
             script += 'code=$?\nprintf "%s\\n" "$code" > "$d/exit"\ncat "$d/runtime-output"\nprintf "GLRT_RUNTIME_EXIT %s\\n" "$code"\n'
             self.prepared = True
