@@ -23,7 +23,9 @@ def test_runtime_unchanged_and_publication_order(tmp_path):
         if name not in {'starlink_pss_fft_staged_output_impl.v','starlink_pss_input_identity_stage.v',
                         'starlink_pss_realtime_input_guard_staged_identity.v','starlink_pss_result_guard_owner_view.v',
                         'starlink_pss_product_identity_split_capacity.v','starlink_pss_product_mailbox_staged_identity.v',
-                        'starlink_pss_mailbox_split_metadata_view.v'}:
+                        'starlink_pss_mailbox_split_metadata_view.v',
+                        'starlink_pss_mailbox_reset_receipt.v','starlink_pss_output_reset_receipt.v',
+                        'starlink_pss_reset_receipt_barrier.v'}:
             assert (tmp_path/'inputs'/name).read_bytes()==(BASE/name).read_bytes(),name
     top=(RTL/'starlink_pss_fft_staged_output_impl.v').read_text()
     # Current top has a complete input-stage inverse in its dedicated tests.

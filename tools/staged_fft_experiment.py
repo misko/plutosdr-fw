@@ -43,12 +43,15 @@ def prepare(path):
     for source in runtime+support:
         relative=str(source.relative_to(BASE/'source_snapshot'))
         require(sha(source)==manifest['sources'][relative]['sha256'],'reference source changed: '+relative)
-    runtime.extend(NEW/name for name in ['starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v',
+    runtime = [p for p in runtime if p.name not in
+               {'starlink_pss_mailbox_owner_view.v', 'starlink_pss_retained_epoch_barrier.v'}]
+    runtime.extend(NEW/name for name in ['starlink_pss_mailbox_reset_receipt.v','starlink_pss_reset_receipt_barrier.v',
+                                       'starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v',
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
                                        'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
                                        'starlink_pss_input_identity_stage.v','starlink_pss_realtime_input_guard_staged_identity.v',
                                        'starlink_pss_product_identity_split_capacity.v','starlink_pss_product_mailbox_staged_identity.v',
-                                       'starlink_pss_mailbox_split_metadata_view.v'])
+                                       'starlink_pss_output_reset_receipt.v'])
     support.extend([NEW/'tb_fft_staged_output.sv',ROOT/'tools/staged_fft_experiment.tcl',Path(__file__).resolve(),
                     ROOT/'tools/retained_destination_synthesis/clocks.xdc',ROOT/'tools/retained_destination_synthesis/threads.tcl'])
     sources=runtime+support

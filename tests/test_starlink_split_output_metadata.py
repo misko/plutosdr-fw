@@ -14,6 +14,9 @@ NEW=RTL/'starlink_pss_mailbox_split_metadata_view.v'
 
 
 def undo_output_top(text):
+    if 'starlink_pss_output_reset_receipt' in text:
+        from tests.test_starlink_reset_receipts import undo_top
+        text=undo_top(text)
     before='starlink_pss_mailbox_split_metadata_view #(.METADATA_WIDTH(37), .RESET_RELEASE_EXTERNAL(1),'
     assert text.count(before)==1
     text=text.replace(before,'starlink_pss_mailbox_owner_view #(.METADATA_WIDTH(37), .RESET_RELEASE_EXTERNAL(1),',1)
