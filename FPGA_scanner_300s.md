@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, local reset receipts integrated: **670 regression + seven
+new evidence tests pass**, both actual FFT campaigns pass, and all **64512
+indexed numerical records** remain exact with unchanged service intervals.
+Routed inspection confirms first-stage fanout is now exclusive to second
+stages and purge is registered: **four CDC-1 and one CDC-10 findings removed**.
+208 bundled-data CDC warnings remain. No constraints were changed.
+Route still fails and is slightly worse: **−1.496 ns WNS / −436.221 ns TNS /
+675 failing endpoints**, same-domain **−1.370 ns**. Retain the verified reset
+cleanup; next target the measured product identity/current-publication path,
+and separately qualify bundled-data timing. No promotion or deployment.
+Branch: `codex/starlink-rx-only-do-not-merge-reset-cdc`; FW `fd2174c3a`,
+HDL `cf14f5d2d`. No radios, PPU/main or primary HDL changes; native 60 MS/s fine
+search, 2.5 MS/s inspection and all full receiver/deployment gates remain.
+See [reset receipts, actual FFT and routed CDC result](reports/experiments/20260911-reset-receipts-actual-route.md).
+
 Update 2026-09-11, output metadata CDC contract: **17 digital contract tests,
 12 assessment tests and seven archive tests pass**. Bounded runs cover 156
 complete reader blocks and 120 reset cases. Read-only routed inspection finds
