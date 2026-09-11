@@ -4,12 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update2026-09-11: bank-local identity now passes the actual vendor FFT campaign.
+All77953 rows and every prior parsed result field match;3230028 full guard-field
+comparisons pass. Independent64 actual preparation,80 physical policy and19 real
+binding tests pass. A frozen167-entry synthesis package is running in root-owned
+process51543; no new routed result yet. Last route remains-2.504ns, failing.
+See [actual PASS and current physical gate](reports/experiments/20260911-bank-identity-actual-physical-parent.md).
+
 The next default-off bank-local identity candidate passes independent **59 tests**
 in18.81s,127 source pins unchanged. Full original guard state/output comparisons,
 clocked and X/Z controls, fault/ACK boundaries and the complete seven-context
 scripted replay pass in modes0/1: all77953 CSV rows and complete prior results
 match. It moves source/product metadata comparisons before phase selection with
-exact X/Z fallback. Actual-vendor preparation is next; no new physical result.
+exact X/Z fallback. Subsequent actual PASS is recorded above; no new physical result.
 See [bank-local candidate checks and remaining gates](reports/experiments/20260910-bank-local-identity-parent.md).
 
 In parallel, independent **15 tests** pass the contextual destination-readiness
