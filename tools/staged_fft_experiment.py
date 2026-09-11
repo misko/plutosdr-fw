@@ -169,6 +169,18 @@ def audit_capture_sim(output):
                        'private_load_checked':True,'held_until_release':True}
     return result
 
+def audit_guardfault_sim(output):
+    result=audit_capture_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_GUARDFAULT_CASE_PASS boundary=(\d+) input_fault_unknown=(\d+) cutover_difference=(\d+) reads=0 releases=0$',text,re.M)
+    require(rows==[(str(n),str(int(n in (2,3))),str(int(n==1))) for n in range(5)],'complete guard fault known/unknown/absorption cases')
+    cycles=re.findall(r'^STAGED_GUARDFAULT_CYCLES_PASS owner0=(\d+) owner1=(\d+)$',text,re.M)
+    require(len(cycles)==1 and all(int(n)>=1000 for n in cycles[0]),'both original fault accumulator checks')
+    require(text.count('STAGED_GUARDFAULT_PASS cases=5 exact_accumulation=1 alias_checked=1')==1,'exact guard fault terminal evidence')
+    result['guardfault']={'boundaries':rows,'cycles':list(map(int,cycles[0])),
+                          'exact_accumulation':True,'alias_checked':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -186,7 +198,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_capture_sim(output)
+        if mode=='sim':result['audit']=audit_guardfault_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

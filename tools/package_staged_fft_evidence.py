@@ -13,8 +13,8 @@ def digest(data):return hashlib.sha256(data).hexdigest()
 
 def package(output,campaign='output'):
     if output.exists():raise ValueError('no artifact overwrite')
-    if campaign not in {'output','handover','admission','completion','replay','capture'}:raise ValueError('explicit campaign required')
-    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1}[campaign]
+    if campaign not in {'output','handover','admission','completion','replay','capture','guardfault'}:raise ValueError('explicit campaign required')
+    final_version={'output':5,'handover':4,'admission':3,'completion':2,'replay':2,'capture':1,'guardfault':1}[campaign]
     sources={}
     def add(name,path):
         if name in sources or path.is_symlink() or not path.is_file():raise ValueError('invalid artifact member '+name)
@@ -29,14 +29,15 @@ def package(output,campaign='output'):
         sim=folder/'project/staged_fft.sim/sim_1/behav/xsim'
         for name in ['simulate.log','staged_words.csv','xvlog.log','xvhdl.log','elaborate.log']:
             if (sim/name).is_file():add(f'actual-v{version}/sim/{name}',sim/name)
-    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1]}[campaign]):
+    for version in ({'output':[5],'handover':[2,4],'admission':[1,2,3],'completion':[1,2],'replay':[1,2],'capture':[1],'guardfault':[1,2]}[campaign]):
         for kind in ['synth','route']:
             if campaign=='admission' and version==1 and kind=='route':continue
+            if campaign=='guardfault' and version==2 and kind=='synth':continue
             folder=RECOVERY/f'staged-{campaign}-{kind}-v{version}'
             prefix=kind if campaign=='output' else f'{kind}-v{version}'
             for p in sorted(folder.iterdir()):
                 if p.is_file():add(f'{prefix}/{p.name}',p)
-            if kind=='route':
+            if kind=='route' and not (campaign=='guardfault' and version==1):
                 for p in sorted((folder/'route').iterdir()):
                     if p.is_file():add(f'{prefix}/reports/{p.name}',p)
     for name in ['staged-mailbox-parent.Tc4Uke1L','staged-adapter-parent.qSJUuasQ']:
@@ -68,9 +69,10 @@ def package(output,campaign='output'):
                 if p.is_file() and p.suffix in {'.xml','.log','.json','.sv','.v','.txt'}:
                     add('tests/'+name+'/'+str(p.relative_to(folder)),p)
             add('tests/'+name+'.xml',RECOVERY/(name+'.xml'))
-    if campaign in {'replay','capture'}:
+    if campaign in {'replay','capture','guardfault'}:
         names=(['staged-replay-preflight-v1','staged-replay-unit-v1','staged-replay-regression-v1',
                 'staged-replay-preflight-v2','staged-replay-regression-v2'] if campaign=='replay' else
+               ['staged-guardfault-unit-v1','staged-guardfault-preflight-v1','staged-guardfault-regression-v1','staged-guardfault-regression-v2'] if campaign=='guardfault' else
                ['staged-capture-preflight-v1','staged-capture-unit-v1','staged-capture-unit-v2','staged-capture-regression-v1'])
         for name in names:
             folder=RECOVERY/name
@@ -84,23 +86,30 @@ def package(output,campaign='output'):
                       'test_starlink_route_report_audit.py','test_starlink_admission_certificate.py',
                       'test_starlink_admission_audit.py','test_starlink_completion_audit.py','test_starlink_private_kernel_payload.py',
                       'test_starlink_private_replay.py','test_starlink_replay_audit.py','test_starlink_writer_audit.py',
-                      'test_starlink_private_descriptor_capture.py','test_starlink_capture_audit.py'}:
+                      'test_starlink_private_descriptor_capture.py','test_starlink_capture_audit.py',
+                      'test_starlink_guard_fault_equivalence.py','test_starlink_guardfault_audit.py'}:
             add('current/tests/'+p.name,p)
     for name in ['staged_fft_experiment.py','staged_fft_experiment.tcl','route_starlink_staged_fft.py','audit_staged_fft_route.py','package_staged_fft_evidence.py']:
         add('current/tools/'+name,ROOT/'tools'/name)
     add('current/docs/starlink-staged-output-integration-20260911.md',ROOT/'docs/starlink-staged-output-integration-20260911.md')
-    if campaign in {'handover','admission','completion','replay','capture'}:
+    if campaign in {'handover','admission','completion','replay','capture','guardfault'}:
         add('current/docs/starlink-staged-handover-20260911.md',ROOT/'docs/starlink-staged-handover-20260911.md')
         add('reference/actual_words.csv',RECOVERY/'destination-actual-parent.LQnQo9ny/run/project/retained_output_actual.sim/sim_1/behav/xsim/actual_words.csv')
-    if campaign in {'admission','completion','replay','capture'}:
+    if campaign in {'admission','completion','replay','capture','guardfault'}:
         add('current/docs/starlink-staged-admission-20260911.md',ROOT/'docs/starlink-staged-admission-20260911.md')
-    if campaign in {'completion','replay','capture'}:
+    if campaign in {'completion','replay','capture','guardfault'}:
         add('current/docs/starlink-staged-completion-20260911.md',ROOT/'docs/starlink-staged-completion-20260911.md')
-    if campaign in {'replay','capture'}:
+    if campaign in {'replay','capture','guardfault'}:
         add('current/docs/starlink-staged-replay-20260911.md',ROOT/'docs/starlink-staged-replay-20260911.md')
-    if campaign=='capture':
+    if campaign in {'capture','guardfault'}:
         add('current/docs/starlink-staged-capture-20260911.md',ROOT/'docs/starlink-staged-capture-20260911.md')
         add('reference/qualified_capture.v',RECOVERY/'staged-replay-prepared-v2/starlink_pss_fft_staged_output_impl.v')
+    if campaign=='guardfault':
+        add('current/docs/starlink-guard-fault-summary-20260911.md',ROOT/'docs/starlink-guard-fault-summary-20260911.md')
+        for name in ['starlink_pss_fft_staged_output_impl.v',
+                     'starlink_pss_realtime_input_guard_local_admission.v',
+                     'starlink_pss_core_job_cutover.v']:
+            add('reference/capture/'+name,RECOVERY/'staged-capture-prepared-v1'/name)
     manifest={name:{'source':str(path),'sha256':digest(path.read_bytes()),'bytes':path.stat().st_size} for name,path in sources.items()}
     def insert(archive,name,data):
         info=tarfile.TarInfo(name);info.size=len(data);info.mode=0o644;archive.addfile(info,io.BytesIO(data))
@@ -128,5 +137,5 @@ def package(output,campaign='output'):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser();parser.add_argument('output',type=Path)
-    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture'],default='output')
+    parser.add_argument('--campaign',choices=['output','handover','admission','completion','replay','capture','guardfault'],default='output')
     args=parser.parse_args();print(json.dumps(package(args.output,args.campaign),indent=2))
