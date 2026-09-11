@@ -10,6 +10,9 @@ PARENT=Path('/dev/shm/starlink-replay-quiet.C5YGuYRF/prepared-v2')
 TOP='starlink_pss_fft_staged_output_impl.v'
 
 def undo_top(text):
+    if '// BEGIN PRIVATE QUARANTINE PROFILE' in text:
+        from tests.test_starlink_private_quarantine_offer import undo_top as undo_private
+        text=undo_private(text)
     for label in ['REPLAY FENCE CONFIGURATION','REPLAY QUIET PUBLICATION FENCE']:
         replacement='' if label=='REPLAY FENCE CONFIGURATION' else '  wire output_replay_accept = output_replay_valid && output_descriptor_valid && output_bank_ready && !common_current_fault;\n'
         text,count=re.subn(r' *// BEGIN '+label+r'\n.*? *// END '+label+r'\n',lambda _:replacement,text,flags=re.S)
@@ -21,6 +24,9 @@ def undo_top(text):
     return text
 
 def undo_bench(text):
+    if '// BEGIN PRIVATE QUARANTINE WITNESS' in text:
+        from tests.test_starlink_private_quarantine_offer import undo_bench as undo_private
+        text=undo_private(text)
     text,count=re.subn(r' *// BEGIN INTEGRATED REPLAY FENCE WITNESS\n.*? *// END INTEGRATED REPLAY FENCE WITNESS\n','',text,flags=re.S)
     assert count==1
     line='      $display("STAGED_REPLAY_FENCE_PASS enabled=1 profile=1 independent_shadow=1 current_publication_exact=1"); // INTEGRATED REPLAY FENCE REPORT\n'
@@ -36,10 +42,15 @@ def test_exact_runtime_bench_and_synthesis_profile_delta():
     names=(PARENT/'profile.tcl').read_text().split('set runtime_names {')[1].split('}')[0].split()
     assert len(names)==22
     for name in names:
-        if name!=TOP and (RTL/name).exists():assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+        if name!=TOP and (RTL/name).exists():
+            text=(RTL/name).read_text()
+            if name=='starlink_pss_result_guard_owner_view.v' and '// BEGIN PRIVATE QUARANTINE OFFER' in text:
+                from tests.test_starlink_private_quarantine_offer import undo_guard
+                text=undo_guard(text)
+            assert text==(PARENT/name).read_text(),name
     tcl=(ROOT/'tools/staged_fft_experiment.tcl').read_text()
     assert tcl.count(' REPLAY_QUIET_PUBLICATION=1')==1
-    assert tcl.replace(' REPLAY_QUIET_PUBLICATION=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
+    assert tcl.replace(' PRIVATE_QUARANTINE_OFFER=1','',1).replace(' REPLAY_QUIET_PUBLICATION=1','',1)==(PARENT/'staged_fft_experiment.tcl').read_text()
 
 def run(tmp_path,mode='1',profile=31,mutation=None):
     text=(RTL/TOP).read_text()

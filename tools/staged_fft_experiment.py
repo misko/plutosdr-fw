@@ -417,9 +417,27 @@ def audit_replay_fence(output,auxiliary=False):
     result['replay_fence']={'enabled':True,'profile':True,'independent_shadow':True,'current_publication_exact':True}
     return result
 
+def private_quarantine_compiled(prepared):
+    return '.PRIVATE_QUARANTINE_OFFER(1)) dut' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def verify_private_quarantine_configuration(prepared):
+    verify_replay_fence_configuration(prepared)
+    require((prepared/'tb_fft_staged_output.sv').read_text().count('.PRIVATE_QUARANTINE_OFFER(1)) dut')==1 and
+            (prepared/'staged_fft_experiment.tcl').read_text().count(' PRIVATE_QUARANTINE_OFFER=1')==1,
+            'matching enabled private quarantine profile')
+
+def audit_private_quarantine(output,auxiliary=False):
+    result=audit_replay_fence(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_PRIVATE_QUARANTINE_PASS checks=(\d+) differences=(\d+) public_fenced=1 healthy_exact=1$',text,re.M)
+    require(len(rows)==1 and int(rows[0][0])>=1000 and int(rows[0][1])>0,'complete private quarantine witness')
+    result['private_quarantine']={'checks':int(rows[0][0]),'differences':int(rows[0][1]),'public_fenced':True,'healthy_exact':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected)
     if replay_fence_compiled(prepared):verify_replay_fence_configuration(prepared)
+    if private_quarantine_compiled(prepared):verify_private_quarantine_configuration(prepared)
     fresh(output)
     env=dict(os.environ)
     for key in ['PYTHONHOME','PYTHONPATH','PYTHONOPTIMIZE','LD_LIBRARY_PATH']:env.pop(key,None)
@@ -450,6 +468,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_private_facts(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and replay_quiet_compiled(prepared):
             result['audit']=audit_replay_fence(output,auxiliary=mode=='ack') if replay_fence_compiled(prepared) else audit_replay_quiet(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and private_quarantine_compiled(prepared):
+            result['audit']=audit_private_quarantine(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

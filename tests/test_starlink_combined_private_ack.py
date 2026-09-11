@@ -18,6 +18,9 @@ def test_complete_guard_and_top_inverse():
                      (GUARD,'ba0b9e308e2747e43edeec6c9b4bb486b2c1fc12d7d850d2bbf6a6ff02cc4431')]:
         old=(BASE/name).read_bytes();assert hashlib.sha256(old).hexdigest()==pin
         text=(RTL/name).read_text()
+        if name==GUARD and '// BEGIN PRIVATE QUARANTINE OFFER' in text:
+            from tests.test_starlink_private_quarantine_offer import undo_guard
+            text=undo_guard(text)
         if name==TOP:
             text=undo_forward_receipt(text)
             text=text.replace('    .PRIVATE_ACK_RETIREMENT(CERTIFIED_ADMISSION && OWNER==1),\n','',1)

@@ -38,6 +38,9 @@ def undo_payload(text):
       '        snapshot_valid<=1;','        snapshot_good<=checks_good;snapshot_valid<=1;',1)
 
 def parent_runtime_bytes(path):
+    if path.name=='starlink_pss_result_guard_owner_view.v' and '// BEGIN PRIVATE QUARANTINE OFFER' in path.read_text():
+        from tests.test_starlink_private_quarantine_offer import undo_guard
+        return undo_guard(path.read_text()).encode()
     return undo_payload(path.read_text()).encode() if path.name==NAME else path.read_bytes()
 
 def undo_bench(text):
@@ -64,7 +67,7 @@ def test_exact_opt_in_delta_and_unchanged_runtime():
     assert len(names)==22
     for name in names:
         if name not in {TOP,NAME} and (RTL/name).exists():
-            assert (RTL/name).read_bytes()==(PARENT/name).read_bytes(),name
+            assert parent_runtime_bytes(RTL/name)==(PARENT/name).read_bytes(),name
 
 def test_exact_bench_delta():
     assert undo_bench((RTL/BENCH).read_text())==(PARENT/BENCH).read_text()
