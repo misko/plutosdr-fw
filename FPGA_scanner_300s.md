@@ -4,6 +4,19 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, registered FFT handover and held reader metadata: six actual
+FFT contexts independently match all **64,512 numerical records**; both
+stopped-reader reset cases and seven actual fault cases pass. 290 regression
+tests plus 12 route-auditor controls pass. Source-matched routing still fails:
+**WNS -3.970 ns**, TNS -2566.980 ns, 2261 setup failures. This is worse than the
+preceding staged-output baseline, so no promotion. The live metadata lookup
+crossing is removed, but input-validation/cutover logic still feeds admission
+through an 11-level path. Next pipeline bank-local validation into explicit
+ownership certificates, keeping fault/publication fences, then reroute before
+new features. Native 60 MS/s fine search, 2.5 MS/s IIO and `.18`→`.17` deployment
+remain open requirements. No radio/PPU/main changes.
+See [handover verification and next timing boundary](reports/experiments/20260911-staged-handover-actual-route-parent.md).
+
 Update 2026-09-11, actual staged-output integration: the new command arbiter and
 real inverse-output buffer pass four generated-FFT contexts, with all **43,008
 numerical records** independently matching the prior actual evidence. 259
