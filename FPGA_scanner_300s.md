@@ -7,8 +7,13 @@ Status: implementation started; hardware qualification is NOT complete.
 Update2026-09-11: bank-local identity now passes the actual vendor FFT campaign.
 All77953 rows and every prior parsed result field match;3230028 full guard-field
 comparisons pass. Independent64 actual preparation,80 physical policy and19 real
-binding tests pass. A frozen167-entry synthesis package is running in root-owned
-process51543; no new routed result yet. Last route remains-2.504ns, failing.
+binding tests pass. Synthesis51543 completes with2354LUT4758FF21DSP15RAMB18,
+source/resource/constraint audit PASS. Root route17298 completes but regresses:
+**WNS-2.640ns**,TNS-1007.296ns,916 failing setup endpoints versus reference
+-2.504ns/679. Hold+.044ns passes;7210 nets fully routed. Bank-local factoring is
+not accepted as a timing improvement and stays default-off. Independent39 revised
+contextual destination tests pass,144 source files unchanged; its separate actual
+and physical qualification is next, with no presumed bank-local union benefit.
 See [actual PASS and current physical gate](reports/experiments/20260911-bank-identity-actual-physical-parent.md).
 
 The next default-off bank-local identity candidate passes independent **59 tests**
