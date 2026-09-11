@@ -4,6 +4,17 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, clocked private admission and held lookup: all **64,512 actual
+FFT numerical records** and the full reset/fault campaign pass, including six
+new admission-cancellation cases. **321 tests** pass. Source-matched routing
+improves from -3.970 ns / 2261 failing endpoints through -3.451 ns / 1602 to
+**-3.080 ns / 1511**, TNS -1541.860 ns; timing still FAILS. The worst path now
+feeds the completion receipt through input identity/fault logic. Next stage
+producer-completion validation with explicit ownership/cancellation, then rerun
+actual tests and route before further features. No radio/PPU/main changes;
+native 60 MS/s fine search, 2.5 MS/s inspection and all deployment gates remain.
+See [admission verification, physical comparison and next gate](reports/experiments/20260911-staged-admission-actual-route-parent.md).
+
 Update 2026-09-11, registered FFT handover and held reader metadata: six actual
 FFT contexts independently match all **64,512 numerical records**; both
 stopped-reader reset cases and seven actual fault cases pass. 290 regression
