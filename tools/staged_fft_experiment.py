@@ -193,6 +193,19 @@ def audit_sequence_sim(output):
     result['sequence']={'boundaries':rows,'advances':advances,'holds':holds,'finals':finals,'next_block_checked':True,'quarantine_checked':True}
     return result
 
+def audit_certification_sim(output):
+    result=audit_sequence_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_CERTIFICATION_CASE_PASS boundary=(\d+) stale_starts=0 stale_reads=0 fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(rows==[str(n) for n in range(6)],'complete private descriptor snapshot cancellation and recovery cases')
+    counts=re.findall(r'^STAGED_CERTIFICATION_CYCLES_PASS checks=(\d+) private_differences=(\d+)$',text,re.M)
+    require(len(counts)==1,'one private descriptor cycle receipt')
+    checks,differences=map(int,counts[0])
+    require(checks>=1000 and differences>=2,'original/private descriptor coverage')
+    require(text.count('STAGED_CERTIFICATION_PASS cases=6 snapshot_cancelled=1 consume_cancelled=1 fresh_recovery=1')==1,'one complete descriptor terminal')
+    result['certification']={'boundaries':rows,'checks':checks,'private_differences':differences,'snapshot_cancelled':True,'consume_cancelled':True,'fresh_recovery':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -210,7 +223,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_sequence_sim(output)
+        if mode=='sim':result['audit']=audit_certification_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
