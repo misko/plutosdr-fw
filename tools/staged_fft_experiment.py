@@ -179,6 +179,20 @@ def audit_finalcapture_sim(output):
     result['finalcapture']={'loads':loads,'holds':holds,'accepts':accepts,'fault_loads':fault_loads,'original_payload_checked':True}
     return result
 
+def audit_sequence_sim(output):
+    result=audit_finalcapture_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_SEQUENCE_CASE_PASS boundary=(\d+) private_advance=1 final=(\d+) reads=(\d+) releases=(\d+)$',text,re.M)
+    expected=[(str(n),str(int(n>=3)),'512' if n in (3,4) else '0','1' if n in (3,4) else '0') for n in range(6)]
+    require(rows==expected,'complete private sequence mid/final fault and late/stalled final cases')
+    counts=re.findall(r'^STAGED_SEQUENCE_CYCLES_PASS advances=(\d+) holds=(\d+) finals=(\d+)$',text,re.M)
+    require(len(counts)==1,'one private sequence cycle receipt')
+    advances,holds,finals=map(int,counts[0])
+    require(advances==9216 and holds>=1000 and finals==18,'healthy private sequence cycle coverage')
+    require(text.count('STAGED_SEQUENCE_PASS cases=6 public_acceptance_preserved=1 next_block_checked=1 quarantine_checked=1')==1,'one full sequence terminal')
+    result['sequence']={'boundaries':rows,'advances':advances,'holds':holds,'finals':finals,'next_block_checked':True,'quarantine_checked':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -196,7 +210,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_finalcapture_sim(output)
+        if mode=='sim':result['audit']=audit_sequence_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
