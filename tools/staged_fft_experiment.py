@@ -243,6 +243,16 @@ def audit_inputstage_sim(output):
                           'exact_payload':True,'admitted_descriptor':True,'boundaries':boundaries}
     return result
 
+def audit_enginecapture_sim(output):
+    result=audit_inputstage_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_ENGINE_CAPTURE_CASE_PASS boundary=(\d+) extra_private=1 stale_reads=0 fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(rows==[str(n) for n in range(6)],'all private engine capture boundaries and recoveries')
+    counts=re.findall(r'^STAGED_ENGINE_CAPTURE_PASS checks=(\d+) private_differences=(\d+) owned_exact=1 cases=6$',text,re.M)
+    require(len(counts)==1 and int(counts[0][0])>=1000 and int(counts[0][1])>=8,'owned descriptor comparison and private-only differences')
+    result['enginecapture']={'boundaries':rows,'checks':int(counts[0][0]),'private_differences':int(counts[0][1]),'owned_exact':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -260,7 +270,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_inputstage_sim(output)
+        if mode=='sim':result['audit']=audit_enginecapture_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

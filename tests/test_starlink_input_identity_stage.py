@@ -63,7 +63,11 @@ def test_integrated_top_inverse():
     old = parent.read_text()
     assert hashlib.sha256(old.encode()).hexdigest() == (
         'b3511a70b97b91e3e9b4106ea0c9bab8df4f7a43a07ff30a5447cd522dc5d143')
-    new = top.read_text()
+    # Historical input-stage inverse; current engine-capture delta has its own
+    # complete inverse and actual runtime payload/authorization witnesses.
+    new = (ROOT.parent / 'staged-inputidentity-prepared-v2' / top.name).read_text()
+    assert hashlib.sha256(new.encode()).hexdigest() == (
+        '2711556e640f6fd64995a755af9ba328529b38c498afe87b26ef842c84b35002')
     start = new.index('  // BEGIN REGISTERED INPUT IDENTITY\n')
     end = new.index('  // END REGISTERED INPUT IDENTITY\n') + len('  // END REGISTERED INPUT IDENTITY\n')
     old_start = old.index('  assign source_read_ready =')
