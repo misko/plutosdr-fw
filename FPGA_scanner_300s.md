@@ -4,6 +4,21 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, bounded post-route physical optimization on retained
+references: **19 tool/audit tests pass**, both implementation passes complete,
+and source/checkpoint/constraint audits pass. No RTL or clock changes. Private
+certification improves to **-1.364 ns WNS / -448.933 ns TNS / 704 failures**;
+guard facts to **-1.307 ns global WNS / -457.279 ns TNS / 822 failures**.
+Guard-facts same-domain 175 MHz slack is **-1.167 ns**, but its global worst is
+now a held-metadata clock crossing. Neither closes timing or qualifies for
+deployment; crossings and unconstrained I/O remain visible. Keep the physical
+pass as a measured finishing step, not a replacement for shorter control paths.
+Next investigate bank-local metadata checks followed by one-bit selection,
+preserving four-state behavior and current fault/reset vetoes. Branch:
+`codex/starlink-rx-only-do-not-merge-postroute-physical`. No radio, PPU/main,
+production HDL, native 60 MS/s fine-search or 2.5 MS/s inspection changes.
+See [post-route comparison and next boundary](reports/experiments/20260911-staged-postroute-comparison.md).
+
 Update 2026-09-11, private inverse input observations: **533 tests** and
 **64,512 actual FFT records** pass with unchanged service intervals. Across
 543,731 monitored cycles, all 424 private count/completion differences are
