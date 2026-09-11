@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, expanded guard facts: **464 tests** and **64,512 actual FFT
+records** pass at unchanged service latency. Original and expanded certificates
+agree for 384,922 live cycles; 32 fact-mapping fault injections block stale work.
+Route is a **mixed result**, not a promotion: **-1.340 ns WNS / -463.636 ns TNS /
+821 failing endpoints**, versus parent -1.452 / -451.168 / 704. Retain both
+candidates. Worst path now reaches actual output-bank publication through
+phase-dependent metadata selection/comparison and current fault checks. Next
+inspect preparing and holding metadata before publication, retaining immediate
+fault vetoes and real reader ACK. No added receiver features before closure.
+Branch: `codex/starlink-rx-only-do-not-merge-guard-facts`. No radio/PPU/main or
+primary production HDL changes. Native 60 MS/s fine search, 2.5 MS/s inspection
+and all full-receiver/deployment gates remain required.
+See [guard-fact proof and mixed route](reports/experiments/20260911-staged-guardfacts-actual-route-parent.md).
+
 Update 2026-09-11, private descriptor certification: **new best measured
 development reference**, with **449 tests** and **64,512 actual FFT records**
 passing at unchanged latency. Snapshot/consume cancellation and six fresh-reset
