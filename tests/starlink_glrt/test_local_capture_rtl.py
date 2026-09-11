@@ -57,3 +57,38 @@ def test_visit_reservation_fences_early_clear_and_releases_after_abort(captures,
                      (0x10, 0), (0x10, 0), (0xC0C, 0)]
     np.testing.assert_array_equal(np.asarray(output).reshape(-1, 2), raw)
     assert final == (0, 0)
+
+
+@pytest.mark.parametrize("count", [1, 2, 31, 32])
+def test_finite_limit_delivers_last_sample_before_search_closure(captures, tmp_path, count):
+    raw = np.array([[517 + n, -731 - n] for n in range(count + 2)], dtype=np.int16)
+    rows = [*arm(visit=519, limit=count), *samples(raw), wait(400), *snapshot(),
+            write(0xC10, 2), *(read(a) for a in range(0xD00, 0xD40, 4)),
+            read(0xC68), read(0xC6C)]
+    output, reads, final = run(captures(2500000, legacy=False, local=True), rows, tmp_path)
+    np.testing.assert_array_equal(output, raw[:count])
+    state = dict(reads)
+    assert u64(state, 0x90) == u64(state, 0x98) == count
+    assert u64(state, 0xD38) == u64(state, 0x80)
+    assert u64(state, 0xC68) == u64(state, 0x80) + count - 1
+    assert state[0xD00] == 0x1B3 and state[0xD04] == state[0xD30] == 0
+    assert state[0xD18] == state[0xD1C] == state[0xD2C] == 1
+    assert final == (0, 0)
+
+
+def test_physical_gap_aborts_search_after_the_exact_admitted_prefix(captures, tmp_path):
+    raw = np.array([[517 + n, -731 - n] for n in range(31)], dtype=np.int16)
+    rows = [*arm(visit=520), *samples(raw), wait(100), (0, 5, 0, 0x12345678, 0),
+            wait(400), *snapshot(), write(0xC10, 2),
+            *(read(a) for a in range(0xD00, 0xD40, 4)), read(0xC68), read(0xC6C)]
+    output, reads, final = run(captures(2500000, legacy=False, local=True), rows, tmp_path)
+    np.testing.assert_array_equal(output, raw)
+    state = dict(reads)
+    assert u64(state, 0x90) == u64(state, 0x98) == len(raw)
+    assert u64(state, 0xD38) == u64(state, 0x80)
+    assert u64(state, 0xC68) == u64(state, 0x80) + len(raw) - 1
+    assert state[0xC8] & 2 and state[0xD04] & 4
+    assert state[0xD00] & 0x193 == 0x193
+    assert state[0xD24] == state[0xD28] == state[0xD30] == 0
+    assert state[0xD1C] == state[0xD2C] == 1
+    assert final == (0, 0)
