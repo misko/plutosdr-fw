@@ -4,6 +4,23 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, parallel forward capacity shadow: **964 distinct tests pass**
+(956 corrected regression + eight evidence tests). Both corrected actual FFT
+campaigns pass, preserving all 64512 records/CSV and service. Parallel readiness
+matches the original unforced equation in 941189 observations; two deliberately
+forced summary-bit differences are retained. First auxiliary failed because the
+shadow observed a forced transport-valid wire instead of its owning register;
+only that observation changed for the successful rerun, not the fault stimulus.
+All 22 runtime modules remain byte-identical: NO new synthesis/route or timing
+improvement is claimed. Next export occupancy and factor the authoritative
+kernel READY itself, retaining guard/fault connections and all direct-injection
+tests; then route the integrated candidate. Inherited −1.399 global / −1.324 ns
+same-domain timing still fails. Branch
+`codex/starlink-rx-only-do-not-merge-forward-capacity-contract`, FW `11b161a69`,
+HDL `ac869ae20`, both pushed. No radio, PPU/main or primary HDL changes; native
+60 MS/s fine and 2.5 MS/s inspection remain required. See
+[parallel capacity contract](reports/experiments/20260911-forward-capacity-contract-actual.md).
+
 Update 2026-09-11, monotonic reset-release contract: **948 distinct tests pass**
 (921 regression + 16 enabled mailbox + 11 evidence tests). Both actual FFT
 campaigns preserve all 64512 numerical records/CSV and service latency. Both old
