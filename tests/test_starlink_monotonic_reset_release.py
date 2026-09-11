@@ -31,6 +31,9 @@ def undo_top(text):
     return text
 
 def undo_bench(text):
+    if '// BEGIN FORWARD CAPACITY SHADOW' in text:
+        from tests.test_starlink_forward_capacity_contract import undo_bench as undo_capacity
+        text=undo_capacity(text)
     text,n=re.subn(r'  // BEGIN MONOTONIC RESET WITNESS\n.*?  // END MONOTONIC RESET WITNESS\n','',text,flags=re.S)
     assert n==1
     for value in ['      report_monotonic_release; // MONOTONIC RESET REPORT\n',',.MONOTONIC_OUTER_RESET(1)']:

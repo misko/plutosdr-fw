@@ -468,6 +468,18 @@ def audit_monotonic_reset(output,auxiliary=False):
     result['monotonic_reset']={'fast':int(rows[0][0]),'slow':int(rows[0][1]),'resets':int(rows[0][2]),'current_exact':True,'latency_unchanged':True}
     return result
 
+def forward_capacity_compiled(prepared):
+    return '// BEGIN FORWARD CAPACITY SHADOW' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_forward_capacity(output,auxiliary=False):
+    result=audit_monotonic_reset(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_FORWARD_CAPACITY_SHADOW_PASS checks=(\d+) healthy=(\d+) faults=(\d+) ready_overrides=(\d+) summary_overrides=(\d+) common_differences=(\d+) unexplained=0 runtime_unchanged=1$',text,re.M)
+    require(len(rows)==1 and min(map(int,rows[0][:2]))>=1000 and int(rows[0][2])>=10,'complete forward capacity shadow')
+    result['forward_capacity_shadow']=dict(zip(['checks','healthy','faults','ready_overrides','summary_overrides','common_differences'],map(int,rows[0])))
+    result['forward_capacity_shadow'].update(unexplained=0,runtime_unchanged=True,production_interface_proven=False)
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected)
     if replay_fence_compiled(prepared):verify_replay_fence_configuration(prepared)
@@ -510,6 +522,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_split_preflight(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and monotonic_reset_compiled(prepared):
             result['audit']=audit_monotonic_reset(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and forward_capacity_compiled(prepared):
+            result['audit']=audit_forward_capacity(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
