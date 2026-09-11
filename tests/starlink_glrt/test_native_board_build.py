@@ -18,6 +18,34 @@ def test_invalid_native_build_selection_creates_no_evidence_directory(tmp_path, 
     assert not output.exists()
 
 
+@pytest.mark.parametrize("rate,native,legacy,schedule,local,netlist,accepted", [
+    ("2500000", "0", "0", "0", "1", "/pinned", True),
+    ("60000000", "0", "0", "0", "1", "/pinned", False),
+    ("2500000", "1", "0", "0", "1", "/pinned", False),
+    ("2500000", "0", "1", "0", "1", "/pinned", False),
+    ("2500000", "0", "0", "1", "1", "/pinned", False),
+    ("2500000", "0", "0", "0", "2", "/pinned", False),
+    ("2500000", "0", "0", "0", "1", "", False),
+])
+def test_local_board_profile_is_exclusive_and_requires_netlist(tmp_path, rate, native, legacy,
+                                                              schedule, local, netlist, accepted):
+    repo = Path(__file__).resolve().parents[2]
+    bench = tmp_path / "local-selection.tcl"
+    values = {"RATE_HZ": rate, "NATIVE_REFINEMENT": native, "LEGACY_SCORER": legacy,
+              "NATIVE_SCHEDULE": schedule, "LOCAL_SEARCH": local, "LOCAL_NETLIST": netlist}
+    bench.write_text("\n".join([
+        *(f"set ::env(STARLINK_GLRT_{key}) {{{value}}}" for key, value in values.items()),
+        "proc unknown {args} { return {} }",
+        'proc ad_ip_parameter {cell key value} { puts "$key=$value" }',
+        f"source {{{repo / 'hdl/projects/pluto/system_glrt_bd.tcl'}}}",
+    ]) + "\n")
+    result = subprocess.run(["tclsh", str(bench)], capture_output=True, text=True, timeout=10, check=False)
+    assert (result.returncode == 0) == accepted, result.stdout + result.stderr
+    if accepted:
+        assert "CONFIG.ENABLE_LOCAL_SEARCH=1" in result.stdout
+        assert "CONFIG.ENABLE_LEGACY_SCORER=0" in result.stdout
+
+
 @pytest.mark.parametrize("rate,native,legacy,accepted", [
     ("60000000", "1", "0", True), ("60000000", "1", "1", True),
     ("2500000", "0", "1", True), ("60000000", "0", "0", False),

@@ -1,5 +1,9 @@
 # Complete local acquisition component, including both buffers and decisions.
-if {$argc!=2 || [version -short] ne "2022.2"} { error "requires Vivado 2022.2, fresh output, ROM directory" }
+if {$argc ni {2 3} || [version -short] ne "2022.2"} {
+  error "requires Vivado 2022.2, fresh output, ROM directory, optional --control-netlist"
+}
+set control_netlist [expr {$argc==3}]
+if {$control_netlist && [lindex $argv 2] ne "--control-netlist"} { error "unknown output mode" }
 set output [file normalize [lindex $argv 0]]
 set roms [file normalize [lindex $argv 1]]
 if {[file exists $output]} { error "output exists" }
@@ -9,7 +13,14 @@ set sources [list]
 foreach name {local_search coarse_search coarse_window coarse_mac6 coarse_norm coarse_peaks verify_control verify_window3 verify_mac3 verify_rotate3} {
   lappend sources $repo/hdl/library/starlink_glrt/starlink_glrt_$name.v
 }
-lappend sources $repo/tools/starlink_glrt_local_search_ooc_wrapper.v
+if {$control_netlist} {
+  lappend sources $repo/hdl/library/starlink_glrt/starlink_glrt_local_control.v
+  lappend sources $repo/hdl/library/starlink_glrt/starlink_glrt_local_cadence.v
+  set top starlink_glrt_local_control
+} else {
+  lappend sources $repo/tools/starlink_glrt_local_search_ooc_wrapper.v
+  set top starlink_glrt_local_search_ooc_wrapper
+}
 set tracked [concat $sources [list [file normalize [info script]] $roms/manifest.json \
     $roms/coarse_upper_q9.mem $roms/coarse_upper_energy.mem $roms/verify_upper_pilot_q9.mem \
     $roms/verify_upper_energy.mem $roms/verify_oscillator_q10.mem]]
@@ -67,7 +78,9 @@ foreach {name tag_width original} {coarse_mac6 5 coarse_mac6 verify_mac3 1 verif
   lappend stubs $stub
 }
 set shell_sources [list]
-foreach name {local_search coarse_search coarse_window coarse_peaks verify_control verify_window3} {
+set shell_names {local_search coarse_search coarse_window coarse_peaks verify_control verify_window3}
+if {$control_netlist} { lappend shell_names local_control local_cadence }
+foreach name $shell_names {
   set path $repo/hdl/library/starlink_glrt/starlink_glrt_$name.v
   set fd [open $path r];set content [read $fd];close $fd
   if {$name eq "coarse_window"} { set content [string map {starlink_glrt_coarse_norm starlink_glrt_coarse_norm4} $content] }
@@ -78,17 +91,50 @@ foreach name {local_search coarse_search coarse_window coarse_peaks verify_contr
 }
 create_project -in_memory -part xc7z010clg400-1
 set_msg_config -id {Synth 8-311} -new_severity ERROR
-read_verilog -sv [concat $shell_sources $stubs [list [lindex $sources end]]]
-synth_design -top starlink_glrt_local_search_ooc_wrapper -mode out_of_context \
+if {!$control_netlist} { lappend shell_sources [lindex $sources end] }
+read_verilog -sv [concat $shell_sources $stubs]
+synth_design -top $top -mode out_of_context \
   -flatten_hierarchy none -directive Default
-set shell_edif $output/starlink_glrt_local_search_ooc_wrapper.edf
+set shell_edif $output/$top.edf
+if {$control_netlist} {
+  file mkdir $output/shell
+  set shell_edif $output/shell/$top.edf
+}
 write_edif $shell_edif
 close_project
 create_project -in_memory -part xc7z010clg400-1
 read_edif $netlists
 read_edif $shell_edif
-link_design -top starlink_glrt_local_search_ooc_wrapper -part xc7z010clg400-1 -mode out_of_context
+link_design -top $top -part xc7z010clg400-1 -mode out_of_context
 if {[llength [get_cells -hier -filter {IS_BLACKBOX == 1}]]} { error "unresolved arithmetic black box" }
+if {$control_netlist} {
+  # An unplaced complete component for the board implementation. No fixture
+  # registers or false paths are exported; the board must time every port.
+  write_edif $output/starlink_glrt_local_control.edf
+  report_utilization -hierarchical -file $output/synthesis_utilization.rpt
+  set source $repo/hdl/library/starlink_glrt/starlink_glrt_local_control.v
+  set fd [open $source r];set content [read $fd];close $fd
+  set start [string first "module starlink_glrt_local_control" $content]
+  set finish [string first "\n);" $content $start]
+  if {$start<0 || $finish<0} { error "cannot extract local control interface" }
+  set fd [open $output/starlink_glrt_local_control_stub.v {WRONLY CREAT EXCL}]
+  puts $fd "(* black_box=\"yes\" *) [string range $content $start [expr {$finish+2}]]\nendmodule"
+  close $fd
+  set fd [open $output/source-hashes.txt {WRONLY CREAT EXCL}]
+  foreach path $tracked {
+    if {[lindex [exec sha256sum $path] 0] ne $hashes($path)} { error "source changed" }
+    puts $fd "$hashes($path)  $path"
+  }
+  close $fd
+  set fd [open $output/outputs.sha256 {WRONLY CREAT EXCL}]
+  foreach name {starlink_glrt_local_control.edf starlink_glrt_local_control_stub.v source-hashes.txt} {
+    puts $fd "[lindex [exec sha256sum $output/$name] 0]  $name"
+  }
+  close $fd
+  puts "LOCAL_CONTROL_NETLIST_READY_NOT_BOARD_TIMING_VERIFIED"
+  close_project
+  exit
+}
 create_clock -name local_clk -period 10.0 [get_ports clk]
 set_property HD.CLK_SRC BUFGCTRL_X0Y0 [get_ports clk]
 set_clock_uncertainty 0.1 [get_clocks local_clk]
