@@ -16,7 +16,12 @@ def test_complete_guard_and_top_inverses():
     for name,pin in [(TOP,'6c181d830143c998ffa3fba15d51fe34cf087d08eb622591f698229b07b1a4a4'),
                      (GUARD,'6b3f4ff240f3f81edaaf694f7b2a926be320da71bfc3641d84a6ce3c87104f45')]:
         old=(BASE/name).read_bytes();assert hashlib.sha256(old).hexdigest()==pin
-        text=(RTL/name).read_text()
+        # This historical whole-file inverse belongs to the pinned guard-fact
+        # candidate. The held-metadata test separately inverts today's full top.
+        current=ROOT.parent/'staged-guardfacts-prepared-v1'/name
+        text=current.read_text() if name==TOP else (RTL/name).read_text()
+        if name==TOP:
+            assert hashlib.sha256(current.read_bytes()).hexdigest()=='b3511a70b97b91e3e9b4106ea0c9bab8df4f7a43a07ff30a5447cd522dc5d143'
         if name==GUARD:
             text=text.replace('  output wire [7:0] offered_local_faults_now,\n','',1)
             start=text.index('  // Same facts as the scalar view, before its OR reduction.')

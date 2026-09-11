@@ -216,6 +216,18 @@ def audit_guardfacts_sim(output):
     result['guardfacts']={'boundaries':rows,'cycles':int(cycles[0]),'exact_certificates':True,'fresh_recovery':True}
     return result
 
+def audit_heldmeta_sim(output):
+    result=audit_guardfacts_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_HELDMETA_PASS checks=(\d+) firsts=(\d+) finals=(\d+) replays=(\d+) reads=(\d+) stalls=(\d+) exact_bank=1$',text,re.M)
+    require(len(rows)==1,'one exact held-metadata bank witness receipt')
+    counts=list(map(int,rows[0]))
+    require(all(a>=b for a,b in zip(counts,[1000,18,36,18,9216,1000])),
+            'first/final/replay/read/stall held-metadata coverage')
+    result['heldmeta']=dict(zip(['checks','firsts','finals','replays','reads','stalls'],counts))
+    result['heldmeta']['exact_bank']=True
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -233,7 +245,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_guardfacts_sim(output)
+        if mode=='sim':result['audit']=audit_heldmeta_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
