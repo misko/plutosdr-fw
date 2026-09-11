@@ -2,6 +2,20 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, two READY KEEP attributes removed: **992 regression tests
+and both actual FFT campaigns pass**, preserving all 64512 records/CSV and
+service clocks. Matched routing improves WNS **-1.434 to -1.245 ns**, same-domain
+WNS **-1.434 to -1.046 ns**, and setup failures **590 to 453**. Timing still
+fails; no deployment. The former release-to-kernel-protocol-fault path improves
+to -0.733 ns; the new same-domain worst is handoff identity through current
+fault/commit/ACK control. Next examine that complete dependency, keeping immediate
+fault/reset veto and stale-evidence rejection. CDC remains nine CDC-3 / 208
+CDC-15, unqualified. Branch
+`codex/starlink-rx-only-do-not-merge-ready-logic-absorption`, FW `e63d31957`,
+HDL `17092c6ef`. Native 60 MS/s fine and 2.5 MS/s inspection remain required.
+No radios, PPU/main or primary HDL changes; `.20/.21` excluded. See
+[READY absorption route](reports/experiments/20260911-ready-logic-absorption-actual-route.md).
+
 ## Current verified status (2026-09-11)
 
 Update 2026-09-11, authoritative parallel kernel READY integrated: **988 distinct
