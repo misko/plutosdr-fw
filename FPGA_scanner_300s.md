@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, private inverse offer decoupled from sticky quarantine:
+**843 regression + ten new evidence tests pass (853 distinct)**; both actual
+FFT campaigns pass, with exact 64512 numerical records, CSV and service. One
+main/two auxiliary private differing cycles remain fenced from every public
+commit/ACK. The targeted guard fault-to-commit path improves -1.235 to -0.292 ns,
+but overall setup regresses: **-1.322 ns WNS / -323.338 ns TNS / 622 failures**.
+Do not promote: the quiet-fence parent (-1.241 / 572) remains the better routed
+reference. New worst is preflight metadata identity to fast fault; inspect its
+held-lease/phase contract and nearby reset-to-ROM-valid path before further RTL.
+Branch `codex/starlink-rx-only-do-not-merge-private-quarantine-offer`, FW
+`212da8871`, HDL `f0cedf13d`, both pushed. No clocks/exceptions, radios, PPU/main,
+primary HDL or TX removal; native 60 MS/s fine and 2.5 MS/s inspection remain.
+See [private quarantine offer actual route](reports/experiments/20260911-private-quarantine-offer-actual-route.md).
+
 Update 2026-09-11, opt-in quiet publication fence integrated with actual FFT and
 buffers: **820 regression + twelve new evidence tests pass (832 distinct)**.
 Both actual FFT campaigns pass; all 64512 records, CSV bytes and service clocks
