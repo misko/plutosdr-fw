@@ -2,6 +2,19 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, local private completion facts: **1,191 tests pass**; actual
+FFT numerics/service remain unchanged at 4,177 clocks, with cycle-exact original
+certificate comparison and ten additional completion cancellation tests.
+**Timing regresses to -1.655 ns WNS / -504.761 ns TNS / 1,163 endpoints.**
+No promotion: keep the buffered parent as the better integrated timing reference.
+The worst path is now current output-bank metadata validation into output control.
+Next prototype a buffered/registered inverse-output identity boundary, retaining
+real publication fault fencing, ownership and service-budget checks. Branch
+`codex/starlink-rx-only-do-not-merge-local-completion-facts`, FW `ea372e9b3`,
+HDL `0fc161937`. No radios, PPU/main or primary HDL pointer changed; native
+60 MS/s fine and 2.5 MS/s inspection remain required. See
+[completion facts and retained timing regression](reports/experiments/20260911-local-completion-facts-actual-route.md).
+
 Update 2026-09-11, buffered forward FFT integration: **1,159 distinct tests
 pass**, and the real FFT/kernel/product/inverse subsystem passes 64,512-word
 numerical comparisons, six fault injections, eight reset boundaries and two
