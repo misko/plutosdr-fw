@@ -2,6 +2,19 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, registered private abort: **1,241 tests pass**, both actual
+FFT campaigns retain 64,512 exact numerical words and 4,178 service clocks.
+Six direct guard-fault cases exercise extra private work without new publication
+or reuse, with fresh reset recovery. **Timing still fails: -1.414 ns WNS /
+-321.485 ns TNS / 653 endpoints.** Same-domain 175 MHz WNS is -1.357 ns;
+overall worst is an unqualified held-metadata CDC path. Next separate and
+address the genuine reset/current-fault control cone and mailbox CDC constraints;
+no blanket timing waiver. Branch
+`codex/starlink-rx-only-do-not-merge-registered-private-abort`, FW `a069a0ccb`,
+HDL `338dbec0e`. No radios, PPU/main or primary HDL pointer changed. Native
+60 MS/s fine and 2.5 MS/s inspection remain required. See
+[registered-abort result and retained evidence](reports/experiments/20260911-registered-private-abort-actual-route.md).
+
 Update 2026-09-11, inverse-output identity stage: **1,200 tests pass** and both
 actual FFT runs match 64,512 numerical words. Nine new output-stage fault/reset
 cases recover correctly. Service is **4,178 clocks**, only one more than the
