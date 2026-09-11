@@ -17,6 +17,11 @@ def test_complete_guard_and_top_inverses():
                      (GUARD,'6b3f4ff240f3f81edaaf694f7b2a926be320da71bfc3641d84a6ce3c87104f45')]:
         old=(BASE/name).read_bytes();assert hashlib.sha256(old).hexdigest()==pin
         text=(RTL/name).read_text()
+        if name==TOP:
+            # New publication authorization is independently source-inverted;
+            # retain the historical guard-fact inverse on its pinned parent.
+            text=(ROOT.parent/'staged-preflightpublication-prepared-v1'/name).read_text()
+            assert hashlib.sha256(text.encode()).hexdigest()=='b3511a70b97b91e3e9b4106ea0c9bab8df4f7a43a07ff30a5447cd522dc5d143'
         if name==GUARD:
             text=text.replace('  output wire [7:0] offered_local_faults_now,\n','',1)
             start=text.index('  // Same facts as the scalar view, before its OR reduction.')
