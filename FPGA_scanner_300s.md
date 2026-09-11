@@ -2,6 +2,22 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-11, private forward capture progress: **standalone internal
+timing passes +0.186 ns WNS / 0 TNS / 0 setup failures**, same clock/recipe,
+72 LUT / 111 FF / one RAMB18 / zero DSP. The wide descriptor-to-counter path
+is absent in replica-inclusive routed queries. **1115 distinct tests pass**
+(1099 regression + 16 guard/bank contract tests); actual-FFT observer results
+and all original numerical records are unchanged. The guard/bank tests prove
+that final qualification requires ownership-ready, not raw capture-ready, and
+that subsequent ACK waits for actual product ownership. Next integrate that
+contract into the real FFT/kernel/product schedule and measure sustained
+service, then route the integrated subsystem. **This is not full receiver
+timing closure or deployment.** Branch
+`codex/starlink-rx-only-do-not-merge-private-forward-capture`, FW `3557f9c27`,
+HDL `fa314a25f`. Native 60 MS/s fine and independent 2.5 MS/s inspection remain
+required. No radios, PPU/main or primary HDL pointer changed. See
+[local closure and integration contract](reports/experiments/20260911-private-forward-capture-local-closure.md).
+
 Update 2026-09-11, whole forward-return bank component: **1077 tests pass**.
 Both corrected actual-FFT observer campaigns pass, checking 75144 replay words
 and 144 complete blocks. All 22 original runtime modules, original numerical
