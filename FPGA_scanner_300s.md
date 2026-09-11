@@ -4,6 +4,24 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, parallel output metadata comparisons: **652 distinct tests
+pass**, both corrected actual-FFT campaigns pass and **64512 numerical records
+and service intervals remain exact**. Compare live/replay metadata before
+selecting the current one-bit result; no RTL state, delayed fault or added
+latency. Six new actual corruption/reset cases prove cancellation and fresh
+512-word recovery. Failed injection diagnostics are retained; all 22 runtime
+modules remain identical across those testbench corrections.
+Route improves to **-1.258 ns WNS / -328.306 ns TNS / 692 failures**; same-domain
+175 MHz worst is **-1.215 ns**. Setup still fails. Worst overall path is now
+bundled metadata CDC, while a same-domain equality/current-completion path
+also remains open. Next prove a private output-validation boundary and,
+separately, the bundled-data stability/ownership constraints; do not hide CDC
+or delay current fault vetoes. Branch:
+`codex/starlink-rx-only-do-not-merge-split-output-metadata`.
+No promotion, radios, PPU/main or primary HDL changes. Native 60 MS/s fine
+search, 2.5 MS/s inspection and all full receiver/deployment gates remain.
+See [parallel output metadata proof and routed result](reports/experiments/20260911-staged-outputmetadata-actual-route.md).
+
 Update 2026-09-11, split product capacity interface: **631 distinct tests pass**,
 both actual-FFT campaigns pass, **64512 numerical records and service times
 remain identical**. Explicitly separate actual bank capacity from qualified
