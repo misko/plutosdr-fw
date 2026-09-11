@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, compare metadata before phase selection: **874 regression +
+ten new evidence tests pass (884 distinct)**; both actual FFT campaigns pass,
+with exact 64512 records/CSV and unchanged service. The former product-metadata
+bit-34-to-fast-fault path improves **-1.322 to +0.052 ns**. Same-domain WNS
+improves to -1.037 ns; global WNS is -1.373 ns on held metadata CDC, TNS -292.853,
+580 setup failures. Timing is NOT closed. Next prove a caller-specific reset-
+release redundancy before removing that critical dependency; preserve immediate
+reset cancellation and qualify CDC separately. CDC-15 count rises 208 to 209 due
+to a source-metadata reader replica, explicitly retained for qualification.
+Branch `codex/starlink-rx-only-do-not-merge-split-preflight-identity`, FW
+`f5c10235c`, HDL `ac16ab63d`, both pushed. No radio (including .20/.21), PPU/main,
+primary HDL, clock/exception or TX changes; native 60 MS/s fine and 2.5 MS/s
+inspection remain required. See [split preflight route](reports/experiments/20260911-split-preflight-identity-actual-route.md).
+
 Update 2026-09-11, private inverse offer decoupled from sticky quarantine:
 **843 regression + ten new evidence tests pass (853 distinct)**; both actual
 FFT campaigns pass, with exact 64512 numerical records, CSV and service. One
