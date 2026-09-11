@@ -169,6 +169,16 @@ def audit_capture_sim(output):
                        'private_load_checked':True,'held_until_release':True}
     return result
 
+def audit_finalcapture_sim(output):
+    result=audit_capture_sim(output)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    counts=re.findall(r'^STAGED_FINALCAPTURE_PASS loads=(\d+) holds=(\d+) accepts=(\d+) fault_loads=(\d+) original_payload_checked=1$',text,re.M)
+    require(len(counts)==1,'one original/private final payload terminal')
+    loads,holds,accepts,fault_loads=map(int,counts[0])
+    require(loads>=1000 and holds>=1000 and accepts>=18 and fault_loads>=100,'private final load/hold/accept/fault coverage')
+    result['finalcapture']={'loads':loads,'holds':holds,'accepts':accepts,'fault_loads':fault_loads,'original_payload_checked':True}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -186,7 +196,7 @@ def run(mode,prepared,expected,output):
             except subprocess.TimeoutExpired:
                 p.terminate();p.wait(timeout=30);raise
         require(result['returncode']==0,'vendor command failed; see '+str(output/'stdout.log'))
-        if mode=='sim':result['audit']=audit_capture_sim(output)
+        if mode=='sim':result['audit']=audit_finalcapture_sim(output)
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise
