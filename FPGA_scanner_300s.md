@@ -4,6 +4,16 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, staged-control work: a separate compact descriptor-ownership
+table now passes 36 tests, including stale-tag/abort/reset controls and RTL
+mutants. Early registered-boundary routes fail at -0.012 ns and -0.246 ns;
+the latter comparison rewrite is reverted. These are component-only probes,
+not complete-island improvements. Next split command validation from ownership
+application with a registered command/response contract, then integrate the
+actual FFT/buffers. Source and failed physical experiments are preserved in a
+verified 1859-member evidence archive. No radio or production promotion.
+See [staged ownership prototype and next integration gates](reports/experiments/20260911-staged-descriptor-slots-parent.md).
+
 Update 2026-09-11: the independent destination candidate passes actual FFT
 simulation (all 77953 rows and previous results identical), 85 preparation
 tests, 69 physical-policy tests and source-matched synthesis. Routing completes
