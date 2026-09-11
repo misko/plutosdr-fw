@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-10)
 
+Update 2026-09-11, private inverse ACK retirement: **514 tests** and **64,512
+actual FFT records** pass with unchanged service latency. Original-guard public
+and diagnostic outputs match across 501,911 cycles; 306 private occupancy
+differences are known-quarantined. Six new readiness-edge cases recover cleanly.
+Route improves over handoff to **-1.617 ns WNS / -488.478 ns TNS / 679 failing
+endpoints**. Fewer failures than private certification, but worse WNS/TNS: retain
+both, no overall best-reference or deployment promotion. Worst path now feeds
+inverse private input accounting through input-identity/delivery qualification.
+Investigate that boundary next without replacing certified delivery by a private
+offer. Branch: `codex/starlink-rx-only-do-not-merge-private-ack-retirement`.
+No radio/PPU/main or primary production HDL change. Native 60 MS/s fine search,
+2.5 MS/s inspection and all full-receiver/deployment gates remain required.
+See [private ACK proof and physical comparison](reports/experiments/20260911-staged-privateack-actual-route-parent.md).
+
 Update 2026-09-11, whole held bank handoff: **496 tests** and **64,512 actual
 FFT records** pass at unchanged service latency. The original-input bank and
 441,088 rising-edge ownership/offer checks match; six new late-event, paused
