@@ -14,6 +14,7 @@ from staged_fft_experiment import final_capacity_compiled, audit_finalcapacity
 from staged_fft_experiment import split_capacity_compiled, audit_splitcapacity
 from staged_fft_experiment import output_metadata_compiled, audit_outputmetadata
 from staged_fft_experiment import balanced_handoff_compiled, audit_balancedhandoff
+from staged_fft_experiment import completion_slot_compiled, audit_completion_slot
 
 from staged_fft_experiment import ROOT, audit_sim, audit_handover_sim, audit_admission_sim, audit_completion_sim, audit_replay_sim, audit_writer_sim, audit_capture_sim, audit_finalcapture_sim, audit_sequence_sim, audit_certification_sim, audit_guardfacts_sim, fresh, require, sha, verify
 
@@ -34,6 +35,7 @@ def verify_ack_auxiliary(auxiliary,expected,prepared):
     if split_capacity_compiled(prepared):audited=audit_splitcapacity(auxiliary,auxiliary=True)
     if output_metadata_compiled(prepared):audited=audit_outputmetadata(auxiliary,auxiliary=True)
     if balanced_handoff_compiled(prepared):audited=audit_balancedhandoff(auxiliary,auxiliary=True)
+    if completion_slot_compiled(prepared):audited=audit_completion_slot(auxiliary,auxiliary=True)
     require(json.dumps(audited,sort_keys=True)==json.dumps(result['audit'],sort_keys=True),'ACK auxiliary re-audit mismatch')
     return audited
 
@@ -76,6 +78,9 @@ def run(actual,synthesis,output,ack_actual=None):
     require(('balancedhandoff' in a['audit'])==balanced_handoff_compiled(prepared),
             'main audit and compiled balanced handoff campaign differ')
     if balanced_handoff_compiled(prepared):audited=audit_balancedhandoff(actual)
+    require(('completion_slot' in a['audit'])==completion_slot_compiled(prepared),
+            'main audit and compiled completion slot campaign differ')
+    if completion_slot_compiled(prepared):audited=audit_completion_slot(actual)
     require(json.dumps(audited,sort_keys=True)==json.dumps(a['audit'],sort_keys=True),
             'actual numerical re-audit mismatch')
     prepared=Path(s['command'][-3]);verify(prepared,s['prepared_sha'])

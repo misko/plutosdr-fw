@@ -46,7 +46,7 @@ def prepare(path):
     runtime = [p for p in runtime if p.name not in
                {'starlink_pss_mailbox_owner_view.v', 'starlink_pss_retained_epoch_barrier.v'}]
     runtime.extend(NEW/name for name in ['starlink_pss_mailbox_reset_receipt.v','starlink_pss_reset_receipt_barrier.v',
-                                       'starlink_pss_descriptor_commands.v','starlink_pss_staged_mailbox_control.v','starlink_pss_fft_staged_output_impl.v',
+                                       'starlink_pss_descriptor_commands.v','starlink_pss_completion_mailbox_stage.v','starlink_pss_fft_staged_output_impl.v',
                                        'starlink_pss_core_job_cutover.v','starlink_pss_result_guard_owner_view.v','starlink_pss_admission_certificate.v',
                                        'starlink_pss_kernel_rom.v','starlink_pss_forward_kernel_join.v',
                                        'starlink_pss_input_identity_stage.v','starlink_pss_realtime_input_guard_staged_identity.v',
@@ -359,6 +359,20 @@ def audit_balancedhandoff(output,auxiliary=False):
     result['balancedhandoff']={'checks':int(rows[0][0]),'owned':int(rows[0][1]),'exact_current':True}
     return result
 
+def completion_slot_compiled(prepared):
+    return '// BEGIN COMPLETION MAILBOX WITNESS' in (prepared/'tb_fft_staged_output.sv').read_text()
+
+def audit_completion_slot(output,auxiliary=False):
+    result=audit_balancedhandoff(output,auxiliary)
+    text=(output/'project/staged_fft.sim/sim_1/behav/xsim/simulate.log').read_text()
+    rows=re.findall(r'^STAGED_COMPLETION_SLOT_PASS accepts=(\d+) consumes=(\d+) holds=(\d+) immediate_ownership=1 held_payload=1$',text,re.M)
+    require(len(rows)==1 and min(map(int,rows[0][:2]))>=18 and int(rows[0][2])>=1000,'complete actual completion slot coverage')
+    cases=re.findall(r'^STAGED_COMPLETION_SLOT_CASE_PASS boundary=(\d+) fresh_reads=512 fresh_releases=1$',text,re.M)
+    require(cases==([str(n) for n in range(3)] if auxiliary else []),'complete pending receipt cancellation inventory')
+    result['completion_slot']={'accepts':int(rows[0][0]),'consumes':int(rows[0][1]),'holds':int(rows[0][2]),
+        'immediate_ownership':True,'held_payload':True,'boundaries':cases}
+    return result
+
 def run(mode,prepared,expected,output):
     verify(prepared,expected);fresh(output)
     env=dict(os.environ)
@@ -384,6 +398,8 @@ def run(mode,prepared,expected,output):
             result['audit']=audit_outputmetadata(output,auxiliary=mode=='ack')
         if mode in {'sim','ack'} and balanced_handoff_compiled(prepared):
             result['audit']=audit_balancedhandoff(output,auxiliary=mode=='ack')
+        if mode in {'sim','ack'} and completion_slot_compiled(prepared):
+            result['audit']=audit_completion_slot(output,auxiliary=mode=='ack')
     except Exception as exc:
         result['error']=f'{type(exc).__name__}: {exc}'
         raise

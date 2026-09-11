@@ -13,6 +13,9 @@ OLD="  wire forward_handoff_identity = product_bank_metadata ==\n    {1'b1, engi
 
 
 def undo_handoff(text):
+    if 'starlink_pss_completion_mailbox_stage' in text:
+        from tests.test_starlink_completion_mailbox_stage import undo_adapter_top
+        text=undo_adapter_top(text)
     text,count=re.subn(r'  // BEGIN BALANCED HANDOFF IDENTITY\n.*?  // END BALANCED HANDOFF IDENTITY\n',
                       lambda _:OLD,text,flags=re.S)
     assert count==1
@@ -20,6 +23,9 @@ def undo_handoff(text):
 
 
 def undo_bench(text):
+    if '// BEGIN COMPLETION MAILBOX WITNESS' in text:
+        from tests.test_starlink_completion_mailbox_stage import undo_completion_bench
+        text=undo_completion_bench(text)
     text,count=re.subn(r'  // BEGIN BALANCED HANDOFF WITNESS\n.*?  // END BALANCED HANDOFF WITNESS\n','',text,flags=re.S)
     assert count==1
     for spaces,mode in [(6,'AUXILIARY'),(4,'MAIN')]:
