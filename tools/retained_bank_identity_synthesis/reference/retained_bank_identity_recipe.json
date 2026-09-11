@@ -1,0 +1,36 @@
+{
+  "kind": "retained-bank-local-identity-offline-v1",
+  "qualified_actual_manifest": "b5d112562b7db31164dc4a6ff92404de8e7d7d5d96b1c1b23e1a7dbac9d2c368",
+  "qualified116_signature": "cf37ea269f9c220a3cfeea1761757657bccc5faff62aade4dec1d87a7d0694fb",
+  "option": {"name": "BANK_LOCAL_IDENTITY_EQ", "default": 0, "admitted": [0, 1]},
+  "original_sources": {
+    "starlink_pss_fft_bank_owned_retained_output_probe.v": "7367d534792385eab3b4264f2e36849b18222e6fe848ef7dbc0887394de8bf94",
+    "starlink_pss_fft_retained_output_impl.v": "3b98a25b8c5d50a18da1692511ae1647c2969fadf5c55d679278b2d5a7bbf0ff",
+    "starlink_pss_realtime_input_guard_local_admission.v": "55438743eede0d346cec67351e079eb6ae21da437d4088a131a2a258b43ff233"
+  },
+  "candidate_sources": {
+    "starlink_pss_fft_bank_owned_retained_output_probe.v": "42b6f902aef4235d1ddfae3e38135f73deab3fe06ff8b57f4ff32c9684792489",
+    "starlink_pss_fft_retained_output_impl.v": "c41ecec9ae2f6072c6725ec452edd999120947647caaa6648f69d4c5a153d07b",
+    "starlink_pss_realtime_input_guard_local_admission.v": "1197df519574ceceaa1b17b5b972bd3fc38a1caedd18ede492dd3ec1e056b005"
+  },
+  "inverse_sha256": "9f6e7baba19887e10e32e5a260e8925d417e8f1e678f5214d11b844214b700be",
+  "contract": {
+    "input_guard": "Both70-bit bank metadata words compare against the original private admission descriptor, never job_descriptor or engine_metadata. Caller supplies input_metadata exactly equal to phase?product:source, as original top wiring does; arbitrary inconsistent ports are outside enabled known-phase equivalence scope. Phase===0/1 selects the corresponding scalar; X/Z selects exact original input_metadata equality. Default0 ignores added ports.",
+    "preflight": "Comparison0 uses source/product70-bit equality against unchanged engine_metadata and known-phase scalar selection with original selected-preflight equality fallback. Comparison1 engine_metadata versus expected_product_metadata unchanged except naming alias.",
+    "counterexample": "descriptor low2=00, source01, product10, phaseX/Z: old mux-before-equality=X, naive scalar-before-mux=0; exact fallback must be X.",
+    "unchanged": ["private descriptor capture", "all guard state and counters", "certification and immediate faults/reasons", "selected data/position/LAST/transport", "current ACK/publication authority", "all116 qualified sources", "all frozen vectors and service/reset/frame gates"],
+    "added_state_bits": 0,
+    "added_latency_cycles": 0,
+    "payload_banks": 3
+  },
+  "acceptance": [
+    "Strict whole-source inverse of all3 files and default0 full behavior; unknown new parameter rejected.",
+    "Full original real input guard state/output equality under identical known/X/Z phase and metadata/control stimuli in balanced0/1 and option0/1 modes.",
+    "Both banks and all70 metadata bits; known/unknown phase; stalls, active descriptor changes, phase changes between/within jobs, duplicate, delivery, reset, and current ACK collisions. No hierarchy writes presented as reachable guard state.",
+    "Explicit naive unknown-phase counterexample and fallback equality, including cases where known bit mismatches mask unknown metadata.",
+    "Complete original seven-context scripted composition CSV byte equality, full old parsed result equality, unchanged guard shadows and additional full original input-guard state/output shadow. No numerical regeneration or event/service shift.",
+    "Negative controls for wrong bank/descriptor owner, missing fallback, missed high metadata bit, preflight comparison1 change, source/inverse/parameter mutations."
+  ],
+  "scope": "Offline candidate addressing phase-fanout only, not epoch-release paths, timing closure, actual vendor, hardware/radio, lowerclock or deployment.",
+  "vendor_execution_authorized": false
+}

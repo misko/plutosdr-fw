@@ -1,0 +1,42 @@
+{
+  "actual_execution_accepted": false,
+  "kind": "UNBOUND_BANK_LOCAL_IDENTITY_PHYSICAL_RECIPE",
+  "previous_physical_inventory": "1760f6d51c2438bd22ff12dfeccb18aa83a528b54ac0b71992efa27c32160a2b",
+  "reference_assets": {
+    "clocks.xdc": "bac30eff84cc71d1f273104b716b388b55e51d33be10f9beaf1901232193ba3f",
+    "reference/admission.py": "6d9dadfdf9fb3ad3df87a771bc151e854b65c19ab518e6dd501b1ed0f0f9cc84",
+    "reference/create_shared_realtime_xfft_ip.tcl": "0795ea7e6aa981d78080ac22fa4ba6355da59d6829ceb409dda07a54f7f9420d",
+    "reference/prepare_starlink_retained_summary_synthesis.py": "26a4e81835ca8504873e85699645e73b193e2c3e4fd5e5573a9fa18925a3858b",
+    "reference/retained_bank_identity_inverse.json": "9f6e7baba19887e10e32e5a260e8925d417e8f1e678f5214d11b844214b700be",
+    "reference/retained_bank_identity_recipe.json": "a42134dfe3745437c964175723caec04ff6d2989d638700ccb872908f1f15054",
+    "reference/route_owner.py": "fa576de960ad915f184fb9326fd9228d3cc79a860d06cb401bda918219a49d2c",
+    "reference/runtime/starlink_pss_fft_bank_owned_retained_output_probe.v": "42b6f902aef4235d1ddfae3e38135f73deab3fe06ff8b57f4ff32c9684792489",
+    "reference/runtime/starlink_pss_fft_retained_output_impl.v": "c41ecec9ae2f6072c6725ec452edd999120947647caaa6648f69d4c5a153d07b",
+    "reference/runtime/starlink_pss_realtime_input_guard_local_admission.v": "1197df519574ceceaa1b17b5b972bd3fc38a1caedd18ede492dd3ec1e056b005",
+    "reference/summary_source_pins.json": "f82a7d486ac37afff6a80953a3d8517166e02b615ad0ed44503931fa5e5bca1c",
+    "reference/synthesis_owner.py": "c0305cdcfc4cf9e5dd4d6d7987ca68b18826218189884ca9129772e4c0e8f028",
+    "reference/synthesize_retained_summary.tcl": "d233ce418555b626fe4dbeb822c46a4d1c3d1ea9e0daadb748f4d2450c688d6b",
+    "reference/test_summary_synthesis.py": "1ea6534987113cc0045315efa8d42837921044cda890355c7487dcc13fbf848a",
+    "route_retained_output.tcl": "034d1eaa197757b762644acd0cad9dc267338ae23fd5d757290c8485d0f1ac9a",
+    "threads.tcl": "aec974f2800f01285e888d1b188cd089534941922531914926a8e1b568d4c227"
+  },
+  "runtime": {
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_block_mailbox.v": "e85122eb6689ff49b31aa5a0c200e2666786629055b4f45856fe79fb829dbb55",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_fft_bank_owned_local_admission_probe.v": "0cb54617eb6757e1d6c719d97b0fd5002ec7f6105c8c4b50c41eba67d4306235",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_forward_kernel_join.v": "87e40b3cc9025502c05d2afbd6b0d9658618cd7204d4fd8ddc3f0ba74e68843a",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_kernel_rom.v": "0b4ee87d93d61c6fa12ee9992aa517a3a8be568835075531d9af4453f4ec80e5",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_realtime_input_guard.v": "eb1f968a30ae0371421cfb0766c7f8bf0c23411e730717cd0d4924be0604109e",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_realtime_result_guard.v": "09ab35339d55ddf88e813830322d21574d0794c489c9749f68113e9da7807be2",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_spectrum_product_bank_arithmetic.v": "515d29534dab921601c37564ad8a9957eed9befb9dff2e1c8c5f1f79fc6b5f70",
+    "hdl/library/starlink_pss_acquisition/retained_output/baseline/starlink_pss_spectrum_product_operand_register.v": "dead8e465b4bd982cebcab0c4a4e7eb4f3b20c038938f74c7663a79e0779893d",
+    "hdl/library/starlink_pss_acquisition/retained_output/starlink_pss_mailbox_owner_view.v": "de060a7930be1d65cc91903da447e51ead3efad4ebed4b61e4f257e45d76d2d6",
+    "hdl/library/starlink_pss_acquisition/retained_output/starlink_pss_retained_epoch_barrier.v": "954cff125145c81081678967f8afeecc6430dac07a4b7aff16c87b6174bf3afd",
+    "hdl/library/starlink_pss_acquisition/retained_output/starlink_pss_retained_output_owner.v": "b6280f6a894ec120f0e57415d5cc6da7b9e193a65f42b1d7f9789cbdbaa5d648",
+    "hdl/library/starlink_pss_acquisition/retained_output_bank_identity_candidate/starlink_pss_fft_bank_owned_retained_output_probe.v": "42b6f902aef4235d1ddfae3e38135f73deab3fe06ff8b57f4ff32c9684792489",
+    "hdl/library/starlink_pss_acquisition/retained_output_bank_identity_candidate/starlink_pss_fft_retained_output_impl.v": "c41ecec9ae2f6072c6725ec452edd999120947647caaa6648f69d4c5a153d07b",
+    "hdl/library/starlink_pss_acquisition/retained_output_bank_identity_candidate/starlink_pss_realtime_input_guard_local_admission.v": "1197df519574ceceaa1b17b5b972bd3fc38a1caedd18ede492dd3ec1e056b005",
+    "hdl/library/starlink_pss_acquisition/retained_output_summary_candidate/starlink_pss_core_job_cutover.v": "c67b62486356215a12cd8e9c2b220c5a877a661bd1b15a13b25f9904171ba330",
+    "hdl/library/starlink_pss_acquisition/retained_output_summary_candidate/starlink_pss_result_guard_owner_view.v": "8b853ee26ab18b4639ab0faf156fd75661f86030773c14f5a9843140c52b5d02"
+  },
+  "runtime_hdl_pin": "7e8898af9"
+}
