@@ -146,6 +146,15 @@ def test_local_iq_and_delayed_decisions_are_recorded_and_bound(tmp_path):
     assert scenario.log.index(("iq", "final_snapshot")) < scenario.log.index(("events", "close"))
 
 
+def test_default_cli_selector_does_not_change_published_legacy_protocol(tmp_path):
+    scenario, args = Scenario(), arguments(tmp_path)
+    args.local_search = False
+    result = collect(args, library=scenario, context_factory=scenario.context)
+    assert result["status"] == "complete"
+    protocol = json.loads((args.output/"protocol.json").read_text())
+    assert protocol["schema"] == "starlink-glrt-iio-capture/v1" and "local_search" not in protocol
+
+
 @pytest.mark.parametrize("fault", ["abi", "source_visit", "search_loss", "sequence", "truncated_iq"])
 def test_local_collector_retains_failures_and_never_attests_bad_evidence(tmp_path, fault):
     scenario, args = LocalScenario(fault), local_arguments(tmp_path)

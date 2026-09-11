@@ -202,6 +202,8 @@ def collect(args, *, library=None, context_factory=Context):
         expected_extension = "GLA1-1.0"
     args.output.mkdir(parents=True, exist_ok=False)
     protocol = {key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()}
+    if not local:
+        protocol.pop("local_search", None)  # Keep the published GLR1 protocol unchanged.
     protocol.update(schema="starlink-glrt-iio-capture/v1", output_rate_hz=2_500_000,
                     detector_profile=profile((args.acquisition_q16, args.threshold_q16, args.margin_q16),
                                              requested=getattr(args, "profile", None)),
