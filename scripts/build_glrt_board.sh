@@ -20,6 +20,7 @@ if [[ $# -eq 4 ]]; then
   local_search=1
   legacy_scorer=0
   local_netlist=$(realpath "$4")
+  test -s "$local_netlist/starlink_glrt_local_control.dcp"
   (cd "$local_netlist" && sha256sum --status -c outputs.sha256)
   sha256sum --status -c "$local_netlist/source-hashes.txt"
 elif [[ $# -eq 3 ]]; then
@@ -52,7 +53,8 @@ printf '%s\n' "$local_search" >"$output/local_search.txt"
 if [[ "$local_search" == 1 ]]; then
   mkdir "$output/local-netlist"
   cp "$local_netlist/starlink_glrt_local_control.edf" "$local_netlist/starlink_glrt_local_control_stub.v" \
-    "$local_netlist/source-hashes.txt" "$local_netlist/outputs.sha256" "$output/local-netlist/"
+    "$local_netlist/starlink_glrt_local_control.dcp" "$local_netlist/source-hashes.txt" \
+    "$local_netlist/outputs.sha256" "$output/local-netlist/"
   local_netlist="$output/local-netlist"
   (cd "$local_netlist" && sha256sum --status -c outputs.sha256)
 fi
