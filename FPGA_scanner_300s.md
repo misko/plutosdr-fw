@@ -4,6 +4,20 @@ Status: implementation started; hardware qualification is NOT complete.
 
 ## Current verified status (2026-09-11)
 
+Update 2026-09-11, registered input identity integrated with actual FFT/buffers:
+**489 regression tests plus nine audit/inverse cases pass**, all **64512 numerical
+records** match, six new identity/reset cases recover cleanly. Normal service is
+3661 clocks (+2), within the unchanged 5215-clock gate. Synthesis and route
+complete, but setup fails at **-1.503 ns WNS / -521.325 ns TNS / 896 endpoints**,
+worse than retained guard facts. Do not promote or deploy. Worst path is now
+output-bank fault through capacity to the 70-bit scheduler descriptor enable;
+next separate private descriptor capture from that fault-heavy enable, keeping
+admission/cancellation unchanged, then test and route again. Branch remains
+`codex/starlink-rx-only-do-not-merge-input-validation-stage`; this supersedes its
+component-only status below. No radio, PPU/main or primary HDL changes. Native
+60 MS/s fine search, 2.5 MS/s inspection and all deployment gates remain required.
+See [actual integration and route evidence](reports/experiments/20260911-staged-inputidentity-actual-route.md).
+
 Update 2026-09-11, registered input identity components: **16 focused tests pass**.
 A one-beat private register captures payload and identity evidence together;
 the actual input-checker variant retains ordinal/LAST/demand/certification checks.
