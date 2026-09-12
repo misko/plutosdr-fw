@@ -13,7 +13,7 @@ def simulate(tmp_path, rows):
     stimulus.write_text('\n'.join(rows)+'\n')
     bench=tmp_path/'tb.sv'
     bench.write_text(BENCH.replace('starlink_glrt_coarse_mac6 dut',
-                                  'starlink_glrt_coarse_mac6_serial dut'))
+                                  'starlink_glrt_coarse_mac6 #(.SERIAL_IQ(1)) dut'))
     rtl=Path(__file__).parents[2]/'hdl/library/starlink_glrt/starlink_glrt_coarse_mac6.v'
     executable=tmp_path/'sim'
     subprocess.run(['iverilog','-g2012','-s','tb','-o',str(executable),str(bench),str(rtl)],
@@ -28,6 +28,14 @@ def simulate(tmp_path, rows):
 IDLE='1 0 0 0 0 123 -321 abcdef 98765432'
 RESET='0 0 0 0 0 0 0 0 0'
 FLUSH='1 1 0 0 0 0 0 0 0'
+
+
+@pytest.mark.parametrize('serial', [0, 1])
+def test_packaged_verilog_2005_compiles_both_modes(tmp_path, serial):
+    rtl=Path(__file__).parents[2]/'hdl/library/starlink_glrt/starlink_glrt_coarse_mac6.v'
+    subprocess.run(['iverilog','-g2005','-s','starlink_glrt_coarse_mac6',
+                    f'-Pstarlink_glrt_coarse_mac6.SERIAL_IQ={serial}',
+                    '-o',str(tmp_path/'sim'),str(rtl)], check=True,capture_output=True,text=True)
 
 
 def job(rng, tag, extra_bubbles=False):
