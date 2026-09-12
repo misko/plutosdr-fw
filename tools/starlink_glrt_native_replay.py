@@ -25,7 +25,7 @@ def round_even(value: int, denominator: int) -> int:
 
 
 def coefficients(bank: bytes, *, rate_hz: int = RATE) -> list[tuple[int, int, int, int]]:
-    if type(rate_hz) is not int or rate_hz not in (15000000,30000000,60000000):
+    if type(rate_hz) is not int or rate_hz not in (5000000,15000000,30000000,60000000):
         raise ValueError("unsupported cubic reference output rate")
     if digest(bank) != BANK_SHA256:
         raise ValueError("native template differs from the qualified original-input bank")
