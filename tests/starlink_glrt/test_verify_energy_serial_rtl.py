@@ -58,12 +58,12 @@ def test_exact_full_width_products_and_minimum_spacing(tmp_path):
     pairs += [(rng.randrange(2**43),rng.randrange(2**35)) for _ in range(1000)]
     rows=[RESET]*2
     for a,b in pairs:
-        rows += [f'1 0 1 {a:x} {b:x}']+[IDLE]*3
+        rows += [f'1 0 1 {a:x} {b:x}']+[IDLE]*4
     actual,log=simulate(tmp_path,rows+[IDLE])
     assert actual==[a*b for a,b in pairs] and '\nF\n' not in log
 
 
-@pytest.mark.parametrize('slot',[1,2,3])
+@pytest.mark.parametrize('slot',[1,2,3,4])
 @pytest.mark.parametrize('interrupt',['collision','flush','reset'])
 def test_every_occupied_slot_fences_partial_results_and_recovers(tmp_path,slot,interrupt):
     first='1 0 1 7ffffffffff 7ffffffff'
