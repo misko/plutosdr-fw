@@ -17,23 +17,27 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from tools import starlink_coarse25 as base
 from tools import starlink_coarse25_normalized as norm
 
-PRIOR = 285941.79442491336
 PRIOR_PLAN = Path('/tmp/starlink-coarse-alternatives.Y3JzOI/narrow-coarse/reports/'
                   'narrow-coarse-20260910-v1/plan.json')
 
 
-def run(output: Path) -> None:
+def run(output: Path, *, prior_alias: int = 0) -> None:
     output.mkdir(parents=True, exist_ok=True)
     cases = json.loads((base.ROOT / 'reports/coarse25-screen-20260912/plan.json').read_bytes())['cases']
     prior_bytes = PRIOR_PLAN.read_bytes()
     if base.digest(prior_bytes) != 'cf701ae2ad5c11434469869d2a52b9075ca5a4432211cb6f3b64cbd1d393af66':
         raise ValueError('independent prior provenance changed')
+    if prior_alias not in (0, 1):
+        raise ValueError('only the two earlier recorded pilot clusters are defined')
+    prior_cluster = json.loads(prior_bytes)['positive_prior']['clusters'][prior_alias]
+    prior_hz = prior_cluster['median_hz']
     base.write_new(output / 'plan.json', {
         'development_only': True, 'hardware_access': False,
         'code_sha256': base.digest(Path(__file__).read_bytes()),
         'normalized_code_sha256': base.digest(Path(norm.__file__).read_bytes()),
         'base_hashes': base.code_hashes(), 'cases': cases,
-        'prior_hz': PRIOR, 'prior_plan_sha256': base.digest(prior_bytes),
+        'prior_hz': prior_hz, 'prior_alias_index': prior_alias,
+        'prior_cluster': prior_cluster, 'prior_plan_sha256': base.digest(prior_bytes),
         'unchanged_configuration': base.configuration(),
         'negative_prior_is_noncausal': True,
         'change': 'recenter canonical IQ before frozen pilot DDC; normalized correlation'})
@@ -48,7 +52,7 @@ def run(output: Path) -> None:
         values = raw[:, 0].astype(float) + 1j * raw[:, 1]
         # Local phase origin differs only by a constant carrier phase, which
         # normalized complex-correlation magnitude eliminates.
-        values *= np.exp(-2j * np.pi * PRIOR * np.arange(len(raw)) / base.CANONICAL_RATE)
+        values *= np.exp(-2j * np.pi * prior_hz * np.arange(len(raw)) / base.CANONICAL_RATE)
         filtered, centers = base.condition(base.iq(values), first)
         take = (centers >= case['center_start']) & (centers < case['center_start'] + base.WINDOW)
         result = norm.search(filtered[take], centers[take], banks)
@@ -70,4 +74,6 @@ def run(output: Path) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    run(parser.parse_args().output)
+    parser.add_argument('--prior-alias', type=int, choices=(0, 1), default=0)
+    args = parser.parse_args()
+    run(args.output, prior_alias=args.prior_alias)

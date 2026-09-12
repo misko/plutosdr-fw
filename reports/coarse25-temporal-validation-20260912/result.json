@@ -1,0 +1,607 @@
+{
+  "hardware_access": false,
+  "passed": true,
+  "plan_sha256": "03bd2de64b73f14e82a8234ae4a16d5baa02fc67c16e12aecf588912fcfe61a4",
+  "results": [
+    {
+      "canonical_stride": 6,
+      "case": "negative_later_1",
+      "first_canonical_center": 16800001,
+      "glrt_candidates": [
+        {
+          "control_score": 0.03376918890154725,
+          "epoch_sample": 3153,
+          "exact_score": 0.03425360489773045,
+          "margin": 0.00048441599618320036,
+          "method": "glrt64",
+          "residual_cfo_hz": -88778.4090909113,
+          "tracking_cfo_hz": -372112.05710487324
+        },
+        {
+          "control_score": 0.04362113931954131,
+          "epoch_sample": 1456,
+          "exact_score": 0.03310091083088868,
+          "margin": -0.010520228488652632,
+          "method": "glrt64",
+          "residual_cfo_hz": 11985.085227273026,
+          "tracking_cfo_hz": 183096.54728950263
+        },
+        {
+          "control_score": 0.033369956745591456,
+          "epoch_sample": 176,
+          "exact_score": 0.04491826020857507,
+          "margin": 0.011548303462983613,
+          "method": "glrt64",
+          "residual_cfo_hz": -101207.38636363889,
+          "tracking_cfo_hz": -213053.48987996468
+        },
+        {
+          "control_score": 0.033452326817542996,
+          "epoch_sample": 3207,
+          "exact_score": 0.036958923740885205,
+          "margin": 0.003506596923342209,
+          "method": "glrt64",
+          "residual_cfo_hz": 44389.20454545565,
+          "tracking_cfo_hz": -225188.18483257142
+        },
+        {
+          "control_score": 0.03691953168689591,
+          "epoch_sample": 1380,
+          "exact_score": 0.03874821856519295,
+          "margin": 0.0018286868782970422,
+          "method": "glrt64",
+          "residual_cfo_hz": -887.784090909113,
+          "tracking_cfo_hz": -236955.63529872627
+        },
+        {
+          "control_score": 0.03991973152618115,
+          "epoch_sample": 2198,
+          "exact_score": 0.05156525417739865,
+          "margin": 0.011645522651217502,
+          "method": "glrt64",
+          "residual_cfo_hz": 99875.71022727522,
+          "tracking_cfo_hz": 386692.9034173974
+        },
+        {
+          "control_score": 0.032167224973454984,
+          "epoch_sample": 429,
+          "exact_score": 0.03558802007944539,
+          "margin": 0.003420795105990408,
+          "method": "glrt64",
+          "residual_cfo_hz": -58149.857954546904,
+          "tracking_cfo_hz": -202295.90686841946
+        },
+        {
+          "control_score": 0.045537192745511004,
+          "epoch_sample": 1754,
+          "exact_score": 0.036208031586103355,
+          "margin": -0.00932916115940765,
+          "method": "glrt64",
+          "residual_cfo_hz": 85227.27272727486,
+          "tracking_cfo_hz": 324927.27272727486
+        }
+      ],
+      "glrt_phase_us": 879.2666666666667,
+      "iq_bytes": 1200000,
+      "iq_path": "/srv/bulk/leo/starlink-pss-preflight.RVtFMZII/fresh-coarse25-fw/reports/coarse25-temporal-validation-20260912/negative_later_1.ci16",
+      "iq_sha256": "9b452a1901339431cc7ebe0b52de6ad5fcbe1d08c04260c452d208598cfbe26c",
+      "passed": true,
+      "phase_difference_us": 509.26666666666677,
+      "pss": {
+        "detected": false,
+        "hypotheses": [
+          {
+            "cfo_hypothesis_hz": -400000,
+            "peak_normalized_score": 0.09073427654241074,
+            "peak_z": 4.013412293541965,
+            "phase_us": 877.3333333333334
+          },
+          {
+            "cfo_hypothesis_hz": -300000,
+            "peak_normalized_score": 0.09015436251320223,
+            "peak_z": 3.9109953388396947,
+            "phase_us": 561.7333333333333
+          },
+          {
+            "cfo_hypothesis_hz": -200000,
+            "peak_normalized_score": 0.09213801602884408,
+            "peak_z": 4.153925189917475,
+            "phase_us": 756.0
+          },
+          {
+            "cfo_hypothesis_hz": -100000,
+            "peak_normalized_score": 0.09461641023505613,
+            "peak_z": 4.482960577103582,
+            "phase_us": 1264.9333333333334
+          },
+          {
+            "cfo_hypothesis_hz": 0,
+            "peak_normalized_score": 0.0923408989322075,
+            "peak_z": 4.394409696374688,
+            "phase_us": 475.73333333333335
+          },
+          {
+            "cfo_hypothesis_hz": 100000,
+            "peak_normalized_score": 0.08906459527395338,
+            "peak_z": 3.9962708747967564,
+            "phase_us": 817.3333333333334
+          },
+          {
+            "cfo_hypothesis_hz": 200000,
+            "peak_normalized_score": 0.09585954345504293,
+            "peak_z": 4.921024657449281,
+            "phase_us": 55.2
+          },
+          {
+            "cfo_hypothesis_hz": 300000,
+            "peak_normalized_score": 0.09104321182182318,
+            "peak_z": 3.8945341834636564,
+            "phase_us": 808.9333333333333
+          },
+          {
+            "cfo_hypothesis_hz": 400000,
+            "peak_normalized_score": 0.09672596206781371,
+            "peak_z": 4.490152132392531,
+            "phase_us": 17.066666666666666
+          }
+        ],
+        "winner": {
+          "cfo_hypothesis_hz": 200000,
+          "peak_normalized_score": 0.09585954345504293,
+          "peak_z": 4.921024657449281,
+          "phase_us": 55.2
+        }
+      }
+    },
+    {
+      "canonical_stride": 6,
+      "case": "negative_later_2",
+      "first_canonical_center": 24300001,
+      "glrt_candidates": [
+        {
+          "control_score": 0.035963082979909425,
+          "epoch_sample": 1281,
+          "exact_score": 0.04372636107010864,
+          "margin": 0.007763278090199215,
+          "method": "glrt64",
+          "residual_cfo_hz": -85671.1647727294,
+          "tracking_cfo_hz": -126278.97788073792
+        },
+        {
+          "control_score": 0.03928997196427434,
+          "epoch_sample": 1358,
+          "exact_score": 0.03562164012809068,
+          "margin": -0.003668331836183661,
+          "method": "glrt64",
+          "residual_cfo_hz": 37730.823863637306,
+          "tracking_cfo_hz": 303792.44111926603
+        },
+        {
+          "control_score": 0.045258418798286966,
+          "epoch_sample": 513,
+          "exact_score": 0.03480719252042755,
+          "margin": -0.010451226277859417,
+          "method": "glrt64",
+          "residual_cfo_hz": -40838.0681818192,
+          "tracking_cfo_hz": -237820.26562004493
+        },
+        {
+          "control_score": 0.03440123598536935,
+          "epoch_sample": 1283,
+          "exact_score": 0.03524237761015773,
+          "margin": 0.0008411416247883774,
+          "method": "glrt64",
+          "residual_cfo_hz": 23970.170454546052,
+          "tracking_cfo_hz": -374146.878591854
+        },
+        {
+          "control_score": 0.038193089836735805,
+          "epoch_sample": 2838,
+          "exact_score": 0.039284680818958945,
+          "margin": 0.0010915909822231395,
+          "method": "glrt64",
+          "residual_cfo_hz": -26189.630681818835,
+          "tracking_cfo_hz": -121310.78162370298
+        },
+        {
+          "control_score": 0.036308666925511816,
+          "epoch_sample": 3028,
+          "exact_score": 0.03610155680021491,
+          "margin": -0.0002071101252969082,
+          "method": "glrt64",
+          "residual_cfo_hz": -67915.48295454714,
+          "tracking_cfo_hz": -334896.25164809055
+        },
+        {
+          "control_score": 0.03257649583238923,
+          "epoch_sample": 2250,
+          "exact_score": 0.03339381540516932,
+          "margin": 0.0008173195727800911,
+          "method": "glrt64",
+          "residual_cfo_hz": 23082.38636363694,
+          "tracking_cfo_hz": -283679.68842613796
+        },
+        {
+          "control_score": 0.046117275313768705,
+          "epoch_sample": 1437,
+          "exact_score": 0.031232321238286037,
+          "margin": -0.014884954075482668,
+          "method": "glrt64",
+          "residual_cfo_hz": -102982.95454545712,
+          "tracking_cfo_hz": -342445.3740067495
+        }
+      ],
+      "glrt_phase_us": 512.4666666666667,
+      "iq_bytes": 1200000,
+      "iq_path": "/srv/bulk/leo/starlink-pss-preflight.RVtFMZII/fresh-coarse25-fw/reports/coarse25-temporal-validation-20260912/negative_later_2.ci16",
+      "iq_sha256": "cf937e573020ebe30066a99a2b1481c2f107ef2ec15d46a584b1972964cf2705",
+      "passed": true,
+      "phase_difference_us": 664.9999999999999,
+      "pss": {
+        "detected": false,
+        "hypotheses": [
+          {
+            "cfo_hypothesis_hz": -400000,
+            "peak_normalized_score": 0.0920775180092097,
+            "peak_z": 4.157808880568979,
+            "phase_us": 1106.8
+          },
+          {
+            "cfo_hypothesis_hz": -300000,
+            "peak_normalized_score": 0.09434025453065194,
+            "peak_z": 4.564393696495562,
+            "phase_us": 367.73333333333335
+          },
+          {
+            "cfo_hypothesis_hz": -200000,
+            "peak_normalized_score": 0.0899809949439301,
+            "peak_z": 3.8163365571979195,
+            "phase_us": 374.8
+          },
+          {
+            "cfo_hypothesis_hz": -100000,
+            "peak_normalized_score": 0.09215544084626659,
+            "peak_z": 4.1606404573622155,
+            "phase_us": 102.53333333333333
+          },
+          {
+            "cfo_hypothesis_hz": 0,
+            "peak_normalized_score": 0.08990916866824367,
+            "peak_z": 4.064349495968923,
+            "phase_us": 158.93333333333334
+          },
+          {
+            "cfo_hypothesis_hz": 100000,
+            "peak_normalized_score": 0.09358569519488609,
+            "peak_z": 4.72685814566721,
+            "phase_us": 1177.4666666666667
+          },
+          {
+            "cfo_hypothesis_hz": 200000,
+            "peak_normalized_score": 0.09258269948314145,
+            "peak_z": 4.457736595982111,
+            "phase_us": 49.86666666666667
+          },
+          {
+            "cfo_hypothesis_hz": 300000,
+            "peak_normalized_score": 0.09549562739285898,
+            "peak_z": 4.5761898160892835,
+            "phase_us": 592.9333333333333
+          },
+          {
+            "cfo_hypothesis_hz": 400000,
+            "peak_normalized_score": 0.09237892473144914,
+            "peak_z": 3.850959516784927,
+            "phase_us": 250.93333333333334
+          }
+        ],
+        "winner": {
+          "cfo_hypothesis_hz": 100000,
+          "peak_normalized_score": 0.09358569519488609,
+          "peak_z": 4.72685814566721,
+          "phase_us": 1177.4666666666667
+        }
+      }
+    },
+    {
+      "canonical_stride": 6,
+      "case": "positive_later_1",
+      "first_canonical_center": 549300001,
+      "glrt_candidates": [
+        {
+          "control_score": 0.059284599621466254,
+          "epoch_sample": 1001,
+          "exact_score": 0.6206625203544635,
+          "margin": 0.5613779207329972,
+          "method": "glrt64",
+          "residual_cfo_hz": 0.0,
+          "tracking_cfo_hz": -1350.5727019688184
+        },
+        {
+          "control_score": 0.03614235725102917,
+          "epoch_sample": 2962,
+          "exact_score": 0.03899612656122781,
+          "margin": 0.0028537693101986436,
+          "method": "glrt64",
+          "residual_cfo_hz": 75461.64772727461,
+          "tracking_cfo_hz": -147954.31141472887
+        },
+        {
+          "control_score": 0.037917637996056665,
+          "epoch_sample": 1002,
+          "exact_score": 0.2686008045226557,
+          "margin": 0.23068316652659906,
+          "method": "glrt64",
+          "residual_cfo_hz": 112748.57954545735,
+          "tracking_cfo_hz": 225963.8290853926
+        },
+        {
+          "control_score": 0.04155215930566753,
+          "epoch_sample": 1842,
+          "exact_score": 0.03952437634519067,
+          "margin": -0.0020277829604768635,
+          "method": "glrt64",
+          "residual_cfo_hz": 49715.90909091033,
+          "tracking_cfo_hz": -101703.08363876265
+        },
+        {
+          "control_score": 0.03828047258356285,
+          "epoch_sample": 3161,
+          "exact_score": 0.038071843354916056,
+          "margin": -0.00020862922864679084,
+          "method": "glrt64",
+          "residual_cfo_hz": 30184.659090909845,
+          "tracking_cfo_hz": 254790.87227369548
+        },
+        {
+          "control_score": 0.045724336594851506,
+          "epoch_sample": 1245,
+          "exact_score": 0.03654353425482652,
+          "margin": -0.009180802340024989,
+          "method": "glrt64",
+          "residual_cfo_hz": 110085.22727273002,
+          "tracking_cfo_hz": -83428.00444208381
+        },
+        {
+          "control_score": 0.037812646704070585,
+          "epoch_sample": 2295,
+          "exact_score": 0.041760555796261103,
+          "margin": 0.0039479090921905186,
+          "method": "glrt64",
+          "residual_cfo_hz": -10209.5170454548,
+          "tracking_cfo_hz": 83527.05253870907
+        },
+        {
+          "control_score": 0.037873300107947566,
+          "epoch_sample": 855,
+          "exact_score": 0.03969250402352976,
+          "margin": 0.0018192039155821918,
+          "method": "glrt64",
+          "residual_cfo_hz": -69247.15909091082,
+          "tracking_cfo_hz": -101860.26149151265
+        }
+      ],
+      "glrt_phase_us": 400.46666666666664,
+      "iq_bytes": 1200000,
+      "iq_path": "/srv/bulk/leo/starlink-pss-preflight.RVtFMZII/fresh-coarse25-fw/reports/coarse25-temporal-validation-20260912/positive_later_1.ci16",
+      "iq_sha256": "620476059325b54433d56453325f58de932f0732684787747bf136e0ba2a00f1",
+      "passed": true,
+      "phase_difference_us": 0.33333333333337123,
+      "pss": {
+        "detected": true,
+        "hypotheses": [
+          {
+            "cfo_hypothesis_hz": -400000,
+            "peak_normalized_score": 0.12184036481959111,
+            "peak_z": 5.402839900025223,
+            "phase_us": 845.8666666666667
+          },
+          {
+            "cfo_hypothesis_hz": -300000,
+            "peak_normalized_score": 0.1246808250261856,
+            "peak_z": 6.262994907029802,
+            "phase_us": 1158.6666666666667
+          },
+          {
+            "cfo_hypothesis_hz": -200000,
+            "peak_normalized_score": 0.11907223053052458,
+            "peak_z": 6.082076562157024,
+            "phase_us": 1158.6666666666667
+          },
+          {
+            "cfo_hypothesis_hz": -100000,
+            "peak_normalized_score": 0.15233374666785057,
+            "peak_z": 10.476191463831404,
+            "phase_us": 400.6666666666667
+          },
+          {
+            "cfo_hypothesis_hz": 0,
+            "peak_normalized_score": 0.15841225311784649,
+            "peak_z": 11.270837174193597,
+            "phase_us": 400.8
+          },
+          {
+            "cfo_hypothesis_hz": 100000,
+            "peak_normalized_score": 0.1202330798515926,
+            "peak_z": 6.403011587014854,
+            "phase_us": 355.3333333333333
+          },
+          {
+            "cfo_hypothesis_hz": 200000,
+            "peak_normalized_score": 0.11874543850397146,
+            "peak_z": 5.587317338128,
+            "phase_us": 889.3333333333334
+          },
+          {
+            "cfo_hypothesis_hz": 300000,
+            "peak_normalized_score": 0.12238985393256556,
+            "peak_z": 5.380074016032566,
+            "phase_us": 220.0
+          },
+          {
+            "cfo_hypothesis_hz": 400000,
+            "peak_normalized_score": 0.1287141156373417,
+            "peak_z": 5.941751761860301,
+            "phase_us": 491.2
+          }
+        ],
+        "winner": {
+          "cfo_hypothesis_hz": 0,
+          "peak_normalized_score": 0.15841225311784649,
+          "peak_z": 11.270837174193597,
+          "phase_us": 400.8
+        }
+      }
+    },
+    {
+      "canonical_stride": 6,
+      "case": "positive_later_2",
+      "first_canonical_center": 556800001,
+      "glrt_candidates": [
+        {
+          "control_score": 0.043835174100899835,
+          "epoch_sample": 1004,
+          "exact_score": 0.6511696291466816,
+          "margin": 0.6073344550457818,
+          "method": "glrt64",
+          "residual_cfo_hz": 0.0,
+          "tracking_cfo_hz": -3234.882780311138
+        },
+        {
+          "control_score": 0.03513780518434328,
+          "epoch_sample": 1004,
+          "exact_score": 0.5391237192266103,
+          "margin": 0.503985914042267,
+          "method": "glrt64",
+          "residual_cfo_hz": -113636.36363636647,
+          "tracking_cfo_hz": -230636.29233609262
+        },
+        {
+          "control_score": 0.03421240783114487,
+          "epoch_sample": 2930,
+          "exact_score": 0.04495022653842711,
+          "margin": 0.010737818707282243,
+          "method": "glrt64",
+          "residual_cfo_hz": 110973.01136363913,
+          "tracking_cfo_hz": 51283.55208307172
+        },
+        {
+          "control_score": 0.04117116346802234,
+          "epoch_sample": 95,
+          "exact_score": 0.039059211970628234,
+          "margin": -0.002111951497394106,
+          "method": "glrt64",
+          "residual_cfo_hz": -3551.136363636452,
+          "tracking_cfo_hz": -136941.6551291039
+        },
+        {
+          "control_score": 0.037547684609181606,
+          "epoch_sample": 3032,
+          "exact_score": 0.04197598309364889,
+          "margin": 0.004428298484467283,
+          "method": "glrt64",
+          "residual_cfo_hz": 3551.136363636452,
+          "tracking_cfo_hz": 142305.43208543875
+        },
+        {
+          "control_score": 0.04369414204535203,
+          "epoch_sample": 1518,
+          "exact_score": 0.05030427805975847,
+          "margin": 0.006610136014406437,
+          "method": "glrt64",
+          "residual_cfo_hz": 0.0,
+          "tracking_cfo_hz": 22849.141785935233
+        },
+        {
+          "control_score": 0.04968695471600726,
+          "epoch_sample": 1991,
+          "exact_score": 0.04421768648374974,
+          "margin": -0.005469268232257518,
+          "method": "glrt64",
+          "residual_cfo_hz": -100763.49431818433,
+          "tracking_cfo_hz": -179895.77531895414
+        },
+        {
+          "control_score": 0.03914872327736041,
+          "epoch_sample": 1829,
+          "exact_score": 0.03491146013826018,
+          "margin": -0.004237263139100229,
+          "method": "glrt64",
+          "residual_cfo_hz": 47940.340909092105,
+          "tracking_cfo_hz": 36905.066877683304
+        }
+      ],
+      "glrt_phase_us": 401.6666666666667,
+      "iq_bytes": 1200000,
+      "iq_path": "/srv/bulk/leo/starlink-pss-preflight.RVtFMZII/fresh-coarse25-fw/reports/coarse25-temporal-validation-20260912/positive_later_2.ci16",
+      "iq_sha256": "7242ffa068d34ca80e5d91ce15c8758eeda127ef6b0e0b1f921cd540103eb943",
+      "passed": true,
+      "phase_difference_us": 0.06666666666671972,
+      "pss": {
+        "detected": true,
+        "hypotheses": [
+          {
+            "cfo_hypothesis_hz": -400000,
+            "peak_normalized_score": 0.11204433415887838,
+            "peak_z": 4.592646731911191,
+            "phase_us": 888.2666666666667
+          },
+          {
+            "cfo_hypothesis_hz": -300000,
+            "peak_normalized_score": 0.11112069726848128,
+            "peak_z": 4.883696307586031,
+            "phase_us": 1222.6666666666667
+          },
+          {
+            "cfo_hypothesis_hz": -200000,
+            "peak_normalized_score": 0.11667195727454742,
+            "peak_z": 5.803803372104659,
+            "phase_us": 649.3333333333334
+          },
+          {
+            "cfo_hypothesis_hz": -100000,
+            "peak_normalized_score": 0.1631759781019013,
+            "peak_z": 11.790579976153854,
+            "phase_us": 401.6
+          },
+          {
+            "cfo_hypothesis_hz": 0,
+            "peak_normalized_score": 0.1786617322058551,
+            "peak_z": 14.14699531109892,
+            "phase_us": 401.73333333333335
+          },
+          {
+            "cfo_hypothesis_hz": 100000,
+            "peak_normalized_score": 0.12086575159232364,
+            "peak_z": 6.562271036177872,
+            "phase_us": 402.1333333333333
+          },
+          {
+            "cfo_hypothesis_hz": 200000,
+            "peak_normalized_score": 0.1226963155199267,
+            "peak_z": 6.202878342118867,
+            "phase_us": 1106.9333333333334
+          },
+          {
+            "cfo_hypothesis_hz": 300000,
+            "peak_normalized_score": 0.12084378356863494,
+            "peak_z": 5.509405016763392,
+            "phase_us": 373.6
+          },
+          {
+            "cfo_hypothesis_hz": 400000,
+            "peak_normalized_score": 0.12126072500128267,
+            "peak_z": 5.441937241504676,
+            "phase_us": 1117.7333333333333
+          }
+        ],
+        "winner": {
+          "cfo_hypothesis_hz": 0,
+          "peak_normalized_score": 0.1786617322058551,
+          "peak_z": 14.14699531109892,
+          "phase_us": 401.73333333333335
+        }
+      }
+    }
+  ]
+}

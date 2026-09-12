@@ -33,7 +33,8 @@ def normalized_scores(samples: np.ndarray, bank: np.ndarray) -> np.ndarray:
                              where=denominator > 0), 0, 1)
 
 
-def search(samples: np.ndarray, centers: np.ndarray, banks: list[np.ndarray]) -> dict:
+def search(samples: np.ndarray, centers: np.ndarray, banks: list[np.ndarray],
+           *, cfo_bank: tuple[int, ...] = base.CFO_BANK) -> dict:
     if (len(samples) != len(centers) or len(samples) < 10_000
             or not np.all(np.diff(centers) == 6)):
         raise ValueError('contiguous supported inspection epoch required')
@@ -43,7 +44,7 @@ def search(samples: np.ndarray, centers: np.ndarray, banks: list[np.ndarray]) ->
     if np.any(count == 0):
         raise ValueError('insufficient phase coverage')
     results = []
-    for cfo, bank in zip(base.CFO_BANK, banks, strict=True):
+    for cfo, bank in zip(cfo_bank, banks, strict=True):
         scores = normalized_scores(samples, bank)
         folded = np.bincount(phase, weights=scores, minlength=10_000) / count
         folded = (np.roll(folded, 1) + folded + np.roll(folded, -1)) / 3
@@ -58,19 +59,23 @@ def search(samples: np.ndarray, centers: np.ndarray, banks: list[np.ndarray]) ->
             'hypotheses': results}
 
 
-def run(output: Path) -> None:
+def run(output: Path, *, cfo_limit_hz: int = 400_000) -> None:
+    if cfo_limit_hz not in (400_000, 800_000):
+        raise ValueError('only the baseline and explicitly widened development domain are supported')
+    cfo_bank = tuple(range(-cfo_limit_hz, cfo_limit_hz + 1, 100_000))
     output.mkdir(parents=True, exist_ok=True)
     original = base.ROOT / 'reports/coarse25-screen-20260912/plan.json'
     cases = json.loads(original.read_bytes())['cases']
     plan = {'schema': 'coarse25-local-energy-development-v1',
             'code_sha256': base.digest(Path(__file__).read_bytes()),
             'base_hashes': base.code_hashes(), 'numpy_version': np.__version__,
-            'configuration': base.configuration(), 'cases': cases,
+            'configuration': {**base.configuration(), 'cfo_bank_hz': list(cfo_bank)}, 'cases': cases,
             'previously_inspected_development_data': True,
-            'acceptance_unchanged': True, 'hardware_access': False,
+            'timing_and_z_criteria_unchanged': True, 'hardware_access': False,
+            'search_domain_widened': cfo_limit_hz != 400_000,
             'change': 'normalized match power before identical phase folding'}
     base.write_new(output / 'plan.json', plan)
-    banks = [base.template(cfo)[0] for cfo in base.CFO_BANK]
+    banks = [base.template(cfo)[0] for cfo in cfo_bank]
     report = {'plan_sha256': base.digest((output / 'plan.json').read_bytes()),
               'real': [], 'development_only': True, 'hardware_access': False}
     for case in cases:
@@ -81,7 +86,7 @@ def run(output: Path) -> None:
                                         case['center_start'] - base.HALO)
         take = ((centers >= case['center_start'])
                 & (centers < case['center_start'] + base.WINDOW))
-        result = search(values[take], centers[take], banks)
+        result = search(values[take], centers[take], banks, cfo_bank=cfo_bank)
         expected = case['historical_pilot_phase_us_for_comparison_only']
         error = (None if expected is None else float(base.circular_distance(
             result['winner']['phase_us'], expected, 4000 / 3)))
@@ -97,4 +102,6 @@ def run(output: Path) -> None:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, required=True)
-    run(parser.parse_args().output)
+    parser.add_argument('--cfo-limit-hz', type=int, choices=(400_000, 800_000), default=400_000)
+    args = parser.parse_args()
+    run(args.output, cfo_limit_hz=args.cfo_limit_hz)
