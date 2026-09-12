@@ -1,0 +1,732 @@
+From 47a75cbc5e7d24a063b8b54eb531fdba6602b85c Mon Sep 17 00:00:00 2001
+From: misko <misko@cs.toronto.edu>
+Date: Sat, 12 Sep 2026 21:18:08 +0000
+Subject: [PATCH] Add explicit physical 1R1T counter metadata provider
+
+---
+ COUNTER_METADATA_V1.md            |  75 +++++++++++++++
+ iiod/CMakeLists.txt               |   2 +-
+ iiod/adi-rx-counter.h             |  21 +++++
+ iiod/iiod.c                       |  30 ++++++
+ iiod/spf-buffer-metadata.c        | 111 ++++++++++++++++++++++
+ iiod/spf-counter-metadata.c       | 127 +++++++++++++++++++++++++
+ iiod/spf-counter-metadata.h       |  25 +++++
+ tests/CMakeLists.txt              |  13 +++
+ tests/test_spf_counter_metadata.c | 152 ++++++++++++++++++++++++++++++
+ 9 files changed, 555 insertions(+), 1 deletion(-)
+ create mode 100644 COUNTER_METADATA_V1.md
+ create mode 100644 iiod/adi-rx-counter.h
+ create mode 100644 iiod/spf-counter-metadata.c
+ create mode 100644 iiod/spf-counter-metadata.h
+ create mode 100644 tests/test_spf_counter_metadata.c
+
+diff --git a/COUNTER_METADATA_V1.md b/COUNTER_METADATA_V1.md
+new file mode 100644
+index 0000000..c431330
+--- /dev/null
++++ b/COUNTER_METADATA_V1.md
+@@ -0,0 +1,75 @@
++# SPFC1 physical single-receiver counter metadata
++
++SPFC1 is an opt-in request over the existing ABI-3 generic metadata transport.
++It does not change the SPFT tandem request, RadioMetadataV6, paired HOLD/AUTO,
++or the exact-allocation direct-async contract. It supports ordinary and finite
++direct-async RX without an additional RAM ring. Older providers reject SPFC1.
++
++Discovery requires `iio,buffer-counter-metadata=1` and
++`iio,buffer-counter-metadata-profile=ad9361:1r1t:rx0:manual:decimation1:spfc1`.
++`iio,buffer-counter-metadata-topology-supported` distinguishes current physical
++eligibility from implementation support. The kernel rechecks physical AD9361
++1R1T, physical receiver 0, manual gain, sample rate, idle DMA and decimation 1
++under configuration exclusion before timestamp or DMA setup. The receiver's
++available sample-rate attribute is authoritative; RF bandwidth is independent.
++
++All wire integers are little-endian. The 32-byte request is:
++
++| Offset | Type | Value |
++| --- | --- | --- |
++| 0 | u32 | 0x43465053 (`SPFC`) |
++| 4, 6 | u16, u16 | version 1, length 32 |
++| 8 | u32 | required features exactly 7 |
++| 12 | u32 | scan mask exactly 3 (I0/Q0) |
++| 16 | u32 | requested/read-back sample rate in Hz |
++| 20 | u32 | positive even complex samples per frame |
++| 24, 28 | u32, u32 | zero |
++
++The descriptor-owned kernel lease uses a distinct `ADI_RX_COUNTER_IOC_ACQUIRE`
++on the existing exclusive `/dev/tandem-agc-events` endpoint. Sharing that
++endpoint excludes paired ownership; the counter ioctl does not prepare paired
++hardware, seed gains, arm pins, collect events, or heartbeat tandem. Closing the
++descriptor restores the timestamp-control register and releases configuration
++exclusion. PHY writes and ADC configuration writes are rejected while leased.
++The provider unwinds the descriptor on rejected admission and normal cleanup.
++
++The 80-byte frame is:
++
++| Offset | Type | Meaning |
++| --- | --- | --- |
++| 0 | u32 | 0x31435053 (`SPC1`) |
++| 4, 6 | u16, u16 | version 1, length 80 |
++| 8 | u32 | features exactly 7: counter, canonical CI16, exact gaps |
++| 12 | u32 | flags: sequence-valid bit 4, hardware-counter-valid bit 21; bits 11 and 23 iff missing samples > 0 |
++| 16 | u64 | nonzero session stream ID |
++| 24 | u64 | logical buffer sequence; advances by 1 + floor(gap / frame samples) |
++| 32 | u64 | hardware sequence of the first returned complex sample |
++| 40 | u64 | exact missing complex samples before this frame |
++| 48 | u32 | complex samples per receiver |
++| 52 | u32 | IQ payload bytes = 4 × sample count |
++| 56 | u32 | scan mask 3 |
++| 60 | u32 | attested sample rate in Hz |
++| 64 | u32 | source counter correction: exactly 2 complex samples |
++| 68, 72 | u32, u32 | zero |
++| 76 | u32 | IEEE CRC32 of bytes 0..75 |
++
++The DMA buffer has one eight-byte hardware timestamp followed by CI16 IQ.
++`util_cpack2` presents two consecutive RX0 complex samples in each 64-bit word;
++the concurrently captured counter has advanced twice from the first sample.
++SPFC1 therefore subtracts two from the raw full-width counter, failing on
++underflow. Its offset field makes this correction explicit. Existing paired
++frames retain their original counter interpretation. Prefix removal returns
++exactly I0,Q0,I0,Q0... with signed 16-bit little-endian components.
++
++The exclusive end is first + sample count, checked for 64-bit overflow. No
++claim is made about the interval preceding a new session. Within a session,
++missing = first_current - end_previous; negative intervals are errors. When the
++transport drops queued frames it rebases the missing count and CRC to the last
++delivered frame. Flag bit 11 means a counter-observed missing interval, not an
++independent ADC overload measurement. Gain, RSSI, tandem state and events are
++absent and have no asserted validity bits.
++
++Physical mode is distinct from the transfer mask: RX0-only transfer on a CMOS
++2R2T PHY does not increase its 30.72 MS/s interface limit. Physical 1R1T permits
++up to the driver's 61.44 MS/s limit; a 60 MS/s test needs an independently valid
++analog RF bandwidth and does not imply sustained 240 MB/s Ethernet delivery.
+diff --git a/iiod/CMakeLists.txt b/iiod/CMakeLists.txt
+index 25341cb..9692f08 100644
+--- a/iiod/CMakeLists.txt
++++ b/iiod/CMakeLists.txt
+@@ -81,7 +81,7 @@ if (IIOD_BUFFER_METADATA_PROVIDER)
+ 				${SPF_SAMPLER_COVERAGE_SOURCE})
+ 		endif()
+ 	endif()
+-	set(IIOD_METADATA_CFILES ${IIOD_BUFFER_METADATA_PROVIDER}
++	set(IIOD_METADATA_CFILES ${CMAKE_CURRENT_SOURCE_DIR}/spf-counter-metadata.c ${IIOD_BUFFER_METADATA_PROVIDER}
+ 		${IIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES})
+ else()
+ 	set(IIOD_METADATA_CFILES buffer-metadata-none.c)
+diff --git a/iiod/adi-rx-counter.h b/iiod/adi-rx-counter.h
+new file mode 100644
+index 0000000..813c194
+--- /dev/null
++++ b/iiod/adi-rx-counter.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
++#ifndef _UAPI_ADI_RX_COUNTER_H
++#define _UAPI_ADI_RX_COUNTER_H
++#include <linux/types.h>
++#include <linux/ioctl.h>
++/* A separate request namespace; never a tandem HOLD/AUTO request. */
++#define ADI_RX_COUNTER_MAGIC 0x43465053U /* SPFC */
++#define ADI_RX_COUNTER_VERSION 1U
++#define ADI_RX_COUNTER_FEATURES 7U /* counter, canonical CI16, exact gaps */
++struct adi_rx_counter_request {
++	__u32 magic;
++	__u16 version;
++	__u16 size;
++	__u32 required_features;
++	__u32 scan_mask;
++	__u32 sample_rate_hz;
++	__u32 samples_per_channel;
++	__u32 reserved[2];
++};
++#define ADI_RX_COUNTER_IOC_ACQUIRE _IOW('T', 0x20, struct adi_rx_counter_request)
++#endif
+diff --git a/iiod/iiod.c b/iiod/iiod.c
+index b80b387..13e36bb 100644
+--- a/iiod/iiod.c
++++ b/iiod/iiod.c
+@@ -654,6 +654,36 @@ static int start_iiod(const char *uri, const char *ffs_mountpoint,
+ 	}
+ 
+ #ifdef IIOD_HAS_BUFFER_METADATA
++	{
++		struct iio_device *counter_controller = iio_context_find_device(ctx, "tandem-agc");
++		long long counter_version = 0, counter_topology = 0;
++		if (counter_controller &&
++		    !iio_device_attr_read_longlong(counter_controller, "counter_metadata_version",
++						   &counter_version) &&
++		    counter_version == 1 &&
++		    !iio_device_attr_read_longlong(counter_controller,
++						   "counter_metadata_topology_supported",
++						   &counter_topology)) {
++			ret = iio_context_add_attr(ctx, "iio,buffer-counter-metadata", "1");
++			if (ret < 0) {
++				iio_context_destroy(ctx);
++				return EXIT_FAILURE;
++			}
++			ret = iio_context_add_attr(ctx, "iio,buffer-counter-metadata-profile",
++						   "ad9361:1r1t:rx0:manual:decimation1:spfc1");
++			if (ret < 0) {
++				iio_context_destroy(ctx);
++				return EXIT_FAILURE;
++			}
++			ret = iio_context_add_attr(ctx,
++						   "iio,buffer-counter-metadata-topology-supported",
++						   counter_topology == 1 ? "1" : "0");
++			if (ret < 0) {
++				iio_context_destroy(ctx);
++				return EXIT_FAILURE;
++			}
++		}
++	}
+ 	ret = iio_context_add_attr(ctx, "iio,buffer-metadata", "3");
+ 	if (ret < 0) {
+ 		iio_context_destroy(ctx);
+diff --git a/iiod/spf-buffer-metadata.c b/iiod/spf-buffer-metadata.c
+index 2f53ccb..6150a0c 100644
+--- a/iiod/spf-buffer-metadata.c
++++ b/iiod/spf-buffer-metadata.c
+@@ -2,6 +2,10 @@
+ #define _POSIX_C_SOURCE 200809L
+ 
+ #include "buffer-metadata.h"
++#include "spf-counter-metadata.h"
++#include "adi-rx-counter.h"
++#include <fcntl.h>
++#include <sys/ioctl.h>
+ #include "spf-buffer-layout.h"
+ #include "spf-ddr-burst-request.h"
+ #include "spf-ddr-ring-request.h"
+@@ -32,6 +36,9 @@
+ 
+ struct spf_iiod_metadata_context {
+ 	struct iio_device *rx;
++	bool counter_only;
++	int counter_fd;
++	uint32_t counter_rate;
+ 	struct iio_device *phy;
+ 	spf_gain_sampler_t sampler;
+ 	struct spf_temperature_sampler temperature_sampler;
+@@ -73,6 +80,57 @@ static uint64_t make_stream_id(const void *address)
+ 	return value ? value : UINT64_C(1);
+ }
+ 
++static int counter_open(const struct iio_device *dev, size_t samples_count, const uint32_t *mask,
++			size_t words, size_t scan_bytes, const void *request, size_t request_bytes,
++			void **provider_context, size_t *extra_samples)
++{
++	struct spf_counter_request decoded;
++	struct spf_buffer_layout layout;
++	struct spf_iiod_metadata_context *ctx;
++	struct adi_rx_counter_request lease = {0};
++	int ret;
++	if (!iio_device_get_name(dev) || strcmp(iio_device_get_name(dev), "cf-ad9361-lpc"))
++		return -ENODEV;
++	ret = spf_buffer_layout_resolve(samples_count, mask, words, scan_bytes, &layout);
++	if (ret)
++		return ret;
++	ret = spf_counter_request_decode(request, request_bytes, samples_count,
++					 layout.enabled_scan_mask, &decoded);
++	if (ret)
++		return ret;
++	ctx = calloc(1, sizeof(*ctx));
++	if (!ctx)
++		return -ENOMEM;
++	ctx->counter_fd = open("/dev/tandem-agc-events", O_RDWR | O_CLOEXEC);
++	if (ctx->counter_fd < 0) {
++		ret = -errno;
++		free(ctx);
++		return ret;
++	}
++	lease.magic = ADI_RX_COUNTER_MAGIC;
++	lease.version = 1;
++	lease.size = sizeof(lease);
++	lease.required_features = ADI_RX_COUNTER_FEATURES;
++	lease.scan_mask = 3;
++	lease.sample_rate_hz = decoded.sample_rate_hz;
++	lease.samples_per_channel = decoded.samples_per_channel;
++	if (ioctl(ctx->counter_fd, ADI_RX_COUNTER_IOC_ACQUIRE, &lease) < 0) {
++		ret = -errno;
++		close(ctx->counter_fd);
++		free(ctx);
++		return ret;
++	}
++	ctx->counter_only = true;
++	ctx->counter_rate = decoded.sample_rate_hz;
++	ctx->rx = (struct iio_device *)dev;
++	ctx->layout = layout;
++	ctx->samples_per_channel = decoded.samples_per_channel;
++	ctx->stream_id = make_stream_id(ctx);
++	*provider_context = ctx;
++	*extra_samples = layout.extra_samples;
++	return 0;
++}
++
+ int iiod_buffer_metadata_open(const struct iio_device *dev,
+ 		size_t samples_count, const uint32_t *mask, size_t words,
+ 		size_t scan_bytes,
+@@ -94,6 +152,9 @@ int iiod_buffer_metadata_open(const struct iio_device *dev,
+ 		!extra_samples || !burst_plan)
+ 		return -EINVAL;
+ 	memset(burst_plan, 0, sizeof(*burst_plan));
++	if (request_bytes >= 4 && spf_counter_read32(request) == SPF_COUNTER_REQUEST_MAGIC)
++		return counter_open(dev, samples_count, mask, words, scan_bytes, request,
++				    request_bytes, provider_context, extra_samples);
+ 	if (request_bytes == sizeof(struct adi_tandem_agc_request_v1) +
+ 			SPF_DDR_BURST_REQUEST_BYTES) {
+ 		ret = spf_ddr_burst_request_decode(&burst_request,
+@@ -121,6 +182,12 @@ int iiod_buffer_metadata_open(const struct iio_device *dev,
+ 	ctx = calloc(1, sizeof(*ctx));
+ 	if (!ctx)
+ 		return -ENOMEM;
++	/* A single transferred receiver still requires the paired physical PHY. */
++	if (!iio_device_find_channel(dev, "voltage2", false) ||
++	    !iio_device_find_channel(dev, "voltage3", false)) {
++		free(ctx);
++		return -EOPNOTSUPP;
++	}
+ 	ret = spf_tandem_session_init(&ctx->tandem, request,
+ 		tandem_request_bytes, NULL);
+ 	if (ret) {
+@@ -249,6 +316,8 @@ int iiod_buffer_metadata_buffer_opened(void *provider_context,
+ 
+ 	if (!ctx || !kernel_buffers_count)
+ 		return -EINVAL;
++	if (ctx->counter_only)
++		return 0;
+ 	ret = spf_sampler_coverage_plan_compute(ctx->samples_per_channel,
+ 		ctx->observation_interval_samples, kernel_buffers_count,
+ 		SPF_GAIN_SAMPLER_RING_CAPACITY, &coverage);
+@@ -270,6 +339,8 @@ int iiod_buffer_metadata_before_refill(void *provider_context)
+ 
+ 	if (!ctx)
+ 		return -EINVAL;
++	if (ctx->counter_only)
++		return 0;
+ 	/* The first dequeue consumes an already queued block. Every later refill
+ 	 * can rearm one block while all older queued blocks remain capture work.
+ 	 * Reset to the complete queue-depth window so producer copy/backpressure
+@@ -291,6 +362,8 @@ int iiod_buffer_metadata_after_refill(void *provider_context)
+ 
+ 	if (!ctx)
+ 		return -EINVAL;
++	if (ctx->counter_only)
++		return 0;
+ 	if (ctx->refills_started > 1 &&
+ 		!spf_gain_sampler_finish_capture(
+ 			&ctx->sampler, SPF_IIOD_SAMPLER_START_TIMEOUT_MS))
+@@ -315,6 +388,11 @@ void iiod_buffer_metadata_close(void *provider_context)
+ 	struct spf_iiod_metadata_context *ctx = provider_context;
+ 	if (!ctx)
+ 		return;
++	if (ctx->counter_only) {
++		close(ctx->counter_fd);
++		free(ctx);
++		return;
++	}
+ 	if (ctx->tandem_initialized)
+ 		spf_tandem_session_close(&ctx->tandem);
+ 	if (ctx->sampler_started)
+@@ -351,6 +429,35 @@ ssize_t iiod_buffer_metadata_get(void *provider_context,
+ 	if (!ctx || dev != ctx->rx || !buffer || !metadata || !iq_offset ||
+ 		!iq_bytes)
+ 		return -EINVAL;
++	if (ctx->counter_only) {
++		if (raw_bytes != ctx->layout.raw_bytes)
++			return -EIO;
++		raw = iio_buffer_start(buffer);
++		if (!raw)
++			return -EIO;
++		first_sample_sequence = spf_counter_read64(raw);
++		/* util_cpack2 emits two RX0 samples after the counter advanced twice.
++		 * SPFC1 defines the counter of the first sample, not the packing edge.
++		 * Keep the paired ABI's existing timestamp interpretation unchanged. */
++		if (first_sample_sequence < 2)
++			return -ERANGE;
++		first_sample_sequence -= 2;
++		ret = spf_buffer_sequence_resolve(&ctx->sequence, first_sample_sequence,
++						  ctx->samples_per_channel, &sequence);
++		if (ret)
++			return ret;
++		ret = spf_counter_frame_build(metadata, metadata_capacity, ctx->stream_id,
++					      sequence.buffer_sequence, first_sample_sequence,
++					      sequence.missing_samples_before,
++					      ctx->samples_per_channel, ctx->counter_rate);
++		if (ret < 0)
++			return ret;
++		spf_buffer_sequence_commit(&ctx->sequence, &sequence);
++		ctx->frames_emitted++;
++		*iq_offset = 8;
++		*iq_bytes = ctx->layout.iq_bytes;
++		return ret;
++	}
+ 	header_bytes = spf_radio_frame_v5_header_bytes(
+ 		(uint16_t)ctx->tandem.request.observation_capacity,
+ 		(uint16_t)ctx->tandem.request.event_capacity);
+@@ -537,6 +644,8 @@ int iiod_buffer_metadata_describe_frame(void *provider_context,
+ 
+ 	if (!info)
+ 		return -EINVAL;
++	if (ctx && ctx->counter_only)
++		return spf_counter_frame_describe(metadata, metadata_bytes, info);
+ 	ret = spf_exact_gap_header(ctx, metadata, metadata_bytes, &header);
+ 	if (ret)
+ 		return ret;
+@@ -556,6 +665,8 @@ int iiod_buffer_metadata_rebase_frame(void *provider_context,
+ 	const spf_radio_meta_v3_prefix_t *const_header;
+ 	int ret;
+ 
++	if (ctx && ctx->counter_only)
++		return spf_counter_frame_rebase(metadata, metadata_bytes, previous_frame_end);
+ 	ret = spf_exact_gap_header(ctx, metadata, metadata_bytes, &const_header);
+ 	if (ret)
+ 		return ret;
+diff --git a/iiod/spf-counter-metadata.c b/iiod/spf-counter-metadata.c
+new file mode 100644
+index 0000000..7c1ba99
+--- /dev/null
++++ b/iiod/spf-counter-metadata.c
+@@ -0,0 +1,127 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#include "spf-counter-metadata.h"
++#include <errno.h>
++#include <string.h>
++#define VALID_FLAGS ((UINT32_C(1) << 4) | (UINT32_C(1) << 21))
++#define GAP_FLAGS ((UINT32_C(1) << 11) | (UINT32_C(1) << 23))
++uint32_t spf_counter_read32(const void *wire)
++{
++	const uint8_t *p = wire;
++	return (uint32_t)p[0] | (uint32_t)p[1] << 8 | (uint32_t)p[2] << 16 | (uint32_t)p[3] << 24;
++}
++uint64_t spf_counter_read64(const void *wire)
++{
++	const uint8_t *p = wire;
++	return spf_counter_read32(p) | (uint64_t)spf_counter_read32(p + 4) << 32;
++}
++static void put32(void *wire, uint32_t value)
++{
++	uint8_t *p = wire;
++	unsigned i;
++	for (i = 0; i < 4; ++i)
++		p[i] = (uint8_t)(value >> (8 * i));
++}
++static void put64(void *wire, uint64_t value)
++{
++	uint8_t *p = wire;
++	put32(p, (uint32_t)value);
++	put32(p + 4, (uint32_t)(value >> 32));
++}
++static uint32_t crc32(const uint8_t *p, size_t bytes)
++{
++	uint32_t crc = UINT32_MAX;
++	size_t i;
++	unsigned bit;
++	for (i = 0; i < bytes; ++i) {
++		crc ^= p[i];
++		for (bit = 0; bit < 8; ++bit)
++			crc = (crc >> 1) ^ (UINT32_C(0xedb88320) & (0U - (crc & 1)));
++	}
++	return ~crc;
++}
++int spf_counter_request_decode(const void *wire, size_t bytes, size_t samples, uint32_t scan_mask,
++			       struct spf_counter_request *request)
++{
++	const uint8_t *p = wire;
++	if (!p || !request || bytes != SPF_COUNTER_REQUEST_BYTES)
++		return -EINVAL;
++	if (spf_counter_read32(p) != SPF_COUNTER_REQUEST_MAGIC ||
++	    spf_counter_read32(p + 4) != ((SPF_COUNTER_REQUEST_BYTES << 16) | 1))
++		return -EPROTONOSUPPORT;
++	if (spf_counter_read32(p + 8) != SPF_COUNTER_FEATURES || spf_counter_read32(p + 12) != 3 ||
++	    scan_mask != 3 || spf_counter_read32(p + 24) || spf_counter_read32(p + 28))
++		return -EINVAL;
++	request->sample_rate_hz = spf_counter_read32(p + 16);
++	request->samples_per_channel = spf_counter_read32(p + 20);
++	if (!request->sample_rate_hz || request->sample_rate_hz > 61440000U || !samples ||
++	    samples > UINT32_MAX / 4 || (samples & 1) || request->samples_per_channel != samples)
++		return -EINVAL;
++	return 0;
++}
++int spf_counter_frame_build(void *wire, size_t capacity, uint64_t stream, uint64_t sequence,
++			    uint64_t first, uint64_t missing, uint32_t samples, uint32_t rate)
++{
++	uint8_t *p = wire;
++	if (!p || capacity < SPF_COUNTER_FRAME_BYTES)
++		return -ENOSPC;
++	if (!stream || !samples || (samples & 1) || samples > UINT32_MAX / 4 || !rate ||
++	    rate > 61440000U || first > UINT64_MAX - samples || missing > first)
++		return -EINVAL;
++	memset(p, 0, SPF_COUNTER_FRAME_BYTES);
++	put32(p, SPF_COUNTER_FRAME_MAGIC);
++	put32(p + 4, (SPF_COUNTER_FRAME_BYTES << 16) | 1);
++	put32(p + 8, SPF_COUNTER_FEATURES);
++	put32(p + 12, VALID_FLAGS | (missing ? GAP_FLAGS : 0));
++	put64(p + 16, stream);
++	put64(p + 24, sequence);
++	put64(p + 32, first);
++	put64(p + 40, missing);
++	put32(p + 48, samples);
++	put32(p + 52, samples * 4);
++	put32(p + 56, 3);
++	put32(p + 60, rate);
++	put32(p + 64, 2);
++	put32(p + 76, crc32(p, 76));
++	return SPF_COUNTER_FRAME_BYTES;
++}
++int spf_counter_frame_describe(const void *wire, size_t bytes,
++			       struct iiod_buffer_metadata_frame_info *info)
++{
++	const uint8_t *p = wire;
++	uint32_t samples, rate;
++	uint64_t first, missing;
++	if (!p || !info || bytes != SPF_COUNTER_FRAME_BYTES)
++		return -EBADMSG;
++	samples = spf_counter_read32(p + 48);
++	rate = spf_counter_read32(p + 60);
++	first = spf_counter_read64(p + 32);
++	missing = spf_counter_read64(p + 40);
++	if (spf_counter_read32(p) != SPF_COUNTER_FRAME_MAGIC ||
++	    spf_counter_read32(p + 4) != ((SPF_COUNTER_FRAME_BYTES << 16) | 1) ||
++	    spf_counter_read32(p + 8) != SPF_COUNTER_FEATURES ||
++	    spf_counter_read32(p + 12) != (VALID_FLAGS | (missing ? GAP_FLAGS : 0)) ||
++	    !spf_counter_read64(p + 16) || !samples || (samples & 1) || samples > UINT32_MAX / 4 ||
++	    first > UINT64_MAX - samples || missing > first ||
++	    spf_counter_read32(p + 52) != samples * 4 || spf_counter_read32(p + 56) != 3 || !rate ||
++	    rate > 61440000U || spf_counter_read32(p + 64) != 2 || spf_counter_read32(p + 68) ||
++	    spf_counter_read32(p + 72) || spf_counter_read32(p + 76) != crc32(p, 76))
++		return -EBADMSG;
++	info->first_sample_sequence = first;
++	info->frame_end = first + samples;
++	info->missing_samples_before = missing;
++	return 0;
++}
++int spf_counter_frame_rebase(void *wire, size_t bytes, uint64_t previous_end)
++{
++	uint8_t *p = wire;
++	struct iiod_buffer_metadata_frame_info info;
++	int ret = spf_counter_frame_describe(wire, bytes, &info);
++	if (ret)
++		return ret;
++	if (info.first_sample_sequence < previous_end)
++		return -ERANGE;
++	put64(p + 40, info.first_sample_sequence - previous_end);
++	put32(p + 12, VALID_FLAGS | (info.first_sample_sequence != previous_end ? GAP_FLAGS : 0));
++	put32(p + 76, crc32(p, 76));
++	return 0;
++}
+diff --git a/iiod/spf-counter-metadata.h b/iiod/spf-counter-metadata.h
+new file mode 100644
+index 0000000..801909f
+--- /dev/null
++++ b/iiod/spf-counter-metadata.h
+@@ -0,0 +1,25 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifndef SPF_COUNTER_METADATA_H
++#define SPF_COUNTER_METADATA_H
++#include <stddef.h>
++#include <stdint.h>
++#include "buffer-metadata.h"
++#define SPF_COUNTER_REQUEST_MAGIC UINT32_C(0x43465053)
++#define SPF_COUNTER_FRAME_MAGIC UINT32_C(0x31435053)
++#define SPF_COUNTER_REQUEST_BYTES 32U
++#define SPF_COUNTER_FRAME_BYTES 80U
++#define SPF_COUNTER_FEATURES 7U
++struct spf_counter_request {
++	uint32_t sample_rate_hz;
++	uint32_t samples_per_channel;
++};
++uint32_t spf_counter_read32(const void *wire);
++uint64_t spf_counter_read64(const void *wire);
++int spf_counter_request_decode(const void *wire, size_t bytes, size_t samples, uint32_t scan_mask,
++			       struct spf_counter_request *request);
++int spf_counter_frame_build(void *wire, size_t capacity, uint64_t stream, uint64_t sequence,
++			    uint64_t first, uint64_t missing, uint32_t samples, uint32_t rate);
++int spf_counter_frame_describe(const void *wire, size_t bytes,
++			       struct iiod_buffer_metadata_frame_info *info);
++int spf_counter_frame_rebase(void *wire, size_t bytes, uint64_t previous_end);
++#endif
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 679651f..84378c2 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -94,6 +94,19 @@ if(IIOD_BUFFER_METADATA_PROVIDER MATCHES "spf-buffer-metadata\\.c$")
+ 	if(NOT SPF_THREAD_JOIN_SOURCE)
+ 		message(FATAL_ERROR "SPF temperature tests require spf_thread_join.c")
+ 	endif()
++	add_executable(test_spf_counter_metadata test_spf_counter_metadata.c
++		../iiod/spf-counter-metadata.c ../iiod/spf-buffer-metadata.c
++		../iiod/spf-buffer-layout.c ../iiod/spf-sampler-coverage.c
++		../iiod/spf-temperature-cache.c ../iiod/spf-ddr-burst-request.c
++		../iiod/spf-ddr-ring-request.c
++		${IIOD_BUFFER_METADATA_PROVIDER_EXTRA_SOURCES})
++	target_include_directories(test_spf_counter_metadata PRIVATE ../iiod ..
++		${IIOD_BUFFER_METADATA_INCLUDE_DIRS})
++	target_link_libraries(test_spf_counter_metadata iio ${PTHREAD_LIBRARIES})
++	target_link_options(test_spf_counter_metadata PRIVATE
++		-Wl,--wrap=open -Wl,--wrap=close -Wl,--wrap=ioctl
++		-Wl,--wrap=iio_device_get_name -Wl,--wrap=iio_buffer_start -Wl,--wrap=spf_tandem_session_acquire
++		-Wl,--wrap=spf_gain_sampler_start)
+ 	add_executable(test_spf_tandem_session test_spf_tandem_session.c
+ 		../iiod/spf-tandem-session.c)
+ 	add_executable(test_spf_tandem_metadata test_spf_tandem_metadata.c
+diff --git a/tests/test_spf_counter_metadata.c b/tests/test_spf_counter_metadata.c
+new file mode 100644
+index 0000000..ea1b250
+--- /dev/null
++++ b/tests/test_spf_counter_metadata.c
+@@ -0,0 +1,152 @@
++/* SPDX-License-Identifier: LGPL-2.1-or-later */
++#ifdef NDEBUG
++#undef NDEBUG
++#endif
++#include "spf-counter-metadata.h"
++#include "adi-rx-counter.h"
++#include "spf-tandem-session.h"
++#include <spf_gain_sampler.h>
++#include <assert.h>
++#include <errno.h>
++#include <stdarg.h>
++#include <stdio.h>
++#include <string.h>
++#include <iio.h>
++
++static const uint8_t request[32] = {
++    0x53, 0x50, 0x46, 0x43, 1, 0, 32, 0, 7, 0, 0, 0, 3, 0, 0, 0,
++    0x00, 0x87, 0x93, 0x03, 4, 0, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0}; /* 60 MHz, four complex samples */
++static uint8_t raw[24] = {0xfe, 0xff, 0xff, 0xff, 1, 0, 0, 0, 1, 0, 2, 0,
++			  3,	0,    4,    0,	  5, 0, 6, 0, 7, 0, 8, 0};
++static int opens, closes, acquisitions, reject_acquire;
++int __wrap_open(const char *path, int flags, ...)
++{
++	(void)flags;
++	assert(!strcmp(path, "/dev/tandem-agc-events"));
++	++opens;
++	return 97;
++}
++int __wrap_close(int fd)
++{
++	assert(fd == 97);
++	++closes;
++	return 0;
++}
++int __wrap_ioctl(int fd, unsigned long cmd, ...)
++{
++	va_list args;
++	const struct adi_rx_counter_request *lease;
++	assert(fd == 97 && cmd == ADI_RX_COUNTER_IOC_ACQUIRE);
++	va_start(args, cmd);
++	lease = va_arg(args, const struct adi_rx_counter_request *);
++	va_end(args);
++	assert(lease->magic == ADI_RX_COUNTER_MAGIC && lease->scan_mask == 3);
++	assert(lease->sample_rate_hz == 60000000 && lease->samples_per_channel == 4);
++	++acquisitions;
++	if (reject_acquire) {
++		errno = EOPNOTSUPP;
++		return -1;
++	}
++	return 0;
++}
++const char *__wrap_iio_device_get_name(const struct iio_device *dev)
++{
++	(void)dev;
++	return "cf-ad9361-lpc";
++}
++void *__wrap_iio_buffer_start(const struct iio_buffer *buffer)
++{
++	(void)buffer;
++	return raw;
++}
++int __wrap_spf_tandem_session_acquire(struct spf_tandem_session *session)
++{
++	(void)session;
++	assert(!"counter capture acquired paired tandem");
++	return -EIO;
++}
++bool __wrap_spf_gain_sampler_start(spf_gain_sampler_t *sampler, uint32_t interval)
++{
++	(void)sampler;
++	(void)interval;
++	assert(!"counter capture started paired sampler");
++	return false;
++}
++
++int main(int argc, char **argv)
++{
++	uint8_t frame[80], mutated[80];
++	struct spf_counter_request decoded;
++	struct iiod_buffer_metadata_frame_info info;
++	struct iiod_buffer_burst_plan plan;
++	struct iio_device *dev = (struct iio_device *)(uintptr_t)1;
++	struct iio_buffer *buffer = (struct iio_buffer *)(uintptr_t)2;
++	void *ctx = NULL;
++	size_t extra = 0, offset, iqbytes;
++	uint32_t mask = 3;
++	unsigned i;
++	assert(spf_counter_request_decode(request, 32, 4, 3, &decoded) == 0);
++	assert(spf_counter_request_decode(request, 31, 4, 3, &decoded) == -EINVAL);
++	assert(spf_counter_request_decode(request, 32, 4, 12, &decoded) == -EINVAL);
++	assert(spf_counter_request_decode(request, 32, 3, 3, &decoded) == -EINVAL);
++	assert(spf_counter_frame_build(frame, 80, 1, 0, UINT64_C(0x1fffffffe), 0, 4, 60000000) ==
++	       80);
++	assert(spf_counter_frame_describe(frame, 80, &info) == 0);
++	assert(info.frame_end == UINT64_C(0x200000002));
++	for (i = 0; i < 80; ++i) {
++		memcpy(mutated, frame, 80);
++		mutated[i] ^= 1;
++		assert(spf_counter_frame_describe(mutated, 80, &info) < 0);
++	}
++	assert(spf_counter_frame_build(frame, 80, 1, 0, UINT64_MAX - 2, 0, 4, 60000000) < 0);
++	assert(spf_counter_frame_rebase(frame, 80, UINT64_C(0x1fffffff8)) == 0);
++	assert(spf_counter_frame_describe(frame, 80, &info) == 0 &&
++	       info.missing_samples_before == 6);
++	assert(spf_counter_frame_rebase(frame, 80, UINT64_C(0x200000002)) == -ERANGE);
++	if (argc > 1) {
++		FILE *out = fopen(argv[1], "wb");
++		assert(out);
++		assert(fwrite(frame, 1, 80, out) == 80);
++		assert(fclose(out) == 0);
++	}
++	/* Execute the actual provider dispatch/lifecycle. No RX1 device exists. */
++	assert(iiod_buffer_metadata_open(dev, 4, &mask, 1, 4, request, 32, &ctx, &extra, &plan) ==
++	       0);
++	assert(ctx && extra == 2 && opens == 1 && acquisitions == 1);
++	assert(iiod_buffer_metadata_buffer_opened(ctx, 50) == 0);
++	assert(iiod_buffer_metadata_before_refill(ctx) == 0);
++	assert(iiod_buffer_metadata_after_refill(ctx) == 0);
++	assert(iiod_buffer_metadata_get(ctx, dev, buffer, 23, frame, 80, &offset, &iqbytes) ==
++	       -EIO);
++	assert(iiod_buffer_metadata_get(ctx, dev, buffer, 24, frame, 79, &offset, &iqbytes) ==
++	       -ENOSPC);
++	assert(iiod_buffer_metadata_get(ctx, dev, buffer, 24, frame, 80, &offset, &iqbytes) == 80);
++	assert(offset == 8 && iqbytes == 16 && raw[offset] == 1 && raw[offset + 14] == 8);
++	assert(iiod_buffer_metadata_describe_frame(ctx, frame, 80, &info) == 0);
++	assert(info.first_sample_sequence == UINT64_C(0x1fffffffc));
++	assert(iiod_buffer_metadata_get(ctx, dev, buffer, 24, frame, 80, &offset, &iqbytes) ==
++	       -ERANGE);
++	/* Nine samples later: five missing, deliberately not a frame multiple. */
++	raw[0] = 7;
++	raw[1] = raw[2] = raw[3] = 0;
++	raw[4] = 2;
++	assert(iiod_buffer_metadata_get(ctx, dev, buffer, 24, frame, 80, &offset, &iqbytes) == 80);
++	assert(iiod_buffer_metadata_describe_frame(ctx, frame, 80, &info) == 0 &&
++	       info.missing_samples_before == 5);
++	assert(iiod_buffer_metadata_rebase_frame(ctx, frame, 80, UINT64_C(0x1fffffffc)) == 0);
++	assert(iiod_buffer_metadata_describe_frame(ctx, frame, 80, &info) == 0 &&
++	       info.missing_samples_before == 9);
++	iiod_buffer_metadata_close(ctx);
++	assert(closes == 1);
++	reject_acquire = 1;
++	ctx = NULL;
++	assert(iiod_buffer_metadata_open(dev, 4, &mask, 1, 4, request, 32, &ctx, &extra, &plan) ==
++	       -EOPNOTSUPP);
++	assert(!ctx && closes == 2);
++	mask = 12;
++	assert(iiod_buffer_metadata_open(dev, 4, &mask, 1, 4, request, 32, &ctx, &extra, &plan) ==
++	       -EINVAL);
++	assert(opens == 2 && acquisitions == 2);
++	puts("PASS: counter wire, real provider dispatch, prefix, exact gaps and cleanup");
++	return 0;
++}
+-- 
+2.53.0
+

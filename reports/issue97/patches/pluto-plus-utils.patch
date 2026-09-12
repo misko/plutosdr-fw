@@ -1,0 +1,502 @@
+From 4e560749aac96b6c53a3fa69c9e4c3893babd306 Mon Sep 17 00:00:00 2001
+From: misko <misko@cs.toronto.edu>
+Date: Sat, 12 Sep 2026 21:41:25 +0000
+Subject: [PATCH] Support explicitly negotiated single-RX counter capture
+
+---
+ scripts/install_native_libiio.sh        |  20 +++-
+ src/pluto_plus/counter_metadata.py      |  92 ++++++++++++++++
+ src/pluto_plus/hardware/base.py         |   1 +
+ src/pluto_plus/hardware/iio.py          |  23 ++++
+ src/pluto_plus/hardware/iio_metadata.py |  47 ++++++--
+ src/pluto_plus/hardware/preflight.py    |   2 +-
+ tests/test_counter_metadata.py          | 139 ++++++++++++++++++++++++
+ tests/test_hardware_preflight.py        |   4 +-
+ 8 files changed, 314 insertions(+), 14 deletions(-)
+ create mode 100644 src/pluto_plus/counter_metadata.py
+ create mode 100644 tests/test_counter_metadata.py
+
+diff --git a/scripts/install_native_libiio.sh b/scripts/install_native_libiio.sh
+index 98587f3..2bf6265 100755
+--- a/scripts/install_native_libiio.sh
++++ b/scripts/install_native_libiio.sh
+@@ -12,11 +12,13 @@ uv_bin=""
+ metadata_abi=1
+ source_ref=""
+ source_commit=""
++source_directory=""
+ 
+ usage() {
+     cat <<EOF
+ Usage: scripts/install_native_libiio.sh --uv-bin ABSOLUTE_PATH
+        [--python PATH] [--prefix PATH] [--jobs N] [--metadata-abi 1|2|3|4]
++       [--source-directory ABSOLUTE_CLEAN_GIT_CHECKOUT]
+ 
+ Builds the exact host libiio matched to the selected firmware metadata ABI with
+ USB support. The default ABI is 1 for the currently deployed production radios.
+@@ -31,6 +33,7 @@ while (($#)); do
+     --prefix) prefix="${2:?missing value for --prefix}"; shift 2 ;;
+     --jobs) jobs="${2:?missing value for --jobs}"; shift 2 ;;
+     --uv-bin) uv_bin="${2:?missing value for --uv-bin}"; shift 2 ;;
++    --source-directory) source_directory="${2:?missing source directory}"; shift 2 ;;
+     --metadata-abi) metadata_abi="${2:?missing value for --metadata-abi}"; shift 2 ;;
+     -h|--help) usage; exit 0 ;;
+     *) usage >&2; printf 'ERROR: unknown argument: %s\n' "$1" >&2; exit 2 ;;
+@@ -47,8 +50,8 @@ case "$metadata_abi" in
+     source_commit="6305ea1d43436ff8bdd83aa6c9e5abf7244aa5f7"
+     ;;
+ 3)
+-    source_ref="persistent-hop-duty-v1-source/libiio-v1"
+-    source_commit="f6c450eada95ce99fe8756ebc244bfcf6ddcc72a"
++    source_ref="counter-rx-v1-rc1-source/libiio-v1"
++    source_commit="47a75cbc5e7d24a063b8b54eb531fdba6602b85c"
+     ;;
+ 4)
+     source_ref="iio-gain-timeline-v8-rc1-source/libiio-v4"
+@@ -98,7 +101,18 @@ trap cleanup EXIT
+ 
+ git -C "$worktree" init --quiet src
+ git -C "$worktree/src" remote add origin https://github.com/misko/libiio.git
+-git -C "$worktree/src" fetch --quiet --depth 1 origin "$source_ref"
++if [[ -n "$source_directory" ]]; then
++    [[ "$source_directory" == /* && -d "$source_directory" ]] || {
++        printf 'ERROR: --source-directory must be an absolute git checkout\n' >&2; exit 1;
++    }
++    [[ "$(git -C "$source_directory" rev-parse HEAD)" == "$source_commit" &&
++       -z "$(git -C "$source_directory" status --porcelain --untracked-files=normal)" ]] || {
++        printf 'ERROR: local source must be clean at the immutable runtime pin\n' >&2; exit 1;
++    }
++    git -C "$worktree/src" fetch --quiet "$source_directory" "$source_commit"
++else
++    git -C "$worktree/src" fetch --quiet --depth 1 origin "$source_ref"
++fi
+ git -C "$worktree/src" -c advice.detachedHead=false checkout --quiet --detach FETCH_HEAD
+ actual_commit="$(git -C "$worktree/src" rev-parse HEAD)"
+ [[ "$actual_commit" == "$source_commit" ]] || {
+diff --git a/src/pluto_plus/counter_metadata.py b/src/pluto_plus/counter_metadata.py
+new file mode 100644
+index 0000000..115c406
+--- /dev/null
++++ b/src/pluto_plus/counter_metadata.py
+@@ -0,0 +1,92 @@
++"""SPFC1 counter-only request and SPC1 frame, independent of paired metadata."""
++
++from __future__ import annotations
++
++import struct
++import zlib
++from dataclasses import dataclass
++
++REQUEST = struct.Struct("<IHHIIIIII")
++FRAME = struct.Struct("<IHHIIQQQQIIIIIIII")
++REQUEST_MAGIC = 0x43465053
++FRAME_MAGIC = 0x31435053
++FEATURES = 7
++VALID_FLAGS = (1 << 4) | (1 << 21)
++GAP_FLAGS = (1 << 11) | (1 << 23)
++CAPABILITY = "iio,buffer-counter-metadata"
++PROFILE = "ad9361:1r1t:rx0:manual:decimation1:spfc1"
++
++
++def pack_counter_request(samples: int, rate: int) -> bytes:
++    if (
++        isinstance(samples, bool)
++        or not isinstance(samples, int)
++        or samples <= 0
++        or samples & 1
++        or samples > 0xFFFFFFFF // 4
++    ):
++        raise ValueError("counter capture requires an even positive CI16 sample count")
++    if isinstance(rate, bool) or not isinstance(rate, int) or not 0 < rate <= 61_440_000:
++        raise ValueError("counter capture rate must be within 1..61440000")
++    return REQUEST.pack(REQUEST_MAGIC, 1, REQUEST.size, FEATURES, 3, rate, samples, 0, 0)
++
++
++@dataclass(frozen=True, slots=True)
++class CounterMetadataV1:
++    flags: int
++    stream_id: int
++    buffer_sequence: int
++    first_sample_sequence: int
++    missing_samples_before: int
++    samples_per_channel: int
++    iq_payload_bytes: int
++    enabled_scan_mask: int
++    sample_rate_hz: int
++    channel_count: int = 1
++    source_counter_offset_samples: int = 2
++
++    @classmethod
++    def unpack(cls, wire: bytes) -> CounterMetadataV1:
++        if len(wire) != FRAME.size:
++            raise ValueError("counter metadata frame must be exactly 80 bytes")
++        (
++            magic,
++            version,
++            size,
++            features,
++            flags,
++            stream,
++            sequence,
++            first,
++            missing,
++            samples,
++            iq_bytes,
++            mask,
++            rate,
++            r0,
++            r1,
++            r2,
++            crc,
++        ) = FRAME.unpack(wire)
++        if (
++            magic != FRAME_MAGIC
++            or version != 1
++            or size != FRAME.size
++            or features != FEATURES
++            or r0 != 2
++            or r1
++            or r2
++            or crc != zlib.crc32(wire[:76])
++        ):
++            raise ValueError("invalid counter metadata identity, features, reserved fields or CRC")
++        pack_counter_request(samples, rate)
++        if (
++            not stream
++            or mask != 3
++            or iq_bytes != samples * 4
++            or first + samples > 0xFFFFFFFFFFFFFFFF
++            or missing > first
++            or flags != VALID_FLAGS | (GAP_FLAGS if missing else 0)
++        ):
++            raise ValueError("invalid counter metadata interval, layout or flags")
++        return cls(flags, stream, sequence, first, missing, samples, iq_bytes, mask, rate)
+diff --git a/src/pluto_plus/hardware/base.py b/src/pluto_plus/hardware/base.py
+index a279af0..1ae04e0 100644
+--- a/src/pluto_plus/hardware/base.py
++++ b/src/pluto_plus/hardware/base.py
+@@ -387,6 +387,7 @@ class MetadataRadioDevice(RadioDevice, Protocol):
+         sample_count: int,
+         *,
+         kernel_buffers: int,
++        counter_only: bool = False,
+         batch_frames: int = 1,
+         ddr_burst_bytes: int = 0,
+         direct_async_frames: int = 0,
+diff --git a/src/pluto_plus/hardware/iio.py b/src/pluto_plus/hardware/iio.py
+index 9a6180c..4a2faf5 100644
+--- a/src/pluto_plus/hardware/iio.py
++++ b/src/pluto_plus/hardware/iio.py
+@@ -1066,6 +1066,7 @@ class IioRadioDevice:
+         sample_count: int,
+         *,
+         kernel_buffers: int,
++        counter_only: bool = False,
+         batch_frames: int = 1,
+         tandem_request: TandemSessionRequestV1 | None = None,
+         ddr_burst_bytes: int = 0,
+@@ -1137,6 +1138,27 @@ class IioRadioDevice:
+         elif ddr_ring_frames or ddr_ring_continuous:
+             raise ValueError("DDR ring mode requires a positive byte budget")
+         device = self._require_device()
++        if counter_only:
++            from pluto_plus.counter_metadata import CAPABILITY, PROFILE
++
++            attrs = dict(device.ctx.attrs)
++            scan = tuple(
++                sorted(ch.id for ch in device._rxadc.channels if ch.scan_element and not ch.output)
++            )
++            if (
++                attrs.get(CAPABILITY) != "1"
++                or attrs.get("iio,buffer-counter-metadata-profile") != PROFILE
++            ):
++                raise RadioConfigurationError("radio does not support SPFC1 counter-only metadata")
++            if (
++                scan != ("voltage0", "voltage1")
++                or tuple(device.rx_enabled_channels) != (0,)
++                or device.gain_control_mode_chan0 != "manual"
++                or tandem_request is not None
++            ):
++                raise RadioConfigurationError(
++                    "counter-only mode requires physical 1R1T RX0/manual and no tandem request"
++                )
+         self.reset_receive_buffer()
+         channels = tuple(int(item) for item in device.rx_enabled_channels)
+         if channels not in {(0,), (1,), (0, 1)}:
+@@ -1296,6 +1318,7 @@ class IioRadioDevice:
+         session = IioMetadataCaptureSession(
+             device,
+             metadata_buffer_type,
++            counter_only=counter_only,
+             sample_rate_hz=sample_rate_hz,
+             samples_per_channel=sample_count,
+             kernel_buffers=actual_kernel_buffers,
+diff --git a/src/pluto_plus/hardware/iio_metadata.py b/src/pluto_plus/hardware/iio_metadata.py
+index 0ff7d28..5550d76 100644
+--- a/src/pluto_plus/hardware/iio_metadata.py
++++ b/src/pluto_plus/hardware/iio_metadata.py
+@@ -14,6 +14,7 @@ from typing import Any
+ import numpy as np
+ from pydantic import ValidationError
+ 
++from pluto_plus.counter_metadata import CAPABILITY, PROFILE, CounterMetadataV1, pack_counter_request
+ from pluto_plus.ddr_ring import DdrRingStatusSnapshot
+ from pluto_plus.direct_radio.usb import (
+     MetadataFlags,
+@@ -310,6 +311,7 @@ class IioMetadataCaptureSession:
+         sdr: Any,
+         metadata_buffer_type: Any,
+         *,
++        counter_only: bool = False,
+         sample_rate_hz: int,
+         samples_per_channel: int,
+         kernel_buffers: int,
+@@ -372,6 +374,25 @@ class IioMetadataCaptureSession:
+             )
+         if ddr_ring_bytes < 0 or ddr_ring_frames < 0:
+             raise ValueError("DDR ring values must not be negative")
++        if not isinstance(counter_only, bool):
++            raise ValueError("counter_only must be boolean")
++        if counter_only:
++            if metadata_abi != 3 or tandem_request is not None:
++                raise ValueError("counter-only mode requires ABI 3 transport and no tandem request")
++            if ddr_burst_bytes or ddr_ring_bytes or batch_frames != 1:
++                raise ValueError(
++                    "counter-only v1 supports ordinary or direct capture without RAM rings"
++                )
++            attrs = dict(getattr(sdr.ctx, "attrs", {}) or {})
++            if (
++                attrs.get(CAPABILITY) != "1"
++                or attrs.get("iio,buffer-counter-metadata-profile") != PROFILE
++            ):
++                raise ValueError("radio does not advertise the SPFC1 counter-only profile")
++            if tuple(sdr.rx_enabled_channels) != (0,):
++                raise ValueError("counter-only v1 requires RX0")
++            pack_counter_request(samples_per_channel, sample_rate_hz)
++        self._counter_only = counter_only
+         if ddr_burst_bytes and ddr_ring_bytes:
+             raise ValueError("device DDR burst and DDR ring are mutually exclusive")
+         if direct_async_frames and ddr_burst_bytes:
+@@ -406,12 +427,15 @@ class IioMetadataCaptureSession:
+         self._ddr_ring_capture_frames = ddr_ring_frames
+         self._ddr_ring_continuous = ddr_ring_continuous
+         self._direct_async_frames = direct_async_frames
+-        self._drop_backlog_on_overrun = bool(
+-            direct_async_frames and drop_backlog_on_overrun
+-        )
+-        self._tandem_request = tandem_request or TandemSessionRequestV1.auto_for_sample_count(
+-            samples_per_channel,
+-            retention_frames=(kernel_buffers + 1 if metadata_abi == 4 else 2),
++        self._drop_backlog_on_overrun = bool(direct_async_frames and drop_backlog_on_overrun)
++        self._tandem_request = (
++            None
++            if counter_only
++            else tandem_request
++            or TandemSessionRequestV1.auto_for_sample_count(
++                samples_per_channel,
++                retention_frames=(kernel_buffers + 1 if metadata_abi == 4 else 2),
++            )
+         )
+         self._channels = tuple(int(item) for item in sdr.rx_enabled_channels)
+         if self._channels not in {(0,), (1,), (0, 1)}:
+@@ -632,7 +656,9 @@ class IioMetadataCaptureSession:
+ 
+     def _open_metadata_buffer(self) -> Any:
+         request: bytes | None
+-        if self._metadata_abi == 1:
++        if self._counter_only:
++            request = pack_counter_request(self._samples_per_channel, self._sample_rate_hz)
++        elif self._metadata_abi == 1:
+             request = None
+         elif self._metadata_abi in {2, 3}:
+             request = self._tandem_request.pack(self._samples_per_channel)
+@@ -779,7 +805,12 @@ class IioMetadataCaptureSession:
+         tandem_metadata: RadioMetadataV5 | RadioMetadataV7 | None = None
+         parsed_v7: RadioMetadataV7 | None = None
+         metadata: Any
+-        if self._metadata_abi == 1:
++        if self._counter_only:
++            metadata = CounterMetadataV1.unpack(raw_metadata)
++            if metadata.sample_rate_hz != self._sample_rate_hz:
++                raise RuntimeError("counter metadata sample rate changed during capture")
++            declared_missing = metadata.missing_samples_before
++        elif self._metadata_abi == 1:
+             metadata = RadioMetadataV3.unpack(raw_metadata)
+         elif self._metadata_abi == 2:
+             parsed = RadioMetadataV5.unpack(raw_metadata)
+diff --git a/src/pluto_plus/hardware/preflight.py b/src/pluto_plus/hardware/preflight.py
+index a10ecba..3746fe3 100644
+--- a/src/pluto_plus/hardware/preflight.py
++++ b/src/pluto_plus/hardware/preflight.py
+@@ -24,7 +24,7 @@ METADATA_RUNTIME_RECEIPT = Path("share/pluto-plus-utils/metadata-runtime.json")
+ METADATA_RUNTIME_SOURCE_COMMITS = {
+     1: "c26258bfa33098c2b215e19cf85d448e89499b1a",
+     2: "6305ea1d43436ff8bdd83aa6c9e5abf7244aa5f7",
+-    3: "f6c450eada95ce99fe8756ebc244bfcf6ddcc72a",
++    3: "47a75cbc5e7d24a063b8b54eb531fdba6602b85c",
+     4: "98a5e6139459a01a5a42ca7cd3e98d807156b6b0",
+ }
+ _RING_METADATA_BUFFER_PARAMETERS = (
+diff --git a/tests/test_counter_metadata.py b/tests/test_counter_metadata.py
+new file mode 100644
+index 0000000..465e75b
+--- /dev/null
++++ b/tests/test_counter_metadata.py
+@@ -0,0 +1,139 @@
++from __future__ import annotations
++
++import struct
++import zlib
++from types import SimpleNamespace
++
++import pytest
++from test_iio_metadata_capture import _open_radio
++
++from pluto_plus.counter_metadata import (
++    CAPABILITY,
++    FEATURES,
++    FRAME,
++    FRAME_MAGIC,
++    GAP_FLAGS,
++    PROFILE,
++    VALID_FLAGS,
++    CounterMetadataV1,
++    pack_counter_request,
++)
++from pluto_plus.errors import RadioConfigurationError
++
++
++def frame(first: int = 0x1FFFFFFFE, *, sequence: int = 0, missing: int = 0) -> bytes:
++    wire = FRAME.pack(
++        FRAME_MAGIC,
++        1,
++        80,
++        FEATURES,
++        VALID_FLAGS | (GAP_FLAGS if missing else 0),
++        1,
++        sequence,
++        first,
++        missing,
++        4,
++        16,
++        3,
++        5_000_000,
++        2,
++        0,
++        0,
++        0,
++    )
++    return wire[:76] + struct.pack("<I", zlib.crc32(wire[:76]))
++
++
++def test_request_golden() -> None:
++    assert pack_counter_request(4, 60_000_000).hex() == (
++        "5350464301002000070000000300000000879303040000000000000000000000"
++    )
++
++
++@pytest.mark.parametrize("samples", [True, 0, -2, 3, 0xFFFFFFFF, 4.0])
++def test_reject_sample_geometry(samples: int) -> None:
++    with pytest.raises(ValueError):
++        pack_counter_request(samples, 60_000_000)
++
++
++@pytest.mark.parametrize("rate", [True, 0, -1, 61_440_001, 60_000_000.0])
++def test_reject_rate(rate: int) -> None:
++    with pytest.raises(ValueError):
++        pack_counter_request(4, rate)
++
++
++def test_counter_high_word_and_corruption() -> None:
++    wire = frame()
++    assert CounterMetadataV1.unpack(wire).first_sample_sequence == 0x1FFFFFFFE
++    for index in range(80):
++        corrupt = bytearray(wire)
++        corrupt[index] ^= 1
++        with pytest.raises(ValueError):
++            CounterMetadataV1.unpack(corrupt)
++    for bad in [wire[:-1], wire + b"\0"]:
++        with pytest.raises(ValueError):
++            CounterMetadataV1.unpack(bad)
++
++
++def counter_radio(headers: list[bytes]):
++    radio, adi, factory = _open_radio(headers, metadata_abi=3, channels=(0,))
++    assert adi.device is not None
++    adi.device.ctx.attrs.update({CAPABILITY: "1", "iio,buffer-counter-metadata-profile": PROFILE})
++    adi.device._rxadc.channels = [
++        SimpleNamespace(id=f"voltage{i}", scan_element=True, output=False) for i in range(2)
++    ]
++    adi.device.gain_control_mode_chan0 = "manual"
++    adi.device.sample_rate = 5_000_000
++    return radio, adi, factory
++
++
++def test_public_counter_capture_exact_gaps_without_tandem() -> None:
++    radio, adi, factory = counter_radio([frame(), frame(0x200000007, sequence=2, missing=5)])
++    try:
++        with radio.begin_metadata_capture(4, kernel_buffers=4, counter_only=True) as capture:
++            first = capture.read_block()
++            second = capture.read_block()
++            assert first.tandem_metadata is None and second.tandem_metadata is None
++            assert first.first_sample_sequence == 0x1FFFFFFFE
++            assert second.missing_samples_before == 5
++            assert capture._tandem_request is None
++            assert capture._buffer.signature[1] == pack_counter_request(4, 5_000_000)
++    finally:
++        radio.close()
++
++
++def test_counter_mode_rejects_paired_topology_before_open() -> None:
++    radio, adi, factory = counter_radio([])
++    assert adi.device is not None
++    adi.device._rxadc.channels.append(
++        SimpleNamespace(id="voltage2", scan_element=True, output=False)
++    )
++    try:
++        with pytest.raises(RadioConfigurationError, match="physical 1R1T"):
++            radio.begin_metadata_capture(4, kernel_buffers=4, counter_only=True)
++    finally:
++        radio.close()
++
++
++def test_counter_mode_rejects_absent_capability() -> None:
++    radio, adi, factory = counter_radio([])
++    del adi.device.ctx.attrs[CAPABILITY]
++    try:
++        with pytest.raises(RadioConfigurationError, match="SPFC1"):
++            radio.begin_metadata_capture(4, kernel_buffers=4, counter_only=True)
++    finally:
++        radio.close()
++
++
++def test_corrupt_counter_frame_closes_capture() -> None:
++    wire = bytearray(frame())
++    wire[76] ^= 1
++    radio, adi, factory = counter_radio([bytes(wire)])
++    try:
++        capture = radio.begin_metadata_capture(4, kernel_buffers=4, counter_only=True)
++        buf = capture._buffer
++        with pytest.raises(ValueError, match="CRC"):
++            capture.read_block()
++        assert buf.closed and capture._buffer is None
++    finally:
++        radio.close()
+diff --git a/tests/test_hardware_preflight.py b/tests/test_hardware_preflight.py
+index 40a68c8..665b8ea 100644
+--- a/tests/test_hardware_preflight.py
++++ b/tests/test_hardware_preflight.py
+@@ -199,8 +199,8 @@ def test_metadata_runtime_gate_binds_release_local_hashes_and_constructor(
+     (
+         (
+             3,
+-            "persistent-hop-duty-v1-source/libiio-v1",
+-            "f6c450eada95ce99fe8756ebc244bfcf6ddcc72a",
++            "counter-rx-v1-rc1-source/libiio-v1",
++            "47a75cbc5e7d24a063b8b54eb531fdba6602b85c",
+         ),
+         (
+             4,
+-- 
+2.53.0
+
