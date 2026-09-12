@@ -36,7 +36,7 @@ int glrt_tracking_resolve_2500000(
         memset(w->power, 0, sizeof(w->power));
         for (frame = 0; frame < frames; frame++) {
             size_t start = starts[frame]-8U+hypothesis;
-            double observed_energy = 0, denominator;
+            double observed_energy = 0, denominator, reciprocal;
             memset(w->bins, 0, sizeof(w->bins));
             for (n = 0; n < reference_samples; n++) {
                 double i = observations[2*(start+n)], q = observations[2*(start+n)+1];
@@ -46,9 +46,10 @@ int glrt_tracking_resolve_2500000(
                 observed_energy += i*i+q*q;
             }
             denominator = fmax(observed_energy*reference_energy, 1.0);
+            reciprocal = 1.0/denominator;
             if (fft(context, w->bins, GLRT_RESOLVER_FFT)) return -1;
             for (n = 0; n < GLRT_RESOLVER_FFT; n++) {
-                double power = (w->bins[n][0]*w->bins[n][0]+w->bins[n][1]*w->bins[n][1])/denominator;
+                double power = (w->bins[n][0]*w->bins[n][0]+w->bins[n][1]*w->bins[n][1])*reciprocal;
                 if (!isfinite(power)) return -1;
                 w->power[n] += power/GLRT_RESOLVER_FRAMES;
             }

@@ -48,6 +48,10 @@ def call(resolver, reference, iq, starts, *, damage=None):
         values[:] = np.fft.fft(values)
         if damage == "fft_nan":
             values[1] = np.nan
+        if damage == "fft_inf":
+            values[1] = np.inf
+        if damage == "fft_square_overflow":
+            values[1] = 1e300
         return 0
 
     rc = resolver(None if damage == "no_workspace" else workspace, reference.ctypes.data,
@@ -108,7 +112,8 @@ def test_all_timing_hypotheses_and_cfo_aliases_match_oracle(resolver, kind, shif
 
 
 @pytest.mark.parametrize("damage", ["no_workspace", "short_reference", "short_starts", "left_guard",
-                                    "right_guard", "wrapped_start", "empty_reference", "fft_fail", "fft_nan"])
+                                    "right_guard", "wrapped_start", "empty_reference", "fft_fail", "fft_nan",
+                                    "fft_inf", "fft_square_overflow"])
 def test_invalid_or_failed_resolver_clears_estimate_and_checks_bounds_before_fft(resolver, damage):
     reference = np.ones((N, 2), dtype=np.int16)
     iq = np.ones((13400, 2), dtype=np.int16)
@@ -119,4 +124,5 @@ def test_invalid_or_failed_resolver_clears_estimate_and_checks_bounds_before_fft
     if damage == "empty_reference": reference[:] = 0
     rc, result, calls = call(resolver, reference, iq, starts, damage=damage)
     assert rc == -1 and bytes(result) == bytes(Result())
-    assert len(calls) == (3 if damage == "fft_fail" else 1 if damage == "fft_nan" else 0)
+    assert len(calls) == (3 if damage == "fft_fail" else 1 if damage in
+                         ("fft_nan", "fft_inf", "fft_square_overflow") else 0)
