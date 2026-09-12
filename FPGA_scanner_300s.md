@@ -7,6 +7,11 @@ slack and 880 failing endpoints. No further variants or deployment are permitted
 without an explicit user-approved restart. Previously listed next steps below
 are historical, not authorization to continue this approach.
 
+Closeout: all 2,431 scoped tests and 92 actual FFT fault cases passed, but the
+failed physical gate is decisive. Sources and evidence are preserved on the
+do-not-merge product-publication branch. No new development or radio operation.
+See [final rejected candidate and evidence](reports/experiments/20260912-product-publication-no-go.md).
+
 Update 2026-09-12, phase-specific quiet publication: **2,411 scoped tests and
 all 92 actual FFT fault/reset/stall cases pass**. Full and reduced publication
 match across 1,851,082 checks, including active preflight events. Exact 64,512
