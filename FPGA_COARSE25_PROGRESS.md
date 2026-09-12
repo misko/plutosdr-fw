@@ -1,6 +1,7 @@
 # Coarse25 continuation checkpoint — 2026-09-12 06:19 UTC
 
-**Later checkpoint:** [complete detector RTL and routing](FPGA_COARSE25_DETECTOR_CHECKPOINT.md).
+**Latest decision checkpoint:** [timebox review; not deployed](FPGA_COARSE25_TIMEBOX_REVIEW.md).
+**Earlier checkpoint:** [complete detector RTL and routing](FPGA_COARSE25_DETECTOR_CHECKPOINT.md).
 The following preserves the earlier arithmetic-only milestone.
 
 Goal unchanged: **2.5 / 5 / 15 MS/s FPGA PSS detection, with a 2.5 MS/s

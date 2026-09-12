@@ -11,7 +11,8 @@ from .pilot_ddc import PilotDdcOracle, mixer_lut
 LIB = Path(__file__).resolve().parents[2] / "hdl/library"
 
 
-def compile_simulator(directory, rate_msps=15, *, watchdog_cycles=3_000_000):
+def compile_simulator(directory, rate_msps=15, *, watchdog_cycles=3_000_000,
+                      coarse25=False, coarse_groups=29):
     assert shutil.which("iverilog") and shutil.which("vvp"), "Icarus is required"
     executable = directory / "capture.vvp"
     files = [LIB / "axi_starlink_pilot_capture/axi_starlink_pilot_capture.v",
@@ -19,13 +20,19 @@ def compile_simulator(directory, rate_msps=15, *, watchdog_cycles=3_000_000):
              LIB / "axi_starlink_pss_phase_map/starlink_pss_axi_lite.v"]
     files += [LIB / "starlink_pss_acquisition" / name for name in
               ("starlink_pilot_ddc.v", "starlink_pilot_halfband2.v", "starlink_pilot_fir3.v")]
+    files += [LIB / "starlink_coarse25" / f"starlink_coarse25_{name}.v" for name in
+              ("mac", "score", "datapath", "fold", "detector", "registers")]
+    files.append(LIB / "starlink_pss_acquisition/starlink_pss_score_divider.v")
     subprocess.run(["iverilog", "-g2012", "-Wall", "-s", "tb_starlink_pilot_capture",
                     "-P", f"tb_starlink_pilot_capture.SOURCE_RATE_MSPS={rate_msps}",
                     "-P", f"tb_starlink_pilot_capture.WATCHDOG_CYCLES={watchdog_cycles}",
+                    "-P", f"tb_starlink_pilot_capture.COARSE25_BYPASS={int(coarse25)}",
+                    "-P", f"tb_starlink_pilot_capture.COARSE_GROUPS={coarse_groups}",
                     "-o", str(executable), *map(str, files)],
                    check=True, capture_output=True, text=True, timeout=60)
     for name in ("pilot_mixer_q16.mem", "pilot_halfband2_q17.mem", "pilot_fir3_q17.mem"):
         shutil.copyfile(LIB / "starlink_pss_acquisition" / name, directory / name)
+    shutil.copyfile(LIB / "starlink_coarse25/coarse25_q15.mem", directory / "coarse25_q15.mem")
     return rate_msps, directory, executable
 
 

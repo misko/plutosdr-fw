@@ -86,6 +86,17 @@ def test_injection_keeps_its_existing_15msps_only_contract():
                  message="acquisition-injection")
 
 
+def test_coarse25_is_explicit_bypass_only_without_old_fft_features():
+    admitted({"profile": "coarse25", "rate_msps": "2.5"})
+    for rate in ("15", "30", "60"):
+        rejected({"profile": "coarse25", "rate_msps": rate}, message="coarse25 requires explicit")
+    rejected({"profile": "coarse25"}, message="coarse25 requires explicit")
+    for profile in ("full", "paired-pilot", "detector-only", "acquisition-only"):
+        rejected({"profile": profile, "rate_msps": "2.5"}, message="coarse25 requires explicit")
+    for feature in ("shared_xfft", "realtime_xfft", "boundary_stop"):
+        rejected({"profile": "coarse25", "rate_msps": "2.5", feature: "1"}, message="requires explicit")
+
+
 @pytest.mark.parametrize("realtime,boundary", list(product((None, "0", "1"), repeat=2)))
 def test_stop_never_implies_realtime_and_shared_nonrealtime_is_preserved(realtime, boundary):
     fields = SHARED.copy()
@@ -191,9 +202,9 @@ MUTANTS = [
      "STARLINK_PSS_BOUNDARY_STOP boundary_stop 1", {}, True),
     ("boolean_alias", "if {$value ni {0 1}}", "if {0}",
      SHARED | {"boundary_stop": "true"}, False),
-    ("unsupported_rate", "if {$rate ni {15 30 60}}", "if {0}",
+    ("unsupported_rate", "if {$rate ni {2.5 15 30 60}}", "if {0}",
      {"rate_msps": "25"}, False),
-    ("unsupported_profile", "if {$profile ni {full detector-only paired-pilot acquisition-only acquisition-injection}}",
+    ("unsupported_profile", "if {$profile ni {full detector-only paired-pilot acquisition-only acquisition-injection coarse25}}",
      "if {0}", {"profile": "unknown"}, False),
     ("injection_rate", 'if {$profile eq "acquisition-injection" && $rate ne "15"}',
      "if {0}", {"profile": "acquisition-injection", "rate_msps": "30"}, False),
