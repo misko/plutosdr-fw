@@ -81,7 +81,7 @@ def test_first_tracking_image_has_one_native_engine_and_shared_acquisition(captu
 
 
 @pytest.mark.parametrize(("termination", "stop_phase"), [
-    ("complete", 0), ("gap", 0), ("cancel", 0),
+    ("complete", 0), ("gap", 0), ("cancel", 0), ("pre-pilot-cancel", 0),
     # Sweep one complete 2.5-MS/s sample interval at the 100-MHz core clock.
     # Every partial result must remain independently covered by exported IQ.
     *(("mid-pilot", phase) for phase in range(40)),
@@ -90,11 +90,12 @@ def test_exact_native_results_coexist_with_iq_and_stop_keeps_queued_evidence(
     captures, tmp_path, termination, stop_phase
 ):
     completed = termination == "complete"
-    count = 3 if completed else 2
+    early_cancel = termination == "pre-pilot-cancel"
+    count = 0 if early_cancel else 3 if completed else 2
     rows = [(0, 11, 0, 3, 1), write(8, 4), wait(2000), write(0x20, 517), write(8, 1),
-        write(0x808, 16), *configuration(), wait(450000 if completed else 200000+stop_phase)]
+        write(0x808, 16), *configuration(), wait(20 if early_cancel else 450000 if completed else 200000+stop_phase)]
     if termination == "gap": rows += [(0, 5, 0, 0x12345678, 0), wait(100)]
-    if termination == "cancel": rows += [write(0x808, 2), wait(500)]
+    if termination == "cancel" or early_cancel: rows += [write(0x808, 2), wait(500)]
     rows += [write(8, 2), wait(500), *snapshot(), *tracking_snapshot()]
     for _ in range(count): rows += [*head(), write(0x808, 32)]
     rows += [*tracking_snapshot(), write(0x808, 4), wait(100), write(8, 4), wait(100),
@@ -110,8 +111,8 @@ def test_exact_native_results_coexist_with_iq_and_stop_keeps_queued_evidence(
     before, after = map(decode_snapshot, groups(reads, 0x900, 24))
     assert before.epoch == 1 and before.faults == 8 and before.configured == 3
     assert (before.admitted, before.committed, before.queued) == (count, count, count)
-    assert before.unavailable == (0 if completed or termination == "cancel" else 1)
-    assert before.cancelled == (1 if termination == "cancel" else 0)
+    assert before.unavailable == (0 if completed or termination == "cancel" or early_cancel else 1)
+    assert before.cancelled == (3 if early_cancel else 1 if termination == "cancel" else 0)
     after.require_drained()
     b = TrackingBatch(2500000, 1, 71, 1000, 24576, round(Fraction(2500000*65536, 750)),
                       4096*65536, 0, 17, 3, 30000)
