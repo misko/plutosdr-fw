@@ -46,6 +46,20 @@ def decode_snapshot(words):
     return TrackingSnapshot.from_sysfs("GLT1SNAP 00010000 "+" ".join(f"{v:08x}" for v in words))
 
 
+@pytest.mark.parametrize("command,strobe", [(0, 15), (3, 15), (0x80000002, 15), (2, 7)])
+def test_registered_commands_reject_partial_and_aliased_writes(captures, tmp_path, command, strobe):
+    # CANCEL is legal while idle. Invalid commands must not become CANCEL
+    # merely because bit 1 is set, or because the previous command was valid.
+    rows = [write(0x808, 2), read(0x810), write(0x808, command, strobe=strobe),
+            read(0x810), write(0x808, 4), wait(20), read(0x810),
+            write(0x808, 2), read(0x810)]
+    output, reads, final = run(
+        captures(2500000, continuous=True, legacy=False, local=True, tracking=True), rows, tmp_path
+    )
+    assert not output and final == (0, 0)
+    assert reads == [(0x810, 0), (0x810, 1), (0x810, 0), (0x810, 0)]
+
+
 def test_first_tracking_image_has_one_native_engine_and_shared_acquisition(captures, tmp_path):
     executable = captures(2500000, continuous=True, legacy=False, local=True, tracking=True)
     source = executable.read_text()
