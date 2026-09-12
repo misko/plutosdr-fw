@@ -6,7 +6,7 @@
 #define GLRT_BOOTSTRAP_SPACING 9U
 #define GLRT_BOOTSTRAP_LIMIT 200U
 
-enum glrt_bootstrap_status { GLRT_BOOTSTRAP_ERROR=-1, GLRT_BOOTSTRAP_PAST=1,
+enum glrt_bootstrap_status { GLRT_BOOTSTRAP_ERROR=-1, GLRT_BOOTSTRAP_WAIT=0, GLRT_BOOTSTRAP_PAST=1,
                              GLRT_BOOTSTRAP_READY=2 };
 enum glrt_bootstrap_failure { GLRT_BOOTSTRAP_NONE, GLRT_BOOTSTRAP_INVALID,
     GLRT_BOOTSTRAP_SOURCE_LOSS, GLRT_BOOTSTRAP_BUDGET, GLRT_BOOTSTRAP_HISTORY,
@@ -41,6 +41,26 @@ int glrt_tracking_bootstrap_init(struct glrt_tracking_bootstrap *, uint32_t epoc
 int glrt_tracking_bootstrap_next(struct glrt_tracking_bootstrap *, uint64_t earliest,
     uint64_t available, uint32_t lead, uint32_t *frame,
     struct glrt_tracking_job *, struct glrt_tracking_batch *handoff);
+
+/* Additive live adapter: DMA delivery and actual reception have separate
+ * clocks. All coordinates are in the same attested 2.5-MS/s epoch. Retained
+ * IQ ends at retained_end (exclusive); source_now is the next receiver sample
+ * index. The caller serializes ring admission/copy, enforces a wall-time
+ * timeout even if the source stops, and rechecks the hardware SUBMIT deadline.
+ * WAIT clears outputs and creates no pending measurement. It does not extend
+ * the configured source deadline, 200-anchor budget or 32-repeat forecast.
+ * Observe past jobs through live.core using the original observe() port. */
+struct glrt_tracking_bootstrap_live {
+    struct glrt_tracking_bootstrap core;
+    uint64_t source_deadline, last_source, last_earliest;
+    uint32_t seen;
+};
+int glrt_tracking_bootstrap_live_init(struct glrt_tracking_bootstrap_live *,
+    uint32_t epoch, uint64_t start, uint32_t fraction, double cfo_hz,
+    uint64_t source_deadline);
+int glrt_tracking_bootstrap_live_next(struct glrt_tracking_bootstrap_live *,
+    uint64_t earliest, uint64_t retained_end, uint64_t source_now, uint32_t lead,
+    uint32_t *frame, struct glrt_tracking_job *, struct glrt_tracking_batch *handoff);
 
 /* Accept only the outstanding job's associated software estimate. Return 1
  * for supported, 0 for a retained quality rejection, -1 for a terminal fault.

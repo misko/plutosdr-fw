@@ -162,3 +162,56 @@ uses preloaded sparse IQ fixtures. It excludes live IIO ingestion, recent-IQ
 ring ownership, receiver contention and hardware job submission. The radio's
 resident firmware and boot identity are unchanged, TX remains disabled, and
 temporary benchmark files were removed. No RF was collected.
+
+## Recent IQ and separate live source time
+
+`glrt_tracking_recent_iq.h/.c` supplies caller-owned interleaved CI16 retention.
+At 2.5 MS/s, one second uses 10 MB. The ring keeps absolute integer source
+coordinates and an explicit epoch, supports partial and oversized delivery
+blocks, and distinguishes overwritten data from data not yet delivered. Gaps,
+overlaps and source-counter overflow invalidate history until reset. A stale
+reader or writer cannot invalidate a newer epoch. Failed reads do not modify
+their destination. The capture owner must serialize ingestion and copying;
+this component does not create threads or read IIO itself.
+
+The additive `glrt_tracking_bootstrap_live_*` adapter separates the exclusive
+retained-IQ endpoint from the actual next receiver sample index. If a hardware
+snapshot reports the latest received index, check overflow and add one before
+using it as this API's `source_now`. Both coordinates must refer to the same
+attested source epoch. A successful past-job request must be copied before
+ingestion can overwrite its samples, then associated with `live.core` through
+the existing observe port.
+
+Incomplete DMA delivery returns WAIT with no job or measurement. A handoff
+searches all eight-repeat batches permitted by the unchanged 32-repeat
+forecast bound and compares their start against actual source time plus lead.
+The 200-anchor limit still applies. A fixed source deadline bounds advancing
+input; the caller must also enforce a wall-time timeout for a stopped source.
+Final hardware admission time remains a separate recheck. The legacy
+saved-IQ API and the bootstrap state layout are preserved.
+
+The combined ring/live/legacy tests pass 189 cases. The ARM shared-library
+build passes with warnings treated as errors; it has not been run on the
+radio. Legacy replay v4 matches all 2,342 past and 1,152 future records. Its
+initial v3 attempt rejected an old documentation hash; v4 verifies that
+noncompiled document against its exact archived/git version, while checking
+current compiled sources and unchanged numerical evidence.
+
+`physical-tracking-live-retention-v1` reattests four saved physical captures
+and all fourteen development cases. A one-second C ring reproduces every
+copied pilot exactly. The three previously initializing cases still hand off
+with modeled 4,096/65,536/100,000-sample delivery blocks, at 713.0–730.6 ms
+for resolver plus catch-up. An additional queued 65,536-sample block makes
+all three reach the 200-anchor limit. All six controls remain rejected.
+The independent integer oracle matches 1,584 unique results across 2,703
+occurrences. These are modeled delivery/compute scenarios, not measured live
+IIO latency. The five other accepted cases still fail startup support.
+
+Follow-up `physical-tracking-live-retention-v2` tests the existing collector's
+125,000-sample blocks and a 4,096-sample block with one extra block of lag.
+The three cases hand off at 732.6 ms and 717.4 ms respectively; the first
+requires thirteen modeled one-ms waits. Future support remains weak in case
+1 (74/128 and 73/128), while cases 2 and 3 support 128/128. This does not pass
+the physical tracking release gate. The next integration is one radio-local
+capture owner feeding retention, acquisition/handoff and independent host IQ
+export, followed by loaded ingestion/admission measurement on `.21`.

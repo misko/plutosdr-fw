@@ -37,8 +37,8 @@ int glrt_tracking_bootstrap_init(struct glrt_tracking_bootstrap *s, uint32_t epo
     return 0;
 }
 
-int glrt_tracking_bootstrap_next(struct glrt_tracking_bootstrap *s, uint64_t earliest,
-    uint64_t available, uint32_t lead, uint32_t *frame,
+static int next(struct glrt_tracking_bootstrap *s, uint64_t earliest,
+    uint64_t available, uint64_t source_now, int live, uint32_t lead, uint32_t *frame,
     struct glrt_tracking_job *out, struct glrt_tracking_batch *handoff)
 {
     struct glrt_tracking_batch batch;
@@ -49,7 +49,7 @@ int glrt_tracking_bootstrap_next(struct glrt_tracking_bootstrap *s, uint64_t ear
     if (out) memset(out,0,sizeof(*out));
     if (handoff) memset(handoff,0,sizeof(*handoff));
     if (!s || !frame || !out || !handoff || !s->valid || s->pending || s->ready ||
-        !lead || available>UINT64_MAX-lead || earliest>available)
+        !lead || source_now>UINT64_MAX-lead || available>source_now || earliest>available)
         return fail(s,GLRT_BOOTSTRAP_INVALID);
     if (s->clock_seen && available<s->last_available)
         return fail(s,GLRT_BOOTSTRAP_SOURCE_LOSS);
@@ -73,18 +73,55 @@ int glrt_tracking_bootstrap_next(struct glrt_tracking_bootstrap *s, uint64_t ear
         s->pending=1; s->pending_job=job; *frame=target; *out=job;
         return GLRT_BOOTSTRAP_PAST;
     }
-    if (s->jobs<8) return fail(s,GLRT_BOOTSTRAP_HISTORY);
+    if (s->jobs<8) return live ? GLRT_BOOTSTRAP_WAIT : fail(s,GLRT_BOOTSTRAP_HISTORY);
     first=target-GLRT_BOOTSTRAP_SPACING+1;
-    last=target+GLRT_BOOTSTRAP_SPACING;
+    /* The trend still enforces the same last-supported +32 horizon. A live
+     * DMA block can lag the receiver beyond the legacy eighteen-position
+     * search, so consider every eight-repeat batch inside that horizon. */
+    last=live ? s->trend.history.last_supported+32-7 : target+GLRT_BOOTSTRAP_SPACING;
     for (; first<=last; first++) {
         if (glrt_tracking_trend_batch(&s->trend,first,8,1,0,&batch,&slope) ||
             glrt_tracking_prediction(&batch,0,&job)) continue;
-        if (job.start>=available+lead) {
+        if (job.start>=source_now+lead) {
             s->ready=1; *frame=first; *out=job; *handoff=batch;
             return GLRT_BOOTSTRAP_READY;
         }
     }
-    return fail(s,GLRT_BOOTSTRAP_FUTURE);
+    return live ? GLRT_BOOTSTRAP_WAIT : fail(s,GLRT_BOOTSTRAP_FUTURE);
+}
+
+int glrt_tracking_bootstrap_next(struct glrt_tracking_bootstrap *s, uint64_t earliest,
+    uint64_t available, uint32_t lead, uint32_t *frame,
+    struct glrt_tracking_job *out, struct glrt_tracking_batch *handoff)
+{
+    return next(s,earliest,available,available,0,lead,frame,out,handoff);
+}
+
+int glrt_tracking_bootstrap_live_init(struct glrt_tracking_bootstrap_live *s,
+    uint32_t epoch, uint64_t start, uint32_t fraction, double cfo, uint64_t deadline)
+{
+    if (!s) return GLRT_BOOTSTRAP_ERROR;
+    memset(s,0,sizeof(*s));
+    if (glrt_tracking_bootstrap_init(&s->core,epoch,start,fraction,cfo))
+        return GLRT_BOOTSTRAP_ERROR;
+    if (deadline<=start) return fail(&s->core,GLRT_BOOTSTRAP_INVALID);
+    s->source_deadline=deadline;
+    return 0;
+}
+
+int glrt_tracking_bootstrap_live_next(struct glrt_tracking_bootstrap_live *s,
+    uint64_t earliest, uint64_t retained_end, uint64_t source_now, uint32_t lead,
+    uint32_t *frame, struct glrt_tracking_job *out, struct glrt_tracking_batch *handoff)
+{
+    if (frame) *frame=0;
+    if (out) memset(out,0,sizeof(*out));
+    if (handoff) memset(handoff,0,sizeof(*handoff));
+    if (!s) return GLRT_BOOTSTRAP_ERROR;
+    if (s->seen && (source_now<s->last_source || earliest<s->last_earliest))
+        return fail(&s->core,GLRT_BOOTSTRAP_SOURCE_LOSS);
+    if (source_now>s->source_deadline) return fail(&s->core,GLRT_BOOTSTRAP_BUDGET);
+    s->last_source=source_now; s->last_earliest=earliest; s->seen=1;
+    return next(&s->core,earliest,retained_end,source_now,1,lead,frame,out,handoff);
 }
 
 int glrt_tracking_bootstrap_observe(struct glrt_tracking_bootstrap *s, uint32_t epoch,
