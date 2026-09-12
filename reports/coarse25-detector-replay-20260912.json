@@ -1,0 +1,123 @@
+{
+  "hardware_access": false,
+  "passed": true,
+  "plan_sha256": "2da08791f50635b6c07959159e43f0fe4b8618825ad054ad2f3125c1813c1bd4",
+  "results": [
+    {
+      "case": "positive_later_1",
+      "elapsed_seconds": 49.39557999186218,
+      "expected": [
+        485,
+        1542,
+        3465,
+        13920260,
+        20314886898,
+        9699,
+        1
+      ],
+      "glrt_phase_difference_us": 0.33333333333337123,
+      "integer_map_exact": true,
+      "iq_sha256": "620476059325b54433d56453325f58de932f0732684787747bf136e0ba2a00f1",
+      "passed": true,
+      "pss_phase_us": 400.8,
+      "rtl": [
+        [
+          485,
+          1542,
+          3465,
+          13920260,
+          20314886898,
+          9699,
+          1
+        ]
+      ]
+    },
+    {
+      "case": "positive_later_2",
+      "elapsed_seconds": 49.42971905088052,
+      "expected": [
+        485,
+        1549,
+        3949,
+        13883076,
+        20189652012,
+        9699,
+        1
+      ],
+      "glrt_phase_difference_us": 0.06666666666671972,
+      "integer_map_exact": true,
+      "iq_sha256": "7242ffa068d34ca80e5d91ce15c8758eeda127ef6b0e0b1f921cd540103eb943",
+      "passed": true,
+      "pss_phase_us": 401.73333333333335,
+      "rtl": [
+        [
+          485,
+          1549,
+          3949,
+          13883076,
+          20189652012,
+          9699,
+          1
+        ]
+      ]
+    },
+    {
+      "case": "negative_later_1",
+      "elapsed_seconds": 48.662477508187294,
+      "expected": [
+        485,
+        2104,
+        2037,
+        13882443,
+        20069614657,
+        9699,
+        0
+      ],
+      "glrt_phase_difference_us": 403.5333333333333,
+      "integer_map_exact": true,
+      "iq_sha256": "9b452a1901339431cc7ebe0b52de6ad5fcbe1d08c04260c452d208598cfbe26c",
+      "passed": true,
+      "pss_phase_us": 475.73333333333335,
+      "rtl": [
+        [
+          485,
+          2104,
+          2037,
+          13882443,
+          20069614657,
+          9699,
+          0
+        ]
+      ]
+    },
+    {
+      "case": "negative_later_2",
+      "elapsed_seconds": 49.01518554287031,
+      "expected": [
+        485,
+        4719,
+        1961,
+        13854384,
+        19986055816,
+        9699,
+        0
+      ],
+      "glrt_phase_difference_us": 311.9333333333333,
+      "integer_map_exact": true,
+      "iq_sha256": "cf937e573020ebe30066a99a2b1481c2f107ef2ec15d46a584b1972964cf2705",
+      "passed": true,
+      "pss_phase_us": 824.4,
+      "rtl": [
+        [
+          485,
+          4719,
+          1961,
+          13854384,
+          19986055816,
+          9699,
+          0
+        ]
+      ]
+    }
+  ]
+}
