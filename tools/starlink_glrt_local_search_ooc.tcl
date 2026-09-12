@@ -1,9 +1,10 @@
-# Complete local acquisition component, including both buffers and decisions.
+# Complete local acquisition component, with duplicated or shared IQ storage.
 if {$argc ni {2 3} || [version -short] ne "2022.2"} {
-  error "requires Vivado 2022.2, fresh output, ROM directory, optional --control-netlist"
+  error "requires Vivado 2022.2, fresh output, ROM directory, optional --control-netlist or --shared-window"
 }
-set control_netlist [expr {$argc==3}]
-if {$control_netlist && [lindex $argv 2] ne "--control-netlist"} { error "unknown output mode" }
+set control_netlist [expr {$argc==3 && [lindex $argv 2] eq "--control-netlist"}]
+set shared_window [expr {$argc==3 && [lindex $argv 2] eq "--shared-window"}]
+if {$argc==3 && !$control_netlist && !$shared_window} { error "unknown output mode" }
 set output [file normalize [lindex $argv 0]]
 set roms [file normalize [lindex $argv 1]]
 if {[file exists $output]} { error "output exists" }
@@ -93,7 +94,9 @@ create_project -in_memory -part xc7z010clg400-1
 set_msg_config -id {Synth 8-311} -new_severity ERROR
 if {!$control_netlist} { lappend shell_sources [lindex $sources end] }
 read_verilog -sv [concat $shell_sources $stubs]
-synth_design -top $top -mode out_of_context \
+set generics [list]
+if {$shared_window} { lappend generics SHARED_WINDOW=1 }
+synth_design -top $top -mode out_of_context -generic $generics \
   -flatten_hierarchy none -directive Default
 set shell_edif $output/$top.edf
 if {$control_netlist} {
@@ -174,6 +177,7 @@ set setup [get_property SLACK [get_timing_paths -delay_type max -max_paths 1]]
 set hold [get_property SLACK [get_timing_paths -delay_type min -max_paths 1]]
 set fd [open $output/summary.txt {WRONLY CREAT EXCL}]
 puts $fd "scope=autonomous_local_glrt_component_not_complete_radio_board"
+puts $fd "shared_window=$shared_window"
 puts $fd "clock_mhz=100\nlut=$lut\nff=$ff\ndsp=$dsp\nram36=$ram36\nram18=$ram18\nsetup_ns=$setup\nhold_ns=$hold"
 foreach path $tracked {
   if {[lindex [exec sha256sum $path] 0] ne $hashes($path)} { error "source changed" }
@@ -181,7 +185,9 @@ foreach path $tracked {
 }
 close $fd
 write_checkpoint $output/routed.dcp
-if {$lut>15000 || $dsp>80 || $ram36*2+$ram18>100 || $setup<0 || $hold<0} {
+set ram_half_budget [expr {$shared_window ? 54 : 100}]
+set dsp_budget [expr {$shared_window ? 71 : 80}]
+if {$lut>15000 || $dsp>$dsp_budget || $ram36*2+$ram18>$ram_half_budget || $setup<0 || $hold<0} {
   error "local acquisition feasibility gate: LUT=$lut DSP=$dsp RAM36=$ram36 RAM18=$ram18 setup=$setup hold=$hold"
 }
 puts "LOCAL_SEARCH_OOC_PASS"

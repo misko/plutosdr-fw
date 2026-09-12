@@ -195,6 +195,10 @@ def local_engine(tmp_path_factory):
 
 @pytest.mark.parametrize('kind',['pilot','zero','gap','held_gap','held_index'])
 def test_two_windows_copy_overlap_absolute_coordinates_and_fault_fences(tmp_path,local_engine,kind):
+    check_two_windows(tmp_path, local_engine, kind)
+
+
+def check_two_windows(tmp_path, local_engine, kind, *, shared=False):
     path,coefficients,pilot,wave,subsets=local_engine
     rng=np.random.default_rng(21300)
     windows=[]
@@ -212,11 +216,16 @@ def test_two_windows_copy_overlap_absolute_coordinates_and_fault_fences(tmp_path
     stimulus.write_text(''.join(f'{(int(i)&65535)|((int(q)&65535)<<16):08x}\n' for iq in windows for i,q in iq))
     fault_mode = {'gap': 1, 'held_gap': 2, 'held_index': 3}.get(kind, 0)
     run=subprocess.run([str(path/'obj/sim'),f'+INPUT={stimulus}',f'+GAP={fault_mode}',
-        f'+OVERLAP={int(kind!="zero")}'],capture_output=True,text=True,timeout=90)
+        f'+OVERLAP={int(kind!="zero" and not shared)}'],capture_output=True,text=True,timeout=90)
     (tmp_path/'simulation.log').write_text(run.stdout+run.stderr)
     assert run.returncode==0,run.stdout+run.stderr
     actual=[list(map(int,line.split()[1:])) for line in run.stdout.splitlines() if line.startswith('R ')]
     if not fault_mode:
+        starts = [0, 50000]
+        if shared:
+            second, = [int(line.split()[1]) for line in run.stdout.splitlines() if line.startswith('START2 ')]
+            assert second >= 50000
+            starts[1] = second
         expected=[]
         for index,iq in enumerate(windows):
             records=reference(iq,coefficients,pilot,wave,subsets)
@@ -224,7 +233,7 @@ def test_two_windows_copy_overlap_absolute_coordinates_and_fault_fences(tmp_path
                 assert records[-1][1]==0
                 assert abs(records[-1][6]*100-(123400 if index==0 else -218700))<=100
                 assert records[-1][3]==(17 if index==0 else 31)
-            expected.extend([[0x20000000000003+index*50000,*r] for r in records])
+            expected.extend([[0x20000000000003+starts[index],*r] for r in records])
         assert actual==expected
     else:
         assert not any(r[1] for r in actual)
@@ -232,3 +241,36 @@ def test_two_windows_copy_overlap_absolute_coordinates_and_fault_fences(tmp_path
             assert f'HELD_FAULT_FENCED {fault_mode:11d}' in run.stdout
             assert not actual
     assert 'PASS' in run.stdout
+
+
+@pytest.fixture(scope='module')
+def shared_engine(tmp_path_factory, local_engine):
+    roms, coefficients, pilot, wave, subsets = local_engine
+    path = tmp_path_factory.mktemp('shared-local-engine')
+    bench = (roms/'tb.sv').read_text().replace('.EPOCH_COUNT(64)', '.EPOCH_COUNT(64),.SHARED_WINDOW(1)')
+    # Keep one buffer owned through the complete verification/controller drain.
+    # The second independent window starts only once the ownership port permits it.
+    bench = bench.replace('reg driving=0,held=0;', 'integer second_start=-1;\nreg driving=0,held=0;')
+    bench = bench.replace('n==60000', 'n==10000')
+    bench = bench.replace('64000', '(second_start+14000)').replace('50000', 'second_start')
+    bench = bench.replace('arm=0;input_valid=0;input_gap=0;', '''arm=0;input_valid=0;input_gap=0;
+ if(second_start<0 && n>=50000 && divider==0 && arm_ready) begin
+  second_start=n;$display("START2 %d",n);
+ end''')
+    bench = bench.replace('if(n==second_start && busy) overlapped=1;', '''if(n==second_start && busy) $fatal(1,"shared buffer released early");
+  if(dut.controller_busy && arm_ready) $fatal(1,"verification buffer overwrite allowed");''')
+    (path/'tb.sv').write_text(bench)
+    root = Path(__file__).parents[2]/'hdl/library/starlink_glrt'
+    sources = [root/f'starlink_glrt_{name}.v' for name in ('local_search','coarse_search','coarse_window',
+        'coarse_mac6','coarse_norm','coarse_peaks','verify_control','verify_window3','verify_mac3','verify_rotate3')]
+    build = subprocess.run(['verilator','--binary','--timing','--top-module','tb','-Wno-fatal',
+        '--Mdir',str(path/'obj'),'-o','sim','-j','4',str(path/'tb.sv'),*map(str,sources)],
+        capture_output=True,text=True,timeout=120)
+    (path/'build.log').write_text(build.stdout+build.stderr)
+    assert build.returncode == 0, build.stdout+build.stderr
+    return path, coefficients, pilot, wave, subsets
+
+
+@pytest.mark.parametrize('kind',['pilot','zero','gap','held_gap','held_index'])
+def test_shared_window_exact_scores_ownership_release_and_fault_fences(tmp_path,shared_engine,kind):
+    check_two_windows(tmp_path, shared_engine, kind, shared=True)

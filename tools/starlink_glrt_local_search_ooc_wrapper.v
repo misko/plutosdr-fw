@@ -1,5 +1,7 @@
 // Registered fixture around both overlapping stages and local decisions.
-module starlink_glrt_local_search_ooc_wrapper (
+module starlink_glrt_local_search_ooc_wrapper #(
+  parameter integer SHARED_WINDOW=0
+) (
   input wire clk,
   input wire [101:0] stimulus,
   output reg [226:0] observation
@@ -22,5 +24,5 @@ module starlink_glrt_local_search_ooc_wrapper (
   assign response={busy,arm_ready,done,fault,rejected_arms,window_first_index,output_valid,output_decision,
       output_reasons,output_rank,output_epoch,output_coarse_frequency,output_coarse_score,output_cfo_units,
       output_acquire,output_verify,output_control,output_conditioned,output_support};
-  (* keep_hierarchy="yes" *) starlink_glrt_local_search dut(.*);
+  (* keep_hierarchy="yes" *) starlink_glrt_local_search #(.SHARED_WINDOW(SHARED_WINDOW)) dut(.*);
 endmodule

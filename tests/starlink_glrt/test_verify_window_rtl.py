@@ -28,7 +28,9 @@ wire [16:0] output_score;
 wire [2:0] output_support;
 wire [31:0] rejected_arms;
 starlink_glrt_verify_window3 #(.PILOT_FILE("PILOT"),.ENERGY_FILE("ENERGY"),
- .OSCILLATOR_FILE("WAVE")) dut(.*);
+ .OSCILLATOR_FILE("WAVE")) dut(.external_ready(1'b0),.external_valid(1'b0),
+ .external_first_index(64'd0),.external_offset(14'd0),.external_data(32'd0),
+ .sample_read_enable(),.sample_read_address(),.*);
 integer fd,jobs,rc,si,sq,n=0,waits=0,job=0,invalid=0;
 reg [4095:0] path;
 reg held=0;
