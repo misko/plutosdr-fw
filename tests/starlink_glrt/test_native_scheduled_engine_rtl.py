@@ -35,6 +35,7 @@ def test_scheduler_drives_full_pilots_and_accounts_for_unavailable_slot(tmp_path
         direct_path.write_bytes(pack_phase_rom(phase_major, phases=phases, samples=count))
     # Reuse the engine's result stability assertions and complete moment output.
     bench = BENCH[:BENCH.index("integer fd,rc;")]
+    bench = bench.replace(".SERIAL_ROTATE(0)", f".SERIAL_ROTATE({int(rate == 2500000)})")
     bench = bench.replace("job_valid=0,", "")
     bench = bench.replace("reg [63:0] job_start=0,input_index=0;",
                           "wire job_valid; wire [63:0] job_start; reg [63:0] input_index=0;")

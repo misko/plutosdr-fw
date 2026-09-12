@@ -62,6 +62,8 @@ def test_first_tracking_image_has_one_native_engine_and_shared_acquisition(captu
         3300, 2500000, 64, 0xdc509401, 1, 4, 24, 0x474c4131), strict=True))
     # Inspect the elaborated parameter, not a source-text claim about sharing.
     assert re.search(r'\.param/l "SHARED_WINDOW".*C4<0*1>;', source)
+    assert re.search(r'\.param/l "SERIAL_ROTATE".*C4<0*1>;', source)
+    assert re.search(r'\.scope generate, "g_serial"', source)
 
 
 @pytest.mark.parametrize("termination", ["complete", "mid-pilot", "gap"])

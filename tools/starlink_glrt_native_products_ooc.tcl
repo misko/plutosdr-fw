@@ -13,6 +13,11 @@ set names {rtl rotation cordic wrapper script}
 set sources [list $cordic $rotation $rtl]
 set top starlink_glrt_native_products_ooc_wrapper
 set generics {}
+set serial_rotate 0
+if {[info exists ::env(STARLINK_GLRT_OOC_SERIAL_ROTATE)]} {
+  set serial_rotate $::env(STARLINK_GLRT_OOC_SERIAL_ROTATE)
+  if {$serial_rotate ni {0 1}} { error "invalid serial rotation selection" }
+}
 set mode products
 set rate 60000000
 if {$argc >= 3} {
@@ -46,6 +51,8 @@ if {$argc >= 2} {
   set wrapper [file join $repo tools starlink_glrt_native_engine_ooc_wrapper.v]
   set top starlink_glrt_native_engine_ooc_wrapper
   set generics [list TEMPLATE_FILE=$bank REFERENCE_STRIDE=$stride]
+  if {$serial_rotate && $rate != 2500000} { error "serial rotation requires 2.5 MS/s" }
+  lappend generics SERIAL_ROTATE=$serial_rotate
   if {$rate == 2500000} {
     lappend generics DIRECT_COEFFICIENT_FILE=$bank DIRECT_REFERENCE_PHASES=$reference_phases
   }
@@ -69,6 +76,7 @@ if {$argc >= 2} {
   }
 }
 lappend sources $wrapper
+if {$serial_rotate && $mode ne "engine"} { error "serial rotation requires the rate-specific engine fixture" }
 if {[file exists [file join $output summary.txt]]} { error "output already completed" }
 file mkdir $output
 foreach name $names { set digest($name) [lindex [exec sha256sum [set $name]] 0] }
@@ -133,6 +141,7 @@ puts $fd "clock_mhz=100"
 puts $fd "source_rate_hz=$rate"
 puts $fd "reference_stride=$stride"
 puts $fd "reference_phases=$reference_phases"
+puts $fd "serial_rotate=$serial_rotate"
 set direct_mode [expr {$mode eq "engine" && $rate == 2500000}]
 puts $fd "direct_coefficients=$direct_mode"
 puts $fd "clock_source_site=BUFGCTRL_X0Y0"

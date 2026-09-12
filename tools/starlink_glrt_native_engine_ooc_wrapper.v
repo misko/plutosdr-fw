@@ -1,5 +1,6 @@
 // Same-clock registered boundaries for every native-engine DUT data port.
 module starlink_glrt_native_engine_ooc_wrapper #(
+  parameter integer SERIAL_ROTATE=0,
   parameter TEMPLATE_FILE="native_cubic_60000000_upper.mem",
   parameter integer REFERENCE_STRIDE=1,
   parameter DIRECT_COEFFICIENT_FILE="",
@@ -34,6 +35,7 @@ module starlink_glrt_native_engine_ooc_wrapper #(
       input_clipped,input_index,ii,iq,result_ready,reference_phase} = launch;
   assign response = {job_ready,active,result_valid,result_start,result_seed,result_step,count,fault,ri,rq,di,dq,ti,tq,energy,result_reference_phase};
   (* keep_hierarchy="yes" *) starlink_glrt_native_engine #(.TEMPLATE_FILE(TEMPLATE_FILE),
+    .SERIAL_ROTATE(SERIAL_ROTATE),
     .REFERENCE_STRIDE(REFERENCE_STRIDE),.SAMPLE_COUNT(SAMPLE_COUNT),
     .DIRECT_COEFFICIENT_FILE(DIRECT_COEFFICIENT_FILE),.DIRECT_REFERENCE_PHASES(DIRECT_REFERENCE_PHASES)) dut (
     .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),

@@ -33,7 +33,7 @@ wire signed [S-1:0] ri,rq,di,dq;
 wire signed [T-1:0] ti,tq;
 wire [E-1:0] energy;
 starlink_glrt_native_engine #(.SAMPLE_COUNT(N),.SEGMENT_COUNT(SEGMENTS),
- .REFERENCE_STRIDE(STRIDE_VALUE),.TEMPLATE_FILE("BANK_PATH"),
+ .REFERENCE_STRIDE(STRIDE_VALUE),.SERIAL_ROTATE(0),.TEMPLATE_FILE("BANK_PATH"),
  .DIRECT_COEFFICIENT_FILE("DIRECT_PATH"),.DIRECT_REFERENCE_PHASES(PHASES)) dut (
  .clk(clk),.resetn(resetn),.flush(flush),.job_valid(job_valid),.job_ready(job_ready),
  .job_start(job_start),.job_phase_seed(seed),.job_phase_step(step),.input_valid(input_valid),
@@ -106,7 +106,7 @@ def expected(job, samples, coefficients, fault=0):
     return [start,seed,step,n,fault,*sums,*prefix,sum(value[5] for value in values)]
 
 
-def simulate(tmp_path, count, bank, rows, stride=1, direct=None, phases=1):
+def simulate(tmp_path, count, bank, rows, stride=1, direct=None, phases=1, serial=False):
     bank_path,bench,trace,executable = [tmp_path/name for name in ("bank.mem","tb.sv","input.txt","sim")]
     bank_path.write_text("".join(f"{word:027x}\n" for word in packed_words(bank)))
     direct_path = ""
@@ -120,7 +120,8 @@ def simulate(tmp_path, count, bank, rows, stride=1, direct=None, phases=1):
             stream.write(pack_phase_rom(phase_major, phases=phases, samples=count))
     bench.write_text(BENCH.replace("COUNT_VALUE",str(count)).replace("SEGMENT_VALUE",str(len(bank)))
                      .replace("BANK_PATH",str(bank_path)).replace("STRIDE_VALUE",str(stride))
-                     .replace("DIRECT_PATH",direct_path).replace("PHASE_VALUE",str(phases)))
+                     .replace("DIRECT_PATH",direct_path).replace("PHASE_VALUE",str(phases))
+                     .replace(".SERIAL_ROTATE(0)",f".SERIAL_ROTATE({int(serial)})"))
     with trace.open("w") as file:
         file.writelines(rows)
     sources = [BANK_ROOT/f"starlink_glrt_{name}.v" for name in (
@@ -139,9 +140,11 @@ def complete_job(job, count, *, ready=1):
         row(value=sample(job[0]+n),closed=int(n==count-1),ready=ready) for n in range(count)]
 
 
-@pytest.mark.parametrize("stride,direct_bank,phases", [(24, True, 1), (24, True, 4), (24, False, 1), (4, False, 1), (2, False, 1), (1, False, 1)],
-                         ids=["2p5MSs-direct", "2p5MSs-phase4", "2p5MSs-cubic-diagnostic", "15MSs", "30MSs", "60MSs"])
-def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(tmp_path, stride, direct_bank, phases):
+@pytest.mark.parametrize("stride,direct_bank,phases,serial", [
+    (24, True, 1, False), (24, True, 4, False), (24, True, 4, True),
+    (24, False, 1, False), (4, False, 1, False), (2, False, 1, False), (1, False, 1, False)],
+    ids=["2p5MSs-direct", "2p5MSs-phase4", "2p5MSs-serial-phase4", "2p5MSs-cubic-diagnostic", "15MSs", "30MSs", "60MSs"])
+def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(tmp_path, stride, direct_bank, phases, serial):
     count,base = 79200//stride,2**55+73
     bank = bank_for(79200)
     direct = [tuple((n*(k+1)*13+37) % 4000-2000 for k in range(4)) for n in range(count*phases)] if direct_bank else None
@@ -156,7 +159,7 @@ def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(
             valid = (cycle+1)*3//(5*stride) != cycle*3//(5*stride)
             yield row(job=job,value=sample(base+native_index) if valid else None)
             native_index += int(valid)
-    result = simulate(tmp_path,count,bank,rows(),stride,direct,phases)
+    result = simulate(tmp_path,count,bank,rows(),stride,direct,phases,serial)
     truth = []
     for job in jobs:
         phase = job[1] % phases
