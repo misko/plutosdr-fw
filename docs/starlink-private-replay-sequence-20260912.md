@@ -59,8 +59,12 @@ Two test-harness failures are retained:
    net. Strict public comparison remains enabled; no RTL or fault checks change.
    The focused run re-executes every affected branch before the full campaign.
 
-Final regression: 2,107 passing tests. The complete actual campaign is required
-to retain the 71 inherited cases plus all 11 new cases before routing.
+Final regression: 2,107 passing tests. The complete actual campaign passes all
+82 cases (71 inherited plus 11 new) in 316.793 s. Its independent reference
+makes 1,700,310 comparisons and observes 75,149 private takes, 12 private-only
+takes, five private-only finals and 2,272 quarantined state differences. The
+extra private-only take is exercised by an inherited fault case. Current bank
+publication/ownership checks and all inherited witnesses pass.
 
 ## Source pins
 
@@ -70,7 +74,46 @@ to retain the 71 inherited cases plus all 11 new cases before routing.
 - Synthesis DCP: `18e77d1b192bec57111cdfebb1110bfaebfd2f87f259246f812ff065fcc53e69`.
 - Numeric CSV: `df33d4b05c4ae65191af85f9e6748a484773d0a659051a5fad7112b8a717d8c8`.
 
-## Physical/deployment gates
+## Routed result — still not timing closed
+
+The unchanged 100/175 MHz OOC route completes in 50.834 s with all 8,559 nets
+routed and no routing errors. It does not close timing:
+
+| Metric | Output-retirement parent | Private replay |
+|---|---:|---:|
+| Overall WNS / TNS | -1.152 / -343.090 ns | -1.182 / -349.709 ns |
+| Failing setup endpoints | 867 / 14,505 | 930 / 14,496 |
+| Same-domain 175 MHz WNS | -1.095 ns | -0.970 ns |
+| LUT / FF | 2,689 / 5,912 | 2,756 / 5,908 |
+| Kernel next-start CE | -0.476 ns | -0.364 ns |
+| Kernel index / history | +1.744 / -0.169 ns | +3.061 / +0.375 ns |
+| Product / output publication | -1.095 / -0.831 ns | -0.970 / -0.618 ns |
+
+The kernel history endpoint now passes, but next-start CE still fails from a
+different source: product-bank request/availability, five LUT levels, 5.825 ns,
+81.529% routing. Do not call that endpoint closed merely because its original
+capture-metadata dependency was separated.
+
+The worst internal path now starts at product-bank write-position bit 4,
+passes through its current framing fault and shared fault logic, and returns
+to the same bank's publication request: seven logic levels (one CARRY4 and
+six LUT6), 6.631 ns, 70.459% routing. The bank already checks framing locally
+before publishing. Next inspect whether this repeated self-fault dependency
+can be factored at the actual publication boundary without removing its local
+framing check, other fault sources, diagnostics, quarantine or recovery.
+Require source-matched actual publication equivalence and aggregate benefit;
+this candidate is retained as a tested alternative, not a receiver promotion.
+
+Descriptor CE/data +1.422/+3.013 ns, product occupancy/identity +1.258/+0.793 ns,
+output occupancy +0.898 ns. All actual physical request endpoints are included
+(one per bank in this checkpoint). RAMB18/DSP remain 16/21. Hold +0.050 ns,
+pulse +1.830 ns, zero loops. Nine CDC-3 / 208 CDC-15 / no CDC-10; scalar fault
+directly feeds its synchronizer, and reset-release has a physical replica.
+114 inputs / 124 outputs remain unqualified. Overall worst is held metadata
+crossing to the slow domain, not a qualified asynchronous timing exception.
+The routed DCP SHA is `4de735e3fbfb806de94fc6cd3a90d3e402c9ad49777daea07684b01e2564b233`.
+
+## Full receiver/deployment gates
 
 The unchanged 100/175 MHz OOC route must measure all actual kernel block-start
 CEs, index/history registers and publication replicas. The parent block-start
