@@ -1,0 +1,2 @@
+# Archived format-patch context includes mandatory leading spaces and tabs.
+reports/issue97/patches/*.patch -whitespace

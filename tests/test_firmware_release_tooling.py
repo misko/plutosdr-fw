@@ -334,7 +334,7 @@ def test_direct_async_ring_v1_has_exact_historical_candidate_route() -> None:
     assert "persistent_qualified: false" in build_manifest
 
 
-def test_direct_async_v4_has_exact_candidate_and_main_release_routes() -> None:
+def test_direct_async_v4_retains_its_exact_historical_candidate_route() -> None:
     workflow = (ROOT / ".github" / "workflows" / "firmware-main.yml").read_text()
     builder = (ROOT / "scripts" / "build_gain_series_candidate.sh").read_text()
     package = (ROOT / "scripts" / "ci" / "package_main_firmware.sh").read_text()
@@ -346,7 +346,7 @@ def test_direct_async_v4_has_exact_candidate_and_main_release_routes() -> None:
     assert workflow.count(branch) == 4
     assert workflow.count(f"'{manifest_name}'") == 1
     assert workflow.count("'plutoplus-spf-iq-direct-async-v4'") == 1
-    assert workflow.count("'v0.49-plutoplus-spf-iq-direct-async-v4'") == 2
+    assert workflow.count("'v0.49-plutoplus-spf-iq-direct-async-v4'") == 1
     assert f"{manifest_name}:*" in package
     assert f"./scripts/check_source_graph.sh manifests/{manifest_name}" in checker
     current_worktree_checks = [
@@ -356,7 +356,7 @@ def test_direct_async_v4_has_exact_candidate_and_main_release_routes() -> None:
         and "SOURCE_GRAPH_CHECK_WORKTREE=0" not in line
     ]
     assert current_worktree_checks == [
-        f"./scripts/check_source_graph.sh manifests/{manifest_name}"
+        "./scripts/check_source_graph.sh manifests/counter-rx-v1-source.yaml"
     ]
     for source in (builder, package, checker):
         assert manifest_name in source
