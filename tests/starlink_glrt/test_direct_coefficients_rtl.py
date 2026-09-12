@@ -31,15 +31,20 @@ def test_pinned_four_phase_bank_matches_every_signed_reference_coefficient(tmp_p
     check_bank(tmp_path, [rows[phase*3300:(phase+1)*3300] for phase in range(4)], False)
 
 
-def check_bank(tmp_path, values, reset):
+def check_bank(tmp_path, values, reset, *, packed=False, always_ready=False, cancel_delay=15):
     phases, count = len(values), len(values[0])
     bank = tmp_path/"bank.mem"
     phase_major = "".join(f"{sum((v & 65535) << (16*k) for k,v in enumerate(row)):016x}\n"
                            for phase in values for row in phase).encode()
-    bank.write_bytes(pack_phase_rom(phase_major, phases=phases, samples=count))
+    if packed:
+        from tools.generate_glrt_packed_direct_rom import pack_direct_rom
+        bank.write_bytes(pack_direct_rom(phase_major,phases=phases,samples=count))
+    else:
+        bank.write_bytes(pack_phase_rom(phase_major, phases=phases, samples=count))
+    module="starlink_glrt_packed_direct_coefficients" if packed else "starlink_glrt_direct_coefficients"
     first = BENCH.index("starlink_glrt_cubic_coefficients #(")
     last = BENCH.index(" dut (", first)
-    source = (BENCH[:first] + 'starlink_glrt_direct_coefficients #(.SAMPLE_COUNT(N),'
+    source = (BENCH[:first] + module+' #(.SAMPLE_COUNT(N),'
               '.PHASE_COUNT(PHASE_VALUE),.TEMPLATE_FILE("BANK_PATH"))' + BENCH[last:])
     source = source.replace('wire job_ready,', 'reg [2:0] job_phase=0;\nwire job_ready,')
     source = source.replace('.job_valid(job_valid),', '.job_valid(job_valid),.job_phase(job_phase),')
@@ -52,15 +57,16 @@ def check_bank(tmp_path, values, reset):
     bench, trace, executable = (tmp_path/name for name in ("tb.sv", "trace", "sim"))
     bench.write_text(source)
     # Fill and stall both pipeline slots, then discard before either is consumed.
-    cycles = [(1,0,1,0,phases-1)] + [(1,0,0,0,n % phases) for n in range(15)]
+    cycles = [(1,0,1,0,phases-1)] + [(1,0,0,0,n % phases) for n in range(cancel_delay)]
     cycles += [(0,0,0,0,0) if reset else (1,1,0,0,0), (1,0,0,0,0)]
-    selected = [phase % phases for phase in (3, 1, 2, 0)]
+    selected = list(reversed(range(phases))) if packed else [phase % phases for phase in (3, 1, 2, 0)]
     for phase in selected:
         cycles += [(1,0,1,0,phase)]
-        cycles += [(1,0,0,int(n % 9 == 0),n % phases) for n in range(9*count+30)]
+        interval=13 if packed else 9
+        cycles += [(1,0,0,int(always_ready or n % interval == 0),n % phases) for n in range(interval*count+30)]
     trace.write_text("".join(" ".join(map(str,row))+"\n" for row in cycles))
     build = subprocess.run(["iverilog", "-g2012", "-s", "tb", "-o", str(executable), str(bench),
-                            str(BANK_ROOT/"starlink_glrt_direct_coefficients.v")],
+                            str(BANK_ROOT/(module+".v"))],
                            capture_output=True, text=True, check=False)
     assert build.returncode == 0, build.stdout+build.stderr
     run = subprocess.run(["vvp", str(executable), f"+INPUT={trace}"],

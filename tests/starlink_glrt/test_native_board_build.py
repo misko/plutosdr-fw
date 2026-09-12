@@ -53,7 +53,8 @@ def test_tracking_board_requires_shared_local_component(tmp_path, tracking, shar
     assert (result.returncode == 0) == accepted, result.stdout+result.stderr
     if accepted:
         assert "CONFIG.ENABLE_TRACKING=1" in result.stdout
-        assert "native_direct_2500000_phase4_upper_interleaved.mem" in result.stdout
+        assert "CONFIG.TRACKING_PACKED_ROM=1" in result.stdout
+        assert "native_direct_2500000_phase4_upper_packed.mem" in result.stdout
 
 
 @pytest.mark.parametrize("rate,native,legacy,schedule,local,netlist,accepted", [

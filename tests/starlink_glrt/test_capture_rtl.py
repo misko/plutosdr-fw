@@ -16,24 +16,26 @@ IP_ROOT = BANK_ROOT.parent/"axi_starlink_glrt"
 
 
 @pytest.fixture(scope="session")
-def captures(tmp_path_factory):
+def captures(tmp_path_factory, request):
     root = tmp_path_factory.mktemp("capture-compile")
     cache = {}
-    def get(rate, continuous=False, native=False, fifo_bits=5, legacy=True, schedule=False, local=False, tracking=False):
-        key = rate, continuous, native, fifo_bits, legacy, schedule, local, tracking
+    def get(rate, continuous=False, native=False, fifo_bits=5, legacy=True, schedule=False, local=False, tracking=False, packed=None):
+        packed = getattr(request, "param", False) if packed is None else packed
+        key = rate, continuous, native, fifo_bits, legacy, schedule, local, tracking, packed
         if key not in cache:
             source = (IP_ROOT/"tb/tb_starlink_glrt_capture.sv").read_text()
             for token, filename in {
                 "NATIVE_FILE": f"pilot_{rate}_upper_q7.mem", "ACQUISITION_FILE": "pilot_2500000_upper_q7.mem",
                 "FIRST_FILE": f"ddc_{rate}_q17.mem", "FINAL_FILE": "ddc_5000000_q17.mem", "TWIDDLE_FILE": "glrt_dft512_q15.mem",
                 "REFINEMENT_FILE": "native_cubic_60000000_upper.mem",
-                "TRACKING_DIRECT_FILE": "native_direct_2500000_phase4_upper_interleaved.mem",
+                "TRACKING_DIRECT_FILE": ("native_direct_2500000_phase4_upper_packed.mem" if packed else
+                                         "native_direct_2500000_phase4_upper_interleaved.mem"),
                 "LOCAL_COEFFICIENT_FILE": "coarse_upper_q9.mem", "LOCAL_COARSE_ENERGY_FILE": "coarse_upper_energy.mem",
                 "LOCAL_PILOT_FILE": "verify_upper_pilot_q9.mem", "LOCAL_VERIFY_ENERGY_FILE": "verify_upper_energy.mem",
                 "LOCAL_OSCILLATOR_FILE": "verify_oscillator_q10.mem",
             }.items():
                 source = source.replace(f'"{token}"', f'"{BANK_ROOT/filename}"')
-            suffix = f"{rate}_{int(continuous)}_{int(native)}_{fifo_bits}_{int(legacy)}_{int(schedule)}_{int(local)}_{int(tracking)}"
+            suffix = f"{rate}_{int(continuous)}_{int(native)}_{fifo_bits}_{int(legacy)}_{int(schedule)}_{int(local)}_{int(tracking)}_{int(packed)}"
             bench, executable = root/f"tb_{suffix}.sv", root/f"sim_{suffix}"
             bench.write_text(source)
             top = "tb_starlink_glrt_capture"
@@ -44,6 +46,7 @@ def captures(tmp_path_factory):
                                       f"-P{top}.ENABLE_NATIVE_SCHEDULE={int(schedule)}",
                                       f"-P{top}.ENABLE_LOCAL_SEARCH={int(local)}",
                                       f"-P{top}.ENABLE_TRACKING={int(tracking)}",
+                                      f"-P{top}.TRACKING_PACKED_ROM={int(packed)}",
                                       f"-P{top}.OUTPUT_FIFO_BITS={fifo_bits}",
                                       "-o", str(executable), str(bench),
                                       *map(str, sorted(BANK_ROOT.glob("*.v"))),

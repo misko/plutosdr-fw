@@ -18,6 +18,8 @@ from .test_capture_rtl import read, run, snapshot, u64, wait, write
 from .test_native_engine_rtl import expected
 from .test_native_queued_engine_rtl import signed
 
+pytestmark = pytest.mark.parametrize("captures", [False, True], indirect=True, ids=["wide", "packed"])
+
 
 def pattern(index):
     pair = ((index*73+19) & 65535, (index & 65535) ^ 0xa5a5)
