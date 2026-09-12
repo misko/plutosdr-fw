@@ -2,6 +2,20 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, phase-specific quiet publication: **2,411 scoped tests and
+all 92 actual FFT fault/reset/stall cases pass**. Full and reduced publication
+match across 1,851,082 checks, including active preflight events. Exact 64,512
+words and 4,178-clock service are unchanged. Routed output-publication slack
+improves -0.998 to -0.623 ns; failing endpoints fall 764 to 655. Complete timing
+still FAILS: **WNS -1.203 ns / TNS -234.465 ns / same-175 MHz -0.881 ns**.
+Next inspect product publication's reader-handoff dependency and prove an
+ownership/phase boundary before changing it; preserve all reader ACK/fault
+checks. Forward-buffer fault/state enables also remain critical. No timing
+waiver, PRIMARY promotion, radio, PPU or main changes. Native 60 MS/s fine search,
+2.5 MS/s inspection and .18-to-.17 qualification/deployment gates stay open.
+Branch: `codex/starlink-rx-only-do-not-merge-phase-publication`.
+See [phase publication proof and routed results](reports/experiments/20260912-phase-publication-actual-route.md).
+
 Update 2026-09-12, checked-completion-pulse retiming: **2,390 scoped tests and
 all 92 actual FFT fault/reset/stall cases pass**. Both original guards match
 all outputs/effective state across 1,851,082 checks each. Visible timing and
