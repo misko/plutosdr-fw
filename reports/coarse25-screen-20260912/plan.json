@@ -1,0 +1,97 @@
+{
+  "cases": [
+    {
+      "center_start": 15000000,
+      "file_first_canonical_index": 14997048,
+      "historical_pilot_phase_us_for_comparison_only": null,
+      "name": "negative_later_1",
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-causal-heldout-v1/negative_later_1/conditioned-15msps.ci16",
+      "source_window_sha256": "774419b60a0c79aa9b4bba355c0ff9e252b2988e697fa5014c5015fb8de29cc9"
+    },
+    {
+      "center_start": 22500000,
+      "file_first_canonical_index": 22497048,
+      "historical_pilot_phase_us_for_comparison_only": null,
+      "name": "negative_later_2",
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-causal-heldout-v1/negative_later_2/conditioned-15msps.ci16",
+      "source_window_sha256": "911332ed0140452bdcf570a2dfa9de112103c5d6c83a5e8795560ab492c6948a"
+    },
+    {
+      "center_start": 547500000,
+      "file_first_canonical_index": 547497048,
+      "historical_pilot_phase_us_for_comparison_only": 400.46666666666664,
+      "name": "positive_later_1",
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-causal-heldout-v1/positive_later_1/conditioned-15msps.ci16",
+      "source_window_sha256": "437d38b1a5c2e2d2692fefe64f5b1b85497bfed53ff3dd7cfad6f58dacc05068"
+    },
+    {
+      "center_start": 555000000,
+      "file_first_canonical_index": 554997048,
+      "historical_pilot_phase_us_for_comparison_only": 401.26666666666665,
+      "name": "positive_later_2",
+      "path": "/home/mouse9911/gits/plutosdr-fw-starlink-rx-only/hdl/library/starlink_pss_acquisition/build/capture25-causal-heldout-v1/positive_later_2/conditioned-15msps.ci16",
+      "source_window_sha256": "4d7e7324dc47c9d013887a77bf461ef0b0949a0805cd744b714963945ea3f0ac"
+    }
+  ],
+  "code_sha256": {
+    "FPGA_COARSE25_PLAN.md": "9b27be1a2f77c410f256ef85c3c51d600d26d87d148e0a2d83ebe90055268097",
+    "tests/starlink_oracle/numerology.py": "c27a23dc6e8acaccf9ca41d6dfa07de1286d36932ee0077e036acf6360c95015",
+    "tests/starlink_oracle/pilot_ddc.py": "bc72e56637be9f01053abe300bde0137a496b07afd8dcb295f2ce8c904aa2ecf",
+    "tests/starlink_oracle/waveforms.py": "7e2fb765aa5f8a60f94d126c89e895e9ebe1f6df2de728a4badeedbad045d984",
+    "tools/starlink_coarse25.py": "da05cdd7115e93e4bcf857b279ce0e3a3e7479e03c6d71e0e0e9b458072e5305"
+  },
+  "configuration": {
+    "background_guard_cells": 150,
+    "cfo_bank_hz": [
+      -400000,
+      -300000,
+      -200000,
+      -100000,
+      0,
+      100000,
+      200000,
+      300000,
+      400000
+    ],
+    "cw_hz": [
+      -300000,
+      0,
+      300000
+    ],
+    "drift_bank_ppm": [
+      0
+    ],
+    "inspection_rate_hz": 2500000,
+    "noise_seed": 20260912,
+    "noise_trials": 32,
+    "peak_z_threshold": 8.0,
+    "phase_cells": 10000,
+    "positive_tolerance_us": 2.0,
+    "smoothing_cells": 3,
+    "source_rate_hz": 15000000,
+    "synthetic_cfo_hz": [
+      -300000,
+      0,
+      300000
+    ],
+    "synthetic_duration_canonical_samples": 240000,
+    "synthetic_phase_canonical_base": 6012,
+    "synthetic_phase_offsets_canonical": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "synthetic_scope": "noiseless periodic PSS, random carrier phase per frame",
+    "synthetic_tolerance_us": 0.4,
+    "template_first_center": -17,
+    "template_taps": 16,
+    "window_canonical_samples": 1800000
+  },
+  "hardware_access": false,
+  "numpy_version": "2.4.6",
+  "schema": "fresh-coarse25-screen-v1",
+  "timing_or_cfo_seeds_used": false
+}
