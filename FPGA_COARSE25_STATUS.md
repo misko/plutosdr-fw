@@ -1,5 +1,10 @@
 # Fresh coarse25 checkpoint — C0 failed, not deployed
 
+**Historical checkpoint, superseded by [continued progress](FPGA_COARSE25_PROGRESS.md).**
+The user reaffirmed the full 2.5/5/15 MS/s FPGA PSS plus 2.5 MS/s inspection
+goal. Work continued without substituting an IQ-only objective. The failed
+unrecentered detector below remains a real failure, not a deleted result.
+
 2026-09-12. The new feasibility screen found a problem before RTL implementation
 or a long build. This is **not** completion of implement/test/deploy/verify.
 The frozen [plan](FPGA_COARSE25_PLAN.md) is retained unchanged so its hash and

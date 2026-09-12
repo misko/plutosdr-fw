@@ -11,6 +11,14 @@ from tools import starlink_coarse25 as base
 RTL = base.ROOT / 'hdl/library/starlink_coarse25/starlink_coarse25_mac.v'
 
 
+def test_tracked_coefficient_rom_matches_frozen_template():
+    h, _ = base.template(0)
+    coefficients = np.rint(np.column_stack((h.real, h.imag)) * 32767).astype(int)
+    expected = [((int(q) & 65535) << 16) | (int(i) & 65535) for i, q in coefficients]
+    actual = [int(line, 16) for line in (RTL.parent / 'coarse25_q15.mem').read_text().splitlines()]
+    assert actual == expected
+
+
 def run_case(tmp_path, samples, coefficients):
     compiler, runner = shutil.which('iverilog'), shutil.which('vvp')
     assert compiler and runner, 'Icarus is required; do not skip RTL verification'
@@ -79,7 +87,7 @@ endmodule
                          for (xi, xq), (hi, hq) in zip(history, coefficients, strict=True))
                 energy = sum(xi*xi + xq*xq for xi, xq in history)
                 pending = ((index - 15) % 2**64, re, im, energy)
-                due = cycle + 16
+                due = cycle + 19
         elif pending is not None and cycle == due:
             expected.append(tuple(map(str, ('RESULT', cycle, *pending))))
             pending, due = None, None
@@ -87,7 +95,7 @@ endmodule
     return actual
 
 
-@pytest.mark.parametrize('spacing', [17, 40])
+@pytest.mark.parametrize('spacing', [20, 40])
 def test_full_width_random_and_endpoint_arithmetic(tmp_path, spacing):
     rng = np.random.default_rng(6012)
     coefficients = rng.integers(-32768, 32768, size=(16, 2))
