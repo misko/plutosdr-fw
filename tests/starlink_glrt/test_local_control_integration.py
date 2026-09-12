@@ -20,7 +20,7 @@ reg [7:0] write_address=0,read_address=0;
 reg [3:0] write_strobe=15;
 wire [31:0] read_data;
 wire reserved,records_pending,halted,settled;
-starlink_glrt_local_control #(.EPOCH_COUNT(64),.PERIOD_SAMPLES(50000),
+starlink_glrt_local_control #(.EPOCH_COUNT(64),.PERIOD_SAMPLES(50000),.SOURCE_RATE_HZ(NATIVE_RATE),
  .COEFFICIENT_FILE("COARSE"),.COARSE_ENERGY_FILE("COARSE_ENERGY"),.PILOT_FILE("PILOT"),
  .VERIFY_ENERGY_FILE("ENERGY"),.OSCILLATOR_FILE("WAVE")) dut(.*);
 reg [31:0] samples[0:27999];reg [4095:0] path;
@@ -41,7 +41,7 @@ initial begin
  fork
   begin
    for(n=0;n<64000;n=n+1) begin
-    input_valid=1;input_index=64'h20000000000003+n;
+    input_valid=1;input_index=64'dNATIVE_FIRST+64'(n)*NATIVE_STRIDE;
     if(n<14000) {input_q,input_i}=samples[n];
     else if(n>=50000) {input_q,input_i}=samples[14000+n-50000];
     else begin input_i=0;input_q=0;end
@@ -67,6 +67,8 @@ initial begin
  join
  check(3,0);check(8,0);check(11,record_count);check(12,record_count);check(13,2);check(14,2);
  check(15,0);check(16,2);check(18,0);check(19,0);check(2,32'h113);
+ check(0,32'hNATIVE_MAGIC);check(1,32'h00010000);check(21,2500000);
+ check(29,PROFILE_RATE);check(30,PROFILE_STRIDE);check(31,PROFILE_DELAY);
  if(reserved || !settled) $fatal(1,"unsettled after complete drain");
  $display("PASS");$finish;
 end
@@ -74,11 +76,20 @@ endmodule
 '''
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture(scope="module", params=[2500000, 5000000, 15000000])
 def control_engine(request, tmp_path_factory):
     roms, coefficients, pilot, wave, subsets = request.getfixturevalue("local_engine")
     output = tmp_path_factory.mktemp("local-control-engine")
-    bench = BENCH
+    rate = request.param
+    stride = rate // 2500000
+    first = 0x20000000000003
+    first += (-first) % stride
+    bench = BENCH.replace("NATIVE_RATE", str(rate)).replace("NATIVE_FIRST", str(first))
+    bench = bench.replace("NATIVE_STRIDE", str(stride))
+    bench = bench.replace("NATIVE_MAGIC", "474c4131" if rate == 2500000 else "474c4132")
+    bench = bench.replace("PROFILE_RATE", str(0 if rate == 2500000 else rate))
+    bench = bench.replace("PROFILE_STRIDE", str(0 if rate == 2500000 else stride))
+    bench = bench.replace("PROFILE_DELAY", str({2500000: 0, 5000000: 100, 15000000: 318}[rate]))
     for key, name in (("COARSE", "coarse.mem"), ("COARSE_ENERGY", "coarse_energy.mem"),
                       ("PILOT", "pilot.mem"), ("ENERGY", "energy.mem"), ("WAVE", "wave.mem")):
         bench = bench.replace(f'"{key}"', f'"{roms / name}"')
@@ -92,7 +103,7 @@ def control_engine(request, tmp_path_factory):
         capture_output=True, text=True, timeout=120, check=False)
     (output / "build.log").write_text(build.stdout + build.stderr)
     assert build.returncode == 0, build.stdout + build.stderr
-    return output, coefficients, pilot, wave, subsets
+    return output, coefficients, pilot, wave, subsets, rate, first
 
 
 def encode_expected(records, first_index, sequence=0, visit=517):
@@ -108,7 +119,7 @@ def encode_expected(records, first_index, sequence=0, visit=517):
 
 @pytest.mark.parametrize("kind", ["pilot", "zero"])
 def test_complete_numerical_records_survive_queue_pressure(tmp_path, control_engine, kind):
-    output, coefficients, pilot, wave, subsets = control_engine
+    output, coefficients, pilot, wave, subsets, rate, first = control_engine
     rng = np.random.default_rng(21300)
     windows = []
     for epoch, cfo in ((17, 123400), (31, -218700)):
@@ -133,5 +144,14 @@ def test_complete_numerical_records_survive_queue_pressure(tmp_path, control_eng
     expected = []
     for index, iq in enumerate(windows):
         expected.extend(encode_expected(reference(iq, coefficients, pilot, wave, subsets),
-                                       0x20000000000003 + index * 50000, len(expected)))
+                                       first + index * 50000 * (rate // 2500000), len(expected)))
+    if rate != 2500000:
+        for record in expected:
+            record[0] = 0x474c4132
+            record[13:] = [rate, rate // 2500000, 100 if rate == 5000000 else 318]
     assert words == [word for record in expected for word in record]
+    from tools.starlink_glrt_local_abi import FilteredLocalEvent, LocalEvent
+    import struct
+    for record in expected:
+        event = (LocalEvent if rate == 2500000 else FilteredLocalEvent).decode(struct.pack("<16I", *record))
+        assert event.words == tuple(record)

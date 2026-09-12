@@ -1,4 +1,4 @@
-"""GLA1 direct-rate local acquisition records and exact saved-IQ binding.
+"""GLA1 direct acquisition and additive GLA2 filtered event coordinates.
 
 These checks attest transport, source support and search accounting. Numerical
 equivalence and RF identity require independent replay and deployment evidence.
@@ -76,20 +76,23 @@ class LocalEvent:
         require(len(data) == 64, "GLA1 record requires 64 bytes")
         w = struct.unpack("<16I", data)
         event = cls(w)
-        flags = w[5]
         require(w[0] == MAGIC and w[1] != 0, "GLA1 record identity invalid")
-        require(flags >> 28 == 0 and event.epoch < 3333 and (flags >> 12 & 15) <= 10
-                and (flags >> 6 & 7) <= 4, "GLA1 record flags invalid")
-        require(-400_000 <= event.cfo_hz <= 400_000 and all(v <= 65536 for v in w[7:12]),
-                "GLA1 CFO or score out of range")
         require(w[12] == WINDOW and not any(w[13:]) and event.first <= U64_MAX-WINDOW+1,
                 "GLA1 window or reserved fields invalid")
-        if event.reasons & 1:
-            require(flags == 3 and not any(w[6:12]), "GLA1 empty decision has payload")
-        else:
-            require(w[7] != 0 and (event.decision or event.reasons == 0),
-                    "GLA1 candidate has zero score or decision reasons")
+        event._require_payload("GLA1")
         return event
+
+    def _require_payload(self, family: str) -> None:
+        w, flags = self.words, self.words[5]
+        require(flags >> 28 == 0 and self.epoch < 3333 and (flags >> 12 & 15) <= 10
+                and (flags >> 6 & 7) <= 4, f"{family} record flags invalid")
+        require(-400_000 <= self.cfo_hz <= 400_000 and all(v <= 65536 for v in w[7:12]),
+                f"{family} CFO or score out of range")
+        if self.reasons & 1:
+            require(flags == 3 and not any(w[6:12]), f"{family} empty decision has payload")
+        else:
+            require(w[7] != 0 and (self.decision or self.reasons == 0),
+                    f"{family} candidate has zero score or decision reasons")
 
     @property
     def first(self) -> int:
@@ -115,6 +118,68 @@ class LocalEvent:
     @property
     def candidate_payload(self) -> tuple[int, ...]:
         return (self.words[5] & ~63, *self.words[6:12])
+
+
+class FilteredLocalEvent(LocalEvent):
+    """GLA2-1.0 event only; capture closure/driver integration is separate.
+
+    first is the newest native input coordinate of the first filtered sample.
+    Epochs and window lengths remain in 2.5-MS/s output samples. Filter support
+    and coordinate mapping are explicit; this object cannot certify IQ identity,
+    hardware continuity, native refinement or source ownership by itself.
+    """
+
+    @classmethod
+    def decode(cls, data: bytes) -> FilteredLocalEvent:
+        require(len(data) == 64, "GLA2 record requires 64 bytes")
+        w = struct.unpack("<16I", data)
+        event = cls(w)
+        require(w[0] == 0x474c4132 and w[1] != 0, "GLA2 record identity invalid")
+        profiles = {5_000_000: (2, 100), 15_000_000: (6, 318)}
+        require(w[13] in profiles and tuple(w[14:]) == profiles[w[13]],
+                "GLA2 filter profile invalid")
+        require(w[12] == WINDOW and event.first % event.stride == 0
+                and event.first >= 2 * event.filter_delay
+                and event.native_last <= U64_MAX, "GLA2 native window invalid")
+        event._require_payload("GLA2")
+        return event
+
+    @property
+    def native_rate(self) -> int:
+        return self.words[13]
+
+    @property
+    def stride(self) -> int:
+        return self.words[14]
+
+    @property
+    def filter_delay(self) -> int:
+        return self.words[15]
+
+    @property
+    def native_last(self) -> int:
+        return self.first + (WINDOW - 1) * self.stride
+
+    @property
+    def required_native_first(self) -> int:
+        return self.first - 2 * self.filter_delay
+
+    def native_q16(self, coarse_offset_q16: int) -> int:
+        """Map a local filtered coordinate to its native signal-center Q16.
+
+        This is geometry, not a validated seed or a fit on native IQ. The upper
+        pilot's template-origin convention and filter model need separate proof.
+        """
+        require(type(coarse_offset_q16) is int
+                and 0 <= coarse_offset_q16 <= (WINDOW - 1) * 65536,
+                "GLA2 coarse offset outside window")
+        return (self.first - self.filter_delay) * 65536 + coarse_offset_q16 * self.stride
+
+    def require_native_support(self, first: int, end: int) -> None:
+        """Check the retained native half-open interval covers all FIR inputs."""
+        require(type(first) is int and type(end) is int and 0 <= first <= end <= U64_MAX
+                and first <= self.required_native_first and end > self.native_last,
+                "GLA2 window lacks retained native support")
 
 
 @dataclass(frozen=True)
