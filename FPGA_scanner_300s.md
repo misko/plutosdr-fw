@@ -2,6 +2,19 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, private replay sequence separation: **2,107 regression tests
+and all 82 actual FFT fault/reset/delay cases pass**, with unchanged arithmetic
+and 4,178-clock service. Kernel history now passes +0.375 ns; kernel next-start
+CE remains -0.364 ns. Same-domain worst improves to -0.970 ns, but aggregate
+timing still FAILS: **WNS -1.182 ns / TNS -349.709 ns / 930 endpoints**.
+The critical internal path now runs from product-bank position/framing through
+shared fault logic back to its publication request. Next inspect factoring
+that repeated self-fault path while retaining local framing, other faults and
+diagnostics. This is a tested alternative, not a receiver promotion. Branch
+`codex/starlink-rx-only-do-not-merge-private-replay-sequence`, source FW
+`e20341e68`, report FW `f877cb409`, HDL `e6f7bdfaf`. No primary HDL, radio or
+PPU/main changes. See [private replay proof and route](reports/experiments/20260912-private-replay-sequence-actual-route.md).
+
 Update 2026-09-12, current publication factoring: **1,977 regression tests and
 all 79 actual FFT fault/reset/delay cases pass**; arithmetic and 4,178-clock
 service unchanged. Seven archive-writer and two recorder tests also pass.
