@@ -1,0 +1,12 @@
+{
+  "path": "/dev/shm/starlink-replay-capacity.MDfTXxjB/20260912-replay-capacity-evidence.tgz",
+  "bytes": 32815927,
+  "sha256": "6ec2b1ccbc7cf028f230a69eb6a863f91919afe8837e8301499fae52e3162a2f",
+  "members": 1801,
+  "all_members_verified": true,
+  "full_receiver_or_deployment_claim": false,
+  "verification": "sequential payload SHA256, inventory, regular files, gzip CRC, stable archive SHA256",
+  "verifier_sha256": "c03e82ec7454df7fccba72a20fc958dc839d566094aaa6dfd6233e19b9456b88",
+  "writer_sha256": "a4b8b9394b622322ab9da8e39dd914b7d0ed36621e2a05df5265dde2e97eaca7",
+  "sources_unchanged": true
+}

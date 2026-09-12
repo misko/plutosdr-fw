@@ -2,6 +2,22 @@
 
 Status: implementation started; hardware qualification is NOT complete.
 
+Update 2026-09-12, registered replay capacity and cancellation partition:
+**2,181 scoped regression tests plus eight recorder tests pass; all 82 actual
+FFT fault/reset/stall cases pass** for the partitioned ring. Numerical words
+remain exact; service is 4,179 clocks. Three buffer variants were routed.
+Latest same-175 MHz slack is -0.977 ns, but overall setup still FAILS:
+**WNS -1.334 ns / TNS -452.620 ns / 1,214 endpoints**. Not promoted.
+The first ring's full campaign was rejected for bypassing registered fault
+reporting; separating known upstream cancellation restored the required
+delayed diagnostic while preserving immediate publication vetoes.
+Next test registered capacity on the kernel/product OUTPUT side, comparing
+against the lean private-replay parent and keeping the 5,215-clock service
+ceiling. Do not automatically carry extra replay storage forward. Branch
+`codex/starlink-rx-only-do-not-merge-replay-capacity-buffer`, source FW
+`50f9811e7`, HDL `39b08bf8c`. No primary HDL, radio or PPU/main changes.
+See [buffer experiments and next test](reports/experiments/20260912-replay-capacity-actual-route.md).
+
 Update 2026-09-12, product-local framing cofactor: **2,232 tests and all 88
 actual FFT fault/reset/stall cases pass**, with unchanged 64,512 numerical words
 and 4,178-clock service. Product publication improves slightly to -0.905 ns,
