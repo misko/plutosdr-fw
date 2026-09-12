@@ -22,7 +22,7 @@ set mode products
 set rate 60000000
 if {$argc >= 3} {
   set rate [lindex $argv 2]
-  if {$rate ni {2500000 15000000 30000000 60000000}} { error "unsupported tracking rate" }
+  if {$rate ni {2500000 5000000 15000000 30000000 60000000}} { error "unsupported tracking rate" }
 }
 set reference_phases 1
 if {$argc == 4} {
@@ -51,7 +51,9 @@ if {$argc >= 2} {
   set wrapper [file join $repo tools starlink_glrt_native_engine_ooc_wrapper.v]
   set top starlink_glrt_native_engine_ooc_wrapper
   set generics [list TEMPLATE_FILE=$bank REFERENCE_STRIDE=$stride]
-  if {$serial_rotate && $rate != 2500000} { error "serial rotation requires 2.5 MS/s" }
+  if {$serial_rotate && $rate ni {2500000 5000000}} {
+    error "serial rotation requires 2.5 or 5 MS/s"
+  }
   lappend generics SERIAL_ROTATE=$serial_rotate
   if {$rate == 2500000} {
     lappend generics DIRECT_COEFFICIENT_FILE=$bank DIRECT_REFERENCE_PHASES=$reference_phases

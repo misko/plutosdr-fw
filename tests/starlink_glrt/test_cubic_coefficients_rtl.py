@@ -113,7 +113,7 @@ def test_positive_and_negative_half_ties_round_to_even(tmp_path):
     assert aborted == 0
 
 
-@pytest.mark.parametrize("stride", [2, 4, 24])
+@pytest.mark.parametrize("stride", [2, 4, 12, 24])
 @pytest.mark.parametrize("reset", [False, True])
 def test_multirate_polynomial_derivative_stalls_and_restart(tmp_path, stride, reset):
     segments = coefficients(8)

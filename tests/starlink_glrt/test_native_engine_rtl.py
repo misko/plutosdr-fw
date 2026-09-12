@@ -142,14 +142,16 @@ def complete_job(job, count, *, ready=1):
 
 @pytest.mark.parametrize("stride,direct_bank,phases,serial", [
     (24, True, 1, False), (24, True, 4, False), (24, True, 4, True),
-    (24, False, 1, False), (4, False, 1, False), (2, False, 1, False), (1, False, 1, False)],
-    ids=["2p5MSs-direct", "2p5MSs-phase4", "2p5MSs-serial-phase4", "2p5MSs-cubic-diagnostic", "15MSs", "30MSs", "60MSs"])
+    (24, False, 1, False), (12, False, 1, False), (12, False, 1, True),
+    (4, False, 1, False), (2, False, 1, False), (1, False, 1, False)],
+    ids=["2p5MSs-direct", "2p5MSs-phase4", "2p5MSs-serial-phase4", "2p5MSs-cubic-diagnostic",
+         "5MSs", "5MSs-serial", "15MSs", "30MSs", "60MSs"])
 def test_three_full_native_pilots_on_750_hz_opportunities_with_original_indexes(tmp_path, stride, direct_bank, phases, serial):
     count,base = 79200//stride,2**55+73
     bank = bank_for(79200)
     direct = [tuple((n*(k+1)*13+37) % 4000-2000 for k in range(4)) for n in range(count*phases)] if direct_bank else None
     # Integer rounding at each absolute rational epoch, not a repeatedly
-    # rounded 3,333-sample period at 2.5 MS/s.
+    # rounded period at 2.5 or 5 MS/s.
     jobs = [(base+(64+stride-1)//stride+(frame*80000+stride//2)//stride,
              (2**32-1-frame*711) % 2**32,(7310173+frame*1357) % 2**32) for frame in range(3)]
     def rows():
