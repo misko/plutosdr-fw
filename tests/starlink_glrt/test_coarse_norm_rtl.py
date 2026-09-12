@@ -4,7 +4,6 @@ import random
 import subprocess
 from pathlib import Path
 
-
 BENCH=r'''
 `timescale 1ns/1ps
 module tb;
@@ -12,7 +11,7 @@ reg clk=0;always #5 clk=~clk;
 reg resetn=0,flush=0,input_valid=0;
 reg [63:0] numerator_power=0,denominator_power=0;
 reg [31:0] input_tag=0;
-wire output_valid,zero_energy,ratio_clamped;
+wire output_valid,zero_energy,ratio_clamped,fault;
 wire [16:0] score_q16;
 wire [31:0] output_tag;
 starlink_glrt_coarse_norm dut(.*);

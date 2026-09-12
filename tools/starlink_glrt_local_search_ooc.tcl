@@ -65,7 +65,9 @@ foreach {name tag_width original} {coarse_mac6 5 coarse_mac6 verify_mac3 1 verif
   puts $fd [list set_msg_config -id {Synth 8-311} -new_severity ERROR]
   puts $fd [list cd $roms]
   puts $fd [list read_verilog -sv $source]
-  puts $fd [list synth_design -top $module -mode out_of_context -generic TAG_WIDTH=$tag_width \
+  set arithmetic_generics [list TAG_WIDTH=$tag_width]
+  if {$original eq "coarse_norm"} { lappend arithmetic_generics SHARED_ROOT=1 }
+  puts $fd [list synth_design -top $module -mode out_of_context -generic $arithmetic_generics \
       -flatten_hierarchy rebuilt -directive AreaOptimized_high]
   puts $fd [list report_utilization -hierarchical -file $output/${module}_synthesis.rpt]
   puts $fd [list write_edif $netlist]

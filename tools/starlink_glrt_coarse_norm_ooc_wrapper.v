@@ -13,5 +13,6 @@ module starlink_glrt_coarse_norm_ooc_wrapper (
   wire [16:0] score_q16;
   assign {resetn,flush,input_valid,numerator_power,denominator_power,input_tag}=launch;
   assign response={output_valid,score_q16,zero_energy,ratio_clamped,output_tag};
+  wire fault;
   (* keep_hierarchy="yes" *) starlink_glrt_coarse_norm dut(.*);
 endmodule

@@ -7,10 +7,11 @@ from pathlib import Path
 from .test_coarse_norm_rtl import BENCH
 
 
-def simulate(tmp_path, rows):
+def simulate(tmp_path, rows, *, shared_root=False):
     bench = BENCH.replace("wire output_valid,zero_energy,ratio_clamped;",
                           "wire output_valid,zero_energy,ratio_clamped,fault;")
-    bench = bench.replace("starlink_glrt_coarse_norm dut", "starlink_glrt_verify_norm #(.TAG_WIDTH(32)) dut")
+    module = "starlink_glrt_coarse_norm #(.SHARED_ROOT(1))" if shared_root else "starlink_glrt_verify_norm #(.TAG_WIDTH(32))"
+    bench = bench.replace("starlink_glrt_coarse_norm dut", module+" dut")
     bench = bench.replace("cycle=cycle+1;", 'if(fault) $display("F %d",cycle); cycle=cycle+1;')
     source = tmp_path/"tb.sv"
     source.write_text(bench)
