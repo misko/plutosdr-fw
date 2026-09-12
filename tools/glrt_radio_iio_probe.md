@@ -41,7 +41,13 @@ The exclusive current receiver coordinate is `latest_ingress_index + 1`.
 It is distinct from the end of the block just received. Each block enters the
 one-second, 10-MB CI16 ring and is copied back and compared byte-for-byte before
 being saved. Ring and evidence-store costs are included in the measurements.
-The capture owner must serialize ring access with any future bootstrap worker.
+`glrt_tracking_iq_owner` now serializes publication and copying through a
+mutex. Each copy returns the matching retained interval, receiver source
+coordinate, observation timestamp and generation. Workers perform numerical
+work after the copy returns. Source/time regression fences history; normal
+closure keeps past evidence readable but forbids publication. This prepares
+concurrent bootstrap access; the ingestion probe still does not resolve live
+candidates or submit tracking jobs.
 
 `blocks.csv` records absolute source coordinates and monotonic timestamps
 around refill, snapshot read, ring copying, evidence storage and event draining.
@@ -59,8 +65,9 @@ No supported signal in a short probe is inconclusive for detector sensitivity.
 
 ## Build and qualification
 
-Link `glrt_radio_iio_probe.c`, `glrt_capture_source.c` and
-`glrt_tracking_recent_iq.c` with libiio 0.x. The ARM build uses the firmware's
+Link `glrt_radio_iio_probe.c`, `glrt_capture_source.c`,
+`glrt_tracking_recent_iq.c` and `glrt_tracking_iq_owner.c` with libiio 0.x and
+`-pthread`. The ARM build uses the firmware's
 Buildroot toolchain and its real libiio header/library. Local libiio includes
 its final NUL in attribute byte counts; the owner accepts a final terminator
 and rejects embedded NULs. The parser's input length excludes the terminator.

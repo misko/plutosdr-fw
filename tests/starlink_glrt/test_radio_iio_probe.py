@@ -21,7 +21,8 @@ def probe(tmp_path_factory):
     binary = tmp_path_factory.mktemp("iio-probe")/"probe"
     subprocess.run(["cc","-std=c99","-O2","-Wall","-Wextra","-Werror","-I",str(fixture),
         str(root/"tools/glrt_radio_iio_probe.c"),str(root/"tools/glrt_capture_source.c"),
-        str(root/"tools/glrt_tracking_recent_iq.c"),str(fixture/"backend.c"),"-o",str(binary)],check=True)
+        str(root/"tools/glrt_tracking_recent_iq.c"),str(root/"tools/glrt_tracking_iq_owner.c"),
+        str(fixture/"backend.c"),"-pthread","-o",str(binary)],check=True)
     return binary
 
 

@@ -5,7 +5,7 @@
  */
 #define _POSIX_C_SOURCE 200809L
 #include "glrt_capture_source.h"
-#include "glrt_tracking_recent_iq.h"
+#include "glrt_tracking_iq_owner.h"
 #include <iio.h>
 #include <ctype.h>
 #include <errno.h>
@@ -201,7 +201,8 @@ int main(int argc, char **argv)
     struct iio_buffer *iq_buffer=NULL,*event_buffer=NULL;
     struct glrt_capture_snapshot baseline,final,current;
     struct glrt_capture_source cursor;
-    struct glrt_tracking_recent_iq ring;
+    struct glrt_tracking_iq_owner owner={0};
+    struct glrt_tracking_iq_view view;
     int16_t *storage=NULL,*copied=NULL;
     FILE *iq_file=NULL,*event_file=NULL,*blocks_file=NULL,*snapshots_file=NULL;
     char wire[WIRE_SIZE],before[WIRE_SIZE],after[WIRE_SIZE];
@@ -272,9 +273,11 @@ int main(int argc, char **argv)
         t2=ns();length=read_attr(iq,"capture_snapshot",wire);t3=ns();
         CHECK(length>0 && glrt_capture_snapshot_parse(wire,(size_t)length,&current)==0 &&
             glrt_capture_source_take(&cursor,&current,chunk,&first,&source_now)==0,"block_source_binding");
-        if (!n) CHECK(glrt_tracking_recent_iq_reset(&ring,storage,RATE,visit,first)==0,"ring_reset");
-        CHECK(glrt_tracking_recent_iq_append(&ring,visit,first,iio_buffer_start(iq_buffer),chunk)==0 &&
-            glrt_tracking_recent_iq_read(&ring,visit,first,copied,chunk)==0 &&
+        if (!n) CHECK(glrt_tracking_iq_owner_init(&owner,storage,RATE,visit,first)==0,"ring_reset");
+        CHECK(glrt_tracking_iq_owner_publish(&owner,visit,first,iio_buffer_start(iq_buffer),chunk,source_now,t3)==0 &&
+            glrt_tracking_iq_owner_copy(&owner,visit,first,copied,chunk,&view)==0 &&
+            view.epoch==visit && view.valid && !view.closed && view.end==first+chunk &&
+            view.source_now==source_now && view.observed_ns==t3 &&
             !memcmp(copied,iio_buffer_start(iq_buffer),4U*chunk),"ring_exact_copy");
         t4=ns();
         CHECK(fwrite(copied,4,chunk,iq_file)==chunk && fprintf(snapshots_file,"%s\n",wire)>0,"iq_evidence");
@@ -286,6 +289,8 @@ int main(int argc, char **argv)
     }
 cleanup:
     if (iq_buffer) { iio_buffer_destroy(iq_buffer);iq_buffer=NULL; }
+    if (owner.initialized && glrt_tracking_iq_owner_close(&owner,failure!=NULL) && !failure)
+        failure="ring_close";
     finished=ns();
     if (armed) {
         length=save_attr(directory,iq,"capture_final_snapshot","final_snapshot.txt",wire);
@@ -321,6 +326,7 @@ cleanup:
     if (event_file && fclose(event_file) && !failure) failure="events_close";
     if (blocks_file && fclose(blocks_file) && !failure) failure="blocks_close";
     if (snapshots_file && fclose(snapshots_file) && !failure) failure="snapshots_close";
+    if (owner.initialized && glrt_tracking_iq_owner_destroy(&owner) && !failure) failure="ring_destroy";
     free(copied);free(storage);
     if (directory>=0) close(directory);
     printf("{\"status\":\"%s\",\"failed_stage\":\"%s\",\"visit\":%u,\"chunk_samples\":%u,"
